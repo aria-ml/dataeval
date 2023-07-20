@@ -36,21 +36,28 @@ nothing to commit, working tree clean
 jgleeson@daml:$
 ```
 
+## Contribution
 - the project structure is as follows...
 ```
 jgleeson@daml:$ tree .
 .
 ├── README.md
 ├── docs
+├── pyproject.toml
 ├── src
 │   └── daml
 │       ├── __init__.py
 │       └── helloworld.py
-└── tests
+├── tests
+│   └── test_helloworld.py
+└── tox.ini
 
-4 directories, 3 files
+4 directories, 6 files
 jgleeson@daml:$
 ```
+- reference the JATIC guidelines for stucture: https://jatic.pages.jatic.net/docs/sdp/Software%20Requirements/#project-structure
+
+- however, generally a `some_module.py` in the `src` folder will need a corresponding `test_some_module.py` in the `tests` folder and execution of tox results in ideally 100% code coverage output. Sub 100% code coverage should be explicitly called out and justified in a merge request.
 
 ## Usage
 TODO
