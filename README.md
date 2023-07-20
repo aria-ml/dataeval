@@ -59,6 +59,18 @@ jgleeson@daml:$
 
 - however, generally a `some_module.py` in the `src` folder will need a corresponding `test_some_module.py` in the `tests` folder and execution of tox results in ideally 100% code coverage output. Sub 100% code coverage should be explicitly called out and justified in a merge request.
 
+## Environment
+- [Poetry](https://python-poetry.org/docs/) is the dependency management and packaging tool used in DAML.
+- Installation instructions are [here](https://python-poetry.org/docs/#installation), or refer to the steps below:
+  - Linux, macOS, Windows (WSL)
+  ```
+  curl -sSL https://install.python-poetry.org | python3 -
+  ```
+  - Windows (Powershell)
+  ```
+  (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | py -
+  ```
+
 ## Usage
 TODO
 
