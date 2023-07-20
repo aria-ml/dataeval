@@ -52,6 +52,18 @@ jgleeson@daml:$ tree .
 jgleeson@daml:$
 ```
 
+## Environment
+- [Poetry](https://python-poetry.org/docs/) is the dependency management and packaging tool used in DAML.
+- Installation instructions are [here](https://python-poetry.org/docs/#installation), or refer to the steps below:
+  - Linux, macOS, Windows (WSL)
+  ```
+  curl -sSL https://install.python-poetry.org | python3 -
+  ```
+  - Windows (Powershell)
+  ```
+  (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | py -
+  ```
+
 ## Usage
 TODO
 
