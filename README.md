@@ -24,6 +24,33 @@ jgleeson@daml:$ source env/bin/activate
 (env) jgleeson@daml:$ python -m pip install tox
 ```
 
+- build the package and install to the virtual environment
+```
+(env) jgleeson@daml:$ python -m build
+* Creating venv isolated environment...
+* Installing packages in isolated environment... (poetry-core)
+* Getting build dependencies for sdist...
+* Building sdist...
+* Building wheel from sdist
+* Creating venv isolated environment...
+* Installing packages in isolated environment... (poetry-core)
+* Getting build dependencies for wheel...
+* Building wheel...
+Successfully built daml-0.0.1.tar.gz and daml-0.0.1-py3-none-any.whl
+(env) jgleeson@daml:$
+(env) jgleeson@daml:$
+(env) jgleeson@daml:$
+(env) jgleeson@daml:$ python -m pip install --force-reinstall dist/daml-0.0.1-py3-none-any.whl
+Processing ./dist/daml-0.0.1-py3-none-any.whl
+Installing collected packages: daml
+  Attempting uninstall: daml
+    Found existing installation: daml 0.0.1
+    Uninstalling daml-0.0.1:
+      Successfully uninstalled daml-0.0.1
+Successfully installed daml-0.0.1
+(env) jgleeson@daml:$
+```
+
 - run the unit tests using `pytest`
 ```
 (env) jgleeson@daml:$ pytest -v tests/
@@ -39,7 +66,7 @@ tests/test_helloworld.py::TestHelloWorld::test_hello_world PASSED               
 (env) jgleeson@daml:$
 ```
 
-- run the code coverage report using `tox`
+- run the code coverage report using `tox`. NOTE: tox will build and re-install the package artifact replacing the above 
 ```
 (env) jgleeson@daml:$ tox -e coverage
 .pkg: _optional_hooks> python /home/jgleeson/.local/lib/python3.10/site-packages/pyproject_api/_backend.py True poetry.core.masonry.api
