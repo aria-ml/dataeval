@@ -5,5 +5,6 @@ from daml.helloworld import HelloWorld
 
 class TestHelloWorld(unittest.TestCase):
     def test_hello_world(self):
-        h_world = HelloWorld()
-        self.assertEqual(h_world.run(), h_world.message)
+        test_message = "Hello World! :p"
+        h_world = HelloWorld(message=test_message)
+        self.assertEqual(h_world.run(), test_message)
