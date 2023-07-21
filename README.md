@@ -25,6 +25,7 @@ jgleeson@daml:$ source env/bin/activate
 ```
 
 - run the unit tests using `pytest`
+```
 (env) jgleeson@daml:$ pytest -v tests/
 =================================== test session starts ====================================
 platform linux -- Python 3.10.6, pytest-7.4.0, pluggy-1.2.0 -- /home/jgleeson/aria/code/cdao/daml/env/bin/python
@@ -36,6 +37,7 @@ tests/test_helloworld.py::TestHelloWorld::test_hello_world PASSED               
 
 ==================================== 1 passed in 0.01s =====================================
 (env) jgleeson@daml:$
+```
 
 - run the code coverage report using `tox`
 ```
