@@ -44,11 +44,12 @@ run:
       - build/*
 
 pages:
-  script:
+  before_script:
     - pip install sphinx sphinx-rtd-theme
-    - cd doc
-    - make html
-    - mv build/html/ ../public/
+  script:
+    - cd docs && make html
+  after_script:
+    - mv docs/_build/html/ ./public/
   artifacts:
     paths:
       - public
