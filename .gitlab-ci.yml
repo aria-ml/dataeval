@@ -30,7 +30,7 @@ before_script:
   - source venv/bin/activate
 
 stages:
-  - testing
+  - test
   - docs
   - build
 
@@ -38,13 +38,13 @@ include:
   - template: Security/SAST.gitlab-ci.yml
 
 # test:
-#   stage: testing
+#   stage: test
 #   script:
 #     - pip install tox  # you can also use tox
 #     - tox -e test
 
 testcov:
-  stage: testing
+  stage: test
   script:
     - pip install tox
     - tox -e coverage
@@ -60,7 +60,7 @@ testcov:
 
 
 linting:
-  stage: testing
+  stage: test
   script:
     - pip install tox
     - tox -e lint
