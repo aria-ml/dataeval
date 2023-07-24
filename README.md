@@ -13,9 +13,9 @@ DAML provides a simple interface to characterize image data and its impact on mo
 #### [Option 1] Setting up a virtual environment
 - install the virtualenv model from python pip
 ```
-jgleeson@daml:$ python3 -m pip install virtualenv
+jgleeson@daml:$ python3 -m pip install virtualenv build
 ```
-
+- NOTE: Optionally, might have to pip install `python3.10-venv` as well.
 - create a directory in the project called `env` and activate that directory
 ```
 jgleeson@daml:$ mkdir env
