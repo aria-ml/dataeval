@@ -34,9 +34,6 @@ stages:
   - docs
   - build
 
-include:
-  - template: Security/SAST.gitlab-ci.yml
-
 # test:
 #   stage: test
 #   script:
@@ -50,13 +47,13 @@ testcov:
     - tox -e coverage
   artifacts:
     reports:
-      junit: python/junit
+      junit: junit
       coverage_report:
         coverage_format: cobertura
-        path: python/coverage.xml
+        path: coverage.xml
     paths:
-    - python/junit.xml
-    - python/coverage.xml
+    - junit.xml
+    - coverage.xml
 
 
 linting:
