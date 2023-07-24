@@ -23,11 +23,15 @@ cache:
     - .cache/pip
     - venv/
 
-before_script:
-  - python --version ; pip --version  # For debugging
-  - pip install virtualenv
-  - virtualenv venv
-  - source venv/bin/activate
+.build_env:
+  before_script:
+    - python --version ; pip --version  # For debugging
+    - pip install virtualenv
+    - virtualenv venv
+    - source venv/bin/activate
+  before_test_script:
+    - !reference [".build_env", "before_script"]
+    - pip install tox
 
 stages:
   - test
@@ -42,8 +46,9 @@ stages:
 
 testcov:
   stage: test
+  before_script:
+    - !reference [".build_env", "before_test_script"]
   script:
-    - pip install tox
     - tox -e coverage
   artifacts:
     reports:
@@ -55,11 +60,11 @@ testcov:
     - junit.xml
     - coverage.xml
 
-
 linting:
   stage: test
+  before_script:
+    - !reference [".build_env", "before_test_script"]
   script:
-    - pip install tox
     - tox -e lint
 
 pages:
@@ -80,3 +85,8 @@ deploy:
   stage: build
   script: echo "Define your deployment script!"
   environment: production
+
+include:
+- template: Jobs/SAST.gitlab-ci.yml
+- template: Security/Dependency-Scanning.gitlab-ci.yml
+- template: Security/Secret-Detection.gitlab-ci.yml
