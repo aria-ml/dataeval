@@ -47,7 +47,7 @@ testcov:
     - tox -e coverage
   artifacts:
     reports:
-      junit: junit
+      junit: junit.xml
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
