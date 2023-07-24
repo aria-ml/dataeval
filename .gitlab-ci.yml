@@ -1,13 +1,3 @@
-# This file is a template, and might need editing before it works on your project.
-# To contribute improvements to CI/CD templates, please follow the Development guide at:
-# https://docs.gitlab.com/ee/development/cicd/templates.html
-# This specific template is located at:
-# https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Python.gitlab-ci.yml
-
-# Official language image. Look for the different tagged releases at:
-# https://hub.docker.com/r/library/python/tags/
-image: python:latest
-
 # Change pip's cache directory to be inside the project directory since we can
 # only cache local items.
 variables:
@@ -46,22 +36,47 @@ stages:
 
 testcov:
   stage: test
+  image: python:$PYTHON_VERSIONS
+  parallel:
+    matrix:
+      - PYTHON_VERSIONS: ["3.8", "3.9", "3.10"]
   before_script:
     - !reference [".build_env", "before_test_script"]
   script:
     - tox -e coverage
+  after_script:
+    - mv .coverage .coverage.$PYTHON_VERSIONS
   artifacts:
     reports:
       junit: junit.xml
+    paths:
+    - junit.xml
+    - ".coverage*"
+
+testcovreport:
+  stage: test
+  image: python:latest
+  needs:
+    - job: testcov
+      artifacts: true  
+  before_script:
+    - !reference [".build_env", "before_script"]
+    - pip install coverage
+  script:
+    - coverage combine
+    - coverage report
+    - coverage xml
+  artifacts:
+    reports:
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
     paths:
-    - junit.xml
-    - coverage.xml
+      - coverage.xml
 
 linting:
   stage: test
+  image: python:latest
   before_script:
     - !reference [".build_env", "before_test_script"]
   script:
