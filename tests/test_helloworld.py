@@ -8,3 +8,6 @@ class TestHelloWorld(unittest.TestCase):
         test_message = "Hello World! :p"
         h_world = HelloWorld(message=test_message)
         self.assertEqual(h_world.run(), test_message)
+
+    def test_pipeline_fails(self):
+        self.assertTrue(False)
