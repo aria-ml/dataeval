@@ -34,17 +34,30 @@ stages:
   - docs
   - build
 
-test:
-  stage: testing
-  script:
-    - pip install tox  # you can also use tox
-    - tox -e test
+include:
+  - template: Security/SAST.gitlab-ci.yml
 
-coverage:
+# test:
+#   stage: testing
+#   script:
+#     - pip install tox  # you can also use tox
+#     - tox -e test
+
+testcov:
   stage: testing
   script:
     - pip install tox
     - tox -e coverage
+  artifacts:
+    reports:
+      junit: python/junit
+      coverage_report:
+        coverage_format: cobertura
+        path: python/coverage.xml
+    paths:
+    - python/junit.xml
+    - python/coverage.xml
+
 
 linting:
   stage: testing
