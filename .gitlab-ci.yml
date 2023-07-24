@@ -84,6 +84,7 @@ linting:
 
 pages:
   stage: docs
+  image: python:latest
   before_script:
     - pip install sphinx sphinx-rtd-theme
   script:
