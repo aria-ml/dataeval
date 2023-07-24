@@ -29,21 +29,31 @@ before_script:
   - virtualenv venv
   - source venv/bin/activate
 
-test:
-  script:
-    - pip install ruff tox  # you can also use tox
-    - pip install --editable ".[test]"
-    - tox -e py,ruff
+stages:
+  - testing
+  - docs
+  - build
 
-run:
+test:
+  stage: testing
   script:
-    - pip install .
-    # run the command here
-  artifacts:
-    paths:
-      - build/*
+    - pip install tox  # you can also use tox
+    - tox -e test
+
+coverage:
+  stage: testing
+  script:
+    - pip install tox
+    - tox -e coverage
+
+linting:
+  stage: testing
+  script:
+    - pip install tox
+    - tox -e lint
 
 pages:
+  stage: docs
   before_script:
     - pip install sphinx sphinx-rtd-theme
   script:
@@ -57,6 +67,6 @@ pages:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 deploy:
-  stage: deploy
+  stage: build
   script: echo "Define your deployment script!"
   environment: production
