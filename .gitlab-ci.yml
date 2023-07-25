@@ -53,7 +53,7 @@ testcov:
     - junit.xml
     - ".coverage*"
 
-testcovreport:
+testcov-aggregate:
   stage: test
   image: python:latest
   needs:
@@ -64,8 +64,8 @@ testcovreport:
     - pip install coverage
   script:
     - coverage combine
-    - coverage report
-    - coverage xml
+    - coverage report -m --skip-empty
+    - coverage xml --skip-empty
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
     reports:
