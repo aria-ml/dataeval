@@ -66,6 +66,7 @@ testcov-aggregate:
     - coverage combine
     - coverage report -m --skip-empty
     - coverage xml --skip-empty
+    - coverage html --skip-empty
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
     reports:
@@ -74,6 +75,7 @@ testcov-aggregate:
         path: coverage.xml
     paths:
       - coverage.xml
+      - htmlcov/
 
 linting:
   stage: test
@@ -86,12 +88,15 @@ linting:
 pages:
   stage: docs
   image: python:latest
+  dependencies: 
+    - testcov-aggregate
   before_script:
     - pip install sphinx sphinx-rtd-theme
   script:
     - cd docs && make html
   after_script:
     - mv docs/_build/html/ ./public/
+    - mv htmlcov/ ./public/testcov/
   artifacts:
     paths:
       - public
