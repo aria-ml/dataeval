@@ -2,6 +2,7 @@
 # only cache local items.
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PYTHON_LATEST_SUPPORTED_VERSION: "3.10"
 
 # Pip's cache doesn't store the python packages
 # https://pip.pypa.io/en/stable/topics/caching/
@@ -24,8 +25,9 @@ cache:
     - pip install tox
 
 stages:
-  - test
-  - docs
+  - test     # used by GitLab static analysis and security pipelines
+  - validate # unit and functional tests and code coverage
+  - docs     # documentation generation and publish
   - build
 
 # test:
@@ -34,8 +36,8 @@ stages:
 #     - pip install tox  # you can also use tox
 #     - tox -e test
 
-testcov:
-  stage: test
+test:
+  stage: validate
   image: python:$PYTHON_VERSIONS
   parallel:
     matrix:
@@ -53,11 +55,11 @@ testcov:
     - junit.xml
     - ".coverage*"
 
-testcov-aggregate:
-  stage: test
-  image: python:latest
+coverage:
+  stage: validate
+  image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   needs:
-    - job: testcov
+    - job: test
       artifacts: true  
   before_script:
     - !reference [".build_env", "before_script"]
@@ -79,17 +81,25 @@ testcov-aggregate:
 
 linting:
   stage: test
-  image: python:latest
+  image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   before_script:
     - !reference [".build_env", "before_test_script"]
   script:
     - tox -e lint
 
+typecheck:
+  stage: test
+  image: python:$PYTHON_LATEST_SUPPORTED_VERSION
+  before_script:
+    - !reference [".build_env", "before_test_script"]
+  script:
+    - tox -e typecheck
+
 pages:
   stage: docs
-  image: python:latest
+  image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   dependencies: 
-    - testcov-aggregate
+    - coverage
   before_script:
     - pip install sphinx sphinx-rtd-theme
   script:
