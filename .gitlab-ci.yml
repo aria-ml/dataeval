@@ -131,18 +131,14 @@ tag:
       curl -X POST "https://gitlab.jatic.net/api/v4/projects/$CI_PROJECT_ID/repository/tags?tag_name=$newVer&ref=main&release_description='DAML%20$newVer'&private_token=$DAML_BUILD_PAT"
   environment: production
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_MESSAGE =~ /^infra/'
 
 deploy:
   stage: build
-  dependencies:
-    - tag
-  script:
-    - pip install build twine --upgrade
-    - poetry build
+  script: echo "Not Yet"
   environment: production
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_MESSAGE =~ /^infra/'
 
 include:
 - template: Jobs/SAST.gitlab-ci.yml
