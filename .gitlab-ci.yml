@@ -113,10 +113,36 @@ pages:
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
+tag:
+  stage: build
+  dependencies:
+    - coverage
+  script:
+    - |
+      git fetch --tags
+      currentVer=$(git describe --match "v[0-9\.]*" --abbrev=4 HEAD 2>/dev/null) || exit_code=$?
+      if [[ -z "$currentVer" ]]; then currentVer="v0.0.0"; fi
+      currentMinorVer=$(cut -d '.' -f2 <<< $currentVer)
+      pendingMinorVer=$(( 21+($(date +%s) - $(date -d "2023-07-19 UTC" +%s)) / (60*60*24*14) ))
+      pendingVer="v0.$pendingMinorVer.0"
+      patchVer=$(echo $currentVer | perl -pe 's/(\d+)(?!.*\d+)/$1+1/e')
+      if (($pendingMinorVer > $currentMinorVer)); then newVer=$pendingVer; else newVer=$patchVer; fi
+      echo "git tag -a $newVer -m 'DAML $newVer'"
+      curl -X POST "https://gitlab.jatic.net/api/v4/projects/$CI_PROJECT_ID/repository/tags?tag_name=$newVer&ref=main&release_description='DAML%20$newVer'&private_token=$DAML_BUILD_PAT"
+  environment: production
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
 deploy:
   stage: build
-  script: echo "Define your deployment script!"
+  dependencies:
+    - tag
+  script:
+    - pip install build twine --upgrade
+    - poetry build
   environment: production
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 include:
 - template: Jobs/SAST.gitlab-ci.yml
