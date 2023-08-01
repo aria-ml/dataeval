@@ -1,53 +1,38 @@
-# Change pip's cache directory to be inside the project directory since we can
-# only cache local items.
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   PYTHON_LATEST_SUPPORTED_VERSION: "3.10"
 
-# Pip's cache doesn't store the python packages
-# https://pip.pypa.io/en/stable/topics/caching/
-#
-# If you want to also cache the installed packages, you have to install
-# them in a virtualenv and cache it as well.
 cache:
   paths:
-    - .cache/pip
-    - venv/
+  - .cache/pip
+  - venv/
 
 .build_env:
   before_script:
-    - python --version ; pip --version  # For debugging
-    - pip install virtualenv
-    - virtualenv venv
-    - source venv/bin/activate
-  before_test_script:
-    - !reference [".build_env", "before_script"]
-    - pip install tox
+  - python --version ; pip --version
+  - pip install virtualenv
+  - virtualenv venv
+  - source venv/bin/activate
 
 stages:
-  - test     # used by GitLab static analysis and security pipelines
-  - validate # unit and functional tests and code coverage
-  - docs     # documentation generation and publish
-  - build
-
-# test:
-#   stage: test
-#   script:
-#     - pip install tox  # you can also use tox
-#     - tox -e test
+- test
+- validate
+- docs
+- build
 
 test:
   stage: validate
   image: python:$PYTHON_VERSIONS
   parallel:
     matrix:
-      - PYTHON_VERSIONS: ["3.8", "3.9", "3.10"]
+    - PYTHON_VERSIONS: ["3.8", "3.9", "3.10"]
   before_script:
-    - !reference [".build_env", "before_test_script"]
+  - !reference [".build_env", "before_script"]
+  - pip install tox
   script:
-    - tox -e coverage
+  - tox -e coverage
   after_script:
-    - mv .coverage .coverage.$PYTHON_VERSIONS
+  - mv .coverage .coverage.$PYTHON_VERSIONS
   artifacts:
     reports:
       junit: junit.xml
@@ -59,88 +44,90 @@ coverage:
   stage: validate
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   needs:
-    - job: test
-      artifacts: true  
+  - job: test
+    artifacts: true
   before_script:
-    - !reference [".build_env", "before_script"]
-    - pip install coverage
+  - !reference [".build_env", "before_script"]
+  - pip install coverage
   script:
-    - coverage combine
-    - coverage report -m --skip-empty
-    - coverage xml --skip-empty
-    - coverage html --skip-empty
-  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  - coverage combine
+  - coverage report -m --skip-empty
+  - coverage xml --skip-empty
+  - coverage html --skip-empty
+  coverage: "/(?i)total.*? (100(?:\\.0+)?\\%|[1-9]?\\d(?:\\.\\d+)?\\%)$/"
   artifacts:
     reports:
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
     paths:
-      - coverage.xml
-      - htmlcov/
+    - coverage.xml
+    - htmlcov/
 
 linting:
   stage: test
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   before_script:
-    - !reference [".build_env", "before_test_script"]
+  - !reference [".build_env", "before_script"]
+  - pip install tox
   script:
-    - tox -e lint
+  - tox -e lint
 
 typecheck:
   stage: test
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   before_script:
-    - !reference [".build_env", "before_test_script"]
+  - !reference [".build_env", "before_script"]
+  - pip install tox
   script:
-    - tox -e typecheck
+  - tox -e typecheck
 
 pages:
   stage: docs
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
-  dependencies: 
-    - coverage
+  dependencies:
+  - coverage
   before_script:
-    - pip install sphinx sphinx-rtd-theme
+  - pip install sphinx sphinx-rtd-theme
   script:
-    - cd docs && make html
+  - cd docs && make html
   after_script:
-    - mv docs/_build/html/ ./public/
-    - mv htmlcov/ ./public/testcov/
+  - mv docs/_build/html/ ./public/
+  - mv htmlcov/ ./public/testcov/
   artifacts:
     paths:
-      - public
+    - public
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
 
 tag:
   stage: build
   dependencies:
-    - coverage
+  - coverage
   script:
-    - |
-      git fetch --tags
-      currentVer=$(git describe --match "v[0-9\.]*" --abbrev=4 HEAD 2>/dev/null) || exit_code=$?
-      if [[ -z "$currentVer" ]]; then currentVer="v0.0.0"; fi
-      currentMinorVer=$(cut -d '.' -f2 <<< $currentVer)
-      pendingMinorVer=$(( 21+($(date +%s) - $(date -d "2023-07-19 UTC" +%s)) / (60*60*24*14) ))
-      pendingVer="v0.$pendingMinorVer.0"
-      patchVer=$(echo $currentVer | perl -pe 's/(\d+)(?!.*\d+)/$1+1/e')
-      if (($pendingMinorVer > $currentMinorVer)); then newVer=$pendingVer; else newVer=$patchVer; fi
-      echo "git tag -a $newVer -m 'DAML $newVer'"
-      curl -X POST "https://gitlab.jatic.net/api/v4/projects/$CI_PROJECT_ID/repository/tags?tag_name=$newVer&ref=main&release_description='DAML%20$newVer'&private_token=$DAML_BUILD_PAT"
+  - |
+    git fetch --tags
+    currentVer=$(git describe --match "v[0-9\.]*" --abbrev=4 HEAD 2>/dev/null) || exit_code=$?
+    if [[ -z "$currentVer" ]]; then currentVer="v0.0.0"; fi
+    currentMinorVer=$(cut -d '.' -f2 <<< $currentVer)
+    pendingMinorVer=$(( 21+($(date +%s) - $(date -d "2023-07-19 UTC" +%s)) / (60*60*24*14) ))
+    pendingVer="v0.$pendingMinorVer.0"
+    patchVer=$(echo $currentVer | perl -pe 's/(\d+)(?!.*\d+)/$1+1/e')
+    if (($pendingMinorVer > $currentMinorVer)); then newVer=$pendingVer; else newVer=$patchVer; fi
+    echo "git tag -a $newVer -m 'DAML $newVer'"
+    curl -X POST "https://gitlab.jatic.net/api/v4/projects/$CI_PROJECT_ID/repository/tags?tag_name=$newVer&ref=main&release_description='DAML%20$newVer'&private_token=$DAML_BUILD_PAT"
   environment: production
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_MESSAGE =~ /^infra/'
+  - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_MESSAGE =~ /^infra/"
 
 deploy:
   stage: build
   script: echo "Not Yet"
   environment: production
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_MESSAGE =~ /^infra/'
+  - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_MESSAGE =~ /^infra/"
 
 include:
-- template: Jobs/SAST.gitlab-ci.yml
+- template: Security/SAST.gitlab-ci.yml
 - template: Security/Dependency-Scanning.gitlab-ci.yml
 - template: Security/Secret-Detection.gitlab-ci.yml
