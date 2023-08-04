@@ -88,12 +88,14 @@ pages:
   dependencies:
   - coverage
   before_script:
-  - pip install sphinx sphinx-rtd-theme
+  - apt-get update && apt-get upgrade -y
+  - apt-get install graphviz -y
+  - pip install sphinx sphinx-immaterial
   script:
   - cd docs && make html
   after_script:
   - mv docs/_build/html/ ./public/
-  - mv htmlcov/ ./public/testcov/
+  - mv htmlcov/ ./public/coverage/
   artifacts:
     paths:
     - public

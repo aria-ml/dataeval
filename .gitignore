@@ -10,3 +10,4 @@ htmlcov/
 junit.xml
 
 docs/_*/
+!docs/_static
