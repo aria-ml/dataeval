@@ -1,3 +1,9 @@
+workflow:
+  rules:
+  - if: $CI_COMMIT_TAG
+    when: never
+  - when: always
+
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   PYTHON_LATEST_SUPPORTED_VERSION: "3.10"
@@ -88,12 +94,14 @@ pages:
   dependencies:
   - coverage
   before_script:
-  - pip install sphinx sphinx-rtd-theme
+  - apt-get update && apt-get upgrade -y
+  - apt-get install graphviz -y
+  - pip install sphinx sphinx-immaterial
   script:
   - cd docs && make html
   after_script:
   - mv docs/_build/html/ ./public/
-  - mv htmlcov/ ./public/testcov/
+  - mv htmlcov/ ./public/coverage/
   artifacts:
     paths:
     - public
@@ -107,25 +115,30 @@ tag:
   script:
   - |
     git fetch --tags
-    currentVer=$(git describe --match "v[0-9\.]*" --abbrev=4 HEAD 2>/dev/null) || exit_code=$?
+    currentVer=$(git describe --tags --abbrev=0 2>/dev/null) || exit_code=$?
     if [[ -z "$currentVer" ]]; then currentVer="v0.0.0"; fi
+    echo "Latest tag found: $currentVer"
     currentMinorVer=$(cut -d '.' -f2 <<< $currentVer)
     pendingMinorVer=$(( 21+($(date +%s) - $(date -d "2023-07-19 UTC" +%s)) / (60*60*24*14) ))
     pendingVer="v0.$pendingMinorVer.0"
     patchVer=$(echo $currentVer | perl -pe 's/(\d+)(?!.*\d+)/$1+1/e')
     if (($pendingMinorVer > $currentMinorVer)); then newVer=$pendingVer; else newVer=$patchVer; fi
-    echo "git tag -a $newVer -m 'DAML $newVer'"
-    curl -X POST "https://gitlab.jatic.net/api/v4/projects/$CI_PROJECT_ID/repository/tags?tag_name=$newVer&ref=main&release_description='DAML%20$newVer'&private_token=$DAML_BUILD_PAT"
-  environment: production
+    echo "Tagging main branch with $newVer"
+    curl --verbose --request POST \
+    --header "PRIVATE-TOKEN: $DAML_BUILD_PAT" \
+    "https://gitlab.jatic.net/api/v4/projects/$CI_PROJECT_ID/repository/tags?tag_name=$newVer&ref=main&release_description='DAML%20$newVer'"
+  environment:
+    name: production
   rules:
-  - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_MESSAGE =~ /^infra/"
+  - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
 
-deploy:
+publish:
   stage: build
-  script: echo "Not Yet"
-  environment: production
+  script: echo "Not Yet... But Soon? ... If Tagging Will Work?"
+  environment:
+    name: production
   rules:
-  - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_MESSAGE =~ /^infra/"
+  - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
 
 include:
 - template: Security/SAST.gitlab-ci.yml
