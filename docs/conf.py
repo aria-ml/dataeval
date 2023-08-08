@@ -31,3 +31,23 @@ autosummary_generate = False
 # html_static_path = ['_static']
 html_theme = "sphinx_immaterial"
 html_show_sourcelink = False
+html_theme_options = {
+    "palette": [
+        {
+            "media": "(prefers-color-scheme: light)",
+            "scheme": "default",
+            "toggle": {
+                "icon": "material/lightbulb",
+                "name": "Switch to dark mode",
+            }
+        },
+        {
+            "media": "(prefers-color-scheme: dark)",
+            "scheme": "slate",
+            "toggle": {
+                "icon": "material/lightbulb-outline",
+                "name": "Switch to light mode",
+            }
+        },
+    ]
+}
