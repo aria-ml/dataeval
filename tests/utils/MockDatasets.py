@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Dict
 import numpy as np
 
 class MockImageClassificationDataset:
@@ -16,7 +16,7 @@ class MockImageClassificationDataset:
         self.images = images
         self.labels = labels
 
-    def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
+    def __getitem__(self, idx: int) -> Dict[str, np.ndarray]:
         """Returns an image-label pair specified by idx
         
         :param idx: Index of requested image and label
@@ -25,9 +25,10 @@ class MockImageClassificationDataset:
         :return: An image, label pair
         :rtype: Tuple[np.ndarray, np.ndarray]
         """
-        return (self.images[idx], self.labels[idx])
+        # return (self.images[idx], self.labels[idx])
+        return {"image": self.images[idx], "label": self.labels[idx]}
     
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.images)
     
 class MockObjectDetectionDataset:

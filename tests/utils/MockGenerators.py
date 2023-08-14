@@ -1,8 +1,6 @@
-
-from typing import Union, Sequence, Tuple, Optional, List
+from typing import Sequence, Tuple, Union
 import numpy as np
-
-from MockDatasets import MockImageClassificationDataset
+from .MockDatasets import MockImageClassificationDataset
 
 class MockImageClassificationGenerator:
     """A class that creates a mock dataset as a :class:`MockImageClassificationDataset`
@@ -25,8 +23,6 @@ class MockImageClassificationGenerator:
                  labels: Union[int, Sequence[int]], 
                  img_dims: Union[int, Sequence[int]],
                  channels: int = 1) -> None:
-        super()
-
         self._limit = limit
         if isinstance(labels, int):
             labels = [labels]
@@ -48,19 +44,20 @@ class MockImageClassificationGenerator:
         return self._dataset    
     
     def _create_dataset(self) -> None:
-        if self._num_labels > 1:    
-            images, labels = self._create_data()
-        else:
-            images = np.ones(shape=(self._limit, *self._img_dims))
-            labels = np.ones(shape=(self._limit, 1)) * self._labels[0]
 
+        images, labels = self._create_data()
         self._dataset = MockImageClassificationDataset(images, labels)
     
     def _create_data(self) -> Tuple[np.ndarray, np.ndarray]:
         # Create an index for each label
-        mock_data = np.ones(shape=(self._limit, 32, 32, 3))
-        mock_labels = np.ones(shape=(self._limit, 1), dtype=int)
+        mock_data = np.ones(shape=(self._limit, *self._img_dims))
+        mock_labels = np.ones(shape=(self._limit), dtype=int) 
 
+        # If only 1 label, split is not needed, replace "1" with label value and return
+        if self._num_labels <= 1:
+            mock_labels *= self._labels[0]
+            return (mock_data, mock_labels)
+        
         mock_data = np.array_split(mock_data, self._num_labels)
         mock_labels = np.array_split(mock_labels, self._num_labels)
 
@@ -73,12 +70,9 @@ class MockImageClassificationGenerator:
         return (mock_data, mock_labels)
 
     def _set_dims(self, 
-                  dims: Union[int, Sequence[int]], 
+                  dims: Sequence[int], 
                   channels: int = 1
                   ) -> Tuple[int]:
-
-        if isinstance(dims, int):
-            dims = [dims]
 
         dim_size = len(dims)
         if dim_size == 3:
@@ -93,10 +87,4 @@ class MockImageClassificationGenerator:
             new_dims[1] = dims[0]
         else:
             new_dims[1] = dims[1]
-
         return tuple(new_dims)
-
-if __name__ == "__main__":
-    # TODO Add simple usage case as an example
-    gen = MockImageClassificationGenerator(50000, 1, 32)
-    ds = gen.dataset
