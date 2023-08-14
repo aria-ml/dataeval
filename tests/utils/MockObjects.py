@@ -1,5 +1,4 @@
-from MockDatasets import MockImageClassificationDataset
-from MockGenerators import MockImageClassificationGenerator
+from .MockGenerators import MockImageClassificationGenerator, MockImageClassificationDataset
 
 class MockCifar10:
     """
@@ -58,9 +57,3 @@ class MockCifar10:
         """
         return self._test_dataset
 
-if __name__ == "__main__":
-    # TODO Add simple usage case as an example
-    mds = MockCifar10(MAKE_LABELS=True)
-    
-    train = mds.train_dataset
-    test = mds.test_dataset
