@@ -27,11 +27,21 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.8"
+alibi-detect = "*"
+tensorflow = "*"
 
 [tool.poetry-dynamic-versioning]
 enable = true
 vcs = "git"
 style = "semver"
+
+[tool.pyright]
+reportMissingImports = false
+
+[tool.pytest.ini_options]
+markers = [
+  "functional: marks slower functional tests",
+]
 
 [build-system]
 requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning"]
