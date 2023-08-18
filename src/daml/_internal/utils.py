@@ -6,7 +6,22 @@ from daml._internal.alibidetect.outlierdetectors import AlibiAE
 class Metrics:
     """A global dictionary to parse metrics, providers, and methods"""
 
-    metrics_providers_methods = {"OutlierDetection": {"Alibi-Detect": ["Autoencoder"]}}
+    class Method:
+        OutlierDetection = "OutlierDetection"
+
+    class Provider:
+        AlibiDetect = "Alibi-Detect"
+
+    class Algorithm:
+        AutoEncoder = "Autoencoder"
+
+    metrics_providers_methods = {
+        Method.OutlierDetection: {
+            Provider.AlibiDetect: [
+                Algorithm.AutoEncoder,
+            ]
+        }
+    }
 
 
 def list_metrics() -> List[str]:
@@ -51,7 +66,7 @@ def load_metric(
 
     # Set a default provider
     if provider is None:
-        provider = "Alibi-Detect"
+        provider = Metrics.Provider.AlibiDetect
 
     # Gets the methods a provider has for a specific meric
     method_names = providers.get(provider, [])

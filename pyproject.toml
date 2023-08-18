@@ -27,6 +27,7 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.8"
+# alibi-detect = {extras=["tensorflow"], version="*"}
 alibi-detect = "*"
 tensorflow = "*"
 

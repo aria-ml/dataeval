@@ -4,7 +4,5 @@ API
 .. autosummary::
    :recursive:
 
-   daml.helloworld.HelloWorld
-   daml.helloworld.HelloWorld.run
-   daml.metrics.Metrics
-   daml.metrics.Metrics.list_metrics
+   daml._internals.utils.load_metric
+   daml._internals.utils.list_metrics
