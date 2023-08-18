@@ -2,13 +2,14 @@ from typing import Sequence, Tuple, Union
 import numpy as np
 from .MockDatasets import MockImageClassificationDataset
 
+
 class MockImageClassificationGenerator:
     """A class that creates a mock dataset as a :class:`MockImageClassificationDataset`
 
     This class creates arrays of multi-dimensional arrays representing a list of images and 
     their corresponding labels. They are then stored as :class:`MockImageClassificationDataset` 
     and exposed with the attribute `dataset`
-    
+
     :param limit: The total number of images and labels in the dataset
     :type limit: int
     :param labels: The values of labels for the dataset
@@ -37,17 +38,17 @@ class MockImageClassificationGenerator:
     @property
     def dataset(self) -> MockImageClassificationDataset:
         """Returns the created dataset
-        
+
         :return: A dataset containing images and labels based on given parameters
         :rtype: :class:`MockImageClassificationDataset`
         """
         return self._dataset    
-    
+
     def _create_dataset(self) -> None:
 
         images, labels = self._create_data()
         self._dataset = MockImageClassificationDataset(images, labels)
-    
+
     def _create_data(self) -> Tuple[np.ndarray, np.ndarray]:
         # Create an index for each label
         mock_data = np.ones(shape=(self._limit, *self._img_dims))
@@ -55,14 +56,15 @@ class MockImageClassificationGenerator:
 
         # If only 1 label, split is not needed, replace "1" with label value and return
         if self._num_labels <= 1:
+            mock_data *= self._labels[0]
             mock_labels *= self._labels[0]
             return (mock_data, mock_labels)
-        
+
         mock_data = np.array_split(mock_data, self._num_labels)
         mock_labels = np.array_split(mock_labels, self._num_labels)
 
-        assert(len(mock_data) == self._num_labels)
-        assert(len(mock_labels) == self._num_labels)
+        assert len(mock_data) == self._num_labels
+        assert len(mock_labels) == self._num_labels
 
         mock_data = np.concatenate([x*label for x, label in zip(mock_data, self._labels)])
         mock_labels = np.concatenate([x*label for x, label in zip(mock_labels, self._labels)])
@@ -77,8 +79,8 @@ class MockImageClassificationGenerator:
         dim_size = len(dims)
         if dim_size == 3:
             return tuple(dims)
-        
-        assert(0 < dim_size < 3)
+
+        assert 0 < dim_size < 3
 
         new_dims = [0, 0, 0]
         new_dims[0] = dims[0]
