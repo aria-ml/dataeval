@@ -134,6 +134,9 @@ tag:
     name: production
   rules:
   - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+    changes:
+    - src/**/*
+    - pyproject.toml
 
 publish:
   stage: build
