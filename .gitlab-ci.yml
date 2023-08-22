@@ -22,12 +22,12 @@ cache:
 
 stages:
 - test
-- validate
 - docs
 - build
+- security
 
 test:
-  stage: validate
+  stage: test
   image: python:$PYTHON_VERSIONS
   parallel:
     matrix:
@@ -45,13 +45,9 @@ test:
     paths:
     - junit.xml
     - ".coverage*"
-  rules:
-  - changes:
-    - src/*
-    - tests/*
 
 coverage:
-  stage: validate
+  stage: test
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   needs:
   - job: test
@@ -71,10 +67,6 @@ coverage:
         path: coverage.xml
     paths:
     - coverage.xml
-  rules:
-  - changes:
-    - src/*
-    - tests/*
 
 linting:
   stage: test
@@ -84,10 +76,6 @@ linting:
   - pip install tox
   script:
   - tox -e lint
-  rules:
-  - changes:
-    - src/*
-    - tests/*
 
 typecheck:
   stage: test
@@ -97,10 +85,6 @@ typecheck:
   - pip install tox
   script:
   - tox -e typecheck
-  rules:
-  - changes:
-    - src/*
-    - tests/*
 
 sphinx:
   stage: docs
@@ -114,11 +98,6 @@ sphinx:
   artifacts:
     paths:
     - docs/_build/html/
-  rules:
-  - changes:
-    - src/*
-    - tests/*
-    - docs/*
 
 pages:
   stage: docs
@@ -155,8 +134,6 @@ tag:
     name: production
   rules:
   - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
-    changes:
-    - src/*
 
 publish:
   stage: build
@@ -165,23 +142,23 @@ publish:
     name: production
   rules:
   - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
-    changes:
-    - src/*
 
 include:
 - template: Security/SAST.gitlab-ci.yml
 - template: Security/Dependency-Scanning.gitlab-ci.yml
 - template: Security/Secret-Detection.gitlab-ci.yml
 
-gemnasium-python-dependency_scanning:
+secret_detection:
+  stage: security
   rules:
-  - changes:
-    - poetry.lock
-    - pyproject.toml
-    - src/*
+  - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+
+gemnasium-python-dependency_scanning:
+  stage: security
+  rules:
+  - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
 semgrep-sast:
+  stage: security
   rules:
-  - changes:
-    - src/*
-    - tests/*
+  - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
