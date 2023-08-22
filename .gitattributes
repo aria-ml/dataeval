@@ -1,0 +1,4 @@
+# line ending tip taken from https://code.visualstudio.com/docs/devcontainers/tips-and-tricks
+* text=auto eol=lf
+*.{cmd,[cC][mM][dD]} text eol=crlf
+*.{bat,[bB][aA][tT]} text eol=crlf
