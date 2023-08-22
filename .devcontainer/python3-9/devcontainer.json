@@ -4,8 +4,12 @@
 	"name": "Python 3.9",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
 	"image": "mcr.microsoft.com/devcontainers/python:1-3.9-bookworm",
-	"features": {
-		"ghcr.io/devcontainers-contrib/features/poetry:2": {}
+	"postCreateCommand": "bash ./.devcontainer/post-install.sh",
+	"mounts": [
+		"source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,consistency=cached"
+	],
+	"containerEnv": {
+		"VENV_SUFFIX": "py39"
 	}
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
