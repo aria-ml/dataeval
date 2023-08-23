@@ -120,8 +120,9 @@ lint: commands[2]> isort --check --diff src/
 (env) jgleeson@daml:$
 ```
 
-#### [Option 2] Pull the Docker container
-TODO
+#### [Option 2] Use the project's dev container and tox
+Open VS Code, install the `ms-vscode-remote.remote-containers` extention, then use `ctrl+shift+P` to open the command pallet and select the command: `Dev Containers: Rebuild and Reopen in Container`.
+Open the terminal and then run either `./create_dev_env.sh --all` if you want all supported python environments, or `./create_dev_env.sh` to create only the python 3.10 environment.
 
 ### Pulling the Repo from JATIC-GitLab
 - upload an SSH key to your profile:

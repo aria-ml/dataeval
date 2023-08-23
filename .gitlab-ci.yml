@@ -24,6 +24,10 @@ cache:
   - pip install virtualenv
   - virtualenv venv
   - source venv/bin/activate
+  - declare -A version_dict
+  - version_dict['3.8']=py38
+  - version_dict['3.9']=py39
+  - version_dict['3.10']=py310
 
 stages:
 - test
@@ -41,7 +45,7 @@ test:
   - !reference [".build_env", "before_script"]
   - pip install tox
   script:
-  - tox -e test
+  - tox -e test-${version_dict[${PYTHON_VERSIONS}]}
   after_script:
   - mv .coverage .coverage.$PYTHON_VERSIONS
   artifacts:
@@ -84,12 +88,15 @@ linting:
 
 typecheck:
   stage: test
-  image: python:$PYTHON_LATEST_SUPPORTED_VERSION
+  image: python:$PYTHON_VERSIONS
+  parallel:
+    matrix:
+    - PYTHON_VERSIONS: ["3.8", "3.9", "3.10"]
   before_script:
   - !reference [".build_env", "before_script"]
   - pip install tox
   script:
-  - tox -e typecheck
+  - tox -e typecheck-${version_dict[${PYTHON_VERSIONS}]}
 
 sphinx:
   stage: docs
