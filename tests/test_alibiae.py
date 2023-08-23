@@ -1,22 +1,28 @@
 import daml
+from daml._internal.utils import Metrics
 import numpy as np
-import unittest
 import pytest
 
 from .utils import MockObjects
 
 
-class TestAlibiAE(unittest.TestCase):
+@pytest.mark.parametrize(
+    "input",
+    [   
+        Metrics.Method.AutoEncoder,  
+        Metrics.Method.VariationalAutoEncoder
+    ]
+)
+class TestAlibi:
     # Test main functionality of the program
     @pytest.mark.functional
-    def test_label_5s_as_outliers(self):
-        """Functional testing of AlibiAE
+    def test_label_5s_as_outliers(self, input):
+        """Functional testing of Alibi OutlierDection
 
         The AlibiAE model is being trained on all 1's and tested on all 5's.
         When evaluating, the model should say all 1's are not outliers
         and all 5's are outliers
         """
-
         # Initialize a dataset of 32 images of size 32x32x3, containing all 1's
         all_ones = MockObjects.MockImageClassificationGenerator(
             limit=1,
@@ -39,10 +45,10 @@ class TestAlibiAE(unittest.TestCase):
 
         # Initialize the autoencoder-based outlier detector from alibi-detect
         metric = daml.load_metric(
-            metric="OutlierDetection",
-            provider="Alibi-Detect",
-            method="Autoencoder"
-            )
+            metric=Metrics.OutlierDetection,
+            provider=Metrics.Provider.AlibiDetect,
+            method=input
+        )
 
         # Train the detector on the dataset of all 1's
         metric.fit_dataset(dataset=X_all_ones, epochs=10, verbose=False)
@@ -60,14 +66,14 @@ class TestAlibiAE(unittest.TestCase):
         # We expect all elements to be outliers
         num_errors_on_fives = np.sum(np.where(preds_on_fives != 1))
 
-        self.assertEqual(len(preds_on_ones), len(X_all_ones))
-        self.assertEqual(len(preds_on_fives), len(X_all_fives))
+        assert len(preds_on_ones) == len(X_all_ones)
+        assert len(preds_on_fives) == len(X_all_fives)
 
-        self.assertEqual(num_errors_on_ones, 0)
-        self.assertEqual(num_errors_on_fives, 0)
+        assert num_errors_on_ones == 0
+        assert num_errors_on_fives == 0
 
     # Ensure that the program fails upon wrong order of operations
-    def test_eval_before_fit_fails(self):
+    def test_eval_before_fit_fails(self, input):
         """Testing incorrect order of operations for fitting and evaluating"""
 
         all_ones = MockObjects.MockImageClassificationGenerator(
@@ -80,15 +86,18 @@ class TestAlibiAE(unittest.TestCase):
         X = all_ones.dataset.images
 
         metric = daml.load_metric(
-            provider="Alibi-Detect",
-            metric="OutlierDetection",
-            method="Autoencoder"
+            metric=Metrics.OutlierDetection,
+            provider=Metrics.Provider.AlibiDetect,
+            method=input
         )
+
+        # force 
+        # metric.is_trained = False
         # Evaluate dataset before fitting it
         with pytest.warns():
             metric.evaluate(X)
 
-    def test_missing_detector(self):
+    def test_missing_detector(self, input):
 
         all_ones = MockObjects.MockImageClassificationGenerator(
             limit=1,
@@ -100,9 +109,9 @@ class TestAlibiAE(unittest.TestCase):
         X = all_ones.dataset.images
 
         metric = daml.load_metric(
-            provider="Alibi-Detect",
-            metric="OutlierDetection",
-            method="Autoencoder"
+            metric=Metrics.OutlierDetection,
+            provider=Metrics.Provider.AlibiDetect,
+            method=input
         )
 
         # Force the detector to not be initialized
@@ -112,4 +121,3 @@ class TestAlibiAE(unittest.TestCase):
 
         with pytest.raises(TypeError):
             metric.evaluate(dataset=X)
-

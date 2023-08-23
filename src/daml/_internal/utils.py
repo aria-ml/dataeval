@@ -1,27 +1,7 @@
 from typing import List, Optional
 
 from daml._internal.alibidetect.outlierdetectors import AlibiAE
-
-
-class Metrics:
-    """A global dictionary to parse metrics, providers, and methods"""
-
-    class Method:
-        OutlierDetection = "OutlierDetection"
-
-    class Provider:
-        AlibiDetect = "Alibi-Detect"
-
-    class Algorithm:
-        AutoEncoder = "Autoencoder"
-
-    metrics_providers_methods = {
-        Method.OutlierDetection: {
-            Provider.AlibiDetect: [
-                Algorithm.AutoEncoder,
-            ]
-        }
-    }
+from daml._internal.MetricClasses import Metrics
 
 
 def list_metrics() -> List[str]:
@@ -82,4 +62,4 @@ def load_metric(
         raise ValueError(f"Method, {method}, is invalid for provider, {provider}")
 
     # TODO Add logic when more methods are developed
-    return AlibiAE()
+    return AlibiAE(method)
