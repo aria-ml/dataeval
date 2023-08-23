@@ -6,6 +6,28 @@ from abc import ABC, abstractmethod
 from typing import Any, Iterable
 
 
+class Metrics:
+    """A global dictionary to parse metrics, providers, and methods"""
+
+    OutlierDetection = "OutlierDetection"
+
+    class Provider:
+        AlibiDetect = "Alibi-Detect"
+
+    class Method:
+        AutoEncoder = "Autoencoder"
+        VariationalAutoEncoder = "VAE"
+
+    metrics_providers_methods = {
+        OutlierDetection: {
+            Provider.AlibiDetect: [
+                Method.AutoEncoder,
+                Method.VariationalAutoEncoder,
+            ]
+        }
+    }
+
+
 class DataMetric(ABC):
     """Abstract class for all DAML metrics"""
 

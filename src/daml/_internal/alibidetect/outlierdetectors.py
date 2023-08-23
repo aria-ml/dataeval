@@ -15,7 +15,7 @@ from tensorflow.keras.layers import (
 )
 from tensorflow.nn import relu
 
-from daml._internal.MetricClasses import OutlierDetector
+from daml._internal.MetricClasses import Metrics, OutlierDetector
 
 
 class AlibiDetectODMetric(OutlierDetector, ABC):
@@ -45,11 +45,25 @@ class AlibiDetectODMetric(OutlierDetector, ABC):
 class AlibiAE(AlibiDetectODMetric):
     """Autoencoder-based outlier detector, from alibi-detect"""
 
-    def __init__(self):
+    def __init__(self, method: str):
         super().__init__()
+        self.method = method
+        self._kwargs = dict()
+        self._set_method(method)
         # if load_path and detector_type and dataset_name and detector_name:
         #     self.detector = fetch_detector(detector, save_path)
         self.detector: Any = self.initialize_detector()
+
+    def _set_method(self, method: str) -> None:
+        """Store a pointer to the correct method for auto-encoding"""
+        if method == Metrics.Method.AutoEncoder:
+            self._method = alibi_detect.od.OutlierAE
+        elif method == Metrics.Method.VariationalAutoEncoder:
+            self._method = alibi_detect.od.OutlierVAE
+            self._kwargs.update({"latent_dim": 1024, "samples": 10})
+        # an else here would be unreachable as these inputs are validate
+        # in daml._internals.utils.load_metric()
+        return None
 
     def initialize_detector(self) -> tf.keras.Sequential:
         """Initialize the architecture and model weights of the autoencoder"""
@@ -116,12 +130,16 @@ class AlibiAE(AlibiDetectODMetric):
             ]
         )
 
-        # initialize outlier detector using autoencoder network
-        detector = alibi_detect.od.OutlierAE(
-            threshold=0.015,  # threshold for outlier score
-            encoder_net=encoder_net,  # can also pass AE model instead
-            decoder_net=decoder_net,  # of separate encoder and decoder
+        # common inputs across encoders...
+        self._kwargs.update(
+            {
+                "threshold": 0.015,  # threshold for outlier score
+                "encoder_net": encoder_net,  # can also pass AE model instead
+                "decoder_net": decoder_net,  # of separate encoder and decoder
+            }
         )
+        # initialize outlier detector using autoencoder network
+        detector = self._method(**self._kwargs)
         return detector
 
     def fit_dataset(
