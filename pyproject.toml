@@ -4,8 +4,8 @@ version = "0" # dynamic
 description = "DAML provides a simple interface to characterize image data and its impact on model performance across classification and object-detection tasks"
 license = "MIT"
 readme = "README.md"
-homepage = "https://gitlab.jatic.net/jatic/aria/daml"
-repository = "https://gitlab.jatic.net/jatic/aria/daml"
+homepage = "https://jatic.pages.jatic.net/aria/daml/"
+repository = "https://gitlab.jatic.net/jatic/aria/daml/"
 
 authors = [
   "James Gleeson <james.gleeson@ariacoustics.com>",
@@ -27,9 +27,8 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.8"
-# alibi-detect = {extras=["tensorflow"], version="*"}
-alibi-detect = "*"
 tensorflow = "*"
+alibi-detect = {extras=["tensorflow"], version="*"}
 
 [tool.poetry-dynamic-versioning]
 enable = true

@@ -108,8 +108,6 @@ pages:
   stage: docs
   needs:
   - sphinx
-  dependencies:
-  - sphinx
   script:
   - mv docs/_build/html/ ./public/
   artifacts:
@@ -145,7 +143,13 @@ tag:
 
 publish:
   stage: build
-  script: echo "Not Yet... But Soon? ... If Tagging Will Work?"
+  needs:
+  - tag
+  script:
+  - pip install build twine --upgrade
+  - twine --version
+  - python -m build
+  - twine upload --repository-url $GITLAB_REPO_URL -u gitlab-ci-token -p $DAML_BUILD_PAT dist/*
   environment:
     name: production
   rules:
