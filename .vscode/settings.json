@@ -1,0 +1,7 @@
+{
+  "python.defaultInterpreterPath": "${env:VIRTUAL_ENV}",
+  "python.terminal.activateEnvInCurrentTerminal": true,
+  "python.testing.pytestArgs": ["${workspaceFolder}/tests/"],
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false
+}

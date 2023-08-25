@@ -1,0 +1,24 @@
+// For format details, see https://aka.ms/devcontainer.json.
+{
+  "image": "31z4/tox",
+
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/tox/.gitconfig,type=bind,consistency=cached",
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.cache,target=/home/tox/.cache,type=bind,consistency=cached"
+  ],
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-docker",
+        "esbenp.prettier-vscode",
+        "ms-python.python",
+        "ms-python.black-formatter",
+        "ms-python.flake8",
+        "ms-python.isort"
+      ]
+    }
+  },
+
+  "updateContentCommand": "./create_dev_env.sh"
+}
