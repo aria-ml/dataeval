@@ -7,11 +7,7 @@ readme = "README.md"
 homepage = "https://jatic.pages.jatic.net/aria/daml/"
 repository = "https://gitlab.jatic.net/jatic/aria/daml/"
 
-authors = [
-  "James Gleeson <james.gleeson@ariacoustics.com>",
-  "Shaun Jullens <shaun.jullens@ariacoustics.com>",
-  "Andrew Weng <andrew.weng@ariacoustics.com>",
-]
+authors = ["ARiA <daml@ariacoustics.com>"]
 
 classifiers = [
   "Development Status :: 4 - Beta",
