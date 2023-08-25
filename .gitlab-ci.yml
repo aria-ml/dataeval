@@ -150,7 +150,7 @@ publish:
   - pip install build twine --upgrade
   - twine --version
   - python -m build
-  - twine upload --repository-url $GITLAB_REPO_URL -u gitlab-ci-token -p $DAML_BUILD_PAT dist/*
+  - twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi -u gitlab-ci-token -p $DAML_BUILD_PAT dist/*
   environment:
     name: production
   rules:
