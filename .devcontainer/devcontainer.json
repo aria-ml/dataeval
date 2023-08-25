@@ -7,6 +7,10 @@
     "source=${localEnv:HOME}${localEnv:USERPROFILE}/.cache,target=/home/tox/.cache,type=bind,consistency=cached"
   ],
 
+  "containerEnv": {
+    "SHELL": "/bin/bash"
+  },
+
   "customizations": {
     "vscode": {
       "extensions": [
