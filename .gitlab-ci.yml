@@ -145,6 +145,7 @@ publish:
   stage: build
   needs:
   - tag
+  image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   script:
   - pip install build twine --upgrade
   - twine --version
