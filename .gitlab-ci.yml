@@ -45,7 +45,7 @@ test:
   - !reference [".build_env", "before_script"]
   - pip install tox
   script:
-  - tox -e test-${version_dict[${PYTHON_VERSIONS}]}
+  - tox -e ${version_dict[${PYTHON_VERSIONS}]} -- test
   after_script:
   - mv .coverage .coverage.$PYTHON_VERSIONS
   artifacts:
@@ -96,7 +96,7 @@ typecheck:
   - !reference [".build_env", "before_script"]
   - pip install tox
   script:
-  - tox -e typecheck-${version_dict[${PYTHON_VERSIONS}]}
+  - tox -e ${version_dict[${PYTHON_VERSIONS}]} -- typecheck
 
 sphinx:
   stage: docs

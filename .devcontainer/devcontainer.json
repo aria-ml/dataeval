@@ -4,8 +4,12 @@
 
   "mounts": [
     "source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/tox/.gitconfig,type=bind,consistency=cached",
-    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.cache,target=/home/tox/.cache,type=bind,consistency=cached"
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/tox/.ssh,type=bind,consistency=cached"
   ],
+
+  "features": {
+    "ghcr.io/devcontainers/features/sshd:1": {}
+  },
 
   "containerEnv": {
     "SHELL": "/bin/bash"
