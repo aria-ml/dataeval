@@ -4,215 +4,126 @@
 DAML provides a simple interface to characterize image data and its impact on model performance across classification and object-detection tasks
 
 ## Installation
-### Prerequisites
-- Must have at least python3.8+ and preferably no greater than python3.10 installed
-- git
-- pip
+### Dependencies
+- python 3.8-3.10
+- alibi-detect[tensorflow]
+- tensorflow
 
-### Virtual Environment versus Docker container
-#### [Option 1] Setting up a virtual environment
-- install the virtualenv model from python pip
+### Development Environment
+#### Ubuntu with Windows Subsystem for Linux
+##### Enable Virtual Machine Platform
 ```
-jgleeson@daml:$ python3 -m pip install virtualenv build
-```
-- NOTE: Optionally, might have to pip install `python3.10-venv` as well.
-- create a directory in the project called `env` and activate that directory
-```
-jgleeson@daml:$ mkdir env
-jgleeson@daml:$ python3 -m venv env
-jgleeson@daml:$ source env/bin/activate
-(env) jgleeson@daml:$ python -m pip install tox
+(admin) PS> dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
 ```
 
-- build the package and install to the virtual environment
+##### Install WSL2 and Ubuntu (or Linux flavor of choice)
 ```
-(env) jgleeson@daml:$ python -m build
-* Creating venv isolated environment...
-* Installing packages in isolated environment... (poetry-core)
-* Getting build dependencies for sdist...
-* Building sdist...
-* Building wheel from sdist
-* Creating venv isolated environment...
-* Installing packages in isolated environment... (poetry-core)
-* Getting build dependencies for wheel...
-* Building wheel...
-Successfully built daml-0.0.1.tar.gz and daml-0.0.1-py3-none-any.whl
-(env) jgleeson@daml:$
-(env) jgleeson@daml:$
-(env) jgleeson@daml:$
-(env) jgleeson@daml:$ python -m pip install --force-reinstall dist/daml-0.0.1-py3-none-any.whl
-Processing ./dist/daml-0.0.1-py3-none-any.whl
-Installing collected packages: daml
-  Attempting uninstall: daml
-    Found existing installation: daml 0.0.1
-    Uninstalling daml-0.0.1:
-      Successfully uninstalled daml-0.0.1
-Successfully installed daml-0.0.1
-(env) jgleeson@daml:$
+(admin) PS> wsl --install
 ```
 
-- run the unit tests using `pytest`
+##### In Ubuntu, set up your user account and environment
 ```
-(env) jgleeson@daml:$ pytest -v tests/
-=================================== test session starts ====================================
-platform linux -- Python 3.10.6, pytest-7.4.0, pluggy-1.2.0 -- /home/jgleeson/aria/code/cdao/daml/env/bin/python
-cachedir: .pytest_cache
-rootdir: /home/jgleeson/aria/code/cdao/daml
-collected 1 item
-
-tests/test_helloworld.py::TestHelloWorld::test_hello_world PASSED                    [100%]
-
-==================================== 1 passed in 0.01s =====================================
-(env) jgleeson@daml:$
+:~$ sudo apt update
+:~$ sudo apt upgrade -y
+:~$ sudo apt install python-is-python3 python3-pip python3-virtualenv -y
 ```
 
-- run the code coverage report using `tox`. NOTE: tox will build and re-install the package artifact replacing the above 
+##### Create the SSH key in your host environment
 ```
-(env) jgleeson@daml:$ tox -e coverage
-.pkg: _optional_hooks> python /home/jgleeson/.local/lib/python3.10/site-packages/pyproject_api/_backend.py True poetry.core.masonry.api
-.pkg: get_requires_for_build_sdist> python /home/jgleeson/.local/lib/python3.10/site-packages/pyproject_api/_backend.py True poetry.core.masonry.api
-.pkg: prepare_metadata_for_build_wheel> python /home/jgleeson/.local/lib/python3.10/site-packages/pyproject_api/_backend.py True poetry.core.masonry.api
-.pkg: build_sdist> python /home/jgleeson/.local/lib/python3.10/site-packages/pyproject_api/_backend.py True poetry.core.masonry.api
-coverage: install_package> python -I -m pip install --force-reinstall --no-deps /home/jgleeson/aria/code/cdao/daml/.tox/.tmp/package/29/daml-0.0.1.tar.gz
-coverage: commands[0]> coverage erase
-coverage: commands[1]> coverage run --branch -m pytest --junitxml=junit.xml -v tests/
-=================================== test session starts ====================================
-platform linux -- Python 3.10.6, pytest-7.4.0, pluggy-1.2.0 -- /home/jgleeson/aria/code/cdao/daml/.tox/coverage/bin/python
-cachedir: .tox/coverage/.pytest_cache
-rootdir: /home/jgleeson/aria/code/cdao/daml
-collected 1 item
-
-tests/test_helloworld.py::TestHelloWorld::test_hello_world PASSED                    [100%]
-
-------------- generated xml file: /home/jgleeson/aria/code/cdao/daml/junit.xml -------------
-==================================== 1 passed in 0.02s =====================================
-coverage: commands[2]> coverage report -m --skip-empty
-Name                       Stmts   Miss Branch BrPart  Cover   Missing
-----------------------------------------------------------------------
-tests/test_helloworld.py       7      0      0      0   100%
-----------------------------------------------------------------------
-TOTAL                          7      0      0      0   100%
-coverage: commands[3]> coverage xml
-Wrote XML report to coverage.xml
-.pkg: _exit> python /home/jgleeson/.local/lib/python3.10/site-packages/pyproject_api/_backend.py True poetry.core.masonry.api
-  coverage: OK (2.25=setup[1.78]+cmd[0.07,0.25,0.07,0.07] seconds)
-  congratulations :) (2.29 seconds)
-(env) jgleeson@daml:$
+:~$ ssh-keygen -t ed25519 -C "user@domain.com"
 ```
 
--run the lint test using `tox`
+##### Upload the generated public key (defaults to ~/.ssh/id_ed25519.pub) to GitLab [here](https://gitlab.jatic.net/-/profile/keys).
+Additional information on configuring the SSH key can be found [here](https://gitlab.jatic.net/help/user/ssh.md).
+
+##### Clone the daml project from GitLab
 ```
-(env) jgleeson@daml:$ tox -e lint
-.pkg: _optional_hooks> python /home/jgleeson/.local/lib/python3.10/site-packages/pyproject_api/_backend.py True poetry.core.masonry.api
-.pkg: get_requires_for_build_sdist> python /home/jgleeson/.local/lib/python3.10/site-packages/pyproject_api/_backend.py True poetry.core.masonry.api
-.pkg: prepare_metadata_for_build_wheel> python /home/jgleeson/.local/lib/python3.10/site-packages/pyproject_api/_backend.py True poetry.core.masonry.api
-.pkg: build_sdist> python /home/jgleeson/.local/lib/python3.10/site-packages/pyproject_api/_backend.py True poetry.core.masonry.api
-lint: install_package> python -I -m pip install --force-reinstall --no-deps /home/jgleeson/aria/code/cdao/daml/.tox/.tmp/package/30/daml-0.0.1.tar.gz
-lint: commands[0]> flake8 --count src/
-0
-lint: commands[1]> black --check --diff src/
-All done! ✨ 🍰 ✨
-2 files would be left unchanged.
-lint: commands[2]> isort --check --diff src/
-.pkg: _exit> python /home/jgleeson/.local/lib/python3.10/site-packages/pyproject_api/_backend.py True poetry.core.masonry.api
-  lint: OK (2.13=setup[1.78]+cmd[0.11,0.16,0.08] seconds)
-  congratulations :) (2.17 seconds)
-(env) jgleeson@daml:$
+:~$ git clone git@gitlab.jatic.net:jatic/aria/daml.git
+:~$ cd daml
 ```
 
-#### [Option 2] Use the project's dev container and tox
-Open VS Code, install the `ms-vscode-remote.remote-containers` extention, then use `ctrl+shift+P` to open the command pallet and select the command: `Dev Containers: Rebuild and Reopen in Container`.
-Open the terminal and then run either `./create_dev_env.sh --all` if you want all supported python environments, or `./create_dev_env.sh` to create only the python 3.10 environment.
+#### [Option 1] Working locally with [VirtualEnv](https://virtualenv.pypa.io/en/latest/)
 
-### Pulling the Repo from JATIC-GitLab
-- upload an SSH key to your profile:
-`User -> Edit Profile -> SSH Keys`
-
-- for details on how to do this: https://gitlab.jatic.net/help/user/ssh.md
-
-- Clone the repo from the JATIC GitLab to your local workspace
+##### Enable the Virtual Environment and install Poetry (packaging) and Tox (test automation)
 ```
-jgleeson@cdao:$ git clone git@gitlab.jatic.net:jatic/aria/daml.git daml
-Cloning into 'daml'...
-[SNIP]
-Enter passphrase for key '/home/jgleeson/.ssh/id_ed25519':
-remote: Enumerating objects: 20, done.
-remote: Counting objects: 100% (6/6), done.
-remote: Compressing objects: 100% (6/6), done.
-remote: Total 20 (delta 2), reused 0 (delta 0), pack-reused 14
-Receiving objects: 100% (20/20), 5.20 KiB | 1.73 MiB/s, done.
-Resolving deltas: 100% (5/5), done.
-jgleeson@cdao:$
+:~/daml$ virtualenv .venv
+:~/daml$ source .venv/bin/activate
+(.venv) :~/daml$ pip install poetry tox
 ```
 
-- create a new feature branch
+#### [Option 2] VS Code Development Container
+This option allows you to run or test DAML in a virtual development container fully isolated from the host environment.  It also allows you to run on different versions of Python independently of what is on your host environment.
+
+_Note: In VS Code, press_ `F1` _or_ `Ctrl+Shift+P` _to open the_ `Command Palette`
+
+1. Open the DAML project in VS Code
+2. Install the Remote Development Extension Pack: `ms-vscode-remote.vscode-remote-extensionpack`
+3. Using the `Command Palette` run `>Dev Containers: Rebuild and Reopen in Container`
+   - On first installation, the container takes a few minutes the prepare the development environment
+4. Using the `Command Palette` run `>Python: Select Interpreter`
+   - Only select Python versions in the _Workspace_ group, **not** the _Global_ group
+
+##### Known Issues
+In some cases, the pip cache can get corrupted and will need to be cleaned. If you see errors like `FAIL code -9` or `Killed` during tox execution of a pip install, the following workaround may help:
+###### Linux
 ```
-jgleeson@daml:$ git checkout -b issue3-helloworld
-Switched to a new branch 'issue3-helloworld'
-jgleeson@daml:$
-jgleeson@daml:$
-jgleeson@daml:$ git status
-On branch issue3-helloworld
-nothing to commit, working tree clean
-jgleeson@daml:$
+:~/daml$ rm -rf ~/.cache/pip
 ```
 
-## Contribution
-- the project structure is as follows...
+###### Windows
 ```
-jgleeson@daml:$ tree .
-.
-├── README.md
-├── docs
-├── pyproject.toml
-├── src
-│   └── daml
-│       ├── __init__.py
-│       └── helloworld.py
-├── tests
-│   └── test_helloworld.py
-└── tox.ini
-
-4 directories, 6 files
-jgleeson@daml:$
+PS> Remove-Item -Recurse -Force %LOCALAPPDATA%/pip/cache
 ```
-- reference the JATIC guidelines for stucture: https://jatic.pages.jatic.net/docs/sdp/Software%20Requirements/#project-structure
 
-- however, generally a `some_module.py` in the `src` folder will need a corresponding `test_some_module.py` in the `tests` folder and execution of tox results in ideally 100% code coverage output. Sub 100% code coverage should be explicitly called out and justified in a merge request.
+**Note:** this will clear out your entire pip cache so future installations will need to download new copies of any packages
 
-- Run `tox -e test` and verify tests pass before editing code
-- If adding a new feature, add a new test first and verify that it fails
+##### Sharing your SSH key with Development Container
+###### Windows:
+Start a local Administrator PowerShell and run the following commands:
 
-## Environment
-- [Poetry](https://python-poetry.org/docs/) is the dependency management and packaging tool used in DAML.
-- Installation instructions are [here](https://python-poetry.org/docs/#installation), or refer to the steps below:
-  - Linux, macOS, Windows (WSL)
-  ```
-  curl -sSL https://install.python-poetry.org | python3 -
-  ```
-  - Windows (Powershell)
-  ```
-  (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | py -
-  ```
+```
+(admin) PS> Set-Service ssh-agent -StartupType Automatic
+(admin) PS> Start-Service ssh-agent
+(admin) PS> Get-Service ssh-agent
+```
 
-## Usage
-TODO
+###### Linux:
+First, start the SSH Agent in the background by running the following in a terminal:
 
-## Remote Development
-- An option for standardizing the development platform is to use [containers](https://containers.dev/). 3 dev container configurations are included in the .devcontainer folder for Python 3.8, 3.9 and 3.10.
-- Recommended configuration on Windows with WSL:
-  - [Visual Studio Code](https://code.visualstudio.com/)
-  - [Docker](https://www.docker.com/products/docker-desktop/)
-  - [Remote Development - VS Code Extension Pack](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack)
-- Opening a development container:
-  - Open the project in VS Code
-  - Using the Command Palette (F1 or Ctrl+Shift+P)
-    - \>Dev Containers: Reopen in Container
-    - Select the Python version
-    - ???
-    - Profit
+```
+:~$ eval "$(ssh-agent -s)"
+```
 
-![](.devcontainer/howto.gif)
+Then add these lines to your ~/.bash_profile or ~/.zprofile (for Zsh) so it starts on login:
+
+```
+if [ -z "$SSH_AUTH_SOCK" ]; then
+   # Check for a currently running instance of the agent
+   RUNNING_AGENT="`ps -ax | grep 'ssh-agent -s' | grep -v grep | wc -l | tr -d '[:space:]'`"
+   if [ "$RUNNING_AGENT" = "0" ]; then
+        # Launch a new instance of the agent
+        ssh-agent -s &> $HOME/.ssh/ssh-agent
+   fi
+   eval `cat $HOME/.ssh/ssh-agent`
+fi
+```
+
+#### Run Tests
+
+##### Run all tests
+```
+(.venv) :~/daml$ tox
+```
+
+##### Run selective test
+```
+(.venv) :~/daml$ tox -e [lint, test-{py38,py39,py310}, typecheck-{py38,py39,py310}]
+```
+
+#### Install DAML
+```
+(.venv) :~/daml$ pip install .
+```
 
 ## POCs
 **POC**: Scott Swan @scott.swan
