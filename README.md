@@ -63,64 +63,23 @@ _Note: In VS Code, press_ `F1` _or_ `Ctrl+Shift+P` _to open the_ `Command Palett
 4. Using the `Command Palette` run `>Python: Select Interpreter`
    - Only select Python versions in the _Workspace_ group, **not** the _Global_ group
 
-##### Known Issues
-In some cases, the pip cache can get corrupted and will need to be cleaned. If you see errors like `FAIL code -9` or `Killed` during tox execution of a pip install, the following workaround may help:
-###### Linux
-```
-:~/daml$ rm -rf ~/.cache/pip
-```
+The devcontainer is configured to share the SSH keys on the host environment to allow git commands to work.  If you are unable to pull or commit, check the `.ssh` folder in the `$HOME` or `%USERPROFILE%` path and ensure that it is correctly configured.
 
-###### Windows
-```
-PS> Remove-Item -Recurse -Force %LOCALAPPDATA%/pip/cache
-```
+### Run Tests
 
-**Note:** this will clear out your entire pip cache so future installations will need to download new copies of any packages
+DAML uses tox to manage test environments and execution. you can run the tests in several ways.
 
-##### Sharing your SSH key with Development Container
-###### Windows:
-Start a local Administrator PowerShell and run the following commands:
 
-```
-(admin) PS> Set-Service ssh-agent -StartupType Automatic
-(admin) PS> Start-Service ssh-agent
-(admin) PS> Get-Service ssh-agent
-```
+| Function | Command |
+| ------ | ------ |
+| Run all tests sequentially | `tox r` |
+| Run all tests in parallel | `tox p` |
+| Run tests | `tox r -e py{38,39,310} -- test` |
+| Run typecheck | `tox r -e py{38,39,310} -- typecheck` |
+| Run lint | `tox r -e lint` |
 
-###### Linux:
-First, start the SSH Agent in the background by running the following in a terminal:
 
-```
-:~$ eval "$(ssh-agent -s)"
-```
-
-Then add these lines to your ~/.bash_profile or ~/.zprofile (for Zsh) so it starts on login:
-
-```
-if [ -z "$SSH_AUTH_SOCK" ]; then
-   # Check for a currently running instance of the agent
-   RUNNING_AGENT="`ps -ax | grep 'ssh-agent -s' | grep -v grep | wc -l | tr -d '[:space:]'`"
-   if [ "$RUNNING_AGENT" = "0" ]; then
-        # Launch a new instance of the agent
-        ssh-agent -s &> $HOME/.ssh/ssh-agent
-   fi
-   eval `cat $HOME/.ssh/ssh-agent`
-fi
-```
-
-#### Run Tests
-
-##### Run all tests
-```
-(.venv) :~/daml$ tox
-```
-
-##### Run selective test
-```
-(.venv) :~/daml$ tox -e [lint, test-{py38,py39,py310}, typecheck-{py38,py39,py310}]
-```
-
-#### Install DAML
+### Install DAML
 ```
 (.venv) :~/daml$ pip install .
 ```
