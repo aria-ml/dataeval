@@ -3,17 +3,19 @@ import pytest
 from daml import load_metric, list_metrics
 from daml._internal.alibidetect.outlierdetectors import AlibiAE
 from daml._internal.MetricClasses import Metrics
+from daml._internal.utils import _get_supported_method
 
 
 class TestLoadListMetrics:
 
     def test_list_metrics(self):
-        m = ["OutlierDetection"]
+        m = [Metrics.OutlierDetection, Metrics.Divergence]
         x = list_metrics()
         assert (x == m)
 
     def test_load_metric_returns_documentation(self):
-        # TODO When nothing is given to load_metric, it should return list_metrics
+        # TODO When nothing is given to load_metric, it should return
+        # list_metrics
         assert (True)
 
     # Ensure that the program fails upon bad user input
@@ -39,7 +41,7 @@ class TestLoadListMetrics:
             method=method
         )
         assert (isinstance(metric, AlibiAE))
-    
+
     def test_set_method_invalid(self):
         metric = load_metric(
             metric=Metrics.OutlierDetection,
@@ -47,3 +49,6 @@ class TestLoadListMetrics:
             method=Metrics.Method.AutoEncoder
         )
         assert metric._set_method("not a method") is None
+
+    def test_get_support_metrics(self):
+        assert _get_supported_method("not valid") is None
