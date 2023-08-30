@@ -1,7 +1,19 @@
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from daml._internal.alibidetect.outlierdetectors import AlibiAE
+from daml._internal.divergence import DpDivergence
 from daml._internal.MetricClasses import Metrics
+
+
+def _get_supported_method(method):
+    # TODO: develop a cleaner method for selecting the method class.
+    if method == Metrics.Method.AutoEncoder:
+        return AlibiAE(method)
+    elif method == Metrics.Method.VariationalAutoEncoder:
+        return AlibiAE(method)
+    elif method == Metrics.Method.DpDivergence:
+        return DpDivergence(method)
+    return None
 
 
 def list_metrics() -> List[str]:
@@ -10,7 +22,6 @@ def list_metrics() -> List[str]:
     :return: A list of metrics
     :rtype: List
     """
-
     return list(Metrics.metrics_providers_methods.keys())
 
 
@@ -18,7 +29,7 @@ def load_metric(
     metric: Optional[str] = None,
     provider: Optional[str] = None,
     method: Optional[str] = None,
-) -> AlibiAE:
+) -> Any:
     """
     Function that returns a data metric algorithm
 
@@ -37,7 +48,11 @@ def load_metric(
 
     if metric is None:
         mpm_list = list(mpm.keys())
-        raise ValueError(f"No provider given. Choose one of the following: {mpm_list}")
+        raise ValueError(
+            f"""
+            No provider given. Choose one of the following: {mpm_list}
+            """
+        )
 
     # Gets providers for a specific metric
     providers = mpm.get(metric, {})
@@ -48,18 +63,26 @@ def load_metric(
     if provider is None:
         provider = Metrics.Provider.AlibiDetect
 
-    # Gets the methods a provider has for a specific meric
-    method_names = providers.get(provider, [])
-    if len(method_names) == 0:
-        raise ValueError(f"Provider, {provider}, is invalid for metric, {metric}")
+    # Gets the methods a provider has for a specific metric
+    supported_methods = providers.get(provider, [])
+
+    if len(supported_methods) == 0:
+        raise ValueError(
+            f"""
+            Provider, {provider}, is invalid for metric, {metric}
+            """
+        )
 
     # Set a default method, must be valid for the provider
     if method is None:
-        method = method_names[0]
+        method = supported_methods[0]
 
     # Check if the provider supports the method
-    if method not in method_names:
-        raise ValueError(f"Method, {method}, is invalid for provider, {provider}")
+    if method not in supported_methods:
+        raise ValueError(
+            f"""
+            Method, {method}, is invalid for provider, {provider}
+            """
+        )
 
-    # TODO Add logic when more methods are developed
-    return AlibiAE(method)
+    return _get_supported_method(method)
