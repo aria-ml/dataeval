@@ -82,19 +82,13 @@ class MockImageClassificationGenerator:
     def _set_dims(self,
                   dims: Sequence[int],
                   channels: int = 1
-                  ) -> Tuple[int]:
+                  ) -> Tuple[int, int, int]:
 
         dim_size = len(dims)
         if dim_size == 3:
-            return tuple(dims)
+            return (dims[0], dims[1], dims[2])
 
         assert 0 < dim_size < 3
 
-        new_dims = [0, 0, 0]
-        new_dims[0] = dims[0]
-        new_dims[2] = channels
-        if dim_size < 2:   # If 1 dimension, make image square
-            new_dims[1] = dims[0]
-        else:
-            new_dims[1] = dims[1]
-        return tuple(new_dims)
+        # If 1 dimension, make image square
+        return (dims[0], dims[0] if (dim_size < 2) else dims[1], channels)
