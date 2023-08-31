@@ -1,6 +1,7 @@
-import pytest
-import daml
 import numpy as np
+import pytest
+
+import daml
 from daml._internal.utils import Metrics
 
 
@@ -22,7 +23,7 @@ class TestDpDivergence:
                     "Error": 0.0,
                 },
             ),
-        ]
+        ],
     )
     def test_dp_divergence(self, input, output):
         """Unit testing of Dp Divergence
@@ -37,7 +38,7 @@ class TestDpDivergence:
         metric = daml.load_metric(
             metric=Metrics.Divergence,
             provider=Metrics.Provider.ARiA,
-            method=Metrics.Method.DpDivergence
+            method=Metrics.Method.DpDivergence,
         )
         result = metric.evaluate(
             dataset_a=all_ones,
@@ -51,7 +52,7 @@ class TestDpDivergence:
             metric = daml.load_metric(
                 metric=Metrics.Divergence,
                 provider=Metrics.Provider.ARiA,
-                method=Metrics.Method.DpDivergence
+                method=Metrics.Method.DpDivergence,
             )
             result = metric.evaluate(
                 dataset_a=np.array([1, 2, 3]),

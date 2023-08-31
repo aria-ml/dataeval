@@ -1,17 +1,14 @@
-import daml
-from daml._internal.utils import Metrics
 import numpy as np
 import pytest
+
+import daml
+from daml._internal.utils import Metrics
 
 from .utils import MockObjects
 
 
 @pytest.mark.parametrize(
-    "input",
-    [   
-        Metrics.Method.AutoEncoder,  
-        Metrics.Method.VariationalAutoEncoder
-    ]
+    "input", [Metrics.Method.AutoEncoder, Metrics.Method.VariationalAutoEncoder]
 )
 class TestAlibi:
     # Test main functionality of the program
@@ -25,18 +22,12 @@ class TestAlibi:
         """
         # Initialize a dataset of 32 images of size 32x32x3, containing all 1's
         all_ones = MockObjects.MockImageClassificationGenerator(
-            limit=1,
-            labels=1,
-            img_dims=(32, 32),
-            channels=3
+            limit=1, labels=1, img_dims=(32, 32), channels=3
         )
 
         # Initialize a dataset of 32 images of size 32x32x3, containing all 5's
         all_fives = MockObjects.MockImageClassificationGenerator(
-            limit=1,
-            labels=5,
-            img_dims=(32, 32),
-            channels=3
+            limit=1, labels=5, img_dims=(32, 32), channels=3
         )
 
         # Get model input from each dataset
@@ -47,7 +38,7 @@ class TestAlibi:
         metric = daml.load_metric(
             metric=Metrics.OutlierDetection,
             provider=Metrics.Provider.AlibiDetect,
-            method=input
+            method=input,
         )
 
         # Train the detector on the dataset of all 1's
@@ -77,10 +68,7 @@ class TestAlibi:
         """Testing incorrect order of operations for fitting and evaluating"""
 
         all_ones = MockObjects.MockImageClassificationGenerator(
-            limit=1,
-            labels=1,
-            img_dims=(32, 32),
-            channels=3
+            limit=1, labels=1, img_dims=(32, 32), channels=3
         )
 
         X = all_ones.dataset.images
@@ -88,22 +76,18 @@ class TestAlibi:
         metric = daml.load_metric(
             metric=Metrics.OutlierDetection,
             provider=Metrics.Provider.AlibiDetect,
-            method=input
+            method=input,
         )
 
-        # force 
+        # force
         # metric.is_trained = False
         # Evaluate dataset before fitting it
         with pytest.warns():
             metric.evaluate(X)
 
     def test_missing_detector(self, input):
-
         all_ones = MockObjects.MockImageClassificationGenerator(
-            limit=1,
-            labels=1,
-            img_dims=(32, 32),
-            channels=3
+            limit=1, labels=1, img_dims=(32, 32), channels=3
         )
 
         X = all_ones.dataset.images
@@ -111,7 +95,7 @@ class TestAlibi:
         metric = daml.load_metric(
             metric=Metrics.OutlierDetection,
             provider=Metrics.Provider.AlibiDetect,
-            method=input
+            method=input,
         )
 
         # Force the detector to not be initialized

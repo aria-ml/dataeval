@@ -1,4 +1,5 @@
 from typing import Dict
+
 import numpy as np
 
 
@@ -12,6 +13,7 @@ class MockImageClassificationDataset:
     :param labels: An array of ints representing the image labels
     :type labels :class:`np.ndarray`
     """
+
     def __init__(self, images: np.ndarray, labels: np.ndarray) -> None:
         """Constructor method"""
         self.images = images
@@ -34,7 +36,6 @@ class MockImageClassificationDataset:
 
 
 class MockObjectDetectionDataset:
-
     def __init__(self) -> None:
         pass
 
