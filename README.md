@@ -74,8 +74,10 @@ DAML uses tox to manage test environments and execution. you can run the tests i
 | ------ | ------ |
 | Run all tests sequentially | `tox r` |
 | Run all tests in parallel | `tox p` |
-| Run tests | `tox r -e py{38,39,310} -- test` |
-| Run typecheck | `tox r -e py{38,39,310} -- typecheck` |
+| Run unit tests sequentially | `tox r -e py38,py39,py310 -- test` |
+| Run unit tests in parallel | `tox p -e py38,py39,py310 -- test` |
+| Run typecheck sequentially | `tox r -e py38,py39,py310 -- typecheck` |
+| Run typecheck in parallel | `tox p -e py38,py39,py310 -- typecheck` |
 | Run lint | `tox r -e lint` |
 
 
