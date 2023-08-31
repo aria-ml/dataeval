@@ -12,5 +12,6 @@
   "isort.severity": {
     "W": "Warning",
     "E": "Error"
-  }
+  },
+  "python.analysis.typeCheckingMode": "basic"
 }
