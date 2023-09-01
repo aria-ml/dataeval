@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from os import environ
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from requests import Response, get, put
 
@@ -39,7 +39,7 @@ class ChangelogEntry:
         return f"ChangelogEntry({self.time}, {self.hash}, {self.description})"
 
 
-def request(cmd: str, urlPath: str, data: Dict[str, Any] = None) -> Response:
+def request(cmd: str, urlPath: str, data: Optional[Dict[str, Any]] = None) -> Response:
     # $DAML_BUILD_PAT is only available in production environments
     headers = {"PRIVATE-TOKEN": environ["DAML_BUILD_PAT"]}
     url = "https://gitlab.jatic.net/api/v4/projects/151/" + urlPath
