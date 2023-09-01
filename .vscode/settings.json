@@ -3,5 +3,15 @@
   "python.terminal.activateEnvInCurrentTerminal": true,
   "python.testing.pytestArgs": ["${workspaceFolder}/tests/"],
   "python.testing.pytestEnabled": true,
-  "python.testing.unittestEnabled": false
+  "python.testing.unittestEnabled": false,
+
+  "black-formatter.importStrategy": "fromEnvironment",
+  "flake8.importStrategy": "fromEnvironment",
+  "isort.check": true,
+  "isort.importStrategy": "fromEnvironment",
+  "isort.severity": {
+    "W": "Warning",
+    "E": "Error"
+  },
+  "python.analysis.typeCheckingMode": "basic"
 }

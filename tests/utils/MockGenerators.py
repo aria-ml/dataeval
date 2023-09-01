@@ -1,5 +1,7 @@
 from typing import Sequence, Tuple, Union
+
 import numpy as np
+
 from .MockDatasets import MockImageClassificationDataset
 
 
@@ -21,11 +23,14 @@ class MockImageClassificationGenerator:
     :param channels: The number of channels for the image, default is 1
     :type channels: int, optional
     """
-    def __init__(self,
-                 limit: int,
-                 labels: Union[int, Sequence[int]],
-                 img_dims: Union[int, Sequence[int]],
-                 channels: int = 1) -> None:
+
+    def __init__(
+        self,
+        limit: int,
+        labels: Union[int, Sequence[int]],
+        img_dims: Union[int, Sequence[int]],
+        channels: int = 1,
+    ) -> None:
         self._limit = limit
         if isinstance(labels, int):
             labels = [labels]
@@ -48,7 +53,6 @@ class MockImageClassificationGenerator:
         return self._dataset
 
     def _create_dataset(self) -> None:
-
         images, labels = self._create_data()
         self._dataset = MockImageClassificationDataset(images, labels)
 
@@ -71,19 +75,15 @@ class MockImageClassificationGenerator:
         assert len(mock_labels) == self._num_labels
 
         mock_data = np.concatenate(
-            [x*label for x, label in zip(mock_data, self._labels)]
-            )
+            [x * label for x, label in zip(mock_data, self._labels)]
+        )
         mock_labels = np.concatenate(
-            [x*label for x, label in zip(mock_labels, self._labels)]
-            )
+            [x * label for x, label in zip(mock_labels, self._labels)]
+        )
 
         return (mock_data, mock_labels)
 
-    def _set_dims(self,
-                  dims: Sequence[int],
-                  channels: int = 1
-                  ) -> Tuple[int, int, int]:
-
+    def _set_dims(self, dims: Sequence[int], channels: int = 1) -> Tuple[int, int, int]:
         dim_size = len(dims)
         if dim_size == 3:
             return (dims[0], dims[1], dims[2])
