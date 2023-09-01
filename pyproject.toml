@@ -8,6 +8,11 @@ homepage = "https://jatic.pages.jatic.net/aria/daml/"
 repository = "https://gitlab.jatic.net/jatic/aria/daml/"
 
 authors = ["ARiA <daml@ariacoustics.com>"]
+maintainers = [
+  "Andrew Weng <andrew.weng@ariacoustics.com>",
+  "James Gleeson <james.gleeson@ariacoustics.com>",
+  "Jason Inman <jason.inman@ariacoustics.com>",
+]
 
 classifiers = [
   "Development Status :: 4 - Beta",
