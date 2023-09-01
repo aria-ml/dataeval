@@ -1,6 +1,7 @@
-[//]: # (e3cb1bc9671ce7c920cb3fe440a2b249a24f61f7)
+[//]: # (0907cfbe5599f947dfd92e08ac6addeef3c140d5)
 
 # DAML Change Log
+## v0.24.3
 ## v0.24.2
 - ```126e27f3 - Automate changelist generation in documentation for release```
 ## v0.24.1
