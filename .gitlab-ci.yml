@@ -4,6 +4,10 @@ workflow:
     when: never
   - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
     when: never
+  - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+    changes:
+    - "CHANGELOG.md"
+    when: never
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
     changes:
     - "**/*"
@@ -122,6 +126,8 @@ pages:
     - public
   rules:
   - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+    changes:
+    - docs/**/*
 
 tag:
   stage: build
@@ -158,6 +164,23 @@ publish:
   - twine --version
   - python -m build
   - twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi -u gitlab-ci-token -p $DAML_BUILD_PAT dist/*
+  environment:
+    name: production
+  rules:
+  - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+    changes:
+    - src/**/*
+    - pyproject.toml
+
+changelog:
+  stage: build
+  needs:
+  - publish
+  image: python:$PYTHON_LATEST_SUPPORTED_VERSION
+  before_script:
+  - pip install requests
+  script:
+  - python ./update_changelog.py
   environment:
     name: production
   rules:
