@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from os import environ
 from typing import Any, Dict, List
 
-from requests import get, put, Response
+from requests import Response, get, put
 
 
 class ChangelogEntry:
