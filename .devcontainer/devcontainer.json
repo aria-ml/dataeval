@@ -28,5 +28,5 @@
     }
   },
 
-  "updateContentCommand": "./create_dev_env.sh"
+  "postAttachCommand": "./create_dev_env.sh"
 }
