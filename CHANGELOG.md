@@ -1,6 +1,9 @@
-[//]: # (0907cfbe5599f947dfd92e08ac6addeef3c140d5)
+[//]: # (773f8151aa015d3346551acd2e45fbd2fc79299c)
 
 # DAML Change Log
+## v0.24.4
+- ```773f8151 - Fix VS Code formatting```
+- ```865985ec - Create contributing.md and update readme.md```
 ## v0.24.3
 ## v0.24.2
 - ```126e27f3 - Automate changelist generation in documentation for release```
