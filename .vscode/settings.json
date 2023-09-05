@@ -13,5 +13,9 @@
     "W": "Warning",
     "E": "Error"
   },
-  "python.analysis.typeCheckingMode": "basic"
+  "python.analysis.typeCheckingMode": "basic",
+
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  }
 }
