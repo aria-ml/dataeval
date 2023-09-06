@@ -41,13 +41,5 @@ class TestLoadListMetrics:
         )
         assert isinstance(metric, AlibiAE)
 
-    def test_set_method_invalid(self):
-        metric = load_metric(
-            metric=Metrics.OutlierDetection,
-            provider=Metrics.Provider.AlibiDetect,
-            method=Metrics.Method.AutoEncoder,
-        )
-        assert metric._set_method("not a method") is None
-
     def test_get_support_metrics(self):
         assert _get_supported_method("not valid") is None

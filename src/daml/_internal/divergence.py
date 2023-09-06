@@ -11,9 +11,8 @@ from daml._internal.MetricClasses import Divergence, Metrics
 
 
 class DpDivergence(Divergence, ABC):
-    def __init__(self, method: str) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.method = method
 
     def _compute_neighbors(self, A, B, k=1, algorithm="auto") -> None:
         """

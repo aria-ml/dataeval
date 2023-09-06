@@ -5,26 +5,27 @@
 
 import os
 import sys
-sys.path.insert(0, os.path.abspath(os.path.join('..', 'src')))
 
-project = 'DAML'
-copyright = '2023, ARiA'
-author = 'ARiA'
+sys.path.insert(0, os.path.abspath(os.path.join("..", "src")))
+
+project = "DAML"
+copyright = "2023, ARiA"
+author = "ARiA"
 
 site_url = "https://jatic.pages.jatic.net/aria/daml/"
 repo_url = "https://gitlab.jatic.net/jatic/aria/daml"
 repo_name = "DAML"
 
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.autosummary',
-    'sphinx.ext.graphviz',
-    'sphinx_immaterial',
+    "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.graphviz",
+    "sphinx_immaterial",
     "sphinx_immaterial.graphviz",
 ]
 
-templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+templates_path = ["_templates"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 autosummary_generate = False
 
@@ -39,7 +40,7 @@ html_theme_options = {
             "toggle": {
                 "icon": "material/lightbulb",
                 "name": "Switch to dark mode",
-            }
+            },
         },
         {
             "media": "(prefers-color-scheme: dark)",
@@ -47,7 +48,7 @@ html_theme_options = {
             "toggle": {
                 "icon": "material/lightbulb-outline",
                 "name": "Switch to light mode",
-            }
+            },
         },
     ]
 }
