@@ -1,6 +1,12 @@
 from typing import Any, List, Optional
 
-from daml._internal.alibidetect.outlierdetectors import AlibiAE
+from daml._internal.alibidetect.outlierdetectors import (
+    AlibiAE,
+    AlibiAEGMM,
+    AlibiLLR,
+    AlibiVAE,
+    AlibiVAEGMM,
+)
 from daml._internal.divergence import DpDivergence
 from daml._internal.MetricClasses import Metrics
 
@@ -8,11 +14,17 @@ from daml._internal.MetricClasses import Metrics
 def _get_supported_method(method):
     # TODO: develop a cleaner method for selecting the method class.
     if method == Metrics.Method.AutoEncoder:
-        return AlibiAE(method)
-    elif method == Metrics.Method.VariationalAutoEncoder:
-        return AlibiAE(method)
-    elif method == Metrics.Method.DpDivergence:
-        return DpDivergence(method)
+        return AlibiAE()
+    if method == Metrics.Method.VariationalAutoEncoder:
+        return AlibiVAE()
+    if method == Metrics.Method.AutoEncoderGMM:
+        return AlibiAEGMM()
+    if method == Metrics.Method.VariationalAutoEncoderGMM:
+        return AlibiVAEGMM()
+    if method == Metrics.Method.LLR:
+        return AlibiLLR()
+    if method == Metrics.Method.DpDivergence:
+        return DpDivergence()
     return None
 
 
@@ -47,10 +59,10 @@ def load_metric(
     mpm = Metrics.metrics_providers_methods
 
     if metric is None:
-        mpm_list = list(mpm.keys())
+        metric_list = list(mpm.keys())
         raise ValueError(
             f"""
-            No provider given. Choose one of the following: {mpm_list}
+            No metric given. Choose one of the following: {metric_list}
             """
         )
 
@@ -84,5 +96,4 @@ def load_metric(
             Method, {method}, is invalid for provider, {provider}
             """
         )
-
     return _get_supported_method(method)

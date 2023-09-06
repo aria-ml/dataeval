@@ -3,7 +3,9 @@
 # https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/ae.html#Examples
 
 from abc import ABC, abstractmethod
-from typing import Any, Iterable
+from typing import Any, Iterable, Type
+
+import numpy as np
 
 
 class Metrics:
@@ -19,6 +21,9 @@ class Metrics:
     class Method:
         AutoEncoder = "Autoencoder"
         VariationalAutoEncoder = "VAE"
+        AutoEncoderGMM = "AEGMM"
+        VariationalAutoEncoderGMM = "VAEGMM"
+        LLR = "LLR"
         DpDivergence = "Dp_Divergence"
 
     class Algorithm:
@@ -33,6 +38,9 @@ class Metrics:
             Provider.AlibiDetect: [
                 Method.AutoEncoder,
                 Method.VariationalAutoEncoder,
+                Method.AutoEncoderGMM,
+                Method.VariationalAutoEncoderGMM,
+                Method.LLR,
             ]
         },
         Divergence: {
@@ -59,6 +67,8 @@ class OutlierDetector(DataMetric, ABC):
 
     def __init__(self):
         self.is_trained: bool = False
+        self.DATASET_TYPE: Type = None
+        self.FLATTEN_DATASET: bool = False
 
     @abstractmethod
     def fit_dataset(
@@ -80,6 +90,43 @@ class OutlierDetector(DataMetric, ABC):
             "initialize_detector must be called \
             by a child class that implements it"
         )
+
+    def flatten_dataset(self, dataset) -> np.ndarray:
+        """Flattens an array of (H, W, C) images into an array of (H*W*C)"""
+        return np.reshape(dataset, (len(dataset), np.prod(np.shape(dataset[0]))))
+
+    def check_dtype(self, dataset, dtype):
+        """
+        Check is the dataset dtype fits with the required dtype of the model.
+        None is used for any accepted type. Can extend to check for multiple types
+        """
+        if dtype is None:
+            return
+        if not isinstance(dataset, np.ndarray):  # Use ndarray type conversion function
+            raise TypeError("Dataset should be of type: np.ndarray")
+
+        if not dataset.dtype.type == dtype:
+            raise TypeError(
+                f"Dataset values should be of type {dtype}, not {dataset.dtype.type}"
+            )
+
+    def format_dataset(
+        self,
+        dataset: Any,
+        flatten_dataset: bool = False,
+        dataset_type: Type = None,
+    ) -> Any:
+        """
+        Some metric libraries want a dataset in a particular format
+        (e.g. float32, or flattened)
+        This returns an iterable dataset object.
+        Override this to set the standard dataset formatting.
+        """
+        if dataset_type:
+            self.check_dtype(dataset, dataset_type)
+        if flatten_dataset:
+            dataset = self.flatten_dataset(dataset)
+        return dataset
 
 
 class Divergence(DataMetric, ABC):
