@@ -7,6 +7,7 @@ from daml._internal.alibidetect.outlierdetectors import (
     AlibiVAE,
     AlibiVAEGMM,
 )
+from daml._internal.ber import MultiClassBER
 from daml._internal.divergence import DpDivergence
 from daml._internal.MetricClasses import Metrics
 
@@ -25,6 +26,8 @@ def _get_supported_method(method):
         return AlibiLLR()
     if method == Metrics.Method.DpDivergence:
         return DpDivergence()
+    if method == Metrics.Method.MultiClassBER:
+        return MultiClassBER()
     return None
 
 
