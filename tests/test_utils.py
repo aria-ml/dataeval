@@ -8,7 +8,7 @@ from daml._internal.utils import _get_supported_method
 
 class TestLoadListMetrics:
     def test_list_metrics(self):
-        m = [Metrics.OutlierDetection, Metrics.Divergence]
+        m = [Metrics.OutlierDetection, Metrics.Divergence, Metrics.BER]
         x = list_metrics()
         assert x == m
 

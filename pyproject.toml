@@ -45,13 +45,13 @@ markers = [
 ]
 
 [tool.black]
-extend-exclude = '\.tox|.*venv.*|docs\/'
+extend-exclude = '\.tox|.*env.*|docs\/'
 
 [tool.isort]
 profile = 'black'
 skip_glob = [
     ".tox",
-    "*venv*",
+    "*env*",
     "docs/*"
     ]
 
@@ -59,13 +59,13 @@ skip_glob = [
 count = true
 exclude = [
     ".tox",
-    "*venv*",
+    "*env*",
     "docs/*"
     ]
 max-line-length = 88
 
 [tool.codespell]
-skip = '*venv*,./docs/_build,CHANGELOG.md'
+skip = '*env*,./docs/_build,CHANGELOG.md'
 
 [build-system]
 requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning"]

@@ -13,6 +13,7 @@ class Metrics:
 
     OutlierDetection = "OutlierDetection"
     Divergence = "Divergence"
+    BER = "BER"
 
     class Provider:
         AlibiDetect = "Alibi-Detect"
@@ -25,6 +26,7 @@ class Metrics:
         VariationalAutoEncoderGMM = "VAEGMM"
         LLR = "LLR"
         DpDivergence = "Dp_Divergence"
+        MultiClassBER = "MultiClassBER"
 
     class Algorithm:
         FirstNearestNeighbor = "fnn"
@@ -46,6 +48,11 @@ class Metrics:
         Divergence: {
             Provider.ARiA: [
                 Method.DpDivergence,
+            ]
+        },
+        BER: {
+            Provider.ARiA: [
+                Method.MultiClassBER,
             ]
         },
     }
@@ -131,6 +138,13 @@ class OutlierDetector(DataMetric, ABC):
 
 class Divergence(DataMetric, ABC):
     """Abstract class for calculating Dp Divergence between datasets."""
+
+    def __init__(self) -> None:
+        super().__init__()
+
+
+class BER(DataMetric, ABC):
+    """Abstract class for calculating the Bayesian Error Rate."""
 
     def __init__(self) -> None:
         super().__init__()
