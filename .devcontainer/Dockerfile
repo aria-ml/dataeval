@@ -8,6 +8,7 @@ USER root
 # sphinx (graphviz) and system level python packages
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
+        gnupg2 \
         git \
         wget \
         nodejs \
