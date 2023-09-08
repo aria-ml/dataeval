@@ -36,6 +36,23 @@ DAML provides a simple interface to characterize image data and its impact on mo
 ##### Upload the generated public key (defaults to ~/.ssh/id_ed25519.pub) to GitLab [here](https://gitlab.jatic.net/-/profile/keys).
 Additional information on configuring the SSH key can be found [here](https://gitlab.jatic.net/help/user/ssh.md).
 
+##### Create the GPG key in your host environment
+GitLab provides documentation for the GPG signing process [here](https://docs.gitlab.com/ee/user/project/repository/signed_commits/gpg.html).
+
+###### Windows/WSL2 + Dev Containers
+1. Download and install [GPG4Win](https://www.gpg4win.org/)
+2. Open Kleopatra (GPG4Win UI)
+3. `File` > `New OpenPGP Key Pair... (Ctrl+N)`
+4. Enter name and email address **matching** your GitLab account
+5. Check `Protect the generated key with a passphrase`
+6. Click `Advanced Settings`
+7. Set `Key Material` to `RSA + RSA @ 4096 bits` [source](https://docs.gitlab.com/ee/user/project/repository/signed_commits/gpg.html#create-a-gpg-key)
+8. Check `Signing` and `Authentication` and uncheck `Valid until: expiry date`.
+9. Click OK, set your passphrase, and your key should be visible in the list.
+
+###### Linux
+Follow the GitLab instructions provided in the section heading.  The instructions can also be run directly in WSL2 but is not as straightforward to link to a running Dev Container as following the instructions for Windows/WSL2 + Dev Containers
+
 ##### Clone the daml project from GitLab
 ```
 :~$ git clone git@gitlab.jatic.net:jatic/aria/daml.git
@@ -46,6 +63,12 @@ Additional information on configuring the SSH key can be found [here](https://gi
 ```
 :~$ git config --global user.name "User Name"
 :~$ git config --global user.email "username@domain.com"
+```
+
+##### Configure git to sign commits
+```
+:~$ git config --global user.signingkey <KEY ID>
+:~$ git config --global commit.gpgsign true
 ```
 
 ##### Configure .gitconfig safe directory settings
