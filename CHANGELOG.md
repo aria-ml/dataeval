@@ -1,6 +1,14 @@
-[//]: # (773f8151aa015d3346551acd2e45fbd2fc79299c)
+[//]: # (569f6896c42662b7b64763e9c6d49f05a6657622)
 
 # DAML Change Log
+## v0.24.7
+- ```569f6896 - Enable CUDA cuDNN in devcontainers```
+## v0.24.6
+- ```2ad9fed5 - Implement BER estimate```
+## v0.24.5
+- ```946d0f48 - Implement and unit test remaining Outlier Detection methods```
+- ```70d62a7d - add pytest and python extended functionality```
+- ```b75ceea8 - Write test cases for BER metrics/methods```
 ## v0.24.4
 - ```773f8151 - Fix VS Code formatting```
 - ```865985ec - Create contributing.md and update readme.md```
