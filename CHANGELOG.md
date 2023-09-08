@@ -1,6 +1,8 @@
-[//]: # (569f6896c42662b7b64763e9c6d49f05a6657622)
+[//]: # (7961457785bbd803a3938884f3613ed08d662fc9)
 
 # DAML Change Log
+## v0.24.8
+- ```79614577 - Implement Multiclass MST version of BER```
 ## v0.24.7
 - ```569f6896 - Enable CUDA cuDNN in devcontainers```
 ## v0.24.6
