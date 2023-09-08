@@ -76,11 +76,13 @@ DAML uses tox to manage test environments and execution. you can run the tests i
 | Function | Command |
 | ------ | ------ |
 | Run all tests sequentially | `tox r` |
-| Run all tests in parallel | `tox p` |
+| ~~Run all tests in parallel~~ | ~~`tox p`~~ |
 | Run unit tests sequentially | `tox r -e py38,py39,py310 -- test` |
-| Run unit tests in parallel | `tox p -e py38,py39,py310 -- test` |
+| ~~Run unit tests in parallel~~ | ~~`tox p -e py38,py39,py310 -- test`~~ |
 | Run typecheck sequentially | `tox r -e py38,py39,py310 -- typecheck` |
-| Run typecheck in parallel | `tox p -e py38,py39,py310 -- typecheck` |
+| Run typecheck in parallel~~ | ~~`tox p -e py38,py39,py310 -- typecheck` |
 | Run unit tests for specific python version | `tox r -e py3* -- test` |
 | Run typecheck for specific python version | `tox r -e py3* -- typecheck` |
 | Run lint | `tox r -e lint` |
+
+As GPU access is not thread-safe, tests cannot be run in parallel.
