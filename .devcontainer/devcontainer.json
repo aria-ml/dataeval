@@ -1,10 +1,17 @@
 // For format details, see https://aka.ms/devcontainer.json.
 {
-  "image": "31z4/tox",
+  "build": {
+    "dockerfile": "./Dockerfile"
+  },
+
+  "runArgs": [
+    "--gpus",
+    "all"
+  ],
 
   "mounts": [
-    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/tox/.gitconfig,type=bind,consistency=cached",
-    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/tox/.ssh,type=bind,consistency=cached"
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/daml/.gitconfig,type=bind,consistency=cached",
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/daml/.ssh,type=bind,consistency=cached"
   ],
 
   "features": {
@@ -14,6 +21,8 @@
   "containerEnv": {
     "SHELL": "/bin/bash"
   },
+
+  "containerUser": "daml",
 
   "customizations": {
     "vscode": {
@@ -28,5 +37,5 @@
     }
   },
 
-  "postAttachCommand": "./create_dev_env.sh"
+  "postCreateCommand": "./.devcontainer/create_dev_env.sh"
 }
