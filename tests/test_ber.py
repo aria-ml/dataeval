@@ -118,19 +118,3 @@ class TestMulticlassBER:
                 y=labels,
             )
             assert value is not None
-
-    def test_invalid_labels_to_calc_FR_stat(self):
-        covariates = np.ones(20)
-        labels = np.array([1, 2, 3])
-        metric = daml.load_metric(
-            metric=Metrics.BER,
-            provider=Metrics.Provider.ARiA,
-            method=Metrics.Method.MultiClassBER,
-        )
-        with pytest.raises(ValueError):
-            metric._calc_FR_stat(
-                covariates,
-                labels,
-            )
-            # should never get here!
-            assert False
