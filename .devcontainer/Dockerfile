@@ -85,3 +85,6 @@ RUN (${PIPDOCS} install ${DOCS_DEPS} \
    & ${PIP39} install ${TEST_DEPS} ${CUDA_DEPS} \
    & ${PIP310} install ${TEST_DEPS} ${CUDA_DEPS} \
    & wait)
+
+# Enable GPG signing
+ENV GPG_TTY=$(tty)
