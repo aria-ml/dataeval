@@ -80,7 +80,7 @@ ARG CUDA_DEPS="opencv-contrib-python-headless==4.8.0.76 nvidia-cudnn-cu11==8.6.0
 ENV LC_ALL=C.UTF-8
 
 # Install dependencies
-RUN (${PIPDOCS} install ${DOCS_DEPS} \
+RUN (${PIPDOCS} install ${TEST_DEPS} ${DOCS_DEPS} \
    & ${PIP38} install ${TEST_DEPS} ${CUDA_DEPS} \
    & ${PIP39} install ${TEST_DEPS} ${CUDA_DEPS} \
    & ${PIP310} install ${TEST_DEPS} ${CUDA_DEPS} \
