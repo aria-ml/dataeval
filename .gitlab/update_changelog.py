@@ -107,5 +107,8 @@ if __name__ == "__main__":
     body["commit_message"] = f"Update CHANGELOG.md with {entries[0].shorthash}"
     body["content"] = content
 
-    response = request("put", "repository/files/CHANGELOG.md", body)
-    print(response.json())
+    print(body["commit_message"])
+
+    # GPG signature requirements prevent REST API commits
+    # response = request("put", "repository/files/CHANGELOG.md", body)
+    # print(response.json())
