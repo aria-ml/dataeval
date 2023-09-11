@@ -39,16 +39,23 @@ Additional information on configuring the SSH key can be found [here](https://gi
 ##### Create the GPG key in your host environment
 GitLab provides documentation for the GPG signing process [here](https://docs.gitlab.com/ee/user/project/repository/signed_commits/gpg.html).
 
-###### Windows/WSL2 + Dev Containers
+###### Windows/WSL/Dev Containers
+####### Windows
 1. Download and install [GPG4Win](https://www.gpg4win.org/)
-2. Open Kleopatra (GPG4Win UI)
-3. `File` > `New OpenPGP Key Pair... (Ctrl+N)`
-4. Enter name and email address **matching** your GitLab account
-5. Check `Protect the generated key with a passphrase`
-6. Click `Advanced Settings`
-7. Set `Key Material` to `RSA + RSA @ 4096 bits` [source](https://docs.gitlab.com/ee/user/project/repository/signed_commits/gpg.html#create-a-gpg-key)
-8. Check `Signing` and `Authentication` and uncheck `Valid until: expiry date`.
-9. Click OK, set your passphrase, and your key should be visible in the list.
+2. Create an RSA+RSA 4096 bit GPG Key (Windows Instructions Below):
+   1. Open Kleopatra (GPG4Win UI)
+   2. `File` > `New OpenPGP Key Pair... (Ctrl+N)`
+   3. Enter name and email address **matching** your GitLab account
+   4. Check `Protect the generated key with a passphrase`
+   5. Click `Advanced Settings`
+   6. Set `Key Material` to `RSA + RSA @ 4096 bits` [source](https://docs.gitlab.com/ee/user/project/repository/signed_commits/gpg.html#create-a-gpg-key)
+   7. Check `Signing` and `Authentication` and uncheck `Valid until: expiry date`.
+   8. Click OK, set your passphrase, and your key should be visible in the list.
+
+####### WSL
+1. Ensure gpg is installed: `sudo apt install gpg`
+2. Register pinentry: `echo pinentry-program /mnt/c/Program\ Files\ \(x86\)/Gpg4win/bin/pinentry.exe > ~/.gnupg/gpg-agent.conf`
+3. Reload the gpg: `gpg-connect-agent reloadagent /bye`
 
 ###### Linux
 Follow the GitLab instructions provided in the section heading.  The instructions can also be run directly in WSL2 but is not as straightforward to link to a running Dev Container as following the instructions for Windows/WSL2 + Dev Containers
