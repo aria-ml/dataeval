@@ -1,5 +1,10 @@
+"""
+This module contains the implementation of Dp Divergence
+using the First Nearest Neighbor and Minimum Spanning Tree algorithms
+"""
+
 from abc import ABC
-from typing import Any, Dict
+from typing import Any, Dict, Literal
 
 import numpy as np
 from scipy.sparse import csr_matrix
@@ -12,24 +17,46 @@ from daml._internal.MetricClasses import Divergence, Metrics
 
 class DpDivergence(Divergence, ABC):
     def __init__(self) -> None:
+        """Constructor method"""
+
         super().__init__()
 
-    def _compute_neighbors(self, A, B, k=1, algorithm="auto") -> None:
+    def _compute_neighbors(
+        self,
+        A: np.ndarray,
+        B: np.ndarray,
+        k: int = 1,
+        algorithm: Literal["auto", "ball_tree", "kd_tree"] = "auto",
+    ) -> np.ndarray:
         """
         For each sample in A, compute the nearest neighbor in B
-        :inputs:
-        A and B - both (n_samples x n_features)
-        algorithm - look @ scipy NearestNeighbors nocumentation for this
-        (ball_tree or kd_tree)
-                    dont use kd_tree if n_features>~20 or 30
-        :return:
-        a list of the closest points to each point in A and B
+
+        Parameters
+        ----------
+        A, B : np.ndarray
+            The n_samples and n_features respectively
+        k : int
+            The number of neighbors to find
+        algorithm : str
+            Tree method for nearest neighbor (ball_tree or kd_tree)
+
+        .. note::
+            Do not use kd_tree if n_features > 20
+
+        Returns
+        -------
+        List:
+            Closest points to each point in A and B
+
+        See Also
+        --------
+        :func:`sklearn.neighbors.NearestNeighbors`
         """
+
         nbrs = NearestNeighbors(n_neighbors=k + 1, algorithm=algorithm).fit(B)
         nns = nbrs.kneighbors(A)[1]
         nns = nns[:, 1]
 
-        # exit()
         return nns
 
     def evaluate(
@@ -39,21 +66,44 @@ class DpDivergence(Divergence, ABC):
         algorithm: str = Metrics.Algorithm.MinimumSpanningTree,
     ) -> Dict[str, Any]:
         """
-        Requires A and B to be the same number of dimensions
-        *******
-        WARNING!!!
-        MST is very slow in this implementation, this is unlike matlab where
-        they have comparable speeds
-        Overall, MST takes ~25x LONGER!!
-        Source of slowdown:
-        conversion to and from CSR format adds ~10% of the time diff between
-        1nn and scipy mst function the remaining 90%
-        *******
+        Returns the divergence between two datasets
+
+        Parameters
+        ----------
+        dataset_a : np.ndarray
+        dataset_b : np.ndarray
+        algorithm : str, default "mst"
+
+        Returns
+        -------
+        Dict[str, Any]
+            Dictionary containing the dp divergence and the errors during calculation
+
+        Raises
+        ------
+        ValueError
+            If unsupported method is given
+
+        .. note::
+            - A and B must be the same number of dimensions
+            - Only algorithm "mst" is supported at the current time
+
+        .. warning::
+            WARNING!!!
+            MST is very slow in this implementation, this is unlike matlab where
+            they have comparable speeds
+            Overall, MST takes ~25x LONGER!!
+            Source of slowdown:
+            conversion to and from CSR format adds ~10% of the time diff between
+            1nn and scipy mst function the remaining 90%
+
+        .. todo::
+            - validate the input algorithm
+            - improve speed for MST, requires a fast mst implementation
+            mst is at least 10x slower than knn approach
         """
-        # TODO: validate the input algorithm.
 
         data = np.vstack((dataset_a, dataset_b))
-        print(type(dataset_a))
         N = dataset_a.shape[0]
         M = dataset_b.shape[0]
         labels = np.vstack([np.zeros([N, 1]), np.ones([M, 1])])
@@ -68,8 +118,6 @@ class DpDivergence(Divergence, ABC):
             # print('Errors '+str(errors))
             Dp = 1 - ((M + N) / (2 * M * N)) * errors
 
-        # TODO: improve speed for MST, requires a fast mst implementation
-        # mst is at least 10x slower than knn approach
         elif algorithm == Metrics.Algorithm.MinimumSpanningTree:
             dense_eudist = squareform(pdist(data))
             eudist_csr = csr_matrix(dense_eudist)
@@ -98,6 +146,4 @@ class DpDivergence(Divergence, ABC):
                 "Error": errors,
             },
         )
-        # errors=0
-        # Cij = errors
         return results
