@@ -40,25 +40,30 @@ Additional information on configuring the SSH key can be found [here](https://gi
 GitLab provides documentation for the GPG signing process [here](https://docs.gitlab.com/ee/user/project/repository/signed_commits/gpg.html).
 
 ###### Windows/WSL/Dev Containers
-####### Windows
+**Enable GPG in the host Windows environment**
 1. Download and install [GPG4Win](https://www.gpg4win.org/)
-2. Create an RSA+RSA 4096 bit GPG Key (Windows Instructions Below):
-   1. Open Kleopatra (GPG4Win UI)
-   2. `File` > `New OpenPGP Key Pair... (Ctrl+N)`
-   3. Enter name and email address **matching** your GitLab account
-   4. Check `Protect the generated key with a passphrase`
-   5. Click `Advanced Settings`
-   6. Set `Key Material` to `RSA + RSA @ 4096 bits` [source](https://docs.gitlab.com/ee/user/project/repository/signed_commits/gpg.html#create-a-gpg-key)
-   7. Check `Signing` and `Authentication` and uncheck `Valid until: expiry date`.
-   8. Click OK, set your passphrase, and your key should be visible in the list.
+2. Create an RSA+RSA 4096 bit GPG Key
+   1. `PS> gpg --full-gen-key`
+   2. Select RSA and RSA and use 4096-bit key length
+   3. Select a validity period
+   4. Enter name and email address **matching** your GitLab account
+   5. Enter optional comment which displays in parentheses after your name
+   6. Confirm your entries
+   7. Set a strong password
+3. Note down the `<KEY ID>`
+   1. `PS> gpg --list-secret-keys --keyid-format LONG`
+      * The key begins after the encryption method:<br>
+      `sec   rsa4096/<KEY ID>`
+4. Export the public key to upload to GitLab
+   1. `PS> gpg --armor --export <KEY ID>`
 
-####### WSL
-1. Ensure gpg is installed: `sudo apt install gpg`
-2. Register pinentry: `echo pinentry-program /mnt/c/Program\ Files\ \(x86\)/Gpg4win/bin/pinentry.exe > ~/.gnupg/gpg-agent.conf`
-3. Reload the gpg: `gpg-connect-agent reloadagent /bye`
-
-###### Linux
-Follow the GitLab instructions provided in the section heading.  The instructions can also be run directly in WSL2 but is not as straightforward to link to a running Dev Container as following the instructions for Windows/WSL2 + Dev Containers
+**Forward GPG pin entry requests from WSL to Windows**
+1. Ensure gpg is installed
+   - `$: sudo apt install gpg`
+2. Register pin entry client
+   - `$: echo pinentry-program /mnt/c/Program\ Files\ \(x86\)/Gpg4win/bin/pinentry.exe > ~/.gnupg/gpg-agent.conf`
+3. Reload the gpg agent
+   - `$: gpg-connect-agent reloadagent /bye`
 
 ##### Clone the daml project from GitLab
 ```
