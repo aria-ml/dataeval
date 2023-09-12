@@ -1,5 +1,4 @@
-# Max Bright
-# Return types for data metrics
+"""This module contains dataclasses for each metric output"""
 
 from dataclasses import dataclass
 from typing import Any, Iterable

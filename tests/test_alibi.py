@@ -49,9 +49,9 @@ class TestAlibi:
         )
 
         # TODO Need to create a helper function to handle this
-        if metric._DATASET_TYPE is not None:
-            X_all_ones = X_all_ones.astype(metric._DATASET_TYPE)
-            X_all_fives = X_all_fives.astype(metric._DATASET_TYPE)
+        if metric._dataset_type is not None:
+            X_all_ones = X_all_ones.astype(metric._dataset_type)
+            X_all_fives = X_all_fives.astype(metric._dataset_type)
 
         # Train the detector on the dataset of all 1's
         metric.fit_dataset(dataset=X_all_ones, epochs=10, verbose=False)
@@ -91,9 +91,6 @@ class TestAlibi:
             method=input,
         )
 
-        # force
-        # metric.is_trained = False
-        # Evaluate dataset before fitting it
         with pytest.raises(TypeError):
             metric.evaluate(X)
 
