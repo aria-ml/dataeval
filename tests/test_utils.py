@@ -42,4 +42,5 @@ class TestLoadListMetrics:
         assert isinstance(metric, AlibiAE)
 
     def test_get_support_metrics(self):
-        assert _get_supported_method("not valid") is None
+        with pytest.raises(ValueError):
+            _get_supported_method("not valid")

@@ -1,3 +1,8 @@
+"""
+This module contains the implementation of the
+FR Test Statistic based estimate for the Bayes Error Rate
+"""
+
 from abc import ABC
 from typing import Any, Dict
 
@@ -11,6 +16,8 @@ from daml._internal.MetricClasses import BER, Metrics
 
 class MultiClassBER(BER, ABC):
     def __init__(self) -> None:
+        """Constructor method"""
+
         super().__init__()
 
     def _multiclass_ber(
@@ -20,13 +27,29 @@ class MultiClassBER(BER, ABC):
     ) -> float:
         """
         Implements the FR Test Statistic based estimator for the Bayes Error Rate
-        derived here: https://arxiv.org/abs/1811.06419 (Th. 3 and Th. 4)
-        :inputs:
-        X - (n_samples x n_features) array of covariates (or image embeddings)
-        y - n_samples vector of class labels with M unique classes. 2 <= M <= 10
-        :return:
-        Estimate of the Bayes Error Rate
+
+        Parameters
+        ----------
+        X : np.ndarray
+            (n_samples x n_features) array of covariates (or image embeddings)
+        y : np.ndarray
+            n_samples vector of class labels with M unique classes. 2 <= M <= 10
+
+        Returns
+        -------
+        float
+            Estimate of the Bayes Error Rate
+
+        Raises
+        ------
+        ValueError
+            If unique classes M < 2 or M > 10
+
+        See Also
+        --------
+        https://arxiv.org/abs/1811.06419 (Th. 3 and Th. 4)
         """
+
         classes, counts = np.unique(y, return_counts=True)
         M = len(classes)
         N = np.sum(counts)
@@ -49,9 +72,27 @@ class MultiClassBER(BER, ABC):
         y: np.ndarray,
     ) -> Dict[str, Any]:
         """
-        TODO: Add Metric description for documentation.
+        Return the Bayes Error Rate estimate
+
+        Parameters
+        ----------
+        X : np.ndarray
+            (n_samples x n_features) array of covariates (or image embeddings)
+        y : np.ndarray
+            n_samples vector of class labels with M unique classes. 2 <= M <= 10
+
+        Returns
+        -------
+        Dict[str, float]
+            "ber": Estimate of the Bayes Error Rate
+
+        .. todo:: Add Metric description for documentation.
+
+        See Also
+        --------
         https://gitlab.jatic.net/jatic/aria/daml/-/issues/83
         """
+
         return {
             Metrics.BER: self._multiclass_ber(X, y),
         }

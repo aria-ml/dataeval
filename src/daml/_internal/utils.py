@@ -1,3 +1,8 @@
+"""
+This module contains utility functions to help
+user workflows be simpler and more efficient
+"""
+
 from typing import Any, List, Optional
 
 from daml._internal.alibidetect.outlierdetectors import (
@@ -12,7 +17,27 @@ from daml._internal.divergence import DpDivergence
 from daml._internal.MetricClasses import Metrics
 
 
-def _get_supported_method(method):
+def _get_supported_method(
+    method: str,
+) -> Any:
+    """
+    Return method class based on supported types
+
+    Parameters
+    ----------
+    method : str
+        The name of the method
+
+    Returns
+    -------
+    Metric
+
+    Raises
+    ------
+    ValueError
+        If the input is not a supported method
+    """
+
     # TODO: develop a cleaner method for selecting the method class.
     if method == Metrics.Method.AutoEncoder:
         return AlibiAE()
@@ -28,35 +53,47 @@ def _get_supported_method(method):
         return DpDivergence()
     if method == Metrics.Method.MultiClassBER:
         return MultiClassBER()
-    return None
+    raise ValueError("Method is not supported by DAML")
 
 
 def list_metrics() -> List[str]:
-    """Returns a list of metrics used in DAML
+    """Return a list of metrics used in DAML
 
-    :return: A list of metrics
-    :rtype: List
+    Returns
+    -------
+    List
+        Names of all the metrics provided by DAML
     """
+
     return list(Metrics.metrics_providers_methods.keys())
 
 
 def load_metric(
-    metric: Optional[str] = None,
+    metric: str,
     provider: Optional[str] = None,
     method: Optional[str] = None,
 ) -> Any:
     """
-    Function that returns a data metric algorithm
+    Return a data metric algorithm
 
-    :param metric: Group of algorithms based on what is being calculated
-    :type metric: Optional[str]
-    :param provider: Where to search for the dataset metrics
-    :type provider: Optional[str]
-    :param method: Name of a specific algorithm for a certain metric type
-    :type method: Optional[str]
+    Parameters
+    ----------
+    metric : str
+        Group of algorithms based on what is being calculated
+    provider : str, optional
+        The parent library where the implementation is defined
+    method : str, optional
+        Name of the specific algorithm for a certain metric type
 
-    :return: A metric method class
-    :rtype: DataMetric
+    Returns
+    -------
+    Metric
+        A metric that performs data analysis with a specific method
+
+    Raises
+    ------
+    ValueError
+        If the metric, provider, or method are invalid. See docs for supported inputs
     """
 
     mpm = Metrics.metrics_providers_methods
