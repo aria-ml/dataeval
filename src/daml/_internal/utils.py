@@ -19,10 +19,9 @@ from daml._internal.MetricClasses import Metrics
 _methods = {
     Metrics.Method.AutoEncoder: AlibiAE,
     Metrics.Method.AutoEncoderGMM: AlibiAEGMM,
-    Metrics.Method.VariationalAutoEncoder: AlibiVAE,
-    Metrics.Method.AutoEncoderGMM: AlibiAEGMM,
-    Metrics.Method.VariationalAutoEncoderGMM: AlibiVAEGMM,
     Metrics.Method.LLR: AlibiLLR,
+    Metrics.Method.VariationalAutoEncoder: AlibiVAE,
+    Metrics.Method.VariationalAutoEncoderGMM: AlibiVAEGMM,
     Metrics.Method.DpDivergence: DpDivergence,
     Metrics.Method.MultiClassBER: MultiClassBER,
 }
