@@ -166,7 +166,7 @@ changelog:
   before_script:
   - pip install requests
   script:
-  - python ./gitlab/update_changelog.py
+  - python .gitlab/update_changelog.py
   environment:
     name: production
   rules:
