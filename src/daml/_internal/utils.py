@@ -16,44 +16,16 @@ from daml._internal.ber import MultiClassBER
 from daml._internal.divergence import DpDivergence
 from daml._internal.MetricClasses import Metrics
 
-
-def _get_supported_method(
-    method: str,
-) -> Any:
-    """
-    Return method class based on supported types
-
-    Parameters
-    ----------
-    method : str
-        The name of the method
-
-    Returns
-    -------
-    Metric
-
-    Raises
-    ------
-    ValueError
-        If the input is not a supported method
-    """
-
-    # TODO: develop a cleaner method for selecting the method class.
-    if method == Metrics.Method.AutoEncoder:
-        return AlibiAE()
-    if method == Metrics.Method.VariationalAutoEncoder:
-        return AlibiVAE()
-    if method == Metrics.Method.AutoEncoderGMM:
-        return AlibiAEGMM()
-    if method == Metrics.Method.VariationalAutoEncoderGMM:
-        return AlibiVAEGMM()
-    if method == Metrics.Method.LLR:
-        return AlibiLLR()
-    if method == Metrics.Method.DpDivergence:
-        return DpDivergence()
-    if method == Metrics.Method.MultiClassBER:
-        return MultiClassBER()
-    raise ValueError("Method is not supported by DAML")
+_methods = {
+    Metrics.Method.AutoEncoder: AlibiAE,
+    Metrics.Method.AutoEncoderGMM: AlibiAEGMM,
+    Metrics.Method.VariationalAutoEncoder: AlibiVAE,
+    Metrics.Method.AutoEncoderGMM: AlibiAEGMM,
+    Metrics.Method.VariationalAutoEncoderGMM: AlibiVAEGMM,
+    Metrics.Method.LLR: AlibiLLR,
+    Metrics.Method.DpDivergence: DpDivergence,
+    Metrics.Method.MultiClassBER: MultiClassBER,
+}
 
 
 def list_metrics() -> List[str]:
@@ -129,11 +101,11 @@ def load_metric(
     if method is None:
         method = supported_methods[0]
 
-    # Check if the provider supports the method
-    if method not in supported_methods:
+    if method in _methods:
+        return _methods[method]()
+    else:
         raise ValueError(
             f"""
             Method, {method}, is invalid for provider, {provider}
             """
         )
-    return _get_supported_method(method)

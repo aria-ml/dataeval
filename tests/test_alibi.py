@@ -14,7 +14,8 @@ from .utils import MockImageClassificationGenerator
         Metrics.Method.VariationalAutoEncoder,
         Metrics.Method.AutoEncoderGMM,
         Metrics.Method.VariationalAutoEncoderGMM,
-        Metrics.Method.LLR,
+        # remove functional marker after issue #94 is resolved
+        pytest.param(Metrics.Method.LLR, marks=pytest.mark.functional),
     ],
 )
 class TestAlibi:
