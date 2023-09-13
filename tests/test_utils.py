@@ -3,7 +3,6 @@ import pytest
 from daml import list_metrics, load_metric
 from daml._internal.alibidetect.outlierdetectors import AlibiAE
 from daml._internal.MetricClasses import Metrics
-from daml._internal.utils import _get_supported_method
 
 
 class TestLoadListMetrics:
@@ -40,7 +39,3 @@ class TestLoadListMetrics:
             metric=Metrics.OutlierDetection, provider=provider, method=method
         )
         assert isinstance(metric, AlibiAE)
-
-    def test_get_support_metrics(self):
-        with pytest.raises(ValueError):
-            _get_supported_method("not valid")

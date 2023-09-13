@@ -21,7 +21,16 @@ class TestDatasetType:
         all_ones_images = all_ones.dataset.images
         metric.check_dtype(all_ones_images, None)
 
-    @pytest.mark.parametrize("dtype", [int, np.float64, np.float32, np.float16, float])
+    @pytest.mark.parametrize(
+        "dtype",
+        [
+            pytest.param(int, marks=pytest.mark.functional),
+            np.float64,
+            np.float32,
+            pytest.param(np.float16, marks=pytest.mark.functional),
+            pytest.param(float, marks=pytest.mark.functional),
+        ],
+    )
     @pytest.mark.parametrize(
         "method",
         [
@@ -29,7 +38,8 @@ class TestDatasetType:
             Metrics.Method.AutoEncoderGMM,
             Metrics.Method.VariationalAutoEncoder,
             Metrics.Method.VariationalAutoEncoderGMM,
-            Metrics.Method.LLR,
+            # remove functional marker after issue #94 is resolved
+            pytest.param(Metrics.Method.LLR, marks=pytest.mark.functional),
         ],
     )
     def test_dataset_type_is_incorrect(self, dtype, method):
@@ -86,9 +96,30 @@ class TestFlatten:
         new_dataset = metric.format_dataset(images, flatten_dataset=None)
         assert new_dataset.shape == images.shape
 
-    @pytest.mark.parametrize("limit", [1, 5, 25])
-    @pytest.mark.parametrize("img_dims", [(1, 1), (32, 32), (16, 64)])
-    @pytest.mark.parametrize("channels", [1, 3, 5])
+    @pytest.mark.parametrize(
+        "limit",
+        [
+            1,
+            pytest.param(5, marks=pytest.mark.functional),
+            pytest.param(25, marks=pytest.mark.functional),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "img_dims",
+        [
+            (1, 1),
+            pytest.param((32, 32), marks=pytest.mark.functional),
+            pytest.param((16, 64), marks=pytest.mark.functional),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "channels",
+        [
+            1,
+            pytest.param(3, marks=pytest.mark.functional),
+            pytest.param(5, marks=pytest.mark.functional),
+        ],
+    )
     def test_flatten_dataset_is_true(self, limit, img_dims, channels):
         """Prove that the flatten dataset only affects the image shape, not batch"""
         # Define data
