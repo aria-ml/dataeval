@@ -48,7 +48,7 @@ test:
   - !reference [".build_env", "before_script"]
   - pip install tox
   script:
-  - tox -e ${version_dict[${PYTHON_VERSIONS}]} -- test
+  - tox -e ${version_dict[${PYTHON_VERSIONS}]} -- test --runfunctional
   after_script:
   - mv .coverage .coverage.$PYTHON_VERSIONS
   artifacts:
