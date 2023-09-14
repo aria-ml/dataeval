@@ -31,6 +31,21 @@ python = ">=3.8, <3.11"
 tensorflow = "2.12.1"
 alibi-detect = {extras=["tensorflow"], version="0.11.4"}
 
+[tool.poetry.group.test.dependencies]
+numpy = "*"
+pytest = "*"
+coverage = "*"
+
+[tool.poetry.group.type.dependencies]
+pyright = "*"
+
+[tool.poetry.group.lint.dependencies]
+flake8 = "*"
+flake8-pyproject = "*"
+black = { extras = ["jupyter"], version = "*" }
+isort = "*"
+codespell = "*"
+
 [tool.poetry-dynamic-versioning]
 enable = false
 vcs = "git"
