@@ -43,6 +43,7 @@ class BaseAlibiDetectOD(OutlierDetector, ABC):
         super().__init__()
         self._kwargs = dict()
         self.detector: Any = None
+        self._reference_input_shape: Optional[Tuple[int, int, int]] = None
 
     # Train the alibi-detect metric on dataset
     def fit_dataset(
@@ -141,6 +142,7 @@ class AlibiAE(BaseAlibiDetectOD):
             the detector will be trained on.
 
         """
+        self._reference_input_shape = input_shape
         tf.keras.backend.clear_session()
         encoding_dim = 1024
 
@@ -194,13 +196,9 @@ class AlibiAE(BaseAlibiDetectOD):
                     padding="same",
                     activation=relu,
                 ),
-                Conv2DTranspose(
-                    3,
-                    4,
-                    strides=2,
-                    padding="same",
-                    activation="sigmoid",
-                ),
+                Flatten(),
+                Dense(np.prod(input_shape)),
+                Reshape(target_shape=input_shape),
             ]
         )
 
@@ -266,6 +264,7 @@ class AlibiAE(BaseAlibiDetectOD):
             dataset,
             flatten_dataset=self._FLATTEN_DATASET_FLAG,
             dataset_type=self._DATASET_TYPE,
+            reference_input_shape=self._reference_input_shape,
         )
 
         if self.detector is None:
@@ -313,6 +312,7 @@ class AlibiVAE(BaseAlibiDetectOD):
             the detector will be trained on.
 
         """
+        self._reference_input_shape = input_shape
         tf.keras.backend.clear_session()
         encoding_dim = 1024
 
@@ -366,13 +366,9 @@ class AlibiVAE(BaseAlibiDetectOD):
                     padding="same",
                     activation=relu,
                 ),
-                Conv2DTranspose(
-                    3,
-                    4,
-                    strides=2,
-                    padding="same",
-                    activation="sigmoid",
-                ),
+                Flatten(),
+                Dense(np.prod(input_shape)),
+                Reshape(target_shape=input_shape),
             ]
         )
 
@@ -441,6 +437,7 @@ class AlibiVAE(BaseAlibiDetectOD):
             dataset,
             flatten_dataset=self._FLATTEN_DATASET_FLAG,
             dataset_type=self._DATASET_TYPE,
+            reference_input_shape=self._reference_input_shape,
         )
 
         if self.detector is None:
@@ -493,6 +490,7 @@ class AlibiAEGMM(BaseAlibiDetectOD):
             the detector will be trained on.
 
         """
+        self._reference_input_shape = input_shape
         tf.keras.backend.clear_session()
         n_features = tf.math.reduce_prod(input_shape)
         latent_dim = 1
@@ -574,6 +572,7 @@ class AlibiAEGMM(BaseAlibiDetectOD):
             dataset,
             flatten_dataset=self._FLATTEN_DATASET_FLAG,
             dataset_type=self._DATASET_TYPE,
+            reference_input_shape=self._reference_input_shape,
         )
 
         super().fit_dataset(dataset, epochs, verbose)
@@ -600,6 +599,7 @@ class AlibiAEGMM(BaseAlibiDetectOD):
             dataset,
             flatten_dataset=self._FLATTEN_DATASET_FLAG,
             dataset_type=self._DATASET_TYPE,
+            reference_input_shape=self._reference_input_shape,
         )
 
         if self.detector is None:
@@ -649,6 +649,7 @@ class AlibiVAEGMM(BaseAlibiDetectOD):
             the detector will be trained on.
 
         """
+        self._reference_input_shape = input_shape
         tf.keras.backend.clear_session()
         n_features = tf.math.reduce_prod(input_shape)
         latent_dim = 2
@@ -731,6 +732,7 @@ class AlibiVAEGMM(BaseAlibiDetectOD):
             dataset,
             flatten_dataset=self._FLATTEN_DATASET_FLAG,
             dataset_type=self._DATASET_TYPE,
+            reference_input_shape=self._reference_input_shape,
         )
 
         super().fit_dataset(dataset, epochs, verbose)
@@ -757,6 +759,7 @@ class AlibiVAEGMM(BaseAlibiDetectOD):
             dataset,
             flatten_dataset=self._FLATTEN_DATASET_FLAG,
             dataset_type=self._DATASET_TYPE,
+            reference_input_shape=self._reference_input_shape,
         )
 
         if self.detector is None:
@@ -806,6 +809,7 @@ class AlibiLLR(BaseAlibiDetectOD):
 
         """
         tf.keras.backend.clear_session()
+        self._reference_input_shape = input_shape
 
         # LLR internally uses a Pixel CNN architecture,
         # which we initialize here
@@ -863,6 +867,7 @@ class AlibiLLR(BaseAlibiDetectOD):
             dataset,
             flatten_dataset=self._FLATTEN_DATASET_FLAG,
             dataset_type=self._DATASET_TYPE,
+            reference_input_shape=self._reference_input_shape,
         )
 
         super().fit_dataset(dataset, epochs, verbose)
@@ -904,6 +909,7 @@ class AlibiLLR(BaseAlibiDetectOD):
             dataset,
             flatten_dataset=self._FLATTEN_DATASET_FLAG,
             dataset_type=self._DATASET_TYPE,
+            reference_input_shape=self._reference_input_shape,
         )
 
         predictions = self.detector.predict(
