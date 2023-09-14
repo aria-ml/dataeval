@@ -80,7 +80,7 @@ exclude = [
 max-line-length = 88
 
 [tool.codespell]
-skip = '*env*,./docs/_build,CHANGELOG.md'
+skip = '*env*,./docs/_build,CHANGELOG.md,poetry.lock'
 
 [build-system]
 requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning"]
