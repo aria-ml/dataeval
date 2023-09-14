@@ -141,7 +141,7 @@ class OutlierDetector(DataMetric, ABC):
     def check_dtype(self, dataset: np.ndarray, dtype: Type):
         """
         Check if the dataset dtype fits with the required dtype of the model.
-        None is used for any accepted type. Can extend to check for multiple types
+        None is used for any accepted type. Can extend to check for multiple types.
 
         Parameters
         ----------
@@ -160,7 +160,8 @@ class OutlierDetector(DataMetric, ABC):
 
         if dtype is None:
             return
-        if not isinstance(dataset, np.ndarray):  # Use ndarray type conversion function
+        # Use ndarray type conversion function
+        if not isinstance(dataset, np.ndarray):
             raise TypeError("Dataset should be of type: np.ndarray")
 
         if not dataset.dtype.type == dtype:

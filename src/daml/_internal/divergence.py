@@ -4,7 +4,7 @@ using the First Nearest Neighbor and Minimum Spanning Tree algorithms
 """
 
 from abc import ABC
-from typing import Any, Dict, Literal
+from typing import Literal
 
 import numpy as np
 from scipy.sparse import csr_matrix
@@ -13,6 +13,7 @@ from scipy.spatial.distance import pdist, squareform
 from sklearn.neighbors import NearestNeighbors
 
 from daml._internal.MetricClasses import Divergence, Metrics
+from daml._internal.MetricOutputs import DivergenceOutput
 
 
 class DpDivergence(Divergence, ABC):
@@ -64,7 +65,7 @@ class DpDivergence(Divergence, ABC):
         dataset_a: np.ndarray,
         dataset_b: np.ndarray,
         algorithm: str = Metrics.Algorithm.MinimumSpanningTree,
-    ) -> Dict[str, Any]:
+    ) -> DivergenceOutput:
         """
         Returns the divergence between two datasets
 
@@ -107,7 +108,6 @@ class DpDivergence(Divergence, ABC):
         N = dataset_a.shape[0]
         M = dataset_b.shape[0]
         labels = np.vstack([np.zeros([N, 1]), np.ones([M, 1])])
-        results = dict()
         Dp = None
 
         if algorithm == Metrics.Algorithm.FirstNearestNeighbor:
@@ -140,10 +140,8 @@ class DpDivergence(Divergence, ABC):
                 }
                 """
             )
-        results.update(
-            {
-                Metrics.Method.DpDivergence: Dp,
-                "Error": errors,
-            },
-        )
-        return results
+
+        # errors=0
+        # Cij = errors
+        output = DivergenceOutput(dpdivergence=Dp, error=errors)
+        return output
