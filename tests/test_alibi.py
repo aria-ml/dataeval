@@ -81,6 +81,43 @@ class TestAlibi:
         assert num_errors_on_ones == 0
         assert num_errors_on_fives == 0
 
+    @pytest.mark.functional
+    def test_different_input_shape(self, input):
+        """Testing of Alibi Detection under different input size"""
+
+        input_shape = (38, 38, 2)
+
+        # Initialize a dataset of 32 images of size 32x32x3, containing all 1's
+        all_ones = MockImageClassificationGenerator(
+            limit=1, labels=1, img_dims=input_shape
+        )
+
+        # Get model input from each dataset
+        X_all_ones = all_ones.dataset.images
+
+        # Initialize the autoencoder-based outlier detector from alibi-detect
+        metric = daml.load_metric(
+            metric=Metrics.OutlierDetection,
+            provider=Metrics.Provider.AlibiDetect,
+            method=input,
+        )
+
+        metric.initialize_detector(input_shape)
+
+        # TODO Need to create a helper function to handle this
+        if metric._DATASET_TYPE is not None:
+            X_all_ones = X_all_ones.astype(metric._DATASET_TYPE)
+
+        # Train the detector on the dataset of all 1's
+        metric.fit_dataset(dataset=X_all_ones, epochs=10, verbose=False)
+
+        # Evaluate the detector on the dataset of all 1's
+        preds_on_ones = metric.evaluate(X_all_ones).is_outlier
+
+        num_errors_on_ones = np.sum(np.where(preds_on_ones != 0))
+
+        assert num_errors_on_ones == 0
+
     # Ensure that the program fails upon wrong order of operations
     def test_eval_before_fit_fails(self, input):
         """Testing incorrect order of operations for fitting and evaluating"""
@@ -106,7 +143,51 @@ class TestAlibi:
         with pytest.raises(TypeError):
             metric.evaluate(X)
 
+    # Ensure that the program fails upon testing on a dataset of different
+    # shape than what was trained on
+    def test_wrong_dataset_dims_fails(self, input):
+        """Testing incorrect order of operations for fitting and evaluating"""
+
+        input_shape = (32, 32, 3)
+        faulty_input_shape = (11, 32, 3)
+
+        all_ones = MockImageClassificationGenerator(
+            limit=3, labels=1, img_dims=input_shape[:1], channels=input_shape[2]
+        )
+
+        faulty_all_ones = MockImageClassificationGenerator(
+            limit=3,
+            labels=1,
+            img_dims=faulty_input_shape[:1],
+            channels=faulty_input_shape[2],
+        )
+
+        X = all_ones.dataset.images
+        faulty_X = faulty_all_ones.dataset.images
+
+        metric = daml.load_metric(
+            metric=Metrics.OutlierDetection,
+            provider=Metrics.Provider.AlibiDetect,
+            method=input,
+        )
+
+        if metric._DATASET_TYPE is not None:
+            X = X.astype(metric._DATASET_TYPE)
+            faulty_X = faulty_X.astype(metric._DATASET_TYPE)
+
+        metric.initialize_detector(input_shape)
+
+        metric.fit_dataset(dataset=X, epochs=1, verbose=False)
+
+        # force
+        # metric.is_trained = False
+        # Evaluate dataset before fitting it
+        with pytest.raises(TypeError):
+            metric.evaluate(faulty_X)
+
     def test_missing_detector(self, input):
+        input_shape = (32, 32, 3)
+
         input_shape = (32, 32, 3)
 
         all_ones = MockImageClassificationGenerator(

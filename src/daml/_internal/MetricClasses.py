@@ -6,7 +6,7 @@ https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/ae.html#Exampl
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Iterable, Type
+from typing import Any, Iterable, Optional, Tuple, Type
 
 import numpy as np
 
@@ -96,7 +96,7 @@ class OutlierDetector(DataMetric, ABC):
         """Constructor method"""
 
         self.is_trained: bool = False
-        self._dataset_type: Type = None
+        self._DATASET_TYPE: Type = None
         self.FLATTEN_DATASET_FLAG: bool = False
 
     @abstractmethod
@@ -169,11 +169,39 @@ class OutlierDetector(DataMetric, ABC):
                 f"Dataset values should be of type {dtype}, not {dataset.dtype.type}"
             )
 
+    def check_dataset_shape(self, dataset, reference_input_shape):
+        """
+        Verifies that a dataset has the same shape as a reference shape.
+        Use this when fitting or evaluating a model on a dataset, to
+        ensure that the dataset's dims are compatible with that which the model
+        was built for.
+
+        Parameters
+        ----------
+        dataset : Iterable[float]
+            An array of images in shape (B, H, W, C)
+        reference_input_shape : Tuple[int, int, int]
+            Dimensions of one image (H,W,C) to compare the dataset shape to
+
+        Raises
+        -------
+        TypeError
+            Raised if the dims of the last 3 channels of dataset
+            don't line up with reference_input_shape
+        """
+        if dataset.shape[-3:] != reference_input_shape:
+            raise TypeError(
+                f"Model was initialzied on dataset shape \
+                (W,H,C)={reference_input_shape}, \
+                but provided dataset has shape (W,H,C)={dataset.shape[-3:]}"
+            )
+
     def format_dataset(
         self,
         dataset: Any,
         flatten_dataset: bool = False,
         dataset_type: Type = None,
+        reference_input_shape: Optional[Tuple[int, int, int]] = None,
     ) -> Iterable[float]:
         """
         Formats a dataset such that it fits the required datatype and shape
@@ -196,7 +224,8 @@ class OutlierDetector(DataMetric, ABC):
                 (e.g. float32, or flattened)
             - Override this to set the standard dataset formatting.
         """
-
+        if reference_input_shape:
+            self.check_dataset_shape(dataset, reference_input_shape)
         if dataset_type:
             self.check_dtype(dataset, dataset_type)
         if flatten_dataset:

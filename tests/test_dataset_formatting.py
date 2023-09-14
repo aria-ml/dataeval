@@ -56,7 +56,7 @@ class TestDatasetType:
         # Cast dtype to force error when dataset dtype is not the required
         images = all_ones.dataset.images.astype(dtype)
 
-        metric_dtype = metric._dataset_type
+        metric_dtype = metric._DATASET_TYPE
         if dtype == metric_dtype or metric_dtype is None:
             metric.check_dtype(images, metric_dtype)
         else:
