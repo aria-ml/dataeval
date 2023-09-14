@@ -75,7 +75,7 @@ class TestDatasetType:
         )
         images_list = list(all_ones.dataset.images)
         with pytest.raises(TypeError):
-            metric.check_dtype(images_list, metric._dataset_type)
+            metric.check_dtype(images_list, metric._DATASET_TYPE)
 
 
 class TestFlatten:

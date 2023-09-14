@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 import daml
+from daml._internal.MetricOutputs import DivergenceOutput
 from daml._internal.utils import Metrics
 
 
@@ -11,17 +12,17 @@ class TestDpDivergence:
         [
             (
                 Metrics.Algorithm.MinimumSpanningTree,
-                {
-                    Metrics.Method.DpDivergence: -0.96875,
-                    "Error": 63,
-                },
+                DivergenceOutput(
+                    dpdivergence=-0.96875,
+                    error=63,
+                ),
             ),
             (
                 Metrics.Algorithm.FirstNearestNeighbor,
-                {
-                    Metrics.Method.DpDivergence: 1.0,
-                    "Error": 0.0,
-                },
+                DivergenceOutput(
+                    dpdivergence=1.0,
+                    error=0.0,
+                ),
             ),
         ],
     )

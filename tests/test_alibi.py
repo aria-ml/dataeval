@@ -28,14 +28,17 @@ class TestAlibi:
         When evaluating, the model should say all 1's are not outliers
         and all 5's are outliers
         """
+
+        input_shape = (32, 32, 3)
+
         # Initialize a dataset of 32 images of size 32x32x3, containing all 1's
         all_ones = MockImageClassificationGenerator(
-            limit=1, labels=1, img_dims=(32, 32), channels=3
+            limit=1, labels=1, img_dims=input_shape
         )
 
         # Initialize a dataset of 32 images of size 32x32x3, containing all 5's
         all_fives = MockImageClassificationGenerator(
-            limit=1, labels=5, img_dims=(32, 32), channels=3
+            limit=1, labels=5, img_dims=input_shape
         )
 
         # Get model input from each dataset
@@ -49,10 +52,12 @@ class TestAlibi:
             method=input,
         )
 
+        metric.initialize_detector(input_shape)
+
         # TODO Need to create a helper function to handle this
-        if metric._dataset_type is not None:
-            X_all_ones = X_all_ones.astype(metric._dataset_type)
-            X_all_fives = X_all_fives.astype(metric._dataset_type)
+        if metric._DATASET_TYPE is not None:
+            X_all_ones = X_all_ones.astype(metric._DATASET_TYPE)
+            X_all_fives = X_all_fives.astype(metric._DATASET_TYPE)
 
         # Train the detector on the dataset of all 1's
         metric.fit_dataset(dataset=X_all_ones, epochs=10, verbose=False)
@@ -80,8 +85,10 @@ class TestAlibi:
     def test_eval_before_fit_fails(self, input):
         """Testing incorrect order of operations for fitting and evaluating"""
 
+        input_shape = (32, 32, 3)
+
         all_ones = MockImageClassificationGenerator(
-            limit=3, labels=1, img_dims=(32, 32), channels=3
+            limit=3, labels=1, img_dims=input_shape
         )
 
         X = all_ones.dataset.images
@@ -92,12 +99,18 @@ class TestAlibi:
             method=input,
         )
 
+        metric.initialize_detector(input_shape)
+
+        # force metric.is_trained = False
+        # Evaluate dataset before fitting it
         with pytest.raises(TypeError):
             metric.evaluate(X)
 
     def test_missing_detector(self, input):
+        input_shape = (32, 32, 3)
+
         all_ones = MockImageClassificationGenerator(
-            limit=1, labels=1, img_dims=(32, 32), channels=3
+            limit=1, labels=1, img_dims=input_shape
         )
 
         X = all_ones.dataset.images
@@ -108,8 +121,6 @@ class TestAlibi:
             method=input,
         )
 
-        # Force the detector to not be initialized
-        metric.detector = None
         with pytest.raises(TypeError):
             metric.fit_dataset(dataset=X, epochs=1, verbose=False)
 
