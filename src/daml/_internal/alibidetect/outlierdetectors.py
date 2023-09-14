@@ -4,7 +4,7 @@ created by Alibi Detect
 """
 
 from abc import ABC
-from typing import Any, Dict, Iterable, Optional, Type
+from typing import Any, Dict, Iterable, Optional, Tuple, Type
 
 import alibi_detect
 import numpy as np
@@ -22,7 +22,7 @@ from tensorflow.keras.layers import (
 from tensorflow.nn import relu
 
 from daml._internal.MetricClasses import OutlierDetector
-from daml._internal.MetricOutputs import AlibiOutlierDetectorOutput
+from daml._internal.MetricOutputs import OutlierDetectorOutput
 
 
 class BaseAlibiDetectOD(OutlierDetector, ABC):
@@ -42,14 +42,14 @@ class BaseAlibiDetectOD(OutlierDetector, ABC):
 
         super().__init__()
         self._kwargs = dict()
-        self.detector: Any = self.initialize_detector()
+        self.detector: Any = None
 
     # Train the alibi-detect metric on dataset
     def fit_dataset(
         self,
         dataset: Iterable[float],
-        epochs: int,
-        verbose: bool,
+        epochs: int = 3,
+        verbose: bool = False,
     ) -> None:
         """
         Trains a model on a dataset containing that can be used
@@ -59,10 +59,10 @@ class BaseAlibiDetectOD(OutlierDetector, ABC):
         ----------
         dataset : Iterable[float]
             An array of images for the model to train on
-        epochs : int
-            Number of training iterations
-        verbose : bool
-            Flag to output logging
+        epochs : int, default 3
+            Number of epochs to train the detector for.
+        verbose : bool, default False
+            Flag to output logs from Alibi-Detect verbose mode.bi-Detect verbose mode.
 
         Raises
         ------
@@ -85,10 +85,10 @@ class BaseAlibiDetectOD(OutlierDetector, ABC):
 
     def _format_results(
         self, preds: Dict[str, Dict[str, Any]]
-    ) -> AlibiOutlierDetectorOutput:
+    ) -> OutlierDetectorOutput:
         """
         Changes outlier detection dictionary outputs into an \
-        :class:`AlibiOutlierDetectorOutput` dataclass
+        :class:`OutlierDetectorOutput` dataclass
 
         Parameters
         ----------
@@ -97,12 +97,12 @@ class BaseAlibiDetectOD(OutlierDetector, ABC):
 
         Returns
         -------
-        :class:`AlibiOutlierDetectorOutput`
+        :class:`OutlierDetectorOutput`
             A dataclass containing outlier mask, feature scores
             and instance scores if applicable
         """
 
-        output = AlibiOutlierDetectorOutput(
+        output = OutlierDetectorOutput(
             is_outlier=preds["data"]["is_outlier"],
             feature_score=preds["data"]["feature_score"],
             instance_score=preds["data"]["instance_score"],
@@ -124,18 +124,23 @@ class AlibiAE(BaseAlibiDetectOD):
         """Constructor method"""
 
         super().__init__()
-        self._dataset_type: Optional[Type] = None
+        self._DATASET_TYPE: Optional[Type] = None
+        self._FLATTEN_DATASET_FLAG: bool = False
 
-    def initialize_detector(self) -> tf.keras.Sequential:
+    def initialize_detector(self, input_shape: Tuple[int, int, int]) -> None:
         """
-        Initialize the architecture and model weights of the autoencoder
+        Initialize the architecture and model weights of the autoencoder.
 
-        Returns
-        -------
-        tf.keras.Sequential
-            An untrained autoencoder created by AlibiDetect
+        Parameters
+        ----------
+        input_shape : tuple(int)
+            The shape (W,H,C) of the dataset
+            that the detector will be constructed around. This influences
+            the internal neural network architecture.
+            This should be the same shape as the dataset that
+            the detector will be trained on.
+
         """
-
         tf.keras.backend.clear_session()
         encoding_dim = 1024
 
@@ -143,7 +148,7 @@ class AlibiAE(BaseAlibiDetectOD):
         # Here we define the encoder
         encoder_net = Sequential(
             [
-                InputLayer(input_shape=(32, 32, 3)),
+                InputLayer(input_shape=input_shape),
                 Conv2D(
                     64,
                     4,
@@ -208,7 +213,7 @@ class AlibiAE(BaseAlibiDetectOD):
             }
         )
         # initialize outlier detector using autoencoder network
-        return alibi_detect.od.OutlierAE(**self._kwargs)
+        self.detector = alibi_detect.od.OutlierAE(**self._kwargs)
 
     def fit_dataset(
         self,
@@ -225,9 +230,9 @@ class AlibiAE(BaseAlibiDetectOD):
         dataset : Iterable[float]
             An array of images for the model to train on
         epochs : int, default 3
-            Number of training iterations
+            Number of epochs to train the detector for.
         verbose : bool, default False
-            Flag to output logging
+            Flag to output logs from Alibi-Detect verbose mode.
 
         Raises
         ------
@@ -241,20 +246,27 @@ class AlibiAE(BaseAlibiDetectOD):
         super().fit_dataset(dataset, epochs, verbose)
         self.detector.infer_threshold(dataset, threshold_perc=95)
 
-    def evaluate(self, dataset: Iterable[float]) -> AlibiOutlierDetectorOutput:
+    def evaluate(self, dataset: Iterable[float]) -> OutlierDetectorOutput:
         """
-        Evaluate the outlier detector metric on dataset
+        Evaluate the outlier detector metric on a dataset.
 
         Parameters
         ----------
         dataset : Iterable[float]
-            An array of images
+            The dataset to detect outliers on.
 
         Returns
         -------
-        :class:`AlibiOutlierDetectorOutput
-            Outlier mask and associated feature and instance scores
+        :class: OutlierDetectorOutput
+            Outlier mask, and associated feature andinstance scores
+
         """
+        # Cast and flatten dataset
+        dataset = self.format_dataset(
+            dataset,
+            flatten_dataset=self._FLATTEN_DATASET_FLAG,
+            dataset_type=self._DATASET_TYPE,
+        )
 
         if self.detector is None:
             raise TypeError(
@@ -284,18 +296,23 @@ class AlibiVAE(BaseAlibiDetectOD):
         """Constructor method"""
 
         super().__init__()
-        self._dataset_type: Optional[Type] = None
+        self._DATASET_TYPE: Optional[Type] = None
+        self._FLATTEN_DATASET_FLAG: bool = False
 
-    def initialize_detector(self) -> tf.keras.Sequential:
+    def initialize_detector(self, input_shape: Tuple[int, int, int]) -> None:
         """
-        Initialize the architecture and model weights of the autoencoder
+        Initialize the architecture and model weights of the autoencoder.
 
-        Returns
-        -------
-        tf.keras.Sequential
-            An untrained autoencoder created by AlibiDetect
+        Parameters
+        ----------
+        input_shape : tuple(int)
+            The shape (W,H,C) of the dataset
+            that the detector will be constructed around. This influences
+            the internal neural network architecture.
+            This should be the same shape as the dataset that
+            the detector will be trained on.
+
         """
-
         tf.keras.backend.clear_session()
         encoding_dim = 1024
 
@@ -303,7 +320,7 @@ class AlibiVAE(BaseAlibiDetectOD):
         # Here we define the encoder
         encoder_net = Sequential(
             [
-                InputLayer(input_shape=(32, 32, 3)),
+                InputLayer(input_shape=input_shape),
                 Conv2D(
                     64,
                     4,
@@ -370,7 +387,7 @@ class AlibiVAE(BaseAlibiDetectOD):
             }
         )
         # initialize outlier detector using autoencoder network
-        return alibi_detect.od.OutlierVAE(**self._kwargs)
+        self.detector = alibi_detect.od.OutlierVAE(**self._kwargs)
 
     def fit_dataset(
         self,
@@ -386,10 +403,10 @@ class AlibiVAE(BaseAlibiDetectOD):
         ----------
         dataset : Iterable[float]
             An array of images for the model to train on
-        epochs : int
-            Number of training iterations
-        verbose : bool
-            Flag to output logging
+        epochs : int, default 3
+            Number of epochs to train the detector for.
+        verbose : bool, default False
+            Flag to output logs from Alibi-Detect verbose mode.
 
         Raises
         ------
@@ -403,9 +420,9 @@ class AlibiVAE(BaseAlibiDetectOD):
         super().fit_dataset(dataset, epochs, verbose)
         self.detector.infer_threshold(dataset, threshold_perc=95)
 
-    def evaluate(self, dataset: Iterable[float]) -> AlibiOutlierDetectorOutput:
+    def evaluate(self, dataset: Iterable[float]) -> OutlierDetectorOutput:
         """
-        Evaluate the outlier detector metric on dataset
+        Evaluate the outlier detector metric on a dataset.
 
         Parameters
         ----------
@@ -414,9 +431,17 @@ class AlibiVAE(BaseAlibiDetectOD):
 
         Returns
         -------
-        :class:`AlibiOutlierDetectorOutput
-            Outlier mask and associated feature and instance scores
+        :class:`OutlierDetectorOutput`
+            A dataclass containing outlier mask, feature scores
+            and instance scores if applicable
+
         """
+        # Cast and flatten dataset
+        dataset = self.format_dataset(
+            dataset,
+            flatten_dataset=self._FLATTEN_DATASET_FLAG,
+            dataset_type=self._DATASET_TYPE,
+        )
 
         if self.detector is None:
             raise TypeError(
@@ -443,8 +468,8 @@ class AlibiAEGMM(BaseAlibiDetectOD):
     """
     Gaussian Mixture Model Autoencoder-based outlier detector,
     from alibi-detect.
-    Based on https://docs.seldon.io/projects/alibi-detect/
-             en/latest/examples/od_aegmm_kddcup.html
+    The implementation is based on https://docs.seldon.io/projects/alibi-detect/
+    en/latest/examples/od_aegmm_kddcup.html
     """
 
     def __init__(self):
@@ -452,20 +477,24 @@ class AlibiAEGMM(BaseAlibiDetectOD):
 
         super().__init__()
         self._FLATTEN_DATASET_FLAG: bool = True
-        self._dataset_type: Type = np.float32
+        self._DATASET_TYPE: Type = np.float32
 
-    def initialize_detector(self) -> tf.keras.Sequential:
+    def initialize_detector(self, input_shape: Tuple[int, int, int]) -> None:
         """
-        Initialize the architecture and model weights of the autoencoder
+        Initialize the architecture and model weights of the autoencoder.
 
-        Returns
-        -------
-        tf.keras.Sequential
-            An untrained autoencoder created by AlibiDetect
+        Parameters
+        ----------
+        input_shape : tuple(int)
+            The shape (W,H,C) of the dataset
+            that the detector will be constructed around. This influences
+            the internal neural network architecture.
+            This should be the same shape as the dataset that
+            the detector will be trained on.
+
         """
-
         tf.keras.backend.clear_session()
-        n_features = 32 * 32 * 3
+        n_features = tf.math.reduce_prod(input_shape)
         latent_dim = 1
         n_gmm = 2  # nb of components in GMM
 
@@ -510,7 +539,7 @@ class AlibiAEGMM(BaseAlibiDetectOD):
             }
         )
         # initialize outlier detector using autoencoder network
-        return alibi_detect.od.OutlierAEGMM(**self._kwargs)
+        self.detector = alibi_detect.od.OutlierAEGMM(**self._kwargs)
 
     def fit_dataset(
         self,
@@ -526,10 +555,10 @@ class AlibiAEGMM(BaseAlibiDetectOD):
         ----------
         dataset : Iterable[float]
             An array of images for the model to train on
-        epochs : int
-            Number of training iterations
-        verbose : bool
-            Flag to output logging
+        epochs : int, default 3
+            Number of epochs to train the detector for.
+        verbose : bool, default False
+            Flag to output logs from Alibi-Detect verbose mode.
 
         Raises
         ------
@@ -544,15 +573,15 @@ class AlibiAEGMM(BaseAlibiDetectOD):
         dataset = self.format_dataset(
             dataset,
             flatten_dataset=self._FLATTEN_DATASET_FLAG,
-            dataset_type=self._dataset_type,
+            dataset_type=self._DATASET_TYPE,
         )
 
         super().fit_dataset(dataset, epochs, verbose)
         self.detector.infer_threshold(dataset, threshold_perc=95)
 
-    def evaluate(self, dataset: Iterable[float]) -> AlibiOutlierDetectorOutput:
+    def evaluate(self, dataset: Iterable[float]) -> OutlierDetectorOutput:
         """
-        Evaluate the outlier detector metric on dataset
+        Evaluate the outlier detector metric on a dataset.
 
         Parameters
         ----------
@@ -561,15 +590,16 @@ class AlibiAEGMM(BaseAlibiDetectOD):
 
         Returns
         -------
-        :class:`AlibiOutlierDetectorOutput
-            Outlier mask and associated feature and instance scores
+        :class:`OutlierDetectorOutput`
+            A dataclass containing outlier mask, feature scores
+            and instance scores if applicable
         """
 
         # Cast and flatten dataset
         dataset = self.format_dataset(
             dataset,
             flatten_dataset=self._FLATTEN_DATASET_FLAG,
-            dataset_type=self._dataset_type,
+            dataset_type=self._DATASET_TYPE,
         )
 
         if self.detector is None:
@@ -603,20 +633,24 @@ class AlibiVAEGMM(BaseAlibiDetectOD):
 
         super().__init__()
         self._FLATTEN_DATASET_FLAG: bool = True
-        self._dataset_type = np.float32
+        self._DATASET_TYPE = np.float32
 
-    def initialize_detector(self) -> tf.keras.Sequential:
+    def initialize_detector(self, input_shape: Tuple[int, int, int]) -> None:
         """
-        Initialize the architecture and model weights of the autoencoder
+        Initialize the architecture and model weights of the autoencoder.
 
-        Returns
-        -------
-        tf.keras.Sequential
-            An untrained autoencoder created by AlibiDetect
+        Parameters
+        ----------
+        input_shape : tuple(int)
+            The shape (W,H,C) of the dataset
+            that the detector will be constructed around. This influences
+            the internal neural network architecture.
+            This should be the same shape as the dataset that
+            the detector will be trained on.
+
         """
-
         tf.keras.backend.clear_session()
-        n_features = 32 * 32 * 3
+        n_features = tf.math.reduce_prod(input_shape)
         latent_dim = 2
         n_gmm = 2  # nb of components in GMM
 
@@ -662,7 +696,7 @@ class AlibiVAEGMM(BaseAlibiDetectOD):
             }
         )
         # initialize outlier detector using autoencoder network
-        return alibi_detect.od.OutlierVAEGMM(**self._kwargs)
+        self.detector = alibi_detect.od.OutlierVAEGMM(**self._kwargs)
 
     def fit_dataset(
         self,
@@ -678,10 +712,10 @@ class AlibiVAEGMM(BaseAlibiDetectOD):
         ----------
         dataset : Iterable[float]
             An array of images for the model to train on
-        epochs : int
-            Number of training iterations
-        verbose : bool
-            Flag to output logging
+        epochs : int, default 3
+            Number of epochs to train the detector for.
+        verbose : bool, default False
+            Flag to output logs from Alibi-Detect verbose mode.
 
         Raises
         ------
@@ -696,15 +730,15 @@ class AlibiVAEGMM(BaseAlibiDetectOD):
         dataset = self.format_dataset(
             dataset,
             flatten_dataset=self._FLATTEN_DATASET_FLAG,
-            dataset_type=self._dataset_type,
+            dataset_type=self._DATASET_TYPE,
         )
 
         super().fit_dataset(dataset, epochs, verbose)
         self.detector.infer_threshold(dataset, threshold_perc=95)
 
-    def evaluate(self, dataset: Iterable[float]) -> AlibiOutlierDetectorOutput:
+    def evaluate(self, dataset: Iterable[float]) -> OutlierDetectorOutput:
         """
-        Evaluate the outlier detector metric on dataset
+        Evaluate the outlier detector metric on a dataset.
 
         Parameters
         ----------
@@ -713,15 +747,16 @@ class AlibiVAEGMM(BaseAlibiDetectOD):
 
         Returns
         -------
-        :class:`AlibiOutlierDetectorOutput
-            Outlier mask and associated feature and instance scores
+        :class:`OutlierDetectorOutput`
+            A dataclass containing outlier mask, feature scores
+            and instance scores if applicable
         """
 
         # Cast and flatten dataset
         dataset = self.format_dataset(
             dataset,
             flatten_dataset=self._FLATTEN_DATASET_FLAG,
-            dataset_type=self._dataset_type,
+            dataset_type=self._DATASET_TYPE,
         )
 
         if self.detector is None:
@@ -754,19 +789,23 @@ class AlibiLLR(BaseAlibiDetectOD):
 
         super().__init__()
         self._FLATTEN_DATASET_FLAG = False
-        self._dataset_type: type = np.float32
+        self._DATASET_TYPE: type = np.float32
 
-    def initialize_detector(self) -> tf.keras.Sequential:
+    def initialize_detector(self, input_shape: Tuple[int, int, int]) -> None:
         """
-        Initialize the architecture and model weights of the Pixel CNN architecture
+        Initialize the architecture and model weights of the autoencoder.
 
-        Returns
-        -------
-        tf.keras.Sequential
-            An untrained PixelCNN model created by AlibiDetect
+        Parameters
+        ----------
+        input_shape : tuple(int)
+            The shape (W,H,C) of the dataset
+            that the detector will be constructed around. This influences
+            the internal neural network architecture.
+            This should be the same shape as the dataset that
+            the detector will be trained on.
+
         """
         tf.keras.backend.clear_session()
-        input_shape = (32, 32, 3)
 
         # LLR internally uses a Pixel CNN architecture,
         # which we initialize here
@@ -789,7 +828,7 @@ class AlibiLLR(BaseAlibiDetectOD):
             }
         )
         # initialize outlier detector using autoencoder network
-        return alibi_detect.od.LLR(**self._kwargs)
+        self.detector = alibi_detect.od.LLR(**self._kwargs)
 
     def fit_dataset(
         self,
@@ -805,10 +844,10 @@ class AlibiLLR(BaseAlibiDetectOD):
         ----------
         dataset : Iterable[float]
             An array of images for the model to train on
-        epochs : int
-            Number of training iterations
-        verbose : bool
-            Flag to output logging
+        epochs : int, default 3
+            Number of epochs to train the detector for.
+        verbose : bool, default False
+            Flag to output logs from Alibi-Detect verbose mode.
 
         Raises
         ------
@@ -823,7 +862,7 @@ class AlibiLLR(BaseAlibiDetectOD):
         dataset = self.format_dataset(
             dataset,
             flatten_dataset=self._FLATTEN_DATASET_FLAG,
-            dataset_type=self._dataset_type,
+            dataset_type=self._DATASET_TYPE,
         )
 
         super().fit_dataset(dataset, epochs, verbose)
@@ -833,9 +872,9 @@ class AlibiLLR(BaseAlibiDetectOD):
             batch_size=32,
         )
 
-    def evaluate(self, dataset: Iterable[float]) -> AlibiOutlierDetectorOutput:
+    def evaluate(self, dataset: Iterable[float]) -> OutlierDetectorOutput:
         """
-        Evaluate the outlier detector metric on dataset
+        Evaluate the outlier detector metric on a dataset.
 
         Parameters
         ----------
@@ -844,8 +883,9 @@ class AlibiLLR(BaseAlibiDetectOD):
 
         Returns
         -------
-        :class:`AlibiOutlierDetectorOutput
-            Outlier mask and associated feature and instance scores
+        :class:`OutlierDetectorOutput`
+            A dataclass containing outlier mask, feature scores
+            and instance scores if applicable
         """
 
         if self.detector is None:
@@ -863,7 +903,7 @@ class AlibiLLR(BaseAlibiDetectOD):
         dataset = self.format_dataset(
             dataset,
             flatten_dataset=self._FLATTEN_DATASET_FLAG,
-            dataset_type=self._dataset_type,
+            dataset_type=self._DATASET_TYPE,
         )
 
         predictions = self.detector.predict(
