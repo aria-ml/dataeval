@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 import daml
+from daml._internal.MetricOutputs import BEROutput
 from daml._internal.utils import Metrics
 
 
@@ -9,13 +10,15 @@ class TestMulticlassBER:
     def test_multiclass_ber_with_randos(self):
         """
         Two classes with a single, identically distributed covariate.
-        Should spit out a large number.
+        Should spit out a large number. Used numpy.random to generate
+        datasets and then hardcoded those to avoid the random numbers
+        in the pipeline.
         """
         # The expected output...
-        expected_result = {"BER": 0.45}
+        expected_result = BEROutput(ber=0.45)
 
         # Initialize a 2nxp  (2nx1) numpy array of standard gaussians
-        np.random.seed(37)
+        # np.random.seed(37)
 
         # Initialize a numpy array of random numbers distributed around 1
         # covariates = np.random.normal(
