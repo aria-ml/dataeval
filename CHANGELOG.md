@@ -1,6 +1,20 @@
-[//]: # (7961457785bbd803a3938884f3613ed08d662fc9)
+[//]: # (22fec6e5caafec3975763533d08a78649f30f788)
 
 # DAML Change Log
+## v0.25.6
+## v0.25.5
+## v0.25.4
+- ```2ca285cc - update BER metric to return a dataclass instead of dict```
+## v0.25.3
+- ```67f08b27 - Fix: Alibi-detect-models-have-fixed-architecture-shapes```
+## v0.25.2
+- ```db4adaff - 69 convert metric output dictionary to dataclass```
+## v0.25.1
+## v0.25.0
+- ```9c8fae0b - Add parameter for pytest to run functional tests```
+## v0.24.9
+- ```3f6ca9b0 - Finalize documentation of Outlier Detection methods```
+- ```55556d09 - Create gitlab folder for pipelines```
 ## v0.24.8
 - ```79614577 - Implement Multiclass MST version of BER```
 ## v0.24.7
