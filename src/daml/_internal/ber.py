@@ -4,14 +4,14 @@ FR Test Statistic based estimate for the Bayes Error Rate
 """
 
 from abc import ABC
-from typing import Any, Dict
 
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 from scipy.sparse.csgraph import minimum_spanning_tree
 from scipy.spatial.distance import pdist, squareform
 
-from daml._internal.MetricClasses import BER, Metrics
+from daml._internal.MetricClasses import BER
+from daml._internal.MetricOutputs import BEROutput
 
 
 class MultiClassBER(BER, ABC):
@@ -70,7 +70,7 @@ class MultiClassBER(BER, ABC):
         self,
         X: np.ndarray,
         y: np.ndarray,
-    ) -> Dict[str, Any]:
+    ) -> BEROutput:
         """
         Return the Bayes Error Rate estimate
 
@@ -92,7 +92,4 @@ class MultiClassBER(BER, ABC):
         --------
         https://gitlab.jatic.net/jatic/aria/daml/-/issues/83
         """
-
-        return {
-            Metrics.BER: self._multiclass_ber(X, y),
-        }
+        return BEROutput(ber=self._multiclass_ber(X, y))
