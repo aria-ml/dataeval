@@ -23,3 +23,12 @@ class DivergenceOutput:
 
     dpdivergence: float
     error: float
+
+
+@dataclass
+class BEROutput:
+    """
+    dataclass to store output from a BER calculation
+    """
+
+    ber: float
