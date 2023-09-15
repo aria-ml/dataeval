@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "daml"
-version = "0.24.3-post.26+665bd09" # dynamic
+version = "0" # dynamic
 description = "DAML provides a simple interface to characterize image data and its impact on model performance across classification and object-detection tasks"
 license = "MIT"
 readme = "README.md"
