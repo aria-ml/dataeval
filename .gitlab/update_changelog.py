@@ -110,5 +110,5 @@ if __name__ == "__main__":
     print(body["commit_message"])
 
     # GPG signature requirements prevent REST API commits
-    # response = request("put", "repository/files/CHANGELOG.md", body)
-    # print(response.json())
+    response = request("put", "repository/files/CHANGELOG.md", body)
+    print(response.json())
