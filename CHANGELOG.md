@@ -2,15 +2,12 @@
 
 # DAML Change Log
 ## v0.25.6
-## v0.25.5
-## v0.25.4
 - ```2ca285cc - update BER metric to return a dataclass instead of dict```
 ## v0.25.3
 - ```67f08b27 - Fix: Alibi-detect-models-have-fixed-architecture-shapes```
 ## v0.25.2
 - ```db4adaff - 69 convert metric output dictionary to dataclass```
 ## v0.25.1
-## v0.25.0
 - ```9c8fae0b - Add parameter for pytest to run functional tests```
 ## v0.24.9
 - ```3f6ca9b0 - Finalize documentation of Outlier Detection methods```
@@ -29,7 +26,6 @@
 - ```773f8151 - Fix VS Code formatting```
 - ```865985ec - Create contributing.md and update readme.md```
 ## v0.24.3
-## v0.24.2
 - ```126e27f3 - Automate changelist generation in documentation for release```
 ## v0.24.1
 - ```84c9a16b - Move lint config to pyproject.toml```
@@ -41,7 +37,6 @@
 - ```773df599 - udpate devcontainer with shell```
 - ```ec88ebbe - Use tox to manage dev environment and dev containers```
 ## v0.23.3
-## v0.23.2
 - ```9dc9f1cb - Setup release pipeline```
 ## v0.23.1
 - ```99d2fd22 - Implement outlier detection metrics using the alibi-detect VAE method```
