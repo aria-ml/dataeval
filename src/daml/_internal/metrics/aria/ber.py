@@ -3,18 +3,16 @@ This module contains the implementation of the
 FR Test Statistic based estimate for the Bayes Error Rate
 """
 
-from abc import ABC
-
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 from scipy.sparse.csgraph import minimum_spanning_tree
 from scipy.spatial.distance import pdist, squareform
 
-from daml._internal.MetricClasses import BER
-from daml._internal.MetricOutputs import BEROutput
+from daml._internal.metrics.base import Metric
+from daml.metrics.outputs import BEROutput
 
 
-class MultiClassBER(BER, ABC):
+class MultiClassBER(Metric):
     def __init__(self) -> None:
         """Constructor method"""
 
@@ -92,4 +90,5 @@ class MultiClassBER(BER, ABC):
         --------
         https://gitlab.jatic.net/jatic/aria/daml/-/issues/83
         """
+
         return BEROutput(ber=self._multiclass_ber(X, y))

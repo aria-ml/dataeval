@@ -1,9 +1,8 @@
 import numpy as np
 import pytest
 
-import daml
-from daml._internal.MetricOutputs import DivergenceOutput
-from daml._internal.utils import Metrics
+from daml.metrics.divergence import FNN, MST
+from daml.metrics.outputs import DivergenceOutput
 
 
 class TestDpDivergence:
@@ -11,14 +10,14 @@ class TestDpDivergence:
         "input, output",
         [
             (
-                Metrics.Algorithm.MinimumSpanningTree,
+                MST,
                 DivergenceOutput(
                     dpdivergence=-0.96875,
                     error=63,
                 ),
             ),
             (
-                Metrics.Algorithm.FirstNearestNeighbor,
+                FNN,
                 DivergenceOutput(
                     dpdivergence=1.0,
                     error=0.0,
@@ -36,29 +35,6 @@ class TestDpDivergence:
         all_fives = all_ones * 13
 
         # Initialize the autoencoder-based outlier detector from alibi-detect
-        metric = daml.load_metric(
-            metric=Metrics.Divergence,
-            provider=Metrics.Provider.ARiA,
-            method=Metrics.Method.DpDivergence,
-        )
-        result = metric.evaluate(
-            dataset_a=all_ones,
-            dataset_b=all_fives,
-            algorithm=input,
-        )
+        metric = input()
+        result = metric.evaluate(dataset_a=all_ones, dataset_b=all_fives)
         assert result == output
-
-    def test_invalid_algorithm(self):
-        with pytest.raises(ValueError):
-            metric = daml.load_metric(
-                metric=Metrics.Divergence,
-                provider=Metrics.Provider.ARiA,
-                method=Metrics.Method.DpDivergence,
-            )
-            result = metric.evaluate(
-                dataset_a=np.array([1, 2, 3]),
-                dataset_b=np.array([4, 5, 6]),
-                algorithm="not valid",
-            )
-            # should not get here!
-            assert result == (1.0, 0.0)
