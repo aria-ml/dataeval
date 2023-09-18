@@ -1,19 +1,14 @@
 import numpy as np
 import pytest
 
-import daml
-from daml._internal.utils import Metrics
+from daml.metrics.outlier_detection import AE, AEGMM, LLR, VAE, VAEGMM
 
 from .utils import MockImageClassificationGenerator
 
 
 class TestDatasetType:
     def test_dataset_type_is_none(self):
-        metric = daml.load_metric(
-            metric=Metrics.OutlierDetection,
-            provider=Metrics.Provider.AlibiDetect,
-            method=Metrics.Method.AutoEncoder,
-        )
+        metric = AE()
 
         all_ones = MockImageClassificationGenerator(
             limit=1, labels=1, img_dims=(32, 32), channels=3
@@ -34,20 +29,16 @@ class TestDatasetType:
     @pytest.mark.parametrize(
         "method",
         [
-            Metrics.Method.AutoEncoder,
-            Metrics.Method.AutoEncoderGMM,
-            Metrics.Method.VariationalAutoEncoder,
-            Metrics.Method.VariationalAutoEncoderGMM,
+            AE,
+            AEGMM,
+            VAE,
+            VAEGMM,
             # remove functional marker after issue #94 is resolved
-            pytest.param(Metrics.Method.LLR, marks=pytest.mark.functional),
+            pytest.param(LLR, marks=pytest.mark.functional),
         ],
     )
     def test_dataset_type_is_incorrect(self, dtype, method):
-        metric = daml.load_metric(
-            metric=Metrics.OutlierDetection,
-            provider=Metrics.Provider.AlibiDetect,
-            method=method,
-        )
+        metric = method()
 
         all_ones = MockImageClassificationGenerator(
             limit=1, labels=1, img_dims=(32, 32), channels=3
@@ -64,18 +55,14 @@ class TestDatasetType:
                 metric.check_dtype(images, metric_dtype)
 
     def test_dataset_type_is_not_numpy(self):
-        metric = daml.load_metric(
-            metric=Metrics.OutlierDetection,
-            provider=Metrics.Provider.AlibiDetect,
-            method=Metrics.Method.AutoEncoderGMM,
-        )
+        metric = AEGMM()
 
         all_ones = MockImageClassificationGenerator(
             limit=1, labels=1, img_dims=(32, 32), channels=3
         )
         images_list = list(all_ones.dataset.images)
         with pytest.raises(TypeError):
-            metric.check_dtype(images_list, metric._DATASET_TYPE)
+            metric.check_dtype(images_list, metric._DATASET_TYPE)  # type: ignore
 
 
 class TestFlatten:
@@ -86,14 +73,12 @@ class TestFlatten:
             limit=1, labels=1, img_dims=(32, 32), channels=3
         )
         # Define model
-        metric = daml.load_metric(
-            metric=Metrics.OutlierDetection,
-            provider=Metrics.Provider.AlibiDetect,
-            method=Metrics.Method.AutoEncoder,
-        )
+        metric = AE()
 
         images = all_ones.dataset.images
-        new_dataset = metric.format_dataset(images, flatten_dataset=None)
+        new_dataset = metric.format_dataset(
+            images, flatten_dataset=None  # type: ignore
+        )
         assert new_dataset.shape == images.shape
 
     @pytest.mark.parametrize(
@@ -127,11 +112,7 @@ class TestFlatten:
             limit=limit, labels=1, img_dims=img_dims, channels=channels
         )
         # Define model
-        metric = daml.load_metric(
-            metric=Metrics.OutlierDetection,
-            provider=Metrics.Provider.AlibiDetect,
-            method=Metrics.Method.AutoEncoder,
-        )
+        metric = AE()
         images = all_ones.dataset.images
         new_dataset = metric.format_dataset(images, flatten_dataset=True)
         output_shape = img_dims[0] * img_dims[1] * channels
