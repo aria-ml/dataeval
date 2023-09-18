@@ -3,8 +3,8 @@ This module contains the implementation of Dp Divergence
 using the First Nearest Neighbor and Minimum Spanning Tree algorithms
 """
 
-from abc import ABC
-from typing import Literal
+from abc import ABC, abstractmethod
+from typing import Any, Literal
 
 import numpy as np
 from scipy.sparse import csr_matrix
@@ -12,11 +12,11 @@ from scipy.sparse.csgraph import minimum_spanning_tree
 from scipy.spatial.distance import pdist, squareform
 from sklearn.neighbors import NearestNeighbors
 
-from daml._internal.MetricClasses import Divergence, Metrics
-from daml._internal.MetricOutputs import DivergenceOutput
+from daml._internal.metrics.base import Metric
+from daml.metrics.outputs import DivergenceOutput
 
 
-class DpDivergence(Divergence, ABC):
+class _DpDivergence(Metric, ABC):
     def __init__(self) -> None:
         """Constructor method"""
 
@@ -60,11 +60,14 @@ class DpDivergence(Divergence, ABC):
 
         return nns
 
+    @abstractmethod
+    def calculate_errors(self, data: Any, labels: Any) -> Any:
+        raise NotImplementedError
+
     def evaluate(
         self,
         dataset_a: np.ndarray,
         dataset_b: np.ndarray,
-        algorithm: str = Metrics.Algorithm.MinimumSpanningTree,
     ) -> DivergenceOutput:
         """
         Returns the divergence between two datasets
@@ -108,40 +111,28 @@ class DpDivergence(Divergence, ABC):
         N = dataset_a.shape[0]
         M = dataset_b.shape[0]
         labels = np.vstack([np.zeros([N, 1]), np.ones([M, 1])])
-        Dp = None
+        errors = self.calculate_errors(data, labels)
+        dp = 1 - ((M + N) / (2 * M * N)) * errors
+        results = DivergenceOutput(dpdivergence=dp, error=errors)
+        return results
 
-        if algorithm == Metrics.Algorithm.FirstNearestNeighbor:
-            nn_indices = self._compute_neighbors(data, data)
-            # import pdb
-            # pdb.set_trace()
-            errors = np.sum(np.abs(labels[nn_indices] - labels))
-            # print('Errors '+str(errors))
-            Dp = 1 - ((M + N) / (2 * M * N)) * errors
 
-        elif algorithm == Metrics.Algorithm.MinimumSpanningTree:
-            dense_eudist = squareform(pdist(data))
-            eudist_csr = csr_matrix(dense_eudist)
-            mst = minimum_spanning_tree(eudist_csr)
-            mst = mst.toarray()
-            edgelist = np.transpose(np.nonzero(mst))
+class DpDivergenceMST(_DpDivergence):
+    def calculate_errors(self, data: Any, labels: Any) -> Any:
+        dense_eudist = squareform(pdist(data))
+        eudist_csr = csr_matrix(dense_eudist)
+        mst = minimum_spanning_tree(eudist_csr)
+        mst = mst.toarray()
+        edgelist = np.transpose(np.nonzero(mst))
+        errors = np.sum(labels[edgelist[:, 0]] != labels[edgelist[:, 1]])
+        return errors
 
-            errors = np.sum(labels[edgelist[:, 0]] != labels[edgelist[:, 1]])
 
-            Dp = 1 - ((M + N) / (2 * M * N)) * errors
-        else:
-            raise ValueError(
-                f"""
-                Unsupported algorithm detected!
-                Valid Options: {
-                    [
-                        Metrics.Algorithm.FirstNearestNeighbor,
-                        Metrics.Algorithm.MinimumSpanningTree
-                    ]
-                }
-                """
-            )
-
-        # errors=0
-        # Cij = errors
-        output = DivergenceOutput(dpdivergence=Dp, error=errors)
-        return output
+class DpDivergenceFNN(_DpDivergence):
+    def calculate_errors(self, data: Any, labels: Any) -> Any:
+        nn_indices = self._compute_neighbors(data, data)
+        # import pdb
+        # pdb.set_trace()
+        errors = np.sum(np.abs(labels[nn_indices] - labels))
+        # print('Errors '+str(errors))
+        return errors

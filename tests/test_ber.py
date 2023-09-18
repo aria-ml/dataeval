@@ -1,9 +1,8 @@
 import numpy as np
 import pytest
 
-import daml
-from daml._internal.MetricOutputs import BEROutput
-from daml._internal.utils import Metrics
+from daml.metrics.ber import BER
+from daml.metrics.outputs import BEROutput
 
 
 class TestMulticlassBER:
@@ -76,11 +75,7 @@ class TestMulticlassBER:
             ]
         )
 
-        metric = daml.load_metric(
-            metric=Metrics.BER,
-            provider=Metrics.Provider.ARiA,
-            method=Metrics.Method.MultiClassBER,
-        )
+        metric = BER()
 
         assert (
             metric.evaluate(
@@ -94,11 +89,7 @@ class TestMulticlassBER:
         value = None
         covariates = np.ones(20)
         labels = np.array(range(20))
-        metric = daml.load_metric(
-            metric=Metrics.BER,
-            provider=Metrics.Provider.ARiA,
-            method=Metrics.Method.MultiClassBER,
-        )
+        metric = BER()
         with pytest.raises(ValueError):
             value = metric.evaluate(
                 X=covariates,
@@ -110,11 +101,7 @@ class TestMulticlassBER:
         value = None
         covariates = np.ones(20)
         labels = np.ones(20)
-        metric = daml.load_metric(
-            metric=Metrics.BER,
-            provider=Metrics.Provider.ARiA,
-            method=Metrics.Method.MultiClassBER,
-        )
+        metric = BER()
         with pytest.raises(ValueError):
             value = metric.evaluate(
                 X=covariates,
