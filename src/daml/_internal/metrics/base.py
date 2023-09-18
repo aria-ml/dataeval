@@ -1,73 +1,10 @@
-"""
-This module contains Base and Abstract classes for all metric implementations in DAML
-
-Based on example code from
-https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/ae.html#Examples
-"""
-
 from abc import ABC, abstractmethod
 from typing import Any, Iterable, Optional, Tuple, Type
 
 import numpy as np
 
 
-class Metrics:
-    """A global dictionary to parse metrics, providers, and methods"""
-
-    OutlierDetection = "OutlierDetection"
-    Divergence = "Divergence"
-    BER = "BER"
-
-    class Provider:
-        """Set of libraries that implement methods"""
-
-        AlibiDetect = "Alibi-Detect"
-        ARiA = "ARiA"
-
-    class Method:
-        """A set of solutions for a given metric"""
-
-        AutoEncoder = "Autoencoder"
-        VariationalAutoEncoder = "VAE"
-        AutoEncoderGMM = "AEGMM"
-        VariationalAutoEncoderGMM = "VAEGMM"
-        LLR = "LLR"
-        DpDivergence = "Dp_Divergence"
-        MultiClassBER = "MultiClassBER"
-
-    class Algorithm:
-        """A set of differing ways to calculate a solution"""
-
-        FirstNearestNeighbor = "fnn"
-        MinimumSpanningTree = "mst"
-
-    # This might be better referred to as a list of supported operations.
-    # Potentially a subset of the above enum classes. Not all permutations
-    # may be supported.
-    metrics_providers_methods = {
-        OutlierDetection: {
-            Provider.AlibiDetect: [
-                Method.AutoEncoder,
-                Method.VariationalAutoEncoder,
-                Method.AutoEncoderGMM,
-                Method.VariationalAutoEncoderGMM,
-                Method.LLR,
-            ]
-        },
-        Divergence: {
-            Provider.ARiA: [
-                Method.DpDivergence,
-            ]
-        },
-        BER: {
-            Provider.ARiA: [
-                Method.MultiClassBER,
-            ]
-        },
-    }
-
-
-class DataMetric(ABC):
+class Metric(ABC):
     """Abstract class for all DAML metrics"""
 
     @abstractmethod
@@ -78,7 +15,7 @@ class DataMetric(ABC):
         )
 
 
-class OutlierDetector(DataMetric, ABC):
+class OutlierDetector(Metric, ABC):
     """
     Abstract class for all DAML outlier detection metrics.
 
@@ -145,8 +82,8 @@ class OutlierDetector(DataMetric, ABC):
 
         Parameters
         ----------
-        dataset : Iterable[float]
-            An array of images in the shape (B, H, W, C)
+        dataset : np.ndarray
+            A numpy ndarray of images in the shape (B, H, W, C)
         dtype : Type
             The preferred dtype of the array
 
@@ -202,14 +139,14 @@ class OutlierDetector(DataMetric, ABC):
         flatten_dataset: bool = False,
         dataset_type: Type = None,
         reference_input_shape: Optional[Tuple[int, int, int]] = None,
-    ) -> Iterable[float]:
+    ) -> np.ndarray:
         """
         Formats a dataset such that it fits the required datatype and shape
 
         Parameters
         ----------
-        dataset : Iterable[float]
-            An array of images in shape (B, H, W, C)
+        dataset : np.ndarray
+            A numpy array of images in shape (B, H, W, C)
         flatten_dataset : bool, default False
             Flag to flatten a dataset to shape (B, H * W * C)
         dataset_type : Type, Optional
@@ -231,21 +168,3 @@ class OutlierDetector(DataMetric, ABC):
         if flatten_dataset:
             dataset = self.flatten_dataset(dataset)
         return dataset
-
-
-class Divergence(DataMetric, ABC):
-    """Abstract class for calculating Dp Divergence between datasets."""
-
-    def __init__(self) -> None:
-        """Constructor method"""
-
-        super().__init__()
-
-
-class BER(DataMetric, ABC):
-    """Abstract class for calculating the Bayesian Error Rate."""
-
-    def __init__(self) -> None:
-        """Constructor method"""
-
-        super().__init__()
