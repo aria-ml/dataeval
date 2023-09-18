@@ -1,6 +1,9 @@
-[//]: # (22fec6e5caafec3975763533d08a78649f30f788)
+[//]: # (56e7580e10a47505cf141b9bd116561998736733)
 
 # DAML Change Log
+## Pending Release
+- ```56e7580e - Refactor metric instantiation from load_metric to imports```
+- ```54faef53 - Bayes error rate tutorial```
 ## v0.25.5
 - ```2ca285cc - update BER metric to return a dataclass instead of dict```
 - ```67f08b27 - Fix: Alibi-detect-models-have-fixed-architecture-shapes```
