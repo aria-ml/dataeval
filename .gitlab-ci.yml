@@ -71,6 +71,7 @@ coverage:
   - coverage combine
   - coverage report -m --skip-empty
   - coverage xml --skip-empty
+  - coverage html --skip-empty
   coverage: "/(?i)total.*? (100(?:\\.0+)?\\%|[1-9]?\\d(?:\\.\\d+)?\\%)$/"
   artifacts:
     reports:
@@ -79,6 +80,7 @@ coverage:
         path: coverage.xml
     paths:
     - coverage.xml
+    - htmlcov/
 
 linting:
   stage: test
@@ -118,15 +120,16 @@ pages:
   stage: docs
   needs:
   - sphinx
+  - coverage
   script:
   - mv docs/_build/html/ ./public/
+  - mv htmlcov/ ./public/testcov/
   artifacts:
     paths:
     - public
   rules:
   - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
-    changes:
-    - docs/**/*
+  - if: $CI_PIPELINE_SOURCE == 'web'
 
 tag:
   stage: build
@@ -139,6 +142,8 @@ tag:
     changes:
     - src/**/*
     - pyproject.toml
+  - if: $CI_PIPELINE_SOURCE == 'web'
+    when: never
 
 publish:
   stage: build
@@ -157,6 +162,8 @@ publish:
     changes:
     - src/**/*
     - pyproject.toml
+  - if: $CI_PIPELINE_SOURCE == 'web'
+    when: never
 
 changelog:
   stage: build
@@ -174,6 +181,8 @@ changelog:
     changes:
     - src/**/*
     - pyproject.toml
+  - if: $CI_PIPELINE_SOURCE == 'web'
+    when: never
 
 include:
 - template: Security/SAST.gitlab-ci.yml
