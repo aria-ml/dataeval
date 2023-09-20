@@ -11,7 +11,7 @@ import tensorflow as tf
 from alibi_detect.models.tensorflow import PixelCNN
 
 from daml._internal.metrics.alibi_detect.base import BaseAlibiDetectOD
-from daml.metrics.outputs import OutlierDetectorOutput
+from daml._internal.metrics.outputs import OutlierDetectorOutput
 
 
 class AlibiLLR(BaseAlibiDetectOD):
