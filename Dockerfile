@@ -12,7 +12,7 @@ WORKDIR /daml
 
 RUN pip install poetry
 COPY --chown=daml:daml pyproject.toml ./
-RUN poetry install --no-root
+RUN poetry install --no-root --all-extras
 
 COPY --chown=daml:daml src/   src/
 COPY --chown=daml:daml tests/ tests/
@@ -21,7 +21,7 @@ COPY --chown=daml:daml tests/ tests/
 FROM base as daml_installed
 COPY --chown=daml:daml README.md ./
 COPY --chown=daml:daml .git/     .git/
-RUN poetry install --only-root
+RUN poetry install --only-root --all-extras
 
 
 FROM daml_installed as unit
