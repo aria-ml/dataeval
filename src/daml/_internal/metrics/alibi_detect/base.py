@@ -7,7 +7,7 @@ from abc import ABC
 from typing import Any, Dict, Iterable, Optional, Tuple
 
 from daml._internal.metrics.base import OutlierDetector
-from daml.metrics.outputs import OutlierDetectorOutput
+from daml._internal.metrics.outputs import OutlierDetectorOutput
 
 
 class BaseAlibiDetectOD(OutlierDetector, ABC):

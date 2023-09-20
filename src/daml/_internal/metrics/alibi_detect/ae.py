@@ -15,7 +15,7 @@ from tensorflow.keras.layers import (
 from tensorflow.nn import relu
 
 from daml._internal.metrics.alibi_detect.base import BaseAlibiDetectOD
-from daml.metrics.outputs import OutlierDetectorOutput
+from daml._internal.metrics.outputs import OutlierDetectorOutput
 
 
 class AlibiAE(BaseAlibiDetectOD):

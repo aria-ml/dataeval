@@ -1,8 +1,7 @@
 import numpy as np
 import pytest
 
-from daml.metrics.divergence import FNN, MST
-from daml.metrics.outputs import DivergenceOutput
+from daml.metrics.divergence import FNN, MST, DivergenceOutput
 
 
 class TestDpDivergence:

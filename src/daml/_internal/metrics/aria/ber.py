@@ -9,7 +9,7 @@ from scipy.sparse.csgraph import minimum_spanning_tree
 from scipy.spatial.distance import pdist, squareform
 
 from daml._internal.metrics.base import Metric
-from daml.metrics.outputs import BEROutput
+from daml._internal.metrics.outputs import BEROutput
 
 
 class MultiClassBER(Metric):
