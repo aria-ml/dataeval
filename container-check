@@ -1,0 +1,24 @@
+#!/bin/bash -e
+
+declare -A versions
+versions[py38]=3.8
+versions[py39]=3.9
+versions[py310]=3.10
+
+for version in "${!versions[@]}"; do
+    echo $'\n********************************************************'
+    echo "Python ${versions[$version]}"
+    echo "********************************************************"
+    docker build --build-arg python_version=${versions[$version]} --tag daml-type-${version} --target type .
+    docker build --build-arg python_version=${versions[$version]} --tag daml-unit-${version} --target unit .
+done
+
+
+echo $'\n********************************************************'
+echo "Linting..."
+echo "********************************************************"
+docker build --tag daml-lint --target lint .
+
+echo $'\n********************************************************'
+echo "Success!"
+echo "********************************************************"
