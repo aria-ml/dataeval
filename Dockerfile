@@ -1,16 +1,12 @@
 ARG python_version=3.10
 FROM python:${python_version} as base
+RUN pip install poetry
 
 RUN addgroup --gid 1000 daml
 RUN adduser  --gid 1000 --uid 1000 --disabled-password daml
 USER daml
-
-# Non-root pip installs end up here, so it needs to be in the path
-ENV PATH=/home/daml/.local/bin:$PATH
-
 WORKDIR /daml
 
-RUN pip install poetry
 COPY --chown=daml:daml pyproject.toml ./
 RUN poetry install --no-root --all-extras
 
