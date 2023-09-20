@@ -1,4 +1,5 @@
 #!/bin/bash -e
+LANG=C
 
 function docker_build() {
     temp=$(mktemp)
