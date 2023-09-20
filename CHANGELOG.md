@@ -1,7 +1,9 @@
-[//]: # (56e7580e10a47505cf141b9bd116561998736733)
+[//]: # (6069098e8c20b8e20594f5ba9d0ce8272e0caaca)
 
 # DAML Change Log
 ## Pending Release
+- ```6069098e - Create containers for running type/lint/unit tasks```
+- ```3adf3a66 - Define optional dependencies and move Output classes to related submodules```
 - ```56e7580e - Refactor metric instantiation from load_metric to imports```
 - ```54faef53 - Bayes error rate tutorial```
 ## v0.25.5
