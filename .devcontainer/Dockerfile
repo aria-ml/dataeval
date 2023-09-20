@@ -53,37 +53,20 @@ WORKDIR ${HOMEDIR}
 ENV PATH ${HOMEDIR}/.local/bin:$PATH
 RUN pip install tox nvidia-pyindex
 
-ARG PIPDOCS="${HOMEDIR}/.venv-docs/bin/python -I -m pip" \
-    PIP38="${HOMEDIR}/.venv-py38/bin/python -I -m pip" \
+ARG PIP38="${HOMEDIR}/.venv-py38/bin/python -I -m pip" \
     PIP39="${HOMEDIR}/.venv-py39/bin/python -I -m pip" \
     PIP310="${HOMEDIR}/.venv-py310/bin/python -I -m pip"
 
 # Create virtual environments
-RUN (/usr/bin/python3.8 -m venv ${HOMEDIR}/.venv-docs \
-   & /usr/bin/python3.8 -m venv ${HOMEDIR}/.venv-py38 \
+RUN (/usr/bin/python3.8 -m venv ${HOMEDIR}/.venv-py38 \
    & /usr/bin/python3.9 -m venv ${HOMEDIR}/.venv-py39 \
    & /usr/bin/python3.10 -m venv ${HOMEDIR}/.venv-py310 \
    & wait)
 
 # Upgrade pip
-RUN (${PIPDOCS} install --upgrade pip setuptools wheel \
-   & ${PIP38} install --upgrade pip setuptools wheel \
+RUN (${PIP38} install --upgrade pip setuptools wheel \
    & ${PIP39} install --upgrade pip setuptools wheel \
    & ${PIP310} install --upgrade pip setuptools wheel \
-   & wait)
-
-ARG DOCS_DEPS="pydantic==1.10.12 sphinx==7.1.2 sphinx-immaterial==0.11.4"
-ARG TEST_DEPS="pytest pyright coverage flake8 flake8-pyproject black[jupyter] isort"
-ARG CUDA_DEPS="opencv-contrib-python-headless==4.8.0.76 nvidia-cudnn-cu11==8.6.0.163 tensorrt==8.6.1.post1"
-
-# Set system locale for docs
-ENV LC_ALL=C.UTF-8
-
-# Install dependencies
-RUN (${PIPDOCS} install ${TEST_DEPS} ${DOCS_DEPS} \
-   & ${PIP38} install ${TEST_DEPS} ${CUDA_DEPS} \
-   & ${PIP39} install ${TEST_DEPS} ${CUDA_DEPS} \
-   & ${PIP310} install ${TEST_DEPS} ${CUDA_DEPS} \
    & wait)
 
 # Enable GPG signing

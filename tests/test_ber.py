@@ -1,8 +1,7 @@
 import numpy as np
 import pytest
 
-from daml.metrics.ber import BER
-from daml.metrics.outputs import BEROutput
+from daml.metrics.ber import BER, BEROutput
 
 
 class TestMulticlassBER:

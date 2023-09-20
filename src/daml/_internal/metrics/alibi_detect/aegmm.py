@@ -7,7 +7,7 @@ from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense, InputLayer
 
 from daml._internal.metrics.alibi_detect.base import BaseAlibiDetectOD
-from daml.metrics.outputs import OutlierDetectorOutput
+from daml._internal.metrics.outputs import OutlierDetectorOutput
 
 
 class AlibiAEGMM(BaseAlibiDetectOD):

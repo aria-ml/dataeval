@@ -13,7 +13,7 @@ from scipy.spatial.distance import pdist, squareform
 from sklearn.neighbors import NearestNeighbors
 
 from daml._internal.metrics.base import Metric
-from daml.metrics.outputs import DivergenceOutput
+from daml._internal.metrics.outputs import DivergenceOutput
 
 
 class _DpDivergence(Metric, ABC):
