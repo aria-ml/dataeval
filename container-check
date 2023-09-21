@@ -1,24 +1,22 @@
 #!/bin/bash -e
+LANG=C
 
-declare -A versions
-versions[py38]=3.8
-versions[py39]=3.9
-versions[py310]=3.10
+function docker_build() {
+    temp=$(mktemp)
+    docker build --build-arg python_version=$1 --tag daml-$2-$1 --target $2 . &> $temp || result="FAILED"
 
-for version in "${!versions[@]}"; do
-    echo $'\n********************************************************'
-    echo "Python ${versions[$version]}"
-    echo "********************************************************"
-    docker build --build-arg python_version=${versions[$version]} --tag daml-type-${version} --target type .
-    docker build --build-arg python_version=${versions[$version]} --tag daml-unit-${version} --target unit .
-done
+    echo -n "-> Python ${1} - ${2}: "
+    if [[ $result == "FAILED" ]]; then
+        log_file="daml-${2}-${1}_failure_$(date +%s).log"
+        echo "FAILED (see log file ${log_file})"
+        cat $temp > $log_file
+    else
+        echo SUCCEEDED
+    fi
+    rm $temp
+}
 
+export -f docker_build
 
-echo $'\n********************************************************'
-echo "Linting..."
-echo "********************************************************"
-docker build --tag daml-lint --target lint .
-
-echo $'\n********************************************************'
-echo "Success!"
-echo "********************************************************"
+echo "Building containers..."
+parallel docker_build ::: 3.8 3.9 3.10 ::: type lint unit
