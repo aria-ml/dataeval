@@ -18,6 +18,7 @@ RUN apt-get update \
         python3-pip \
         python3-venv \
         python-is-python3 \
+        parallel \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
@@ -46,7 +47,8 @@ RUN add-apt-repository ppa:deadsnakes/ppa -y \
 # Create and switch to daml user
 ARG HOMEDIR=/home/daml
 RUN addgroup --gid 1000 daml
-RUN adduser  --gid 1000 --uid 1000 --disabled-password daml
+RUN addgroup --gid 1001 docker
+RUN adduser --ingroup daml --ingroup docker --ingroup sudo --uid 1000 --disabled-password daml
 USER daml
 
 WORKDIR ${HOMEDIR}
