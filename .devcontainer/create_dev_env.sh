@@ -7,9 +7,16 @@ rm -rf .tox
 rm -rf .venv-*
 
 echo "Creating development environments in parallel..."
-(trap 'kill 0' SIGINT; tox devenv -e py38 .venv-py38 & tox devenv -e py39 .venv-py39 & tox devenv -e py310 .venv-py310 & wait)
+(
+	trap 'kill 0' SIGINT
+	tox d -e py38 .venv-py38 -x testenv.extras= &
+	tox d -e py39 .venv-py39 -x testenv.extras= &
+	tox d -e py310 .venv-py310 -x testenv.extras= &
+	wait
+)
 
 # update docker created venv in vscode workspaces
+echo "Updating workspaces virtual environments..."
 cp -rn ~/.venv-* /workspaces/daml
 
 # ensure symlinks and cuda/cudnn path variables for tox environments

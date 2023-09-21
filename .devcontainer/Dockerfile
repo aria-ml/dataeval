@@ -45,13 +45,24 @@ RUN add-apt-repository ppa:deadsnakes/ppa -y \
 
 # Create and switch to daml user
 ARG HOMEDIR=/home/daml
-RUN useradd -rm -d ${HOMEDIR} -s /bin/bash -G sudo -u 1000 daml
+RUN addgroup --gid 1000 daml
+RUN adduser  --gid 1000 --uid 1000 --disabled-password daml
 USER daml
+
 WORKDIR ${HOMEDIR}
 
-# Install tox, pyright and nvidia python index to base image
+# Enable system python packages to be found
 ENV PATH ${HOMEDIR}/.local/bin:$PATH
-RUN pip install tox nvidia-pyindex
+
+# Set locale settings
+ENV LANGUAGE=en
+ENV LC_ALL=C.UTF-8
+ENV LANG=en_US.UTF-8
+
+# Enable GPG signing
+ENV GPG_TTY=$(tty)
+
+RUN pip install poetry tox nvidia-pyindex
 
 ARG PIP38="${HOMEDIR}/.venv-py38/bin/python -I -m pip" \
     PIP39="${HOMEDIR}/.venv-py39/bin/python -I -m pip" \
@@ -69,5 +80,13 @@ RUN (${PIP38} install --upgrade pip setuptools wheel \
    & ${PIP310} install --upgrade pip setuptools wheel \
    & wait)
 
-# Enable GPG signing
-ENV GPG_TTY=$(tty)
+# Prepare the dev environment
+COPY --chown=daml:daml requirements.txt ./
+RUN (${PIP38} install -r requirements.txt \
+   & ${PIP39} install -r requirements.txt \
+   & ${PIP310} install -r requirements.txt \
+   & wait)
+
+# cuda deps in requirements.txt
+# opencv-contrib-python-headless==4.8.0.76
+# nvidia-cudnn-cu11==8.6.0.163
