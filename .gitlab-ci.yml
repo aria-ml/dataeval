@@ -142,7 +142,7 @@ tag:
     changes:
     - src/**/*
     - pyproject.toml
-  - if: $CI_PIPELINE_SOURCE == 'web'
+  - if: $CI_PIPELINE_SOURCE == 'web' && $PUBLISH != 'true'
     when: never
 
 publish:
@@ -162,7 +162,7 @@ publish:
     changes:
     - src/**/*
     - pyproject.toml
-  - if: $CI_PIPELINE_SOURCE == 'web'
+  - if: $CI_PIPELINE_SOURCE == 'web' && $PUBLISH != 'true'
     when: never
 
 changelog:
@@ -181,7 +181,7 @@ changelog:
     changes:
     - src/**/*
     - pyproject.toml
-  - if: $CI_PIPELINE_SOURCE == 'web'
+  - if: $CI_PIPELINE_SOURCE == 'web' && $PUBLISH != 'true'
     when: never
 
 include:
