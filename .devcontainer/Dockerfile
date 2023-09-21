@@ -65,7 +65,8 @@ ENV LANG=en_US.UTF-8
 # Enable GPG signing
 ENV GPG_TTY=$(tty)
 
-RUN pip install poetry tox nvidia-pyindex
+RUN pip install poetry tox pyright nvidia-pyindex
+RUN pyright
 
 ARG PIP38="${HOMEDIR}/.venv-py38/bin/python -I -m pip" \
     PIP39="${HOMEDIR}/.venv-py39/bin/python -I -m pip" \

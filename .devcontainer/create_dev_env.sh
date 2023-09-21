@@ -33,7 +33,7 @@ for i in "${!dict[@]}"; do
 
 	grep -qF 'export LD_LIBRARY_PATH' ".venv-${i}/bin/activate" || (
 		echo 'CUDNN_PATH=$(dirname $(python -c "import nvidia.cudnn;print(nvidia.cudnn.__file__)"))' >> ".venv-${i}/bin/activate" &&
-		echo 'export LD_LIBRARY_PATH=$CUDNN_PATH/lib' >> ".venv-${i}/bin/activate"
+		echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$CUDNN_PATH/lib' >> ".venv-${i}/bin/activate"
 	)
 done
 
