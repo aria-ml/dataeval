@@ -1,7 +1,9 @@
-[//]: # (6069098e8c20b8e20594f5ba9d0ce8272e0caaca)
+[//]: # (997e4dac2cba35c8d431a752ba5add8104c421b5)
 
 # DAML Change Log
-## Pending Release
+## v0.25.7
+- ```997e4dac - Make poetry dev groups optional```
+- ```f7de02d5 - container-check - Use `parallel` to build containers concurrently```
 - ```6069098e - Create containers for running type/lint/unit tasks```
 - ```3adf3a66 - Define optional dependencies and move Output classes to related submodules```
 - ```56e7580e - Refactor metric instantiation from load_metric to imports```
