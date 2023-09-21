@@ -5,7 +5,7 @@ USER root
 
 # Install git, wget and dependencies for pyright (nodejs),
 # add-apt-repository (software-properties-common), opencv (libgl1),
-# sphinx (graphviz) and system level python packages
+# sphinx (graphviz, pandoc) and system level python packages
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
         gnupg2 \
@@ -15,6 +15,7 @@ RUN apt-get update \
         software-properties-common \
         libgl1 \
         graphviz \
+        pandoc \
         python3-pip \
         python3-venv \
         python-is-python3 \

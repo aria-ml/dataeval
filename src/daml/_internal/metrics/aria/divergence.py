@@ -38,10 +38,11 @@ class _DpDivergence(Metric, ABC):
             The n_samples and n_features respectively
         k : int
             The number of neighbors to find
-        algorithm : str
-            Tree method for nearest neighbor (ball_tree or kd_tree)
+        algorithm : Literal
+            Tree method for nearest neighbor (auto, ball_tree or kd_tree)
 
-        .. note::
+        Note
+        ----
             Do not use kd_tree if n_features > 20
 
         Returns
@@ -69,44 +70,6 @@ class _DpDivergence(Metric, ABC):
         dataset_a: np.ndarray,
         dataset_b: np.ndarray,
     ) -> DivergenceOutput:
-        """
-        Returns the divergence between two datasets
-
-        Parameters
-        ----------
-        dataset_a : np.ndarray
-        dataset_b : np.ndarray
-        algorithm : str, default "mst"
-
-        Returns
-        -------
-        Dict[str, Any]
-            Dictionary containing the dp divergence and the errors during calculation
-
-        Raises
-        ------
-        ValueError
-            If unsupported method is given
-
-        .. note::
-            - A and B must be the same number of dimensions
-            - Only algorithm "mst" is supported at the current time
-
-        .. warning::
-            WARNING!!!
-            MST is very slow in this implementation, this is unlike matlab where
-            they have comparable speeds
-            Overall, MST takes ~25x LONGER!!
-            Source of slowdown:
-            conversion to and from CSR format adds ~10% of the time diff between
-            1nn and scipy mst function the remaining 90%
-
-        .. todo::
-            - validate the input algorithm
-            - improve speed for MST, requires a fast mst implementation
-            mst is at least 10x slower than knn approach
-        """
-
         data = np.vstack((dataset_a, dataset_b))
         N = dataset_a.shape[0]
         M = dataset_b.shape[0]
@@ -118,6 +81,43 @@ class _DpDivergence(Metric, ABC):
 
 
 class DpDivergenceMST(_DpDivergence):
+    """
+    Returns the divergence between two datasets
+
+    Parameters
+    ----------
+    dataset_a : np.ndarray
+    dataset_b : np.ndarray
+
+    Returns
+    -------
+    Dict[str, Any]
+        Dictionary containing the dp divergence and the errors during calculation
+
+    Raises
+    ------
+    ValueError
+        If unsupported method is given
+
+    Note
+    ----
+        - A and B must be the same number of dimensions
+
+    Warning
+    -------
+        MST is very slow in this implementation, this is unlike matlab where
+        they have comparable speeds
+        Overall, MST takes ~25x LONGER!!
+        Source of slowdown:
+        conversion to and from CSR format adds ~10% of the time diff between
+        1nn and scipy mst function the remaining 90%
+    """
+
+    # TODO
+    # - validate the input algorithm
+    # - improve speed for MST, requires a fast mst implementation
+    # mst is at least 10x slower than knn approach
+
     def calculate_errors(self, data: Any, labels: Any) -> Any:
         dense_eudist = squareform(pdist(data))
         eudist_csr = csr_matrix(dense_eudist)
@@ -129,6 +129,29 @@ class DpDivergenceMST(_DpDivergence):
 
 
 class DpDivergenceFNN(_DpDivergence):
+    """
+    Returns the divergence between two datasets
+
+    Parameters
+    ----------
+    dataset_a : np.ndarray
+    dataset_b : np.ndarray
+
+    Returns
+    -------
+    Dict[str, Any]
+        Dictionary containing the dp divergence and the errors during calculation
+
+    Raises
+    ------
+    ValueError
+        If unsupported method is given
+
+    Note
+    ----
+        - A and B must be the same number of dimensions
+    """
+
     def calculate_errors(self, data: Any, labels: Any) -> Any:
         nn_indices = self._compute_neighbors(data, data)
         # import pdb

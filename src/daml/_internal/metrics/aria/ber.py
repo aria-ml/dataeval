@@ -13,6 +13,31 @@ from daml._internal.metrics.outputs import BEROutput
 
 
 class MultiClassBER(Metric):
+    """
+    Implements the FR Test Statistic based estimator for the Bayes Error Rate
+
+    Parameters
+    ----------
+    X : np.ndarray
+        (n_samples x n_features) array of covariates (or image embeddings)
+    y : np.ndarray
+        n_samples vector of class labels with M unique classes. 2 <= M <= 10
+
+    Returns
+    -------
+    float
+        Estimate of the Bayes Error Rate
+
+    Raises
+    ------
+    ValueError
+        If unique classes M < 2 or M > 10
+
+    See Also
+    --------
+    `Learning to Bound the Multi-class Bayes Error (Th. 3 and Th. 4) <https://arxiv.org/abs/1811.06419>`_
+    """  # noqa F401
+
     def __init__(self) -> None:
         """Constructor method"""
 
@@ -23,31 +48,6 @@ class MultiClassBER(Metric):
         X: np.ndarray,
         y: np.ndarray,
     ) -> float:
-        """
-        Implements the FR Test Statistic based estimator for the Bayes Error Rate
-
-        Parameters
-        ----------
-        X : np.ndarray
-            (n_samples x n_features) array of covariates (or image embeddings)
-        y : np.ndarray
-            n_samples vector of class labels with M unique classes. 2 <= M <= 10
-
-        Returns
-        -------
-        float
-            Estimate of the Bayes Error Rate
-
-        Raises
-        ------
-        ValueError
-            If unique classes M < 2 or M > 10
-
-        See Also
-        --------
-        https://arxiv.org/abs/1811.06419 (Th. 3 and Th. 4)
-        """
-
         classes, counts = np.unique(y, return_counts=True)
         M = len(classes)
         N = np.sum(counts)
@@ -83,12 +83,6 @@ class MultiClassBER(Metric):
         -------
         Dict[str, float]
             "ber": Estimate of the Bayes Error Rate
-
-        .. todo:: Add Metric description for documentation.
-
-        See Also
-        --------
-        https://gitlab.jatic.net/jatic/aria/daml/-/issues/83
         """
-
+        # TODO: Add Metric description for documentation
         return BEROutput(ber=self._multiclass_ber(X, y))

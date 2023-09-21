@@ -12,11 +12,10 @@ from daml._internal.metrics.outputs import OutlierDetectorOutput
 
 class AlibiVAEGMM(BaseAlibiDetectOD):
     """
-    Variational Gaussian Mixture Model Autoencoder-based outlier detector,
-    from alibi-detect.
-    Based on https://docs.seldon.io/projects/alibi-detect
-             /en/latest/od/methods/vaegmm.html
-    """
+    Variational Gaussian Mixture Model Autoencoder-based outlier detector, from alibi-detect
+
+    Based on https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/vaegmm.html
+    """  # noqa E501
 
     def __init__(self):
         "Constructor method"
@@ -37,7 +36,6 @@ class AlibiVAEGMM(BaseAlibiDetectOD):
             the internal neural network architecture.
             This should be the same shape as the dataset that
             the detector will be trained on.
-
         """
         self._reference_input_shape = input_shape
         tf.keras.backend.clear_session()
@@ -97,7 +95,7 @@ class AlibiVAEGMM(BaseAlibiDetectOD):
     ) -> None:
         """
         Trains a model on a dataset containing that can be used
-        for the detection of outliers in :method:`evaluate`
+        for the detection of outliers in :meth:`evaluate`
 
         Parameters
         ----------
@@ -113,7 +111,8 @@ class AlibiVAEGMM(BaseAlibiDetectOD):
         TypeError
             If the detector has not been initialized or loaded from path
 
-        .. note::
+        Note
+        ----
             The supplied dataset should contain no outliers for maximum benefit
         """
 
