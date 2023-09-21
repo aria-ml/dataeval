@@ -8,7 +8,6 @@ from typing import Iterable, Tuple
 import alibi_detect
 import numpy as np
 import tensorflow as tf
-from alibi_detect.models.tensorflow import PixelCNN
 
 from daml._internal.metrics.alibi_detect.base import BaseAlibiDetectOD
 from daml._internal.metrics.outputs import OutlierDetectorOutput
@@ -17,9 +16,9 @@ from daml._internal.metrics.outputs import OutlierDetectorOutput
 class AlibiLLR(BaseAlibiDetectOD):
     """
     Log likelihood Ratio (LLR) outlier detector, from alibi-detect
-    Based on https://docs.seldon.io/projects/alibi-detect
-             /en/latest/examples/od_llr_mnist.html
-    """
+
+    Based on https://docs.seldon.io/projects/alibi-detect/en/latest/examples/od_llr_mnist.html
+    """  # noqa E501
 
     def __init__(self):
         "Constructor method"
@@ -47,6 +46,8 @@ class AlibiLLR(BaseAlibiDetectOD):
 
         # LLR internally uses a Pixel CNN architecture,
         # which we initialize here
+        from alibi_detect.models.tensorflow import PixelCNN
+
         llr_model = PixelCNN(
             image_shape=input_shape,
             num_resnet=5,
@@ -76,7 +77,7 @@ class AlibiLLR(BaseAlibiDetectOD):
     ) -> None:
         """
         Trains a model on a dataset containing that can be used
-        for the detection of outliers in :method:`evaluate`
+        for the detection of outliers in :meth:`evaluate`
 
         Parameters
         ----------
@@ -92,7 +93,8 @@ class AlibiLLR(BaseAlibiDetectOD):
         TypeError
             If the detector has not been initialized or loaded from path
 
-        .. note::
+        Note
+        ----
             The supplied dataset should contain no outliers for maximum benefit
         """
 

@@ -19,13 +19,10 @@ from daml._internal.metrics.outputs import OutlierDetectorOutput
 
 
 class AlibiAE(BaseAlibiDetectOD):
-    """Autoencoder-based outlier detector, from alibi-detect
+    """
+    Autoencoder-based outlier detector, from alibi-detect
 
-    ---
-    Methods
-    - :method:`initialize_detector`
-    - :method:`fit_dataset`
-    - :method:`evaluate`
+    Based on https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/ae.html
     """
 
     def __init__(self):
@@ -128,7 +125,7 @@ class AlibiAE(BaseAlibiDetectOD):
     ) -> None:
         """
         Trains a model on a dataset containing that can be used
-        for the detection of outliers in :method:`evaluate`
+        for the detection of outliers in :meth:`evaluate`
 
         Parameters
         ----------
@@ -144,7 +141,8 @@ class AlibiAE(BaseAlibiDetectOD):
         TypeError
             If the detector has not been initialized or loaded from path
 
-        .. note::
+        Note
+        ----
             The supplied dataset should contain no outliers for maximum benefit
         """
 
