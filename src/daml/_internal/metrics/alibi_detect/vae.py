@@ -19,7 +19,7 @@ from daml._internal.metrics.outputs import OutlierDetectorOutput
 
 
 class AlibiVAE(BaseAlibiDetectOD):
-    """Autoencoder-based outlier detector, from alibi-detect"""
+    """Variational autoencoder-based outlier detector, from alibi-detect"""
 
     def __init__(self):
         """Constructor method"""
@@ -123,7 +123,7 @@ class AlibiVAE(BaseAlibiDetectOD):
     ) -> None:
         """
         Trains a model on a dataset containing that can be used
-        for the detection of outliers in :method:`evaluate`
+        for the detection of outliers in :meth:`evaluate`
 
         Parameters
         ----------
@@ -139,7 +139,8 @@ class AlibiVAE(BaseAlibiDetectOD):
         TypeError
             If the detector has not been initialized or loaded from path
 
-        .. note::
+        Note
+        ----
             The supplied dataset should contain no outliers for maximum benefit
         """
 

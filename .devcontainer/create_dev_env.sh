@@ -12,6 +12,7 @@ echo "Creating development environments in parallel..."
 	tox d -e py38 .venv-py38 -x testenv.extras= &
 	tox d -e py39 .venv-py39 -x testenv.extras= &
 	tox d -e py310 .venv-py310 -x testenv.extras= &
+	tox d -e docs .venv-docs -x testenv:docs.extras= &
 	wait
 )
 
@@ -20,19 +21,19 @@ echo "Updating workspaces virtual environments..."
 cp -rn ~/.venv-* /workspaces/daml
 
 # ensure symlinks and cuda/cudnn path variables for tox environments
-declare -A py; py[38]=3.8; py[39]=3.9; py[310]=3.10
-for i in "${!py[@]}"; do
-	ensure_folder ".tox/py${i}"
-	rm -rf ".tox/py${i}/bin"
-	ln -st "${PWD}/.tox/py${i}" "${PWD}/.venv-py${i}/bin"
+declare -A dict; dict[py38]=3.8; dict[py39]=3.9; dict[py310]=3.10; dict[docs]=3.10;
+for i in "${!dict[@]}"; do
+	ensure_folder ".tox/${i}"
+	rm -rf ".tox/${i}/bin"
+	ln -st "${PWD}/.tox/${i}" "${PWD}/.venv-${i}/bin"
 
-	ensure_folder ".tox/py${i}/lib/python${py[${i}]}"
-	rm -rf ".tox/py${i}/lib/python${py[${i}]}/site-packages"
-	ln -st "${PWD}/.tox/py${i}/lib/python${py[${i}]}" "${PWD}/.venv-py${i}/lib/python${py[${i}]}/site-packages"
+	ensure_folder ".tox/${i}/lib/python${dict[${i}]}"
+	rm -rf ".tox/${i}/lib/python${dict[${i}]}/site-packages"
+	ln -st "${PWD}/.tox/${i}/lib/python${dict[${i}]}" "${PWD}/.venv-${i}/lib/python${dict[${i}]}/site-packages"
 
-	grep -qF 'export LD_LIBRARY_PATH' ".venv-py${i}/bin/activate" || (
-		echo 'CUDNN_PATH=$(dirname $(python -c "import nvidia.cudnn;print(nvidia.cudnn.__file__)"))' >> ".venv-py${i}/bin/activate" &&
-        echo 'export LD_LIBRARY_PATH=$CUDNN_PATH/lib' >> ".venv-py${i}/bin/activate"
+	grep -qF 'export LD_LIBRARY_PATH' ".venv-${i}/bin/activate" || (
+		echo 'CUDNN_PATH=$(dirname $(python -c "import nvidia.cudnn;print(nvidia.cudnn.__file__)"))' >> ".venv-${i}/bin/activate" &&
+		echo 'export LD_LIBRARY_PATH=$CUDNN_PATH/lib' >> ".venv-${i}/bin/activate"
 	)
 done
 

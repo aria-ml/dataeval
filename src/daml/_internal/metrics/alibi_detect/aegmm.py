@@ -12,11 +12,10 @@ from daml._internal.metrics.outputs import OutlierDetectorOutput
 
 class AlibiAEGMM(BaseAlibiDetectOD):
     """
-    Gaussian Mixture Model Autoencoder-based outlier detector,
-    from alibi-detect.
-    The implementation is based on https://docs.seldon.io/projects/alibi-detect/
-    en/latest/examples/od_aegmm_kddcup.html
-    """
+    Gaussian Mixture Model Autoencoder-based outlier detector, from alibi-detect
+
+    The implementation is based on https://docs.seldon.io/projects/alibi-detect/en/latest/examples/od_aegmm_kddcup.html
+    """  # noqa E501
 
     def __init__(self):
         """Constructor method"""
@@ -96,7 +95,7 @@ class AlibiAEGMM(BaseAlibiDetectOD):
     ) -> None:
         """
         Trains a model on a dataset containing that can be used
-        for the detection of outliers in :method:`evaluate`
+        for the detection of outliers in :meth:`evaluate`
 
         Parameters
         ----------
@@ -112,7 +111,8 @@ class AlibiAEGMM(BaseAlibiDetectOD):
         TypeError
             If the detector has not been initialized or loaded from path
 
-        .. note::
+        Note
+        ----
             The supplied dataset should contain no outliers for maximum benefit
         """
 
