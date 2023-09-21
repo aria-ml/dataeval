@@ -108,10 +108,10 @@ sphinx:
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   before_script:
   - apt-get update && apt-get upgrade -y
-  - apt-get install graphviz -y
-  - pip install sphinx sphinx-immaterial
+  - apt-get install graphviz pandoc -y
+  - pip install tox
   script:
-  - cd docs && make html
+  - tox -e docs
   artifacts:
     paths:
     - docs/_build/html/

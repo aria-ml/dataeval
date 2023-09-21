@@ -156,7 +156,8 @@ class OutlierDetector(Metric, ABC):
         Iterable[float]
             Returns a dataset style array
 
-        .. note::
+        Note
+        ----
             - Some metric libraries want a dataset in a particular format
                 (e.g. float32, or flattened)
             - Override this to set the standard dataset formatting.

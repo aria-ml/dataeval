@@ -11,8 +11,8 @@ Data-Analysis Metrics Library
    :hidden:
 
    ml_lifecycle
-   usage
-   api
+   metrics
+   tutorials
 
 ----------
 About DAML

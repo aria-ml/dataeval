@@ -9,4 +9,5 @@ htmlcov/
 junit.xml
 
 docs/_*/
+docs/tutorials/checkpoints/
 !docs/_static
