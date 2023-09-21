@@ -147,7 +147,7 @@ class AlibiAE(BaseAlibiDetectOD):
         """
 
         super().fit_dataset(dataset, epochs, verbose)
-        self.detector.infer_threshold(dataset, threshold_perc=95)
+        self.detector.infer_threshold(dataset, threshold_perc=95, batch_size=64)
 
     def evaluate(self, dataset: Iterable[float]) -> OutlierDetectorOutput:
         """
@@ -189,5 +189,6 @@ class AlibiAE(BaseAlibiDetectOD):
             outlier_perc=75,
             return_feature_score=True,
             return_instance_score=True,
+            batch_size=64,
         )
         return self._format_results(predictions)
