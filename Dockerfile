@@ -8,7 +8,7 @@ USER daml
 WORKDIR /daml
 
 COPY --chown=daml:daml pyproject.toml ./
-RUN poetry install --no-root --all-extras
+RUN poetry install --no-root --with test --with type --with lint --all-extras
 
 COPY --chown=daml:daml src/   src/
 COPY --chown=daml:daml tests/ tests/
