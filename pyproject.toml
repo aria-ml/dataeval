@@ -32,19 +32,27 @@ numpy = {version = "1.24.3"}
 scipy = {version = "1.10.1"}
 scikit-learn = {version = "1.3.0"}
 # outlier-detection
-alibi-detect = {version = "= 0.11.4", extras = ["tensorflow"], optional = true}
+alibi-detect = {version = "0.11.4", extras = ["tensorflow"], optional = true}
 tensorflow = {version = "2.12.1", optional = true}
 
 [tool.poetry.extras]
 alibi-detect = ["alibi-detect", "tensorflow"]
 
+[tool.poetry.group.test]
+optional = true
+
 [tool.poetry.group.test.dependencies]
-numpy = "*"
 pytest = "*"
 coverage = "*"
 
+[tool.poetry.group.type]
+optional = true
+
 [tool.poetry.group.type.dependencies]
 pyright = "*"
+
+[tool.poetry.group.lint]
+optional = true
 
 [tool.poetry.group.lint.dependencies]
 flake8 = "*"
