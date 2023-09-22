@@ -1,4 +1,4 @@
-ARG python_version=3.10
+ARG python_version=3.11
 FROM python:${python_version} as base
 RUN pip install poetry
 

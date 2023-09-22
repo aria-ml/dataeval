@@ -4,6 +4,7 @@ declare -a py_versions
 py_versions+=$'\n3.8'
 py_versions+=$'\n3.9'
 py_versions+=$'\n3.10'
+py_versions+=$'\n3.11'
 
 declare -a tasks
 tasks+=$'\ntype'
