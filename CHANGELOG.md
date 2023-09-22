@@ -1,6 +1,8 @@
-[//]: # (123433dd29c08b4d84706d46cd0670de2b98aa88)
+[//]: # (235d526497d648c813e3160644d7c68f41190dd0)
 
 # DAML Change Log
+## v0.25.10
+- ```235d5264 - First iteration demo. Trains model on 1, 4, and 9. Adds batch size to...```
 ## v0.25.8
 - ```123433dd - Documentation overhaul```
 ## v0.25.7
