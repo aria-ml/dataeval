@@ -42,6 +42,10 @@ RUN add-apt-repository ppa:deadsnakes/ppa -y \
         python3.10-dev \
         python3.10-distutils \
         python3.10-venv \
+        python3.11 \
+        python3.11-dev \
+        python3.11-distutils \
+        python3.11-venv \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
@@ -70,18 +74,21 @@ RUN pyright
 
 ARG PIP38="${HOMEDIR}/.venv-py38/bin/python -I -m pip" \
     PIP39="${HOMEDIR}/.venv-py39/bin/python -I -m pip" \
-    PIP310="${HOMEDIR}/.venv-py310/bin/python -I -m pip"
+    PIP310="${HOMEDIR}/.venv-py310/bin/python -I -m pip" \
+    PIP311="${HOMEDIR}/.venv-py311/bin/python -I -m pip"
 
 # Create virtual environments
 RUN (/usr/bin/python3.8 -m venv ${HOMEDIR}/.venv-py38 \
    & /usr/bin/python3.9 -m venv ${HOMEDIR}/.venv-py39 \
    & /usr/bin/python3.10 -m venv ${HOMEDIR}/.venv-py310 \
+   & /usr/bin/python3.11 -m venv ${HOMEDIR}/.venv-py311 \
    & wait)
 
 # Upgrade pip
 RUN (${PIP38} install --upgrade pip setuptools wheel \
    & ${PIP39} install --upgrade pip setuptools wheel \
    & ${PIP310} install --upgrade pip setuptools wheel \
+   & ${PIP311} install --upgrade pip setuptools wheel \
    & wait)
 
 # Prepare the dev environment
@@ -89,6 +96,7 @@ COPY --chown=daml:daml requirements.txt ./
 RUN (${PIP38} install -r requirements.txt \
    & ${PIP39} install -r requirements.txt \
    & ${PIP310} install -r requirements.txt \
+   & ${PIP311} install -r requirements.txt \
    & wait)
 
 # cuda deps in requirements.txt
