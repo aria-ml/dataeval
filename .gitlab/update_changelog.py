@@ -75,12 +75,14 @@ if __name__ == "__main__":
     else:
         lastHash = ""
 
+    # Entries retrieved are not in chronological order, sort before check
+    entries.sort(reverse=True)
+
     # Just bail early if everything is up to date
     if lastHash == entries[0].hash:
         exit()
 
     lines: List[str] = list()
-    entries.sort(reverse=True)
     lines.append(f"[//]: # ({entries[0].hash})\n")
     lines.append("\n")
     lines.append("# DAML Change Log\n")
