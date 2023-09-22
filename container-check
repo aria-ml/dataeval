@@ -51,8 +51,8 @@ function docker_build() {
     temp=$(mktemp)
     docker build $no_cache --build-arg python_version=$1 --tag daml-$2-$1 --target $2 . &> $temp || result="FAILED"
 
-    task="Python ${1} - ${2}"
-    echo -n "-> $task: "
+    job="Python ${1} - ${2}"
+    echo -n "-> $job: "
     if [[ $result == "FAILED" ]]; then
         log_file="daml-${2}-${1}_failure_$(date +%s).log"
         echo "FAILED (see log file ${log_file})"
@@ -62,7 +62,7 @@ function docker_build() {
         if [[ $verbose == "true" ]]; then
             echo "========== Output =========="
             cat $temp
-            echo "========== ^^^^^ Output from $task ^^^^^ =========="$'\n\n'
+            echo "========== ^^^^^ Output from $job ^^^^^ =========="$'\n\n'
         fi
     fi
     rm $temp
