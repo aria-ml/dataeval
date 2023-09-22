@@ -12,7 +12,7 @@ echo "Creating development environments in parallel..."
 	tox d -e py38 .venv-py38 -x testenv.extras= &
 	tox d -e py39 .venv-py39 -x testenv.extras= &
 	tox d -e py310 .venv-py310 -x testenv.extras= &
-	tox d -e docs .venv-docs -x testenv:docs.extras= &
+	tox d -e py311 .venv-py311 -x testenv.extras= &
 	wait
 )
 
@@ -21,7 +21,7 @@ echo "Updating workspaces virtual environments..."
 cp -rn ~/.venv-* /workspaces/daml
 
 # ensure symlinks and cuda/cudnn path variables for tox environments
-declare -A dict; dict[py38]=3.8; dict[py39]=3.9; dict[py310]=3.10; dict[docs]=3.10;
+declare -A dict; dict[py38]=3.8; dict[py39]=3.9; dict[py310]=3.10; dict[py311]=3.11;
 for i in "${!dict[@]}"; do
 	ensure_folder ".tox/${i}"
 	rm -rf ".tox/${i}/bin"

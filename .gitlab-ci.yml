@@ -14,7 +14,7 @@ workflow:
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  PYTHON_LATEST_SUPPORTED_VERSION: "3.10"
+  PYTHON_LATEST_SUPPORTED_VERSION: "3.11"
 
 cache:
   paths:
@@ -31,6 +31,7 @@ cache:
   - version_dict['3.8']=py38
   - version_dict['3.9']=py39
   - version_dict['3.10']=py310
+  - version_dict['3.11']=py311
 
 stages:
 - test
@@ -43,7 +44,7 @@ test:
   image: python:$PYTHON_VERSIONS
   parallel:
     matrix:
-    - PYTHON_VERSIONS: ["3.8", "3.9", "3.10"]
+    - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
   before_script:
   - !reference [".build_env", "before_script"]
   - pip install tox
@@ -96,7 +97,7 @@ typecheck:
   image: python:$PYTHON_VERSIONS
   parallel:
     matrix:
-    - PYTHON_VERSIONS: ["3.8", "3.9", "3.10"]
+    - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
   before_script:
   - !reference [".build_env", "before_script"]
   - pip install tox
@@ -196,6 +197,8 @@ secret_detection:
 
 gemnasium-python-dependency_scanning:
   stage: security
+  variables:
+    DS_INCLUDE_DEV_DEPENDENCIES: "false"
   rules:
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
