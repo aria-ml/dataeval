@@ -26,6 +26,10 @@ do
         fi
     done
 
+    if [[ $1 == "-v" ]]; then
+        export verbose="true"
+    fi
+
     i=$((i + 1));
     shift 1;
 done
@@ -50,6 +54,11 @@ function docker_build() {
         cat $temp > $log_file
     else
         echo SUCCEEDED
+        if [[ $verbose == "true" ]]; then
+            echo "========== Output =========="
+            cat $temp
+            echo "========== ^^^^^ Output from $task ^^^^^ =========="$'\n\n'
+        fi
     fi
     rm $temp
 }
