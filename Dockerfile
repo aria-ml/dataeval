@@ -7,6 +7,8 @@ RUN adduser  --gid 1000 --uid 1000 --disabled-password daml
 USER daml
 WORKDIR /daml
 
+ENV POETRY_DYNAMIC_VERSIONING_BYPASS=true
+
 COPY --chown=daml:daml pyproject.toml ./
 RUN poetry install --no-root --with test --with type --with lint --all-extras
 
@@ -16,7 +18,6 @@ COPY --chown=daml:daml tests/ tests/
 
 FROM base as daml_installed
 COPY --chown=daml:daml README.md ./
-COPY --chown=daml:daml .git/     .git/
 RUN poetry install --only-root --all-extras
 
 
@@ -31,7 +32,7 @@ RUN poetry run pyright --ignoreexternal --verifytypes daml
 
 
 FROM base as lint
-RUN poetry run black --check --diff . 
+RUN poetry run black --check --diff .
 RUN poetry run flake8
 RUN poetry run isort --check --diff .
 RUN poetry run codespell
