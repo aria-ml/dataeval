@@ -1,6 +1,8 @@
-[//]: # (235d526497d648c813e3160644d7c68f41190dd0)
+[//]: # (dfe0bddb8d1a3ef04ba72e6fcf4806a8840482cd)
 
 # DAML Change Log
+## v0.25.11
+- ```dfe0bddb - Add support for python 3.11```
 ## v0.25.10
 - ```235d5264 - First iteration demo. Trains model on 1, 4, and 9. Adds batch size to...```
 ## v0.25.8
