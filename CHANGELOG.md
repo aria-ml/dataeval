@@ -1,6 +1,8 @@
-[//]: # (997e4dac2cba35c8d431a752ba5add8104c421b5)
+[//]: # (123433dd29c08b4d84706d46cd0670de2b98aa88)
 
 # DAML Change Log
+## v0.25.8
+- ```123433dd - Documentation overhaul```
 ## v0.25.7
 - ```997e4dac - Make poetry dev groups optional```
 - ```f7de02d5 - container-check - Use `parallel` to build containers concurrently```
@@ -11,6 +13,7 @@
 ## v0.25.5
 - ```2ca285cc - update BER metric to return a dataclass instead of dict```
 - ```67f08b27 - Fix: Alibi-detect-models-have-fixed-architecture-shapes```
+## v0.25.1
 - ```db4adaff - 69 convert metric output dictionary to dataclass```
 ## v0.25.0
 - ```9c8fae0b - Add parameter for pytest to run functional tests```
@@ -21,8 +24,6 @@
 - ```79614577 - Implement Multiclass MST version of BER```
 ## v0.24.7
 - ```569f6896 - Enable CUDA cuDNN in devcontainers```
-## v0.24.6
-- ```2ad9fed5 - Implement BER estimate```
 ## v0.24.5
 - ```946d0f48 - Implement and unit test remaining Outlier Detection methods```
 - ```70d62a7d - add pytest and python extended functionality```
