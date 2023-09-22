@@ -30,6 +30,10 @@ do
         export verbose="true"
     fi
 
+    if [[ $1 == "--no-cache" ]]; then
+        export no_cache="--no-cache"
+    fi
+
     i=$((i + 1));
     shift 1;
 done
@@ -44,7 +48,7 @@ fi
 
 function docker_build() {
     temp=$(mktemp)
-    docker build --build-arg python_version=$1 --tag daml-$2-$1 --target $2 . &> $temp || result="FAILED"
+    docker build $no_cache --build-arg python_version=$1 --tag daml-$2-$1 --target $2 . &> $temp || result="FAILED"
 
     task="Python ${1} - ${2}"
     echo -n "-> $task: "
