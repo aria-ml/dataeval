@@ -1,17 +1,69 @@
 #!/bin/bash -e
-LANG=C
+
+declare -a py_versions
+py_versions+=$'\n3.8'
+py_versions+=$'\n3.9'
+py_versions+=$'\n3.10'
+py_versions+=$'\n3.11'
+
+declare -a tasks
+tasks+=$'\ntype'
+tasks+=$'\nlint'
+tasks+=$'\nunit'
+
+i=1;
+j=$#;
+while [ $i -le $j ]
+do
+    for v in $py_versions; do
+        if [[ $1 == $v ]]; then
+            versions_to_run+=$'\n'$v
+        fi
+    done
+
+    for t in $tasks; do
+        if [[ $1 == $t ]]; then
+            tasks_to_run+=$'\n'$t
+        fi
+    done
+
+    if [[ $1 == "-v" ]]; then
+        export verbose="true"
+    fi
+
+    if [[ $1 == "--no-cache" ]]; then
+        export no_cache="--no-cache"
+    fi
+
+    i=$((i + 1));
+    shift 1;
+done
+
+if [[ $versions_to_run == "" ]]; then
+    versions_to_run=$py_versions
+fi
+
+if [[ $tasks_to_run == "" ]]; then
+    tasks_to_run=$tasks
+fi
 
 function docker_build() {
     temp=$(mktemp)
-    docker build --build-arg python_version=$1 --tag daml-$2-$1 --target $2 . &> $temp || result="FAILED"
+    docker build $no_cache --build-arg python_version=$1 --tag daml-$2-$1 --target $2 . &> $temp || result="FAILED"
 
-    echo -n "-> Python ${1} - ${2}: "
+    job="Python ${1} - ${2}"
+    echo -n "-> $job: "
     if [[ $result == "FAILED" ]]; then
         log_file="daml-${2}-${1}_failure_$(date +%s).log"
         echo "FAILED (see log file ${log_file})"
         cat $temp > $log_file
     else
         echo SUCCEEDED
+        if [[ $verbose == "true" ]]; then
+            echo "========== Output =========="
+            cat $temp
+            echo "========== ^^^^^ Output from $job ^^^^^ =========="$'\n\n'
+        fi
     fi
     rm $temp
 }
@@ -19,4 +71,4 @@ function docker_build() {
 export -f docker_build
 
 echo "Building containers..."
-parallel docker_build ::: 3.8 3.9 3.10 3.11 ::: type lint unit
+LANG=C parallel docker_build ::: $versions_to_run ::: $tasks_to_run
