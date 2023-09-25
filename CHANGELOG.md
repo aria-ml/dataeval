@@ -1,6 +1,8 @@
-[//]: # (dfe0bddb8d1a3ef04ba72e6fcf4806a8840482cd)
+[//]: # (1c0df29bf4c7f90ac0ea6d99b1dda08ee00dd15a)
 
 # DAML Change Log
+## v0.25.12
+- ```fcbb99dd - Enhance container-check script```
 ## v0.25.11
 - ```dfe0bddb - Add support for python 3.11```
 ## v0.25.10
