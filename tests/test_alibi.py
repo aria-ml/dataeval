@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import numpy as np
 import pytest
 
@@ -6,20 +8,10 @@ from daml.metrics.outlier_detection import AE, AEGMM, LLR, VAE, VAEGMM
 from .utils import MockImageClassificationGenerator
 
 
-@pytest.mark.parametrize(
-    "method",
-    [
-        AE,
-        AEGMM,
-        VAE,
-        VAEGMM,
-        # remove functional marker after issue #94 is resolved
-        pytest.param(LLR, marks=pytest.mark.functional),
-    ],
-)
-class Test:
+@pytest.mark.functional
+@pytest.mark.parametrize("method", [AE, AEGMM, VAE, VAEGMM, LLR])
+class TestAlibiDetect_Functional:
     # Test main functionality of the program
-    @pytest.mark.functional
     def test_label_5s_as_outliers(self, method):
         """Functional testing of  OutlierDection
 
@@ -76,7 +68,6 @@ class Test:
         assert num_errors_on_ones == 0
         assert num_errors_on_fives == 0
 
-    @pytest.mark.functional
     def test_different_input_shape(self, method):
         """Testing of  Detection under different input size"""
 
@@ -108,6 +99,32 @@ class Test:
         num_errors_on_ones = np.sum(np.where(preds_on_ones != 0))
 
         assert num_errors_on_ones == 0
+
+
+@pytest.mark.parametrize(
+    "method, classnames",
+    [
+        (AE, ["alibi_detect.od.OutlierAE"]),
+        (AEGMM, ["alibi_detect.od.OutlierAEGMM"]),
+        (LLR, ["alibi_detect.od.LLR", "alibi_detect.models.tensorflow.PixelCNN"]),
+        (VAE, ["alibi_detect.od.OutlierVAE"]),
+        (VAEGMM, ["alibi_detect.od.OutlierVAEGMM"]),
+    ],
+)
+class TestAlibiDetect:
+    # Set to false if method is not expected to mock alibi_detect classes
+    _is_mock_expected = True
+
+    @pytest.fixture(scope="function", autouse=True)
+    def mock_classes_and_validate(self, classnames):
+        mocks = list()
+        for cls in classnames:
+            mock = patch(cls)
+            mocks.append((mock, mock.start()))
+        yield
+        for mock in mocks:
+            assert mock[1].called == self._is_mock_expected
+            mock[0].stop()
 
     # Ensure that the program fails upon wrong order of operations
     def test_eval_before_fit_fails(self, method):
@@ -169,6 +186,7 @@ class Test:
             metric.evaluate(faulty_X)
 
     def test_missing_detector(self, method):
+        self._is_mock_expected = False
         input_shape = (32, 32, 3)
 
         all_ones = MockImageClassificationGenerator(
@@ -184,3 +202,19 @@ class Test:
 
         with pytest.raises(TypeError):
             metric.evaluate(dataset=X)
+
+    def test_initialize_fit_evaluate(self, method):
+        input_shape = (32, 32, 3)
+
+        all_ones = MockImageClassificationGenerator(
+            limit=3, labels=1, img_dims=input_shape
+        )
+
+        x = all_ones.dataset.images
+
+        metric = method()
+        metric.initialize_detector(input_shape)
+        if metric._DATASET_TYPE is not None:
+            x = x.astype(metric._DATASET_TYPE)
+        metric.fit_dataset(dataset=x, epochs=1, verbose=False)
+        metric.evaluate(x)
