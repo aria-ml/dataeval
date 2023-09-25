@@ -50,6 +50,7 @@ test:
   - !reference [".build_env", "before_script"]
   - pip install tox
   script:
+  - tox -e ${version_dict[${PYTHON_VERSIONS}]} -- typecheck
   - tox -e ${version_dict[${PYTHON_VERSIONS}]} -- test $DAML_SCHEDULED_TEST_ARGS
   after_script:
   - mv .coverage .coverage.$PYTHON_VERSIONS
@@ -93,17 +94,17 @@ linting:
   script:
   - tox -e lint
 
-typecheck:
-  stage: test
-  image: python:$PYTHON_VERSIONS
-  parallel:
-    matrix:
-    - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
-  before_script:
-  - !reference [".build_env", "before_script"]
-  - pip install tox
-  script:
-  - tox -e ${version_dict[${PYTHON_VERSIONS}]} -- typecheck
+# typecheck:
+#  stage: test
+#   image: python:$PYTHON_VERSIONS
+#   parallel:
+#     matrix:
+#     - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
+#   before_script:
+#   - !reference [".build_env", "before_script"]
+#   - pip install tox
+#   script:
+#   - tox -e ${version_dict[${PYTHON_VERSIONS}]} -- typecheck
 
 sphinx:
   stage: docs
