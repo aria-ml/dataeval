@@ -1,5 +1,6 @@
 workflow:
   rules:
+  - if: $DAML_SCHEDULED_TEST_ARGS
   - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
     changes:
     - "CHANGELOG.md"
@@ -49,7 +50,7 @@ test:
   - !reference [".build_env", "before_script"]
   - pip install tox
   script:
-  - tox -e ${version_dict[${PYTHON_VERSIONS}]} -- test --runfunctional
+  - tox -e ${version_dict[${PYTHON_VERSIONS}]} -- test $DAML_SCHEDULED_TEST_ARGS
   after_script:
   - mv .coverage .coverage.$PYTHON_VERSIONS
   artifacts:
