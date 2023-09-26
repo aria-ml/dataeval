@@ -90,9 +90,25 @@ for task in "${ptsks[@]}"; do
     done
 done
 
+function copy_from_image() {
+    tag=$1
+    src=$2
+    dest=$3
+
+    id=$(docker ps --all --filter name=$tag --quiet)
+    if [[ $id ]]; then
+        docker rm --force $id &> /dev/null
+    fi
+
+    docker run --detach --name $tag $tag tail -f /dev/null &> /dev/null
+    docker cp $tag:$src $dest
+    docker rm --force $tag &> /dev/null
+}
+
 function docker_build() {
     temp=$(mktemp)
-    docker build $no_cache --build-arg python_version=$1 --tag daml-$2-$1 --target $2 . &> $temp || result="FAILED"
+    tag="daml-$2-$1"
+    docker build $no_cache --build-arg python_version=$1 --tag $tag --target $2 . &> $temp || result="FAILED"
 
     job="Python ${1} - ${2}"
     echo -n "-> $job: "
@@ -109,8 +125,16 @@ function docker_build() {
         fi
     fi
     rm $temp
+
+    if [[ $2 == "unit" ]]; then
+        copy_from_image $tag /daml/junit.xml    ./junit.${1}.xml
+        copy_from_image $tag /daml/.coverage    ./.coverage.${1}
+        copy_from_image $tag /daml/coverage.xml ./coverage.${1}.xml
+        copy_from_image $tag /daml/htmlcov      ./htmlcov.${1}
+    fi
 }
 
+export -f copy_from_image
 export -f docker_build
 
 echo "Building containers..."
