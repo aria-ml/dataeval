@@ -101,7 +101,7 @@ class DpDivergenceMST(_DpDivergence):
 
     Note
     ----
-        - A and B must be the same number of dimensions
+        - A and B must be 2 dimensions, and equivalent in size on the second dimension
 
     Warning
     -------
@@ -149,7 +149,7 @@ class DpDivergenceFNN(_DpDivergence):
 
     Note
     ----
-        - A and B must be the same number of dimensions
+        - A and B must be 2 dimensions, and equivalent in size on the second dimension
     """
 
     def calculate_errors(self, data: Any, labels: Any) -> Any:
