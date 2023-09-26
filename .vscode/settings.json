@@ -19,8 +19,11 @@
   "python.analysis.typeCheckingMode": "basic",
 
   "[python]": {
-    "editor.defaultFormatter": "ms-python.black-formatter"
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "file"
   },
+
   "files.exclude": {
     "**/.git": true,
     "**/__pycache__/": true,
