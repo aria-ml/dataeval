@@ -34,14 +34,7 @@ cache:
   - version_dict['3.10']=py310
   - version_dict['3.11']=py311
 
-stages:
-- test
-- docs
-- build
-- security
-
 test:
-  stage: test
   image: python:$PYTHON_VERSIONS
   parallel:
     matrix:
@@ -62,7 +55,6 @@ test:
     - ".coverage*"
 
 coverage:
-  stage: test
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   needs:
   - job: test
@@ -86,7 +78,6 @@ coverage:
     - htmlcov/
 
 linting:
-  stage: test
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   before_script:
   - !reference [".build_env", "before_script"]
@@ -95,7 +86,6 @@ linting:
   - tox -e lint
 
 # typecheck:
-#  stage: test
 #   image: python:$PYTHON_VERSIONS
 #   parallel:
 #     matrix:
@@ -107,7 +97,6 @@ linting:
 #   - tox -e ${version_dict[${PYTHON_VERSIONS}]} -- typecheck
 
 sphinx:
-  stage: docs
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   before_script:
   - apt-get update && apt-get upgrade -y
@@ -120,7 +109,6 @@ sphinx:
     - docs/_build/html/
 
 pages:
-  stage: docs
   needs:
   - sphinx
   - coverage
@@ -135,7 +123,6 @@ pages:
   - if: $CI_PIPELINE_SOURCE == 'web'
 
 tag:
-  stage: build
   script:
   - ./.gitlab/auto_tag.sh
   environment:
@@ -149,7 +136,6 @@ tag:
     when: never
 
 publish:
-  stage: build
   needs:
   - tag
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
@@ -169,7 +155,6 @@ publish:
     when: never
 
 changelog:
-  stage: build
   needs:
   - publish
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
@@ -193,18 +178,15 @@ include:
 - template: Security/Secret-Detection.gitlab-ci.yml
 
 secret_detection:
-  stage: security
   rules:
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
 gemnasium-python-dependency_scanning:
-  stage: security
   variables:
     DS_INCLUDE_DEV_DEPENDENCIES: "false"
   rules:
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
 semgrep-sast:
-  stage: security
   rules:
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
