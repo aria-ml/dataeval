@@ -1,6 +1,8 @@
-[//]: # (1c0df29bf4c7f90ac0ea6d99b1dda08ee00dd15a)
+[//]: # (3ccf6f3b7b449dfad01ad8b45a5cf2eae8427905)
 
 # DAML Change Log
+## v0.25.13
+- ```3ccf6f3b - Use patch to mock long running alibi_detect calls```
 ## v0.25.12
 - ```fcbb99dd - Enhance container-check script```
 ## v0.25.11
