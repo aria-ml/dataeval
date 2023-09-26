@@ -4,9 +4,13 @@ dist/
 .tox/
 
 .coverage
+.coverage.*
 coverage.xml
+coverage.*.xml
 htmlcov/
+htmlcov.*/
 junit.xml
+junit.*.xml
 *.log
 
 docs/_*/
