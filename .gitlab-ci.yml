@@ -17,14 +17,23 @@ stages:
 - test
 - build
 
+image: docker:git
+
+services:
+  - docker:dind
+
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   PYTHON_LATEST_SUPPORTED_VERSION: "3.11"
+  DOCKER_DRIVER: overlay2
 
 cache:
   paths:
   - .cache/pip
   - venv/
+
+before_script:
+  - if [[ ! $(which bash) ]]; then apk add --no-cache bash parallel; fi
 
 .build_env:
   before_script:
@@ -40,24 +49,18 @@ cache:
 
 test:
   stage: test
-  image: python:$PYTHON_VERSIONS
   parallel:
     matrix:
     - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
-  before_script:
-  - !reference [".build_env", "before_script"]
-  - pip install tox
   script:
-  - tox -e ${version_dict[${PYTHON_VERSIONS}]} -- typecheck
-  - tox -e ${version_dict[${PYTHON_VERSIONS}]} -- test $DAML_SCHEDULED_TEST_ARGS
-  after_script:
-  - mv .coverage .coverage.$PYTHON_VERSIONS
+  - ./container-check -v ${PYTHON_VERSIONS} unit type
   artifacts:
     reports:
-      junit: junit.xml
+      junit: junit.${PYTHON_VERSIONS}.xml
     paths:
-    - junit.xml
-    - ".coverage*"
+    - junit.${PYTHON_VERSIONS}.xml
+    - ".coverage.${PYTHON_VERSIONS}"
+    - "htmlcov.${PYTHON_VERSIONS}"
 
 coverage:
   stage: test
@@ -66,9 +69,10 @@ coverage:
   - job: test
     artifacts: true
   before_script:
-  - !reference [".build_env", "before_script"]
   - pip install coverage
   script:
+  # TODO: Move coverage report generation in to build script (and/or resolve issue with using symlinks instead of a full recursive copy)
+  - cp --recursive $(pwd) /daml
   - coverage combine
   - coverage report -m --skip-empty
   - coverage xml --skip-empty
@@ -85,12 +89,8 @@ coverage:
 
 linting:
   stage: test
-  image: python:$PYTHON_LATEST_SUPPORTED_VERSION
-  before_script:
-  - !reference [".build_env", "before_script"]
-  - pip install tox
   script:
-  - tox -e lint
+  - ./container-check -v lint
 
 # typecheck:
 #   image: python:$PYTHON_VERSIONS
@@ -105,13 +105,8 @@ linting:
 
 sphinx:
   stage: test
-  image: python:$PYTHON_LATEST_SUPPORTED_VERSION
-  before_script:
-  - apt-get update && apt-get upgrade -y
-  - apt-get install graphviz pandoc -y
-  - pip install tox
   script:
-  - tox -e docs
+  - ./container-check -v docs
   artifacts:
     paths:
     - docs/_build/html/
