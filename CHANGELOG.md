@@ -1,6 +1,9 @@
-[//]: # (3ccf6f3b7b449dfad01ad8b45a5cf2eae8427905)
+[//]: # (da04ddb1265cf7e8db79a76d5337207f1e2d5be6)
 
 # DAML Change Log
+## v0.25.14
+- ```da04ddb1 - Quickfix divergence docs. Based on questions from a user at Kitware```
+- ```633a4016 - Configure black format on save```
 ## v0.25.13
 - ```3ccf6f3b - Use patch to mock long running alibi_detect calls```
 ## v0.25.12
