@@ -92,11 +92,11 @@ RUN (${PIP38} install --upgrade pip setuptools wheel \
    & wait)
 
 # Prepare the dev environment
-COPY --chown=daml:daml requirements.txt ./
-RUN (${PIP38} install -r requirements.txt \
-   & ${PIP39} install -r requirements.txt \
-   & ${PIP310} install -r requirements.txt \
-   & ${PIP311} install -r requirements.txt \
+COPY --chown=daml:daml requirements*.txt ./
+RUN (${PIP38} install -r requirements_dev.txt \
+   & ${PIP39} install -r requirements_dev.txt \
+   & ${PIP310} install -r requirements_dev.txt \
+   & ${PIP311} install -r requirements_dev.txt -r requirements_docs.txt \
    & wait)
 
 # cuda deps in requirements.txt
