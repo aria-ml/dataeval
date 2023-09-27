@@ -1,6 +1,9 @@
-[//]: # (4507790dd385b9c9aaf2ff2607df0e8f51602c88)
+[//]: # (b526b2b93a20e2d2d61c2db2226f89416d68ed44)
 
 # DAML Change Log
+## v0.26.1
+- ```b526b2b9 - Add docs capability to container-check```
+- ```6218d53b - Remove pipeline stages to increase parallelism```
 ## v0.26.0
 ## v0.25.14
 - ```da04ddb1 - Quickfix divergence docs. Based on questions from a user at Kitware```
