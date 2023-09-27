@@ -1,0 +1,7 @@
+# docs
+Sphinx
+sphinx-rtd-size
+sphinx-rtd-theme
+nbsphinx
+ipykernel
+ipywidgets
