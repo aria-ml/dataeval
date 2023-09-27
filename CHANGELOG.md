@@ -1,6 +1,7 @@
-[//]: # (da04ddb1265cf7e8db79a76d5337207f1e2d5be6)
+[//]: # (4507790dd385b9c9aaf2ff2607df0e8f51602c88)
 
 # DAML Change Log
+## v0.26.0
 ## v0.25.14
 - ```da04ddb1 - Quickfix divergence docs. Based on questions from a user at Kitware```
 - ```633a4016 - Configure black format on save```
