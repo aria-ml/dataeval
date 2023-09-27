@@ -1,5 +1,8 @@
 ARG python_version=3.11
 FROM python:${python_version} as base
+
+USER root
+RUN apt-get update && apt-get install pandoc -y
 RUN pip install poetry
 
 RUN addgroup --gid 1000 daml
@@ -10,7 +13,8 @@ WORKDIR /daml
 ENV POETRY_DYNAMIC_VERSIONING_BYPASS=true
 
 COPY --chown=daml:daml pyproject.toml ./
-RUN poetry install --no-root --with test --with type --with lint --all-extras
+COPY --chown=daml:daml .devcontainer/requirements_dev.txt ./
+RUN poetry run pip install -r requirements_dev.txt
 
 COPY --chown=daml:daml src/   src/
 COPY --chown=daml:daml tests/ tests/
@@ -21,14 +25,31 @@ COPY --chown=daml:daml README.md ./
 RUN poetry install --only-root --all-extras
 
 
+FROM daml_installed as daml_installed_with_docs
+COPY --chown=daml:daml .devcontainer/requirements_docs.txt ./
+RUN poetry run pip install -r requirements_docs.txt
+
+COPY --chown=daml:daml docs/ docs/
+
+
 FROM daml_installed as unit
 RUN poetry run coverage run --source=daml --branch -m pytest --junitxml=junit.xml -v
+RUN poetry run coverage report -m --skip-empty
+
+
+FROM daml_installed as func
+RUN poetry run coverage run --source=daml --branch -m pytest --runfunctional --junitxml=junit.xml -v
 RUN poetry run coverage report -m --skip-empty
 
 
 FROM daml_installed as type
 RUN poetry run pyright src/ tests/
 RUN poetry run pyright --ignoreexternal --verifytypes daml
+
+
+FROM daml_installed_with_docs as docs
+WORKDIR /daml/docs
+RUN poetry run make html
 
 
 FROM base as lint

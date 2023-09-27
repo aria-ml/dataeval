@@ -7,6 +7,7 @@ dist/
 coverage.xml
 htmlcov/
 junit.xml
+*.log
 
 docs/_*/
 docs/tutorials/checkpoints/
