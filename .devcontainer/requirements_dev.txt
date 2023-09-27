@@ -24,15 +24,6 @@ flake8
 Flake8-pyproject
 isort
 
-# docs
-Sphinx
-sphinx-rtd-size
-sphinx-rtd-theme
-nbsphinx
-ipykernel
-ipython
-ipywidgets
-
 # packaging
 poetry
 poetry-core
