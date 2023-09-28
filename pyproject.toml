@@ -41,6 +41,22 @@ opencv-contrib-python-headless = {version = "4.8.0.76", optional = true}
 alibi-detect = ["alibi-detect", "tensorflow"]
 cuda = ["nvidia-cudnn-cu11", "opencv-contrib-python-headless"]
 
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+# test
+pytest = "*"
+coverage = "*"
+# type
+pyright = "*"
+# lint
+flake8 = "*"
+flake8-pyproject = "*"
+black = { extras = ["jupyter"], version = "*" }
+isort = "*"
+codespell = "*"
+
 [tool.poetry-dynamic-versioning]
 enable = true
 vcs = "git"
