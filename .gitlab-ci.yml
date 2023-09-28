@@ -13,6 +13,10 @@ workflow:
     when: never
   - if: $CI_COMMIT_BRANCH
 
+stages:
+- test
+- build
+
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   PYTHON_LATEST_SUPPORTED_VERSION: "3.11"
@@ -35,6 +39,7 @@ cache:
   - version_dict['3.11']=py311
 
 test:
+  stage: test
   image: python:$PYTHON_VERSIONS
   parallel:
     matrix:
@@ -55,6 +60,7 @@ test:
     - ".coverage*"
 
 coverage:
+  stage: test
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   needs:
   - job: test
@@ -78,6 +84,7 @@ coverage:
     - htmlcov/
 
 linting:
+  stage: test
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   before_script:
   - !reference [".build_env", "before_script"]
@@ -97,6 +104,7 @@ linting:
 #   - tox -e ${version_dict[${PYTHON_VERSIONS}]} -- typecheck
 
 sphinx:
+  stage: test
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   before_script:
   - apt-get update && apt-get upgrade -y
@@ -109,6 +117,7 @@ sphinx:
     - docs/_build/html/
 
 pages:
+  stage: build
   needs:
   - sphinx
   - coverage
@@ -123,6 +132,7 @@ pages:
   - if: $CI_PIPELINE_SOURCE == 'web'
 
 tag:
+  stage: build
   script:
   - ./.gitlab/auto_tag.sh
   environment:
@@ -136,6 +146,7 @@ tag:
     when: never
 
 publish:
+  stage: build
   needs:
   - tag
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
@@ -155,6 +166,7 @@ publish:
     when: never
 
 changelog:
+  stage: build
   needs:
   - publish
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
