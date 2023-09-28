@@ -90,6 +90,12 @@ for task in "${ptsks[@]}"; do
     done
 done
 
+function print_job_output() {
+    echo "========== Output =========="
+    cat $1
+    echo "========== ^^^^^ Output from $2 ^^^^^ =========="$'\n\n'
+}
+
 function copy_from_image() {
     tag=$1
     src=$2
@@ -107,6 +113,7 @@ function copy_from_image() {
 
 function docker_build() {
     temp=$(mktemp)
+    trap "rm $temp" EXIT
     tag="daml-$2-$1"
     docker build $no_cache --build-arg python_version=$1 --tag $tag --target $2 . &> $temp || result="FAILED"
 
@@ -116,15 +123,14 @@ function docker_build() {
         log_file="daml-${2}-${1}_failure_$(date +%s).log"
         echo "FAILED (see log file ${log_file})"
         cat $temp > $log_file
+        print_job_output $temp "$job"
+        exit 1
     else
         echo SUCCEEDED
         if [[ $verbose == "true" ]]; then
-            echo "========== Output =========="
-            cat $temp
-            echo "========== ^^^^^ Output from $job ^^^^^ =========="$'\n\n'
+            print_job_output $temp "$job"
         fi
     fi
-    rm $temp
 
     if [[ $2 == "unit" ]]; then
         copy_from_image $tag /daml/junit.xml    ./junit.${1}.xml
@@ -138,6 +144,7 @@ function docker_build() {
     fi
 }
 
+export -f print_job_output
 export -f copy_from_image
 export -f docker_build
 
