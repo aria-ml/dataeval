@@ -1,6 +1,7 @@
-[//]: # (b526b2b93a20e2d2d61c2db2226f89416d68ed44)
+[//]: # (960511b8716f97a8e09f26a7fe06a82276d58a10)
 
 # DAML Change Log
+## v0.26.2
 ## v0.26.1
 - ```b526b2b9 - Add docs capability to container-check```
 - ```6218d53b - Remove pipeline stages to increase parallelism```
