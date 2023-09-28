@@ -132,6 +132,10 @@ function docker_build() {
         copy_from_image $tag /daml/coverage.xml ./coverage.${1}.xml
         copy_from_image $tag /daml/htmlcov      ./htmlcov.${1}
     fi
+
+    if [[ $2 == "docs" ]]; then
+        copy_from_image $tag /daml/docs/_build ./docs
+    fi
 }
 
 export -f copy_from_image
