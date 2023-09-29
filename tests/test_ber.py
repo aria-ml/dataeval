@@ -13,7 +13,7 @@ class TestMulticlassBER:
         in the pipeline.
         """
         # The expected output...
-        expected_result = BEROutput(ber=0.45)
+        expected_result = BEROutput(ber=0.45, ber_lower=0.34188611699158106)
 
         # Initialize a 2nxp  (2nx1) numpy array of standard gaussians
         # np.random.seed(37)
@@ -75,14 +75,12 @@ class TestMulticlassBER:
         )
 
         metric = BER()
-
-        assert (
-            metric.evaluate(
-                X=covariates,
-                y=labels,
-            )
-            == expected_result
+        value = metric.evaluate(
+            X=covariates,
+            y=labels,
         )
+        assert value.ber == expected_result.ber
+        assert value.ber_lower == expected_result.ber_lower
 
     def test_class_max(self):
         value = None

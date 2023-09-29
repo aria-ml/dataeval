@@ -2,6 +2,7 @@
 This module contains the implementation of the
 FR Test Statistic based estimate for the Bayes Error Rate
 """
+from typing import Tuple
 
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
@@ -47,7 +48,7 @@ class MultiClassBER(Metric):
         self,
         X: np.ndarray,
         y: np.ndarray,
-    ) -> float:
+    ) -> Tuple[float, float]:
         classes, counts = np.unique(y, return_counts=True)
         M = len(classes)
         N = np.sum(counts)
@@ -60,9 +61,12 @@ class MultiClassBER(Metric):
         # Sparse matrix of pairwise distances between each feature vector
         Xdist = csr_matrix(np.triu(squareform(pdist(X)), 1))
         tree = coo_matrix(minimum_spanning_tree(Xdist, overwrite=True))
-        deltas = np.sum([y[tree.row[i]] != y[tree.col[i]] for i in range(N - 1)])
-
-        return deltas / N
+        deltas = np.sum([y[tree.row[i]] != y[tree.col[i]] for i in range(N - 1)]) / (
+            2 * N
+        )
+        upper = 2 * deltas
+        lower = ((M - 1) / (M)) * (1 - (1 - 2 * ((M) / (M - 1)) * deltas) ** 0.5)
+        return upper, lower
 
     def evaluate(
         self,
@@ -85,4 +89,5 @@ class MultiClassBER(Metric):
             "ber": Estimate of the Bayes Error Rate
         """
         # TODO: Add Metric description for documentation
-        return BEROutput(ber=self._multiclass_ber(X, y))
+        ber, ber_lower = self._multiclass_ber(X, y)
+        return BEROutput(ber=ber, ber_lower=ber_lower)
