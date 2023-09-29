@@ -1,9 +1,18 @@
+from typing import Optional
 from unittest.mock import patch
 
 import numpy as np
 import pytest
 
-from daml.metrics.outlier_detection import AE, AEGMM, LLR, VAE, VAEGMM
+from daml.metrics.outlier_detection import (
+    AE,
+    AEGMM,
+    LLR,
+    VAE,
+    VAEGMM,
+    Threshold,
+    ThresholdType,
+)
 
 from .utils import MockImageClassificationGenerator
 
@@ -42,9 +51,9 @@ class TestAlibiDetect_Functional:
         metric.initialize_detector(input_shape)
 
         # TODO Need to create a helper function to handle this
-        if metric._DATASET_TYPE is not None:
-            X_all_ones = X_all_ones.astype(metric._DATASET_TYPE)
-            X_all_fives = X_all_fives.astype(metric._DATASET_TYPE)
+        if metric._dataset_type is not None:
+            X_all_ones = X_all_ones.astype(metric._dataset_type)
+            X_all_fives = X_all_fives.astype(metric._dataset_type)
 
         # Train the detector on the dataset of all 1's
         metric.fit_dataset(dataset=X_all_ones, epochs=10, verbose=False)
@@ -87,8 +96,8 @@ class TestAlibiDetect_Functional:
         metric.initialize_detector(input_shape)
 
         # TODO Need to create a helper function to handle this
-        if metric._DATASET_TYPE is not None:
-            X_all_ones = X_all_ones.astype(metric._DATASET_TYPE)
+        if metric._dataset_type is not None:
+            X_all_ones = X_all_ones.astype(metric._dataset_type)
 
         # Train the detector on the dataset of all 1's
         metric.fit_dataset(dataset=X_all_ones, epochs=10, verbose=False)
@@ -106,14 +115,20 @@ class TestAlibiDetect_Functional:
     [
         (AE, ["alibi_detect.od.OutlierAE"]),
         (AEGMM, ["alibi_detect.od.OutlierAEGMM"]),
-        (LLR, ["alibi_detect.od.LLR", "alibi_detect.models.tensorflow.PixelCNN"]),
+        (
+            LLR,
+            ["alibi_detect.od.LLR", "daml._internal.metrics.alibi_detect.llr.PixelCNN"],
+        ),
         (VAE, ["alibi_detect.od.OutlierVAE"]),
         (VAEGMM, ["alibi_detect.od.OutlierVAEGMM"]),
     ],
 )
 class TestAlibiDetect:
-    # Set to false if method is not expected to mock alibi_detect classes
-    _is_mock_expected = True
+    input_shape = (32, 32, 3)
+    all_ones = MockImageClassificationGenerator(limit=3, labels=1, img_dims=input_shape)
+    dataset = all_ones.dataset.images
+
+    _is_mock_expected: Optional[bool] = True
 
     @pytest.fixture(scope="function", autouse=True)
     def mock_classes_and_validate(self, classnames):
@@ -123,40 +138,35 @@ class TestAlibiDetect:
             mocks.append((mock, mock.start()))
         yield
         for mock in mocks:
-            assert mock[1].called == self._is_mock_expected
+            if self._is_mock_expected is not None:
+                assert mock[1].called == self._is_mock_expected
             mock[0].stop()
 
     # Ensure that the program fails upon wrong order of operations
     def test_eval_before_fit_fails(self, method):
         """Testing incorrect order of operations for fitting and evaluating"""
 
-        input_shape = (32, 32, 3)
-
-        all_ones = MockImageClassificationGenerator(
-            limit=3, labels=1, img_dims=input_shape
-        )
-
-        X = all_ones.dataset.images
-
+        dataset = self.all_ones.dataset.images
         metric = method()
-
-        metric.initialize_detector(input_shape)
+        metric.initialize_detector(self.input_shape)
 
         # force metric.is_trained = False
         # Evaluate dataset before fitting it
         with pytest.raises(TypeError):
-            metric.evaluate(X)
+            metric.evaluate(dataset)
 
     # Ensure that the program fails upon testing on a dataset of different
     # shape than what was trained on
     def test_wrong_dataset_dims_fails(self, method):
         """Testing incorrect order of operations for fitting and evaluating"""
 
-        input_shape = (32, 32, 3)
         faulty_input_shape = (11, 32, 3)
 
         all_ones = MockImageClassificationGenerator(
-            limit=3, labels=1, img_dims=input_shape[:1], channels=input_shape[2]
+            limit=3,
+            labels=1,
+            img_dims=self.input_shape[:1],
+            channels=self.input_shape[2],
         )
 
         faulty_all_ones = MockImageClassificationGenerator(
@@ -166,55 +176,79 @@ class TestAlibiDetect:
             channels=faulty_input_shape[2],
         )
 
-        X = all_ones.dataset.images
-        faulty_X = faulty_all_ones.dataset.images
+        dataset = all_ones.dataset.images
+        faulty_dataset = faulty_all_ones.dataset.images
 
         metric = method()
 
-        if metric._DATASET_TYPE is not None:
-            X = X.astype(metric._DATASET_TYPE)
-            faulty_X = faulty_X.astype(metric._DATASET_TYPE)
+        if metric._dataset_type:
+            dataset = dataset.astype(metric._dataset_type)
+            faulty_dataset = faulty_dataset.astype(metric._dataset_type)
 
-        metric.initialize_detector(input_shape)
+        metric.initialize_detector(self.input_shape)
 
-        metric.fit_dataset(dataset=X, epochs=1, verbose=False)
+        metric.fit_dataset(dataset=dataset, epochs=1, verbose=False)
 
         # force
         # metric.is_trained = False
         # Evaluate dataset before fitting it
         with pytest.raises(TypeError):
-            metric.evaluate(faulty_X)
+            metric.evaluate(faulty_dataset)
 
     def test_missing_detector(self, method):
         self._is_mock_expected = False
-        input_shape = (32, 32, 3)
 
-        all_ones = MockImageClassificationGenerator(
-            limit=1, labels=1, img_dims=input_shape
-        )
-
-        X = all_ones.dataset.images
+        dataset = self.all_ones.dataset.images
 
         metric = method()
 
         with pytest.raises(TypeError):
-            metric.fit_dataset(dataset=X, epochs=1, verbose=False)
+            metric.fit_dataset(dataset=dataset, epochs=1, verbose=False)
 
         with pytest.raises(TypeError):
-            metric.evaluate(dataset=X)
+            metric.evaluate(dataset=dataset)
 
     def test_initialize_fit_evaluate(self, method):
-        input_shape = (32, 32, 3)
-
-        all_ones = MockImageClassificationGenerator(
-            limit=3, labels=1, img_dims=input_shape
-        )
-
-        x = all_ones.dataset.images
-
         metric = method()
-        metric.initialize_detector(input_shape)
-        if metric._DATASET_TYPE is not None:
-            x = x.astype(metric._DATASET_TYPE)
-        metric.fit_dataset(dataset=x, epochs=1, verbose=False)
-        metric.evaluate(x)
+        metric.initialize_detector(self.input_shape)
+        if metric._dataset_type:
+            dataset = self.dataset.astype(metric._dataset_type)
+        else:
+            dataset = self.dataset
+        metric.fit_dataset(dataset=dataset, epochs=1, verbose=False)
+        metric.evaluate(dataset)
+
+    def test_set_threshold_value(self, method):
+        metric = method()
+        metric.initialize_detector(self.input_shape)
+        if metric._dataset_type:
+            dataset = self.dataset.astype(metric._dataset_type)
+        else:
+            dataset = self.dataset
+        metric.fit_dataset(
+            dataset=dataset,
+            epochs=1,
+            verbose=False,
+            threshold=Threshold(0.015, ThresholdType.VALUE),
+        )
+        assert metric.detector.threshold == 0.015
+
+    def test_set_prediction_args(self, method):
+        self._is_mock_expected = False
+        metric = method()
+        expected = {
+            k: v
+            for k, v in metric._predict_kwargs.items()
+            if k != "return_instance_score"
+        }
+        metric.set_prediction_args(return_instance_score=False)
+        assert not metric._predict_kwargs["return_instance_score"]
+        for key in expected:
+            assert metric._predict_kwargs[key] == expected[key]
+
+    def test_set_model_is_retained(self, method):
+        self._is_mock_expected = None
+        metric = method()
+        metric._model_kwargs.update({"model": 0})
+        metric.initialize_detector(self.input_shape)
+        assert metric._model_kwargs["model"] == 0

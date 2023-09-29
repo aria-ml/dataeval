@@ -1,7 +1,7 @@
 """This module contains dataclasses for each metric output"""
 
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any, List
 
 
 @dataclass
@@ -11,7 +11,7 @@ class OutlierDetectorOutput:
 
     Attributes
     ----------
-    is_outlier : Iterable[bool]
+    is_outlier : List[bool]
         Indicates which elements of the dataset are marked as outliers
     feature_score : Any
         TODO
@@ -19,7 +19,7 @@ class OutlierDetectorOutput:
         TODO
     """
 
-    is_outlier: Iterable[bool]
+    is_outlier: List[bool]
     feature_score: Any
     instance_score: Any
 

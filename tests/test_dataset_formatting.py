@@ -1,4 +1,3 @@
-import numpy as np
 import pytest
 
 from daml.metrics.outlier_detection import AE, AEGMM, LLR, VAE, VAEGMM
@@ -14,45 +13,22 @@ class TestDatasetType:
             limit=1, labels=1, img_dims=(32, 32), channels=3
         )
         all_ones_images = all_ones.dataset.images
-        metric.check_dtype(all_ones_images, None)
+        metric._check_dtype(all_ones_images)
 
-    @pytest.mark.parametrize(
-        "dtype",
-        [
-            pytest.param(int, marks=pytest.mark.functional),
-            np.float64,
-            np.float32,
-            pytest.param(np.float16, marks=pytest.mark.functional),
-            pytest.param(float, marks=pytest.mark.functional),
-        ],
-    )
-    @pytest.mark.parametrize(
-        "method",
-        [
-            AE,
-            AEGMM,
-            VAE,
-            VAEGMM,
-            # remove functional marker after issue #94 is resolved
-            pytest.param(LLR, marks=pytest.mark.functional),
-        ],
-    )
-    def test_dataset_type_is_incorrect(self, dtype, method):
-        metric = method()
-
+    @pytest.mark.parametrize("method", [AE, AEGMM, VAE, VAEGMM, LLR])
+    def test_dataset_type_is_incorrect(self, method):
         all_ones = MockImageClassificationGenerator(
             limit=1, labels=1, img_dims=(32, 32), channels=3
         )
-        # TODO Should move dtype casting into MockImageClassificationGenerator
-        # Cast dtype to force error when dataset dtype is not the required
-        images = all_ones.dataset.images.astype(dtype)
 
-        metric_dtype = metric._DATASET_TYPE
-        if dtype == metric_dtype or metric_dtype is None:
-            metric.check_dtype(images, metric_dtype)
-        else:
+        images = all_ones.dataset.images.astype(int)
+
+        metric = method()
+        if metric._dataset_type:
             with pytest.raises(TypeError):
-                metric.check_dtype(images, metric_dtype)
+                metric._check_dtype(images)
+        else:
+            metric._check_dtype(images)
 
     def test_dataset_type_is_not_numpy(self):
         metric = AEGMM()
@@ -62,25 +38,10 @@ class TestDatasetType:
         )
         images_list = list(all_ones.dataset.images)
         with pytest.raises(TypeError):
-            metric.check_dtype(images_list, metric._DATASET_TYPE)  # type: ignore
+            metric._check_dtype(images_list)  # type: ignore
 
 
 class TestFlatten:
-    def test_flatten_dataset_is_none(self):
-        """Input and output shape are equivalent if no flatten is done"""
-        # Define data
-        all_ones = MockImageClassificationGenerator(
-            limit=1, labels=1, img_dims=(32, 32), channels=3
-        )
-        # Define model
-        metric = AE()
-
-        images = all_ones.dataset.images
-        new_dataset = metric.format_dataset(
-            images, flatten_dataset=None  # type: ignore
-        )
-        assert new_dataset.shape == images.shape
-
     @pytest.mark.parametrize(
         "limit",
         [
@@ -114,7 +75,8 @@ class TestFlatten:
         # Define model
         metric = AE()
         images = all_ones.dataset.images
-        new_dataset = metric.format_dataset(images, flatten_dataset=True)
+        metric._flatten_dataset = True
+        new_dataset = metric._format_dataset(images)
         output_shape = img_dims[0] * img_dims[1] * channels
 
         assert new_dataset.shape[0] == limit
