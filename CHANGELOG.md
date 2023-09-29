@@ -1,6 +1,8 @@
-[//]: # (00a3e3e24dadf99e1926b4fbe6afebf6d365b04b)
+[//]: # (bf31996ff1a766031e3848c765af297a4453e999)
 
 # DAML Change Log
+## v0.26.4
+- ```bf31996f - BER lower bound capability```
 ## v0.26.3
 ## v0.26.2
 ## v0.26.1
