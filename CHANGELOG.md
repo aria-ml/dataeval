@@ -1,6 +1,7 @@
-[//]: # (960511b8716f97a8e09f26a7fe06a82276d58a10)
+[//]: # (00a3e3e24dadf99e1926b4fbe6afebf6d365b04b)
 
 # DAML Change Log
+## v0.26.3
 ## v0.26.2
 ## v0.26.1
 - ```b526b2b9 - Add docs capability to container-check```
