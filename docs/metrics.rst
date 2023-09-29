@@ -24,3 +24,15 @@ Blurb on what data metrics are and why they are important.
    daml.metrics.outlier_detection.OutlierDetectorOutput
    daml.metrics.outlier_detection.VAE
    daml.metrics.outlier_detection.VAEGMM
+
+Enums and Types
+
+.. autoclass:: daml.metrics.outlier_detection.Threshold()
+   :members:                                        
+   :undoc-members:                                  
+   :member-order: bysource
+
+.. autoclass:: daml.metrics.outlier_detection.ThresholdType()
+   :members:                                        
+   :undoc-members:                                  
+   :member-order: bysource
