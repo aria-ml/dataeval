@@ -102,3 +102,6 @@ RUN (${PIP38} install -r requirements_dev.txt \
 # cuda deps in requirements.txt
 # opencv-contrib-python-headless==4.8.0.76
 # nvidia-cudnn-cu11==8.6.0.163
+
+# Memory fragmentation can cause OOM in some scenarios
+ENV TF_GPU_ALLOCATOR=cuda_malloc_async
