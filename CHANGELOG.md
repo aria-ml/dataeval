@@ -3,12 +3,9 @@
 # DAML Change Log
 ## v0.26.4
 - ```bf31996f - BER lower bound capability```
-## v0.26.3
-## v0.26.2
 ## v0.26.1
 - ```b526b2b9 - Add docs capability to container-check```
 - ```6218d53b - Remove pipeline stages to increase parallelism```
-## v0.26.0
 ## v0.25.14
 - ```da04ddb1 - Quickfix divergence docs. Based on questions from a user at Kitware```
 - ```633a4016 - Configure black format on save```
