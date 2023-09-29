@@ -3,7 +3,7 @@
 function showHelp() {
 cat << EOF
 Usage:
- container-check [options] <python version(s)> <tasks(s)>
+ build [options] <python version(s)> <tasks(s)>
 
 Options:
  -h, --help       display this help information
@@ -28,7 +28,7 @@ Note:
 EOF
 }
 
-options=$(getopt -l "help,verbose,no-cache" -o "hv" -n "container-check" -- "$@")
+options=$(getopt -l "help,verbose,no-cache" -o "hv" -n "build" -- "$@")
 eval set -- "$options"
 while true; do
     case "$1" in

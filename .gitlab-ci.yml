@@ -41,7 +41,7 @@ test:
     matrix:
     - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
   script:
-  - ./container-check -v ${PYTHON_VERSIONS} unit
+  - ./build -v ${PYTHON_VERSIONS} unit
   artifacts:
     reports:
       junit: junit.${PYTHON_VERSIONS}.xml
@@ -78,19 +78,19 @@ coverage:
 linting:
   stage: test
   script:
-  - ./container-check -v lint
+  - ./build -v lint
 
 typecheck:
   parallel:
     matrix:
       - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
   script:
-    - ./container-check -v ${PYTHON_VERSIONS} type
+    - ./build -v ${PYTHON_VERSIONS} type
 
 sphinx:
   stage: test
   script:
-  - ./container-check -v docs
+  - ./build -v docs
   artifacts:
     paths:
     - docs/_build/html/
