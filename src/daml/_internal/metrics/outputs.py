@@ -50,7 +50,10 @@ class BEROutput:
     ----------
     ber : float
         The minimum error rate that can be achieved by a classifier
-        based on the Bayes decision rule.
+        based on the Bayes decision rule. This is the upper bound.
+    ber_lower: float
+        Lower bound for the above.
     """
 
     ber: float
+    ber_lower: float
