@@ -1,6 +1,10 @@
-[//]: # (bf31996ff1a766031e3848c765af297a4453e999)
+[//]: # (8241906eb9e2b2eef6ea268c57c1fb526039bab8)
 
 # DAML Change Log
+## v0.26.6
+## v0.26.5
+- ```45ce9971 - Refactor alibi-detect and outlier-detection base and child classes```
+- ```2c2e72bc - publish and tagging should be staged after validation```
 ## v0.26.4
 - ```bf31996f - BER lower bound capability```
 ## v0.26.1
