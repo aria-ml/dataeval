@@ -1,6 +1,7 @@
-[//]: # (8241906eb9e2b2eef6ea268c57c1fb526039bab8)
+[//]: # (4d9cc752a86cffe3a6a5825fb48dc0447885edb9)
 
 # DAML Change Log
+## v0.26.7
 ## v0.26.6
 ## v0.26.5
 - ```45ce9971 - Refactor alibi-detect and outlier-detection base and child classes```
