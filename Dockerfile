@@ -35,6 +35,7 @@ COPY --chown=daml:daml docs/ docs/
 FROM daml_installed as unit
 RUN poetry run coverage run --source=daml --branch -m pytest --junitxml=junit.xml -v
 RUN poetry run coverage report -m --skip-empty
+RUN poetry run coverage html --skip-empty
 
 
 FROM daml_installed as func
