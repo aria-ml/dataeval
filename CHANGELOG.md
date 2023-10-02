@@ -1,6 +1,8 @@
-[//]: # (7f16ca92c1f17301a804b5c8c2cfdaa4f10850b2)
+[//]: # (dab0a8ff53eca5dc02c5dce1c72ffe774186f35f)
 
 # DAML Change Log
+## v0.26.10
+- ```dab0a8ff - Handle MST edge cases```
 ## v0.26.9
 ## v0.26.8
 ## v0.26.7
