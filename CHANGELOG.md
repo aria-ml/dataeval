@@ -1,6 +1,7 @@
-[//]: # (4d9cc752a86cffe3a6a5825fb48dc0447885edb9)
+[//]: # (7996def619870fce083bdc1813f5ef10dec80431)
 
 # DAML Change Log
+## v0.26.8
 ## v0.26.7
 ## v0.26.6
 ## v0.26.5
