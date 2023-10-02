@@ -58,9 +58,11 @@ class MultiClassBER(Metric):
             raise ValueError("Label vector contains more than 10 classes!")
         # All features belong on second dimension
         X = X.reshape((X.shape[0], -1))
-        # Sparse matrix of pairwise distances between each feature vector
-        Xdist = csr_matrix(np.triu(squareform(pdist(X)), 1))
-        tree = coo_matrix(minimum_spanning_tree(Xdist, overwrite=True))
+        # We add a small constant to the distance matrix to ensure scipy interprets
+        # the input graph as fully-connected.
+        dense_eudist = squareform(pdist(X)) + 1e-4
+        eudist_csr = csr_matrix(dense_eudist)
+        tree = coo_matrix(minimum_spanning_tree(eudist_csr))
         deltas = np.sum([y[tree.row[i]] != y[tree.col[i]] for i in range(N - 1)]) / (
             2 * N
         )
