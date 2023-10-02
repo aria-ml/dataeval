@@ -119,7 +119,9 @@ class DpDivergenceMST(_DpDivergence):
     # mst is at least 10x slower than knn approach
 
     def calculate_errors(self, data: Any, labels: Any) -> Any:
-        dense_eudist = squareform(pdist(data))
+        # We add a small constant to the distance matrix to ensure scipy interprets
+        # the input graph as fully-connected.
+        dense_eudist = squareform(pdist(data)) + 1e-4
         eudist_csr = csr_matrix(dense_eudist)
         mst = minimum_spanning_tree(eudist_csr)
         mst = mst.toarray()
