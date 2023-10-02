@@ -249,6 +249,9 @@ class TestAlibiDetect:
     def test_set_model_is_retained(self, method):
         self._is_mock_expected = None
         metric = method()
-        metric._model_kwargs.update({"model": 0})
+        # artificially fill all arguments of the model with 0s
+        argcount = metric.set_model.__code__.co_argcount - 1
+        metric.set_model(*[0] * argcount)
         metric.initialize_detector(self.input_shape)
-        assert metric._model_kwargs["model"] == 0
+        print(metric._model_kwargs.values())
+        assert all(v == 0 for v in metric._model_kwargs.values())
