@@ -26,15 +26,13 @@ class AlibiAEGMM(BaseAlibiDetectOD):
     def set_model(
         self, encoder_net: Any, decoder_net: Any, gmm_density_net: Any, n_gmm: int
     ) -> None:
-        self._model_kwargs.update(locals())
+        self._update_kwargs_with_locals(self._model_kwargs, **locals())
 
     def set_prediction_args(
         self,
         return_instance_score: Optional[bool] = None,
     ) -> None:
-        self._predict_kwargs.update(
-            {k: v for k, v in locals().items() if v is not None}
-        )
+        self._update_kwargs_with_locals(self._predict_kwargs, **locals())
 
     def _get_default_model_kwargs(self) -> dict:
         n_features = tf.math.reduce_prod(self._input_shape)

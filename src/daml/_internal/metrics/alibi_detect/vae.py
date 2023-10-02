@@ -36,7 +36,7 @@ class AlibiVAE(BaseAlibiDetectOD):
         latent_dim: int = 1024,
         samples: int = 10,
     ) -> None:
-        self._model_kwargs.update(locals())
+        self._update_kwargs_with_locals(self._model_kwargs, **locals())
 
     def set_prediction_args(
         self,
@@ -46,9 +46,7 @@ class AlibiVAE(BaseAlibiDetectOD):
         return_instance_score: Optional[bool] = None,
         batch_size: Optional[int] = None,
     ) -> None:
-        self._predict_kwargs.update(
-            {k: v for k, v in locals().items() if v is not None}
-        )
+        self._update_kwargs_with_locals(self._predict_kwargs, **locals())
 
     def _get_default_model_kwargs(self) -> dict:
         encoding_dim = 1024
