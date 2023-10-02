@@ -11,8 +11,8 @@ class TestDpDivergence:
             (
                 MST,
                 DivergenceOutput(
-                    dpdivergence=-0.96875,
-                    error=63,
+                    dpdivergence=0.96875,
+                    error=1,
                 ),
             ),
             (
@@ -31,7 +31,7 @@ class TestDpDivergence:
         """
         # Initialize a dataset of 32 images of size 32x32x3, containing all 1's
         all_ones = np.ones(shape=(32, 32))
-        all_fives = all_ones * 13
+        all_fives = all_ones * 5
 
         # Initialize the autoencoder-based outlier detector from alibi-detect
         metric = input()
