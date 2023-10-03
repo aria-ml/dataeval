@@ -52,10 +52,10 @@ test:
   rules:
   - if: $DAML_SCHEDULED_TEST_ARGS
     variables:
-      $TEST_ARG: "func"
+      TEST_ARG: "func"
   - when: always
     variables:
-      $TEST_ARG: "unit"
+      TEST_ARG: "unit"
   
 
 coverage:
