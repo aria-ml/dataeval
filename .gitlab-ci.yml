@@ -100,9 +100,6 @@ sphinx:
 
 pages:
   stage: build
-  needs:
-  - sphinx
-  - coverage
   script:
   - mv docs/_build/html/ ./public/
   - mv htmlcov/ ./public/testcov/
@@ -110,10 +107,9 @@ pages:
     paths:
     - public
   rules:
-  - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
-  - if: $CI_PIPELINE_SOURCE == 'web'
-  - if: $DAML_SCHEDULED_TEST_ARGS
-    when: never
+  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_PIPELINE_SOURCE == 'web'
+    needs: ['sphinx', 'coverage']
+  - when: never
 
 tag:
   stage: build
