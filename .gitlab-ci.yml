@@ -34,6 +34,12 @@ cache:
 
 before_script:
   - if [[ ! $(which bash) ]]; then apk add --no-cache bash parallel; fi
+  # Attempt to clear unused docker data. Since multiple jobs may run simultaneously on the
+  # same runner, the operation may not succeed if pruning is already in progress elsewhere.
+  - |
+    if [[ $(which docker) ]]; then
+      docker system prune --volumes --force || echo "Unable to perform docker data pruning!"
+    fi
 
 test:
   stage: test
