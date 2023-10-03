@@ -94,6 +94,9 @@ sphinx:
   artifacts:
     paths:
     - docs/_build/html/
+  rules:
+  - if: $DAML_SCHEDULED_TEST_ARGS
+    when: never
 
 pages:
   stage: build
@@ -109,6 +112,8 @@ pages:
   rules:
   - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
   - if: $CI_PIPELINE_SOURCE == 'web'
+  - if: $DAML_SCHEDULED_TEST_ARGS
+    when: never
 
 tag:
   stage: build
@@ -122,6 +127,8 @@ tag:
     - src/**/*
     - pyproject.toml
   - if: $CI_PIPELINE_SOURCE == 'web' && $PUBLISH != 'true'
+    when: never
+  - if: $DAML_SCHEDULED_TEST_ARGS
     when: never
 
 publish:
@@ -143,6 +150,8 @@ publish:
     - pyproject.toml
   - if: $CI_PIPELINE_SOURCE == 'web' && $PUBLISH != 'true'
     when: never
+  - if: $DAML_SCHEDULED_TEST_ARGS
+    when: never
 
 changelog:
   stage: build
@@ -161,6 +170,8 @@ changelog:
     - src/**/*
     - pyproject.toml
   - if: $CI_PIPELINE_SOURCE == 'web' && $PUBLISH != 'true'
+    when: never
+  - if: $DAML_SCHEDULED_TEST_ARGS
     when: never
 
 include:
