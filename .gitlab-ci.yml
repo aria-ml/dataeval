@@ -17,10 +17,7 @@ stages:
 - test
 - build
 
-image: docker:git
-
-services:
-  - docker:dind
+image: python:$PYTHON_LATEST_SUPPORTED_VERSION
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
@@ -43,6 +40,9 @@ before_script:
 
 test:
   stage: test
+  image: docker:git
+  services:
+    - docker:dind
   parallel:
     matrix:
     - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
@@ -62,7 +62,6 @@ test:
   - when: always
     variables:
       TEST_ARG: "unit"
-  
 
 coverage:
   stage: test
@@ -91,10 +90,16 @@ coverage:
 
 linting:
   stage: test
+  image: docker:git
+  services:
+    - docker:dind
   script:
   - ./build -v lint
 
 typecheck:
+  image: docker:git
+  services:
+    - docker:dind
   parallel:
     matrix:
       - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
@@ -103,6 +108,9 @@ typecheck:
 
 sphinx:
   stage: test
+  image: docker:git
+  services:
+    - docker:dind
   script:
   - ./build -v docs
   artifacts:
