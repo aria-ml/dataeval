@@ -40,8 +40,10 @@ test:
   parallel:
     matrix:
     - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
+  variables:
+    TEST_ARG: "unit"
   script:
-  - ./build -v ${PYTHON_VERSIONS} unit
+  - ./build -v ${PYTHON_VERSIONS} $TEST_ARG
   artifacts:
     reports:
       junit: junit.${PYTHON_VERSIONS}.xml
@@ -49,6 +51,11 @@ test:
     - junit.${PYTHON_VERSIONS}.xml
     - ".coverage.${PYTHON_VERSIONS}"
     - "htmlcov.${PYTHON_VERSIONS}"
+  rules:
+  - if: $DAML_SCHEDULED_TEST_ARGS
+    variables:
+      $TEST_ARG: "func"
+  
 
 coverage:
   stage: test
