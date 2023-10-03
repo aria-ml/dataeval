@@ -8,7 +8,7 @@ fi
 
 echo "Latest tag found: $currentVer"
 currentMinorVer=$(cut -d '.' -f2 <<< $currentVer)
-pendingMinorVer=$(( 21+($(date +%s) - $(date -d "2023-07-19 UTC" +%s)) / (60*60*24*14) ))
+pendingMinorVer=$(( 21+($(date +%s) - $(date -d "2023-07-19" -u +%s)) / (60*60*24*14) ))
 pendingVer="v0.$pendingMinorVer.0"
 patchVer=$(echo $currentVer | perl -pe 's/(\d+)(?!.*\d+)/$1+1/e')
 
