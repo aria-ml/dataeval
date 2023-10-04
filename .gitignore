@@ -3,16 +3,8 @@ __pycache__/
 dist/
 .tox/
 
-.coverage
-.coverage.*
-coverage.xml
-coverage.*.xml
-htmlcov/
-htmlcov.*/
-junit.xml
-junit.*.xml
-*.log
-
 docs/_*/
 docs/tutorials/checkpoints/
 !docs/_static
+
+output/
