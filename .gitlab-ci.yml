@@ -60,11 +60,11 @@ prune:
   - ./build -v ${PYTHON_VERSIONS} ${TASK}
   artifacts:
     reports:
-      junit: junit.${TASK}.${PYTHON_VERSIONS}.xml
+      junit: ./output/junit.${TASK}.${PYTHON_VERSIONS}.xml
     paths:
-    - junit.${TASK}.${PYTHON_VERSIONS}.xml
-    - ".coverage.${TASK}.${PYTHON_VERSIONS}"
-    - "htmlcov.${TASK}.${PYTHON_VERSIONS}"
+    - ./output/junit.${TASK}.${PYTHON_VERSIONS}.xml
+    - ./output/.coverage.${TASK}.${PYTHON_VERSIONS}
+    - ./output/htmlcov.${TASK}.${PYTHON_VERSIONS}
 
 test:
   extends: .test
@@ -93,7 +93,7 @@ coverage:
   script:
   # TODO: Move coverage report generation in to build script (and/or resolve issue with using symlinks instead of a full recursive copy)
   - cp --recursive $(pwd) /daml
-  - coverage combine
+  - coverage combine ./output
   - coverage report -m --skip-empty
   - coverage xml --skip-empty
   - coverage html --skip-empty

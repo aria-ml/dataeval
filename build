@@ -101,6 +101,8 @@ function copy_from_image() {
     src=$2
     dest=$3
 
+    mkdir -p $(dirname $dest)
+
     id=$(docker ps --all --filter name=$tag --quiet)
     if [[ $id ]]; then
         docker rm --force $id &> /dev/null
@@ -133,9 +135,9 @@ function docker_build() {
     fi
 
     if [[ $2 == "unit" || $2 == "func" ]]; then
-        copy_from_image $tag /daml/junit.xml    ./junit.${2}.${1}.xml
-        copy_from_image $tag /daml/.coverage    ./.coverage.${2}.${1}
-        copy_from_image $tag /daml/htmlcov      ./htmlcov.${2}.${1}
+        copy_from_image $tag /daml/junit.xml ./output/junit.${2}.${1}.xml
+        copy_from_image $tag /daml/.coverage ./output/.coverage.${2}.${1}
+        copy_from_image $tag /daml/htmlcov   ./output/htmlcov.${2}.${1}
     fi
 
     if [[ $2 == "docs" ]]; then
