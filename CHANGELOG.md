@@ -1,6 +1,12 @@
-[//]: # (dab0a8ff53eca5dc02c5dce1c72ffe774186f35f)
+[//]: # (948ee5e165198aade52cbfbad658056dd67b3e0c)
 
 # DAML Change Log
+## v0.26.11
+- ```948ee5e1 - Fix nightly functional tests and prune at start```
+- ```35dd5acd - Use python as the default pipeline image```
+- ```2a9fa680 - Run docker prune before each run```
+- ```1a000de5 - Consolidate requirements and add cuda to project toml```
+- ```e5570cee - Use container-check and docker-in-docker build within the pipeline```
 ## v0.26.10
 - ```dab0a8ff - Handle MST edge cases```
 ## v0.26.9
