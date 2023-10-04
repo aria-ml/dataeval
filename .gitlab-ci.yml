@@ -1,12 +1,11 @@
 workflow:
   rules:
   - if: $DAML_NIGHTLY
-  - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     changes:
     - "CHANGELOG.md"
     when: never
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-  - if: $CI_PIPELINE_SOURCE == 'web'
   - if: $CI_COMMIT_TAG
     when: never
   - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
@@ -174,14 +173,12 @@ tag:
   environment:
     name: production
   rules:
-  - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+  - if: $DAML_NIGHTLY
+    when: never
+  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     changes:
     - src/**/*
     - pyproject.toml
-  - if: $CI_PIPELINE_SOURCE == 'web' && $PUBLISH != 'true'
-    when: never
-  - if: $DAML_NIGHTLY
-    when: never
 
 publish:
   stage: build
@@ -196,14 +193,12 @@ publish:
   environment:
     name: production
   rules:
-  - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+  - if: $DAML_NIGHTLY
+    when: never
+  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     changes:
     - src/**/*
     - pyproject.toml
-  - if: $CI_PIPELINE_SOURCE == 'web' && $PUBLISH != 'true'
-    when: never
-  - if: $DAML_NIGHTLY
-    when: never
 
 changelog:
   stage: build
@@ -217,14 +212,12 @@ changelog:
   environment:
     name: production
   rules:
-  - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+  - if: $DAML_NIGHTLY
+    when: never
+  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     changes:
     - src/**/*
     - pyproject.toml
-  - if: $CI_PIPELINE_SOURCE == 'web' && $PUBLISH != 'true'
-    when: never
-  - if: $DAML_NIGHTLY
-    when: never
 
 include:
 - template: Security/SAST.gitlab-ci.yml
