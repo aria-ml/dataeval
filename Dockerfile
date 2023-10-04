@@ -35,6 +35,7 @@ RUN poetry run coverage html --skip-empty
 FROM daml_installed as func
 RUN poetry run coverage run --source=daml --branch -m pytest --runfunctional --junitxml=junit.xml -v
 RUN poetry run coverage report -m --skip-empty
+RUN poetry run coverage html --skip-empty
 
 
 FROM daml_installed as type
