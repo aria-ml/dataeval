@@ -15,4 +15,5 @@ pytest
 scikit-learn
 scipy
 tensorflow==2.12.1
+tensorflow-datasets
 tox
