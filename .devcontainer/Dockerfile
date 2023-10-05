@@ -7,19 +7,32 @@ USER root
 # add-apt-repository (software-properties-common), opencv (libgl1),
 # sphinx (graphviz, pandoc) and system level python packages
 RUN apt-get update \
+ && apt-get upgrade -y \
  && apt-get install -y --no-install-recommends \
-        gnupg2 \
-        git \
-        wget \
-        nodejs \
-        software-properties-common \
-        libgl1 \
-        graphviz \
-        pandoc \
-        python3-pip \
-        python3-venv \
-        python-is-python3 \
-        parallel \
+    gnupg2 \
+    git \
+    wget \
+    nodejs \
+    software-properties-common \
+    parallel \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update \
+ && apt-get upgrade -y \
+ && apt-get install -y --no-install-recommends \
+    libgl1 \
+    graphviz \
+    pandoc \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update \
+ && apt-get upgrade -y \
+ && apt-get install -y --no-install-recommends \
+    python3-pip \
+    python3-venv \
+    python-is-python3 \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
@@ -53,7 +66,7 @@ RUN add-apt-repository ppa:deadsnakes/ppa -y \
 ARG HOMEDIR=/home/daml
 RUN addgroup --gid 1000 daml
 RUN addgroup --gid 1001 docker
-RUN adduser --ingroup daml --ingroup docker --ingroup sudo --uid 1000 --disabled-password daml
+RUN adduser --ingroup daml --ingroup docker --uid 1000 --disabled-password daml
 USER daml
 
 WORKDIR ${HOMEDIR}
@@ -92,11 +105,11 @@ RUN (${PIP38} install --upgrade pip setuptools wheel \
    & wait)
 
 # Prepare the dev environment
-COPY --chown=daml:daml requirements.txt ./
+COPY --chown=daml:daml requirements*.txt ./
 RUN (${PIP38} install -r requirements.txt \
    & ${PIP39} install -r requirements.txt \
    & ${PIP310} install -r requirements.txt \
-   & ${PIP311} install -r requirements.txt \
+   & ${PIP311} install -r requirements.txt -r requirements_docs.txt\
    & wait)
 
 # cuda deps in requirements.txt
