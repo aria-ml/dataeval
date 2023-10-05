@@ -2,7 +2,7 @@ ARG python_version=3.11
 FROM python:${python_version} as base
 
 USER root
-RUN apt-get update && apt-get install pandoc -y
+RUN apt-get update && apt-get install pandoc graphviz -y
 RUN pip install poetry
 
 RUN addgroup --gid 1000 daml
@@ -13,8 +13,12 @@ WORKDIR /daml
 ENV POETRY_DYNAMIC_VERSIONING_BYPASS=true
 
 COPY --chown=daml:daml pyproject.toml ./
+
 COPY --chown=daml:daml .devcontainer/requirements.txt ./
 RUN poetry run pip install -r requirements.txt
+
+COPY --chown=daml:daml .devcontainer/requirements_docs.txt ./
+RUN poetry run pip install -r requirements_docs.txt
 
 COPY --chown=daml:daml src/   src/
 COPY --chown=daml:daml tests/ tests/
