@@ -7,4 +7,5 @@ These static jupyter notebooks demonstrate how to use DAML to perform data analy
    :maxdepth: 1
 
    tutorials/BayesErrorRateEstimationTutorial.ipynb
+   tutorials/DPDivergenceTutorial.ipynb
    tutorials/OutlierDetectionTutorial.ipynb
