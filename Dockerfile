@@ -21,8 +21,13 @@ COPY --chown=daml:daml src/   src/
 COPY --chown=daml:daml tests/ tests/
 COPY --chown=daml:daml docs/  docs/
 
+
 FROM base as daml_installed
 RUN poetry install --only-root --all-extras
+
+
+FROM base as deps
+RUN poetry export --extras alibi-detect --extras cuda --without-hashes --without dev --format requirements.txt --output requirements.txt
 
 
 FROM daml_installed as unit

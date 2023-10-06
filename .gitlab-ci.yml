@@ -144,6 +144,14 @@ typecheck:
     when: never
   - when: always
 
+generate shipped dependencies:
+  image: docker:git
+  script:
+    - ./build -v deps
+  artifacts:
+    paths:
+      - output/requirements.txt
+
 sphinx:
   stage: test
   image: docker:git
@@ -234,8 +242,23 @@ secret_detection:
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
 gemnasium-python-dependency_scanning:
+  needs:
+  - job: generate shipped dependencies
+    artifacts: true
+  # Both `needs` and `dependencies` are used due to a quirk of gitlab.
+  # `gemnasium-python-dependency_scanning` specifies an empty list of
+  # dependencies, which means that unless you explicitly add the dependency,
+  # all artifacts will be filtered out and removed from this job.
+  dependencies:
+    - generate shipped dependencies
   variables:
+    # This seems like it *should* resolve the dev dependencies problem, but
+    # it doesn't seem to work, probably due to the change in poetry 1.2.0 that
+    # removed the "dev-dependencies" section in favor of naming a dependency group "dev"
+    # (https://python-poetry.org/docs/managing-dependencies/#dependency-groups).
+    # Leaving it configured for visibility, in case it gets fixed in the future.
     DS_INCLUDE_DEV_DEPENDENCIES: "false"
+    DS_EXCLUDED_PATHS: "poetry.lock"
   rules:
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 

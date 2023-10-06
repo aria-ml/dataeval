@@ -22,9 +22,10 @@ Tasks:
  type             run typecheck
  lint             run static code analysis
  docs             generate documentation
+ deps             generate list of shipped dependencies
 
 Note:
- lint and docs are always performed on python 3.11
+ lint, docs, and deps are always performed on python 3.11
 EOF
 }
 
@@ -53,7 +54,7 @@ fi
 # declare allowed value maps
 declare -A a_pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1)
 declare -A a_ptsks=([unit]=1 [func]=1 [type]=1)
-declare -A a_stsks=([lint]=1 [docs]=1)
+declare -A a_stsks=([lint]=1 [docs]=1 [deps]=1)
 
 # generate python and task lists
 declare -a pvers; declare -a ptsks; declare -a stsks
@@ -82,7 +83,7 @@ if [[ $count == 0 ]]; then stsks=("lint" "docs"); fi
 t_list="";p_list=""
 # handle special tasks (lint + docs)
 for task in "${stsks[@]}"; do
-    if [[ $task == "lint" || $task == "docs" ]]; then
+    if [[ $task == "lint" || $task == "docs" || $task == "deps" ]]; then
         t_list+="$task "
         p_list+="3.11 "
     fi
@@ -154,6 +155,10 @@ function docker_build() {
 
     if [[ $2 == "docs" ]]; then
         copy_from_image $tag /daml/docs/_build ./docs
+    fi
+
+    if [[ $2 == "deps" ]]; then
+        copy_from_image $tag /daml/requirements.txt ./output/requirements.txt
     fi
 
     if [[ -z ${save_build_images} ]]; then
