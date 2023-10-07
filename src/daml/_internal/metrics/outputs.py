@@ -1,27 +1,29 @@
 """This module contains dataclasses for each metric output"""
 
 from dataclasses import dataclass
-from typing import Any, List
+from typing import Iterable
+
+import numpy as np
 
 
 @dataclass
 class OutlierDetectorOutput:
     """
-    Dataclass to store outputs from Outlier Detection
+    Dataclass to store outputs from Outlier Detection metrics
 
     Attributes
     ----------
     is_outlier : List[bool]
         Indicates which elements of the dataset are marked as outliers
-    feature_score : Any
-        TODO
-    instance_score : Any
-        TODO
+    feature_score : np.ndarray
+        Feature level outlier scores. Shape = (B, H, W, C)
+    instance_score : np.ndarray
+        Instance (image) level outlier scores. Shape = (B, )
     """
 
-    is_outlier: List[bool]
-    feature_score: Any
-    instance_score: Any
+    is_outlier: Iterable[bool]
+    feature_score: np.ndarray
+    instance_score: np.ndarray
 
 
 @dataclass
@@ -32,9 +34,14 @@ class DivergenceOutput:
     Attributes
     ----------
     dpdivergence : float
-        TODO
+        Measure of the distance between two distributions (or datasets).
+
+        For more information about this divergence, its formal definition,
+        and its associated estimators
+        visit https://arxiv.org/abs/1412.6534.
+
     error : float
-        TODO
+        Number of edges connecting the two datasets
     """
 
     dpdivergence: float

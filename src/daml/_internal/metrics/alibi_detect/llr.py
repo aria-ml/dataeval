@@ -17,9 +17,8 @@ from daml._internal.metrics.alibi_detect.base import (
 
 class AlibiLLR(BaseAlibiDetectOD):
     """
-    Log likelihood Ratio (LLR) outlier detector, from alibi-detect
-
-    Based on https://docs.seldon.io/projects/alibi-detect/en/latest/examples/od_llr_mnist.html
+    Log likelihood Ratio (LLR) outlier detector,
+    using `alibi-detect llr. <https://docs.seldon.io/projects/alibi-detect/en/latest/examples/od_llr_mnist.html>`_
     """  # noqa E501
 
     def __init__(self):
@@ -30,6 +29,13 @@ class AlibiLLR(BaseAlibiDetectOD):
         )
 
     def set_model(self, model: Any) -> None:
+        """
+        Sets additional arguments to be used during model creation.
+
+        Note
+        ----
+        Visit `alibi-detect llr <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/llr.html#Initialize>`_ for additional information on model parameters.
+        """  # noqa E501
         self._update_kwargs_with_locals(self._model_kwargs, **locals())
 
     def set_prediction_args(
@@ -37,6 +43,13 @@ class AlibiLLR(BaseAlibiDetectOD):
         outlier_type: Optional[AlibiDetectOutlierType] = None,
         return_instance_score: Optional[bool] = None,
     ) -> None:
+        """
+        Sets additional arguments to be used during prediction.
+
+        Note
+        ----
+        Visit `alibi-detect llr <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/llr.html#Detect>`_ for additional information on prediction parameters.
+        """  # noqa E501
         self._update_kwargs_with_locals(self._predict_kwargs, **locals())
 
     def _get_default_model_kwargs(self) -> dict:

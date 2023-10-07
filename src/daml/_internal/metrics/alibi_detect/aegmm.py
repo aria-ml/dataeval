@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Optional
 
 import alibi_detect
 import numpy as np
@@ -11,9 +11,8 @@ from daml._internal.metrics.alibi_detect.base import BaseAlibiDetectOD
 
 class AlibiAEGMM(BaseAlibiDetectOD):
     """
-    Gaussian Mixture Model Autoencoder-based outlier detector, from alibi-detect
-
-    The implementation is based on https://docs.seldon.io/projects/alibi-detect/en/latest/examples/od_aegmm_kddcup.html
+    Gaussian Mixture Model Autoencoder-based outlier detector,
+    using alibi-detect aegmm. `<https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/aegmm.html>`_
     """  # noqa E501
 
     def __init__(self):
@@ -24,14 +23,32 @@ class AlibiAEGMM(BaseAlibiDetectOD):
         )
 
     def set_model(
-        self, encoder_net: Any, decoder_net: Any, gmm_density_net: Any, n_gmm: int
+        self,
+        encoder_net: tf.keras.Model,
+        decoder_net: tf.keras.Model,
+        gmm_density_net: tf.keras.Model,
+        n_gmm: int,
     ) -> None:
+        """
+        Sets additional arguments to be used during model creation.
+
+        Note
+        ----
+        Visit `alibi-detect aegmm <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/aegmm.html#Initialize> for additional information on model parameters.
+        """  # noqa E501
         self._update_kwargs_with_locals(self._model_kwargs, **locals())
 
     def set_prediction_args(
         self,
         return_instance_score: Optional[bool] = None,
     ) -> None:
+        """
+        Sets additional arguments to be used during prediction.
+
+        Note
+        ----
+        Visit `alibi-detect aegmm <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/aegmm.html#Detect>`_ for additional information on prediction parameters.
+        """  # noqa E501
         self._update_kwargs_with_locals(self._predict_kwargs, **locals())
 
     def _get_default_model_kwargs(self) -> dict:

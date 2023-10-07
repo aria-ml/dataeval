@@ -28,8 +28,10 @@ class BaseAlibiDetectOD(Metric, ABC):
 
     Attributes
     ----------
-    detector: Any, default None
+    detector : Any, default None
         A model used for outlier detection after being trained on clean data
+    is_trained : bool, default False
+        Flag to determine if the detector has been trained on the dataset
     """
 
     # TODO: Add model loading & saving
@@ -60,15 +62,18 @@ class BaseAlibiDetectOD(Metric, ABC):
         self,
         alibi_detect_class: type,
         flatten_dataset: bool,
-        dataset_type: Optional[type],
+        dataset_type: Optional[type] = None,
     ):
         """
         Constructor method
-        alibi_detect_class : type,
+
+        Parameters
+        ----------
+        alibi_detect_class : type
             This is the alibi_detect outlier detection class to instantiate
         flatten_dataset : bool, default False
             Flag to flatten a dataset to shape (B, H * W * C)
-        dataset_type : Optional[type]
+        dataset_type : Optional[type], default None
             Type used for formatting the dataset
         """
 
@@ -92,14 +97,9 @@ class BaseAlibiDetectOD(Metric, ABC):
         Parameters
         ----------
         input_shape : tuple(int)
-            The shape (W,H,C) of the dataset
-            that the detector will be constructed around. This influences
-            the internal neural network architecture.
-            This should be the same shape as the dataset that
-            the detector will be trained on.
-
-        ad_kwargs : dict[str, Any]
-            Additional args to pass to alibi-detect's constructor.
+            The shape (H, W, C) of the dataset that the detector will be constructed
+            around. This influences the internal neural network architecture and should
+            be the same shape as the dataset that the detector will be trained on.
         """
         self._input_shape = input_shape
         tf.keras.backend.clear_session()
@@ -129,9 +129,13 @@ class BaseAlibiDetectOD(Metric, ABC):
         dataset : Iterable[float]
             An array of images for the model to train on
         epochs : int, default 3
-            Number of epochs to train the detector for.
+            Number of epochs to train the detector for
+        threshold : Threshold, default Threshold(95.0, ThresholdType.PERCENTAGE)
+            Sets the expected threshold of an outlier in the dataset
+        batch_size : Optional[int], default None
+            Batch size override to use during training
         verbose : bool, default False
-            Flag to output logs from Alibi-Detect verbose mode.bi-Detect verbose mode.
+            Flag to output logs from Alibi-Detect verbose mode
 
         Raises
         ------
@@ -140,7 +144,7 @@ class BaseAlibiDetectOD(Metric, ABC):
 
         Note
         ----
-            The supplied dataset should contain no outliers for maximum benefit
+        The supplied dataset should contain no outliers for maximum benefit
         """
         if self.detector is None:
             raise TypeError(
@@ -213,8 +217,6 @@ class BaseAlibiDetectOD(Metric, ABC):
         ----------
         dataset : Iterable[float]
             An array of images in shape (B, H, W, C)
-        reference_input_shape : Tuple[int, int, int]
-            Dimensions of one image (H,W,C) to compare the dataset shape to
 
         Raises
         -------
@@ -244,13 +246,13 @@ class BaseAlibiDetectOD(Metric, ABC):
         Returns
         -------
         Iterable[float]
-            Returns a dataset style array
+            A dataset style array
 
         Note
         ----
-            - Some metric libraries want a dataset in a particular format
-                (e.g. float32, or flattened)
-            - Override this to set the standard dataset formatting.
+        - Some metric libraries want a dataset in a particular format
+            (e.g. float32, or flattened)
+        - Override this to set the standard dataset formatting.
         """
         self._check_dataset_shape(dataset)
         self._check_dtype(dataset)
@@ -273,8 +275,8 @@ class BaseAlibiDetectOD(Metric, ABC):
 
         Returns
         -------
-        :class: OutlierDetectorOutput
-            Outlier mask, and associated feature andinstance scores
+        OutlierDetectorOutput
+            Outlier mask, and associated feature and instance scores
 
         """
         if self.detector is None:
