@@ -17,21 +17,21 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.graphviz",
     "sphinx_rtd_size",
-    "nbsphinx"
+    "nbsphinx",
 ]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 autosummary_generate = False
-sphinx_rtd_size_width = "90%"
+sphinx_rtd_size_width = "80%"
 nbsphinx_allow_errors = True
 
 # html_static_path = ['_static']
 html_theme = "sphinx_rtd_theme"
 html_show_sourcelink = False
 html_theme_options = {
-    'navigation_depth': 4,
+    "navigation_depth": 4,
 }
 
 
@@ -40,6 +40,7 @@ html_theme_options = {
 # public classes as aliases, which we don't want
 def normalize_module(mod_names):
     import importlib
+
     for mod_name in mod_names:
         mod = importlib.import_module(mod_name)
         for cls_name in mod.__all__:
@@ -51,8 +52,8 @@ def normalize_module(mod_names):
 def setup(app):
     normalize_module(
         [
-            'daml.metrics.ber',
-            'daml.metrics.divergence',
-            'daml.metrics.outlier_detection'
+            "daml.metrics.ber",
+            "daml.metrics.divergence",
+            "daml.metrics.outlier_detection",
         ]
     )

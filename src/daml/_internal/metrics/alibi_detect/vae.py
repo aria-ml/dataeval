@@ -1,7 +1,8 @@
-from typing import Any, Optional
+from typing import Optional
 
 import alibi_detect
 import numpy as np
+import tensorflow as tf
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import (
     Conv2D,
@@ -20,7 +21,10 @@ from daml._internal.metrics.alibi_detect.base import (
 
 
 class AlibiVAE(BaseAlibiDetectOD):
-    """Variational autoencoder-based outlier detector, from alibi-detect"""
+    """
+    Variational Autoencoder-based outlier detector,
+    using `alibi-detect vae. <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/vae.html>`_
+    """  # noqa E501
 
     def __init__(self):
         super().__init__(
@@ -31,11 +35,19 @@ class AlibiVAE(BaseAlibiDetectOD):
 
     def set_model(
         self,
-        encoder_net: Any,
-        decoder_net: Any,
+        encoder_net: tf.keras.Model,
+        decoder_net: tf.keras.Model,
         latent_dim: int = 1024,
         samples: int = 10,
     ) -> None:
+        """
+        Sets additional arguments to be used during model creation.
+
+        Note
+        ----
+        Visit `alibi-detect vae <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/vae.html#Initialize>`_ for additional information on model parameters.
+        """  # noqa E501
+
         self._update_kwargs_with_locals(self._model_kwargs, **locals())
 
     def set_prediction_args(
@@ -46,6 +58,13 @@ class AlibiVAE(BaseAlibiDetectOD):
         return_instance_score: Optional[bool] = None,
         batch_size: Optional[int] = None,
     ) -> None:
+        """
+        Sets additional arguments to be used during prediction.
+
+        Note
+        ----
+        Visit `alibi-detect vae <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/vae.html#Detect>`_ for additional information on prediction parameters.
+        """  # noqa E501
         self._update_kwargs_with_locals(self._predict_kwargs, **locals())
 
     def _get_default_model_kwargs(self) -> dict:
