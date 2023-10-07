@@ -1,6 +1,12 @@
-[//]: # (948ee5e165198aade52cbfbad658056dd67b3e0c)
+[//]: # (a2fd2a9e9bcf3009f74aa6114fd76fde089a0c66)
 
 # DAML Change Log
+## v0.26.12
+- ```a2fd2a9e - Add documentation to MetricClasses and outlierdetectors```
+- ```29dce003 - Author Dp Divergence tutorial```
+- ```59082ecb - Split requirements.txt in to multiple files to reduce cache invalidation```
+- ```3efebf01 - Add dir for build output```
+- ```65a578a0 - Fix rules for publish and tag```
 ## v0.26.11
 - ```948ee5e1 - Fix nightly functional tests and prune at start```
 - ```35dd5acd - Use python as the default pipeline image```
