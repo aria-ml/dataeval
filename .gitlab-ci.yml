@@ -36,8 +36,6 @@ before_script:
 prune:
   stage: prune
   image: docker:git
-  services:
-  - docker:dind
   script:
   - docker system df
   - docker system df --verbose
@@ -51,8 +49,6 @@ prune:
 .test:
   stage: test
   image: docker:git
-  services:
-  - docker:dind
   parallel:
     matrix:
     - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
@@ -114,8 +110,6 @@ coverage:
 linting:
   stage: test
   image: docker:git
-  services:
-    - docker:dind
   script:
   - ./build -v lint
   rules:
@@ -125,8 +119,6 @@ linting:
 
 typecheck:
   image: docker:git
-  services:
-    - docker:dind
   parallel:
     matrix:
       - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
@@ -140,8 +132,6 @@ typecheck:
 sphinx:
   stage: test
   image: docker:git
-  services:
-    - docker:dind
   script:
   - ./build -v docs
   artifacts:
