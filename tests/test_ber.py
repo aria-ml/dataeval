@@ -5,82 +5,23 @@ from daml.metrics.ber import BER, BEROutput
 
 
 class TestMulticlassBER:
-    def test_multiclass_ber_with_randos(self):
+    def test_multiclass_ber_with_mnist(self):
         """
-        Two classes with a single, identically distributed covariate.
-        Should spit out a large number. Used numpy.random to generate
-        datasets and then hardcoded those to avoid the random numbers
-        in the pipeline.
+        Load a slice of the MNIST dataset and pass into the BER multiclass
+        evaluate function.
         """
-        # The expected output...
-        expected_result = BEROutput(ber=0.45, ber_lower=0.34188611699158106)
 
-        # Initialize a 2nxp  (2nx1) numpy array of standard gaussians
-        # np.random.seed(37)
-
-        # Initialize a numpy array of random numbers distributed around 1
-        # covariates = np.random.normal(
-        #     size=(2 * n, 1),
-        # )
-        covariates = np.array(
-            [
-                [-0.05446361],
-                [0.67430807],
-                [0.34664703],
-                [-1.30034617],
-                [1.51851188],
-                [0.98982371],
-                [0.2776809],
-                [-0.44858935],
-                [0.96196624],
-                [-0.82757864],
-                [0.53465707],
-                [1.22838619],
-                [0.51959233],
-                [-0.06335482],
-                [-0.03479336],
-                [0.04556555],
-                [1.44802513],
-                [1.89350553],
-                [0.4030323],
-                [0.19242609],
-            ]
-        )
-
-        # Initialize the class labels. First n are 0, next n are 1
-        # labels = np.concatenate((np.zeros((n, 1)), np.ones((n, 1))))
-        labels = np.array(
-            [
-                [0.0],
-                [0.0],
-                [0.0],
-                [0.0],
-                [0.0],
-                [0.0],
-                [0.0],
-                [0.0],
-                [0.0],
-                [0.0],
-                [1.0],
-                [1.0],
-                [1.0],
-                [1.0],
-                [1.0],
-                [1.0],
-                [1.0],
-                [1.0],
-                [1.0],
-                [1.0],
-            ]
-        )
+        expected_result = BEROutput(ber=0.137, ber_lower=0.07132636098401203)
+        path = "tests/datasets/mnist.npz"
+        with np.load(path, allow_pickle=True) as fp:
+            covariates, labels = fp["x_train"][:1000], fp["y_train"][:1000]
 
         metric = BER()
-        value = metric.evaluate(
+        actual_result = metric.evaluate(
             X=covariates,
             y=labels,
         )
-        assert value.ber == expected_result.ber
-        assert value.ber_lower == expected_result.ber_lower
+        assert actual_result == expected_result
 
     def test_class_max(self):
         value = None
