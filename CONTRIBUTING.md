@@ -4,6 +4,9 @@
 DAML provides a simple interface to characterize image data and its impact on model performance across classification and object-detection tasks
 
 ## Installation
+### Environment Dependencies
+- [git-lfs](https://git-lfs.com/)
+
 ### Dependencies
 - python 3.8-3.10
 - alibi-detect[tensorflow]

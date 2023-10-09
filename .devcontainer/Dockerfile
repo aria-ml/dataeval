@@ -3,7 +3,7 @@ FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
 
 USER root
 
-# Install git, wget and dependencies for pyright (nodejs),
+# Install git, git-lfs, wget and dependencies for pyright (nodejs),
 # add-apt-repository (software-properties-common), opencv (libgl1),
 # sphinx (graphviz, pandoc) and system level python packages
 RUN apt-get update \
@@ -11,6 +11,7 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends \
     gnupg2 \
     git \
+    git-lfs \
     wget \
     nodejs \
     software-properties-common \
