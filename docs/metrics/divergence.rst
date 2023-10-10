@@ -4,10 +4,10 @@ Divergence
 -------
 Classes
 -------
-.. autoclass:: daml.metrics.divergence.FNN
+.. autoclass:: daml.metrics.divergence.HP_FNN
    :members:
    :inherited-members:
-.. autoclass:: daml.metrics.divergence.MST
+.. autoclass:: daml.metrics.divergence.HP_MST
    :members:
    :inherited-members:
 
