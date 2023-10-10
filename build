@@ -117,6 +117,11 @@ function docker_build() {
     temp=$(mktemp)
     trap "rm $temp" EXIT
     tag="daml-$2-$1"
+
+    if [[ $CI_PIPELINE_ID ]]; then
+        tag="${tag}-${CI_PIPELINE_ID}"
+    fi
+
     docker build $no_cache --build-arg python_version=$1 --tag $tag --target $2 . &> $temp || result="FAILED"
 
     job="Python ${1} - ${2}"
