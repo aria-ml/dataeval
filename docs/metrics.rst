@@ -13,10 +13,11 @@ Blurb on what data metrics are and why they are important.
 .. autosummary::
    :recursive:
 
-   daml.metrics.ber.BER
+   daml.metrics.ber.BER_FNN
+   daml.metrics.ber.BER_MST
    daml.metrics.ber.BEROutput
-   daml.metrics.divergence.FNN
-   daml.metrics.divergence.MST
+   daml.metrics.divergence.HP_FNN
+   daml.metrics.divergence.HP_MST
    daml.metrics.divergence.DivergenceOutput
    daml.metrics.outlier_detection.AE
    daml.metrics.outlier_detection.AEGMM
