@@ -2,7 +2,7 @@ ARG python_version=3.11
 FROM python:${python_version} as base
 
 USER root
-RUN apt-get update && apt-get install pandoc graphviz -y
+RUN apt-get update && apt-get install pandoc graphviz make -y
 RUN pip install poetry
 
 RUN addgroup --gid 1000 daml
