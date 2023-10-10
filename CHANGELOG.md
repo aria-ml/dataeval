@@ -1,6 +1,12 @@
-[//]: # (a2fd2a9e9bcf3009f74aa6114fd76fde089a0c66)
+[//]: # (4a999692e7f322b2a064ac0b853c8327c00a2240)
 
 # DAML Change Log
+## v0.26.13
+- ```949e09bd - Add kNN BER implementation```
+- ```5b39077c - Do not preserve docker build images```
+- ```e821168c - Add MNIST to functional tests```
+- ```378c2f0f - Use corrupted MNIST data for outlier tutorial```
+- ```90175b36 - Remove dind service```
 ## v0.26.12
 - ```a2fd2a9e - Add documentation to MetricClasses and outlierdetectors```
 - ```29dce003 - Author Dp Divergence tutorial```
