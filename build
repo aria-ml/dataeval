@@ -143,6 +143,8 @@ function docker_build() {
     if [[ $2 == "docs" ]]; then
         copy_from_image $tag /daml/docs/_build ./docs
     fi
+
+    docker rmi $tag &> /dev/null
 }
 
 export -f print_job_output
