@@ -1,5 +1,5 @@
 ARG python_version=3.11
-FROM python:${python_version} as base
+FROM python:${python_version}-slim as base
 
 USER root
 RUN apt-get update && apt-get install pandoc graphviz make -y
