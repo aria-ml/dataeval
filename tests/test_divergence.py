@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from daml.metrics.divergence import FNN, MST, DivergenceOutput
+from daml.metrics.divergence import HP_FNN, HP_MST, DivergenceOutput
 
 
 class TestDpDivergence:
@@ -9,14 +9,14 @@ class TestDpDivergence:
         "input, output",
         [
             (
-                MST,
+                HP_MST,
                 DivergenceOutput(
                     dpdivergence=0.96875,
                     error=1,
                 ),
             ),
             (
-                FNN,
+                HP_FNN,
                 DivergenceOutput(
                     dpdivergence=1.0,
                     error=0.0,
