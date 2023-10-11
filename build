@@ -133,8 +133,9 @@ function docker_build() {
     job="Python ${1} - ${2}"
     echo -n "-> $job: "
     if [[ $result == "FAILED" ]]; then
-        log_file="daml-${2}-${1}_failure_$(date +%s).log"
+        log_file="output/logs/daml-${2}-${1}_failure_$(date +%s).log"
         echo "FAILED (see log file ${log_file})"
+        mkdir -p output/logs
         cat $temp > $log_file
         print_job_output $temp "$job"
         exit 1
