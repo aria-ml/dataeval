@@ -20,9 +20,10 @@ RUN poetry run pip install -r requirements.txt
 COPY --chown=daml:daml .devcontainer/requirements_docs.txt ./
 RUN poetry run pip install -r requirements_docs.txt
 
-COPY --chown=daml:daml src/   src/
-COPY --chown=daml:daml tests/ tests/
-COPY --chown=daml:daml docs/  docs/
+COPY --chown=daml:daml poetry.lock ./
+COPY --chown=daml:daml src/        src/
+COPY --chown=daml:daml tests/      tests/
+COPY --chown=daml:daml docs/       docs/
 
 
 FROM base as daml_installed

@@ -44,6 +44,12 @@ while true; do
     shift
 done
 
+if [[ -f .settings ]]; then
+    if [[ $(cat .settings | grep save-build-images) ]]; then
+        export save_build_images="true"
+    fi
+fi
+
 # declare allowed value maps
 declare -A a_pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1)
 declare -A a_ptsks=([unit]=1 [func]=1 [type]=1)
@@ -117,13 +123,19 @@ function docker_build() {
     temp=$(mktemp)
     trap "rm $temp" EXIT
     tag="daml-$2-$1"
+
+    if [[ $CI_PIPELINE_ID ]]; then
+        tag="${tag}-${CI_PIPELINE_ID}"
+    fi
+
     docker build $no_cache --build-arg python_version=$1 --tag $tag --target $2 . &> $temp || result="FAILED"
 
     job="Python ${1} - ${2}"
     echo -n "-> $job: "
     if [[ $result == "FAILED" ]]; then
-        log_file="daml-${2}-${1}_failure_$(date +%s).log"
+        log_file="output/logs/daml-${2}-${1}_failure_$(date +%s).log"
         echo "FAILED (see log file ${log_file})"
+        mkdir -p output/logs
         cat $temp > $log_file
         print_job_output $temp "$job"
         exit 1
@@ -144,7 +156,9 @@ function docker_build() {
         copy_from_image $tag /daml/docs/_build ./docs
     fi
 
-    docker rmi $tag &> /dev/null
+    if [[ -z ${save_build_images} ]]; then
+        docker rmi $tag &> /dev/null
+    fi
 }
 
 export -f print_job_output
