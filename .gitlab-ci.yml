@@ -12,7 +12,12 @@ workflow:
     when: never
   - if: $CI_COMMIT_BRANCH
 
+default:
+  tags:
+    - aria
+
 stages:
+- info
 - prune
 - test
 - build
@@ -32,15 +37,19 @@ cache:
 before_script:
   - if [[ ! $(which bash) ]]; then apk add --no-cache bash parallel; fi
 
+info:
+  stage: info
+  image: docker:git
+  script:
+    - docker system df
+    - docker container ls --all
+    - docker image ls --all
+    - docker volume ls
+
 # Clear unused docker data on nightly basis
 prune:
   stage: prune
   image: docker:git
-  parallel:
-    matrix:
-      - RUNNERS: [ "CPU1", "CPU2", "GPU1", "GPU2" ]
-  tags:
-    - ${RUNNERS}
   script:
   - docker system df --verbose
   - docker builder prune --force --keep-storage 50GB
