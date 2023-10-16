@@ -10,16 +10,13 @@ class TestDpDivergence:
         [
             (
                 HP_MST,
-                DivergenceOutput(
-                    dpdivergence=0.96875,
-                    error=1,
-                ),
+                DivergenceOutput(dpdivergence=0.8377897755491117, error=81.0),
             ),
             (
                 HP_FNN,
                 DivergenceOutput(
-                    dpdivergence=1.0,
-                    error=0.0,
+                    dpdivergence=0.8618209199122062,
+                    error=69.0,
                 ),
             ),
         ],
@@ -29,11 +26,19 @@ class TestDpDivergence:
 
         TBD
         """
-        # Initialize a dataset of 32 images of size 32x32x3, containing all 1's
-        all_ones = np.ones(shape=(32, 32))
-        all_fives = all_ones * 5
+        path = "tests/datasets/mnist.npz"
+        with np.load(path, allow_pickle=True) as fp:
+            covariates, labels = fp["x_train"][:1000], fp["y_train"][:1000]
 
-        # Initialize the autoencoder-based outlier detector from alibi-detect
+        inds = np.array([x in [0, 2, 4, 6, 8] for x in labels])
+        rev_inds = np.invert(inds)
+        even = covariates[inds, :, :]
+        odd = covariates[rev_inds, :, :]
+        even = even.reshape((even.shape[0], -1))
+        odd = odd.reshape((odd.shape[0], -1))
         metric = input()
-        result = metric.evaluate(dataset_a=all_ones, dataset_b=all_fives)
+        result = metric.evaluate(
+            dataset_a=even,
+            dataset_b=odd,
+        )
         assert result == output
