@@ -54,6 +54,7 @@ prune:
   - docker system df --verbose
   - docker builder prune --force --keep-storage 50GB
   - docker image prune --force
+  - docker volume prune --force
   - docker system df
   allow_failure: true
   rules:
