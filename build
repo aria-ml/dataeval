@@ -128,7 +128,7 @@ function docker_build() {
         tag="${tag}-${CI_PIPELINE_ID}"
     fi
 
-    docker build $no_cache --build-arg python_version=$1 --tag $tag --target $2 . &> $temp || result="FAILED"
+    docker build --pull $no_cache --build-arg python_version=$1 --tag $tag --target $2 . &> $temp || result="FAILED"
 
     job="Python ${1} - ${2}"
     echo -n "-> $job: "
