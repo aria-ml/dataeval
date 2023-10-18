@@ -39,7 +39,7 @@ before_script:
 
 info:
   stage: info
-  image: docker:git
+  image: docker
   script:
     - docker system df
     - docker container ls --all
@@ -49,11 +49,12 @@ info:
 # Clear unused docker data on nightly basis
 prune:
   stage: prune
-  image: docker:git
+  image: docker
   script:
   - docker system df --verbose
   - docker builder prune --force --keep-storage 50GB
   - docker image prune --force
+  - docker volume prune --force
   - docker system df
   allow_failure: true
   rules:
@@ -63,7 +64,7 @@ prune:
 
 .test:
   stage: test
-  image: docker:git
+  image: docker
   parallel:
     matrix:
     - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
@@ -124,7 +125,7 @@ coverage:
 
 linting:
   stage: test
-  image: docker:git
+  image: docker
   script:
   - ./build -v lint
   rules:
@@ -133,7 +134,7 @@ linting:
   - when: always
 
 typecheck:
-  image: docker:git
+  image: docker
   parallel:
     matrix:
       - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
@@ -146,7 +147,7 @@ typecheck:
 
 sphinx:
   stage: test
-  image: docker:git
+  image: docker
   script:
   - ./build -v docs
   artifacts:
