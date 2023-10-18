@@ -28,17 +28,13 @@ ENV PATH=${PYENV_ROOT}/bin:${PATH}
 ENV PATH=${PYENV_ROOT}/shims:${PATH}
 ARG versions
 RUN pyenv install ${versions}
-
+RUN echo ${versions} | xargs -n1 sh -c 'pyenv virtualenv $0 daml-$0'
 
 # Install poetry
 FROM pyenv as poetry
 ARG CACHE
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    for py in ${versions}; do \
-    pyenv global ${py}; \
-    pip install poetry; \
-    done
-
+    echo ${versions} | xargs -n1 -P 0 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/pip install poetry'
 
 # Install daml dependencies
 FROM poetry as base
@@ -49,26 +45,20 @@ COPY --chown=daml:daml poetry.lock    ./
 ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
 ENV POETRY_VIRTUALENVS_CREATE=false
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    for py in ${versions}; do \
-    pyenv global ${py}; \
-    poetry install --no-root --with dev --all-extras; \
-    done
+    echo ${versions} | xargs -n1 -P 0 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --no-root --with dev --all-extras'
 
 
 # Install daml
 FROM base as daml_installed
 COPY --chown=daml:daml src/ src/
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    for py in ${versions}; do \
-    pyenv global ${py}; \
-    poetry install --only-root --all-extras; \
-    done
+    echo ${versions} | xargs -n1 -P 0 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --only-root --all-extras'
 
 
 # Set the python version for subsequent targets
 FROM daml_installed as versioned
 ARG python_version
-RUN pyenv global ${python_version}
+ENV PATH ${PYENV_ROOT}/versions/daml-${python_version}/bin:$PATH
 
 
 # Create list of shipped dependencies for dependency scanning
@@ -83,22 +73,22 @@ COPY --chown=daml:daml tests/ tests/
 
 # Run unit tests and create coverage reports
 FROM tests_dir as unit
-RUN poetry run coverage run --source=daml --branch -m pytest --junitxml=junit.xml -v
-RUN poetry run coverage report -m --skip-empty
-RUN poetry run coverage html --skip-empty
+RUN coverage run --source=daml --branch -m pytest --junitxml=junit.xml -v
+RUN coverage report -m --skip-empty
+RUN coverage html --skip-empty
 
 
 # Run functional tests and create coverage reports
 FROM tests_dir as func
-RUN poetry run coverage run --source=daml --branch -m pytest --runfunctional --junitxml=junit.xml -v
-RUN poetry run coverage report -m --skip-empty
-RUN poetry run coverage html --skip-empty
+RUN coverage run --source=daml --branch -m pytest --runfunctional --junitxml=junit.xml -v
+RUN coverage report -m --skip-empty
+RUN coverage html --skip-empty
 
 
 # Run typechecking
 FROM tests_dir as type
-RUN poetry run pyright src/ tests/
-RUN poetry run pyright --ignoreexternal --verifytypes daml
+RUN pyright src/ tests/
+RUN pyright --ignoreexternal --verifytypes daml
 
 
 # Copy docs dir
@@ -110,14 +100,14 @@ COPY --chown=daml:daml docs/ docs/
 FROM docs_dir as docs
 COPY --chown=daml:daml .devcontainer/requirements_docs.txt ./
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    poetry run pip install -r requirements_docs.txt
+    pip install -r requirements_docs.txt
 WORKDIR /daml/docs
-RUN poetry run make html
+RUN make html
 
 
 # Run linters
 FROM docs_dir as lint
-RUN poetry run black --check --diff .
-RUN poetry run flake8
-RUN poetry run isort --check --diff .
-RUN poetry run codespell
+RUN black --check --diff .
+RUN flake8
+RUN isort --check --diff .
+RUN codespell
