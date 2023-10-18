@@ -1,6 +1,14 @@
-[//]: # (4a999692e7f322b2a064ac0b853c8327c00a2240)
+[//]: # (3d456072f77d1f93b5e4cb89991638edee562978)
 
 # DAML Change Log
+## v0.27.0
+- ```ae91e7e7 - Misc. pipeline fixes/enhancements```
+- ```37ac9dcb - Determine which functional tests can be implemented for Dp Divergence and BER estimation```
+- ```a8ba460f - Use ARiA-specific runner```
+- ```61283cd7 - Add pipeline ID to build image tags```
+- ```2a847999 - Update prune to run on all known runners```
+- ```5c0a61a0 - Use slim versions of python images```
+- ```f5b2e8d7 - Update documentation for new metrics```
 ## v0.26.13
 - ```949e09bd - Add kNN BER implementation```
 - ```5b39077c - Do not preserve docker build images```
