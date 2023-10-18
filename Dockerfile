@@ -10,25 +10,24 @@ RUN adduser  --gid 1000 --uid 1000 --disabled-password daml
 USER daml
 WORKDIR /daml
 
-ENV POETRY_DYNAMIC_VERSIONING_BYPASS=true
+ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
 
+COPY --chown=daml:daml README.md      ./
 COPY --chown=daml:daml pyproject.toml ./
+COPY --chown=daml:daml poetry.lock    ./
+RUN poetry install --no-root --with dev --all-extras
 
-COPY --chown=daml:daml .devcontainer/requirements.txt ./
-RUN poetry run pip install -r requirements.txt
-
-COPY --chown=daml:daml .devcontainer/requirements_docs.txt ./
-RUN poetry run pip install -r requirements_docs.txt
-
-COPY --chown=daml:daml poetry.lock ./
-COPY --chown=daml:daml src/        src/
-COPY --chown=daml:daml tests/      tests/
-COPY --chown=daml:daml docs/       docs/
+COPY --chown=daml:daml src/   src/
+COPY --chown=daml:daml tests/ tests/
+COPY --chown=daml:daml docs/  docs/
 
 
 FROM base as daml_installed
-COPY --chown=daml:daml README.md ./
 RUN poetry install --only-root --all-extras
+
+
+FROM base as deps
+RUN poetry export --extras alibi-detect --extras cuda --without-hashes --without dev --format requirements.txt --output requirements.txt
 
 
 FROM daml_installed as unit
@@ -49,6 +48,8 @@ RUN poetry run pyright --ignoreexternal --verifytypes daml
 
 
 FROM daml_installed as docs
+COPY --chown=daml:daml .devcontainer/requirements_docs.txt ./
+RUN poetry run pip install -r requirements_docs.txt
 WORKDIR /daml/docs
 RUN poetry run make html
 
