@@ -7,13 +7,27 @@ ARG python_version="3.11"
 
 
 # Install pyenv and the supported python versions
-FROM python:3.11.6 as pyenv
+FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04 as pyenv
+USER root
+
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt update && apt install -y \
-    git \
-    graphviz \
-    pandoc
+    apt-get update \
+ && apt-get install -y --no-install-recommends \
+    curl gnupg2 git git-lfs wget nodejs parallel libgl1 graphviz pandoc
+
+# Set the local timezone
+ENV DEBIAN_FRONTEND noninteractive
+RUN tz=`(wget -qO - http://geoip.ubuntu.com/lookup | sed -n -e 's/.*<TimeZone>\(.*\)<\/TimeZone>.*/\1/p')` \
+ && ln -fs /usr/share/zoneinfo/$tz /etc/localtime
+
+# Install python compiler dependencies
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update \
+ && apt-get install -y --no-install-recommends \
+    build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev llvm \
+    libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
 
 RUN addgroup --gid 1000 daml
 RUN adduser  --gid 1000 --uid 1000 --disabled-password daml
