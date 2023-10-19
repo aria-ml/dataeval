@@ -46,6 +46,8 @@ ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
 ENV POETRY_VIRTUALENVS_CREATE=false
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
     echo ${versions} | xargs -n1 -P 0 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --no-root --with dev --all-extras'
+# Run pyright once to install pre-built nodeenv in to environment
+RUN ${PYENV_ROOT}/versions/daml-3.11/bin/pyright --version
 
 
 # Install daml
