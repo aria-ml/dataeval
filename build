@@ -3,44 +3,41 @@
 function showHelp() {
 cat << EOF
 Usage:
- build [options] <python version(s)> <tasks(s)>
+  build [options] <python version(s)> <tasks(s)>
 
 Options:
- -h, --help       display this help information
- -v, --verbose    print output to console during container execution
- --no-cache       runs docker build without using the cache
+  -h, --help       display this help information
+  -v, --verbose    print output to console during container execution
+      --no-cache   runs docker build without using the cache
 
 Default:
- run unit and type tests for 3.8-3.11 as well as lint and docs
+  run unit and type tests for 3.8-3.11 as well as lint and docs
 
 Python Versions:
- 3.8, 3.9, 3.10 and 3.11 are supported for unit, func and type tasks
+  3.8, 3.9, 3.10 and 3.11 are supported for unit, func and type tasks
 
 Tasks:
- unit             run unit tests
- func             run functional tests
- type             run typecheck
- lint             run static code analysis
- docs             generate documentation
- deps             generate list of shipped dependencies
+  unit    run unit tests
+  func    run functional tests
+  type    run typecheck
+  lint    run static code analysis
+  docs    generate documentation
+  deps    generate list of shipped dependencies
 
 Note:
- lint, docs, and deps are always performed on python 3.11
+  lint, docs, and deps are always performed on python 3.11
 EOF
+exit $1
 }
 
 options=$(getopt -l "help,verbose,no-cache" -o "hv" -n "build" -- "$@")
 eval set -- "$options"
 while true; do
     case "$1" in
-        -h|--help)
-            showHelp; exit 0;;
-        -v|--verbose)
-            export verbose="true";;
-        --no-cache)
-            export no_cache="--no-cache";;
-        --)
-            shift; break;;
+        -h|--help)     showHelp;;
+        -v|--verbose)  export verbose=1;;
+        --no-cache)    export no_cache="--no-cache";;
+        --)            shift; break;;
     esac
     shift
 done
@@ -51,57 +48,40 @@ if [[ -f .settings ]]; then
     fi
 fi
 
-# declare allowed value maps
-declare -A a_pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1)
-declare -A a_ptsks=([unit]=1 [func]=1 [type]=1)
-declare -A a_stsks=([lint]=1 [docs]=1 [deps]=1)
+# declare lookup maps
+declare -A supported_pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1)
+declare -A supported_tasks=([unit]=1 [func]=1 [type]=1)
+declare -A supported_other=([lint]=1 [docs]=1 [deps]=1)
 
 # generate python and task lists
-declare -a pvers; declare -a ptsks; declare -a stsks
-count=0; c_pvers=0; c_ptsks=0; c_stsks=0
+declare -a pvers; declare -a tasks;
+count=0; c_pvers=0; c_tasks=0; c_other=0;
 
 # validate args
 for arg do
     if [[ $arg == -* ]]; then continue; fi
-    if [[ ${a_pvers["$arg"]} ]]; then pvers+=($arg); ((++c_pvers)); fi
-    if [[ ${a_ptsks["$arg"]} ]]; then ptsks+=($arg); ((++c_ptsks)); fi
-    if [[ ${a_stsks["$arg"]} ]]; then stsks+=($arg); ((++c_stsks)); fi
+    if [[ ${supported_pvers["$arg"]} ]]; then pvers+=($arg); ((++c_pvers)); fi
+    if [[ ${supported_tasks["$arg"]} ]]; then tasks+=($arg); ((++c_tasks)); fi
+    if [[ ${supported_other["$arg"]} ]]; then tasks+=($arg); ((++c_other)); fi
     ((++count))
 done
 
 # show help if arg count mismatch
-if [[ $((c_pvers + c_ptsks + c_stsks)) != $count ]]; then
-    showHelp
-    exit 1
-fi
+if [[ $((c_pvers + c_tasks + c_other)) != $count ]]; then showHelp 1; fi
 
 # set defaults if not specified
-if [[ $count == 0 || ($c_pvers == 0 && $c_ptsks != 0) ]]; then pvers=("3.8" "3.9" "3.10" "3.11"); fi
-if [[ $count == 0 || ($c_ptsks == 0 && $c_pvers != 0) ]]; then ptsks=("unit" "type"); fi
-if [[ $count == 0 ]]; then stsks=("lint" "docs"); fi
+if [[ $count == 0 || ($c_pvers == 0 && $c_tasks != 0) ]]; then pvers=("3.8" "3.9" "3.10" "3.11"); fi
+if [[ $count == 0 || ($c_tasks == 0 && $c_pvers != 0) ]]; then tasks+=("unit" "type"); fi
+if [[ $count == 0 ]]; then tasks+=("lint" "docs"); fi
 
-t_list="";p_list=""
-# handle special tasks (lint + docs)
-for task in "${stsks[@]}"; do
-    if [[ $task == "lint" || $task == "docs" || $task == "deps" ]]; then
-        t_list+="$task "
-        p_list+="3.11 "
-    fi
+# generate "task-pver" jobs
+declare -A jobs;
+for task in "${tasks[@]}"; do
+    case "$task" in
+        lint|docs|deps) jobs["$task-3.11"]=1;;
+        *) for pver in "${pvers[@]}"; do jobs["$task-$pver"]=1; done;;
+    esac
 done
-
-# handle python tasks (unit + func + type)
-for task in "${ptsks[@]}"; do
-    for pver in "${pvers[@]}"; do
-        t_list+="$task "
-        p_list+="$pver "
-    done
-done
-
-function print_job_output() {
-    echo "========== Output =========="
-    cat $1
-    echo "========== ^^^^^ Output from $2 ^^^^^ =========="$'\n\n'
-}
 
 function copy_from_image() {
     tag=$1
@@ -115,60 +95,63 @@ function copy_from_image() {
         docker rm --force $id &> /dev/null
     fi
 
-    docker run --detach --name $tag $tag tail -f /dev/null &> /dev/null
-    docker cp $tag:$src $dest
+    if [[ $verbose ]]; then echo -n "Copying $src from $tag to $dest..."; fi
+    docker run --detach --name $tag $tag tail -f /dev/null &> /dev/null && docker cp --quiet $tag:$src $dest
+    if [[ $verbose ]]; then
+        if [[ $? ]]; then echo "SUCCEEDED"; else echo "FAILED"; fi
+    fi
     docker rm --force $tag &> /dev/null
 }
 
 function docker_build() {
     temp=$(mktemp)
     trap "rm $temp" EXIT
-    tag="daml-$2-$1"
+    IFS=- read -r task pver <<< $1
+    tag="daml-$task-$pver"
 
     if [[ $CI_PIPELINE_ID ]]; then
         tag="${tag}-${CI_PIPELINE_ID}"
     fi
 
-    docker build --pull $no_cache --build-arg python_version=$1 --tag $tag --target $2 . &> $temp || result="FAILED"
+    if [[ $verbose ]]; then
+        (docker build --pull $no_cache --progress plain --build-arg python_version=$pver --tag $tag --target $task . | tee $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
+    else
+        docker build --pull $no_cache --build-arg python_version=$pver --tag $tag --target $task . &> $temp || result="FAILED"
+    fi
 
-    job="Python ${1} - ${2}"
-    echo -n "-> $job: "
     if [[ $result == "FAILED" ]]; then
-        log_file="output/logs/daml-${2}-${1}_failure_$(date +%s).log"
+        log_file="output/logs/daml-${task}-${pver}_failure_$(date +%s).log"
         echo "FAILED (see log file ${log_file})"
         mkdir -p output/logs
         cat $temp > $log_file
-        print_job_output $temp "$job"
+        if [[ ! $verbose ]]; then cat $temp; fi
         exit 1
     else
         echo SUCCEEDED
-        if [[ $verbose == "true" ]]; then
-            print_job_output $temp "$job"
-        fi
     fi
 
-    if [[ $2 == "unit" || $2 == "func" ]]; then
-        copy_from_image $tag /daml/junit.xml ./output/junit.${2}.${1}.xml
-        copy_from_image $tag /daml/.coverage ./output/.coverage.${2}.${1}
-        copy_from_image $tag /daml/htmlcov   ./output/htmlcov.${2}.${1}
-    fi
-
-    if [[ $2 == "docs" ]]; then
-        copy_from_image $tag /daml/docs/_build ./docs
-    fi
-
-    if [[ $2 == "deps" ]]; then
-        copy_from_image $tag /daml/requirements.txt ./output/requirements.txt
-    fi
+    case "$task" in
+        unit|func)
+            copy_from_image $tag /daml/junit.xml ./output/junit.${task}.${pver}.xml
+            copy_from_image $tag /daml/.coverage ./output/.coverage.${task}.${pver}
+            copy_from_image $tag /daml/htmlcov   ./output/htmlcov.${task}.${pver};;
+        docs)
+            copy_from_image $tag /daml/docs/_build ./docs;;
+        deps)
+            copy_from_image $tag /daml/requirements.txt ./output/requirements.txt;;
+    esac
 
     if [[ -z ${save_build_images} ]]; then
         docker rmi $tag &> /dev/null
     fi
 }
 
-export -f print_job_output
 export -f copy_from_image
 export -f docker_build
 
-echo "Building containers..."
-LANG=C parallel --link --keep-order docker_build ::: $p_list ::: $t_list
+# execute jobs
+case ${#jobs[@]} in
+    0)  showHelp 1;;
+    1)  export verbose=1; docker_build ${!jobs[@]};;
+    *)  LANG=C parallel --lb --tag docker_build ::: ${!jobs[@]};;
+esac
