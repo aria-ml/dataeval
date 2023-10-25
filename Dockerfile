@@ -5,7 +5,6 @@ ARG CACHE="$HOME/.cache"
 ARG versions="3.8 3.9 3.10 3.11"
 ARG python_version="3.11"
 
-
 # Install pyenv and the supported python versions
 FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04 as pyenv
 USER root
@@ -50,7 +49,7 @@ ARG CACHE
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
     echo ${versions} | xargs -n1 -P 0 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/pip install poetry'
 
-# Install daml dependencies
+# Install daml dependencies and bootstrap pyright nodeenv
 FROM poetry as base
 COPY --chown=daml:daml README.md      ./
 COPY --chown=daml:daml pyproject.toml ./
@@ -59,8 +58,7 @@ COPY --chown=daml:daml poetry.lock    ./
 ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
 ENV POETRY_VIRTUALENVS_CREATE=false
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    echo ${versions} | xargs -n1 -P 0 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --no-root --with dev --all-extras'
-# Run pyright once to install pre-built nodeenv in to environment
+    echo ${versions} | xargs -n1 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --no-root --with dev --all-extras'
 RUN ${PYENV_ROOT}/versions/daml-3.11/bin/pyright --version
 
 
@@ -68,18 +66,20 @@ RUN ${PYENV_ROOT}/versions/daml-3.11/bin/pyright --version
 FROM base as daml_installed
 COPY --chown=daml:daml src/ src/
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    echo ${versions} | xargs -n1 -P 0 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --only-root --all-extras'
+    echo ${versions} | xargs -n1 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --only-root --all-extras'
 
 
 # Set the python version for subsequent targets
 FROM daml_installed as versioned
 ARG python_version
 ENV PATH ${PYENV_ROOT}/versions/daml-${python_version}/bin:$PATH
+ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${python_version}/versions/daml-${python_version}/lib/python${python_version}/site-packages/nvidia/cudnn/lib
+COPY --chown=daml:daml run ./
 
 
 # Create list of shipped dependencies for dependency scanning
 FROM versioned as deps
-RUN poetry export --extras alibi-detect --extras cuda --without-hashes --without dev --format requirements.txt --output requirements.txt
+CMD ./run deps
 
 
 # Copy tests dir
@@ -89,22 +89,17 @@ COPY --chown=daml:daml tests/ tests/
 
 # Run unit tests and create coverage reports
 FROM tests_dir as unit
-RUN coverage run --source=daml --branch -m pytest --junitxml=junit.xml -v
-RUN coverage report -m --skip-empty
-RUN coverage html --skip-empty
+CMD ./run unit
 
 
 # Run functional tests and create coverage reports
 FROM tests_dir as func
-RUN coverage run --source=daml --branch -m pytest --runfunctional --junitxml=junit.xml -v
-RUN coverage report -m --skip-empty
-RUN coverage html --skip-empty
+CMD ./run func
 
 
 # Run typechecking
 FROM tests_dir as type
-RUN pyright src/ tests/
-RUN pyright --ignoreexternal --verifytypes daml
+CMD ./run type
 
 
 # Copy docs dir
@@ -117,13 +112,9 @@ FROM docs_dir as docs
 COPY --chown=daml:daml .devcontainer/requirements_docs.txt ./
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
     pip install -r requirements_docs.txt
-WORKDIR /daml/docs
-RUN make html
+CMD ./run docs
 
 
 # Run linters
 FROM docs_dir as lint
-RUN black --check --diff .
-RUN flake8
-RUN isort --check --diff .
-RUN codespell
+CMD ./run lint
