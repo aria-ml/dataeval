@@ -109,9 +109,9 @@ COPY --chown=daml:daml docs/ docs/
 
 # Build docs
 FROM docs_dir as docs
-COPY --chown=daml:daml .devcontainer/requirements_docs.txt ./
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    pip install -r requirements_docs.txt
+    ${PYENV_ROOT}/versions/daml-${python_version}/bin/poetry install --no-root --with docs --all-extras
+ENV PYDEVD_DISABLE_FILE_VALIDATION 1
 CMD ./run docs
 
 
