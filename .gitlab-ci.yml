@@ -156,8 +156,9 @@ generate shipped dependencies:
 sphinx:
   stage: test
   image: docker
+  tags: [GPU]
   script:
-  - ./build docs
+  - ./build docs --gpu
   artifacts:
     paths:
     - output/docs/html/
