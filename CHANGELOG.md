@@ -1,6 +1,8 @@
-[//]: # (f3dc7a5da1c9fc81fdc491e514f35974b3728221)
+[//]: # (da14b9578059d96dc1f0108cfab3097b34a65779)
 
 # DAML Change Log
+## v0.28.1
+- ```da14b957 - Move documentation dependencies in to pyproject.toml```
 ## v0.28.0
 - ```f3dc7a5d - Use docker run to execute build tasks```
 - ```6942b7c5 - Switch to cuda docker image for gpu support```
