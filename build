@@ -3,11 +3,12 @@
 function showHelp() {
 cat << EOF
 Usage:
-  build [options] <python version(s)> <tasks(s)>
+  build [options] <tasks(s)> <python version(s)>
 
 Options:
   -h, --help       display this help information
   -v, --verbose    print output to console during container execution
+      --gpu        enable gpu support on task execution
       --no-cache   runs docker build without using the cache
 
 Default:
@@ -30,12 +31,13 @@ EOF
 exit $1
 }
 
-options=$(getopt -l "help,verbose,no-cache" -o "hv" -n "build" -- "$@")
+options=$(getopt -l "help,verbose,gpu,no-cache" -o "hv" -n "build" -- "$@")
 eval set -- "$options"
 while true; do
     case "$1" in
         -h|--help)     showHelp;;
         -v|--verbose)  export verbose=1;;
+        --gpu)         export gpuflag="--gpus all";;
         --no-cache)    export no_cache="--no-cache";;
         --)            shift; break;;
     esac
@@ -72,7 +74,7 @@ if [[ $((c_pvers + c_tasks + c_other)) != $count ]]; then showHelp 1; fi
 # set defaults if not specified
 if [[ $count == 0 || ($c_pvers == 0 && $c_tasks != 0) ]]; then pvers=("3.8" "3.9" "3.10" "3.11"); fi
 if [[ $count == 0 || ($c_tasks == 0 && $c_pvers != 0) ]]; then tasks+=("unit" "type"); fi
-if [[ $count == 0 ]]; then tasks+=("lint" "docs"); fi
+if [[ $count == 0 ]]; then tasks+=("lint"); fi
 
 # generate "task-pver" jobs
 declare -A jobs;
@@ -83,40 +85,24 @@ for task in "${tasks[@]}"; do
     esac
 done
 
-function copy_from_image() {
-    tag=$1
-    src=$2
-    dest=$3
-
-    mkdir -p $(dirname $dest)
-
-    id=$(docker ps --all --filter name=$tag --quiet)
-    if [[ $id ]]; then
-        docker rm --force $id &> /dev/null
-    fi
-
-    if [[ $verbose ]]; then echo -n "Copying $src from $tag to $dest..."; fi
-    docker run --detach --name $tag $tag tail -f /dev/null &> /dev/null && docker cp --quiet $tag:$src $dest
-    if [[ $verbose ]]; then
-        if [[ $? ]]; then echo "SUCCEEDED"; else echo "FAILED"; fi
-    fi
-    docker rm --force $tag &> /dev/null
-}
-
 function docker_build() {
     temp=$(mktemp)
     trap "rm $temp" EXIT
     IFS=- read -r task pver <<< $1
     tag="daml-$task-$pver"
-
+    
     if [[ $CI_PIPELINE_ID ]]; then
         tag="${tag}-${CI_PIPELINE_ID}"
     fi
 
+    docker_build_cmd="docker build --pull $no_cache --progress plain --build-arg python_version=$pver --tag $tag --target $task ."
+    docker_run_cmd="docker run --name $tag $gpuflag $tag"
+
     if [[ $verbose ]]; then
-        (docker build --pull $no_cache --progress plain --build-arg python_version=$pver --tag $tag --target $task . | tee $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
+        (echo "Building $tag..."; echo $docker_build_cmd; $docker_build_cmd | tee $temp; exit ${PIPESTATUS[0]}) && \
+        (echo "Running $tag..."; echo $docker_run_cmd; $docker_run_cmd | tee -a $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
     else
-        docker build --pull $no_cache --build-arg python_version=$pver --tag $tag --target $task . &> $temp || result="FAILED"
+        $docker_build_cmd &> $temp && $docker_run_cmd &>> $temp || result="FAILED"
     fi
 
     if [[ $result == "FAILED" ]]; then
@@ -125,28 +111,27 @@ function docker_build() {
         mkdir -p output/logs
         cat $temp > $log_file
         if [[ ! $verbose ]]; then cat $temp; fi
-        exit 1
+        exitcode=1
     else
-        echo SUCCEEDED
+        if [[ ! $verbose ]]; then echo SUCCEEDED; fi
+        case "$task" in
+            unit|func|docs|deps) docker cp --quiet $tag:/daml/output ./;;
+        esac
     fi
 
-    case "$task" in
-        unit|func)
-            copy_from_image $tag /daml/junit.xml ./output/junit.${task}.${pver}.xml
-            copy_from_image $tag /daml/.coverage ./output/.coverage.${task}.${pver}
-            copy_from_image $tag /daml/htmlcov   ./output/htmlcov.${task}.${pver};;
-        docs)
-            copy_from_image $tag /daml/docs/_build ./docs;;
-        deps)
-            copy_from_image $tag /daml/requirements.txt ./output/requirements.txt;;
-    esac
+    # remove container
+    docker rm --force $tag &> /dev/null
 
-    if [[ -z ${save_build_images} ]]; then
-        docker rmi $tag &> /dev/null
+    # remove image
+    if [ "${save_build_images}" == "" ]; then
+        if docker images | grep -q $tag; then
+            docker rmi $tag &> /dev/null
+        fi
     fi
+    
+    exit $exitcode
 }
 
-export -f copy_from_image
 export -f docker_build
 
 # execute jobs

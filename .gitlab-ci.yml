@@ -69,14 +69,14 @@ prune:
     matrix:
     - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
   script:
-  - ./build -v ${PYTHON_VERSIONS} ${TASK}
+  - ./build ${PYTHON_VERSIONS} ${TASK}
   artifacts:
     reports:
-      junit: ./output/junit.${TASK}.${PYTHON_VERSIONS}.xml
+      junit: output/junit.${TASK}.${PYTHON_VERSIONS}.xml
     paths:
-    - ./output/junit.${TASK}.${PYTHON_VERSIONS}.xml
-    - ./output/.coverage.${TASK}.${PYTHON_VERSIONS}
-    - ./output/htmlcov.${TASK}.${PYTHON_VERSIONS}
+    - output/junit.${TASK}.${PYTHON_VERSIONS}.xml
+    - output/.coverage.${TASK}.${PYTHON_VERSIONS}
+    - output/htmlcov.${TASK}.${PYTHON_VERSIONS}
 
 test:
   extends: .test
@@ -127,7 +127,7 @@ linting:
   stage: test
   image: docker
   script:
-  - ./build -v lint
+  - ./build lint
   rules:
   - if: $DAML_NIGHTLY
     when: never
@@ -139,7 +139,7 @@ typecheck:
     matrix:
       - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
   script:
-    - ./build -v ${PYTHON_VERSIONS} type
+    - ./build ${PYTHON_VERSIONS} type
   rules:
   - if: $DAML_NIGHTLY
     when: never
@@ -148,7 +148,7 @@ typecheck:
 generate shipped dependencies:
   image: docker:git
   script:
-    - ./build -v deps
+    - ./build deps
   artifacts:
     paths:
       - output/requirements.txt
@@ -157,10 +157,10 @@ sphinx:
   stage: test
   image: docker
   script:
-  - ./build -v docs
+  - ./build docs
   artifacts:
     paths:
-    - docs/_build/html/
+    - output/docs/html/
   rules:
   - if: $DAML_NIGHTLY
     when: never
@@ -169,7 +169,7 @@ sphinx:
 pages:
   stage: build
   script:
-  - mv docs/_build/html/ ./public/
+  - mv output/docs/html/ ./public/
   - mv htmlcov/ ./public/testcov/
   artifacts:
     paths:

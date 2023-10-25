@@ -1,0 +1,47 @@
+#!/bin/bash -e
+
+function showHelp() {
+cat << EOF
+Usage:
+  run <task>
+
+Tasks:
+  unit    run unit tests
+  func    run functional tests
+  type    run typecheck
+  lint    run static code analysis
+  docs    generate documentation
+  deps    generate list of shipped dependencies
+EOF
+exit $1
+}
+
+declare -A supported_tasks=([unit]=1 [func]=1 [type]=1 [lint]=1 [docs]=1 [deps]=1)
+
+# validate args
+if (( $# != 1 )); then echo Too many parameters; showHelp 1; fi
+if [[ ! ${supported_tasks[$1]} ]]; then echo Invalid task; showHelp 1; fi
+
+pver=$(python --version | cut -d' ' -f2 | cut -d'.' -f1-2)
+func=""
+case $1 in
+    "func") func="--runfunctional";&
+    "unit") coverage run --data-file=output/.coverage.$1.$pver --source=daml --branch -m pytest $func --junitxml=output/junit.$1.$pver.xml -v
+            coverage report --data-file=output/.coverage.$1.$pver
+            coverage xml --data-file=output/.coverage.$1.$pver --skip-empty -o output/coverage.$1.$pver.xml
+            coverage html --data-file=output/.coverage.$1.$pver --skip-empty -d output/htmlcov.$1.$pver
+            ;;
+    "type") pyright src/ tests/
+            pyright --ignoreexternal --verifytypes daml
+            ;;
+    "lint") black --check --diff .
+            flake8
+            isort --check --diff .
+            codespell
+            ;;
+    "docs") sphinx-build -M html docs output/docs
+            ;;
+    "deps") mkdir -p output
+            poetry export --extras alibi-detect --extras cuda --without-hashes --format requirements.txt --output output/requirements.txt
+            ;;
+esac
