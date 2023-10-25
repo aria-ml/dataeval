@@ -1,6 +1,12 @@
-[//]: # (3d456072f77d1f93b5e4cb89991638edee562978)
+[//]: # (f3dc7a5da1c9fc81fdc491e514f35974b3728221)
 
 # DAML Change Log
+## v0.28.0
+- ```f3dc7a5d - Use docker run to execute build tasks```
+- ```6942b7c5 - Switch to cuda docker image for gpu support```
+- ```7d610a86 - Print output in real-time for single and verbose parallel job runs```
+- ```d86cf421 - use virtualenvs instead of pyenv global```
+- ```1af04afe - Create a shared base image with all supported python versions and dependencies```
 ## v0.27.0
 - ```ae91e7e7 - Misc. pipeline fixes/enhancements```
 - ```37ac9dcb - Determine which functional tests can be implemented for Dp Divergence and BER estimation```
