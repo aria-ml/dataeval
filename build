@@ -31,6 +31,11 @@ EOF
 exit $1
 }
 
+if [[ -z "${CI_JOB_TOKEN}${JATIC_TOKEN}" ]]; then
+    echo "When running locally, ensure the JATIC_TOKEN environment variable is set to your JATIC Gitlab Personal Access Token with access to the Packages API."
+    exit 1
+fi
+
 options=$(getopt -l "help,verbose,gpu,no-cache" -o "hv" -n "build" -- "$@")
 eval set -- "$options"
 while true; do
@@ -96,13 +101,14 @@ function docker_build() {
     fi
 
     docker_build_cmd="docker build --pull $no_cache --progress plain --build-arg python_version=$pver --tag $tag --target $task ."
-    docker_run_cmd="docker run --name $tag $gpuflag $tag"
+    docker_run_args="--name $tag $gpuflag $tag"
+    docker_run_envs="--env POETRY_HTTP_BASIC_JATIC_USERNAME=gitlab-ci-token --env POETRY_HTTP_BASIC_JATIC_PASSWORD=${CI_JOB_TOKEN}${JATIC_TOKEN}"
 
     if [[ $verbose ]]; then
         (echo "Building $tag..."; echo $docker_build_cmd; $docker_build_cmd | tee $temp; exit ${PIPESTATUS[0]}) && \
-        (echo "Running $tag..."; echo $docker_run_cmd; $docker_run_cmd | tee -a $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
+        (echo "Running $tag..."; echo docker run $docker_run_args; docker run $docker_run_envs $docker_run_args | tee -a $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
     else
-        $docker_build_cmd &> $temp && $docker_run_cmd &>> $temp || result="FAILED"
+        $docker_build_cmd &> $temp && docker run $docker_run_envs $docker_run_args &>> $temp || result="FAILED"
     fi
 
     if [[ $result == "FAILED" ]]; then
