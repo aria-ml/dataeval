@@ -16,6 +16,21 @@ EOF
 exit $1
 }
 
+function installJATIC() {
+    if [[ -z ${POETRY_HTTP_BASIC_JATIC_PASSWORD} && ${JATIC_TOKEN} ]]; then export POETRY_HTTP_BASIC_JATIC_PASSWORD=${JATIC_TOKEN}; fi
+    if [[ -z "${POETRY_HTTP_BASIC_JATIC_PASSWORD}" ]]; then
+        echo "When running locally, ensure the JATIC_TOKEN environment variable is set to your JATIC Gitlab Personal Access Token with access to the Packages API."
+        exit 1
+    fi
+
+    poetry install --no-root --with jatic --all-extras
+}
+
+if [ ! -f /.dockerenv ]; then
+    echo "Docker container not found. Check to see if you are running in a container."
+    exit 1
+fi
+
 declare -A supported_tasks=([unit]=1 [func]=1 [type]=1 [lint]=1 [docs]=1 [deps]=1)
 
 # validate args
@@ -26,7 +41,8 @@ pver=$(python --version | cut -d' ' -f2 | cut -d'.' -f1-2)
 func=""
 case $1 in
     "func") func="--runfunctional";&
-    "unit") coverage run --data-file=output/.coverage.$1.$pver --source=daml --branch -m pytest $func --junitxml=output/junit.$1.$pver.xml -v
+    "unit") installJATIC
+            coverage run --data-file=output/.coverage.$1.$pver --source=daml --branch -m pytest $func --junitxml=output/junit.$1.$pver.xml -v
             coverage report --data-file=output/.coverage.$1.$pver
             coverage xml --data-file=output/.coverage.$1.$pver --skip-empty -o output/coverage.$1.$pver.xml
             coverage html --data-file=output/.coverage.$1.$pver --skip-empty -d output/htmlcov.$1.$pver
@@ -42,6 +58,6 @@ case $1 in
     "docs") sphinx-build -M html docs output/docs
             ;;
     "deps") mkdir -p output
-            poetry export --extras alibi-detect --extras cuda --without-hashes --format requirements.txt --output output/requirements.txt
+            poetry export --extras alibi-detect --without-hashes --format requirements.txt --output output/requirements.txt
             ;;
 esac
