@@ -38,6 +38,11 @@ before_script:
 info:
   stage: info
   image: docker
+  parallel:
+    matrix:
+    - TAG: ["aria", "GPU1", "GPU2"]
+  tags:
+  - ${TAG}
   script:
     - docker system df
     - docker container ls --all
@@ -48,6 +53,11 @@ info:
 prune:
   stage: prune
   image: docker
+  parallel:
+    matrix:
+    - TAG: ["aria", "GPU1", "GPU2"]
+  tags:
+  - ${TAG}
   script:
   - docker system df --verbose
   - docker builder prune --force --keep-storage 50GB
