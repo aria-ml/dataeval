@@ -1,7 +1,8 @@
 // For format details, see https://aka.ms/devcontainer.json.
 {
   "build": {
-    "dockerfile": "./Dockerfile"
+    "dockerfile": "../Dockerfile",
+    "target": "devcontainer"
   },
 
   "runArgs": [
@@ -38,5 +39,5 @@
     }
   },
 
-  "postCreateCommand": "./.devcontainer/create_dev_env.sh"
+  "postCreateCommand": "echo 'Installing daml...'; echo 3.8 3.9 3.10 3.11 | xargs -n1 -P0 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --only-root --all-extras --quiet'"
 }

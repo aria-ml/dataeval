@@ -109,18 +109,19 @@ The devcontainer is configured to share the SSH keys on the host environment to 
 
 ### Run Tests
 
-DAML uses tox to manage test environments and execution. you can run the tests in several ways.
+DAML uses containers to normalize environments for testing and development.  The build script automates building docker containers and running tests in parallel.  The run script allows you to run the same commands locally in your devcontainer.
 
-| Function | Command |
-| ------ | ------ |
-| Run all tests sequentially | `tox r` |
-| ~~Run all tests in parallel~~ | ~~`tox p`~~ |
-| Run unit tests sequentially | `tox r -e py38,py39,py310 -- test` |
-| ~~Run unit tests in parallel~~ | ~~`tox p -e py38,py39,py310 -- test`~~ |
-| Run typecheck sequentially | `tox r -e py38,py39,py310 -- typecheck` |
-| Run typecheck in parallel~~ | ~~`tox p -e py38,py39,py310 -- typecheck` |
-| Run unit tests for specific python version | `tox r -e py3* -- test` |
-| Run typecheck for specific python version | `tox r -e py3* -- typecheck` |
-| Run lint | `tox r -e lint` |
+| Function | Container | Local (Devcontainer) |
+| -------- | --------- | -------------------- |
+| Run unit tests, typecheck and linting GPU | `./build --gpu` | N/A |
+| Run unit tests, typecheck and linting | `./build` | N/A |
+| Run unit tests on all versions | `./build unit` | N/A |
+| Run unit tests and typecheck on python 3.11 | `./build 3.11` | N/A |
+| Run only typecheck on python 3.10 | `./build type 3.10` | `pyenv shell daml-3.10; ./run type` |
+| Run only unit tests on python 3.8 | `./build unit 3.8` | `pyenv shell daml-3.8; ./run unit` |
+| Run only unit tests on python 3.9 w/ GPU enabled | `./build unit 3.9 --gpu` | `pyenv shell daml-3.9; ./run unit 3.9` |
+| Build documentation | `./build docs` | `pyenv shell daml-3.11; ./run docs` |
 
-As GPU access is not thread-safe, tests cannot be run in parallel.
+- Note: The python version argument is optional for `./run`, and it will use the active version of python if not specified.
+- Note: The `./run` command executes on your local devcontainer which already has GPU access enabled.
+- Note: Adding a convenience parameter to `./run` is coming soon.
