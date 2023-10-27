@@ -60,6 +60,7 @@ ENV POETRY_VIRTUALENVS_CREATE=false
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
     echo ${versions} | xargs -n1 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --no-root --with dev --all-extras'
 RUN ${PYENV_ROOT}/versions/daml-3.11/bin/pyright --version
+ENV TF_GPU_ALLOCATOR cuda_malloc_async
 
 
 # Install daml
