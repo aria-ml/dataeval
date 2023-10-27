@@ -31,9 +31,17 @@ EOF
 exit $1
 }
 
-if [[ -z "${CI_JOB_TOKEN}${JATIC_TOKEN}" ]]; then
-    echo "When running locally, ensure the JATIC_TOKEN environment variable is set to your JATIC Gitlab Personal Access Token with access to the Packages API."
-    exit 1
+[ ! -s ~/.jatic_token ] || export POETRY_HTTP_BASIC_JATIC_PASSWORD=$(<~/.jatic_token)
+if [[ -z "${CI_JOB_TOKEN}${POETRY_HTTP_BASIC_JATIC_PASSWORD}" ]]; then
+    echo
+    echo "Please provide your JATIC Gitlab personal access token:"
+    read -p "JATIC_TOKEN=" token
+    echo $token > ~/.jatic_token
+    chmod 600 ~/.jatic_token
+    echo
+    echo "Token saved in ~/.jatic_token"
+    echo
+    export POETRY_HTTP_BASIC_JATIC_PASSWORD=$token
 fi
 
 options=$(getopt -l "help,verbose,gpu,no-cache" -o "hv" -n "build" -- "$@")
@@ -102,7 +110,7 @@ function docker_build() {
 
     docker_build_cmd="docker build --pull $no_cache --progress plain --build-arg python_version=$pver --tag $tag --target $task ."
     docker_run_args="--name $tag $gpuflag $tag"
-    docker_run_envs="--env POETRY_HTTP_BASIC_JATIC_USERNAME=gitlab-ci-token --env POETRY_HTTP_BASIC_JATIC_PASSWORD=${CI_JOB_TOKEN}${JATIC_TOKEN}"
+    docker_run_envs="--env POETRY_HTTP_BASIC_JATIC_PASSWORD=${CI_JOB_TOKEN}${POETRY_HTTP_BASIC_JATIC_PASSWORD}"
 
     if [[ $verbose ]]; then
         (echo "Building $tag..."; echo $docker_build_cmd; $docker_build_cmd | tee $temp; exit ${PIPESTATUS[0]}) && \
