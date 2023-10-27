@@ -1,24 +1,49 @@
 workflow:
   rules:
-  - if: $DAML_NIGHTLY
   - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     changes:
     - "CHANGELOG.md"
     when: never
   - if: $CI_COMMIT_TAG
     when: never
+  - if: $DAML_NIGHTLY
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
   - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
 
 default:
   tags:
     - aria
-
+    
 stages:
 - info
 - prune
 - test
-- build
+- release
+
+.on_nightly:
+  rules:
+  - if: $DAML_NIGHTLY
+    when: on_success
+  - when: never
+
+.on_default:
+  rules:
+  - if: $DAML_NIGHTLY
+    when: never
+  - when: on_success
+
+.on_release:
+  stage: release
+  environment:
+    name: production
+  rules:
+  - if: $DAML_NIGHTLY
+    when: never
+  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    changes:
+    - src/**/*
+    - pyproject.toml
 
 image: python:$PYTHON_LATEST_SUPPORTED_VERSION
 
@@ -33,7 +58,7 @@ cache:
   - venv/
 
 before_script:
-  - if [[ ! $(which bash) ]]; then apk add --no-cache bash parallel; fi
+  - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
 
 info:
   stage: info
@@ -48,9 +73,11 @@ info:
     - docker container ls --all
     - docker image ls --all
     - docker volume ls
+  allow_failure: true
 
 # Clear unused docker data on nightly basis
 prune:
+  extends: .on_nightly
   stage: prune
   image: docker
   parallel:
@@ -65,10 +92,6 @@ prune:
   - docker volume prune --force
   - docker system df
   allow_failure: true
-  rules:
-  - if: $DAML_NIGHTLY
-    when: always
-  - when: never
 
 .test:
   stage: test
@@ -87,26 +110,27 @@ prune:
     - output/htmlcov.${TASK}.${PYTHON_VERSIONS}
 
 test:
-  extends: .test
+  extends:
+  - .test
+  - .on_default
   variables:
     TASK: unit
-  rules:
-  - if: $DAML_NIGHTLY
-    when: never
-  - when: always
 
 functional:
-  extends: .test
+  extends:
+  - .test
+  - .on_nightly
   variables:
     TASK: func
-  rules:
-  - if: $DAML_NIGHTLY
-    when: always
 
 coverage:
   stage: test
   needs:
   - job: test
+    optional: true
+    artifacts: true
+  - job: functional
+    optional: true
     artifacts: true
   before_script:
   - pip install coverage
@@ -126,32 +150,21 @@ coverage:
     paths:
     - coverage.xml
     - htmlcov/
-  rules:
-  - if: $DAML_NIGHTLY
-    when: never
-  - when: always
 
 linting:
-  stage: test
+  extends: .on_default
   image: docker
   script:
   - ./build lint
-  rules:
-  - if: $DAML_NIGHTLY
-    when: never
-  - when: always
 
 typecheck:
+  extends: .on_default
   image: docker
   parallel:
     matrix:
       - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
   script:
     - ./build ${PYTHON_VERSIONS} type
-  rules:
-  - if: $DAML_NIGHTLY
-    when: never
-  - when: always
 
 generate shipped dependencies:
   image: docker:git
@@ -160,8 +173,11 @@ generate shipped dependencies:
   artifacts:
     paths:
       - output/requirements.txt
+  rules:
+  - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
 sphinx:
+  extends: .on_nightly
   stage: test
   image: docker
 #  tags: [GPU]
@@ -170,41 +186,29 @@ sphinx:
   artifacts:
     paths:
     - output/docs/html/
-  rules:
-  - if: $DAML_NIGHTLY
-    when: never
-  - when: always
 
 pages:
-  stage: build
+  extends: .on_nightly
+  needs:
+  - job: sphinx
+    artifacts: true
+  - job: coverage
+    artifacts: true
+  stage: release
   script:
   - mv output/docs/html/ ./public/
-  - mv htmlcov/ ./public/testcov/
+  - mv htmlcov/ ./public/coverage/
   artifacts:
     paths:
     - public
-  rules:
-  - if: $DAML_NIGHTLY
-    when: never
-  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || ($CI_PIPELINE_SOURCE == 'web' && $PUBLISH == 'true')
-    needs: ['sphinx', 'coverage']
 
 tag:
-  stage: build
+  extends: .on_release
   script:
   - ./.gitlab/auto_tag.sh
-  environment:
-    name: production
-  rules:
-  - if: $DAML_NIGHTLY
-    when: never
-  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    changes:
-    - src/**/*
-    - pyproject.toml
 
 publish:
-  stage: build
+  extends: .on_release
   needs:
   - tag
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
@@ -213,34 +217,14 @@ publish:
   - twine --version
   - python -m build
   - twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi -u gitlab-ci-token -p $DAML_BUILD_PAT dist/*
-  environment:
-    name: production
-  rules:
-  - if: $DAML_NIGHTLY
-    when: never
-  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    changes:
-    - src/**/*
-    - pyproject.toml
 
 changelog:
-  stage: build
+  extends: .on_release
   needs:
   - publish
-  image: python:$PYTHON_LATEST_SUPPORTED_VERSION
-  before_script:
-  - pip install requests
   script:
+  - pip install requests
   - python .gitlab/update_changelog.py
-  environment:
-    name: production
-  rules:
-  - if: $DAML_NIGHTLY
-    when: never
-  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    changes:
-    - src/**/*
-    - pyproject.toml
 
 include:
 - template: Security/SAST.gitlab-ci.yml
