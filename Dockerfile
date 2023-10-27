@@ -61,6 +61,19 @@ RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
     echo ${versions} | xargs -n1 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --no-root --with dev --all-extras'
 RUN ${PYENV_ROOT}/versions/daml-3.11/bin/pyright --version
 ENV TF_GPU_ALLOCATOR cuda_malloc_async
+ENV POETRY_HTTP_BASIC_JATIC_USERNAME=gitlab-ci-token
+
+
+FROM base as devcontainer
+USER root
+RUN addgroup --gid 1001 docker
+RUN usermod -a -G docker daml
+USER daml
+RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
+    echo ${versions} | xargs -n1 -P0 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --no-root --with docs --all-extras'
+ENV LANGUAGE=en
+ENV LC_ALL=C.UTF-8
+ENV LANG=en_US.UTF-8
 
 
 # Install daml
