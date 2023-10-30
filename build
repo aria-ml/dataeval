@@ -99,15 +99,31 @@ for task in "${tasks[@]}"; do
     esac
 done
 
+function post_build_cleanup() {
+    temp=$1
+    tag=$2
+
+    rm -f $temp
+
+    if [[ $(docker container ls --all --filter name=$tag) ]]; then
+        docker container rm --force $tag &> /dev/null
+    fi
+
+    if [[ -z $save_build_images && $(docker image ls --filter reference=$tag) ]]; then
+        docker image rm --force $tag &> /dev/null
+    fi
+}
+
 function docker_build() {
     temp=$(mktemp)
-    trap "rm $temp" EXIT
     IFS=- read -r task pver <<< $1
     tag="daml-$task-$pver"
 
     if [[ $CI_PIPELINE_ID ]]; then
         tag="${tag}-${CI_PIPELINE_ID}"
     fi
+
+    trap "post_build_cleanup $temp $tag" EXIT
 
     docker_build_cmd="docker build --cache-from $cache_tag --progress plain --build-arg python_version=$pver --tag $tag --target $task ."
     docker_run_args="--name $tag $gpuflag $tag"
@@ -134,21 +150,12 @@ function docker_build() {
         esac
     fi
 
-    # remove container
-    docker rm --force $tag &> /dev/null
-
-    # remove image
-    if [ "${save_build_images}" == "" ]; then
-        if docker images | grep -q $tag; then
-            docker rmi $tag &> /dev/null
-        fi
-    fi
-
     exit $exitcode
 }
 
 export DOCKER_BUILDKIT=1
 export cache_tag="daml-cache"
+export -f post_build_cleanup
 export -f docker_build
 
 echo "================== building cache image =================="
