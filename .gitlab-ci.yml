@@ -75,6 +75,7 @@ info:
     - docker container ls --all --format '{{.Names}} - {{.Image}} => {{.Size}}'
     - docker image ls --all
     - docker volume ls --format '{{.Name}} -> {{.Size}}'
+    - docker inspect $(docker image ls -aq)  --format '{{.RepoTags}} => {{ .GraphDriver.Data.MergedDir}}'
   allow_failure: true
 
 # Clear unused docker data on nightly basis
