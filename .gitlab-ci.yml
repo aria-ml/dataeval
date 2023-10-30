@@ -92,9 +92,17 @@ prune:
     - docker system df
   allow_failure: true
 
+build:
+  image: docker
+  script:
+    - ./build --build-only
+
 .test:
   stage: test
   image: docker
+  needs:
+    - job: build
+      optional: true
   parallel:
     matrix:
       - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
@@ -153,12 +161,18 @@ coverage:
 linting:
   extends: .on_default
   image: docker
+  needs:
+    - job: build
+      optional: true
   script:
     - ./build lint
 
 typecheck:
   extends: .on_default
   image: docker
+  needs:
+    - job: build
+      optional: true
   parallel:
     matrix:
       - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
@@ -167,6 +181,9 @@ typecheck:
 
 generate shipped dependencies:
   image: docker:git
+  needs:
+    - job: build
+      optional: true
   script:
     - ./build deps
   artifacts:
@@ -179,6 +196,9 @@ sphinx:
   extends: .on_nightly
   stage: test
   image: docker
+  needs:
+    - job: build
+      optional: true
   #  tags: [GPU]
   script:
     - ./build docs # --gpu
