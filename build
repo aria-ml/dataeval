@@ -130,7 +130,7 @@ function docker_build() {
     else
         if [[ ! $verbose ]]; then echo SUCCEEDED; fi
         case "$task" in
-            unit|func|docs|deps) docker cp --quiet $tag:/daml/output ./;;
+            unit|func|docs|deps) docker cp $tag:/daml/output ./;;
         esac
     fi
 

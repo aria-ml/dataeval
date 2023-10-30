@@ -61,7 +61,7 @@ before_script:
 
 info:
   stage: info
-  image: docker
+  image: docker:20.10-git
   parallel:
     matrix:
       - TAG: ["aria", "GPU1", "GPU2"]
@@ -80,7 +80,7 @@ info:
 prune:
   extends: .on_nightly
   stage: prune
-  image: docker
+  image: docker:20.10-git
   parallel:
     matrix:
       - TAG: ["aria", "GPU1", "GPU2"]
@@ -95,13 +95,13 @@ prune:
   allow_failure: true
 
 build:
-  image: docker
+  image: docker:20.10-git
   script:
     - ./build --build-only
 
 .test:
   stage: test
-  image: docker
+  image: docker:20.10-git
   needs:
     - job: build
       optional: true
@@ -162,7 +162,7 @@ coverage:
 
 linting:
   extends: .on_default
-  image: docker
+  image: docker:20.10-git
   needs:
     - job: build
       optional: true
@@ -171,7 +171,7 @@ linting:
 
 typecheck:
   extends: .on_default
-  image: docker
+  image: docker:20.10-git
   needs:
     - job: build
       optional: true
@@ -182,7 +182,7 @@ typecheck:
     - ./build ${PYTHON_VERSIONS} type
 
 generate shipped dependencies:
-  image: docker:git
+  image: docker:20.10-git
   needs:
     - job: build
       optional: true
@@ -197,7 +197,7 @@ generate shipped dependencies:
 sphinx:
   extends: .on_nightly
   stage: test
-  image: docker
+  image: docker:20.10-git
   needs:
     - job: build
       optional: true
