@@ -72,7 +72,7 @@ info:
     - docker version
     - docker info
     - docker system df
-    - docker container ls --all
+    - docker container ls --all --format '{{.Names}} - {{.Image}} => {{.Size}}'
     - docker image ls --all
     - docker volume ls
   allow_failure: true
