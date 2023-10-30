@@ -1,49 +1,48 @@
 workflow:
   rules:
-  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    changes:
-    - "CHANGELOG.md"
-    when: never
-  - if: $CI_COMMIT_TAG
-    when: never
-  - if: $DAML_NIGHTLY
-  - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - "CHANGELOG.md"
+      when: never
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $DAML_NIGHTLY
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 default:
   tags:
     - aria
-    
+
 stages:
-- info
-- prune
-- test
-- release
+  - info
+  - prune
+  - test
+  - release
 
 .on_nightly:
   rules:
-  - if: $DAML_NIGHTLY
-    when: on_success
-  - when: never
+    - if: $DAML_NIGHTLY
+      when: on_success
+    - when: never
 
 .on_default:
   rules:
-  - if: $DAML_NIGHTLY
-    when: never
-  - when: on_success
+    - if: $DAML_NIGHTLY
+      when: never
+    - when: on_success
 
 .on_release:
   stage: release
   environment:
     name: production
   rules:
-  - if: $DAML_NIGHTLY
-    when: never
-  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-    changes:
-    - src/**/*
-    - pyproject.toml
+    - if: $DAML_NIGHTLY
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - src/**/*
+        - pyproject.toml
 
 image: python:$PYTHON_LATEST_SUPPORTED_VERSION
 
@@ -54,8 +53,8 @@ variables:
 
 cache:
   paths:
-  - .cache/pip
-  - venv/
+    - .cache/pip
+    - venv/
 
 before_script:
   - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
@@ -65,9 +64,9 @@ info:
   image: docker
   parallel:
     matrix:
-    - TAG: ["aria", "GPU1", "GPU2"]
+      - TAG: ["aria", "GPU1", "GPU2"]
   tags:
-  - ${TAG}
+    - ${TAG}
   script:
     - docker system df
     - docker container ls --all
@@ -82,15 +81,15 @@ prune:
   image: docker
   parallel:
     matrix:
-    - TAG: ["aria", "GPU1", "GPU2"]
+      - TAG: ["aria", "GPU1", "GPU2"]
   tags:
-  - ${TAG}
+    - ${TAG}
   script:
-  - docker system df --verbose
-  - docker builder prune --force --keep-storage 50GB
-  - docker image prune --force
-  - docker volume prune --force
-  - docker system df
+    - docker system df --verbose
+    - docker builder prune --force --keep-storage 50GB
+    - docker image prune --force
+    - docker volume prune --force
+    - docker system df
   allow_failure: true
 
 .test:
@@ -98,49 +97,49 @@ prune:
   image: docker
   parallel:
     matrix:
-    - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
+      - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
   script:
-  - ./build ${PYTHON_VERSIONS} ${TASK}
+    - ./build ${PYTHON_VERSIONS} ${TASK}
   artifacts:
     reports:
       junit: output/junit.${TASK}.${PYTHON_VERSIONS}.xml
     paths:
-    - output/junit.${TASK}.${PYTHON_VERSIONS}.xml
-    - output/.coverage.${TASK}.${PYTHON_VERSIONS}
-    - output/htmlcov.${TASK}.${PYTHON_VERSIONS}
+      - output/junit.${TASK}.${PYTHON_VERSIONS}.xml
+      - output/.coverage.${TASK}.${PYTHON_VERSIONS}
+      - output/htmlcov.${TASK}.${PYTHON_VERSIONS}
 
 test:
   extends:
-  - .test
-  - .on_default
+    - .test
+    - .on_default
   variables:
     TASK: unit
 
 functional:
   extends:
-  - .test
-  - .on_nightly
+    - .test
+    - .on_nightly
   variables:
     TASK: func
 
 coverage:
   stage: test
   needs:
-  - job: test
-    optional: true
-    artifacts: true
-  - job: functional
-    optional: true
-    artifacts: true
+    - job: test
+      optional: true
+      artifacts: true
+    - job: functional
+      optional: true
+      artifacts: true
   before_script:
-  - pip install coverage
+    - pip install coverage
   script:
-  # TODO: Move coverage report generation in to build script (and/or resolve issue with using symlinks instead of a full recursive copy)
-  - cp --recursive $(pwd) /daml
-  - coverage combine ./output
-  - coverage report -m --skip-empty
-  - coverage xml --skip-empty
-  - coverage html --skip-empty
+    # TODO: Move coverage report generation in to build script (and/or resolve issue with using symlinks instead of a full recursive copy)
+    - cp --recursive $(pwd) /daml
+    - coverage combine ./output
+    - coverage report -m --skip-empty
+    - coverage xml --skip-empty
+    - coverage html --skip-empty
   coverage: "/(?i)total.*? (100(?:\\.0+)?\\%|[1-9]?\\d(?:\\.\\d+)?\\%)$/"
   artifacts:
     reports:
@@ -148,14 +147,14 @@ coverage:
         coverage_format: cobertura
         path: coverage.xml
     paths:
-    - coverage.xml
-    - htmlcov/
+      - coverage.xml
+      - htmlcov/
 
 linting:
   extends: .on_default
   image: docker
   script:
-  - ./build lint
+    - ./build lint
 
 typecheck:
   extends: .on_default
@@ -174,71 +173,71 @@ generate shipped dependencies:
     paths:
       - output/requirements.txt
   rules:
-  - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
 sphinx:
   extends: .on_nightly
   stage: test
   image: docker
-#  tags: [GPU]
+  #  tags: [GPU]
   script:
-   - ./build docs # --gpu
+    - ./build docs # --gpu
   artifacts:
     paths:
-    - output/docs/html/
+      - output/docs/html/
 
 pages:
   extends: .on_nightly
   needs:
-  - job: sphinx
-    artifacts: true
-  - job: coverage
-    artifacts: true
+    - job: sphinx
+      artifacts: true
+    - job: coverage
+      artifacts: true
   stage: release
   script:
-  - mv output/docs/html/ ./public/
-  - mv htmlcov/ ./public/coverage/
+    - mv output/docs/html/ ./public/
+    - mv htmlcov/ ./public/coverage/
   artifacts:
     paths:
-    - public
+      - public
 
 tag:
   extends: .on_release
   script:
-  - ./.gitlab/auto_tag.sh
+    - ./.gitlab/auto_tag.sh
 
 publish:
   extends: .on_release
   needs:
-  - tag
+    - tag
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   script:
-  - pip install build twine --upgrade
-  - twine --version
-  - python -m build
-  - twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi -u gitlab-ci-token -p $DAML_BUILD_PAT dist/*
+    - pip install build twine --upgrade
+    - twine --version
+    - python -m build
+    - twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi -u gitlab-ci-token -p $DAML_BUILD_PAT dist/*
 
 changelog:
   extends: .on_release
   needs:
-  - publish
+    - publish
   script:
-  - pip install requests
-  - python .gitlab/update_changelog.py
+    - pip install requests
+    - python .gitlab/update_changelog.py
 
 include:
-- template: Security/SAST.gitlab-ci.yml
-- template: Security/Dependency-Scanning.gitlab-ci.yml
-- template: Security/Secret-Detection.gitlab-ci.yml
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
 
 secret_detection:
   rules:
-  - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
 gemnasium-python-dependency_scanning:
   needs:
-  - job: generate shipped dependencies
-    artifacts: true
+    - job: generate shipped dependencies
+      artifacts: true
   # Both `needs` and `dependencies` are used due to a quirk of gitlab.
   # `gemnasium-python-dependency_scanning` specifies an empty list of
   # dependencies, which means that unless you explicitly add the dependency,
@@ -254,8 +253,8 @@ gemnasium-python-dependency_scanning:
     DS_INCLUDE_DEV_DEPENDENCIES: "false"
     DS_EXCLUDED_PATHS: "poetry.lock"
   rules:
-  - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
 semgrep-sast:
   rules:
-  - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
