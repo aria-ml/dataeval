@@ -68,6 +68,8 @@ info:
   tags:
     - ${TAG}
   script:
+    - docker version
+    - docker info
     - docker system df
     - docker container ls --all
     - docker image ls --all
