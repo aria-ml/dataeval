@@ -44,15 +44,16 @@ if [[ -z "${CI_JOB_TOKEN}${POETRY_HTTP_BASIC_JATIC_PASSWORD}" ]]; then
     export POETRY_HTTP_BASIC_JATIC_PASSWORD=$token
 fi
 
-options=$(getopt -l "help,verbose,gpu,no-cache" -o "hv" -n "build" -- "$@")
+options=$(getopt -l "help,verbose,gpu,no-cache,build-only" -o "hvb" -n "build" -- "$@")
 eval set -- "$options"
 while true; do
     case "$1" in
-        -h|--help)     showHelp;;
-        -v|--verbose)  export verbose=1;;
-        --gpu)         export gpuflag="--gpus all";;
-        --no-cache)    export no_cache="--no-cache";;
-        --)            shift; break;;
+        -h|--help)       showHelp;;
+        -v|--verbose)    export verbose=1;;
+        --gpu)           export gpuflag="--gpus all";;
+        --no-cache)      export no_cache="--no-cache";;
+        -b|--build-only) build_only="true";;
+        --)              shift; break;;
     esac
     shift
 done
@@ -103,12 +104,12 @@ function docker_build() {
     trap "rm $temp" EXIT
     IFS=- read -r task pver <<< $1
     tag="daml-$task-$pver"
-    
+
     if [[ $CI_PIPELINE_ID ]]; then
         tag="${tag}-${CI_PIPELINE_ID}"
     fi
 
-    docker_build_cmd="docker build --pull $no_cache --progress plain --build-arg python_version=$pver --tag $tag --target $task ."
+    docker_build_cmd="docker build --cache-from $cache_tag --progress plain --build-arg python_version=$pver --tag $tag --target $task ."
     docker_run_args="--name $tag $gpuflag $tag"
     docker_run_envs="--env POETRY_HTTP_BASIC_JATIC_PASSWORD=${CI_JOB_TOKEN}${POETRY_HTTP_BASIC_JATIC_PASSWORD}"
 
@@ -142,11 +143,24 @@ function docker_build() {
             docker rmi $tag &> /dev/null
         fi
     fi
-    
+
     exit $exitcode
 }
 
+export DOCKER_BUILDKIT=1
+export cache_tag="daml-cache"
 export -f docker_build
+
+echo "================== building cache image =================="
+docker build --build-arg BUILDKIT_INLINE_CACHE=1 --pull $no_cache --progress plain --tag $cache_tag .
+echo "--------------------------"
+echo "build complete"
+echo "=========================================================="
+
+if [[ -n $build_only ]]; then
+    echo "build-only option selected, done."
+    exit 0
+fi
 
 # execute jobs
 case ${#jobs[@]} in
