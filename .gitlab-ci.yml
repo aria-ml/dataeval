@@ -7,6 +7,7 @@ workflow:
     - if: $CI_COMMIT_TAG
       when: never
     - if: $DAML_NIGHTLY
+    - if: $CI_PIPELINE_SOURCE == 'web'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
@@ -71,9 +72,11 @@ info:
     - docker version
     - docker info
     - docker system df
-    - docker container ls --all
+    - docker container ls --all --format '{{.Names}} - {{.Image}} => {{.Size}}'
     - docker image ls --all
-    - docker volume ls
+    - docker volume ls --format '{{.Name}} -> {{.Size}}'
+    - docker inspect $(docker image ls -aq)  --format '{{.RepoTags}} => {{ .GraphDriver.Data.MergedDir}}'
+    - for i in $(docker container ls --all --format '{{.Names}}'); do ./log_size $i; done
   allow_failure: true
 
 # Clear unused docker data on nightly basis
