@@ -2,7 +2,8 @@
 {
   "build": {
     "dockerfile": "../Dockerfile",
-    "target": "devcontainer"
+    "target": "devcontainer",
+    "cacheFrom": "daml-cache"
   },
 
   "runArgs": [
