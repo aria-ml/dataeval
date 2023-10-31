@@ -31,19 +31,6 @@ EOF
 exit $1
 }
 
-[ ! -s ~/.jatic_token ] || export POETRY_HTTP_BASIC_JATIC_PASSWORD=$(<~/.jatic_token)
-if [[ -z "${CI_JOB_TOKEN}${POETRY_HTTP_BASIC_JATIC_PASSWORD}" ]]; then
-    echo
-    echo "Please provide your JATIC Gitlab personal access token:"
-    read -p "JATIC_TOKEN=" token
-    echo $token > ~/.jatic_token
-    chmod 600 ~/.jatic_token
-    echo
-    echo "Token saved in ~/.jatic_token"
-    echo
-    export POETRY_HTTP_BASIC_JATIC_PASSWORD=$token
-fi
-
 options=$(getopt -l "help,verbose,gpu,no-cache,build-only" -o "hvb" -n "build" -- "$@")
 eval set -- "$options"
 while true; do
@@ -167,6 +154,19 @@ echo "=========================================================="
 if [[ -n $build_only ]]; then
     echo "build-only option selected, done."
     exit 0
+fi
+
+[ ! -s ~/.jatic_token ] || export POETRY_HTTP_BASIC_JATIC_PASSWORD=$(<~/.jatic_token)
+if [[ -z "${CI_JOB_TOKEN}${POETRY_HTTP_BASIC_JATIC_PASSWORD}" ]]; then
+    echo
+    echo "Please provide your JATIC Gitlab personal access token:"
+    read -p "JATIC_TOKEN=" token
+    echo $token > ~/.jatic_token
+    chmod 600 ~/.jatic_token
+    echo
+    echo "Token saved in ~/.jatic_token"
+    echo
+    export POETRY_HTTP_BASIC_JATIC_PASSWORD=$token
 fi
 
 # execute jobs
