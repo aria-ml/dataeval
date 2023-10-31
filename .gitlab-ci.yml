@@ -76,6 +76,7 @@ info:
     - docker image ls --all
     - docker volume ls --format '{{.Name}} -> {{.Size}}'
     - docker inspect $(docker image ls -aq)  --format '{{.RepoTags}} => {{ .GraphDriver.Data.MergedDir}}'
+    - for i in $(docker container ls --all --format '{{.Names}}'); do ./log_size $i; done
   allow_failure: true
 
 # Clear unused docker data on nightly basis
