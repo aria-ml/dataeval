@@ -74,7 +74,7 @@ info:
     - docker system df
     - docker container ls --all --format '{{.Names}} - {{.Image}} => {{.Size}}'
     - docker image ls --all
-    - docker volume ls
+    - docker volume ls --format '{{.Name}} -> {{.Size}}'
   allow_failure: true
 
 # Clear unused docker data on nightly basis
