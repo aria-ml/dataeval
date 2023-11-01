@@ -226,7 +226,19 @@ pages:
     paths:
       - public
 
+clean:
+  extends: .on_release
+  image: docker:20.10-git
+  script:
+    - branch_name=$(git log -n 1 --format=%s | grep "^Merge branch" | cut -d"'" -f2) || echo "Unable to get merge branch name from commit log."
+    - if [[ -z $branch_name ]]; then exit 0; fi
+    - docker rmi -f daml-cache:${branch_name::120}
+    - docker system prune -f
+  allow_failure: true
+
 tag:
+  needs:
+    - clean
   extends: .on_release
   script:
     - ./.gitlab/auto_tag.sh

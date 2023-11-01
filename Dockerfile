@@ -40,16 +40,17 @@ RUN echo 'eval "$(pyenv init -)"' >> ~/.bashrc
 ENV PATH=${PYENV_ROOT}/bin:${PATH}
 ENV PATH=${PYENV_ROOT}/shims:${PATH}
 ARG versions
-RUN pyenv install ${versions}
+ENV versions=${versions}
+RUN --mount=type=cache,target=${PYENV_ROOT}/cache,sharing=locked,uid=1000,gid=1000 pyenv install ${versions}
 RUN echo ${versions} | xargs -n1 sh -c 'pyenv virtualenv $0 daml-$0'
 
 # Install poetry
 FROM pyenv as poetry
 ARG CACHE
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    echo ${versions} | xargs -n1 -P 0 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/pip install poetry'
+    echo ${versions} | xargs -n1 -P 0 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/pip install poetry | sed -u -e "s/^/$0: /"'
 
-# Install daml dependencies and bootstrap pyright nodeenv
+# Install daml dependencies
 FROM poetry as base
 COPY --chown=daml:daml README.md      ./
 COPY --chown=daml:daml pyproject.toml ./
@@ -57,8 +58,15 @@ COPY --chown=daml:daml poetry.lock    ./
 
 ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
 ENV POETRY_VIRTUALENVS_CREATE=false
+ENV POETRY_INSTALLER_MAX_WORKERS=10
+# Create pyright cache and env dirs in persistent folder
+ARG HOME
+RUN mkdir -p ${HOME}/.pyright
+ENV PYRIGHT_PYTHON_CACHE_DIR=${HOME}/.pyright
+ENV PYRIGHT_PYTHON_ENV_DIR=${HOME}/.pyright/nodeenv
+ARG CACHE
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    echo ${versions} | xargs -n1 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --no-root --with dev --all-extras'
+    echo ${versions} | xargs -n1 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --no-root --with dev --all-extras | sed -u -e "s/^/$0: /"'
 RUN ${PYENV_ROOT}/versions/daml-3.11/bin/pyright --version
 ENV TF_GPU_ALLOCATOR cuda_malloc_async
 ENV POETRY_HTTP_BASIC_JATIC_USERNAME=gitlab-ci-token
@@ -69,8 +77,9 @@ USER root
 RUN addgroup --gid 1001 docker
 RUN usermod -a -G docker daml
 USER daml
+ARG CACHE
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    echo ${versions} | xargs -n1 -P0 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --no-root --with docs --all-extras'
+    echo ${versions} | xargs -n1 -P0 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --no-root --with docs --all-extras | sed -u -e "s/^/$0: /"'
 ENV LANGUAGE=en
 ENV LC_ALL=C.UTF-8
 ENV LANG=en_US.UTF-8
@@ -79,15 +88,16 @@ ENV LANG=en_US.UTF-8
 # Install daml
 FROM base as daml_installed
 COPY --chown=daml:daml src/ src/
+ARG CACHE
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    echo ${versions} | xargs -n1 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --only-root --all-extras'
+    echo ${versions} | xargs -n1 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --only-root --all-extras | sed -u -e "s/^/$0: /"'
 
 
 # Set the python version for subsequent targets
 FROM daml_installed as versioned
 ARG python_version
 ENV PATH ${PYENV_ROOT}/versions/daml-${python_version}/bin:$PATH
-ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${python_version}/versions/daml-${python_version}/lib/python${python_version}/site-packages/nvidia/cudnn/lib
+ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${PYENV_ROOT}/versions/daml-${python_version}/lib/python${python_version}/site-packages/nvidia/cudnn/lib
 COPY --chown=daml:daml run ./
 
 
@@ -98,6 +108,7 @@ CMD ./run deps
 
 # Copy tests dir
 FROM versioned as tests_dir
+COPY --chown=daml:daml .coveragerc ./
 COPY --chown=daml:daml tests/ tests/
 
 
@@ -123,6 +134,8 @@ COPY --chown=daml:daml docs/ docs/
 
 # Build docs
 FROM docs_dir as docs
+ARG CACHE
+ARG python_version
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
     ${PYENV_ROOT}/versions/daml-${python_version}/bin/poetry install --no-root --with docs --all-extras
 ENV PYDEVD_DISABLE_FILE_VALIDATION 1
