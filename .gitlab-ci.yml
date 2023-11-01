@@ -227,7 +227,7 @@ pages:
       - public
 
 clean:
-  extends: .on_release
+  stage: release
   image: docker:20.10-git
   script:
     - branch_name=$(git log -n 1 --format=%s | grep "^Merge branch" | cut -d"'" -f2) || echo "Unable to get merge branch name from commit log."
@@ -235,6 +235,10 @@ clean:
     - docker rmi -f daml-cache:${branch_name::120}
     - docker system prune -f
   allow_failure: true
+  rules:
+    - if: $DAML_NIGHTLY
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 tag:
   needs:
