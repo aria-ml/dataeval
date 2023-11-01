@@ -1,6 +1,17 @@
-[//]: # (da14b9578059d96dc1f0108cfab3097b34a65779)
+[//]: # (1d85c7776a1f95c8c8744d9004a6e8df651d4e5c)
 
 # DAML Change Log
+## v0.28.2
+- ```1d85c777 - Remove unused base class```
+- ```b0baac49 - Print more disk usage info in pipeline```
+- ```3725be9c - move token check```
+- ```19deb6b7 - Use cache-from for dev container build```
+- ```6c265500 - Use trap to ensure containers/images get cleaned up```
+- ```413ec769 - Add standalone build job```
+- ```cf87af41 - Merge devcontainer Dockerfile with build DockerFile and remove tox```
+- ```46178900 - Move documentation to nightly builds```
+- ```86246c21 - Update dependencies with support for torch and JATIC toolbox```
+- ```9c0cf329 - matrix info and prune jobs```
 ## v0.28.1
 - ```da14b957 - Move documentation dependencies in to pyproject.toml```
 ## v0.28.0
