@@ -38,7 +38,7 @@ while true; do
         -h|--help)       showHelp;;
         -v|--verbose)    export verbose=1;;
         --gpu)           export gpuflag="--gpus all";;
-        --no-cache)      export no_cache="--no-cache";;
+        --no-cache)      cache_arg="--no-cache";;
         -b|--build-only) build_only="true";;
         --)              shift; break;;
     esac
@@ -141,12 +141,26 @@ function docker_build() {
 }
 
 export DOCKER_BUILDKIT=1
-export cache_tag="daml-cache"
 export -f post_build_cleanup
 export -f docker_build
 
+cache_tag="daml-cache"
+if [[ $CI ]]; then
+    # Gitlab does not populate CI_COMMIT_BRANCH in merge requests and vice versa for CI_MERGE_REQUEST_SOURCE_BRANCH_NAME
+    branch_name=${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}${CI_COMMIT_BRANCH}
+    cache_tag="daml-cache:${branch_name::120}"
+fi
+export cache_tag
+
+if [[ -z $cache_arg ]]; then
+    cache_arg="--cache-from ${cache_tag}"
+    if [[ $CI && ($branch_name != $CI_DEFAULT_BRANCH) ]]; then
+        cache_arg="--cache-from daml-cache:main ${cache_arg}"
+    fi
+fi
+
 echo "================== building cache image =================="
-docker build --build-arg BUILDKIT_INLINE_CACHE=1 --pull $no_cache --progress plain --tag $cache_tag .
+docker build --build-arg BUILDKIT_INLINE_CACHE=1 --pull $cache_arg --progress plain --tag $cache_tag .
 echo "--------------------------"
 echo "build complete"
 echo "=========================================================="
