@@ -1,6 +1,9 @@
-[//]: # (1d85c7776a1f95c8c8744d9004a6e8df651d4e5c)
+[//]: # (57569af543344f631beecd1116e9730036f4fe2f)
 
 # DAML Change Log
+## v0.28.3
+- ```57569af5 - Write JATIC interop test cases```
+- ```5bd3c2f5 - Build and tag docker images of daml-cache by branch name```
 ## v0.28.2
 - ```1d85c777 - Remove unused base class```
 - ```b0baac49 - Print more disk usage info in pipeline```
