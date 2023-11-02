@@ -76,7 +76,7 @@ class TestFlatten:
         metric = AE()
         images = all_ones.dataset.images
         metric._flatten_dataset = True
-        new_dataset = metric._format_dataset(images)
+        new_dataset = metric._format_images(images)
         output_shape = img_dims[0] * img_dims[1] * channels
 
         assert new_dataset.shape[0] == limit

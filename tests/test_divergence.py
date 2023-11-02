@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from daml.datasets import DamlDataset
 from daml.metrics.divergence import HP_FNN, HP_MST, DivergenceOutput
 
 
@@ -37,8 +38,7 @@ class TestDpDivergence:
         even = even.reshape((even.shape[0], -1))
         odd = odd.reshape((odd.shape[0], -1))
         metric = input()
-        result = metric.evaluate(
-            dataset_a=even,
-            dataset_b=odd,
-        )
+        dataset_a = DamlDataset(even)
+        dataset_b = DamlDataset(odd)
+        result = metric.evaluate(dataset_a=dataset_a, dataset_b=dataset_b)
         assert result == output

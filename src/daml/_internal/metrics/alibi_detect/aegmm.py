@@ -95,4 +95,7 @@ class AlibiAEGMM(BaseAlibiDetectOD):
 
     @property
     def _default_predict_kwargs(self) -> dict:
-        return {"return_instance_score": True}
+        return {
+            "return_instance_score": True,
+            "batch_size": 64,
+        }

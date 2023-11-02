@@ -5,13 +5,14 @@ created by Alibi Detect
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, Iterable, Optional, Tuple
+from typing import Any, Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
 
 from daml._internal.metrics.base import Metric, Threshold, ThresholdType
 from daml._internal.metrics.outputs import OutlierDetectorOutput
+from daml.datasets import DamlDataset
 
 
 class AlibiDetectOutlierType(str, Enum):
@@ -114,7 +115,7 @@ class BaseAlibiDetectOD(Metric, ABC):
     # Train the alibi-detect metric on dataset
     def fit_dataset(
         self,
-        dataset: Iterable[float],
+        dataset: DamlDataset,
         epochs: int = 3,
         threshold: Threshold = Threshold(95.0, ThresholdType.PERCENTAGE),
         batch_size: Optional[int] = None,
@@ -126,7 +127,7 @@ class BaseAlibiDetectOD(Metric, ABC):
 
         Parameters
         ----------
-        dataset : Iterable[float]
+        dataset : DamlDataset
             An array of images for the model to train on
         epochs : int, default 3
             Number of epochs to train the detector for
@@ -152,12 +153,13 @@ class BaseAlibiDetectOD(Metric, ABC):
                     Try calling metric.initialize_detector()"
             )
 
-        dataset = self._format_dataset(dataset)
-
+        # Autoencoders only need images, so extract from dataset and format
+        images = self._format_images(dataset.images)
+        # Train the autoencoder using only the formatted images
         self.detector.fit(
-            dataset,
+            images,
             epochs=epochs,
-            batch_size=batch_size if batch_size else self._default_batch_size,
+            batch_size=batch_size or self._default_batch_size,
             verbose=verbose,
         )
 
@@ -166,21 +168,21 @@ class BaseAlibiDetectOD(Metric, ABC):
 
         if threshold.type is ThresholdType.PERCENTAGE:
             self.detector.infer_threshold(
-                dataset,
+                images,
                 threshold_perc=threshold.value,
-                batch_size=batch_size if batch_size else self._default_batch_size,
+                batch_size=batch_size or self._default_batch_size,
             )
         else:
             self.detector.threshold = threshold.value
 
-    def _check_dtype(self, dataset: np.ndarray):
+    def _check_dtype(self, images: np.ndarray):
         """
         Check if the dataset dtype fits with the required dtype of the model.
         None is used for any accepted type. Can extend to check for multiple types.
 
         Parameters
         ----------
-        dataset : np.ndarray
+        images : np.ndarray
             A numpy ndarray of images in the shape (B, H, W, C)
         dtype : Type
             The preferred dtype of the array
@@ -197,16 +199,16 @@ class BaseAlibiDetectOD(Metric, ABC):
             return
 
         # Use ndarray type conversion function
-        if not isinstance(dataset, np.ndarray):
+        if not isinstance(images, np.ndarray):
             raise TypeError("Dataset should be of type: np.ndarray")
 
-        if not dataset.dtype.type == self._dataset_type:
+        if not images.dtype.type == self._dataset_type:
             raise TypeError(
                 f"Dataset values should be of type {self._dataset_type}, \
-                not {dataset.dtype.type}"
+                not {images.dtype.type}"
             )
 
-    def _check_dataset_shape(self, dataset):
+    def _check_image_shape(self, images: np.ndarray):
         """
         Verifies that a dataset has the same shape as a reference shape.
         Use this when fitting or evaluating a model on a dataset, to
@@ -215,7 +217,7 @@ class BaseAlibiDetectOD(Metric, ABC):
 
         Parameters
         ----------
-        dataset : Iterable[float]
+        image : np.ndarray
             An array of images in shape (B, H, W, C)
 
         Raises
@@ -227,26 +229,26 @@ class BaseAlibiDetectOD(Metric, ABC):
         if self.detector is None:
             return
 
-        if dataset.shape[-3:] != self._input_shape:
+        if images.shape[-3:] != self._input_shape:
             raise TypeError(
                 f"Model was initialized on dataset shape \
                 (W,H,C)={self._input_shape}, \
-                but provided dataset has shape (W,H,C)={dataset.shape[-3:]}"
+                but provided dataset has shape (W,H,C)={images.shape[-3:]}"
             )
 
-    def _format_dataset(self, dataset: Any) -> np.ndarray:
+    def _format_images(self, images: np.ndarray) -> np.ndarray:
         """
-        Formats a dataset such that it fits the required datatype and shape
+        Formats images such that it fits the required datatype and shape
 
         Parameters
         ----------
-        dataset : np.ndarray
+        images : np.ndarray
             A numpy array of images in shape (B, H, W, C)
 
         Returns
         -------
-        Iterable[float]
-            A dataset style array
+        np.ndarray
+            A numpy array of formatted images
 
         Note
         ----
@@ -254,23 +256,23 @@ class BaseAlibiDetectOD(Metric, ABC):
             (e.g. float32, or flattened)
         - Override this to set the standard dataset formatting.
         """
-        self._check_dataset_shape(dataset)
-        self._check_dtype(dataset)
+        self._check_image_shape(images)
+        self._check_dtype(images)
 
         if self._flatten_dataset:
-            dataset = np.reshape(dataset, (len(dataset), np.prod(np.shape(dataset[0]))))
-        return dataset
+            images = np.reshape(images, (len(images), np.prod(np.shape(images[0]))))
+        return images
 
     def evaluate(
         self,
-        dataset: Iterable[float],
+        dataset: DamlDataset,
     ) -> OutlierDetectorOutput:
         """
         Evaluate the outlier detector metric on a dataset.
 
         Parameters
         ----------
-        dataset : Iterable[float]
+        dataset : DamlDataset
             The dataset to detect outliers on.
 
         Returns
@@ -291,10 +293,10 @@ class BaseAlibiDetectOD(Metric, ABC):
                     Try calling metric.fit_dataset(data)"
             )
 
-        # Cast and flatten dataset
-        dataset = self._format_dataset(dataset)
+        # Cast and flatten images
+        images = self._format_images(dataset.images)
 
-        self._predict_kwargs.update({"X": dataset})
+        self._predict_kwargs.update({"X": images})
 
         predictions = self.detector.predict(**self._predict_kwargs)
 
