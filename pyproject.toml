@@ -50,7 +50,7 @@ optional = true
 pytest = "*"
 coverage = "*"
 # type
-pyright = "1.1.331"
+pyright = "*"
 # lint
 flake8 = "*"
 flake8-pyproject = "*"
