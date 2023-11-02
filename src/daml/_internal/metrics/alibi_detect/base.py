@@ -11,9 +11,9 @@ from typing import Any, Optional, Tuple
 import numpy as np
 import tensorflow as tf
 
+from daml._internal.datasets import DamlDataset
 from daml._internal.metrics.base import Metric, Threshold, ThresholdType
 from daml._internal.metrics.outputs import OutlierDetectorOutput
-from daml.datasets import DamlDataset
 
 
 class AlibiDetectOutlierType(str, Enum):
