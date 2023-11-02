@@ -60,9 +60,25 @@ cache:
 before_script:
   - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
 
+clean:
+  stage: info
+  image: docker:20.10-git
+  script:
+    - branch_name=$(git log -n 1 --format=%s | grep "^Merge branch" | cut -d"'" -f2) || echo "Unable to get merge branch name from commit log."
+    - if [[ -z $branch_name ]]; then exit 0; fi
+    - docker rmi --force daml-cache:${branch_name::120}
+  rules:
+    - if: $DAML_NIGHTLY
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  allow_failure: true
+
 info:
   stage: info
   image: docker:20.10-git
+  needs:
+    - job: clean
+      optional: true
   parallel:
     matrix:
       - TAG: ["aria", "GPU1", "GPU2"]
@@ -101,6 +117,7 @@ build:
   image: docker:20.10-git
   script:
     - ./build --build-only
+    - docker system prune --force
   retry: 2
 
 .test:
@@ -227,23 +244,7 @@ pages:
     paths:
       - public
 
-clean:
-  stage: release
-  image: docker:20.10-git
-  script:
-    - branch_name=$(git log -n 1 --format=%s | grep "^Merge branch" | cut -d"'" -f2) || echo "Unable to get merge branch name from commit log."
-    - if [[ -z $branch_name ]]; then exit 0; fi
-    - docker rmi -f daml-cache:${branch_name::120}
-    - docker system prune -f
-  allow_failure: true
-  rules:
-    - if: $DAML_NIGHTLY
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
 tag:
-  needs:
-    - clean
   extends: .on_release
   script:
     - ./.gitlab/auto_tag.sh
