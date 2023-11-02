@@ -1,7 +1,7 @@
+import math
 from typing import Optional
 
 import alibi_detect
-import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import (
@@ -91,7 +91,7 @@ class AlibiVAE(BaseAlibiDetectOD):
                 Conv2DTranspose(256, 4, strides=2, padding="same", activation=relu),
                 Conv2DTranspose(64, 4, strides=2, padding="same", activation=relu),
                 Flatten(),
-                Dense(np.prod(self._input_shape)),
+                Dense(math.prod(self._input_shape)),
                 Reshape(target_shape=self._input_shape),
             ]
         )

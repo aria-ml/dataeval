@@ -3,6 +3,7 @@ This module contains implementations of Image Outlier Detection methods
 created by Alibi Detect
 """
 
+import math
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any, Optional, Tuple
@@ -260,7 +261,7 @@ class BaseAlibiDetectOD(Metric, ABC):
         self._check_dtype(images)
 
         if self._flatten_dataset:
-            images = np.reshape(images, (len(images), np.prod(np.shape(images[0]))))
+            images = np.reshape(images, (len(images), math.prod(np.shape(images[0]))))
         return images
 
     def evaluate(
