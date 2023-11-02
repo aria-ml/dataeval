@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from daml.datasets import DamlDataset
 from daml.metrics.ber import BEROutput
 from daml.metrics.ber.aria import BER_FNN, BER_MST
 
@@ -22,12 +23,9 @@ class TestMulticlassBER:
         path = "tests/datasets/mnist.npz"
         with np.load(path, allow_pickle=True) as fp:
             covariates, labels = fp["x_train"][:1000], fp["y_train"][:1000]
-
+        dataset = DamlDataset(covariates, labels)
         metric = input()
-        value = metric.evaluate(
-            X=covariates,
-            y=labels,
-        )
+        value = metric.evaluate(dataset)
         assert value == output
 
     @pytest.mark.parametrize(
@@ -41,12 +39,10 @@ class TestMulticlassBER:
         value = None
         covariates = np.ones(20)
         labels = np.array(range(20))
+        dataset = DamlDataset(covariates, labels)
         metric = input()
         with pytest.raises(ValueError):
-            value = metric.evaluate(
-                X=covariates,
-                y=labels,
-            )
+            value = metric.evaluate(dataset)
             assert value is not None
 
     @pytest.mark.parametrize(
@@ -60,10 +56,8 @@ class TestMulticlassBER:
         value = None
         covariates = np.ones(20)
         labels = np.ones(20)
+        dataset = DamlDataset(covariates, labels)
         metric = input()
         with pytest.raises(ValueError):
-            value = metric.evaluate(
-                X=covariates,
-                y=labels,
-            )
+            value = metric.evaluate(dataset)
             assert value is not None

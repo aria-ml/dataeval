@@ -12,6 +12,7 @@ from scipy.sparse.csgraph import minimum_spanning_tree
 from scipy.spatial.distance import pdist, squareform
 from sklearn.neighbors import NearestNeighbors
 
+from daml._internal.datasets.datasets import DamlDataset
 from daml._internal.metrics.base import Metric
 from daml._internal.metrics.outputs import BEROutput
 
@@ -69,11 +70,7 @@ class _MultiClassBer(Metric, ABC):
     ) -> Tuple[float, float]:
         raise NotImplementedError
 
-    def evaluate(
-        self,
-        X: np.ndarray,
-        y: np.ndarray,
-    ) -> BEROutput:
+    def evaluate(self, dataset: DamlDataset) -> BEROutput:
         """
         Return the Bayes Error Rate estimate
 
@@ -89,7 +86,8 @@ class _MultiClassBer(Metric, ABC):
         Dict[str, float]
             "ber": Estimate of the Bayes Error Rate
         """
-        # TODO: Add Metric description for documentation
+        X = dataset.images
+        y = dataset.labels
         ber, ber_lower = self._multiclass_ber(X, y)
         return BEROutput(ber=ber, ber_lower=ber_lower)
 

@@ -70,4 +70,5 @@ class AlibiLLR(BaseAlibiDetectOD):
         return {
             "outlier_type": AlibiDetectOutlierType.INSTANCE,
             "return_instance_score": True,
+            "batch_size": 64,
         }

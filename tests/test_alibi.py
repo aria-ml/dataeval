@@ -4,6 +4,7 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
+from daml.datasets import DamlDataset
 from daml.metrics.outlier_detection import (
     AE,
     AEGMM,
@@ -31,6 +32,10 @@ class TestAlibiDetect_Functional:
 
         input_shape = (32, 32, 3)
 
+        # Initialize the autoencoder-based outlier detector from alibi-detect
+        metric = method()
+        metric.initialize_detector(input_shape)
+
         # Initialize a dataset of 32 images of size 32x32x3, containing all 1's
         all_ones = MockImageClassificationGenerator(
             limit=1, labels=1, img_dims=input_shape
@@ -45,68 +50,65 @@ class TestAlibiDetect_Functional:
         X_all_ones = all_ones.dataset.images
         X_all_fives = all_fives.dataset.images
 
-        # Initialize the autoencoder-based outlier detector from alibi-detect
-        metric = method()
-
-        metric.initialize_detector(input_shape)
-
-        # TODO Need to create a helper function to handle this
         if metric._dataset_type is not None:
             X_all_ones = X_all_ones.astype(metric._dataset_type)
             X_all_fives = X_all_fives.astype(metric._dataset_type)
 
+        all_ones_ds = DamlDataset(X_all_ones)
+        all_fives_ds = DamlDataset(X_all_fives)
         # Train the detector on the dataset of all 1's
-        metric.fit_dataset(dataset=X_all_ones, epochs=10, verbose=False)
+        metric.fit_dataset(dataset=all_ones_ds, epochs=10, verbose=False)
 
         # Evaluate the detector on the dataset of all 1's
-        preds_on_ones = metric.evaluate(X_all_ones).is_outlier
-        # print(preds_on_ones)
-        # ones_outliers = preds_on_ones
+        preds_on_ones = metric.evaluate(all_ones_ds).is_outlier
+
         # Evaluate the detector on the dataset of all 5's
-        preds_on_fives = metric.evaluate(X_all_fives).is_outlier
-        # fives_outliers = preds_on_fives
+        preds_on_fives = metric.evaluate(all_fives_ds).is_outlier
 
         # We expect all elements to not be outliers
         num_errors_on_ones = np.sum(np.where(preds_on_ones != 0))
         # We expect all elements to be outliers
         num_errors_on_fives = np.sum(np.where(preds_on_fives != 1))
 
+        # Test
+        # Assert there is a prediction for each image
         assert len(preds_on_ones) == len(X_all_ones)
         assert len(preds_on_fives) == len(X_all_fives)
-
+        # Assert there are no errors
         assert num_errors_on_ones == 0
         assert num_errors_on_fives == 0
 
     def test_different_input_shape(self, method):
-        """Testing of  Detection under different input size"""
+        """
+        Confirm autoencoders can encode and decode arbitrary image sizes
+        without breaking fit_dataset or evaluate
+        """
 
         input_shape = (38, 38, 2)
+        metric = method()
+        # Initialize the autoencoder-based outlier detector from alibi-detect
+        metric.initialize_detector(input_shape)
 
         # Initialize a dataset of 32 images of size 32x32x3, containing all 1's
         all_ones = MockImageClassificationGenerator(
             limit=1, labels=1, img_dims=input_shape
         )
 
-        # Get model input from each dataset
         X_all_ones = all_ones.dataset.images
-
-        metric = method()
-
-        # Initialize the autoencoder-based outlier detector from alibi-detect
-        metric.initialize_detector(input_shape)
-
-        # TODO Need to create a helper function to handle this
         if metric._dataset_type is not None:
             X_all_ones = X_all_ones.astype(metric._dataset_type)
 
+        all_ones_ds = DamlDataset(X_all_ones)
+
         # Train the detector on the dataset of all 1's
-        metric.fit_dataset(dataset=X_all_ones, epochs=10, verbose=False)
+        metric.fit_dataset(dataset=all_ones_ds, epochs=10, verbose=False)
 
         # Evaluate the detector on the dataset of all 1's
-        preds_on_ones = metric.evaluate(X_all_ones).is_outlier
+        preds_on_ones = metric.evaluate(all_ones_ds).is_outlier
 
         num_errors_on_ones = np.sum(np.where(preds_on_ones != 0))
 
+        # Test
         assert num_errors_on_ones == 0
 
 
@@ -126,7 +128,6 @@ class TestAlibiDetect_Functional:
 class TestAlibiDetect:
     input_shape = (32, 32, 3)
     all_ones = MockImageClassificationGenerator(limit=3, labels=1, img_dims=input_shape)
-    dataset = all_ones.dataset.images
 
     _is_mock_expected: Optional[bool] = True
 
@@ -144,64 +145,55 @@ class TestAlibiDetect:
 
     # Ensure that the program fails upon wrong order of operations
     def test_eval_before_fit_fails(self, method):
-        """Testing incorrect order of operations for fitting and evaluating"""
-
-        dataset = self.all_ones.dataset.images
+        """Raises error when evaluate is called before fitting a model"""
+        # Load metric and create model
         metric = method()
         metric.initialize_detector(self.input_shape)
 
-        # force metric.is_trained = False
-        # Evaluate dataset before fitting it
+        # Create Daml dataset
+        dataset = DamlDataset(self.all_ones.dataset.images)
+
+        # Test
         with pytest.raises(TypeError):
             metric.evaluate(dataset)
 
     # Ensure that the program fails upon testing on a dataset of different
     # shape than what was trained on
     def test_wrong_dataset_dims_fails(self, method):
-        """Testing incorrect order of operations for fitting and evaluating"""
-
-        faulty_input_shape = (11, 32, 3)
-
-        all_ones = MockImageClassificationGenerator(
-            limit=3,
-            labels=1,
-            img_dims=self.input_shape[:1],
-            channels=self.input_shape[2],
-        )
-
-        faulty_all_ones = MockImageClassificationGenerator(
-            limit=3,
-            labels=1,
-            img_dims=faulty_input_shape[:1],
-            channels=faulty_input_shape[2],
-        )
-
-        dataset = all_ones.dataset.images
-        faulty_dataset = faulty_all_ones.dataset.images
-
+        """
+        Raises an error when image shape in evaluate
+        does not match the detector input
+        """
+        # Load metric and create model with a "typo" for input shape
+        faulty_input_shape = (31, 32, 3)
         metric = method()
+        metric.initialize_detector(faulty_input_shape)
 
+        # Create daml dataset
+        images = self.all_ones.dataset.images
         if metric._dataset_type:
-            dataset = dataset.astype(metric._dataset_type)
-            faulty_dataset = faulty_dataset.astype(metric._dataset_type)
+            dataset = images.astype(metric._dataset_type)
+        dataset = DamlDataset(X=images)
 
-        metric.initialize_detector(self.input_shape)
+        # metric.fit_dataset(dataset=dataset, epochs=1, verbose=False)
+        metric.is_trained = True
 
-        metric.fit_dataset(dataset=dataset, epochs=1, verbose=False)
-
-        # force
-        # metric.is_trained = False
-        # Evaluate dataset before fitting it
         with pytest.raises(TypeError):
-            metric.evaluate(faulty_dataset)
+            metric.evaluate(dataset)
 
     def test_missing_detector(self, method):
+        """
+        Raises error if fit_dataset or evaluate are called without a detector
+        """
         self._is_mock_expected = False
-
-        dataset = self.all_ones.dataset.images
-
+        # Load metric
         metric = method()
 
+        # Create Daml datasets
+        images = self.all_ones.dataset.images
+        dataset = DamlDataset(images)
+
+        # Test
         with pytest.raises(TypeError):
             metric.fit_dataset(dataset=dataset, epochs=1, verbose=False)
 
@@ -209,22 +201,34 @@ class TestAlibiDetect:
             metric.evaluate(dataset=dataset)
 
     def test_initialize_fit_evaluate(self, method):
+        """What does this test? Is this a pseudo functional test?"""
+        # Load metric and create model
         metric = method()
         metric.initialize_detector(self.input_shape)
+
+        # Load dataset
+        images = self.all_ones.dataset.images
         if metric._dataset_type:
-            dataset = self.dataset.astype(metric._dataset_type)
-        else:
-            dataset = self.dataset
+            images = images.astype(metric._dataset_type)
+        dataset = DamlDataset(images)
+
+        # Test
         metric.fit_dataset(dataset=dataset, epochs=1, verbose=False)
         metric.evaluate(dataset)
 
     def test_set_threshold_value(self, method):
+        """Asserts that the threshold is set by fit_dataset"""
+        # Load metric and create model
         metric = method()
         metric.initialize_detector(self.input_shape)
+
+        # Load dataset and set type
+        images = self.all_ones.dataset.images
         if metric._dataset_type:
-            dataset = self.dataset.astype(metric._dataset_type)
-        else:
-            dataset = self.dataset
+            images = images.astype(metric._dataset_type)
+        dataset = DamlDataset(images)
+
+        # Test
         metric.fit_dataset(
             dataset=dataset,
             epochs=1,
