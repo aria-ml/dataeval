@@ -1,3 +1,3 @@
-from . import metrics
+from . import datasets, interop, metrics
 
-__all__ = ["metrics"]
+__all__ = ["metrics", "interop", "datasets"]

@@ -12,6 +12,7 @@ from scipy.sparse.csgraph import minimum_spanning_tree
 from scipy.spatial.distance import pdist, squareform
 from sklearn.neighbors import NearestNeighbors
 
+from daml._internal.datasets.datasets import DamlDataset
 from daml._internal.metrics.base import Metric
 from daml._internal.metrics.outputs import DivergenceOutput
 
@@ -34,8 +35,8 @@ class _DpDivergence(Metric, ABC):
 
     def evaluate(
         self,
-        dataset_a: np.ndarray,
-        dataset_b: np.ndarray,
+        dataset_a: DamlDataset,
+        dataset_b: DamlDataset,
     ) -> DivergenceOutput:
         """
         Calculates the divergence and any errors between two datasets
@@ -54,9 +55,11 @@ class _DpDivergence(Metric, ABC):
         ----
         A and B must be 2 dimensions, and equivalent in size on the second dimension
         """
-        data = np.vstack((dataset_a, dataset_b))
-        N = dataset_a.shape[0]
-        M = dataset_b.shape[0]
+        imgs_a = dataset_a.images
+        imgs_b = dataset_b.images
+        data = np.vstack((imgs_a, imgs_b))
+        N = imgs_a.shape[0]
+        M = imgs_b.shape[0]
         labels = np.vstack([np.zeros([N, 1]), np.ones([M, 1])])
         errors = self.calculate_errors(data, labels)
         dp = 1 - ((M + N) / (2 * M * N)) * errors
