@@ -12,6 +12,7 @@ Tasks:
   lint    run static code analysis
   docs    generate documentation
   deps    generate list of shipped dependencies
+  lock    updates poetry.lock file
 EOF
 exit $1
 }
@@ -71,5 +72,7 @@ case $1 in
             ;;
     "deps") mkdir -p output
             poetry export --extras alibi-detect --without-hashes --format requirements.txt --output output/requirements.txt
+            ;;
+    "lock") poetry lock
             ;;
 esac
