@@ -16,11 +16,11 @@ from tensorflow.nn import relu
 
 from daml._internal.metrics.alibi_detect.base import (
     AlibiDetectOutlierType,
-    BaseAlibiDetectOD,
+    _AlibiDetectMetric,
 )
 
 
-class AlibiAE(BaseAlibiDetectOD):
+class AlibiAE(_AlibiDetectMetric):
     """
     Autoencoder-based outlier detector, using `alibi-detect ae. <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/ae.html>`_
     """  # noqa E501

@@ -11,7 +11,10 @@ class TestDpDivergence:
         [
             (
                 HP_MST,
-                DivergenceOutput(dpdivergence=0.8377897755491117, error=81.0),
+                DivergenceOutput(
+                    dpdivergence=0.8377897755491117,
+                    error=81.0,
+                ),
             ),
             (
                 HP_FNN,
@@ -41,4 +44,36 @@ class TestDpDivergence:
         dataset_a = DamlDataset(even)
         dataset_b = DamlDataset(odd)
         result = metric.evaluate(dataset_a=dataset_a, dataset_b=dataset_b)
+        assert result == output
+
+
+class TestEncodedDpDivergence:
+    @pytest.mark.parametrize(
+        "input, output",
+        [
+            (
+                HP_MST,
+                DivergenceOutput(
+                    dpdivergence=0.96875,
+                    error=1,
+                ),
+            ),
+            (
+                HP_FNN,
+                DivergenceOutput(
+                    dpdivergence=1.0,
+                    error=0.0,
+                ),
+            ),
+        ],
+    )
+    def test_dpd_with_autoencoder(self, input, output):
+        # Initialize a dataset of 32 images of size 32x32x3, containing all 1's
+        dataset_a = DamlDataset(np.ones(shape=(32, 32)) + np.identity(32))
+        dataset_b = DamlDataset(13 * np.ones(shape=(32, 32)) + np.identity(32))
+
+        # Initialize the autoencoder-based outlier detector from alibi-detect
+        metric = input(encode=True)
+        metric.fit_dataset(dataset_a, epochs=10)
+        result = metric.evaluate(dataset_a, dataset_b)
         assert result == output
