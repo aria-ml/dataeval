@@ -6,10 +6,10 @@ import tensorflow as tf
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense, InputLayer
 
-from daml._internal.metrics.alibi_detect.base import BaseAlibiDetectOD
+from daml._internal.metrics.alibi_detect.base import _AlibiDetectMetric
 
 
-class AlibiVAEGMM(BaseAlibiDetectOD):
+class AlibiVAEGMM(_AlibiDetectMetric):
     """
     Variational Gaussian Mixture Model Autoencoder-based outlier detector,
     using `alibi-detect vaegmm. <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/vaegmm.html>`_
