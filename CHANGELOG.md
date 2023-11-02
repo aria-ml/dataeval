@@ -1,6 +1,8 @@
-[//]: # (57569af543344f631beecd1116e9730036f4fe2f)
+[//]: # (c39e009e9b566cd09d167d393db632b34371daaa)
 
 # DAML Change Log
+## v0.28.4
+- ```c39e009e - Fix typecheck issues found with pyright-1.1.333```
 ## v0.28.3
 - ```57569af5 - Write JATIC interop test cases```
 - ```5bd3c2f5 - Build and tag docker images of daml-cache by branch name```
