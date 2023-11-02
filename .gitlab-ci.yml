@@ -101,6 +101,7 @@ build:
   image: docker:20.10-git
   script:
     - ./build --build-only
+  retry: 2
 
 .test:
   stage: test

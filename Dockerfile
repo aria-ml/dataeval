@@ -6,14 +6,13 @@ ARG versions="3.8 3.9 3.10 3.11"
 ARG python_version="3.11"
 
 # Install pyenv and the supported python versions
-FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04 as pyenv
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 as pyenv
 USER root
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update \
- && apt-get install -y --no-install-recommends \
-    curl gnupg2 git git-lfs wget nodejs parallel libgl1 graphviz pandoc
+    apt-get update && apt-get install -y --no-install-recommends \
+        curl gnupg2 git git-lfs wget nodejs parallel libgl1 graphviz pandoc
 
 # Set the local timezone
 ENV DEBIAN_FRONTEND noninteractive
@@ -23,10 +22,9 @@ RUN tz=`(wget -qO - http://geoip.ubuntu.com/lookup | sed -n -e 's/.*<TimeZone>\(
 # Install python compiler dependencies
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update \
- && apt-get install -y --no-install-recommends \
-    build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev llvm \
-    libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
+    apt-get update && apt-get install -y --no-install-recommends \
+        build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev llvm \
+        libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
 
 RUN addgroup --gid 1000 daml
 RUN adduser  --gid 1000 --uid 1000 --disabled-password daml
@@ -44,18 +42,21 @@ ENV versions=${versions}
 RUN --mount=type=cache,target=${PYENV_ROOT}/cache,sharing=locked,uid=1000,gid=1000 pyenv install ${versions}
 RUN echo ${versions} | xargs -n1 sh -c 'pyenv virtualenv $0 daml-$0'
 
+# Uncomment to clear cache in mounted cache folder
+# ARG CACHE
+# RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 rm -rf ${CACHE}/*
+
 # Install poetry
 FROM pyenv as poetry
 ARG CACHE
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    echo ${versions} | xargs -n1 -P 0 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/pip install poetry | sed -u -e "s/^/$0: /"'
+    echo ${versions} | xargs -n1 -P0 bash -c '${PYENV_ROOT}/versions/daml-$0/bin/pip install poetry | sed -u -e "s/^/$0: /" && exit $PIPESTATUS'
 
 # Install daml dependencies
 FROM poetry as base
-COPY --chown=daml:daml README.md      ./
+RUN touch README.md
 COPY --chown=daml:daml pyproject.toml ./
 COPY --chown=daml:daml poetry.lock    ./
-
 ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
 ENV POETRY_VIRTUALENVS_CREATE=false
 ENV POETRY_INSTALLER_MAX_WORKERS=10
@@ -66,7 +67,7 @@ ENV PYRIGHT_PYTHON_CACHE_DIR=${HOME}/.pyright
 ENV PYRIGHT_PYTHON_ENV_DIR=${HOME}/.pyright/nodeenv
 ARG CACHE
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    echo ${versions} | xargs -n1 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --no-root --with dev --all-extras | sed -u -e "s/^/$0: /"'
+    echo ${versions} | xargs -n1 -P0 bash -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --no-root --with dev --all-extras | sed -u -e "s/^/$0: /" && exit $PIPESTATUS'
 RUN ${PYENV_ROOT}/versions/daml-3.11/bin/pyright --version
 ENV TF_GPU_ALLOCATOR cuda_malloc_async
 ENV POETRY_HTTP_BASIC_JATIC_USERNAME=gitlab-ci-token
@@ -79,7 +80,7 @@ RUN usermod -a -G docker daml
 USER daml
 ARG CACHE
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    echo ${versions} | xargs -n1 -P0 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --no-root --with docs --all-extras | sed -u -e "s/^/$0: /"'
+    echo ${versions} | xargs -n1 -P0 bash -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --no-root --with docs --all-extras | sed -u -e "s/^/$0: /" && exit $PIPESTATUS'
 ENV LANGUAGE=en
 ENV LC_ALL=C.UTF-8
 ENV LANG=en_US.UTF-8
@@ -90,7 +91,7 @@ FROM base as daml_installed
 COPY --chown=daml:daml src/ src/
 ARG CACHE
 RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    echo ${versions} | xargs -n1 sh -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --only-root --all-extras | sed -u -e "s/^/$0: /"'
+    echo ${versions} | xargs -n1 -P0 bash -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --only-root --all-extras | sed -u -e "s/^/$0: /" && exit $PIPESTATUS'
 
 
 # Set the python version for subsequent targets
