@@ -11,11 +11,11 @@ from alibi_detect.models.tensorflow import PixelCNN
 
 from daml._internal.metrics.alibi_detect.base import (
     AlibiDetectOutlierType,
-    BaseAlibiDetectOD,
+    _AlibiDetectMetric,
 )
 
 
-class AlibiLLR(BaseAlibiDetectOD):
+class AlibiLLR(_AlibiDetectMetric):
     """
     Log likelihood Ratio (LLR) outlier detector,
     using `alibi-detect llr. <https://docs.seldon.io/projects/alibi-detect/en/latest/examples/od_llr_mnist.html>`_

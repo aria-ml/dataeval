@@ -16,11 +16,11 @@ from tensorflow.nn import relu
 
 from daml._internal.metrics.alibi_detect.base import (
     AlibiDetectOutlierType,
-    BaseAlibiDetectOD,
+    _AlibiDetectMetric,
 )
 
 
-class AlibiVAE(BaseAlibiDetectOD):
+class AlibiVAE(_AlibiDetectMetric):
     """
     Variational Autoencoder-based outlier detector,
     using `alibi-detect vae. <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/vae.html>`_

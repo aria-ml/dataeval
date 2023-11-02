@@ -4,29 +4,27 @@ using the First Nearest Neighbor and Minimum Spanning Tree algorithms
 """
 
 from abc import ABC, abstractmethod
-from typing import Literal
 
 import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import minimum_spanning_tree
 from scipy.spatial.distance import pdist, squareform
-from sklearn.neighbors import NearestNeighbors
 
 from daml._internal.datasets.datasets import DamlDataset
-from daml._internal.metrics.base import Metric
+from daml._internal.metrics.aria.base import _AriaMetric
 from daml._internal.metrics.outputs import DivergenceOutput
 
 
-class _DpDivergence(Metric, ABC):
+class _DpDivergence(_AriaMetric, ABC):
     """
     For more information about this divergence, its formal definition,
     and its associated estimators
     see https://arxiv.org/abs/1412.6534.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, encode: bool = False) -> None:
         """Constructor method"""
-        super().__init__()
+        super().__init__(encode)
 
     @abstractmethod
     def calculate_errors(self, data: np.ndarray, labels: np.ndarray) -> int:
@@ -43,7 +41,7 @@ class _DpDivergence(Metric, ABC):
 
         Parameters
         ----------
-        dataset_a, dataset_b : np.ndarray
+        dataset_a, dataset_b : DamlDataset
             Datasets to calculate the divergence between
 
         Returns
@@ -55,8 +53,21 @@ class _DpDivergence(Metric, ABC):
         ----
         A and B must be 2 dimensions, and equivalent in size on the second dimension
         """
-        imgs_a = dataset_a.images
-        imgs_b = dataset_b.images
+        # If self.encode == True, pass dataset_a and dataset_b through an autoencoder
+        # before evaluating dp divergence
+
+        imgs_a: np.ndarray = dataset_a.images
+        imgs_b: np.ndarray = dataset_b.images
+
+        if self.encode:
+            if not self.is_trained or self.autoencoder is None:
+                raise TypeError(
+                    "Tried to encode data without fitting a model.\
+                    Try calling Metric.fit_dataset(dataset) first."
+                )
+            imgs_a = self.autoencoder.encoder.predict(imgs_a)
+            imgs_b = self.autoencoder.encoder.predict(imgs_b)
+
         data = np.vstack((imgs_a, imgs_b))
         N = imgs_a.shape[0]
         M = imgs_b.shape[0]
@@ -119,45 +130,6 @@ class DpDivergenceFNN(_DpDivergence):
     """
     A first nearest neighbor implementation of dp divergence
     """
-
-    def _compute_neighbors(
-        self,
-        A: np.ndarray,
-        B: np.ndarray,
-        k: int = 1,
-        algorithm: Literal["auto", "ball_tree", "kd_tree"] = "auto",
-    ) -> np.ndarray:
-        """
-        For each sample in A, compute the nearest neighbor in B
-
-        Parameters
-        ----------
-        A, B : np.ndarray
-            The n_samples and n_features respectively
-        k : int, default 1
-            The number of neighbors to find
-        algorithm : Literal, default auto
-            Tree method for nearest neighbor (auto, ball_tree or kd_tree)
-
-        Note
-        ----
-        Do not use kd_tree if n_features > 20
-
-        Returns
-        -------
-        np.ndarray
-            Closest point in B to each point in A
-
-        See Also
-        --------
-        sklearn.neighbors.NearestNeighbors
-        """
-
-        nbrs = NearestNeighbors(n_neighbors=k + 1, algorithm=algorithm).fit(B)
-        nns = nbrs.kneighbors(A)[1]
-        nns = nns[:, 1]
-
-        return nns
 
     def calculate_errors(self, data: np.ndarray, labels: np.ndarray) -> int:
         """
