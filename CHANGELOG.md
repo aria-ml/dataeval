@@ -1,6 +1,8 @@
-[//]: # (c39e009e9b566cd09d167d393db632b34371daaa)
+[//]: # (9d1c354c06f22ff1cbf0930c7928feb9658ccf3b)
 
 # DAML Change Log
+## v0.28.5
+- ```9d1c354c - Add fit_dataset, format_dataset to DpDivergence & BER```
 ## v0.28.4
 - ```c39e009e - Fix typecheck issues found with pyright-1.1.333```
 ## v0.28.3
