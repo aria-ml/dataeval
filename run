@@ -44,7 +44,7 @@ if [[ -z "${POETRY_HTTP_BASIC_JATIC_PASSWORD}" ]]; then
     export POETRY_HTTP_BASIC_JATIC_PASSWORD=$token
 fi
 
-declare -A supported_tasks=([unit]=1 [func]=1 [type]=1 [lint]=1 [docs]=1 [deps]=1)
+declare -A supported_tasks=([unit]=1 [func]=1 [type]=1 [lint]=1 [docs]=1 [deps]=1 [lock]=1)
 
 # validate args
 if (( $# != 1 )); then echo Too many parameters; showHelp 1; fi
