@@ -4,63 +4,23 @@ FR Test Statistic based estimate and the
 FNN based estimate for the Bayes Error Rate
 """
 from abc import ABC, abstractmethod
-from typing import Literal, Tuple
+from typing import Tuple
 
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 from scipy.sparse.csgraph import minimum_spanning_tree
 from scipy.spatial.distance import pdist, squareform
-from sklearn.neighbors import NearestNeighbors
 
 from daml._internal.datasets.datasets import DamlDataset
-from daml._internal.metrics.base import Metric
+from daml._internal.metrics.aria.base import _AriaMetric
 from daml._internal.metrics.outputs import BEROutput
 
 
-class _MultiClassBer(Metric, ABC):
-    def __init__(self) -> None:
+class _MultiClassBer(_AriaMetric, ABC):
+    def __init__(self, encode: bool = False) -> None:
         """Constructor method"""
 
-        super().__init__()
-
-    def _compute_neighbors(
-        self,
-        A: np.ndarray,
-        B: np.ndarray,
-        k: int = 1,
-        algorithm: Literal["auto", "ball_tree", "kd_tree"] = "auto",
-    ) -> np.ndarray:
-        """
-        For each sample in A, compute the nearest neighbor in B
-
-        Parameters
-        ----------
-        A, B : np.ndarray
-            The n_samples and n_features respectively
-        k : int
-            The number of neighbors to find
-        algorithm : Literal
-            Tree method for nearest neighbor (auto, ball_tree or kd_tree)
-
-        Note
-        ----
-            Do not use kd_tree if n_features > 20
-
-        Returns
-        -------
-        List:
-            Closest points to each point in A and B
-
-        See Also
-        --------
-        :func:`sklearn.neighbors.NearestNeighbors`
-        """
-
-        nbrs = NearestNeighbors(n_neighbors=k + 1, algorithm=algorithm).fit(B)
-        nns = nbrs.kneighbors(A)[1]
-        nns = nns[:, 1]
-
-        return nns
+        super().__init__(encode)
 
     @abstractmethod
     def _multiclass_ber(
@@ -69,6 +29,16 @@ class _MultiClassBer(Metric, ABC):
         y: np.ndarray,
     ) -> Tuple[float, float]:
         raise NotImplementedError
+
+    def _get_classes_counts(self, labels: np.ndarray) -> Tuple[int, np.intp]:
+        classes, counts = np.unique(labels, return_counts=True)
+        M = len(classes)
+        if M < 2:
+            raise ValueError("Label vector contains less than 2 classes!")
+        if M > 10:
+            raise ValueError("Label vector contains more than 10 classes!")
+        N = np.sum(counts)
+        return M, N
 
     def evaluate(self, dataset: DamlDataset) -> BEROutput:
         """
@@ -83,11 +53,31 @@ class _MultiClassBer(Metric, ABC):
 
         Returns
         -------
-        Dict[str, float]
-            "ber": Estimate of the Bayes Error Rate
+        BEROutput
+            The estimated upper and lower bounds of the Bayes Error Rate
+
+        Raises
+        ------
+        ValueError
+            If unique classes M < 2 or M > 10
+
+        See Also
+        --------
+        https://gitlab.jatic.net/jatic/aria/daml/-/issues/83
         """
-        X = dataset.images
-        y = dataset.labels
+        X: np.ndarray = dataset.images
+        y: np.ndarray = dataset.labels
+
+        # If self.encode == True, pass X through an autoencoder before evaluating BER
+        if self.encode:
+            if not self.is_trained or self.autoencoder is None:
+                raise TypeError(
+                    "Tried to encode data without fitting a model.\
+                    Try calling Metric.fit_dataset(dataset) first."
+                )
+            else:
+                X = self.autoencoder.encoder.predict(X)
+
         ber, ber_lower = self._multiclass_ber(X, y)
         return BEROutput(ber=ber, ber_lower=ber_lower)
 
@@ -126,13 +116,8 @@ class MultiClassBerMST(_MultiClassBer):
         ValueError
             If unique classes M < 2 or M > 10
         """
-        classes, counts = np.unique(y, return_counts=True)
-        M = len(classes)
-        N = np.sum(counts)
-        if M < 2:
-            raise ValueError("Label vector contains less than 2 classes!")
-        if M > 10:
-            raise ValueError("Label vector contains more than 10 classes!")
+        M, N = self._get_classes_counts(y)
+
         # All features belong on second dimension
         X = X.reshape((X.shape[0], -1))
         # We add a small constant to the distance matrix to ensure scipy interprets
@@ -179,13 +164,8 @@ class MultiClassBerFNN(_MultiClassBer):
         X: np.ndarray,
         y: np.ndarray,
     ) -> Tuple[float, float]:
-        classes, counts = np.unique(y, return_counts=True)
-        M = len(classes)
-        N = np.sum(counts)
-        if M < 2:
-            raise ValueError("Label vector contains less than 2 classes!")
-        if M > 10:
-            raise ValueError("Label vector contains more than 10 classes!")
+        M, N = self._get_classes_counts(y)
+
         # All features belong on second dimension
         X = X.reshape((X.shape[0], -1))
         nn_indices = self._compute_neighbors(X, X)

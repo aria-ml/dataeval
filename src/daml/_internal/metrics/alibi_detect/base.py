@@ -23,7 +23,7 @@ class AlibiDetectOutlierType(str, Enum):
         return str.__str__(self)  # pragma: no cover
 
 
-class BaseAlibiDetectOD(Metric, ABC):
+class _AlibiDetectMetric(Metric, ABC):
     """
     Base class for all outlier detection metrics in alibi-detect
 
