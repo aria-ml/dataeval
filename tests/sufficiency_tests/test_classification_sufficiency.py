@@ -176,8 +176,10 @@ class TestSufficiency:
         assert np.all(accuracy <= 1)
 
         # Geomshape tests
-        geomshape = output["geomshape"]
-        geomshape_answer = (int(0.01 * len(self.train_ds)), len(self.train_ds), 20)
+        geomshape = np.array(output["geomshape"])
+        geomshape_answer = np.array(
+            [int(0.01 * len(self.train_ds)), len(self.train_ds), 20]
+        )
         npt.assert_array_equal(geomshape, geomshape_answer)
 
         # n_i tests
