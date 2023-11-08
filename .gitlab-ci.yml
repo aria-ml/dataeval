@@ -62,13 +62,13 @@ before_script:
 clean:
   stage: prepare
   script:
-    - branch_name=$(git log -n 1 --format=%s | grep "^Merge branch" | cut -d"'" -f2) || echo "Unable to get merge branch name from commit log."
-    - if [[ -z $branch_name ]]; then exit 0; fi
+    - branch_name=$(echo $CI_COMMIT_TITLE | cut -d"'" -f2) || echo "Unable to get merge branch name from commit log."
+    - if [[ -z $branch_name || "$branch_name" == "$CI_COMMIT_TITLE" ]]; then echo "No branch found to clean."; exit 0; fi
     - docker rmi --force daml-cache:${branch_name::120}
   rules:
     - if: $DAML_NIGHTLY
       when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_TITLE =~ /^Merge branch/
   allow_failure: true
 
 build:
