@@ -16,8 +16,7 @@ default:
     - aria
 
 stages:
-  - info
-  - prune
+  - prepare
   - test
   - release
 
@@ -45,7 +44,7 @@ stages:
         - src/**/*
         - pyproject.toml
 
-image: python:$PYTHON_LATEST_SUPPORTED_VERSION
+image: docker:20.10-git
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
@@ -61,8 +60,7 @@ before_script:
   - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
 
 clean:
-  stage: info
-  image: docker:20.10-git
+  stage: prepare
   script:
     - branch_name=$(git log -n 1 --format=%s | grep "^Merge branch" | cut -d"'" -f2) || echo "Unable to get merge branch name from commit log."
     - if [[ -z $branch_name ]]; then exit 0; fi
@@ -73,59 +71,42 @@ clean:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   allow_failure: true
 
-info:
-  stage: info
-  image: docker:20.10-git
-  needs:
-    - job: clean
-      optional: true
-  parallel:
-    matrix:
-      - TAG: ["aria", "GPU1", "GPU2"]
-  tags:
-    - ${TAG}
+build:
   script:
     - docker version
     - docker info
-    - docker system df
     - docker container ls --all --format '{{.Names}} - {{.Image}} => {{.Size}}'
     - docker image ls --all
     - docker volume ls --format '{{.Name}} -> {{.Size}}'
-    - docker inspect $(docker image ls -aq)  --format '{{.RepoTags}} => {{ .GraphDriver.Data.MergedDir}}'
+    - docker inspect $(docker image ls -aq)  --format '{{.RepoTags}} => {{.GraphDriver.Data.MergedDir}}'
     - for i in $(docker container ls --all --format '{{.Names}}'); do ./log_size $i; done
-  allow_failure: true
-
-# Clear unused docker data on nightly basis
-prune:
-  extends: .on_nightly
-  stage: prune
-  image: docker:20.10-git
-  parallel:
-    matrix:
-      - TAG: ["aria", "GPU1", "GPU2"]
-  tags:
-    - ${TAG}
-  script:
-    - docker system df --verbose
-    - docker builder prune --force --keep-storage 50GB
-    - docker image prune --force
-    - docker volume prune --force
-    - docker system df
-  allow_failure: true
-
-build:
-  image: docker:20.10-git
-  script:
     - ./build --build-only
     - docker system prune --force
+    - docker system df --verbose
+    - docker system df
   retry: 2
+
+generate shipped dependencies:
+  image: python:$PYTHON_LATEST_SUPPORTED_VERSION
+  before_script:
+    - pip install poetry
+  script:
+    - ./run deps
+  artifacts:
+    paths:
+      - output/requirements.txt
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+
+linting:
+  extends: .on_default
+  needs: [build]
+  script:
+    - ./build lint
 
 .test:
   stage: test
-  image: docker:20.10-git
-  needs:
-    - job: build
-      optional: true
+  needs: [build]
   parallel:
     matrix:
       - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
@@ -155,6 +136,7 @@ functional:
 
 coverage:
   stage: test
+  image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   needs:
     - job: test
       optional: true
@@ -181,47 +163,19 @@ coverage:
       - coverage.xml
       - htmlcov/
 
-linting:
-  extends: .on_default
-  image: docker:20.10-git
-  needs:
-    - job: build
-      optional: true
-  script:
-    - ./build lint
-
 typecheck:
   extends: .on_default
-  image: docker:20.10-git
-  needs:
-    - job: build
-      optional: true
+  needs: [build]
   parallel:
     matrix:
       - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
   script:
     - ./build ${PYTHON_VERSIONS} type
 
-generate shipped dependencies:
-  image: docker:20.10-git
-  needs:
-    - job: build
-      optional: true
-  script:
-    - ./build deps
-  artifacts:
-    paths:
-      - output/requirements.txt
-  rules:
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-
 sphinx:
   extends: .on_nightly
   stage: test
-  image: docker:20.10-git
-  needs:
-    - job: build
-      optional: true
+  needs: [build]
   #  tags: [GPU]
   script:
     - ./build docs # --gpu
@@ -246,14 +200,15 @@ pages:
 
 tag:
   extends: .on_release
+  before_script:
+    - apk add --no-cache curl perl bash
   script:
     - ./.gitlab/auto_tag.sh
 
 publish:
   extends: .on_release
-  needs:
-    - tag
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
+  needs: [tag]
   script:
     - pip install build twine --upgrade
     - twine --version
@@ -262,8 +217,8 @@ publish:
 
 changelog:
   extends: .on_release
-  needs:
-    - publish
+  image: python:$PYTHON_LATEST_SUPPORTED_VERSION
+  needs: [publish]
   script:
     - pip install requests
     - python .gitlab/update_changelog.py
