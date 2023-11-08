@@ -6,10 +6,11 @@ Usage:
   build [options] <tasks(s)> <python version(s)>
 
 Options:
-  -h, --help       display this help information
-  -v, --verbose    print output to console during container execution
-      --gpu        enable gpu support on task execution
-      --no-cache   runs docker build without using the cache
+  -b, --build-only  only build base and supporting dependency images
+  -h, --help        display this help information
+  -v, --verbose     print output to console during container execution
+      --gpu         enable gpu support on task execution
+      --no-cache    runs docker build without using the cache
 
 Default:
   run unit and type tests for 3.8-3.11 as well as lint and docs
@@ -57,15 +58,15 @@ declare -A supported_tasks=([unit]=1 [func]=1 [type]=1)
 declare -A supported_other=([lint]=1 [docs]=1 [deps]=1)
 
 # generate python and task lists
-declare -a pvers; declare -a tasks;
+declare -A pvers; declare -A tasks;
 count=0; c_pvers=0; c_tasks=0; c_other=0;
 
 # validate args
 for arg do
     if [[ $arg == -* ]]; then continue; fi
-    if [[ ${supported_pvers["$arg"]} ]]; then pvers+=($arg); ((++c_pvers)); fi
-    if [[ ${supported_tasks["$arg"]} ]]; then tasks+=($arg); ((++c_tasks)); fi
-    if [[ ${supported_other["$arg"]} ]]; then tasks+=($arg); ((++c_other)); fi
+    if [[ ${supported_pvers["$arg"]} ]]; then pvers[$arg]=1; ((++c_pvers)); fi
+    if [[ ${supported_tasks["$arg"]} ]]; then tasks[$arg]=1; ((++c_tasks)); fi
+    if [[ ${supported_other["$arg"]} ]]; then tasks[$arg]=1; ((++c_other)); fi
     ((++count))
 done
 
@@ -73,18 +74,19 @@ done
 if [[ $((c_pvers + c_tasks + c_other)) != $count ]]; then showHelp 1; fi
 
 # set defaults if not specified
-if [[ $count == 0 || ($c_pvers == 0 && $c_tasks != 0) ]]; then pvers=("3.8" "3.9" "3.10" "3.11"); fi
-if [[ $count == 0 || ($c_tasks == 0 && $c_pvers != 0) ]]; then tasks+=("unit" "type"); fi
-if [[ $count == 0 ]]; then tasks+=("lint"); fi
+if [[ $count == 0 || ($c_pvers == 0 && $c_tasks != 0) ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
+if [[ $count == 0 || ($c_tasks == 0 && $c_pvers != 0) ]]; then tasks[unit]=1; tasks[type]=1; fi
+if [[ $count == 0 ]]; then tasks[lint]=1; fi
 
 # generate "task-pver" jobs
 declare -A jobs;
-for task in "${tasks[@]}"; do
+for task in "${!tasks[@]}"; do
     case "$task" in
-        lint|docs|deps) jobs["$task-3.11"]=1;;
-        *) for pver in "${pvers[@]}"; do jobs["$task-$pver"]=1; done;;
+        lint|docs|deps) needs_311="true"; jobs["$task-3.11"]=1;;
+        *) for pver in "${!pvers[@]}"; do jobs["$task-$pver"]=1; done;;
     esac
 done
+if [[ -n $needs_311 ]]; then pvers[3.11]=1; fi
 
 function post_build_cleanup() {
     temp=$1
@@ -184,6 +186,7 @@ if [[ -z "${CI_JOB_TOKEN}${POETRY_HTTP_BASIC_JATIC_PASSWORD}" ]]; then
 fi
 
 # execute jobs
+echo "Running ${!jobs[@]}..."
 case ${#jobs[@]} in
     0)  showHelp 1;;
     1)  export verbose=1; docker_build ${!jobs[@]};;
