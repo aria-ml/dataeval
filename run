@@ -18,6 +18,19 @@ exit $1
 }
 
 function installJATIC() {
+    [ ! -s ~/.jatic_token ] || export POETRY_HTTP_BASIC_JATIC_PASSWORD=$(<~/.jatic_token)
+    if [[ -z "${POETRY_HTTP_BASIC_JATIC_PASSWORD}" ]]; then
+        echo
+        echo "Please provide your JATIC Gitlab personal access token:"
+        read -p "JATIC_TOKEN=" token
+        echo $token > ~/.jatic_token
+        chmod 600 ~/.jatic_token
+        echo
+        echo "Token saved in ~/.jatic_token"
+        echo
+        export POETRY_HTTP_BASIC_JATIC_PASSWORD=$token
+    fi
+
     if [[ -z "${POETRY_HTTP_BASIC_JATIC_PASSWORD}" ]]; then
         echo "When running locally, ensure .jatic_token contains your JATIC Gitlab Personal Access Token with access to the Packages API."
         exit 1
@@ -29,19 +42,6 @@ function installJATIC() {
 if [ ! -f /.dockerenv ]; then
     echo "Docker container not found. Check to see if you are running in a container."
     exit 1
-fi
-
-[ ! -s ~/.jatic_token ] || export POETRY_HTTP_BASIC_JATIC_PASSWORD=$(<~/.jatic_token)
-if [[ -z "${POETRY_HTTP_BASIC_JATIC_PASSWORD}" ]]; then
-    echo
-    echo "Please provide your JATIC Gitlab personal access token:"
-    read -p "JATIC_TOKEN=" token
-    echo $token > ~/.jatic_token
-    chmod 600 ~/.jatic_token
-    echo
-    echo "Token saved in ~/.jatic_token"
-    echo
-    export POETRY_HTTP_BASIC_JATIC_PASSWORD=$token
 fi
 
 declare -A supported_tasks=([unit]=1 [func]=1 [type]=1 [lint]=1 [docs]=1 [deps]=1 [lock]=1)
