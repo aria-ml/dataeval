@@ -72,6 +72,7 @@ clean:
   allow_failure: true
 
 build:
+  stage: prepare
   script:
     - docker version
     - docker info
@@ -88,6 +89,7 @@ build:
 
 generate shipped dependencies:
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
+  needs: []
   before_script:
     - pip install poetry
   script:
