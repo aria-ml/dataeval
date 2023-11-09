@@ -103,7 +103,7 @@ function post_build_cleanup() {
     fi
 }
 
-function docker_build() {
+function docker_run() {
     temp=$(mktemp)
     IFS=- read -r task pver <<< $1
     tag="daml-$task-$pver"
@@ -114,7 +114,7 @@ function docker_build() {
 
     trap "post_build_cleanup $temp $tag" EXIT
 
-    docker_build_cmd="docker build --cache-from $cache_tag --progress plain --build-arg python_version=$pver --tag $tag --target $task ."
+    docker_build_cmd="docker build $verbosity --build-arg python_version=$pver --cache-from daml-build:$branch_name-base --cache-from daml-build:$branch_name-py$pver --tag $tag --target $task ."
     docker_run_args="--name $tag $gpuflag $tag"
     docker_run_envs="--env POETRY_HTTP_BASIC_JATIC_PASSWORD=${CI_JOB_TOKEN}${POETRY_HTTP_BASIC_JATIC_PASSWORD}"
 
@@ -142,33 +142,46 @@ function docker_build() {
     exit $exitcode
 }
 
+# pass in target, tag, extra_args
+function docker_build() {
+    echo "Building $2 image..."
+    docker build --build-arg BUILDKIT_INLINE_CACHE=1 ${@:3} $verbosity --tag $2 --target $1 .
+    echo "Finished building $2."
+}
+
 export DOCKER_BUILDKIT=1
 export -f post_build_cleanup
-export -f docker_build
+export -f docker_run
 
-cache_tag="daml-cache"
 if [[ $CI ]]; then
     # Gitlab does not populate CI_COMMIT_BRANCH in merge requests and vice versa for CI_MERGE_REQUEST_SOURCE_BRANCH_NAME
     branch_name=${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}${CI_COMMIT_BRANCH}
-    cache_tag="daml-cache:${branch_name::120}"
+else
+    branch_name=$(git branch --show-current)
 fi
-export cache_tag
+branch_name=${branch_name::120}
+export branch_name
 
-if [[ -z $cache_arg ]]; then
-    cache_arg="--cache-from ${cache_tag}"
-    if [[ $CI && ($branch_name != $CI_DEFAULT_BRANCH) ]]; then
-        cache_arg="--cache-from daml-cache:main ${cache_arg}"
-    fi
+if [[ -z $verbose ]]; then
+    verbosity="--quiet"
+else
+    verbosity="--progress=plain"
 fi
-
-echo "================== building cache image =================="
-docker build --build-arg BUILDKIT_INLINE_CACHE=1 --pull $cache_arg --progress plain --tag $cache_tag .
-echo "--------------------------"
-echo "build complete"
-echo "=========================================================="
+export verbosity
 
 if [[ -n $build_only ]]; then
-    echo "build-only option selected, done."
+    (
+        trap 'kill 0' SIGINT
+        docker_build base daml-build:$branch_name-base &
+        for py in ${!pvers[@]}; do
+            docker_build pydeps daml-build:$branch_name-py$py --build-arg python_version=$py &
+        done
+        wait
+    )
+    if [[ -z $CI ]]; then
+        docker_build devcontainer daml-devcontainer --cache-from daml-build:$branch_name-base --cache-from daml-build:$branch_name-py3.8 --cache-from daml-build:$branch_name-py3.9 --cache-from daml-build:$branch_name-py3.10 --cache-from daml-build:$branch_name-py3.11
+        docker image prune -f
+    fi
     exit 0
 fi
 
@@ -189,6 +202,6 @@ fi
 echo "Running ${!jobs[@]}..."
 case ${#jobs[@]} in
     0)  showHelp 1;;
-    1)  export verbose=1; docker_build ${!jobs[@]};;
-    *)  LANG=C parallel --lb --tag docker_build ::: ${!jobs[@]};;
+    1)  export verbose=1; docker_run ${!jobs[@]};;
+    *)  LANG=C parallel --lb --tag docker_run ::: ${!jobs[@]};;
 esac
