@@ -1,104 +1,121 @@
 ARG USER="daml"
 ARG HOME="/home/$USER"
 ARG PYENV_ROOT="$HOME/.pyenv"
-ARG CACHE="$HOME/.cache"
-ARG versions="3.8 3.9 3.10 3.11"
 ARG python_version="3.11"
 
-# Install pyenv and the supported python versions
 FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 as pyenv
-USER root
-
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends \
-        curl gnupg2 git git-lfs wget nodejs parallel libgl1 graphviz pandoc
-
-# Set the local timezone
 ENV DEBIAN_FRONTEND noninteractive
-RUN tz=`(wget -qO - http://geoip.ubuntu.com/lookup | sed -n -e 's/.*<TimeZone>\(.*\)<\/TimeZone>.*/\1/p')` \
- && ln -fs /usr/share/zoneinfo/$tz /etc/localtime
-
-# Install python compiler dependencies
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
-        build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev llvm \
-        libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
-
-RUN addgroup --gid 1000 daml
-RUN adduser  --gid 1000 --uid 1000 --disabled-password daml
+    build-essential \
+    ca-certificates \
+    curl \
+    git \
+    libbz2-dev \
+    libffi-dev \
+    liblzma-dev \
+    libncursesw5-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libssl-dev \
+    libxml2-dev \
+    libxmlsec1-dev \
+    llvm \
+    tk-dev \
+    wget \
+    xz-utils \
+    zlib1g-dev
+RUN useradd -m -u 1000 daml
 USER daml
-WORKDIR /daml
-
-ARG PYENV_ROOT
-ENV PYENV_ROOT=${PYENV_ROOT}
+WORKDIR /home/daml
 RUN curl https://pyenv.run | bash
-RUN echo 'eval "$(pyenv init -)"' >> ~/.bashrc
-ENV PATH=${PYENV_ROOT}/bin:${PATH}
-ENV PATH=${PYENV_ROOT}/shims:${PATH}
-ARG versions
-ENV versions=${versions}
-RUN --mount=type=cache,target=${PYENV_ROOT}/cache,sharing=locked,uid=1000,gid=1000 pyenv install ${versions}
-RUN echo ${versions} | xargs -n1 sh -c 'pyenv virtualenv $0 daml-$0'
-
-# Uncomment to clear cache in mounted cache folder
-# ARG CACHE
-# RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 rm -rf ${CACHE}/*
-
-# Install poetry
-FROM pyenv as poetry
-ARG CACHE
-RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    echo ${versions} | xargs -n1 -P0 bash -c '${PYENV_ROOT}/versions/daml-$0/bin/pip install poetry | sed -u -e "s/^/$0: /" && exit $PIPESTATUS'
-
-# Install daml dependencies
-FROM poetry as base
-RUN touch README.md
-COPY --chown=daml:daml pyproject.toml ./
-COPY --chown=daml:daml poetry.lock    ./
+# ENV PYTHON_CONFIGURE_OPTS '--enable-optimizations --with-lto'
+# ENV PYTHON_CFLAGS '-march=native -mtune=native'
 ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
 ENV POETRY_VIRTUALENVS_CREATE=false
 ENV POETRY_INSTALLER_MAX_WORKERS=10
-# Create pyright cache and env dirs in persistent folder
-ARG HOME
-RUN mkdir -p ${HOME}/.pyright
-ENV PYRIGHT_PYTHON_CACHE_DIR=${HOME}/.pyright
-ENV PYRIGHT_PYTHON_ENV_DIR=${HOME}/.pyright/nodeenv
-ARG CACHE
-RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    echo ${versions} | xargs -n1 -P0 bash -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --no-root --with dev --all-extras | sed -u -e "s/^/$0: /" && exit $PIPESTATUS'
-RUN ${PYENV_ROOT}/versions/daml-3.11/bin/pyright --version
-ENV TF_GPU_ALLOCATOR cuda_malloc_async
+RUN touch README.md
+COPY --chown=daml:daml pyproject.toml ./
+COPY --chown=daml:daml poetry.lock    ./
+ARG PYENV_ROOT
+RUN echo "\
+${PYENV_ROOT}/bin/pyenv install \$1 && \
+${PYENV_ROOT}/bin/pyenv virtualenv \$1 daml-\$1 && \
+${PYENV_ROOT}/versions/daml-\$1/bin/pip install --no-cache-dir --disable-pip-version-check poetry && \
+${PYENV_ROOT}/versions/daml-\$1/bin/poetry install --no-cache --no-root --with dev --all-extras && \
+rm -rf /tmp/* /home/daml/.cache/pypoetry \
+" > install.sh && chmod +x install.sh
+
+
+FROM pyenv as py3.8
+RUN ./install.sh 3.8
+FROM pyenv as py3.9
+RUN ./install.sh 3.9
+FROM pyenv as py3.10
+RUN ./install.sh 3.10
+FROM pyenv as py3.11
+RUN ./install.sh 3.11
+FROM py${python_version} as pydeps
+ARG python_version
+
+
+# Install pyenv and the supported python versions
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 as base
+USER root
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+    graphviz \
+    libgl1 \
+    pandoc
+RUN useradd -m -u 1000 -s /bin/bash daml
+USER daml
+WORKDIR /daml
+RUN touch README.md
+COPY --chown=daml:daml pyproject.toml ./
+COPY --chown=daml:daml poetry.lock    ./
+ARG PYENV_ROOT
+ENV PYENV_ROOT=${PYENV_ROOT}
+ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
+ENV POETRY_VIRTUALENVS_CREATE=false
+ENV POETRY_INSTALLER_MAX_WORKERS=10
+ENV TF_GPU_ALLOCATOR=cuda_malloc_async
 ENV POETRY_HTTP_BASIC_JATIC_USERNAME=gitlab-ci-token
 
 
 FROM base as devcontainer
 USER root
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    git-lfs \
+    gnupg2 \
+    openssh-server \
+    parallel
 RUN addgroup --gid 1001 docker
 RUN usermod -a -G docker daml
 USER daml
-ARG CACHE
-RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    echo ${versions} | xargs -n1 -P0 bash -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --no-root --with docs --all-extras | sed -u -e "s/^/$0: /" && exit $PIPESTATUS'
 ENV LANGUAGE=en
 ENV LC_ALL=C.UTF-8
 ENV LANG=en_US.UTF-8
+ENV PATH=${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:${PATH}
+COPY --from=py3.8  ${PYENV_ROOT}/ ${PYENV_ROOT}/
+COPY --from=py3.9  ${PYENV_ROOT}/ ${PYENV_ROOT}/
+COPY --from=py3.10 ${PYENV_ROOT}/ ${PYENV_ROOT}/
+COPY --from=py3.11 ${PYENV_ROOT}/ ${PYENV_ROOT}/
+RUN echo 'eval "$(pyenv init -)"' >> ~/.bashrc
 
 
-# Install daml
-FROM base as daml_installed
-COPY --chown=daml:daml src/ src/
-ARG CACHE
-RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    echo ${versions} | xargs -n1 -P0 bash -c '${PYENV_ROOT}/versions/daml-$0/bin/poetry install --only-root --all-extras | sed -u -e "s/^/$0: /" && exit $PIPESTATUS'
-
-
-# Set the python version for subsequent targets
-FROM daml_installed as versioned
+FROM base as versioned
+ARG PYENV_ROOT
 ARG python_version
 ENV PATH ${PYENV_ROOT}/versions/daml-${python_version}/bin:$PATH
 ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${PYENV_ROOT}/versions/daml-${python_version}/lib/python${python_version}/site-packages/nvidia/cudnn/lib
+COPY --from=pydeps ${PYENV_ROOT}/ ${PYENV_ROOT}/
+COPY --chown=daml:daml src/ src/
+RUN poetry install --no-cache --only-root --all-extras
 COPY --chown=daml:daml run ./
 
 
@@ -135,10 +152,7 @@ COPY --chown=daml:daml docs/ docs/
 
 # Build docs
 FROM docs_dir as docs
-ARG CACHE
-ARG python_version
-RUN --mount=type=cache,target=${CACHE},sharing=locked,uid=1000,gid=1000 \
-    ${PYENV_ROOT}/versions/daml-${python_version}/bin/poetry install --no-root --with docs --all-extras
+RUN poetry install --no-cache --no-root --with dev --with docs --all-extras
 ENV PYDEVD_DISABLE_FILE_VALIDATION 1
 CMD ./run docs
 
