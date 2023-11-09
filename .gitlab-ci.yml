@@ -231,6 +231,7 @@ include:
   - template: Security/Secret-Detection.gitlab-ci.yml
 
 secret_detection:
+  needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
@@ -256,5 +257,6 @@ gemnasium-python-dependency_scanning:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
 semgrep-sast:
+  needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
