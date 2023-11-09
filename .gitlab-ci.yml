@@ -64,7 +64,8 @@ clean:
   script:
     - branch_name=$(echo $CI_COMMIT_TITLE | cut -d"'" -f2) || echo "Unable to get merge branch name from commit log."
     - if [[ -z $branch_name ]]; then exit 0; fi
-    - docker images | grep '^daml-.*${branch_name::120}' | tr -s ' ' ':' | cut -d ':' -f 1-2 | xargs -n 1 docker rmi --force
+    - pattern="^daml-.*${branch_name::120}"
+    - docker images | grep $pattern | tr -s ' ' ':' | cut -d ':' -f 1-2 | xargs -n 1 docker rmi --force
   rules:
     - if: $DAML_NIGHTLY
       when: never
