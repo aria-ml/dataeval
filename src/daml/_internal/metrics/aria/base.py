@@ -1,3 +1,4 @@
+import math
 from typing import Literal, Optional
 
 import numpy as np
@@ -5,6 +6,7 @@ import tensorflow as tf
 from sklearn.neighbors import NearestNeighbors
 from tensorflow.keras import layers, losses
 from tensorflow.keras.models import Model
+from tensorflow.nn import relu
 
 from daml._internal.datasets.datasets import DamlDataset
 from daml._internal.metrics.base import Metric
@@ -108,20 +110,34 @@ class ARiAAutoencoder(Model):
     https://www.tensorflow.org/tutorials/generative/autoencoder
     """
 
-    def __init__(self, latent_dim, shape):
+    def __init__(self, encoding_dim, input_shape):
         super(ARiAAutoencoder, self).__init__()
-        self.latent_dim = latent_dim
-        self.shape = shape
+        self.encoding_dim = encoding_dim
+        self.shape = input_shape
         self.encoder = tf.keras.Sequential(
             [
+                layers.InputLayer(input_shape=self.shape),
+                layers.Conv2D(64, 4, strides=2, padding="same", activation=relu),
+                layers.Conv2D(128, 4, strides=2, padding="same", activation=relu),
+                layers.Conv2D(512, 4, strides=2, padding="same", activation=relu),
                 layers.Flatten(),
-                layers.Dense(latent_dim, activation="relu"),
+                layers.Dense(self.encoding_dim),
             ]
         )
         self.decoder = tf.keras.Sequential(
             [
-                layers.Dense(tf.math.reduce_prod(shape), activation="sigmoid"),
-                layers.Reshape(shape),
+                layers.InputLayer(input_shape=(self.encoding_dim,)),
+                layers.Dense(4 * 4 * 128),
+                layers.Reshape(target_shape=(4, 4, 128)),
+                layers.Conv2DTranspose(
+                    256, 4, strides=2, padding="same", activation=relu
+                ),
+                layers.Conv2DTranspose(
+                    64, 4, strides=2, padding="same", activation=relu
+                ),
+                layers.Flatten(),
+                layers.Dense(math.prod(self.shape)),
+                layers.Reshape(target_shape=self.shape),
             ]
         )
 
