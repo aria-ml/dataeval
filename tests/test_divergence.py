@@ -68,9 +68,10 @@ class TestEncodedDpDivergence:
         ],
     )
     def test_dpd_with_autoencoder(self, input, output):
-        # Initialize a dataset of 32 images of size 32x32x3, containing all 1's
-        dataset_a = DamlDataset(np.ones(shape=(32, 32)) + np.identity(32))
-        dataset_b = DamlDataset(13 * np.ones(shape=(32, 32)) + np.identity(32))
+        # Initialize two datasets of 32 images of size 32x32x3, containing all 1's
+        # and 13's...
+        dataset_a = DamlDataset(np.ones(shape=(32, 32, 32, 3)))
+        dataset_b = DamlDataset(13 * np.ones(shape=(32, 32, 32, 3)))
 
         # Initialize the autoencoder-based outlier detector from alibi-detect
         metric = input(encode=True)
