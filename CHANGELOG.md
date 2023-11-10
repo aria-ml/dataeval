@@ -1,6 +1,14 @@
-[//]: # (9d1c354c06f22ff1cbf0930c7928feb9658ccf3b)
+[//]: # (5c4e6e06d24044def358338662d3e02101170a55)
 
 # DAML Change Log
+## v0.29.0
+- ```5c4e6e06 - Use convolutional autoencoder for BER and Divergence metrics```
+- ```4d18fd36 - Switch to multi-stage build process for Dockerfile image```
+- ```cc11187c - Move Gitlab token check into installJATIC function```
+- ```48ced022 - Update build with help and dedupe python versions passed in```
+- ```c78e5502 - Sufficiency typecheck bugfix```
+- ```59c2fe4d - Remove merged branch image earlier in pipeline job and prune on build```
+- ```3479dc6a - Switch to cuda image with cudnn8 and developer libraries```
 ## v0.28.5
 - ```9d1c354c - Add fit_dataset, format_dataset to DpDivergence & BER```
 ## v0.28.4
