@@ -112,16 +112,16 @@ linting:
   needs: [build]
   parallel:
     matrix:
-      - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
+      - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
   script:
-    - ./build ${PYTHON_VERSIONS} ${TASK}
+    - ./build ${PYTHON_VERSION} ${TASK}
   artifacts:
     reports:
-      junit: output/junit.${TASK}.${PYTHON_VERSIONS}.xml
+      junit: output/junit.${TASK}.${PYTHON_VERSION}.xml
     paths:
-      - output/junit.${TASK}.${PYTHON_VERSIONS}.xml
-      - output/.coverage.${TASK}.${PYTHON_VERSIONS}
-      - output/htmlcov.${TASK}.${PYTHON_VERSIONS}
+      - output/junit.${TASK}.${PYTHON_VERSION}.xml
+      - output/.coverage.${TASK}.${PYTHON_VERSION}
+      - output/htmlcov.${TASK}.${PYTHON_VERSION}
 
 test:
   extends:
@@ -171,9 +171,9 @@ typecheck:
   needs: [build]
   parallel:
     matrix:
-      - PYTHON_VERSIONS: ["3.8", "3.9", "3.10", "3.11"]
+      - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
   script:
-    - ./build ${PYTHON_VERSIONS} type
+    - ./build ${PYTHON_VERSION} type
 
 sphinx:
   extends: .on_nightly
