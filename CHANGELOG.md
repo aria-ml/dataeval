@@ -1,6 +1,9 @@
-[//]: # (5c4e6e06d24044def358338662d3e02101170a55)
+[//]: # (fb605c562937e30674d858cfe8d025b10f5410db)
 
 # DAML Change Log
+## v0.33.0
+- ```fb605c56 - Fix JATIC wrapper and speed up miscellaneous test execution```
+- ```cb9bff80 - Better handle milestones and sprints in auto-versioning```
 ## v0.29.0
 - ```5c4e6e06 - Use convolutional autoencoder for BER and Divergence metrics```
 - ```4d18fd36 - Switch to multi-stage build process for Dockerfile image```
