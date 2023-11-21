@@ -11,6 +11,7 @@ Options:
   -v, --verbose     print output to console during container execution
       --gpu         enable gpu support on task execution
       --no-cache    runs docker build without using the cache
+      --push        push all built images to repository
 
 Default:
   run unit and type tests for 3.8-3.11 as well as lint and docs
@@ -32,7 +33,7 @@ EOF
 exit $1
 }
 
-options=$(getopt -l "help,verbose,gpu,no-cache,build-only" -o "hvb" -n "build" -- "$@")
+options=$(getopt -l "help,verbose,gpu,no-cache,build-only,push" -o "hvb" -n "build" -- "$@")
 eval set -- "$options"
 while true; do
     case "$1" in
@@ -40,7 +41,8 @@ while true; do
         -v|--verbose)    export verbose=1;;
         --gpu)           export gpuflag="--gpus all";;
         --no-cache)      cache_arg="--no-cache";;
-        -b|--build-only) build_only="true";;
+        -b|--build-only) build_only=1;;
+        --push)          export push_to_repo=1;;
         --)              shift; break;;
     esac
     shift
@@ -53,7 +55,7 @@ if [[ -f .settings ]]; then
 fi
 
 # declare lookup maps
-declare -A supported_pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1)
+declare -A supported_pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1 [base]=1)
 declare -A supported_tasks=([unit]=1 [func]=1 [type]=1)
 declare -A supported_other=([lint]=1 [docs]=1 [deps]=1)
 
@@ -70,23 +72,28 @@ for arg do
     ((++count))
 done
 
+# base is only supported with --build-only
+if [[ ${pvers[base]} && ! $build_only ]]; then showHelp 1; fi
+
 # show help if arg count mismatch
 if [[ $((c_pvers + c_tasks + c_other)) != $count ]]; then showHelp 1; fi
 
 # set defaults if not specified
-if [[ $count == 0 || ($c_pvers == 0 && $c_tasks != 0) ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
-if [[ $count == 0 || ($c_tasks == 0 && $c_pvers != 0) ]]; then tasks[unit]=1; tasks[type]=1; fi
-if [[ $count == 0 ]]; then tasks[lint]=1; fi
+if [[ ! $build_only ]]; then
+    if [[ $count == 0 || ($c_pvers == 0 && $c_tasks != 0) ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
+    if [[ $count == 0 || ($c_tasks == 0 && $c_pvers != 0) ]]; then tasks[unit]=1; tasks[type]=1; fi
+    if [[ $count == 0 ]]; then tasks[lint]=1; fi
+fi
 
 # generate "task-pver" jobs
 declare -A jobs;
 for task in "${!tasks[@]}"; do
     case "$task" in
-        lint|docs|deps) needs_311="true"; jobs["$task-3.11"]=1;;
+        lint|docs|deps) jobs["$task-3.11"]=1;;
         *) for pver in "${!pvers[@]}"; do jobs["$task-$pver"]=1; done;;
     esac
 done
-if [[ -n $needs_311 ]]; then pvers[3.11]=1; fi
+if [[ ${tasks[lint]} || ${tasks[docs]} || ${tasks[deps]} ]]; then pvers[3.11]=1; fi
 
 function post_build_cleanup() {
     temp=$1
@@ -114,7 +121,7 @@ function docker_run() {
 
     trap "post_build_cleanup $temp $tag" EXIT
 
-    docker_build_cmd="docker build $verbosity --build-arg python_version=$pver --cache-from daml-build:$branch_name-base --cache-from daml-build:$branch_name-py$pver --tag $tag --target $task ."
+    docker_build_cmd="docker build $verbosity --build-arg deps_image=$deps_image:$deps_hash --build-arg python_version=$pver --cache-from $base_image:$base_hash --cache-from $base_image:main --cache-from $deps_image:$deps_hash-$pver --cache-from $deps_image:main-$pver --tag $tag --target $task ."
     docker_run_args="--name $tag $gpuflag $tag"
     docker_run_envs="--env POETRY_HTTP_BASIC_JATIC_PASSWORD=${CI_JOB_TOKEN}${POETRY_HTTP_BASIC_JATIC_PASSWORD}"
 
@@ -142,25 +149,40 @@ function docker_run() {
     exit $exitcode
 }
 
-# pass in target, tag, extra_args
-function docker_build() {
-    echo "Building $2 image..."
-    docker build --build-arg BUILDKIT_INLINE_CACHE=1 ${@:3} $verbosity --tag $2 --target $1 .
-    echo "Finished building $2."
+function ensure_image() {
+    echo "Checking $2:$3$4 image..."
+    docker manifest inspect $2:$3$4 > /dev/null 2>&1 || needs_build=1
+    if [[ $needs_build ]]; then
+        echo "Building $2:$3$4..."
+        docker build $verbosity \
+            ${@:5} \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            --cache-from $2:$3$4 \
+            --cache-from $2:main$4 \
+            --tag $2:$3$4 \
+            --target $1 .
+        echo "Finished building $2:$3$4."
+        if [[ $push_to_repo ]]; then
+            echo "Pushing $2:$3$4..."
+            docker push $2:$3$4
+            if [[ $CI && $CI_COMMIT_BRANCH == main ]]; then
+                docker image tag $2:$3$4 $2:main$4
+                echo "Pushing $2:main$4..."
+                docker push $2:main$4
+            fi
+        fi
+    fi
 }
 
 export DOCKER_BUILDKIT=1
 export -f post_build_cleanup
 export -f docker_run
 
-if [[ $CI ]]; then
-    # Gitlab does not populate CI_COMMIT_BRANCH in merge requests and vice versa for CI_MERGE_REQUEST_SOURCE_BRANCH_NAME
-    branch_name=${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}${CI_COMMIT_BRANCH}
-else
-    branch_name=$(git branch --show-current)
-fi
-branch_name=${branch_name::120}
-export branch_name
+export base_image="harbor.jatic.net:443/daml/daml-base"
+export deps_image="harbor.jatic.net:443/daml/daml-deps"
+
+export base_hash=$(sha256sum Dockerfile | cut -c 1-8)
+export deps_hash=$(sha256sum poetry.lock | cut -c 1-8)
 
 if [[ -z $verbose ]]; then
     verbosity="--quiet"
@@ -169,19 +191,33 @@ else
 fi
 export verbosity
 
-if [[ -n $build_only ]]; then
+if [[ $build_only ]]; then
     (
-        trap 'kill 0' SIGINT
-        docker_build base daml-build:$branch_name-base &
-        for py in ${!pvers[@]}; do
-            docker_build pydeps daml-build:$branch_name-py$py --build-arg python_version=$py &
+        trap "exit 1" SIGINT
+        if [[ ${#pvers[@]} == 0 ]]; then pvers=([base]=1 [3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
+        for pver in ${!pvers[@]}; do
+            if [[ $pver == base ]]; then
+                ensure_image base $base_image $base_hash &
+            else
+                ensure_image pydeps-$pver $deps_image $deps_hash -$pver --build-arg python_version=$pver &
+            fi
         done
         wait
+
+        if [[ -z $CI && ${!pvers[@]} == ${!supported_pvers[@]} ]]; then
+            echo "Building devcontainer..."
+            docker build $verbosity \
+                --build-arg deps_image=$deps_image:$deps_hash \
+                --cache-from $base_image:$base_hash \
+                --cache-from $deps_image:$deps_hash-3.8 \
+                --cache-from $deps_image:$deps_hash-3.9 \
+                --cache-from $deps_image:$deps_hash-3.10 \
+                --cache-from $deps_image:$deps_hash-3.11 \
+                --tag daml-devcontainer \
+                --target devcontainer .
+            docker image prune -f
+        fi
     )
-    if [[ -z $CI ]]; then
-        docker_build devcontainer daml-devcontainer --cache-from daml-build:$branch_name-base --cache-from daml-build:$branch_name-py3.8 --cache-from daml-build:$branch_name-py3.9 --cache-from daml-build:$branch_name-py3.10 --cache-from daml-build:$branch_name-py3.11
-        docker image prune -f
-    fi
     exit 0
 fi
 
@@ -202,6 +238,6 @@ fi
 echo "Running ${!jobs[@]}..."
 case ${#jobs[@]} in
     0)  showHelp 1;;
-    1)  export verbose=1; docker_run ${!jobs[@]};;
+    1)  export verbose=1; export verbosity="--progress=plain"; docker_run ${!jobs[@]};;
     *)  LANG=C parallel --lb --tag docker_run ::: ${!jobs[@]};;
 esac
