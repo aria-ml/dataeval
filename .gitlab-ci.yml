@@ -13,10 +13,10 @@ workflow:
 
 default:
   tags:
-    - aria
+    - autoscaler
 
 stages:
-  - prepare
+  - build
   - test
   - release
 
@@ -44,7 +44,15 @@ stages:
         - src/**/*
         - pyproject.toml
 
-image: docker:20.10-git
+.docker:
+  image: docker:24.0-git
+  before_script:
+    - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
+    - echo ${DAML_HARBOR_TOKEN} | docker login harbor.jatic.net:443 -u 'robot$daml+daml-build' --password-stdin
+  after_script:
+    - docker logout harbor.jatic.net:443
+
+image: python:$PYTHON_LATEST_SUPPORTED_VERSION
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
@@ -56,40 +64,16 @@ cache:
     - .cache/pip
     - venv/
 
-before_script:
-  - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
-
-clean:
-  stage: prepare
-  script:
-    - branch_name=$(echo $CI_COMMIT_TITLE | cut -d"'" -f2) || echo "Unable to get merge branch name from commit log."
-    - if [[ -z $branch_name ]]; then exit 0; fi
-    - pattern="^daml-.*${branch_name::120}"
-    - docker images | grep $pattern | tr -s ' ' ':' | cut -d ':' -f 1-2 | xargs -n 1 docker rmi --force
-  rules:
-    - if: $DAML_NIGHTLY
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_TITLE =~ /^Merge branch/
-  allow_failure: true
-
 build:
-  stage: prepare
+  extends: .docker
+  stage: build
+  parallel:
+    matrix:
+      - PYTHON_VERSION: ["base", "3.8", "3.9", "3.10", "3.11"]
   script:
-    - docker version
-    - docker info
-    - docker container ls --all --format '{{.Names}} - {{.Image}} => {{.Size}}'
-    - docker image ls --all
-    - docker volume ls --format '{{.Name}} -> {{.Size}}'
-    - docker inspect $(docker image ls -aq)  --format '{{.RepoTags}} => {{.GraphDriver.Data.MergedDir}}'
-    - for i in $(docker container ls --all --format '{{.Names}}'); do ./log_size $i; done
-    - ./build --build-only
-    - docker system prune --force
-    - docker system df --verbose
-    - docker system df
-  retry: 2
+    - ./build --build-only --push --verbose ${PYTHON_VERSION}
 
 generate shipped dependencies:
-  image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   needs: []
   before_script:
     - pip install poetry
@@ -103,11 +87,16 @@ generate shipped dependencies:
 
 linting:
   extends: .on_default
-  needs: [build]
+  needs: []
+  before_script:
+    - pip install poetry
+    - poetry config virtualenvs.create false
+    - poetry install --only dev
   script:
-    - ./build lint
+    - ./run lint
 
 .test:
+  extends: .docker
   stage: test
   needs: [build]
   parallel:
@@ -124,22 +113,17 @@ linting:
       - output/htmlcov.${TASK}.${PYTHON_VERSION}
 
 test:
-  extends:
-    - .test
-    - .on_default
+  extends: [.test, .on_default]
   variables:
     TASK: unit
 
 functional:
-  extends:
-    - .test
-    - .on_nightly
+  extends: [.test, .on_nightly]
   variables:
     TASK: func
 
 coverage:
   stage: test
-  image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   needs:
     - job: test
       optional: true
@@ -167,7 +151,7 @@ coverage:
       - htmlcov/
 
 typecheck:
-  extends: .on_default
+  extends: [.docker, .on_default]
   needs: [build]
   parallel:
     matrix:
@@ -176,9 +160,9 @@ typecheck:
     - ./build ${PYTHON_VERSION} type
 
 sphinx:
-  extends: .on_nightly
-  stage: test
+  extends: [.docker, .on_nightly]
   needs: [build]
+  stage: test
   #  tags: [GPU]
   script:
     - ./build docs # --gpu
@@ -210,7 +194,6 @@ tag:
 
 publish:
   extends: .on_release
-  image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   needs: [tag]
   script:
     - pip install build twine --upgrade
@@ -220,7 +203,6 @@ publish:
 
 changelog:
   extends: .on_release
-  image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   needs: [publish]
   script:
     - pip install requests
