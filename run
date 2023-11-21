@@ -55,7 +55,8 @@ func=""
 case $1 in
     "func") func="--runfunctional";&
     "unit") installJATIC
-            coverage run --data-file=output/.coverage.$1.$pver --source=daml --branch -m pytest $func --junitxml=output/junit.$1.$pver.xml -v
+            if [[ -z $CI ]]; then export CUDA_VISIBLE_DEVICES=-1; fi # disable GPU for local test runs - comment out this line to enable
+            coverage run --data-file=output/.coverage.$1.$pver --source=daml --branch -m pytest $func --junitxml=output/junit.$1.$pver.xml --verbose --durations=0
             coverage report --data-file=output/.coverage.$1.$pver
             coverage xml --data-file=output/.coverage.$1.$pver --skip-empty -o output/coverage.$1.$pver.xml
             coverage html --data-file=output/.coverage.$1.$pver --skip-empty -d output/htmlcov.$1.$pver

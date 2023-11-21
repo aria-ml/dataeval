@@ -13,9 +13,9 @@ class JaticClassificationDatasetWrapper(DamlDataset):
     def _split_data(self, dataset: pr.VisionDataset):
         X_list = []
         y_list = []
-        for data in dataset:
-            X_list.append(np.array(data["image"]))
-            y_list.append(np.array(data["label"]))
+        for i in range(len(dataset)):
+            X_list.append(np.array(dataset[i]["image"]))
+            y_list.append(np.array(dataset[i]["label"]))
         X = np.array(X_list)
         y = np.array(y_list)
         self._set_data(X, y)
