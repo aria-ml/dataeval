@@ -96,6 +96,7 @@ reportMissingImports = false
 
 [tool.pytest.ini_options]
 markers = [
+  "interop: marks external library interop tests",
   "functional: marks slower functional tests",
 ]
 

@@ -51,12 +51,13 @@ class TestEncodedDpDivergence:
     @pytest.mark.parametrize(
         "input, output",
         [
-            (
+            pytest.param(
                 HP_MST,
                 DivergenceOutput(
                     dpdivergence=0.96875,
                     error=1,
                 ),
+                marks=pytest.mark.functional,
             ),
             (
                 HP_FNN,

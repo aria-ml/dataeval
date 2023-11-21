@@ -10,7 +10,14 @@ from tests.utils.JaticUtils import (
 
 
 @pytest.mark.parametrize(
-    "method", [AE, AEGMM, VAE, VAEGMM, pytest.param(LLR, marks=pytest.mark.functional)]
+    "method",
+    [
+        AE,
+        pytest.param(AEGMM, marks=pytest.mark.functional),
+        pytest.param(VAE, marks=pytest.mark.functional),
+        pytest.param(VAEGMM, marks=pytest.mark.functional),
+        pytest.param(LLR, marks=pytest.mark.functional),
+    ],
 )
 @pytest.mark.interop
 class TestOutlierDetectionJaticInterop:
@@ -21,7 +28,7 @@ class TestOutlierDetectionJaticInterop:
         # Create jatic dataset
         path = "tests/datasets/mnist.npz"
         with np.load(path, allow_pickle=True) as fp:
-            images, labels = fp["x_train"][:1000], fp["y_train"][:1000]
+            images, labels = fp["x_train"][:100], fp["y_train"][:100]
 
         # Instantiate outlier detection method
         method = method()

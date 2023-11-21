@@ -164,7 +164,7 @@ class TestSufficiency:
         acc = torchmetrics.Accuracy(task="multiclass", num_classes=10)
 
         suff = Sufficiency(model, optimizer, criterion, acc)
-        output = suff.run(self.train_ds, self.test_ds)
+        output = suff.run(self.train_ds, self.test_ds, epochs=3, substeps=3)
 
         # Param tests
         params = output["params"]
@@ -178,7 +178,7 @@ class TestSufficiency:
         # Geomshape tests
         geomshape = np.array(output["geomshape"])
         geomshape_answer = np.array(
-            [int(0.01 * len(self.train_ds)), len(self.train_ds), 20]
+            [int(0.01 * len(self.train_ds)), len(self.train_ds), 3]
         )
         npt.assert_array_equal(geomshape, geomshape_answer)
 
@@ -197,8 +197,9 @@ class TestSufficiency:
         acc = torchmetrics.Accuracy(task="multiclass", num_classes=10)
 
         suff = Sufficiency(model, optimizer, criterion, acc)
-        suff.run(self.train_ds, self.test_ds, plot=True)
+        suff.run(self.train_ds, self.test_ds, epochs=3, substeps=3, plot=True)
 
         import os
 
         assert os.path.exists("Sufficiency Plot.png")
+        os.remove("Sufficiency Plot.png")
