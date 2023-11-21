@@ -66,10 +66,6 @@
 - ```e5570cee - Use container-check and docker-in-docker build within the pipeline```
 ## v0.26.10
 - ```dab0a8ff - Handle MST edge cases```
-## v0.26.9
-## v0.26.8
-## v0.26.7
-## v0.26.6
 ## v0.26.5
 - ```45ce9971 - Refactor alibi-detect and outlier-detection base and child classes```
 - ```2c2e72bc - publish and tagging should be staged after validation```
