@@ -168,11 +168,6 @@ function ensure_image() {
         fi
     fi
 
-    echo $CI
-    echo $CI_COMMIT_BRANCH
-    echo $CI_DEFAULT_BRANCH
-    echo $push_to_repo
-
     if [[ $CI && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $push_to_repo ]]; then
         main_manifest=$(docker manifest inspect $2:main$4 2> /dev/null) || true
         hash_manifest=$(docker manifest inspect $2:$3$4 2> /dev/null) || true
@@ -181,6 +176,8 @@ function ensure_image() {
             docker pull $2:$3$4
             docker image tag $2:$3$4 $2:main$4
             docker push $2:main$4
+        else
+            echo "$2:main$4 is up to date with $2:$3$4."
         fi
     fi
 }
