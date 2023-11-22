@@ -168,7 +168,7 @@ function ensure_image() {
         fi
     fi
 
-    if [[ $CI && $CI_COMMIT_BRANCH == main && $push_to_repo ]]; then
+    if [[ $CI && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $push_to_repo ]]; then
         main_manifest=$(docker manifest inspect $2:main$4 2> /dev/null)
         hash_manifest=$(docker manifest inspect $2:$3$4 2> /dev/null)
         if [[ -z $main_manifest || "$main_manifest" != "$hash_manifest" ]]; then
