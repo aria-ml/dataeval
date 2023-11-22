@@ -165,11 +165,17 @@ function ensure_image() {
         if [[ $push_to_repo ]]; then
             echo "Pushing $2:$3$4..."
             docker push $2:$3$4
-            if [[ $CI && $CI_COMMIT_BRANCH == main ]]; then
-                docker image tag $2:$3$4 $2:main$4
-                echo "Pushing $2:main$4..."
-                docker push $2:main$4
-            fi
+        fi
+    fi
+
+    if [[ $CI && $CI_COMMIT_BRANCH == main && $push_to_repo ]]; then
+        main_manifest=$(docker manifest inspect $2:main$4 2> /dev/null)
+        hash_manifest=$(docker manifest inspect $2:$3$4 2> /dev/null)
+        if [[ -z $main_manifest || "$main_manifest" != "$hash_manifest" ]]; then
+            echo "Updating $2:main$4 image with $3 build..."
+            docker pull $2:$3$4
+            docker image tag $2:$3$4 $2:main$4
+            docker push $2:main$4
         fi
     fi
 }
