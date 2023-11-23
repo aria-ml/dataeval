@@ -17,7 +17,7 @@ EOF
 exit $1
 }
 
-function installJATIC() {
+function ensureJATIC() {
     [ ! -s ~/.jatic_token ] || export POETRY_HTTP_BASIC_JATIC_PASSWORD=$(<~/.jatic_token)
     if [[ -z "${POETRY_HTTP_BASIC_JATIC_PASSWORD}" ]]; then
         echo
@@ -35,8 +35,6 @@ function installJATIC() {
         echo "When running locally, ensure .jatic_token contains your JATIC Gitlab Personal Access Token with access to the Packages API."
         exit 1
     fi
-
-    poetry install --no-root --with jatic --all-extras
 }
 
 if [ ! -f /.dockerenv ]; then
@@ -54,7 +52,8 @@ pver=$(python --version | cut -d' ' -f2 | cut -d'.' -f1-2)
 func=""
 case $1 in
     "func") func="--runfunctional";&
-    "unit") installJATIC
+    "unit") ensureJATIC
+            poetry install --no-root --with jatic --all-extras
             if [[ -z $CI ]]; then export CUDA_VISIBLE_DEVICES=-1; fi # disable GPU for local test runs - comment out this line to enable
             coverage run --data-file=output/.coverage.$1.$pver --source=daml --branch -m pytest $func --junitxml=output/junit.$1.$pver.xml --verbose --durations=0
             coverage report --data-file=output/.coverage.$1.$pver
@@ -74,6 +73,7 @@ case $1 in
     "deps") mkdir -p output
             poetry export --extras alibi-detect --without-hashes --format requirements.txt --output output/requirements.txt
             ;;
-    "lock") poetry lock
+    "lock") ensureJATIC
+            poetry lock
             ;;
 esac
