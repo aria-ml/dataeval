@@ -68,7 +68,9 @@ case $1 in
             isort --check --diff .
             codespell
             ;;
-    "docs") sphinx-build -M html docs output/docs
+    "docs") ensureJATIC
+            poetry install --no-root --with jatic --all-extras
+            sphinx-build -M html docs output/docs
             ;;
     "deps") mkdir -p output
             poetry export --extras alibi-detect --without-hashes --format requirements.txt --output output/requirements.txt
