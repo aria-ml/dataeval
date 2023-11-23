@@ -1,6 +1,10 @@
-[//]: # (fb605c562937e30674d858cfe8d025b10f5410db)
+[//]: # (ae4ef2dde1c111f9d0d057446f3068aa5c008c2a)
 
 # DAML Change Log
+## v0.34.0
+- ```4a59eff5 - Prepares classification sufficiency for Object Detection updates```
+- ```fc5c9859 - Build dependencies from scratch if no access to harbor.jatic.net```
+- ```4a76e6eb - Move to autoscaler runners and harbor image registry```
 ## v0.33.0
 - ```fb605c56 - Fix JATIC wrapper and speed up miscellaneous test execution```
 - ```cb9bff80 - Better handle milestones and sprints in auto-versioning```
