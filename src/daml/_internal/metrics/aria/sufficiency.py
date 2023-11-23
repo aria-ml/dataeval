@@ -1,182 +1,151 @@
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Callable, Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.optim as optim
 from matplotlib.figure import Figure
 from scipy.optimize import minimize
-from torch.nn.modules.loss import _Loss as LossType
-from torchmetrics import Metric
 
 from daml._internal.datasets import DamlDataset
+
+
+def f_out(n_i: np.ndarray, x: np.ndarray) -> np.ndarray:
+    """
+    Calculates the line of best fit based on its free parameters
+
+    Parameters
+    ----------
+    n_i : np.ndarray
+        Array of sample sizes
+    x : np.ndarray
+        Array of inverse power curve coefficients
+
+    Returns
+    -------
+    np.ndarray
+        Data points for the line of best fit
+    """
+    return x[0] * n_i ** (-x[1]) + x[2]
+
+
+def calc_params(p_i: np.ndarray, n_i: np.ndarray) -> np.ndarray:
+    """
+    Retrieves the inverse power curve coefficients for the line of best fit
+
+    Parameters
+    ----------
+    p_i : np.ndarray
+        Array of corresponding losses
+    n_i : np.ndarray
+        Array of sample sizes
+
+    Returns
+    -------
+    np.ndarray
+        Array of parameters to recreate line of best fit
+    """
+
+    def f(x):
+        inner = np.square(p_i - x[0] * n_i ** (-x[1]) - x[2])
+        return np.sum(inner)
+
+    res = minimize(
+        f, np.array([0.5, 0.5, 0.1]), bounds=((0, None), (0, None), (0, None))
+    )
+    return res.x
+
+
+def create_data_indices(N: int, M: int) -> np.ndarray:
+    """
+    Randomly selects integers in range (0, M) an N number of times
+
+    Parameters
+    ----------
+    N : int
+        Size of the first dimension
+    M : int
+        Size of the second dimension
+
+    Returns
+    -------
+    np.ndarray
+        An NxM array of randomly selected integers in range (0, M)
+    """
+    return np.random.randint(0, M, size=(N, M))
+
+
+def reset_parameters(model: nn.Module):
+    """
+    Re-initializes each layer in the model using
+    the layer's defined weight_init function
+    """
+
+    @torch.no_grad()
+    def weight_reset(m: nn.Module):
+        # Check if the current module has reset_parameters
+        reset_parameters = getattr(m, "reset_parameters", None)
+        if callable(reset_parameters):
+            m.reset_parameters()  # type: ignore
+
+    # Applies fn recursively to every submodule see:
+    # https://pytorch.org/docs/stable/generated/torch.nn.Module.html
+    return model.apply(fn=weight_reset)
 
 
 class Sufficiency:
     def __init__(
         self,
-        model: nn.Module,
-        optimizer: optim.Optimizer,
-        criterion: LossType,
-        metric: Metric,
     ):
-        self._model = model
-        self._optimizer = optimizer
-        self._criterion = criterion
-        self._metric = metric
+        # Used to calculate total number of training runs
+        self._substeps = 0
+        self._num_models = 0
 
-    @staticmethod
-    def f_out(n_i: np.ndarray, x: np.ndarray) -> np.ndarray:
-        """
-        Calculates the line of best fit based on its free parameters
+        # Train & Eval functions must be set during run
+        self._training_func = None
+        self._eval_func = None
 
-        Parameters
-        ----------
-        n_i : np.ndarray
-            Array of sample sizes
-        x : np.ndarray
-            Array of inverse power curve coefficients
+        self._output_dict = None
 
-        Returns
-        -------
-        np.ndarray
-            Data points for the line of best fit
-        """
-        return x[0] * n_i ** (-x[1]) + x[2]
+    def train(self, model, X, y, kwargs):
+        if callable(self._training_func):
+            self._training_func(model, X, y, **kwargs)
 
-    @staticmethod
-    def get_params(p_i: np.ndarray, n_i: np.ndarray) -> np.ndarray:
-        """
-        Retrieves the inverse power curve coefficients for the line of best fit
+    def eval(self, model, X, y, kwargs):
+        if callable(self._eval_func):
+            return self._eval_func(model, X, y, **kwargs)
 
-        Parameters
-        ----------
-        p_i : np.ndarray
-            Array of corresponding losses
-        n_i : np.ndarray
-            Array of sample sizes
+    def _set_func(self, func: Callable, error_msg="Argument was not a callable"):
+        if callable(func):
+            return func
+        else:
+            raise TypeError(error_msg)
 
-        Returns
-        -------
-        np.ndarray
-            Array of parameters to recreate line of best fit
-        """
+    def set_training_func(self, func):
+        self._training_func = self._set_func(func)
 
-        def f(x):
-            inner = np.square(p_i - x[0] * n_i ** (-x[1]) - x[2])
-            return np.sum(inner)
+    def set_eval_func(self, func):
+        self._eval_func = self._set_func(func)
 
-        res = minimize(
-            f, np.array([0.5, 0.5, 0.5]), bounds=((0, None), (0, None), (0, None))
-        )
+    def setup(self, length, num_models, substeps):
+        # Stores each models' metric output per step
+        self._outputs = np.zeros((substeps, num_models))
 
-        return res.x
+        # Save the shape for plotting
+        self._geomshape = (int(0.01 * length), length, substeps)
+        self._ranges = np.geomspace(*self._geomshape).astype(int)
 
-    @staticmethod
-    def _create_data_indices(N: int, M: int) -> np.ndarray:
-        """
-        Randomly selects integers in range (0, M) an N number of times
-
-        Parameters
-        ----------
-        N : int
-            Size of the first dimension
-        M : int
-            Size of the second dimension
-
-        Returns
-        -------
-        np.ndarray
-            An NxM array of randomly selected integers in range (0, M)
-        """
-        return np.random.randint(0, M, size=(N, M))
-
-    @staticmethod
-    def reset_parameters(model: nn.Module):
-        """
-        Re-initializes each layer in the model using
-        the layer's defined weight_init function
-        """
-
-        @torch.no_grad()
-        def weight_reset(m: nn.Module):
-            # Check if the current module has reset_parameters
-            reset_parameters = getattr(m, "reset_parameters", None)
-            if callable(reset_parameters):
-                m.reset_parameters()  # type: ignore
-
-        # Applies fn recursively to every submodule see:
-        # https://pytorch.org/docs/stable/generated/torch.nn.Module.html
-        return model.apply(fn=weight_reset)
-
-    def train_one_epoch(self, model: nn.Module, X: torch.Tensor, y: torch.Tensor):
-        """
-        Passes data once through the model with backpropagation
-
-        Parameters
-        ----------
-        model : nn.Module
-            The trained model that will be evaluated
-        X : torch.Tensor
-            The training data to be passed through the model
-        y : torch.Tensor
-            The training labels corresponding to the data
-        """
-
-        # Zero out gradients
-        self._optimizer.zero_grad()
-        # Forward Propagation
-        outputs = model(X)
-        # Back prop
-        loss = self._criterion(outputs, y)
-        loss.backward()
-        # Update optimizer
-        self._optimizer.step()
-
-    @staticmethod
-    def eval(
-        model: nn.Module, X: torch.Tensor, y: torch.Tensor, metric: Metric
-    ) -> float:
-        """
-        Evaluate a model on a single pass with a given metric
-
-        Parameters
-        ----------
-        model : nn.Module
-            The trained model that will be evaluated
-        X : torch.Tensor
-            The testing data to be passed through th model
-        y : torch.Tensor
-            The testing labels corresponding to the data
-        metric : Metric
-            The statistic to calculate the performance of the model
-
-        Returns
-        -------
-        float
-            The calculated performance of the model
-        """
-        # Set model layers into evaluation mode
-        model.eval()
-        # Tell PyTorch to not track gradients, greatly speeds up processing
-        with torch.no_grad():
-            preds = model(X)
-            metric.forward(preds, y)
-            result = metric.compute()
-        # Metrics accumulate data, so reset after each evaluation
-        metric.reset()
-        return result
+        # Randomly sample data indices for each model
+        self._indices = create_data_indices(num_models, length)
 
     def run(
         self,
+        model: nn.Module,
         train: DamlDataset,
         test: DamlDataset,
-        epochs: int = 5,
-        model_count: int = 3,
-        substeps: int = 20,
-        plot: bool = False,
+        train_kwargs: Dict[str, Any] = {},
+        eval_kwargs: Dict[str, Any] = {},
     ) -> Dict[str, Any]:
         """
         Creates data indices, trains models, and returns plotting data
@@ -197,74 +166,71 @@ class Sufficiency:
         Returns:
         Dict[str, Any]
         """
-        # Dataset metadata
-        train_length = len(train)
 
         # Convert datasets to correct type?
         X_test = torch.from_numpy(test.images.astype(np.float32))
         y_test = torch.from_numpy(test.labels)
 
-        accs = np.zeros((substeps, model_count))
-
-        # Save the shape for plotting
-        geomshape = (int(0.01 * train_length), train_length, substeps)
-        ranges = np.geomspace(*geomshape).astype(int)
-
-        # Randomly sample data indices for each model
-        indices = self._create_data_indices(model_count, train_length)
-
         # For each model's dataset
-        for j, inds in enumerate(indices):
+        for j, inds in enumerate(self._indices):
             # Reset the network weights
-            self._model = self.reset_parameters(self._model)
+            model = reset_parameters(model)
 
             # For each subset of data
-            for i, substep in enumerate(ranges):
+            for i, substep in enumerate(self._ranges):
                 # We warm start on new data
                 b_inds = inds[:substep]
                 X_train = torch.from_numpy(train.images[b_inds].astype(np.float32))
                 y_train = torch.from_numpy(train.labels[b_inds])
 
-                # Loop over the dataset multiple times
-                for _ in range(epochs):
-                    self.train_one_epoch(self._model, X_train, y_train)
+                self.train(model, X_train, y_train, train_kwargs)
 
                 # After each substep training, evaluate model on the test set
-                accs[i, j] = self.eval(self._model, X_test, y_test, self._metric)
+                self._outputs[i, j] = self.eval(model, X_test, y_test, eval_kwargs)
 
-        p_i = 1 - np.mean(accs, axis=1)
-        n_i = ranges
-        params = self.get_params(p_i=p_i, n_i=n_i)
+        n_i = self._ranges
+        p_i = 1 - np.mean(self._outputs, axis=1)
 
-        if plot:
-            self.plot(params, n_i, p_i, geomshape=geomshape)
+        params = calc_params(p_i=p_i, n_i=n_i)
 
-        output_dict = {
-            "accuracy": accs,
+        self._output_dict = {
+            "metric": self._outputs,
             "params": params,
             "n_i": n_i,
             "p_i": p_i,
-            "geomshape": geomshape,
+            "geomshape": self._geomshape,
         }
 
-        return output_dict
+        return self._output_dict
 
-    def plot(
-        self, params: np.ndarray, n_i: np.ndarray, p_i: np.ndarray, geomshape: Tuple
-    ):
+    def plot(self, output_dict: Dict[str, Any]):
         """Plotting function for data sufficiency tasks
 
         Parameters
         ----------
         params : np.ndarray
             The parameters used to calculate the line of best fit
-        n_i : np.ndarray
-            TODO: Ask Thayer
-        p_i: np.ndarray
-            TODO: Ask Thayer
-        geomshape : Tuple
-            The shape of all models' data
+        output_dict : Dict[str, Any]
+            Output of sufficiency run
+
         """
+
+        # Retrieve only relevant values in dictionary
+        params = output_dict.get("params", None)
+        n_i = output_dict.get("n_i", None)
+        p_i = output_dict.get("p_i", None)
+        geomshape = output_dict.get("geomshape", None)
+
+        # Ensure all values were retrieved correctly
+        if params is None:
+            raise KeyError("params not found in output_dict")
+        if n_i is None:
+            raise KeyError("n_i not found in output_dict")
+        if p_i is None:
+            raise KeyError("p_i not found in output_dict")
+        if geomshape is None:
+            raise KeyError("geomshape not found in output_dict")
+
         # Setup 1 plt figure
         fig = plt.figure()
         ax = fig.add_subplot(111)
@@ -280,7 +246,7 @@ class Sufficiency:
         extrapolated = np.geomspace(geomshape[0], geomshape[1] * 4, geomshape[2])
         ax.plot(
             extrapolated,
-            1 - self.f_out(extrapolated, params),
+            1 - f_out(extrapolated, params),
             linestyle="dashed",
             label="Potential Model Results",
         )
@@ -306,4 +272,4 @@ class Sufficiency:
         A directory will be created if it does not exist
         """
         # TODO: Add folder creation, checking, and path handling
-        fig.savefig(path)
+        fig.savefig(path)  # type: ignore
