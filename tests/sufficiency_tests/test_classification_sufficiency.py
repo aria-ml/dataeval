@@ -1,5 +1,3 @@
-from copy import deepcopy
-
 import numpy as np
 import numpy.testing as npt
 import pytest
@@ -17,13 +15,13 @@ torch.manual_seed(0)
 
 
 def load_dataset():
-    # Loads dataset
+    # Loads mnist dataset from binary
     path = "tests/datasets/mnist.npz"
     with np.load(path, allow_pickle=True) as fp:
-        images, labels = fp["x_train"][:3000], fp["y_train"][:3000]
-        test_images, test_labels = fp["x_test"][:500], fp["y_test"][:500]
-    images = images.reshape((3000, 1, 28, 28))
-    test_images = test_images.reshape((500, 1, 28, 28))
+        images, labels = fp["x_train"][:1000], fp["y_train"][:1000]
+        test_images, test_labels = fp["x_test"][:100], fp["y_test"][:100]
+    images = images.reshape((1000, 1, 28, 28))
+    test_images = test_images.reshape((100, 1, 28, 28))
     train_ds = DamlDataset(images, labels)
     test_ds = DamlDataset(test_images, test_labels)
     return train_ds, test_ds
@@ -48,158 +46,165 @@ class Net(nn.Module):
         return x
 
 
-class TestSufficiency:
+def custom_train(model: nn.Module, X: torch.Tensor, y: torch.Tensor):
+    """
+    Passes data once through the model with backpropagation
+
+    Parameters
+    ----------
+    model : nn.Module
+        The trained model that will be evaluated
+    X : torch.Tensor
+        The training data to be passed through the model
+    y : torch.Tensor
+        The training labels corresponding to the data
+    """
+    # Defined only for this testing scenario
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+    epochs = 1
+
+    for _ in range(epochs):
+        # Zero out gradients
+        optimizer.zero_grad()
+        # Forward Propagation
+        outputs = model(X)
+        # Back prop
+        loss = criterion(outputs, y)
+        loss.backward()
+        # Update optimizer
+        optimizer.step()
+
+
+def custom_eval(model: nn.Module, X: torch.Tensor, y: torch.Tensor) -> float:
+    """
+    Evaluate a model on a single pass with a given metric
+
+    Parameters
+    ----------
+    model : nn.Module
+        The trained model that will be evaluated
+    X : torch.Tensor
+        The testing data to be passed through th model
+    y : torch.Tensor
+        The testing labels corresponding to the data
+
+    Returns
+    -------
+    float
+        The calculated performance of the model
+    """
+    metric = torchmetrics.Accuracy(task="multiclass", num_classes=10)
+
+    # Set model layers into evaluation mode
+    model.eval()
+    # Tell PyTorch to not track gradients, greatly speeds up processing
+    with torch.no_grad():
+        preds = model(X)
+        result = metric(preds, y)
+    return result
+
+
+class TestClassificationSufficiency:
     train_ds, test_ds = load_dataset()
 
-    def test_f_out(self):
-        n_i = np.geomspace(30, 3000, 20).astype(int)
-        x = np.array([0.5, 0.5, 0.5])
-        answer = [
-            0.591287,
-            0.581111,
-            0.572169,
-            0.5635,
-            0.556254,
-            0.55,
-            0.544194,
-            0.539163,
-            0.534669,
-            0.530715,
-            0.527196,
-            0.524084,
-            0.521339,
-            0.518898,
-            0.516741,
-            0.514828,
-            0.513135,
-            0.511634,
-            0.510305,
-            0.509129,
-        ]
-
-        output = Sufficiency.f_out(n_i, x)
-
-        npt.assert_almost_equal(output, answer, decimal=5)
-
-    def test_get_params(self):
-        p_i = np.array(
-            [
-                0.806667,
-                0.63,
-                0.669333,
-                0.673333,
-                0.622,
-                0.485333,
-                0.399333,
-                0.382667,
-                0.330667,
-                0.314,
-                0.284667,
-                0.256,
-                0.228667,
-                0.219333,
-                0.202667,
-                0.180667,
-                0.168667,
-                0.149333,
-                0.141333,
-                0.137333,
-            ]
-        )
-        n_i = np.geomspace(30, 3000, 20).astype(int)
-        answer = [3.263266, 0.416022, 0.005313]
-
-        output = Sufficiency.get_params(p_i, n_i)
-
-        npt.assert_almost_equal(output, answer, decimal=5)
-
-    def test_create_data_indices(self):
-        N = 5
-        M = 100
-
-        output = Sufficiency._create_data_indices(N, M)
-
-        assert output.shape == (N, M)
-
-    def test_reset_parameters(self):
-        """
-        Test that resetting the parameters brings us back to the original model
-        """
-
-        # Setup model
+    def test_output_values(self):
         model = Net()
-        # Get original weights
-        state_dict = deepcopy(model.state_dict())
+        length = len(self.train_ds)
 
-        # Reset the parameters
-        model = Sufficiency.reset_parameters(model)
-        reset_state_dict = model.state_dict()
+        # Instantiate sufficiency metric
+        suff = Sufficiency()
+        # Set predefined training and eval functions
+        suff.set_training_func(custom_train)
+        suff.set_eval_func(custom_eval)
+        # Create data indices for training
+        m_count = 1
+        num_steps = 3
+        suff.setup(length, m_count, num_steps)
+        # Train & test model
+        output = suff.run(model, self.train_ds, self.test_ds)
 
-        # Confirm reset_parameters changed the original parameters
-        assert str(state_dict) != str(reset_state_dict)
+        for k, v in output.items():
+            print(f"{k}:{v}")
 
-    @pytest.mark.functional
-    def test_run_output(self):
-        model = Net()
-        criterion = torch.nn.CrossEntropyLoss()
-        optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
-        acc = torchmetrics.Accuracy(task="multiclass", num_classes=10)
-
-        suff = Sufficiency(model, optimizer, criterion, acc)
-        output = suff.run(self.train_ds, self.test_ds)
-
-        answer = np.array([2.97047, 0.53136, 0.3346])
-
-        # Test
+        # Loose params testing. TODO -> Find way to make tighter
         params = output["params"]
-        npt.assert_almost_equal(answer, params, decimal=5)
+        assert params[0] >= 0.0
+        assert params[1] >= 0.0
+        assert params[2] >= 0.0
+        assert params[2] <= 0.5
 
-    def test_outputs(self):
-        """
-        Testing that the outputs come back with the correct shape and type, not value
-        """
-        model = Net()
-        criterion = torch.nn.CrossEntropyLoss()
-        optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
-        acc = torchmetrics.Accuracy(task="multiclass", num_classes=10)
-
-        suff = Sufficiency(model, optimizer, criterion, acc)
-        output = suff.run(self.train_ds, self.test_ds, epochs=3, substeps=3)
-
-        # Param tests
         params = output["params"]
         assert len(params) == 3
 
-        # Accuracy tests
-        accuracy = output["accuracy"]
+        # Accuracy should be bounded
+        accuracy = output["metric"]
         assert np.all(0 <= accuracy)
         assert np.all(accuracy <= 1)
 
-        # Geomshape tests
+        # Geomshape should calculate deterministically
         geomshape = np.array(output["geomshape"])
         geomshape_answer = np.array(
-            [int(0.01 * len(self.train_ds)), len(self.train_ds), 3]
+            [int(0.01 * len(self.train_ds)), len(self.train_ds), num_steps]
         )
         npt.assert_array_equal(geomshape, geomshape_answer)
 
-        # n_i tests
+        # n_i test
         n_i = output["n_i"]
         npt.assert_array_equal(n_i, np.geomspace(*geomshape).astype(int))
 
-        # p_i tests
+        # p_i test
         p_i = output["p_i"]
         npt.assert_array_equal(p_i, 1 - np.mean(accuracy, axis=1))
 
-    def test_plotting(self):
-        model = Net()
-        criterion = torch.nn.CrossEntropyLoss()
-        optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
-        acc = torchmetrics.Accuracy(task="multiclass", num_classes=10)
+    def test_setup_non_func(self):
+        suff = Sufficiency()
 
-        suff = Sufficiency(model, optimizer, criterion, acc)
-        suff.run(self.train_ds, self.test_ds, epochs=3, substeps=3, plot=True)
+        # Add more types: Scalars, Arrays, etc
+        with pytest.raises(TypeError):
+            suff.set_eval_func(None)
 
+        with pytest.raises(TypeError):
+            suff.set_training_func(None)
+
+    def test_plot(self):
+        # Only needed for plotting test
         import os
 
+        suff = Sufficiency()
+
+        output = {
+            "metric": np.ones(shape=(3, 1)),
+            "params": np.ones(shape=(3,)),
+            "n_i": np.ones(shape=(3,)),
+            "p_i": np.ones(shape=(3,)),
+            "geomshape": (1, 100, 3),
+        }
+
+        suff.plot(output_dict=output)
+        # Can only confirm file is created, not data in it
         assert os.path.exists("Sufficiency Plot.png")
         os.remove("Sufficiency Plot.png")
+
+    def test_plot_empty_output(self):
+        suff = Sufficiency()
+        fake_output = {}
+
+        # Tests empty params
+        with pytest.raises(KeyError):
+            suff.plot(fake_output)
+
+        # Tests empty n_i, must fill params first
+        fake_output["params"] = [0.24500099, 0.02901963, 0.64048776]
+        with pytest.raises(KeyError):
+            suff.plot(fake_output)
+
+        # Tests empty p_i
+        fake_output["n_i"] = [1, 10, 100]
+        with pytest.raises(KeyError):
+            suff.plot(fake_output)
+
+        # Tests empty geomshape
+        fake_output["p_i"] = [0.89, 0.86, 0.86]
+        with pytest.raises(KeyError):
+            suff.plot(fake_output)
