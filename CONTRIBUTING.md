@@ -12,6 +12,21 @@ DAML provides a simple interface to characterize image data and its impact on mo
 - alibi-detect[tensorflow]
 - tensorflow
 
+### Harbor Image Registry
+In order to perform build caching and normalize development environments, DAML utilizes images built on top of Ubuntu and Nvidia CUDA images.  These images are stored in the [Harbor Image Registry](https://harbor.jatic.net/) hosted alongside our [Gitlab](https://gitlab.jatic.net).
+
+To use images stored in the registry, follow these steps:
+
+1. Browse to https://harbor.jatic.net/
+2. Sign in via OIDC provider (this will authenticate you through jatic.net)
+3. Access your user profile icon in the top right corner
+4. Note down your username and copy the CLI secret
+5. Log in to the registry through docker CLI
+   1. `docker login harbor.jatic.net:443`
+   2. Enter username as shown
+   3. Paste CLI secret token as password
+6. Contact @aweng for access permissions to the daml project.
+
 ### Development Environment
 #### Ubuntu with Windows Subsystem for Linux
 ##### Enable Virtual Machine Platform
