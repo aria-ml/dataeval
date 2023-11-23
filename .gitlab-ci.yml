@@ -220,6 +220,7 @@ secret_detection:
   needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 gemnasium-python-dependency_scanning:
   needs:
@@ -241,8 +242,10 @@ gemnasium-python-dependency_scanning:
     DS_EXCLUDED_PATHS: "poetry.lock"
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 semgrep-sast:
   needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
