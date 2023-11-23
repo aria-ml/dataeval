@@ -122,7 +122,7 @@ function docker_run() {
     trap "post_build_cleanup $temp $tag" EXIT
 
     # if docker images are not accessible build dependencies locally
-    docker manifest inspect $deps_image:$deps_hash > /dev/null 2>&1 && deps_image_build_arg="--build-arg deps_image=$deps_image:$deps_hash" || echo "Unable to pull dependency image $deps_image:$deps_hash."
+    docker manifest inspect $deps_image:$deps_hash-$pver > /dev/null 2>&1 && deps_image_build_arg="--build-arg deps_image=$deps_image:$deps_hash" || echo "Unable to pull dependency image $deps_image:$deps_hash-$pver."
 
     docker_build_cmd="docker build $verbosity $deps_image_build_arg --build-arg python_version=$pver --cache-from $base_image:$base_hash --cache-from $base_image:main --cache-from $deps_image:$deps_hash-$pver --cache-from $deps_image:main-$pver --tag $tag --target $task ."
     docker_run_args="--name $tag $gpuflag $tag"
