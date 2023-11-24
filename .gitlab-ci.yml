@@ -162,21 +162,20 @@ typecheck:
   script:
     - ./build ${PYTHON_VERSION} type
 
-sphinx:
-  extends: [.docker, .on_nightly]
+docs:
+  extends: [.docker, .on_default]
   needs: [build]
   stage: test
-  #  tags: [GPU]
   script:
-    - ./build docs # --gpu
+    - ./build docs
   artifacts:
     paths:
       - output/docs/html/
 
 pages:
-  extends: .on_nightly
+  extends: .on_release
   needs:
-    - job: sphinx
+    - job: docs
       artifacts: true
     - job: coverage
       artifacts: true
