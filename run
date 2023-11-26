@@ -11,7 +11,6 @@ Tasks:
   type    run typecheck
   lint    run static code analysis
   docs    generate documentation
-  deps    generate list of shipped dependencies
   lock    updates poetry.lock file
 EOF
 exit $1
@@ -42,7 +41,7 @@ if [ ! -f /.dockerenv ]; then
     exit 1
 fi
 
-declare -A supported_tasks=([unit]=1 [func]=1 [type]=1 [lint]=1 [docs]=1 [deps]=1 [lock]=1)
+declare -A supported_tasks=([unit]=1 [func]=1 [type]=1 [lint]=1 [docs]=1 [lock]=1)
 
 # validate args
 if (( $# != 1 )); then echo Too many parameters; showHelp 1; fi
@@ -71,9 +70,6 @@ case $1 in
     "docs") ensureJATIC
             poetry install --no-root --with jatic --all-extras
             sphinx-build -M html docs output/docs
-            ;;
-    "deps") mkdir -p output
-            poetry export --extras alibi-detect --without-hashes --format requirements.txt --output output/requirements.txt
             ;;
     "lock") ensureJATIC
             poetry lock
