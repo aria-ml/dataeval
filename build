@@ -25,10 +25,9 @@ Tasks:
   type    run typecheck
   lint    run static code analysis
   docs    generate documentation
-  deps    generate list of shipped dependencies
 
 Note:
-  lint, docs, and deps are always performed on python 3.11
+  lint and docs are always performed on python 3.11
 EOF
 exit $1
 }
@@ -57,7 +56,7 @@ fi
 # declare lookup maps
 declare -A supported_pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1 [base]=1)
 declare -A supported_tasks=([unit]=1 [func]=1 [type]=1)
-declare -A supported_other=([lint]=1 [docs]=1 [deps]=1)
+declare -A supported_other=([lint]=1 [docs]=1)
 
 # generate python and task lists
 declare -A pvers; declare -A tasks;
@@ -89,11 +88,11 @@ fi
 declare -A jobs;
 for task in "${!tasks[@]}"; do
     case "$task" in
-        lint|docs|deps) jobs["$task-3.11"]=1;;
+        lint|docs) jobs["$task-3.11"]=1;;
         *) for pver in "${!pvers[@]}"; do jobs["$task-$pver"]=1; done;;
     esac
 done
-if [[ ${tasks[lint]} || ${tasks[docs]} || ${tasks[deps]} ]]; then pvers[3.11]=1; fi
+if [[ ${tasks[lint]} || ${tasks[docs]} ]]; then pvers[3.11]=1; fi
 
 function post_build_cleanup() {
     temp=$1
@@ -145,7 +144,7 @@ function docker_run() {
     else
         if [[ ! $verbose ]]; then echo SUCCEEDED; fi
         case "$task" in
-            unit|func|docs|deps) docker cp $tag:/daml/output ./;;
+            unit|func|docs) docker cp $tag:/daml/output ./;;
         esac
     fi
 
