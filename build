@@ -192,7 +192,7 @@ export base_image="harbor.jatic.net:443/daml/daml-base"
 export deps_image="harbor.jatic.net:443/daml/daml-deps"
 
 export base_hash=$(sha256sum Dockerfile | cut -c 1-8)
-export deps_hash=$(tail -1 poetry.lock | cut -d '"' -f2 | cut -c 1-8)
+export deps_hash=$(sha256sum poetry.lock | cut -c 1-8)
 
 if [[ -z $verbose ]]; then
     verbosity="--quiet"
