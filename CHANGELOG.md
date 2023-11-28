@@ -1,6 +1,10 @@
-[//]: # (ae4ef2dde1c111f9d0d057446f3068aa5c008c2a)
+[//]: # (e9225fb13a0235e3c612abf5c756bfacb1c70062)
 
 # DAML Change Log
+## v0.34.1
+- ```e9225fb1 - Add check for jatic_toolbox before exposing functions that have dependencies on it```
+- ```d293d435 - Update dependencies using alibi-detect 0.11.5-dev```
+- ```66cda4e6 - Build python with optimizations```
 ## v0.34.0
 - ```4a59eff5 - Prepares classification sufficiency for Object Detection updates```
 - ```fc5c9859 - Build dependencies from scratch if no access to harbor.jatic.net```
