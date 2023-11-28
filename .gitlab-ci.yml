@@ -79,6 +79,7 @@ generate shipped dependencies:
   needs: []
   before_script:
     - pip install poetry
+    - poetry check
     - poetry self add poetry-lock-groups-plugin
   script:
     - poetry lock --without dev --without docs --without jatic
