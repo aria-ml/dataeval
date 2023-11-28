@@ -28,19 +28,25 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = ">=3.8.1,<3.12"
-numpy = "1.24.3"
+numpy = ">=1.24.2"
 nvidia-cudnn-cu11 = {version = "8.6.0.163"}
-opencv-contrib-python-headless = {version = "4.8.0.76"}
-scipy = "*"
-scikit-learn = "*"
-torch = {version = "*", source = "pytorch"}
-torchvision = {version = "*", source = "pytorch"}
-torchmetrics = {version = "*", source = "pytorch"}
-alibi-detect = {version = "0.11.4", extras = ["tensorflow"], optional = true}
-tensorflow = {version = "2.12.1", optional = true}
+scipy = {version = ">=1.10" }
+scikit-learn = {version = ">=1.2.1" }
+torch = {version = ">=2.1.0", source = "pytorch"}
+torchvision = {version = ">=0.16.0", source = "pytorch"}
+torchmetrics = {version = ">=1.0.0", source = "pytorch"}
+alibi-detect = {git = "https://github.com/SeldonIO/alibi-detect.git", rev = "7dcac8a", extras = ["tensorflow"], optional = true}
+tensorflow = [
+  {version = "~2.13.1", python = "~3.8.1", optional = true},
+  {version = "~2.14.1", python = ">=3.9,<3.12", optional = true},
+]
+tensorflow_probability = [
+  {version = "~0.21.0", python = "~3.8.1", optional = true},
+  {version = "~0.22.1", python = ">=3.9,<3.12", optional = true},
+]
 
 [tool.poetry.extras]
-alibi-detect = ["alibi-detect", "tensorflow"]
+alibi-detect = ["alibi-detect", "tensorflow", "tensorflow_probability"]
 
 [tool.poetry.group.dev]
 optional = true
