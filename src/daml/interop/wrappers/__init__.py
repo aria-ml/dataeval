@@ -1,3 +1,3 @@
-from daml._internal.interop.wrappers.jatic import JaticClassificationDatasetWrapper
+from daml._internal.interop.wrappers import JaticClassificationDatasetWrapper
 
 __all__ = ["JaticClassificationDatasetWrapper"]
