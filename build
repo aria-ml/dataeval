@@ -209,7 +209,10 @@ if [[ $build_only ]]; then
             if [[ $pver == base ]]; then
                 ensure_image base $base_image $base_hash &
             else
-                ensure_image pydeps-$pver $deps_image $deps_hash -$pver --build-arg python_version=$pver &
+                (
+                    ensure_image pybase-$pver $deps_image base -$pver --build-arg python_version=$pver &&
+                    ensure_image pydeps-$pver $deps_image $deps_hash -$pver --build-arg python_version=$pver --cache-from $deps_image:base-$pver
+                ) &
             fi
         done
         wait

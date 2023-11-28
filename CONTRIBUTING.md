@@ -132,10 +132,10 @@ DAML uses containers to normalize environments for testing and development.  The
 | Run unit tests, typecheck and linting | `./build` | N/A |
 | Run unit tests on all versions | `./build unit` | N/A |
 | Run unit tests and typecheck on python 3.11 | `./build 3.11` | N/A |
-| Run only typecheck on python 3.10 | `./build type 3.10` | `pyenv shell daml-3.10; ./run type` |
-| Run only unit tests on python 3.8 | `./build unit 3.8` | `pyenv shell daml-3.8; ./run unit` |
-| Run only unit tests on python 3.9 w/ GPU enabled | `./build unit 3.9 --gpu` | `pyenv shell daml-3.9; ./run unit 3.9` |
-| Build documentation | `./build docs` | `pyenv shell daml-3.11; ./run docs` |
+| Run only typecheck on python 3.10 | `./build type 3.10` | `pyenv shell 3.10; ./run type` |
+| Run only unit tests on python 3.8 | `./build unit 3.8` | `pyenv shell 3.8; ./run unit` |
+| Run only unit tests on python 3.9 w/ GPU enabled | `./build unit 3.9 --gpu` | `pyenv shell 3.9; ./run unit 3.9` |
+| Build documentation | `./build docs` | `pyenv shell 3.11; ./run docs` |
 
 - Note: The python version argument is optional for `./run`, and it will use the active version of python if not specified.
 - Note: The `./run` command executes on your local devcontainer which already has GPU access enabled.
