@@ -75,12 +75,16 @@ RUN ${PYENV_ROOT}/versions/3.11.*/bin/poetry install --no-cache --no-root --with
 
 
 FROM scratch as pydeps-3.8
+ARG PYENV_ROOT
 COPY --from=pyenv-3.8 ${PYENV_ROOT}/ ${PYENV_ROOT}/
 FROM scratch as pydeps-3.9
+ARG PYENV_ROOT
 COPY --from=pyenv-3.9 ${PYENV_ROOT}/ ${PYENV_ROOT}/
 FROM scratch as pydeps-3.10
+ARG PYENV_ROOT
 COPY --from=pyenv-3.10 ${PYENV_ROOT}/ ${PYENV_ROOT}/
 FROM scratch as pydeps-3.11
+ARG PYENV_ROOT
 COPY --from=pyenv-3.11 ${PYENV_ROOT}/ ${PYENV_ROOT}/
 
 
