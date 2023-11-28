@@ -32,47 +32,53 @@ RUN useradd -m -u 1000 daml
 USER daml
 WORKDIR /home/daml
 RUN curl https://pyenv.run | bash
-# ENV PYTHON_CONFIGURE_OPTS '--enable-optimizations --with-lto'
+ENV PYTHON_CONFIGURE_OPTS '--enable-optimizations --with-lto'
 # ENV PYTHON_CFLAGS '-march=native -mtune=native'
 ARG PYENV_ROOT
 ENV PYENV_ROOT=${PYENV_ROOT}
 ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
 ENV POETRY_VIRTUALENVS_CREATE=false
 ENV POETRY_INSTALLER_MAX_WORKERS=10
-RUN echo 'echo Installing python $1 and dependencies... \n\
-${PYENV_ROOT}/bin/pyenv install $1 \n\
-${PYENV_ROOT}/bin/pyenv virtualenv $1 daml-$1 \n\
-${PYENV_ROOT}/versions/daml-$1/bin/pip install --no-cache-dir --disable-pip-version-check poetry \n\
-${PYENV_ROOT}/versions/daml-$1/bin/poetry install --no-cache --no-root --with dev --all-extras \n\
+RUN echo 'echo Installing python dependencies... \n\
+${PYENV_ROOT}/versions/$1.*/bin/pip install --no-cache-dir --disable-pip-version-check poetry \n\
+${PYENV_ROOT}/versions/$1.*/bin/poetry install --no-cache --no-root --with dev --all-extras \n\
 ' > install.sh && chmod +x install.sh
 RUN touch README.md
-COPY --chown=daml:daml pyproject.toml ./
-COPY --chown=daml:daml poetry.lock    ./
 
 
-FROM pybase as pyenv-3.8
+FROM pybase as pybase-3.8
+RUN ${PYENV_ROOT}/bin/pyenv install 3.8
+FROM pybase as pybase-3.9
+RUN ${PYENV_ROOT}/bin/pyenv install 3.9
+FROM pybase as pybase-3.10
+RUN ${PYENV_ROOT}/bin/pyenv install 3.10
+FROM pybase as pybase-3.11
+RUN ${PYENV_ROOT}/bin/pyenv install 3.11
+
+
+FROM pybase-3.8 as pyenv-3.8
+COPY --chown=daml:daml pyproject.toml poetry.lock ./
 RUN ./install.sh 3.8
+FROM pybase-3.9 as pyenv-3.9
+COPY --chown=daml:daml pyproject.toml poetry.lock ./
+RUN ./install.sh 3.9
+FROM pybase-3.10 as pyenv-3.10
+COPY --chown=daml:daml pyproject.toml poetry.lock ./
+RUN ./install.sh 3.10
+FROM pybase-3.11 as pyenv-3.11
+COPY --chown=daml:daml pyproject.toml poetry.lock ./
+RUN ./install.sh 3.11
+
+
 FROM scratch as pydeps-3.8
 ARG PYENV_ROOT
 COPY --from=pyenv-3.8 ${PYENV_ROOT}/ ${PYENV_ROOT}/
-
-
-FROM pybase as pyenv-3.9
-RUN ./install.sh 3.9
 FROM scratch as pydeps-3.9
 ARG PYENV_ROOT
 COPY --from=pyenv-3.9 ${PYENV_ROOT}/ ${PYENV_ROOT}/
-
-
-FROM pybase as pyenv-3.10
-RUN ./install.sh 3.10
 FROM scratch as pydeps-3.10
 ARG PYENV_ROOT
 COPY --from=pyenv-3.10 ${PYENV_ROOT}/ ${PYENV_ROOT}/
-
-
-FROM pybase as pyenv-3.11
-RUN ./install.sh 3.11
 FROM scratch as pydeps-3.11
 ARG PYENV_ROOT
 COPY --from=pyenv-3.11 ${PYENV_ROOT}/ ${PYENV_ROOT}/
@@ -123,30 +129,24 @@ ENV LC_ALL=C.UTF-8
 ENV LANG=en_US.UTF-8
 ARG PYENV_ROOT
 ENV PATH=${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:${PATH}
-COPY --chown=daml:daml --from=pysrc-3.8  ${PYENV_ROOT}/ ${PYENV_ROOT}/
-COPY --chown=daml:daml --from=pysrc-3.9  ${PYENV_ROOT}/ ${PYENV_ROOT}/
-COPY --chown=daml:daml --from=pysrc-3.10 ${PYENV_ROOT}/ ${PYENV_ROOT}/
-COPY --chown=daml:daml --from=pysrc-3.11 ${PYENV_ROOT}/ ${PYENV_ROOT}/
+COPY --chown=daml:daml --link --from=pysrc-3.8  ${PYENV_ROOT}/ ${PYENV_ROOT}/
+COPY --chown=daml:daml --link --from=pysrc-3.9  ${PYENV_ROOT}/ ${PYENV_ROOT}/
+COPY --chown=daml:daml --link --from=pysrc-3.10 ${PYENV_ROOT}/ ${PYENV_ROOT}/
+COPY --chown=daml:daml --link --from=pysrc-3.11 ${PYENV_ROOT}/ ${PYENV_ROOT}/
 RUN echo 'eval "$(pyenv init -)"' >> ~/.bashrc
 
 
 FROM base as versioned
 ARG PYENV_ROOT
 ARG python_version
-ENV PATH ${PYENV_ROOT}/versions/daml-${python_version}/bin:$PATH
-ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${PYENV_ROOT}/versions/daml-${python_version}/lib/python${python_version}/site-packages/nvidia/cudnn/lib
-COPY --chown=daml:daml --from=pysrc ${PYENV_ROOT} ${PYENV_ROOT}
+COPY --chown=daml:daml --link --from=pysrc ${PYENV_ROOT} ${PYENV_ROOT}
+RUN ln -s ${PYENV_ROOT}/versions/$(${PYENV_ROOT}/bin/pyenv latest ${python_version}) ${PYENV_ROOT}/versions/${python_version}
+ENV PATH ${PYENV_ROOT}/versions/${python_version}/bin:${PYENV_ROOT}/bin:$PATH
+ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${PYENV_ROOT}/versions/${python_version}/lib/python${python_version}/site-packages/nvidia/cudnn/lib
 RUN touch README.md
-COPY --chown=daml:daml pyproject.toml ./
-COPY --chown=daml:daml poetry.lock    ./
-COPY --chown=daml:daml run            ./
-COPY --chown=daml:daml src/           src/
+COPY --chown=daml:daml pyproject.toml poetry.lock run ./
+COPY --chown=daml:daml src/ src/
 RUN poetry install --no-cache --only-root --all-extras
-
-
-# Create list of shipped dependencies for dependency scanning
-FROM versioned as deps
-CMD ./run deps
 
 
 # Copy tests dir
