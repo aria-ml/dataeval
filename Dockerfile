@@ -36,16 +36,12 @@ ENV PYTHON_CONFIGURE_OPTS '--enable-optimizations --with-lto'
 # ENV PYTHON_CFLAGS '-march=native -mtune=native'
 ARG PYENV_ROOT
 ENV PYENV_ROOT=${PYENV_ROOT}
-ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
 ENV POETRY_VIRTUALENVS_CREATE=false
 ENV POETRY_INSTALLER_MAX_WORKERS=10
-RUN echo 'echo Installing python dependencies... \n\
-${PYENV_ROOT}/versions/$1.*/bin/pip install --no-cache-dir --disable-pip-version-check poetry \n\
-${PYENV_ROOT}/versions/$1.*/bin/poetry install --no-cache --no-root --with dev --all-extras \n\
-' > install.sh && chmod +x install.sh
-RUN touch README.md
 
 
+# Specific versions are hardcoded because devcontainer image
+# currently needs hardcoded references to each python version
 FROM pybase as pybase-3.8
 RUN ${PYENV_ROOT}/bin/pyenv install 3.8
 FROM pybase as pybase-3.9
@@ -57,30 +53,34 @@ RUN ${PYENV_ROOT}/bin/pyenv install 3.11
 
 
 FROM pybase-3.8 as pyenv-3.8
+RUN touch README.md
 COPY --chown=daml:daml pyproject.toml poetry.lock ./
-RUN ./install.sh 3.8
+RUN ${PYENV_ROOT}/versions/3.8.*/bin/pip install --no-cache-dir --disable-pip-version-check poetry
+RUN ${PYENV_ROOT}/versions/3.8.*/bin/poetry install --no-cache --no-root --with dev --all-extras
 FROM pybase-3.9 as pyenv-3.9
+RUN touch README.md
 COPY --chown=daml:daml pyproject.toml poetry.lock ./
-RUN ./install.sh 3.9
+RUN ${PYENV_ROOT}/versions/3.9.*/bin/pip install --no-cache-dir --disable-pip-version-check poetry
+RUN ${PYENV_ROOT}/versions/3.9.*/bin/poetry install --no-cache --no-root --with dev --all-extras
 FROM pybase-3.10 as pyenv-3.10
+RUN touch README.md
 COPY --chown=daml:daml pyproject.toml poetry.lock ./
-RUN ./install.sh 3.10
+RUN ${PYENV_ROOT}/versions/3.10.*/bin/pip install --no-cache-dir --disable-pip-version-check poetry
+RUN ${PYENV_ROOT}/versions/3.10.*/bin/poetry install --no-cache --no-root --with dev --all-extras
 FROM pybase-3.11 as pyenv-3.11
+RUN touch README.md
 COPY --chown=daml:daml pyproject.toml poetry.lock ./
-RUN ./install.sh 3.11
+RUN ${PYENV_ROOT}/versions/3.11.*/bin/pip install --no-cache-dir --disable-pip-version-check poetry
+RUN ${PYENV_ROOT}/versions/3.11.*/bin/poetry install --no-cache --no-root --with dev --all-extras
 
 
 FROM scratch as pydeps-3.8
-ARG PYENV_ROOT
 COPY --from=pyenv-3.8 ${PYENV_ROOT}/ ${PYENV_ROOT}/
 FROM scratch as pydeps-3.9
-ARG PYENV_ROOT
 COPY --from=pyenv-3.9 ${PYENV_ROOT}/ ${PYENV_ROOT}/
 FROM scratch as pydeps-3.10
-ARG PYENV_ROOT
 COPY --from=pyenv-3.10 ${PYENV_ROOT}/ ${PYENV_ROOT}/
 FROM scratch as pydeps-3.11
-ARG PYENV_ROOT
 COPY --from=pyenv-3.11 ${PYENV_ROOT}/ ${PYENV_ROOT}/
 
 

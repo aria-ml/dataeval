@@ -152,6 +152,7 @@ function docker_run() {
 }
 
 function ensure_image() {
+    local needs_build
     echo "Checking $2:$3$4 image..."
     docker manifest inspect $2:$3$4 > /dev/null 2>&1 || needs_build=1
     if [[ $needs_build ]]; then
@@ -170,7 +171,7 @@ function ensure_image() {
         fi
     fi
 
-    if [[ $CI && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $push_to_repo ]]; then
+    if [[ $CI && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $push_to_repo && $3 != base ]]; then
         main_manifest=$(docker manifest inspect $2:main$4 2> /dev/null) || true
         hash_manifest=$(docker manifest inspect $2:$3$4 2> /dev/null) || true
         if [[ "$main_manifest" != "$hash_manifest" ]]; then
