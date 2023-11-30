@@ -66,12 +66,19 @@ cache:
     - .cache/pip
     - venv/
 
-build:
+build base:
   extends: .docker
   stage: build
+  script:
+    - ./build --build-only --push --verbose base
+
+build image:
+  extends: .docker
+  stage: build
+  needs: [build base]
   parallel:
     matrix:
-      - PYTHON_VERSION: ["base", "3.8", "3.9", "3.10", "3.11"]
+      - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
   script:
     - ./build --build-only --push --verbose ${PYTHON_VERSION}
 
@@ -103,7 +110,7 @@ linting:
 .test:
   extends: .docker
   stage: test
-  needs: [build]
+  needs: [build image]
   parallel:
     matrix:
       - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
@@ -157,7 +164,7 @@ coverage:
 
 typecheck:
   extends: [.docker, .on_default]
-  needs: [build]
+  needs: [build image]
   parallel:
     matrix:
       - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
@@ -166,7 +173,7 @@ typecheck:
 
 docs:
   extends: [.docker, .on_default]
-  needs: [build]
+  needs: [build image]
   stage: test
   script:
     - ./build docs
