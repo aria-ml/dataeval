@@ -94,6 +94,7 @@ generate shipped dependencies:
     paths:
       - poetry.lock
   rules:
+    - when: never # Only needed for project dependency scanning but that is being enforced and run as a group level policy
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
@@ -244,9 +245,13 @@ gemnasium-python-dependency_scanning:
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  variables:
+    SAST_DISABLED: "true"
 
 semgrep-sast:
   needs: []
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  variables:
+    SAST_DISABLED: "true"
