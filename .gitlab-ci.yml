@@ -83,7 +83,7 @@ build image:
     - ./build --build-only --push --verbose ${PYTHON_VERSION}
 
 generate shipped dependencies:
-  needs: []
+  stage: build
   before_script:
     - pip install poetry
     - poetry check
