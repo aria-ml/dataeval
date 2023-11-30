@@ -140,13 +140,16 @@ COPY --chown=daml:daml --link --from=pysrc-3.11 ${PYENV_ROOT}/ ${PYENV_ROOT}/
 RUN echo 'eval "$(pyenv init -)"' >> ~/.bashrc
 
 
-FROM base as versioned
+FROM base as build
 ARG PYENV_ROOT
 ARG python_version
 COPY --chown=daml:daml --link --from=pysrc ${PYENV_ROOT} ${PYENV_ROOT}
 RUN ln -s ${PYENV_ROOT}/versions/$(${PYENV_ROOT}/bin/pyenv latest ${python_version}) ${PYENV_ROOT}/versions/${python_version}
 ENV PATH ${PYENV_ROOT}/versions/${python_version}/bin:${PYENV_ROOT}/bin:$PATH
 ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${PYENV_ROOT}/versions/${python_version}/lib/python${python_version}/site-packages/nvidia/cudnn/lib
+
+
+FROM build as versioned
 RUN touch README.md
 COPY --chown=daml:daml pyproject.toml poetry.lock run ./
 COPY --chown=daml:daml src/ src/
