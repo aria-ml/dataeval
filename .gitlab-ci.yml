@@ -229,13 +229,13 @@ include:
 secret_detection:
   needs: []
   rules:
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_REF_PROTECTED == "true"
 
 gemnasium-python-dependency_scanning:
   needs:
     - job: generate shipped dependencies
       artifacts: true
+      optional: true
   # Both `needs` and `dependencies` are used due to a quirk of gitlab.
   # `gemnasium-python-dependency_scanning` specifies an empty list of
   # dependencies, which means that unless you explicitly add the dependency,
@@ -243,15 +243,13 @@ gemnasium-python-dependency_scanning:
   dependencies:
     - generate shipped dependencies
   rules:
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_REF_PROTECTED == "true"
   variables:
     SAST_DISABLED: "true"
 
 semgrep-sast:
   needs: []
   rules:
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_REF_PROTECTED == "true"
   variables:
     SAST_DISABLED: "true"
