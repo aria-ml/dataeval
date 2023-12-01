@@ -4,8 +4,8 @@ import pytest
 from daml._internal.interop.wrappers.jatic import JaticClassificationDatasetWrapper
 from daml.metrics.ber import BER_FNN, BER_MST, BEROutput
 from tests.utils.JaticUtils import (
-    MockJaticImageClassificationDataset,
-    check_jatic_interop,
+    JaticImageClassificationDataset,
+    check_jatic_classification,
 )
 
 
@@ -28,14 +28,14 @@ class TestBERJaticInterop:
             images, labels = fp["x_train"][:1000], fp["y_train"][:1000]
 
         # Create jatic compliant dataset
-        jatic_ds = MockJaticImageClassificationDataset(images, labels)
-        check_jatic_interop(jatic_ds)
+        jatic_ds = JaticImageClassificationDataset(images, labels)
+        check_jatic_classification(jatic_ds)
 
         # Wrap into Daml dataset
         ber_ds = JaticClassificationDatasetWrapper(jatic_ds)
         method = method()
 
-        assert len(ber_ds.images) == len(images)
+        assert len(ber_ds) == len(images)
 
         value = method.evaluate(ber_ds)
         assert value == output

@@ -4,8 +4,8 @@ import pytest
 from daml._internal.interop.wrappers.jatic import JaticClassificationDatasetWrapper
 from daml.metrics.outlier_detection import AE, AEGMM, LLR, VAE, VAEGMM
 from tests.utils.JaticUtils import (
-    MockJaticImageClassificationDataset,
-    check_jatic_interop,
+    JaticImageClassificationDataset,
+    check_jatic_classification,
 )
 
 
@@ -37,8 +37,8 @@ class TestOutlierDetectionJaticInterop:
         images = images[..., np.newaxis].astype(method._dataset_type)
 
         # Create jatic compliant dataset
-        jatic_ds = MockJaticImageClassificationDataset(images, labels)
-        check_jatic_interop(jatic_ds)
+        jatic_ds = JaticImageClassificationDataset(images, labels)
+        check_jatic_classification(jatic_ds)
         # Wrap jatic dataset with daml dataset
         daml_ds = JaticClassificationDatasetWrapper(jatic_ds)
 
