@@ -17,7 +17,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.graphviz",
     "sphinx_rtd_size",
-    "nbsphinx",
+    "myst_nb",
 ]
 
 templates_path = ["_templates"]
@@ -25,7 +25,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 autosummary_generate = False
 sphinx_rtd_size_width = "80%"
-nbsphinx_allow_errors = True
+nb_execution_timeout = -1
 
 # html_static_path = ['_static']
 html_theme = "sphinx_rtd_theme"
