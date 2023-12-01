@@ -8,17 +8,42 @@ class JaticClassificationDatasetWrapper(DamlDataset):
     "Reformats Jatic data into the DAML format"
 
     def __init__(self, dataset: pr.VisionDataset):
-        self._split_data(dataset)
+        images, labels = self._split_data(dataset)
+        super().__init__(images, labels)
 
     def _split_data(self, dataset: pr.VisionDataset):
-        X_list = []
-        y_list = []
-        for i in range(len(dataset)):
-            X_list.append(np.array(dataset[i]["image"]))
-            y_list.append(np.array(dataset[i]["label"]))
-        X = np.array(X_list)
-        y = np.array(y_list)
-        self._set_data(X, y)
+        images = []
+        labels = []
+        for idx in range(len(dataset)):
+            images.append(np.array(dataset[idx]["image"]))
+            labels.append(np.array(dataset[idx]["label"]))
 
-    def __getitem__(self, index: int) -> pr.SupportsImageClassification:
-        return {"image": self._images[index], "label": self._labels[index]}
+        images = np.array(images)
+        labels = np.array(labels)
+
+        return images, labels
+
+
+class JaticObjectDetectionWrapper(DamlDataset):
+    "Reformats Jatic data into the DAML format"
+
+    def __init__(self, dataset: pr.ObjectDetectionDataset):
+        images, labels, boxes = self._split_data(dataset)
+        super().__init__(images=images, labels=labels, boxes=boxes)
+
+    def _split_data(self, dataset: pr.ObjectDetectionDataset):
+        images = []
+        labels = []
+        boxes = []
+        for idx in range(len(dataset)):
+            objects: pr.HasDataBoxesLabels = dataset[idx]["objects"]  # type: ignore
+
+            images.append(np.array(dataset[idx]["image"]))
+            labels.append(np.array(objects["labels"]))
+            boxes.append(np.array(objects["boxes"]))
+
+        images = np.array(images)
+        labels = np.array(labels)
+        boxes = np.array(boxes)
+
+        return images, labels, boxes

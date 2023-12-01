@@ -173,7 +173,7 @@ class TestAlibiDetect:
         images = self.all_ones.dataset.images
         if metric._dataset_type:
             dataset = images.astype(metric._dataset_type)
-        dataset = DamlDataset(X=images)
+        dataset = DamlDataset(images=images)
 
         # metric.fit_dataset(dataset=dataset, epochs=1, verbose=False)
         metric.is_trained = True
