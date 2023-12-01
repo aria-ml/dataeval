@@ -1,6 +1,9 @@
-[//]: # (e9225fb13a0235e3c612abf5c756bfacb1c70062)
+[//]: # (2a0141b4667fe25571106bd9a562a2c69c828bd7)
 
 # DAML Change Log
+## v0.34.2
+- ```2a0141b4 - Adds object detection to Daml Dataset. Updates jatic wrappers```
+- ```4503e91c - Push composited build images to harbor to skip compositing images in each task runner```
 ## v0.34.1
 - ```e9225fb1 - Add check for jatic_toolbox before exposing functions that have dependencies on it```
 - ```d293d435 - Update dependencies using alibi-detect 0.11.5-dev```
