@@ -4,8 +4,8 @@ import pytest
 from daml._internal.interop.wrappers.jatic import JaticClassificationDatasetWrapper
 from daml.metrics.divergence import HP_FNN, HP_MST, DivergenceOutput
 from tests.utils.JaticUtils import (
-    MockJaticImageClassificationDataset,
-    check_jatic_interop,
+    JaticImageClassificationDataset,
+    check_jatic_classification,
 )
 
 
@@ -39,11 +39,11 @@ class TestDivergenceJaticInterop:
         all_ones = np.ones(shape=(32, 32))
         all_fives = all_ones * 5
 
-        dataset_a = MockJaticImageClassificationDataset(all_ones, all_ones)
-        dataset_b = MockJaticImageClassificationDataset(all_fives, all_fives)
+        dataset_a = JaticImageClassificationDataset(all_ones, all_ones)
+        dataset_b = JaticImageClassificationDataset(all_fives, all_fives)
 
-        check_jatic_interop(dataset_a)
-        check_jatic_interop(dataset_b)
+        check_jatic_classification(dataset_a)
+        check_jatic_classification(dataset_b)
 
         # Initialize the autoencoder-based outlier detector from alibi-detect
         metric = method()
