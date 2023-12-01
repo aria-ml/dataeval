@@ -101,8 +101,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
         graphviz \
-        libgl1 \
-        pandoc
+        libgl1
 RUN useradd -m -u 1000 -s /bin/bash daml
 USER daml
 WORKDIR /daml
@@ -184,8 +183,6 @@ COPY --chown=daml:daml docs/ docs/
 
 # Build docs
 FROM docs_dir as docs
-RUN poetry install --no-cache --no-root --with dev --with docs --all-extras
-ENV PYDEVD_DISABLE_FILE_VALIDATION 1
 CMD ./run docs
 
 
