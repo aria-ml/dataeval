@@ -40,6 +40,10 @@ class DamlDataset(Dataset):
     def images(self) -> np.ndarray:
         return self._images
 
+    @images.setter
+    def images(self, value: np.ndarray):
+        self._images = value
+
     @property
     def labels(self) -> np.ndarray:
         if self._labels is None:
@@ -47,9 +51,17 @@ class DamlDataset(Dataset):
         else:
             return self._labels
 
+    @labels.setter
+    def labels(self, value: Optional[np.ndarray]):
+        self._labels = value
+
     @property
     def boxes(self) -> np.ndarray:
         if self._boxes is None:
             return np.array([])
         else:
             return self._boxes
+
+    @boxes.setter
+    def boxes(self, value: Optional[np.ndarray]):
+        self._boxes = value
