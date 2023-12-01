@@ -66,6 +66,13 @@ cache:
     - .cache/pip
     - venv/
 
+verify lock:
+  stage: build
+  before_script:
+    - pip install poetry
+  script:
+    - poetry check
+
 build base:
   extends: .docker
   stage: build
@@ -75,7 +82,7 @@ build base:
 build image:
   extends: .docker
   stage: build
-  needs: [build base]
+  needs: [verify lock, build base]
   parallel:
     matrix:
       - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
