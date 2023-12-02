@@ -1,6 +1,8 @@
-[//]: # (2a0141b4667fe25571106bd9a562a2c69c828bd7)
+[//]: # (5d858473c4ea6eab302a3138b12b1302ef3f54d2)
 
 # DAML Change Log
+## v0.34.3
+- ```5d858473 - Update documentation tutorials to use DamlDataset```
 ## v0.34.2
 - ```2a0141b4 - Adds object detection to Daml Dataset. Updates jatic wrappers```
 - ```4503e91c - Push composited build images to harbor to skip compositing images in each task runner```
