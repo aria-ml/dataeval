@@ -1,6 +1,7 @@
-[//]: # (5d858473c4ea6eab302a3138b12b1302ef3f54d2)
+[//]: # (4f794111c615888efa50555d356a4f25bae5769a)
 
 # DAML Change Log
+## v0.34.4
 ## v0.34.3
 - ```5d858473 - Update documentation tutorials to use DamlDataset```
 ## v0.34.2
