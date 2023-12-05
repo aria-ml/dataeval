@@ -3,6 +3,7 @@ ARG HOME="/home/$USER"
 ARG PYENV_ROOT="$HOME/.pyenv"
 ARG python_version="3.11"
 ARG deps_image="pydeps"
+ARG base_image="pybase"
 
 
 FROM ubuntu:22.04 as pybase
@@ -38,61 +39,23 @@ ARG PYENV_ROOT
 ENV PYENV_ROOT=${PYENV_ROOT}
 ENV POETRY_VIRTUALENVS_CREATE=false
 ENV POETRY_INSTALLER_MAX_WORKERS=10
+ARG python_version
+RUN ${PYENV_ROOT}/bin/pyenv install ${python_version}
 
 
-# Specific versions are hardcoded because devcontainer image
-# currently needs hardcoded references to each python version
-FROM pybase as pybase-3.8
-RUN ${PYENV_ROOT}/bin/pyenv install 3.8
-FROM pybase as pybase-3.9
-RUN ${PYENV_ROOT}/bin/pyenv install 3.9
-FROM pybase as pybase-3.10
-RUN ${PYENV_ROOT}/bin/pyenv install 3.10
-FROM pybase as pybase-3.11
-RUN ${PYENV_ROOT}/bin/pyenv install 3.11
-
-
-FROM pybase-3.8 as pyenv-3.8
+FROM ${base_image} as base_image
+FROM base_image as pyenv
+ARG PYENV_ROOT
+ARG python_version
+RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/pip install --no-cache-dir --disable-pip-version-check poetry
 RUN touch README.md
 COPY --chown=daml:daml pyproject.toml poetry.lock ./
-RUN ${PYENV_ROOT}/versions/3.8.*/bin/pip install --no-cache-dir --disable-pip-version-check poetry
-RUN ${PYENV_ROOT}/versions/3.8.*/bin/poetry install --no-cache --no-root --with dev --all-extras
-FROM pybase-3.9 as pyenv-3.9
-RUN touch README.md
-COPY --chown=daml:daml pyproject.toml poetry.lock ./
-RUN ${PYENV_ROOT}/versions/3.9.*/bin/pip install --no-cache-dir --disable-pip-version-check poetry
-RUN ${PYENV_ROOT}/versions/3.9.*/bin/poetry install --no-cache --no-root --with dev --all-extras
-FROM pybase-3.10 as pyenv-3.10
-RUN touch README.md
-COPY --chown=daml:daml pyproject.toml poetry.lock ./
-RUN ${PYENV_ROOT}/versions/3.10.*/bin/pip install --no-cache-dir --disable-pip-version-check poetry
-RUN ${PYENV_ROOT}/versions/3.10.*/bin/poetry install --no-cache --no-root --with dev --all-extras
-FROM pybase-3.11 as pyenv-3.11
-RUN touch README.md
-COPY --chown=daml:daml pyproject.toml poetry.lock ./
-RUN ${PYENV_ROOT}/versions/3.11.*/bin/pip install --no-cache-dir --disable-pip-version-check poetry
-RUN ${PYENV_ROOT}/versions/3.11.*/bin/poetry install --no-cache --no-root --with dev --all-extras
+RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/poetry install --no-cache --no-root --all-extras
 
 
-FROM scratch as pydeps-3.8
+FROM scratch as pydeps
 ARG PYENV_ROOT
-COPY --from=pyenv-3.8 ${PYENV_ROOT}/ ${PYENV_ROOT}/
-FROM scratch as pydeps-3.9
-ARG PYENV_ROOT
-COPY --from=pyenv-3.9 ${PYENV_ROOT}/ ${PYENV_ROOT}/
-FROM scratch as pydeps-3.10
-ARG PYENV_ROOT
-COPY --from=pyenv-3.10 ${PYENV_ROOT}/ ${PYENV_ROOT}/
-FROM scratch as pydeps-3.11
-ARG PYENV_ROOT
-COPY --from=pyenv-3.11 ${PYENV_ROOT}/ ${PYENV_ROOT}/
-
-
-FROM ${deps_image}-3.8 as pysrc-3.8
-FROM ${deps_image}-3.9 as pysrc-3.9
-FROM ${deps_image}-3.10 as pysrc-3.10
-FROM ${deps_image}-3.11 as pysrc-3.11
-FROM ${deps_image}-${python_version} as pysrc
+COPY --link --from=pyenv  ${PYENV_ROOT}/ ${PYENV_ROOT}/
 
 
 # Base image for build runs and devcontainers
@@ -114,6 +77,31 @@ ENV TF_GPU_ALLOCATOR=cuda_malloc_async
 ENV POETRY_HTTP_BASIC_JATIC_USERNAME=gitlab-ci-token
 
 
+FROM ${deps_image} as deps_image
+FROM base as build
+ARG PYENV_ROOT
+ARG python_version
+COPY --chown=daml:daml --link --from=deps_image ${PYENV_ROOT} ${PYENV_ROOT}
+RUN ln -s ${PYENV_ROOT}/versions/$(${PYENV_ROOT}/bin/pyenv latest ${python_version}) ${PYENV_ROOT}/versions/${python_version}
+ENV PATH ${PYENV_ROOT}/versions/${python_version}/bin:${PYENV_ROOT}/bin:$PATH
+ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${PYENV_ROOT}/versions/${python_version}/lib/python${python_version}/site-packages/nvidia/cudnn/lib
+
+
+FROM build as versioned
+RUN touch README.md
+COPY --chown=daml:daml pyproject.toml poetry.lock ./
+COPY --chown=daml:daml src/ src/
+RUN poetry install --no-cache --all-extras --with dev --with docs
+
+
+FROM versioned as run
+COPY --chown=daml:daml .coveragerc ./
+COPY --chown=daml:daml tests/ tests/
+COPY --chown=daml:daml docs/ docs/
+COPY --chown=daml:daml run ./
+ENTRYPOINT [ "./run" ]
+
+
 FROM base as devcontainer
 USER root
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -132,60 +120,4 @@ ENV LC_ALL=C.UTF-8
 ENV LANG=en_US.UTF-8
 ARG PYENV_ROOT
 ENV PATH=${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:${PATH}
-COPY --chown=daml:daml --link --from=pysrc-3.8  ${PYENV_ROOT}/ ${PYENV_ROOT}/
-COPY --chown=daml:daml --link --from=pysrc-3.9  ${PYENV_ROOT}/ ${PYENV_ROOT}/
-COPY --chown=daml:daml --link --from=pysrc-3.10 ${PYENV_ROOT}/ ${PYENV_ROOT}/
-COPY --chown=daml:daml --link --from=pysrc-3.11 ${PYENV_ROOT}/ ${PYENV_ROOT}/
 RUN echo 'eval "$(pyenv init -)"' >> ~/.bashrc
-
-
-FROM base as build
-ARG PYENV_ROOT
-ARG python_version
-COPY --chown=daml:daml --link --from=pysrc ${PYENV_ROOT} ${PYENV_ROOT}
-RUN ln -s ${PYENV_ROOT}/versions/$(${PYENV_ROOT}/bin/pyenv latest ${python_version}) ${PYENV_ROOT}/versions/${python_version}
-ENV PATH ${PYENV_ROOT}/versions/${python_version}/bin:${PYENV_ROOT}/bin:$PATH
-ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${PYENV_ROOT}/versions/${python_version}/lib/python${python_version}/site-packages/nvidia/cudnn/lib
-
-
-FROM build as versioned
-RUN touch README.md
-COPY --chown=daml:daml pyproject.toml poetry.lock run ./
-COPY --chown=daml:daml src/ src/
-RUN poetry install --no-cache --only-root --all-extras
-
-
-# Copy tests dir
-FROM versioned as tests_dir
-COPY --chown=daml:daml .coveragerc ./
-COPY --chown=daml:daml tests/ tests/
-
-
-# Run unit tests and create coverage reports
-FROM tests_dir as unit
-CMD ./run unit
-
-
-# Run functional tests and create coverage reports
-FROM tests_dir as func
-CMD ./run func
-
-
-# Run typechecking
-FROM tests_dir as type
-CMD ./run type
-
-
-# Copy docs dir
-FROM tests_dir as docs_dir
-COPY --chown=daml:daml docs/ docs/
-
-
-# Build docs
-FROM docs_dir as docs
-CMD ./run docs
-
-
-# Run linters
-FROM docs_dir as lint
-CMD ./run lint
