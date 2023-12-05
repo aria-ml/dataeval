@@ -121,15 +121,15 @@ function docker_run() {
     trap "post_build_cleanup $temp $tag" EXIT
 
     # if docker images are not accessible build dependencies locally
-    docker manifest inspect $deps_image:$deps_hash-$pver > /dev/null 2>&1 && deps_image_build_arg="--build-arg deps_image=$deps_image:$deps_hash" || echo "Unable to pull dependency image $deps_image:$deps_hash-$pver."
+    docker manifest inspect $deps_image:$deps_hash-$pver > /dev/null 2>&1 && deps_image_build_arg="--build-arg deps_image=$deps_image:$deps_hash-$pver" || echo "Unable to pull dependency image $deps_image:$deps_hash-$pver."
 
-    docker_build_cmd="docker build $verbosity $deps_image_build_arg --build-arg python_version=$pver --cache-from $build_image:$build_hash-$pver --cache-from $build_image:main-$pver --cache-from $base_image:$base_hash --cache-from $base_image:main --tag $tag --target $task ."
+    docker_build_cmd="docker build $verbosity $deps_image_build_arg --build-arg python_version=$pver --cache-from $build_image:$build_hash-$pver --cache-from $build_image:main-$pver --cache-from $deps_image:main-$pver --cache-from $deps_image:base-$pver --cache-from $base_image:$base_hash --cache-from $base_image:main --tag $tag --target run ."
     docker_run_args="--name $tag $gpuflag $tag"
     docker_run_envs="--env POETRY_HTTP_BASIC_JATIC_PASSWORD=${CI_JOB_TOKEN}${POETRY_HTTP_BASIC_JATIC_PASSWORD}"
 
     if [[ $verbose ]]; then
         (echo "Building $tag..."; echo $docker_build_cmd; $docker_build_cmd | tee $temp; exit ${PIPESTATUS[0]}) && \
-        (echo "Running $tag..."; echo docker run $docker_run_args; docker run $docker_run_envs $docker_run_args | tee -a $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
+        (echo "Running $tag..."; echo docker run $docker_run_args $task; docker run $docker_run_envs $docker_run_args $task | tee -a $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
     else
         $docker_build_cmd &> $temp && docker run $docker_run_envs $docker_run_args &>> $temp || result="FAILED"
     fi
@@ -152,15 +152,12 @@ function docker_run() {
 }
 
 function ensure_image() {
-    local needs_build
     echo "Checking $2:$3$4 image..."
-    docker manifest inspect $2:$3$4 > /dev/null 2>&1 || needs_build=1
-    if [[ $needs_build ]]; then
+    if ! $(docker manifest inspect $2:$3$4 > /dev/null 2>&1); then
         echo "Building $2:$3$4..."
         docker build $verbosity \
             ${@:5} \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
-            --cache-from $2:$3$4 \
             --cache-from $2:main$4 \
             --tag $2:$3$4 \
             --target $1 .
@@ -172,8 +169,8 @@ function ensure_image() {
     fi
 
     if [[ $CI && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $push_to_repo && $3 != base ]]; then
-        main_manifest=$(docker manifest inspect $2:main$4 2> /dev/null) || true
-        hash_manifest=$(docker manifest inspect $2:$3$4 2> /dev/null) || true
+        local main_manifest=$(docker manifest inspect $2:main$4 2> /dev/null) || true
+        local hash_manifest=$(docker manifest inspect $2:$3$4 2> /dev/null) || true
         if [[ "$main_manifest" != "$hash_manifest" ]]; then
             echo "Updating $2:main$4 image with $3 build..."
             docker pull $2:$3$4
@@ -211,32 +208,21 @@ if [[ $build_only ]]; then
 
         # first handle base images
         if [[ ${pvers[base]} ]]; then
-            ensure_image base $base_image $base_hash &
-            for pver in 3.8 3.9 3.10 3.11; do
-                ensure_image pybase-$pver $deps_image base -$pver --build-arg python_version=$pver &
-            done
-            wait
+            unset pvers[base]
+            ensure_image base $base_image $base_hash || exit 1
         fi
 
         # now build python specific versioned images
         for pver in ${!pvers[@]}; do
-            if [[ $pver == base ]]; then continue; fi
             (
-                ensure_image pydeps-$pver $deps_image $deps_hash -$pver --build-arg python_version=$pver --cache-from $deps_image:base-$pver &&
-                ensure_image build $build_image $build_hash -$pver --build-arg deps_image=$deps_image:$deps_hash --build-arg python_version=$pver --cache-from $base_image:$base_hash --cache-from $deps_image:$deps_hash-$pver
-            ) &
+                ensure_image pybase $deps_image base -$pver --build-arg python_version=$pver &&
+                ensure_image pydeps $deps_image $deps_hash -$pver --build-arg base_image=$deps_image:base-$pver --build-arg python_version=$pver --cache-from $deps_image:main-$pver &&
+                if [[ $CI ]]; then
+                    ensure_image build $build_image $build_hash -$pver --build-arg deps_image=$deps_image:$deps_hash-$pver --build-arg python_version=$pver --cache-from $base_image:$base_hash --cache-from $build_image:main-$pver
+                fi
+            ) || exit 1 &
         done
         wait
-
-        if [[ -z $CI && ${!pvers[@]} == ${!supported_pvers[@]} ]]; then
-            echo "Building devcontainer..."
-            docker build $verbosity \
-                --build-arg deps_image=$deps_image:$deps_hash \
-                --cache-from $base_image:$base_hash \
-                --tag daml-devcontainer \
-                --target devcontainer .
-            docker image prune -f
-        fi
     )
     exit 0
 fi
