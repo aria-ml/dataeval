@@ -52,7 +52,7 @@ func=""
 case $1 in
     "func") func="--runfunctional";&
     "unit") ensureJATIC
-            poetry install --no-root --with jatic --all-extras
+            poetry install --only jatic --all-extras
             if [[ -z $CI ]]; then export CUDA_VISIBLE_DEVICES=-1; fi # disable GPU for local test runs - comment out this line to enable
             coverage run --data-file=output/.coverage.$1.$pver --source=daml --branch -m pytest $func --junitxml=output/junit.$1.$pver.xml --verbose --durations=0
             coverage report --data-file=output/.coverage.$1.$pver
@@ -68,9 +68,9 @@ case $1 in
             codespell
             ;;
     "docs") ensureJATIC
+            poetry install --only jatic --all-extras
             export TF_CPP_MIN_LOG_LEVEL=3
             export PYDEVD_DISABLE_FILE_VALIDATION=1
-            poetry install --no-root --with docs --with jatic --all-extras
             sphinx-build -M html docs output/docs -j 4
             ;;
     "lock") ensureJATIC
