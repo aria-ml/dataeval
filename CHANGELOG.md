@@ -1,6 +1,8 @@
-[//]: # (4f794111c615888efa50555d356a4f25bae5769a)
+[//]: # (4fd3ca77f3cf9310e0c6dbf780975da2687adcce)
 
 # DAML Change Log
+## v0.34.5
+- ```4fd3ca77 - add devenv script for custom capabilities on devcontainer```
 ## v0.34.4
 ## v0.34.3
 - ```5d858473 - Update documentation tutorials to use DamlDataset```
