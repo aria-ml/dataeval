@@ -13,6 +13,7 @@ Data-Analysis Metrics Library
    ml_lifecycle
    metrics
    tutorials
+   howtos
 
 ----------
 About DAML
