@@ -1,26 +1,23 @@
-import math
+from abc import ABC
 from typing import Literal, Optional
 
 import numpy as np
-import tensorflow as tf
 from sklearn.neighbors import NearestNeighbors
-from tensorflow.keras import layers, losses
-from tensorflow.keras.models import Model
-from tensorflow.nn import relu
+from tensorflow.keras import losses
 
 from daml._internal.datasets.datasets import DamlDataset
-from daml._internal.metrics.base import Metric
+from daml._internal.models.autoencoder import ARiAAutoencoder, create_default_model
 
 
-class _AriaMetric(Metric):
+class _AriaMetric(ABC):
     """Abstract base class for ARiA metrics"""
 
     def __init__(self, encode: bool):
         """Constructor method"""
 
-        self.is_trained: bool = False
         self.encode = encode
         self.autoencoder: Optional[ARiAAutoencoder] = None
+        self._is_trained: bool = False
 
     def fit_dataset(
         self,
@@ -28,8 +25,7 @@ class _AriaMetric(Metric):
         epochs: int = 3,
     ) -> None:
         """
-        Trains a model on a dataset containing that can be used
-        for the detection of outliers in :method:`evaluate`
+        Trains a model on a dataset to be used during calculation of metrics.
 
         Parameters
         ----------
@@ -40,9 +36,9 @@ class _AriaMetric(Metric):
 
         """
         images = dataset.images
-        shape = images.shape[1:]
+        shape = (images.shape[1], images.shape[2], images.shape[3])
         latent_dim = 64
-        self.autoencoder = ARiAAutoencoder(latent_dim, shape)
+        self.autoencoder = create_default_model(ARiAAutoencoder, shape, latent_dim)
 
         self.autoencoder.compile(optimizer="adam", loss=losses.MeanSquaredError())
 
@@ -52,7 +48,7 @@ class _AriaMetric(Metric):
             epochs=epochs,
             shuffle=True,
         )
-        self.is_trained = True
+        self._is_trained = True
 
     def _compute_neighbors(
         self,
@@ -92,69 +88,3 @@ class _AriaMetric(Metric):
         nns = nns[:, 1]
 
         return nns
-
-
-class ARiAAutoencoder(Model):
-    """
-    Basic encoder for ARiA data metrics
-
-    Attributes
-    ----------
-    encoder : tf.keras.Model
-        The internal encoder
-    decoder : tf.keras.Model
-        The internal decoder
-
-    See also
-    ----------
-    https://www.tensorflow.org/tutorials/generative/autoencoder
-    """
-
-    def __init__(self, encoding_dim, input_shape):
-        super(ARiAAutoencoder, self).__init__()
-        self.encoding_dim = encoding_dim
-        self.shape = input_shape
-        self.encoder = tf.keras.Sequential(
-            [
-                layers.InputLayer(input_shape=self.shape),
-                layers.Conv2D(64, 4, strides=2, padding="same", activation=relu),
-                layers.Conv2D(128, 4, strides=2, padding="same", activation=relu),
-                layers.Conv2D(512, 4, strides=2, padding="same", activation=relu),
-                layers.Flatten(),
-                layers.Dense(self.encoding_dim),
-            ]
-        )
-        self.decoder = tf.keras.Sequential(
-            [
-                layers.InputLayer(input_shape=(self.encoding_dim,)),
-                layers.Dense(4 * 4 * 128),
-                layers.Reshape(target_shape=(4, 4, 128)),
-                layers.Conv2DTranspose(
-                    256, 4, strides=2, padding="same", activation=relu
-                ),
-                layers.Conv2DTranspose(
-                    64, 4, strides=2, padding="same", activation=relu
-                ),
-                layers.Flatten(),
-                layers.Dense(math.prod(self.shape)),
-                layers.Reshape(target_shape=self.shape),
-            ]
-        )
-
-    def call(self, x):
-        """
-        Override for TensorFlow model call method
-
-        Parameters
-        ----------
-        x : Iterable[float]
-            Data to run through the model
-
-        Returns
-        -------
-        decoded : Iterable[float]
-            The resulting data after x is run through the encoder and decoder.
-        """
-        encoded = self.encoder(x)
-        decoded = self.decoder(encoded)
-        return decoded

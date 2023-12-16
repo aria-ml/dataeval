@@ -4,13 +4,14 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
+from daml._internal.models.autoencoder import create_default_model
 from daml.datasets import DamlDataset
 from daml.metrics.outlier_detection import (
-    AE,
-    AEGMM,
-    LLR,
-    VAE,
-    VAEGMM,
+    OD_AE,
+    OD_AEGMM,
+    OD_LLR,
+    OD_VAE,
+    OD_VAEGMM,
     Threshold,
     ThresholdType,
 )
@@ -19,7 +20,7 @@ from .utils import MockImageClassificationGenerator
 
 
 @pytest.mark.functional
-@pytest.mark.parametrize("method", [AE, AEGMM, VAE, VAEGMM, LLR])
+@pytest.mark.parametrize("method", [OD_AE, OD_AEGMM, OD_VAE, OD_VAEGMM, OD_LLR])
 class TestAlibiDetect_Functional:
     # Test main functionality of the program
     def test_label_5s_as_outliers(self, method):
@@ -34,7 +35,6 @@ class TestAlibiDetect_Functional:
 
         # Initialize the autoencoder-based outlier detector from alibi-detect
         metric = method()
-        metric.initialize_detector(input_shape)
 
         # Initialize a dataset of 32 images of size 32x32x3, containing all 1's
         all_ones = MockImageClassificationGenerator(
@@ -87,7 +87,6 @@ class TestAlibiDetect_Functional:
         input_shape = (38, 38, 2)
         metric = method()
         # Initialize the autoencoder-based outlier detector from alibi-detect
-        metric.initialize_detector(input_shape)
 
         # Initialize a dataset of 32 images of size 32x32x3, containing all 1's
         all_ones = MockImageClassificationGenerator(
@@ -115,14 +114,11 @@ class TestAlibiDetect_Functional:
 @pytest.mark.parametrize(
     "method, classnames",
     [
-        (AE, ["alibi_detect.od.OutlierAE"]),
-        (AEGMM, ["alibi_detect.od.OutlierAEGMM"]),
-        (
-            LLR,
-            ["alibi_detect.od.LLR", "daml._internal.metrics.alibi_detect.llr.PixelCNN"],
-        ),
-        (VAE, ["alibi_detect.od.OutlierVAE"]),
-        (VAEGMM, ["alibi_detect.od.OutlierVAEGMM"]),
+        (OD_AE, ["alibi_detect.od.OutlierAE"]),
+        (OD_AEGMM, ["alibi_detect.od.OutlierAEGMM"]),
+        (OD_LLR, ["alibi_detect.od.LLR", "daml._internal.models.autoencoder.PixelCNN"]),
+        (OD_VAE, ["alibi_detect.od.OutlierVAE"]),
+        (OD_VAEGMM, ["alibi_detect.od.OutlierVAEGMM"]),
     ],
 )
 class TestAlibiDetect:
@@ -142,13 +138,14 @@ class TestAlibiDetect:
             if self._is_mock_expected is not None:
                 assert mock[1].called == self._is_mock_expected
             mock[0].stop()
+        self._is_mock_expected = True
 
     # Ensure that the program fails upon wrong order of operations
     def test_eval_before_fit_fails(self, method):
+        self._is_mock_expected = False
         """Raises error when evaluate is called before fitting a model"""
         # Load metric and create model
         metric = method()
-        metric.initialize_detector(self.input_shape)
 
         # Create Daml dataset
         dataset = DamlDataset(self.all_ones.dataset.images)
@@ -160,6 +157,7 @@ class TestAlibiDetect:
     # Ensure that the program fails upon testing on a dataset of different
     # shape than what was trained on
     def test_wrong_dataset_dims_fails(self, method):
+        self._is_mock_expected = None
         """
         Raises an error when image shape in evaluate
         does not match the detector input
@@ -167,7 +165,8 @@ class TestAlibiDetect:
         # Load metric and create model with a "typo" for input shape
         faulty_input_shape = (31, 32, 3)
         metric = method()
-        metric.initialize_detector(faulty_input_shape)
+        model = create_default_model(metric._model_class, faulty_input_shape)
+        metric.model = model
 
         # Create daml dataset
         images = self.all_ones.dataset.images
@@ -182,10 +181,10 @@ class TestAlibiDetect:
             metric.evaluate(dataset)
 
     def test_missing_detector(self, method):
+        self._is_mock_expected = False
         """
         Raises error if fit_dataset or evaluate are called without a detector
         """
-        self._is_mock_expected = False
         # Load metric
         metric = method()
 
@@ -195,16 +194,12 @@ class TestAlibiDetect:
 
         # Test
         with pytest.raises(TypeError):
-            metric.fit_dataset(dataset=dataset, epochs=1, verbose=False)
-
-        with pytest.raises(TypeError):
             metric.evaluate(dataset=dataset)
 
     def test_initialize_fit_evaluate(self, method):
         """What does this test? Is this a pseudo functional test?"""
         # Load metric and create model
         metric = method()
-        metric.initialize_detector(self.input_shape)
 
         # Load dataset
         images = self.all_ones.dataset.images
@@ -220,7 +215,6 @@ class TestAlibiDetect:
         """Asserts that the threshold is set by fit_dataset"""
         # Load metric and create model
         metric = method()
-        metric.initialize_detector(self.input_shape)
 
         # Load dataset and set type
         images = self.all_ones.dataset.images
@@ -249,13 +243,3 @@ class TestAlibiDetect:
         assert not metric._predict_kwargs["return_instance_score"]
         for key in expected:
             assert metric._predict_kwargs[key] == expected[key]
-
-    def test_set_model_is_retained(self, method):
-        self._is_mock_expected = None
-        metric = method()
-        # artificially fill all arguments of the model with 0s
-        argcount = metric.set_model.__code__.co_argcount - 1
-        metric.set_model(*[0] * argcount)
-        metric.initialize_detector(self.input_shape)
-        print(metric._model_kwargs.values())
-        assert all(v == 0 for v in metric._model_kwargs.values())
