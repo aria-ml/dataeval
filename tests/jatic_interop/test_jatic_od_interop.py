@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from daml._internal.interop.wrappers.jatic import JaticClassificationDatasetWrapper
-from daml.metrics.outlier_detection import AE, AEGMM, LLR, VAE, VAEGMM
+from daml.metrics.outlier_detection import OD_AE, OD_AEGMM, OD_LLR, OD_VAE, OD_VAEGMM
 from tests.utils.JaticUtils import (
     JaticImageClassificationDataset,
     check_jatic_classification,
@@ -12,11 +12,11 @@ from tests.utils.JaticUtils import (
 @pytest.mark.parametrize(
     "method",
     [
-        AE,
-        pytest.param(AEGMM, marks=pytest.mark.functional),
-        pytest.param(VAE, marks=pytest.mark.functional),
-        pytest.param(VAEGMM, marks=pytest.mark.functional),
-        pytest.param(LLR, marks=pytest.mark.functional),
+        OD_AE,
+        pytest.param(OD_AEGMM, marks=pytest.mark.functional),
+        pytest.param(OD_VAE, marks=pytest.mark.functional),
+        pytest.param(OD_VAEGMM, marks=pytest.mark.functional),
+        pytest.param(OD_LLR, marks=pytest.mark.functional),
     ],
 )
 @pytest.mark.interop
@@ -41,9 +41,6 @@ class TestOutlierDetectionJaticInterop:
         check_jatic_classification(jatic_ds)
         # Wrap jatic dataset with daml dataset
         daml_ds = JaticClassificationDatasetWrapper(jatic_ds)
-
-        # Initialize a detector
-        method.initialize_detector(daml_ds.images[0].shape)
 
         # Test 1: Fit dataset
         method.fit_dataset(daml_ds, epochs=1, batch_size=32, verbose=0)

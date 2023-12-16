@@ -1,13 +1,19 @@
-from daml._internal.metrics.base import Threshold, ThresholdType
 from daml._internal.metrics.outputs import OutlierDetectorOutput
-from daml.metrics.outlier_detection.alibi_detect import AE, AEGMM, LLR, VAE, VAEGMM
+from daml._internal.metrics.types import Threshold, ThresholdType
+from daml.metrics.outlier_detection.alibi_detect import (
+    OD_AE,
+    OD_AEGMM,
+    OD_LLR,
+    OD_VAE,
+    OD_VAEGMM,
+)
 
 __all__ = [
-    "AE",
-    "AEGMM",
-    "LLR",
-    "VAE",
-    "VAEGMM",
+    "OD_AE",
+    "OD_AEGMM",
+    "OD_LLR",
+    "OD_VAE",
+    "OD_VAEGMM",
     "OutlierDetectorOutput",
     "Threshold",
     "ThresholdType",

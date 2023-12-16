@@ -1,17 +1,18 @@
-Metrics API
-+++++++++++
+DAML API
+++++++++
 
 .. toctree::
    :hidden:
 
-   metrics/ber
-   metrics/divergence
-   metrics/outlier-detection
+   api/ber
+   api/divergence
+   api/outlier-detection
+   api/models
 
-Blurb on what data metrics are and why they are important.
+API
+---
 
 .. autosummary::
-   :recursive:
 
    daml.metrics.ber.BER_FNN
    daml.metrics.ber.BER_MST
@@ -19,14 +20,15 @@ Blurb on what data metrics are and why they are important.
    daml.metrics.divergence.HP_FNN
    daml.metrics.divergence.HP_MST
    daml.metrics.divergence.DivergenceOutput
-   daml.metrics.outlier_detection.AE
-   daml.metrics.outlier_detection.AEGMM
-   daml.metrics.outlier_detection.LLR
+   daml.metrics.outlier_detection.OD_AE
+   daml.metrics.outlier_detection.OD_AEGMM
+   daml.metrics.outlier_detection.OD_LLR
+   daml.metrics.outlier_detection.OD_VAE
+   daml.metrics.outlier_detection.OD_VAEGMM
    daml.metrics.outlier_detection.OutlierDetectorOutput
-   daml.metrics.outlier_detection.VAE
-   daml.metrics.outlier_detection.VAEGMM
 
 Enums and Types
+---------------
 
 .. autoclass:: daml.metrics.outlier_detection.Threshold()
    :members:                                        

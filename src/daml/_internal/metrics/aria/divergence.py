@@ -3,7 +3,7 @@ This module contains the implementation of Dp Divergence
 using the First Nearest Neighbor and Minimum Spanning Tree algorithms
 """
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 import numpy as np
 from scipy.sparse import csr_matrix
@@ -15,7 +15,7 @@ from daml._internal.metrics.aria.base import _AriaMetric
 from daml._internal.metrics.outputs import DivergenceOutput
 
 
-class _DpDivergence(_AriaMetric, ABC):
+class _DpDivergence(_AriaMetric):
     """
     For more information about this divergence, its formal definition,
     and its associated estimators
@@ -28,8 +28,12 @@ class _DpDivergence(_AriaMetric, ABC):
 
     @abstractmethod
     def calculate_errors(self, data: np.ndarray, labels: np.ndarray) -> int:
-        """"""
-        raise NotImplementedError
+        pass
+
+    def set_dataset(self, dataset: DamlDataset) -> None:
+        """
+        Sets the source dataset which will be used to calculate divergence"""
+        self.dataset = dataset
 
     def evaluate(
         self,
@@ -60,7 +64,7 @@ class _DpDivergence(_AriaMetric, ABC):
         imgs_b: np.ndarray = dataset_b.images
 
         if self.encode:
-            if not self.is_trained or self.autoencoder is None:
+            if not self._is_trained or self.autoencoder is None:
                 raise TypeError(
                     "Tried to encode data without fitting a model.\
                     Try calling Metric.fit_dataset(dataset) first."
