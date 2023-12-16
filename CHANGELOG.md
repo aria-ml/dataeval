@@ -1,6 +1,7 @@
-[//]: # (fe34408e3278d4021d114282a911ab3cfa426b53)
+[//]: # (e73682207a20ad0e36f08ecf339aed5673920860)
 
 # DAML Change Log
+## v0.35.1
 ## v0.35.0
 - ```fe34408e - Refactor metrics and split models out from outlier_detection```
 ## v0.34.5
