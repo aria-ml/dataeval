@@ -11,7 +11,7 @@ Data-Analysis Metrics Library
    :hidden:
 
    ml_lifecycle
-   metrics
+   api
    tutorials
    howtos
 

@@ -57,7 +57,7 @@ optional = true
 pytest = "*"
 coverage = "*"
 # type
-pyright = "*"
+pyright = {version = "*, !=1.1.340"}
 # lint
 flake8 = "*"
 flake8-pyproject = "*"

@@ -3,7 +3,7 @@ This module contains the implementation of the
 FR Test Statistic based estimate and the
 FNN based estimate for the Bayes Error Rate
 """
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Tuple
 
 import numpy as np
@@ -16,7 +16,7 @@ from daml._internal.metrics.aria.base import _AriaMetric
 from daml._internal.metrics.outputs import BEROutput
 
 
-class _MultiClassBer(_AriaMetric, ABC):
+class _MultiClassBer(_AriaMetric):
     def __init__(self, encode: bool = False) -> None:
         """Constructor method"""
 
@@ -28,7 +28,7 @@ class _MultiClassBer(_AriaMetric, ABC):
         X: np.ndarray,
         y: np.ndarray,
     ) -> Tuple[float, float]:
-        raise NotImplementedError
+        pass
 
     def _get_classes_counts(self, labels: np.ndarray) -> Tuple[int, np.intp]:
         classes, counts = np.unique(labels, return_counts=True)
@@ -70,7 +70,7 @@ class _MultiClassBer(_AriaMetric, ABC):
 
         # If self.encode == True, pass X through an autoencoder before evaluating BER
         if self.encode:
-            if not self.is_trained or self.autoencoder is None:
+            if not self._is_trained or self.autoencoder is None:
                 raise TypeError(
                     "Tried to encode data without fitting a model.\
                     Try calling Metric.fit_dataset(dataset) first."
@@ -125,9 +125,8 @@ class MultiClassBerMST(_MultiClassBer):
         dense_eudist = squareform(pdist(X)) + 1e-4
         eudist_csr = csr_matrix(dense_eudist)
         tree = coo_matrix(minimum_spanning_tree(eudist_csr))
-        deltas = np.sum([y[tree.row[i]] != y[tree.col[i]] for i in range(N - 1)]) / (
-            2 * N
-        )
+        sum = np.sum([y[tree.row[i]] != y[tree.col[i]] for i in range(N - 1)])
+        deltas = sum / (2 * N)
         upper = 2 * deltas
         lower = ((M - 1) / (M)) * (1 - (1 - 2 * ((M) / (M - 1)) * deltas) ** 0.5)
         return upper, lower
