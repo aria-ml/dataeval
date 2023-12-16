@@ -2,11 +2,11 @@
 
 # DAML Change Log
 ## v0.35.1
+- ```e7368220 - update dependencies for maite rename```
 ## v0.35.0
 - ```fe34408e - Refactor metrics and split models out from outlier_detection```
 ## v0.34.5
 - ```4fd3ca77 - add devenv script for custom capabilities on devcontainer```
-## v0.34.4
 ## v0.34.3
 - ```5d858473 - Update documentation tutorials to use DamlDataset```
 ## v0.34.2
