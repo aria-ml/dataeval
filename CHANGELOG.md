@@ -1,6 +1,8 @@
-[//]: # (4fd3ca77f3cf9310e0c6dbf780975da2687adcce)
+[//]: # (fe34408e3278d4021d114282a911ab3cfa426b53)
 
 # DAML Change Log
+## v0.35.0
+- ```fe34408e - Refactor metrics and split models out from outlier_detection```
 ## v0.34.5
 - ```4fd3ca77 - add devenv script for custom capabilities on devcontainer```
 ## v0.34.4
