@@ -1,7 +1,13 @@
-from daml._internal.metrics.alibi_detect import AlibiAE as AE
-from daml._internal.metrics.alibi_detect import AlibiAEGMM as AEGMM
-from daml._internal.metrics.alibi_detect import AlibiLLR as LLR
-from daml._internal.metrics.alibi_detect import AlibiVAE as VAE
-from daml._internal.metrics.alibi_detect import AlibiVAEGMM as VAEGMM
+from daml._internal.metrics.alibi_detect.ae import AlibiAE as OD_AE
+from daml._internal.metrics.alibi_detect.aegmm import AlibiAEGMM as OD_AEGMM
+from daml._internal.metrics.alibi_detect.llr import AlibiLLR as OD_LLR
+from daml._internal.metrics.alibi_detect.vae import AlibiVAE as OD_VAE
+from daml._internal.metrics.alibi_detect.vaegmm import AlibiVAEGMM as OD_VAEGMM
 
-__all__ = ["AE", "AEGMM", "LLR", "VAE", "VAEGMM"]
+__all__ = [
+    "OD_AE",
+    "OD_AEGMM",
+    "OD_LLR",
+    "OD_VAE",
+    "OD_VAEGMM",
+]

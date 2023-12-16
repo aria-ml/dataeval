@@ -1,13 +1,13 @@
 import pytest
 
-from daml.metrics.outlier_detection import AE, AEGMM, LLR, VAE, VAEGMM
+from daml.metrics.outlier_detection import OD_AE, OD_AEGMM, OD_LLR, OD_VAE, OD_VAEGMM
 
 from .utils import MockImageClassificationGenerator
 
 
 class TestDatasetType:
     def test_dataset_type_is_none(self):
-        metric = AE()
+        metric = OD_AE()
 
         all_ones = MockImageClassificationGenerator(
             limit=1, labels=1, img_dims=(32, 32), channels=3
@@ -15,7 +15,7 @@ class TestDatasetType:
         all_ones_images = all_ones.dataset.images
         metric._check_dtype(all_ones_images)
 
-    @pytest.mark.parametrize("method", [AE, AEGMM, VAE, VAEGMM, LLR])
+    @pytest.mark.parametrize("method", [OD_AE, OD_AEGMM, OD_VAE, OD_VAEGMM, OD_LLR])
     def test_dataset_type_is_incorrect(self, method):
         all_ones = MockImageClassificationGenerator(
             limit=1, labels=1, img_dims=(32, 32), channels=3
@@ -31,7 +31,7 @@ class TestDatasetType:
             metric._check_dtype(images)
 
     def test_dataset_type_is_not_numpy(self):
-        metric = AEGMM()
+        metric = OD_AEGMM()
 
         all_ones = MockImageClassificationGenerator(
             limit=1, labels=1, img_dims=(32, 32), channels=3
@@ -73,7 +73,7 @@ class TestFlatten:
             limit=limit, labels=1, img_dims=img_dims, channels=channels
         )
         # Define model
-        metric = AE()
+        metric = OD_AE()
         images = all_ones.dataset.images
         metric._flatten_dataset = True
         new_dataset = metric._format_images(images)

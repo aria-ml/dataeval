@@ -12,8 +12,9 @@ import numpy as np
 import tensorflow as tf
 
 from daml._internal.datasets import DamlDataset
-from daml._internal.metrics.base import Metric, Threshold, ThresholdType
 from daml._internal.metrics.outputs import OutlierDetectorOutput
+from daml._internal.metrics.types import Threshold, ThresholdType
+from daml._internal.models.autoencoder import create_default_model
 
 
 class AlibiDetectOutlierType(str, Enum):
@@ -24,7 +25,7 @@ class AlibiDetectOutlierType(str, Enum):
         return str.__str__(self)  # pragma: no cover
 
 
-class _AlibiDetectMetric(Metric, ABC):
+class _AlibiDetectMetric(ABC):
     """
     Base class for all outlier detection metrics in alibi-detect
 
@@ -32,11 +33,8 @@ class _AlibiDetectMetric(Metric, ABC):
     ----------
     detector : Any, default None
         A model used for outlier detection after being trained on clean data
-    is_trained : bool, default False
-        Flag to determine if the detector has been trained on the dataset
     """
 
-    # TODO: Add model loading & saving
     @staticmethod
     def _update_kwargs_with_locals(kwargs_to_update, **kwargs):
         kwargs_to_update.update(
@@ -44,25 +42,20 @@ class _AlibiDetectMetric(Metric, ABC):
         )
 
     @abstractmethod
-    def set_model(self) -> None:
-        raise NotImplementedError
-
-    @abstractmethod
     def set_prediction_args(self) -> None:
-        raise NotImplementedError
-
-    @abstractmethod
-    def _get_default_model_kwargs(self) -> dict:
-        raise NotImplementedError
+        pass
 
     @property
     @abstractmethod
     def _default_predict_kwargs(self) -> dict:
-        raise NotImplementedError
+        pass
 
     def __init__(
         self,
         alibi_detect_class: type,
+        model_class: type,
+        model_param_name: str,
+        model: Optional[Any],
         flatten_dataset: bool,
         dataset_type: Optional[type] = None,
     ):
@@ -78,11 +71,12 @@ class _AlibiDetectMetric(Metric, ABC):
         dataset_type : Optional[type], default None
             Type used for formatting the dataset
         """
-
         self.detector: Any = None
         self.is_trained: bool = False
 
         self._alibi_detect_class = alibi_detect_class
+        self._model_class = model_class
+        self._model_param_name = model_param_name
         self._flatten_dataset = flatten_dataset
         self._dataset_type = dataset_type
 
@@ -92,26 +86,11 @@ class _AlibiDetectMetric(Metric, ABC):
 
         self._input_shape: Tuple[int, int, int]
 
-    def initialize_detector(self, input_shape: Tuple[int, int, int]) -> None:
-        """
-        Initialize the architecture and model weights of the autoencoder.
-
-        Parameters
-        ----------
-        input_shape : tuple(int)
-            The shape (H, W, C) of the dataset that the detector will be constructed
-            around. This influences the internal neural network architecture and should
-            be the same shape as the dataset that the detector will be trained on.
-        """
-        self._input_shape = input_shape
-        tf.keras.backend.clear_session()
-
-        # code is covered by concrete child classes
-        if not any(self._model_kwargs):  # pragma: no cover
-            self._model_kwargs.update(self._get_default_model_kwargs())
-
-        # initialize outlier detector using autoencoder network
-        self.detector = self._alibi_detect_class(**self._model_kwargs)
+        if model is not None:
+            self.detector = self._alibi_detect_class(
+                threshold=0, **{model_param_name: model}
+            )
+            self._input_shape = model.layers[0].input_shape[0][-3:]
 
     # Train the alibi-detect metric on dataset
     def fit_dataset(
@@ -148,10 +127,13 @@ class _AlibiDetectMetric(Metric, ABC):
         ----
         The supplied dataset should contain no outliers for maximum benefit
         """
+        tf.keras.backend.clear_session()
         if self.detector is None:
-            raise TypeError(
-                "Tried to evaluate without initializing a detector. \
-                    Try calling metric.initialize_detector()"
+            self._input_shape = dataset.images[0].shape
+            model = create_default_model(self._model_class, self._input_shape)
+            self.detector = self._alibi_detect_class(
+                threshold=0,
+                **{self._model_param_name: model},
             )
 
         # Autoencoders only need images, so extract from dataset and format
@@ -175,6 +157,13 @@ class _AlibiDetectMetric(Metric, ABC):
             )
         else:
             self.detector.threshold = threshold.value
+
+    def export_model(self):
+        if self.detector is None:
+            raise RuntimeError("The model must be initialized first")
+        if self._model_param_name not in self.detector.__dict__.keys():
+            raise ValueError("Member not found in detector")
+        return self.detector[self._model_param_name]
 
     def _check_dtype(self, images: np.ndarray):
         """
@@ -282,13 +271,7 @@ class _AlibiDetectMetric(Metric, ABC):
             Outlier mask, and associated feature and instance scores
 
         """
-        if self.detector is None:
-            raise TypeError(
-                "Tried to evaluate without initializing a detector. \
-                    Try calling metric.initialize_detector()"
-            )
-
-        if not self.is_trained:
+        if self.detector is None or not self.is_trained:
             raise TypeError(
                 "Error: tried to evaluate a metric that is not trained. \
                     Try calling metric.fit_dataset(data)"
