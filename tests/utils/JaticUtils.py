@@ -1,4 +1,4 @@
-import jatic_toolbox.protocols as pr
+import maite.protocols as pr
 import numpy as np
 
 

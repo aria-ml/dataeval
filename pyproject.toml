@@ -82,7 +82,7 @@ tensorflow-datasets = {version = "*", python = ">=3.9,<3.12"}
 optional = true
 
 [tool.poetry.group.jatic.dependencies]
-jatic-toolbox = {version = "*", source = "jatic"}
+maite = {version = "*", source = "jatic"}
 
 [[tool.poetry.source]]
 name = "jatic"

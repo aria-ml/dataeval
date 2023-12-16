@@ -1,4 +1,4 @@
-from jatic_toolbox.protocols import ObjectDetectionDataset, VisionDataset
+from maite.protocols import ObjectDetectionDataset, VisionDataset
 
 from daml._internal.datasets import DamlDataset
 from daml._internal.interop.wrappers.jatic import (
