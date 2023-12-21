@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 from matplotlib.figure import Figure
 from scipy.optimize import minimize
+from torch.utils.data import DataLoader
 
 from daml._internal.datasets import DamlDataset
 
@@ -98,23 +99,23 @@ class Sufficiency:
     def __init__(
         self,
     ):
-        # Used to calculate total number of training runs
-        self._substeps = 0
-        self._num_models = 0
-
         # Train & Eval functions must be set during run
         self._training_func = None
         self._eval_func = None
 
         self._output_dict = None
 
-    def train(self, model, X, y, kwargs):
-        if callable(self._training_func):
-            self._training_func(model, X, y, **kwargs)
+    def _train(self, model: nn.Module, dataloader: DataLoader, kwargs: Dict[str, Any]):
+        if self._training_func is None:
+            raise TypeError("Training function is None. Set function before calling")
 
-    def eval(self, model, X, y, kwargs):
-        if callable(self._eval_func):
-            return self._eval_func(model, X, y, **kwargs)
+        self._training_func(model, dataloader, **kwargs)
+
+    def _eval(self, model: nn.Module, dataloader: DataLoader, kwargs: Dict[str, Any]):
+        if self._eval_func is None:
+            raise TypeError("Eval function is None. Set function before calling")
+
+        return self._eval_func(model, dataloader, **kwargs)
 
     def _set_func(self, func: Callable, error_msg="Argument was not a callable"):
         if callable(func):
@@ -122,19 +123,21 @@ class Sufficiency:
         else:
             raise TypeError(error_msg)
 
-    def set_training_func(self, func):
+    def set_training_func(self, func: Callable):
         self._training_func = self._set_func(func)
 
-    def set_eval_func(self, func):
+    def set_eval_func(self, func: Callable):
         self._eval_func = self._set_func(func)
 
-    def setup(self, length, num_models, substeps):
+    def setup(self, length: int, num_models: int = 1, substeps: int = 1):
+        if length <= 0:
+            raise ValueError("Length cannot be 0")
+
         # Stores each models' metric output per step
         self._outputs = np.zeros((substeps, num_models))
-
         # Save the shape for plotting
-        self._geomshape = (int(0.01 * length), length, substeps)
-        self._ranges = np.geomspace(*self._geomshape).astype(int)
+        self._geomshape = (0.01 * length, length, substeps)
+        self._ranges = np.geomspace(*self._geomshape).astype(np.int64)
 
         # Randomly sample data indices for each model
         self._indices = create_data_indices(num_models, length)
@@ -142,10 +145,12 @@ class Sufficiency:
     def run(
         self,
         model: nn.Module,
-        train: DamlDataset,
-        test: DamlDataset,
-        train_kwargs: Dict[str, Any] = {},
-        eval_kwargs: Dict[str, Any] = {},
+        train_ds: DamlDataset,
+        test_ds: DamlDataset,
+        train_kwargs: Optional[
+            Dict[str, Any]
+        ] = None,  # Mutable sequences should not be used as default arg
+        eval_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Creates data indices, trains models, and returns plotting data
@@ -167,11 +172,15 @@ class Sufficiency:
         Dict[str, Any]
         """
 
-        # Convert datasets to correct type?
-        X_test = torch.from_numpy(test.images.astype(np.float32))
-        y_test = torch.from_numpy(test.labels)
+        if train_kwargs is None:
+            train_kwargs = {}
+        if eval_kwargs is None:
+            eval_kwargs = {}
 
-        # For each model's dataset
+        # BUG -> Manual conversion required. PyTorch fails on non np.float32
+        X_test = test_ds.images.astype(np.float32)
+        y_test = test_ds.labels
+        # Bootstrapping
         for j, inds in enumerate(self._indices):
             # Reset the network weights
             model = reset_parameters(model)
@@ -180,13 +189,17 @@ class Sufficiency:
             for i, substep in enumerate(self._ranges):
                 # We warm start on new data
                 b_inds = inds[:substep]
-                X_train = torch.from_numpy(train.images[b_inds].astype(np.float32))
-                y_train = torch.from_numpy(train.labels[b_inds])
 
-                self.train(model, X_train, y_train, train_kwargs)
+                images: np.ndarray = train_ds.images[b_inds].astype(np.float32)
+                labels = train_ds.labels[b_inds] if len(train_ds.labels) else None
+                boxes = train_ds.boxes[b_inds] if len(train_ds.boxes) else None
 
-                # After each substep training, evaluate model on the test set
-                self._outputs[i, j] = self.eval(model, X_test, y_test, eval_kwargs)
+                subset_dataset = DamlDataset(images, labels, boxes)
+                subset_test = DamlDataset(X_test, y_test)
+
+                self._outputs[i, j] = self._run_subset(
+                    model, subset_dataset, subset_test, train_kwargs, eval_kwargs
+                )
 
         n_i = self._ranges
         p_i = 1 - np.mean(self._outputs, axis=1)
@@ -203,6 +216,19 @@ class Sufficiency:
 
         return self._output_dict
 
+    def _run_subset(
+        self,
+        model: nn.Module,
+        train_data: DamlDataset,
+        eval_data: DamlDataset,
+        train_kwargs,
+        eval_kwargs,
+    ):
+        train_loader = DataLoader(train_data)
+        self._train(model, train_loader, train_kwargs)
+        test_loader = DataLoader(eval_data)
+        return self._eval(model, test_loader, eval_kwargs)
+
     def plot(self, output_dict: Dict[str, Any]):
         """Plotting function for data sufficiency tasks
 
@@ -214,7 +240,6 @@ class Sufficiency:
             Output of sufficiency run
 
         """
-
         # Retrieve only relevant values in dictionary
         params = output_dict.get("params", None)
         n_i = output_dict.get("n_i", None)
@@ -243,7 +268,9 @@ class Sufficiency:
         ax.scatter(n_i, 1 - p_i, label="Model Results", s=15, c="black")
 
         # Plot line of best fit with extrapolation
-        extrapolated = np.geomspace(geomshape[0], geomshape[1] * 4, geomshape[2])
+        extrapolated = np.geomspace(
+            geomshape[0], geomshape[1] * 4, geomshape[2]
+        ).astype(np.int64)
         ax.plot(
             extrapolated,
             1 - f_out(extrapolated, params),
