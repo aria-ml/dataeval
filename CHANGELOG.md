@@ -1,6 +1,8 @@
-[//]: # (e73682207a20ad0e36f08ecf339aed5673920860)
+[//]: # (0799523b7843a5dfc2dc78f649471e2dff786755)
 
 # DAML Change Log
+## v0.36.0
+- ```0799523b - Object detection model training```
 ## v0.35.1
 - ```e7368220 - update dependencies for maite rename```
 ## v0.35.0
