@@ -64,3 +64,17 @@ class BEROutput:
 
     ber: float
     ber_lower: float
+
+
+@dataclass
+class UAPOutput:
+    """
+    Dataclass to store output from UAP metrics
+
+    Attributes
+    ----------
+    uap : float
+        The maximum average precision that can be achieved by a detector.
+    """
+
+    uap: float

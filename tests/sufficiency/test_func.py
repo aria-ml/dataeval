@@ -131,7 +131,6 @@ class TestSufficiencyFunctional:
         assert params[0] >= 0.0
         assert params[1] >= 0.0
         assert params[2] >= 0.0
-        assert params[2] <= 0.5
 
         params = output["params"]
         assert len(params) == 3

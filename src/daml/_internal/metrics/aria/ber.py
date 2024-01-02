@@ -46,11 +46,9 @@ class _MultiClassBer(_AriaMetric):
 
         Parameters
         ----------
-        X : np.ndarray
-            (n_samples x n_features) array of covariates (or image embeddings)
-        y : np.ndarray
-            n_samples vector of class labels with M unique classes. 2 <= M <= 10
-
+        dataset : DamlDataset
+            Dataset containing (n_samples x n_features) array of (padded) instance
+            embeddings and n_samples vector of class labels with M unique classes.
         Returns
         -------
         BEROutput
