@@ -1,6 +1,9 @@
-[//]: # (0799523b7843a5dfc2dc78f649471e2dff786755)
+[//]: # (7d1a599f90972fc2cfda1cc4e65f1eb1bb5290ff)
 
 # DAML Change Log
+## v0.36.1
+- ```7d1a599f - Implement the uap class```
+- ```9ad6f904 - Create classification dataset sufficiency tutorial```
 ## v0.36.0
 - ```0799523b - Object detection model training```
 ## v0.35.1
