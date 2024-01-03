@@ -45,6 +45,10 @@ tensorflow_probability = [
   {version = "~0.21.0", python = "~3.8.1", optional = true},
   {version = "~0.22.1", python = ">=3.9,<3.12", optional = true},
 ]
+tensorflow-io-gcs-filesystem = [
+  {version = "~0.34.0", python = "~3.8.1", optional = true},
+  {version = "~0.35.0", python = ">=3.9,<3.12", optional = true},
+]
 
 [tool.poetry.extras]
 alibi-detect = ["alibi-detect", "tensorflow", "tensorflow_probability"]
@@ -82,12 +86,7 @@ tensorflow-datasets = {version = "*", python = ">=3.9,<3.12"}
 optional = true
 
 [tool.poetry.group.jatic.dependencies]
-maite = {version = "*", source = "jatic"}
-
-[[tool.poetry.source]]
-name = "jatic"
-url = "https://gitlab.jatic.net/api/v4/groups/101/-/packages/pypi/simple"
-priority = "explicit"
+maite = {version = "*"}
 
 [[tool.poetry.source]]
 name = "pytorch"
