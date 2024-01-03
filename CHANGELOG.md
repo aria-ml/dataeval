@@ -1,6 +1,9 @@
-[//]: # (7d1a599f90972fc2cfda1cc4e65f1eb1bb5290ff)
+[//]: # (1c44826f5234a860bd049fc68741f81fcc7e5f9e)
 
 # DAML Change Log
+## v0.41.0
+- ```1c44826f - Remove JATIC token requirements for MAITE```
+- ```636dfdaf - update project with __version__ metadata```
 ## v0.36.1
 - ```7d1a599f - Implement the uap class```
 - ```9ad6f904 - Create classification dataset sufficiency tutorial```
