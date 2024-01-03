@@ -11,29 +11,8 @@ Tasks:
   type    run typecheck
   lint    run static code analysis
   docs    generate documentation
-  lock    updates poetry.lock file
 EOF
 exit $1
-}
-
-function ensureJATIC() {
-    [ ! -s ~/.jatic_token ] || export POETRY_HTTP_BASIC_JATIC_PASSWORD=$(<~/.jatic_token)
-    if [[ -z "${POETRY_HTTP_BASIC_JATIC_PASSWORD}" ]]; then
-        echo
-        echo "Please provide your JATIC Gitlab personal access token:"
-        read -p "JATIC_TOKEN=" token
-        echo $token > ~/.jatic_token
-        chmod 600 ~/.jatic_token
-        echo
-        echo "Token saved in ~/.jatic_token"
-        echo
-        export POETRY_HTTP_BASIC_JATIC_PASSWORD=$token
-    fi
-
-    if [[ -z "${POETRY_HTTP_BASIC_JATIC_PASSWORD}" ]]; then
-        echo "When running locally, ensure .jatic_token contains your JATIC Gitlab Personal Access Token with access to the Packages API."
-        exit 1
-    fi
 }
 
 if [ ! -f /.dockerenv ]; then
@@ -41,7 +20,7 @@ if [ ! -f /.dockerenv ]; then
     exit 1
 fi
 
-declare -A supported_tasks=([unit]=1 [func]=1 [type]=1 [lint]=1 [docs]=1 [lock]=1)
+declare -A supported_tasks=([unit]=1 [func]=1 [type]=1 [lint]=1 [docs]=1)
 
 # validate args
 if (( $# != 1 )); then echo Too many parameters; showHelp 1; fi
@@ -51,8 +30,7 @@ pver=$(python --version | cut -d' ' -f2 | cut -d'.' -f1-2)
 func=""
 case $1 in
     "func") func="--runfunctional";&
-    "unit") ensureJATIC
-            poetry install --only jatic --all-extras
+    "unit") poetry install --only jatic --all-extras
             if [[ -z $CI ]]; then export CUDA_VISIBLE_DEVICES=-1; fi # disable GPU for local test runs - comment out this line to enable
             coverage run --data-file=output/.coverage.$1.$pver --source=daml --branch -m pytest $func --junitxml=output/junit.$1.$pver.xml --verbose --durations=0
             coverage report --data-file=output/.coverage.$1.$pver
@@ -67,13 +45,9 @@ case $1 in
             isort --check --diff .
             codespell
             ;;
-    "docs") ensureJATIC
-            poetry install --only jatic --all-extras
+    "docs") poetry install --only jatic --all-extras
             export TF_CPP_MIN_LOG_LEVEL=3
             export PYDEVD_DISABLE_FILE_VALIDATION=1
             sphinx-build -M html docs output/docs -j 4
-            ;;
-    "lock") ensureJATIC
-            poetry lock
             ;;
 esac
