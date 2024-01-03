@@ -125,13 +125,12 @@ function docker_run() {
 
     docker_build_cmd="docker build $verbosity $deps_image_build_arg --build-arg python_version=$pver --cache-from $build_image:$build_hash-$pver --cache-from $build_image:main-$pver --cache-from $deps_image:main-$pver --cache-from $deps_image:base-$pver --cache-from $base_image:$base_hash --cache-from $base_image:main --tag $tag --target run ."
     docker_run_args="--name $tag $gpuflag $tag"
-    docker_run_envs="--env POETRY_HTTP_BASIC_JATIC_PASSWORD=${CI_JOB_TOKEN}${POETRY_HTTP_BASIC_JATIC_PASSWORD}"
 
     if [[ $verbose ]]; then
         (echo "Building $tag..."; echo $docker_build_cmd; $docker_build_cmd | tee $temp; exit ${PIPESTATUS[0]}) && \
-        (echo "Running $tag..."; echo docker run $docker_run_args $task; docker run $docker_run_envs $docker_run_args $task | tee -a $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
+        (echo "Running $tag..."; echo docker run $docker_run_args $task; docker run $docker_run_args $task | tee -a $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
     else
-        $docker_build_cmd &> $temp && docker run $docker_run_envs $docker_run_args &>> $temp || result="FAILED"
+        $docker_build_cmd &> $temp && docker run $docker_run_args &>> $temp || result="FAILED"
     fi
 
     if [[ $result == "FAILED" ]]; then
@@ -225,19 +224,6 @@ if [[ $build_only ]]; then
         wait
     )
     exit 0
-fi
-
-[ ! -s ~/.jatic_token ] || export POETRY_HTTP_BASIC_JATIC_PASSWORD=$(<~/.jatic_token)
-if [[ -z "${CI_JOB_TOKEN}${POETRY_HTTP_BASIC_JATIC_PASSWORD}" ]]; then
-    echo
-    echo "Please provide your JATIC Gitlab personal access token:"
-    read -p "JATIC_TOKEN=" token
-    echo $token > ~/.jatic_token
-    chmod 600 ~/.jatic_token
-    echo
-    echo "Token saved in ~/.jatic_token"
-    echo
-    export POETRY_HTTP_BASIC_JATIC_PASSWORD=$token
 fi
 
 # execute jobs
