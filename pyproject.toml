@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "daml"
-version = "0" # dynamic
+version = "0.0.0" # dynamic
 description = "DAML provides a simple interface to characterize image data and its impact on model performance across classification and object-detection tasks"
 license = "MIT"
 readme = "README.md"
@@ -98,6 +98,9 @@ priority = "explicit"
 enable = true
 vcs = "git"
 style = "semver"
+
+[tool.poetry-dynamic-versioning.substitution]
+files = ["src/daml/__init__.py"]
 
 [tool.pyright]
 reportMissingImports = false
