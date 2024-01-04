@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.4
+
 ARG USER="daml"
 ARG HOME="/home/$USER"
 ARG PYENV_ROOT="$HOME/.pyenv"
