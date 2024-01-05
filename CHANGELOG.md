@@ -1,6 +1,7 @@
-[//]: # (fd546f8fd2b663dace8c196d3f0e03be7b400549)
+[//]: # (26c284b2826ab1f21e3ecdd8b0be1f2ea014d900)
 
 # DAML Change Log
+## v0.41.2
 ## v0.41.1
 ## v0.41.0
 - ```1c44826f - Remove JATIC token requirements for MAITE```
