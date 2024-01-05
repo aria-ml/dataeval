@@ -2,7 +2,7 @@
 name: Upload Python Package
 
 on:
-  release:
+  label:
     types: [created]
 
 jobs:
