@@ -1,0 +1,47 @@
+# This workflows will upload a Python Package using PyPI's Trusted Publisher feature: https://docs.pypi.org/trusted-publishers/adding-a-publisher/
+name: Upload Python Package
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build-artifacts:
+    name: Builds wheel artifacts
+    runs-on: ubuntu-latest
+    environment: pypi-publish
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+    - name: Build
+      run: |
+        python -m pip install --upgrade pip
+        pip install build
+        python -m build
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist
+        path: dist
+        retention-days: 0
+  pypi-publish:
+    needs: build-artifacts
+    name: Upload release to PyPI
+    runs-on: ubuntu-latest
+    environment: 
+      name: pypi-publish
+      url: https://pypi.org/p/daml
+    permissions:
+      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
+    steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: dist
+        path: dist
+    # retrieve your distributions here
+    - name: Publish package distributions to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
