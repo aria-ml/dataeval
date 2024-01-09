@@ -1,9 +1,0 @@
-#!/bin/bash -e
-
-temp=$(mktemp)
-trap "rm -f $temp" EXIT
-
-docker logs $1 &> $temp
-size=$(du -h $temp | awk '{print $1}')
-
-echo "$1 -> $size"
