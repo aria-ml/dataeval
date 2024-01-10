@@ -181,8 +181,9 @@ docs:
   extends: [.docker, .on_default]
   needs: [build image]
   stage: test
+  tags: [gpu-test]
   script:
-    - ./build docs
+    - ./build docs --gpu
   artifacts:
     paths:
       - output/docs/html/
