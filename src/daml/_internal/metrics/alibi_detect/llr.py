@@ -5,12 +5,12 @@ created by Alibi Detect
 
 from typing import Optional, Union
 
-import alibi_detect
 import numpy as np
-from alibi_detect.models.tensorflow.pixelcnn import PixelCNN
 from tensorflow.keras.models import Model
 from tensorflow_probability.python.distributions.distribution import Distribution
 
+import alibi_detect
+from alibi_detect.models.tensorflow.pixelcnn import PixelCNN
 from daml._internal.metrics.alibi_detect.base import (
     AlibiDetectOutlierType,
     _AlibiDetectMetric,

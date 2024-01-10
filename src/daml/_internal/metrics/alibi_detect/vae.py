@@ -2,7 +2,6 @@ from typing import Optional
 
 import alibi_detect
 from alibi_detect.models.tensorflow.autoencoder import VAE
-
 from daml._internal.metrics.alibi_detect.base import (
     AlibiDetectOutlierType,
     _AlibiDetectMetric,
