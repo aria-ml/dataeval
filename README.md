@@ -35,6 +35,9 @@ For more ideas on getting started using DAML in your workflow, additional inform
 ## Contributing
 For steps on how to get started on contributing to the project, you can follow the steps in [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Attribution
+This project uses code from the [Alibi-Detect](https://github.com/SeldonIO/alibi-detect) python library developed by SeldonIO.  Additional documentation from the developers are also available [here](https://docs.seldon.io/projects/alibi-detect/en/stable/).
+
 ## POCs
 - **POC**: Scott Swan @scott.swan
 - **DPOC**: Andrew Weng @aweng
