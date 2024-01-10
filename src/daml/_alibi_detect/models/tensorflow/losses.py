@@ -5,7 +5,7 @@ import tensorflow_probability as tfp
 from tensorflow.keras.layers import Flatten
 from tensorflow.keras.losses import categorical_crossentropy, kld
 
-from alibi_detect.models.tensorflow.gmm import gmm_energy, gmm_params
+from daml._alibi_detect.models.tensorflow.gmm import gmm_energy, gmm_params
 
 
 def elbo(

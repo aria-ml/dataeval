@@ -4,7 +4,7 @@ from typing import Callable, Type, Union
 import numpy as np
 import tensorflow as tf
 
-from alibi_detect.utils.prediction import tokenize_transformer
+from daml._alibi_detect.utils.prediction import tokenize_transformer
 
 
 def predict_batch(

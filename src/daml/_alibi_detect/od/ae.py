@@ -4,16 +4,16 @@ from typing import Dict, Tuple
 import numpy as np
 import tensorflow as tf
 
-from alibi_detect.base import (
+from daml._alibi_detect.base import (
     BaseDetector,
     FitMixin,
     ThresholdMixin,
     outlier_prediction_dict,
 )
-from alibi_detect.models.tensorflow.autoencoder import AE
-from alibi_detect.models.tensorflow.trainer import trainer
-from alibi_detect.utils._types import OptimizerTF
-from alibi_detect.utils.tensorflow.prediction import predict_batch
+from daml._alibi_detect.models.tensorflow.autoencoder import AE
+from daml._alibi_detect.models.tensorflow.trainer import trainer
+from daml._alibi_detect.utils._types import OptimizerTF
+from daml._alibi_detect.utils.tensorflow.prediction import predict_batch
 
 logger = logging.getLogger(__name__)
 
