@@ -1,8 +1,6 @@
 import math
 from typing import Tuple
 
-from alibi_detect.models.tensorflow.autoencoder import AE, AEGMM, VAE, VAEGMM
-from alibi_detect.models.tensorflow.pixelcnn import PixelCNN
 from tensorflow.keras import Model, Sequential
 from tensorflow.keras.layers import (
     Conv2D,
@@ -14,6 +12,9 @@ from tensorflow.keras.layers import (
 )
 from tensorflow.math import reduce_prod
 from tensorflow.nn import relu, softmax, tanh
+
+from alibi_detect.models.tensorflow.autoencoder import AE, AEGMM, VAE, VAEGMM
+from alibi_detect.models.tensorflow.pixelcnn import PixelCNN
 
 
 class LLRPixelCNN(PixelCNN):

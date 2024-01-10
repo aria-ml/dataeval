@@ -1,9 +1,9 @@
 from typing import Optional
 
-import alibi_detect
 import numpy as np
-from alibi_detect.models.tensorflow.autoencoder import AEGMM
 
+import alibi_detect
+from alibi_detect.models.tensorflow.autoencoder import AEGMM
 from daml._internal.metrics.alibi_detect.base import _AlibiDetectMetric
 
 

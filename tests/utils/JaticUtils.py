@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import maite.protocols as pr
 import numpy as np
 
@@ -21,9 +23,15 @@ def check_jatic_object_detection(dataset):
     assert pr.is_typed_dict(dataset[0], pr.SupportsObjectDetection)
 
 
+@dataclass
+class MockMetadata:
+    id: int
+
+
 classification_data: pr.SupportsImageClassification = {
     "image": np.ones((3, 28, 28)),
     "label": np.array([1]),
+    "metadata": MockMetadata(id=1),
 }
 
 object_detection_data: pr.SupportsObjectDetection = {
@@ -32,6 +40,7 @@ object_detection_data: pr.SupportsObjectDetection = {
         "labels": np.array([1]),
         "boxes": np.array([0.0, 0.0, 1.0, 1.0]),
     },
+    "metadata": MockMetadata(id=1),
 }
 
 
@@ -61,6 +70,7 @@ class JaticImageClassificationDataset:
     def __init__(self, images: np.ndarray, labels: np.ndarray):
         self._images: np.ndarray = images
         self._labels: np.ndarray = labels
+        self._metadata = MockMetadata(id=1)
 
     def __len__(self) -> int:
         return len(self._images)
@@ -69,5 +79,6 @@ class JaticImageClassificationDataset:
         output: pr.SupportsImageClassification = {
             "image": self._images[index],
             "label": self._labels[index],
+            "metadata": self._metadata,
         }
         return output
