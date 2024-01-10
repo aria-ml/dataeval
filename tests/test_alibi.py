@@ -114,11 +114,14 @@ class TestAlibiDetect_Functional:
 @pytest.mark.parametrize(
     "method, classnames",
     [
-        (OD_AE, ["alibi_detect.od.OutlierAE"]),
-        (OD_AEGMM, ["alibi_detect.od.OutlierAEGMM"]),
-        (OD_LLR, ["alibi_detect.od.LLR", "daml._internal.models.autoencoder.PixelCNN"]),
-        (OD_VAE, ["alibi_detect.od.OutlierVAE"]),
-        (OD_VAEGMM, ["alibi_detect.od.OutlierVAEGMM"]),
+        (OD_AE, ["daml._alibi_detect.od.OutlierAE"]),
+        (OD_AEGMM, ["daml._alibi_detect.od.OutlierAEGMM"]),
+        (
+            OD_LLR,
+            ["daml._alibi_detect.od.LLR", "daml._internal.models.autoencoder.PixelCNN"],
+        ),
+        (OD_VAE, ["daml._alibi_detect.od.OutlierVAE"]),
+        (OD_VAEGMM, ["daml._alibi_detect.od.OutlierVAEGMM"]),
     ],
 )
 class TestAlibiDetect:

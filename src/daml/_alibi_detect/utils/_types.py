@@ -10,7 +10,7 @@ from sklearn.base import (  # import here (instead of later) since sklearn curre
 # Literal for typing
 from typing_extensions import Literal, TypeAlias
 
-from alibi_detect.utils.frameworks import has_pytorch, has_tensorflow
+from daml._alibi_detect.utils.frameworks import has_pytorch, has_tensorflow
 
 # Optional dep dependent tuples of types, for isinstance checks and pydantic
 supported_models_tf: tuple = ()
