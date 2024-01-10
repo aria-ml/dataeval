@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Union
 import numpy as np
 from typing_extensions import Protocol, runtime_checkable
 
-from alibi_detect.version import __version__
+from daml._alibi_detect.version import __version__
 
 DEFAULT_META: Dict = {
     "name": None,
@@ -141,7 +141,7 @@ class DriftConfigMixin:
         Parameters
         ----------
         config
-            A config dictionary matching the schema's in :class:`~alibi_detect.saving.schemas`.
+            A config dictionary matching the schema's in :class:`~_alibi_detect.saving.schemas`.
         """
         # Check for existing version_warning. meta is pop'd as don't want to pass as arg/kwarg
         meta = config.pop("meta", None)
@@ -206,7 +206,7 @@ class DriftConfigMixin:
 class Detector(Protocol):
     """Type Protocol for all detectors.
 
-    Used for typing legacy save and load functionality in `alibi_detect.saving._tensorflow.saving.py`.
+    Used for typing legacy save and load functionality in `_alibi_detect.saving._tensorflow.saving.py`.
 
     Note
     ----
@@ -224,7 +224,7 @@ class Detector(Protocol):
 class ConfigurableDetector(Detector, Protocol):
     """Type Protocol for detectors that have support for saving via config.
 
-    Used for typing save and load functionality in `alibi_detect.saving.saving`.
+    Used for typing save and load functionality in `_alibi_detect.saving.saving`.
     """
 
     def get_config(self) -> dict:
@@ -242,7 +242,7 @@ class ConfigurableDetector(Detector, Protocol):
 class StatefulDetectorOnline(ConfigurableDetector, Protocol):
     """Type Protocol for detectors that have support for save/loading of online state.
 
-    Used for typing save and load functionality in `alibi_detect.saving.saving`.
+    Used for typing save and load functionality in `_alibi_detect.saving.saving`.
     """
 
     t: int = 0

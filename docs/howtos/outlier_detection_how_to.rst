@@ -3,23 +3,6 @@ Outlier Detection How-To Guide
 ==============================
 
 ---------------------------------------------------------------
-Initialize an Outlier Detector with a Custom, Pre-Trained Model
----------------------------------------------------------------
-
-.. code-block:: python
-
-    from daml.metrics.outlier_detection import OD_AE
-    from alibi_detect.models.autoencoder import AE
-
-    # instantiate an autoencoder model that has been pre-trained
-    model = AE(encoder_net=pretrained_encoder, decoder_net=pretrained_decoder)
-
-    # instantiate an outlier detector metric with provided model
-    metric = OD_AE(model)
-    metric.fit_dataset(dataset)
-    metric.evaluate(dataset)
-
----------------------------------------------------------------
 Initialize an Outlier Detector with Custom Prediction Arguments
 ---------------------------------------------------------------
 

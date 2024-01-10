@@ -11,7 +11,7 @@ from tensorflow.keras.layers import (
     Layer,
 )
 
-from alibi_detect.utils.tensorflow.distance import relative_euclidean_distance
+from daml._alibi_detect.utils.tensorflow.distance import relative_euclidean_distance
 
 
 class Sampling(Layer):

@@ -9,8 +9,8 @@ import numpy as np
 from tensorflow.keras.models import Model
 from tensorflow_probability.python.distributions.distribution import Distribution
 
-import alibi_detect
-from alibi_detect.models.tensorflow.pixelcnn import PixelCNN
+from daml import _alibi_detect
+from daml._alibi_detect.models.tensorflow.pixelcnn import PixelCNN
 from daml._internal.metrics.alibi_detect.base import (
     AlibiDetectOutlierType,
     _AlibiDetectMetric,
@@ -29,7 +29,7 @@ class AlibiLLR(_AlibiDetectMetric):
 
     def __init__(self, model: Optional[Union[Model, Distribution, PixelCNN]] = None):
         super().__init__(
-            alibi_detect_class=alibi_detect.od.LLR,
+            alibi_detect_class=_alibi_detect.od.LLR,
             model_class=LLRPixelCNN,
             model_param_name="model",
             model=model,

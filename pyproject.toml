@@ -36,20 +36,17 @@ torch = {version = ">=2.1.0", source = "pytorch"}
 torchvision = {version = ">=0.16.0", source = "pytorch"}
 torchmetrics = {version = ">=1.0.0", source = "pytorch"}
 tensorflow = [
-  {version = "~2.13.1", python = "~3.8.1", optional = true},
-  {version = "~2.14.1", python = ">=3.9,<3.12", optional = true},
+  {version = "~2.13.1", python = "~3.8.1"},
+  {version = "~2.14.1", python = ">=3.9,<3.12"},
 ]
 tensorflow_probability = [
-  {version = "~0.21.0", python = "~3.8.1", optional = true},
-  {version = "~0.22.1", python = ">=3.9,<3.12", optional = true},
+  {version = "~0.21.0", python = "~3.8.1"},
+  {version = "~0.22.1", python = ">=3.9,<3.12"},
 ]
 tensorflow-io-gcs-filesystem = [
-  {version = "~0.34.0", python = "~3.8.1", optional = true},
-  {version = "~0.35.0", python = ">=3.9,<3.12", optional = true},
+  {version = "~0.34.0", python = "~3.8.1"},
+  {version = "~0.35.0", python = ">=3.9,<3.12"},
 ]
-
-[tool.poetry.extras]
-alibi-detect = ["tensorflow", "tensorflow_probability", "tensorflow-io-gcs-filesystem"]
 
 [tool.poetry.group.dev]
 optional = true
@@ -102,7 +99,7 @@ files = ["src/daml/__init__.py"]
 
 [tool.pyright]
 reportMissingImports = false
-exclude = ["src/alibi_detect"]
+exclude = ["src/daml/_alibi_detect"]
 
 [tool.pytest.ini_options]
 markers = [
@@ -129,7 +126,7 @@ exclude = [
     "*env*",
     "docs/*",
     "output/*",
-    "src/alibi_detect/*"
+    "src/daml/_alibi_detect/*"
     ]
 max-line-length = 88
 
