@@ -25,10 +25,6 @@ To install the package from the GitLab Pypi repository, run the following comman
 
 `pip install daml`
 
-If you would like to enable outlier-detection using metrics derived from [Alibi-Detect](https://github.com/SeldonIO/alibi-detect), install DAML with the extra `alibi-detect`.
-
-`pip install daml[alibi-detect]`
-
 ### Additional Tutorials
 For more ideas on getting started using DAML in your workflow, additional information is in our Sphinx documentation hosted in [here](https://jatic.pages.jatic.net/aria/daml/) on Gitlab Pages.
 

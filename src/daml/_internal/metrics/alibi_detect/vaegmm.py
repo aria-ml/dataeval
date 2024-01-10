@@ -2,8 +2,8 @@ from typing import Optional
 
 import numpy as np
 
-import alibi_detect
-from alibi_detect.models.tensorflow.autoencoder import VAEGMM
+from daml import _alibi_detect
+from daml._alibi_detect.models.tensorflow.autoencoder import VAEGMM
 from daml._internal.metrics.alibi_detect.base import _AlibiDetectMetric
 
 
@@ -18,7 +18,7 @@ class AlibiVAEGMM(_AlibiDetectMetric):
 
     def __init__(self, model: Optional[VAEGMM] = None):
         super().__init__(
-            alibi_detect_class=alibi_detect.od.OutlierVAEGMM,
+            alibi_detect_class=_alibi_detect.od.OutlierVAEGMM,
             model_class=VAEGMM,
             model_param_name="vaegmm",
             model=model,

@@ -1,7 +1,7 @@
 from typing import Optional
 
-import alibi_detect
-from alibi_detect.models.tensorflow.autoencoder import VAE
+from daml import _alibi_detect
+from daml._alibi_detect.models.tensorflow.autoencoder import VAE
 from daml._internal.metrics.alibi_detect.base import (
     AlibiDetectOutlierType,
     _AlibiDetectMetric,
@@ -18,7 +18,7 @@ class AlibiVAE(_AlibiDetectMetric):
 
     def __init__(self, model: Optional[VAE] = None):
         super().__init__(
-            alibi_detect_class=alibi_detect.od.OutlierVAE,
+            alibi_detect_class=_alibi_detect.od.OutlierVAE,
             model_class=VAE,
             model_param_name="vae",
             model=model,

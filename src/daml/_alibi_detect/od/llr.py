@@ -8,17 +8,17 @@ from tensorflow.keras.layers import Input
 from tensorflow.keras.models import Model
 from tensorflow_probability.python.distributions.distribution import Distribution
 
-from alibi_detect.base import (
+from daml._alibi_detect.base import (
     BaseDetector,
     FitMixin,
     ThresholdMixin,
     outlier_prediction_dict,
 )
-from alibi_detect.models.tensorflow.pixelcnn import PixelCNN
-from alibi_detect.models.tensorflow.trainer import trainer
-from alibi_detect.utils._types import OptimizerTF
-from alibi_detect.utils.tensorflow.perturbation import mutate_categorical
-from alibi_detect.utils.tensorflow.prediction import predict_batch
+from daml._alibi_detect.models.tensorflow.pixelcnn import PixelCNN
+from daml._alibi_detect.models.tensorflow.trainer import trainer
+from daml._alibi_detect.utils._types import OptimizerTF
+from daml._alibi_detect.utils.tensorflow.perturbation import mutate_categorical
+from daml._alibi_detect.utils.tensorflow.prediction import predict_batch
 
 logger = logging.getLogger(__name__)
 

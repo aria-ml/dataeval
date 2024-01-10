@@ -155,9 +155,9 @@ coverage:
     # TODO: Move coverage report generation in to build script (and/or resolve issue with using symlinks instead of a full recursive copy)
     - cp --recursive $(pwd) /daml
     - coverage combine ./output
-    - coverage report -m --skip-empty
-    - coverage xml --skip-empty
-    - coverage html --skip-empty
+    - coverage report -m --skip-empty --omit */_alibi_detect/*
+    - coverage xml --skip-empty --omit */_alibi_detect/*
+    - coverage html --skip-empty --omit */_alibi_detect/*
   coverage: "/(?i)total.*? (100(?:\\.0+)?\\%|[1-9]?\\d(?:\\.\\d+)?\\%)$/"
   artifacts:
     reports:
