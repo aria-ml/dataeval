@@ -1,6 +1,9 @@
-[//]: # (26c284b2826ab1f21e3ecdd8b0be1f2ea014d900)
+[//]: # (da23f2f02145d825ce3eab60b6c3e68d0cb5fe11)
 
 # DAML Change Log
+## v0.41.3-pre
+- ```da23f2f0 - Snapshot outlier detection code from alibi-detect```
+## v0.41.2-pre
 ## v0.41.2
 ## v0.41.1
 ## v0.41.0
