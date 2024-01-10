@@ -1,6 +1,8 @@
-[//]: # (da23f2f02145d825ce3eab60b6c3e68d0cb5fe11)
+[//]: # (2ba149a738308c59eecec0f36db9ed538cb99dc8)
 
 # DAML Change Log
+## v0.41.4-pre
+- ```2ba149a7 - Make internal implementation of alibi-detect a subpackage of daml```
 ## v0.41.3-pre
 - ```da23f2f0 - Snapshot outlier detection code from alibi-detect```
 ## v0.41.2-pre
