@@ -1,7 +1,8 @@
 """
 This module contains the implementation of the
 FR Test Statistic based estimate for the upperbound
-average precision (UAP)
+average precision (UAP_MST) and empirical mean
+precision (UAP_EMP)
 """
 from typing import Tuple
 
@@ -16,7 +17,7 @@ from daml._internal.metrics.aria.base import _AriaMetric
 from daml._internal.metrics.outputs import UAPOutput
 
 
-class UAP(_AriaMetric):
+class UAP_MST(_AriaMetric):
     def __init__(self, encode: bool = False) -> None:
         """Constructor method"""
 

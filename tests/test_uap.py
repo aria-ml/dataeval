@@ -3,17 +3,17 @@ import pytest
 
 from daml.datasets import DamlDataset
 from daml.metrics.uap import UAPOutput
-from daml.metrics.uap.aria import UAP, UAP_EMP
+from daml.metrics.uap.aria import UAP_EMP, UAP_MST
 
 
 class TestUAP:
     @pytest.mark.parametrize(
         "input, output",
         [
-            (UAP, UAPOutput(uap=1.0)),
+            (UAP_MST, UAPOutput(uap=1.0)),
         ],
     )
-    def test_multiclass_UAP_with_mnist(self, input, output):
+    def test_multiclass_UAP_MST_with_mnist(self, input, output):
         """
         Load a slice of the MNIST dataset and pass into the UAP
         evaluate function.

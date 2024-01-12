@@ -25,4 +25,4 @@ fi
 echo "Tagging main branch with $newVer"
 REPO_URL="https://gitlab.jatic.net/api/v4/projects/151/repository/"
 TAG_QUERY="tags?tag_name=$newVer&ref=main&message='DAML%20$newVer'"
-curl --verbose --request POST --header "PRIVATE-TOKEN: $CI_JOB_TOKEN" "${REPO_URL}${TAG_QUERY}"
+curl --verbose --request POST --header "PRIVATE-TOKEN: $DAML_BUILD_PAT" "${REPO_URL}${TAG_QUERY}"
