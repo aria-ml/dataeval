@@ -110,3 +110,33 @@ class UAP(_AriaMetric):
             prob_inds[i, :] = probs[int(y[i]), :]
         uap = average_precision_score(lab_inds, prob_inds)
         return float(uap)
+
+
+class UAP_EMP(_AriaMetric):
+    def __init__(self) -> None:
+        """Constructor method"""
+
+        super().__init__(encode=False)
+
+    def evaluate(self, dataset: DamlDataset, scores: np.ndarray) -> UAPOutput:
+        """
+        Return the Upper Average Precision estimate
+
+        Parameters
+        ----------
+        dataset : DamlDataset
+            Dataset containing (n_samples x n_features) array of (padded) instance
+            embeddings and n_samples vector of class labels with M unique classes.
+
+        scores : np.ndarray
+            A 2D array of class probabilities per image
+
+        Returns
+        -------
+        UAPOutput
+            The estimated UAP
+        """
+        y: np.ndarray = dataset.labels
+
+        uap = float(average_precision_score(y, scores, average="weighted"))
+        return UAPOutput(uap=uap)
