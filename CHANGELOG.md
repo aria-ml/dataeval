@@ -1,7 +1,7 @@
-[//]: # (42cc77eab524ed87f940ac2cf40ca627dcc81026)
+[//]: # (32e068e458fa619b65da916d6200e301d4026bf3)
 
 # DAML Change Log
-## Pending Release
+## v0.41.6
 - ```42cc77ea - Add empirical upper bound to UAP metric output```
 ## v0.41.5
 ## v0.41.4-pre
