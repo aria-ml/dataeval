@@ -3,7 +3,7 @@ import pytest
 
 from daml.datasets import DamlDataset
 from daml.metrics.uap import UAPOutput
-from daml.metrics.uap.aria import UAP
+from daml.metrics.uap.aria import UAP, UAP_EMP
 
 
 class TestUAP:
@@ -26,3 +26,13 @@ class TestUAP:
         metric = input()
         value = metric.evaluate(dataset)
         assert value == output
+
+    def test_UAP_EMP(self):
+        path = "tests/datasets/mnist.npz"
+        with np.load(path, allow_pickle=True) as fp:
+            covariates, labels = fp["x_train"][:1000], fp["y_train"][:1000]
+        dataset = DamlDataset(covariates, labels)
+        scores = np.zeros((1000, 10), dtype=float)
+        metric = UAP_EMP()
+        value = metric.evaluate(dataset, scores)
+        assert value.uap > 0
