@@ -1,6 +1,9 @@
-[//]: # (2ba149a738308c59eecec0f36db9ed538cb99dc8)
+[//]: # (42cc77eab524ed87f940ac2cf40ca627dcc81026)
 
 # DAML Change Log
+## Pending Release
+- ```42cc77ea - Add empirical upper bound to UAP metric output```
+## v0.41.5
 ## v0.41.4-pre
 - ```2ba149a7 - Make internal implementation of alibi-detect a subpackage of daml```
 ## v0.41.3-pre
