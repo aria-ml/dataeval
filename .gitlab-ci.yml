@@ -191,7 +191,7 @@ docs:
   extends: [.docker_harbor_optional, .on_default]
   needs: [build image]
   stage: test
-  tags: [gpu-test]
+  tags: [GPU]
   script:
     - ./build docs --gpu
   artifacts:
