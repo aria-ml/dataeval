@@ -155,11 +155,11 @@ function ensure_image() {
     if ! $(docker manifest inspect $2:$3$4 > /dev/null 2>&1); then
         echo "Building $2:$3$4..."
         docker build $verbosity \
-            ${@:5} \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
             --cache-from $2:main$4 \
             --tag $2:$3$4 \
-            --target $1 .
+            --target $1 . \
+            <<< ${@:5}
         echo "Finished building $2:$3$4."
         if [[ $push_to_repo ]]; then
             echo "Pushing $2:$3$4..."
@@ -208,7 +208,7 @@ if [[ $build_only ]]; then
         # first handle base images
         if [[ ${pvers[base]} ]]; then
             unset pvers[base]
-            ensure_image base $base_image $base_hash || exit 1
+            ensure_image base $base_image $base_hash "" --build-arg pyenv_configure_opts=--enable-optimizations\ --with-lto || exit 1
         fi
 
         # now build python specific versioned images
