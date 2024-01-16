@@ -3,7 +3,6 @@ from typing import Optional
 import numpy as np
 
 from daml import _alibi_detect
-from daml._alibi_detect.models.tensorflow.autoencoder import AEGMM
 from daml._internal.metrics.alibi_detect.base import _AlibiDetectMetric
 
 
@@ -16,12 +15,10 @@ class AlibiAEGMM(_AlibiDetectMetric):
     The model used by this class is :py:class:`daml.models.AEGMM`
     """  # noqa E501
 
-    def __init__(self, model: Optional[AEGMM] = None):
+    def __init__(self):
         super().__init__(
             alibi_detect_class=_alibi_detect.od.OutlierAEGMM,
-            model_class=AEGMM,
             model_param_name="aegmm",
-            model=model,
             flatten_dataset=True,
             dataset_type=np.float32,
         )

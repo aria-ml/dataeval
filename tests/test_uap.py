@@ -2,8 +2,7 @@ import numpy as np
 import pytest
 
 from daml.datasets import DamlDataset
-from daml.metrics.uap import UAPOutput
-from daml.metrics.uap.aria import UAP_EMP, UAP_MST
+from daml.metrics.uap import UAP_EMP, UAP_MST, UAPOutput
 
 
 class TestUAP:

@@ -3,19 +3,15 @@ This module contains implementations of Image Outlier Detection methods
 created by Alibi Detect
 """
 
-from typing import Optional, Union
+from typing import Optional
 
 import numpy as np
-from tensorflow.keras.models import Model
-from tensorflow_probability.python.distributions.distribution import Distribution
 
 from daml import _alibi_detect
-from daml._alibi_detect.models.tensorflow.pixelcnn import PixelCNN
 from daml._internal.metrics.alibi_detect.base import (
     AlibiDetectOutlierType,
     _AlibiDetectMetric,
 )
-from daml._internal.models.tensorflow.alibi import LLRPixelCNN
 
 
 class AlibiLLR(_AlibiDetectMetric):
@@ -27,12 +23,10 @@ class AlibiLLR(_AlibiDetectMetric):
     The model used by this class is :py:class:`daml.models.LLR`
     """  # noqa E501
 
-    def __init__(self, model: Optional[Union[Model, Distribution, PixelCNN]] = None):
+    def __init__(self):
         super().__init__(
             alibi_detect_class=_alibi_detect.od.LLR,
-            model_class=LLRPixelCNN,
             model_param_name="model",
-            model=model,
             flatten_dataset=False,
             dataset_type=np.float32,
         )
