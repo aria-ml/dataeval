@@ -50,7 +50,7 @@ stages:
   image: docker:24.0-git
   before_script:
     - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
-    - echo ${DAML_HARBOR_TOKEN} | docker login harbor.jatic.net:443 -u 'robot$daml+daml-build' --password-stdin"
+    - echo ${DAML_HARBOR_TOKEN} | docker login harbor.jatic.net:443 -u 'robot$daml+daml-build' --password-stdin
   after_script:
     - docker logout harbor.jatic.net:443"
 
