@@ -2,11 +2,14 @@ from abc import ABC
 from typing import Literal, Optional
 
 import numpy as np
+import torch
+import torch.nn as nn
 from sklearn.neighbors import NearestNeighbors
-from tensorflow.keras import losses
 
 from daml._internal.datasets.datasets import DamlDataset
-from daml._internal.models.autoencoder import ARiAAutoencoder, create_default_model
+from daml._internal.models import AERunner, AETrainer
+
+from .utils import permute_to_torch
 
 
 class _AriaMetric(ABC):
@@ -16,13 +19,14 @@ class _AriaMetric(ABC):
         """Constructor method"""
 
         self.encode = encode
-        self.autoencoder: Optional[ARiAAutoencoder] = None
+        self.model: Optional[AERunner] = None
         self._is_trained: bool = False
 
     def fit_dataset(
         self,
         dataset: DamlDataset,
         epochs: int = 3,
+        model: Optional[nn.Module] = None,
     ) -> None:
         """
         Trains a model on a dataset to be used during calculation of metrics.
@@ -35,19 +39,12 @@ class _AriaMetric(ABC):
             Number of epochs to train the detector for.
 
         """
-        images = dataset.images
-        shape = (images.shape[1], images.shape[2], images.shape[3])
-        latent_dim = 64
-        self.autoencoder = create_default_model(ARiAAutoencoder, shape, latent_dim)
-
-        self.autoencoder.compile(optimizer="adam", loss=losses.MeanSquaredError())
-
-        self.autoencoder.fit(
-            images,
-            images,
-            epochs=epochs,
-            shuffle=True,
-        )
+        if model is None:
+            images: torch.Tensor = permute_to_torch(dataset.images)
+            self.model = AETrainer(images.shape[1])
+            self.model.train(images, epochs)
+        else:
+            self.model = AERunner(model)
         self._is_trained = True
 
     def _compute_neighbors(

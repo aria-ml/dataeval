@@ -1,7 +1,7 @@
 import math
-from typing import Tuple
+from typing import Tuple, Type
 
-from tensorflow.keras import Model, Sequential
+from tensorflow.keras import Sequential
 from tensorflow.keras.layers import (
     Conv2D,
     Conv2DTranspose,
@@ -17,50 +17,10 @@ from daml._alibi_detect.models.tensorflow.autoencoder import AE, AEGMM, VAE, VAE
 from daml._alibi_detect.models.tensorflow.pixelcnn import PixelCNN
 
 
-class LLRPixelCNN(PixelCNN):
+class LLRPixelCNN:
+    """Abstract class for alibi.LLR model"""
+
     pass
-
-
-class ARiAAutoencoder(Model):
-    """
-    Basic encoder for ARiA data metrics
-
-    Attributes
-    ----------
-    encoder : tf.keras.Model
-        The internal encoder
-    decoder : tf.keras.Model
-        The internal decoder
-
-    See also
-    ----------
-    https://www.tensorflow.org/tutorials/generative/autoencoder
-    """
-
-    def __init__(self, encoding_dim, input_shape, encoder, decoder):
-        super(ARiAAutoencoder, self).__init__()
-        self.encoding_dim = encoding_dim
-        self.shape = input_shape
-        self.encoder = encoder
-        self.decoder = decoder
-
-    def call(self, x):
-        """
-        Override for TensorFlow model call method
-
-        Parameters
-        ----------
-        x : Iterable[float]
-            Data to run through the model
-
-        Returns
-        -------
-        decoded : Iterable[float]
-            The resulting data after x is run through the encoder and decoder.
-        """
-        encoded = self.encoder(x)
-        decoded = self.decoder(encoded)
-        return decoded
 
 
 def _get_default_encoder_net(input_shape: Tuple[int, int, int], encoding_dim: int):
@@ -91,22 +51,14 @@ def _get_default_decoder_net(input_shape: Tuple[int, int, int], encoding_dim: in
     )
 
 
-def create_default_model(
-    model_class: type,
+def create_alibi_model(
+    model_class: Type,
     input_shape: Tuple[int, int, int],
     encoding_dim: int = 1024,
     n_gmm: int = 2,
     aegmm_latent_dim: int = 1,
     vaegmm_latent_dim: int = 2,
 ):
-    if model_class is ARiAAutoencoder:
-        return ARiAAutoencoder(
-            encoding_dim,
-            input_shape,
-            _get_default_encoder_net(input_shape, encoding_dim),
-            _get_default_decoder_net(input_shape, encoding_dim),
-        )
-
     if model_class is AE:
         return AE(
             _get_default_encoder_net(input_shape, encoding_dim),

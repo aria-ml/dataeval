@@ -33,12 +33,9 @@ class TestDamlImageDataset:
         npt.assert_array_equal(output, image_0)
 
     def test_property(self):
-        # Images
-        npt.assert_array_equal(self.dds.images, self.images)
-        # Labels
-        npt.assert_array_equal(self.dds.labels, np.array([]))
-        # Boxes
-        npt.assert_array_equal(self.dds.boxes, np.array([]))
+        npt.assert_array_equal(self.dds.images, self.images)  # Images
+        npt.assert_array_equal(self.dds.labels, np.array([]))  # Labels
+        npt.assert_array_equal(self.dds.boxes, np.array([]))  # Boxes
 
 
 class TestDamlClassificationDataset:
@@ -77,12 +74,9 @@ class TestDamlClassificationDataset:
         npt.assert_array_equal(output[1], label_0)
 
     def test_property(self):
-        # Images
-        npt.assert_array_equal(self.dds.images, self.images)
-        # Labels
-        npt.assert_array_equal(self.dds.labels, self.labels)
-        # Boxes
-        npt.assert_array_equal(self.dds.boxes, np.array([]))
+        npt.assert_array_equal(self.dds.images, self.images)  # Images
+        npt.assert_array_equal(self.dds.labels, self.labels)  # Labels
+        npt.assert_array_equal(self.dds.boxes, np.array([]))  # Boxes
 
 
 class TestDamlObjectDetectionDataset:
@@ -136,13 +130,30 @@ class TestDamlObjectDetectionDataset:
         npt.assert_array_equal(output[1], label_0)
         npt.assert_array_equal(output[2], box_0)
 
+    def test_setitem(self):
+        """DamlDataset properties can be modified correctly"""
+        dds = DamlDataset(np.array([]), np.array([]), np.array([]))
+
+        # Confirm they are initialized correctly
+        assert not len(dds.images)
+        assert not len(dds.labels)
+        assert not len(dds.boxes)
+
+        # Set them to new values
+        dds.images = self.images
+        dds.labels = self.labels
+        dds.boxes = self.boxes
+
+        # Confirm they were set
+        npt.assert_array_equal(dds.images, self.images)
+        npt.assert_array_equal(dds.images, self.images)
+        npt.assert_array_equal(dds.images, self.images)
+
     def test_property(self):
-        # Images
-        npt.assert_array_equal(self.dds.images, self.images)
-        # Labels
-        npt.assert_array_equal(self.dds.labels, self.labels)
-        # Boxes
-        npt.assert_array_equal(self.dds.boxes, self.boxes)
+        """DamlDataset properly sets values during init"""
+        npt.assert_array_equal(self.dds.images, self.images)  # Images
+        npt.assert_array_equal(self.dds.labels, self.labels)  # Labels
+        npt.assert_array_equal(self.dds.boxes, self.boxes)  # Boxes
 
 
 @pytest.mark.skip(reason="Future improvements")

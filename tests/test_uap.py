@@ -27,6 +27,9 @@ class TestUAP:
         value = metric.evaluate(dataset)
         assert value == output
 
+    def test_uap_with_pytorch(self):
+        pass
+
     def test_UAP_EMP(self):
         path = "tests/datasets/mnist.npz"
         with np.load(path, allow_pickle=True) as fp:
