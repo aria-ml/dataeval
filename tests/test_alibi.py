@@ -4,7 +4,6 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from daml._internal.models.autoencoder import create_default_model
 from daml.datasets import DamlDataset
 from daml.metrics.outlier_detection import (
     OD_AE,
@@ -15,8 +14,7 @@ from daml.metrics.outlier_detection import (
     Threshold,
     ThresholdType,
 )
-
-from .utils import MockImageClassificationGenerator
+from tests.utils import MockImageClassificationGenerator
 
 
 @pytest.mark.functional
@@ -118,7 +116,10 @@ class TestAlibiDetect_Functional:
         (OD_AEGMM, ["daml._alibi_detect.od.OutlierAEGMM"]),
         (
             OD_LLR,
-            ["daml._alibi_detect.od.LLR", "daml._internal.models.autoencoder.PixelCNN"],
+            [
+                "daml._alibi_detect.od.LLR",
+                "daml._internal.models.tensorflow.alibi.PixelCNN",
+            ],
         ),
         (OD_VAE, ["daml._alibi_detect.od.OutlierVAE"]),
         (OD_VAEGMM, ["daml._alibi_detect.od.OutlierVAEGMM"]),
@@ -165,11 +166,11 @@ class TestAlibiDetect:
         Raises an error when image shape in evaluate
         does not match the detector input
         """
-        # Load metric and create model with a "typo" for input shape
+        # Load metric with an incorrect input shape
         faulty_input_shape = (31, 32, 3)
         metric = method()
-        model = create_default_model(metric._model_class, faulty_input_shape)
-        metric.model = model
+        metric.detector = 1  # detector cannot be None
+        metric._input_shape = faulty_input_shape
 
         # Create daml dataset
         images = self.all_ones.dataset.images
@@ -180,7 +181,7 @@ class TestAlibiDetect:
         # metric.fit_dataset(dataset=dataset, epochs=1, verbose=False)
         metric.is_trained = True
 
-        with pytest.raises(TypeError):
+        with pytest.raises(ValueError):
             metric.evaluate(dataset)
 
     def test_missing_detector(self, method):

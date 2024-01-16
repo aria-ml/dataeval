@@ -47,6 +47,12 @@ class DivergenceOutput:
     dpdivergence: float
     error: float
 
+    def __eq__(self, other):
+        if isinstance(other, DivergenceOutput):
+            if self.dpdivergence == other.dpdivergence and self.error == other.error:
+                return True
+        return False
+
 
 @dataclass
 class BEROutput:
