@@ -2,10 +2,10 @@
 This module contains the implementation of Dp Divergence
 using the First Nearest Neighbor and Minimum Spanning Tree algorithms
 """
-
 from abc import abstractmethod
 
 import numpy as np
+import torch
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import minimum_spanning_tree
 from scipy.spatial.distance import pdist, squareform
@@ -13,6 +13,8 @@ from scipy.spatial.distance import pdist, squareform
 from daml._internal.datasets.datasets import DamlDataset
 from daml._internal.metrics.aria.base import _AriaMetric
 from daml._internal.metrics.outputs import DivergenceOutput
+
+from .utils import permute_to_numpy, permute_to_torch
 
 
 class _DpDivergence(_AriaMetric):
@@ -62,17 +64,38 @@ class _DpDivergence(_AriaMetric):
 
         imgs_a: np.ndarray = dataset_a.images
         imgs_b: np.ndarray = dataset_b.images
-
         if self.encode:
-            if not self._is_trained or self.autoencoder is None:
+            if not self._is_trained or self.model is None:
                 raise TypeError(
                     "Tried to encode data without fitting a model.\
                     Try calling Metric.fit_dataset(dataset) first."
                 )
-            imgs_a = self.autoencoder.encoder.predict(imgs_a)
-            imgs_b = self.autoencoder.encoder.predict(imgs_b)
+            # Model inputs should be torch.Tensors
+            input_a = (
+                imgs_a if isinstance(imgs_a, torch.Tensor) else permute_to_torch(imgs_a)
+            )
+            input_b = (
+                imgs_b if isinstance(imgs_b, torch.Tensor) else permute_to_torch(imgs_b)
+            )
 
-        data = np.vstack((imgs_a, imgs_b))
+            # Pass inputs through model
+            tensor_a = self.model.encode(input_a).flatten(start_dim=1)
+            tensor_b = self.model.encode(input_b).flatten(start_dim=1)
+
+            # Combine data into one dataset
+            data = torch.vstack((tensor_a, tensor_b)).numpy()
+        else:
+            # Input could be a torch.Tensor (future update)
+            imgs_a = (
+                imgs_a if isinstance(imgs_a, np.ndarray) else permute_to_numpy(imgs_a)
+            )
+            imgs_b = (
+                imgs_b if isinstance(imgs_b, np.ndarray) else permute_to_numpy(imgs_b)
+            )
+
+            # Combine data into one dataset
+            data = np.vstack((imgs_a, imgs_b))
+
         N = imgs_a.shape[0]
         M = imgs_b.shape[0]
         labels = np.vstack([np.zeros([N, 1]), np.ones([M, 1])])

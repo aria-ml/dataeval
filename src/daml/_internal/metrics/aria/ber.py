@@ -7,6 +7,7 @@ from abc import abstractmethod
 from typing import Tuple
 
 import numpy as np
+import torch
 from scipy.sparse import coo_matrix, csr_matrix
 from scipy.sparse.csgraph import minimum_spanning_tree
 from scipy.spatial.distance import pdist, squareform
@@ -14,6 +15,8 @@ from scipy.spatial.distance import pdist, squareform
 from daml._internal.datasets.datasets import DamlDataset
 from daml._internal.metrics.aria.base import _AriaMetric
 from daml._internal.metrics.outputs import BEROutput
+
+from .utils import permute_to_numpy, permute_to_torch
 
 
 class _MultiClassBer(_AriaMetric):
@@ -68,15 +71,19 @@ class _MultiClassBer(_AriaMetric):
 
         # If self.encode == True, pass X through an autoencoder before evaluating BER
         if self.encode:
-            if not self._is_trained or self.autoencoder is None:
+            if not self._is_trained or self.model is None:
                 raise TypeError(
                     "Tried to encode data without fitting a model.\
                     Try calling Metric.fit_dataset(dataset) first."
                 )
             else:
-                X = self.autoencoder.encoder.predict(X)
+                images = X if isinstance(X, torch.Tensor) else permute_to_torch(X)
+                embeddings = self.model.encode(images).numpy()
+        else:
+            embeddings = X if isinstance(X, np.ndarray) else permute_to_numpy(X)
 
-        ber, ber_lower = self._multiclass_ber(X, y)
+        assert isinstance(embeddings, np.ndarray)
+        ber, ber_lower = self._multiclass_ber(embeddings, y)
         return BEROutput(ber=ber, ber_lower=ber_lower)
 
 

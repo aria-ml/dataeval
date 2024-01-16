@@ -14,7 +14,7 @@ import tensorflow as tf
 from daml._internal.datasets import DamlDataset
 from daml._internal.metrics.outputs import OutlierDetectorOutput
 from daml._internal.metrics.types import Threshold, ThresholdType
-from daml._internal.models.autoencoder import create_default_model
+from daml._internal.models import create_alibi_model
 
 
 class AlibiDetectOutlierType(str, Enum):
@@ -130,7 +130,7 @@ class _AlibiDetectMetric(ABC):
         tf.keras.backend.clear_session()
         if self.detector is None:
             self._input_shape = dataset.images[0].shape
-            model = create_default_model(self._model_class, self._input_shape)
+            model = create_alibi_model(self._model_class, self._input_shape)
             self.detector = self._alibi_detect_class(
                 threshold=0,
                 **{self._model_param_name: model},
@@ -218,9 +218,8 @@ class _AlibiDetectMetric(ABC):
         """
         if self.detector is None:
             return
-
         if images.shape[-3:] != self._input_shape:
-            raise TypeError(
+            raise ValueError(
                 f"Model was initialized on dataset shape \
                 (W,H,C)={self._input_shape}, \
                 but provided dataset has shape (W,H,C)={images.shape[-3:]}"

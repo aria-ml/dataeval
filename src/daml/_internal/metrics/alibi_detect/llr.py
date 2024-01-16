@@ -15,7 +15,7 @@ from daml._internal.metrics.alibi_detect.base import (
     AlibiDetectOutlierType,
     _AlibiDetectMetric,
 )
-from daml._internal.models.autoencoder import LLRPixelCNN
+from daml._internal.models.tensorflow.alibi import LLRPixelCNN
 
 
 class AlibiLLR(_AlibiDetectMetric):
