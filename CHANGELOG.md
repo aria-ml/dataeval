@@ -1,6 +1,9 @@
-[//]: # (32e068e458fa619b65da916d6200e301d4026bf3)
+[//]: # (c9b5116e4eb17df24908973392d3c8f08903bd22)
 
 # DAML Change Log
+## Pending Release
+- ```c9b5116e - ARiA Autoencoder as PyTorch Model```
+## v0.41.7
 ## v0.41.6
 - ```42cc77ea - Add empirical upper bound to UAP metric output```
 ## v0.41.5
