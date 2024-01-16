@@ -1,7 +1,6 @@
 from typing import Optional
 
 from daml import _alibi_detect
-from daml._alibi_detect.models.tensorflow.autoencoder import VAE
 from daml._internal.metrics.alibi_detect.base import (
     AlibiDetectOutlierType,
     _AlibiDetectMetric,
@@ -16,12 +15,10 @@ class AlibiVAE(_AlibiDetectMetric):
     The model used by this class is :py:class:`daml.models.VAE`
     """  # noqa E501
 
-    def __init__(self, model: Optional[VAE] = None):
+    def __init__(self):
         super().__init__(
             alibi_detect_class=_alibi_detect.od.OutlierVAE,
-            model_class=VAE,
             model_param_name="vae",
-            model=model,
             flatten_dataset=False,
             dataset_type=None,
         )

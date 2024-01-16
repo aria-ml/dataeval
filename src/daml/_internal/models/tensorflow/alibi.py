@@ -1,5 +1,5 @@
 import math
-from typing import Tuple, Type
+from typing import Tuple
 
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import (
@@ -15,12 +15,6 @@ from tensorflow.nn import relu, softmax, tanh
 
 from daml._alibi_detect.models.tensorflow.autoencoder import AE, AEGMM, VAE, VAEGMM
 from daml._alibi_detect.models.tensorflow.pixelcnn import PixelCNN
-
-
-class LLRPixelCNN:
-    """Abstract class for alibi.LLR model"""
-
-    pass
 
 
 def _get_default_encoder_net(input_shape: Tuple[int, int, int], encoding_dim: int):
@@ -51,28 +45,28 @@ def _get_default_decoder_net(input_shape: Tuple[int, int, int], encoding_dim: in
     )
 
 
-def create_alibi_model(
-    model_class: Type,
+def create_model(
+    class_name: str,
     input_shape: Tuple[int, int, int],
     encoding_dim: int = 1024,
     n_gmm: int = 2,
     aegmm_latent_dim: int = 1,
     vaegmm_latent_dim: int = 2,
 ):
-    if model_class is AE:
+    if class_name == "AlibiAE":
         return AE(
             _get_default_encoder_net(input_shape, encoding_dim),
             _get_default_decoder_net(input_shape, encoding_dim),
         )
 
-    if model_class is VAE:
+    if class_name == "AlibiVAE":
         return VAE(
             _get_default_encoder_net(input_shape, encoding_dim),
             _get_default_decoder_net(input_shape, encoding_dim),
             encoding_dim,
         )
 
-    if model_class is AEGMM:
+    if class_name == "AlibiAEGMM":
         n_features = reduce_prod(input_shape)
         n_gmm = 2  # nb of components in GMM
         # The outlier detector is an encoder/decoder architecture
@@ -111,7 +105,7 @@ def create_alibi_model(
             n_gmm=n_gmm,
         )
 
-    if model_class is VAEGMM:
+    if class_name == "AlibiVAEGMM":
         n_features = reduce_prod(input_shape)
 
         # The outlier detector is an encoder/decoder architecture
@@ -150,7 +144,7 @@ def create_alibi_model(
             latent_dim=vaegmm_latent_dim,
         )
 
-    if model_class is LLRPixelCNN:
+    if class_name == "AlibiLLR":
         return PixelCNN(
             image_shape=input_shape,
             num_resnet=5,
@@ -162,4 +156,4 @@ def create_alibi_model(
             l2_weight=0.0,
         )
 
-    raise TypeError("Unknown model type specified: ", model_class)
+    raise TypeError("Unknown alibi_detect class specified: ", class_name)

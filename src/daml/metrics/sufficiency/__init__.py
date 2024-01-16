@@ -1,3 +1,3 @@
-from daml.metrics.sufficiency.aria import Sufficiency
+from daml._internal.metrics.aria.sufficiency import Sufficiency
 
 __all__ = ["Sufficiency"]
