@@ -14,7 +14,7 @@ import tensorflow as tf
 from daml._internal.datasets import DamlDataset
 from daml._internal.metrics.outputs import OutlierDetectorOutput
 from daml._internal.metrics.types import Threshold, ThresholdType
-from daml._internal.models import create_alibi_model
+from daml._internal.models.tensorflow.alibi import create_model
 
 
 class AlibiDetectOutlierType(str, Enum):
@@ -43,19 +43,17 @@ class _AlibiDetectMetric(ABC):
 
     @abstractmethod
     def set_prediction_args(self) -> None:
-        pass
+        """Abstract method to set specific prediction arguments for the detector"""
 
     @property
     @abstractmethod
     def _default_predict_kwargs(self) -> dict:
-        pass
+        """Abstract method for the default prediction arguments for the detector"""
 
     def __init__(
         self,
         alibi_detect_class: type,
-        model_class: type,
         model_param_name: str,
-        model: Optional[Any],
         flatten_dataset: bool,
         dataset_type: Optional[type] = None,
     ):
@@ -75,7 +73,6 @@ class _AlibiDetectMetric(ABC):
         self.is_trained: bool = False
 
         self._alibi_detect_class = alibi_detect_class
-        self._model_class = model_class
         self._model_param_name = model_param_name
         self._flatten_dataset = flatten_dataset
         self._dataset_type = dataset_type
@@ -85,12 +82,6 @@ class _AlibiDetectMetric(ABC):
         self._default_batch_size = 64
 
         self._input_shape: Tuple[int, int, int]
-
-        if model is not None:
-            self.detector = self._alibi_detect_class(
-                threshold=0, **{model_param_name: model}
-            )
-            self._input_shape = model.layers[0].input_shape[0][-3:]
 
     # Train the alibi-detect metric on dataset
     def fit_dataset(
@@ -130,7 +121,7 @@ class _AlibiDetectMetric(ABC):
         tf.keras.backend.clear_session()
         if self.detector is None:
             self._input_shape = dataset.images[0].shape
-            model = create_alibi_model(self._model_class, self._input_shape)
+            model = create_model(type(self).__name__, self._input_shape)
             self.detector = self._alibi_detect_class(
                 threshold=0,
                 **{self._model_param_name: model},
