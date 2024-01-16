@@ -1,7 +1,9 @@
-[//]: # (c9b5116e4eb17df24908973392d3c8f08903bd22)
+[//]: # (d953fcc57559aed79e1e5e0c338f4866141b5a49)
 
 # DAML Change Log
 ## Pending Release
+- ```d953fcc5 - Refactor and cleanup dead code```
+## v0.41.8
 - ```c9b5116e - ARiA Autoencoder as PyTorch Model```
 ## v0.41.7
 ## v0.41.6
