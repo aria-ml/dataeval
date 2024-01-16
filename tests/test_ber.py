@@ -2,8 +2,7 @@ import numpy as np
 import pytest
 
 from daml.datasets import DamlDataset
-from daml.metrics.ber import BEROutput
-from daml.metrics.ber.aria import BER_FNN, BER_MST
+from daml.metrics.ber import BER_FNN, BER_MST, BEROutput
 
 
 class TestMulticlassBER:

@@ -7,7 +7,7 @@ import torch.nn as nn
 from sklearn.neighbors import NearestNeighbors
 
 from daml._internal.datasets.datasets import DamlDataset
-from daml._internal.models import AERunner, AETrainer
+from daml._internal.models.pytorch.autoencoder import AERunner, AETrainer
 
 from .utils import permute_to_torch
 
