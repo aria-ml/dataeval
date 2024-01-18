@@ -2,6 +2,5 @@
 exclude_lines = 
     pragma: no cover
     raise NotImplementedError
-    raise TypeError
 omit =
     src/daml/_alibi_detect/*

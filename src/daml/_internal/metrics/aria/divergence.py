@@ -30,12 +30,7 @@ class _DpDivergence(_AriaMetric):
 
     @abstractmethod
     def calculate_errors(self, data: np.ndarray, labels: np.ndarray) -> int:
-        pass
-
-    def set_dataset(self, dataset: DamlDataset) -> None:
-        """
-        Sets the source dataset which will be used to calculate divergence"""
-        self.dataset = dataset
+        """Abstract method for the implementation of divergence calculation"""
 
     def evaluate(
         self,

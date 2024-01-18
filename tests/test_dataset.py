@@ -1,3 +1,4 @@
+import copy
 from typing import List, Tuple
 
 import numpy as np
@@ -72,6 +73,16 @@ class TestDamlClassificationDataset:
 
         npt.assert_array_equal(output[0], image_0)
         npt.assert_array_equal(output[1], label_0)
+
+    def test_setter(self):
+        dds2 = copy.deepcopy(self.dds)
+        dds2.images = np.zeros(shape=self.shape)
+        dds2.labels = np.zeros(self.shape[0])
+        dds2.boxes = np.zeros(self.shape[0])
+
+        assert not np.array_equal(dds2.images, self.dds.images)
+        assert not np.array_equal(dds2.labels, self.dds.labels)
+        assert dds2.boxes is not None
 
     def test_property(self):
         npt.assert_array_equal(self.dds.images, self.images)  # Images

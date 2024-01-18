@@ -1,9 +1,12 @@
+from os import remove
+from os.path import exists
 from typing import Optional
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 
+from daml._internal.models.tensorflow.alibi import create_model
 from daml.datasets import DamlDataset
 from daml.metrics.outlier_detection import (
     OD_AE,
@@ -247,3 +250,47 @@ class TestAlibiDetect:
         assert not metric._predict_kwargs["return_instance_score"]
         for key in expected:
             assert metric._predict_kwargs[key] == expected[key]
+
+
+class TestAlibiModels:
+    input_shape = (32, 32, 3)
+    all_ones = MockImageClassificationGenerator(limit=3, labels=1, img_dims=input_shape)
+
+    def test_export_model(self):
+        metric = OD_AE()
+        dataset = DamlDataset(self.all_ones.dataset.images)
+        metric.fit_dataset(dataset=dataset, epochs=1, verbose=False)
+
+        metric.export_model("model.keras")
+        if exists("model.keras"):
+            remove("model.keras")
+        else:
+            pytest.fail("model not exported")
+
+    def test_export_model_no_detector(self):
+        metric = OD_AE()
+        with pytest.raises(RuntimeError):
+            metric.export_model("model.keras")
+
+    def test_export_model_no_model(self):
+        metric = OD_AE()
+        dataset = DamlDataset(self.all_ones.dataset.images)
+        metric.fit_dataset(dataset=dataset, epochs=1, verbose=False)
+        metric._model_param_name = "llr"
+        with pytest.raises(ValueError):
+            metric.export_model("model.keras")
+
+    @patch("daml._internal.models.tensorflow.alibi.create_model")
+    def test_fit_dataset_with_model_calls_infer_and_fit(self, create_model_fn):
+        metric = OD_AE()
+        dataset = DamlDataset(self.all_ones.dataset.images)
+        metric.detector = MagicMock()
+        metric._input_shape = self.input_shape
+        metric.fit_dataset(dataset=dataset, epochs=1, verbose=False)
+        assert metric.detector.infer_threshold.called
+        assert metric.detector.fit.called
+        assert not create_model_fn.called
+
+    def test_create_model_invalid_class(self):
+        with pytest.raises(TypeError):
+            create_model("not_a_valid_class", self.input_shape)
