@@ -129,3 +129,11 @@ class TestConversions:
 
         assert isinstance(pt_images, torch.Tensor)
         assert pt_images.shape == (1, 3, 32, 32)
+
+    def test_pt_np_typeerror(self):
+        with pytest.raises(TypeError):
+            pytorch_to_numpy(0)  # type: ignore
+
+    def test_np_pt_typeerror(self):
+        with pytest.raises(TypeError):
+            numpy_to_pytorch(0)  # type: ignore
