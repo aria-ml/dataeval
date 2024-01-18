@@ -101,6 +101,35 @@ class TestSufficiency:
 
         assert isinstance(results, dict)
 
+    def test_mock_run_with_kwargs(self) -> None:
+        suff = Sufficiency()
+
+        suff._train = MagicMock()
+        suff._eval = MagicMock()
+        suff.setup(100, 1, 2)
+
+        patch("torch.utils.data.DataLoader").start()
+
+        model = MagicMock()
+        train_ds = MagicMock()
+        test_ds = MagicMock()
+
+        results = suff.run(
+            model,
+            train_ds=train_ds,
+            test_ds=test_ds,
+            train_kwargs={"train": 1},
+            eval_kwargs={"eval": 1},
+        )
+
+        assert suff._train.call_count == 2
+        assert {"train": 1} in suff._train.call_args[0]
+
+        assert suff._eval.call_count == 2
+        assert {"eval": 1} in suff._eval.call_args[0]
+
+        assert isinstance(results, dict)
+
     def test_train_func_is_none(self) -> None:
         suff = Sufficiency()
 

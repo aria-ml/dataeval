@@ -149,12 +149,12 @@ class _AlibiDetectMetric(ABC):
         else:
             self.detector.threshold = threshold.value
 
-    def export_model(self):
+    def export_model(self, path: str):
         if self.detector is None:
             raise RuntimeError("The model must be initialized first")
         if self._model_param_name not in self.detector.__dict__.keys():
             raise ValueError("Member not found in detector")
-        return self.detector[self._model_param_name]
+        getattr(self.detector, self._model_param_name).save(path)
 
     def _check_dtype(self, images: np.ndarray):
         """

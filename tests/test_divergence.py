@@ -136,3 +136,14 @@ class TestEncodedDpDivergence:
         result = metric.evaluate(dataset_a, dataset_b)
         assert result.dpdivergence >= output.dpdivergence
         assert result.error <= output.error
+
+
+class TestDivergenceOutput:
+    def test_divergenceoutput_eq(self):
+        assert DivergenceOutput(1.0, 1.0) == DivergenceOutput(1.0, 1.0)
+
+    def test_divergenceoutput_ne(self):
+        assert DivergenceOutput(1.0, 1.0) != DivergenceOutput(0.9, 0.9)
+
+    def test_divergenceoutput_ne_type(self):
+        assert DivergenceOutput(1.0, 1.0) != (1.0, 1.0)
