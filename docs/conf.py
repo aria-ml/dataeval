@@ -7,8 +7,8 @@ project = "DAML"
 copyright = "2023, ARiA"
 author = "ARiA"
 
-site_url = "https://jatic.pages.jatic.net/aria/daml/"
-repo_url = "https://gitlab.jatic.net/jatic/aria/daml"
+site_url = "https://github.com/aria-ml/daml/"
+repo_url = "https://github.com/aria-ml/daml/"
 repo_name = "DAML"
 
 extensions = [
