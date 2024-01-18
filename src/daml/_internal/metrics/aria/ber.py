@@ -31,7 +31,7 @@ class _MultiClassBer(_AriaMetric):
         X: np.ndarray,
         y: np.ndarray,
     ) -> Tuple[float, float]:
-        pass
+        """Abstract method for the implementation of multiclass BER calculation"""
 
     def _get_classes_counts(self, labels: np.ndarray) -> Tuple[int, np.intp]:
         classes, counts = np.unique(labels, return_counts=True)
