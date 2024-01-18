@@ -52,7 +52,6 @@ tensorflow-io-gcs-filesystem = [
 optional = true
 
 [tool.poetry.group.dev.dependencies]
-attrs = "*"  # This is needed for a bug in MAITE https://gitlab.jatic.net/jatic/cdao/maite/-/issues/313
 # test
 pytest = "*"
 coverage = "*"
