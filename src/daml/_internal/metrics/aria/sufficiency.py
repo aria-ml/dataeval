@@ -147,6 +147,7 @@ class Sufficiency:
         model: nn.Module,
         train_ds: DamlDataset,
         test_ds: DamlDataset,
+        batch_size: int = 8,
         train_kwargs: Optional[
             Dict[str, Any]
         ] = None,  # Mutable sequences should not be used as default arg
@@ -198,7 +199,12 @@ class Sufficiency:
                 subset_test = DamlDataset(X_test, y_test)
 
                 self._outputs[i, j] = self._run_subset(
-                    model, subset_dataset, subset_test, train_kwargs, eval_kwargs
+                    model,
+                    subset_dataset,
+                    subset_test,
+                    batch_size,
+                    train_kwargs,
+                    eval_kwargs,
                 )
 
         n_i = self._ranges
@@ -221,12 +227,13 @@ class Sufficiency:
         model: nn.Module,
         train_data: DamlDataset,
         eval_data: DamlDataset,
+        batch_size: int,
         train_kwargs,
         eval_kwargs,
     ):
-        train_loader = DataLoader(train_data)
+        train_loader = DataLoader(train_data, batch_size=batch_size)
         self._train(model, train_loader, train_kwargs)
-        test_loader = DataLoader(eval_data)
+        test_loader = DataLoader(eval_data, batch_size=batch_size)
         return self._eval(model, test_loader, eval_kwargs)
 
     def plot(self, output_dict: Dict[str, Any]):
