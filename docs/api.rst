@@ -7,7 +7,6 @@ DAML API
    api/ber
    api/divergence
    api/outlier-detection
-   api/models
 
 API
 ---

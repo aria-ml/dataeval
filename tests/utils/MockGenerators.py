@@ -12,7 +12,7 @@ class MockImageClassificationGenerator:
     This class creates arrays of multi-dimensional arrays representing a list
     of images and their corresponding labels. They are then stored as
     :class:`MockImageClassificationDataset` and exposed with the attribute
-     dataset`
+    dataset
 
     :param limit: The total number of images and labels in the dataset
     :type limit: int

@@ -5,6 +5,7 @@ dist/
 
 docs/_*/
 docs/tutorials/checkpoints/
+docs/tutorials/data/
 !docs/_static
 
 output/
