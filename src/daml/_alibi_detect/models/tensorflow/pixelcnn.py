@@ -313,7 +313,7 @@ class PixelCNN(distribution.Distribution):
             if conditional_shape is not None and not tensorshape_util.is_fully_defined(
                 conditional_shape
             ):
-                raise ValueError("`conditional_shape` must be fully defined`")
+                raise ValueError("`conditional_shape` must be fully defined.")
 
             if tensorshape_util.rank(image_shape) != 3:
                 raise ValueError(
