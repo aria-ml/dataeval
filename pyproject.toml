@@ -9,14 +9,14 @@ repository = "https://github.com/aria-ml/daml/"
 documentation = "https://daml.readthedocs.io/"
 
 authors = [
-  {name = "Andrew Weng", email = "andrew.weng@ariacoustics.com"},
-  {name = "James Gleeson", email = "james.gleeson@ariacoustics.com"},
-  {name = "Scott Swan", email = "scott.swan@ariacoustics.com"},
-  {name = "Shaun Jullens", email = "shaun.jullens@ariacoustics.com"},
-  {name = "Thayer Fisher", email = "thayer.fisher@ariacoustics.com"},
+  "Andrew Weng <andrew.weng@ariacoustics.com>",
+  "James Gleeson <james.gleeson@ariacoustics.com>",
+  "Scott Swan <scott.swan@ariacoustics.com>",
+  "Shaun Jullens <shaun.jullens@ariacoustics.com>",
+  "Thayer Fisher <thayer.fisher@ariacoustics.com>",
 ]
 maintainers = [
-  {name = "ARiA", email = "daml@ariacoustics.com"}
+  "ARiA <daml@ariacoustics.com>"
 ]
 
 classifiers = [
