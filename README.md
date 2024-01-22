@@ -26,7 +26,7 @@ To install the package from the GitLab Pypi repository, run the following comman
 `pip install daml`
 
 ### Additional Tutorials
-For more ideas on getting started using DAML in your workflow, additional information is in our Sphinx documentation hosted in [here](https://jatic.pages.jatic.net/aria/daml/) on Gitlab Pages.
+For more ideas on getting started using DAML in your workflow, additional information and tutorials are in our Sphinx documentation hosted on [Read the Docs](https://daml.readthedocs.io/).
 
 ## Contributing
 For steps on how to get started on contributing to the project, you can follow the steps in [CONTRIBUTING.md](CONTRIBUTING.md).

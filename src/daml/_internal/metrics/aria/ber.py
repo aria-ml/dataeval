@@ -61,10 +61,6 @@ class _MultiClassBer(_AriaMetric):
         ------
         ValueError
             If unique classes M < 2 or M > 10
-
-        See Also
-        --------
-        https://gitlab.jatic.net/jatic/aria/daml/-/issues/83
         """
         X: np.ndarray = dataset.images
         y: np.ndarray = dataset.labels
