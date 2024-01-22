@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # array of minor versions based off of biweekly milestone & sprint
-declare -a minorVersions=(21 22 23 24 25 31 32 33 34 35 36 37 38 41 42 43 44 45 46 51 52 53 54 55 56)
+declare -a minorVersions=(21 22 23 24 25 31 32 33 34 35 36 37 38 40 42 43 44 45 46 51 52 53 54 55 56)
 
 git fetch --tags
 currentVer=$(git describe --tags --abbrev=0 2>/dev/null) || exit_code=$?
