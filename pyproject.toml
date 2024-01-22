@@ -8,19 +8,28 @@ homepage = "https://daml.ai/"
 repository = "https://github.com/aria-ml/daml/"
 documentation = "https://daml.readthedocs.io/"
 
-authors = ["ARiA <daml@ariacoustics.com>"]
+authors = [
+  {name = "Andrew Weng", email = "andrew.weng@ariacoustics.com"},
+  {name = "James Gleeson", email = "james.gleeson@ariacoustics.com"},
+  {name = "Scott Swan", email = "scott.swan@ariacoustics.com"},
+  {name = "Shaun Jullens", email = "shaun.jullens@ariacoustics.com"},
+  {name = "Thayer Fisher", email = "thayer.fisher@ariacoustics.com"},
+]
+maintainers = [
+  {name = "ARiA", email = "daml@ariacoustics.com"}
+]
 
 classifiers = [
   "Development Status :: 4 - Beta",
-  "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
   "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Topic :: Scientific/Engineering",
-  "Programming Language :: Python :: 3 :: Only",
 ]
 
 [tool.poetry.dependencies]
