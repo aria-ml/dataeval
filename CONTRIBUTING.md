@@ -4,30 +4,19 @@
 DAML provides a simple interface to characterize image data and its impact on model performance across classification and object-detection tasks
 
 ## Installation
-### Environment Dependencies
-- [git-lfs](https://git-lfs.com/)
+### Development Dependencies
+- [git-lfs](https://git-lfs.com/) - Large file storage for binaries in git repository
+- [graphviz](https://graphviz.org/) - Documentation dependency for rendering diagrams
+- [Visual Studio Code](https://code.visualstudio.com/Download) - Development IDE
 
-### Dependencies
-- python 3.8-3.10
-- alibi-detect[tensorflow]
-- tensorflow
-
-### Harbor Image Registry
-In order to perform build caching and normalize development environments, DAML utilizes images built on top of Ubuntu and Nvidia CUDA images.  These images are stored in the [Harbor Image Registry](https://harbor.jatic.net/) hosted alongside our [Gitlab](https://gitlab.jatic.net).
-
-To use images stored in the registry, follow these steps:
-
-1. Browse to https://harbor.jatic.net/
-2. Sign in via OIDC provider (this will authenticate you through jatic.net)
-3. Access your user profile icon in the top right corner
-4. Note down your username and copy the CLI secret
-5. Log in to the registry through docker CLI
-   1. `docker login harbor.jatic.net:443`
-   2. Enter username as shown
-   3. Paste CLI secret token as password
-6. Contact @aweng for access permissions to the daml project.
+### Containerized Development Dependencies
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) - Containerization software for developer environment management
+- [Visual Studio Code](https://code.visualstudio.com/Download) - Development IDE
 
 ### Development Environment
+
+Development is standardized on Ubuntu with support for Ubuntu on Windows Subsystem for Linux (WSL2) as well.  Additionally, the usage of Docker containers allows for minimization of environment variables.
+
 #### Ubuntu with Windows Subsystem for Linux
 ##### Enable Virtual Machine Platform
 ```
@@ -39,6 +28,7 @@ To use images stored in the registry, follow these steps:
 (admin) PS> wsl --install
 ```
 
+#### Ubuntu
 ##### In Ubuntu, set up your user account and environment
 ```
 :~$ sudo apt update
@@ -75,7 +65,7 @@ GitLab provides documentation for the GPG signing process [here](https://docs.gi
 4. Export the public key to upload to GitLab
    1. `PS> gpg --armor --export <KEY ID>`
 
-**Forward GPG pin entry requests from WSL to Windows**
+**Install pinentry utility in WSL2**
 1. Ensure gpg is installed
    - `$: sudo apt install gpg`
 2. Register pin entry client
@@ -106,6 +96,21 @@ This is required for git to trust your repository ownership when the files belon
 ```
 :~$ git config --global --add safe.directory "*"
 ```
+
+### Harbor Image Registry
+In order to perform build caching and normalize development environments, DAML utilizes images built on top of Ubuntu and Nvidia CUDA images.  These images are stored in the [Harbor Image Registry](https://harbor.jatic.net/) hosted alongside our [Gitlab](https://gitlab.jatic.net).
+
+To use images stored in the registry, follow these steps:
+
+1. Browse to https://harbor.jatic.net/
+2. Sign in via OIDC provider (this will authenticate you through jatic.net)
+3. Access your user profile icon in the top right corner
+4. Note down your username and copy the CLI secret
+5. Log in to the registry through docker CLI
+   1. `docker login harbor.jatic.net:443`
+   2. Enter username as shown
+   3. Paste CLI secret token as password
+6. Contact @aweng for access permissions to the daml project.
 
 #### VS Code Development Container
 This option allows you to run or test DAML in a virtual development container fully isolated from the host environment.  It also allows you to run on different versions of Python independently of what is on your host environment.

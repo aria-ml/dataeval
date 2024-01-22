@@ -3,20 +3,10 @@
 # DAML Change Log
 ## Pending Release
 - ```d953fcc5 - Refactor and cleanup dead code```
-## v0.41.8
 - ```c9b5116e - ARiA Autoencoder as PyTorch Model```
-## v0.41.7
-## v0.41.6
 - ```42cc77ea - Add empirical upper bound to UAP metric output```
-## v0.41.5
-## v0.41.4-pre
 - ```2ba149a7 - Make internal implementation of alibi-detect a subpackage of daml```
-## v0.41.3-pre
 - ```da23f2f0 - Snapshot outlier detection code from alibi-detect```
-## v0.41.2-pre
-## v0.41.2
-## v0.41.1
-## v0.41.0
 - ```1c44826f - Remove JATIC token requirements for MAITE```
 - ```636dfdaf - update project with __version__ metadata```
 ## v0.36.1
