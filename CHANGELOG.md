@@ -1,7 +1,9 @@
-[//]: # (d953fcc57559aed79e1e5e0c338f4866141b5a49)
+[//]: # (1deb74705577546171b9a9a9f800c96f6c67bef5)
 
 # DAML Change Log
-## Pending Release
+## v0.38.0
+- ```8fe97232 - Add export_model functionality and improve test coverage```
+- ```94aa495f - Fix sufficiency tutorial and expose batch_size argument```
 - ```d953fcc5 - Refactor and cleanup dead code```
 - ```c9b5116e - ARiA Autoencoder as PyTorch Model```
 - ```42cc77ea - Add empirical upper bound to UAP metric output```
