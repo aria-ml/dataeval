@@ -130,7 +130,7 @@ function docker_run() {
         (echo "Building $tag..."; echo $docker_build_cmd; $docker_build_cmd | tee $temp; exit ${PIPESTATUS[0]}) && \
         (echo "Running $tag..."; echo docker run $docker_run_args $task; docker run $docker_run_args $task | tee -a $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
     else
-        $docker_build_cmd &> $temp && docker run $docker_run_args &>> $temp || result="FAILED"
+        $docker_build_cmd &> $temp && docker run $docker_run_args $task &>> $temp || result="FAILED"
     fi
 
     if [[ $result == "FAILED" ]]; then

@@ -131,14 +131,29 @@ linting:
     matrix:
       - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
   script:
-    - ./build ${PYTHON_VERSION} ${TASK}
+    - ./build ${PYTHON_VERSION} ${TASK} type --verbose
   artifacts:
     reports:
       junit: output/junit.${TASK}.${PYTHON_VERSION}.xml
     paths:
-      - output/junit.${TASK}.${PYTHON_VERSION}.xml
-      - output/.coverage.${TASK}.${PYTHON_VERSION}
-      - output/htmlcov.${TASK}.${PYTHON_VERSION}
+      - output/*
+
+# .test:
+#   extends: .docker_harbor_optional
+#   stage: test
+#   needs: [build image]
+#   parallel:
+#     matrix:
+#       - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
+#   script:
+#     - ./build ${PYTHON_VERSION} ${TASK}
+#   artifacts:
+#     reports:
+#       junit: output/junit.${TASK}.${PYTHON_VERSION}.xml
+#     paths:
+#       - output/junit.${TASK}.${PYTHON_VERSION}.xml
+#       - output/.coverage.${TASK}.${PYTHON_VERSION}
+#       - output/htmlcov.${TASK}.${PYTHON_VERSION}
 
 test:
   extends: [.test, .on_default]
@@ -178,14 +193,14 @@ coverage:
       - coverage.xml
       - htmlcov/
 
-typecheck:
-  extends: [.docker_harbor_optional, .on_default]
-  needs: [build image]
-  parallel:
-    matrix:
-      - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
-  script:
-    - ./build ${PYTHON_VERSION} type
+# typecheck:
+#   extends: [.docker_harbor_optional, .on_default]
+#   needs: [build image]
+#   parallel:
+#     matrix:
+#       - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
+#   script:
+#     - ./build ${PYTHON_VERSION} type
 
 docs:
   extends: [.docker_harbor_optional, .on_default]
