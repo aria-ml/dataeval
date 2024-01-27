@@ -230,6 +230,6 @@ fi
 echo "Running ${!jobs[@]}..."
 case ${#jobs[@]} in
     0)  showHelp 1;;
-    1)  export verbose=1; export verbosity="--progress=plain"; docker_run ${!jobs[@]};;
+    1)  export verbose=1; docker_run ${!jobs[@]};;
     *)  LANG=C parallel --lb --tag docker_run ::: ${!jobs[@]};;
 esac
