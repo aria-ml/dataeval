@@ -154,12 +154,13 @@ function ensure_image() {
     echo "Checking $2:$3$4 image..."
     if ! $(docker manifest inspect $2:$3$4 > /dev/null 2>&1); then
         echo "Building $2:$3$4..."
-        docker build $verbosity \
+        args="$verbosity \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
+            ${@:5} \
             --cache-from $2:main$4 \
             --tag $2:$3$4 \
-            --target $1 . \
-            <<< ${@:5}
+            --target $1 ."
+        docker build $args
         echo "Finished building $2:$3$4."
         if [[ $push_to_repo ]]; then
             echo "Pushing $2:$3$4..."
