@@ -4,20 +4,21 @@ FR Test Statistic based estimate for the upperbound
 average precision (UAP_MST) and empirical mean
 precision (UAP_EMP)
 """
-from typing import Tuple
 
 import numpy as np
 import torch
-from scipy.sparse import csr_matrix
-from scipy.sparse.csgraph import minimum_spanning_tree
-from scipy.spatial.distance import pdist, squareform
 from sklearn.metrics import average_precision_score
 
 from daml._internal.datasets.datasets import DamlDataset
 from daml._internal.metrics.aria.base import _AriaMetric
 from daml._internal.metrics.outputs import UAPOutput
 
-from .utils import permute_to_numpy, permute_to_torch
+from .utils import (
+    get_classes_counts,
+    minimum_spanning_tree,
+    permute_to_numpy,
+    permute_to_torch,
+)
 
 
 class UAP_MST(_AriaMetric):
@@ -25,12 +26,6 @@ class UAP_MST(_AriaMetric):
         """Constructor method"""
 
         super().__init__(encode, device="cpu")
-
-    def _get_classes_counts(self, labels: np.ndarray) -> Tuple[int, np.intp]:
-        classes, counts = np.unique(labels, return_counts=True)
-        M = len(classes)
-        N = np.sum(counts)
-        return M, N
 
     def evaluate(self, dataset: DamlDataset) -> UAPOutput:
         """
@@ -92,15 +87,9 @@ class UAP_MST(_AriaMetric):
         ValueError
             If unique classes M < 2 or M > 10
         """
-        M, N = self._get_classes_counts(y)
+        M, N = get_classes_counts(y)
 
-        # All features belong on second dimension
-        X = X.reshape((X.shape[0], -1))
-        # We add a small constant to the distance matrix to ensure scipy interprets
-        # the input graph as fully-connected.
-        dense_eudist = squareform(pdist(X)) + 1e-4
-        eudist_csr = csr_matrix(dense_eudist)
-        tree = minimum_spanning_tree(eudist_csr).todense()
+        tree = minimum_spanning_tree(X).todense()
         conf_mat = np.zeros((M, M))
         for i in range(len(tree)):
             edges = np.where(tree[i, :] != 0)[1]
