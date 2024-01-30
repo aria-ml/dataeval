@@ -1,7 +1,8 @@
-[//]: # (42617f43a5c0c9761a3ee943ef6040dc699b20ea)
+[//]: # (57f9eade34c90998edfa8417e81d55f3c476736b)
 
 # DAML Change Log
-## Pending Release
+## v0.38.2
+- ```6bb442c3 - Refactor common minimum spanning tree code into utils```
 - ```42617f43 - Enable GPU functionality in pytorch features```
 ## v0.38.1
 ## v0.38.0
