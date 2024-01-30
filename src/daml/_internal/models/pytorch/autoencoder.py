@@ -1,3 +1,5 @@
+from typing import Optional, Union
+
 import torch
 import torch.nn as nn
 from torch.optim import Adam
@@ -7,8 +9,11 @@ torch.manual_seed(0)
 
 
 class AERunner:
-    def __init__(self, model: nn.Module):
+    def __init__(self, model: nn.Module, device: Union[str, torch.device] = "cpu"):
         self._model = model
+        self._device = device
+
+        self._model.to(self._device)
 
     def encode(self, x) -> torch.Tensor:
         with torch.no_grad():
@@ -24,19 +29,30 @@ class AERunner:
 
 
 class AETrainer(AERunner):
-    def __init__(self, model=None, channels=3):
-        _model = model if model else AriaAutoencoder(channels)
-        super().__init__(_model)
+    def __init__(
+        self,
+        model: Optional[nn.Module] = None,
+        channels: Optional[int] = None,
+        device: Union[str, torch.device] = "cpu",
+    ):
+        # Channel check only if no model given
+        if model is None:
+            if channels is None:
+                raise TypeError("Channels must be set for default model")
+            _model = AriaAutoencoder(channels)
+        else:
+            _model = model
+        super().__init__(_model, device=device)
 
-    def train(self, dataset, epochs: int = 100):
-        dl = DataLoader(dataset)
+    def train(self, dataset, epochs: int = 100, batch_size=8):
+        dl = DataLoader(dataset, batch_size=batch_size)
 
         opt = Adam(self._model.parameters(), lr=0.001)
-        criterion = nn.MSELoss()
+        criterion = nn.MSELoss().to(self._device)
         loss = 0
         for _ in range(epochs):
             for batch in dl:
-                imgs = batch[0]  # (imgs, labels, bboxes)
+                imgs = batch[0].to(self._device)  # (imgs, labels, bboxes)
                 opt.zero_grad()
                 pred = self._model(imgs)
                 loss = criterion(pred, imgs)

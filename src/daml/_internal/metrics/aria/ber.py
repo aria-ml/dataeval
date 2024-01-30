@@ -4,7 +4,7 @@ FR Test Statistic based estimate and the
 FNN based estimate for the Bayes Error Rate
 """
 from abc import abstractmethod
-from typing import Tuple
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -20,10 +20,12 @@ from .utils import permute_to_numpy, permute_to_torch
 
 
 class _MultiClassBer(_AriaMetric):
-    def __init__(self, encode: bool = False) -> None:
+    def __init__(
+        self, encode: bool = False, device: Union[str, torch.device] = "cpu"
+    ) -> None:
         """Constructor method"""
 
-        super().__init__(encode)
+        super().__init__(encode, device)
 
     @abstractmethod
     def _multiclass_ber(
@@ -38,12 +40,12 @@ class _MultiClassBer(_AriaMetric):
         M = len(classes)
         if M < 2:
             raise ValueError("Label vector contains less than 2 classes!")
-        if M > 10:
-            raise ValueError("Label vector contains more than 10 classes!")
         N = np.sum(counts)
         return M, N
 
-    def evaluate(self, dataset: DamlDataset) -> BEROutput:
+    def evaluate(
+        self, dataset: DamlDataset, encode: Optional[bool] = None
+    ) -> BEROutput:
         """
         Return the Bayes Error Rate estimate
 
@@ -60,13 +62,15 @@ class _MultiClassBer(_AriaMetric):
         Raises
         ------
         ValueError
-            If unique classes M < 2 or M > 10
+            If unique classes M < 2
         """
         X: np.ndarray = dataset.images
         y: np.ndarray = dataset.labels
 
-        # If self.encode == True, pass X through an autoencoder before evaluating BER
-        if self.encode:
+        # Parameter encode can override class encode
+        do_encode = self.encode if encode is None else encode
+        # Pass X through an autoencoder before evaluating BER
+        if do_encode:
             if not self._is_trained or self.model is None:
                 raise TypeError(
                     "Tried to encode data without fitting a model.\
@@ -74,7 +78,7 @@ class _MultiClassBer(_AriaMetric):
                 )
             else:
                 images = X if isinstance(X, torch.Tensor) else permute_to_torch(X)
-                embeddings = self.model.encode(images).numpy()
+                embeddings = self.model.encode(images).detach().cpu().numpy()
         else:
             embeddings = X if isinstance(X, np.ndarray) else permute_to_numpy(X)
 
