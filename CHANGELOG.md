@@ -1,6 +1,9 @@
-[//]: # (1deb74705577546171b9a9a9f800c96f6c67bef5)
+[//]: # (42617f43a5c0c9761a3ee943ef6040dc699b20ea)
 
 # DAML Change Log
+## Pending Release
+- ```42617f43 - Enable GPU functionality in pytorch features```
+## v0.38.1
 ## v0.38.0
 - ```8fe97232 - Add export_model functionality and improve test coverage```
 - ```94aa495f - Fix sufficiency tutorial and expose batch_size argument```
