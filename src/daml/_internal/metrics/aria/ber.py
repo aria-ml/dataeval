@@ -8,15 +8,18 @@ from typing import Optional, Tuple, Union
 
 import numpy as np
 import torch
-from scipy.sparse import coo_matrix, csr_matrix
-from scipy.sparse.csgraph import minimum_spanning_tree
-from scipy.spatial.distance import pdist, squareform
+from scipy.sparse import coo_matrix
 
 from daml._internal.datasets.datasets import DamlDataset
 from daml._internal.metrics.aria.base import _AriaMetric
 from daml._internal.metrics.outputs import BEROutput
 
-from .utils import permute_to_numpy, permute_to_torch
+from .utils import (
+    get_classes_counts,
+    minimum_spanning_tree,
+    permute_to_numpy,
+    permute_to_torch,
+)
 
 
 class _MultiClassBer(_AriaMetric):
@@ -34,14 +37,6 @@ class _MultiClassBer(_AriaMetric):
         y: np.ndarray,
     ) -> Tuple[float, float]:
         """Abstract method for the implementation of multiclass BER calculation"""
-
-    def _get_classes_counts(self, labels: np.ndarray) -> Tuple[int, np.intp]:
-        classes, counts = np.unique(labels, return_counts=True)
-        M = len(classes)
-        if M < 2:
-            raise ValueError("Label vector contains less than 2 classes!")
-        N = np.sum(counts)
-        return M, N
 
     def evaluate(
         self, dataset: DamlDataset, encode: Optional[bool] = None
@@ -121,17 +116,11 @@ class MultiClassBerMST(_MultiClassBer):
         ValueError
             If unique classes M < 2 or M > 10
         """
-        M, N = self._get_classes_counts(y)
+        M, N = get_classes_counts(y)
 
-        # All features belong on second dimension
-        X = X.reshape((X.shape[0], -1))
-        # We add a small constant to the distance matrix to ensure scipy interprets
-        # the input graph as fully-connected.
-        dense_eudist = squareform(pdist(X)) + 1e-4
-        eudist_csr = csr_matrix(dense_eudist)
-        tree = coo_matrix(minimum_spanning_tree(eudist_csr))
-        sum = np.sum([y[tree.row[i]] != y[tree.col[i]] for i in range(N - 1)])
-        deltas = sum / (2 * N)
+        tree = coo_matrix(minimum_spanning_tree(X))
+        matches = np.sum([y[tree.row[i]] != y[tree.col[i]] for i in range(N - 1)])
+        deltas = matches / (2 * N)
         upper = 2 * deltas
         lower = ((M - 1) / (M)) * (1 - (1 - 2 * ((M) / (M - 1)) * deltas) ** 0.5)
         return upper, lower
@@ -168,7 +157,7 @@ class MultiClassBerFNN(_MultiClassBer):
         X: np.ndarray,
         y: np.ndarray,
     ) -> Tuple[float, float]:
-        M, N = self._get_classes_counts(y)
+        M, N = get_classes_counts(y)
 
         # All features belong on second dimension
         X = X.reshape((X.shape[0], -1))

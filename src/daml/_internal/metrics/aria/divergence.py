@@ -7,15 +7,12 @@ from typing import Optional, Union
 
 import numpy as np
 import torch
-from scipy.sparse import csr_matrix
-from scipy.sparse.csgraph import minimum_spanning_tree
-from scipy.spatial.distance import pdist, squareform
 
 from daml._internal.datasets.datasets import DamlDataset
 from daml._internal.metrics.aria.base import _AriaMetric
 from daml._internal.metrics.outputs import DivergenceOutput
 
-from .utils import permute_to_numpy, permute_to_torch
+from .utils import minimum_spanning_tree, permute_to_numpy, permute_to_torch
 
 
 class _DpDivergence(_AriaMetric):
@@ -152,10 +149,7 @@ class DpDivergenceMST(_DpDivergence):
         We add a small constant to the distance matrix to ensure scipy interprets
         the input graph as fully-connected.
         """
-        dense_eudist = squareform(pdist(data)) + 1e-4
-        eudist_csr = csr_matrix(dense_eudist)
-        mst = minimum_spanning_tree(eudist_csr)
-        mst = mst.toarray()
+        mst = minimum_spanning_tree(data).toarray()
         edgelist = np.transpose(np.nonzero(mst))
         errors = np.sum(labels[edgelist[:, 0]] != labels[edgelist[:, 1]])
         return errors
