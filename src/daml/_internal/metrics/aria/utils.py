@@ -11,7 +11,7 @@ def pytorch_to_numpy(tensor: torch.Tensor) -> np.ndarray:
     if not isinstance(tensor, torch.Tensor):
         raise TypeError("Tensor is not of type torch.Tensor")
 
-    x: np.ndarray = tensor.detach().to("cpu").numpy()
+    x: np.ndarray = tensor.detach().cpu().numpy()
     return x
 
 

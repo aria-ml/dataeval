@@ -9,11 +9,6 @@ from daml._internal.models.pytorch.autoencoder import (
     Encoder,
 )
 
-# from torch.utils.data import DataLoader
-
-
-# from daml._internal.datasets import DamlDataset
-
 
 @pytest.mark.parametrize(
     "channels",
@@ -62,7 +57,7 @@ class TestTrainer:
 
     def test_train_default_model(self):
         images = torch.ones(size=[1, 3, 32, 32])
-        trainer = AETrainer()
+        trainer = AETrainer(channels=3)
         trainer.train(images, epochs=1)
 
     def test_train_good_model(self):
@@ -85,8 +80,8 @@ class TestTrainer:
     def test_batch(self):
         """Image control logic"""
         images = torch.ones(size=[10, 3, 32, 32])
-        trainer = AETrainer()
-        trainer.train(images, epochs=1)
+        trainer = AETrainer(channels=3)
+        trainer.train(images, epochs=1, batch_size=10)
 
     def test_model(self):
         pass
@@ -132,3 +127,67 @@ class TestRunner:
 
         # # Height/Width based on current AE & given image size
         assert result.shape == (1, 3, 32, 32)
+
+
+@pytest.mark.parametrize(
+    "device",
+    [
+        "cpu",
+        torch.device("cpu"),
+        pytest.param(
+            0,
+            marks=pytest.mark.skipif(
+                not torch.cuda.is_available(), reason="cuda not available"
+            ),
+        ),
+        pytest.param(
+            torch.device(0),
+            marks=pytest.mark.skipif(
+                not torch.cuda.is_available(), reason="cuda not available"
+            ),
+        ),
+        pytest.param(
+            "cuda",
+            marks=pytest.mark.skipif(
+                not torch.cuda.is_available(), reason="cuda not available"
+            ),
+        ),
+        pytest.param(
+            torch.device("cuda"),
+            marks=pytest.mark.skipif(
+                not torch.cuda.is_available(), reason="cuda not available"
+            ),
+        ),
+    ],
+)
+class TestGPU:
+    def test_runner_device(self, device):
+        model = AriaAutoencoder()
+        runner = AERunner(model=model, device=device)
+
+        # Check runner device set properly
+        assert runner._device == device
+
+        # Check if all params moved to device
+        m = runner._model
+        assert isinstance(m, torch.nn.Module)
+
+        # Need to check device.type as tensor's device automatically selects an index
+        # i.e. param.to("cuda"), param.device equals device(type="cuda", index=0)
+        for param in m.parameters():
+            print(param.device.type)
+            assert param.device.type == torch.device(device).type
+
+    def test_trainer_device(self, device):
+        trainer = AETrainer(channels=1, device=device)
+        # Check trainer device set properly
+        assert trainer._device == device
+
+        # Check if all params moved to device
+        m = trainer._model
+        assert isinstance(m, torch.nn.Module)
+
+        # Need to check device.type as tensor's device automatically selects an index
+        # i.e. param.to("cuda"), param.device equals device(type="cuda", index=0)
+        for param in m.parameters():
+            assert param.device.type == torch.device(device).type

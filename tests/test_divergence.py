@@ -1,5 +1,10 @@
+from unittest import mock
+from unittest.mock import MagicMock
+
 import numpy as np
 import pytest
+import torch
+import torch.nn as nn
 
 from daml.datasets import DamlDataset
 from daml.metrics.divergence import HP_FNN, HP_MST, DivergenceOutput
@@ -9,7 +14,7 @@ np.random.seed(0)
 
 class TestDpDivergence:
     @pytest.mark.parametrize(
-        "metric_class, output",
+        "dp_metric, output",
         [
             (
                 HP_MST,
@@ -27,14 +32,13 @@ class TestDpDivergence:
             ),
         ],
     )
-    def test_dp_divergence(self, metric_class, output):
+    def test_dp_divergence(self, mnist, dp_metric, output):
         """Unit testing of Dp Divergence
 
         TBD
         """
-        path = "tests/datasets/mnist.npz"
-        with np.load(path, allow_pickle=True) as fp:
-            covariates, labels = fp["x_train"][:1000], fp["y_train"][:1000]
+
+        covariates, labels = mnist
 
         inds = np.array([x % 2 == 0 for x in labels])
         rev_inds = np.invert(inds)
@@ -42,100 +46,158 @@ class TestDpDivergence:
         odd = covariates[rev_inds, :, :]
         even = even.reshape((even.shape[0], -1))
         odd = odd.reshape((odd.shape[0], -1))
-        metric = metric_class()
+        metric = dp_metric()
         dataset_a = DamlDataset(even)
         dataset_b = DamlDataset(odd)
         result = metric.evaluate(dataset_a=dataset_a, dataset_b=dataset_b)
         assert result == output
 
 
-@pytest.mark.skip
-class TestEncodedDpDivergence:
-    @pytest.mark.parametrize(
-        "metric_class, output",
-        [
-            pytest.param(
-                HP_MST,
-                DivergenceOutput(
-                    dpdivergence=0.8,
-                    error=10,
-                ),
-                # marks=pytest.mark.functional,
-            ),
-            (
-                HP_FNN,
-                DivergenceOutput(
-                    dpdivergence=0.8,
-                    error=10,
-                ),
-            ),
-        ],
-    )
-    def test_ae_new_label(self, metric_class, output):
-        """
-        Checks the dp divergence between trained labels and a new distribution
+@pytest.mark.parametrize(
+    "dp_metric",
+    [
+        HP_FNN,
+        HP_MST,
+    ],
+)
+class TestDpCreateEncoding:
+    """Tests that inputs can be encoded, not functionality"""
 
-        WIP Does not work, do not run
-        """
-        # Separates mnist data into even and odd indices as two datasets
-        path = "tests/datasets/mnist.npz"
-        with np.load(path, allow_pickle=True) as fp:
-            covariates, labels = fp["x_train"][:3000], fp["y_train"][:3000]
-        # Take two dissimilar numbers
-        ones = covariates[labels == 1]
-        fours = covariates[labels == 4]
-        train = np.concatenate([ones, fours])
-        np.random.shuffle(train)
-        test = covariates[labels == 8]
+    @mock.patch("torch.vstack")
+    def test_create_encoding(self, mock_vstack, dp_metric):
+        model = MagicMock()
+        empty_imgs = torch.Tensor([])
+        m = dp_metric()
+        m.model = model
+        m._is_trained = True
+        m.create_encoding(empty_imgs, empty_imgs)
+        assert model.encode.call_count == 2
+        assert mock_vstack.call_count == 1
 
-        # Add new axis to make NHWC from NHW
-        # train = train[..., np.newaxis]
-        train = np.stack([train, train, train, train, train], axis=-1)
-        # test = test[..., np.newaxis]
-        test = np.stack([test, test, test, test, test], axis=-1)
-        print(train.shape, test.shape)
-        dataset_a = DamlDataset(train)
-        dataset_b = DamlDataset(test)
-        # Initialize the autoencoder-based outlier detector from alibi-detect
-        metric = metric_class(encode=True)
-        metric.fit_dataset(dataset_a, epochs=25)
-        # Evaluate using model embeddings
-        result = metric.evaluate(dataset_a, dataset_b)
-        assert result.dpdivergence >= output.dpdivergence
-        assert result.error <= output.error
+    def test_create_encoding_no_model(self, dp_metric):
+        m = dp_metric()
+        m._is_trained = True
 
-    @pytest.mark.parametrize(
-        "metric_class, output",
-        [
-            (HP_MST, DivergenceOutput(dpdivergence=0.8, error=10)),
-            (HP_FNN, DivergenceOutput(dpdivergence=0.8, error=10)),
-        ],
-    )
-    def test_ae_interclass(self, metric_class, output):
-        """This test fails, do not run"""
-        path = "tests/datasets/mnist.npz"
-        with np.load(path, allow_pickle=True) as fp:
-            covariates, labels = fp["x_train"][:3000], fp["y_train"][:3000]
-        # Take two dissimilar numbers
-        ones = covariates[labels == 1]
-        eights = covariates[labels == 8]
-        training = np.concatenate([ones, eights])
-        np.random.shuffle(training)
-        # Add new axis to make NHWC from NHW
-        ones = ones[..., np.newaxis]
-        eights = eights[..., np.newaxis]
-        training = training[..., np.newaxis]
-        # Convert to DamlDataset
-        dataset_a = DamlDataset(ones)
-        dataset_b = DamlDataset(eights)
-        train_dataset = DamlDataset(training)
-        # Initialize the autoencoder-based outlier detector from alibi-detect
-        metric = metric_class(encode=True)
-        metric.fit_dataset(train_dataset, epochs=25)
-        # Evaluate using model embeddings
-        result = metric.evaluate(dataset_a, dataset_b)
-        assert result.dpdivergence >= output.dpdivergence
-        assert result.error <= output.error
+        x1 = x2 = torch.Tensor([])
+        with pytest.raises(TypeError):
+            m.create_encoding(x1, x2)
+
+    def test_create_encoding_not_trained(self, dp_metric):
+        m = dp_metric()
+        x1 = x2 = torch.Tensor([])
+        with pytest.raises(ValueError):
+            m.create_encoding(x1, x2)
+
+
+@pytest.mark.parametrize(
+    "dp_metric",
+    [
+        HP_FNN,
+        HP_MST,
+    ],
+)
+class TestDpFitDataset:
+    @mock.patch("daml._internal.metrics.aria.base.AERunner")
+    def test_has_model(self, mock_runner, mnist, dp_metric):
+        """Test given model is wrapped by AERunner"""
+
+        class _TestModel(nn.Module):
+            def forward(self, x):
+                return x
+
+        model = _TestModel()
+        images, _ = mnist
+        images = images[:, np.newaxis]
+        dataset = DamlDataset(images)
+        m = dp_metric()
+        assert m.model is None
+        m.fit_dataset(dataset, model=model)
+        assert mock_runner.call_count == 1
+
+    @mock.patch("daml._internal.metrics.aria.base.AETrainer")
+    def test_no_model(self, mock_trainer, mnist, dp_metric):
+        """Test default AETrainer is setup"""
+        images, _ = mnist
+        images = images[:, np.newaxis]
+        dataset = DamlDataset(images)
+        m = dp_metric()
+        assert m.model is None
+        m.fit_dataset(dataset)
+
+        assert mock_trainer.call_count == 1
+
+    def test_has_bad_model(self, mnist, dp_metric):
+        images, _ = mnist
+        images = images[:, np.newaxis]
+        dataset = DamlDataset(images)
+        model = "Not a Model"
+        m = dp_metric()
+        assert m.model is None
+        with pytest.raises(TypeError):
+            m.fit_dataset(dataset, model=model)  # type: ignore
+
+
+@pytest.mark.parametrize(
+    "dp_metric",
+    [
+        HP_FNN,
+        HP_MST,
+    ],
+)
+class TestDpEncode:
+    def test_encode_default(self, dp_metric):
+        """Default encode is False"""
+        m = dp_metric()
+        m.create_encoding = MagicMock()
+        m.calculate_errors = MagicMock()
+        x1 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
+        x2 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
+
+        assert m.encode is False
+        m.evaluate(x1, x2)
+
+        assert m.create_encoding.call_count == 0
+
+    def test_encode_fit_dataset(self, dp_metric):
+        """After fitting a dataset, encode is set to True"""
+        m = dp_metric()
+        m.create_encoding = MagicMock()
+        m.calculate_errors = MagicMock()
+        m.encode = True
+        # Create 4-dim images for permute
+        x1 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
+        x2 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
+
+        m.evaluate(x1, x2)
+
+        assert m.create_encoding.call_count == 1
+
+    def test_encode_override_true(self, dp_metric):
+        """Override default encode with True breaks (no model fit)"""
+        m = dp_metric()
+        m.calculate_errors = MagicMock()
+        # Create 4-dim images for permute
+        x1 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
+        x2 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
+
+        assert m.encode is False
+        assert m.model is None
+        assert m._is_trained is False
+        with pytest.raises(ValueError):
+            m.evaluate(x1, x2, True)
+
+    def test_encode_override_false(self, dp_metric):
+        """Override encode with False after fitting dataset"""
+        m = dp_metric()
+        m.create_encoding = MagicMock()
+        m.calculate_errors = MagicMock()
+        m.encode = True
+        x1 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
+        x2 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
+
+        m.evaluate(x1, x2, False)
+
+        assert m.create_encoding.call_count == 0
 
 
 class TestDivergenceOutput:
