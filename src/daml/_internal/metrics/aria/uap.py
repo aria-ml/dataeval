@@ -24,7 +24,7 @@ class UAP_MST(_AriaMetric):
     def __init__(self, encode: bool = False) -> None:
         """Constructor method"""
 
-        super().__init__(encode)
+        super().__init__(encode, device="cpu")
 
     def _get_classes_counts(self, labels: np.ndarray) -> Tuple[int, np.intp]:
         classes, counts = np.unique(labels, return_counts=True)
@@ -124,7 +124,7 @@ class UAP_EMP(_AriaMetric):
     def __init__(self) -> None:
         """Constructor method"""
 
-        super().__init__(encode=False)
+        super().__init__(encode=False, device="cpu")
 
     def evaluate(self, dataset: DamlDataset, scores: np.ndarray) -> UAPOutput:
         """
