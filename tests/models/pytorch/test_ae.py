@@ -55,6 +55,10 @@ class TestChannels:
 class TestTrainer:
     """Tests the AETrainer class"""
 
+    def test_no_model_no_channels(self):
+        with pytest.raises(TypeError):
+            AETrainer()
+
     def test_train_default_model(self):
         images = torch.ones(size=[1, 3, 32, 32])
         trainer = AETrainer(channels=3)
