@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Literal, Optional
+from typing import Literal, Optional, Union
 
 import numpy as np
 import torch
@@ -15,12 +15,13 @@ from .utils import permute_to_torch
 class _AriaMetric(ABC):
     """Abstract base class for ARiA metrics"""
 
-    def __init__(self, encode: bool):
+    def __init__(self, encode: bool, device: Union[str, torch.device]):
         """Constructor method"""
 
         self.encode = encode
         self.model: Optional[AERunner] = None
         self._is_trained: bool = False
+        self._device = device
 
     def fit_dataset(
         self,
@@ -41,11 +42,14 @@ class _AriaMetric(ABC):
         """
         if model is None:
             images: torch.Tensor = permute_to_torch(dataset.images)
-            self.model = AETrainer(images.shape[1])
+            self.model = AETrainer(model, images.shape[1], device=self._device)
             self.model.train(images, epochs)
+        elif isinstance(model, nn.Module):
+            self.model = AERunner(model, device=self._device)
         else:
-            self.model = AERunner(model)
+            raise TypeError(f"Given model is of type {type(model)}, expected nn.Module")
         self._is_trained = True
+        self.encode = True
 
     def _compute_neighbors(
         self,

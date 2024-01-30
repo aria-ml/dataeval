@@ -3,6 +3,7 @@ This module contains the implementation of Dp Divergence
 using the First Nearest Neighbor and Minimum Spanning Tree algorithms
 """
 from abc import abstractmethod
+from typing import Optional, Union
 
 import numpy as np
 import torch
@@ -24,18 +25,40 @@ class _DpDivergence(_AriaMetric):
     see https://arxiv.org/abs/1412.6534.
     """
 
-    def __init__(self, encode: bool = False) -> None:
+    def __init__(
+        self, encode: bool = False, device: Union[str, torch.device] = "cpu"
+    ) -> None:
         """Constructor method"""
-        super().__init__(encode)
+        super().__init__(encode, device)
 
     @abstractmethod
     def calculate_errors(self, data: np.ndarray, labels: np.ndarray) -> int:
         """Abstract method for the implementation of divergence calculation"""
 
+    def create_encoding(self, imgs_1: torch.Tensor, imgs_2: torch.Tensor) -> np.ndarray:
+        """Reduces image dimensions using a trained autoencoder and stacks results"""
+        if not self._is_trained:
+            raise ValueError(
+                "Tried to encode data without fitting a model.\
+                    Try calling Metric.fit_dataset(dataset) first."
+            )
+        if self.model is None:
+            raise TypeError(
+                "Model is None. Try calling Metric.fit_dataset(dataset) first."
+            )
+
+        # Pass inputs through model
+        tensor_a = self.model.encode(imgs_1).flatten(start_dim=1)
+        tensor_b = self.model.encode(imgs_2).flatten(start_dim=1)
+
+        # Combine data into one dataset and return
+        return torch.vstack((tensor_a, tensor_b)).detach().cpu().numpy()
+
     def evaluate(
         self,
         dataset_a: DamlDataset,
         dataset_b: DamlDataset,
+        encode: Optional[bool] = None,
     ) -> DivergenceOutput:
         """
         Calculates the divergence and any errors between two datasets
@@ -54,31 +77,21 @@ class _DpDivergence(_AriaMetric):
         ----
         A and B must be 2 dimensions, and equivalent in size on the second dimension
         """
-        # If self.encode == True, pass dataset_a and dataset_b through an autoencoder
-        # before evaluating dp divergence
 
         imgs_a: np.ndarray = dataset_a.images
         imgs_b: np.ndarray = dataset_b.images
-        if self.encode:
-            if not self._is_trained or self.model is None:
-                raise TypeError(
-                    "Tried to encode data without fitting a model.\
-                    Try calling Metric.fit_dataset(dataset) first."
-                )
-            # Model inputs should be torch.Tensors
-            input_a = (
+
+        do_encode = self.encode if encode is None else encode
+        # Pass dataset_a and dataset_b through an autoencoder
+        # before evaluating dp divergence
+        if do_encode:
+            i1 = (
                 imgs_a if isinstance(imgs_a, torch.Tensor) else permute_to_torch(imgs_a)
             )
-            input_b = (
+            i2 = (
                 imgs_b if isinstance(imgs_b, torch.Tensor) else permute_to_torch(imgs_b)
             )
-
-            # Pass inputs through model
-            tensor_a = self.model.encode(input_a).flatten(start_dim=1)
-            tensor_b = self.model.encode(input_b).flatten(start_dim=1)
-
-            # Combine data into one dataset
-            data = torch.vstack((tensor_a, tensor_b)).numpy()
+            data = self.create_encoding(i1, i2)
         else:
             # Input could be a torch.Tensor (future update)
             imgs_a = (
