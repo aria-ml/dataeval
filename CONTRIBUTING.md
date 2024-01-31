@@ -65,11 +65,7 @@ You can install [git-lfs](https://git-lfs.com/) from the distribution repository
 :~$ git config --global user.name "User Name"
 :~$ git config --global user.email "username@domain.com"
 ```
-##### Configure git to sign commits
-```
-:~$ git config --global user.signingkey <KEY ID>
-:~$ git config --global commit.gpgsign true
-``` 
+
 ##### Configure git to sign commits
 ```
 :~$ git config --global user.signingkey <KEY ID>
