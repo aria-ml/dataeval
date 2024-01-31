@@ -1,103 +1,88 @@
 # Data Assessment Metrics Library (DAML)
 
-## Description
-DAML provides a simple interface to characterize image data and its impact on model performance across classification and object-detection tasks
+## Overview
+Below you will find detailed instructions on the pre-requisites and steps to set up and contribute to the DAML project.  This assumes you have an active developer account with [JATIC GitLab](https://gitlab.jatic.net/).
 
-## Installation
-### Development Dependencies
+## Environment
+Currently only Linux and Linux on Windows (via Windows Subsystem for Linux 2 - WSL2) are supported.  We use Ubuntu (both natively and in Windows) but other distributions should work as well.  Ubuntu 20.04 and 22.04 have been tested on natively, as well as on WSL2 in Windows 10 and 11.
+
+### Dependencies
 - [git-lfs](https://git-lfs.com/) - Large file storage for binaries in git repository
-- [graphviz](https://graphviz.org/) - Documentation dependency for rendering diagrams
+- [graphviz](https://graphviz.org/) - Documentation dependency for rendering diagrams in documentation
 - [Visual Studio Code](https://code.visualstudio.com/Download) - Development IDE
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Optional) - Containerization software for developer environment management
+- [Remote Development Extension Pack](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack) (Optional) - Visual Studio Code extension pack enabling development in containers and in WSL2
 
-### Containerized Development Dependencies
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) - Containerization software for developer environment management
-- [Visual Studio Code](https://code.visualstudio.com/Download) - Development IDE
+## Getting Started
 
-### Development Environment
+### Installing WSL2 (Windows Only)
+Follow the steps detailed at [learn.microsoft.com](https://learn.microsoft.com/en-us/windows/wsl/install) to get WSL2 installed.  Ubuntu 20.04 or 22.04 is recommended.
 
-Development is standardized on Ubuntu with support for Ubuntu on Windows Subsystem for Linux (WSL2) as well.  Additionally, the usage of Docker containers allows for minimization of environment variables.
+### Identity and Security
+#### SSH Key
+The SSH key is your user credentials for GitLab, giving you permissions to access the repository. Additional information on configuring the SSH key can be found [here](https://gitlab.jatic.net/help/user/ssh.md).
 
-#### Ubuntu with Windows Subsystem for Linux
-##### Enable Virtual Machine Platform
-```
-(admin) PS> dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
-```
+##### Generate and set the SSH key
+- `ssh-keygen -t ed25519 -C "user@domain.com"`
+- Upload the SSH key (defaults to ~/.ssh/id_ed25519.pub) to your [GitLab profile](https://gitlab.jatic.net/-/profile/keys)
 
-##### Install WSL2 and Ubuntu (or Linux flavor of choice)
-```
-(admin) PS> wsl --install
-```
+#### GPG Key
+The GPG key is used to sign your commits to ensure the identity of the origin of the commit. GitLab provides documentation for the GPG signing process [here](https://docs.gitlab.com/ee/user/project/repository/signed_commits/gpg.html).
 
-#### Ubuntu
-##### In Ubuntu, set up your user account and environment
-```
-:~$ sudo apt update
-:~$ sudo apt upgrade -y
-:~$ sudo apt install python-is-python3 python3-pip python3-virtualenv -y
-```
-
-##### Create the SSH key in your host environment
-```
-:~$ ssh-keygen -t ed25519 -C "user@domain.com"
-```
-
-##### Upload the generated public key (defaults to ~/.ssh/id_ed25519.pub) to GitLab [here](https://gitlab.jatic.net/-/profile/keys).
-Additional information on configuring the SSH key can be found [here](https://gitlab.jatic.net/help/user/ssh.md).
-
-##### Create the GPG key in your host environment
-GitLab provides documentation for the GPG signing process [here](https://docs.gitlab.com/ee/user/project/repository/signed_commits/gpg.html).
-
-###### Windows/WSL/Dev Containers
-**Enable GPG in the host Windows environment**
-1. Download and install [GPG4Win](https://www.gpg4win.org/)
-2. Create an RSA+RSA 4096 bit GPG Key
-   1. `PS> gpg --full-gen-key`
+##### Generate an RSA+RSA 4096 bit GPG key
+   1. `gpg --full-gen-key`
    2. Select RSA and RSA and use 4096-bit key length
    3. Select a validity period
    4. Enter name and email address **matching** your GitLab account
-   5. Enter optional comment which displays in parentheses after your name
+   5. Enter optional comment which displays in parentheses after your name (e.g. `John Doe (Comment)`)
    6. Confirm your entries
-   7. Set a strong password
-3. Note down the `<KEY ID>`
-   1. `PS> gpg --list-secret-keys --keyid-format LONG`
-      * The key begins after the encryption method:<br>
-      `sec   rsa4096/<KEY ID>`
-4. Export the public key to upload to GitLab
-   1. `PS> gpg --armor --export <KEY ID>`
+   7. Set a strong password - this will be required on every commit
 
-**Install pinentry utility in WSL2**
-1. Ensure gpg is installed
-   - `$: sudo apt install gpg`
-2. Register pin entry client
-   - `$: echo pinentry-program /mnt/c/Program\ Files\ \(x86\)/Gpg4win/bin/pinentry.exe > ~/.gnupg/gpg-agent.conf`
-3. Reload the gpg agent
-   - `$: gpg-connect-agent reloadagent /bye`
+##### Note down the `<KEY ID>`
+- `gpg --list-secret-keys --keyid-format LONG`
+- The key begins after the encryption method (eg: `sec   rsa4096/<KEY ID>`)
 
-##### Clone the daml project from GitLab
+##### Export the public key to upload to GitLab
+- `gpg --armor --export <KEY ID>`
+- Upload the full key to your [GitLab Profile](https://gitlab.jatic.net/-/profile/gpg_keys)
+
+##### Install Pin Entry Utility (Windows Only)
+- `sudo apt-get install pinentry-gtk2`
+
+#### Local settings
+##### Install dependencies
+You can install [git-lfs](https://git-lfs.com/) from the distribution repository
 ```
-:~$ git clone git@gitlab.jatic.net:jatic/aria/daml.git
-:~$ cd daml
+:~$ sudo apt-get install git-lfs
+```
+(Optional) If you are developing locally, you will need [graphviz](https://graphviz.org/) for generating documentation diagrams
+```
+:~$ sudo apt-get install graphviz
 ```
 
-##### Configure .gitconfig user settings
+##### Configure git user settings
 ```
 :~$ git config --global user.name "User Name"
 :~$ git config --global user.email "username@domain.com"
 ```
-
+##### Configure git to sign commits
+```
+:~$ git config --global user.signingkey <KEY ID>
+:~$ git config --global commit.gpgsign true
+``` 
 ##### Configure git to sign commits
 ```
 :~$ git config --global user.signingkey <KEY ID>
 :~$ git config --global commit.gpgsign true
 ```
 
-##### Configure .gitconfig safe directory settings
-This is required for git to trust your repository ownership when the files belong to a different user identity, which is possible when running under different virtual environments/containers.  Do not set this if you are using a shared device, repository or file system unless you know what you're doing.
+### Clone DAML
 ```
-:~$ git config --global --add safe.directory "*"
+:~$ git clone git@gitlab.jatic.net:jatic/aria/daml.git
+:~$ cd daml
 ```
 
-### Harbor Image Registry
+### Harbor Image Registry (Recommended)
 In order to perform build caching and normalize development environments, DAML utilizes images built on top of Ubuntu and Nvidia CUDA images.  These images are stored in the [Harbor Image Registry](https://harbor.jatic.net/) hosted alongside our [Gitlab](https://gitlab.jatic.net).
 
 To use images stored in the registry, follow these steps:
@@ -112,20 +97,32 @@ To use images stored in the registry, follow these steps:
    3. Paste CLI secret token as password
 6. Contact @aweng for access permissions to the daml project.
 
-#### VS Code Development Container
+### Visual Studio Code Development Containers (Recommended)
 This option allows you to run or test DAML in a virtual development container fully isolated from the host environment.  It also allows you to run on different versions of Python independently of what is on your host environment.
+
+#### Prerequisites
+Ensure that [Visual Studio Code](https://code.visualstudio.com/Download) with the [Remote Development Extension Pack](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack) is installed, as well as [Docker Desktop](https://www.docker.com/products/docker-desktop/) (with WSL2 backend if on Windows).
+
+#### Building the development container
+Run the `devenv` script to build the images needed to run in a devcontainer.  By default this includes all supported versions of Python and dependencies, so can take quite a bit of time and storage (~50GB).
+```
+:~/daml$ ./devenv
+```
+Alternatively you can select a subset of Python versions to be available in the development container.  For instance this will create a devcontainer with just Python 3.8 and 3.11.
+```
+:~/daml$ ./devenv 3.8 3.11
+```
+
+#### Starting the development container
 
 _Note: In VS Code, press_ `F1` _or_ `Ctrl+Shift+P` _to open the_ `Command Palette`
 
 1. Open the DAML project in VS Code
-2. Install the Remote Development Extension Pack: `ms-vscode-remote.vscode-remote-extensionpack`
-3. Using the `Command Palette` run `>Dev Containers: Rebuild and Reopen in Container`
-   - On first installation, the container takes a few minutes the prepare the development environment
-4. Using the `Command Palette` run `>Python: Select Interpreter`
-   - Only select Python versions in the _Workspace_ group, **not** the _Global_ group
+2. Using the `Command Palette`
+   1. `>Dev Containers: Rebuild and Reopen in Container`
+   2. `>Python: Select Interpreter`
 
 The devcontainer is configured to share the SSH keys on the host environment to allow git commands to work.  If you are unable to pull or commit, check the `.ssh` folder in the `$HOME` or `%USERPROFILE%` path and ensure that it is correctly configured.
-
 
 ### Run Tests
 
