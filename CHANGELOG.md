@@ -1,6 +1,10 @@
-[//]: # (57f9eade34c90998edfa8417e81d55f3c476736b)
+[//]: # (69f6c16f1a18ad3a8ab500bbca668240b4b2bd7f)
 
 # DAML Change Log
+## Pending Release
+- ```69f6c16f - Refactor base AriaMetric class for better code sharing and easier future removal of model workflow```
+## v0.40.0
+- ```ddb798c6 - Document guidelines for sufficiency training```
 ## v0.38.2
 - ```6bb442c3 - Refactor common minimum spanning tree code into utils```
 - ```42617f43 - Enable GPU functionality in pytorch features```
