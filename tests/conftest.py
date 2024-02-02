@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Literal, Tuple
 
 import numpy as np
 import pytest
@@ -24,9 +24,17 @@ def pytest_collection_modifyitems(config, items):
 
 
 @pytest.fixture
-def mnist() -> Tuple[np.ndarray, np.ndarray]:
-    path = "tests/datasets/mnist.npz"
-    with np.load(path, allow_pickle=True) as fp:
-        covariates, labels = fp["x_train"][:1000], fp["y_train"][:1000]
+def mnist():
+    def _method(
+        size: int = 1000,
+        category: Literal["train", "test"] = "train",
+        add_channels: bool = False,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        path = "tests/datasets/mnist.npz"
+        with np.load(path, allow_pickle=True) as fp:
+            images, labels = fp["x_" + category][:size], fp["y_" + category][:size]
+        if add_channels:
+            images = images[:, np.newaxis]
+        return images, labels
 
-    return covariates, labels
+    return _method

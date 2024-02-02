@@ -4,31 +4,28 @@ FR Test Statistic based estimate and the
 FNN based estimate for the Bayes Error Rate
 """
 from abc import abstractmethod
-from typing import Optional, Tuple, Union
+from typing import Tuple
 
 import numpy as np
 import torch
 from scipy.sparse import coo_matrix
 
 from daml._internal.datasets.datasets import DamlDataset
-from daml._internal.metrics.aria.base import _AriaMetric
+from daml._internal.metrics.aria.base import _BaseMetric
 from daml._internal.metrics.outputs import BEROutput
 
-from .utils import (
-    get_classes_counts,
-    minimum_spanning_tree,
-    permute_to_numpy,
-    permute_to_torch,
-)
+from .utils import compute_neighbors, get_classes_counts, minimum_spanning_tree
 
 
-class _MultiClassBer(_AriaMetric):
+class _MultiClassBer(_BaseMetric):
     def __init__(
-        self, encode: bool = False, device: Union[str, torch.device] = "cpu"
+        self,
+        dataset: DamlDataset,
+        encode: bool = False,
+        device: torch.device = torch.device("cpu"),
     ) -> None:
         """Constructor method"""
-
-        super().__init__(encode, device)
+        super().__init__(dataset, encode, device=device)
 
     @abstractmethod
     def _multiclass_ber(
@@ -38,9 +35,7 @@ class _MultiClassBer(_AriaMetric):
     ) -> Tuple[float, float]:
         """Abstract method for the implementation of multiclass BER calculation"""
 
-    def evaluate(
-        self, dataset: DamlDataset, encode: Optional[bool] = None
-    ) -> BEROutput:
+    def _evaluate(self) -> BEROutput:
         """
         Return the Bayes Error Rate estimate
 
@@ -59,26 +54,9 @@ class _MultiClassBer(_AriaMetric):
         ValueError
             If unique classes M < 2
         """
-        X: np.ndarray = dataset.images
-        y: np.ndarray = dataset.labels
-
-        # Parameter encode can override class encode
-        do_encode = self.encode if encode is None else encode
         # Pass X through an autoencoder before evaluating BER
-        if do_encode:
-            if not self._is_trained or self.model is None:
-                raise TypeError(
-                    "Tried to encode data without fitting a model.\
-                    Try calling Metric.fit_dataset(dataset) first."
-                )
-            else:
-                images = X if isinstance(X, torch.Tensor) else permute_to_torch(X)
-                embeddings = self.model.encode(images).detach().cpu().numpy()
-        else:
-            embeddings = X if isinstance(X, np.ndarray) else permute_to_numpy(X)
-
-        assert isinstance(embeddings, np.ndarray)
-        ber, ber_lower = self._multiclass_ber(embeddings, y)
+        embeddings = self._encode(self.dataset.images)
+        ber, ber_lower = self._multiclass_ber(embeddings, self.dataset.labels)
         return BEROutput(ber=ber, ber_lower=ber_lower)
 
 
@@ -161,7 +139,7 @@ class MultiClassBerFNN(_MultiClassBer):
 
         # All features belong on second dimension
         X = X.reshape((X.shape[0], -1))
-        nn_indices = self._compute_neighbors(X, X)
+        nn_indices = compute_neighbors(X, X)
         deltas = float(np.count_nonzero(y[nn_indices] - y) / (2 * N))
         upper = 2 * deltas
         lower = ((M - 1) / (M)) * (1 - (1 - 2 * ((M) / (M - 1)) * deltas) ** 0.5)

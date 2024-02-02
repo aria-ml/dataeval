@@ -93,27 +93,25 @@ def custom_eval(model: nn.Module, dataloader) -> float:
     return result
 
 
-def load_dataset() -> Tuple[DamlDataset, DamlDataset]:
+def load_dataset(mnist) -> Tuple[DamlDataset, DamlDataset]:
     # Loads mnist dataset from binary
-    path = "tests/datasets/mnist.npz"
-    train_count = 1000
-    with np.load(path, allow_pickle=True) as fp:
-        images, labels = fp["x_train"][:train_count], fp["y_train"][:train_count]
-        test_images, test_labels = fp["x_test"][:100], fp["y_test"][:100]
-    images = images.reshape((train_count, 1, 28, 28))
-    test_images = test_images.reshape((100, 1, 28, 28))
+    images, labels = mnist(1000, "train")
+    images = images.reshape((1000, 1, 28, 28))
     train_ds = DamlDataset(images, labels)
+
+    test_images, test_labels = mnist(100, "test")
+    test_images = test_images.reshape((100, 1, 28, 28))
     test_ds = DamlDataset(test_images, test_labels)
+
     return train_ds, test_ds
 
 
 # @pytest.mark.functional
 class TestSufficiencyFunctional:
-    train_ds, test_ds = load_dataset()
-
-    def test_classification(self) -> None:
+    def test_classification(self, mnist) -> None:
         model = Net()
-        length: int = len(self.train_ds)
+        train_ds, test_ds = load_dataset(mnist)
+        length: int = len(train_ds)
         # Instantiate sufficiency metric
         suff = Sufficiency()
         # Set predefined training and eval functions
@@ -124,7 +122,7 @@ class TestSufficiencyFunctional:
         num_steps = 3
         suff.setup(length, m_count, num_steps)
         # Train & test model
-        output = suff.run(model, self.train_ds, self.test_ds)
+        output = suff.run(model, train_ds, test_ds)
 
         # Loose params testing. TODO -> Find way to make tighter
         params = output["params"]
@@ -142,7 +140,7 @@ class TestSufficiencyFunctional:
 
         # Geomshape should calculate deterministically
         geomshape = output["geomshape"]
-        geomshape_answer = (0.01 * len(self.train_ds), len(self.train_ds), num_steps)
+        geomshape_answer = (0.01 * len(train_ds), len(train_ds), num_steps)
         assert geomshape == geomshape_answer
 
         # n_i test
