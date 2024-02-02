@@ -23,15 +23,13 @@ from tests.utils.JaticUtils import (
 class TestOutlierDetectionJaticInterop:
     """Tests if JATIC datasets can be correctly handled by BER methods"""
 
-    def test_fit_and_eval(self, method):
+    def test_fit_and_eval(self, method, mnist):
         """Asserts that wrapped images are compatible with entire workflow"""
-        # Create jatic dataset
-        path = "tests/datasets/mnist.npz"
-        with np.load(path, allow_pickle=True) as fp:
-            images, labels = fp["x_train"][:100], fp["y_train"][:100]
-
         # Instantiate outlier detection method
         method = method()
+
+        # Create jatic dataset
+        images, labels = mnist(100)
 
         # Add the 3rd dimension to the images
         images = images[..., np.newaxis].astype(method._dataset_type)
@@ -39,6 +37,7 @@ class TestOutlierDetectionJaticInterop:
         # Create jatic compliant dataset
         jatic_ds = JaticImageClassificationDataset(images, labels)
         check_jatic_classification(jatic_ds)
+
         # Wrap jatic dataset with daml dataset
         daml_ds = JaticClassificationDatasetWrapper(jatic_ds)
 

@@ -3,19 +3,20 @@ This module contains the implementation of Dp Divergence
 using the First Nearest Neighbor and Minimum Spanning Tree algorithms
 """
 from abc import abstractmethod
-from typing import Optional, Union
+from typing import Optional
 
 import numpy as np
 import torch
+from torch import nn
 
 from daml._internal.datasets.datasets import DamlDataset
-from daml._internal.metrics.aria.base import _AriaMetric
+from daml._internal.metrics.aria.base import _BaseMetric
 from daml._internal.metrics.outputs import DivergenceOutput
 
-from .utils import minimum_spanning_tree, permute_to_numpy, permute_to_torch
+from .utils import compute_neighbors, minimum_spanning_tree
 
 
-class _DpDivergence(_AriaMetric):
+class _DpDivergence(_BaseMetric):
     """
     For more information about this divergence, its formal definition,
     and its associated estimators
@@ -23,88 +24,54 @@ class _DpDivergence(_AriaMetric):
     """
 
     def __init__(
-        self, encode: bool = False, device: Union[str, torch.device] = "cpu"
+        self,
+        dataset: DamlDataset,
+        dataset_other: DamlDataset,
+        encode: bool = False,
+        model: Optional[nn.Module] = None,
+        fit: Optional[bool] = None,
+        epochs: Optional[int] = None,
+        device: torch.device = torch.device("cpu"),
     ) -> None:
         """Constructor method"""
-        super().__init__(encode, device)
+        self.dataset_other = dataset_other
+        super().__init__(
+            dataset,
+            encode,
+            model=model,
+            fit=fit,
+            epochs=epochs,
+            device=device,
+        )
 
     @abstractmethod
     def calculate_errors(self, data: np.ndarray, labels: np.ndarray) -> int:
         """Abstract method for the implementation of divergence calculation"""
 
-    def create_encoding(self, imgs_1: torch.Tensor, imgs_2: torch.Tensor) -> np.ndarray:
-        """Reduces image dimensions using a trained autoencoder and stacks results"""
-        if not self._is_trained:
-            raise ValueError(
-                "Tried to encode data without fitting a model.\
-                    Try calling Metric.fit_dataset(dataset) first."
-            )
-        if self.model is None:
-            raise TypeError(
-                "Model is None. Try calling Metric.fit_dataset(dataset) first."
-            )
+    def _encode_and_vstack(self) -> np.ndarray:
+        emb_a = self._encode(self.dataset.images)
+        emb_b = self._encode(self.dataset_other.images)
+        if self.encode:
+            emb_a = emb_a.flatten()
+            emb_b = emb_b.flatten()
+        return np.vstack((emb_a, emb_b))
 
-        # Pass inputs through model
-        tensor_a = self.model.encode(imgs_1).flatten(start_dim=1)
-        tensor_b = self.model.encode(imgs_2).flatten(start_dim=1)
-
-        # Combine data into one dataset and return
-        return torch.vstack((tensor_a, tensor_b)).detach().cpu().numpy()
-
-    def evaluate(
-        self,
-        dataset_a: DamlDataset,
-        dataset_b: DamlDataset,
-        encode: Optional[bool] = None,
-    ) -> DivergenceOutput:
+    def _evaluate(self) -> DivergenceOutput:
         """
-        Calculates the divergence and any errors between two datasets
-
-        Parameters
-        ----------
-        dataset_a, dataset_b : DamlDataset
-            Datasets to calculate the divergence between
+        Calculates the divergence and any errors between the datasets
 
         Returns
         -------
         DivergenceOutput
             Dataclass containing the dp divergence and errors during calculation
-
-        Note
-        ----
-        A and B must be 2 dimensions, and equivalent in size on the second dimension
         """
+        N = self.dataset.images.shape[0]
+        M = self.dataset_other.images.shape[0]
 
-        imgs_a: np.ndarray = dataset_a.images
-        imgs_b: np.ndarray = dataset_b.images
-
-        do_encode = self.encode if encode is None else encode
-        # Pass dataset_a and dataset_b through an autoencoder
-        # before evaluating dp divergence
-        if do_encode:
-            i1 = (
-                imgs_a if isinstance(imgs_a, torch.Tensor) else permute_to_torch(imgs_a)
-            )
-            i2 = (
-                imgs_b if isinstance(imgs_b, torch.Tensor) else permute_to_torch(imgs_b)
-            )
-            data = self.create_encoding(i1, i2)
-        else:
-            # Input could be a torch.Tensor (future update)
-            imgs_a = (
-                imgs_a if isinstance(imgs_a, np.ndarray) else permute_to_numpy(imgs_a)
-            )
-            imgs_b = (
-                imgs_b if isinstance(imgs_b, np.ndarray) else permute_to_numpy(imgs_b)
-            )
-
-            # Combine data into one dataset
-            data = np.vstack((imgs_a, imgs_b))
-
-        N = imgs_a.shape[0]
-        M = imgs_b.shape[0]
+        images = self._encode_and_vstack()
         labels = np.vstack([np.zeros([N, 1]), np.ones([M, 1])])
-        errors = self.calculate_errors(data, labels)
+
+        errors = self.calculate_errors(images, labels)
         dp = 1 - ((M + N) / (2 * M * N)) * errors
         return DivergenceOutput(dpdivergence=dp, error=errors)
 
@@ -176,6 +143,6 @@ class DpDivergenceFNN(_DpDivergence):
         int
             Number of edges connecting the two datasets
         """
-        nn_indices = self._compute_neighbors(data, data)
+        nn_indices = compute_neighbors(data, data)
         errors = np.sum(np.abs(labels[nn_indices] - labels))
         return errors

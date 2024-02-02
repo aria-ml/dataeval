@@ -3,7 +3,6 @@ from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
-import torch
 import torch.nn as nn
 
 from daml.datasets import DamlDataset
@@ -38,7 +37,7 @@ class TestDpDivergence:
         TBD
         """
 
-        covariates, labels = mnist
+        covariates, labels = mnist(add_channels=True)
 
         inds = np.array([x % 2 == 0 for x in labels])
         rev_inds = np.invert(inds)
@@ -46,10 +45,10 @@ class TestDpDivergence:
         odd = covariates[rev_inds, :, :]
         even = even.reshape((even.shape[0], -1))
         odd = odd.reshape((odd.shape[0], -1))
-        metric = dp_metric()
         dataset_a = DamlDataset(even)
         dataset_b = DamlDataset(odd)
-        result = metric.evaluate(dataset_a=dataset_a, dataset_b=dataset_b)
+        metric = dp_metric(dataset_a, dataset_b)
+        result = metric.evaluate()
         assert result == output
 
 
@@ -60,45 +59,9 @@ class TestDpDivergence:
         HP_MST,
     ],
 )
-class TestDpCreateEncoding:
-    """Tests that inputs can be encoded, not functionality"""
-
-    @mock.patch("torch.vstack")
-    def test_create_encoding(self, mock_vstack, dp_metric):
-        model = MagicMock()
-        empty_imgs = torch.Tensor([])
-        m = dp_metric()
-        m.model = model
-        m._is_trained = True
-        m.create_encoding(empty_imgs, empty_imgs)
-        assert model.encode.call_count == 2
-        assert mock_vstack.call_count == 1
-
-    def test_create_encoding_no_model(self, dp_metric):
-        m = dp_metric()
-        m._is_trained = True
-
-        x1 = x2 = torch.Tensor([])
-        with pytest.raises(TypeError):
-            m.create_encoding(x1, x2)
-
-    def test_create_encoding_not_trained(self, dp_metric):
-        m = dp_metric()
-        x1 = x2 = torch.Tensor([])
-        with pytest.raises(ValueError):
-            m.create_encoding(x1, x2)
-
-
-@pytest.mark.parametrize(
-    "dp_metric",
-    [
-        HP_FNN,
-        HP_MST,
-    ],
-)
-class TestDpFitDataset:
+class TestDpDivergenceFit:
     @mock.patch("daml._internal.metrics.aria.base.AERunner")
-    def test_has_model(self, mock_runner, mnist, dp_metric):
+    def test_has_trained_model(self, mock_runner, mnist, dp_metric):
         """Test given model is wrapped by AERunner"""
 
         class _TestModel(nn.Module):
@@ -106,35 +69,45 @@ class TestDpFitDataset:
                 return x
 
         model = _TestModel()
-        images, _ = mnist
-        images = images[:, np.newaxis]
+        images, _ = mnist(add_channels=True)
         dataset = DamlDataset(images)
-        m = dp_metric()
-        assert m.model is None
-        m.fit_dataset(dataset, model=model)
+        m = dp_metric(dataset, dataset, True, model, False)
+        m._fit()
         assert mock_runner.call_count == 1
+
+    @mock.patch("daml._internal.metrics.aria.base.AETrainer")
+    def test_has_untrained_model(self, mock_trainer, mnist, dp_metric):
+        """Test given model is wrapped by AERunner"""
+
+        class _TestModel(nn.Module):
+            def forward(self, x):
+                return x
+
+        model = _TestModel()
+        images, _ = mnist(add_channels=True)
+        dataset = DamlDataset(images)
+        m = dp_metric(dataset, dataset, True, model, True, 10)
+        m._fit()
+        assert mock_trainer.call_count == 1
 
     @mock.patch("daml._internal.metrics.aria.base.AETrainer")
     def test_no_model(self, mock_trainer, mnist, dp_metric):
         """Test default AETrainer is setup"""
-        images, _ = mnist
-        images = images[:, np.newaxis]
+        images, _ = mnist(add_channels=True)
         dataset = DamlDataset(images)
-        m = dp_metric()
+        m = dp_metric(dataset, dataset)
         assert m.model is None
-        m.fit_dataset(dataset)
+        m._fit()
 
         assert mock_trainer.call_count == 1
 
     def test_has_bad_model(self, mnist, dp_metric):
-        images, _ = mnist
-        images = images[:, np.newaxis]
+        images, _ = mnist(add_channels=True)
         dataset = DamlDataset(images)
-        model = "Not a Model"
-        m = dp_metric()
-        assert m.model is None
+        m = dp_metric(dataset, dataset)
+        m.model = "Not a Model"
         with pytest.raises(TypeError):
-            m.fit_dataset(dataset, model=model)  # type: ignore
+            m._fit()
 
 
 @pytest.mark.parametrize(
@@ -145,59 +118,48 @@ class TestDpFitDataset:
     ],
 )
 class TestDpEncode:
-    def test_encode_default(self, dp_metric):
+    @mock.patch("numpy.vstack")
+    def test_create_encoding(self, mock_vstack, dp_metric):
+        empty_ds = DamlDataset(np.ndarray([]))
+        m = dp_metric(empty_ds, empty_ds, True)
+        m._encode = MagicMock()
+        m._encode_and_vstack()
+
+        assert m._encode.call_count == 2
+        assert mock_vstack.call_count == 1
+
+    def test_encode_default_false(self, dp_metric):
         """Default encode is False"""
-        m = dp_metric()
-        m.create_encoding = MagicMock()
-        m.calculate_errors = MagicMock()
         x1 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
         x2 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
+        m = dp_metric(x1, x2)
+        m._fit = MagicMock()
+        m._encode_and_vstack = MagicMock()
+        m.calculate_errors = MagicMock()
 
         assert m.encode is False
-        m.evaluate(x1, x2)
+        m.evaluate()
 
-        assert m.create_encoding.call_count == 0
-
-    def test_encode_fit_dataset(self, dp_metric):
-        """After fitting a dataset, encode is set to True"""
-        m = dp_metric()
-        m.create_encoding = MagicMock()
-        m.calculate_errors = MagicMock()
-        m.encode = True
-        # Create 4-dim images for permute
-        x1 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
-        x2 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
-
-        m.evaluate(x1, x2)
-
-        assert m.create_encoding.call_count == 1
+        assert m._fit.call_count == 0
+        assert m._encode_and_vstack.call_count == 1
+        assert m.calculate_errors.call_count == 1
 
     def test_encode_override_true(self, dp_metric):
-        """Override default encode with True breaks (no model fit)"""
-        m = dp_metric()
-        m.calculate_errors = MagicMock()
+        """Override default encode with True"""
         # Create 4-dim images for permute
         x1 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
         x2 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
-
-        assert m.encode is False
-        assert m.model is None
-        assert m._is_trained is False
-        with pytest.raises(ValueError):
-            m.evaluate(x1, x2, True)
-
-    def test_encode_override_false(self, dp_metric):
-        """Override encode with False after fitting dataset"""
-        m = dp_metric()
-        m.create_encoding = MagicMock()
+        m = dp_metric(x1, x2, True)
+        m._fit = MagicMock()
+        m._encode_and_vstack = MagicMock()
         m.calculate_errors = MagicMock()
-        m.encode = True
-        x1 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
-        x2 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
 
-        m.evaluate(x1, x2, False)
+        assert m.encode is True
+        m.evaluate()
 
-        assert m.create_encoding.call_count == 0
+        assert m._fit.call_count == 1
+        assert m._encode_and_vstack.call_count == 1
+        assert m.calculate_errors.call_count == 1
 
 
 class TestDivergenceOutput:
