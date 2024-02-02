@@ -45,9 +45,9 @@ class TestDivergenceJaticInterop:
         check_jatic_classification(dataset_a)
         check_jatic_classification(dataset_b)
 
-        # Initialize the autoencoder-based outlier detector from alibi-detect
-        metric = method()
         dataset_a = JaticClassificationDatasetWrapper(dataset_a)
         dataset_b = JaticClassificationDatasetWrapper(dataset_b)
-        result = metric.evaluate(dataset_a=dataset_a, dataset_b=dataset_b)
+
+        metric = method(dataset_a, dataset_b)
+        result = metric.evaluate()
         assert result == output

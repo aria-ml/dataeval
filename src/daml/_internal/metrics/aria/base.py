@@ -1,91 +1,94 @@
-from abc import ABC
-from typing import Literal, Optional, Union
+from abc import ABC, abstractmethod
+from typing import Generic, Optional, TypeVar, Union
 
 import numpy as np
 import torch
 import torch.nn as nn
-from sklearn.neighbors import NearestNeighbors
 
 from daml._internal.datasets.datasets import DamlDataset
+from daml._internal.metrics.aria.utils import permute_to_torch, pytorch_to_numpy
 from daml._internal.models.pytorch.autoencoder import AERunner, AETrainer
 
-from .utils import permute_to_torch
+TOutput = TypeVar("TOutput")
 
 
-class _AriaMetric(ABC):
-    """Abstract base class for ARiA metrics"""
+class _BaseMetric(ABC, Generic[TOutput]):
+    """Abstract base class for metrics"""
 
-    def __init__(self, encode: bool, device: Union[str, torch.device]):
-        """Constructor method"""
-
-        self.encode = encode
-        self.model: Optional[AERunner] = None
-        self._is_trained: bool = False
-        self._device = device
-
-    def fit_dataset(
+    def __init__(
         self,
         dataset: DamlDataset,
-        epochs: int = 3,
+        encode: bool,
         model: Optional[nn.Module] = None,
-    ) -> None:
+        fit: Optional[bool] = None,
+        epochs: Optional[int] = None,
+        device: torch.device = torch.device("cpu"),
+    ):
+        self.encode = encode
+        self.dataset = dataset
+
+        # TODO: Model training args will move out of metrics
+        self.model = model
+        self.fit = fit
+        self.epochs = epochs
+        self._device = device
+
+        self._validate_args()
+
+    def evaluate(self) -> TOutput:
+        # TODO: Split model training from metrics and make evaluate the abstractmethod
+        if self.encode:
+            self._fit()
+        return self._evaluate()
+
+    @abstractmethod
+    def _evaluate(self) -> TOutput:
+        """Abstract method to calculate metric based off of constructor parameters"""
+
+    def _fit(self) -> None:
         """
         Trains a model on a dataset to be used during calculation of metrics.
-
-        Parameters
-        ----------
-        dataset : DamlDataset
-            An array of images for the model to train on
-        epochs : int, default 3
-            Number of epochs to train the detector for.
-
         """
-        if model is None:
-            images: torch.Tensor = permute_to_torch(dataset.images)
-            self.model = AETrainer(model, images.shape[1], device=self._device)
-            self.model.train(images, epochs)
-        elif isinstance(model, nn.Module):
-            self.model = AERunner(model, device=self._device)
+        self._validate_args()
+        if isinstance(self.model, nn.Module) and not self.fit:
+            self.model = AERunner(model=self.model, device=self._device)
         else:
-            raise TypeError(f"Given model is of type {type(model)}, expected nn.Module")
-        self._is_trained = True
-        self.encode = True
+            images = permute_to_torch(self.dataset.images)
+            if isinstance(self.model, nn.Module):
+                self.model = AETrainer(model=self.model, device=self._device)
+            else:
+                self.model = AETrainer(channels=images.shape[1], device=self._device)
 
-    def _compute_neighbors(
-        self,
-        A: np.ndarray,
-        B: np.ndarray,
-        k: int = 1,
-        algorithm: Literal["auto", "ball_tree", "kd_tree"] = "auto",
-    ) -> np.ndarray:
+    def _encode(self, images: Union[torch.Tensor, np.ndarray]) -> np.ndarray:
         """
-        For each sample in A, compute the nearest neighbor in B
-
-        Parameters
-        ----------
-        A, B : np.ndarray
-            The n_samples and n_features respectively
-        k : int
-            The number of neighbors to find
-        algorithm : Literal
-            Tree method for nearest neighbor (auto, ball_tree or kd_tree)
-
-        Note
-        ----
-            Do not use kd_tree if n_features > 20
-
-        Returns
-        -------
-        List:
-            Closest points to each point in A and B
-
-        See Also
-        --------
-        :func:`sklearn.neighbors.NearestNeighbors`
+        Takes an array or tensor of images and returns a tensor that is encoded if
+        `self.encode` is True
         """
+        self._validate_args()
 
-        nbrs = NearestNeighbors(n_neighbors=k + 1, algorithm=algorithm).fit(B)
-        nns = nbrs.kneighbors(A)[1]
-        nns = nns[:, 1]
+        if self.encode:
+            if not isinstance(images, torch.Tensor):
+                images = permute_to_torch(images)
+            assert isinstance(self.model, nn.Module)
+            images = self.model.encode(images).detach().cpu().numpy()
 
-        return nns
+        return images if isinstance(images, np.ndarray) else pytorch_to_numpy(images)
+
+    def _validate_args(self):
+        if self.model is not None and not isinstance(self.model, nn.Module):
+            raise TypeError(
+                f"Given model is of type {type(self.model)}, expected nn.Module"
+            )
+
+        if not (self.model is None and self.fit is None and self.epochs is None):
+            if self.model is None:
+                raise ValueError(
+                    "Must specify `model` if model arguments are provided."
+                )
+            if self.fit is None:
+                raise ValueError("Must specify `fit` if model arguments are provided.")
+            if self.epochs is None and self.fit:
+                raise ValueError("Must specify `epochs` to fit model.")
+
+        if not self.encode and self.model is not None:
+            raise ValueError("Model not used if `encode` is `false`.")

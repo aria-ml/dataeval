@@ -1,4 +1,3 @@
-import numpy as np
 import pytest
 
 from daml._internal.interop.wrappers.jatic import JaticClassificationDatasetWrapper
@@ -18,24 +17,17 @@ from tests.utils.JaticUtils import (
     ],
 )
 class TestBERJaticInterop:
-    def test_evaluate(self, method, output):
+    def test_evaluate(self, method, output, mnist):
         """
         Confirm that a dataset that follows JATIC works with BER
         """
-
-        path = "tests/datasets/mnist.npz"
-        with np.load(path, allow_pickle=True) as fp:
-            images, labels = fp["x_train"][:1000], fp["y_train"][:1000]
-
         # Create jatic compliant dataset
-        jatic_ds = JaticImageClassificationDataset(images, labels)
+        jatic_ds = JaticImageClassificationDataset(*mnist())
         check_jatic_classification(jatic_ds)
 
         # Wrap into Daml dataset
         ber_ds = JaticClassificationDatasetWrapper(jatic_ds)
-        method = method()
+        method = method(ber_ds)
 
-        assert len(ber_ds) == len(images)
-
-        value = method.evaluate(ber_ds)
+        value = method.evaluate()
         assert value == output

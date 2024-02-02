@@ -10,56 +10,33 @@ import torch
 from sklearn.metrics import average_precision_score
 
 from daml._internal.datasets.datasets import DamlDataset
-from daml._internal.metrics.aria.base import _AriaMetric
+from daml._internal.metrics.aria.base import _BaseMetric
 from daml._internal.metrics.outputs import UAPOutput
 
-from .utils import (
-    get_classes_counts,
-    minimum_spanning_tree,
-    permute_to_numpy,
-    permute_to_torch,
-)
+from .utils import get_classes_counts, minimum_spanning_tree
 
 
-class UAP_MST(_AriaMetric):
-    def __init__(self, encode: bool = False) -> None:
-        """Constructor method"""
-
-        super().__init__(encode, device="cpu")
-
-    def evaluate(self, dataset: DamlDataset) -> UAPOutput:
+class UAP_MST(_BaseMetric):
+    def __init__(self, dataset: DamlDataset) -> None:
         """
-        Return the Upperbound Average Precision estimate
-
         Parameters
         ----------
         dataset : DamlDataset
             Dataset containing (n_samples x n_features) array of (padded) instance
             embeddings and n_samples vector of class labels with M unique classes.
+        """
+        super().__init__(dataset, encode=False, device=torch.device("cpu"))
+
+    def _evaluate(self) -> UAPOutput:
+        """
+        Upperbound Average Precision estimate
 
         Returns
         -------
         UAPOutput
             The estimated UAP
         """
-        X: np.ndarray = dataset.images
-        y: np.ndarray = dataset.labels
-
-        # If self.encode == True, pass X through an autoencoder before evaluating BER
-        if self.encode:
-            if not self._is_trained or self.model is None:
-                raise TypeError(
-                    "Tried to encode data without fitting a model.\
-                    Try calling Metric.fit_dataset(dataset) first."
-                )
-            else:
-                images = X if isinstance(X, torch.Tensor) else permute_to_torch(X)
-                embeddings = self.model.encode(images).numpy()
-        else:
-            embeddings = X if isinstance(X, np.ndarray) else permute_to_numpy(X)
-
-        assert isinstance(embeddings, np.ndarray)
-        uap = self._uap(embeddings, y)
+        uap = self._uap(self.dataset.images, self.dataset.labels)
         return UAPOutput(uap=uap)
 
     def _uap(
@@ -109,16 +86,9 @@ class UAP_MST(_AriaMetric):
         return float(uap)
 
 
-class UAP_EMP(_AriaMetric):
-    def __init__(self) -> None:
-        """Constructor method"""
-
-        super().__init__(encode=False, device="cpu")
-
-    def evaluate(self, dataset: DamlDataset, scores: np.ndarray) -> UAPOutput:
+class UAP_EMP(_BaseMetric):
+    def __init__(self, dataset: DamlDataset, scores: np.ndarray) -> None:
         """
-        Return the Upper Average Precision estimate
-
         Parameters
         ----------
         dataset : DamlDataset
@@ -127,13 +97,18 @@ class UAP_EMP(_AriaMetric):
 
         scores : np.ndarray
             A 2D array of class probabilities per image
+        """
+        self.scores = scores
+        super().__init__(dataset, encode=False, device=torch.device("cpu"))
 
+    def _evaluate(self) -> UAPOutput:
+        """
         Returns
         -------
         UAPOutput
             The estimated UAP
         """
-        y: np.ndarray = dataset.labels
+        y: np.ndarray = self.dataset.labels
 
-        uap = float(average_precision_score(y, scores, average="weighted"))
+        uap = float(average_precision_score(y, self.scores, average="weighted"))
         return UAPOutput(uap=uap)
