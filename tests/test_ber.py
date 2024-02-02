@@ -1,4 +1,3 @@
-from unittest import mock
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -16,18 +15,15 @@ class TestMulticlassBER:
             (BER_FNN, BEROutput(ber=0.118, ber_lower=0.061072112753426215)),
         ],
     )
-    def test_multiclass_ber_with_mnist(self, ber_metric, output):
+    def test_multiclass_ber_with_mnist(self, ber_metric, output, mnist):
         """
         Load a slice of the MNIST dataset and pass into the BER multiclass
         evaluate function.
         """
 
-        path = "tests/datasets/mnist.npz"
-        with np.load(path, allow_pickle=True) as fp:
-            covariates, labels = fp["x_train"][:1000], fp["y_train"][:1000]
-        dataset = DamlDataset(covariates, labels)
-        metric = ber_metric()
-        value = metric.evaluate(dataset)
+        dataset = DamlDataset(*mnist())
+        metric = ber_metric(dataset)
+        value = metric.evaluate()
         assert value == output
 
     @pytest.mark.parametrize(
@@ -42,9 +38,9 @@ class TestMulticlassBER:
         covariates = np.ones(20)
         labels = np.ones(20)
         dataset = DamlDataset(covariates, labels)
-        metric = ber_metric()
+        metric = ber_metric(dataset)
         with pytest.raises(ValueError):
-            value = metric.evaluate(dataset)
+            value = metric.evaluate()
             assert value is not None
 
 
@@ -58,18 +54,17 @@ class TestMulticlassBER:
 class TestBEREncode:
     def test_encode_default(self, ber_metric):
         """Default encode is False"""
-        m = ber_metric()
-        m.create_encoding = MagicMock()
         images = np.array([1, 1])
         labels = np.array([1, 2])
         x1 = DamlDataset(images, labels)
-        m.evaluate(x1)
+        m = ber_metric(x1)
+        m.create_encoding = MagicMock()
+        m.evaluate()
 
         assert m.create_encoding.call_count == 0
 
     def test_encode_fit_dataset(self, ber_metric):
         """After fitting a dataset, encode is set to True"""
-        m = ber_metric()
 
         # Create two sets of images with different labels
         images_1 = np.ones(shape=(1, 32, 32, 1))
@@ -82,32 +77,7 @@ class TestBEREncode:
         labels = np.concatenate([labels_1, labels_2])
 
         x1 = DamlDataset(images, labels)
-        m.fit_dataset(x1, epochs=1)
+        m = ber_metric(x1)
 
         # Encode set to True by fit_dataset
-        m.evaluate(x1)
-
-    def test_encode_override_true(self, ber_metric):
-        """Override default encode with True raises TypeError (no model fit)"""
-        m = ber_metric()
-        images = np.array([1, 1])
-        labels = np.array([1, 2])
-        x1 = DamlDataset(images, labels)
-
-        with pytest.raises(TypeError):
-            m.evaluate(x1, True)
-
-    @mock.patch("daml._internal.metrics.aria.ber.permute_to_torch")
-    def test_encode_override_false(self, mock_permute, ber_metric):
-        """Override encode with False after fitting dataset"""
-        m = ber_metric()
-        m.encode = True
-
-        images = np.array([1, 1])
-        labels = np.array([1, 2])
-        x1 = DamlDataset(images, labels)
-
-        assert m.encode
-        m.evaluate(x1, False)
-
-        assert mock_permute.call_count == 0
+        m.evaluate()
