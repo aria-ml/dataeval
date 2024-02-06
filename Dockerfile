@@ -6,7 +6,8 @@ ARG PYENV_ROOT="$HOME/.pyenv"
 ARG python_version="3.11"
 ARG deps_image="pydeps"
 ARG base_image="pybase"
-ARG pyenv_configure_opts=""
+ARG pyenv_enable_opt=""
+ARG pyenv_with_lto=""
 
 
 FROM ubuntu:22.04 as pybase
@@ -38,8 +39,9 @@ WORKDIR /home/daml
 RUN curl https://pyenv.run | bash
 # ENV PYTHON_CONFIGURE_OPTS '--enable-optimizations --with-lto'
 # ENV PYTHON_CFLAGS '-march=native -mtune=native'
-ARG pyenv_configure_opts
-ENV PYTHON_CONFIGURE_OPTS="${pyenv_configure_opts}"
+ARG pyenv_enable_opt
+ARG pyenv_with_lto
+ENV PYTHON_CONFIGURE_OPTS="${pyenv_enable_opt} ${pyenv_with_lto}"
 ARG PYENV_ROOT
 ENV PYENV_ROOT=${PYENV_ROOT}
 ENV POETRY_VIRTUALENVS_CREATE=false
