@@ -154,13 +154,12 @@ function ensure_image() {
     echo "Checking $2:$3$4 image..."
     if ! $(docker manifest inspect $2:$3$4 > /dev/null 2>&1); then
         echo "Building $2:$3$4..."
-        args="$verbosity \
-            --build-arg BUILDKIT_INLINE_CACHE=1 \
+        docker build $verbosity \
             ${@:5} \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
             --cache-from $2:main$4 \
             --tag $2:$3$4 \
-            --target $1 ."
-        docker build $args
+            --target $1 .
         echo "Finished building $2:$3$4."
         if [[ $push_to_repo ]]; then
             echo "Pushing $2:$3$4..."
@@ -209,13 +208,13 @@ if [[ $build_only ]]; then
         # first handle base images
         if [[ ${pvers[base]} ]]; then
             unset pvers[base]
-            ensure_image base $base_image $base_hash "" --build-arg pyenv_configure_opts=--enable-optimizations\ --with-lto || exit 1
+            ensure_image base $base_image $base_hash "" || exit 1
         fi
 
         # now build python specific versioned images
         for pver in ${!pvers[@]}; do
             (
-                ensure_image pybase $deps_image base -$pver --build-arg python_version=$pver &&
+                ensure_image pybase $deps_image base -$pver --build-arg python_version=$pver --build-arg pyenv_enable_opt=--enable-optimizations --build-arg pyenv_with_lto=--with-lto &&
                 ensure_image pydeps $deps_image $deps_hash -$pver --build-arg base_image=$deps_image:base-$pver --build-arg python_version=$pver --cache-from $deps_image:main-$pver &&
                 if [[ $CI ]]; then
                     ensure_image build $build_image $build_hash -$pver --build-arg deps_image=$deps_image:$deps_hash-$pver --build-arg python_version=$pver --cache-from $base_image:$base_hash --cache-from $build_image:main-$pver
@@ -224,7 +223,7 @@ if [[ $build_only ]]; then
         done
         wait
     )
-    exit 0
+    exit $?
 fi
 
 # execute jobs
