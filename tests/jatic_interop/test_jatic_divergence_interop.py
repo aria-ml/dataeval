@@ -48,6 +48,6 @@ class TestDivergenceJaticInterop:
         dataset_a = JaticClassificationDatasetWrapper(dataset_a)
         dataset_b = JaticClassificationDatasetWrapper(dataset_b)
 
-        metric = method(dataset_a, dataset_b)
+        metric = method(dataset_a.images, dataset_b.images)
         result = metric.evaluate()
         assert result == output

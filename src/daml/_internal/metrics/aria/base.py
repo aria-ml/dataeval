@@ -5,7 +5,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from daml._internal.datasets.datasets import DamlDataset
 from daml._internal.metrics.aria.utils import permute_to_torch, pytorch_to_numpy
 from daml._internal.models.pytorch.autoencoder import AERunner, AETrainer
 
@@ -17,18 +16,18 @@ class _BaseMetric(ABC, Generic[TOutput]):
 
     def __init__(
         self,
-        dataset: DamlDataset,
+        data: np.ndarray,
         encode: bool,
         model: Optional[nn.Module] = None,
         fit: Optional[bool] = None,
         epochs: Optional[int] = None,
         device: torch.device = torch.device("cpu"),
     ):
+        self.data = data
         self.encode = encode
-        self.dataset = dataset
+        self.model = model
 
         # TODO: Model training args will move out of metrics
-        self.model = model
         self.fit = fit
         self.epochs = epochs
         self._device = device
@@ -37,7 +36,7 @@ class _BaseMetric(ABC, Generic[TOutput]):
 
     def evaluate(self) -> TOutput:
         # TODO: Split model training from metrics and make evaluate the abstractmethod
-        if self.encode:
+        if self.fit or self.encode:
             self._fit()
         return self._evaluate()
 
@@ -53,7 +52,7 @@ class _BaseMetric(ABC, Generic[TOutput]):
         if isinstance(self.model, nn.Module) and not self.fit:
             self.model = AERunner(model=self.model, device=self._device)
         else:
-            images = permute_to_torch(self.dataset.images)
+            images = permute_to_torch(self.data)
             if isinstance(self.model, nn.Module):
                 self.model = AETrainer(model=self.model, device=self._device)
             else:

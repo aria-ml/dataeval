@@ -6,10 +6,8 @@ precision (UAP_EMP)
 """
 
 import numpy as np
-import torch
 from sklearn.metrics import average_precision_score
 
-from daml._internal.datasets.datasets import DamlDataset
 from daml._internal.metrics.aria.base import _BaseMetric
 from daml._internal.metrics.outputs import UAPOutput
 
@@ -17,15 +15,19 @@ from .utils import get_classes_counts, minimum_spanning_tree
 
 
 class UAP_MST(_BaseMetric):
-    def __init__(self, dataset: DamlDataset) -> None:
+    def __init__(self, images: np.ndarray, labels: np.ndarray) -> None:
         """
         Parameters
         ----------
-        dataset : DamlDataset
-            Dataset containing (n_samples x n_features) array of (padded) instance
-            embeddings and n_samples vector of class labels with M unique classes.
+        images : np.ndarray
+            A numpy array containing (n_samples x n_features) array of (padded) instance
+            embeddings.
+        labels : np.ndarray
+            A numpy array containing n_samples vector of class labels with M unique
+            classes.
         """
-        super().__init__(dataset, encode=False, device=torch.device("cpu"))
+        super().__init__(images, False)
+        self.labels = labels
 
     def _evaluate(self) -> UAPOutput:
         """
@@ -36,7 +38,7 @@ class UAP_MST(_BaseMetric):
         UAPOutput
             The estimated UAP
         """
-        uap = self._uap(self.dataset.images, self.dataset.labels)
+        uap = self._uap(self.data, self.labels)
         return UAPOutput(uap=uap)
 
     def _uap(
@@ -87,19 +89,23 @@ class UAP_MST(_BaseMetric):
 
 
 class UAP_EMP(_BaseMetric):
-    def __init__(self, dataset: DamlDataset, scores: np.ndarray) -> None:
+    def __init__(
+        self,
+        labels: np.ndarray,
+        scores: np.ndarray,
+    ) -> None:
         """
         Parameters
         ----------
-        dataset : DamlDataset
-            Dataset containing (n_samples x n_features) array of (padded) instance
-            embeddings and n_samples vector of class labels with M unique classes.
+        labels : np.ndarray
+            A numpy array of n_samples of class labels with M unique classes.
 
         scores : np.ndarray
             A 2D array of class probabilities per image
         """
+        super().__init__(np.ndarray([]), encode=False)
+        self.labels = labels
         self.scores = scores
-        super().__init__(dataset, encode=False, device=torch.device("cpu"))
 
     def _evaluate(self) -> UAPOutput:
         """
@@ -108,7 +114,7 @@ class UAP_EMP(_BaseMetric):
         UAPOutput
             The estimated UAP
         """
-        y: np.ndarray = self.dataset.labels
-
-        uap = float(average_precision_score(y, self.scores, average="weighted"))
+        uap = float(
+            average_precision_score(self.labels, self.scores, average="weighted")
+        )
         return UAPOutput(uap=uap)

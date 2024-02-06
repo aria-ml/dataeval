@@ -7,7 +7,6 @@ import numpy as np
 import pytest
 
 from daml._internal.models.tensorflow.alibi import create_model
-from daml.datasets import DamlDataset
 from daml.metrics.outlier_detection import (
     OD_AE,
     OD_AEGMM,
@@ -55,16 +54,14 @@ class TestAlibiDetect_Functional:
             X_all_ones = X_all_ones.astype(metric._dataset_type)
             X_all_fives = X_all_fives.astype(metric._dataset_type)
 
-        all_ones_ds = DamlDataset(X_all_ones)
-        all_fives_ds = DamlDataset(X_all_fives)
         # Train the detector on the dataset of all 1's
-        metric.fit_dataset(dataset=all_ones_ds, epochs=10, verbose=False)
+        metric.fit_dataset(images=X_all_ones, epochs=10, verbose=False)
 
         # Evaluate the detector on the dataset of all 1's
-        preds_on_ones = metric.evaluate(all_ones_ds).is_outlier
+        preds_on_ones = metric.evaluate(X_all_ones).is_outlier
 
         # Evaluate the detector on the dataset of all 5's
-        preds_on_fives = metric.evaluate(all_fives_ds).is_outlier
+        preds_on_fives = metric.evaluate(X_all_fives).is_outlier
 
         # We expect all elements to not be outliers
         num_errors_on_ones = np.sum(np.where(preds_on_ones != 0))
@@ -98,13 +95,11 @@ class TestAlibiDetect_Functional:
         if metric._dataset_type is not None:
             X_all_ones = X_all_ones.astype(metric._dataset_type)
 
-        all_ones_ds = DamlDataset(X_all_ones)
-
         # Train the detector on the dataset of all 1's
-        metric.fit_dataset(dataset=all_ones_ds, epochs=10, verbose=False)
+        metric.fit_dataset(images=X_all_ones, epochs=10, verbose=False)
 
         # Evaluate the detector on the dataset of all 1's
-        preds_on_ones = metric.evaluate(all_ones_ds).is_outlier
+        preds_on_ones = metric.evaluate(X_all_ones).is_outlier
 
         num_errors_on_ones = np.sum(np.where(preds_on_ones != 0))
 
@@ -154,12 +149,9 @@ class TestAlibiDetect:
         # Load metric and create model
         metric = method()
 
-        # Create Daml dataset
-        dataset = DamlDataset(self.all_ones.dataset.images)
-
         # Test
         with pytest.raises(TypeError):
-            metric.evaluate(dataset)
+            metric.evaluate(self.all_ones.dataset.images)
 
     # Ensure that the program fails upon testing on a dataset of different
     # shape than what was trained on
@@ -175,17 +167,15 @@ class TestAlibiDetect:
         metric.detector = 1  # detector cannot be None
         metric._input_shape = faulty_input_shape
 
-        # Create daml dataset
         images = self.all_ones.dataset.images
         if metric._dataset_type:
-            dataset = images.astype(metric._dataset_type)
-        dataset = DamlDataset(images=images)
+            images = images.astype(metric._dataset_type)
 
         # metric.fit_dataset(dataset=dataset, epochs=1, verbose=False)
         metric.is_trained = True
 
         with pytest.raises(ValueError):
-            metric.evaluate(dataset)
+            metric.evaluate(images)
 
     def test_missing_detector(self, method):
         self._is_mock_expected = False
@@ -195,13 +185,9 @@ class TestAlibiDetect:
         # Load metric
         metric = method()
 
-        # Create Daml datasets
-        images = self.all_ones.dataset.images
-        dataset = DamlDataset(images)
-
         # Test
         with pytest.raises(TypeError):
-            metric.evaluate(dataset=dataset)
+            metric.evaluate(images=self.all_ones.dataset.images)
 
     def test_initialize_fit_evaluate(self, method):
         """What does this test? Is this a pseudo functional test?"""
@@ -212,11 +198,10 @@ class TestAlibiDetect:
         images = self.all_ones.dataset.images
         if metric._dataset_type:
             images = images.astype(metric._dataset_type)
-        dataset = DamlDataset(images)
 
         # Test
-        metric.fit_dataset(dataset=dataset, epochs=1, verbose=False)
-        metric.evaluate(dataset)
+        metric.fit_dataset(images=images, epochs=1, verbose=False)
+        metric.evaluate(images)
 
     def test_set_threshold_value(self, method):
         """Asserts that the threshold is set by fit_dataset"""
@@ -227,11 +212,10 @@ class TestAlibiDetect:
         images = self.all_ones.dataset.images
         if metric._dataset_type:
             images = images.astype(metric._dataset_type)
-        dataset = DamlDataset(images)
 
         # Test
         metric.fit_dataset(
-            dataset=dataset,
+            images=images,
             epochs=1,
             verbose=False,
             threshold=Threshold(0.015, ThresholdType.VALUE),
@@ -258,8 +242,7 @@ class TestAlibiModels:
 
     def test_export_model(self):
         metric = OD_AE()
-        dataset = DamlDataset(self.all_ones.dataset.images)
-        metric.fit_dataset(dataset=dataset, epochs=1, verbose=False)
+        metric.fit_dataset(images=self.all_ones.dataset.images, epochs=1, verbose=False)
 
         metric.export_model("model.keras")
         if exists("model.keras"):
@@ -274,8 +257,7 @@ class TestAlibiModels:
 
     def test_export_model_no_model(self):
         metric = OD_AE()
-        dataset = DamlDataset(self.all_ones.dataset.images)
-        metric.fit_dataset(dataset=dataset, epochs=1, verbose=False)
+        metric.fit_dataset(images=self.all_ones.dataset.images, epochs=1, verbose=False)
         metric._model_param_name = "llr"
         with pytest.raises(ValueError):
             metric.export_model("model.keras")
@@ -283,10 +265,9 @@ class TestAlibiModels:
     @patch("daml._internal.models.tensorflow.alibi.create_model")
     def test_fit_dataset_with_model_calls_infer_and_fit(self, create_model_fn):
         metric = OD_AE()
-        dataset = DamlDataset(self.all_ones.dataset.images)
         metric.detector = MagicMock()
         metric._input_shape = self.input_shape
-        metric.fit_dataset(dataset=dataset, epochs=1, verbose=False)
+        metric.fit_dataset(images=self.all_ones.dataset.images, epochs=1, verbose=False)
         assert metric.detector.infer_threshold.called
         assert metric.detector.fit.called
         assert not create_model_fn.called

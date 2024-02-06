@@ -3,7 +3,6 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from daml.datasets import DamlDataset
 from daml.metrics.ber import BER_FNN, BER_MST, BEROutput
 
 
@@ -21,8 +20,7 @@ class TestMulticlassBER:
         evaluate function.
         """
 
-        dataset = DamlDataset(*mnist())
-        metric = ber_metric(dataset)
+        metric = ber_metric(*mnist())
         value = metric.evaluate()
         assert value == output
 
@@ -37,8 +35,7 @@ class TestMulticlassBER:
         value = None
         covariates = np.ones(20)
         labels = np.ones(20)
-        dataset = DamlDataset(covariates, labels)
-        metric = ber_metric(dataset)
+        metric = ber_metric(covariates, labels)
         with pytest.raises(ValueError):
             value = metric.evaluate()
             assert value is not None
@@ -56,8 +53,7 @@ class TestBEREncode:
         """Default encode is False"""
         images = np.array([1, 1])
         labels = np.array([1, 2])
-        x1 = DamlDataset(images, labels)
-        m = ber_metric(x1)
+        m = ber_metric(images, labels)
         m.create_encoding = MagicMock()
         m.evaluate()
 
@@ -76,8 +72,7 @@ class TestBEREncode:
         images = np.concatenate([images_1, images_2])
         labels = np.concatenate([labels_1, labels_2])
 
-        x1 = DamlDataset(images, labels)
-        m = ber_metric(x1)
+        m = ber_metric(images, labels)
 
         # Encode set to True by fit_dataset
         m.evaluate()
