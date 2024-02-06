@@ -1,6 +1,5 @@
 import numpy as np
 
-from daml.datasets import DamlDataset
 from daml.metrics.uap import UAP_EMP, UAP_MST
 
 
@@ -11,7 +10,7 @@ class TestUAP:
         evaluate function.
         """
 
-        metric = UAP_MST(DamlDataset(*mnist()))
+        metric = UAP_MST(*mnist())
         output = metric.evaluate()
         assert output.uap == 1.0
 
@@ -19,7 +18,8 @@ class TestUAP:
         pass
 
     def test_UAP_EMP(self, mnist):
+        _, labels = mnist()
         scores = np.zeros((1000, 10), dtype=float)
-        metric = UAP_EMP(DamlDataset(*mnist()), scores)
+        metric = UAP_EMP(labels, scores)
         value = metric.evaluate()
         assert value.uap > 0

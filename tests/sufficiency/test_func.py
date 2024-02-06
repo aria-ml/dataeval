@@ -1,5 +1,3 @@
-from typing import Tuple
-
 import numpy as np
 import numpy.testing as npt
 import pytest
@@ -10,7 +8,7 @@ import torch.optim as optim
 import torchmetrics
 from torch.utils.data import DataLoader
 
-from daml.datasets import DamlDataset
+from daml._internal.datasets.datasets import DamlDataset
 from daml.metrics.sufficiency import Sufficiency
 
 
@@ -93,24 +91,12 @@ def custom_eval(model: nn.Module, dataloader) -> float:
     return result
 
 
-def load_dataset(mnist) -> Tuple[DamlDataset, DamlDataset]:
-    # Loads mnist dataset from binary
-    images, labels = mnist(1000, "train")
-    images = images.reshape((1000, 1, 28, 28))
-    train_ds = DamlDataset(images, labels)
-
-    test_images, test_labels = mnist(100, "test")
-    test_images = test_images.reshape((100, 1, 28, 28))
-    test_ds = DamlDataset(test_images, test_labels)
-
-    return train_ds, test_ds
-
-
 # @pytest.mark.functional
 class TestSufficiencyFunctional:
     def test_classification(self, mnist) -> None:
         model = Net()
-        train_ds, test_ds = load_dataset(mnist)
+        train_ds = DamlDataset(*mnist(1000, "train", np.float32, True))
+        test_ds = DamlDataset(*mnist(100, "test", np.float32, True))
         length: int = len(train_ds)
         # Instantiate sufficiency metric
         suff = Sufficiency()
@@ -140,7 +126,7 @@ class TestSufficiencyFunctional:
 
         # Geomshape should calculate deterministically
         geomshape = output["geomshape"]
-        geomshape_answer = (0.01 * len(train_ds), len(train_ds), num_steps)
+        geomshape_answer = (0.01 * length, length, num_steps)
         assert geomshape == geomshape_answer
 
         # n_i test

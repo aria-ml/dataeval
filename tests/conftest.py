@@ -1,4 +1,4 @@
-from typing import Literal, Tuple
+from typing import Literal, Optional, Tuple
 
 import numpy as np
 import pytest
@@ -28,11 +28,14 @@ def mnist():
     def _method(
         size: int = 1000,
         category: Literal["train", "test"] = "train",
+        dtype: Optional[type] = None,
         add_channels: bool = False,
     ) -> Tuple[np.ndarray, np.ndarray]:
         path = "tests/datasets/mnist.npz"
         with np.load(path, allow_pickle=True) as fp:
             images, labels = fp["x_" + category][:size], fp["y_" + category][:size]
+        if dtype is not None:
+            images = images.astype(dtype)
         if add_channels:
             images = images[:, np.newaxis]
         return images, labels
