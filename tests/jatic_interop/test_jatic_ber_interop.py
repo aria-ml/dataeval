@@ -27,7 +27,7 @@ class TestBERJaticInterop:
 
         # Wrap into Daml dataset
         ber_ds = JaticClassificationDatasetWrapper(jatic_ds)
-        method = method(ber_ds)
+        method = method(ber_ds.images, ber_ds.labels)
 
         value = method.evaluate()
         assert value == output

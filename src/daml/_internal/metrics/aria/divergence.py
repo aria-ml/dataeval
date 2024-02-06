@@ -9,7 +9,6 @@ import numpy as np
 import torch
 from torch import nn
 
-from daml._internal.datasets.datasets import DamlDataset
 from daml._internal.metrics.aria.base import _BaseMetric
 from daml._internal.metrics.outputs import DivergenceOutput
 
@@ -25,8 +24,8 @@ class _DpDivergence(_BaseMetric):
 
     def __init__(
         self,
-        dataset: DamlDataset,
-        dataset_other: DamlDataset,
+        images_a: np.ndarray,
+        images_b: np.ndarray,
         encode: bool = False,
         model: Optional[nn.Module] = None,
         fit: Optional[bool] = None,
@@ -34,23 +33,24 @@ class _DpDivergence(_BaseMetric):
         device: torch.device = torch.device("cpu"),
     ) -> None:
         """Constructor method"""
-        self.dataset_other = dataset_other
         super().__init__(
-            dataset,
+            images_a,
             encode,
             model=model,
             fit=fit,
             epochs=epochs,
             device=device,
         )
+        self.images_a = images_a
+        self.images_b = images_b
 
     @abstractmethod
     def calculate_errors(self, data: np.ndarray, labels: np.ndarray) -> int:
         """Abstract method for the implementation of divergence calculation"""
 
     def _encode_and_vstack(self) -> np.ndarray:
-        emb_a = self._encode(self.dataset.images)
-        emb_b = self._encode(self.dataset_other.images)
+        emb_a = self._encode(self.images_a)
+        emb_b = self._encode(self.images_b)
         if self.encode:
             emb_a = emb_a.flatten()
             emb_b = emb_b.flatten()
@@ -65,8 +65,8 @@ class _DpDivergence(_BaseMetric):
         DivergenceOutput
             Dataclass containing the dp divergence and errors during calculation
         """
-        N = self.dataset.images.shape[0]
-        M = self.dataset_other.images.shape[0]
+        N = self.images_a.shape[0]
+        M = self.images_b.shape[0]
 
         images = self._encode_and_vstack()
         labels = np.vstack([np.zeros([N, 1]), np.ones([M, 1])])

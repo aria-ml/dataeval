@@ -10,7 +10,6 @@ import numpy as np
 import torch
 from scipy.sparse import coo_matrix
 
-from daml._internal.datasets.datasets import DamlDataset
 from daml._internal.metrics.aria.base import _BaseMetric
 from daml._internal.metrics.outputs import BEROutput
 
@@ -20,12 +19,15 @@ from .utils import compute_neighbors, get_classes_counts, minimum_spanning_tree
 class _MultiClassBer(_BaseMetric):
     def __init__(
         self,
-        dataset: DamlDataset,
+        images: np.ndarray,
+        labels: np.ndarray,
         encode: bool = False,
         device: torch.device = torch.device("cpu"),
     ) -> None:
         """Constructor method"""
-        super().__init__(dataset, encode, device=device)
+        super().__init__(images, encode, device=device)
+        self.images = images
+        self.labels = labels
 
     @abstractmethod
     def _multiclass_ber(
@@ -39,11 +41,6 @@ class _MultiClassBer(_BaseMetric):
         """
         Return the Bayes Error Rate estimate
 
-        Parameters
-        ----------
-        dataset : DamlDataset
-            Dataset containing (n_samples x n_features) array of (padded) instance
-            embeddings and n_samples vector of class labels with M unique classes.
         Returns
         -------
         BEROutput
@@ -55,8 +52,8 @@ class _MultiClassBer(_BaseMetric):
             If unique classes M < 2
         """
         # Pass X through an autoencoder before evaluating BER
-        embeddings = self._encode(self.dataset.images)
-        ber, ber_lower = self._multiclass_ber(embeddings, self.dataset.labels)
+        embeddings = self._encode(self.images)
+        ber, ber_lower = self._multiclass_ber(embeddings, self.labels)
         return BEROutput(ber=ber, ber_lower=ber_lower)
 
 

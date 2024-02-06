@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 
 from daml._internal.metrics.aria.base import _BaseMetric
-from daml.datasets import DamlDataset
 
 
 class MockNet(nn.Module):
@@ -29,7 +28,7 @@ class MockMetric(_BaseMetric):
         epochs: Optional[int],
     ) -> None:
         super().__init__(
-            DamlDataset(np.ndarray([])),
+            np.ndarray([]),
             encode,
             model=model,
             fit=fit,
