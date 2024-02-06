@@ -1,7 +1,9 @@
-[//]: # (69f6c16f1a18ad3a8ab500bbca668240b4b2bd7f)
+[//]: # (db888bb7176e7688bf2e144f43f8d00bdfc9c454)
 
 # DAML Change Log
 ## Pending Release
+- ```db888bb7 - Remove usage of DamlDataset for ARiA metrics```
+## v0.40.1
 - ```69f6c16f - Refactor base AriaMetric class for better code sharing and easier future removal of model workflow```
 ## v0.40.0
 - ```ddb798c6 - Document guidelines for sufficiency training```
