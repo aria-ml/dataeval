@@ -5,7 +5,6 @@ import numpy as np
 import pytest
 import torch.nn as nn
 
-from daml.datasets import DamlDataset
 from daml.metrics.divergence import HP_FNN, HP_MST, DivergenceOutput
 
 np.random.seed(0)
@@ -45,9 +44,7 @@ class TestDpDivergence:
         odd = covariates[rev_inds, :, :]
         even = even.reshape((even.shape[0], -1))
         odd = odd.reshape((odd.shape[0], -1))
-        dataset_a = DamlDataset(even)
-        dataset_b = DamlDataset(odd)
-        metric = dp_metric(dataset_a, dataset_b)
+        metric = dp_metric(even, odd)
         result = metric.evaluate()
         assert result == output
 
@@ -70,8 +67,7 @@ class TestDpDivergenceFit:
 
         model = _TestModel()
         images, _ = mnist(add_channels=True)
-        dataset = DamlDataset(images)
-        m = dp_metric(dataset, dataset, True, model, False)
+        m = dp_metric(images, images, True, model, False)
         m._fit()
         assert mock_runner.call_count == 1
 
@@ -85,8 +81,7 @@ class TestDpDivergenceFit:
 
         model = _TestModel()
         images, _ = mnist(add_channels=True)
-        dataset = DamlDataset(images)
-        m = dp_metric(dataset, dataset, True, model, True, 10)
+        m = dp_metric(images, images, True, model, True, 10)
         m._fit()
         assert mock_trainer.call_count == 1
 
@@ -94,8 +89,7 @@ class TestDpDivergenceFit:
     def test_no_model(self, mock_trainer, mnist, dp_metric):
         """Test default AETrainer is setup"""
         images, _ = mnist(add_channels=True)
-        dataset = DamlDataset(images)
-        m = dp_metric(dataset, dataset)
+        m = dp_metric(images, images)
         assert m.model is None
         m._fit()
 
@@ -103,8 +97,7 @@ class TestDpDivergenceFit:
 
     def test_has_bad_model(self, mnist, dp_metric):
         images, _ = mnist(add_channels=True)
-        dataset = DamlDataset(images)
-        m = dp_metric(dataset, dataset)
+        m = dp_metric(images, images)
         m.model = "Not a Model"
         with pytest.raises(TypeError):
             m._fit()
@@ -120,8 +113,8 @@ class TestDpDivergenceFit:
 class TestDpEncode:
     @mock.patch("numpy.vstack")
     def test_create_encoding(self, mock_vstack, dp_metric):
-        empty_ds = DamlDataset(np.ndarray([]))
-        m = dp_metric(empty_ds, empty_ds, True)
+        x = np.ones(shape=(1, 1, 1, 1))
+        m = dp_metric(x, x, True)
         m._encode = MagicMock()
         m._encode_and_vstack()
 
@@ -130,9 +123,8 @@ class TestDpEncode:
 
     def test_encode_default_false(self, dp_metric):
         """Default encode is False"""
-        x1 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
-        x2 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
-        m = dp_metric(x1, x2)
+        x = np.ones(shape=(1, 1, 1, 1))
+        m = dp_metric(x, x)
         m._fit = MagicMock()
         m._encode_and_vstack = MagicMock()
         m.calculate_errors = MagicMock()
@@ -147,9 +139,8 @@ class TestDpEncode:
     def test_encode_override_true(self, dp_metric):
         """Override default encode with True"""
         # Create 4-dim images for permute
-        x1 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
-        x2 = DamlDataset(np.ones(shape=(1, 1, 1, 1)))
-        m = dp_metric(x1, x2, True)
+        x = np.ones(shape=(1, 1, 1, 1))
+        m = dp_metric(x, x, True)
         m._fit = MagicMock()
         m._encode_and_vstack = MagicMock()
         m.calculate_errors = MagicMock()

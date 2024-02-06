@@ -11,7 +11,6 @@ from typing import Any, Optional, Tuple
 import numpy as np
 import tensorflow as tf
 
-from daml._internal.datasets import DamlDataset
 from daml._internal.metrics.outputs import OutlierDetectorOutput
 from daml._internal.metrics.types import Threshold, ThresholdType
 from daml._internal.models.tensorflow.alibi import create_model
@@ -86,7 +85,7 @@ class _AlibiDetectMetric(ABC):
     # Train the alibi-detect metric on dataset
     def fit_dataset(
         self,
-        dataset: DamlDataset,
+        images: np.ndarray,
         epochs: int = 3,
         threshold: Threshold = Threshold(95.0, ThresholdType.PERCENTAGE),
         batch_size: Optional[int] = None,
@@ -98,8 +97,8 @@ class _AlibiDetectMetric(ABC):
 
         Parameters
         ----------
-        dataset : DamlDataset
-            An array of images for the model to train on
+        images : np.ndarray
+            A numpy array of images for the model to train on
         epochs : int, default 3
             Number of epochs to train the detector for
         threshold : Threshold, default Threshold(95.0, ThresholdType.PERCENTAGE)
@@ -120,7 +119,7 @@ class _AlibiDetectMetric(ABC):
         """
         tf.keras.backend.clear_session()
         if self.detector is None:
-            self._input_shape = dataset.images[0].shape
+            self._input_shape = images[0].shape
             model = create_model(type(self).__name__, self._input_shape)
             self.detector = self._alibi_detect_class(
                 threshold=0,
@@ -128,7 +127,7 @@ class _AlibiDetectMetric(ABC):
             )
 
         # Autoencoders only need images, so extract from dataset and format
-        images = self._format_images(dataset.images)
+        images = self._format_images(images)
         # Train the autoencoder using only the formatted images
         self.detector.fit(
             images,
@@ -245,15 +244,15 @@ class _AlibiDetectMetric(ABC):
 
     def evaluate(
         self,
-        dataset: DamlDataset,
+        images: np.ndarray,
     ) -> OutlierDetectorOutput:
         """
         Evaluate the outlier detector metric on a dataset.
 
         Parameters
         ----------
-        dataset : DamlDataset
-            The dataset to detect outliers on.
+        images : np.ndarray
+            The images to detect outliers on.
 
         Returns
         -------
@@ -268,7 +267,7 @@ class _AlibiDetectMetric(ABC):
             )
 
         # Cast and flatten images
-        images = self._format_images(dataset.images)
+        images = self._format_images(images)
 
         self._predict_kwargs.update({"X": images})
 

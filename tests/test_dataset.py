@@ -1,4 +1,3 @@
-import copy
 from typing import List, Tuple
 
 import numpy as np
@@ -74,16 +73,6 @@ class TestDamlClassificationDataset:
         npt.assert_array_equal(output[0], image_0)
         npt.assert_array_equal(output[1], label_0)
 
-    def test_setter(self):
-        dds2 = copy.deepcopy(self.dds)
-        dds2.images = np.zeros(shape=self.shape)
-        dds2.labels = np.zeros(self.shape[0])
-        dds2.boxes = np.zeros(self.shape[0])
-
-        assert not np.array_equal(dds2.images, self.dds.images)
-        assert not np.array_equal(dds2.labels, self.dds.labels)
-        assert dds2.boxes is not None
-
     def test_property(self):
         npt.assert_array_equal(self.dds.images, self.images)  # Images
         npt.assert_array_equal(self.dds.labels, self.labels)  # Labels
@@ -140,25 +129,6 @@ class TestDamlObjectDetectionDataset:
         npt.assert_array_equal(output[0], image_0)
         npt.assert_array_equal(output[1], label_0)
         npt.assert_array_equal(output[2], box_0)
-
-    def test_setitem(self):
-        """DamlDataset properties can be modified correctly"""
-        dds = DamlDataset(np.array([]), np.array([]), np.array([]))
-
-        # Confirm they are initialized correctly
-        assert not len(dds.images)
-        assert not len(dds.labels)
-        assert not len(dds.boxes)
-
-        # Set them to new values
-        dds.images = self.images
-        dds.labels = self.labels
-        dds.boxes = self.boxes
-
-        # Confirm they were set
-        npt.assert_array_equal(dds.images, self.images)
-        npt.assert_array_equal(dds.images, self.images)
-        npt.assert_array_equal(dds.images, self.images)
 
     def test_property(self):
         """DamlDataset properly sets values during init"""

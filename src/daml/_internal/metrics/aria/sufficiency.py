@@ -7,9 +7,7 @@ import torch
 import torch.nn as nn
 from matplotlib.figure import Figure
 from scipy.optimize import minimize
-from torch.utils.data import DataLoader
-
-from daml._internal.datasets import DamlDataset
+from torch.utils.data import DataLoader, Dataset, Subset
 
 
 def f_out(n_i: np.ndarray, x: np.ndarray) -> np.ndarray:
@@ -145,8 +143,8 @@ class Sufficiency:
     def run(
         self,
         model: nn.Module,
-        train_ds: DamlDataset,
-        test_ds: DamlDataset,
+        train_ds: Dataset,
+        test_ds: Dataset,
         batch_size: int = 8,
         train_kwargs: Optional[
             Dict[str, Any]
@@ -158,9 +156,9 @@ class Sufficiency:
 
         Parameters
         ----------
-        train : DamlDataset
+        train : Dataset
             Full training data that will be split for each run
-        test : DamlDataset
+        test : Dataset
             Data that will be used for every run's evaluation
         epochs : int
             Number of training cycles of the dataset, per model
@@ -178,9 +176,6 @@ class Sufficiency:
         if eval_kwargs is None:
             eval_kwargs = {}
 
-        # BUG -> Manual conversion required. PyTorch fails on non np.float32
-        X_test = test_ds.images.astype(np.float32)
-        y_test = test_ds.labels
         # Bootstrapping
         for j, inds in enumerate(self._indices):
             # Reset the network weights
@@ -191,17 +186,10 @@ class Sufficiency:
                 # We warm start on new data
                 b_inds = inds[:substep]
 
-                images: np.ndarray = train_ds.images[b_inds].astype(np.float32)
-                labels = train_ds.labels[b_inds] if len(train_ds.labels) else None
-                boxes = train_ds.boxes[b_inds] if len(train_ds.boxes) else None
-
-                subset_dataset = DamlDataset(images, labels, boxes)
-                subset_test = DamlDataset(X_test, y_test)
-
                 self._outputs[i, j] = self._run_subset(
                     model,
-                    subset_dataset,
-                    subset_test,
+                    Subset(train_ds, b_inds),
+                    test_ds,
                     batch_size,
                     train_kwargs,
                     eval_kwargs,
@@ -225,8 +213,8 @@ class Sufficiency:
     def _run_subset(
         self,
         model: nn.Module,
-        train_data: DamlDataset,
-        eval_data: DamlDataset,
+        train_data: Dataset,
+        eval_data: Dataset,
         batch_size: int,
         train_kwargs,
         eval_kwargs,

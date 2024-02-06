@@ -17,6 +17,8 @@ class DamlDataset(Dataset):
         self._labels = labels
         self._boxes = boxes
 
+        self._validate()
+
     def __len__(self) -> int:
         return len(self._images)
 
@@ -40,20 +42,12 @@ class DamlDataset(Dataset):
     def images(self) -> np.ndarray:
         return self._images
 
-    @images.setter
-    def images(self, value: np.ndarray) -> None:
-        self._images = value
-
     @property
     def labels(self) -> np.ndarray:
         if self._labels is None:
             return np.array([])
         else:
             return self._labels
-
-    @labels.setter
-    def labels(self, value: Optional[np.ndarray]) -> None:
-        self._labels = value
 
     @property
     def boxes(self) -> np.ndarray:
@@ -62,6 +56,11 @@ class DamlDataset(Dataset):
         else:
             return self._boxes
 
-    @boxes.setter
-    def boxes(self, value: Optional[np.ndarray]) -> None:
-        self._boxes = value
+    def _validate(self):
+        if self._labels is not None:
+            if self._boxes is None:
+                assert len(self._images) == len(self._labels)
+            else:
+                assert len(self._boxes) == len(self._labels)
+        else:
+            assert self._boxes is None
