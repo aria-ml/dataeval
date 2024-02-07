@@ -15,21 +15,21 @@ from .utils import get_classes_counts, minimum_spanning_tree
 
 
 class UAP_MST(_BaseMetric):
-    def __init__(self, images: np.ndarray, labels: np.ndarray) -> None:
+    def __init__(self, data: np.ndarray, labels: np.ndarray) -> None:
         """
         Parameters
         ----------
-        images : np.ndarray
+        data : np.ndarray
             A numpy array containing (n_samples x n_features) array of (padded) instance
             embeddings.
         labels : np.ndarray
             A numpy array containing n_samples vector of class labels with M unique
             classes.
         """
-        super().__init__(images, False)
+        self.data = data
         self.labels = labels
 
-    def _evaluate(self) -> UAPOutput:
+    def evaluate(self) -> UAPOutput:
         """
         Upperbound Average Precision estimate
 
@@ -41,18 +41,14 @@ class UAP_MST(_BaseMetric):
         uap = self._uap(self.data, self.labels)
         return UAPOutput(uap=uap)
 
-    def _uap(
-        self,
-        X: np.ndarray,
-        y: np.ndarray,
-    ) -> float:
+    def _uap(self, X: np.ndarray, y: np.ndarray) -> float:
         """
         Calculates the UAP estimate
 
         Parameters
         ----------
         X : np.ndarray
-            (n_samples x n_features) array of (padded) instance embeddings
+            (n_samples x n_features) array of (padded) instance data
         y : np.ndarray
             n_samples vector of class labels with M unique classes. 2 <= M <= 10
 
@@ -89,11 +85,7 @@ class UAP_MST(_BaseMetric):
 
 
 class UAP_EMP(_BaseMetric):
-    def __init__(
-        self,
-        labels: np.ndarray,
-        scores: np.ndarray,
-    ) -> None:
+    def __init__(self, labels: np.ndarray, scores: np.ndarray) -> None:
         """
         Parameters
         ----------
@@ -103,11 +95,10 @@ class UAP_EMP(_BaseMetric):
         scores : np.ndarray
             A 2D array of class probabilities per image
         """
-        super().__init__(np.ndarray([]), encode=False)
         self.labels = labels
         self.scores = scores
 
-    def _evaluate(self) -> UAPOutput:
+    def evaluate(self) -> UAPOutput:
         """
         Returns
         -------
