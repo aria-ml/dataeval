@@ -95,8 +95,8 @@ def custom_eval(model: nn.Module, dataloader) -> float:
 class TestSufficiencyFunctional:
     def test_classification(self, mnist) -> None:
         model = Net()
-        train_ds = DamlDataset(*mnist(1000, "train", np.float32, True))
-        test_ds = DamlDataset(*mnist(100, "test", np.float32, True))
+        train_ds = DamlDataset(*mnist(1000, "train", np.float32, "channels_first"))
+        test_ds = DamlDataset(*mnist(100, "test", np.float32, "channels_first"))
         length: int = len(train_ds)
         # Instantiate sufficiency metric
         suff = Sufficiency()

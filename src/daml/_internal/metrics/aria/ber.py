@@ -2,12 +2,14 @@
 This module contains the implementation of the
 FR Test Statistic based estimate and the
 FNN based estimate for the Bayes Error Rate
+
+Learning to Bound the Multi-class Bayes Error (Th. 3 and Th. 4)
+https://arxiv.org/abs/1811.06419
 """
 from abc import abstractmethod
 from typing import Tuple
 
 import numpy as np
-import torch
 from scipy.sparse import coo_matrix
 
 from daml._internal.metrics.aria.base import _BaseMetric
@@ -17,27 +19,15 @@ from .utils import compute_neighbors, get_classes_counts, minimum_spanning_tree
 
 
 class _MultiClassBer(_BaseMetric):
-    def __init__(
-        self,
-        images: np.ndarray,
-        labels: np.ndarray,
-        encode: bool = False,
-        device: torch.device = torch.device("cpu"),
-    ) -> None:
-        """Constructor method"""
-        super().__init__(images, encode, device=device)
-        self.images = images
+    def __init__(self, data: np.ndarray, labels: np.ndarray) -> None:
+        self.data = data
         self.labels = labels
 
     @abstractmethod
-    def _multiclass_ber(
-        self,
-        X: np.ndarray,
-        y: np.ndarray,
-    ) -> Tuple[float, float]:
+    def _multiclass_ber(self, X: np.ndarray, y: np.ndarray) -> Tuple[float, float]:
         """Abstract method for the implementation of multiclass BER calculation"""
 
-    def _evaluate(self) -> BEROutput:
+    def evaluate(self) -> BEROutput:
         """
         Return the Bayes Error Rate estimate
 
@@ -52,34 +42,21 @@ class _MultiClassBer(_BaseMetric):
             If unique classes M < 2
         """
         # Pass X through an autoencoder before evaluating BER
-        embeddings = self._encode(self.images)
-        ber, ber_lower = self._multiclass_ber(embeddings, self.labels)
+        ber, ber_lower = self._multiclass_ber(self.data, self.labels)
         return BEROutput(ber=ber, ber_lower=ber_lower)
 
 
 class MultiClassBerMST(_MultiClassBer):
-    """
-    Implements the FR Test Statistic based estimator for the Bayes Error Rate
-
-    Note
-    ----
-    `Learning to Bound the Multi-class Bayes Error (Th. 3 and Th. 4) <https://arxiv.org/abs/1811.06419>`_
-    """  # noqa F401
-
-    def _multiclass_ber(
-        self,
-        X: np.ndarray,
-        y: np.ndarray,
-    ) -> Tuple[float, float]:
+    def _multiclass_ber(self, X: np.ndarray, y: np.ndarray) -> Tuple[float, float]:
         """
-        Calculates the Bayes Error Rate estimate
+        Implements the FR Test Statistic based estimator for the Bayes Error Rate
 
         Parameters
         ----------
         X : np.ndarray
-            (n_samples x n_features) array of covariates (or image embeddings)
+            (n_samples x n_features) array of covariates (or image data)
         y : np.ndarray
-            n_samples vector of class labels with M unique classes. 2 <= M <= 10
+            n_samples vector of class labels with M unique classes. 2 <= M
 
         Returns
         -------
@@ -89,7 +66,7 @@ class MultiClassBerMST(_MultiClassBer):
         Raises
         ------
         ValueError
-            If unique classes M < 2 or M > 10
+            If the number of unique classes is less than 2
         """
         M, N = get_classes_counts(y)
 
@@ -102,36 +79,31 @@ class MultiClassBerMST(_MultiClassBer):
 
 
 class MultiClassBerFNN(_MultiClassBer):
-    """
-    Implements the KNN Test Statistic based estimator for the Bayes Error Rate
+    def _multiclass_ber(self, X: np.ndarray, y: np.ndarray) -> Tuple[float, float]:
+        """
+        Implements the KNN Test Statistic based estimator for the Bayes Error Rate
 
-    Parameters
-    ----------
-    X : np.ndarray
-        (n_samples x n_features) array of covariates (or image embeddings)
-    y : np.ndarray
-        n_samples vector of class labels with M unique classes. 2 <= M <= 10
+        Parameters
+        ----------
+        X : np.ndarray
+            (n_samples x n_features) array of covariates (or image data)
+        y : np.ndarray
+            n_samples vector of class labels with M unique classes. 2 <= M
 
-    Returns
-    -------
-    float
-        Estimate of the Bayes Error Rate
+        Returns
+        -------
+        float
+            Estimate of the Bayes Error Rate
 
-    Raises
-    ------
-    ValueError
-        If unique classes M < 2 or M > 10
+        Raises
+        ------
+        ValueError
+            If the number of unique classes is less than 2
 
-    See Also
-    --------
-    `Learning to Bound the Multi-class Bayes Error (Th. 3 and Th. 4) <https://arxiv.org/abs/1811.06419>`_
-    """  # noqa F401
-
-    def _multiclass_ber(
-        self,
-        X: np.ndarray,
-        y: np.ndarray,
-    ) -> Tuple[float, float]:
+        See Also
+        --------
+        `Learning to Bound the Multi-class Bayes Error (Th. 3 and Th. 4) <https://arxiv.org/abs/1811.06419>`_
+        """  # noqa F401
         M, N = get_classes_counts(y)
 
         # All features belong on second dimension

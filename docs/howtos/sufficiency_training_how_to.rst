@@ -1,10 +1,10 @@
-==============================
+=================================
 Sufficiency Training How-To Guide
-==============================
+=================================
 
----------------------------------------------------------------
+------------------------
 Initializing Sufficiency
----------------------------------------------------------------
+------------------------
 
 Initialize a dataset, training function, eval function, and attach them to a sufficiency object.
 
@@ -20,9 +20,9 @@ Initialize a dataset, training function, eval function, and attach them to a suf
     suff.set_training_func(custom_train)
     suff.set_eval_func(custom_eval)
 
----------------------------------------------------------------
+-----------------------------------
 Defining a Custom Training Function
----------------------------------------------------------------
+-----------------------------------
 
 Use a small step size and around 50 epochs per step on the curve.
 
@@ -58,9 +58,9 @@ Use a small step size and around 50 epochs per step on the curve.
         # Update optimizer
         optimizer.step()
 
----------------------------------------------------------------
+-----------------------------------
 Parameters for Setup, Eval, and Run
----------------------------------------------------------------
+-----------------------------------
 
 We recommend at least 5 bootstrap samples (m_count) and 10 steps along the training curve per model (num_steps). 
 

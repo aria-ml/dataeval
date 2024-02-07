@@ -3,11 +3,8 @@ This module contains the implementation of Dp Divergence
 using the First Nearest Neighbor and Minimum Spanning Tree algorithms
 """
 from abc import abstractmethod
-from typing import Optional
 
 import numpy as np
-import torch
-from torch import nn
 
 from daml._internal.metrics.aria.base import _BaseMetric
 from daml._internal.metrics.outputs import DivergenceOutput
@@ -22,41 +19,16 @@ class _DpDivergence(_BaseMetric):
     see https://arxiv.org/abs/1412.6534.
     """
 
-    def __init__(
-        self,
-        images_a: np.ndarray,
-        images_b: np.ndarray,
-        encode: bool = False,
-        model: Optional[nn.Module] = None,
-        fit: Optional[bool] = None,
-        epochs: Optional[int] = None,
-        device: torch.device = torch.device("cpu"),
-    ) -> None:
+    def __init__(self, data_a: np.ndarray, data_b: np.ndarray) -> None:
         """Constructor method"""
-        super().__init__(
-            images_a,
-            encode,
-            model=model,
-            fit=fit,
-            epochs=epochs,
-            device=device,
-        )
-        self.images_a = images_a
-        self.images_b = images_b
+        self.data_a = data_a
+        self.data_b = data_b
 
     @abstractmethod
     def calculate_errors(self, data: np.ndarray, labels: np.ndarray) -> int:
         """Abstract method for the implementation of divergence calculation"""
 
-    def _encode_and_vstack(self) -> np.ndarray:
-        emb_a = self._encode(self.images_a)
-        emb_b = self._encode(self.images_b)
-        if self.encode:
-            emb_a = emb_a.flatten()
-            emb_b = emb_b.flatten()
-        return np.vstack((emb_a, emb_b))
-
-    def _evaluate(self) -> DivergenceOutput:
+    def evaluate(self) -> DivergenceOutput:
         """
         Calculates the divergence and any errors between the datasets
 
@@ -65,13 +37,13 @@ class _DpDivergence(_BaseMetric):
         DivergenceOutput
             Dataclass containing the dp divergence and errors during calculation
         """
-        N = self.images_a.shape[0]
-        M = self.images_b.shape[0]
+        N = self.data_a.shape[0]
+        M = self.data_b.shape[0]
 
-        images = self._encode_and_vstack()
+        stacked_data = np.vstack((self.data_a, self.data_b))
         labels = np.vstack([np.zeros([N, 1]), np.ones([M, 1])])
 
-        errors = self.calculate_errors(images, labels)
+        errors = self.calculate_errors(stacked_data, labels)
         dp = 1 - ((M + N) / (2 * M * N)) * errors
         return DivergenceOutput(dpdivergence=dp, error=errors)
 
