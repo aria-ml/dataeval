@@ -9,8 +9,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from daml.datasets import DamlDataset
 from daml.metrics.sufficiency import Sufficiency
+from tests.utils.data import DamlDataset
 
 np.random.seed(0)
 torch.manual_seed(0)
