@@ -1,7 +1,10 @@
-[//]: # (db888bb7176e7688bf2e144f43f8d00bdfc9c454)
+[//]: # (e8e906d7bcb51860d6c5b2d45ba7d6e83a930cec)
 
 # DAML Change Log
 ## Pending Release
+- ```e8e906d7 - Restructure src and tests to match current design```
+## v0.40.2
+- ```f3eddaed - Flavor 2 - Remove models from metrics entirely```
 - ```db888bb7 - Remove usage of DamlDataset for ARiA metrics```
 ## v0.40.1
 - ```69f6c16f - Refactor base AriaMetric class for better code sharing and easier future removal of model workflow```
