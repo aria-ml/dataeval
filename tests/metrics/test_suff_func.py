@@ -1,6 +1,5 @@
 import numpy as np
 import numpy.testing as npt
-import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -8,8 +7,8 @@ import torch.optim as optim
 import torchmetrics
 from torch.utils.data import DataLoader
 
-from daml._internal.datasets.datasets import DamlDataset
 from daml.metrics.sufficiency import Sufficiency
+from tests.utils.data import DamlDataset
 
 
 class Net(nn.Module):
@@ -137,7 +136,3 @@ class TestSufficiencyFunctional:
         # p_i test
         p_i = output["p_i"]
         npt.assert_array_equal(p_i, 1 - np.mean(accuracy, axis=1))
-
-    @pytest.mark.xfail
-    def test_object_detection(self) -> None:
-        assert False

@@ -45,27 +45,15 @@ class TestDatasetType:
 class TestFlatten:
     @pytest.mark.parametrize(
         "count",
-        [
-            1,
-            pytest.param(5, marks=pytest.mark.functional),
-            pytest.param(25, marks=pytest.mark.functional),
-        ],
+        [1, 10],
     )
     @pytest.mark.parametrize(
         "img_dims",
-        [
-            (1, 1),
-            pytest.param((32, 32), marks=pytest.mark.functional),
-            pytest.param((16, 64), marks=pytest.mark.functional),
-        ],
+        [(1, 1), (32, 32), (16, 64)],
     )
     @pytest.mark.parametrize(
         "channels",
-        [
-            1,
-            pytest.param(3, marks=pytest.mark.functional),
-            pytest.param(5, marks=pytest.mark.functional),
-        ],
+        [1, 5],
     )
     def test_flatten_dataset_is_true(self, count, img_dims, channels):
         """Prove that the flatten dataset only affects the image shape, not batch"""
