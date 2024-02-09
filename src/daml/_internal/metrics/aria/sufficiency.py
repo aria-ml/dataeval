@@ -1,5 +1,4 @@
-from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -224,7 +223,7 @@ class Sufficiency:
         test_loader = DataLoader(eval_data, batch_size=batch_size)
         return self._eval(model, test_loader, eval_kwargs)
 
-    def plot(self, output_dict: Dict[str, Any]):
+    def plot(self, output_dict: Dict[str, Any]) -> Figure:
         """Plotting function for data sufficiency tasks
 
         Parameters
@@ -233,6 +232,8 @@ class Sufficiency:
             The parameters used to calculate the line of best fit
         output_dict : Dict[str, Any]
             Output of sufficiency run
+        filename : Optional[str]
+            Filename to save plot to if not None
 
         """
         # Retrieve only relevant values in dictionary
@@ -274,24 +275,4 @@ class Sufficiency:
         )
 
         ax.legend()
-        # Save figure
-        path = Path("Sufficiency Plot")
-        self.save_fig(fig, path)  # type: ignore
-
-    @staticmethod
-    def save_fig(fig: Figure, path: Path):
-        """
-        Saves a `plt.figure` at a given path
-
-        Parameters
-        ---------
-        fig : plt.figure
-            Figure to be saved to png
-        path : Path
-            Location to save the figure
-        Note
-        ----
-        A directory will be created if it does not exist
-        """
-        # TODO: Add folder creation, checking, and path handling
-        fig.savefig(path)  # type: ignore
+        return cast(Figure, fig)  # py3.8 fig is returned as FigureBase | Unknown
