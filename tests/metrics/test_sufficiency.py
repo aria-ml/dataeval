@@ -7,6 +7,7 @@ import numpy.testing as npt
 import pytest
 import torch
 import torch.nn as nn
+from matplotlib.figure import Figure
 from torch.utils.data import DataLoader
 
 from daml.metrics.sufficiency import Sufficiency
@@ -213,10 +214,8 @@ class TestSufficiency:
             suff.setup(-1, 1, 1)
 
     def test_plot(self):
-        """Tests that a plot is generated and saved"""
+        """Tests that a plot is generated"""
         # Only needed for plotting test
-        import os
-
         suff = Sufficiency()
 
         output = {
@@ -227,10 +226,8 @@ class TestSufficiency:
             "geomshape": (1, 100, 3),
         }
 
-        suff.plot(output_dict=output)
-        # Can only confirm file is created, not data in it
-        assert os.path.exists("Sufficiency Plot.png")
-        os.remove("Sufficiency Plot.png")
+        result = suff.plot(output_dict=output)
+        assert isinstance(result, Figure)
 
     def test_plot_missing_output_keys(self):
         """Tests that custom dictionaries have all keys"""
