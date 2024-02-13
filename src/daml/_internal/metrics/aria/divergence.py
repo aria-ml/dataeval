@@ -13,19 +13,12 @@ from .utils import compute_neighbors, minimum_spanning_tree
 
 
 class _DpDivergence(_BaseMetric):
-    """
-    For more information about this divergence, its formal definition,
-    and its associated estimators
-    see https://arxiv.org/abs/1412.6534.
-    """
-
     def __init__(self, data_a: np.ndarray, data_b: np.ndarray) -> None:
-        """Constructor method"""
         self.data_a = data_a
         self.data_b = data_b
 
     @abstractmethod
-    def calculate_errors(self, data: np.ndarray, labels: np.ndarray) -> int:
+    def _calculate_errors(self, data: np.ndarray, labels: np.ndarray) -> int:
         """Abstract method for the implementation of divergence calculation"""
 
     def evaluate(self) -> DivergenceOutput:
@@ -43,7 +36,7 @@ class _DpDivergence(_BaseMetric):
         stacked_data = np.vstack((self.data_a, self.data_b))
         labels = np.vstack([np.zeros([N, 1]), np.ones([M, 1])])
 
-        errors = self.calculate_errors(stacked_data, labels)
+        errors = self._calculate_errors(stacked_data, labels)
         dp = 1 - ((M + N) / (2 * M * N)) * errors
         return DivergenceOutput(dpdivergence=dp, error=errors)
 
@@ -51,6 +44,18 @@ class _DpDivergence(_BaseMetric):
 class DpDivergenceMST(_DpDivergence):
     """
     A minimum spanning tree implementation of dp divergence
+
+    Parameters
+    ----------
+    data_a : np.ndarray
+        Array of images or image embeddings to compare
+    data_b : np.ndarray
+        Array of images or image embeddings to compare
+
+    See Also
+    --------
+        For more information about this divergence, its formal definition,
+        and its associated estimators see https://arxiv.org/abs/1412.6534.
 
     Warning
     -------
@@ -67,16 +72,9 @@ class DpDivergenceMST(_DpDivergence):
     # - improve speed for MST, requires a fast mst implementation
     # mst is at least 10x slower than knn approach
 
-    def calculate_errors(self, data: np.ndarray, labels: np.ndarray) -> int:
+    def _calculate_errors(self, data: np.ndarray, labels: np.ndarray) -> int:
         """
         Returns the divergence between two datasets using a minimum spanning tree
-
-        Parameters
-        ----------
-        data : np.ndarray
-            Array containing images from two datasets
-        labels : np.ndarray
-            Array showing which dataset each image belonged to
 
         Returns
         -------
@@ -85,8 +83,8 @@ class DpDivergenceMST(_DpDivergence):
 
         Note
         ----
-        We add a small constant to the distance matrix to ensure scipy interprets
-        the input graph as fully-connected.
+            We add a small constant to the distance matrix to ensure scipy interprets
+            the input graph as fully-connected.
         """
         mst = minimum_spanning_tree(data).toarray()
         edgelist = np.transpose(np.nonzero(mst))
@@ -97,9 +95,21 @@ class DpDivergenceMST(_DpDivergence):
 class DpDivergenceFNN(_DpDivergence):
     """
     A first nearest neighbor implementation of dp divergence
+
+    Parameters
+    ----------
+    data_a : np.ndarray
+        Array of images or image embeddings to compare
+    data_b : np.ndarray
+        Array of images or image embeddings to compare
+
+    See Also
+    --------
+        For more information about this divergence, its formal definition,
+        and its associated estimators see https://arxiv.org/abs/1412.6534.
     """
 
-    def calculate_errors(self, data: np.ndarray, labels: np.ndarray) -> int:
+    def _calculate_errors(self, data: np.ndarray, labels: np.ndarray) -> int:
         """
         Returns the divergence between two datasets using first nearest neighbor
 

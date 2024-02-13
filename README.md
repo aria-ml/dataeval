@@ -19,17 +19,52 @@ The Data-Analysis Metrics Library, or DAML, focuses on characterizing image data
 
 ## Getting Started
 
+### Requirements
+- Python 3.8-3.11
+
 ### Installing DAML
 
-To install the package from the GitLab Pypi repository, run the following command in an environment with Python 3.8-3.11 installed:
+You can install DAML directly from pypi.org using the following command.
 
-`pip install daml`
+```
+pip install daml
+```
 
-### Additional Tutorials
+### Installing DAML from GitHub
+
+To install DAML from source locally on Ubuntu, you will need `git-lfs` to download larger, binary source files and `poetry` for project dependency management.
+
+```
+sudo apt-get install git-lfs
+pip install poetry
+```
+
+Pull the source down and change to the DAML project directory.
+```
+git clone https://github.com/aria-ml/daml.git
+cd daml
+```
+
+Install DAML with optional dependencies for development.
+```
+poetry install --with dev
+```
+
+Alternatively, you can install with optional dependencies used to generate documentation as well.
+```
+poetry install --with dev --with docs
+```
+
+Now that DAML is installed, you can run commands in the poetry virtual environment by prefixing shell commands with `poetry run`, or activate the virtual environment directly in the shell.
+```
+poetry shell
+```
+
+### Documentation and Tutorials
 For more ideas on getting started using DAML in your workflow, additional information and tutorials are in our Sphinx documentation hosted on [Read the Docs](https://daml.readthedocs.io/).
 
 ## Contributing
-For steps on how to get started on contributing to the project, you can follow the steps in [CONTRIBUTING.md](CONTRIBUTING.md).
+For steps on how to get started on contributing to the project, including setting up a development environment and running unit tests and building documentation locally, you can follow the steps in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Attribution
 This project uses code from the [Alibi-Detect](https://github.com/SeldonIO/alibi-detect) python library developed by SeldonIO.  Additional documentation from the developers are also available [here](https://docs.seldon.io/projects/alibi-detect/en/stable/).

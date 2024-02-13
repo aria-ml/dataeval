@@ -15,28 +15,36 @@ from .utils import get_classes_counts, minimum_spanning_tree
 
 
 class UAP_MST(_BaseMetric):
+    """
+    FR Test Statistic based estimate of the upperbound average precision
+
+    Parameters
+    ----------
+    data : np.ndarray
+        A numpy array containing (n_samples x n_features) array of (padded) instance
+        embeddings.
+    labels : np.ndarray
+        A numpy array containing n_samples vector of class labels with M unique
+        classes.
+    """
+
     def __init__(self, data: np.ndarray, labels: np.ndarray) -> None:
-        """
-        Parameters
-        ----------
-        data : np.ndarray
-            A numpy array containing (n_samples x n_features) array of (padded) instance
-            embeddings.
-        labels : np.ndarray
-            A numpy array containing n_samples vector of class labels with M unique
-            classes.
-        """
         self.data = data
         self.labels = labels
 
     def evaluate(self) -> UAPOutput:
         """
-        Upperbound Average Precision estimate
+        Calculates the upperbound average precision estimate
 
         Returns
         -------
         UAPOutput
-            The estimated UAP
+            The estimated upperbound average precision
+
+        Raises
+        ------
+        ValueError
+            If unique classes M < 2
         """
         uap = self._uap(self.data, self.labels)
         return UAPOutput(uap=uap)
@@ -56,11 +64,6 @@ class UAP_MST(_BaseMetric):
         -------
         float
             Estimate of the UAP
-
-        Raises
-        ------
-        ValueError
-            If unique classes M < 2 or M > 10
         """
         M, N = get_classes_counts(y)
 
@@ -85,16 +88,19 @@ class UAP_MST(_BaseMetric):
 
 
 class UAP_EMP(_BaseMetric):
-    def __init__(self, labels: np.ndarray, scores: np.ndarray) -> None:
-        """
-        Parameters
-        ----------
-        labels : np.ndarray
-            A numpy array of n_samples of class labels with M unique classes.
+    """
+    FR Test Statistic based estimate of the empirical mean precision
 
-        scores : np.ndarray
-            A 2D array of class probabilities per image
-        """
+    Parameters
+    ----------
+    labels : np.ndarray
+        A numpy array of n_samples of class labels with M unique classes.
+
+    scores : np.ndarray
+        A 2D array of class probabilities per image
+    """
+
+    def __init__(self, labels: np.ndarray, scores: np.ndarray) -> None:
         self.labels = labels
         self.scores = scores
 
@@ -103,7 +109,12 @@ class UAP_EMP(_BaseMetric):
         Returns
         -------
         UAPOutput
-            The estimated UAP
+            The empirical mean precision estimate
+
+        Raises
+        ------
+        ValueError
+            If unique classes M < 2
         """
         uap = float(
             average_precision_score(self.labels, self.scores, average="weighted")
