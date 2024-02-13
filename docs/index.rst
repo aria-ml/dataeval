@@ -10,10 +10,9 @@ Data-Analysis Metrics Library
 .. toctree::
    :hidden:
 
-   ml_lifecycle
-   api
    tutorials
    howtos
+   reference
 
 ----------
 About DAML

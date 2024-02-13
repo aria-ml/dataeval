@@ -93,6 +93,10 @@ def reset_parameters(model: nn.Module):
 
 
 class Sufficiency:
+    """
+    Project dataset sufficiency using given a model and evaluation criteria
+    """
+
     def __init__(
         self,
     ):
@@ -121,12 +125,46 @@ class Sufficiency:
             raise TypeError(error_msg)
 
     def set_training_func(self, func: Callable):
+        """
+        Set the training function which will be executed each substep to train
+        the provided model.
+
+        Parameters
+        ----------
+        func : Callable[[torch.nn.Module, torch.utils.data.DataLoader], None]
+            Function which takes a model (nn.Module) and a data loader (DataLoader)
+            and executes model training against the data.
+        """
         self._training_func = self._set_func(func)
 
     def set_eval_func(self, func: Callable):
+        """
+        Set the evaluation function which will be executed each substep
+        in order to aggregate the resulting output for evaluation.
+
+        Parameters
+        ----------
+        func : Callable[[torch.nn.Module, torch.utils.data.DataLoader], float]
+            Function which takes a model (nn.Module) and a data loader (DataLoader)
+            and returns a float which is used to assess model performance given
+            the model and data.
+        """
         self._eval_func = self._set_func(func)
 
     def setup(self, length: int, num_models: int = 1, substeps: int = 1):
+        """
+        Sets parameters used during run.
+
+        Parameters
+        ----------
+        length : int
+            The length of the training dataset.
+        num_models : int
+            The number of times to train and evaluate the model against randomized
+            subsets of data.
+        substeps : int
+            The number of substeps to divide the dataset in an increasing log scale.
+        """
         if length <= 0:
             raise ValueError("Length cannot be 0")
 
@@ -166,8 +204,9 @@ class Sufficiency:
         substeps : int
             Total number of dataset partitions that each model will train on
 
-        Returns:
-        Dict[str, Any]
+        Returns
+        -------
+            Dict[str, Any]
         """
 
         if train_kwargs is None:
