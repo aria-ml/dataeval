@@ -91,7 +91,7 @@ linting:
   script:
     - ./run lint
 
-test:
+.test:
   extends: .docker_harbor_optional
   stage: test
   needs: [build image]
@@ -109,14 +109,25 @@ test:
       junit: output/junit.${TASK}.${PYTHON_VERSION}.xml
     paths:
       - output/*
+
+test:
+  extends: [.test]
+  variables:
+    TASK: unit
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
+      when: never
+    - when: on_success
+
+functional:
+  extends: [.test]
+  tags: [GPU]
+  variables:
+    TASK: func --gpu
   rules:
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
       when: on_success
-      variables:
-        TASK: func
-    - when: on_success
-      variables:
-        TASK: unit
+    - when: never
 
 lite:
   stage: test
