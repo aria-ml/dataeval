@@ -38,7 +38,7 @@ class _DpDivergence(_BaseMetric):
         labels = np.vstack([np.zeros([N, 1]), np.ones([M, 1])])
 
         errors = self._calculate_errors(stacked_data, labels)
-        dp = 1 - ((M + N) / (2 * M * N)) * errors
+        dp = max(0.0, 1 - ((M + N) / (2 * M * N)) * errors)
         return DivergenceOutput(dpdivergence=dp, error=errors)
 
 
