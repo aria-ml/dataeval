@@ -2,6 +2,7 @@
 This module contains the implementation of Dp Divergence
 using the First Nearest Neighbor and Minimum Spanning Tree algorithms
 """
+
 from abc import abstractmethod
 
 import numpy as np
