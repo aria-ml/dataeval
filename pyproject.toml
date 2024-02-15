@@ -117,7 +117,7 @@ markers = [
 ]
 
 [tool.black]
-extend-exclude = '\.tox|.*env.*|docs|output\/'
+extend-exclude = '\.tox|.*env.*|docs|output|src/daml/_alibi_detect\/'
 
 [tool.isort]
 profile = 'black'
