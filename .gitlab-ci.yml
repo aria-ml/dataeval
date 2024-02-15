@@ -19,30 +19,15 @@ stages:
   - test
   - release
 
-.on_merge_to_main:
-  rules:
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
-      when: on_success
-    - when: never
-
-.not_on_merge_to_main:
-  rules:
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
-      when: never
-    - when: on_success
-
 .on_release:
   stage: release
   environment:
     name: production
   rules:
-    - if: $DAML_NIGHTLY
-      when: never
     - if: $CI_COMMIT_BRANCH == 'main'
       changes:
         - src/**/*
         - pyproject.toml
-    - if: $DAML_RELEASE
 
 .docker_harbor_required:
   image: docker:24.0-git
@@ -230,6 +215,8 @@ secret_detection:
   needs: []
   rules:
     - if: $CI_COMMIT_REF_PROTECTED == "true"
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'develop'
 
 # gemnasium-python-dependency_scanning:
 #   needs:
