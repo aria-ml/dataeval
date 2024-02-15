@@ -1,10 +1,7 @@
 import numpy as np
 import pytest
-import torch
 
 from daml.metrics.ber import BER_FNN, BER_MST, BEROutput
-
-torch.manual_seed(0)
 
 
 class TestMulticlassBER:
