@@ -99,7 +99,7 @@ linting:
     matrix:
       - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
   script:
-    - ./build ${PYTHON_VERSION} ${TASK} || TESTFAILED=1
+    - ./build ${PYTHON_VERSION} ${TASK} ${ARGS} || TESTFAILED=1
     - if [[ $TESTFAILED ]]; then echo "=========== ${TASK} FAILED ==========="; EXITCODE=1; fi
     - ./build ${PYTHON_VERSION} type || TYPEFAILED=1
     - if [[ $TYPEFAILED ]]; then echo "=========== type FAILED ==========="; EXITCODE=1; fi
@@ -123,7 +123,8 @@ functional:
   extends: [.test]
   tags: [GPU]
   variables:
-    TASK: func --gpu
+    TASK: func
+    ARGS: --gpu
   rules:
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
       when: on_success
