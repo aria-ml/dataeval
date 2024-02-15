@@ -76,14 +76,12 @@ class BaseDetector(ABC):
 
 class FitMixin(ABC):
     @abstractmethod
-    def fit(self, *args, **kwargs) -> None:
-        ...
+    def fit(self, *args, **kwargs) -> None: ...
 
 
 class ThresholdMixin(ABC):
     @abstractmethod
-    def infer_threshold(self, *args, **kwargs) -> None:
-        ...
+    def infer_threshold(self, *args, **kwargs) -> None: ...
 
 
 # "Large artefacts" - to save memory these are skipped in _set_config(), but added back in get_config()
@@ -216,8 +214,7 @@ class Detector(Protocol):
 
     meta: Dict
 
-    def predict(self) -> Any:
-        ...
+    def predict(self) -> Any: ...
 
 
 @runtime_checkable
@@ -227,15 +224,12 @@ class ConfigurableDetector(Detector, Protocol):
     Used for typing save and load functionality in `_alibi_detect.saving.saving`.
     """
 
-    def get_config(self) -> dict:
-        ...
+    def get_config(self) -> dict: ...
 
     @classmethod
-    def from_config(cls, config: dict):
-        ...
+    def from_config(cls, config: dict): ...
 
-    def _set_config(self, inputs: dict):
-        ...
+    def _set_config(self, inputs: dict): ...
 
 
 @runtime_checkable
@@ -247,11 +241,9 @@ class StatefulDetectorOnline(ConfigurableDetector, Protocol):
 
     t: int = 0
 
-    def save_state(self, filepath: Union[str, os.PathLike]):
-        ...
+    def save_state(self, filepath: Union[str, os.PathLike]): ...
 
-    def load_state(self, filepath: Union[str, os.PathLike]):
-        ...
+    def load_state(self, filepath: Union[str, os.PathLike]): ...
 
 
 class NumpyEncoder(json.JSONEncoder):

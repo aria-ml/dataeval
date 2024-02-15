@@ -24,10 +24,10 @@ The Data-Analysis Metrics Library, or DAML, focuses on characterizing image data
 
 ### Installing DAML
 
-You can install DAML directly from pypi.org using the following command.
+You can install DAML directly from pypi.org using the following command.  The optional dependencies of DAML are `torch`, `tensorflow` and `all`.  Using `torch` enables Sufficiency metrics, and `tensorflow` enables Outlier Detection.
 
 ```
-pip install daml
+pip install daml[all]
 ```
 
 ### Installing DAML from GitHub
@@ -45,14 +45,16 @@ git clone https://github.com/aria-ml/daml.git
 cd daml
 ```
 
+
+
 Install DAML with optional dependencies for development.
 ```
-poetry install --with dev
+poetry install --all-extras --with dev
 ```
 
 Alternatively, you can install with optional dependencies used to generate documentation as well.
 ```
-poetry install --with dev --with docs
+poetry install --all-extras --with dev --with docs
 ```
 
 Now that DAML is installed, you can run commands in the poetry virtual environment by prefixing shell commands with `poetry run`, or activate the virtual environment directly in the shell.

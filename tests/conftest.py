@@ -2,7 +2,11 @@ from typing import Literal, Optional, Tuple
 
 import numpy as np
 import pytest
-import torch
+
+try:
+    from torch.nn import Module
+except ImportError:
+    pass
 
 
 def pytest_addoption(parser):
@@ -48,7 +52,7 @@ def mnist():
 
 @pytest.fixture
 def mock_net():
-    class MockNet(torch.nn.Module):
+    class MockNet(Module):  # type: ignore
         def __init__(self) -> None:
             super().__init__()
 
