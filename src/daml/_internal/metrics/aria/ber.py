@@ -6,6 +6,7 @@ FNN based estimate for the Bayes Error Rate
 Learning to Bound the Multi-class Bayes Error (Th. 3 and Th. 4)
 https://arxiv.org/abs/1811.06419
 """
+
 from abc import abstractmethod
 from typing import Tuple
 

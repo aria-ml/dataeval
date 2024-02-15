@@ -60,9 +60,6 @@ Upperbound Average Precision
 .. autoclass:: daml.metrics.uap.UAP_EMP
    :members:
    :inherited-members:
-.. autoclass:: daml.metrics.uap.UAP_MST
-   :members:
-   :inherited-members:
 .. autoclass:: daml.metrics.uap.UAPOutput
 
 ---------------

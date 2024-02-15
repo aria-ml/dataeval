@@ -23,6 +23,5 @@ Reference
    daml.metrics.outlier_detection.Threshold
    daml.metrics.outlier_detection.ThresholdType
    daml.metrics.sufficiency.Sufficiency
-   daml.metrics.uap.UAP_MST
    daml.metrics.uap.UAP_EMP
    daml.metrics.uap.UAPOutput
