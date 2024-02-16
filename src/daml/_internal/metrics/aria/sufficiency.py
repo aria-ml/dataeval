@@ -1,5 +1,5 @@
-from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from collections import defaultdict
+from typing import Any, Callable, Dict, List, Optional, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,6 +8,8 @@ import torch.nn as nn
 from matplotlib.figure import Figure
 from scipy.optimize import minimize
 from torch.utils.data import DataLoader, Dataset, Subset
+
+from daml._internal.metrics.outputs import SufficiencyOutput
 
 
 def f_out(n_i: np.ndarray, x: np.ndarray) -> np.ndarray:
@@ -56,25 +58,6 @@ def calc_params(p_i: np.ndarray, n_i: np.ndarray) -> np.ndarray:
     return res.x
 
 
-def create_data_indices(N: int, M: int) -> np.ndarray:
-    """
-    Randomly selects integers in range (0, M) an N number of times
-
-    Parameters
-    ----------
-    N : int
-        Size of the first dimension
-    M : int
-        Size of the second dimension
-
-    Returns
-    -------
-    np.ndarray
-        An NxM array of randomly selected integers in range (0, M)
-    """
-    return np.random.randint(0, M, size=(N, M))
-
-
 def reset_parameters(model: nn.Module):
     """
     Re-initializes each layer in the model using
@@ -94,6 +77,10 @@ def reset_parameters(model: nn.Module):
 
 
 class Sufficiency:
+    """
+    Project dataset sufficiency using given a model and evaluation criteria
+    """
+
     def __init__(
         self,
     ):
@@ -101,74 +88,91 @@ class Sufficiency:
         self._training_func = None
         self._eval_func = None
 
-        self._output_dict = None
-
     def _train(self, model: nn.Module, dataloader: DataLoader, kwargs: Dict[str, Any]):
         if self._training_func is None:
             raise TypeError("Training function is None. Set function before calling")
 
         self._training_func(model, dataloader, **kwargs)
 
-    def _eval(self, model: nn.Module, dataloader: DataLoader, kwargs: Dict[str, Any]):
+    def _eval(
+        self, model: nn.Module, dataloader: DataLoader, kwargs: Dict[str, Any]
+    ) -> Dict[str, float]:
         if self._eval_func is None:
             raise TypeError("Eval function is None. Set function before calling")
 
         return self._eval_func(model, dataloader, **kwargs)
 
-    def _set_func(self, func: Callable, error_msg="Argument was not a callable"):
+    def _set_func(self, func: Callable):
         if callable(func):
             return func
         else:
-            raise TypeError(error_msg)
+            raise TypeError("Argument was not a callable")
 
     def set_training_func(self, func: Callable):
+        """
+        Set the training function which will be executed each substep to train
+        the provided model.
+
+        Parameters
+        ----------
+        func : Callable[[torch.nn.Module, torch.utils.data.DataLoader], None]
+            Function which takes a model (nn.Module) and a data loader (DataLoader)
+            and executes model training against the data.
+        """
         self._training_func = self._set_func(func)
 
     def set_eval_func(self, func: Callable):
+        """
+        Set the evaluation function which will be executed each substep
+        in order to aggregate the resulting output for evaluation.
+
+        Parameters
+        ----------
+        func : Callable[[torch.nn.Module, torch.utils.data.DataLoader], float]
+            Function which takes a model (nn.Module) and a data loader (DataLoader)
+            and returns a float which is used to assess model performance given
+            the model and data.
+        """
         self._eval_func = self._set_func(func)
-
-    def setup(self, length: int, num_models: int = 1, substeps: int = 1):
-        if length <= 0:
-            raise ValueError("Length cannot be 0")
-
-        # Stores each models' metric output per step
-        self._outputs = np.zeros((substeps, num_models))
-        # Save the shape for plotting
-        self._geomshape = (0.01 * length, length, substeps)
-        self._ranges = np.geomspace(*self._geomshape).astype(np.int64)
-
-        # Randomly sample data indices for each model
-        self._indices = create_data_indices(num_models, length)
 
     def run(
         self,
         model: nn.Module,
         train_ds: Dataset,
         test_ds: Dataset,
+        runs: int,
+        substeps: int,
         batch_size: int = 8,
-        train_kwargs: Optional[
-            Dict[str, Any]
-        ] = None,  # Mutable sequences should not be used as default arg
+        # Mutable sequences should not be used as default arg
+        train_kwargs: Optional[Dict[str, Any]] = None,
         eval_kwargs: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+    ) -> SufficiencyOutput:
         """
         Creates data indices, trains models, and returns plotting data
 
         Parameters
         ----------
-        train : Dataset
+        model : nn.Module
+            Model that will be trained for each subset of data
+        train_ds : Dataset
             Full training data that will be split for each run
-        test : Dataset
+        test_ds : Dataset
             Data that will be used for every run's evaluation
-        epochs : int
-            Number of training cycles of the dataset, per model
-        model_count : int
-            Number of models to train and take averages from
+        runs : int
+            Number of models to run over all subsets
         substeps : int
             Total number of dataset partitions that each model will train on
+        batch_size : int, default 8
+            The number of data points to be grouped during training and evaluation
+        train_kwargs : Dict[str, Any] | None, default None
+            Additional arguments required for custom training function
+        eval_kwargs : Dict[str, Any] | None, default None
+            Additional arguments required for custom evaluation function
 
-        Returns:
-        Dict[str, Any]
+        Returns
+        -------
+        SufficiencyOutput
+            Dataclass containing the average of each measure per substep
         """
 
         if train_kwargs is None:
@@ -176,39 +180,47 @@ class Sufficiency:
         if eval_kwargs is None:
             eval_kwargs = {}
 
-        # Bootstrapping
-        for j, inds in enumerate(self._indices):
-            # Reset the network weights
+        if not hasattr(train_ds, "__len__"):
+            raise TypeError("Must provide a dataset with a length attribute")
+        length = getattr(train_ds, "__len__")()
+        if length <= 0:
+            raise ValueError("Length must be greater than 0")
+
+        geomshape = (0.01 * length, length, substeps)  # Start, Stop, Num steps
+        ranges = np.geomspace(*geomshape).astype(np.int64)
+
+        # When given a new key (measure name), create an array of zeros as value
+        metric_outputs = defaultdict(lambda: np.zeros(substeps))
+
+        # Run each model over all indices
+        for _ in range(runs):
+            # Create a randomized set of indices to use
+            indices = np.random.randint(0, length, size=length)
+            # Reset the network weights to "create" an untrained model
             model = reset_parameters(model)
-
-            # For each subset of data
-            for i, substep in enumerate(self._ranges):
+            # Run the model with each substep of data
+            for iteration, substep in enumerate(ranges):
                 # We warm start on new data
-                b_inds = inds[:substep]
+                subset = Subset(train_ds, indices[:substep])
 
-                self._outputs[i, j] = self._run_subset(
+                output = self._run_subset(
                     model,
-                    Subset(train_ds, b_inds),
+                    subset,
                     test_ds,
                     batch_size,
                     train_kwargs,
                     eval_kwargs,
                 )
+                # Keep track of each measures values
+                for name, value in output.items():
+                    # Sum result into current substep iteration to be averaged later
+                    metric_outputs[name][iteration] += value
 
-        n_i = self._ranges
-        p_i = 1 - np.mean(self._outputs, axis=1)
+        # The mean for each measure must be calculated before being returned
+        mean_output = {name: 1 - (v / runs) for name, v in metric_outputs.items()}
+        s = SufficiencyOutput(measures=mean_output, steps=ranges)
 
-        params = calc_params(p_i=p_i, n_i=n_i)
-
-        self._output_dict = {
-            "metric": self._outputs,
-            "params": params,
-            "n_i": n_i,
-            "p_i": p_i,
-            "geomshape": self._geomshape,
-        }
-
-        return self._output_dict
+        return s
 
     def _run_subset(
         self,
@@ -216,82 +228,65 @@ class Sufficiency:
         train_data: Dataset,
         eval_data: Dataset,
         batch_size: int,
-        train_kwargs,
-        eval_kwargs,
-    ):
+        train_kwargs: Dict,
+        eval_kwargs: Dict,
+    ) -> Dict[str, float]:
+        """Trains and evaluates model using custom functions"""
         train_loader = DataLoader(train_data, batch_size=batch_size)
         self._train(model, train_loader, train_kwargs)
         test_loader = DataLoader(eval_data, batch_size=batch_size)
         return self._eval(model, test_loader, eval_kwargs)
 
-    def plot(self, output_dict: Dict[str, Any]):
+    def plot(self, data: SufficiencyOutput) -> List[Figure]:
         """Plotting function for data sufficiency tasks
 
         Parameters
         ----------
-        params : np.ndarray
-            The parameters used to calculate the line of best fit
-        output_dict : Dict[str, Any]
-            Output of sufficiency run
+        data : SufficiencyOutput
+            Dataclass containing the average of each measure per substep
+
+        Returns
+        -------
+        List[plt.Figure]
+            List of Figures for each measure
 
         """
-        # Retrieve only relevant values in dictionary
-        params = output_dict.get("params", None)
-        n_i = output_dict.get("n_i", None)
-        p_i = output_dict.get("p_i", None)
-        geomshape = output_dict.get("geomshape", None)
+        # X, y data
+        X = data.steps
+        measures: Dict[str, np.ndarray] = data.measures
 
-        # Ensure all values were retrieved correctly
-        if params is None:
-            raise KeyError("params not found in output_dict")
-        if n_i is None:
-            raise KeyError("n_i not found in output_dict")
-        if p_i is None:
-            raise KeyError("p_i not found in output_dict")
-        if geomshape is None:
-            raise KeyError("geomshape not found in output_dict")
+        # Extrapolation parameters
+        last_X = X[-1]
+        geomshape = (0.01 * last_X, last_X * 4, len(X))
+        extrapolated = np.geomspace(*geomshape).astype(np.int64)
 
-        # Setup 1 plt figure
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.set_title("Accuracy vs Number of Images")
-        ax.set_xlabel("Number of images")
-        ax.set_ylabel("Accuracy")  # TODO: Possibly infer name based on given metric?
-        ax.set_ylim(0, 1)
+        # Stores all plots
+        plots = []
 
-        # Plot model results
-        ax.scatter(n_i, 1 - p_i, label="Model Results", s=15, c="black")
+        # Create a plot for each measure on one figure
+        for measure, values in measures.items():
+            fig = plt.figure()
+            fig = cast(Figure, fig)
+            fig.tight_layout()
 
-        # Plot line of best fit with extrapolation
-        extrapolated = np.geomspace(
-            geomshape[0], geomshape[1] * 4, geomshape[2]
-        ).astype(np.int64)
-        ax.plot(
-            extrapolated,
-            1 - f_out(extrapolated, params),
-            linestyle="dashed",
-            label="Potential Model Results",
-        )
+            ax = fig.add_subplot(111)
 
-        ax.legend()
-        # Save figure
-        path = Path("Sufficiency Plot")
-        self.save_fig(fig, path)  # type: ignore
+            ax.set_title(f"{measure} Sufficiency")
+            ax.set_ylabel(f"{measure}")
+            ax.set_xlabel("Steps")
 
-    @staticmethod
-    def save_fig(fig: Figure, path: Path):
-        """
-        Saves a `plt.figure` at a given path
+            # Plot measure over each step
+            ax.scatter(X, 1 - values, label="Model Results", s=15, c="black")
 
-        Parameters
-        ---------
-        fig : plt.figure
-            Figure to be saved to png
-        path : Path
-            Location to save the figure
-        Note
-        ----
-        A directory will be created if it does not exist
-        """
-        # TODO: Add folder creation, checking, and path handling
-        fig.savefig(path)  # type: ignore
+            # Plot extrapolation
+            params = calc_params(p_i=values, n_i=X)
+            ax.plot(
+                extrapolated,
+                1 - f_out(extrapolated, params),
+                linestyle="dashed",
+                label="Potential Model Results",
+            )
+            ax.legend()
+            plots.append(fig)
+
+        return plots

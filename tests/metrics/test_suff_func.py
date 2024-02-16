@@ -1,3 +1,5 @@
+from typing import Dict
+
 import numpy as np
 import numpy.testing as npt
 import torch
@@ -59,7 +61,7 @@ def custom_train(model: nn.Module, dl: DataLoader):
         optimizer.step()
 
 
-def custom_eval(model: nn.Module, dataloader) -> float:
+def custom_eval(model: nn.Module, dataloader) -> Dict[str, float]:
     """
     Evaluate a model on a single pass with a given metric
 
@@ -87,7 +89,7 @@ def custom_eval(model: nn.Module, dataloader) -> float:
         with torch.no_grad():
             preds = model(X)
             result = metric(preds, y)
-    return result
+    return {"Accuracy": result}
 
 
 # @pytest.mark.functional
@@ -104,35 +106,17 @@ class TestSufficiencyFunctional:
         suff.set_eval_func(custom_eval)
         # Create data indices for training
         m_count = 1
-        num_steps = 3
-        suff.setup(length, m_count, num_steps)
+        steps = 3
         # Train & test model
-        output = suff.run(model, train_ds, test_ds)
-
-        # Loose params testing. TODO -> Find way to make tighter
-        params = output["params"]
-        assert params[0] >= 0.0
-        assert params[1] >= 0.0
-        assert params[2] >= 0.0
-
-        params = output["params"]
-        assert len(params) == 3
+        output = suff.run(model, train_ds, test_ds, m_count, steps)
 
         # Accuracy should be bounded
-        accuracy = output["metric"]
+        accuracy = output.measures["Accuracy"]
         assert np.all(0 <= accuracy)
         assert np.all(accuracy <= 1)
+        assert len(accuracy) == 3
 
         # Geomshape should calculate deterministically
-        geomshape = output["geomshape"]
-        geomshape_answer = (0.01 * length, length, num_steps)
-        assert geomshape == geomshape_answer
-
-        # n_i test
-        n_i = output["n_i"]
-        print(*geomshape)
-        npt.assert_array_equal(n_i, np.geomspace(*geomshape).astype(np.int64))
-
-        # p_i test
-        p_i = output["p_i"]
-        npt.assert_array_equal(p_i, 1 - np.mean(accuracy, axis=1))
+        geomshape = output.steps
+        geomshape_answer = np.geomspace(0.01 * length, length, steps).astype(np.int64)
+        npt.assert_array_equal(geomshape, geomshape_answer)
