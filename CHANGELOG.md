@@ -1,7 +1,8 @@
-[//]: # (b48c05ca98c9bf08f486557bfec3f5490714106e)
+[//]: # (a28a5d75c06d3a641529bfe049e6530ec2735a2d)
 
 # DAML Change Log
-## Pending Release
+## v0.42.1
+## v0.42.0
 - ```b48c05ca - Release v0.42.0```
 ## v0.42.0
 - ```5dacc855 - Update dependencies and use optional installs```
