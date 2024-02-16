@@ -4,7 +4,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 project = "DAML"
-copyright = "2023, ARiA"
+copyright = "2024, ARiA"
 author = "ARiA"
 
 site_url = "https://github.com/aria-ml/daml/"
