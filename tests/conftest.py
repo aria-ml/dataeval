@@ -3,11 +3,6 @@ from typing import Literal, Optional, Tuple
 import numpy as np
 import pytest
 
-try:
-    from torch.nn import Module
-except ImportError:
-    pass
-
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -48,18 +43,3 @@ def mnist():
         return images, labels
 
     return _method
-
-
-@pytest.fixture
-def mock_net():
-    class MockNet(Module):  # type: ignore
-        def __init__(self) -> None:
-            super().__init__()
-
-        def encode(self, x):
-            return x
-
-        def forward(self, x):
-            pass
-
-    return MockNet()
