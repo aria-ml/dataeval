@@ -1,16 +1,14 @@
 workflow:
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == 'main'
       changes:
         - "CHANGELOG.md"
       when: never
     - if: $CI_COMMIT_TAG
       when: never
-    - if: $DAML_NIGHTLY
-    - if: $DAML_RELEASE
     - if: $CI_PIPELINE_SOURCE == 'web'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == 'main' || $CI_COMMIT_BRANCH == 'develop'
 
 default:
   tags:
@@ -21,30 +19,15 @@ stages:
   - test
   - release
 
-.on_nightly:
-  rules:
-    - if: $DAML_NIGHTLY
-      when: on_success
-    - when: never
-
-.on_default:
-  rules:
-    - if: $DAML_NIGHTLY
-      when: never
-    - when: on_success
-
 .on_release:
   stage: release
   environment:
     name: production
   rules:
-    - if: $DAML_NIGHTLY
-      when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH == 'main'
       changes:
         - src/**/*
         - pyproject.toml
-    - if: $DAML_RELEASE
 
 .docker_harbor_required:
   image: docker:24.0-git
@@ -99,22 +82,7 @@ build image:
     - ./build --build-only --push --verbose ${PYTHON_VERSION}
   allow_failure: true
 
-# generate shipped dependencies:
-#   stage: build
-#   before_script:
-#     - pip install poetry
-#     - poetry check
-#     - poetry self add poetry-lock-groups-plugin
-#   script:
-#     - poetry lock --without dev --without docs --without jatic
-#   artifacts:
-#     paths:
-#       - poetry.lock
-#   rules:
-#     - if: $CI_COMMIT_REF_PROTECTED == "true"
-
 linting:
-  extends: .on_default
   needs: []
   before_script:
     - pip install poetry
@@ -131,7 +99,7 @@ linting:
     matrix:
       - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
   script:
-    - ./build ${PYTHON_VERSION} ${TASK} || TESTFAILED=1
+    - ./build ${PYTHON_VERSION} ${TASK} ${ARGS} || TESTFAILED=1
     - if [[ $TESTFAILED ]]; then echo "=========== ${TASK} FAILED ==========="; EXITCODE=1; fi
     - ./build ${PYTHON_VERSION} type || TYPEFAILED=1
     - if [[ $TYPEFAILED ]]; then echo "=========== type FAILED ==========="; EXITCODE=1; fi
@@ -142,32 +110,35 @@ linting:
     paths:
       - output/*
 
-# .test:
-#   extends: .docker_harbor_optional
-#   stage: test
-#   needs: [build image]
-#   parallel:
-#     matrix:
-#       - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
-#   script:
-#     - ./build ${PYTHON_VERSION} ${TASK}
-#   artifacts:
-#     reports:
-#       junit: output/junit.${TASK}.${PYTHON_VERSION}.xml
-#     paths:
-#       - output/junit.${TASK}.${PYTHON_VERSION}.xml
-#       - output/.coverage.${TASK}.${PYTHON_VERSION}
-#       - output/htmlcov.${TASK}.${PYTHON_VERSION}
-
 test:
-  extends: [.test, .on_default]
+  extends: [.test]
   variables:
     TASK: unit
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
+      when: never
+    - when: on_success
 
 functional:
-  extends: [.test, .on_nightly]
+  extends: [.test]
+  tags: [GPU]
   variables:
     TASK: func
+    ARGS: --gpu
+  rules:
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
+      when: on_success
+    - when: never
+
+lite:
+  stage: test
+  image: python:$PYTHON_VERSION
+  needs: []
+  parallel:
+    matrix:
+      - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
+  script:
+    - ./run lite
 
 coverage:
   stage: test
@@ -197,17 +168,8 @@ coverage:
       - coverage.xml
       - htmlcov/
 
-# typecheck:
-#   extends: [.docker_harbor_optional, .on_default]
-#   needs: [build image]
-#   parallel:
-#     matrix:
-#       - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
-#   script:
-#     - ./build ${PYTHON_VERSION} type
-
 docs:
-  extends: [.docker_harbor_optional, .on_default]
+  extends: [.docker_harbor_optional]
   needs: [build image]
   stage: test
   tags: [GPU]
@@ -238,7 +200,7 @@ tag:
   before_script:
     - apk add --no-cache curl perl bash
   script:
-    - ./.gitlab/auto_tag.sh
+    - ./.gitlab/auto_tag.sh --post
 
 publish:
   extends: .on_release
@@ -265,6 +227,8 @@ secret_detection:
   needs: []
   rules:
     - if: $CI_COMMIT_REF_PROTECTED == "true"
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
+    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'develop'
 
 # gemnasium-python-dependency_scanning:
 #   needs:
@@ -283,3 +247,43 @@ secret_detection:
 #   needs: []
 #   rules:
 #     - if: $CI_COMMIT_REF_PROTECTED == "true"
+
+# generate shipped dependencies:
+#   stage: build
+#   before_script:
+#     - pip install poetry
+#     - poetry check
+#     - poetry self add poetry-lock-groups-plugin
+#   script:
+#     - poetry lock --without dev --without docs --without jatic
+#   artifacts:
+#     paths:
+#       - poetry.lock
+#   rules:
+#     - if: $CI_COMMIT_REF_PROTECTED == "true"
+
+# .test:
+#   extends: .docker_harbor_optional
+#   stage: test
+#   needs: [build image]
+#   parallel:
+#     matrix:
+#       - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
+#   script:
+#     - ./build ${PYTHON_VERSION} ${TASK}
+#   artifacts:
+#     reports:
+#       junit: output/junit.${TASK}.${PYTHON_VERSION}.xml
+#     paths:
+#       - output/junit.${TASK}.${PYTHON_VERSION}.xml
+#       - output/.coverage.${TASK}.${PYTHON_VERSION}
+#       - output/htmlcov.${TASK}.${PYTHON_VERSION}
+
+# typecheck:
+#   extends: [.docker_harbor_optional]
+#   needs: [build image]
+#   parallel:
+#     matrix:
+#       - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
+#   script:
+#     - ./build ${PYTHON_VERSION} type

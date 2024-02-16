@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import torch
 
-from daml._internal.metrics.aria.utils import (
+from daml._internal.models.pytorch.utils import (
     numpy_to_pytorch,
     permute_to_numpy,
     permute_to_torch,

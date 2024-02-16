@@ -55,5 +55,7 @@ def setup(app):
             "daml.metrics.ber",
             "daml.metrics.divergence",
             "daml.metrics.outlier_detection",
+            "daml.metrics.sufficiency",
+            "daml.metrics.uap",
         ]
     )

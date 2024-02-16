@@ -5,7 +5,6 @@ it with an object that throws an error on use. This way we avoid errors at impor
 functionality independent of the missing dependency.
 """
 
-
 from importlib import import_module
 from string import Template
 from typing import Any, List, Optional, Union

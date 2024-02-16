@@ -1,15 +1,10 @@
-DAML API
-++++++++
+Reference
++++++++++
 
 .. toctree::
    :hidden:
 
-   api/ber
-   api/divergence
-   api/outlier-detection
-
-API
----
+   reference/api
 
 .. autosummary::
 
@@ -25,16 +20,8 @@ API
    daml.metrics.outlier_detection.OD_VAE
    daml.metrics.outlier_detection.OD_VAEGMM
    daml.metrics.outlier_detection.OutlierDetectorOutput
-
-Enums and Types
----------------
-
-.. autoclass:: daml.metrics.outlier_detection.Threshold()
-   :members:                                        
-   :undoc-members:                                  
-   :member-order: bysource
-
-.. autoclass:: daml.metrics.outlier_detection.ThresholdType()
-   :members:                                        
-   :undoc-members:                                  
-   :member-order: bysource
+   daml.metrics.outlier_detection.Threshold
+   daml.metrics.outlier_detection.ThresholdType
+   daml.metrics.sufficiency.Sufficiency
+   daml.metrics.uap.UAP_EMP
+   daml.metrics.uap.UAPOutput
