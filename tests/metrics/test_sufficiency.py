@@ -15,6 +15,17 @@ np.random.seed(0)
 torch.manual_seed(0)
 
 
+class MockNet(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def encode(self, x):
+        return x
+
+    def forward(self, x):
+        pass
+
+
 def load_cls_dataset() -> Tuple[DamlDataset, DamlDataset]:
     images = np.ones(shape=(1, 32, 32, 3))
     labels = np.ones(shape=(1, 1))
@@ -147,7 +158,7 @@ class TestSufficiency:
         with pytest.raises(TypeError):
             suff._eval(model, test_ds, {})
 
-    def test_train_kwargs(self, mock_net) -> None:
+    def test_train_kwargs(self) -> None:
         """Tests correct kwarg handling"""
 
         def train_task_cls_kwargs(model: nn.Module, dl: DataLoader, num: int) -> None:
@@ -162,9 +173,9 @@ class TestSufficiency:
         dl = DataLoader(train_ds)
 
         kwargs = {"num": 1}
-        suff._train(mock_net, dataloader=dl, kwargs=kwargs)
+        suff._train(MockNet(), dataloader=dl, kwargs=kwargs)
 
-    def test_eval_kwargs(self, mock_net) -> None:
+    def test_eval_kwargs(self) -> None:
         """Tests kwarg handling"""
 
         def eval_kwargs(model: nn.Module, dl: DataLoader, num: int):
@@ -181,7 +192,7 @@ class TestSufficiency:
         dl = DataLoader(test_ds)
 
         kwargs = {"num": 100}
-        result = suff._eval(mock_net, dataloader=dl, kwargs=kwargs)
+        result = suff._eval(MockNet(), dataloader=dl, kwargs=kwargs)
         assert isinstance(result, Dict)
         assert result["test"] == kwargs["num"]
 
@@ -218,7 +229,7 @@ class TestSufficiency:
 
 
 class TestSufficiencyCls:
-    def test_train(self, mock_net) -> None:
+    def test_train(self) -> None:
         def train_task_cls(model: nn.Module, dl: DataLoader):
             # Extract first batch in dataloader
             batch = next(iter(dl))
@@ -236,9 +247,9 @@ class TestSufficiencyCls:
         suff.set_training_func(train_task_cls)
 
         trainloader = DataLoader(train_ds)
-        suff._train(mock_net, trainloader, {})
+        suff._train(MockNet(), trainloader, {})
 
-    def test_eval_result(self, mock_net) -> None:
+    def test_eval_result(self) -> None:
         _, test_ds = load_cls_dataset()
 
         # Instantiate sufficiency metric
@@ -247,7 +258,7 @@ class TestSufficiencyCls:
         suff.set_eval_func(eval_100)
 
         testloader = DataLoader(test_ds)
-        result = suff._eval(mock_net, testloader, {})
+        result = suff._eval(MockNet(), testloader, {})
 
         # Result is a number (int, float) not Iterable, str, etc
         assert isinstance(result, Dict)
@@ -255,7 +266,7 @@ class TestSufficiencyCls:
 
 # Can be combined with classification using parameterize, not sure if worth
 class TestSufficiencyOD:
-    def test_train(self, mock_net) -> None:
+    def test_train(self) -> None:
         def train_task_od(model: nn.Module, dl: DataLoader):
             # Extract first batch from dataloader
             batch = next(iter(dl))
@@ -276,9 +287,9 @@ class TestSufficiencyOD:
         suff.set_training_func(train_task_od)
 
         trainloader = DataLoader(train_ds)
-        suff._train(mock_net, trainloader, {})
+        suff._train(MockNet(), trainloader, {})
 
-    def test_eval_result(self, mock_net) -> None:
+    def test_eval_result(self) -> None:
         _, test_ds = load_od_dataset()
 
         # Instantiate sufficiency metric
@@ -287,7 +298,7 @@ class TestSufficiencyOD:
         suff.set_eval_func(eval_100)
 
         testloader = DataLoader(test_ds)
-        result = suff._eval(mock_net, testloader, {})
+        result = suff._eval(MockNet(), testloader, {})
 
         # Result is a number (int, float) not Iterable, str, etc
         assert isinstance(result, Dict)
