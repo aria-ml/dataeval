@@ -8,8 +8,8 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any, Optional, Tuple
 
+import keras
 import numpy as np
-import tensorflow as tf
 
 from daml._internal.metrics.outputs import OutlierDetectorOutput
 from daml._internal.metrics.types import Threshold, ThresholdType
@@ -117,7 +117,7 @@ class _AlibiDetectMetric(ABC):
         ----
         The supplied dataset should contain no outliers for maximum benefit
         """
-        tf.keras.backend.clear_session()
+        keras.backend.clear_session()
         if self.detector is None:
             self._input_shape = images[0].shape
             model = create_model(type(self).__name__, self._input_shape)

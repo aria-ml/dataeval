@@ -8,6 +8,7 @@ Usage:
 Tasks:
   unit    run unit tests
   func    run functional tests
+  lite    run lite install tests
   type    run typecheck
   lint    run static code analysis
   docs    generate documentation
@@ -16,38 +17,49 @@ exit $1
 }
 
 if [ ! -f /.dockerenv ]; then
-    echo "Docker container not found. Check to see if you are running in a container."
-    exit 1
+    echo "Docker container not found. Ensure requirements have been installed."
+    echo
 fi
 
-declare -A supported_tasks=([unit]=1 [func]=1 [type]=1 [lint]=1 [docs]=1)
+declare -A supported_tasks=([unit]=1 [func]=1 [lite]=1 [type]=1 [lint]=1 [docs]=1)
 
 # validate args
 if (( $# != 1 )); then echo Too many parameters; showHelp 1; fi
 if [[ ! ${supported_tasks[$1]} ]]; then echo Invalid task; showHelp 1; fi
 
 pver=$(python --version | cut -d' ' -f2 | cut -d'.' -f1-2)
-func=""
 case $1 in
-    "func") func="--runfunctional";&
-    "unit") poetry install --only jatic
-            if [[ -z $CI ]]; then export CUDA_VISIBLE_DEVICES=-1; fi # disable GPU for local test runs - comment out this line to enable
-            coverage run --data-file=output/.coverage.$1.$pver --source=daml --branch -m pytest $func --junitxml=output/junit.$1.$pver.xml --verbose --durations=0 --pythonwarnings ignore::DeprecationWarning
-            coverage report --data-file=output/.coverage.$1.$pver
-            coverage xml --data-file=output/.coverage.$1.$pver --skip-empty -o output/coverage.$1.$pver.xml
-            coverage html --data-file=output/.coverage.$1.$pver --skip-empty -d output/htmlcov.$1.$pver
-            ;;
-    "type") pyright src/ tests/
-            pyright --ignoreexternal --verifytypes daml
-            ;;
-    "lint") black --check --diff .
-            flake8
-            isort --check --diff .
-            codespell
-            ;;
-    "docs") poetry install --only jatic
-            export TF_CPP_MIN_LOG_LEVEL=3
-            export PYDEVD_DISABLE_FILE_VALIDATION=1
-            sphinx-build -M html docs output/docs -j 4
-            ;;
+    "unit"|"func")
+        if [ "$1" == "unit" ]; then export CUDA_VISIBLE_DEVICES=-1; fi
+        if [ "$1" == "func" ]; then args="--runfunctional"; fi
+        poetry --quiet run coverage run --data-file=output/.coverage.$1.$pver --source=daml --branch -m pytest $args --junitxml=output/junit.$1.$pver.xml --verbose --durations=0 --pythonwarnings ignore::DeprecationWarning
+        poetry --quiet run coverage report --data-file=output/.coverage.$1.$pver
+        poetry --quiet run coverage xml --data-file=output/.coverage.$1.$pver --skip-empty -o output/coverage.$1.$pver.xml
+        poetry --quiet run coverage html --data-file=output/.coverage.$1.$pver --skip-empty -d output/htmlcov.$1.$pver
+        ;;
+    "lite")
+        pip install poetry virtualenv pytest
+        python -m virtualenv .venv-lite
+        source .venv-lite/bin/activate
+        poetry install
+        pip install pytest
+        pytest --verbose --pythonwarnings ignore::DeprecationWarning tests/metrics/test_ber.py tests/metrics/test_divergence.py tests/metrics/test_uap.py
+        rm -rf .venv-lite
+        ;;
+    "type")
+        poetry --quiet run pyright src/ tests/
+        poetry --quiet run pyright --ignoreexternal --verifytypes daml
+        ;;
+    "lint")
+        poetry --quiet run black --check --diff .
+        poetry --quiet run flake8
+        poetry --quiet run isort --check --diff .
+        poetry --quiet run codespell
+        ;;
+    "docs")
+        if [[ $pver == 3.8 ]]; then echo "Generating docs is not supported in python 3.8"; exit 1; fi
+        export TF_CPP_MIN_LOG_LEVEL=3
+        export PYDEVD_DISABLE_FILE_VALIDATION=1
+        poetry --quiet run sphinx-build -M html docs output/docs -j 4
+        ;;
 esac
