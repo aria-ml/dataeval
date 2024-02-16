@@ -1,6 +1,7 @@
 """
 Defining types compatible with different Python versions and defining custom types.
 """
+
 from typing import Optional, Type, Union
 
 from sklearn.base import (  # import here (instead of later) since sklearn currently a core dep

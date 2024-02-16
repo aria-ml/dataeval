@@ -6,12 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from daml._internal.metrics.aria.sufficiency import (
-    calc_params,
-    create_data_indices,
-    f_out,
-    reset_parameters,
-)
+from daml._internal.metrics.aria.sufficiency import calc_params, f_out, reset_parameters
 
 np.random.seed(0)
 torch.manual_seed(0)
@@ -98,14 +93,6 @@ class TestSufficiencyUtils:
         output = calc_params(p_i, n_i)
 
         npt.assert_almost_equal(output, answer, decimal=5)
-
-    def test_create_data_indices(self):
-        N = 5
-        M = 100
-
-        output = create_data_indices(N, M)
-
-        assert output.shape == (N, M)
 
     def test_reset_parameters(self):
         """

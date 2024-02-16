@@ -57,7 +57,7 @@ ARG python_version
 RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/pip install --no-cache-dir --disable-pip-version-check poetry
 RUN touch README.md
 COPY --chown=daml:daml pyproject.toml poetry.lock ./
-RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/poetry install --no-cache --no-root
+RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/poetry install --no-cache --no-root --all-extras
 
 
 FROM scratch as pydeps
@@ -97,7 +97,7 @@ FROM build as versioned
 RUN touch README.md
 COPY --chown=daml:daml pyproject.toml poetry.lock ./
 COPY --chown=daml:daml src/ src/
-RUN poetry install --no-cache --with dev --with docs
+RUN poetry install --no-cache --all-extras --with dev --with docs
 
 
 FROM versioned as run
