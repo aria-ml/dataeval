@@ -1,7 +1,15 @@
-[//]: # (e8e906d7bcb51860d6c5b2d45ba7d6e83a930cec)
+[//]: # (b48c05ca98c9bf08f486557bfec3f5490714106e)
 
 # DAML Change Log
 ## Pending Release
+- ```b48c05ca - Release v0.42.0```
+## v0.42.0
+- ```5dacc855 - Update dependencies and use optional installs```
+- ```a6ce3e72 - Remove UAP_MST metric```
+- ```601cfae8 - Sufficiency Plotting of Multiple Metrics during one run```
+- ```b46dba6e - Documentation and README.md improvements```
+- ```f5172c60 - MR for discussion```
+- ```3d68a6f1 - Add parameter to plot function for optional file output```
 - ```e8e906d7 - Restructure src and tests to match current design```
 ## v0.40.2
 - ```f3eddaed - Flavor 2 - Remove models from metrics entirely```
