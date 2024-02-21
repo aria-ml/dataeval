@@ -1,30 +1,17 @@
-"""
-This module contains implementations of Image Outlier Detection methods
-created by Alibi Detect
-"""
-
 import math
 from abc import ABC, abstractmethod
-from enum import Enum
 from typing import Any, Optional, Tuple
 
 import keras
 import numpy as np
 
+from daml import _alibi_detect
 from daml._internal.metrics.outputs import OutlierDetectorOutput
-from daml._internal.metrics.types import Threshold, ThresholdType
+from daml._internal.metrics.types import OutlierType, Threshold, ThresholdType
 from daml._internal.models.tensorflow.alibi import create_model
 
 
-class AlibiDetectOutlierType(str, Enum):
-    INSTANCE = "instance"
-    FEATURE = "feature"
-
-    def __str__(self) -> str:
-        return str.__str__(self)  # pragma: no cover
-
-
-class _AlibiDetectMetric(ABC):
+class OD_Base(ABC):
     """
     Base class for all outlier detection metrics in alibi-detect
 
@@ -280,3 +267,203 @@ class _AlibiDetectMetric(ABC):
         )
 
         return output
+
+
+class OD_AE(OD_Base):
+    """
+    Autoencoder-based outlier detector, using `alibi-detect ae. <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/ae.html>`_
+
+    The model used by this class is :py:class:`daml.models.AE`
+    """  # noqa E501
+
+    def __init__(self):
+        super().__init__(
+            alibi_detect_class=_alibi_detect.od.OutlierAE,
+            model_param_name="ae",
+            flatten_dataset=False,
+            dataset_type=None,
+        )
+
+    def set_prediction_args(
+        self,
+        outlier_type: Optional[OutlierType] = None,
+        outlier_perc: Optional[float] = None,
+        return_feature_score: Optional[bool] = None,
+        return_instance_score: Optional[bool] = None,
+        batch_size: Optional[int] = None,
+    ) -> None:
+        """
+        Sets additional arguments to be used during prediction.
+
+        Note
+        ----
+        Visit `alibi-detect ae <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/ae.html#Detect>`_ for additional information on prediction parameters.
+        """  # noqa E501
+        self._update_kwargs_with_locals(self._predict_kwargs, **locals())
+
+    @property
+    def _default_predict_kwargs(self) -> dict:
+        return {
+            "outlier_type": OutlierType.INSTANCE,
+            "outlier_perc": 75,
+            "return_feature_score": True,
+            "return_instance_score": True,
+            "batch_size": 64,
+        }
+
+
+class OD_AEGMM(OD_Base):
+    """
+    Gaussian Mixture Model Autoencoder-based outlier detector,
+    using alibi-detect aegmm. `<https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/aegmm.html>`_
+
+
+    The model used by this class is :py:class:`daml.models.AEGMM`
+    """  # noqa E501
+
+    def __init__(self):
+        super().__init__(
+            alibi_detect_class=_alibi_detect.od.OutlierAEGMM,
+            model_param_name="aegmm",
+            flatten_dataset=True,
+            dataset_type=np.float32,
+        )
+
+    def set_prediction_args(
+        self,
+        return_instance_score: Optional[bool] = None,
+    ) -> None:
+        """
+        Sets additional arguments to be used during prediction.
+
+        Note
+        ----
+        Visit `alibi-detect aegmm <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/aegmm.html#Detect>`_ for additional information on prediction parameters.
+        """  # noqa E501
+        self._update_kwargs_with_locals(self._predict_kwargs, **locals())
+
+    @property
+    def _default_predict_kwargs(self) -> dict:
+        return {
+            "return_instance_score": True,
+            "batch_size": 64,
+        }
+
+
+class OD_LLR(OD_Base):
+    """
+    Log likelihood Ratio (LLR) outlier detector,
+    using `alibi-detect llr. <https://docs.seldon.io/projects/alibi-detect/en/latest/examples/od_llr_mnist.html>`_
+
+
+    The model used by this class is :py:class:`daml.models.LLR`
+    """  # noqa E501
+
+    def __init__(self):
+        super().__init__(
+            alibi_detect_class=_alibi_detect.od.LLR,
+            model_param_name="model",
+            flatten_dataset=False,
+            dataset_type=np.float32,
+        )
+
+    def set_prediction_args(
+        self,
+        outlier_type: Optional[OutlierType] = None,
+        return_instance_score: Optional[bool] = None,
+    ) -> None:
+        """
+        Sets additional arguments to be used during prediction.
+
+        Note
+        ----
+        Visit `alibi-detect llr <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/llr.html#Detect>`_ for additional information on prediction parameters.
+        """  # noqa E501
+        self._update_kwargs_with_locals(self._predict_kwargs, **locals())
+
+    @property
+    def _default_predict_kwargs(self) -> dict:
+        return {
+            "outlier_type": OutlierType.INSTANCE,
+            "return_instance_score": True,
+            "batch_size": 64,
+        }
+
+
+class OD_VAE(OD_Base):
+    """
+    Variational Autoencoder-based outlier detector,
+    using `alibi-detect vae. <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/vae.html>`_
+
+    The model used by this class is :py:class:`daml.models.VAE`
+    """  # noqa E501
+
+    def __init__(self):
+        super().__init__(
+            alibi_detect_class=_alibi_detect.od.OutlierVAE,
+            model_param_name="vae",
+            flatten_dataset=False,
+            dataset_type=None,
+        )
+
+    def set_prediction_args(
+        self,
+        outlier_type: Optional[OutlierType] = None,
+        outlier_perc: Optional[float] = None,
+        return_feature_score: Optional[bool] = None,
+        return_instance_score: Optional[bool] = None,
+        batch_size: Optional[int] = None,
+    ) -> None:
+        """
+        Sets additional arguments to be used during prediction.
+
+        Note
+        ----
+        Visit `alibi-detect vae <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/vae.html#Detect>`_ for additional information on prediction parameters.
+        """  # noqa E501
+        self._update_kwargs_with_locals(self._predict_kwargs, **locals())
+
+    @property
+    def _default_predict_kwargs(self) -> dict:
+        return {
+            "outlier_type": OutlierType.INSTANCE,
+            "outlier_perc": 75,
+            "return_feature_score": True,
+            "return_instance_score": True,
+            "batch_size": 64,
+        }
+
+
+class OD_VAEGMM(OD_Base):
+    """
+    Variational Gaussian Mixture Model Autoencoder-based outlier detector,
+    using `alibi-detect vaegmm. <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/vaegmm.html>`_
+
+
+    The model used by this class is :py:class:`daml.models.VAEGMM`
+    """  # noqa E501
+
+    def __init__(self):
+        super().__init__(
+            alibi_detect_class=_alibi_detect.od.OutlierVAEGMM,
+            model_param_name="vaegmm",
+            flatten_dataset=True,
+            dataset_type=np.float32,
+        )
+
+    def set_prediction_args(
+        self,
+        return_instance_score: Optional[bool] = None,
+    ) -> None:
+        """
+        Sets additional arguments to be used during prediction.
+
+        Note
+        ----
+        Visit `alibi-detect vaegmm <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/vaegmm.html#Detect>`_ for additional information on prediction parameters.
+        """  # noqa E501
+        self._update_kwargs_with_locals(self._predict_kwargs, **locals())
+
+    @property
+    def _default_predict_kwargs(self) -> dict:
+        return {"return_instance_score": True, "batch_size": 64}
