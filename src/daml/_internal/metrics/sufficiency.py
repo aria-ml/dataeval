@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from matplotlib.figure import Figure
-from scipy.optimize import minimize
+from scipy.optimize import basinhopping
 from torch.utils.data import DataLoader, Dataset, Subset
 
 from daml._internal.metrics.outputs import SufficiencyOutput
@@ -33,7 +33,9 @@ def f_out(n_i: np.ndarray, x: np.ndarray) -> np.ndarray:
 
 def calc_params(p_i: np.ndarray, n_i: np.ndarray) -> np.ndarray:
     """
-    Retrieves the inverse power curve coefficients for the line of best fit
+    Retrieves the inverse power curve coefficients for the line of best fit.
+    Global minimization is done via basin hopping. More info on this algorithm
+    can be found here: https://arxiv.org/abs/cond-mat/9803344 .
 
     Parameters
     ----------
@@ -49,12 +51,10 @@ def calc_params(p_i: np.ndarray, n_i: np.ndarray) -> np.ndarray:
     """
 
     def f(x):
-        inner = np.square(p_i - x[0] * n_i ** (-x[1]) - x[2])
-        return np.sum(inner)
+        inner = np.sum(np.square(p_i - x[0] * n_i ** (-x[1]) - x[2]))
+        return inner
 
-    res = minimize(
-        f, np.array([0.5, 0.5, 0.1]), bounds=((0, None), (0, None), (0, None))
-    )
+    res = basinhopping(f, np.array([0.5, 0.5, 0.1]))
     return res.x
 
 
