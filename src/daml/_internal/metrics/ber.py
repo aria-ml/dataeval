@@ -13,13 +13,13 @@ from typing import Tuple
 import numpy as np
 from scipy.sparse import coo_matrix
 
-from daml._internal.metrics.aria.base import _BaseMetric
+from daml._internal.metrics.base import BaseMetric
 from daml._internal.metrics.outputs import BEROutput
 
 from .utils import compute_neighbors, get_classes_counts, minimum_spanning_tree
 
 
-class _MultiClassBer(_BaseMetric):
+class _MultiClassBer(BaseMetric):
     def __init__(self, data: np.ndarray, labels: np.ndarray) -> None:
         self.data = data
         self.labels = labels
