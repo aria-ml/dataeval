@@ -1,63 +1,143 @@
-from typing import Optional, Union
+from typing import Any, Union
 
 import torch
 import torch.nn as nn
 from torch.optim import Adam
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 
 torch.manual_seed(0)
 
 
-class AERunner:
-    def __init__(self, model: nn.Module, device: Union[str, torch.device] = "cpu"):
-        self._model = model
-        self._device = device
-
-        self._model.to(self._device)
-
-    def encode(self, x) -> torch.Tensor:
-        with torch.no_grad():
-            if getattr(self._model, "encode", None) is not None:
-                return self._model.encode(x)
-            else:  # Call model.forward() if no encode function
-                return self._model(x)
-
-    def __call__(self, x):
-        with torch.no_grad():
-            x = self._model(x)
-        return x
+def get_images_from_batch(batch: Any) -> Any:
+    """Extracts images from a batch of collated data by DataLoader"""
+    if isinstance(batch, (list, tuple)):
+        imgs = batch[0]
+    else:
+        imgs = batch
+    return imgs
 
 
-class AETrainer(AERunner):
+class AETrainer:
     def __init__(
         self,
-        model: Optional[nn.Module] = None,
-        channels: Optional[int] = None,
+        model: nn.Module,
         device: Union[str, torch.device] = "cpu",
+        batch_size: int = 8,
     ):
-        # Channel check only if no model given
-        if model is None:
-            if channels is None:
-                raise TypeError("Channels must be set for default model")
-            _model = AriaAutoencoder(channels)
-        else:
-            _model = model
-        super().__init__(_model, device=device)
+        """
+        model : nn.Module
+            Model to be trained
+        device : str | torch.device, default "cpu"
+            Hardware device for model, optimizer, and data to run on
+        batch_size : int, default 8
+            Number of images to group together in `torch.utils.data.DataLoader`
+        """
 
-    def train(self, dataset, epochs: int = 100, batch_size=8):
-        dl = DataLoader(dataset, batch_size=batch_size)
+        self.device = device
+        self.model = model.to(device)
+        self.batch_size = batch_size
 
-        opt = Adam(self._model.parameters(), lr=0.001)
-        criterion = nn.MSELoss().to(self._device)
+    def train(self, dataset: Dataset, epochs: int = 25):
+        """
+        Basic training function for Autoencoder models for reconstruction tasks
+
+        Uses `torch.optim.Adam` and `torch.nn.MSELoss` as default hyperparameters
+
+        Parameters
+        ----------
+        dataset : Dataset
+            Torch Dataset containing images in the first return position
+        epochs : int, default 25
+            Number of full training loops
+
+        Note
+        ----
+        To replace this function with a custom function, do
+            AETrainer.train = custom_function
+        """
+        self.model.train()
+        dl = DataLoader(dataset, batch_size=self.batch_size)
+        opt = Adam(self.model.parameters(), lr=0.001)
+        criterion = nn.MSELoss().to(self.device)
         loss = 0
         for _ in range(epochs):
             for batch in dl:
-                imgs = batch[0].to(self._device)  # (imgs, labels, bboxes)
+                imgs = get_images_from_batch(batch)
+                imgs = imgs.to(self.device)
                 opt.zero_grad()
-                pred = self._model(imgs)
+                pred = self.model(imgs)
                 loss = criterion(pred, imgs)
                 loss.backward()
                 opt.step()
+
+    def eval(self, dataset: Dataset) -> float:
+        """
+        Basic training function for Autoencoder models for reconstruction tasks
+
+        Uses `torch.optim.Adam` and `torch.nn.MSELoss` as default hyperparameters
+
+        Parameters
+        ----------
+        dataset : Dataset
+            Torch Dataset containing images in the first return position
+
+        Returns
+        -------
+        float
+            Total reconstruction loss over all data
+
+        Note
+        ----
+        To replace this function with a custom function, do
+            AETrainer.eval = custom_function
+        """
+        self.model.eval()
+        dl = DataLoader(dataset, batch_size=self.batch_size)
+        criterion = nn.MSELoss().to(self.device)
+        total_loss: float = 0.0
+        with torch.no_grad():
+            for batch in dl:
+                imgs = get_images_from_batch(batch)
+                imgs = imgs.to(self.device)
+                pred = self.model(imgs)
+                loss = criterion(pred, imgs)
+                total_loss += loss
+        return total_loss
+
+    def encode(self, dataset: Dataset) -> torch.Tensor:
+        """
+        Encode data through model if it has an encode attribute,
+        otherwise passes data through model.forward
+
+        Parameters
+        ----------
+        dataset: Dataset
+            Dataset containing images to be encoded by the model
+
+        Returns
+        -------
+        torch.Tensor
+            Data encoded by the model
+        """
+        self.model.eval()
+        dl = DataLoader(dataset, batch_size=self.batch_size)
+        encodings = torch.Tensor([])
+
+        if getattr(self.model, "encode", None) is not None:
+            encode_func = self.model.encode
+        else:
+            encode_func = self.model.forward
+        with torch.no_grad():
+            for batch in dl:
+                imgs = get_images_from_batch(batch)
+                imgs = imgs.to(self.device)
+                embeddings = encode_func(imgs)
+                if len(encodings):
+                    encodings = torch.vstack((encodings, embeddings))
+                else:
+                    encodings = embeddings
+
+        return encodings
 
 
 class AriaAutoencoder(nn.Module):
