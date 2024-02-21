@@ -7,13 +7,13 @@ from abc import abstractmethod
 
 import numpy as np
 
-from daml._internal.metrics.aria.base import _BaseMetric
+from daml._internal.metrics.base import BaseMetric
 from daml._internal.metrics.outputs import DivergenceOutput
 
 from .utils import compute_neighbors, minimum_spanning_tree
 
 
-class _DpDivergence(_BaseMetric):
+class _DpDivergence(BaseMetric):
     def __init__(self, data_a: np.ndarray, data_b: np.ndarray) -> None:
         self.data_a = data_a
         self.data_b = data_b
