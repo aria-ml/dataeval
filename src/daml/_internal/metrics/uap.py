@@ -7,11 +7,11 @@ average precision using empirical mean precision (UAP_EMP)
 import numpy as np
 from sklearn.metrics import average_precision_score
 
-from daml._internal.metrics.aria.base import _BaseMetric
+from daml._internal.metrics.base import BaseMetric
 from daml._internal.metrics.outputs import UAPOutput
 
 
-class UAP_EMP(_BaseMetric):
+class UAP_EMP(BaseMetric):
     """
     FR Test Statistic based estimate of the empirical mean precision
 
