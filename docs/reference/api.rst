@@ -8,10 +8,7 @@ Metrics
 ~~~~~~~~~~~~~~~~
 Bayes Error Rate
 ~~~~~~~~~~~~~~~~
-.. autoclass:: daml.metrics.ber.BER_FNN
-   :members:
-   :inherited-members:
-.. autoclass:: daml.metrics.ber.BER_MST
+.. autoclass:: daml.metrics.ber.BER
    :members:
    :inherited-members:
 .. autoclass:: daml.metrics.ber.BEROutput
@@ -19,10 +16,7 @@ Bayes Error Rate
 ~~~~~~~~~~
 Divergence
 ~~~~~~~~~~
-.. autoclass:: daml.metrics.divergence.HP_FNN
-   :members:
-   :inherited-members:
-.. autoclass:: daml.metrics.divergence.HP_MST
+.. autoclass:: daml.metrics.divergence.Divergence
    :members:
    :inherited-members:
 .. autoclass:: daml.metrics.divergence.DivergenceOutput
@@ -45,6 +39,15 @@ Outlier Detection
 .. autoclass:: daml.metrics.outlier_detection.OD_VAEGMM
    :members:
    :inherited-members:
+.. autoclass:: daml.metrics.outlier_detection.OutlierType()
+   :members:
+   :undoc-members:
+   :member-order: bysource
+.. autoclass:: daml.metrics.outlier_detection.Threshold()
+.. autoclass:: daml.metrics.outlier_detection.ThresholdType()
+   :members:
+   :undoc-members:
+   :member-order: bysource
 .. autoclass:: daml.metrics.outlier_detection.OutlierDetectorOutput
 
 ~~~~~~~~~~~
@@ -53,23 +56,12 @@ Sufficiency
 .. autoclass:: daml.metrics.sufficiency.Sufficiency
    :members:
    :inherited-members:
+.. autoclass:: daml.metrics.sufficiency.SufficiencyOutput
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Upperbound Average Precision
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.. autoclass:: daml.metrics.uap.UAP_EMP
+.. autoclass:: daml.metrics.uap.UAP
    :members:
    :inherited-members:
 .. autoclass:: daml.metrics.uap.UAPOutput
-
----------------
-Enums and Types
----------------
-.. autoclass:: daml.metrics.outlier_detection.Threshold()
-   :members:                                        
-   :undoc-members:                                  
-   :member-order: bysource
-.. autoclass:: daml.metrics.outlier_detection.ThresholdType()
-   :members:                                        
-   :undoc-members:                                  
-   :member-order: bysource
