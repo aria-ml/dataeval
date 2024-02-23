@@ -81,6 +81,6 @@ class Divergence(EvaluateMixin, MethodsMixin[Callable[[np.ndarray, np.ndarray], 
         stacked_data = np.vstack((self.data_a, self.data_b))
         labels = np.vstack([np.zeros([N, 1]), np.ones([M, 1])])
 
-        errors = self.method(stacked_data, labels)
+        errors = self._method(stacked_data, labels)
         dp = max(0.0, 1 - ((M + N) / (2 * M * N)) * errors)
         return DivergenceOutput(dpdivergence=dp, error=errors)

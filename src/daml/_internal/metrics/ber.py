@@ -92,5 +92,5 @@ class BER(
         ValueError
             If unique classes M < 2
         """
-        upper, lower = self.method(self.data, self.labels)
+        upper, lower = self._method(self.data, self.labels)
         return BEROutput(ber=upper, ber_lower=lower)
