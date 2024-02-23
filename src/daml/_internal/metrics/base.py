@@ -39,7 +39,16 @@ class MethodsMixin(ABC, Generic[TCallable]):
     e.g.:
 
         def evaluate(self):
-            return self.method(x, y)
+            return self._method(x, y)
+
+    The resulting class can be used like so.
+
+    m = MyMetric(1.0, 2.0, "ADD")
+    m.evaluate()       #  returns 3.0
+    m.method           #  returns "ADD"
+    MyMetric.methods() #  returns "['ADD', 'MULT']
+    m.method = "MULT"
+    m.evaluate()       #  returns 2.0
     """
 
     @classmethod
@@ -47,13 +56,17 @@ class MethodsMixin(ABC, Generic[TCallable]):
     def _methods(cls) -> Dict[str, TCallable]:
         """Abstract method returning available method functions for class"""
 
+    @property
+    def _method(self) -> TCallable:
+        return self._methods()[self._method_key]
+
     @classmethod
     def methods(cls) -> List[str]:
         return list(cls._methods().keys())
 
     @property
-    def method(self) -> TCallable:
-        return self._methods()[self._method]
+    def method(self) -> str:
+        return self._method_key
 
     @method.setter
     def method(self, value: str):
@@ -61,4 +74,4 @@ class MethodsMixin(ABC, Generic[TCallable]):
             raise KeyError(
                 f"Specified method not available for class ({self.methods()})."
             )
-        self._method = value
+        self._method_key = value
