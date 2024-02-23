@@ -1,24 +1,24 @@
 import numpy as np
 import pytest
 
-from daml.metrics.divergence import HP_FNN, HP_MST, DivergenceOutput
+from daml.metrics.divergence import Divergence, DivergenceOutput
 
 np.random.seed(0)
 
 
 class TestDpDivergence:
     @pytest.mark.parametrize(
-        "dp_metric, output",
+        "method, output",
         [
             (
-                HP_MST,
+                "MST",
                 DivergenceOutput(
                     dpdivergence=0.8377897755491117,
                     error=81.0,
                 ),
             ),
             (
-                HP_FNN,
+                "FNN",
                 DivergenceOutput(
                     dpdivergence=0.8618209199122062,
                     error=69.0,
@@ -26,7 +26,7 @@ class TestDpDivergence:
             ),
         ],
     )
-    def test_dp_divergence(self, mnist, dp_metric, output):
+    def test_dp_divergence(self, mnist, method, output):
         """Unit testing of Dp Divergence
 
         TBD
@@ -40,7 +40,7 @@ class TestDpDivergence:
         odd = covariates[rev_inds, :, :]
         even = even.reshape((even.shape[0], -1))
         odd = odd.reshape((odd.shape[0], -1))
-        metric = dp_metric(even, odd)
+        metric = Divergence(even, odd, method)
         result = metric.evaluate()
         assert result == output
 

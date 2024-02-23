@@ -1,24 +1,56 @@
 import math
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Tuple
+from enum import Enum
+from typing import Any, NamedTuple, Optional, Tuple
 
 import keras
 import numpy as np
 
 from daml import _alibi_detect
 from daml._internal.metrics.outputs import OutlierDetectorOutput
-from daml._internal.metrics.types import OutlierType, Threshold, ThresholdType
 from daml._internal.models.tensorflow.alibi import create_model
+
+
+class OutlierType(str, Enum):
+    """
+    Enum to determine outliers by instance or by feature
+    """
+
+    INSTANCE = "instance"
+    FEATURE = "feature"
+
+    def __str__(self) -> str:
+        return str.__str__(self)  # pragma: no cover
+
+
+class ThresholdType(Enum):
+    """
+    Enum of threshold types for outlier detection
+    """
+
+    VALUE = "value"
+    PERCENTAGE = "percentage"
+
+
+class Threshold(NamedTuple):
+    """
+    NamedTuple to specify the threshold value and type for outlier detection
+
+    Parameters
+    ----------
+    value : float
+        The threshold to determine an outlier
+    type : ThresholdType
+        Whether the value provided is a value or percentage type
+    """
+
+    value: float
+    type: ThresholdType
 
 
 class OD_Base(ABC):
     """
     Base class for all outlier detection metrics in alibi-detect
-
-    Attributes
-    ----------
-    detector : Any, default None
-        A model used for outlier detection after being trained on clean data
     """
 
     @staticmethod
@@ -48,6 +80,8 @@ class OD_Base(ABC):
 
         Parameters
         ----------
+        detector : Any, default None
+            A model used for outlier detection after being trained on clean data
         alibi_detect_class : type
             This is the alibi_detect outlier detection class to instantiate
         flatten_dataset : bool, default False
@@ -272,8 +306,6 @@ class OD_Base(ABC):
 class OD_AE(OD_Base):
     """
     Autoencoder-based outlier detector, using `alibi-detect ae. <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/ae.html>`_
-
-    The model used by this class is :py:class:`daml.models.AE`
     """  # noqa E501
 
     def __init__(self):
