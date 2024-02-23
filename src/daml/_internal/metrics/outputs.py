@@ -96,7 +96,7 @@ class SufficiencyOutput:
     ----------
     measures: Dict[str, np.ndarray]
         Dictionary of metric names as keys and the metric result at each step as values
-    steps" np.ndarray
+    steps: np.ndarray
         Array of indice counts that a model was trained, and then evaluated at
     """
 

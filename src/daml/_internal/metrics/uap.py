@@ -1,17 +1,17 @@
 """
 This module contains the implementation of the
 FR Test Statistic based estimate for the upperbound
-average precision using empirical mean precision (UAP_EMP)
+average precision using empirical mean precision
 """
 
 import numpy as np
 from sklearn.metrics import average_precision_score
 
-from daml._internal.metrics.base import BaseMetric
+from daml._internal.metrics.base import EvaluateMixin
 from daml._internal.metrics.outputs import UAPOutput
 
 
-class UAP_EMP(BaseMetric):
+class UAP(EvaluateMixin):
     """
     FR Test Statistic based estimate of the empirical mean precision
 
