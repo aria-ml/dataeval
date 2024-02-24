@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Any, Callable, Dict, List, Optional, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -289,7 +289,7 @@ class Sufficiency(EvaluateMixin):
         cls,
         data: Dict[str, np.ndarray],
         measure: str,
-        steps: Union[int, np.ndarray],
+        steps: Union[int, Sequence[int], np.ndarray],
     ) -> np.ndarray:
         """Projects the measures for each value of X
 
@@ -308,10 +308,13 @@ class Sufficiency(EvaluateMixin):
             If STEPS_KEY or measure is not a valid key
         ValueError
             If the length of data points in the measures do not match
+            If the steps are not int, Sequence[int] or an ndarray
         """
         validate_output(data)
+        steps = [steps] if isinstance(steps, int) else steps
+        steps = np.array(steps) if isinstance(steps, Sequence) else steps
         if not isinstance(steps, np.ndarray):
-            steps = np.ndarray([steps])
+            raise ValueError("'steps' must be an int, Sequence[int] or ndarray")
         return project_steps(data, measure, steps)
 
     @classmethod
