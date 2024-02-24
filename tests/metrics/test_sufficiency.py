@@ -2,6 +2,7 @@ from typing import Dict, Optional, Tuple
 from unittest.mock import MagicMock, NonCallableMagicMock, patch
 
 import numpy as np
+import numpy.testing as npt
 import pytest
 import torch
 import torch.nn as nn
@@ -213,10 +214,19 @@ class TestSufficiency:
         with pytest.raises(ValueError):
             Sufficiency.project(output, "test1", 10000)
 
-    def test_single_value_projection(self):
+    @pytest.mark.parametrize("steps", [100, [100], np.array([100])])
+    def test_project(self, steps):
         output = {
             STEPS_KEY: np.array([10, 100, 1000]),
             "test1": np.array([0.2, 0.6, 0.9]),
         }
-        result = Sufficiency.project(output, "test1", 10000)
-        assert isinstance(result, np.ndarray)
+        result = Sufficiency.project(output, "test1", steps)
+        npt.assert_almost_equal(result, [0.6], decimal=4)
+
+    def test_project_invalid_steps(self):
+        output = {
+            STEPS_KEY: np.array([10, 100, 1000]),
+            "test1": np.array([0.2, 0.6, 0.9]),
+        }
+        with pytest.raises(ValueError):
+            Sufficiency.project(output, "test1", 1.0)  # type: ignore
