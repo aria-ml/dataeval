@@ -58,7 +58,7 @@ class MethodsMixin(ABC, Generic[TCallable]):
 
     @property
     def _method(self) -> TCallable:
-        return self._methods()[self._method_key]
+        return self._methods()[self.method]
 
     @classmethod
     def methods(cls) -> List[str]:

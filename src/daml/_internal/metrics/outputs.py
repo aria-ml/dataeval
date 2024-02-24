@@ -1,7 +1,7 @@
 """This module contains dataclasses for each metric output"""
 
 from dataclasses import dataclass
-from typing import Dict, Iterable
+from typing import Iterable
 
 import numpy as np
 
@@ -84,21 +84,3 @@ class UAPOutput:
     """
 
     uap: float
-
-
-@dataclass
-class SufficiencyOutput:
-    """
-    Dataclass to store all measures collected during evaluation
-    and array of substeps where each measure was collected
-
-    Attributes
-    ----------
-    measures: Dict[str, np.ndarray]
-        Dictionary of metric names as keys and the metric result at each step as values
-    steps: np.ndarray
-        Array of indice counts that a model was trained, and then evaluated at
-    """
-
-    measures: Dict[str, np.ndarray]
-    steps: np.ndarray
