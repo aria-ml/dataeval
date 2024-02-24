@@ -9,6 +9,7 @@ import torch.optim as optim
 import torchmetrics
 from torch.utils.data import DataLoader
 
+from daml._internal.metrics.sufficiency import STEPS_KEY
 from daml.metrics.sufficiency import Sufficiency
 from tests.utils.data import DamlDataset
 
@@ -96,27 +97,33 @@ def custom_eval(model: nn.Module, dataloader) -> Dict[str, float]:
 class TestSufficiencyFunctional:
     def test_classification(self, mnist) -> None:
         model = Net()
-        train_ds = DamlDataset(*mnist(1000, "train", np.float32, "channels_first"))
+        length = 1000
+        train_ds = DamlDataset(*mnist(length, "train", np.float32, "channels_first"))
         test_ds = DamlDataset(*mnist(100, "test", np.float32, "channels_first"))
-        length: int = len(train_ds)
-        # Instantiate sufficiency metric
-        suff = Sufficiency()
-        # Set predefined training and eval functions
-        suff.set_training_func(custom_train)
-        suff.set_eval_func(custom_eval)
-        # Create data indices for training
         m_count = 1
         steps = 3
+
+        # Instantiate sufficiency metric
+        suff = Sufficiency(
+            model,
+            train_ds,
+            test_ds,
+            custom_train,
+            custom_eval,
+            m_count,
+            steps,
+        )
+
         # Train & test model
-        output = suff.run(model, train_ds, test_ds, m_count, steps)
+        output = suff.evaluate()
 
         # Accuracy should be bounded
-        accuracy = output.measures["Accuracy"]
+        accuracy = output["Accuracy"]
         assert np.all(0 <= accuracy)
         assert np.all(accuracy <= 1)
         assert len(accuracy) == 3
 
         # Geomshape should calculate deterministically
-        geomshape = output.steps
+        geomshape = output[STEPS_KEY]
         geomshape_answer = np.geomspace(0.01 * length, length, steps).astype(np.int64)
         npt.assert_array_equal(geomshape, geomshape_answer)

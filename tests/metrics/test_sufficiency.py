@@ -1,4 +1,4 @@
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 from unittest.mock import MagicMock, NonCallableMagicMock, patch
 
 import numpy as np
@@ -8,7 +8,8 @@ import torch.nn as nn
 from matplotlib.figure import Figure
 from torch.utils.data import DataLoader
 
-from daml.metrics.sufficiency import Sufficiency, SufficiencyOutput
+from daml._internal.metrics.sufficiency import STEPS_KEY
+from daml.metrics.sufficiency import Sufficiency
 from tests.utils.data import DamlDataset
 
 np.random.seed(0)
@@ -52,253 +53,170 @@ def eval_100(model: nn.Module, dl: DataLoader) -> Dict[str, float]:
     return {"eval": 1.0}
 
 
+def mock_ds(len: Optional[int]):
+    ds = MagicMock()
+    if len is None:
+        delattr(ds, "__len__")
+    else:
+        ds.__len__.return_value = len
+    return ds
+
+
 class TestSufficiency:
     def test_mock_run(self) -> None:
-        suff = Sufficiency()
-
-        suff._train = MagicMock()
-        suff._eval = MagicMock()
-        suff._eval.return_value = {"test": 1.0}
-
+        eval_fn = MagicMock()
+        eval_fn.return_value = {"test": 1.0}
         patch("torch.utils.data.DataLoader").start()
 
-        model = MagicMock()
-        train_ds = MagicMock()
-        train_ds.__len__.return_value = 2
-        test_ds = MagicMock()
-
-        results = suff.run(
-            model,
-            train_ds=train_ds,
-            test_ds=test_ds,
+        suff = Sufficiency(
+            model=MagicMock(),
+            train_ds=mock_ds(2),
+            test_ds=mock_ds(2),
+            train_fn=MagicMock(),
+            eval_fn=eval_fn,
             runs=1,
             substeps=2,
         )
 
-        assert isinstance(results, SufficiencyOutput)
+        results = suff.evaluate()
+        assert isinstance(results, dict)
 
     def test_mock_run_with_kwargs(self) -> None:
-        suff = Sufficiency()
-
-        suff._train = MagicMock()
-        suff._eval = MagicMock()
-        suff._eval.return_value = {"test": 1.0}
-
+        train_fn = MagicMock()
+        eval_fn = MagicMock()
+        eval_fn.return_value = {"test": 1.0}
+        train_kwargs = {"train": 1}
+        eval_kwargs = {"eval": 1}
         patch("torch.utils.data.DataLoader").start()
 
-        model = MagicMock()
-        train_ds = MagicMock()
-        train_ds.__len__.return_value = 2
-        test_ds = MagicMock()
-
-        results = suff.run(
-            model,
-            train_ds=train_ds,
-            test_ds=test_ds,
+        suff = Sufficiency(
+            model=MagicMock(),
+            train_ds=mock_ds(2),
+            test_ds=mock_ds(2),
+            train_fn=train_fn,
+            eval_fn=eval_fn,
             runs=1,
             substeps=2,
-            train_kwargs={"train": 1},
-            eval_kwargs={"eval": 1},
+            train_kwargs=train_kwargs,
+            eval_kwargs=eval_kwargs,
         )
 
-        assert suff._train.call_count == 2
-        assert {"train": 1} in suff._train.call_args[0]
+        results = suff.evaluate()
 
-        assert suff._eval.call_count == 2
-        assert {"eval": 1} in suff._eval.call_args[0]
+        assert train_fn.call_count == 2
+        assert train_kwargs == train_fn.call_args.kwargs
 
-        assert isinstance(results, SufficiencyOutput)
+        assert eval_fn.call_count == 2
+        assert eval_kwargs == eval_fn.call_args.kwargs
 
-    def test_dataset_no_len(self):
-        suff = Sufficiency()
-        nolen_ds = MagicMock()
-        delattr(nolen_ds, "__len__")
-        with pytest.raises(TypeError):
-            suff.run(
+        assert isinstance(results, dict)
+
+    def test_run_with_invalid_key(self) -> None:
+        eval_fn = MagicMock()
+        eval_fn.return_value = {STEPS_KEY: 1.0}
+        patch("torch.utils.data.DataLoader").start()
+
+        suff = Sufficiency(
+            model=MagicMock(),
+            train_ds=mock_ds(2),
+            test_ds=mock_ds(2),
+            train_fn=MagicMock(),
+            eval_fn=eval_fn,
+            runs=1,
+            substeps=2,
+        )
+
+        with pytest.raises(KeyError):
+            suff.evaluate()
+
+    @pytest.mark.parametrize(
+        "train_ds_len, test_ds_len, expected_error",
+        [
+            (None, 1, TypeError),
+            (1, None, TypeError),
+            (0, 1, ValueError),
+            (1, 0, ValueError),
+            (1, 1, None),
+        ],
+    )
+    def test_dataset_len(self, train_ds_len, test_ds_len, expected_error):
+        def call_suff(train_ds_len, test_ds_len):
+            Sufficiency(
                 model=MagicMock(),
-                train_ds=nolen_ds,
-                test_ds=nolen_ds,
-                runs=1,
-                substeps=1,
+                train_ds=mock_ds(train_ds_len),
+                test_ds=mock_ds(test_ds_len),
+                train_fn=MagicMock(),
+                eval_fn=MagicMock(),
             )
 
-    def test_dataset_len_zero(self):
-        suff = Sufficiency()
-        empty_ds = MagicMock()
-        empty_ds.__len__.return_value = 0
-        with pytest.raises(ValueError):
-            suff.run(
+        if expected_error is None:
+            call_suff(train_ds_len, test_ds_len)
+            return
+
+        with pytest.raises(expected_error):
+            call_suff(train_ds_len, test_ds_len)
+
+    def test_train_fn_is_non_callable(self):
+        with pytest.raises(TypeError):
+            Sufficiency(
                 model=MagicMock(),
-                train_ds=empty_ds,
-                test_ds=empty_ds,
-                runs=1,
-                substeps=1,
+                train_ds=mock_ds(1),
+                test_ds=mock_ds(1),
+                train_fn=NonCallableMagicMock(),
+                eval_fn=MagicMock(),
             )
 
-    def test_set_func_is_non_callable(self):
-        suff = Sufficiency()
+    def test_eval_fn_is_non_callable(self):
         with pytest.raises(TypeError):
-            suff._set_func(NonCallableMagicMock())
-
-    def test_train_func_is_none(self) -> None:
-        suff = Sufficiency()
-
-        model = MagicMock()
-        train_ds = MagicMock()
-
-        with pytest.raises(TypeError):
-            suff._train(model, train_ds, {})
-
-    def test_eval_func_is_none(self) -> None:
-        suff = Sufficiency()
-
-        model = MagicMock()
-        test_ds = MagicMock()
-
-        with pytest.raises(TypeError):
-            suff._eval(model, test_ds, {})
-
-    def test_train_kwargs(self) -> None:
-        """Tests correct kwarg handling"""
-
-        def train_task_cls_kwargs(model: nn.Module, dl: DataLoader, num: int) -> None:
-            assert isinstance(num, int)
-
-        train_ds, _ = load_cls_dataset()
-
-        # Instantiate sufficiency metric
-        suff = Sufficiency()
-        # Set predefined training and eval functions
-        suff.set_training_func(train_task_cls_kwargs)
-        dl = DataLoader(train_ds)
-
-        kwargs = {"num": 1}
-        suff._train(MockNet(), dataloader=dl, kwargs=kwargs)
-
-    def test_eval_kwargs(self) -> None:
-        """Tests kwarg handling"""
-
-        def eval_kwargs(model: nn.Module, dl: DataLoader, num: int):
-            """Kwargs should match parameter input"""
-            assert isinstance(num, int)
-            return {"test": float(num)}
-
-        _, test_ds = load_cls_dataset()
-
-        # Instantiate sufficiency metric
-        suff = Sufficiency()
-        # Set predefined eval function
-        suff.set_eval_func(eval_kwargs)
-        dl = DataLoader(test_ds)
-
-        kwargs = {"num": 100}
-        result = suff._eval(MockNet(), dataloader=dl, kwargs=kwargs)
-        assert isinstance(result, Dict)
-        assert result["test"] == kwargs["num"]
+            Sufficiency(
+                model=MagicMock(),
+                train_ds=mock_ds(1),
+                test_ds=mock_ds(1),
+                train_fn=MagicMock(),
+                eval_fn=NonCallableMagicMock(),
+            )
 
     def test_plot(self):
         """Tests that a plot is generated"""
         # Only needed for plotting test
-        suff = Sufficiency()
-
-        output = SufficiencyOutput(
-            measures={"test": np.array([0.2, 0.6, 0.9])},
-            steps=np.array([10, 100, 1000]),
-        )
-
-        result = suff.plot(data=output)
+        output = {
+            STEPS_KEY: np.array([10, 100, 1000]),
+            "test": np.array([0.2, 0.6, 0.9]),
+        }
+        result = Sufficiency.plot(output)
         assert len(result) == 1
         assert isinstance(result[0], Figure)
 
     def test_multiplot(self):
         """Tests that the multiple plots are generated"""
-        suff = Sufficiency()
+        output = {
+            STEPS_KEY: np.array([10, 100, 1000]),
+            "test1": np.array([0.2, 0.6, 0.9]),
+            "test2": np.array([0.2, 0.6, 0.9]),
+            "test3": np.array([0.2, 0.6, 0.9]),
+        }
 
-        output = SufficiencyOutput(
-            measures={
-                "test1": np.array([0.2, 0.6, 0.9]),
-                "test2": np.array([0.2, 0.6, 0.9]),
-                "test3": np.array([0.2, 0.6, 0.9]),
-            },
-            steps=np.array([10, 100, 1000]),
-        )
-
-        result = suff.plot(data=output)
+        result = Sufficiency.plot(output)
         assert len(result) == 3
         assert isinstance(result[0], Figure)
 
+    def test_no_steps_key(self):
+        output = {"test1": np.array([0.2, 0.6, 0.9])}
+        with pytest.raises(KeyError):
+            Sufficiency.project(output, "test1", 10000)
 
-class TestSufficiencyCls:
-    def test_train(self) -> None:
-        def train_task_cls(model: nn.Module, dl: DataLoader):
-            # Extract first batch in dataloader
-            batch = next(iter(dl))
-            assert len(batch) == 2
+    def test_measure_length_invalid(self):
+        output = {
+            STEPS_KEY: np.array([10, 100]),
+            "test1": np.array([0.2, 0.6, 0.9]),
+        }
+        with pytest.raises(ValueError):
+            Sufficiency.project(output, "test1", 10000)
 
-            img, lbl = batch
-            # Each image has a label
-            assert img.shape[0] == lbl.shape[0]
-
-        train_ds, _ = load_cls_dataset()
-
-        # Instantiate sufficiency metric
-        suff = Sufficiency()
-        # Set predefined training and eval functions
-        suff.set_training_func(train_task_cls)
-
-        trainloader = DataLoader(train_ds)
-        suff._train(MockNet(), trainloader, {})
-
-    def test_eval_result(self) -> None:
-        _, test_ds = load_cls_dataset()
-
-        # Instantiate sufficiency metric
-        suff = Sufficiency()
-        # Set predefined training and eval functions
-        suff.set_eval_func(eval_100)
-
-        testloader = DataLoader(test_ds)
-        result = suff._eval(MockNet(), testloader, {})
-
-        # Result is a number (int, float) not Iterable, str, etc
-        assert isinstance(result, Dict)
-
-
-# Can be combined with classification using parameterize, not sure if worth
-class TestSufficiencyOD:
-    def test_train(self) -> None:
-        def train_task_od(model: nn.Module, dl: DataLoader):
-            # Extract first batch from dataloader
-            batch = next(iter(dl))
-            assert len(batch)
-
-            img, lbls, bxs = batch
-
-            # Each image has a set of labels and boxes
-            assert img.shape[0] == lbls.shape[0] == bxs.shape[0]
-            # Each box as a label
-            assert lbls.shape[1] == bxs.shape[1]
-
-        train_ds, _ = load_od_dataset()
-
-        # Instantiate sufficiency metric
-        suff = Sufficiency()
-        # Set predefined training and eval functions
-        suff.set_training_func(train_task_od)
-
-        trainloader = DataLoader(train_ds)
-        suff._train(MockNet(), trainloader, {})
-
-    def test_eval_result(self) -> None:
-        _, test_ds = load_od_dataset()
-
-        # Instantiate sufficiency metric
-        suff = Sufficiency()
-        # Set predefined training and eval functions
-        suff.set_eval_func(eval_100)
-
-        testloader = DataLoader(test_ds)
-        result = suff._eval(MockNet(), testloader, {})
-
-        # Result is a number (int, float) not Iterable, str, etc
-        assert isinstance(result, Dict)
+    def test_single_value_projection(self):
+        output = {
+            STEPS_KEY: np.array([10, 100, 1000]),
+            "test1": np.array([0.2, 0.6, 0.9]),
+        }
+        result = Sufficiency.project(output, "test1", 10000)
+        assert isinstance(result, np.ndarray)

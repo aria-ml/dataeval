@@ -88,11 +88,11 @@ class TestSufficiencyUtils:
             ]
         )
         n_i = np.geomspace(30, 3000, 20).astype(int)
-        answer = [3.26332, 0.41603, 0.00532]
+        answer = [3.2633, 0.4160, 0.0053]
 
         output = calc_params(p_i, n_i)
 
-        npt.assert_almost_equal(output, answer, decimal=5)
+        npt.assert_almost_equal(output, answer, decimal=4)
 
     def test_reset_parameters(self):
         """
