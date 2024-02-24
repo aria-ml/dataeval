@@ -56,7 +56,6 @@ Sufficiency
 .. autoclass:: daml.metrics.sufficiency.Sufficiency
    :members:
    :inherited-members:
-.. autoclass:: daml.metrics.sufficiency.SufficiencyOutput
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Upperbound Average Precision
