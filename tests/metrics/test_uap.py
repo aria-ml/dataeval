@@ -1,6 +1,6 @@
 import numpy as np
 
-from daml.metrics.uap import UAP
+from daml.metrics import UAP
 
 
 class TestUAP:
@@ -9,4 +9,4 @@ class TestUAP:
         scores = np.zeros((1000, 10), dtype=float)
         metric = UAP(labels, scores)
         value = metric.evaluate()
-        assert value.uap > 0
+        assert value["uap"] > 0

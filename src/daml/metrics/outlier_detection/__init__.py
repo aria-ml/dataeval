@@ -8,7 +8,6 @@ from daml._internal.metrics.od import (
     Threshold,
     ThresholdType,
 )
-from daml._internal.metrics.outputs import OutlierDetectorOutput
 
 __all__ = [
     "OD_AE",
@@ -16,7 +15,6 @@ __all__ = [
     "OD_LLR",
     "OD_VAE",
     "OD_VAEGMM",
-    "OutlierDetectorOutput",
     "OutlierType",
     "Threshold",
     "ThresholdType",
