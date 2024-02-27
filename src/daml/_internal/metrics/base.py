@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Generic, List, TypeVar
 
-TOutput = TypeVar("TOutput")
+TOutput = TypeVar("TOutput", bound=dict)
 TCallable = TypeVar("TCallable", bound=Callable)
 
 

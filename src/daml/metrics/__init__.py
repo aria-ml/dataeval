@@ -1,8 +1,10 @@
 from importlib.util import find_spec
 
-from . import ber, divergence, uap
+from daml._internal.metrics.ber import BER
+from daml._internal.metrics.divergence import Divergence
+from daml._internal.metrics.uap import UAP
 
-__all__ = ["ber", "divergence", "uap"]
+__all__ = ["BER", "Divergence", "UAP"]
 
 if (
     find_spec("tensorflow") is not None
@@ -13,8 +15,8 @@ if (
     __all__ += ["outlier_detection"]
 
 if find_spec("torch") is not None:  # pragma: no cover
-    from . import sufficiency
+    from daml._internal.metrics.sufficiency import Sufficiency
 
-    __all__ += ["sufficiency"]
+    __all__ += ["Sufficiency"]
 
 del find_spec

@@ -13,7 +13,6 @@ import numpy as np
 from scipy.sparse import coo_matrix
 
 from daml._internal.metrics.base import EvaluateMixin, MethodsMixin
-from daml._internal.metrics.outputs import BEROutput
 
 from .utils import compute_neighbors, get_classes_counts, minimum_spanning_tree
 
@@ -78,14 +77,17 @@ class BER(
     ) -> Dict[str, Callable[[np.ndarray, np.ndarray], Tuple[float, float]]]:
         return {"MST": _mst, "KNN": _knn}
 
-    def evaluate(self) -> BEROutput:
+    def evaluate(self) -> Dict[str, float]:
         """
         Calculates the Bayes Error Rate estimate using the provided method
 
         Returns
         -------
-        BEROutput
-            The estimated upper and lower bounds of the Bayes Error Rate
+        Dict[str, float]
+            ber : float
+                The estimated lower bounds of the Bayes Error Rate
+            ber_lower : float
+                The estimated upper bounds of the Bayes Error Rate
 
         Raises
         ------
@@ -93,4 +95,4 @@ class BER(
             If unique classes M < 2
         """
         upper, lower = self._method(self.data, self.labels)
-        return BEROutput(ber=upper, ber_lower=lower)
+        return {"ber": upper, "ber_lower": lower}

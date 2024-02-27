@@ -3,12 +3,11 @@ This module contains the implementation of Dp Divergence
 using the Fast Nearest Neighbor and Minimum Spanning Tree algorithms
 """
 
-from typing import Callable, Dict, Literal
+from typing import Any, Callable, Dict, Literal
 
 import numpy as np
 
 from daml._internal.metrics.base import EvaluateMixin, MethodsMixin
-from daml._internal.metrics.outputs import DivergenceOutput
 
 from .utils import compute_neighbors, minimum_spanning_tree
 
@@ -66,14 +65,17 @@ class Divergence(EvaluateMixin, MethodsMixin[Callable[[np.ndarray, np.ndarray], 
     def _methods(cls) -> Dict[str, Callable[[np.ndarray, np.ndarray], int]]:
         return {"FNN": _fnn, "MST": _mst}
 
-    def evaluate(self) -> DivergenceOutput:
+    def evaluate(self) -> Dict[str, Any]:
         """
         Calculates the divergence and any errors between the datasets
 
         Returns
         -------
-        DivergenceOutput
-            Dataclass containing the dp divergence and errors during calculation
+        Dict[str, Any]
+            dp : float
+                divergence value between 0.0 and 1.0
+            errors : int
+                the number of differing edges
         """
         N = self.data_a.shape[0]
         M = self.data_b.shape[0]
@@ -83,4 +85,4 @@ class Divergence(EvaluateMixin, MethodsMixin[Callable[[np.ndarray, np.ndarray], 
 
         errors = self._method(stacked_data, labels)
         dp = max(0.0, 1 - ((M + N) / (2 * M * N)) * errors)
-        return DivergenceOutput(dpdivergence=dp, error=errors)
+        return {"dpdivergence": dp, "error": errors}
