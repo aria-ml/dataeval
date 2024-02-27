@@ -3,10 +3,10 @@ import pytest
 import torch
 
 from daml._internal.models.pytorch.utils import (
-    numpy_to_pytorch,
+    numpy_to_torch,
     permute_to_numpy,
     permute_to_torch,
-    pytorch_to_numpy,
+    torch_to_numpy,
 )
 from daml.metrics.outlier_detection import OD_AE, OD_AEGMM, OD_LLR, OD_VAE, OD_VAEGMM
 
@@ -73,7 +73,7 @@ class TestConversions:
     def test_pt_is_pt(self):
         """Convert PyTorch Tensor to Tensor returns unmodified Tensor"""
         images = torch.ones(size=(1, 3, 32, 32))  # NCHW
-        result = numpy_to_pytorch(images)  # type: ignore
+        result = numpy_to_torch(images)  # type: ignore
 
         assert isinstance(images, torch.Tensor)
         assert images is result  # If unmodified, points to same object
@@ -81,7 +81,7 @@ class TestConversions:
     def test_np_is_np(self):
         """Convert NumPy NDArray to NDArray returns unmodified NDArray"""
         images = np.ones(shape=(1, 32, 32, 3))  # NHWC
-        result = pytorch_to_numpy(images)  # type: ignore
+        result = torch_to_numpy(images)  # type: ignore
 
         assert isinstance(images, np.ndarray)
         assert images is result  # If unmodified, points to same object
@@ -89,7 +89,7 @@ class TestConversions:
     def test_pt_np_conv(self):
         """Convert PyTorch Tensor to NumPy NDArray"""
         pt_images = torch.ones(size=(1, 3, 32, 32))
-        np_images = pytorch_to_numpy(pt_images)
+        np_images = torch_to_numpy(pt_images)
 
         assert isinstance(np_images, np.ndarray)
         assert np_images.shape == pt_images.shape
@@ -97,7 +97,7 @@ class TestConversions:
     def test_np_pt_conv(self):
         """Convert NumPy NDArray to PyTorch Tensor"""
         np_images = np.ones(shape=(1, 32, 32, 3))
-        pt_images = numpy_to_pytorch(np_images)
+        pt_images = numpy_to_torch(np_images)
 
         assert isinstance(pt_images, torch.Tensor)
         assert pt_images.shape == np_images.shape
@@ -120,8 +120,8 @@ class TestConversions:
 
     def test_pt_np_typeerror(self):
         with pytest.raises(TypeError):
-            pytorch_to_numpy(0)  # type: ignore
+            torch_to_numpy(0)  # type: ignore
 
     def test_np_pt_typeerror(self):
         with pytest.raises(TypeError):
-            numpy_to_pytorch(0)  # type: ignore
+            numpy_to_torch(0)  # type: ignore
