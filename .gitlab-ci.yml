@@ -29,6 +29,13 @@ stages:
         - src/**/*
         - pyproject.toml
 
+.on_develop:
+  stage: release
+  environment:
+    name: production
+  rules:
+    - if: $CI_COMMIT_BRANCH == 'develop'
+
 .docker_harbor_required:
   image: docker:24.0-git
   before_script:
@@ -180,7 +187,7 @@ docs:
       - output/docs/html/
 
 pages:
-  extends: .on_release
+  extends: .on_develop
   needs:
     - job: docs
       artifacts: true

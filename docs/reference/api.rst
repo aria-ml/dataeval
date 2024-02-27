@@ -8,24 +8,30 @@ Metrics
 ~~~~~~~~~~~~~~~~
 Bayes Error Rate
 ~~~~~~~~~~~~~~~~
-.. autoclass:: daml.metrics.ber.BER_FNN
+.. autoclass:: daml.metrics.BER
    :members:
    :inherited-members:
-.. autoclass:: daml.metrics.ber.BER_MST
-   :members:
-   :inherited-members:
-.. autoclass:: daml.metrics.ber.BEROutput
 
 ~~~~~~~~~~
 Divergence
 ~~~~~~~~~~
-.. autoclass:: daml.metrics.divergence.HP_FNN
+.. autoclass:: daml.metrics.Divergence
    :members:
    :inherited-members:
-.. autoclass:: daml.metrics.divergence.HP_MST
+
+~~~~~~~~~~~
+Sufficiency
+~~~~~~~~~~~
+.. autoclass:: daml.metrics.Sufficiency
    :members:
    :inherited-members:
-.. autoclass:: daml.metrics.divergence.DivergenceOutput
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Upperbound Average Precision
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. autoclass:: daml.metrics.UAP
+   :members:
+   :inherited-members:
 
 ~~~~~~~~~~~~~~~~~
 Outlier Detection
@@ -45,31 +51,12 @@ Outlier Detection
 .. autoclass:: daml.metrics.outlier_detection.OD_VAEGMM
    :members:
    :inherited-members:
-.. autoclass:: daml.metrics.outlier_detection.OutlierDetectorOutput
-
-~~~~~~~~~~~
-Sufficiency
-~~~~~~~~~~~
-.. autoclass:: daml.metrics.sufficiency.Sufficiency
+.. autoclass:: daml.metrics.outlier_detection.OutlierType()
    :members:
-   :inherited-members:
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Upperbound Average Precision
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.. autoclass:: daml.metrics.uap.UAP_EMP
-   :members:
-   :inherited-members:
-.. autoclass:: daml.metrics.uap.UAPOutput
-
----------------
-Enums and Types
----------------
-.. autoclass:: daml.metrics.outlier_detection.Threshold()
-   :members:                                        
-   :undoc-members:                                  
+   :undoc-members:
    :member-order: bysource
+.. autoclass:: daml.metrics.outlier_detection.Threshold()
 .. autoclass:: daml.metrics.outlier_detection.ThresholdType()
-   :members:                                        
-   :undoc-members:                                  
+   :members:
+   :undoc-members:
    :member-order: bysource

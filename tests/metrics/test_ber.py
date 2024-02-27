@@ -1,28 +1,32 @@
 import numpy as np
 import pytest
 
-from daml.metrics.ber import BER_FNN, BER_MST, BEROutput
+from daml._internal.metrics.utils import get_classes_counts
+from daml.metrics import BER
 
 
 class TestMulticlassBER:
     @pytest.mark.parametrize(
-        "ber_metric, expected",
+        "method, expected",
         [
-            (BER_MST, BEROutput(ber=0.137, ber_lower=0.07132636098401203)),
-            (BER_FNN, BEROutput(ber=0.118, ber_lower=0.061072112753426215)),
+            ("MST", {"ber": 0.137, "ber_lower": 0.07132636098401203}),
+            ("KNN", {"ber": 0.118, "ber_lower": 0.061072112753426215}),
         ],
     )
-    def test_ber_on_mnist(self, ber_metric, expected, mnist):
-        metric = ber_metric(*mnist())
+    def test_ber_on_mnist(self, method, expected, mnist):
+        data, labels = mnist()
+        metric = BER(data, labels, method)
         result = metric.evaluate()
         assert result == expected
 
-    @pytest.mark.parametrize("ber_metric", [BER_MST, BER_FNN])
-    def test_class_min(self, ber_metric):
-        value = None
-        covariates = np.ones(20)
-        labels = np.ones(20)
-        metric = ber_metric(covariates, labels)
+    def test_invalid_method(self):
+        with pytest.raises(KeyError):
+            BER(np.empty([]), np.empty([]), "NOT_A_METHOD")  # type: ignore
+
+    def test_class_min(self):
         with pytest.raises(ValueError):
-            value = metric.evaluate()
-            assert value is not None
+            get_classes_counts(np.ones(20))
+
+    def test_list_class_methods(self):
+        methods = BER.methods()
+        assert len(methods) == 2
