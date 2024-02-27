@@ -58,10 +58,10 @@ class TestAlibiDetect_Functional:
         metric.fit_dataset(images=X_all_ones, epochs=10, verbose=False)
 
         # Evaluate the detector on the dataset of all 1's
-        preds_on_ones = metric.evaluate(X_all_ones).is_outlier
+        preds_on_ones = metric.evaluate(X_all_ones)["is_outlier"]
 
         # Evaluate the detector on the dataset of all 5's
-        preds_on_fives = metric.evaluate(X_all_fives).is_outlier
+        preds_on_fives = metric.evaluate(X_all_fives)["is_outlier"]
 
         # We expect all elements to not be outliers
         num_errors_on_ones = np.sum(np.where(preds_on_ones != 0))
@@ -99,7 +99,7 @@ class TestAlibiDetect_Functional:
         metric.fit_dataset(images=X_all_ones, epochs=10, verbose=False)
 
         # Evaluate the detector on the dataset of all 1's
-        preds_on_ones = metric.evaluate(X_all_ones).is_outlier
+        preds_on_ones = metric.evaluate(X_all_ones)["is_outlier"]
 
         num_errors_on_ones = np.sum(np.where(preds_on_ones != 0))
 

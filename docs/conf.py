@@ -4,7 +4,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 project = "DAML"
-copyright = "2023, ARiA"
+copyright = "2024, ARiA"
 author = "ARiA"
 
 site_url = "https://github.com/aria-ml/daml/"
@@ -52,10 +52,7 @@ def normalize_module(mod_names):
 def setup(app):
     normalize_module(
         [
-            "daml.metrics.ber",
-            "daml.metrics.divergence",
+            "daml.metrics",
             "daml.metrics.outlier_detection",
-            "daml.metrics.sufficiency",
-            "daml.metrics.uap",
         ]
     )

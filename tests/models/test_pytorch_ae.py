@@ -1,13 +1,15 @@
 import pytest
 import torch
+from torch.utils.data import DataLoader
 
-from daml._internal.models.pytorch.autoencoder import (
-    AERunner,
-    AETrainer,
-    AriaAutoencoder,
-    Decoder,
-    Encoder,
-)
+from daml._internal.models.pytorch.autoencoder import get_images_from_batch
+from daml.models.ae import AETrainer, AriaAutoencoder, Decoder, Encoder
+from tests.utils.data import DamlDataset
+
+
+@pytest.fixture
+def dataset(images=None, labels=None, bboxes=None):
+    return DamlDataset(images, labels, bboxes)
 
 
 @pytest.mark.parametrize(
@@ -55,82 +57,91 @@ class TestChannels:
 class TestTrainer:
     """Tests the AETrainer class"""
 
-    def test_no_model_no_channels(self):
-        with pytest.raises(TypeError):
-            AETrainer()
-
-    def test_train_default_model(self):
-        images = torch.ones(size=[1, 3, 32, 32])
-        trainer = AETrainer(channels=3)
-        trainer.train(images, epochs=1)
-
-    def test_train_good_model(self):
-        images = torch.ones(size=[1, 3, 32, 32])
-        model = AriaAutoencoder()
-        trainer = AETrainer(model)
-        trainer.train(images, epochs=1)
+    def test_train_aria_ae(self):
+        """Aria provided autoencoder can be trained"""
+        images = torch.ones(size=(5, 3, 32, 32))
+        dataset = DamlDataset(images)
+        ae = AriaAutoencoder(channels=3)
+        trainer = AETrainer(model=ae)
+        trainer.train(dataset, epochs=5)
 
     def test_train_bad_model(self):
         """
-        If model output image shape != input image shape, it's likely not an AE"""
-        images = torch.ones(size=[1, 3, 32, 32])
+        If model output image shape != input image shape, it's likely not an AE
+        """
+        images = torch.ones(size=(5, 3, 32, 32))
+        dataset = DamlDataset(images)
         model = Encoder()
         trainer = AETrainer(model)
 
         # RuntimeError for unmatching imgs/preds during Loss calculation
         with pytest.raises(RuntimeError):
-            trainer.train(images, epochs=1)
+            trainer.train(dataset, epochs=5)
 
-    def test_batch(self):
-        """Image control logic"""
-        images = torch.ones(size=[10, 3, 32, 32])
-        trainer = AETrainer(channels=3)
-        trainer.train(images, epochs=1, batch_size=10)
+    def test_eval_aria_ae(self):
+        """Aria provided autoencoder has evaluate on new data"""
+        images = torch.ones(size=[5, 3, 32, 32])
+        dataset = DamlDataset(images)
+        ae = AriaAutoencoder(channels=3)
+        trainer = AETrainer(model=ae)
+        loss = trainer.eval(dataset)
+        assert loss > 0
 
-    def test_model(self):
-        pass
+    def test_encode_aria_ae(self):
+        images = torch.ones(size=(5, 3, 32, 32))
+        dataset = DamlDataset(images)
+        ae = AriaAutoencoder(channels=3)
+        trainer = AETrainer(model=ae)
+        embeddings = trainer.encode(dataset)
+        assert embeddings.shape == (5, 64, 7, 7)
 
+    def test_encode_batch(self):
+        images = torch.ones(size=(20, 3, 32, 32))
+        dataset = DamlDataset(images)
+        ae = AriaAutoencoder(channels=3)
+        trainer = AETrainer(model=ae)
+        embeddings = trainer.encode(dataset)
+        # Checks batch stacking functionality
+        assert embeddings.shape == (20, 64, 7, 7)
 
-class TestRunner:
-    """Tests the AERunner class"""
+    def test_encode_missing_encode(self):
+        images = torch.ones(size=(5, 3, 32, 32))
+        dataset = DamlDataset(images)
+        ae = Encoder(channels=3)
+        trainer = AETrainer(model=ae)
+        embeddings = trainer.encode(dataset)
 
-    def test_call(self):
-        """
-        Calls runner as if it was the forward pass of the given model
-        For an AE, it should reconstruct the image
-        """
-        images = torch.ones(size=[1, 3, 32, 32])
-        model = AriaAutoencoder(3)
-        runner = AERunner(model=model)
-        result = runner(images)
+        assert embeddings.shape == (5, 64, 7, 7)
 
-        assert result.shape == images.shape
+    # Parameterizing the 3 following tests causes errors, so split into 3 tests
+    def test_images_from_batch_imgs(self):
+        ds = DamlDataset(torch.ones(size=(8, 3, 32, 32)))
+        imgs = []
+        for batch in DataLoader(dataset=ds, batch_size=8):
+            imgs = get_images_from_batch(batch)
+            assert isinstance(imgs, torch.Tensor)
+            assert imgs.shape == (8, 3, 32, 32)
 
-    def test_encode(self):
-        """
-        Calls encode on a model with the encode function.
-        Returns an encoded image shape (model specific)
-        """
-        images = torch.ones(size=[1, 3, 32, 32])
-        model = AriaAutoencoder(3)
-        runner = AERunner(model=model)
-        result = runner.encode(images)
+    def test_images_from_batch_lbls(self):
+        ds = DamlDataset(torch.ones(size=(8, 3, 32, 32)), torch.ones(size=(8, 1)))
+        imgs = []
+        for batch in DataLoader(dataset=ds, batch_size=8):
+            # print("Batch:", batch)
+            imgs = get_images_from_batch(batch)
+            assert isinstance(imgs, torch.Tensor)
+            assert imgs.shape == (8, 3, 32, 32)
 
-        # Height/Width based on current AE & given image size
-        assert result.shape == (1, 64, 7, 7)
-
-    def test_no_encode(self):
-        """
-        Calls encode on a model that does not have an encode function
-        Returns normal model forward behavior
-        """
-        images = torch.ones(size=[1, 64, 7, 7])
-        model = Decoder(3)  # Decoder does not have an encode function
-        runner = AERunner(model=model)
-        result = runner.encode(images)
-
-        # # Height/Width based on current AE & given image size
-        assert result.shape == (1, 3, 32, 32)
+    def test_images_from_batch_bxs(self):
+        ds = DamlDataset(
+            torch.ones(size=(8, 3, 32, 32)),
+            torch.ones(size=(8, 1)),
+            torch.ones(size=(8, 2)),
+        )
+        imgs = []
+        for batch in DataLoader(dataset=ds, batch_size=8):
+            imgs = get_images_from_batch(batch)
+            assert isinstance(imgs, torch.Tensor)
+            assert imgs.shape == (8, 3, 32, 32)
 
 
 @pytest.mark.parametrize(
@@ -165,30 +176,14 @@ class TestRunner:
     ],
 )
 class TestGPU:
-    def test_runner_device(self, device):
-        model = AriaAutoencoder()
-        runner = AERunner(model=model, device=device)
-
-        # Check runner device set properly
-        assert runner._device == device
-
-        # Check if all params moved to device
-        m = runner._model
-        assert isinstance(m, torch.nn.Module)
-
-        # Need to check device.type as tensor's device automatically selects an index
-        # i.e. param.to("cuda"), param.device equals device(type="cuda", index=0)
-        for param in m.parameters():
-            print(param.device.type)
-            assert param.device.type == torch.device(device).type
-
     def test_trainer_device(self, device):
-        trainer = AETrainer(channels=1, device=device)
+        model = AriaAutoencoder()
+        trainer = AETrainer(model, device=device)
         # Check trainer device set properly
-        assert trainer._device == device
+        assert trainer.device == device
 
         # Check if all params moved to device
-        m = trainer._model
+        m = trainer.model
         assert isinstance(m, torch.nn.Module)
 
         # Need to check device.type as tensor's device automatically selects an index
