@@ -53,20 +53,20 @@ def create_model(
     aegmm_latent_dim: int = 1,
     vaegmm_latent_dim: int = 2,
 ):
-    if class_name == "AlibiAE":
+    if class_name == "OD_AE":
         return AE(
             _get_default_encoder_net(input_shape, encoding_dim),
             _get_default_decoder_net(input_shape, encoding_dim),
         )
 
-    if class_name == "AlibiVAE":
+    if class_name == "OD_VAE":
         return VAE(
             _get_default_encoder_net(input_shape, encoding_dim),
             _get_default_decoder_net(input_shape, encoding_dim),
             encoding_dim,
         )
 
-    if class_name == "AlibiAEGMM":
+    if class_name == "OD_AEGMM":
         n_features = reduce_prod(input_shape)
         n_gmm = 2  # nb of components in GMM
         # The outlier detector is an encoder/decoder architecture
@@ -105,7 +105,7 @@ def create_model(
             n_gmm=n_gmm,
         )
 
-    if class_name == "AlibiVAEGMM":
+    if class_name == "OD_VAEGMM":
         n_features = reduce_prod(input_shape)
 
         # The outlier detector is an encoder/decoder architecture
@@ -144,7 +144,7 @@ def create_model(
             latent_dim=vaegmm_latent_dim,
         )
 
-    if class_name == "AlibiLLR":
+    if class_name == "OD_LLR":
         return PixelCNN(
             image_shape=input_shape,
             num_resnet=5,
@@ -156,4 +156,4 @@ def create_model(
             l2_weight=0.0,
         )
 
-    raise TypeError("Unknown alibi_detect class specified: ", class_name)
+    raise TypeError("Unknown outlier detection class specified: ", class_name)

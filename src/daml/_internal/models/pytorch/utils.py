@@ -2,7 +2,7 @@ from numpy import float32, ndarray
 from torch import Tensor, from_numpy
 
 
-def pytorch_to_numpy(tensor: Tensor) -> ndarray:
+def torch_to_numpy(tensor: Tensor) -> ndarray:
     """
     Converts a PyTorch tensor to a NumPy array
     """
@@ -15,7 +15,7 @@ def pytorch_to_numpy(tensor: Tensor) -> ndarray:
     return x
 
 
-def numpy_to_pytorch(array: ndarray) -> Tensor:
+def numpy_to_torch(array: ndarray) -> Tensor:
     """
     Converts a NumPy array to a PyTorch tensor
     """
@@ -41,7 +41,7 @@ def permute_to_torch(array: ndarray) -> Tensor:
     Tensor
         Tensor containing image data in the format NCHW
     """
-    x = numpy_to_pytorch(array)
+    x = numpy_to_torch(array)
     x = x.permute(0, 3, 1, 2)  # NHWC -> NCHW
     return x
 
@@ -63,5 +63,5 @@ def permute_to_numpy(tensor: Tensor) -> ndarray:
         Array containing image data in the format NHWC
     """
     x = tensor.permute(0, 2, 3, 1)
-    x = pytorch_to_numpy(x)  # NCHW -> NHWC
+    x = torch_to_numpy(x)  # NCHW -> NHWC
     return x
