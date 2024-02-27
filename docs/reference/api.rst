@@ -8,18 +8,30 @@ Metrics
 ~~~~~~~~~~~~~~~~
 Bayes Error Rate
 ~~~~~~~~~~~~~~~~
-.. autoclass:: daml.metrics.ber.BER
+.. autoclass:: daml.metrics.BER
    :members:
    :inherited-members:
-.. autoclass:: daml.metrics.ber.BEROutput
 
 ~~~~~~~~~~
 Divergence
 ~~~~~~~~~~
-.. autoclass:: daml.metrics.divergence.Divergence
+.. autoclass:: daml.metrics.Divergence
    :members:
    :inherited-members:
-.. autoclass:: daml.metrics.divergence.DivergenceOutput
+
+~~~~~~~~~~~
+Sufficiency
+~~~~~~~~~~~
+.. autoclass:: daml.metrics.Sufficiency
+   :members:
+   :inherited-members:
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Upperbound Average Precision
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. autoclass:: daml.metrics.UAP
+   :members:
+   :inherited-members:
 
 ~~~~~~~~~~~~~~~~~
 Outlier Detection
@@ -48,19 +60,3 @@ Outlier Detection
    :members:
    :undoc-members:
    :member-order: bysource
-.. autoclass:: daml.metrics.outlier_detection.OutlierDetectorOutput
-
-~~~~~~~~~~~
-Sufficiency
-~~~~~~~~~~~
-.. autoclass:: daml.metrics.sufficiency.Sufficiency
-   :members:
-   :inherited-members:
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Upperbound Average Precision
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.. autoclass:: daml.metrics.uap.UAP
-   :members:
-   :inherited-members:
-.. autoclass:: daml.metrics.uap.UAPOutput
