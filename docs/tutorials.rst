@@ -9,6 +9,7 @@ In addition to viewing them in our documentation, these notebooks can also be op
 - :doc:`tutorials/ClassLearningCurvesTutorial` (`Colab <https://colab.research.google.com/github/aria-ml/daml/blob/develop/docs/tutorials/ClassLearningCurvesTutorial.ipynb>`__)
 - :doc:`tutorials/DPDivergenceTutorial` (`Colab <https://colab.research.google.com/github/aria-ml/daml/blob/develop/docs/tutorials/DPDivergenceTutorial.ipynb>`__)
 - :doc:`tutorials/OutlierDetectionTutorial` (`Colab <https://colab.research.google.com/github/aria-ml/daml/blob/develop/docs/tutorials/OutlierDetectionTutorial.ipynb>`__)
+- :doc:`tutorials/AETrainerTutorial` (`Colab <https://colab.research.google.com/github/aria-ml/daml/blob/develop/docs/tutorials/AETrainerTutorial.ipynb>`__)
 
 .. toctree::
    :hidden:
@@ -18,3 +19,4 @@ In addition to viewing them in our documentation, these notebooks can also be op
    tutorials/ClassLearningCurvesTutorial.ipynb
    tutorials/DPDivergenceTutorial.ipynb
    tutorials/OutlierDetectionTutorial.ipynb
+   tutorials/AETrainerTutorial.ipynb
