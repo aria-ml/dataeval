@@ -52,10 +52,7 @@ def normalize_module(mod_names):
 def setup(app):
     normalize_module(
         [
-            "daml.metrics.ber",
-            "daml.metrics.divergence",
+            "daml.metrics",
             "daml.metrics.outlier_detection",
-            "daml.metrics.sufficiency",
-            "daml.metrics.uap",
         ]
     )

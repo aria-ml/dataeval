@@ -10,7 +10,7 @@ import torchmetrics
 from torch.utils.data import DataLoader
 
 from daml._internal.metrics.sufficiency import STEPS_KEY
-from daml.metrics.sufficiency import Sufficiency
+from daml.metrics import Sufficiency
 from tests.utils.data import DamlDataset
 
 

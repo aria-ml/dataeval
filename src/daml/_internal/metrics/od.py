@@ -1,13 +1,12 @@
 import math
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, NamedTuple, Optional, Tuple
+from typing import Any, Dict, NamedTuple, Optional, Tuple
 
 import keras
 import numpy as np
 
 from daml import _alibi_detect
-from daml._internal.metrics.outputs import OutlierDetectorOutput
 from daml._internal.models.tensorflow.alibi import create_model
 
 
@@ -266,7 +265,7 @@ class OD_Base(ABC):
     def evaluate(
         self,
         images: np.ndarray,
-    ) -> OutlierDetectorOutput:
+    ) -> Dict[str, np.ndarray]:
         """
         Evaluate the outlier detector metric on a dataset.
 
@@ -277,9 +276,10 @@ class OD_Base(ABC):
 
         Returns
         -------
-        OutlierDetectorOutput
-            Outlier mask, and associated feature and instance scores
-
+        Dict[str, np.ndarray]
+            is_outlier
+            feature_score
+            instance_score
         """
         if self.detector is None or not self.is_trained:
             raise TypeError(
@@ -294,11 +294,11 @@ class OD_Base(ABC):
 
         predictions = self.detector.predict(**self._predict_kwargs)
 
-        output = OutlierDetectorOutput(
-            is_outlier=predictions["data"]["is_outlier"].tolist(),
-            feature_score=predictions["data"]["feature_score"],
-            instance_score=predictions["data"]["instance_score"],
-        )
+        output = {
+            "is_outlier": predictions["data"]["is_outlier"].tolist(),
+            "feature_score": predictions["data"]["feature_score"],
+            "instance_score": predictions["data"]["instance_score"],
+        }
 
         return output
 

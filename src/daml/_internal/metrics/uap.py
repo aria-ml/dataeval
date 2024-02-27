@@ -4,11 +4,12 @@ FR Test Statistic based estimate for the upperbound
 average precision using empirical mean precision
 """
 
+from typing import Dict
+
 import numpy as np
 from sklearn.metrics import average_precision_score
 
 from daml._internal.metrics.base import EvaluateMixin
-from daml._internal.metrics.outputs import UAPOutput
 
 
 class UAP(EvaluateMixin):
@@ -28,12 +29,12 @@ class UAP(EvaluateMixin):
         self.labels = labels
         self.scores = scores
 
-    def evaluate(self) -> UAPOutput:
+    def evaluate(self) -> Dict[str, float]:
         """
         Returns
         -------
-        UAPOutput
-            The empirical mean precision estimate
+        Dict[str, float]
+            uap : The empirical mean precision estimate
 
         Raises
         ------
@@ -43,4 +44,4 @@ class UAP(EvaluateMixin):
         uap = float(
             average_precision_score(self.labels, self.scores, average="weighted")
         )
-        return UAPOutput(uap=uap)
+        return {"uap": uap}
