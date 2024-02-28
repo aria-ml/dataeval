@@ -1,9 +1,17 @@
-[//]: # (a28a5d75c06d3a641529bfe049e6530ec2735a2d)
+[//]: # (b5f9c0dcfb322f1b00ce64f06771a15715856e3f)
 
 # DAML Change Log
+## v0.42.2
+- ```5225c491 - Change output classes to dictionaries```
+- ```1dc23edd - AE Trainer workflow notebook. AE Trainer updates based on notebook```
+- ```45040682 - Make Sufficiency a stateful class and revise SufficiencyOutput```
+- ```7c5fdcff - Pass method as a parameter to determine metric algorithm to use```
+- ```2e883f6d - Add better optimizer to find global minimum```
+- ```c3c78680 - Expose AETrainer to public API to use model multiple times after training```
+- ```93564b95 - Updating pyproject.toml and lock file to set dependency less than numpy 2.0```
+- ```15d9d262 - Refactor internal classes - no functional changes```
+- ```bed4e6f6 - Add script to enable execution on colab```
 ## v0.42.1
-## v0.42.0
-- ```b48c05ca - Release v0.42.0```
 ## v0.42.0
 - ```5dacc855 - Update dependencies and use optional installs```
 - ```a6ce3e72 - Remove UAP_MST metric```
