@@ -1,8 +1,6 @@
 [//]: # (b5f9c0dcfb322f1b00ce64f06771a15715856e3f)
 
 # DAML Change Log
-## Pending Release
-- ```b5f9c0dc - Release v0.42.2```
 ## v0.42.2
 - ```5225c491 - Change output classes to dictionaries```
 - ```1dc23edd - AE Trainer workflow notebook. AE Trainer updates based on notebook```
@@ -14,8 +12,6 @@
 - ```15d9d262 - Refactor internal classes - no functional changes```
 - ```bed4e6f6 - Add script to enable execution on colab```
 ## v0.42.1
-## v0.42.0
-- ```b48c05ca - Release v0.42.0```
 ## v0.42.0
 - ```5dacc855 - Update dependencies and use optional installs```
 - ```a6ce3e72 - Remove UAP_MST metric```
