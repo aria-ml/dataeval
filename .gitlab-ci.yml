@@ -1,6 +1,6 @@
 workflow:
   rules:
-    - if: $CI_COMMIT_BRANCH == 'main'
+    - if: $CI_COMMIT_BRANCH == 'main' || $CI_COMMIT_BRANCH == 'develop'
       changes:
         - "CHANGELOG.md"
       when: never
