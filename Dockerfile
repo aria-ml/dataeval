@@ -33,9 +33,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         wget \
         xz-utils \
         zlib1g-dev
-RUN useradd -m -u 1000 daml
-USER daml
-WORKDIR /home/daml
+ARG USER
+RUN useradd -m -u 1000 ${USER}
+USER ${USER}
+ARG HOME
+WORKDIR ${HOME}
 RUN curl https://pyenv.run | bash
 # ENV PYTHON_CONFIGURE_OPTS '--enable-optimizations --with-lto'
 # ENV PYTHON_CFLAGS '-march=native -mtune=native'
@@ -56,7 +58,8 @@ ARG PYENV_ROOT
 ARG python_version
 RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/pip install --no-cache-dir --disable-pip-version-check poetry
 RUN touch README.md
-COPY --chown=daml:daml pyproject.toml poetry.lock ./
+ARG USER
+COPY --chown=${USER}:${USER} pyproject.toml poetry.lock ./
 RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/poetry install --no-cache --no-root --all-extras
 
 
@@ -68,8 +71,9 @@ COPY --link --from=pyenv  ${PYENV_ROOT}/ ${PYENV_ROOT}/
 # Base image for build runs and devcontainers
 FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 as base
 RUN apt-get update && apt-get install -y --no-install-recommends libgl1
-RUN useradd -m -u 1000 -s /bin/bash daml
-USER daml
+ARG USER
+RUN useradd -m -u 1000 -s /bin/bash ${USER}
+USER ${USER}
 WORKDIR /daml
 ARG PYENV_ROOT
 ENV PYENV_ROOT=${PYENV_ROOT}
@@ -83,7 +87,8 @@ FROM ${deps_image} as deps_image
 FROM base as build
 ARG PYENV_ROOT
 ARG python_version
-COPY --chown=daml:daml --link --from=deps_image ${PYENV_ROOT} ${PYENV_ROOT}
+ARG USER
+COPY --chown=${USER}:${USER} --link --from=deps_image ${PYENV_ROOT} ${PYENV_ROOT}
 RUN ln -s ${PYENV_ROOT}/versions/$(${PYENV_ROOT}/bin/pyenv latest ${python_version}) ${PYENV_ROOT}/versions/${python_version}
 ENV PATH ${PYENV_ROOT}/versions/${python_version}/bin:${PYENV_ROOT}/bin:$PATH
 ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${PYENV_ROOT}/versions/${python_version}/lib/python${python_version}/site-packages/nvidia/cudnn/lib
@@ -91,17 +96,19 @@ ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${PYENV_ROOT}/versions/${python_versio
 
 FROM build as versioned
 RUN touch README.md
-COPY --chown=daml:daml pyproject.toml poetry.lock ./
-COPY --chown=daml:daml src/ src/
+ARG USER
+COPY --chown=${USER}:${USER} pyproject.toml poetry.lock ./
+COPY --chown=${USER}:${USER} src/ src/
 RUN poetry install --no-cache --all-extras --with test,lint,docs
 
 
 FROM versioned as run
-COPY --chown=daml:daml .coveragerc ./
-COPY --chown=daml:daml tests/ tests/
-COPY --chown=daml:daml docs/ docs/
-COPY --chown=daml:daml *.md ./
-COPY --chown=daml:daml run ./
+ARG USER
+COPY --chown=${USER}:${USER} .coveragerc ./
+COPY --chown=${USER}:${USER} tests/ tests/
+COPY --chown=${USER}:${USER} docs/ docs/
+COPY --chown=${USER}:${USER} *.md ./
+COPY --chown=${USER}:${USER} run ./
 ENTRYPOINT [ "./run" ]
 
 
@@ -116,8 +123,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         openssh-server \
         parallel
 RUN addgroup --gid 1001 docker
-RUN usermod -a -G docker daml
-USER daml
+ARG USER
+RUN usermod -a -G docker ${USER}
+USER ${USER}
 ENV LANGUAGE=en
 ENV LC_ALL=C.UTF-8
 ENV LANG=en_US.UTF-8
