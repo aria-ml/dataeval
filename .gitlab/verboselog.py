@@ -8,10 +8,13 @@ class _VerboseSingleton:
         self.verbose = False
 
 
+v = _VerboseSingleton()
+
+
 def verbose(text: str):
-    if _VerboseSingleton().instance.verbose:
+    if v.instance.verbose:
         print(text)
 
 
 def set_verbose(value: bool):
-    _VerboseSingleton().instance.verbose = value
+    v.instance.verbose = value

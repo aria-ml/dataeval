@@ -1,5 +1,5 @@
 from os import environ, path
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union, cast
+from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Union, cast
 
 from requests import Response, get, post, put
 from verboselog import verbose
@@ -140,20 +140,35 @@ class Gitlab:
         r = self._request(post, TAGS, tag_content)
         return r.json()
 
-    def list_merge_requests(self) -> List[Dict[str, Any]]:
+    def list_merge_requests(
+        self,
+        state: Optional[Literal["opened", "closed", "locked", "merged"]] = None,
+        target_branch: Optional[str] = None,
+        source_branch: Optional[str] = None,
+        search_title: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """
         List merge requests
 
         Returns
         -------
         List[Dict[str, Any]]
-            List of merge requests that have been merged
+            List of merge requests found using criteria
 
         Notes
         --------
         https://docs.gitlab.com/ee/api/merge_requests.html#list-merge-requests
         """
-        r = self._request(get, MERGE_REQUESTS, {"state": "merged"})
+        params = dict()
+        if state is not None:
+            params.update({"state": state})
+        if target_branch is not None:
+            params.update({"target_branch": target_branch})
+        if source_branch is not None:
+            params.update({"source_branch": source_branch})
+        if search_title is not None:
+            params.update({"search": search_title, "in": "title"})
+        r = self._request(get, MERGE_REQUESTS, params)
         return r.json()
 
     def create_mr(
@@ -196,6 +211,36 @@ class Gitlab:
                 "source_branch": source_branch,
                 "target_branch": target_branch,
             },
+        )
+        return r.json()
+
+    def update_mr(self, mr_iid: int, title: str, description: str) -> Dict[str, Any]:
+        """
+        Updates a merge request
+
+        Parameters
+        ----------
+        mr_iid : int
+            The id of the merge request to update
+        title : str
+            The title text of the merge request
+        description : str
+            The description text for the body of the merge request
+
+        Returns
+        -------
+        Dict[str, Any]:
+            The response received after issuing the request
+
+        Notes
+        --------
+        https://docs.gitlab.com/ee/api/merge_requests.html#update-mr
+        """
+        r = self._request(
+            put,
+            [MERGE_REQUESTS, str(mr_iid)],
+            None,
+            {"title": title, "description": description},
         )
         return r.json()
 
