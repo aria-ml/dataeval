@@ -16,7 +16,7 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
     "sphinx.ext.graphviz",
-    "sphinx_rtd_size",
+    # "sphinx_rtd_size",
     "myst_nb",
 ]
 
@@ -24,7 +24,7 @@ templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 autosummary_generate = False
-sphinx_rtd_size_width = "80%"
+# sphinx_rtd_size_width = "80%"
 nb_execution_timeout = -1
 
 # html_static_path = ['_static']
