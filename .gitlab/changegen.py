@@ -91,7 +91,9 @@ class ChangeGen:
     def _get_entries(self) -> List[_Entry]:
         entries: List[_Entry] = list()
 
-        for response in self.gl.list_merge_requests():
+        for response in self.gl.list_merge_requests(
+            state="merged", target_branch="develop"
+        ):
             entries.append(_Entry(response))
 
         for response in self.gl.list_tags():
@@ -156,6 +158,16 @@ class ChangeGen:
                 if oldline == "## Pending Release\n":
                     continue
                 lines.append(oldline)
+
+        # fmt: off
+        if target == "merge":
+            lines.append("\n")
+            lines.append("## Criteria For Approval\n")
+            lines.append("- [ ] Ensure all features are complete and ready to ship\n")
+            lines.append("- [ ] Review features released for test coverage and documentation\n")  # noqa: E501
+            lines.append("- [ ] Review documentation generated in pipeline\n")
+            lines.append("- [ ] Ensure all security scans have no critical issues and review any pre-existing issues\n")  # noqa: E501
+        # fmt: on
 
         content = "".join(lines)
 

@@ -46,12 +46,27 @@ if __name__ == "__main__":
         vt = VersionTag(gl)
         title = f"Release {vt.pending}"
         merge = cg.generate("merge")
+        existing = gl.list_merge_requests(
+            "opened",
+            target_branch="main",
+            source_branch="develop",
+            search_title="Release",
+        )
         if merge:
-            print("Creating merge request with following content:")
-            print(merge["description"])
-            if args.commit:
-                response = gl.create_mr(title, merge["description"])
+            if existing:
+                print("Updating existing merge request with following content:")
+                print(merge["description"])
+                if args.commit:
+                    response = gl.update_mr(
+                        existing[0]["iid"], title, merge["description"]
+                    )
+            else:
+                print("Creating merge request with following content:")
+                print(merge["description"])
+                if args.commit:
+                    response = gl.create_mr(title, merge["description"])
         else:
             print("No changes to merge.")
+
     if args.verbose:
         print(response)
