@@ -11,10 +11,9 @@ build:
     python: "3.11"
   jobs:
     post_create_environment:
-      - python -m pip install poetry --upgrade
-      - python -m poetry config virtualenvs.create false
+      - pip install poetry --upgrade
     post_install:
-      - python -m poetry install --all-extras --with docs
+      - VIRTUAL_ENV=$READTHEDOCS_VIRTUALENV_PATH poetry install --all-extras --with docs
 
 # Build documentation in the "docs/" directory with Sphinx
 sphinx:
