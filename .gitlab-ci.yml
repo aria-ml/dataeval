@@ -4,7 +4,7 @@ workflow:
   auto_cancel:
     on_new_commit: interruptible
   rules:
-    - if: $CI_COMMIT_BRANCH == 'main' || $CI_COMMIT_BRANCH == 'develop'
+    - if: $CI_COMMIT_BRANCH == 'main'
       changes:
         - "CHANGELOG.md"
       when: never
@@ -12,7 +12,7 @@ workflow:
       when: never
     - if: $CI_PIPELINE_SOURCE == 'web'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-    - if: $CI_COMMIT_BRANCH == 'main' || $CI_COMMIT_BRANCH == 'develop' || $CI_COMMIT_BRANCH =~ /^releases\/\S+$/
+    - if: $CI_COMMIT_BRANCH == 'main' || $CI_COMMIT_BRANCH =~ /^releases\/\S+$/
 
 default:
   # This should allow pipelines to auto-cancel when redundant:
@@ -36,15 +36,6 @@ stages:
   rules:
     # Only allowed to release from a release branch.
     - if: $CI_COMMIT_BRANCH =~ /^releases\/\S+$/
-
-.on_develop:
-  stage: release
-  environment:
-    name: production
-  before_script:
-    - pip install requests --upgrade
-  rules:
-    - if: $CI_COMMIT_BRANCH == 'develop'
 
 .docker_harbor_required:
   image: docker:24.0-git
@@ -225,7 +216,6 @@ docs:
       - output/docs/html/
 
 pages:
-  extends: .on_develop
   needs:
     - job: docs
       artifacts: true
@@ -258,12 +248,6 @@ changelog:
   script:
     - python .gitlab/release.py update_changelog --commit
 
-create_mr:
-  extends: .on_develop
-  script:
-    - python .gitlab/release.py create_mr --commit
-  allow_failure: true
-
 include:
  - template: Security/Secret-Detection.gitlab-ci.yml
 #  - template: Security/Dependency-Scanning.gitlab-ci.yml
@@ -274,7 +258,6 @@ secret_detection:
   rules:
     - if: $CI_COMMIT_REF_PROTECTED == "true"
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'develop'
 
 # gemnasium-python-dependency_scanning:
 #   needs:
