@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 from matplotlib.figure import Figure
 from scipy.optimize import basinhopping
-from torch.utils.data import DataLoader, Dataset, Subset
+from torch.utils.data import Dataset
 
 from daml._internal.metrics.base import EvaluateMixin
 
@@ -133,19 +133,19 @@ class Sufficiency(EvaluateMixin):
         Full training data that will be split for each run
     test_ds : Dataset
         Data that will be used for every run's evaluation
-    train_fn : Callable[[torch.nn.Module, torch.utils.data.DataLoader], None]
-        Function which takes a model (nn.Module) and a data loader (DataLoader)
-        and executes model training against the data.
-    eval_fn : Callable[[torch.nn.Module, torch.utils.data.DataLoader], float]
-        Function which takes a model (nn.Module) and a data loader (DataLoader)
-        and returns a float which is used to assess model performance given
-        the model and data.
+    train_fn : Callable[[nn.Module, Dataset, Sequence[int]], None]
+        Function which takes a model (torch.nn.Module), a dataset
+        (torch.utils.data.Dataset), indices to train on and executes model
+        training against the data.
+    eval_fn : Callable[[nn.Module, Dataset], Dict[str, float]]
+        Function which takes a model (torch.nn.Module), a dataset
+        (torch.utils.data.Dataset) and returns a dictionary of metric
+        values (Dict[str, float]) which is used to assess model performance
+        given the model and data.
     runs : int
         Number of models to run over all subsets
     substeps : int
         Total number of dataset partitions that each model will train on
-    batch_size : int, default 8
-        The number of data points to be grouped during training and evaluation
     train_kwargs : Dict[str, Any] | None, default None
         Additional arguments required for custom training function
     eval_kwargs : Dict[str, Any] | None, default None
@@ -157,11 +157,10 @@ class Sufficiency(EvaluateMixin):
         model: nn.Module,
         train_ds: Dataset,
         test_ds: Dataset,
-        train_fn: Callable[[torch.nn.Module, DataLoader], None],
-        eval_fn: Callable[[torch.nn.Module, DataLoader], Dict[str, float]],
+        train_fn: Callable[[nn.Module, Dataset, Sequence[int]], None],
+        eval_fn: Callable[[nn.Module, Dataset], Dict[str, float]],
         runs: int = 1,
         substeps: int = 5,
-        batch_size: int = 8,
         train_kwargs: Optional[Dict[str, Any]] = None,
         eval_kwargs: Optional[Dict[str, Any]] = None,
     ):
@@ -172,7 +171,6 @@ class Sufficiency(EvaluateMixin):
         self.eval_fn = eval_fn
         self.runs = runs
         self.substeps = substeps
-        self.batch_size = batch_size
         self.train_kwargs = train_kwargs
         self.eval_kwargs = eval_kwargs
 
@@ -196,21 +194,21 @@ class Sufficiency(EvaluateMixin):
         self._test_ds = value
 
     @property
-    def train_fn(self):
+    def train_fn(self) -> Callable[[nn.Module, Dataset, Sequence[int]], None]:
         return self._train_fn
 
     @train_fn.setter
-    def train_fn(self, value: Callable[[torch.nn.Module, DataLoader], None]):
+    def train_fn(self, value: Callable[[nn.Module, Dataset, Sequence[int]], None]):
         if not callable(value):
             raise TypeError("Must provide a callable for train_fn.")
         self._train_fn = value
 
     @property
-    def eval_fn(self):
+    def eval_fn(self) -> Callable[[nn.Module, Dataset], Dict[str, float]]:
         return self._eval_fn
 
     @eval_fn.setter
-    def eval_fn(self, value: Callable[[torch.nn.Module, DataLoader], Dict[str, float]]):
+    def eval_fn(self, value: Callable[[nn.Module, Dataset], Dict[str, float]]):
         if not callable(value):
             raise TypeError("Must provide a callable for eval_fn.")
         self._eval_fn = value
@@ -259,16 +257,20 @@ class Sufficiency(EvaluateMixin):
             model = reset_parameters(self.model)
             # Run the model with each substep of data
             for iteration, substep in enumerate(ranges):
-                # We warm start on new data
-                subset = Subset(self.train_ds, indices[:substep].tolist())
-
                 # train on subset of train data
-                train_loader = DataLoader(subset, batch_size=self.batch_size)
-                self.train_fn(model, train_loader, **self.train_kwargs)
+                self.train_fn(
+                    model,
+                    self.train_ds,
+                    indices[:substep].tolist(),
+                    **self.train_kwargs,
+                )
 
                 # evaluate on test data
-                test_loader = DataLoader(self.test_ds, batch_size=self.batch_size)
-                output = self.eval_fn(model, test_loader, **self.eval_kwargs)
+                output = self.eval_fn(
+                    model,
+                    self.test_ds,
+                    **self.eval_kwargs,
+                )
 
                 # Keep track of each measures values
                 for name, value in output.items():
