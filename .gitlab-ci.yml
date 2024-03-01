@@ -12,7 +12,7 @@ workflow:
       when: never
     - if: $CI_PIPELINE_SOURCE == 'web'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-    - if: $CI_COMMIT_BRANCH == 'main' || $CI_COMMIT_BRANCH == 'develop'
+    - if: $CI_COMMIT_BRANCH == 'main' || $CI_COMMIT_BRANCH == 'develop' || $CI_COMMIT_BRANCH =~ /^releases\/\S+$/
 
 default:
   # This should allow pipelines to auto-cancel when redundant:
@@ -34,10 +34,8 @@ stages:
   before_script:
     - pip install requests build twine --upgrade
   rules:
-    - if: $CI_COMMIT_BRANCH == 'main'
-      changes:
-        - src/**/*
-        - pyproject.toml
+    # Only allowed to release from a release branch.
+    - if: $CI_COMMIT_BRANCH =~ /^releases\/\S+$/
 
 .on_develop:
   stage: release
@@ -148,6 +146,34 @@ functional:
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
       when: on_success
     - when: never
+
+# This job should only run if all the "needs" have succeeded,
+# and it creates a tag that signifies that all testing has passed.
+tag release candidate:
+  stage: release
+  environment:
+    name: production
+  needs: [docs, linting, test, functional]
+  script:
+    - pip install requests
+    - .gitlab/update_latest_known_good.py
+  rules:
+    # Only allowed to tag `main` when everything passes
+    - if: $CI_COMMIT_BRANCH == 'main'
+
+# This job runs and creates a branch from the latest known good tag,
+# when this branch is created a pipeline will run automatically.
+create release branch:
+  stage: release
+  environment:
+    name: production
+  image: python:$PYTHON_LATEST_SUPPORTED_VERSION
+  script:
+    - pip install requests
+    - .gitlab/create_release_branch.py
+  rules:
+    # Only allowed to create a release branch off of `main` with CREATE_NEW_RELEASE set
+    - if: $CI_COMMIT_BRANCH == 'main' && $CREATE_NEW_RELEASE != null
 
 lite:
   stage: test
