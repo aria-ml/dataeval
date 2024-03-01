@@ -1,7 +1,7 @@
 from os import environ, path
 from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Union, cast
 
-from requests import Response, get, post, put
+from requests import Response, delete, get, post, put
 from verboselog import verbose
 
 DAML_PROJECT_URL = "https://gitlab.jatic.net/api/v4/projects/151/"
@@ -10,6 +10,9 @@ COMMITS = "repository/commits"
 FILES = "repository/files"
 MERGE_REQUESTS = "merge_requests"
 TAGS = "repository/tags"
+BRANCHES = "repository/branches"
+
+LATEST_KNOWN_GOOD = "latest-known-good"
 
 
 class Gitlab:
@@ -138,6 +141,53 @@ class Gitlab:
         if message is not None:
             tag_content.update({"message": message})
         r = self._request(post, TAGS, tag_content)
+        return r.json()
+
+    def delete_tag(self, tag_name: str):
+        """
+        Delete a tag
+
+        Parameters
+        ----------
+        tag_name : str
+            The name of the tag (e.g. "v0.1.0")
+
+        Returns
+        -------
+        None
+
+        Notes
+        --------
+        https://docs.gitlab.com/ee/api/tags.html#delete-a-tag
+        """
+
+        try:
+            self._request(delete, f"{TAGS}/{tag_name}")
+        except ConnectionError as e:
+            status_code = int(str(e))
+            # Don't fail if the tag doesn't exist (i.e. function is idempotent)
+            if status_code != 404:
+                raise e
+
+    def create_repository_branch(self, branch: str, ref: str) -> Dict[str, Any]:
+        """
+        Create a repository branch
+
+        Parameters
+        ----------
+        branch_name : str
+            The name of the branch (e.g. "releases/vX.Y")
+
+        Returns
+        -------
+        Dict[str, Any]:
+            The response received after issuing the request
+
+        Notes
+        --------
+        https://docs.gitlab.com/ee/api/branches.html#create-repository-branch
+        """
+        r = self._request(post, BRANCHES, {"branch": branch, "ref": ref})
         return r.json()
 
     def list_merge_requests(
