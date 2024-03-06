@@ -166,7 +166,7 @@ Hotfixes are merged directly in to `main` and the change is cherry-picked in to 
     - `create_mr`: creates or updates the merge request from develop->main with features included in the pending release
 - Merge requests from `develop` to `main` will trigger baseline with functional tests
   - Run additional jobs: `functional`->`coverage`
-- Hotfixes branch from `main` and merged directly back in to `main`
+- TODO: Hotfixes branch from `main` and merged directly back in to `main`
   - The commit for the hotfix will then be cherry-picked in to `develop`
 - Completed merge requests in to `main` will trigger baseline and additionally
   - Run additional jobs: `changelog`, `publish`, `tag`
