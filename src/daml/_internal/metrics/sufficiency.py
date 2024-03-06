@@ -1,4 +1,3 @@
-from collections import defaultdict
 from typing import Any, Callable, Dict, List, Optional, Sequence, Union, cast
 
 import matplotlib.pyplot as plt
@@ -102,23 +101,54 @@ def validate_output(data: Dict[str, np.ndarray]):
 
 
 def project_steps(
-    data: Dict[str, np.ndarray],
-    measure: str,
+    measure: np.ndarray,
     steps: np.ndarray,
+    projection: np.ndarray,
 ) -> np.ndarray:
     """Projects the measures for each value of X
 
     Parameters
     ----------
-    data : Dict[str, np.ndarray]
-        Dataclass containing the average of each measure per substep
-    measure : str
-        Key for measure on which to generate projections
+    measure : np.ndarray
+        Measures from which to extrapolate projection
     steps : np.ndarray
-        Steps to project
+        Steps of the taken measures
+    projection : np.ndarray
+        Steps to extrapolate
     """
-    params = calc_params(p_i=(1 - data[measure]), n_i=data[STEPS_KEY])
-    return 1 - f_out(steps, params)
+    params = calc_params(p_i=(1 - measure), n_i=steps)
+    return 1 - f_out(projection, params)
+
+
+def plot_measure(
+    name: str,
+    steps: np.ndarray,
+    measure: np.ndarray,
+    projection: np.ndarray,
+) -> Figure:
+    fig = plt.figure()
+    fig = cast(Figure, fig)
+    fig.tight_layout()
+
+    ax = fig.add_subplot(111)
+
+    ax.set_title(f"{name} Sufficiency")
+    ax.set_ylabel(f"{name}")
+    ax.set_xlabel("Steps")
+
+    # Plot measure over each step
+    ax.scatter(steps, measure, label=f"Model Results ({name})", s=15, c="black")
+
+    # Plot extrapolation
+    ax.plot(
+        projection,
+        project_steps(measure, steps, projection),
+        linestyle="dashed",
+        label=f"Potential Model Results ({name})",
+    )
+
+    ax.legend()
+    return fig
 
 
 class Sufficiency(EvaluateMixin):
@@ -158,7 +188,9 @@ class Sufficiency(EvaluateMixin):
         train_ds: Dataset,
         test_ds: Dataset,
         train_fn: Callable[[nn.Module, Dataset, Sequence[int]], None],
-        eval_fn: Callable[[nn.Module, Dataset], Dict[str, float]],
+        eval_fn: Callable[
+            [nn.Module, Dataset], Union[Dict[str, float], Dict[str, np.ndarray]]
+        ],
         runs: int = 1,
         substeps: int = 5,
         train_kwargs: Optional[Dict[str, Any]] = None,
@@ -204,11 +236,18 @@ class Sufficiency(EvaluateMixin):
         self._train_fn = value
 
     @property
-    def eval_fn(self) -> Callable[[nn.Module, Dataset], Dict[str, float]]:
+    def eval_fn(
+        self,
+    ) -> Callable[[nn.Module, Dataset], Union[Dict[str, float], Dict[str, np.ndarray]]]:
         return self._eval_fn
 
     @eval_fn.setter
-    def eval_fn(self, value: Callable[[nn.Module, Dataset], Dict[str, float]]):
+    def eval_fn(
+        self,
+        value: Callable[
+            [nn.Module, Dataset], Union[Dict[str, float], Dict[str, np.ndarray]]
+        ],
+    ):
         if not callable(value):
             raise TypeError("Must provide a callable for eval_fn.")
         self._eval_fn = value
@@ -246,8 +285,7 @@ class Sufficiency(EvaluateMixin):
         )  # Start, Stop, Num steps
         ranges = np.geomspace(*geomshape).astype(np.int64)
 
-        # When given a new key (measure name), create an array of zeros as value
-        metric_outputs = defaultdict(lambda: np.zeros(self.substeps))
+        metric_outputs = dict()
 
         # Run each model over all indices
         for _ in range(self.runs):
@@ -277,12 +315,22 @@ class Sufficiency(EvaluateMixin):
                     if name == STEPS_KEY:
                         raise KeyError(f"Cannot use '{STEPS_KEY}' as a metric name.")
 
+                    if name not in metric_outputs.keys():
+                        shape = (
+                            (self.substeps, len(value))
+                            if isinstance(value, np.ndarray)
+                            else self.substeps
+                        )
+                        metric_outputs[name] = np.zeros(shape)
+
                     # Sum result into current substep iteration to be averaged later
                     metric_outputs[name][iteration] += value
 
         output = dict({STEPS_KEY: ranges})
         # The mean for each measure must be calculated before being returned
-        output.update({name: (v / self.runs) for name, v in metric_outputs.items()})
+        output.update(
+            {name: value / self.runs for name, value in metric_outputs.items()}
+        )
 
         return output
 
@@ -290,17 +338,14 @@ class Sufficiency(EvaluateMixin):
     def project(
         cls,
         data: Dict[str, np.ndarray],
-        measure: str,
-        steps: Union[int, Sequence[int], np.ndarray],
-    ) -> np.ndarray:
+        projection: Union[int, Sequence[int], np.ndarray],
+    ) -> Dict[str, np.ndarray]:
         """Projects the measures for each value of X
 
         Parameters
         ----------
         data : Dict[str, np.ndarray]
             Dataclass containing the average of each measure per substep
-        measure : str
-            Key for measure on which to generate projections
         steps : Union[int, np.ndarray]
             Step or steps to project
 
@@ -313,14 +358,35 @@ class Sufficiency(EvaluateMixin):
             If the steps are not int, Sequence[int] or an ndarray
         """
         validate_output(data)
-        steps = [steps] if isinstance(steps, int) else steps
-        steps = np.array(steps) if isinstance(steps, Sequence) else steps
-        if not isinstance(steps, np.ndarray):
+        projection = [projection] if isinstance(projection, int) else projection
+        projection = (
+            np.array(projection) if isinstance(projection, Sequence) else projection
+        )
+        if not isinstance(projection, np.ndarray):
             raise ValueError("'steps' must be an int, Sequence[int] or ndarray")
-        return project_steps(data, measure, steps)
+
+        output = dict()
+        output[STEPS_KEY] = projection
+        for name, measure in data.items():
+            if name == STEPS_KEY:
+                continue
+
+            if len(measure.shape) > 1:
+                result = list()
+                for i in range(measure.shape[1]):
+                    projected = project_steps(
+                        measure[:, i], data[STEPS_KEY], projection
+                    )
+                    result.append(projected)
+                output[name] = np.array(result).T
+            else:
+                output[name] = project_steps(measure, data[STEPS_KEY], projection)
+        return output
 
     @classmethod
-    def plot(cls, data: Dict[str, np.ndarray]) -> List[Figure]:
+    def plot(
+        cls, data: Dict[str, np.ndarray], class_names: Optional[Sequence[str]] = None
+    ) -> List[Figure]:
         """Plotting function for data sufficiency tasks
 
         Parameters
@@ -343,41 +409,36 @@ class Sufficiency(EvaluateMixin):
         validate_output(data)
 
         # X, y data
-        X = data[STEPS_KEY]
+        steps = data[STEPS_KEY]
 
         # Extrapolation parameters
-        last_X = X[-1]
-        geomshape = (0.01 * last_X, last_X * 4, len(X))
+        last_X = steps[-1]
+        geomshape = (0.01 * last_X, last_X * 4, len(steps))
         extrapolated = np.geomspace(*geomshape).astype(np.int64)
 
         # Stores all plots
         plots = []
 
         # Create a plot for each measure on one figure
-        for measure, values in data.items():
-            if measure == STEPS_KEY:
+        for name, measure in data.items():
+            if name == STEPS_KEY:
                 continue
-            fig = plt.figure()
-            fig = cast(Figure, fig)
-            fig.tight_layout()
 
-            ax = fig.add_subplot(111)
+            if len(measure.shape) > 1:
+                if class_names is not None and measure.shape[1] != len(class_names):
+                    raise IndexError("Class name count does not align with measures")
+                for i in range(measure.shape[1]):
+                    class_name = str(i) if class_names is None else class_names[i]
+                    fig = plot_measure(
+                        name + "_" + class_name,
+                        steps,
+                        measure[:, i],
+                        extrapolated,
+                    )
+                    plots.append(fig)
 
-            ax.set_title(f"{measure} Sufficiency")
-            ax.set_ylabel(f"{measure}")
-            ax.set_xlabel("Steps")
-
-            # Plot measure over each step
-            ax.scatter(X, values, label="Model Results", s=15, c="black")
-
-            # Plot extrapolation
-            ax.plot(
-                extrapolated,
-                project_steps(data, measure, extrapolated),
-                linestyle="dashed",
-                label="Potential Model Results",
-            )
-            ax.legend()
-            plots.append(fig)
+            else:
+                fig = plot_measure(name, steps, measure, extrapolated)
+                plots.append(fig)
 
         return plots
