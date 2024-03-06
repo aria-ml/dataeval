@@ -138,3 +138,7 @@ DAML uses containers to normalize environments for testing and development.  The
 - Note: The python version argument is optional for `./run`, and it will use the active version of python if not specified.
 - Note: The `./run` command executes on your local devcontainer which already has GPU access enabled.
 - Note: Adding a convenience parameter to `./run` is coming soon.
+
+### Developing research/prototype code
+
+This repo contains a specific location for prototype code that is being used for R&D work. This segregates incomplete/untested/undocumented work from released work to ensure that the `main` branch remains in a state that can be released/shipped at any point.
