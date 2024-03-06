@@ -177,6 +177,8 @@ class TestSufficiency:
                 eval_fn=NonCallableMagicMock(),
             )
 
+
+class TestSufficiencyPlot:
     def test_plot(self):
         """Tests that a plot is generated"""
         # Only needed for plotting test
@@ -201,10 +203,62 @@ class TestSufficiency:
         assert len(result) == 3
         assert isinstance(result[0], Figure)
 
+    def test_multiplot_classwise(self):
+        output = {
+            STEPS_KEY: np.array([10, 100, 1000]),
+            "test1": np.array([[0.2, 0.3], [0.6, 0.4], [0.9, 0.8]]),
+        }
+
+        result = Sufficiency.plot(output)
+        assert len(result) == 2
+        assert isinstance(result[0], Figure)
+
+    def test_multiplot_classwise_invalid_names(self):
+        output = {
+            STEPS_KEY: np.array([10, 100, 1000]),
+            "test1": np.array([[0.2, 0.3], [0.6, 0.4], [0.9, 0.8]]),
+        }
+
+        with pytest.raises(IndexError):
+            Sufficiency.plot(output, ["A", "B", "C"])
+
+    def test_multiplot_classwise_with_names(self):
+        output = {
+            STEPS_KEY: np.array([10, 100, 1000]),
+            "test1": np.array([[0.2, 0.3], [0.6, 0.4], [0.9, 0.8]]),
+        }
+
+        result = Sufficiency.plot(output, ["A", "B"])
+        assert result[0].axes[0].get_title().startswith("test1_A")
+
+    def test_multiplot_classwise_without_names(self):
+        output = {
+            STEPS_KEY: np.array([10, 100, 1000]),
+            "test1": np.array([[0.2, 0.3], [0.6, 0.4], [0.9, 0.8]]),
+        }
+
+        result = Sufficiency.plot(output)
+        assert result[0].axes[0].get_title().startswith("test1_0")
+
+    def test_multiplot_mixed(self):
+        output = {
+            STEPS_KEY: np.array([10, 100, 1000]),
+            "test1": np.array([[0.2, 0.3], [0.6, 0.4], [0.9, 0.8]]),
+            "test2": np.array([0.2, 0.6, 0.9]),
+        }
+
+        result = Sufficiency.plot(output)
+        assert len(result) == 3
+        assert result[0].axes[0].get_title().startswith("test1_0")
+        assert result[1].axes[0].get_title().startswith("test1_1")
+        assert result[2].axes[0].get_title().startswith("test2")
+
+
+class TestSufficiencyProject:
     def test_no_steps_key(self):
         output = {"test1": np.array([0.2, 0.6, 0.9])}
         with pytest.raises(KeyError):
-            Sufficiency.project(output, "test1", 10000)
+            Sufficiency.project(output, 10000)
 
     def test_measure_length_invalid(self):
         output = {
@@ -212,7 +266,7 @@ class TestSufficiency:
             "test1": np.array([0.2, 0.6, 0.9]),
         }
         with pytest.raises(ValueError):
-            Sufficiency.project(output, "test1", 10000)
+            Sufficiency.project(output, 10000)
 
     @pytest.mark.parametrize("steps", [100, [100], np.array([100])])
     def test_project(self, steps):
@@ -220,8 +274,8 @@ class TestSufficiency:
             STEPS_KEY: np.array([10, 100, 1000]),
             "test1": np.array([0.2, 0.6, 0.9]),
         }
-        result = Sufficiency.project(output, "test1", steps)
-        npt.assert_almost_equal(result, [0.6], decimal=4)
+        result = Sufficiency.project(output, steps)
+        npt.assert_almost_equal(result["test1"], [0.6], decimal=4)
 
     def test_project_invalid_steps(self):
         output = {
@@ -229,4 +283,26 @@ class TestSufficiency:
             "test1": np.array([0.2, 0.6, 0.9]),
         }
         with pytest.raises(ValueError):
-            Sufficiency.project(output, "test1", 1.0)  # type: ignore
+            Sufficiency.project(output, 1.0)  # type: ignore
+
+    def test_project_classwise(self):
+        output = {
+            STEPS_KEY: np.array([10, 100, 1000]),
+            "test1": np.array([[0.2, 0.3], [0.6, 0.4], [0.9, 0.8]]),
+        }
+
+        result = Sufficiency.project(output, [1000, 2000, 4000, 8000])
+        assert len(result.keys()) == 2
+        assert result["test1"].shape == (4, 2)
+
+    def test_project_mixed(self):
+        output = {
+            STEPS_KEY: np.array([10, 100, 1000]),
+            "test1": np.array([[0.2, 0.3], [0.6, 0.4], [0.9, 0.8]]),
+            "test2": np.array([0.2, 0.6, 0.9]),
+        }
+
+        result = Sufficiency.project(output, [1000, 2000, 4000, 8000])
+        assert len(result.keys()) == 3
+        assert result["test1"].shape == (4, 2)
+        assert result["test2"].shape == (4,)
