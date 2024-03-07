@@ -149,13 +149,13 @@ This section outlines the branching and release strategy used for DAML.
 
 ### Branching Strategy
 
-Development is done using Github flow branching strategy.  Feature development is done on short-lived branches against `main` branch and merged in to `main` as frequently as possible, with the idea that `main` is ready to ship at any interval.  If changes are not ready to be released, they should be not part of the public facing API and encapsulated in the `_prototype` subpackage.
+Development is done using trunk-based development strategy.  Feature development is done on short-lived branches against `main` branch and merged in to `main` as frequently as possible, with the idea that `main` is ready to ship at any interval.  If changes are not ready to be released, they should not be part of the public facing API and encapsulated in the `_prototype` subpackage.
 
-As the feature nears completion, the code should move to the `_internal` subpackage and be exposed through our public facing API.  Docstrings, tutorials, how-tos, and other relevant deliverables should be prepared along-side.
+As development nears completion, the code should move to the `_internal` subpackage and be exposed through our public facing API.  Docstrings, tutorials, how-tos, and other relevant deliverables should be prepared along-side.
 
-After merge requests in to `main` are completed, additional validation in the form of extensive functional tests are run.  If this post-merge pipeline succeeds, the build is tagged with `last-known-good`. At some regular cadence which has yet to be determined, a branch is created off of `main` to `releases/vX.X.X` and triggers release to PyPI and ReadTheDocs.
+After merge requests in to `main` are completed, additional validation in the form of extensive functional tests are run.  On post-merge commit pipeline success, the build is tagged with `last-known-good`. On a regular cadence (TBD), a branch is created off of `main` to `releases/vX.X.X` and triggers release to PyPI and ReadTheDocs.
 
-Hotfixes for particular feauture relases are merged directly in to relevant `releases/vX.X.X` branch and the change is cherry-picked in to `main`.
+Hotfixes for particular feauture relases are merged directly in to the relevant `releases/vX.X.X` branch and the change is cherry-picked in to `main`.
 
 ### Branching Diagram
 ![image info](.gitlab/branching.png)
@@ -172,11 +172,11 @@ Hotfixes for particular feauture relases are merged directly in to relevant `rel
     - `tag release candidate`: adds the `last-known-good` tag to the build on successful run of tests
 - TODO: At some cadence TBD, a scheduled pipeline will run against `last-known-good` tag
   - Run additional jobs: `create release branch`
-- TODO: Hotfixes branch from `main` and merged directly back in to `main`
-  - The commit for the hotfix will then be cherry-picked in to `develop`
+- TODO: Hotfixes branch from the relevant `releases/vX.X.X` and are merged back in
+  - The commit for the hotfix will then be cherry-picked in to `main`
 - New branches in the `releases/vX.X.X` path will trigger baseline and additionally
   - Run additional jobs: `changelog`, `publish`, `tag`
-  - `changelog`: updates the changelog in develop with new features and cherry picks change into main
+  - TODO: `changelog`: updates the changelog in `main` with new features and cherry picks change into `releases/vX.X.X`
   - `publish`: packages DAML and publishes to JATIC Gitlab internal repository
   - `tag`: adds an annotated tag with version number for the change
 
