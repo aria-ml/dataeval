@@ -149,11 +149,13 @@ This section outlines the branching and release strategy used for DAML.
 
 ### Branching Strategy
 
-Development is done using a lightweight version of Gitflow.  There are 2 long lived branches, `develop` and `main`.  Development happens against the `develop` branch and changes merged in to `develop` are added to a new or existing merge request in to `main`.
+Development is done using Github flow branching strategy.  Feature development is done on short-lived branches against `main` branch and merged in to `main` as frequently as possible, with the idea that `main` is ready to ship at any interval.  If changes are not ready to be released, they should be not part of the public facing API and encapsulated in the `_prototype` subpackage.
 
-The merge request in to `main` includes additional validation in the form of extensive functional tests.  After feature validation is performed and documentation is reviewed, the merge request is approved and `develop` is merged in to `main`, which triggers release to PyPI and ReadTheDocs.
+As the feature nears completion, the code should move to the `_internal` subpackage and be exposed through our public facing API.  Docstrings, tutorials, how-tos, and other relevant deliverables should be prepared along-side.
 
-Hotfixes are merged directly in to `main` and the change is cherry-picked in to `develop`.
+After merge requests in to `main` are completed, additional validation in the form of extensive functional tests are run.  If this post-merge pipeline succeeds, the build is tagged with `last-known-good`. At some regular cadence which has yet to be determined, a branch is created off of `main` to `releases/vX.X.X` and triggers release to PyPI and ReadTheDocs.
+
+Hotfixes for particular feauture relases are merged directly in to relevant `releases/vX.X.X` branch and the change is cherry-picked in to `main`.
 
 ### Branching Diagram
 ![image info](.gitlab/branching.png)
@@ -162,17 +164,17 @@ Hotfixes are merged directly in to `main` and the change is cherry-picked in to 
 - `.gitlab-ci.yaml`
 - Pipelines will always run as baseline:
   - `build`, `linting`, `lite`, `docs`, `test`->`coverage` (or `functional` superset)
-- Feature work should happen in short-lived (as much as possible) branches off of `develop`
-- Merge requests from features to `develop` will trigger baseline run
-- Completed merge requests in to `develop` will trigger baseline and additionally
-  - Run additional jobs: `create_mr`, `pages`->`pages:deploy`
+- Feature work should happen in short-lived (as much as possible) branches off of `main`
+- Merge requests from features to `main` will trigger baseline run
+- TODO: Completed merge requests in to `main` will trigger baseline run with functional tests and
+  - Run additional jobs: `tag release candidate`, `pages`->`pages:deploy`
     - `pages`->`pages:deploy`: pushes artifacts from docs to pages html server
-    - `create_mr`: creates or updates the merge request from develop->main with features included in the pending release
-- Merge requests from `develop` to `main` will trigger baseline with functional tests
-  - Run additional jobs: `functional`->`coverage`
+    - `tag release candidate`: adds the `last-known-good` tag to the build on successful run of tests
+- TODO: At some cadence TBD, a scheduled pipeline will run against `last-known-good` tag
+  - Run additional jobs: `create release branch`
 - TODO: Hotfixes branch from `main` and merged directly back in to `main`
   - The commit for the hotfix will then be cherry-picked in to `develop`
-- Completed merge requests in to `main` will trigger baseline and additionally
+- New branches in the `releases/vX.X.X` path will trigger baseline and additionally
   - Run additional jobs: `changelog`, `publish`, `tag`
   - `changelog`: updates the changelog in develop with new features and cherry picks change into main
   - `publish`: packages DAML and publishes to JATIC Gitlab internal repository
@@ -180,9 +182,9 @@ Hotfixes are merged directly in to `main` and the change is cherry-picked in to 
 
 ### Github Actions
 - `.github/workflows/publish.yml`
-- This action is configured on new tags to publish to pypi
+- TODO VERIFY: This action is configured on new tags to publish to pypi
 
 ### ReadTheDocs Pipeline
 -----------
 - `.readthedocs.yaml`
-- The pipeline is configured to build documentation using Sphinx on changes to the Github repository for branches `develop` and `main`: 
+- TODO: The pipeline is configured to build documentation using Sphinx on changes to the Github repository for branches in the `releases` path
