@@ -1,4 +1,8 @@
 workflow:
+  # Allows jobs in this workflow to be interrupted:
+  # https://gitlab.jatic.net/help/ci/yaml/index.md#workflowauto_cancelon_new_commit
+  auto_cancel:
+    on_new_commit: interruptible
   rules:
     - if: $CI_COMMIT_BRANCH == 'main' || $CI_COMMIT_BRANCH == 'develop'
       changes:
