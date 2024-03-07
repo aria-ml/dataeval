@@ -11,6 +11,10 @@ workflow:
     - if: $CI_COMMIT_BRANCH == 'main' || $CI_COMMIT_BRANCH == 'develop'
 
 default:
+  # This should allow pipelines to auto-cancel when redundant:
+  # https://gitlab.jatic.net/help/ci/pipelines/settings.md#auto-cancel-redundant-pipelines
+  # https://gitlab.jatic.net/help/ci/yaml/index.md#interruptible
+  interruptible: true
   tags:
     - autoscaler
 
