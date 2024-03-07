@@ -32,6 +32,7 @@ case $1 in
     "unit"|"func")
         if [ "$1" == "unit" ]; then export CUDA_VISIBLE_DEVICES=-1; fi
         if [ "$1" == "func" ]; then args="--runfunctional"; fi
+        poetry --quiet run pytest tests/check_prototype.py --verbose --pythonwarnings ignore::DeprecationWarning
         poetry --quiet run coverage run --data-file=output/.coverage.$1.$pver --source=daml --branch -m pytest $args --junitxml=output/junit.$1.$pver.xml --verbose --durations=0 --pythonwarnings ignore::DeprecationWarning
         poetry --quiet run coverage report --data-file=output/.coverage.$1.$pver
         poetry --quiet run coverage xml --data-file=output/.coverage.$1.$pver --skip-empty -o output/coverage.$1.$pver.xml
