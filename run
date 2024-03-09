@@ -12,6 +12,7 @@ Tasks:
   type    run typecheck
   lint    run static code analysis
   docs    generate documentation
+  qdocs  generate docs without notebooks
 EOF
 exit $1
 }
@@ -21,7 +22,7 @@ if [ ! -f /.dockerenv ]; then
     echo
 fi
 
-declare -A supported_tasks=([unit]=1 [func]=1 [lite]=1 [type]=1 [lint]=1 [docs]=1)
+declare -A supported_tasks=([unit]=1 [func]=1 [lite]=1 [type]=1 [lint]=1 [docs]=1 [qdocs]=1)
 
 # validate args
 if (( $# != 1 )); then echo Too many parameters; showHelp 1; fi
@@ -57,10 +58,14 @@ case $1 in
         poetry --quiet run isort --check --diff .
         poetry --quiet run codespell
         ;;
-    "docs")
+    "docs"|"qdocs")
         if [[ $pver == 3.8 ]]; then echo "Generating docs is not supported in python 3.8"; exit 1; fi
+        if [ "$1" == "docs" ]; then poetry --quiet run jcache cache --cache-path docs/.jupyter_cache/ clear -f; fi
         export TF_CPP_MIN_LOG_LEVEL=3
         export PYDEVD_DISABLE_FILE_VALIDATION=1
-        poetry --quiet run sphinx-build -M html docs output/docs -j 4
+        NB_EXECUTION_MODE_OVERRIDE=off poetry --quiet run sphinx-build -M doctest docs output/docs
+        poetry --quiet run sphinx-build -M html docs output/docs || export EXITCODE=1
+        if [[ $EXITCODE == 1 ]]; then cat /tmp/sphinx*.log && mv /tmp/sphinx*.log output/docs; fi
+        exit $EXITCODE
         ;;
 esac

@@ -2,23 +2,26 @@
 Sufficiency Training How-To Guide
 =================================
 
-------------------------
-Initializing Sufficiency
-------------------------
+.. testsetup:: *
 
-Initialize a dataset, training function, eval function, and attach them to a sufficiency object.
+    from typing import Sequence
 
-.. code-block:: python
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
+    from torch.utils.data import Dataset
+    from unittest.mock import MagicMock, patch
 
-    train_ds, test_ds = load_dataset()
-    model = Net()
-    length = len(train_ds)
-
-    # Instantiate sufficiency metric
-    suff = Sufficiency()
-    # Set predefined training and eval functions
-    suff.set_training_func(custom_train)
-    suff.set_eval_func(custom_eval)
+    from daml.metrics import Sufficiency
+    model = MagicMock()
+    train_ds = MagicMock()
+    train_ds.__len__.return_value = 2
+    test_ds = MagicMock()
+    test_ds.__len__.return_value = 2
+    train_fn = MagicMock()
+    eval_fn = MagicMock()
+    eval_fn.return_value = {"test": 1.0}
+    device = "cpu"
 
 -----------------------------------
 Defining a Custom Training Function
@@ -26,49 +29,51 @@ Defining a Custom Training Function
 
 Use a small step size and around 50 epochs per step on the curve.
 
-.. code-block:: python
-    
-    def custom_train(model: nn.Module, X: torch.Tensor, y: torch.Tensor):
-    """
-    Passes data once through the model with backpropagation
+.. testcode::
 
-    Parameters
-    ----------
-    model : nn.Module
-        The trained model that will be evaluated
-    X : torch.Tensor
-        The training data to be passed through the model
-    y : torch.Tensor
-        The training labels corresponding to the data
-    """
-    # Defined only for this testing scenario
-    criterion = torch.nn.CrossEntropyLoss()
+    def custom_train(model: nn.Module, dataset: Dataset, indices: Sequence[int]):
+        # Defined only for this testing scenario
+        criterion = torch.nn.CrossEntropyLoss().to(device)
+        optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+        epochs = 10
 
-    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
-    epochs = 50
+        # Define the dataloader for training
+        dataloader = DataLoader(Subset(dataset, indices), batch_size=16)
 
-    for _ in range(epochs):
-        # Zero out gradients
-        optimizer.zero_grad()
-        # Forward Propagation
-        outputs = model(X)
-        # Back prop
-        loss = criterion(outputs, y)
-        loss.backward()
-        # Update optimizer
-        optimizer.step()
+        for epoch in range(epochs):
+            for batch in dataloader:
+                # Load data/images to device
+                X = torch.Tensor(batch[0]).to(device)
+                # Load targets/labels to device
+                y = torch.Tensor(batch[1]).to(device)
+                # Zero out gradients
+                optimizer.zero_grad()
+                # Forward propagation
+                outputs = model(X)
+                # Compute loss
+                loss = criterion(outputs, y)
+                # Back prop
+                loss.backward()
+                # Update weights/parameters
+                optimizer.step()
 
------------------------------------
-Parameters for Setup, Eval, and Run
------------------------------------
+--------------------------------------
+Recommended parameters for Sufficiency
+--------------------------------------
 
-We recommend at least 5 bootstrap samples (m_count) and 10 steps along the training curve per model (num_steps). 
+We recommend at least 5 bootstrap samples (runs) and 10 steps along the training curve per model (substeps). 
 
-.. code-block:: python
+.. testcode::
     
     # Create data indices for training
-    m_count = 5
-    num_steps = 10
-    suff.setup(length, m_count, num_steps)
+    suff = Sufficiency(
+        model=model,
+        train_ds=train_ds,
+        test_ds=test_ds,
+        train_fn=train_fn,
+        eval_fn=eval_fn,
+        runs=5,
+        substeps=10)
+
     # Train & test model
-    output = suff.run(model, train_ds, test_ds)
+    output = suff.evaluate()
