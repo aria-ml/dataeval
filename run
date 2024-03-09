@@ -65,7 +65,7 @@ case $1 in
         export TF_CPP_MIN_LOG_LEVEL=3
         export PYDEVD_DISABLE_FILE_VALIDATION=1
         NB_EXECUTION_MODE_OVERRIDE=off poetry --quiet run sphinx-build -M doctest . ../output/docs || export EXITCODE=1
-        poetry --quiet run sphinx-build -T -b html -d _build/doctrees -D language=en . ../output/docs || export EXITCODE=1
+        poetry --quiet run sphinx-build -T -b html -d _build/doctrees -D language=en . ../output/docs/html || export EXITCODE=1
         popd
         if [[ $EXITCODE == 1 ]]; then cat /tmp/sphinx*.log && mv /tmp/sphinx*.log output/docs; fi
         exit $EXITCODE
