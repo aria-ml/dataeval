@@ -142,3 +142,47 @@ DAML uses containers to normalize environments for testing and development.  The
 ### Developing research/prototype code
 
 This repo contains a specific location for prototype code that is being used for R&D work. This segregates incomplete/untested/undocumented work from released work to ensure that the `main` branch remains in a state that can be released/shipped at any point.
+
+## Branching Release Workflow
+
+This section outlines the branching and release strategy used for DAML.
+
+### Branching Strategy
+
+Development is done using a lightweight version of Gitflow.  There are 2 long lived branches, `develop` and `main`.  Development happens against the `develop` branch and changes merged in to `develop` are added to a new or existing merge request in to `main`.
+
+The merge request in to `main` includes additional validation in the form of extensive functional tests.  After feature validation is performed and documentation is reviewed, the merge request is approved and `develop` is merged in to `main`, which triggers release to PyPI and ReadTheDocs.
+
+Hotfixes are merged directly in to `main` and the change is cherry-picked in to `develop`.
+
+### Branching Diagram
+![image info](.gitlab/branching.png)
+
+### Gitlab CI Pipelines
+- `.gitlab-ci.yaml`
+- Pipelines will always run as baseline:
+  - `build`, `linting`, `lite`, `docs`, `test`->`coverage` (or `functional` superset)
+- Feature work should happen in short-lived (as much as possible) branches off of `develop`
+- Merge requests from features to `develop` will trigger baseline run
+- Completed merge requests in to `develop` will trigger baseline and additionally
+  - Run additional jobs: `create_mr`, `pages`->`pages:deploy`
+    - `pages`->`pages:deploy`: pushes artifacts from docs to pages html server
+    - `create_mr`: creates or updates the merge request from develop->main with features included in the pending release
+- Merge requests from `develop` to `main` will trigger baseline with functional tests
+  - Run additional jobs: `functional`->`coverage`
+- TODO: Hotfixes branch from `main` and merged directly back in to `main`
+  - The commit for the hotfix will then be cherry-picked in to `develop`
+- Completed merge requests in to `main` will trigger baseline and additionally
+  - Run additional jobs: `changelog`, `publish`, `tag`
+  - `changelog`: updates the changelog in develop with new features and cherry picks change into main
+  - `publish`: packages DAML and publishes to JATIC Gitlab internal repository
+  - `tag`: adds an annotated tag with version number for the change
+
+### Github Actions
+- `.github/workflows/publish.yml`
+- This action is configured on new tags to publish to pypi
+
+### ReadTheDocs Pipeline
+-----------
+- `.readthedocs.yaml`
+- The pipeline is configured to build documentation using Sphinx on changes to the Github repository for branches `develop` and `main`: 
