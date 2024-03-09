@@ -22,7 +22,7 @@ extensions = [
 ]
 
 templates_path = ["_templates"]
-exclude_patterns = [".jupyter_cache", "Thumbs.db", ".DS_Store"]
+exclude_patterns = [".jupyter_cache", "_build", "Thumbs.db", ".DS_Store"]
 
 autosummary_generate = False
 sphinx_rtd_size_width = "80%"
@@ -31,7 +31,7 @@ from os import getenv
 
 EXECUTION_MODE = getenv("NB_EXECUTION_MODE_OVERRIDE")
 nb_execution_allow_errors = False
-nb_execution_cache_path = "docs/.jupyter_cache"
+nb_execution_cache_path = ".jupyter_cache"
 nb_execution_mode = "cache" if EXECUTION_MODE is None else EXECUTION_MODE
 nb_execution_raise_on_error = True
 nb_execution_timeout = -1
