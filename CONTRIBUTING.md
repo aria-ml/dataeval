@@ -153,9 +153,9 @@ Development is done using trunk-based development strategy.  Feature development
 
 As development nears completion, the code should move to the `_internal` subpackage and be exposed through our public facing API.  Docstrings, tutorials, how-tos, and other relevant deliverables should be prepared along-side.
 
-After merge requests in to `main` are completed, additional validation in the form of extensive functional tests are run.  On post-merge commit pipeline success, the build is tagged with `last-known-good`. On a regular cadence (TBD), a branch is created off of `main` to `releases/vX.X.X` and triggers release to PyPI and ReadTheDocs.
+After merge requests in to `main` are completed, additional validation in the form of functional tests are run.  On post-merge commit pipeline success, the build is tagged with `latest-known-good`. On a weekly cadence, a branch is created off of `main` to `releases/vX.X.X` and triggers release to PyPI and ReadTheDocs.
 
-Hotfixes for particular feauture relases are merged directly in to the relevant `releases/vX.X.X` branch and the change is cherry-picked in to `main`.
+Hotfixes are merged directly in to `main` and cherry-picked into the current `releases/vX.X.X` branch.
 
 ### Branching Diagram
 ![image info](.gitlab/branching.png)
@@ -165,20 +165,17 @@ Hotfixes for particular feauture relases are merged directly in to the relevant 
 - Pipelines will always run as baseline:
   - `build`, `linting`, `lite`, `docs`, `test`->`coverage` (or `functional` superset)
 - Feature work should happen in short-lived (as much as possible) branches off of `main`
-- Merge requests from features to `main` will trigger baseline run
-- TODO: Completed merge requests in to `main` will trigger baseline run with functional tests and
+- Merge request pipelines from features to `main` will trigger baseline run
+- Completed merge requests in to `main` will trigger commit pipeline with with functional tests and
   - Run additional jobs: `tag release candidate`, `pages`->`pages:deploy`
     - `pages`->`pages:deploy`: pushes artifacts from docs to pages html server
-    - `tag release candidate`: adds the `last-known-good` tag to the build on successful run of tests
-- TODO: At some cadence TBD, a scheduled pipeline will run against `last-known-good` tag
-  - Run additional jobs: `create release branch`
-- TODO: Hotfixes branch from the relevant `releases/vX.X.X` and are merged back in
-  - The commit for the hotfix will then be cherry-picked in to `main`
-- New branches in the `releases/vX.X.X` path will trigger baseline and additionally
-  - Run additional jobs: `changelog`, `publish`, `tag`
-  - TODO: `changelog`: updates the changelog in `main` with new features and cherry picks change into `releases/vX.X.X`
+    - `tag release candidate`: adds the `latest-known-good` tag to the build on successful run of tests
+- A scheduled release pipeline runs on a weekly cadence against `latest-known-good` tag
+  - On success it will run additional jobs: `changelog`, `publish`, `tag`
+  - `changelog`: updates the changelog in with new features
   - `publish`: packages DAML and publishes to JATIC Gitlab internal repository
   - `tag`: adds an annotated tag with version number for the change
+- TODO: Hotfixes will be treated as a regular release but will be released immediately and the affected build will be yanked from pypi
 
 ### Github Actions
 - `.github/workflows/publish.yml`
