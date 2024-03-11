@@ -1,13 +1,14 @@
-Reference
-+++++++++
+.. _api_ref:
 
-.. toctree::
-   :hidden:
+=============
+API Reference
+=============
 
-   reference/api
+The following table contains links to specific classes and modules found in DAML.
+Just find the module you are want to know more about and click the name! 
 
 .. autosummary::
-
+   
    daml.metrics.BER
    daml.metrics.Divergence
    daml.metrics.outlier_detection.OD_AE
@@ -20,4 +21,5 @@ Reference
    daml.metrics.outlier_detection.ThresholdType
    daml.metrics.Sufficiency
    daml.metrics.UAP
-   
+
+
