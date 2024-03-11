@@ -40,7 +40,7 @@ case $1 in
         poetry --quiet run coverage html --data-file=output/.coverage.$1.$pver --skip-empty -d output/htmlcov.$1.$pver
         ;;
     "lite")
-        pip install poetry virtualenv pytest
+        pip install poetry virtualenv
         python -m virtualenv .venv-lite
         source .venv-lite/bin/activate
         poetry install
