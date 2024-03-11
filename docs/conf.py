@@ -18,8 +18,12 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.graphviz",
     "sphinx_rtd_size",
+    "sphinx_tabs.tabs",
+    # "sphinx_inline_tabs",
     "myst_nb",
 ]
+
+source_suffix = [".rst", ".md"]
 
 templates_path = ["_templates"]
 exclude_patterns = [".jupyter_cache", "_build", "Thumbs.db", ".DS_Store"]
