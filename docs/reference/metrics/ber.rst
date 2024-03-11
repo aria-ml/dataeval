@@ -4,10 +4,10 @@
 Bayes Error Rate
 ================
 
-Create small blurb here that answers:
+.. Create small blurb here that answers:
 
-1. What it is
-2. What does it solve
+.. 1. What it is
+.. 2. What does it solve
 
 ---------
 Tutorials
@@ -15,7 +15,7 @@ Tutorials
 
 Check out this tutorial to begin using the ``BER`` class
 
-:doc:`Bayes Error Rate QuickStart Guide<../../tutorials/temp/ber>`
+:doc:`Bayes Error Rate Tutorial<../../tutorials/notebooks/BayesErrorRateEstimationTutorial>`
 
 -------------
 How To Guides

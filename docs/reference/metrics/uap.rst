@@ -4,18 +4,18 @@
 Upperbound Average Precision
 ============================
 
-Create small blurb here that answers:
+.. Create small blurb here that answers:
 
-1. What it is
-2. What does it solve
+.. 1. What it is
+.. 2. What does it solve
 
 ---------
 Tutorials
 ---------
 
-Check out this tutorial to begin using the ``UAP`` class
+There are no tutorials for UAP yet, but we will be adding one soon.
 
-:doc:`Upperbound Average Precision QuickStart Guide<../../tutorials/temp/uap>`
+.. TODO: Create UAP Tutorial
 
 -------------
 How To Guides
