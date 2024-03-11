@@ -12,38 +12,28 @@ In addition to viewing them in our documentation, these notebooks can also be op
 Metrics
 -------
 
-.. This is a placeholder for the below tutorials. Remove these as the notebooks are re-integrated into the pipeline
+- :doc:`notebooks/BayesErrorRateEstimationTutorial` (`Colab <https://colab.research.google.com/github/aria-ml/daml/blob/develop/docs/tutorials/notebooks/BayesErrorRateEstimationTutorial.ipynb>`__)
+- :doc:`notebooks/ClassLearningCurvesTutorial` (`Colab <https://colab.research.google.com/github/aria-ml/daml/blob/develop/docs/tutorials/notebooks/ClassLearningCurvesTutorial.ipynb>`__)
+- :doc:`notebooks/DPDivergenceTutorial` (`Colab <https://colab.research.google.com/github/aria-ml/daml/blob/develop/docs/tutorials/notebooks/DPDivergenceTutorial.ipynb>`__)
+- :doc:`notebooks/OutlierDetectionTutorial` (`Colab <https://colab.research.google.com/github/aria-ml/daml/blob/develop/docs/tutorials/notebooks/OutlierDetectionTutorial.ipynb>`__)
 
 .. toctree::
+   :hidden:
+   :maxdepth: 1
 
-   temp/ber
-   temp/divergence
-   temp/outlier_detection
-   temp/sufficiency
-   temp/uap
+   notebooks/BayesErrorRateEstimationTutorial.ipynb
+   notebooks/ClassLearningCurvesTutorial.ipynb
+   notebooks/DPDivergenceTutorial.ipynb
+   notebooks/OutlierDetectionTutorial.ipynb
 
 ------
 Models
 ------
 
+- :doc:`notebooks/AETrainerTutorial` (`Colab <https://colab.research.google.com/github/aria-ml/daml/blob/develop/docs/tutorials/notebooks/AETrainerTutorial.ipynb>`__)
+
 .. toctree::
+   :hidden:
+   :maxdepth: 1
 
-    temp/aetrainer
-
-
-
-.. - :doc:`tutorials/BayesErrorRateEstimationTutorial` (`Colab <https://colab.research.google.com/github/aria-ml/daml/blob/develop/docs/tutorials/BayesErrorRateEstimationTutorial.ipynb>`__)
-.. - :doc:`tutorials/ClassLearningCurvesTutorial` (`Colab <https://colab.research.google.com/github/aria-ml/daml/blob/develop/docs/tutorials/ClassLearningCurvesTutorial.ipynb>`__)
-.. - :doc:`tutorials/DPDivergenceTutorial` (`Colab <https://colab.research.google.com/github/aria-ml/daml/blob/develop/docs/tutorials/DPDivergenceTutorial.ipynb>`__)
-.. - :doc:`tutorials/OutlierDetectionTutorial` (`Colab <https://colab.research.google.com/github/aria-ml/daml/blob/develop/docs/tutorials/OutlierDetectionTutorial.ipynb>`__)
-.. - :doc:`tutorials/AETrainerTutorial` (`Colab <https://colab.research.google.com/github/aria-ml/daml/blob/develop/docs/tutorials/AETrainerTutorial.ipynb>`__)
-
-.. .. toctree::
-..    :hidden:
-..    :maxdepth: 1
-
-..    tutorials/BayesErrorRateEstimationTutorial.ipynb
-..    tutorials/ClassLearningCurvesTutorial.ipynb
-..    tutorials/DPDivergenceTutorial.ipynb
-..    tutorials/OutlierDetectionTutorial.ipynb
-..    tutorials/AETrainerTutorial.ipynb
+   notebooks/AETrainerTutorial.ipynb
