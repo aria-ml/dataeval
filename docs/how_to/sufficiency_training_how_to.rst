@@ -1,7 +1,14 @@
+.. _sufficiency_how_to:
+
 =================================
 Sufficiency Training How-To Guide
 =================================
 
+.. *Add small blurb about why this how-to is useful or when you would use it and what it accomplishes*
+
+------------------------
+Initializing Sufficiency
+------------------------
 .. testsetup:: *
 
     from typing import Sequence
