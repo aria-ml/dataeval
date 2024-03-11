@@ -4,10 +4,10 @@
 Sufficiency
 ===========
 
-Create small blurb here that answers:
+.. Create small blurb here that answers:
 
-1. What it is
-2. What does it solve
+.. 1. What it is
+.. 2. What does it solve
 
 ---------
 Tutorials
@@ -15,7 +15,7 @@ Tutorials
 
 Check out this tutorial to begin using the ``Sufficiency`` class
 
-:doc:`Sufficiency QuickStart Guide<../../tutorials/temp/sufficiency>`
+:doc:`Sufficiency Tutorial<../../tutorials/notebooks/ClassLearningCurvesTutorial>`
 
 -------------
 How To Guides

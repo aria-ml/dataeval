@@ -4,10 +4,10 @@
 Divergence
 ==========
 
-Create small blurb here that answers:
+.. Create small blurb here that answers:
 
-1. What it is
-2. What does it solve
+.. 1. What it is
+.. 2. What does it solve
 
 ---------
 Tutorials
@@ -15,7 +15,7 @@ Tutorials
 
 Check out this tutorial to begin using the ``Divergence`` class
 
-:doc:`Divergence QuickStart Guide<../../tutorials/temp/divergence>`
+:doc:`Divergence Tutorial<../../tutorials/notebooks/DPDivergenceTutorial>`
 
 -------------
 How To Guides
