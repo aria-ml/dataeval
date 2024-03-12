@@ -9,15 +9,11 @@ build:
   os: ubuntu-22.04
   tools:
     python: "3.11"
-  apt_packages:
-    - graphviz
-    - git-lfs
   jobs:
     post_create_environment:
-      - pip install poetry
-      - poetry config virtualenvs.create false
+      - pip install poetry --upgrade
     post_install:
-      - poetry install --all-extras --with docs
+      - VIRTUAL_ENV=$READTHEDOCS_VIRTUALENV_PATH poetry install --all-extras --with docs
 
 # Build documentation in the "docs/" directory with Sphinx
 sphinx:

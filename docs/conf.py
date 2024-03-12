@@ -14,17 +14,30 @@ repo_name = "DAML"
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
+    "sphinx.ext.doctest",
     "sphinx.ext.napoleon",
     "sphinx.ext.graphviz",
     "sphinx_rtd_size",
+    "sphinx_tabs.tabs",
+    # "sphinx_inline_tabs",
     "myst_nb",
 ]
 
+source_suffix = [".rst", ".md"]
+
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = [".jupyter_cache", "_build", "Thumbs.db", ".DS_Store"]
 
 autosummary_generate = False
 sphinx_rtd_size_width = "80%"
+
+from os import getenv
+
+EXECUTION_MODE = getenv("NB_EXECUTION_MODE_OVERRIDE")
+nb_execution_allow_errors = False
+nb_execution_cache_path = ".jupyter_cache"
+nb_execution_mode = "cache" if EXECUTION_MODE is None else EXECUTION_MODE
+nb_execution_raise_on_error = True
 nb_execution_timeout = -1
 
 # html_static_path = ['_static']

@@ -1,4 +1,8 @@
 workflow:
+  # Allows jobs in this workflow to be interrupted:
+  # https://gitlab.jatic.net/help/ci/yaml/index.md#workflowauto_cancelon_new_commit
+  auto_cancel:
+    on_new_commit: interruptible
   rules:
     - if: $CI_COMMIT_BRANCH == 'main' || $CI_COMMIT_BRANCH == 'develop'
       changes:
@@ -11,6 +15,10 @@ workflow:
     - if: $CI_COMMIT_BRANCH == 'main' || $CI_COMMIT_BRANCH == 'develop'
 
 default:
+  # This should allow pipelines to auto-cancel when redundant:
+  # https://gitlab.jatic.net/help/ci/pipelines/settings.md#auto-cancel-redundant-pipelines
+  # https://gitlab.jatic.net/help/ci/yaml/index.md#interruptible
+  interruptible: true
   tags:
     - autoscaler
 
@@ -23,6 +31,8 @@ stages:
   stage: release
   environment:
     name: production
+  before_script:
+    - pip install requests build twine --upgrade
   rules:
     - if: $CI_COMMIT_BRANCH == 'main'
       changes:
@@ -33,6 +43,8 @@ stages:
   stage: release
   environment:
     name: production
+  before_script:
+    - pip install requests --upgrade
   rules:
     - if: $CI_COMMIT_BRANCH == 'develop'
 
@@ -202,18 +214,14 @@ pages:
       - public
 
 tag:
-  image: docker:24.0-git
   extends: .on_release
-  before_script:
-    - apk add --no-cache curl perl bash
   script:
-    - ./.gitlab/auto_tag.sh --post
+    - python .gitlab/release.py bump_version --commit
 
 publish:
   extends: .on_release
   needs: [tag]
   script:
-    - pip install build twine --upgrade
     - twine --version
     - python -m build
     - twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi -u gitlab-ci-token -p $DAML_BUILD_PAT dist/*
@@ -222,8 +230,13 @@ changelog:
   extends: .on_release
   needs: [publish]
   script:
-    - pip install requests
-    - python .gitlab/update_changelog.py
+    - python .gitlab/release.py update_changelog --commit
+
+create_mr:
+  extends: .on_develop
+  script:
+    - python .gitlab/release.py create_mr --commit
+  allow_failure: true
 
 include:
  - template: Security/Secret-Detection.gitlab-ci.yml

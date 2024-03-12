@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torchmetrics
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 
 from daml._internal.metrics.sufficiency import STEPS_KEY
 from daml.metrics import Sufficiency
@@ -33,7 +33,7 @@ class Net(nn.Module):
         return x
 
 
-def custom_train(model: nn.Module, dl: DataLoader):
+def custom_train(model, dataset, indices):
     """
     Passes data once through the model with backpropagation
 
@@ -50,7 +50,7 @@ def custom_train(model: nn.Module, dl: DataLoader):
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
 
-    for X, y in dl:
+    for X, y in DataLoader(Subset(dataset, indices)):
         # Zero out gradients
         optimizer.zero_grad()
         # Forward Propagation
@@ -62,7 +62,7 @@ def custom_train(model: nn.Module, dl: DataLoader):
         optimizer.step()
 
 
-def custom_eval(model: nn.Module, dataloader) -> Dict[str, float]:
+def custom_eval(model, dataset) -> Dict[str, float]:
     """
     Evaluate a model on a single pass with a given metric
 
@@ -86,7 +86,7 @@ def custom_eval(model: nn.Module, dataloader) -> Dict[str, float]:
     model.eval()
     # Tell PyTorch to not track gradients, greatly speeds up processing
     result: float = 0.0
-    for X, y in dataloader:
+    for X, y in DataLoader(dataset):
         with torch.no_grad():
             preds = model(X)
             result = metric(preds, y)
