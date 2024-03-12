@@ -145,14 +145,7 @@ tag release candidate:
   stage: release
   environment:
     name: production
-  needs:
-    - job: docs
-    - job: linting
-    - job: lite
-    - job: unit tests
-      optional: true
-    - job: functional tests
-      optional: true
+  needs: [docs, linting, lite, functional tests]
   script:
     - pip install requests
     - .gitlab/update_latest_known_good.py
