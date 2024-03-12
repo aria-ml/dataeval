@@ -1,6 +1,24 @@
-[//]: # (b5f9c0dcfb322f1b00ce64f06771a15715856e3f)
+[//]: # (a0760a2c132c4b036954e80720cc612098ed4a23)
 
 # DAML Change Log
+## v0.43.0
+- ```72f4d31f - Add notebooks back to docs and rebuild doctree every build```
+- ```4ba8305f - Remove mnist.npz from repository```
+- ```0bd9089d - Overhaul landing page workflow style tutorial```
+- ```cf6fed1f - Use cached notebooks when running sphinx build of documentation notebooks```
+- ```4efffa42 - Add branching strategy information to contributing.md```
+- ```424dee8f - Make workflow interruptible```
+- ```25fb6237 - Exclude prototype code from code coverage```
+- ```010e4b07 - Add a test to ensure no code from _prototype is used in public API```
+- ```948e2f4d - Don't require sw eng approval for prototype code```
+- ```fdf1a74b - Ensure that main is always shippable```
+- ```670a0db5 - Add support for classwise Sufficiency metrics```
+- ```6bbb4a09 - Author a short blurb to preface each tutorial describing goal```
+- ```b96ee099 - Have sufficiency train and eval functions take indices and batch size instead of a DataLoader```
+- ```b1f18651 - Fixed singleton pattern in verboselog```
+- ```0b3d8b07 - Add ability to update existing Release MR with new information```
+- ```217630c3 - Automated develop into main merge requests on successful merges in develop```
+## latest-known-good
 ## v0.42.2
 - ```5225c491 - Change output classes to dictionaries```
 - ```1dc23edd - AE Trainer workflow notebook. AE Trainer updates based on notebook```
