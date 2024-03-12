@@ -25,6 +25,7 @@ Tasks:
   type    run typecheck
   lint    run static code analysis
   docs    generate documentation
+  qdocs   generate documentation using cached notebooks
 
 Note:
   lint and docs are always performed on python 3.11
@@ -56,7 +57,7 @@ fi
 # declare lookup maps
 declare -A supported_pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1 [base]=1)
 declare -A supported_tasks=([unit]=1 [func]=1 [type]=1)
-declare -A supported_other=([lint]=1 [docs]=1)
+declare -A supported_other=([lint]=1 [docs]=1 [qdocs]=1)
 
 # generate python and task lists
 declare -A pvers; declare -A tasks;
@@ -88,11 +89,11 @@ fi
 declare -A jobs;
 for task in "${!tasks[@]}"; do
     case "$task" in
-        lint|docs) jobs["$task-3.11"]=1;;
+        lint|docs|qdocs) jobs["$task-3.11"]=1;;
         *) for pver in "${!pvers[@]}"; do jobs["$task-$pver"]=1; done;;
     esac
 done
-if [[ ${tasks[lint]} || ${tasks[docs]} ]]; then pvers[3.11]=1; fi
+if [[ ${tasks[lint]} || ${tasks[docs]} || ${tasks[qdocs]} ]]; then pvers[3.11]=1; fi
 
 function post_build_cleanup() {
     temp=$1

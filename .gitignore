@@ -2,11 +2,17 @@
 __pycache__/
 dist/
 .tox/
+.coverage
 
 docs/_*/
-docs/tutorials/checkpoints/
-docs/tutorials/data/
+docs/tutorials/notebooks/checkpoints/
+docs/tutorials/notebooks/data/
 !docs/_static
 
 output/
 .settings
+.vscode/
+
+junit.xml
+
+demos/
