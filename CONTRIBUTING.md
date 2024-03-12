@@ -161,7 +161,7 @@ Hotfixes are merged directly in to `main` and the change is cherry-picked in to 
 ### Gitlab CI Pipelines
 - `.gitlab-ci.yaml`
 - Pipelines will always run as baseline:
-  - `build`, `linting`, `lite`, `docs`, `test`->`coverage` (or `functional` superset)
+  - `build`, `linting`, `dependency tests`, `docs`, `test`->`coverage` (or `functional` superset)
 - Feature work should happen in short-lived (as much as possible) branches off of `develop`
 - Merge requests from features to `develop` will trigger baseline run
 - Completed merge requests in to `develop` will trigger baseline and additionally
