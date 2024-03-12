@@ -3,6 +3,8 @@ from typing import Literal, Optional, Tuple
 import numpy as np
 import pytest
 
+from tests.utils.datasets import download_mnist
+
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -31,7 +33,7 @@ def mnist():
         dtype: Optional[type] = None,
         add_channels: Literal["channels_first", "channels_last", "none"] = "none",
     ) -> Tuple[np.ndarray, np.ndarray]:
-        path = "tests/datasets/mnist.npz"
+        path = download_mnist()
         with np.load(path, allow_pickle=True) as fp:
             images, labels = fp["x_" + category][:size], fp["y_" + category][:size]
         if dtype is not None:
