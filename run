@@ -8,7 +8,7 @@ Usage:
 Tasks:
   unit    run unit tests
   func    run functional tests
-  lite    run lite install tests
+  deps    run dependency tests
   type    run typecheck
   lint    run static code analysis
   docs    generate documentation
@@ -22,7 +22,7 @@ if [ ! -f /.dockerenv ]; then
     echo
 fi
 
-declare -A supported_tasks=([unit]=1 [func]=1 [lite]=1 [type]=1 [lint]=1 [docs]=1 [qdocs]=1)
+declare -A supported_tasks=([unit]=1 [func]=1 [deps]=1 [type]=1 [lint]=1 [docs]=1 [qdocs]=1)
 
 # validate args
 if (( $# != 1 )); then echo Too many parameters; showHelp 1; fi
@@ -39,14 +39,14 @@ case $1 in
         poetry --quiet run coverage xml --data-file=output/.coverage.$1.$pver --skip-empty -o output/coverage.$1.$pver.xml
         poetry --quiet run coverage html --data-file=output/.coverage.$1.$pver --skip-empty -d output/htmlcov.$1.$pver
         ;;
-    "lite")
+    "deps")
         pip install poetry virtualenv
-        python -m virtualenv .venv-lite
-        source .venv-lite/bin/activate
+        python -m virtualenv .venv-deps
+        source .venv-deps/bin/activate
         poetry install
         pip install pytest
         pytest --verbose --pythonwarnings ignore::DeprecationWarning tests/metrics/test_ber.py tests/metrics/test_divergence.py tests/metrics/test_uap.py
-        rm -rf .venv-lite
+        rm -rf .venv-deps
         ;;
     "type")
         poetry --quiet run pyright src/ tests/
