@@ -145,7 +145,7 @@ tag release candidate:
   stage: release
   environment:
     name: production
-  needs: [docs, linting, lite, functional tests]
+  needs: [docs, linting, dependency tests, functional tests]
   script:
     - pip install requests
     - .gitlab/update_latest_known_good.py
@@ -167,7 +167,7 @@ create release branch:
     # Only allowed to create a release branch off of `main` with CREATE_NEW_RELEASE set
     - if: $CI_COMMIT_BRANCH == 'main' && $CREATE_NEW_RELEASE != null
 
-lite:
+dependency tests:
   stage: test
   image: python:$PYTHON_VERSION
   needs: []
@@ -175,7 +175,7 @@ lite:
     matrix:
       - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
   script:
-    - ./run lite
+    - ./run deps
 
 coverage:
   stage: test
