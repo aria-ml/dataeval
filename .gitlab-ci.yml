@@ -12,7 +12,11 @@ workflow:
       when: never
     - if: $CI_PIPELINE_SOURCE == 'web'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-    - if: $CI_COMMIT_BRANCH == 'main' || $CI_COMMIT_BRANCH =~ /^releases\/\S+$/
+    - if: $CI_COMMIT_BRANCH =~ /^releases\/\S+$/
+    - if: $CI_COMMIT_BRANCH == 'main'
+      variables:
+        # Functional tests are only run against `main`
+        FUNCTIONAL: "functional"
 
 default:
   # This should allow pipelines to auto-cancel when redundant:
@@ -118,25 +122,22 @@ linting:
     paths:
       - output/*
 
-test:
+unit tests:
   extends: [.test]
   variables:
     TASK: unit
   rules:
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
-      when: never
-    - when: on_success
+    # Unit tests are a subset of functional tests, so only run if functional tests aren't run
+    - if: $FUNCTIONAL == null
 
-functional:
+functional tests:
   extends: [.test]
   tags: [GPU]
   variables:
     TASK: func
     ARGS: --gpu
   rules:
-    - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
-      when: on_success
-    - when: never
+    - if: $FUNCTIONAL != null
 
 # This job should only run if all the "needs" have succeeded,
 # and it creates a tag that signifies that all testing has passed.
@@ -148,16 +149,16 @@ tag release candidate:
     - job: docs
     - job: linting
     - job: lite
-    - job: test
+    - job: unit tests
       optional: true
-    - job: functional
+    - job: functional tests
       optional: true
   script:
     - pip install requests
     - .gitlab/update_latest_known_good.py
   rules:
     # Only allowed to tag `main` when everything passes
-    - if: $CI_COMMIT_BRANCH == 'main'
+    - if: $CI_COMMIT_BRANCH == 'main' && $FUNCTIONAL != null
 
 # This job runs and creates a branch from the latest known good tag,
 # when this branch is created a pipeline will run automatically.
@@ -186,10 +187,10 @@ lite:
 coverage:
   stage: test
   needs:
-    - job: test
+    - job: unit tests
       optional: true
       artifacts: true
-    - job: functional
+    - job: functional tests
       optional: true
       artifacts: true
   before_script:
