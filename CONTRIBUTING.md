@@ -163,11 +163,11 @@ Hotfixes are merged directly in to `main` and cherry-picked into the current `re
 ### Gitlab CI Pipelines
 - `.gitlab-ci.yaml`
 - Pipelines will always run as baseline:
-  - `build`, `linting`, `lite`, `docs`, `test`->`coverage` (or `functional` superset)
-- Feature work should happen in short-lived (as much as possible) branches off of `main`
-- Merge request pipelines from features to `main` will trigger baseline run
-- Completed merge requests in to `main` will trigger commit pipeline with with functional tests and
-  - Run additional jobs: `tag release candidate`, `pages`->`pages:deploy`
+  - `build`, `linting`, `dependency tests`, `docs`, `test`->`coverage` (or `functional` superset)
+- Feature work should happen in short-lived (as much as possible) branches off of `develop`
+- Merge requests from features to `develop` will trigger baseline run
+- Completed merge requests in to `develop` will trigger baseline and additionally
+  - Run additional jobs: `create_mr`, `pages`->`pages:deploy`
     - `pages`->`pages:deploy`: pushes artifacts from docs to pages html server
     - `tag release candidate`: adds the `latest-known-good` tag to the build on successful run of tests
 - A scheduled release pipeline runs on a weekly cadence against `latest-known-good` tag
