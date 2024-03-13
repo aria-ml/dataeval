@@ -69,7 +69,7 @@ class BER(
     ) -> None:
         self.data = data
         self.labels = labels
-        self.method = method
+        self._set_method(method)
 
     @classmethod
     def _methods(
