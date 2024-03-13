@@ -70,6 +70,11 @@ class MethodsMixin(ABC, Generic[TCallable]):
 
     @method.setter
     def method(self, value: str):
+        self._set_method(value)
+
+    def _set_method(self, value: str):
+        """This setter is to fix pyright incorrect detection of
+        incorrectly overriding the 'method' property"""
         if value not in self.methods():
             raise KeyError(
                 f"Specified method not available for class ({self.methods()})."
