@@ -35,8 +35,8 @@ if __name__ == "__main__":
             print("Updating changelog file with following content:")
             print(change["content"])
             if args.commit:
-                response_push = gl.push_file(CHANGELOG_FILE, "develop", **change)
-                file_info = gl.get_file_info(CHANGELOG_FILE, "develop")
+                response_push = gl.push_file(CHANGELOG_FILE, "main", **change)
+                file_info = gl.get_file_info(CHANGELOG_FILE, "main")
                 response_cherry_pick = gl.cherry_pick(file_info["commit_id"])
                 response = {"push": response_push, "cherry-pick": response_cherry_pick}
         else:
