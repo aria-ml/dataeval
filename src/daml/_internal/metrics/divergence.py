@@ -59,7 +59,7 @@ class Divergence(EvaluateMixin, MethodsMixin[Callable[[np.ndarray, np.ndarray], 
     ) -> None:
         self.data_a = data_a
         self.data_b = data_b
-        self.method = method
+        self._set_method(method)
 
     @classmethod
     def _methods(cls) -> Dict[str, Callable[[np.ndarray, np.ndarray], int]]:
