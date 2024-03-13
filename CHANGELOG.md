@@ -1,6 +1,11 @@
-[//]: # (a0760a2c132c4b036954e80720cc612098ed4a23)
+[//]: # (d4a174c6af84d9300718b3e3dbcb56c51c0a17e8)
 
 # DAML Change Log
+## v0.44.0
+## latest-known-good
+- ```d4a174c6 - Call the MethodsMixin method setter in init```
+- ```c3df2609 - Require functional tests to tag release candidate and only run functional tests on main```
+- ```5f2a2b3f - Allow for trunk-based development```
 ## v0.43.0
 - ```72f4d31f - Add notebooks back to docs and rebuild doctree every build```
 - ```4ba8305f - Remove mnist.npz from repository```
