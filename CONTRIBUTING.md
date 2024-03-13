@@ -160,28 +160,24 @@ Hotfixes are merged directly in to `main` and cherry-picked into the current `re
 ### Branching Diagram
 ![image info](.gitlab/branching.png)
 
-### Gitlab CI Pipelines
-- `.gitlab-ci.yaml`
+### [Gitlab CI Pipelines](.gitlab-ci.yaml)
+- Feature work should happen in short-lived (as much as possible) branches
 - Pipelines will always run as baseline:
-  - `build`, `linting`, `dependency tests`, `docs`, `test`->`coverage` (or `functional` superset)
-- Feature work should happen in short-lived (as much as possible) branches off of `develop`
-- Merge requests from features to `develop` will trigger baseline run
-- Completed merge requests in to `develop` will trigger baseline and additionally
-  - Run additional jobs: `create_mr`, `pages`->`pages:deploy`
-    - `pages`->`pages:deploy`: pushes artifacts from docs to pages html server
-    - `tag release candidate`: adds the `latest-known-good` tag to the build on successful run of tests
-- A scheduled release pipeline runs on a weekly cadence against `latest-known-good` tag
-  - On success it will run additional jobs: `changelog`, `publish`, `tag`
-  - `changelog`: updates the changelog in with new features
-  - `publish`: packages DAML and publishes to JATIC Gitlab internal repository
+  - `build`, `linting`, `dependency tests`, `docs`, `unit tests`->`coverage`
+- Merge requests to `main` will trigger baseline run
+- Completed merge requests to `main` will trigger baseline and additionally:
+  - `functional tests`: superset of unit tests and additional slower functional tests using the GPU runner
+  - `tag release candidate`: tags a successful pipeline with `latest-known-good`
+- A scheduled release pipeline runs on a weekly cadence:
+  - `create release branch`: creates the vnext release branch
+- On commit changes to release branches we trigger a publish pipeline:
+  - `pages`->`pages:deploy`: pushes artifacts from docs to Gitlab Pages
+  - `changelog`: updates the changelog in with new features and cherry-picks to release branch
   - `tag`: adds an annotated tag with version number for the change
-- TODO: Hotfixes will be treated as a regular release but will be released immediately and the affected build will be yanked from pypi
+  - `publish`: packages DAML and publishes to JATIC Gitlab internal repository
 
-### Github Actions
-- `.github/workflows/publish.yml`
-- TODO VERIFY: This action is configured on new tags to publish to pypi
+### [Github Actions](.github/workflows/publish.yml)
+- This action is configured on commits to release branches to publish to pypi
 
-### ReadTheDocs Pipeline
------------
-- `.readthedocs.yaml`
+### [ReadTheDocs Pipeline](.readthedocs.yaml)
 - TODO: The pipeline is configured to build documentation using Sphinx on changes to the Github repository for branches in the `releases` path
