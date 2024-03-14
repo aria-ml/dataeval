@@ -224,7 +224,6 @@ pages:
       artifacts: true
     - job: coverage
       artifacts: true
-  stage: release
   script:
     - mv output/docs/html/ ./public/
     - mv htmlcov/ ./public/coverage/
