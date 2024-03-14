@@ -112,6 +112,7 @@ priority = "explicit"
 enable = true
 vcs = "git"
 style = "semver"
+pattern = "v(?P<base>\\d+\\.\\d+\\.\\d+)$"
 
 [tool.poetry-dynamic-versioning.substitution]
 files = ["src/daml/__init__.py"]
