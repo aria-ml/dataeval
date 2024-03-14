@@ -218,6 +218,7 @@ docs:
       - output/docs/html/
 
 pages:
+  extends: .on_release
   needs:
     - job: docs
       artifacts: true
