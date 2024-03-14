@@ -25,7 +25,11 @@ def _fnn(data: np.ndarray, labels: np.ndarray) -> int:
     return errors
 
 
-class Divergence(EvaluateMixin, MethodsMixin[Callable[[np.ndarray, np.ndarray], int]]):
+_METHODS = Literal["FNN", "MST"]
+_FUNCTION = Callable[[np.ndarray, np.ndarray], int]
+
+
+class Divergence(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
     """
     Calculates the estimated divergence between two datasets
 
@@ -55,14 +59,14 @@ class Divergence(EvaluateMixin, MethodsMixin[Callable[[np.ndarray, np.ndarray], 
         self,
         data_a: np.ndarray,
         data_b: np.ndarray,
-        method: Literal["FNN", "MST"] = "FNN",
+        method: _METHODS = "FNN",
     ) -> None:
         self.data_a = data_a
         self.data_b = data_b
         self._set_method(method)
 
     @classmethod
-    def _methods(cls) -> Dict[str, Callable[[np.ndarray, np.ndarray], int]]:
+    def _methods(cls) -> Dict[str, _FUNCTION]:
         return {"FNN": _fnn, "MST": _mst}
 
     def evaluate(self) -> Dict[str, Any]:

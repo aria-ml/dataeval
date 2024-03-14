@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Callable, Dict, Generic, List, TypeVar
 
 TOutput = TypeVar("TOutput", bound=dict)
+TMethods = TypeVar("TMethods")
 TCallable = TypeVar("TCallable", bound=Callable)
 
 
@@ -11,7 +12,7 @@ class EvaluateMixin(ABC, Generic[TOutput]):
         """Abstract method to calculate metric based off of constructor parameters"""
 
 
-class MethodsMixin(ABC, Generic[TCallable]):
+class MethodsMixin(ABC, Generic[TMethods, TCallable]):
     """
     Use this mixin to define a mapping of functions to method names which
     can be queried by the user and called internally with the appropriate
@@ -69,10 +70,10 @@ class MethodsMixin(ABC, Generic[TCallable]):
         return self._method_key
 
     @method.setter
-    def method(self, value: str):
+    def method(self, value: TMethods):
         self._set_method(value)
 
-    def _set_method(self, value: str):
+    def _set_method(self, value: TMethods):
         """This setter is to fix pyright incorrect detection of
         incorrectly overriding the 'method' property"""
         if value not in self.methods():
