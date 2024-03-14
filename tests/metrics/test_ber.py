@@ -23,6 +23,11 @@ class TestMulticlassBER:
         with pytest.raises(KeyError):
             BER(np.empty([]), np.empty([]), "NOT_A_METHOD")  # type: ignore
 
+    def test_invalid_method_setter(self):
+        b = BER(np.empty([]), np.empty([]))
+        with pytest.raises(KeyError):
+            b.method = "NOT_A_METHOD"  # type: ignore
+
     def test_class_min(self):
         with pytest.raises(ValueError):
             get_classes_counts(np.ones(20))
