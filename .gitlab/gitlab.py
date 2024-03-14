@@ -294,7 +294,7 @@ class Gitlab:
         )
         return r.json()
 
-    def get_file(self, filepath: str, dest: str, ref: str = "develop"):
+    def get_file(self, filepath: str, dest: str, ref: str = "main"):
         """
         Gets the raw file content from the repository
 
@@ -304,7 +304,7 @@ class Gitlab:
             The filepath for the repository file to download
         dest : str
             The local filepath to save the contents
-        ref : str, default "develop"
+        ref : str, default "main"
             The tag, branch name or SHA to retrieve the file from
 
         Notes
