@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from os import path, remove
+from re import match
 from typing import Any, Dict, List, Literal
 
 from gitlab import Gitlab
@@ -91,10 +92,12 @@ class ChangeGen:
             entries.append(_Entry(response))
 
         for response in self.gl.list_tags():
+            if not match(r"v[0-9]+.[0-9]+.?[0-9]*", response["name"]):
+                continue
             entry = _Entry(response)
-            match = list(filter(lambda x: x.hash == entry.hash, entries))
-            if match:
-                entry.time = match[0].time + timedelta(seconds=1)
+            hashmatch = list(filter(lambda x: x.hash == entry.hash, entries))
+            if hashmatch:
+                entry.time = hashmatch[0].time + timedelta(seconds=1)
             entries.append(entry)
 
         # Entries retrieved are not in chronological order, sort before check
