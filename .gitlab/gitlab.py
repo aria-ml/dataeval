@@ -169,6 +169,27 @@ class Gitlab:
             if status_code != 404:
                 raise e
 
+    def get_single_repository_branch(self, branch: str) -> Dict[str, Any]:
+        """
+        Get a single repository branch
+
+        Parameters
+        ----------
+        branch_name : str
+            The name of the branch (e.g. "releases/vX.Y")
+
+        Returns
+        -------
+        Dict[str, Any]:
+            The response received after issuing the request
+
+        Notes
+        --------
+        https://docs.gitlab.com/ee/api/branches.html#get-single-repository-branch
+        """
+        r = self._request(get, f"{BRANCHES}/{branch}")
+        return r.json()
+
     def create_repository_branch(self, branch: str, ref: str) -> Dict[str, Any]:
         """
         Create a repository branch
