@@ -1,0 +1,35 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_TAG =~ /v\d+\.\d+\.\d+$/
+      variables:
+        RELEASE: "release"
+
+default:
+  # This should allow pipelines to auto-cancel when redundant:
+  # https://gitlab.jatic.net/help/ci/pipelines/settings.md#auto-cancel-redundant-pipelines
+  # https://gitlab.jatic.net/help/ci/yaml/index.md#interruptible
+  interruptible: true
+  tags:
+    - autoscaler
+
+.release:
+  stage: release
+  environment:
+    name: production
+  before_script:
+    - pip install requests build twine --upgrade
+  rules:
+    - if: $RELEASE
+
+tag:
+  extends: .release
+  script:
+    - python .gitlab/release.py bump_version --commit
+
+publish:
+  extends: .release
+  needs: [tag]
+  script:
+    - twine --version
+    - python -m build
+    - twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi -u gitlab-ci-token -p $DAML_BUILD_PAT dist/*
