@@ -8,9 +8,9 @@ from verboselog import set_verbose
 from versiontag import VersionTag
 
 BUMP_VERSION = "bump_version"
-UPDATE_CHANGELOG = "update_changelog"
+CREATE_RELEASE = "create_release"
 CREATE_MR = "create_mr"
-ACTIONS = [BUMP_VERSION, UPDATE_CHANGELOG, CREATE_MR]
+ACTIONS = [BUMP_VERSION, CREATE_RELEASE, CREATE_MR]
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="DAML Release Utilities")
@@ -21,28 +21,31 @@ if __name__ == "__main__":
 
     set_verbose(args.verbose)
     gl = Gitlab(verbose=args.verbose)
+    vt = VersionTag(gl)
     action = args.action
     response = dict()
     if action == BUMP_VERSION:
-        vt = VersionTag(gl)
         if args.commit:
             print(f"Bumping version from {vt.current} to {vt.pending}...")
             response = gl.add_tag(vt.pending, message=f"DAML {vt.pending}")
         else:
             print(f"Current version: {vt.current} Pending version: {vt.pending}")
-    elif action == UPDATE_CHANGELOG:
+    elif action == CREATE_RELEASE:
         cg = ChangeGen(gl)
         change = cg.generate("changelog")
         if change:
             print("Updating changelog file with following content:")
             print(change["content"])
             if args.commit:
-                response_push = gl.push_file(CHANGELOG_FILE, "main", **change)
+                branch = "main"
+                gl.push_file(CHANGELOG_FILE, branch, **change)
+                response = gl.get_single_repository_branch(branch)
+                commit_id = response["commit"]["id"]
+                gl.create_repository_branch(f"releases/{vt.pending}", commit_id)
         else:
             print("Current changelog is up to date.")
     elif action == CREATE_MR:
         cg = ChangeGen(gl)
-        vt = VersionTag(gl)
         title = f"Release {vt.pending}"
         merge = cg.generate("merge")
         existing = gl.list_merge_requests(
