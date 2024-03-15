@@ -98,7 +98,7 @@ linting:
   before_script:
     - pip install poetry
     - poetry config virtualenvs.create false
-    - poetry install --only dev
+    - poetry install --only lint
   script:
     - ./run lint
 
@@ -278,7 +278,7 @@ secret_detection:
 #     - poetry check
 #     - poetry self add poetry-lock-groups-plugin
 #   script:
-#     - poetry lock --without dev --without docs --without jatic
+#     - poetry lock --without test,lint,docs --without jatic
 #   artifacts:
 #     paths:
 #       - poetry.lock
