@@ -37,7 +37,11 @@ if __name__ == "__main__":
             print("Updating changelog file with following content:")
             print(change["content"])
             if args.commit:
-                response_push = gl.push_file(CHANGELOG_FILE, "main", **change)
+                branch = "main"
+                gl.push_file(CHANGELOG_FILE, branch, **change)
+                response = gl.get_single_repository_branch(branch)
+                commit_id = response["commit"]["id"]
+                gl.create_repository_branch(f"releases/{vt.pending}", commit_id)
         else:
             print("Current changelog is up to date.")
     elif action == CREATE_MR:
