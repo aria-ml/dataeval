@@ -162,22 +162,25 @@ Hotfixes are merged directly in to `main` and cherry-picked into the current `re
 
 ### [Gitlab CI Pipelines](.gitlab-ci.yaml)
 - Feature work should happen in short-lived (as much as possible) branches
-- Pipelines will always run as baseline:
-  - `build`, `linting`, `dependency tests`, `docs`, `unit tests`->`coverage`
-- Merge requests to `main` will trigger baseline run
-- Commits to `main` on completed merge requests will additionally run:
-  - `functional tests`: superset of unit tests and additional slower functional tests using the GPU runner
-  - `tag release candidate`: tags a successful pipeline with `latest-known-good`
-- A weekly scheduled release pipeline will additionally run:
+- On merge requests to `main` trigger baseline run:
+  - `build`: builds container images and verifies dependency lock file
+  - `linting`: static analysis of code
+  - `dependency tests`: tests against installations with no extras
+  - `docs`: build and output artifacts for documentation
+  - `unit tests`->`coverage`: run unit tests and generate code coverage report
+- On commit to `main` for completed merge requests additionally run:
+  - `functional tests`: superset of `unit tests` with additional slower functional tests using the GPU runner
+  - `tag release candidate`: tags a successful run with `latest-known-good`
+- On weekly scheduled release pipelines additionally run:
   - `create release branch`: creates the vnext release branch
-- On release branches we trigger a publish pipeline:
-  - `pages`->`pages:deploy`: pushes artifacts from docs to Gitlab Pages
+- On release branches additionally run:
+  - `pages`->`pages:deploy`: pushes artifacts from `docs` to Gitlab Pages
   - `changelog`: updates the changelog in with new features and cherry-picks to release branch
   - `tag`: adds an annotated version
   - `publish`: packages DAML and publishes to JATIC Gitlab internal repository
 
 ### [Github Actions](.github/workflows/publish.yml)
-- This action runs when new version tags are pushed
+- This action publishes DAML to [pypi](https://pypi.org/project/daml/) when new version tags are pushed
 
 ### [ReadTheDocs Pipeline](.readthedocs.yaml)
-- Documentation builds on changes to the Github repository for `main` branch (latest) as well as last tag (stable)
+- This pipeline publishes documentation to [readthedocs](https://daml.readthedocs.io/) on updates to `main` branch (latest) and new release tags (stable)
