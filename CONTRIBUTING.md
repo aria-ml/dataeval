@@ -165,19 +165,19 @@ Hotfixes are merged directly in to `main` and cherry-picked into the current `re
 - Pipelines will always run as baseline:
   - `build`, `linting`, `dependency tests`, `docs`, `unit tests`->`coverage`
 - Merge requests to `main` will trigger baseline run
-- Completed merge requests to `main` will trigger baseline and additionally:
+- Commits to `main` on completed merge requests will additionally run:
   - `functional tests`: superset of unit tests and additional slower functional tests using the GPU runner
   - `tag release candidate`: tags a successful pipeline with `latest-known-good`
-- A scheduled release pipeline runs on a weekly cadence:
+- A weekly scheduled release pipeline will additionally run:
   - `create release branch`: creates the vnext release branch
-- On commit changes to release branches we trigger a publish pipeline:
+- On release branches we trigger a publish pipeline:
   - `pages`->`pages:deploy`: pushes artifacts from docs to Gitlab Pages
   - `changelog`: updates the changelog in with new features and cherry-picks to release branch
-  - `tag`: adds an annotated tag with version number for the change
+  - `tag`: adds an annotated version
   - `publish`: packages DAML and publishes to JATIC Gitlab internal repository
 
 ### [Github Actions](.github/workflows/publish.yml)
-- This action is configured on commits to release branches to publish to pypi
+- This action runs when new version tags are pushed
 
 ### [ReadTheDocs Pipeline](.readthedocs.yaml)
-- TODO: The pipeline is configured to build documentation using Sphinx on changes to the Github repository for branches in the `releases` path
+- Documentation builds on changes to the Github repository for `main` branch (latest) as well as last tag (stable)
