@@ -4,8 +4,6 @@ workflow:
   auto_cancel:
     on_new_commit: interruptible
   rules:
-    - if: $CI_COMMIT_TAG
-      when: never
     - if: $CI_PIPELINE_SOURCE == 'schedule'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
     - if: $CI_COMMIT_BRANCH == 'main'
@@ -16,7 +14,9 @@ workflow:
       variables:
         # Functional tests are only run against `main`
         FUNCTIONAL: "functional"
-    - if: $CI_COMMIT_BRANCH =~ /^releases\/\S+$/
+    - if: $CI_COMMIT_TAG =~ /v\d+\.\d+\.\d+$/
+      variables:
+        RELEASE: "release"
 
 default:
   # This should allow pipelines to auto-cancel when redundant:
@@ -38,8 +38,7 @@ stages:
   before_script:
     - pip install requests build twine --upgrade
   rules:
-    # Only allowed to release from a release branch.
-    - if: $CI_COMMIT_BRANCH =~ /^releases\/\S+$/
+    - if: $RELEASE != null
 
 .docker_harbor_required:
   image: docker:24.0-git
@@ -153,9 +152,9 @@ tag release candidate:
     # Only allowed to tag `main` when everything passes
     - if: $CI_COMMIT_BRANCH == 'main' && $FUNCTIONAL != null
 
-# This job runs and creates a branch from the latest known good tag,
-# when this branch is created a pipeline will run automatically.
-create release branch:
+# This job runs and creates a release from the latest known good tag,
+# when this release is created a pipeline will run automatically.
+create release:
   stage: release
   environment:
     name: production
@@ -164,7 +163,7 @@ create release branch:
     - pip install requests
     - .gitlab/release.py create_release --commit
   rules:
-    # Only allowed to create a release branch off of `main` with CREATE_NEW_RELEASE set
+    # Only allowed to create a release from `main` with CREATE_NEW_RELEASE set
     - if: $CI_COMMIT_BRANCH == 'main' && $CREATE_NEW_RELEASE != null
 
 dependency tests:
