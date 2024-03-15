@@ -97,7 +97,7 @@ FROM build as versioned
 RUN touch README.md
 COPY --chown=daml:daml pyproject.toml poetry.lock ./
 COPY --chown=daml:daml src/ src/
-RUN poetry install --no-cache --all-extras --with dev --with docs
+RUN poetry install --no-cache --all-extras --with test,lint,docs
 
 
 FROM versioned as run
