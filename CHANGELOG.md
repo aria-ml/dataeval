@@ -1,6 +1,14 @@
-[//]: # (a0760a2c132c4b036954e80720cc612098ed4a23)
+[//]: # (b18b309775a46dccbe02515c570f3d60739b5c59)
 
 # DAML Change Log
+## v0.44.1
+- ```b6c89ab1 - Only run pages job upon release```
+## v0.44.0
+- ```52c185ed - Address blocking issues with release pipeline```
+- ```05c288b8 - Add method list generic type hint and bump test coverage```
+- ```d4a174c6 - Call the MethodsMixin method setter in init```
+- ```c3df2609 - Require functional tests to tag release candidate and only run functional tests on main```
+- ```5f2a2b3f - Allow for trunk-based development```
 ## v0.43.0
 - ```72f4d31f - Add notebooks back to docs and rebuild doctree every build```
 - ```4ba8305f - Remove mnist.npz from repository```
@@ -18,7 +26,6 @@
 - ```b1f18651 - Fixed singleton pattern in verboselog```
 - ```0b3d8b07 - Add ability to update existing Release MR with new information```
 - ```217630c3 - Automated develop into main merge requests on successful merges in develop```
-## latest-known-good
 ## v0.42.2
 - ```5225c491 - Change output classes to dictionaries```
 - ```1dc23edd - AE Trainer workflow notebook. AE Trainer updates based on notebook```

@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from os import path, remove
+from re import match
 from typing import Any, Dict, List, Literal
 
 from gitlab import Gitlab
@@ -18,7 +19,6 @@ class _Entry:
     shorthash - first 8 chars of the hash
     description - description in the commit or the name of the tag
     is_tag - whether the hash is a tag or not
-    skip - whether to skip this entry or not (skips merges from develop into main)
     """
 
     def __init__(self, response: Dict[str, Any]):
@@ -32,10 +32,6 @@ class _Entry:
                 response["title"].replace('Resolve "', "").replace('"', "")
             )
             self.is_tag = False
-            self.skip = (
-                response["source_branch"] == "develop"
-                and response["target_branch"] == "main"
-            )
         elif "target" in response.keys():
             self.time = datetime.strptime(
                 response["commit"]["committed_date"], "%Y-%m-%dT%H:%M:%S.%f%z"
@@ -44,7 +40,6 @@ class _Entry:
             self.shorthash = response["commit"]["short_id"]
             self.description = response["name"]
             self.is_tag = True
-            self.skip = False
 
     def to_markdown(self) -> str:
         if self.is_tag:
@@ -92,15 +87,17 @@ class ChangeGen:
         entries: List[_Entry] = list()
 
         for response in self.gl.list_merge_requests(
-            state="merged", target_branch="develop"
+            state="merged", target_branch="main"
         ):
             entries.append(_Entry(response))
 
         for response in self.gl.list_tags():
+            if not match(r"v[0-9]+.[0-9]+.?[0-9]*", response["name"]):
+                continue
             entry = _Entry(response)
-            match = list(filter(lambda x: x.hash == entry.hash, entries))
-            if match:
-                entry.time = match[0].time + timedelta(seconds=1)
+            hashmatch = list(filter(lambda x: x.hash == entry.hash, entries))
+            if hashmatch:
+                entry.time = hashmatch[0].time + timedelta(seconds=1)
             entries.append(entry)
 
         # Entries retrieved are not in chronological order, sort before check
@@ -148,8 +145,6 @@ class ChangeGen:
         for entry in entries:
             if entry.hash == last_hash:
                 break
-            if entry.skip:
-                continue
             lines.append((entry.to_markdown()))
 
         if target == "changelog":
