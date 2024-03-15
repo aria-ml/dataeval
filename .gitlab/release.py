@@ -21,10 +21,10 @@ if __name__ == "__main__":
 
     set_verbose(args.verbose)
     gl = Gitlab(verbose=args.verbose)
+    vt = VersionTag(gl)
     action = args.action
     response = dict()
     if action == BUMP_VERSION:
-        vt = VersionTag(gl)
         if args.commit:
             print(f"Bumping version from {vt.current} to {vt.pending}...")
             response = gl.add_tag(vt.pending, message=f"DAML {vt.pending}")
@@ -42,7 +42,6 @@ if __name__ == "__main__":
             print("Current changelog is up to date.")
     elif action == CREATE_MR:
         cg = ChangeGen(gl)
-        vt = VersionTag(gl)
         title = f"Release {vt.pending}"
         merge = cg.generate("merge")
         existing = gl.list_merge_requests(
