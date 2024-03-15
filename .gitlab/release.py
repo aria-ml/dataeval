@@ -8,9 +8,9 @@ from verboselog import set_verbose
 from versiontag import VersionTag
 
 BUMP_VERSION = "bump_version"
-UPDATE_CHANGELOG = "update_changelog"
+CREATE_RELEASE = "create_release"
 CREATE_MR = "create_mr"
-ACTIONS = [BUMP_VERSION, UPDATE_CHANGELOG, CREATE_MR]
+ACTIONS = [BUMP_VERSION, CREATE_RELEASE, CREATE_MR]
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="DAML Release Utilities")
@@ -30,7 +30,7 @@ if __name__ == "__main__":
             response = gl.add_tag(vt.pending, message=f"DAML {vt.pending}")
         else:
             print(f"Current version: {vt.current} Pending version: {vt.pending}")
-    elif action == UPDATE_CHANGELOG:
+    elif action == CREATE_RELEASE:
         cg = ChangeGen(gl)
         change = cg.generate("changelog")
         if change:
