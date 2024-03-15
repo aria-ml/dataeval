@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 
 from changegen import CHANGELOG_FILE, ChangeGen
@@ -35,10 +37,7 @@ if __name__ == "__main__":
             print("Updating changelog file with following content:")
             print(change["content"])
             if args.commit:
-                response_push = gl.push_file(CHANGELOG_FILE, "develop", **change)
-                file_info = gl.get_file_info(CHANGELOG_FILE, "develop")
-                response_cherry_pick = gl.cherry_pick(file_info["commit_id"])
-                response = {"push": response_push, "cherry-pick": response_cherry_pick}
+                response_push = gl.push_file(CHANGELOG_FILE, "main", **change)
         else:
             print("Current changelog is up to date.")
     elif action == CREATE_MR:

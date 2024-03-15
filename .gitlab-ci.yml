@@ -217,12 +217,12 @@ docs:
       - output/docs/html/
 
 pages:
+  extends: .on_release
   needs:
     - job: docs
       artifacts: true
     - job: coverage
       artifacts: true
-  stage: release
   script:
     - mv output/docs/html/ ./public/
     - mv htmlcov/ ./public/coverage/

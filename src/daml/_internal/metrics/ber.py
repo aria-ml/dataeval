@@ -40,9 +40,11 @@ def _knn(X: np.ndarray, y: np.ndarray) -> Tuple[float, float]:
     return upper, lower
 
 
-class BER(
-    EvaluateMixin, MethodsMixin[Callable[[np.ndarray, np.ndarray], Tuple[float, float]]]
-):
+_METHODS = Literal["MST", "KNN"]
+_FUNCTION = Callable[[np.ndarray, np.ndarray], Tuple[float, float]]
+
+
+class BER(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
     """
     An estimator for Multi-class Bayes Error Rate using FR or KNN test statistic basis
 
@@ -65,16 +67,16 @@ class BER(
         self,
         data: np.ndarray,
         labels: np.ndarray,
-        method: Literal["MST", "KNN"] = "MST",
+        method: _METHODS = "MST",
     ) -> None:
         self.data = data
         self.labels = labels
-        self.method = method
+        self._set_method(method)
 
     @classmethod
     def _methods(
         cls,
-    ) -> Dict[str, Callable[[np.ndarray, np.ndarray], Tuple[float, float]]]:
+    ) -> Dict[str, _FUNCTION]:
         return {"MST": _mst, "KNN": _knn}
 
     def evaluate(self) -> Dict[str, float]:
