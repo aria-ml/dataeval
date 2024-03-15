@@ -152,6 +152,8 @@ DAML uses containers to normalize environments for testing and development.  The
 
 This repo contains a specific location for prototype code that is being used for R&D work. This segregates incomplete/untested/undocumented work from released work to ensure that the `main` branch remains in a state that can be released/shipped at any point.
 
+<!-- end contributing -->
+
 ## Branching and Release Workflow
 
 Additional information on how branching and releases are managed for DAML can be found in our [Branching and Release Workflow](BRANCHING.md) documentation.
