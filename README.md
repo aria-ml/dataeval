@@ -4,6 +4,8 @@
 
 The Data-Analysis Metrics Library, or DAML, focuses on characterizing image data and its impact on model performance across classification and object-detection tasks.
 
+<!-- start about -->
+
 **Model-agnostic metrics that bound real-world performance**
 - relevance/completeness/coverage
 - metafeatures (data complexity)
@@ -16,6 +18,8 @@ The Data-Analysis Metrics Library, or DAML, focuses on characterizing image data
 - dataset-shift metrics
 - model performance bounds under covariate shift
 - guidance on sampling to assess model error and model retraining
+
+<!-- end about -->
 
 ## Getting Started
 
