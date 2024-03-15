@@ -1,6 +1,15 @@
-[//]: # (b18b309775a46dccbe02515c570f3d60739b5c59)
+[//]: # (2d7df8c5e82dd912111d3cb0a063c1f6d5e2c446)
 
 # DAML Change Log
+## Pending Release
+- ```2d7df8c5 - Split poetry dev dependency group into test and lint```
+- ```591bdf05 - Update contributing for trunk-based development```
+- ```58e5605f - Create release tags instead of branches```
+- ```6f4e6d5f - Commit changelog updates before creating release branch```
+- ```d8bf1245 - Remove entries from .gitignore```
+- ```1468aa5c - Switch to markdown and updated docs```
+- ```b1c5bb4f - Make Spike Issue Template```
+- ```c6a9c5b1 - Re-enable GPU runners```
 ## v0.44.1
 - ```b6c89ab1 - Only run pages job upon release```
 ## v0.44.0
