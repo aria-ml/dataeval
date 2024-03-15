@@ -162,7 +162,7 @@ create release branch:
   image: python:$PYTHON_LATEST_SUPPORTED_VERSION
   script:
     - pip install requests
-    - .gitlab/create_release_branch.py
+    - .gitlab/release.py create_release --commit
   rules:
     # Only allowed to create a release branch off of `main` with CREATE_NEW_RELEASE set
     - if: $CI_COMMIT_BRANCH == 'main' && $CREATE_NEW_RELEASE != null
@@ -242,12 +242,6 @@ publish:
     - twine --version
     - python -m build
     - twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi -u gitlab-ci-token -p $DAML_BUILD_PAT dist/*
-
-changelog:
-  extends: .on_release
-  needs: [publish]
-  script:
-    - python .gitlab/release.py create_release --commit
 
 include:
  - template: Security/Secret-Detection.gitlab-ci.yml
