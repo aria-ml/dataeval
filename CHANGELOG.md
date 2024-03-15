@@ -23,7 +23,6 @@
 - ```b1f18651 - Fixed singleton pattern in verboselog```
 - ```0b3d8b07 - Add ability to update existing Release MR with new information```
 - ```217630c3 - Automated develop into main merge requests on successful merges in develop```
-## latest-known-good
 ## v0.42.2
 - ```5225c491 - Change output classes to dictionaries```
 - ```1dc23edd - AE Trainer workflow notebook. AE Trainer updates based on notebook```
