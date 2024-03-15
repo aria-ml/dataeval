@@ -1,7 +1,7 @@
-[//]: # (b6c89ab1409c3599f137f15d0aa9465c35752eda)
+[//]: # (b18b309775a46dccbe02515c570f3d60739b5c59)
 
 # DAML Change Log
-## Pending Release
+## v0.44.1
 - ```b6c89ab1 - Only run pages job upon release```
 ## v0.44.0
 - ```52c185ed - Address blocking issues with release pipeline```
