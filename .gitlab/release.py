@@ -41,7 +41,7 @@ if __name__ == "__main__":
                 gl.push_file(CHANGELOG_FILE, branch, **change)
                 response = gl.get_single_repository_branch(branch)
                 commit_id = response["commit"]["id"]
-                gl.create_repository_branch(f"releases/{vt.pending}", commit_id)
+                gl.add_tag(vt.pending, commit_id, message=f"DAML {vt.pending}")
         else:
             print("Current changelog is up to date.")
     elif action == CREATE_MR:
