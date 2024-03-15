@@ -132,10 +132,10 @@ unit tests:
 
 functional tests:
   extends: [.test]
-  # tags: [GPU]
+  tags: [GPU]
   variables:
     TASK: func
-    # ARGS: --gpu
+    ARGS: --gpu
   rules:
     - if: $FUNCTIONAL != null
 
@@ -209,10 +209,9 @@ docs:
   extends: [.docker_harbor_optional]
   needs: [build image]
   stage: test
-  # tags: [GPU]
+  tags: [GPU]
   script:
-    # - ./build docs --gpu
-    - ./build docs
+    - ./build docs --gpu
   artifacts:
     paths:
       - output/docs/html/
