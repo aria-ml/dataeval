@@ -4,19 +4,9 @@ workflow:
   auto_cancel:
     on_new_commit: interruptible
   rules:
-    - if: $CI_PIPELINE_SOURCE == 'schedule'
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
     - if: $CI_COMMIT_BRANCH == 'main'
-      changes:
-        - "CHANGELOG.md"
+      changes: ["CHANGELOG.md"]
       when: never
-    - if: $CI_COMMIT_BRANCH == 'main'
-      variables:
-        # Functional tests are only run against `main`
-        FUNCTIONAL: "functional"
-    - if: $CI_COMMIT_TAG =~ /v\d+\.\d+\.\d+$/
-      variables:
-        RELEASE: "release"
 
 default:
   # This should allow pipelines to auto-cancel when redundant:
@@ -29,32 +19,13 @@ default:
 stages:
   - build
   - test
+  - publish
   - release
 
-.on_release:
-  stage: release
-  environment:
-    name: production
-  before_script:
-    - pip install requests build twine --upgrade
-  rules:
-    - if: $RELEASE != null
-
-.docker_harbor_required:
-  image: docker:24.0-git
-  before_script:
-    - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
-    - echo ${DAML_HARBOR_TOKEN} | docker login harbor.jatic.net:443 -u 'robot$daml+daml-build' --password-stdin
-  after_script:
-    - docker logout harbor.jatic.net:443
-
-.docker_harbor_optional:
-  image: docker:24.0-git
-  before_script:
-    - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
-    - echo ${DAML_HARBOR_TOKEN} | docker login harbor.jatic.net:443 -u 'robot$daml+daml-build' --password-stdin || echo "WARNING - Failed to login"
-  after_script:
-    - docker logout harbor.jatic.net:443 || echo "WARNING - Failed to logout"
+include:
+  - '.gitlab-ci/build.yaml'
+  - '.gitlab-ci/test-publish.yaml'
+  - '.gitlab-ci/release.yaml'
 
 image: python:$PYTHON_LATEST_SUPPORTED_VERSION
 
@@ -68,180 +39,6 @@ cache:
     - .cache/pip
     - venv/
 
-verify lock:
-  stage: build
-  before_script:
-    - pip install poetry
-  script:
-    - poetry check
-
-build base:
-  extends: .docker_harbor_required
-  stage: build
-  script:
-    - ./build --build-only --push --verbose base
-  allow_failure: true
-
-build image:
-  extends: .docker_harbor_required
-  stage: build
-  needs: [verify lock, build base]
-  parallel:
-    matrix:
-      - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
-  script:
-    - ./build --build-only --push --verbose ${PYTHON_VERSION}
-  allow_failure: true
-
-linting:
-  needs: []
-  before_script:
-    - pip install poetry
-    - poetry config virtualenvs.create false
-    - poetry install --only lint
-  script:
-    - ./run lint
-
-.test:
-  extends: .docker_harbor_optional
-  stage: test
-  needs: [build image]
-  parallel:
-    matrix:
-      - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
-  script:
-    - ./build ${PYTHON_VERSION} ${TASK} ${ARGS} || TESTFAILED=1
-    - if [[ $TESTFAILED ]]; then echo "=========== ${TASK} FAILED ==========="; EXITCODE=1; fi
-    - ./build ${PYTHON_VERSION} type || TYPEFAILED=1
-    - if [[ $TYPEFAILED ]]; then echo "=========== type FAILED ==========="; EXITCODE=1; fi
-    - exit $EXITCODE
-  artifacts:
-    reports:
-      junit: output/junit.${TASK}.${PYTHON_VERSION}.xml
-    paths:
-      - output/*
-
-unit tests:
-  extends: [.test]
-  variables:
-    TASK: unit
-  rules:
-    # Unit tests are a subset of functional tests, so only run if functional tests aren't run
-    - if: $FUNCTIONAL == null
-
-functional tests:
-  extends: [.test]
-  tags: [GPU]
-  variables:
-    TASK: func
-    ARGS: --gpu
-  rules:
-    - if: $FUNCTIONAL != null
-
-# This job should only run if all the "needs" have succeeded,
-# and it creates a tag that signifies that all testing has passed.
-tag release candidate:
-  stage: release
-  environment:
-    name: production
-  needs: [docs, linting, dependency tests, functional tests]
-  script:
-    - pip install requests
-    - .gitlab/update_latest_known_good.py
-  rules:
-    # Only allowed to tag `main` when everything passes
-    - if: $CI_COMMIT_BRANCH == 'main' && $FUNCTIONAL != null
-
-# This job runs and creates a release from the latest known good tag,
-# when this release is created a pipeline will run automatically.
-create release:
-  stage: release
-  environment:
-    name: production
-  image: python:$PYTHON_LATEST_SUPPORTED_VERSION
-  script:
-    - pip install requests
-    - .gitlab/release.py create_release --commit
-  rules:
-    # Only allowed to create a release from `main` with CREATE_NEW_RELEASE set
-    - if: $CI_COMMIT_BRANCH == 'main' && $CREATE_NEW_RELEASE != null
-
-dependency tests:
-  stage: test
-  image: python:$PYTHON_VERSION
-  needs: []
-  parallel:
-    matrix:
-      - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
-  script:
-    - ./run deps
-
-coverage:
-  stage: test
-  needs:
-    - job: unit tests
-      optional: true
-      artifacts: true
-    - job: functional tests
-      optional: true
-      artifacts: true
-  before_script:
-    - pip install coverage
-  script:
-    # TODO: Move coverage report generation in to build script (and/or resolve issue with using symlinks instead of a full recursive copy)
-    - cp --recursive $(pwd) /daml
-    - coverage combine ./output
-    - coverage report -m --skip-empty --omit */_alibi_detect/*
-    - coverage xml --skip-empty --omit */_alibi_detect/*
-    - coverage html --skip-empty --omit */_alibi_detect/*
-  coverage: "/(?i)total.*? (100(?:\\.0+)?\\%|[1-9]?\\d(?:\\.\\d+)?\\%)$/"
-  artifacts:
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage.xml
-    paths:
-      - coverage.xml
-      - htmlcov/
-
-docs:
-  extends: [.docker_harbor_optional]
-  needs: [build image]
-  stage: test
-  tags: [GPU]
-  script:
-    - ./build docs --gpu
-  artifacts:
-    paths:
-      - output/docs/html/
-
-pages:
-  extends: .on_release
-  needs:
-    - job: docs
-      artifacts: true
-    - job: coverage
-      artifacts: true
-  script:
-    - mv output/docs/html/ ./public/
-    - mv htmlcov/ ./public/coverage/
-  artifacts:
-    paths:
-      - public
-
-tag:
-  extends: .on_release
-  script:
-    - python .gitlab/release.py bump_version --commit
-
-publish:
-  extends: .on_release
-  needs: [tag]
-  script:
-    - twine --version
-    - python -m build
-    - twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi -u gitlab-ci-token -p $DAML_BUILD_PAT dist/*
-
 include:
  - template: Security/Secret-Detection.gitlab-ci.yml
 #  - template: Security/Dependency-Scanning.gitlab-ci.yml
@@ -252,6 +49,21 @@ secret_detection:
   rules:
     - if: $CI_COMMIT_REF_PROTECTED == "true"
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
+
+# generate shipped dependencies:
+#   stage: build
+#   before_script:
+#     - pip install poetry
+#     - poetry check
+#     - poetry self add poetry-lock-groups-plugin
+#   script:
+#     - poetry lock --without test,lint,docs
+#   artifacts:
+#     paths:
+#       - poetry.lock
+#   rules:
+#     - if: $CI_COMMIT_REF_PROTECTED == "true"
+#     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
 
 # gemnasium-python-dependency_scanning:
 #   needs:
@@ -265,48 +77,10 @@ secret_detection:
 #     - generate shipped dependencies
 #   rules:
 #     - if: $CI_COMMIT_REF_PROTECTED == "true"
+#     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
 
 # semgrep-sast:
 #   needs: []
 #   rules:
 #     - if: $CI_COMMIT_REF_PROTECTED == "true"
-
-# generate shipped dependencies:
-#   stage: build
-#   before_script:
-#     - pip install poetry
-#     - poetry check
-#     - poetry self add poetry-lock-groups-plugin
-#   script:
-#     - poetry lock --without test,lint,docs --without jatic
-#   artifacts:
-#     paths:
-#       - poetry.lock
-#   rules:
-#     - if: $CI_COMMIT_REF_PROTECTED == "true"
-
-# .test:
-#   extends: .docker_harbor_optional
-#   stage: test
-#   needs: [build image]
-#   parallel:
-#     matrix:
-#       - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
-#   script:
-#     - ./build ${PYTHON_VERSION} ${TASK}
-#   artifacts:
-#     reports:
-#       junit: output/junit.${TASK}.${PYTHON_VERSION}.xml
-#     paths:
-#       - output/junit.${TASK}.${PYTHON_VERSION}.xml
-#       - output/.coverage.${TASK}.${PYTHON_VERSION}
-#       - output/htmlcov.${TASK}.${PYTHON_VERSION}
-
-# typecheck:
-#   extends: [.docker_harbor_optional]
-#   needs: [build image]
-#   parallel:
-#     matrix:
-#       - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
-#   script:
-#     - ./build ${PYTHON_VERSION} type
+#     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'

@@ -1,0 +1,143 @@
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH == 'main'
+      variables:
+        TEST: 'functional'
+    - if: $CI_PIPELINE_SOURCE == 'schedule' || $CI_PIPELINE_SOURCE == 'merge_request_event'
+      variables:
+        TEST: 'unit'
+
+.test:
+  stage: test
+  rules:
+    - if: $TEST
+
+.test_docker:
+  extends: .test
+  needs: [build image]
+  image: docker:24.0-git
+  before_script:
+    - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
+    - echo ${DAML_HARBOR_TOKEN} | docker login harbor.jatic.net:443 -u 'robot$daml+daml-build' --password-stdin || echo "WARNING - Failed to login"
+  after_script:
+    - docker logout harbor.jatic.net:443 || echo "WARNING - Failed to logout"
+
+.publish:
+  stage: publish
+  rules:
+    - if: $CI_COMMIT_BRANCH == 'main'
+
+linting:
+  extends: .test
+  needs: []
+  before_script:
+    - pip install poetry
+    - poetry config virtualenvs.create false
+    - poetry install --only lint
+  script:
+    - ./run lint
+
+dependency tests:
+  extends: .test
+  image: python:$PYTHON_VERSION
+  needs: []
+  parallel:
+    matrix:
+      - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
+  script:
+    - ./run deps
+
+.run_tests:
+  extends: .test_docker
+  parallel:
+    matrix:
+      - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
+  script:
+    - ./build ${PYTHON_VERSION} ${TASK} ${ARGS} || TESTFAILED=1
+    - if [[ $TESTFAILED ]]; then echo "=========== ${TASK} FAILED ==========="; EXITCODE=1; fi
+    - ./build ${PYTHON_VERSION} type || TYPEFAILED=1
+    - if [[ $TYPEFAILED ]]; then echo "=========== type FAILED ==========="; EXITCODE=1; fi
+    - exit $EXITCODE
+  artifacts:
+    reports:
+      junit: output/junit.${TASK}.${PYTHON_VERSION}.xml
+    paths:
+      - output/*
+
+unit tests:
+  extends: .run_tests
+  variables:
+    TASK: unit
+  rules:
+    - if: $TEST == "unit"
+
+functional tests:
+  extends: .run_tests
+  tags: [GPU]
+  variables:
+    TASK: func
+    ARGS: --gpu
+  rules:
+    - if: $TEST == "functional"
+
+coverage:
+  extends: .test
+  needs:
+    - job: unit tests
+      optional: true
+      artifacts: true
+    - job: functional tests
+      optional: true
+      artifacts: true
+  before_script:
+    - pip install coverage
+  script:
+    # TODO: Move coverage report generation in to build script (and/or resolve issue with using symlinks instead of a full recursive copy)
+    - cp --recursive $(pwd) /daml
+    - coverage combine ./output
+    - coverage report -m --skip-empty --omit */_alibi_detect/*
+    - coverage xml --skip-empty --omit */_alibi_detect/*
+    - coverage html --skip-empty --omit */_alibi_detect/*
+  coverage: "/(?i)total.*? (100(?:\\.0+)?\\%|[1-9]?\\d(?:\\.\\d+)?\\%)$/"
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - coverage.xml
+      - htmlcov/
+
+docs:
+  extends: .test_docker
+  tags: [GPU]
+  script:
+    - ./build docs --gpu
+  artifacts:
+    paths:
+      - output/docs/html/
+
+# This job should only run if all the "needs" have succeeded,
+# and it creates a tag that signifies that all testing has passed.
+tag release candidate:
+  extends: .publish
+  environment:
+    name: production
+  needs: [docs, linting, dependency tests, functional tests]
+  script:
+    - pip install requests
+    - .gitlab/update_latest_known_good.py
+
+pages:
+  extends: .publish
+  needs:
+    - job: docs
+      artifacts: true
+    - job: coverage
+      artifacts: true
+  script:
+    - mv output/docs/html/ ./public/
+    - mv htmlcov/ ./public/coverage/
+  artifacts:
+    paths:
+      - public
