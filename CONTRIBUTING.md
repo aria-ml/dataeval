@@ -1,5 +1,14 @@
 # Data Assessment Metrics Library (DAML)
 
+<!-- start contributing -->
+
+[![Github-CI][github-ci]][github-link]
+[![Documentation Status][rtd-badge]][rtd-link]
+[![PyPi Status][pypi-badge]][pypi-link]
+[![Conda Status][conda-badge]][conda-link]
+[![Code style: black][black-badge]][black-link]
+[![License][license-badge]][license-link]
+
 ## Overview
 Below you will find detailed instructions on the pre-requisites and steps to set up and contribute to the DAML project.  This assumes you have an active developer account with [JATIC GitLab](https://gitlab.jatic.net/).
 
