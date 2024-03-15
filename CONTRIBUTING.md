@@ -1,5 +1,14 @@
 # Data Assessment Metrics Library (DAML)
 
+<!-- start contributing -->
+
+[![Github-CI][github-ci]][github-link]
+[![Documentation Status][rtd-badge]][rtd-link]
+[![PyPi Status][pypi-badge]][pypi-link]
+[![Conda Status][conda-badge]][conda-link]
+[![Code style: black][black-badge]][black-link]
+[![License][license-badge]][license-link]
+
 ## Overview
 Below you will find detailed instructions on the pre-requisites and steps to set up and contribute to the DAML project.  This assumes you have an active developer account with [JATIC GitLab](https://gitlab.jatic.net/).
 
@@ -186,3 +195,19 @@ Hotfixes are merged directly in to `main` and the change is cherry-picked in to 
 -----------
 - `.readthedocs.yaml`
 - The pipeline is configured to build documentation using Sphinx on changes to the Github repository for branches `develop` and `main`: 
+
+
+[github-ci]: https://github.com/aria-ml/daml/workflows/Upload%20Python%20Package/badge.svg
+[github-link]: https://github.com/aria-ml/daml
+[rtd-badge]: https://readthedocs.org/projects/daml/badge/?version=latest
+[rtd-link]: https://daml.readthedocs.io/en/latest/?badge=latest
+[pypi-badge]: https://img.shields.io/pypi/v/daml.svg
+[pypi-link]: https://pypi.org/project/daml
+[conda-badge]: https://anaconda.org/aria-ml/daml/badges/version.svg
+[conda-link]: https://anaconda.org/aria-ml/daml
+[black-badge]: https://img.shields.io/badge/code%20style-black-000000.svg
+[black-link]: https://github.com/ambv/black
+[license-badge]: https://anaconda.org/aria-ml/daml/badges/license.svg
+[license-link]: https://github.com/aria-ml/daml/blob/main/LICENSE.txt
+
+<!-- end contributing -->

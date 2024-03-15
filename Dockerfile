@@ -104,6 +104,7 @@ FROM versioned as run
 COPY --chown=daml:daml .coveragerc ./
 COPY --chown=daml:daml tests/ tests/
 COPY --chown=daml:daml docs/ docs/
+COPY --chown=daml:daml *.md ./
 COPY --chown=daml:daml run ./
 ENTRYPOINT [ "./run" ]
 

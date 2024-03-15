@@ -3,6 +3,8 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
+# -- Project information ---------------------------------------------------
+
 project = "DAML"
 copyright = "2024, ARiA"
 author = "ARiA"
@@ -11,14 +13,22 @@ site_url = "https://github.com/aria-ml/daml/"
 repo_url = "https://github.com/aria-ml/daml/"
 repo_name = "DAML"
 
+root_doc = "index"
+language = "en"
+
+# -- General configuration -------------------------------------------------
+
 extensions = [
+    # Internal Sphinx extensions
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
     "sphinx.ext.doctest",
     "sphinx.ext.napoleon",
     "sphinx.ext.graphviz",
+    # External extensions
     "sphinx_rtd_size",
-    "sphinx_tabs.tabs",
+    "sphinx_design",
+    # "sphinx_tabs.tabs",
     # "sphinx_inline_tabs",
     "myst_nb",
 ]
@@ -28,8 +38,12 @@ source_suffix = [".rst", ".md"]
 templates_path = ["_templates"]
 exclude_patterns = [".jupyter_cache", "_build", "Thumbs.db", ".DS_Store"]
 
+# -- Extension configurations ----------------------------------------------
+
 autosummary_generate = False
 sphinx_rtd_size_width = "80%"
+
+# -- MyST-NB settings ------------------------------------------------------
 
 from os import getenv
 
@@ -40,12 +54,23 @@ nb_execution_mode = "cache" if EXECUTION_MODE is None else EXECUTION_MODE
 nb_execution_raise_on_error = True
 nb_execution_timeout = -1
 
-# html_static_path = ['_static']
+myst_enable_extensions = ["colon_fence", "html_image"]
+
+
+# -- HTML output ----------------------------------------------------------
+
 html_theme = "sphinx_rtd_theme"
+html_logo = "_static/DAML_Logo_Name.png"
+# html_logo = "_static/DAML_LogoOnly.png"
+html_favicon = "_static/DAML_Favicon.png"
+
+
 html_show_sourcelink = False
 html_theme_options = {
-    "navigation_depth": 4,
+    "navigation_depth": 3,
+    "logo_only": True,
 }
+html_static_path = ["_static"]
 
 
 # because we expose private modules in public namespaces
