@@ -1,6 +1,8 @@
 .publish:
   stage: publish
   rules:
+    - if: $CREATE_NEW_RELEASE
+      when: never
     - if: $CI_COMMIT_BRANCH == 'main' 
 
 # This job should only run if all the "needs" have succeeded,
