@@ -1,0 +1,13 @@
+.release:
+  stage: release
+  environment:
+    name: production
+  before_script:
+    - pip install requests build twine --upgrade
+  rules:
+    - if: $CREATE_NEW_RELEASE
+
+create release:
+  extends: .release
+  script:
+    - python .gitlab/release.py create_release --commit

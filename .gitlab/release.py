@@ -34,7 +34,7 @@ if __name__ == "__main__":
         cg = ChangeGen(gl)
         change = cg.generate("changelog")
         if change:
-            print("Updating changelog file with following content:")
+            print(f"Updating changelog and tagging to {vt.pending}:")
             print(change["content"])
             if args.commit:
                 branch = "main"
