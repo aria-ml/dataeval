@@ -4,6 +4,11 @@ workflow:
   auto_cancel:
     on_new_commit: interruptible
   rules:
+    # Release workflow
+    # - TODO: update workflow to run docs and update .jupyter_cache
+    # - release[create release]
+    - if: $CI_PIPELINE_SOURCE == 'schedule' && $CREATE_NEW_RELEASE
+
     # Skip on CHANGELOG.md updates
     - if: $CI_COMMIT_BRANCH == 'main'
       changes: ["CHANGELOG.md"]
@@ -20,11 +25,6 @@ workflow:
     # - test[linting, dependency test, functional test, coverage, docs]
     # - release[pages, tag release candidate]
     - if: $CI_COMMIT_BRANCH == 'main'
-
-    # Release workflow
-    # - TODO: update workflow to run docs and update .jupyter_cache
-    # - release[create release]
-    - if: $CI_PIPELINE_SOURCE == 'schedule' && $CREATE_NEW_RELEASE
 
 default:
   # This should allow pipelines to auto-cancel when redundant:
