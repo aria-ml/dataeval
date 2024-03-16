@@ -1,16 +1,22 @@
 .test:
   stage: test
   rules:
+    - if: $CREATE_NEW_RELEASE
+      when: never
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event' || $CI_COMMIT_BRANCH == 'main'
 
 .test_merge:
   stage: test
   rules:
+    - if: $CREATE_NEW_RELEASE
+      when: never
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
 .test_main:
   stage: test
   rules:
+    - if: $CREATE_NEW_RELEASE
+      when: never
     - if: $CI_COMMIT_BRANCH == 'main' 
 
 .use_docker:

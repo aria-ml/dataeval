@@ -1,6 +1,8 @@
 .build:
   stage: build
   rules:
+    - if: $CREATE_NEW_RELEASE
+      when: never
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event' || $CI_COMMIT_BRANCH == 'main'
 
 .build_docker:
