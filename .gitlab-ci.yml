@@ -49,7 +49,6 @@ cache:
 stages:
   - build
   - test
-  - security
   - publish
   - release
 
