@@ -24,7 +24,7 @@ workflow:
     # Release workflow
     # - TODO: update workflow to run docs and update .jupyter_cache
     # - release[create release]
-    - if: $CREATE_NEW_RELEASE
+    - if: $CI_PIPELINE_SOURCE == 'schedule' && $CREATE_NEW_RELEASE
 
 default:
   # This should allow pipelines to auto-cancel when redundant:
