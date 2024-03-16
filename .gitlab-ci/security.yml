@@ -4,14 +4,12 @@ include:
 #  - template: Security/SAST.gitlab-ci.yml
 
 secret_detection:
-  stage: security
   needs: []
   rules:
     - if: $CI_COMMIT_REF_PROTECTED == "true"
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
 
 # generate shipped dependencies:
-#   stage: security
 #   before_script:
 #     - pip install poetry
 #     - poetry check
@@ -26,7 +24,6 @@ secret_detection:
 #     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
 
 # gemnasium-python-dependency_scanning:
-#   stage: security
 #   needs:
 #     - job: generate shipped dependencies
 #       artifacts: true
@@ -41,7 +38,6 @@ secret_detection:
 #     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
 
 # semgrep-sast:
-#   stage: security
 #   needs: []
 #   rules:
 #     - if: $CI_COMMIT_REF_PROTECTED == "true"
