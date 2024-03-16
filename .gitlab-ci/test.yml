@@ -1,0 +1,109 @@
+.test:
+  stage: test
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event' || $CI_COMMIT_BRANCH == 'main'
+
+.test_merge:
+  stage: test
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+
+.test_main:
+  stage: test
+  rules:
+    - if: $CI_COMMIT_BRANCH == 'main' 
+
+.use_docker:
+  needs: [build image]
+  image: docker:24.0-git
+  before_script:
+    - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
+    - echo ${DAML_HARBOR_TOKEN} | docker login harbor.jatic.net:443 -u 'robot$daml+daml-build' --password-stdin || echo "WARNING - Failed to login"
+  after_script:
+    - docker logout harbor.jatic.net:443 || echo "WARNING - Failed to logout"
+
+.run_tests:
+  extends: .use_docker
+  parallel:
+    matrix:
+      - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
+  script:
+    - ./build ${PYTHON_VERSION} ${TASK} ${ARGS} || TESTFAILED=1
+    - if [[ $TESTFAILED ]]; then echo "=========== ${TASK} FAILED ==========="; EXITCODE=1; fi
+    - ./build ${PYTHON_VERSION} type || TYPEFAILED=1
+    - if [[ $TYPEFAILED ]]; then echo "=========== type FAILED ==========="; EXITCODE=1; fi
+    - exit $EXITCODE
+  artifacts:
+    reports:
+      junit: output/junit.${TASK}.${PYTHON_VERSION}.xml
+    paths:
+      - output/*
+
+linting:
+  extends: .test
+  needs: []
+  before_script:
+    - pip install poetry
+    - poetry config virtualenvs.create false
+    - poetry install --only lint
+  script:
+    - ./run lint
+
+dependency tests:
+  extends: .test
+  image: python:$PYTHON_VERSION
+  needs: []
+  parallel:
+    matrix:
+      - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
+  script:
+    - ./run deps
+
+unit tests:
+  extends: [.test_merge, .run_tests]
+  variables:
+    TASK: unit
+
+functional tests:
+  extends: [.test_main, .run_tests]
+  tags: [GPU]
+  variables:
+    TASK: func
+    ARGS: --gpu
+
+coverage:
+  extends: .test
+  needs:
+    - job: unit tests
+      optional: true
+      artifacts: true
+    - job: functional tests
+      optional: true
+      artifacts: true
+  before_script:
+    - pip install coverage
+  script:
+    # TODO: Move coverage report generation in to build script (and/or resolve issue with using symlinks instead of a full recursive copy)
+    - cp --recursive $(pwd) /daml
+    - coverage combine ./output
+    - coverage report -m --skip-empty --omit */_alibi_detect/*
+    - coverage xml --skip-empty --omit */_alibi_detect/*
+    - coverage html --skip-empty --omit */_alibi_detect/*
+  coverage: "/(?i)total.*? (100(?:\\.0+)?\\%|[1-9]?\\d(?:\\.\\d+)?\\%)$/"
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - coverage.xml
+      - htmlcov/
+
+docs:
+  extends: [.test, .use_docker]
+  tags: [GPU]
+  script:
+    - ./build docs --gpu
+  artifacts:
+    paths:
+      - output/docs/html/
