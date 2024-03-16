@@ -1,7 +1,8 @@
-[//]: # (2d7df8c5e82dd912111d3cb0a063c1f6d5e2c446)
+[//]: # (b903671d3f05f74efa3d5501ae5d2f815c994e40)
 
 # DAML Change Log
-## Pending Release
+## v0.44.2
+## v0.44.3
 - ```2d7df8c5 - Split poetry dev dependency group into test and lint```
 - ```591bdf05 - Update contributing for trunk-based development```
 - ```58e5605f - Create release tags instead of branches```
