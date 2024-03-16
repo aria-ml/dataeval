@@ -3,19 +3,17 @@ include:
 #  - template: Security/Dependency-Scanning.gitlab-ci.yml
 #  - template: Security/SAST.gitlab-ci.yml
 
-.security:
-  rules:
+.security: &security_rules
     - if: $CREATE_NEW_RELEASE
       when: never
     - if: $CI_COMMIT_REF_PROTECTED == "true"
     - if: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
 
 secret_detection:
-  extends: .security
   needs: []
+  rules: *security_rules
 
 # generate shipped dependencies:
-#   extends: .security
 #   before_script:
 #     - pip install poetry
 #     - poetry check
@@ -25,9 +23,9 @@ secret_detection:
 #   artifacts:
 #     paths:
 #       - poetry.lock
+#   rules: *security_rules
 
 # gemnasium-python-dependency_scanning:
-#   extends: .security
 #   needs:
 #     - job: generate shipped dependencies
 #       artifacts: true
@@ -37,7 +35,8 @@ secret_detection:
 #   # all artifacts will be filtered out and removed from this job.
 #   dependencies:
 #     - generate shipped dependencies
+#   rules: *security_rules
 
 # semgrep-sast:
-#   extends: .security
 #   needs: []
+#   rules: *security_rules
