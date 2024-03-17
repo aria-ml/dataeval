@@ -221,6 +221,18 @@ pages:
 
 ### RELEASE ###
 
+# This job will only run if all previous stages have succeeded,
+# and it creates a tag that signifies that all testing has passed.
+tag release candidate:
+  stage: release
+  environment:
+    name: production
+  before_script:
+    - pip install requests
+  script:
+    - .gitlab/update_latest_known_good.py
+  rules: *on_commit_main
+
 create release:
   stage: release
   environment:
