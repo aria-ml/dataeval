@@ -12,7 +12,7 @@ Tasks:
   type    run typecheck
   lint    run static code analysis
   docs    generate documentation
-  qdocs  generate docs without notebooks
+  qdocs   generate docs without notebooks
 EOF
 exit $1
 }
