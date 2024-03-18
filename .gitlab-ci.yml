@@ -66,6 +66,13 @@ stages:
     when: never
   - if: $CI_COMMIT_BRANCH == 'main'
 
+### PYTHON_VERSION PARALLEL MATRIX TEMPLATE ###
+
+.python_version_matrix:
+  parallel:
+    matrix:
+      - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
+
 ### DOCKER TEMPLATES ###
 
 .docker_harbor_required:
@@ -97,11 +104,8 @@ build base:
 
 build image:
   stage: build
-  extends: .docker_harbor_required
+  extends: [.docker_harbor_required, .python_version_matrix]
   needs: [verify lock, build base]
-  parallel:
-    matrix:
-      - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
   script:
     - ./build --build-only --push --verbose ${PYTHON_VERSION}
   allow_failure: true
@@ -129,19 +133,14 @@ linting:
 
 dependency tests:
   image: python:$PYTHON_VERSION
+  extends: .python_version_matrix
   needs: []
-  parallel:
-    matrix:
-      - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
   script:
     - ./run deps
   rules: *on_run
 
 .run_tests:
-  extends: .docker_harbor_optional
-  parallel:
-    matrix:
-      - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
+  extends: [.docker_harbor_optional, .python_version_matrix]
   script:
     - ./build ${PYTHON_VERSION} ${TASK} ${ARGS} || TESTFAILED=1
     - if [[ $TESTFAILED ]]; then echo "=========== ${TASK} FAILED ==========="; EXITCODE=1; fi
