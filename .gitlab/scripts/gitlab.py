@@ -1,5 +1,8 @@
-from os import environ, path
+from os import environ, path, remove
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Union, cast
+from uuid import uuid4
+from zipfile import ZipFile
 
 from requests import Response, delete, get, post, put
 from verboselog import set_verbose, verbose
@@ -11,6 +14,10 @@ FILES = "repository/files"
 MERGE_REQUESTS = "merge_requests"
 TAGS = "repository/tags"
 BRANCHES = "repository/branches"
+PIPELINES = "pipelines"
+JOBS = "jobs"
+ARTIFACTS = "artifacts"
+DOWNLOAD = "download"
 
 LATEST_KNOWN_GOOD = "latest-known-good"
 
@@ -418,4 +425,55 @@ class Gitlab:
         https://docs.gitlab.com/ee/api/commits.html#cherry-pick-a-commit
         """
         r = self._request(post, [COMMITS, sha, "cherry_pick"], None, {"branch": branch})
+        return r.json()
+
+    def get_artifacts(self, job: str, dest: str, ref: str = "main"):
+        """
+        Gets the artifacts from the last successful pipeline run for the ref specified
+
+        Parameters
+        ----------
+        job : str
+            The job from which to download artifacts
+        dest : str
+            The local filepath to save the extracted contents
+        ref : str, default "main"
+            The tag, branch name or SHA to retrieve the file from
+
+        Notes
+        -----
+        https://docs.gitlab.com/ee/api/job_artifacts.html#download-the-artifacts-archive
+        """
+        r = self._request(get, [JOBS, ARTIFACTS, ref, DOWNLOAD], {"job": job})
+        temp_file = str(uuid4()) + ".zip"
+        with open(temp_file, "wb") as f:
+            f.write(r.content)
+        Path(dest).mkdir(parents=True, exist_ok=True)
+        with ZipFile(temp_file, "r") as z:
+            z.extractall(dest)
+        remove(temp_file)
+
+    def commit(self, branch: str, commit_message: str, actions: List[Dict[str, str]]):
+        """
+        Commits the specified actions to the repository at the branch specified
+
+        Parameters
+        ----------
+        branch : str
+            The branch to make the commit at
+        commit_message : str
+            Commit message for the commit
+        actions : List[Dict[str, str]]
+            A list of actions to commit to the repository
+
+        Notes
+        -----
+        https://docs.gitlab.com/ee/api/commits.html#create-a-commit-with-multiple-files-and-actions
+        """
+        r = self._request(
+            post,
+            [COMMITS],
+            None,
+            {"branch": branch, "commit_message": commit_message, "actions": actions},
+        )
         return r.json()
