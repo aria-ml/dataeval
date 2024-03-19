@@ -51,10 +51,12 @@ class VersionTag:
             major, minor, patch = self.current.split(".")
             sprint = int((date.today() - date(2023, 8, 2)).days / 14)
             pending_minor = MINOR_VERSION_SPRINT_MAPPING[sprint]
-            verbose(f"Current: {int(minor)} Pending: {pending_minor}")
+            verbose(f"Current minor: {int(minor)} Pending minor: {pending_minor}")
             if int(minor) == pending_minor:
+                verbose(f"Bumping patch to {int(patch) + 1}")
                 version = f"{major}.{minor}.{int(patch) + 1}"
             else:
+                verbose(f"Bumping minor version to {pending_minor}")
                 version = f"{major}.{pending_minor}.0"
             self._pending = version
         return self._pending

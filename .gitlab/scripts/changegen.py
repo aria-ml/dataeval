@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from os import path, remove
 from re import match
-from typing import Any, Dict, List, Literal
+from typing import Any, Dict, List
 
 from gitlab import Gitlab
 from verboselog import verbose
@@ -23,23 +23,23 @@ class _Entry:
 
     def __init__(self, response: Dict[str, Any]):
         if "merge_commit_sha" in response.keys():
-            self.time = datetime.strptime(
+            self.time: datetime = datetime.strptime(
                 response["merged_at"][0:19], "%Y-%m-%dT%H:%M:%S"
             ).astimezone()
-            self.hash = response["merge_commit_sha"]
-            self.shorthash = response["merge_commit_sha"][0:8]
-            self.description = (
+            self.hash: str = response["merge_commit_sha"]
+            self.shorthash: str = response["merge_commit_sha"][0:8]
+            self.description: str = (
                 response["title"].replace('Resolve "', "").replace('"', "")
             )
-            self.is_tag = False
+            self.is_tag: bool = False
         elif "target" in response.keys():
-            self.time = datetime.strptime(
+            self.time: datetime = datetime.strptime(
                 response["commit"]["committed_date"], "%Y-%m-%dT%H:%M:%S.%f%z"
             )
-            self.hash = response["commit"]["id"]
-            self.shorthash = response["commit"]["short_id"]
-            self.description = response["name"]
-            self.is_tag = True
+            self.hash: str = response["commit"]["id"]
+            self.shorthash: str = response["commit"]["short_id"]
+            self.description: str = response["name"]
+            self.is_tag: bool = True
 
     def to_markdown(self) -> str:
         if self.is_tag:
@@ -47,8 +47,12 @@ class _Entry:
         else:
             return f"- ```{self.shorthash} - {self.description}```\n"
 
-    def __lt__(self, other) -> bool:
-        return self.time < other.time
+    def __lt__(self, other: "_Entry") -> bool:
+        # handle erroneous case with identical tags"
+        if self.is_tag and other.is_tag and self.time == other.time:
+            return self.description < other.description
+        else:
+            return self.time < other.time
 
     def __repr__(self) -> str:
         entry_type = "TAG" if self.is_tag else "COM"
@@ -104,24 +108,17 @@ class ChangeGen:
         entries.sort(reverse=True)
         return entries
 
-    def generate(self, target: Literal["merge", "changelog"]) -> Dict[str, str]:
+    def generate(self) -> Dict[str, str]:
         """
-        Generates content to use for merges or changelogs.
+        Generates content to use for changelogs.
 
         Content are merge commit titles in chronological order. Changelog
-        generation will recreate the full changelog file content. Merge
-        generation will create a snippet of new merge commits since the
-        last release.
-
-        Parameters
-        ---------
-        target : Literal["merge", "changelog"]
-            The type of content to generate
+        generation will recreate the full changelog file content.
 
         Returns
         -------
         Dict[str, str]
-            The content required to update the changelog file or to post an MR
+            The content required to update the changelog file
         """
         current = self._read_changelog()
         last_hash = self._get_last_hash(current[0]) if current else ""
@@ -133,10 +130,9 @@ class ChangeGen:
 
         lines: List[str] = list()
 
-        if target == "changelog":
-            lines.append(f"[//]: # ({entries[0].hash})\n")
-            lines.append("\n")
-            lines.append("# DAML Change Log\n")
+        lines.append(f"[//]: # ({entries[0].hash})\n")
+        lines.append("\n")
+        lines.append("# DAML Change Log\n")
 
         # If we have a change and no release yet
         if not entries[0].is_tag:
@@ -147,31 +143,17 @@ class ChangeGen:
                 break
             lines.append((entry.to_markdown()))
 
-        if target == "changelog":
-            # If we had a pending release we can drop this as there are new changes
-            for oldline in current[3:]:
-                if oldline == "## Pending Release\n":
-                    continue
-                lines.append(oldline)
-
-        # fmt: off
-        if target == "merge":
-            lines.append("\n")
-            lines.append("## Criteria For Approval\n")
-            lines.append("- [ ] Ensure all features are complete and ready to ship\n")
-            lines.append("- [ ] Review features released for test coverage and documentation\n")  # noqa: E501
-            lines.append("- [ ] Review documentation generated in pipeline\n")
-            lines.append("- [ ] Ensure all security scans have no critical issues and review any pre-existing issues\n")  # noqa: E501
-        # fmt: on
+        # If we had a pending release we can drop this as there are new changes
+        for oldline in current[3:]:
+            if oldline == "## Pending Release\n":
+                continue
+            lines.append(oldline)
 
         content = "".join(lines)
 
         new_shorthash = entries[0].shorthash
         change: Dict[str, str] = dict()
-        if target == "changelog":
-            change["commit_message"] = f"Update CHANGELOG.md with {new_shorthash}"
-            change["content"] = content
-        elif target == "merge":
-            change["description"] = content
+        change["commit_message"] = f"Update CHANGELOG.md with {new_shorthash}"
+        change["content"] = content
 
         return change
