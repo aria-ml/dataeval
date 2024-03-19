@@ -13,7 +13,7 @@ if __name__ == "__main__":
         branch = "main"
         response = gl.commit(
             branch,
-            f"Updating jupyter cache and changelog for {pending_version}",
+            f"Release {pending_version}",
             payload,
         )
         commit_id = response["id"]
