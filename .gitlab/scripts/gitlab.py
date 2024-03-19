@@ -49,6 +49,7 @@ class Gitlab:
         resource: Union[str, Sequence[str]],
         params: Optional[Dict[str, Any]] = None,
         data: Optional[Dict[str, Any]] = None,
+        raw: bool = False,
     ):
         """
         Sends requests to Gitlab REST API
@@ -88,10 +89,17 @@ class Gitlab:
                 url = (url + "?" + k) if url == resource else (url + "&" + k)
                 url += "" if v is None else ("=" + v)
 
+        if raw:
+            dtype = "data"
+            self.headers["Content-type"] = "application/octet-stream"
+        else:
+            dtype = "json"
+            self.headers["Content-type"] = "application/json"
+
         args = {
             "url": self.project_url + url,
             "headers": self.headers,
-            "data": data,
+            dtype: data,
             "timeout": self.timeout,
         }
 
@@ -474,6 +482,11 @@ class Gitlab:
             post,
             [COMMITS],
             None,
-            {"branch": branch, "commit_message": commit_message, "actions": actions},
+            {
+                "branch": "aw-test",
+                "start_branch": branch,
+                "commit_message": commit_message,
+                "actions": actions,
+            },
         )
         return r.json()
