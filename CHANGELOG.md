@@ -1,6 +1,10 @@
-[//]: # (b903671d3f05f74efa3d5501ae5d2f815c994e40)
+[//]: # (f67d76c9e48cd36053cf49124723a47c91b8ee41)
 
 # DAML Change Log
+## Pending Release
+- ```f67d76c9 - Update jupyter-cache in scheduled release pipeline```
+- ```94d1887d - Cleanup release scripts```
+## v0.44.4
 ## v0.44.3
 ## v0.44.2
 - ```2d7df8c5 - Split poetry dev dependency group into test and lint```
