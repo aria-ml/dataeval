@@ -52,13 +52,8 @@ gitGraph
 - On commit to `main` for completed merge requests additionally run:
   - `functional tests`: superset of `unit tests` with additional slower functional tests using the GPU runner
   - `tag release candidate`: tags a successful run with `latest-known-good`
-- On weekly scheduled release pipelines additionally run:
-  - `create release branch`: creates the vnext release branch
-- On release branches additionally run:
-  - `pages`->`pages:deploy`: pushes artifacts from `docs` to Gitlab Pages
-  - `changelog`: updates the changelog in with new features and cherry-picks to release branch
-  - `tag`: adds an annotated version
-  - `publish`: packages DAML and publishes to JATIC Gitlab internal repository
+- On weekly scheduled release pipelines **only** run:
+  - `create release`: updates `docs/.jupyter_cache/` and `CHANGELOG.md` and tags the commit with vNext
 
 ## [Github Actions](.github/workflows/publish.yml)
 - This action publishes DAML to [PyPI](https://pypi.org/project/daml/) when new version tags are pushed
