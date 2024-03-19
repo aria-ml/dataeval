@@ -2,7 +2,7 @@ from os import environ, path
 from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Union, cast
 
 from requests import Response, delete, get, post, put
-from verboselog import verbose
+from verboselog import set_verbose, verbose
 
 DAML_PROJECT_URL = "https://gitlab.jatic.net/api/v4/projects/151/"
 
@@ -34,7 +34,7 @@ class Gitlab:
             raise ValueError("No token provided")
         self.headers = {"PRIVATE-TOKEN": token}
         self.timeout = timeout
-        self.verbose = verbose
+        set_verbose(verbose)
 
     def _request(
         self,
