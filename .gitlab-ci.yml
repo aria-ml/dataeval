@@ -200,6 +200,7 @@ docs:
     - ./build docs --gpu
   artifacts:
     paths:
+      - output/docs/.jupyter_cache/
       - output/docs/html/
   rules: *on_run
 
