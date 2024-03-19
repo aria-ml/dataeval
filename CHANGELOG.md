@@ -1,8 +1,8 @@
 [//]: # (b903671d3f05f74efa3d5501ae5d2f815c994e40)
 
 # DAML Change Log
-## v0.44.2
 ## v0.44.3
+## v0.44.2
 - ```2d7df8c5 - Split poetry dev dependency group into test and lint```
 - ```591bdf05 - Update contributing for trunk-based development```
 - ```58e5605f - Create release tags instead of branches```
