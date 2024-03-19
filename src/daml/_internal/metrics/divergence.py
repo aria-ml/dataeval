@@ -25,7 +25,7 @@ def _fnn(data: np.ndarray, labels: np.ndarray) -> int:
     return errors
 
 
-_METHODS = Literal["FNN", "MST"]
+_METHODS = Literal["MST", "FNN"]
 _FUNCTION = Callable[[np.ndarray, np.ndarray], int]
 
 
@@ -39,6 +39,8 @@ class Divergence(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
         Array of images or image embeddings to compare
     data_b : np.ndarray
         Array of images or image embeddings to compare
+    method : Literal["MST, "FNN"], default "MST"
+        Method used to estimate dataset divergence
 
     See Also
     --------
@@ -59,7 +61,7 @@ class Divergence(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
         self,
         data_a: np.ndarray,
         data_b: np.ndarray,
-        method: _METHODS = "FNN",
+        method: _METHODS = "MST",
     ) -> None:
         self.data_a = data_a
         self.data_b = data_b
