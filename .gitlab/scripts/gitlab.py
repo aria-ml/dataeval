@@ -483,10 +483,13 @@ class Gitlab:
             [COMMITS],
             None,
             {
-                "branch": "aw-test",
-                "start_branch": branch,
+                "branch": branch,
                 "commit_message": commit_message,
                 "actions": actions,
             },
         )
+        return r.json()
+
+    def run_pipeline(self, pipeline_id: int):
+        r = self._request(post, ["pipeline_schedules", str(pipeline_id), "play"])
         return r.json()
