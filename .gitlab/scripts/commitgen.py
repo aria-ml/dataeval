@@ -174,12 +174,10 @@ class CommitGen:
         for new_file in new_files:
             if self._is_binary_file(new_file):
                 encoding = "base64"
-                with open(new_file, "rb") as f:
-                    content = b64encode(f.read()).decode("ascii")
+                content = b64encode(open(new_file, "rb").read()).decode()
             else:
                 encoding = "text"
-                with open(new_file, "rt") as f:
-                    content = f.read()
+                content = open(new_file, "rt").read()
 
             if new_file in old_files:
                 actions.append(
