@@ -1,6 +1,8 @@
+from base64 import b64encode
 from datetime import datetime, timedelta
-from os import path, remove
+from os import path, remove, walk
 from re import match
+from shutil import move, rmtree
 from typing import Any, Dict, List
 
 from gitlab import Gitlab
@@ -59,10 +61,10 @@ class _Entry:
         return f"Entry({entry_type}, {self.time}, {self.hash}, {self.description})"
 
 
-class ChangeGen:
+class CommitGen:
     """
-    Generates lists of changes for use in the changelog updates or for
-    merge request descriptions
+    Generates commit payload for changes for used in the documentation cache
+    and changelog updates
     """
 
     def __init__(self, gitlab: Gitlab, verbose: bool = False):
@@ -108,18 +110,7 @@ class ChangeGen:
         entries.sort(reverse=True)
         return entries
 
-    def generate(self) -> Dict[str, str]:
-        """
-        Generates content to use for changelogs.
-
-        Content are merge commit titles in chronological order. Changelog
-        generation will recreate the full changelog file content.
-
-        Returns
-        -------
-        Dict[str, str]
-            The content required to update the changelog file
-        """
+    def _generate_changelog_action(self) -> Dict[str, str]:
         current = self._read_changelog()
         last_hash = self._get_last_hash(current[0]) if current else ""
 
@@ -151,9 +142,96 @@ class ChangeGen:
 
         content = "".join(lines)
 
-        new_shorthash = entries[0].shorthash
-        change: Dict[str, str] = dict()
-        change["commit_message"] = f"Update CHANGELOG.md with {new_shorthash}"
-        change["content"] = content
+        return {
+            "action": "update",
+            "file_path": CHANGELOG_FILE,
+            "encoding": "text",
+            "content": content,
+        }
 
-        return change
+    def _is_binary_file(self, file: str) -> bool:
+        try:
+            with open(file, "rt") as f:
+                f.read()
+                return False
+        except Exception:
+            return True
+
+    def _generate_actions(
+        self, old_files: List[str], new_files: List[str]
+    ) -> List[Dict[str, str]]:
+        actions: List[Dict[str, str]] = list()
+
+        for old_file in old_files:
+            if old_file not in new_files:
+                actions.append(
+                    {
+                        "actions": "delete",
+                        "file_path": old_file,
+                    }
+                )
+
+        for new_file in new_files:
+            if self._is_binary_file(new_file):
+                encoding = "base64"
+                with open(new_file, "rb") as f:
+                    content = b64encode(f.read()).decode("ascii")
+            else:
+                encoding = "text"
+                with open(new_file, "rt") as f:
+                    content = f.read()
+
+            if new_file in old_files:
+                actions.append(
+                    {
+                        "action": "update",
+                        "file_path": new_file,
+                        "encoding": encoding,
+                        "content": content,
+                    }
+                )
+            else:
+                actions.append(
+                    {
+                        "action": "create",
+                        "file_path": new_file,
+                        "encoding": encoding,
+                        "content": content,
+                    }
+                )
+
+        return actions
+
+    def _get_files(self, file_path: str) -> List[str]:
+        file_paths: List[str] = list()
+        for root, _, files in walk(file_path):
+            for filename in files:
+                file_paths.append(path.join(root, filename))
+        return file_paths
+
+    def _generate_jupyter_cache_actions(self) -> List[Dict[str, str]]:
+        ref = "main"
+        cache_path = "docs/.jupyter_cache"
+        output_path = path.join("output", cache_path)
+        self.gl.get_artifacts(job="docs", dest="./", ref=ref)
+        if not path.exists(output_path):
+            raise FileNotFoundError(
+                f"Artifacts downloaded from {ref} does not contain {output_path}"
+            )
+        if not path.exists(cache_path):
+            raise FileNotFoundError(f"Current path does not contain {cache_path}")
+
+        old_files = self._get_files(cache_path)
+        rmtree(cache_path)
+        move(output_path, cache_path)
+        actions = self._generate_actions(old_files, self._get_files(cache_path))
+        return actions
+
+    def generate(self) -> List[Dict[str, str]]:
+        changelog_action = self._generate_changelog_action()
+        if not changelog_action:
+            return list()
+
+        actions = self._generate_jupyter_cache_actions()
+        actions.append(changelog_action)
+        return actions
