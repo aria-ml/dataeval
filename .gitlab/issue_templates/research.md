@@ -1,5 +1,5 @@
 <!--
-Spike Issue Template
+Research Issue Template
 
 This template is to be used when a new feature is being researched. This is to explain use cases, not implementation details. \
 This is an important step in the development process and should be documented heavily. 
