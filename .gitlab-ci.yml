@@ -51,12 +51,17 @@ stages:
     when: never
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event' || $CI_COMMIT_BRANCH == 'main'
 
-.on_merge_request: &on_merge_request
+.on_non_release_mr: &on_non_release_mr
   - if: $CREATE_NEW_RELEASE
     when: never
-  - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+  - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_MERGE_REQUEST_LABELS !~ '/release::\w+/'
 
-.on_commit_main: &on_commit_main
+.on_commit_main_or_release_mr: &on_commit_main_or_release_mr
+  - if: $CREATE_NEW_RELEASE
+    when: never
+  - if: $CI_COMMIT_BRANCH == 'main' || $CI_MERGE_REQUEST_LABELS =~ '/release::\w+/'
+
+.on_commit_main_only: &on_commit_main_only
   - if: $CREATE_NEW_RELEASE
     when: never
   - if: $CI_COMMIT_BRANCH == 'main'
@@ -152,7 +157,7 @@ unit tests:
   extends: .run_tests
   variables:
     TASK: unit
-  rules: *on_merge_request
+  rules: *on_non_release_mr
 
 functional tests:
   extends: .run_tests
@@ -160,7 +165,7 @@ functional tests:
   variables:
     TASK: func
     ARGS: --gpu
-  rules: *on_commit_main
+  rules: *on_commit_main_or_release_mr
 
 coverage:
   needs:
@@ -217,7 +222,7 @@ pages:
   artifacts:
     paths:
       - public
-  rules: *on_commit_main
+  rules: *on_commit_main_only
 
 ### RELEASE ###
 
@@ -231,7 +236,7 @@ tag release candidate:
     - pip install requests
   script:
     - .gitlab/scripts/update_latest_known_good.py
-  rules: *on_commit_main
+  rules: *on_commit_main_only
 
 # This job updates the changelog and tags the commit hash with a
 # new version tag, which gets picked up and published from a GitHub
