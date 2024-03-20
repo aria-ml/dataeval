@@ -21,3 +21,5 @@ There is likely to be little code involved, and most of the results will be put 
 ## Related Work
 
 <!-- (Link other companies or codebases related to this feature) -->
+
+/label ~ARiA ~issue::research

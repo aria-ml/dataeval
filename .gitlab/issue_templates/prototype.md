@@ -22,3 +22,5 @@ Other researchers should be able to follow the functionality of the feature
 ## Open Questions
 
 <!-- (What areas of exploration are unknown for this algorithm?) -->
+
+/label ~ARiA ~issue::prototype
