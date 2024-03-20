@@ -19,3 +19,5 @@ Links
 - [ ] Tutorial linked <!-- (Is it linked to the reference page & tutorial guide?) -->
 - [ ] Explanation linked <!-- (Is it linked to the reference page & explanation guide?) -->
 - [ ] How-to linked (Optional) <!-- (Is it linked to the reference page & how-to guide?) -->
+
+/label ~ARiA ~issue::docs
