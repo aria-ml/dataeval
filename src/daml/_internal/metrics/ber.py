@@ -61,7 +61,7 @@ class BER(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
     --------
     `Learning to Bound the Multi-class Bayes Error (Th. 3 and Th. 4) <https://arxiv.org/abs/1811.06419>`_
 
-    """  # noqa F401
+    """
 
     def __init__(
         self,
