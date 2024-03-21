@@ -6,6 +6,7 @@
 [![Documentation Status][rtd-badge]][rtd-link]
 [![PyPi Status][pypi-badge]][pypi-link]
 [![Conda Status][conda-badge]][conda-link]
+[![Python Versions][python-badge]][python-link]
 [![Code style: black][black-badge]][black-link]
 [![License][license-badge]][license-link]
 
@@ -157,3 +158,22 @@ This repo contains a specific location for prototype code that is being used for
 ## Branching and Release Workflow
 
 Additional information on how branching and releases are managed for DAML can be found in our [Branching and Release Workflow](BRANCHING.md) documentation.
+
+
+
+
+<!-- Please don't delete below as these create the tags for easily seeing the repo status -->
+[github-ci]: https://github.com/aria-ml/daml/workflows/Upload%20Python%20Package/badge.svg
+[github-link]: https://github.com/aria-ml/daml
+[rtd-badge]: https://readthedocs.org/projects/daml/badge/?version=latest
+[rtd-link]: https://daml.readthedocs.io/en/latest/?badge=latest
+[pypi-badge]: https://img.shields.io/pypi/v/daml.svg
+[pypi-link]: https://pypi.org/project/daml
+[conda-badge]: https://anaconda.org/aria-ml/daml/badges/version.svg
+[conda-link]: https://anaconda.org/aria-ml/daml
+[python-badge]: https://img.shields.io/badge/python-3.8%20%E2%80%90%203.11-blue.svg
+[python-link]: https://devguide.python.org/versions/
+[black-badge]: https://img.shields.io/badge/code%20style-black-000000.svg
+[black-link]: https://github.com/ambv/black
+[license-badge]: https://anaconda.org/aria-ml/daml/badges/license.svg
+[license-link]: https://github.com/aria-ml/daml/blob/main/LICENSE.txt
