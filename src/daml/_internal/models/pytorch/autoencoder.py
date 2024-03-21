@@ -63,11 +63,10 @@ class AETrainer:
         criterion = nn.MSELoss().to(self.device)
         # Record loss
         loss_history: List[float] = []
-        batch_idx: int = 0
 
         for _ in range(epochs):
             epoch_loss: float = 0
-            for batch_idx, batch in enumerate(dataloader):
+            for batch in dataloader:
                 imgs = get_images_from_batch(batch)
                 imgs = imgs.to(self.device)
                 # Zero your gradients for every batch!
@@ -86,7 +85,7 @@ class AETrainer:
                 # Gather data and report
                 epoch_loss += loss.item()
             # Will take the average from all batches
-            epoch_loss /= batch_idx + 1
+            epoch_loss /= len(dataloader)
             loss_history.append(epoch_loss)
 
         return loss_history
@@ -117,15 +116,14 @@ class AETrainer:
         dataloader = DataLoader(dataset, batch_size=self.batch_size)
         criterion = nn.MSELoss().to(self.device)
         total_loss: float = 0.0
-        batch_idx: int = 0
 
-        for batch_idx, batch in enumerate(dataloader):
+        for batch in dataloader:
             imgs = get_images_from_batch(batch)
             imgs = imgs.to(self.device)
             pred = self.model(imgs)
             loss = criterion(pred, imgs)
             total_loss += loss.item()
-        return total_loss / (batch_idx + 1)
+        return total_loss / len(dataloader)
 
     @torch.no_grad
     def encode(self, dataset: Dataset) -> torch.Tensor:
