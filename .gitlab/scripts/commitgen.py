@@ -67,9 +67,8 @@ class CommitGen:
     and changelog updates
     """
 
-    def __init__(self, gitlab: Gitlab, verbose: bool = False):
+    def __init__(self, gitlab: Gitlab):
         self.gl = gitlab
-        self.verbose = verbose
 
     def _read_changelog(self) -> List[str]:
         temp = False
