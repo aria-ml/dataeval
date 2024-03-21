@@ -119,7 +119,7 @@ class TestSufficiencyFunctional:
 
         # Accuracy should be bounded
         accuracy = output["Accuracy"]
-        assert np.all(0 <= accuracy)
+        assert np.all(accuracy >= 0)
         assert np.all(accuracy <= 1)
         assert len(accuracy) == 3
 

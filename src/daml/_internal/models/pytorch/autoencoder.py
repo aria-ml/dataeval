@@ -10,11 +10,7 @@ torch.manual_seed(0)
 
 def get_images_from_batch(batch: Any) -> Any:
     """Extracts images from a batch of collated data by DataLoader"""
-    if isinstance(batch, (list, tuple)):
-        imgs = batch[0]
-    else:
-        imgs = batch
-    return imgs
+    return batch[0] if isinstance(batch, (list, tuple)) else batch
 
 
 class AETrainer:

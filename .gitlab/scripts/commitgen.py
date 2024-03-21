@@ -24,7 +24,7 @@ class _Entry:
     """
 
     def __init__(self, response: Dict[str, Any]):
-        if "merge_commit_sha" in response.keys():
+        if "merge_commit_sha" in response:
             self.time: datetime = datetime.strptime(
                 response["merged_at"][0:19], "%Y-%m-%dT%H:%M:%S"
             ).astimezone()
@@ -34,7 +34,7 @@ class _Entry:
                 response["title"].replace('Resolve "', "").replace('"', "")
             )
             self.is_tag: bool = False
-        elif "target" in response.keys():
+        elif "target" in response:
             self.time: datetime = datetime.strptime(
                 response["commit"]["committed_date"], "%Y-%m-%dT%H:%M:%S.%f%z"
             )
@@ -89,7 +89,7 @@ class CommitGen:
         return line[start:end]
 
     def _get_entries(self) -> List[_Entry]:
-        entries: List[_Entry] = list()
+        entries: List[_Entry] = []
 
         for response in self.gl.list_merge_requests(
             state="merged", target_branch="main"
@@ -116,9 +116,9 @@ class CommitGen:
         # Return empty dict if nothing to update
         entries = self._get_entries()
         if last_hash == entries[0].hash:
-            return dict()
+            return {}
 
-        lines: List[str] = list()
+        lines: List[str] = []
 
         lines.append(f"[//]: # ({entries[0].hash})\n")
         lines.append("\n")
@@ -131,7 +131,7 @@ class CommitGen:
         for entry in entries:
             if entry.hash == last_hash:
                 break
-            lines.append((entry.to_markdown()))
+            lines.append(entry.to_markdown())
 
         # If we had a pending release we can drop this as there are new changes
         for oldline in current[3:]:
@@ -150,7 +150,7 @@ class CommitGen:
 
     def _is_binary_file(self, file: str) -> bool:
         try:
-            with open(file, "rt") as f:
+            with open(file) as f:
                 f.read()
                 return False
         except Exception:
@@ -159,7 +159,7 @@ class CommitGen:
     def _generate_actions(
         self, old_files: List[str], new_files: List[str]
     ) -> List[Dict[str, str]]:
-        actions: List[Dict[str, str]] = list()
+        actions: List[Dict[str, str]] = []
 
         for old_file in old_files:
             if old_file not in new_files:
@@ -173,10 +173,12 @@ class CommitGen:
         for new_file in new_files:
             if self._is_binary_file(new_file):
                 encoding = "base64"
-                content = b64encode(open(new_file, "rb").read()).decode()
+                with open(new_file, "rb") as f:
+                    content = b64encode(f.read()).decode()
             else:
                 encoding = "text"
-                content = open(new_file, "rt").read()
+                with open(new_file) as f:
+                    content = f.read()
 
             if new_file in old_files:
                 actions.append(
@@ -200,7 +202,7 @@ class CommitGen:
         return actions
 
     def _get_files(self, file_path: str) -> List[str]:
-        file_paths: List[str] = list()
+        file_paths: List[str] = []
         for root, _, files in walk(file_path):
             for filename in files:
                 file_paths.append(path.join(root, filename))
@@ -227,7 +229,7 @@ class CommitGen:
     def generate(self) -> List[Dict[str, str]]:
         changelog_action = self._generate_changelog_action()
         if not changelog_action:
-            return list()
+            return []
 
         actions = self._generate_jupyter_cache_actions()
         actions.append(changelog_action)
