@@ -125,6 +125,7 @@ markers = [
   "functional: marks slower functional tests",
 ]
 
+# Ruff rules - https://docs.astral.sh/ruff/rules/
 [tool.ruff]
 exclude = [
   ".devcontainer",
@@ -141,13 +142,13 @@ indent-width = 4
 target-version = "py38"
 extend-include = ["*.ipynb"]
 
-# Ruff rules - https://docs.astral.sh/ruff/rules/
 [tool.ruff.lint]
 select = ["A", "E", "F", "C4", "I", "UP", "NPY", "SIM", "RUF100"]
 ignore = ["NPY002"]
 fixable = ["ALL"]
 unfixable = []
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+per-file-ignores = { "*.ipynb" = ["E402"] }
 
 [tool.ruff.lint.isort]
 known-first-party = ["daml"]
