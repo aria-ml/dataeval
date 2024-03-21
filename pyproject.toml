@@ -62,10 +62,7 @@ all = ["torch", "matplotlib", "nvidia-cudnn-cu11", "tensorflow", "tensorflow-io-
 optional = true
 
 [tool.poetry.group.lint.dependencies]
-flake8 = "*"
-flake8-pyproject = "*"
-black = { extras = ["jupyter"], version = "*" }
-isort = "*"
+ruff = "*"
 codespell = "*"
 
 [tool.poetry.group.test]
@@ -128,28 +125,41 @@ markers = [
   "functional: marks slower functional tests",
 ]
 
-[tool.black]
-extend-exclude = '\.tox|.*env.*|docs|output|src/daml/_alibi_detect\/'
-
-[tool.isort]
-profile = 'black'
-skip_glob = [
-    ".tox",
-    "*env*",
-    "docs/*",
-    "output/*"
-    ]
-
-[tool.flake8]
-count = true
+# Ruff rules - https://docs.astral.sh/ruff/rules/
+[tool.ruff]
 exclude = [
-    ".tox",
-    "*env*",
-    "docs/*",
-    "output/*",
-    "src/daml/_alibi_detect/*"
-    ]
-max-line-length = 88
+  ".devcontainer",
+  ".github",
+  ".vscode",
+  ".jupyter_cache",
+  "*env*",
+  "output",
+  "_alibi_detect",
+  "_build"
+]
+line-length = 88
+indent-width = 4
+target-version = "py38"
+extend-include = ["*.ipynb"]
+
+[tool.ruff.lint]
+select = ["A", "E", "F", "C4", "I", "UP", "NPY", "SIM", "RUF100"]
+ignore = ["NPY002"]
+fixable = ["ALL"]
+unfixable = []
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+per-file-ignores = { "*.ipynb" = ["E402"] }
+
+[tool.ruff.lint.isort]
+known-first-party = ["daml"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
 
 [tool.codespell]
 skip = '*env*,docs/.jupyter_cache,CHANGELOG.md,poetry.lock,output'

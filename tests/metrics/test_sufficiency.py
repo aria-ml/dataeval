@@ -54,12 +54,12 @@ def eval_100(model: nn.Module, dl: DataLoader) -> Dict[str, float]:
     return {"eval": 1.0}
 
 
-def mock_ds(len: Optional[int]):
+def mock_ds(length: Optional[int]):
     ds = MagicMock()
-    if len is None:
+    if length is None:
         delattr(ds, "__len__")
     else:
-        ds.__len__.return_value = len
+        ds.__len__.return_value = length
     return ds
 
 
