@@ -212,9 +212,8 @@ class Sufficiency(EvaluateMixin):
 
     @train_ds.setter
     def train_ds(self, value: Dataset):
-        len = validate_dataset_len(value)
         self._train_ds = value
-        self._length = len
+        self._length = validate_dataset_len(value)
 
     @property
     def test_ds(self):
@@ -285,7 +284,7 @@ class Sufficiency(EvaluateMixin):
         )  # Start, Stop, Num steps
         ranges = np.geomspace(*geomshape).astype(np.int64)
 
-        metric_outputs = dict()
+        metric_outputs = {}
 
         # Run each model over all indices
         for _ in range(self.runs):
@@ -315,7 +314,7 @@ class Sufficiency(EvaluateMixin):
                     if name == STEPS_KEY:
                         raise KeyError(f"Cannot use '{STEPS_KEY}' as a metric name.")
 
-                    if name not in metric_outputs.keys():
+                    if name not in metric_outputs:
                         shape = (
                             (self.substeps, len(value))
                             if isinstance(value, np.ndarray)
@@ -326,7 +325,7 @@ class Sufficiency(EvaluateMixin):
                     # Sum result into current substep iteration to be averaged later
                     metric_outputs[name][iteration] += value
 
-        output = dict({STEPS_KEY: ranges})
+        output = {STEPS_KEY: ranges}
         # The mean for each measure must be calculated before being returned
         output.update(
             {name: value / self.runs for name, value in metric_outputs.items()}
@@ -365,14 +364,14 @@ class Sufficiency(EvaluateMixin):
         if not isinstance(projection, np.ndarray):
             raise ValueError("'steps' must be an int, Sequence[int] or ndarray")
 
-        output = dict()
+        output = {}
         output[STEPS_KEY] = projection
         for name, measure in data.items():
             if name == STEPS_KEY:
                 continue
 
             if len(measure.shape) > 1:
-                result = list()
+                result = []
                 for i in range(measure.shape[1]):
                     projected = project_steps(
                         measure[:, i], data[STEPS_KEY], projection

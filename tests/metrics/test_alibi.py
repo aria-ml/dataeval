@@ -131,7 +131,7 @@ class TestAlibiDetect:
 
     @pytest.fixture(scope="function", autouse=True)
     def mock_classes_and_validate(self, classnames):
-        mocks = list()
+        mocks = []
         for cls in classnames:
             mock = patch(cls)
             mocks.append((mock, mock.start()))
