@@ -49,14 +49,20 @@ case $1 in
         rm -rf .venv-deps
         ;;
     "type")
+        FAILURES=0
+        trap 'FAILURES=$((FAILURES+1))' ERR
         poetry --quiet run pyright src/ tests/
         poetry --quiet run pyright --ignoreexternal --verifytypes daml
+        exit $FAILURES
         ;;
     "lint")
+        FAILURES=0
+        trap 'FAILURES=$((FAILURES+1))' ERR
         poetry --quiet run black --check --diff .
         poetry --quiet run flake8
         poetry --quiet run isort --check --diff .
         poetry --quiet run codespell
+        exit $FAILURES
         ;;
     "docs"|"qdocs")
         pushd docs
@@ -64,11 +70,13 @@ case $1 in
         if [ "$1" == "docs" ]; then poetry --quiet run jcache cache clear -f; fi
         export TF_CPP_MIN_LOG_LEVEL=3
         export PYDEVD_DISABLE_FILE_VALIDATION=1
-        NB_EXECUTION_MODE_OVERRIDE=off poetry --quiet run sphinx-build -M doctest . ../output/docs || export EXITCODE=1
-        poetry --quiet run sphinx-build -E -T -b html -d _build/doctrees -D language=en . ../output/docs/html || export EXITCODE=1
+        FAILURES=0
+        trap 'FAILURES=$((FAILURES+1))' ERR
+        NB_EXECUTION_MODE_OVERRIDE=off poetry --quiet run sphinx-build -M doctest . ../output/docs
+        poetry --quiet run sphinx-build -E -T -b html -d _build/doctrees -D language=en . ../output/docs/html
         cp -R .jupyter_cache ../output/docs
         popd
-        if [[ $EXITCODE == 1 ]]; then cat /tmp/sphinx*.log && mv /tmp/sphinx*.log output/docs; fi
-        exit $EXITCODE
+        if [[ $FAILURES != 0 ]]; then cat /tmp/sphinx*.log && mv /tmp/sphinx*.log output/docs; fi
+        exit $FAILURES
         ;;
 esac
