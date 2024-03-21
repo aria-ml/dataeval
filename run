@@ -58,7 +58,7 @@ case $1 in
     "lint")
         FAILURES=0
         trap 'FAILURES=$((FAILURES+1))' ERR
-        poetry --quiet run ruff check --select E,F,I,RUF100 --exit-non-zero-on-fix --fix
+        poetry --quiet run ruff check --exit-non-zero-on-fix --fix
         poetry --quiet run codespell
         exit $FAILURES
         ;;
