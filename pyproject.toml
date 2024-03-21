@@ -130,8 +130,8 @@ exclude = [
   ".devcontainer",
   ".github",
   ".vscode",
+  ".jupyter_cache",
   "*env*",
-  "docs",
   "output",
   "_alibi_detect",
   "_build"
@@ -139,6 +139,7 @@ exclude = [
 line-length = 88
 indent-width = 4
 target-version = "py38"
+extend-include = ["*.ipynb"]
 
 # Ruff rules - https://docs.astral.sh/ruff/rules/
 [tool.ruff.lint]
