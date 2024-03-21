@@ -96,7 +96,7 @@ class OD_Base(ABC):
         self._flatten_dataset = flatten_dataset
         self._dataset_type = dataset_type
 
-        self._model_kwargs = dict()
+        self._model_kwargs = {}
         self._predict_kwargs = self._default_predict_kwargs
         self._default_batch_size = 64
 
@@ -175,7 +175,7 @@ class OD_Base(ABC):
     def export_model(self, path: str):
         if self.detector is None:
             raise RuntimeError("The model must be initialized first")
-        if self._model_param_name not in self.detector.__dict__.keys():
+        if self._model_param_name not in self.detector.__dict__:
             raise ValueError("Member not found in detector")
         getattr(self.detector, self._model_param_name).save(path)
 
@@ -310,7 +310,7 @@ class OD_Base(ABC):
 class OD_AE(OD_Base):
     """
     Autoencoder-based outlier detector, using `alibi-detect ae. <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/ae.html>`_
-    """  # noqa E501
+    """
 
     def __init__(self):
         super().__init__(
@@ -355,7 +355,7 @@ class OD_AEGMM(OD_Base):
 
 
     The model used by this class is :py:class:`daml.models.AEGMM`
-    """  # noqa E501
+    """  # E501
 
     def __init__(self):
         super().__init__(
@@ -393,7 +393,7 @@ class OD_LLR(OD_Base):
 
 
     The model used by this class is :py:class:`daml.models.LLR`
-    """  # noqa E501
+    """  # E501
 
     def __init__(self):
         super().__init__(
@@ -432,7 +432,7 @@ class OD_VAE(OD_Base):
     using `alibi-detect vae. <https://docs.seldon.io/projects/alibi-detect/en/latest/od/methods/vae.html>`_
 
     The model used by this class is :py:class:`daml.models.VAE`
-    """  # noqa E501
+    """  # E501
 
     def __init__(self):
         super().__init__(
@@ -477,7 +477,7 @@ class OD_VAEGMM(OD_Base):
 
 
     The model used by this class is :py:class:`daml.models.VAEGMM`
-    """  # noqa E501
+    """  # E501
 
     def __init__(self):
         super().__init__(

@@ -35,8 +35,7 @@ class MockImageClassificationDataset:
         return len(self.images)
 
     def __iter__(self):
-        for img in self.images:
-            yield img
+        yield from self.images
 
 
 class MockObjectDetectionDataset:

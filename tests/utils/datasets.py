@@ -11,10 +11,7 @@ def _validate_file(fpath, file_hash, chunk_size=65535):
         for chunk in iter(lambda: fpath_file.read(chunk_size), b""):
             hasher.update(chunk)
 
-    if str(hasher.hexdigest()) == str(file_hash):
-        return True
-    else:
-        return False
+    return str(hasher.hexdigest()) == str(file_hash)
 
 
 def _get_file(
@@ -45,27 +42,29 @@ def _get_file(
             try:
                 urlretrieve(origin, fpath)
             except HTTPError as e:
-                raise Exception(error_msg.format(origin, e.code, e.msg))
+                raise Exception(error_msg.format(origin, e.code, e.msg)) from e
             except URLError as e:
-                raise Exception(error_msg.format(origin, e.errno, e.reason))
+                raise Exception(error_msg.format(origin, e.errno, e.reason)) from e
         except (Exception, KeyboardInterrupt):
             if os.path.exists(fpath):
                 os.remove(fpath)
             raise
 
-        if os.path.exists(fpath) and file_hash is not None:
-            if not _validate_file(fpath, file_hash):
-                raise ValueError(
-                    "Incomplete or corrupted file detected. "
-                    f"The sha256 file hash does not match the provided value "
-                    f"of {file_hash}."
-                )
+        if (
+            os.path.exists(fpath)
+            and file_hash is not None
+            and not _validate_file(fpath, file_hash)
+        ):
+            raise ValueError(
+                "Incomplete or corrupted file detected. "
+                f"The sha256 file hash does not match the provided value "
+                f"of {file_hash}.",
+            )
     return fpath
 
 
 def download_mnist() -> str:
-    """
-    Code to download mnist originates from keras/datasets:
+    """Code to download mnist originates from keras/datasets:
 
     https://github.com/keras-team/keras/blob/v2.15.0/keras/datasets/mnist.py#L25-L86
     """
@@ -73,9 +72,7 @@ def download_mnist() -> str:
     path = _get_file(
         "mnist.npz",
         origin=origin_folder + "mnist.npz",
-        file_hash=(  # noqa: E501
-            "731c5ac602752760c8e48fbffcf8c3b850d9dc2a2aedcf2cc48468fc17b673d1"
-        ),
+        file_hash=("731c5ac602752760c8e48fbffcf8c3b850d9dc2a2aedcf2cc48468fc17b673d1"),
     )
 
     return path

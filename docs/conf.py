@@ -3,10 +3,11 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-# -- Project information ---------------------------------------------------
+from os import getenv
 
+# -- Project information ---------------------------------------------------
 project = "DAML"
-copyright = "2024, ARiA"
+copyright = "2024, ARiA"  # noqa: A001
 author = "ARiA"
 
 site_url = "https://github.com/aria-ml/daml/"
@@ -44,8 +45,6 @@ autosummary_generate = False
 sphinx_rtd_size_width = "80%"
 
 # -- MyST-NB settings ------------------------------------------------------
-
-from os import getenv
 
 EXECUTION_MODE = getenv("NB_EXECUTION_MODE_OVERRIDE")
 nb_execution_allow_errors = False

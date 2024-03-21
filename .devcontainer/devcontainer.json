@@ -28,10 +28,9 @@
         "ms-azuretools.vscode-docker",
         "esbenp.prettier-vscode",
         "ms-python.python",
-        "ms-python.black-formatter",
-        "ms-python.flake8",
-        "ms-python.isort",
-        "ms-toolsai.jupyter"
+        "ms-toolsai.jupyter",
+        "charliermarsh.ruff",
+        "tamasfe.even-better-toml"
       ]
     }
   },

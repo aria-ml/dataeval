@@ -58,9 +58,7 @@ case $1 in
     "lint")
         FAILURES=0
         trap 'FAILURES=$((FAILURES+1))' ERR
-        poetry --quiet run black --check --diff .
-        poetry --quiet run flake8
-        poetry --quiet run isort --check --diff .
+        poetry --quiet run ruff check --exit-non-zero-on-fix --fix
         poetry --quiet run codespell
         exit $FAILURES
         ;;

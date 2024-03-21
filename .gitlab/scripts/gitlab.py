@@ -245,7 +245,7 @@ class Gitlab:
         --------
         https://docs.gitlab.com/ee/api/merge_requests.html#list-merge-requests
         """
-        params = dict()
+        params = {}
         if state is not None:
             params.update({"state": state})
         if target_branch is not None:

@@ -106,13 +106,13 @@ class Linting(EvaluateMixin):
 
     def _evaluate_images(self) -> Dict[str, Any]:
         if self.images is None:
-            return dict()
+            return {}
 
         return self._evaluate_images_or_boxes(self.images)
 
     def _evaluate_boxes(self) -> Dict[str, Any]:
         if self.boxes is None:
-            return dict()
+            return {}
 
         # Assuming boxes is a (N, P, 4) array where each box is defined by
         # (x_min, y_min, x_max, y_max)
@@ -129,7 +129,7 @@ class Linting(EvaluateMixin):
 
     def _evaluate_labels(self) -> Dict[str, Any]:
         if self.labels is None:
-            return dict()
+            return {}
 
         label_counts = Counter(self.labels.flatten())
         return {"label_counts": dict(label_counts)}
