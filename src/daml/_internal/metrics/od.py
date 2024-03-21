@@ -107,7 +107,7 @@ class OD_Base(ABC):
         self,
         images: np.ndarray,
         epochs: int = 3,
-        threshold: Threshold = Threshold(95.0, ThresholdType.PERCENTAGE),
+        threshold: Optional[Threshold] = None,
         batch_size: Optional[int] = None,
         verbose: bool = False,
     ) -> None:
@@ -121,8 +121,9 @@ class OD_Base(ABC):
             A numpy array of images for the model to train on
         epochs : int, default 3
             Number of epochs to train the detector for
-        threshold : Threshold, default Threshold(95.0, ThresholdType.PERCENTAGE)
+        threshold : Threshold, default None
             Sets the expected threshold of an outlier in the dataset
+            If None, uses Threshold(95.0, ThresholdType.PERCENTAGE)
         batch_size : Optional[int], default None
             Batch size override to use during training
         verbose : bool, default False
@@ -158,6 +159,9 @@ class OD_Base(ABC):
 
         # if save_path: save_detector(self.detector, save_path)
         self.is_trained: bool = True
+
+        if threshold is None:
+            threshold = Threshold(95.0, ThresholdType.PERCENTAGE)
 
         if threshold.type is ThresholdType.PERCENTAGE:
             self.detector.infer_threshold(

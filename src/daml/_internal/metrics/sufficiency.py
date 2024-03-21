@@ -80,7 +80,7 @@ def reset_parameters(model: nn.Module):
 def validate_dataset_len(dataset: Dataset) -> int:
     if not hasattr(dataset, "__len__"):
         raise TypeError("Must provide a dataset with a length attribute")
-    length = getattr(dataset, "__len__")()
+    length: int = dataset.__len__()  # type: ignore
     if length <= 0:
         raise ValueError("Dataset length must be greater than 0")
     return length
