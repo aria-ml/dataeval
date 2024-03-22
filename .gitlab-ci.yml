@@ -91,17 +91,10 @@ stages:
 
 ### BUILD ###
 
-build base:
-  stage: build
-  extends: .harbor
-  script:
-    - ./build --build-only --push --verbose base
-  rules: *on_run
-
 build image:
   stage: build
   extends: [.harbor, .python_version_matrix]
-  needs: [verify lock, build base]
+  needs: [verify lock]
   script:
     - ./build --build-only --push --verbose ${PYTHON_VERSION}
   rules: *on_run
