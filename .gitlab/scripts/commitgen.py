@@ -165,7 +165,7 @@ class CommitGen:
             if old_file not in new_files:
                 actions.append(
                     {
-                        "actions": "delete",
+                        "action": "delete",
                         "file_path": old_file,
                     }
                 )
