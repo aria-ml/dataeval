@@ -17,17 +17,17 @@ EOF
 exit $1
 }
 
-if ! (poetry run pip freeze | grep daml) >/dev/null 2>&1; then
-    echo "DAML environment not found.  Please rebuild your devcontainer or install using poetry with all extras and groups."
-    exit 1
-fi
-
 declare -A supported_tasks=([unit]=1 [func]=1 [deps]=1 [type]=1 [lint]=1 [docs]=1 [qdocs]=1)
 
 # validate args
 if (( $# == 0 )); then showHelp 0; fi
 if (( $# != 1 )); then echo Too many parameters; showHelp 1; fi
 if [[ ! ${supported_tasks[$1]} ]]; then echo Invalid task; showHelp 1; fi
+
+if ! [ $1 == "deps" ] && ! (poetry run pip freeze | grep daml) >/dev/null 2>&1; then
+    echo "DAML environment not found.  Please rebuild your devcontainer or install using poetry with all extras and groups."
+    exit 1
+fi
 
 pver=$(python --version | cut -d' ' -f2 | cut -d'.' -f1-2)
 case $1 in
