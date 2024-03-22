@@ -24,6 +24,8 @@ if (( $# == 0 )); then showHelp 0; fi
 if (( $# != 1 )); then echo Too many parameters; showHelp 1; fi
 if [[ ! ${supported_tasks[$1]} ]]; then echo Invalid task; showHelp 1; fi
 
+# deps task skips poetry check as it builds its own virtual environment for the test
+# all other tests use poetry environment for execution
 if ! [ $1 == "deps" ] && ! (poetry run pip freeze | grep daml) >/dev/null 2>&1; then
     echo "DAML environment not found.  Please rebuild your devcontainer or install using poetry with all extras and groups."
     exit 1
