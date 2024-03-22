@@ -1,7 +1,16 @@
-[//]: # (f67d76c9e48cd36053cf49124723a47c91b8ee41)
+[//]: # (17d1113cb15fe477b6389a6879475c3e7b0d28b6)
 
 # DAML Change Log
 ## Pending Release
+- ```17d1113c - Skip creds for harbor for read-only usage```
+- ```8876b7df - Switch to ruff linter```
+- ```4928697b - Run isort on imports on explicit save```
+- ```d2c937e2 - Fix code linting issues```
+- ```65b5f289 - Initial data linting prototyping```
+- ```41b20d3a - Add rules for release label pipeline workflow and merge request release template```
+- ```53b67a4f - Add Issue Templates```
+- ```7ee53c9c - Update Divergence default to MST```
+## v0.44.5
 - ```f67d76c9 - Update jupyter-cache in scheduled release pipeline```
 - ```94d1887d - Cleanup release scripts```
 ## v0.44.4
