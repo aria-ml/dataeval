@@ -67,11 +67,7 @@ COPY --link --from=pyenv  ${PYENV_ROOT}/ ${PYENV_ROOT}/
 
 # Base image for build runs and devcontainers
 FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 as base
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends \
-        graphviz \
-        libgl1
+RUN apt-get update && apt-get install -y --no-install-recommends libgl1
 RUN useradd -m -u 1000 -s /bin/bash daml
 USER daml
 WORKDIR /daml
