@@ -75,40 +75,35 @@ stages:
 
 ### DOCKER TEMPLATES ###
 
-.docker_harbor_required:
+.docker:
   image: docker:24.0-git
+  before_script:
+    - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
+
+.harbor:
+  extends: .docker
   before_script:
     - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
     - echo ${DAML_HARBOR_TOKEN} | docker login harbor.jatic.net:443 -u 'robot$daml+daml-build' --password-stdin
   after_script:
     - docker logout harbor.jatic.net:443
-
-.docker_harbor_optional:
-  needs: [build image]
-  image: docker:24.0-git
-  before_script:
-    - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
-    - echo ${DAML_HARBOR_TOKEN} | docker login harbor.jatic.net:443 -u 'robot$daml+daml-build' --password-stdin || echo "WARNING - Failed to login"
-  after_script:
-    - docker logout harbor.jatic.net:443 || echo "WARNING - Failed to logout"
+  allow_failure: true
 
 ### BUILD ###
 
 build base:
   stage: build
-  extends: .docker_harbor_required
+  extends: .harbor
   script:
     - ./build --build-only --push --verbose base
-  allow_failure: true
   rules: *on_run
 
 build image:
   stage: build
-  extends: [.docker_harbor_required, .python_version_matrix]
+  extends: [.harbor, .python_version_matrix]
   needs: [verify lock, build base]
   script:
     - ./build --build-only --push --verbose ${PYTHON_VERSION}
-  allow_failure: true
   rules: *on_run
 
 verify lock:
@@ -140,13 +135,13 @@ dependency tests:
   rules: *on_run
 
 .run_tests:
-  extends: [.docker_harbor_optional, .python_version_matrix]
+  extends: [.docker, .python_version_matrix]
   script:
-    - ./build ${PYTHON_VERSION} ${TASK} ${ARGS} || TESTFAILED=1
-    - if [[ $TESTFAILED ]]; then echo "=========== ${TASK} FAILED ==========="; EXITCODE=1; fi
-    - ./build ${PYTHON_VERSION} type || TYPEFAILED=1
-    - if [[ $TYPEFAILED ]]; then echo "=========== type FAILED ==========="; EXITCODE=1; fi
-    - exit $EXITCODE
+    - FAILURES=0
+    - trap 'FAILURES=$((FAILURES+1))' ERR
+    - ./build ${PYTHON_VERSION} ${TASK} ${ARGS}
+    - ./build ${PYTHON_VERSION} type
+    - exit $FAILURES
   artifacts:
     reports:
       junit: output/junit.${TASK}.${PYTHON_VERSION}.xml
@@ -199,7 +194,7 @@ coverage:
 
 docs:
   stage: docs
-  extends: .docker_harbor_optional
+  extends: .docker
   tags: [GPU]
   script:
     - ./build docs --gpu
