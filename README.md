@@ -69,9 +69,6 @@ poetry shell
 ### Documentation and Tutorials
 For more ideas on getting started using DAML in your workflow, additional information and tutorials are in our Sphinx documentation hosted on [Read the Docs](https://daml.readthedocs.io/).
 
-## Contributing
-For steps on how to get started on contributing to the project, including setting up a development environment and running unit tests and building documentation locally, you can follow the steps in [CONTRIBUTING.md](CONTRIBUTING.md).
-
 ## Attribution
 This project uses code from the [Alibi-Detect](https://github.com/SeldonIO/alibi-detect) python library developed by SeldonIO.  Additional documentation from the developers are also available [here](https://docs.seldon.io/projects/alibi-detect/en/stable/).
 
