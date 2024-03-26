@@ -149,10 +149,10 @@ unit tests:
 
 functional tests:
   extends: .run_tests
-  tags: [GPU]
+#  tags: [GPU]
   variables:
     TASK: func
-    ARGS: --gpu
+#    ARGS: --gpu
   rules: *on_commit_main_or_release_mr
 
 coverage:
@@ -188,9 +188,10 @@ coverage:
 docs:
   stage: docs
   extends: .docker
-  tags: [GPU]
+#  tags: [GPU]
   script:
-    - ./build docs --gpu
+#    - ./build docs --gpu
+    - ./build docs
   artifacts:
     paths:
       - output/docs/.jupyter_cache/
