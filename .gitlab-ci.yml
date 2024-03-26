@@ -76,7 +76,7 @@ stages:
 ### DOCKER TEMPLATES ###
 
 .docker:
-  image: docker:24.0-git
+  image: docker:25.0.5-git
   before_script:
     - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
 
