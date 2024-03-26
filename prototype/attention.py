@@ -5,113 +5,80 @@
 #
 # References:
 #   https://github.com/NVlabs/SegFormer/blob/master/mmseg/models/backbones/mix_transformer.py
-#   https://github.com/huggingface/pytorch-image-models/blob/main/timm/layers/drop.py
 
 
 import math
-from typing import List, Set, Tuple
+from typing import Tuple
 
 import torch
-from torch import nn
+from torch import Tensor, nn
+from torch.nn import functional as F
 
 
-def find_pruneable_heads_and_indices(
-    heads: List[int], n_heads: int, head_size: int, already_pruned_heads: Set[int]
-) -> Tuple[Set[int], torch.LongTensor]:
+class EfficientSelfAttention(nn.Module):
     """
-    Finds the heads and their indices taking `already_pruned_heads` into account.
+    CONCEPT OVERVIEW:
+    ----------------
+    Query:      flattened, transformed patch embeddings - our sequence -
+                where we want to look - dim[b, a, (h*w)/R^2, c)]
+    Key:        compressed, transformed, flattened patch embeddings - our available
+                data - where we want to compare - dim[b, a, sr(h)*sr(w), c]
+    Attention:  similarity between our sequence and the data that's available -
+                matmul(Q,K) - dim[b, a, (h*w)/R^2, sr(h)*sr(w)]
+    Value:      compressed, transformed, flattened patch embeddings - our available
+                data - that will be weighted by the attention scores to provide the
+                data that matters most to us - dim[b, a, sr(h)*sr(w), c]
+    Context:    the weighted data that matters most to us, this is passed along in
+                the forward call - dim[b, a, (h*w)/R^2, c]
+
+    b:          number of batches
+    a:          number of attention heads
+    c:          number of channels
+    h:          embdding height
+    w:          embdding width
+    R:          downsample factor
 
     Args:
-        heads (`List[int]`): List of the indices of heads to prune.
-        n_heads (`int`): The number of heads in the model.
-        head_size (`int`): The size of each head.
-        already_pruned_heads (`Set[int]`): A set of already pruned heads.
+        attn_dropout:       Probability of dropout in the attention layer, float [0,1].
+        embed_dim:          Size of the embedding dimension, D - int.
+        num_heads:          Number of attention heads, int.
+        sr_ratio:           Value to reduce the dimensions for self-attention by,
+                             int [1, embed_dim] (sequence reduction ratio).
+        drop:               Probability of dropout after attention, float [0,1].
 
-    Returns:
-        `Tuple[Set[int], torch.LongTensor]`: A tuple with the remaining heads and their corresponding indices.
+    Input:
+        patch_embedding:    Input Tensor in shape (B,N,D)
+        height:             Embdding height, int
+        width:              Embdding width, int
+        output_attentions:  Boolean if you want to output attention probabilities
+
+    Output:
+        outputs:            Tuple of either just the attended Tensor or the attended
+                             Tensor and the attention probabilities
     """
-    mask = torch.ones(n_heads, head_size)
-    heads = (
-        set(heads) - already_pruned_heads
-    )  # Convert to set and remove already pruned heads
-    for head in heads:
-        # Compute how many pruned heads are before the head
-        # and move the index accordingly
-        head = head - sum(1 if h < head else 0 for h in already_pruned_heads)
-        mask[head] = 0
-    mask = mask.view(-1).contiguous().eq(1)
-    index: torch.LongTensor = torch.arange(len(mask))[mask].long()
-    return heads, index
 
-
-def prune_linear_layer(
-    layer: nn.Linear, index: torch.LongTensor, dim: int = 0
-) -> nn.Linear:
-    """
-    Prune a linear layer to keep only entries in index.
-
-    Used to remove heads.
-
-    Args:
-        layer (`torch.nn.Linear`): The layer to prune.
-        index (`torch.LongTensor`): The indices to keep in the layer.
-        dim (`int`, *optional*, defaults to 0): The dimension on which to keep the indices.
-
-    Returns:
-        `torch.nn.Linear`: The pruned layer as a new layer with `requires_grad=True`.
-    """
-    index = index.to(layer.weight.device)
-    W = layer.weight.index_select(dim, index).clone().detach()
-    if layer.bias is not None:
-        if dim == 1:
-            b = layer.bias.clone().detach()
-        else:
-            b = layer.bias[index].clone().detach()
-    new_size = list(layer.weight.size())
-    new_size[dim] = len(index)
-    new_layer = nn.Linear(new_size[1], new_size[0], bias=layer.bias is not None).to(
-        layer.weight.device
-    )
-    new_layer.weight.requires_grad = False
-    new_layer.weight.copy_(W.contiguous())
-    new_layer.weight.requires_grad = True
-    if layer.bias is not None:
-        new_layer.bias.requires_grad = False
-        new_layer.bias.copy_(b.contiguous())
-        new_layer.bias.requires_grad = True
-    return new_layer
-
-
-class SegformerSelfOutput(nn.Module):
-    def __init__(self, embed_dim, drop):
-        super().__init__()
-        self.dense = nn.Linear(embed_dim, embed_dim)
-        self.dropout = nn.Dropout(drop)
-
-    def forward(self, hidden_states, input_tensor):
-        hidden_states = self.dense(hidden_states)
-        hidden_states = self.dropout(hidden_states)
-        return hidden_states
-
-
-class SegformerEfficientSelfAttention(nn.Module):
-    def __init__(self, attn_dropout, embed_dim, num_attn_heads, sr_ratio):
-        super().__init__()
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+        attn_dropout: float = 0.0,
+        drop: float = 0.0,
+        sr_ratio: int = 1,
+    ):
+        super(EfficientSelfAttention, self).__init__()
         self.embed_dim = embed_dim
-        self.num_attn_heads = num_attn_heads
+        self.num_heads = num_heads
 
-        if self.embed_dim % self.num_attn_heads != 0:
-            raise ValueError(
-                f"The hidden size ({self.embed_dim}) is not a multiple of the number of attention "
-                f"heads ({self.num_attn_heads})"
-            )
+        assert self.embed_dim % self.num_heads == 0, ValueError(
+            f"The hidden dimension ({self.embed_dim}) is not a multiple of the number \
+            of attention heads ({self.num_heads})"
+        )
 
-        self.attention_head_size = int(self.embed_dim / self.num_attn_heads)
-        self.all_head_size = self.num_attn_heads * self.attention_head_size
+        self.head_dim = self.embed_dim // self.num_heads
 
-        self.query = nn.Linear(self.embed_dim, self.all_head_size)
-        self.key = nn.Linear(self.embed_dim, self.all_head_size)
-        self.value = nn.Linear(self.embed_dim, self.all_head_size)
+        self.query = nn.Linear(self.embed_dim, self.embed_dim)
+        self.key = nn.Linear(self.embed_dim, self.embed_dim)
+        self.value = nn.Linear(self.embed_dim, self.embed_dim)
 
         self.dropout = nn.Dropout(
             attn_dropout
@@ -124,147 +91,86 @@ class SegformerEfficientSelfAttention(nn.Module):
             )
             self.layer_norm = nn.LayerNorm(embed_dim)
 
-    def transpose_for_scores(self, x):
-        new_x_shape = x.size()[:-1] + (
-            self.num_attn_heads,
-            self.attention_head_size,
-        )
-        x = x.view(*new_x_shape).contiguous()
-        return x.permute(0, 2, 1, 3)
+        self.context = nn.Linear(self.embed_dim, self.embed_dim)
+        self.context_dropout = nn.Dropout(drop)
 
     def forward(
         self,
-        hidden_states,
-        height,
-        width,
-        output_attentions=False,
-    ):
-        """
-        CONCEPT OVERVIEW:
-        ----------------
-        Query:      flattened, transformed patch embeddings - our sequence - where we want to look
-                    - dim[b, a, (h*w)/R^2, c)]
-        Key:        compressed, transformed, flattened patch embeddings - our available data - where we want to compare
-                    - dim[b, a, sr(h)*sr(w), c]
-        Attention:  similarity between our sequence and the data that's available - matmul(Q,K)
-                    - dim[b, a, (h*w)/R^2, sr(h)*sr(w)]
-        Value:      compressed, transformed, flattened patch embeddings - our available data - that will be weighted by
-                    the attention scores to provide the data that matters most to us
-                    - dim[b, a, sr(h)*sr(w), c]
-        Context:    the weighted data that matters most to us, this is passed along in the forward call
-                    - dim[b, a, (h*w)/R^2, c]
-        b, a, c:    n_batch, n_attention_heads, n_channels, respectively
-        h, w, R     native image height, native image width, downsample factor, respectively
-        """
+        patch_embedding: Tensor,
+        height: int,
+        width: int,
+        output_attentions: bool = False,
+    ) -> Tuple[Tensor, Tensor] | Tuple[Tensor]:
 
-        query_layer = self.transpose_for_scores(
-            self.query(hidden_states)
-        )  # dim[nbatch,nattnhead,(h*w)/R^2,nchann)]
+        B, N, D = patch_embedding.shape
+        query_layer = (
+            self.query(patch_embedding)
+            .reshape(B, N, self.num_heads, D // self.num_heads)
+            .permute(0, 2, 1, 3)
+        )
 
         if self.sr_ratio > 1:
-            batch_size, seq_len, num_channels = hidden_states.shape  # seq_len = h*w
-            hidden_states = hidden_states.permute(0, 2, 1).reshape(
-                batch_size, num_channels, height, width
-            )  # dim[nbatch,nchann,h,w]
-            hidden_states = self.sr(
-                hidden_states
+            adjusted_embedding = patch_embedding.permute(0, 2, 1).reshape(
+                B, D, height, width
+            )
+            adjusted_embedding = self.sr(
+                adjusted_embedding
             )  # compress along spatial dimension [h,w] using Conv2d
-            hidden_states = hidden_states.reshape(batch_size, num_channels, -1).permute(
+            adjusted_embedding = adjusted_embedding.reshape(B, D, -1).permute(
                 0, 2, 1
-            )  # re-flatten [h,w]
-            hidden_states = self.layer_norm(
-                hidden_states
-            )  # dim[nbatch,sr(h)*sr(w),nchann]
+            )  # re-flatten [h,w] and flip channels (D) to last dimension
+            adjusted_embedding = self.layer_norm(adjusted_embedding)
+            # Transform patch embeddings (embed_dim) through SEPARATE linear layers
+            # and transpose to get keys, values
+            key_layer = (
+                self.key(adjusted_embedding)
+                .reshape(B, -1, self.num_heads, D // self.num_heads)
+                .permute(0, 2, 1, 3)
+            )
+            value_layer = (
+                self.value(adjusted_embedding)
+                .reshape(B, -1, self.num_heads, D // self.num_heads)
+                .permute(0, 2, 1, 3)
+            )
+        else:
+            # Transform patch embeddings (embed_dim) through SEPARATE linear layers
+            # and transpose to get keys, values
+            key_layer = (
+                self.key(patch_embedding)
+                .reshape(B, N, self.num_heads, D // self.num_heads)
+                .permute(0, 2, 1, 3)
+            )
+            value_layer = (
+                self.value(patch_embedding)
+                .reshape(B, N, self.num_heads, D // self.num_heads)
+                .permute(0, 2, 1, 3)
+            )
+            # ^ NOTICE: key and value layer are the same.
+            # ergo, self attention, not cross attention.
 
-        # Transform patch embeddings (hidden_states) through SEPARATE linear layers and transpose to get keys, values
-        key_layer = self.transpose_for_scores(
-            self.key(hidden_states)
-        )  # dim[nbatch,nattnhead,sr(h)*sr(w),nchann]
-        value_layer = self.transpose_for_scores(
-            self.value(hidden_states)
-        )  # dim[nbatch,nattnhead,sr(h)*sr(w),nchann]
-        # ^ NOTICE: key and value layer are the same. ergo, self attention, not cross attention.
-
-        # Take the dot product between "query" and "key" to get the raw attention scores.
-        attention_scores = torch.matmul(
-            query_layer, key_layer.transpose(-1, -2)
-        )  # dim[nbatch,nattnhead,(h*w)/R^2,sr(h)*sr(w)]
-
-        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
+        # Take the dot product between "query" and "key"
+        # to get the raw attention scores.
+        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
+        attention_scores = attention_scores / math.sqrt(self.head_dim)
 
         # Normalize the attention scores to probabilities.
         attention_probs = F.softmax(attention_scores, dim=-1)
 
         # This is actually dropping out entire tokens to attend to, which might
-        # seem a bit unusual, but is taken from the original Transformer paper. << JC - attn dropout prob = 0 in model config
-        attention_probs = self.dropout(
-            attention_probs
-        )  # dim[nbatch,nattnhead,(h*w)/R^2,sr(h)*sr(w)]
+        # seem a bit unusual, but is taken from the original Transformer paper.
+        attention_probs = self.dropout(attention_probs)
 
-        context_layer = torch.matmul(
-            attention_probs, value_layer
-        )  # dim[nbatch,nattnhead,(h*w)/R^2,nchann]
+        # Take the dot product between attention probability and "value"
+        # to get the attended embeddings.
+        context_layer = torch.matmul(attention_probs, value_layer)
+        context_layer = context_layer.transpose(1, 2).reshape(B, N, D)
 
-        context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
-        new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
-        context_layer = context_layer.view(
-            *new_context_layer_shape
-        ).contiguous()  # dim[nbatch,(h*w)/R^2,nchann]
+        context_layer = self.context(context_layer)
+        context_layer = self.context_dropout(context_layer)
 
+        # Allowing for visualization of the attention probabilities
         outputs = (
             (context_layer, attention_probs) if output_attentions else (context_layer,)
         )
 
-        return outputs
-
-
-class SegformerAttention(nn.Module):
-    def __init__(
-        self, embed_dim, num_attn_heads, attn_dropout, dropout, sr_ratio
-    ) -> None:
-        super().__init__()
-        self.self = SegformerEfficientSelfAttention(
-            attn_dropout=attn_dropout,
-            embed_dim=embed_dim,
-            num_attn_heads=num_attn_heads,
-            sr_ratio=sr_ratio,
-        )
-        self.output = SegformerSelfOutput(embed_dim=embed_dim, drop=dropout)
-        self.pruned_heads = set()
-
-    def prune_heads(self, heads):
-        if len(heads) == 0:
-            return
-        heads, index = find_pruneable_heads_and_indices(
-            heads,
-            self.self.num_attention_heads,
-            self.self.attention_head_size,
-            self.pruned_heads,
-        )
-
-        # Prune linear layers
-        self.self.query = prune_linear_layer(self.self.query, index)
-        self.self.key = prune_linear_layer(self.self.key, index)
-        self.self.value = prune_linear_layer(self.self.value, index)
-        self.output.dense = prune_linear_layer(self.output.dense, index, dim=1)
-
-        # Update hyper params and store pruned heads
-        self.self.num_attention_heads = self.self.num_attention_heads - len(heads)
-        self.self.all_head_size = (
-            self.self.attention_head_size * self.self.num_attention_heads
-        )
-        self.pruned_heads = self.pruned_heads.union(heads)
-
-    def forward(self, embed_dim, height, width, output_attentions=False):
-        self_outputs = self.self(
-            embed_dim, height, width, output_attentions
-        )  # hidden_states = patch_embeddings
-        # ^ Self attention output: (context_layer, attention_probs)
-
-        attention_output = self.output(
-            self_outputs[0], embed_dim
-        )  # dim[nbatch, (h*w)/R^2, nchann], nchann: ref segformer Table 6
-        outputs = (attention_output,) + self_outputs[
-            1:
-        ]  # (context layer, attention probs)
         return outputs

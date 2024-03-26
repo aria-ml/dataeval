@@ -30,8 +30,8 @@ class PatchEmbed(nn.Module):
     Args:
         img_size:      Image size, either single int or tuple(int, int).
         patch_size:    Patch token size, either single int or tuple(int, int).
-        in_channels:   Number of input image channels, C.
-        embed_dim:     Number of linear projection output channels, D.
+        in_channels:   Number of input image channels, C - int.
+        embed_dim:     Number of linear projection output channels, D - int.
         norm_layer:    Normalization layer. Default nn.LayerNorm
 
         Convolution Args:
@@ -42,10 +42,10 @@ class PatchEmbed(nn.Module):
         dilate:        Spacing between kernel elements. Default 1
 
     Input:
-        x:             Input Tensor (forward only)
+        x:             Input Tensor
 
     Output:
-        embeddings:    Flattened Tensor of shape (B, HW, D)
+        embeddings:    Flattened Tensor of shape (B, N, D) where N = HW
         height:        Height of the embedding, H - int
         width:         Width of the embedding, W - int
     """
@@ -63,7 +63,7 @@ class PatchEmbed(nn.Module):
         norm_layer: Optional[Callable[..., nn.Module]] = nn.LayerNorm,
         # flatten_embedding: bool = True,
     ) -> None:
-        super().__init__()
+        super(PatchEmbed, self).__init__()
 
         self.img_size = to_2tuple(image_size)
         self.patch_size = to_2tuple(patch_size)

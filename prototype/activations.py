@@ -12,22 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Only includes those activations which cannot be currently found
+# in PyTorch 2.0, otherwise use the PyTorch implementation
+
 import math
 
 import torch
-from packaging import version
 from torch import Tensor, nn
-
-# from .utils import logging
-
-
-# logger = logging.get_logger(__name__)
 
 
 class NewGELUActivation(nn.Module):
     """
-    Implementation of the GELU activation function currently in Google BERT repo (identical to OpenAI GPT). Also see
-    the Gaussian Error Linear Units paper: https://arxiv.org/abs/1606.08415
+    Implementation of the GELU activation function currently in Google BERT repo
+    (identical to OpenAI GPT). Also see the Gaussian Error Linear Units paper:
+    https://arxiv.org/abs/1606.08415
     """
 
     def forward(self, input: Tensor) -> Tensor:
@@ -44,31 +42,10 @@ class NewGELUActivation(nn.Module):
         )
 
 
-class GELUActivation(nn.Module):
-    """
-    Original Implementation of the GELU activation function in Google BERT repo when initially created. For
-    information: OpenAI GPT's GELU is slightly different (and gives slightly different results): 0.5 * x * (1 +
-    torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3)))) This is now written in C in nn.functional
-    Also see the Gaussian Error Linear Units paper: https://arxiv.org/abs/1606.08415
-    """
-
-    def __init__(self, use_gelu_python: bool = False):
-        super().__init__()
-        if version.parse(torch.__version__) < version.parse("1.4") or use_gelu_python:
-            self.act = self._gelu_python
-        else:
-            self.act = nn.functional.gelu
-
-    def _gelu_python(self, input: Tensor) -> Tensor:
-        return input * 0.5 * (1.0 + torch.erf(input / math.sqrt(2.0)))
-
-    def forward(self, input: Tensor) -> Tensor:
-        return self.act(input)
-
-
 class FastGELUActivation(nn.Module):
     """
-    Applies GELU approximation that is slower than QuickGELU but more accurate. See: https://github.com/hendrycks/GELUs
+    Applies GELU approximation that is slower than QuickGELU but more accurate.
+    See: https://github.com/hendrycks/GELUs
     """
 
     def forward(self, input: Tensor) -> Tensor:
@@ -84,7 +61,8 @@ class FastGELUActivation(nn.Module):
 
 class QuickGELUActivation(nn.Module):
     """
-    Applies GELU approximation that is fast but somewhat inaccurate. See: https://github.com/hendrycks/GELUs
+    Applies GELU approximation that is fast but somewhat inaccurate.
+    See: https://github.com/hendrycks/GELUs
     """
 
     def forward(self, input: Tensor) -> Tensor:
@@ -93,15 +71,18 @@ class QuickGELUActivation(nn.Module):
 
 class ClippedGELUActivation(nn.Module):
     """
-    Clip the range of possible GeLU outputs between [min, max]. This is especially useful for quantization purpose, as
-    it allows mapping negatives values in the GeLU spectrum. For more information on this trick, please refer to
+    Clip the range of possible GeLU outputs between [min, max]. This is especially
+    useful for quantization purpose, as it allows mapping negatives values in the
+    GeLU spectrum. For more information on this trick, please refer to
     https://arxiv.org/abs/2004.09602.
 
-    Gaussian Error Linear Unit. Original Implementation of the gelu activation function in Google Bert repo when
-    initially created.
+    Gaussian Error Linear Unit. Original Implementation of the gelu activation function
+    in Google Bert repo when initially created.
 
-    For information: OpenAI GPT's gelu is slightly different (and gives slightly different results): 0.5 * x * (1 +
-    torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3)))). See https://arxiv.org/abs/1606.08415
+    For information: OpenAI GPT's gelu is slightly different (and gives slightly
+    different results): 0.5 * x * (1 +
+    torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3)))).
+    See https://arxiv.org/abs/1606.08415
     """
 
     def __init__(self, min: float, max: float):
@@ -113,50 +94,32 @@ class ClippedGELUActivation(nn.Module):
         self.max = max
 
     def forward(self, x: Tensor) -> Tensor:
-        return torch.clip(gelu(x), self.min, self.max)
+        return torch.clip(nn.functional.gelu(x), self.min, self.max)
 
 
-class SiLUActivation(nn.Module):
+class AccurateGELUActivation(nn.Module):
     """
-    See Gaussian Error Linear Units (Hendrycks et al., https://arxiv.org/abs/1606.08415) where the SiLU (Sigmoid Linear
-    Unit) was originally introduced and coined, and see Sigmoid-Weighted Linear Units for Neural Network Function
-    Approximation in Reinforcement Learning (Elfwing et al., https://arxiv.org/abs/1702.03118) and Swish: a Self-Gated
-    Activation Function (Ramachandran et al., https://arxiv.org/abs/1710.05941v1) where the SiLU was experimented with
-    later.
-    """
+    Applies GELU approximation that is faster than default and more accurate than
+    QuickGELU. See: https://github.com/hendrycks/GELUs
 
-    def __init__(self):
-        super().__init__()
-        if version.parse(torch.__version__) < version.parse("1.7"):
-            self.act = self._silu_python
-        else:
-            self.act = nn.functional.silu
-
-    def _silu_python(self, input: Tensor) -> Tensor:
-        return input * torch.sigmoid(input)
-
-    def forward(self, input: Tensor) -> Tensor:
-        return self.act(input)
-
-
-class MishActivation(nn.Module):
-    """
-    See Mish: A Self-Regularized Non-Monotonic Activation Function (Misra., https://arxiv.org/abs/1908.08681). Also
-    visit the official repository for the paper: https://github.com/digantamisra98/Mish
+    Implemented along with MEGA (Moving Average Equipped Gated Attention)
     """
 
     def __init__(self):
         super().__init__()
-        if version.parse(torch.__version__) < version.parse("1.9"):
-            self.act = self._mish_python
-        else:
-            self.act = nn.functional.mish
-
-    def _mish_python(self, input: Tensor) -> Tensor:
-        return input * torch.tanh(nn.functional.softplus(input))
+        self.precomputed_constant = math.sqrt(2 / math.pi)
 
     def forward(self, input: Tensor) -> Tensor:
-        return self.act(input)
+        return (
+            0.5
+            * input
+            * (
+                1
+                + torch.tanh(
+                    self.precomputed_constant * (input + 0.044715 * torch.pow(input, 3))
+                )
+            )
+        )
 
 
 class LinearActivation(nn.Module):
@@ -168,38 +131,37 @@ class LinearActivation(nn.Module):
         return input
 
 
+class LaplaceActivation(nn.Module):
+    """
+    Applies elementwise activation based on Laplace function, introduced in MEGA as an
+    attention activation. See https://arxiv.org/abs/2209.10655
+
+    Inspired by squared relu, but with bounded range and gradient for better stability
+    """
+
+    def forward(self, input, mu=0.707107, sigma=0.282095):
+        input = (input - mu).div(sigma * math.sqrt(2.0))
+        return 0.5 * (1.0 + torch.erf(input))
+
+
+class ReLUSquaredActivation(nn.Module):
+    """
+    Applies the relu^2 activation introduced in https://arxiv.org/abs/2109.08668v2
+    """
+
+    def forward(self, input):
+        relu_applied = nn.functional.relu(input)
+        squared = torch.square(relu_applied)
+        return squared
+
+
 ACT2FN = {
-    "relu": nn.ReLU(),
-    "silu": SiLUActivation(),
-    "swish": SiLUActivation(),
-    "gelu": GELUActivation(),
-    "tanh": nn.Tanh(),
-    "gelu_python": GELUActivation(use_gelu_python=True),
-    "gelu_new": NewGELUActivation(),
-    "gelu_fast": FastGELUActivation(),
-    "quick_gelu": QuickGELUActivation(),
     "gelu_10": ClippedGELUActivation(-10, 10),
-    "mish": MishActivation(),
-    "linear": LinearActivation(),
-    "sigmoid": nn.Sigmoid(),
+    "gelu_fast": FastGELUActivation(),
+    "gelu_new": NewGELUActivation(),
+    "gelu_accurate": AccurateGELUActivation,
+    "quick_gelu": QuickGELUActivation(),
+    "laplace": LaplaceActivation,
+    "linear": LinearActivation,
+    "relu2": ReLUSquaredActivation,
 }
-
-
-def get_activation(activation_string):
-    if activation_string in ACT2FN:
-        return ACT2FN[activation_string]
-    else:
-        raise KeyError(
-            f"function {activation_string} not found in ACT2FN mapping {list(ACT2FN.keys())}"
-        )
-
-
-# For backwards compatibility with: from activations import gelu_python
-gelu_python = get_activation("gelu_python")
-gelu_new = get_activation("gelu_new")
-gelu = get_activation("gelu")
-gelu_fast = get_activation("gelu_fast")
-quick_gelu = get_activation("quick_gelu")
-silu = get_activation("silu")
-mish = get_activation("mish")
-linear_act = get_activation("linear")
