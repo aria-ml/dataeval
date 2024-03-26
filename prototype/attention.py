@@ -1,9 +1,9 @@
 # Copyright (c) ARiA. All rights reserved.
 #
-# Licensed under the MIT Liscence
+# Licensed under the MIT License
 # found in the LICENSE file in the root directory of this source tree.
 #
-# References:
+# Modified code from:
 #   https://github.com/NVlabs/SegFormer/blob/master/mmseg/models/backbones/mix_transformer.py
 
 
@@ -65,7 +65,7 @@ class EfficientSelfAttention(nn.Module):
         drop: float = 0.0,
         sr_ratio: int = 1,
     ):
-        super(EfficientSelfAttention, self).__init__()
+        super().__init__()
         self.embed_dim = embed_dim
         self.num_heads = num_heads
 
@@ -101,7 +101,6 @@ class EfficientSelfAttention(nn.Module):
         width: int,
         output_attentions: bool = False,
     ) -> Tuple[Tensor, Tensor] | Tuple[Tensor]:
-
         B, N, D = patch_embedding.shape
         query_layer = (
             self.query(patch_embedding)

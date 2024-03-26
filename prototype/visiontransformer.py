@@ -11,30 +11,26 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" PyTorch SegFormer model with ARiA additions """
+"""PyTorch SegFormer model with ARiA additions"""
 
-
-# from typing import List, Set, Tuple
+from typing import Callable, Dict, Optional, Tuple, Union
 
 # import numpy as np
-import torch
 import torch.nn.functional as F
-import torch.utils.checkpoint
 from torch import nn
 from torch.nn import CrossEntropyLoss, L1Loss, MSELoss
 from torchvision import transforms as T
 
+from daml._prototype.utils.decoder import SegformerDecodeHead
+from daml._prototype.utils.encoder import SegformerEncoder
 from daml._prototype.utils.modeling_outputs import (
     BaseModelOutput,
     SemanticSegmentationModelOutput,
 )
-from daml._prototype.utils.patch_embed import PatchEmbed
 
 
 class Segformer(nn.Module):
     """
-    This implements the ARiA adjusted Segformer model.
-    See https://github.com/NVlabs/SegFormer/tree/master for the original.
 
     Args:
 
@@ -185,6 +181,32 @@ class Segformer(nn.Module):
         )
 
 
+def typecheck(input_var, num_blocks: int = 4) -> list:
+    """
+    Validates the type of input_var. It can be an int, a tuple of two ints,
+    or a list of ints/tuples. If it's a list, it then checks if the length
+    equals num_blocks.
+
+    Returns a list of the correct size for use.
+    """
+    # Check if input_var is an int, a float, or a tuple of 2 ints
+    if isinstance(input_var, (int, float, tuple)):
+        return [input_var for _ in range(num_blocks)]
+    # Check if input_var is a list of the correct length
+    elif isinstance(input_var, list):
+        if len(input_var) == num_blocks:
+            return input_var
+        elif len(input_var) > num_blocks:
+            return input_var[:num_blocks]
+        else:
+            return input_var + [
+                input_var[-1] for _ in range(num_blocks - len(input_var))
+            ]
+    # If it's something else, then there are issues
+    else:
+        return []
+
+
 class SegformerModel(nn.Module):
     """
     This implements the ARiA adjusted Segformer model.
@@ -200,13 +222,90 @@ class SegformerModel(nn.Module):
 
     """
 
-    def __init__(self, config):
-
+    def __init__(
+        self,
+        num_blocks: int,  # config.num_encoder_blocks
+        image_size: Union[int, Tuple[int, int]],  # config.image_size
+        downsampling: Union[
+            int, Union[Tuple[int, int], list[Union[int, Tuple[int, int]]]]
+        ],  # config.downsampling_rates
+        patch_size: Union[int, list[int]],  # config.patch_sizes
+        in_channels: Union[int, list[int]],  # config.num_channels
+        embed_dims: Union[int, list[int]],  # config.hidden_sizes
+        stride: Union[int, list[int]],  # config.strides
+        pad: Union[
+            int, list[int]
+        ],  # config.square_pad[i] if hasattr(config, "square_pad") else config.patch_sizes[i] // 2
+        pad_method: Union[
+            str, list[str]
+        ],  # config.pad_method[i] if hasattr(config, "pad_method") else "zeros"
+        dilation: Union[int, list[int]],  # config.dilation
+        num_heads: Union[int, list[int]],  # config.num_attention_heads
+        mlp_ratios: Union[int, list[int]],  # config.mlp_ratios
+        drop_rate: Union[float, list[float]],  # config.hidden_dropout_prob
+        attn_drop_rate: Union[
+            float, list[float]
+        ],  # config.attention_probs_dropout_prob
+        drop_path_rate: Union[float, list[float]],  # config.drop_path_rate
+        depths: Union[int, list[int]],  # config.depths
+        sr_ratios: Union[int, list[int]],  # config.sr_ratios,
+        norm_layer: Optional[Callable[..., nn.Module]] = None,  # config.norm_layer
+        drop_layer: Optional[Callable[..., nn.Module]] = None,  # config.drop_layer
+        attn_class: Optional[Callable[..., nn.Module]] = None,  # config.attn_class
+        ffn_layer: Optional[Callable[..., nn.Module]] = None,  # config.ffn_layer
+        act_layer: Optional[
+            Callable[..., nn.Module]
+        ] = None,  # ACT2FN[config.hidden_act]
+        config: Optional[Dict] = None,
+    ):
         super().__init__()
         self.config = config
 
+        self.downsampling = typecheck(downsampling, num_blocks)
+        self.patch_size = typecheck(patch_size, num_blocks)
+        self.in_channels = typecheck(in_channels, num_blocks)
+        self.embed_dims = typecheck(embed_dims, num_blocks)
+        self.stride = typecheck(stride, num_blocks)
+        self.pad = typecheck(pad, num_blocks)
+        self.pad_method = (
+            [pad_method for _ in range(num_blocks)]
+            if isinstance(pad_method, str)
+            else pad_method
+        )
+        self.dilation = typecheck(dilation, num_blocks)
+        self.num_heads = typecheck(num_heads, num_blocks)
+        self.mlp_ratios = typecheck(mlp_ratios, num_blocks)
+        self.drop_rate = typecheck(drop_rate, num_blocks)
+        self.attn_drop_rate = typecheck(attn_drop_rate, num_blocks)
+        self.drop_path_rate = typecheck(drop_path_rate, num_blocks)
+        self.depths = typecheck(depths, num_blocks)
+        self.sr_ratios = typecheck(sr_ratios, num_blocks)
+
         # hierarchical Transformer encoder
-        self.encoder = SegformerEncoder(config)
+        self.encoder = SegformerEncoder(
+            num_blocks,
+            image_size,
+            downsampling,
+            patch_size,
+            in_channels,
+            embed_dims,
+            stride,
+            pad,
+            pad_method,
+            dilation,
+            num_heads,
+            mlp_ratios,
+            drop_rate,
+            attn_drop_rate,
+            drop_path_rate,
+            depths,
+            sr_ratios,
+            norm_layer,
+            drop_layer,
+            attn_class,
+            ffn_layer,
+            act_layer,
+        )
 
     def forward(
         self,

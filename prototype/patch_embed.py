@@ -1,9 +1,9 @@
 # Copyright (c) ARiA. All rights reserved.
 #
-# Licensed under the MIT Liscence
+# Licensed under the MIT License
 # found in the LICENSE file in the root directory of this source tree.
 #
-# References:
+# Modified code from:
 #   https://github.com/NVlabs/SegFormer/blob/master/mmseg/models/backbones/mix_transformer.py
 #   https://github.com/huggingface/pytorch-image-models/blob/main/timm/layers/patch_embed.py
 
@@ -54,7 +54,7 @@ class PatchEmbed(nn.Module):
         self,
         image_size: Union[int, Tuple[int, int]] = 224,
         patch_size: Union[int, Tuple[int, int]] = 16,
-        in_channels: int = 3,
+        in_channel: int = 3,
         embed_dim: int = 768,
         stride: int = 1,
         pad: Union[int, Tuple[int, int]] = 0,
@@ -63,7 +63,7 @@ class PatchEmbed(nn.Module):
         norm_layer: Optional[Callable[..., nn.Module]] = nn.LayerNorm,
         # flatten_embedding: bool = True,
     ) -> None:
-        super(PatchEmbed, self).__init__()
+        super().__init__()
 
         self.img_size = to_2tuple(image_size)
         self.patch_size = to_2tuple(patch_size)
@@ -77,7 +77,7 @@ class PatchEmbed(nn.Module):
         # Output size of in later stages is further reduced
         #   sequentially by patch_size & stride
 
-        self.in_chans = in_channels
+        self.in_chans = in_channel
         self.embed_dim = embed_dim
 
         # self.flatten_embedding = flatten_embedding
@@ -85,7 +85,7 @@ class PatchEmbed(nn.Module):
         padding = to_2tuple(pad)
 
         self.proj = nn.Conv2d(
-            in_channels,
+            in_channel,
             embed_dim,
             kernel_size=self.patch_size,
             stride=stride,

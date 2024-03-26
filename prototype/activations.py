@@ -28,15 +28,14 @@ class NewGELUActivation(nn.Module):
     https://arxiv.org/abs/1606.08415
     """
 
-    def forward(self, input: Tensor) -> Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         return (
             0.5
-            * input
+            * x
             * (
                 1.0
                 + torch.tanh(
-                    math.sqrt(2.0 / math.pi)
-                    * (input + 0.044715 * torch.pow(input, 3.0))
+                    math.sqrt(2.0 / math.pi) * (x + 0.044715 * torch.pow(x, 3.0))
                 )
             )
         )
@@ -48,15 +47,8 @@ class FastGELUActivation(nn.Module):
     See: https://github.com/hendrycks/GELUs
     """
 
-    def forward(self, input: Tensor) -> Tensor:
-        return (
-            0.5
-            * input
-            * (
-                1.0
-                + torch.tanh(input * 0.7978845608 * (1.0 + 0.044715 * input * input))
-            )
-        )
+    def forward(self, x: Tensor) -> Tensor:
+        return 0.5 * x * (1.0 + torch.tanh(x * 0.7978845608 * (1.0 + 0.044715 * x * x)))
 
 
 class QuickGELUActivation(nn.Module):
@@ -65,8 +57,8 @@ class QuickGELUActivation(nn.Module):
     See: https://github.com/hendrycks/GELUs
     """
 
-    def forward(self, input: Tensor) -> Tensor:
-        return input * torch.sigmoid(1.702 * input)
+    def forward(self, x: Tensor) -> Tensor:
+        return x * torch.sigmoid(1.702 * x)
 
 
 class ClippedGELUActivation(nn.Module):
@@ -85,13 +77,13 @@ class ClippedGELUActivation(nn.Module):
     See https://arxiv.org/abs/1606.08415
     """
 
-    def __init__(self, min: float, max: float):
-        if min > max:
-            raise ValueError(f"min should be < max (got min: {min}, max: {max})")
+    def __init__(self, min_val: float, max_val: float):
+        if min_val > max_val:
+            raise ValueError(f"min should be < max (got min:{min_val}, max:{max_val})")
 
         super().__init__()
-        self.min = min
-        self.max = max
+        self.min = min_val
+        self.max = max_val
 
     def forward(self, x: Tensor) -> Tensor:
         return torch.clip(nn.functional.gelu(x), self.min, self.max)
@@ -109,14 +101,14 @@ class AccurateGELUActivation(nn.Module):
         super().__init__()
         self.precomputed_constant = math.sqrt(2 / math.pi)
 
-    def forward(self, input: Tensor) -> Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         return (
             0.5
-            * input
+            * x
             * (
                 1
                 + torch.tanh(
-                    self.precomputed_constant * (input + 0.044715 * torch.pow(input, 3))
+                    self.precomputed_constant * (x + 0.044715 * torch.pow(x, 3))
                 )
             )
         )
@@ -127,8 +119,8 @@ class LinearActivation(nn.Module):
     Applies the linear activation function, i.e. forwarding input directly to output.
     """
 
-    def forward(self, input: Tensor) -> Tensor:
-        return input
+    def forward(self, x: Tensor) -> Tensor:
+        return x
 
 
 class LaplaceActivation(nn.Module):
@@ -139,9 +131,11 @@ class LaplaceActivation(nn.Module):
     Inspired by squared relu, but with bounded range and gradient for better stability
     """
 
-    def forward(self, input, mu=0.707107, sigma=0.282095):
-        input = (input - mu).div(sigma * math.sqrt(2.0))
-        return 0.5 * (1.0 + torch.erf(input))
+    def forward(
+        self, x: Tensor, mu: float = 0.707107, sigma: float = 0.282095
+    ) -> Tensor:
+        x = (x - mu).div(sigma * math.sqrt(2.0))
+        return 0.5 * (1.0 + torch.erf(x))
 
 
 class ReLUSquaredActivation(nn.Module):
@@ -149,8 +143,8 @@ class ReLUSquaredActivation(nn.Module):
     Applies the relu^2 activation introduced in https://arxiv.org/abs/2109.08668v2
     """
 
-    def forward(self, input):
-        relu_applied = nn.functional.relu(input)
+    def forward(self, x: Tensor) -> Tensor:
+        relu_applied = nn.functional.relu(x)
         squared = torch.square(relu_applied)
         return squared
 
