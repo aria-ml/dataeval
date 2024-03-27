@@ -74,11 +74,6 @@ Development
 
 Looking for a specific function or class? This reference guide has all the technical details needed to understand the DAML Ecosystem
 
-
-### [Contributing](reference/contributing)
-    
-How to contribute changes to DAML
-
 ### [Changelog](reference/changelog)
     
 DAML's development changelog
@@ -111,7 +106,6 @@ how_to/index
 :maxdepth: 1
 
 reference/index
-reference/contributing
 reference/changelog
 reference/about
 :::
