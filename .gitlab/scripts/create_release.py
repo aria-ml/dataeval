@@ -6,9 +6,9 @@ if __name__ == "__main__":
     from versiontag import VersionTag
 
     gl = Gitlab(verbose=True)
-    payload = CommitGen(gl).generate()
+    pending_version = VersionTag(gl).pending
+    payload = CommitGen(pending_version, gl).generate()
     if payload:
-        pending_version = VersionTag(gl).pending
         print(f"Updating jupyter cache and changelog and tagging to {pending_version}:")
         branch = "main"
         response = gl.commit(
