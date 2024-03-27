@@ -43,14 +43,20 @@ class Gitlab:
         self.timeout = timeout
         set_verbose(verbose)
 
+    def _get_param_str(self, params: Optional[Dict[str, Any]]) -> str:
+        if params is None:
+            return ""
+        return "&".join({f"{k}={v}" for k, v in params.items()})
+
     def _request(
         self,
         fncall: Callable,
         resource: Union[str, Sequence[str]],
         params: Optional[Dict[str, Any]] = None,
         data: Optional[Dict[str, Any]] = None,
-        raw: bool = False,
-    ):
+        raw_data: bool = False,
+        json_response: bool = True,
+    ) -> Any:
         """
         Sends requests to Gitlab REST API
 
@@ -83,34 +89,54 @@ class Gitlab:
         if not isinstance(resource, str):
             resource = path.join(*resource)
 
-        url = resource
-        if params is not None:
-            for k, v in params.items():
-                url = (url + "?" + k) if url == resource else (url + "&" + k)
-                url += "" if v is None else ("=" + v)
+        url = path.join(self.project_url, resource)
 
-        if raw:
+        if params is None:
+            params = {}
+
+        if raw_data:
             dtype = "data"
             self.headers["Content-type"] = "application/octet-stream"
         else:
             dtype = "json"
             self.headers["Content-type"] = "application/json"
 
-        args = {
-            "url": self.project_url + url,
-            "headers": self.headers,
-            dtype: data,
-            "timeout": self.timeout,
-        }
+        last_page = 1
+        page = 1
+        result = []
+        while page <= last_page:
+            args = {
+                "url": f"{url}?{self._get_param_str(params)}",
+                "headers": self.headers,
+                dtype: data,
+                "timeout": self.timeout,
+            }
 
-        response = cast(Response, fncall(**args))
+            response = cast(Response, fncall(**args))
 
-        args_to_print = {x: args[x] for x in args if x != "headers"}
-        verbose(f"Request '{fncall.__name__}' issued: {args_to_print}")
-        verbose(f"Response received: {response}")
-        if response.status_code not in range(200, 299):
-            raise ConnectionError(response.status_code)
-        return response
+            args_to_print = {x: args[x] for x in args if x != "headers"}
+            verbose(f"Request '{fncall.__name__}' issued: {args_to_print}")
+            verbose(f"Response received: {response}")
+            if response.status_code not in range(200, 299):
+                raise ConnectionError(response.status_code)
+
+            if json_response:
+                response_json = response.json()
+
+                if "X-Total-Pages" in response.headers:
+                    last_page = int(response.headers["X-Total-Pages"])
+                else:
+                    assert isinstance(response_json, dict)
+                    return response_json
+
+                assert isinstance(response_json, list)
+                page += 1
+                params["page"] = str(page)
+                result += response_json
+            else:
+                return response
+
+        return result
 
     def list_tags(self) -> List[Dict[str, Any]]:
         """
@@ -126,7 +152,7 @@ class Gitlab:
         https://docs.gitlab.com/ee/api/tags.html#list-project-repository-tags
         """
         r = self._request(get, TAGS)
-        return r.json()
+        return r
 
     def add_tag(
         self, tag_name: str, ref: str = "main", message: Optional[str] = None
@@ -156,7 +182,7 @@ class Gitlab:
         if message is not None:
             tag_content.update({"message": message})
         r = self._request(post, TAGS, tag_content)
-        return r.json()
+        return r
 
     def delete_tag(self, tag_name: str):
         """
@@ -203,7 +229,7 @@ class Gitlab:
         https://docs.gitlab.com/ee/api/branches.html#get-single-repository-branch
         """
         r = self._request(get, f"{BRANCHES}/{branch}")
-        return r.json()
+        return r
 
     def create_repository_branch(self, branch: str, ref: str) -> Dict[str, Any]:
         """
@@ -224,7 +250,7 @@ class Gitlab:
         https://docs.gitlab.com/ee/api/branches.html#create-repository-branch
         """
         r = self._request(post, BRANCHES, {"branch": branch, "ref": ref})
-        return r.json()
+        return r
 
     def list_merge_requests(
         self,
@@ -245,7 +271,7 @@ class Gitlab:
         --------
         https://docs.gitlab.com/ee/api/merge_requests.html#list-merge-requests
         """
-        params = {}
+        params = {"per_page": "100"}
         if state is not None:
             params.update({"state": state})
         if target_branch is not None:
@@ -255,7 +281,7 @@ class Gitlab:
         if search_title is not None:
             params.update({"search": search_title, "in": "title"})
         r = self._request(get, MERGE_REQUESTS, params)
-        return r.json()
+        return r
 
     def create_mr(
         self,
@@ -298,7 +324,7 @@ class Gitlab:
                 "target_branch": target_branch,
             },
         )
-        return r.json()
+        return r
 
     def update_mr(self, mr_iid: int, title: str, description: str) -> Dict[str, Any]:
         """
@@ -328,7 +354,7 @@ class Gitlab:
             None,
             {"title": title, "description": description},
         )
-        return r.json()
+        return r
 
     def get_file(self, filepath: str, dest: str, ref: str = "main"):
         """
@@ -347,7 +373,9 @@ class Gitlab:
         -----
         https://docs.gitlab.com/ee/api/repository_files.html#get-raw-file-from-repository
         """
-        r = self._request(get, [FILES, filepath, "raw"], {"ref": ref})
+        r = self._request(
+            get, [FILES, filepath, "raw"], {"ref": ref}, json_response=False
+        )
         with open(dest, "wb") as f:
             f.write(r.content)
 
@@ -372,7 +400,7 @@ class Gitlab:
         https://docs.gitlab.com/ee/api/repository_files.html#get-file-from-repository
         """
         r = self._request(get, [FILES, filepath], {"ref": ref})
-        return r.json()
+        return r
 
     def push_file(
         self, filepath: str, branch: str, commit_message: str, content: str
@@ -410,7 +438,7 @@ class Gitlab:
                 "content": content,
             },
         )
-        return r.json()
+        return r
 
     def cherry_pick(self, sha: str, branch: str = "main") -> Dict[str, Any]:
         """
@@ -433,7 +461,7 @@ class Gitlab:
         https://docs.gitlab.com/ee/api/commits.html#cherry-pick-a-commit
         """
         r = self._request(post, [COMMITS, sha, "cherry_pick"], None, {"branch": branch})
-        return r.json()
+        return r
 
     def get_artifacts(self, job: str, dest: str, ref: str = "main"):
         """
@@ -452,7 +480,9 @@ class Gitlab:
         -----
         https://docs.gitlab.com/ee/api/job_artifacts.html#download-the-artifacts-archive
         """
-        r = self._request(get, [JOBS, ARTIFACTS, ref, DOWNLOAD], {"job": job})
+        r = self._request(
+            get, [JOBS, ARTIFACTS, ref, DOWNLOAD], {"job": job}, json_response=False
+        )
         temp_file = str(uuid4()) + ".zip"
         with open(temp_file, "wb") as f:
             f.write(r.content)
@@ -488,8 +518,8 @@ class Gitlab:
                 "actions": actions,
             },
         )
-        return r.json()
+        return r
 
     def run_pipeline(self, pipeline_id: int):
         r = self._request(post, ["pipeline_schedules", str(pipeline_id), "play"])
-        return r.json()
+        return r
