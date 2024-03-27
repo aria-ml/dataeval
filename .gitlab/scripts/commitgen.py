@@ -1,9 +1,11 @@
 from base64 import b64encode
-from datetime import datetime, timedelta
+from collections import defaultdict
+from datetime import UTC, datetime
+from enum import IntEnum
 from os import path, remove, walk
 from re import match
 from shutil import move, rmtree
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 from gitlab import Gitlab
 from verboselog import verbose
@@ -11,11 +13,91 @@ from verboselog import verbose
 CHANGELOG_FILE = "CHANGELOG.md"
 
 
-class _Entry:
+def _get_version_tuple(version: str) -> Optional[Tuple[int, int, int]]:
+    result = match("v([0-9]+)\\.([0-9]+)\\.([0-9]+)", version)
+    groups = None if result is None else result.groups()
+    if groups is None or len(groups) != 3:
+        return None
+    return (int(groups[0]), int(groups[1]), int(groups[2]))
+
+
+class _Category(IntEnum):
+    TAG = 0
+    FEATURE = 1
+    IMPROVEMENT = 2
+    FIX = 3
+    DEPRECATION = 4
+    UNKNOWN = 5
+
+    @classmethod
+    def from_label(cls, value: str) -> "_Category":
+        if "release::feature" in value:
+            return _Category.FEATURE
+        elif "release::improvement" in value:
+            return _Category.IMPROVEMENT
+        elif "release::fix" in value:
+            return _Category.FIX
+        elif "release::deprecation" in value:
+            return _Category.DEPRECATION
+        return _Category.UNKNOWN
+
+    @classmethod
+    def to_markdown(cls, value: "_Category"):
+        if value == _Category.FEATURE:
+            return ":star2: **Feature Release**"
+        elif value == _Category.IMPROVEMENT:
+            return ":tools: **Improvements and Enhancements**"
+        elif value == _Category.FIX:
+            return ":space_invader: **Fixes**"
+        elif value == _Category.DEPRECATION:
+            return ":construction: **Deprecations and Removals**"
+        else:
+            return ":pencil: **Miscellaneous**"
+
+
+class _Tag:
+    def __init__(
+        self,
+        response: Optional[Dict[str, Any]] = None,
+        pending_version: Optional[Tuple[str, str]] = None,
+    ):
+        if response is not None:
+            time = response["commit"]["committed_date"]
+            self.time: datetime = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S.%f%z")
+            self.hash: str = response["commit"]["id"]
+            self.shorthash: str = response["commit"]["short_id"]
+            self.description: str = response["name"]
+        elif pending_version is not None:
+            self.time: datetime = datetime.now(UTC)
+            self.hash: str = pending_version[1]
+            self.shorthash: str = pending_version[1][0:8]
+            self.description: str = pending_version[0]
+        else:
+            raise ValueError("Must provide a response or pending version string")
+
+    def to_markdown(self) -> str:
+        return f"## {self.description}"
+
+    def __lt__(self, other: "_Merge") -> bool:
+        self_version = _get_version_tuple(self.description)
+        other_version = _get_version_tuple(other.description)
+
+        if self_version is not None and other_version is not None:
+            return self_version < other_version
+
+        return self.time < other.time
+
+    def __hash__(self):
+        return self.hash.__hash__()
+
+    def __repr__(self) -> str:
+        return f"Entry(TAG, {self.time}, {self.hash}, {self.description})"
+
+
+class _Merge:
     """
-    Extracts the common elements of merge commits and git tags used to
-    create the change history contents.  Elements extracted from the
-    response are:
+    Extracts elements of merge commits to create the change history contents.
+    Elements extracted from the response are:
 
     hash - commit hash of commit or tag
     shorthash - first 8 chars of the hash
@@ -24,40 +106,24 @@ class _Entry:
     """
 
     def __init__(self, response: Dict[str, Any]):
-        if "merge_commit_sha" in response:
-            self.time: datetime = datetime.strptime(
-                response["merged_at"][0:19], "%Y-%m-%dT%H:%M:%S"
-            ).astimezone()
-            self.hash: str = response["merge_commit_sha"]
-            self.shorthash: str = response["merge_commit_sha"][0:8]
-            self.description: str = (
-                response["title"].replace('Resolve "', "").replace('"', "")
-            )
-            self.is_tag: bool = False
-        elif "target" in response:
-            self.time: datetime = datetime.strptime(
-                response["commit"]["committed_date"], "%Y-%m-%dT%H:%M:%S.%f%z"
-            )
-            self.hash: str = response["commit"]["id"]
-            self.shorthash: str = response["commit"]["short_id"]
-            self.description: str = response["name"]
-            self.is_tag: bool = True
+        self.time: datetime = datetime.strptime(
+            response["merged_at"][0:19], "%Y-%m-%dT%H:%M:%S"
+        ).astimezone(UTC)
+        self.hash: str = response["merge_commit_sha"]
+        self.shorthash: str = response["merge_commit_sha"][0:8]
+        self.description: str = (
+            response["title"].replace('Resolve "', "").replace('"', "")
+        )
+        self.type: _Category = _Category.from_label(response["labels"])
 
     def to_markdown(self) -> str:
-        if self.is_tag:
-            return f"## {self.description}\n"
-        else:
-            return f"- ```{self.shorthash} - {self.description}```\n"
+        return f"- `{self.shorthash}` - {self.description}"
 
-    def __lt__(self, other: "_Entry") -> bool:
-        # handle erroneous case with identical tags"
-        if self.is_tag and other.is_tag and self.time == other.time:
-            return self.description < other.description
-        else:
-            return self.time < other.time
+    def __lt__(self, other: "_Merge") -> bool:
+        return self.time < other.time
 
     def __repr__(self) -> str:
-        entry_type = "TAG" if self.is_tag else "COM"
+        entry_type = _Category(self.type).name
         return f"Entry({entry_type}, {self.time}, {self.hash}, {self.description})"
 
 
@@ -67,8 +133,9 @@ class CommitGen:
     and changelog updates
     """
 
-    def __init__(self, gitlab: Gitlab):
+    def __init__(self, pending_version: str, gitlab: Gitlab):
         self.gl = gitlab
+        self.pending_version = pending_version
 
     def _read_changelog(self) -> List[str]:
         temp = False
@@ -88,58 +155,98 @@ class CommitGen:
         end = line.find(")")
         return line[start:end]
 
-    def _get_entries(self) -> List[_Entry]:
-        entries: List[_Entry] = []
+    def _get_entries(self, last_hash: str) -> Dict[_Tag, Dict[_Category, List[_Merge]]]:
+        # get merges in to develop and main and sort
+        merges: List[_Merge] = []
+        m_main = self.gl.list_merge_requests(state="merged", target_branch="main")
+        m_develop = self.gl.list_merge_requests(state="merged", target_branch="develop")
+        for merge in m_main + m_develop:
+            merges.append(_Merge(merge))
+        merges.sort(reverse=True)
 
-        for response in self.gl.list_merge_requests(
-            state="merged", target_branch="main"
-        ):
-            entries.append(_Entry(response))
+        # get version buckets and sort
+        tags: List[_Tag] = [
+            _Tag(pending_version=(self.pending_version, merges[0].hash))
+        ]
+        for tag in self.gl.list_tags():
+            if _get_version_tuple(tag["name"]) is not None:
+                tags.append(_Tag(tag))
+        tags.sort(reverse=True)
 
-        for response in self.gl.list_tags():
-            if not match(r"v[0-9]+.[0-9]+.?[0-9]*", response["name"]):
-                continue
-            entry = _Entry(response)
-            hashmatch = list(filter(lambda x: x.hash == entry.hash, entries))
-            if hashmatch:
-                entry.time = hashmatch[0].time + timedelta(seconds=1)
-            entries.append(entry)
+        # populate the categorized merge issues
+        categorized: Dict[_Tag, Dict[_Category, List[_Merge]]] = defaultdict(
+            lambda: defaultdict(lambda: [])
+        )
 
-        # Entries retrieved are not in chronological order, sort before check
-        entries.sort(reverse=True)
-        return entries
+        tag_it = iter(tags)
+        tag = next(tag_it)
+        next_tag = next(tag_it, None)
+        for merge in merges:
+            # check if we need to move to next tag
+            if next_tag is not None and (
+                merge.hash == next_tag.hash or merge.time <= next_tag.time
+            ):
+                # return early if hash is already present
+                if next_tag.hash == last_hash:
+                    return categorized
+
+                # move to next tag
+                tag = next_tag
+                next_tag = next(tag_it, None)
+
+            # return early if hash is already present
+            if merge.hash == last_hash:
+                return categorized
+
+            # drop merges that are not categorized
+            merge_log = f"COMMITGEN: {merge.description} @ {merge.hash}"
+            if merge.type != _Category.UNKNOWN:
+                verbose(merge_log + f" - ADDED as {_Category(merge.type).name}")
+                categorized[tag][merge.type].append(merge)
+            else:
+                verbose(merge_log + " - SKIPPED")
+
+        return categorized
 
     def _generate_changelog_action(self) -> Dict[str, str]:
         current = self._read_changelog()
         last_hash = self._get_last_hash(current[0]) if current else ""
 
         # Return empty dict if nothing to update
-        entries = self._get_entries()
-        if last_hash == entries[0].hash:
-            return {}
+        entries = self._get_entries(last_hash)
+        tags = list(entries)
 
         lines: List[str] = []
 
-        lines.append(f"[//]: # ({entries[0].hash})\n")
-        lines.append("\n")
-        lines.append("# DAML Change Log\n")
-
-        # If we have a change and no release yet
-        if not entries[0].is_tag:
-            lines.append("## Pending Release\n")
-
-        for entry in entries:
-            if entry.hash == last_hash:
+        for tag in tags:
+            if tag.hash == last_hash:
                 break
-            lines.append(entry.to_markdown())
 
-        # If we had a pending release we can drop this as there are new changes
-        for oldline in current[3:]:
-            if oldline == "## Pending Release\n":
+            if not entries[tag]:
                 continue
-            lines.append(oldline)
 
-        content = "".join(lines)
+            lines.append("")
+            lines.append(tag.to_markdown())
+
+            categories = sorted(entries[tag])
+            for category in categories:
+                merges = entries[tag][category]
+                lines.append("")
+                lines.append(_Category.to_markdown(category))
+                for merge in merges:
+                    if merge.hash == last_hash:
+                        break
+
+                    lines.append(merge.to_markdown())
+
+        if not lines:
+            return {}
+
+        header = [f"[//]: # ({tags[0].hash})", "", "# DAML Change Log"]
+        content = "\n".join(header + lines) + "\n"
+
+        for oldline in current[3:]:
+            content += oldline
 
         return {
             "action": "update",
