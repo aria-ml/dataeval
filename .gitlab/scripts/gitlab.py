@@ -203,7 +203,7 @@ class Gitlab:
         """
 
         try:
-            self._request(delete, f"{TAGS}/{tag_name}")
+            self._request(delete, f"{TAGS}/{tag_name}", json_response=False)
         except ConnectionError as e:
             status_code = int(str(e))
             # Don't fail if the tag doesn't exist (i.e. function is idempotent)
