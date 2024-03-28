@@ -183,7 +183,7 @@ class CommitGen:
         next_tag = next(tag_it, None)
         for merge in merges:
             # check if we need to move to next tag
-            if next_tag is not None and (
+            while next_tag is not None and (
                 merge.hash == next_tag.hash or merge.time <= next_tag.time
             ):
                 # return early if hash is already present
