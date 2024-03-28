@@ -4,7 +4,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Union
 from uuid import uuid4
 from zipfile import ZipFile
 
-from requests import Response, delete, get, post, put
+from requests import JSONDecodeError, Response, delete, get, post, put
 from verboselog import set_verbose, verbose
 
 DAML_PROJECT_URL = "https://gitlab.jatic.net/api/v4/projects/151/"
@@ -55,7 +55,6 @@ class Gitlab:
         params: Optional[Dict[str, Any]] = None,
         data: Optional[Dict[str, Any]] = None,
         raw_data: bool = False,
-        json_response: bool = True,
     ) -> Any:
         """
         Sends requests to Gitlab REST API
@@ -120,21 +119,21 @@ class Gitlab:
             if response.status_code not in range(200, 299):
                 raise ConnectionError(response.status_code)
 
-            if json_response:
+            try:
                 response_json = response.json()
-
-                if "X-Total-Pages" in response.headers:
-                    last_page = int(response.headers["X-Total-Pages"])
-                else:
-                    assert isinstance(response_json, dict)
-                    return response_json
-
-                assert isinstance(response_json, list)
-                page += 1
-                params["page"] = str(page)
-                result += response_json
-            else:
+            except JSONDecodeError:
                 return response
+
+            if "X-Total-Pages" in response.headers:
+                last_page = int(response.headers["X-Total-Pages"])
+            else:
+                assert isinstance(response_json, dict)
+                return response_json
+
+            assert isinstance(response_json, list)
+            page += 1
+            params["page"] = str(page)
+            result += response_json
 
         return result
 
@@ -203,7 +202,7 @@ class Gitlab:
         """
 
         try:
-            self._request(delete, f"{TAGS}/{tag_name}", json_response=False)
+            self._request(delete, f"{TAGS}/{tag_name}")
         except ConnectionError as e:
             status_code = int(str(e))
             # Don't fail if the tag doesn't exist (i.e. function is idempotent)
@@ -373,9 +372,7 @@ class Gitlab:
         -----
         https://docs.gitlab.com/ee/api/repository_files.html#get-raw-file-from-repository
         """
-        r = self._request(
-            get, [FILES, filepath, "raw"], {"ref": ref}, json_response=False
-        )
+        r = self._request(get, [FILES, filepath, "raw"], {"ref": ref})
         with open(dest, "wb") as f:
             f.write(r.content)
 
@@ -480,9 +477,7 @@ class Gitlab:
         -----
         https://docs.gitlab.com/ee/api/job_artifacts.html#download-the-artifacts-archive
         """
-        r = self._request(
-            get, [JOBS, ARTIFACTS, ref, DOWNLOAD], {"job": job}, json_response=False
-        )
+        r = self._request(get, [JOBS, ARTIFACTS, ref, DOWNLOAD], {"job": job})
         temp_file = str(uuid4()) + ".zip"
         with open(temp_file, "wb") as f:
             f.write(r.content)
