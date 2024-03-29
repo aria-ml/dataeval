@@ -44,15 +44,15 @@ class _Category(IntEnum):
     @classmethod
     def to_markdown(cls, value: "_Category"):
         if value == _Category.FEATURE:
-            return ":star2: **Feature Release**"
+            return "🌟 **Feature Release**"
         elif value == _Category.IMPROVEMENT:
-            return ":tools: **Improvements and Enhancements**"
+            return "🛠️ **Improvements and Enhancements**"
         elif value == _Category.FIX:
-            return ":space_invader: **Fixes**"
+            return "👾 **Fixes**"
         elif value == _Category.DEPRECATION:
-            return ":construction: **Deprecations and Removals**"
+            return "🚧 **Deprecations and Removals**"
         else:
-            return ":pencil: **Miscellaneous**"
+            return "📝 **Miscellaneous**"
 
 
 class _Tag:
