@@ -1,3 +1,5 @@
+#!/bin/sh
+
 echo "\033[1;31mPlease wait for this script to complete before allowing vscode to Reload Window!\033[0m"
 echo
 echo "Installing daml for Python ${versions}..."
