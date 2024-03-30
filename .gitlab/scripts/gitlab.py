@@ -5,7 +5,6 @@ from uuid import uuid4
 from zipfile import ZipFile
 
 from requests import JSONDecodeError, Response, delete, get, post, put
-from verboselog import set_verbose, verbose
 
 DAML_PROJECT_URL = "https://gitlab.jatic.net/api/v4/projects/151/"
 
@@ -20,6 +19,24 @@ ARTIFACTS = "artifacts"
 DOWNLOAD = "download"
 
 LATEST_KNOWN_GOOD = "latest-known-good"
+
+
+class _VerboseSingleton:
+    verbose = False
+
+    def __new__(cls):
+        if not hasattr(cls, "instance"):
+            cls.instance = super().__new__(cls)
+        return cls.instance
+
+
+def verbose(text: str):
+    if _VerboseSingleton().verbose:
+        print(text)
+
+
+def set_verbose(value: bool):
+    _VerboseSingleton().verbose = value
 
 
 class Gitlab:

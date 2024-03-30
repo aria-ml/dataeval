@@ -7,8 +7,7 @@ from re import match
 from shutil import move, rmtree
 from typing import Any, Dict, List, Optional, Tuple
 
-from gitlab import Gitlab
-from verboselog import verbose
+from gitlab import Gitlab, verbose
 
 CHANGELOG_FILE = "CHANGELOG.md"
 
