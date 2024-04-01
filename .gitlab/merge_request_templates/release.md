@@ -15,14 +15,10 @@ representing the change, so ensure the title is clear and concise.
 - [ ] Test cases reviewed
 - [ ] Documentation reviewed
 - [ ] Correct `release::category` label applied
-- [ ] Title and notes (if applicable) reviewed
+- [ ] Title reviewed
+- [ ] Release Notes for additional context in change log below (optional)
 
-<!-- 
-Any additional notes to include with the changelog entry should be included
-in the code block below. Avoid adding complex formatting.
--->
-## Notes for Changelog
-```
-```
+## Release Notes
+Placeholder - replace content under this heading to provide additional details for this change
 
 /label ~release::feature
