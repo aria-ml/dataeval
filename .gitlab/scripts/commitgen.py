@@ -3,17 +3,48 @@ from collections import defaultdict
 from datetime import UTC, datetime
 from enum import IntEnum
 from os import path, remove, walk
-from re import match
+from re import MULTILINE, compile
 from shutil import move, rmtree
 from typing import Any, Dict, List, Optional, Tuple
 
 from gitlab import Gitlab, verbose
 
 CHANGELOG_FILE = "CHANGELOG.md"
+TAB = "    "
+
+version_pattern = compile(r"v([0-9]+)\.([0-9]+)\.([0-9]+)")
+
+"""
+Multiline pattern that matches for the following content in MR description:
+
+    ## Release Notes
+
+    This is the release notes intended for capture.
+    Includes multiline content.
+    ```python
+    test = 123  # And potential code comments
+    ```
+
+Capture:
+
+    (?P<content>[\\s\\S]+?) - Lazy named capture group <content> for any whitespace
+    or non-whitespace characters one or more times until hitting one of the post
+    capture end conditions below.
+
+Post capture end conditions:
+
+    ^#+.+$ - Markdown heading indicators (#) at start of line
+    ^Closes #\\d+.*$ - Merge request shortcut to close related issue
+    \\Z - End of string input
+"""
+release_notes_pattern = compile(
+    r"[\s\S]*^#+ Release Notes$(?P<content>[\s\S]+?)(?:^#+.+$|^Closes #\d+.*$|\Z)",
+    MULTILINE,
+)
 
 
 def _get_version_tuple(version: str) -> Optional[Tuple[int, int, int]]:
-    result = match("v([0-9]+)\\.([0-9]+)\\.([0-9]+)", version)
+    result = version_pattern.match(version)
     groups = None if result is None else result.groups()
     if groups is None or len(groups) != 3:
         return None
@@ -96,12 +127,6 @@ class _Tag:
 class _Merge:
     """
     Extracts elements of merge commits to create the change history contents.
-    Elements extracted from the response are:
-
-    hash - commit hash of commit or tag
-    shorthash - first 8 chars of the hash
-    description - description in the commit or the name of the tag
-    is_tag - whether the hash is a tag or not
     """
 
     def __init__(self, response: Dict[str, Any]):
@@ -113,16 +138,22 @@ class _Merge:
         self.description: str = (
             response["title"].replace('Resolve "', "").replace('"', "")
         )
-        self.type: _Category = _Category.from_label(response["labels"])
+        self.category: _Category = _Category.from_label(response["labels"])
+        match = release_notes_pattern.match(response["description"])
+        groupdict = {} if match is None else match.groupdict()
+        self.details: str = groupdict.get("content", "").strip(" \t\n")
 
     def to_markdown(self) -> str:
-        return f"- `{self.shorthash}` - {self.description}"
+        md = f"- `{self.shorthash}` - {self.description}"
+        if len(self.details) > 0 and not self.details.startswith("Placeholder"):
+            md += f"\n\n{TAB}" + f"\n{TAB}".join(self.details.splitlines())
+        return md
 
     def __lt__(self, other: "_Merge") -> bool:
         return self.time < other.time
 
     def __repr__(self) -> str:
-        entry_type = _Category(self.type).name
+        entry_type = _Category(self.category).name
         return f"Entry({entry_type}, {self.time}, {self.hash}, {self.description})"
 
 
@@ -199,9 +230,9 @@ class CommitGen:
 
             # drop merges that are not categorized
             merge_log = f"COMMITGEN: {merge.description} @ {merge.hash}"
-            if merge.type != _Category.UNKNOWN:
-                verbose(merge_log + f" - ADDED as {_Category(merge.type).name}")
-                categorized[tag][merge.type].append(merge)
+            if merge.category != _Category.UNKNOWN:
+                verbose(merge_log + f" - ADDED as {_Category(merge.category).name}")
+                categorized[tag][merge.category].append(merge)
             else:
                 verbose(merge_log + " - SKIPPED")
 
