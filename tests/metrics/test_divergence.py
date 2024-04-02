@@ -6,16 +6,16 @@ from daml.metrics import Divergence
 np.random.seed(0)
 
 
-class TestDpDivergence:
+class TestDivergence:
     @pytest.mark.parametrize(
         "method, output",
         [
-            ("MST", {"dpdivergence": 0.8377897755491117, "error": 81}),
-            ("FNN", {"dpdivergence": 0.8618209199122062, "error": 69}),
+            ("MST", {"divergence": 0.8377897755491117, "error": 81}),
+            ("FNN", {"divergence": 0.8618209199122062, "error": 69}),
         ],
     )
-    def test_dp_divergence(self, mnist, method, output):
-        """Unit testing of Dp Divergence
+    def test_divergence(self, mnist, method, output):
+        """Unit testing of Divergence
 
         TBD
         """
