@@ -1,5 +1,5 @@
 """
-This module contains the implementation of Dp Divergence
+This module contains the implementation of HP Divergence
 using the Fast Nearest Neighbor and Minimum Spanning Tree algorithms
 """
 
@@ -91,4 +91,4 @@ class Divergence(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
 
         errors = self._method(stacked_data, labels)
         dp = max(0.0, 1 - ((M + N) / (2 * M * N)) * errors)
-        return {"dpdivergence": dp, "error": errors}
+        return {"divergence": dp, "error": errors}
