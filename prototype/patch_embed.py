@@ -25,7 +25,8 @@ def to_2tuple(x):
 class PatchEmbed(nn.Module):
     """
     Construct the patch embeddings from an image.
-    2D image to patch embedding: (B,C,H,W) -> (B,N,D)
+    2D image to patch embedding: (Batch,Channel,Heigth,Width) -> (Batch,Tokens,Dim)
+
 
     Args:
         img_size:      Image size, either single int or tuple(int, int).
@@ -45,7 +46,7 @@ class PatchEmbed(nn.Module):
         x:             Input Tensor
 
     Output:
-        embeddings:    Flattened Tensor of shape (B, N, D) where N = HW
+        embeddings:    Flattened Tensor of shape (B, T, D) where T = HW
         height:        Height of the embedding, H - int
         width:         Width of the embedding, W - int
     """
@@ -97,9 +98,9 @@ class PatchEmbed(nn.Module):
         self.layer_norm = norm_layer(embed_dim) if norm_layer else nn.Identity()
 
     def forward(self, x: Tensor) -> Tuple[Tensor, int, int]:
-        x = self.proj(x)  # B D H W
+        x = self.proj(x)  # B C H W -> B D H W
         _, _, height, width = x.shape
-        x = x.flatten(2).transpose(1, 2)  # B HW D
+        x = x.flatten(2).transpose(1, 2)  # B D H W -> B T D
         x = self.layer_norm(x)
         # if not self.flatten_embedding:
         #     x = x.reshape(-1, height, width, self.embed_dim)  # B H W D

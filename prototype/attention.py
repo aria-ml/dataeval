@@ -47,7 +47,7 @@ class EfficientSelfAttention(nn.Module):
         drop:               Probability of dropout after attention, float [0,1].
 
     Input:
-        patch_embedding:    Input Tensor in shape (B,N,D)
+        patch_embedding:    Input Tensor in shape (B,T,D)
         height:             Embdding height, int
         width:              Embdding width, int
         output_attentions:  Boolean if you want to output attention probabilities
@@ -101,10 +101,10 @@ class EfficientSelfAttention(nn.Module):
         width: int,
         output_attentions: bool = False,
     ) -> Tuple[Tensor, Tensor] | Tuple[Tensor]:
-        B, N, D = patch_embedding.shape
+        B, T, D = patch_embedding.shape  # batch, token, embed dimension
         query_layer = (
             self.query(patch_embedding)
-            .reshape(B, N, self.num_heads, D // self.num_heads)
+            .reshape(B, T, self.num_heads, D // self.num_heads)
             .permute(0, 2, 1, 3)
         )
 
@@ -112,12 +112,11 @@ class EfficientSelfAttention(nn.Module):
             adjusted_embedding = patch_embedding.permute(0, 2, 1).reshape(
                 B, D, height, width
             )
-            adjusted_embedding = self.sr(
-                adjusted_embedding
-            )  # compress along spatial dimension [h,w] using Conv2d
-            adjusted_embedding = adjusted_embedding.reshape(B, D, -1).permute(
-                0, 2, 1
-            )  # re-flatten [h,w] and flip channels (D) to last dimension
+            # compress along spatial dimension [h,w] using Conv2d
+            adjusted_embedding = self.sr(adjusted_embedding)
+            # re-flatten [h,w] and flip channels (D) to last dimension
+            adjusted_embedding = adjusted_embedding.reshape(B, D, -1).permute(0, 2, 1)
+            # normalize layer
             adjusted_embedding = self.layer_norm(adjusted_embedding)
             # Transform patch embeddings (embed_dim) through SEPARATE linear layers
             # and transpose to get keys, values
@@ -136,12 +135,12 @@ class EfficientSelfAttention(nn.Module):
             # and transpose to get keys, values
             key_layer = (
                 self.key(patch_embedding)
-                .reshape(B, N, self.num_heads, D // self.num_heads)
+                .reshape(B, T, self.num_heads, D // self.num_heads)
                 .permute(0, 2, 1, 3)
             )
             value_layer = (
                 self.value(patch_embedding)
-                .reshape(B, N, self.num_heads, D // self.num_heads)
+                .reshape(B, T, self.num_heads, D // self.num_heads)
                 .permute(0, 2, 1, 3)
             )
             # ^ NOTICE: key and value layer are the same.
@@ -162,7 +161,7 @@ class EfficientSelfAttention(nn.Module):
         # Take the dot product between attention probability and "value"
         # to get the attended embeddings.
         context_layer = torch.matmul(attention_probs, value_layer)
-        context_layer = context_layer.transpose(1, 2).reshape(B, N, D)
+        context_layer = context_layer.transpose(1, 2).reshape(B, T, D)
 
         context_layer = self.context(context_layer)
         context_layer = self.context_dropout(context_layer)

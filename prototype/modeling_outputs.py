@@ -161,6 +161,7 @@ class BaseModelOutput(ModelOutput):
     last_hidden_state: Optional[torch.Tensor] = None
     hidden_states: Optional[Tuple[torch.Tensor]] = None
     attentions: Optional[Tuple[torch.Tensor]] = None
+    register_tokens: Optional[Tuple[torch.Tensor]] = None
 
 
 @dataclass
