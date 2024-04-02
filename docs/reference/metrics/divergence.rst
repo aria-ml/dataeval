@@ -15,7 +15,7 @@ Tutorials
 
 Check out this tutorial to begin using the ``Divergence`` class
 
-:doc:`Divergence Tutorial<../../tutorials/notebooks/DPDivergenceTutorial>`
+:doc:`Divergence Tutorial<../../tutorials/notebooks/HPDivergenceTutorial>`
 
 -------------
 How To Guides
