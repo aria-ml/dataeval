@@ -1,6 +1,13 @@
-[//]: # (17d1113cb15fe477b6389a6879475c3e7b0d28b6)
+[//]: # (5cc48bec8946f9aecf617a4298e7b33995f387fe)
 
 # DAML Change Log
+
+## v0.45.0
+
+🚧 **Deprecations and Removals**
+- `5cc48bec` - Divergence metric naming corrected to HP Divergence
+
+    Divergence metric output now returns a dictionary of `{ "divergence": float, "error": int }` instead of `{ "dpdivergence": float, "error": int }`.  Code, documentation and tutorials have been updated to the correct nomenclature of HP (Henze-Penrose) divergence.
 
 ## v0.44.6
 
