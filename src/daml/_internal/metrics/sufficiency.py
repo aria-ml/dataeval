@@ -31,6 +31,13 @@ def f_out(n_i: np.ndarray, x: np.ndarray) -> np.ndarray:
     """
     return x[0] * n_i ** (-x[1]) + x[2]
 
+def f_inv_out(y_i: np.ndarray, x: np.ndarray) -> np.ndarray:
+    """
+    Inverse function for f_out()
+    TODO: Test case, assert f_inv(f) == I and f(f_inv) == I
+    """
+    n_i = ( (y_i - x[2]) / x[0] ) ** (-1/x[1])
+    return n_i
 
 def calc_params(p_i: np.ndarray, n_i: np.ndarray) -> np.ndarray:
     """
@@ -117,6 +124,24 @@ def project_steps(
     params = calc_params(p_i=(1 - measure), n_i=steps)
     return 1 - f_out(projection, params)
 
+def inv_project_steps(
+    measure: np.ndarray,
+    steps: np.ndarray,
+    accuracies: np.ndarray,
+) -> np.ndarray:
+    """Projects the measures for each value of X
+
+    Parameters
+    ----------
+    measure : np.ndarray
+        Measures from which to extrapolate projection
+    steps : np.ndarray
+        Steps of the taken measures
+    projection : np.ndarray
+        Steps to extrapolate
+    """
+    params = calc_params(p_i=(1 - measure), n_i=steps)
+    return f_inv_out(1-np.array(accuracies), params)
 
 def plot_measure(
     name: str,
@@ -423,3 +448,25 @@ class Sufficiency(EvaluateMixin):
                 plots.append(fig)
 
         return plots
+
+    @classmethod
+    def data_to_produce_accuracy(cls, desired_accuracies, data: Dict[str, np.ndarray]):
+
+        validate_output(data)
+
+        # X, y data
+        steps = data[STEPS_KEY]
+
+        # Extrapolation parameters
+        last_X = steps[-1]
+        geomshape = (0.01 * last_X, last_X * 4, len(steps))
+        extrapolated = np.geomspace(*geomshape).astype(np.int64)
+        
+        for name, measure in data.items():
+            if name == STEPS_KEY:
+                continue
+            #psteps = project_steps(measure, steps, extrapolated)
+            #return psteps
+        
+            data_needed = inv_project_steps(measure, steps, desired_accuracies)
+            return np.ceil(data_needed)
