@@ -4,8 +4,12 @@ import numpy as np
 from scipy.cluster.hierarchy import linkage
 from scipy.spatial.distance import pdist, squareform
 
+from tests.conftest import mnist
+
 # Example usage
 rng = np.random.default_rng(33)
+img, label = mnist()
+
 data1 = (
     rng.random((10000, 256)) * rng.integers(10, high=20, size=(10000, 256))
 ).astype(dtype=np.int8)
