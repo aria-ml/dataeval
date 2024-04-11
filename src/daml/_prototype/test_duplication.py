@@ -1,31 +1,100 @@
+import hashlib
+import os
+import typing
 from copy import deepcopy
+from urllib.error import HTTPError, URLError
+from urllib.request import urlretrieve
 
 import numpy as np
 from scipy.cluster.hierarchy import linkage
 from scipy.spatial.distance import pdist, squareform
 
-from tests.conftest import mnist
 
-# Example usage
-rng = np.random.default_rng(33)
-img, label = mnist()
+def _validate_file(fpath, file_hash, chunk_size=65535):
+    hasher = hashlib.sha256()
+    with open(fpath, "rb") as fpath_file:
+        for chunk in iter(lambda: fpath_file.read(chunk_size), b""):
+            hasher.update(chunk)
 
-data1 = (
-    rng.random((10000, 256)) * rng.integers(10, high=20, size=(10000, 256))
-).astype(dtype=np.int8)
-data1[100, :] = rng.integers(450, high=500, size=256)
-data1[200, :] = rng.integers(1, high=20, size=256)
-data1[251, :] = data1[200, :] + 2
-data1[500, :] = rng.integers(1, high=20, size=256)
-data2 = (
-    rng.random((10000, 256)) * rng.integers(110, high=120, size=(10000, 256))
-).astype(dtype=np.int8)
-data3 = (
-    rng.random((10000, 256)) * rng.integers(210, high=220, size=(10000, 256))
-).astype(dtype=np.int8)
-data = np.concatenate([data1, data2, data3])
-norm2 = data / np.linalg.norm(data)
-norm1 = data1 / np.linalg.norm(data1)
+    return str(hasher.hexdigest()) == str(file_hash)
+
+
+def _get_file(
+    fname: str,
+    origin: str,
+    file_hash: typing.Optional[str] = None,
+):
+    cache_dir = os.path.join(os.path.expanduser("~"), ".keras")
+    datadir_base = os.path.expanduser(cache_dir)
+    if not os.access(datadir_base, os.W_OK):
+        datadir_base = os.path.join("/tmp", ".keras")
+    datadir = os.path.join(datadir_base, "datasets")
+    os.makedirs(datadir, exist_ok=True)
+
+    fname = os.fspath(fname) if isinstance(fname, os.PathLike) else fname
+    fpath = os.path.join(datadir, fname)
+
+    download = False
+    if os.path.exists(fpath):
+        if file_hash is not None and not _validate_file(fpath, file_hash):
+            download = True
+    else:
+        download = True
+
+    if download:
+        try:
+            error_msg = "URL fetch failure on {}: {} -- {}"
+            try:
+                urlretrieve(origin, fpath)
+            except HTTPError as e:
+                raise Exception(error_msg.format(origin, e.code, e.msg)) from e
+            except URLError as e:
+                raise Exception(error_msg.format(origin, e.errno, e.reason)) from e
+        except (Exception, KeyboardInterrupt):
+            if os.path.exists(fpath):
+                os.remove(fpath)
+            raise
+
+        if (
+            os.path.exists(fpath)
+            and file_hash is not None
+            and not _validate_file(fpath, file_hash)
+        ):
+            raise ValueError(
+                "Incomplete or corrupted file detected. "
+                f"The sha256 file hash does not match the provided value "
+                f"of {file_hash}.",
+            )
+    return fpath
+
+
+def square_to_condensed(square_matrix):
+    """Convert a square distance matrix to a condensed distance matrix."""
+    assert square_matrix.shape[0] == square_matrix.shape[1], "Matrix must be square"
+    n = square_matrix.shape[0]
+    tri_indices = np.triu_indices(n, 1)
+    condensed_matrix = square_matrix[tri_indices]
+    return condensed_matrix
+
+
+def L2_distance_matrix(x):
+    """
+    Takes advantage that Euclidean distance can be written as
+    ||a-b||**2 = ||a||**2 + ||b||**2 - 2 a @ b
+    Also, does not compute the sqrt at the end since the squared distance
+    is still going to produce an equivalent nearest neighbor matrix
+    """
+    # Adjusting dtype to be friendlier for speed and memory
+    # x = x.astype(np.float32)
+    # Compute the squared magnitude of the vector
+    x2 = np.sum(np.square(x), axis=1, keepdims=True, dtype=x.dtype)
+    # Compute the matrix product between x and its transpose
+    mat = np.matmul(x, x.T) * -2
+    # Utilize broadcasting to perform the addition
+    mat += x2
+    mat += x2.T
+
+    return mat
 
 
 def get_duplicate(link_arr, distance):
@@ -249,6 +318,7 @@ def hierarchical_clustering_with_tracking(data):
     """
     # Compute pairwise distances and perform hierarchical clustering
     distance_matrix = pdist(data, metric="euclidean")
+    # distance_matrix = square_to_condensed(L2_distance_matrix(data))
     Z = linkage(distance_matrix, method="single")
 
     # Sort the linkage matrix
@@ -263,12 +333,34 @@ def hierarchical_clustering_with_tracking(data):
     return sample_dict
 
 
+# Getting the mnist dataset and prepping for testing
+rng = np.random.default_rng(33)
+
+origin_folder = "https://storage.googleapis.com/tensorflow/tf-keras-datasets/"
+path = _get_file(
+    "mnist.npz",
+    origin=origin_folder + "mnist.npz",
+    file_hash=("731c5ac602752760c8e48fbffcf8c3b850d9dc2a2aedcf2cc48468fc17b673d1"),
+)
+
+with np.load(path, allow_pickle=True) as fp:
+    images, labels = fp["x_train"][:100], fp["y_train"][:100]
+
+dup_images = deepcopy(images[:8])
+dup_images[:, :25, :25] = images[:8, 3:, 3:]
+dup_images[:, 25:, 25:] = images[:8, :3, :3]
+
+test_imgs = np.concatenate([images, dup_images])
+test_imgs /= 255
+
+rng.shuffle(test_imgs)
+
 # Example usage
-cluster_tracking = hierarchical_clustering_with_tracking(norm1)
+cluster_tracking = hierarchical_clustering_with_tracking(test_imgs)
 # print(num_clusters)
 
 for i, idd in enumerate(cluster_tracking.keys()):
-    if i % 500 == 0:
+    if i % 10 == 0:
         print(cluster_tracking[idd])
 
 print(cluster_tracking[idd])
