@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader, Dataset, Subset
 import daml.metrics.sufficiency as dms
 from daml.metrics import Sufficiency
 
-torch._dynamo.config.suppress_errors = True
+#torch._dynamo.config.suppress_errors = True
 
 np.random.seed(0)
 np.set_printoptions(formatter={"float": lambda x: f"{x:0.4f}"})
