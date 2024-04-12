@@ -10,8 +10,10 @@ from matplotlib.figure import Figure
 from torch.utils.data import DataLoader
 
 from daml._internal.metrics.sufficiency import STEPS_KEY
+import daml._internal.metrics.sufficiency as dms
 from daml.metrics import Sufficiency
 from tests.utils.data import DamlDataset
+
 
 np.random.seed(0)
 torch.manual_seed(0)
@@ -306,3 +308,16 @@ class TestSufficiencyProject:
         assert len(result.keys()) == 3
         assert result["test1"].shape == (4, 2)
         assert result["test2"].shape == (4,)
+
+class TestSufficiencyExtraFeatures:
+    def test_f_inv_out(self):
+        """Tests that f_inv_out inverts the line of best fit"""
+        
+        n_i = np.array([1.234])
+        x = np.array([1.1, 2.2, 3.3])
+        # Predict y from n_i evaluated on curve defined by x
+        y = dms.f_out(n_i,x)
+        # Feed y into inverse function to get the original n_i back out
+        n_i_recovered = dms.f_inv_out(y,x)
+        
+        assert np.isclose(n_i[0], n_i_recovered[0])
