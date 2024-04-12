@@ -201,19 +201,29 @@ def get_sample_info(arr, distance_matrix):
         sample_added = []
         if arr[i, 0] in clusters:
             cluster_num = min([cluster_num, clusters[arr[i, 0]]["cluster_num"]])
-            level = max([level, clusters[arr[i, 0]]["level"] + 1])
+            left_level = max([level, clusters[arr[i, 0]]["level"] + 1])
             distance += clusters[arr[i, 0]]["total_dist"]
             count += clusters[arr[i, 0]]["count"]
         else:
-            sample_added.append(arr[i, 0])
+            sample_added.append(int(arr[i, 0]))
 
         if arr[i, 1] in clusters:
             cluster_num = min([cluster_num, clusters[arr[i, 1]]["cluster_num"]])
-            level = max([level, clusters[arr[i, 1]]["level"] + 1])
+            right_level = max([level, clusters[arr[i, 1]]["level"] + 1])
             distance += clusters[arr[i, 1]]["total_dist"]
             count += clusters[arr[i, 1]]["count"]
         else:
-            sample_added.append(arr[i, 1])
+            sample_added.append(int(arr[i, 1]))
+
+        if arr[i, 0] in clusters and arr[i, 1] in clusters:
+            if cluster_num == clusters[arr[i, 0]]["cluster_num"]:
+                level = left_level
+            elif cluster_num == clusters[arr[i, 1]]["cluster_num"]:
+                level = right_level
+        elif arr[i, 0] in clusters:
+            level = left_level
+        elif arr[i, 1] in clusters:
+            level = right_level
 
         count += 1
         distance += arr[i, 2]
@@ -250,8 +260,8 @@ def get_sample_info(arr, distance_matrix):
 
     for _, values in clusters.items():
         if values["samples_added"]:
-            level = values["level"]
-            cluster = values["cluster_num"]
+            level = values["level"] - 1
+            cluster = values["cluster_num"] - 1
             for sample in values["samples_added"]:
                 sample_tracking[sample]["cluster"][level] = values["cluster_num"]
                 sample_tracking[sample]["distance"][level, cluster] = values[
@@ -276,11 +286,6 @@ def get_sample_info(arr, distance_matrix):
                 )
 
     return sample_tracking
-
-
-# def get_clusters(samples):
-#     for _ in range(len(samples)):
-#         break
 
 
 def sort_linkage(Z):
