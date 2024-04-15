@@ -9,11 +9,10 @@ import torch.nn as nn
 from matplotlib.figure import Figure
 from torch.utils.data import DataLoader
 
-from daml._internal.metrics.sufficiency import STEPS_KEY
 import daml._internal.metrics.sufficiency as dms
+from daml._internal.metrics.sufficiency import STEPS_KEY
 from daml.metrics import Sufficiency
 from tests.utils.data import DamlDataset
-
 
 np.random.seed(0)
 torch.manual_seed(0)
@@ -309,15 +308,32 @@ class TestSufficiencyProject:
         assert result["test1"].shape == (4, 2)
         assert result["test2"].shape == (4,)
 
+
 class TestSufficiencyExtraFeatures:
     def test_f_inv_out(self):
         """Tests that f_inv_out inverts the line of best fit"""
-        
+
         n_i = np.array([1.234])
         x = np.array([1.1, 2.2, 3.3])
         # Predict y from n_i evaluated on curve defined by x
-        y = dms.f_out(n_i,x)
+        y = dms.f_out(n_i, x)
         # Feed y into inverse function to get the original n_i back out
-        n_i_recovered = dms.f_inv_out(y,x)
-        
+        n_i_recovered = dms.f_inv_out(y, x)
+
         assert np.isclose(n_i[0], n_i_recovered[0])
+
+    def test_inv_project_steps(self):
+        measure = np.array([1.1, 2.2, 3.3])
+        steps = np.array([4.4, 5.5, 6.6])
+        projection = np.array([7.7, 8.8, 9.9])
+
+        accuracies = dms.project_steps(measure, steps, projection)
+        predicted_proj = dms.inv_project_steps(measure, steps, accuracies)
+
+        percent_error = (
+            np.linalg.norm(projection - predicted_proj)
+            / np.linalg.norm(projection)
+            * 100
+        )
+
+        assert percent_error < 0.01
