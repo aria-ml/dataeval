@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1.4
 
 ARG USER="daml"
+ARG UID="1000"
 ARG HOME="/home/$USER"
 ARG PYENV_ROOT="$HOME/.pyenv"
 ARG python_version="3.11"
@@ -33,8 +34,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         wget \
         xz-utils \
         zlib1g-dev
+ARG UID
 ARG USER
-RUN useradd -m -u 1000 ${USER}
+RUN useradd -m -u ${UID} ${USER}
 USER ${USER}
 ARG HOME
 WORKDIR ${HOME}
@@ -57,8 +59,8 @@ ARG PYENV_ROOT
 ARG python_version
 RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/pip install --no-cache-dir --disable-pip-version-check poetry
 RUN touch README.md
-ARG USER
-COPY --chown=${USER}:${USER} pyproject.toml poetry.lock ./
+ARG UID
+COPY --chown=${UID} pyproject.toml poetry.lock ./
 RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/poetry install --no-cache --no-root --all-extras --with test,lint,docs
 
 
@@ -72,8 +74,9 @@ FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 as base
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends libgl1
+ARG UID
 ARG USER
-RUN useradd -m -u 1000 -s /bin/bash ${USER}
+RUN useradd -m -u ${UID} -s /bin/bash ${USER}
 USER ${USER}
 WORKDIR /daml
 ARG PYENV_ROOT
@@ -88,8 +91,8 @@ FROM ${deps_image} as deps_image
 FROM base as build
 ARG PYENV_ROOT
 ARG python_version
-ARG USER
-COPY --chown=${USER}:${USER} --link --from=deps_image ${PYENV_ROOT} ${PYENV_ROOT}
+ARG UID
+COPY --chown=${UID} --link --from=deps_image ${PYENV_ROOT} ${PYENV_ROOT}
 RUN ln -s ${PYENV_ROOT}/versions/$(${PYENV_ROOT}/bin/pyenv latest ${python_version}) ${PYENV_ROOT}/versions/${python_version}
 ENV PATH ${PYENV_ROOT}/versions/${python_version}/bin:${PYENV_ROOT}/bin:$PATH
 ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${PYENV_ROOT}/versions/${python_version}/lib/python${python_version}/site-packages/nvidia/cudnn/lib
@@ -97,19 +100,19 @@ ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${PYENV_ROOT}/versions/${python_versio
 
 FROM ${build_image} as versioned
 RUN touch README.md
-ARG USER
-COPY --chown=${USER}:${USER} pyproject.toml poetry.lock ./
-COPY --chown=${USER}:${USER} src/ src/
+ARG UID
+COPY --chown=${UID} pyproject.toml poetry.lock ./
+COPY --chown=${UID} src/ src/
 RUN poetry install --no-cache --all-extras --with test,lint,docs
 
 
 FROM versioned as run
-ARG USER
-COPY --chown=${USER}:${USER} .coveragerc ./
-COPY --chown=${USER}:${USER} tests/ tests/
-COPY --chown=${USER}:${USER} docs/ docs/
-COPY --chown=${USER}:${USER} *.md ./
-COPY --chown=${USER}:${USER} run ./
+ARG UID
+COPY --chown=${UID} .coveragerc ./
+COPY --chown=${UID} tests/ tests/
+COPY --chown=${UID} docs/ docs/
+COPY --chown=${UID} *.md ./
+COPY --chown=${UID} run ./
 ENTRYPOINT [ "./run" ]
 
 
