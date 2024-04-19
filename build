@@ -149,32 +149,39 @@ function docker_run() {
 }
 
 function ensure_image() {
-    echo "Checking $2:$3$4 image..."
-    if ! $(docker manifest inspect $2:$3$4 > /dev/null 2>&1); then
-        echo "Building $2:$3$4..."
+    target=$1
+    image_name=$2
+    base_or_hash=$3
+    python_version=$4
+    tag="$image_name:$base_or_hash-$python_version"
+    main_tag="$image_name:main-$python_version"
+
+    echo "Checking $tag image..."
+    if ! $(docker manifest inspect $tag > /dev/null 2>&1); then
+        echo "Building $tag..."
         docker build $verbosity \
             ${@:5} \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
-            --cache-from $2:main$4 \
-            --tag $2:$3$4 \
-            --target $1 .
-        echo "Finished building $2:$3$4."
+            --cache-from $main_tag \
+            --tag $tag \
+            --target $target .
+        echo "Finished building $tag."
         if [[ $push_to_repo ]]; then
-            echo "Pushing $2:$3$4..."
-            docker push $2:$3$4
+            echo "Pushing $tag..."
+            docker push $tag
         fi
     fi
 
     if [[ $CI && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $push_to_repo ]]; then
-        local main_manifest=$(docker manifest inspect $2:main$4 2> /dev/null) || true
-        local hash_manifest=$(docker manifest inspect $2:$3$4 2> /dev/null) || true
+        local main_manifest=$(docker manifest inspect $main_tag 2> /dev/null) || true
+        local hash_manifest=$(docker manifest inspect $tag 2> /dev/null) || true
         if [[ "$main_manifest" != "$hash_manifest" ]]; then
-            echo "Updating $2:main$4 image with $3 build..."
-            docker pull $2:$3$4
-            docker image tag $2:$3$4 $2:main$4
-            docker push $2:main$4
+            echo "Updating $main_tag image with $base_or_hash build..."
+            docker pull $tag
+            docker image tag $tag $main_tag
+            docker push $main_tag
         else
-            echo "$2:main$4 is up to date with $2:$3$4."
+            echo "$main_tag is up to date with $tag."
         fi
     fi
 }
@@ -202,10 +209,10 @@ if [[ $build_only ]]; then
 
         for pver in ${!pvers[@]}; do
             (
-                ensure_image pybase $deps_image base -$pver --build-arg python_version=$pver --build-arg pyenv_enable_opt=--enable-optimizations --build-arg pyenv_with_lto=--with-lto &&
-                ensure_image pydeps $deps_image $deps_hash -$pver --build-arg base_image=$deps_image:base-$pver --build-arg python_version=$pver --cache-from $deps_image:main-$pver &&
+                ensure_image pybase $deps_image base $pver --build-arg python_version=$pver --build-arg pyenv_enable_opt=--enable-optimizations --build-arg pyenv_with_lto=--with-lto &&
+                ensure_image pydeps $deps_image $deps_hash $pver --build-arg base_image=$deps_image:base-$pver --build-arg python_version=$pver --cache-from $deps_image:main-$pver &&
                 if [[ $CI ]]; then
-                    ensure_image build $build_image $deps_hash -$pver --build-arg deps_image=$deps_image:$deps_hash-$pver --build-arg python_version=$pver --cache-from $build_image:main-$pver
+                    ensure_image build $build_image $deps_hash $pver --build-arg deps_image=$deps_image:$deps_hash-$pver --build-arg python_version=$pver --cache-from $build_image:main-$pver
                 fi
             ) || exit 1 &
         done
