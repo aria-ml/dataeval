@@ -12,7 +12,7 @@ import torchvision.datasets as datasets
 import torchvision.transforms.v2 as v2
 from torch.utils.data import DataLoader, Dataset, Subset
 
-import daml.metrics.sufficiency as dms
+import daml._internal.metrics.sufficiency as dms
 from daml.metrics import Sufficiency
 
 #torch._dynamo.config.suppress_errors = True
@@ -134,5 +134,5 @@ print(tabulate(output, headers=list(output.keys()), tablefmt="pretty"))
 _ = Sufficiency.plot(output)
 
 desired_accuracies = [0.1, 0.5, 0.9, 0.99]
-suff_datas = Sufficiency.data_to_produce_accuracy(desired_accuracies, output)
+suff_datas = dms.data_to_produce_accuracy(desired_accuracies, output)
 print(suff_datas)

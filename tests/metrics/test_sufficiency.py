@@ -337,3 +337,18 @@ class TestSufficiencyExtraFeatures:
         )
 
         assert percent_error < 0.01
+
+    def test_can_invert_sufficiency(self):
+        num_samples = np.arange(1, 80, step=10)
+        accuracies = num_samples / 100
+        # num_samples being too long may take too many iters for calc_params to converge
+
+        data = {}
+        data["_STEPS_"] = num_samples
+        data["Accuracy"] = accuracies
+
+        desired_accuracies = np.array([0.2, 0.4, 0.6])
+        needed_data = dms.data_to_produce_accuracy(desired_accuracies, data)
+
+        target_needed_data = np.array([20, 40, 60])
+        assert np.all(np.isclose(needed_data, target_needed_data, atol=1))
