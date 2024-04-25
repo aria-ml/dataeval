@@ -51,6 +51,11 @@ stages:
     when: never
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event' || $CI_COMMIT_BRANCH == 'main'
 
+.on_merge_request: &on_merge_request
+  - if: $CREATE_NEW_RELEASE
+    when: never
+  - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+
 .on_non_release_mr: &on_non_release_mr
   - if: $CREATE_NEW_RELEASE
     when: never
@@ -188,6 +193,7 @@ coverage:
 docs:
   stage: docs
   extends: .docker
+  needs: [build image]
   tags: [GPU]
   script:
     - ./build docs --gpu
@@ -214,12 +220,19 @@ pages:
 
 ### RELEASE ###
 
+update merge request:
+  stage: release
+  needs: [docs, coverage]
+  before_script:
+    - pip install requests
+  script:
+    - .gitlab/scripts/update_merge_request.py $CI_MERGE_REQUEST_IID $CI_PIPELINE_ID
+  rules: *on_merge_request
+
 # This job will only run if all previous stages have succeeded,
 # and it creates a tag that signifies that all testing has passed.
 tag release candidate:
   stage: release
-  environment:
-    name: production
   before_script:
     - pip install requests
   script:
@@ -231,8 +244,6 @@ tag release candidate:
 # action defined in .github/workflows/publish.yml
 create release:
   stage: release
-  environment:
-    name: production
   needs: []
   before_script:
     - pip install requests
