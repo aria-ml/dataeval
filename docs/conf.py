@@ -90,6 +90,7 @@ def setup(app):
     normalize_module(
         [
             "daml.metrics",
+            "daml.metrics.drift",
             "daml.metrics.outlier_detection",
         ]
     )
