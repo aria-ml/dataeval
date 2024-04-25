@@ -3,8 +3,9 @@ from importlib.util import find_spec
 from daml._internal.metrics.ber import BER
 from daml._internal.metrics.divergence import Divergence
 from daml._internal.metrics.uap import UAP
+from daml.metrics import drift
 
-__all__ = ["BER", "Divergence", "UAP"]
+__all__ = ["BER", "Divergence", "UAP", "drift"]
 
 if (
     find_spec("tensorflow") is not None

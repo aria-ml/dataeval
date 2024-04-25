@@ -11,6 +11,7 @@ Metrics are a way to measure the performance of your models or datasets that can
 
 metrics/ber
 metrics/divergence
+metrics/drift
 metrics/sufficiency
 metrics/uap
 metrics/outlier_detection
