@@ -17,6 +17,8 @@ PIPELINES = "pipelines"
 JOBS = "jobs"
 ARTIFACTS = "artifacts"
 DOWNLOAD = "download"
+PIPELINES = "pipelines"
+NOTES = "notes"
 
 LATEST_KNOWN_GOOD = "latest-known-good"
 
@@ -299,7 +301,7 @@ class Gitlab:
         r = self._request(get, MERGE_REQUESTS, params)
         return r
 
-    def create_mr(
+    def create_merge_request(
         self,
         title: str,
         description: str,
@@ -342,7 +344,9 @@ class Gitlab:
         )
         return r
 
-    def update_mr(self, mr_iid: int, title: str, description: str) -> Dict[str, Any]:
+    def update_merge_request(
+        self, mr_iid: int, title: str, description: str
+    ) -> Dict[str, Any]:
         """
         Updates a merge request
 
@@ -529,6 +533,16 @@ class Gitlab:
                 "commit_message": commit_message,
                 "actions": actions,
             },
+        )
+        return r
+
+    def get_pipeline_jobs(self, pipeline_iid: int):
+        r = self._request(get, [PIPELINES, str(pipeline_iid), JOBS])
+        return r
+
+    def create_merge_request_note(self, merge_request_iid: int, body: str):
+        r = self._request(
+            post, [MERGE_REQUESTS, str(merge_request_iid), NOTES], {"body": body}
         )
         return r
 
