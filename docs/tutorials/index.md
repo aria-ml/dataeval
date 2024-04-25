@@ -10,6 +10,7 @@ Metrics
 
 - [Bayes Error Rate Estimation Tutorial](notebooks/BayesErrorRateEstimationTutorial) [![Open In Colab][colab-badge]][ber-colab]
 - [Class Learning Curves Tutorial](notebooks/ClassLearningCurvesTutorial) [![Open In Colab][colab-badge]][suff-colab]
+- [Drift Detection Tutorial](notebooks/DriftDetectionTutorial) [![Open In Colab][colab-badge]][drift-colab]
 - [HP Divergence Tutorial](notebooks/HPDivergenceTutorial) [![Open In Colab][colab-badge]][div-colab]
 - [Outlier Detection Tutorial](notebooks/OutlierDetectionTutorial) [![Open In Colab][colab-badge]][out-colab]
 
@@ -19,6 +20,7 @@ Metrics
 
 notebooks/BayesErrorRateEstimationTutorial.ipynb
 notebooks/ClassLearningCurvesTutorial.ipynb
+notebooks/DriftDetectionTutorial.ipynb
 notebooks/HPDivergenceTutorial.ipynb
 notebooks/OutlierDetectionTutorial.ipynb
 :::
@@ -39,5 +41,6 @@ notebooks/AETrainerTutorial.ipynb
 [ber-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/BayesErrorRateEstimationTutorial.ipynb
 [suff-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/ClassLearningCurvesTutorial.ipynb
 [div-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/HPDivergenceTutorial.ipynb
+[drift-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/DriftDivergenceTutorial.ipynb
 [out-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/OutlierDetectionTutorial.ipynb
 [ae-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/AETrainerTutorial.ipynb
