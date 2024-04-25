@@ -96,7 +96,7 @@ build image:
   extends: [.harbor, .python_version_matrix]
   needs: [verify lock]
   script:
-    - ./build --build-only --push --verbose ${PYTHON_VERSION}
+    - ./build --verbose --build-only --push ${PYTHON_VERSION}
   rules: *on_run
 
 verify lock:
@@ -132,8 +132,8 @@ dependency tests:
   script:
     - FAILURES=0
     - trap 'FAILURES=$((FAILURES+1))' ERR
-    - ./build ${PYTHON_VERSION} ${TASK} ${ARGS}
-    - ./build ${PYTHON_VERSION} type
+    - ./build --verbose ${PYTHON_VERSION} ${TASK} ${ARGS}
+    - ./build --verbose ${PYTHON_VERSION} type
     - exit $FAILURES
   artifacts:
     reports:
@@ -190,7 +190,7 @@ docs:
   extends: .docker
   tags: [GPU]
   script:
-    - ./build docs --gpu
+    - ./build --verbose docs --gpu
   artifacts:
     paths:
       - output/docs/.jupyter_cache/
