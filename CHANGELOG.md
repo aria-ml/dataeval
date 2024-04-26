@@ -1,6 +1,20 @@
-[//]: # (5cc48bec8946f9aecf617a4298e7b33995f387fe)
+[//]: # (e3c4b66010176cbb89a04493c263291e2d59ef18)
 
 # DAML Change Log
+
+## v0.51.0
+
+🌟 **Feature Release**
+- `2ed88a07` - Implement Drift Detection Metrics
+
+    This change adds 4 types of Drift Detection metrics which allow for the detection of potential drift in the dataset.
+    
+    * Kolmogorov-Smirnov
+    * Cramér-von Mises
+    * Maximum Mean Discrepancy
+    * Classifier Uncertainty
+    
+    The conceptual source is derived from [Failing Loudly: An Empirical Study of Methods for Detecting Dataset Shift](https://arxiv.org/abs/1810.11953) and the implementation is derived from [Alibi-Detect v0.11.4](https://github.com/SeldonIO/alibi-detect/tree/v0.11.4).
 
 ## v0.45.0
 
