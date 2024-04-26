@@ -8,7 +8,7 @@ ARG deps_image="pydeps"
 ARG base_image="pybase"
 ARG pyenv_enable_opt=""
 ARG pyenv_with_lto=""
-
+ARG build_image="build"
 
 FROM ubuntu:22.04 as pybase
 ENV DEBIAN_FRONTEND noninteractive
@@ -52,8 +52,7 @@ ARG python_version
 RUN ${PYENV_ROOT}/bin/pyenv install ${python_version}
 
 
-FROM ${base_image} as base_image
-FROM base_image as pyenv
+FROM ${base_image} as pyenv
 ARG PYENV_ROOT
 ARG python_version
 RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/pip install --no-cache-dir --disable-pip-version-check poetry
@@ -94,7 +93,7 @@ ENV PATH ${PYENV_ROOT}/versions/${python_version}/bin:${PYENV_ROOT}/bin:$PATH
 ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${PYENV_ROOT}/versions/${python_version}/lib/python${python_version}/site-packages/nvidia/cudnn/lib
 
 
-FROM build as versioned
+FROM ${build_image} as versioned
 RUN touch README.md
 ARG USER
 COPY --chown=${USER}:${USER} pyproject.toml poetry.lock ./
