@@ -59,7 +59,7 @@ RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/pip install --no-cache-dir --
 RUN touch README.md
 ARG USER
 COPY --chown=${USER}:${USER} pyproject.toml poetry.lock ./
-RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/poetry install --no-cache --no-root --all-extras
+RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/poetry install --no-cache --no-root --all-extras --with test,lint,docs
 
 
 FROM scratch as pydeps
@@ -69,7 +69,9 @@ COPY --link --from=pyenv  ${PYENV_ROOT}/ ${PYENV_ROOT}/
 
 # Base image for build runs and devcontainers
 FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 as base
-RUN apt-get update && apt-get install -y --no-install-recommends libgl1
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends libgl1
 ARG USER
 RUN useradd -m -u 1000 -s /bin/bash ${USER}
 USER ${USER}
