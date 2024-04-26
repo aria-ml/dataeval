@@ -154,7 +154,7 @@ unit tests:
 
 functional tests:
   extends: .run_tests
-  tags: [GPU]
+  tags: [single-gpu]
   variables:
     TASK: func
     ARGS: --gpu
@@ -194,7 +194,7 @@ docs:
   stage: docs
   extends: .docker
   needs: [build image]
-  tags: [GPU]
+  tags: [multi-gpu]
   script:
     - ./build --verbose docs --gpu
   artifacts:
