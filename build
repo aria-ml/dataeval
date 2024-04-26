@@ -107,6 +107,47 @@ function post_build_cleanup() {
     fi
 }
 
+function build_image() {
+    tag=$1
+    target=$2
+    python_version=$3
+    cache_from_tag=$4
+
+    if [[ $(docker manifest inspect $cache_from_tag) ]]; then
+        # Optimizations are only enabled if there's a cached image to use
+        python_optimization_args="\
+            --build-arg pyenv_enable_opt=--enable-optimizations \
+            --build-arg pyenv_with_lto=--with-lto"
+
+        # Set the various image vars if there's a cached image available
+        image_args="\
+            --build-arg base_image=$deps_image:base-$python_version \
+            --build-arg deps_image=$deps_image:$deps_hash-$python_version \
+            --build-arg build_image=$build_image:$deps_hash-$python_version"
+
+        docker pull $cache_from_tag
+        cache_from_arg="--cache-from $cache_from_tag"
+    fi
+
+    docker_build_cmd="docker build $verbosity \
+        --build-arg python_version=$python_version \
+        --build-arg BUILDKIT_INLINE_CACHE=1 \
+        $python_optimization_args \
+        $image_args \
+        $cache_from_arg \
+        --tag $tag \
+        --target $target \
+        ."
+
+    if [[ $verbose ]]; then
+        echo "Building $tag..."
+        echo $docker_build_cmd
+        $docker_build_cmd
+    else
+        $docker_build_cmd &> /dev/null
+    fi
+}
+
 function docker_run() {
     temp=$(mktemp)
     IFS=- read -r task pver <<< $1
@@ -118,23 +159,13 @@ function docker_run() {
 
     trap "post_build_cleanup $temp $tag" EXIT
 
-    # if docker images are not accessible build dependencies locally
-    if [[ $(docker manifest inspect $build_image:$deps_hash-$pver) ]]; then
-        from_image_arg="--build-arg build_image=$build_image:$deps_hash-$pver"
-    elif [[ $(docker manifest inspect $deps_image:$deps_hash-$pver) ]]; then
-        from_image_arg="--build-arg deps_image=$deps_image:$deps_hash-$pver"
-    else
-        echo "Unable to pull images from registry."
-    fi
-
-    docker_build_cmd="docker build $verbosity --build-arg python_version=$pver $from_image_arg --cache-from $build_image:main-$pver --tag $tag --target run ."
+    build_image $tag run $pver "$build_image:$deps_hash-$pver"
     docker_run_args="--name $tag $gpuflag $tag"
 
     if [[ $verbose ]]; then
-        (echo "Building $tag..."; echo $docker_build_cmd; $docker_build_cmd | tee $temp; exit ${PIPESTATUS[0]}) && \
         (echo "Running $tag..."; echo docker run $docker_run_args $task; docker run $docker_run_args $task | tee -a $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
     else
-        $docker_build_cmd &> $temp && docker run $docker_run_args $task &>> $temp || result="FAILED"
+        docker run $docker_run_args $task &> $temp || result="FAILED"
     fi
 
     if [[ $result == "FAILED" ]]; then
@@ -164,13 +195,7 @@ function ensure_image() {
 
     echo "Checking $tag image..."
     if ! $(docker manifest inspect $tag > /dev/null 2>&1); then
-        echo "Building $tag..."
-        docker build $verbosity \
-            ${@:5} \
-            --build-arg BUILDKIT_INLINE_CACHE=1 \
-            --cache-from $main_tag \
-            --tag $tag \
-            --target $target .
+        build_image $tag $target $python_version $tag
         echo "Finished building $tag."
         if [[ $push_to_repo ]]; then
             echo "Pushing $tag..."
@@ -195,6 +220,7 @@ function ensure_image() {
 
 export DOCKER_BUILDKIT=1
 export -f post_build_cleanup
+export -f build_image
 export -f docker_run
 
 export deps_image="harbor.jatic.net:443/daml/daml-deps"
@@ -216,10 +242,10 @@ if [[ $build_only ]]; then
 
         for pver in ${!pvers[@]}; do
             (
-                ensure_image pybase $deps_image base $pver --build-arg python_version=$pver --build-arg pyenv_enable_opt=--enable-optimizations --build-arg pyenv_with_lto=--with-lto &&
-                ensure_image pydeps $deps_image $deps_hash $pver --build-arg base_image=$deps_image:base-$pver --build-arg python_version=$pver &&
+                ensure_image pybase $deps_image base $pver &&
+                ensure_image pydeps $deps_image $deps_hash $pver &&
                 if [[ $CI ]]; then
-                    ensure_image build $build_image $deps_hash $pver --build-arg deps_image=$deps_image:$deps_hash-$pver --build-arg python_version=$pver
+                    ensure_image build $build_image $deps_hash $pver
                 fi
             ) || exit 1 &
         done
