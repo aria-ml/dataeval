@@ -119,9 +119,15 @@ function docker_run() {
     trap "post_build_cleanup $temp $tag" EXIT
 
     # if docker images are not accessible build dependencies locally
-    docker manifest inspect $deps_image:$deps_hash-$pver > /dev/null 2>&1 && deps_image_build_arg="--build-arg deps_image=$deps_image:$deps_hash-$pver" || echo "Unable to pull dependency image $deps_image:$deps_hash-$pver."
+    if [[ $(docker manifest inspect $build_image:$deps_hash-$pver) ]]; then
+        from_image_arg="--build-arg build_image=$build_image:$deps_hash-$pver"
+    elif [[ $(docker manifest inspect $deps_image:$deps_hash-$pver) ]]; then
+        from_image_arg="--build-arg deps_image=$deps_image:$deps_hash-$pver"
+    else
+        echo "Unable to pull images from registry."
+    fi
 
-    docker_build_cmd="docker build $verbosity $deps_image_build_arg --build-arg python_version=$pver --cache-from $build_image:$deps_hash-$pver --cache-from $build_image:main-$pver --cache-from $deps_image:main-$pver --tag $tag --target run ."
+    docker_build_cmd="docker build $verbosity --build-arg python_version=$pver $from_image_arg --cache-from $build_image:main-$pver --tag $tag --target run ."
     docker_run_args="--name $tag $gpuflag $tag"
 
     if [[ $verbose ]]; then
@@ -210,9 +216,9 @@ if [[ $build_only ]]; then
         for pver in ${!pvers[@]}; do
             (
                 ensure_image pybase $deps_image base $pver --build-arg python_version=$pver --build-arg pyenv_enable_opt=--enable-optimizations --build-arg pyenv_with_lto=--with-lto &&
-                ensure_image pydeps $deps_image $deps_hash $pver --build-arg base_image=$deps_image:base-$pver --build-arg python_version=$pver --cache-from $deps_image:main-$pver &&
+                ensure_image pydeps $deps_image $deps_hash $pver --build-arg base_image=$deps_image:base-$pver --build-arg python_version=$pver &&
                 if [[ $CI ]]; then
-                    ensure_image build $build_image $deps_hash $pver --build-arg deps_image=$deps_image:$deps_hash-$pver --build-arg python_version=$pver --cache-from $build_image:main-$pver
+                    ensure_image build $build_image $deps_hash $pver --build-arg deps_image=$deps_image:$deps_hash-$pver --build-arg python_version=$pver
                 fi
             ) || exit 1 &
         done
