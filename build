@@ -178,7 +178,8 @@ function ensure_image() {
         fi
     fi
 
-    if [[ $CI && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $push_to_repo ]]; then
+    # Base tag images do not have a main tag equivalent so we can skip main tag update
+    if [[ $CI && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $push_to_repo && $base_or_hash != base ]]; then
         local main_manifest=$(docker manifest inspect $main_tag 2> /dev/null) || true
         local hash_manifest=$(docker manifest inspect $tag 2> /dev/null) || true
         if [[ "$main_manifest" != "$hash_manifest" ]]; then
