@@ -14,6 +14,7 @@ workflow:
       when: never
     # Commit Main Branch Workflow
     - if: $CI_COMMIT_BRANCH == 'main'
+    - if: $CI_PIPELINE_SOURCE == 'web'
 
 default:
   # This should allow pipelines to auto-cancel when redundant:
@@ -50,16 +51,18 @@ stages:
   - if: $CREATE_NEW_RELEASE
     when: never
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event' || $CI_COMMIT_BRANCH == 'main'
+  - if: $CI_PIPELINE_SOURCE == 'web'
 
 .on_merge_request: &on_merge_request
   - if: $CREATE_NEW_RELEASE
     when: never
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
-.on_non_release_mr: &on_non_release_mr
+.on_non_release_mr_or_web: &on_non_release_mr_or_web
   - if: $CREATE_NEW_RELEASE
     when: never
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_MERGE_REQUEST_LABELS !~ '/release::\w+/'
+  - if: $CI_PIPELINE_SOURCE == 'web'
 
 .on_commit_main_or_release_mr: &on_commit_main_or_release_mr
   - if: $CREATE_NEW_RELEASE
@@ -150,7 +153,7 @@ unit tests:
   extends: .run_tests
   variables:
     TASK: unit
-  rules: *on_non_release_mr
+  rules: *on_non_release_mr_or_web
 
 functional tests:
   extends: .run_tests
