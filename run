@@ -3,7 +3,7 @@
 function showHelp() {
 cat << EOF
 Usage:
-  run <task>
+  run <task> [pyenv python version]
 
 Tasks:
   unit    run unit tests
@@ -11,18 +11,32 @@ Tasks:
   deps    run dependency tests
   type    run typecheck
   lint    run static code analysis
-  docs    generate documentation
-  qdocs   generate docs without notebooks
+  docs    generate documentation (Python 3.11 only)
+  qdocs   generate docs without notebooks (Python 3.11 only)
+
+Optional Pyenv Python version:
+  3.8, 3.9, 3.10 and 3.11 are supported
 EOF
 exit $1
 }
 
 declare -A supported_tasks=([unit]=1 [func]=1 [deps]=1 [type]=1 [lint]=1 [docs]=1 [qdocs]=1)
+declare -A supported_pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1)
 
 # validate args
 if (( $# == 0 )); then showHelp 0; fi
-if (( $# != 1 )); then echo Too many parameters; showHelp 1; fi
+if (( $# > 2 )); then echo Too many parameters; showHelp 1; fi
 if [[ ! ${supported_tasks[$1]} ]]; then echo Invalid task; showHelp 1; fi
+if [[ $# == 2 ]]; then
+    if [[ ! ${supported_pvers[$2]} ]]; then echo Unsupported Python version; showHelp 1; fi
+    if ! (pyenv versions 2>/dev/null | grep -q $2); then echo Pyenv installation of Python version not found; exit 1; fi
+    pver=$2
+    python=$(PYENV_VERSION=$2 pyenv which python)
+else
+    pver=$(python --version | cut -d' ' -f2 | cut -d'.' -f1-2)
+    python=$(which python)
+fi
+poetry_run="$python -m poetry --quiet run"
 
 # deps task skips poetry check as it builds its own virtual environment for the test
 # all other tests use poetry environment for execution
@@ -31,53 +45,49 @@ if ! [ $1 == "deps" ] && ! (poetry run pip freeze | grep daml) >/dev/null 2>&1; 
     exit 1
 fi
 
-pver=$(python --version | cut -d' ' -f2 | cut -d'.' -f1-2)
+echo "Running $1 task in Python $pver..."
+
+FAILURES=0
+trap 'FAILURES=$((FAILURES+1))' ERR
+
 case $1 in
     "unit"|"func")
         if [ "$1" == "unit" ]; then export CUDA_VISIBLE_DEVICES=-1; fi
         if [ "$1" == "func" ]; then args="--runfunctional"; fi
-        poetry --quiet run pytest tests/check_prototype.py --verbose --pythonwarnings ignore::DeprecationWarning
-        poetry --quiet run coverage run --data-file=output/.coverage.$1.$pver --source=daml --branch -m pytest $args --junitxml=output/junit.$1.$pver.xml --verbose --durations=0 --pythonwarnings ignore::DeprecationWarning
-        poetry --quiet run coverage report --data-file=output/.coverage.$1.$pver
-        poetry --quiet run coverage xml --data-file=output/.coverage.$1.$pver --skip-empty -o output/coverage.$1.$pver.xml
-        poetry --quiet run coverage html --data-file=output/.coverage.$1.$pver --skip-empty -d output/htmlcov.$1.$pver
+        $poetry_run pytest tests/check_prototype.py --verbose --pythonwarnings ignore::DeprecationWarning
+        $poetry_run coverage run --data-file=output/.coverage.$1.$pver --source=daml --branch -m pytest $args --junitxml=output/junit.$1.$pver.xml --verbose --durations=0 --pythonwarnings ignore::DeprecationWarning
+        $poetry_run coverage report --data-file=output/.coverage.$1.$pver
+        $poetry_run coverage xml --data-file=output/.coverage.$1.$pver --skip-empty -o output/coverage.$1.$pver.xml
+        $poetry_run coverage html --data-file=output/.coverage.$1.$pver --skip-empty -d output/htmlcov.$1.$pver
         ;;
     "deps")
-        pip install poetry virtualenv
-        python -m virtualenv .venv-deps
+        $python -m pip install virtualenv
+        $python -m virtualenv .venv-deps
         source .venv-deps/bin/activate
-        poetry install
-        pip install pytest
+        pip install . pytest
         pytest --verbose --pythonwarnings ignore::DeprecationWarning tests/metrics/test_ber.py tests/metrics/test_divergence.py tests/metrics/test_uap.py
         rm -rf .venv-deps
         ;;
     "type")
-        FAILURES=0
-        trap 'FAILURES=$((FAILURES+1))' ERR
-        poetry --quiet run pyright src/ tests/
-        poetry --quiet run pyright --ignoreexternal --verifytypes daml
-        exit $FAILURES
+        $poetry_run pyright src/ tests/
+        $poetry_run pyright --ignoreexternal --verifytypes daml
         ;;
     "lint")
-        FAILURES=0
-        trap 'FAILURES=$((FAILURES+1))' ERR
-        poetry --quiet run ruff check --exit-non-zero-on-fix --fix
-        poetry --quiet run codespell
-        exit $FAILURES
+        $poetry_run ruff check --exit-non-zero-on-fix --fix
+        $poetry_run codespell
         ;;
     "docs"|"qdocs")
         pushd docs
         if [[ $pver == 3.8 ]]; then echo "Generating docs is not supported in python 3.8"; exit 1; fi
-        if [ "$1" == "docs" ]; then poetry --quiet run jcache cache clear -f; fi
+        if [ "$1" == "docs" ]; then $poetry_run jcache cache clear -f; fi
         export TF_CPP_MIN_LOG_LEVEL=3
         export PYDEVD_DISABLE_FILE_VALIDATION=1
-        FAILURES=0
-        trap 'FAILURES=$((FAILURES+1))' ERR
-        NB_EXECUTION_MODE_OVERRIDE=off poetry --quiet run sphinx-build -M doctest . ../output/docs
-        poetry --quiet run sphinx-build -E -T -b html -d _build/doctrees -D language=en . ../output/docs/html
+        NB_EXECUTION_MODE_OVERRIDE=off $poetry_run sphinx-build -M doctest . ../output/docs
+        $poetry_run sphinx-build -E -T -b html -d _build/doctrees -D language=en . ../output/docs/html
         cp -R .jupyter_cache ../output/docs
         popd
         if [[ $FAILURES != 0 ]]; then cat /tmp/sphinx*.log && mv /tmp/sphinx*.log output/docs; fi
-        exit $FAILURES
         ;;
 esac
+
+exit $FAILURES
