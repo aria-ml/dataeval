@@ -35,13 +35,24 @@ def f_out(n_i: np.ndarray, x: np.ndarray) -> np.ndarray:
 def f_inv_out(y_i: np.ndarray, x: np.ndarray) -> np.ndarray:
     """
     Inverse function for f_out()
-    TODO: Test case, assert f_inv(f) == I and f(f_inv) == I
+
+    Parameters
+    ----------
+    y_i : np.ndarray
+        Data points for the line of best fit
+    x : np.ndarray
+        Array of inverse power curve coefficients
+
+    Returns
+    -------
+    np.ndarray
+        Array of sample sizes
     """
     n_i = ((y_i - x[2]) / x[0]) ** (-1 / x[1])
     return n_i
 
 
-def calc_params(p_i: np.ndarray, n_i: np.ndarray) -> np.ndarray:
+def calc_params(p_i: np.ndarray, n_i: np.ndarray, niter: int) -> np.ndarray:
     """
     Retrieves the inverse power curve coefficients for the line of best fit.
     Global minimization is done via basin hopping. More info on this algorithm
@@ -64,7 +75,7 @@ def calc_params(p_i: np.ndarray, n_i: np.ndarray) -> np.ndarray:
         inner = np.sum(np.square(p_i - x[0] * n_i ** (-x[1]) - x[2]))
         return inner
 
-    res = basinhopping(f, np.array([0.5, 0.5, 0.1]), niter=1000)
+    res = basinhopping(f, np.array([0.5, 0.5, 0.1]), niter=niter)
     return res.x
 
 
@@ -123,7 +134,7 @@ def project_steps(
     projection : np.ndarray
         Steps to extrapolate
     """
-    params = calc_params(p_i=(1 - measure), n_i=steps)
+    params = calc_params(p_i=(1 - measure), n_i=steps, niter=1000)
     return 1 - f_out(projection, params)
 
 
@@ -132,7 +143,7 @@ def inv_project_steps(
     steps: np.ndarray,
     accuracies: np.ndarray,
 ) -> np.ndarray:
-    """Projects the measures for each value of X
+    """Inverse function for project_steps()
 
     Parameters
     ----------
@@ -140,10 +151,15 @@ def inv_project_steps(
         Measures from which to extrapolate projection
     steps : np.ndarray
         Steps of the taken measures
-    projection : np.ndarray
-        Steps to extrapolate
+    accuracies : np.ndarray
+        Desired accuracy values
+
+    Returns
+    -------
+    np.ndarray
+        Array of sample sizes
     """
-    params = calc_params(p_i=(1 - measure), n_i=steps)
+    params = calc_params(p_i=(1 - measure), n_i=steps, niter=1000)
     return f_inv_out(1 - np.array(accuracies), params)
 
 
@@ -457,21 +473,37 @@ class Sufficiency(EvaluateMixin):
 
 
 def data_to_produce_accuracy(desired_accuracies, data: Dict[str, np.ndarray]):
+    """
+    How many training samples in data are needed to achieve the model accuracies
+    specified in desired_accuracies?
+
+    Parameters
+    ----------
+    desired_accuracies : np.ndarray
+        List of the accuracies (from 0.0 to 1.0) that we want to achieve.
+
+    data : Dict[str, np.ndarray]
+        Dataclass containing the average of each measure per substep
+
+    Returns
+    -------
+    num_samples_needed : np.ndarray(np.int64)
+        List of the numbe of training samples needed to achieve each
+        corresponding accuracy entry in desired_accuracies
+    """
+
     validate_output(data)
 
     # X, y data
     steps = data[STEPS_KEY]
 
-    # Extrapolation parameters
-    last_X = steps[-1]
-    geomshape = (0.01 * last_X, last_X * 4, len(steps))
-    extrapolated = np.geomspace(*geomshape).astype(np.int64)
-
+    # Iterate through the elements of the data dictionary until
+    # we reach the array of measures, which are then used to predict
+    # the number of needed training samples
     for name, measure in data.items():
         if name == STEPS_KEY:
             continue
-        # psteps = project_steps(measure, steps, extrapolated)
-        # return psteps
 
-        data_needed = inv_project_steps(measure, steps, desired_accuracies)
-        return np.ceil(data_needed)
+        num_samples_needed = inv_project_steps(measure, steps, desired_accuracies)
+        num_samples_needed = np.int64(np.ceil(num_samples_needed))
+        return num_samples_needed
