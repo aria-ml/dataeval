@@ -41,7 +41,5 @@ class UAP(EvaluateMixin):
         ValueError
             If unique classes M < 2
         """
-        uap = float(
-            average_precision_score(self.labels, self.scores, average="weighted")
-        )
+        uap = float(average_precision_score(self.labels, self.scores, average="weighted"))
         return {"uap": uap}

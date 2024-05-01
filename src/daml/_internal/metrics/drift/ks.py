@@ -96,7 +96,5 @@ class KSDrift(BaseUnivariateDrift):
         p_val = np.zeros(self.n_features, dtype=np.float32)
         dist = np.zeros_like(p_val)
         for f in range(self.n_features):
-            dist[f], p_val[f] = ks_2samp(
-                x_ref[:, f], x[:, f], alternative=self.alternative, method="exact"
-            )
+            dist[f], p_val[f] = ks_2samp(x_ref[:, f], x[:, f], alternative=self.alternative, method="exact")
         return p_val, dist

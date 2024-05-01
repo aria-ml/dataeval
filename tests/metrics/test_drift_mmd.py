@@ -97,9 +97,7 @@ class TestMMDDrift:
         np.random.seed(0)
         torch.manual_seed(0)
 
-        x_ref = (
-            np.random.randn(n * n_features).reshape(n, n_features).astype(np.float32)
-        )
+        x_ref = np.random.randn(n * n_features).reshape(n, n_features).astype(np.float32)
         preprocess_fn, preprocess_kwargs = preprocess
         if (
             isinstance(preprocess_fn, Callable)

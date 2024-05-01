@@ -76,9 +76,7 @@ class Linting(EvaluateMixin):
 
     def _evaluate_images_or_boxes(self, data: np.ndarray) -> Dict[str, Any]:
         if data.ndim == 3:  # Assuming (C, H, W)
-            data = np.expand_dims(
-                data, axis=0
-            )  # Convert to (N, C, H, W) for consistency
+            data = np.expand_dims(data, axis=0)  # Convert to (N, C, H, W) for consistency
         n_samples, channels, height, width = data.shape
 
         pixel_values = data.reshape(-1, channels)
@@ -96,10 +94,7 @@ class Linting(EvaluateMixin):
             "pixel_value_variance": np.var(pixel_values, axis=0),
             "pixel_value_skew": skew(pixel_values, axis=0),
             "pixel_value_kurtosis": kurtosis(pixel_values, axis=0),
-            "pixel_value_histogram": [
-                np.histogram(pixel_values[:, i], bins=10)[0].tolist()
-                for i in range(channels)
-            ],
+            "pixel_value_histogram": [np.histogram(pixel_values[:, i], bins=10)[0].tolist() for i in range(channels)],
         }
 
         return stats
@@ -118,9 +113,7 @@ class Linting(EvaluateMixin):
         # (x_min, y_min, x_max, y_max)
 
         # Convert boxes to an array of dimensions for the sake of statistical analysis
-        box_dimensions = (
-            self.boxes[:, :, 2:] - self.boxes[:, :, :2]
-        )  # (N, P, 2) where 2 corresponds to (width, height)
+        box_dimensions = self.boxes[:, :, 2:] - self.boxes[:, :, :2]  # (N, P, 2) where 2 corresponds to (width, height)
         box_dimensions = box_dimensions.reshape(-1, 2)  # Flatten to (N*P, 2)
         boxes_data = np.concatenate(
             [box_dimensions, np.ones((len(box_dimensions), 1))], axis=-1

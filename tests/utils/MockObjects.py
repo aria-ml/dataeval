@@ -30,12 +30,8 @@ class MockCifar10:
 
         labels = range(0, 10) if MAKE_LABELS else 1
         # Create train and test datasets
-        train_generator = MockImageClassificationGenerator(
-            limit=50_000, labels=labels, img_dims=32, channels=3
-        )
-        test_generator = MockImageClassificationGenerator(
-            limit=10_000, labels=labels, img_dims=32, channels=3
-        )
+        train_generator = MockImageClassificationGenerator(limit=50_000, labels=labels, img_dims=32, channels=3)
+        test_generator = MockImageClassificationGenerator(limit=10_000, labels=labels, img_dims=32, channels=3)
 
         self._train_dataset = train_generator.dataset
         self._test_dataset = test_generator.dataset

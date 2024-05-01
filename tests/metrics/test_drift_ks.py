@@ -47,11 +47,7 @@ class TestKSDrift:
             update_x_ref,
         ) = ksdrift_params
         np.random.seed(0)
-        x_ref = (
-            np.random.randn(self.n * n_features)
-            .reshape(self.n, n_features)
-            .astype(np.float32)
-        )
+        x_ref = np.random.randn(self.n * n_features).reshape(self.n, n_features).astype(np.float32)
 
         cd = KSDrift(
             x_ref=x_ref,
@@ -73,11 +69,7 @@ class TestKSDrift:
         assert (preds_feature["is_drift"] == preds_by_feature).all()  # type: ignore
 
         np.random.seed(0)
-        X_randn = (
-            np.random.randn(self.n * n_features)
-            .reshape(self.n, n_features)
-            .astype("float32")
-        )
+        X_randn = np.random.randn(self.n * n_features).reshape(self.n, n_features).astype("float32")
         mu, sigma = 5, 5
         X_low = sigma * X_randn - mu
         X_high = sigma * X_randn + mu

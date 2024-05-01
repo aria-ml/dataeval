@@ -142,19 +142,14 @@ class AETrainer:
         encodings = torch.Tensor([])
 
         # Get encode function if defined
-        if getattr(self.model, "encode", None) is not None:
-            encode_func = self.model.encode
-        else:
-            encode_func = self.model.forward
+        encode_func = self.model.encode if getattr(self.model, "encode", None) else self.model.forward
+
         # Accumulate encodings from batches
         for batch in dl:
             imgs = get_images_from_batch(batch)
             imgs = imgs.to(self.device)
             embeddings = encode_func(imgs).to("cpu")
-            if len(encodings):
-                encodings = torch.vstack((encodings, embeddings))
-            else:
-                encodings = embeddings
+            encodings = torch.vstack((encodings, embeddings)) if len(encodings) else embeddings
 
         return encodings
 
