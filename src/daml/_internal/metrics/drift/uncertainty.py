@@ -51,9 +51,7 @@ def classifier_uncertainty(
     elif preds_type == "logits":
         probs = softmax(preds, axis=-1)
     else:
-        raise NotImplementedError(
-            "Only prediction types 'probs' and 'logits' supported."
-        )
+        raise NotImplementedError("Only prediction types 'probs' and 'logits' supported.")
 
     uncertainties = entropy(probs, axis=-1)
     return uncertainties[:, None]  # Detectors expect N x d  # type: ignore

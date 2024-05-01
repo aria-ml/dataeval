@@ -39,18 +39,14 @@ class TestPredictBatch:
             self.dense = nn.Linear(self.n_features, self.n_classes)
             self.multi_out = multi_out
 
-        def forward(
-            self, x: torch.Tensor
-        ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        def forward(self, x: torch.Tensor) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
             out = self.dense(x)
             if not self.multi_out:
                 return out
             else:
                 return out, out
 
-    AutoEncoder = nn.Sequential(
-        nn.Linear(n_features, latent_dim), nn.Linear(latent_dim, n_features)
-    )
+    AutoEncoder = nn.Sequential(nn.Linear(n_features, latent_dim), nn.Linear(latent_dim, n_features))
 
     # model, batch size, dtype, preprocessing function
     tests_predict = [
@@ -86,11 +82,7 @@ class TestPredictBatch:
         if isinstance(preds, tuple):
             preds = preds[0]
         assert preds.dtype == dtype
-        if (
-            isinstance(model, nn.Sequential)
-            or hasattr(model, "__name__")
-            and model.__name__ == "id_fn"
-        ):
+        if isinstance(model, nn.Sequential) or hasattr(model, "__name__") and model.__name__ == "id_fn":
             assert preds.shape == self.x.shape
         elif isinstance(model, nn.Module):
             assert preds.shape == (self.n, self.n_classes)
@@ -106,9 +98,7 @@ class TestSquaredPairwiseDistance:
     def pairwise_params(self, request):
         return self.tests_pairwise[request.param]
 
-    @pytest.mark.parametrize(
-        "pairwise_params", list(range(n_tests_pairwise)), indirect=True
-    )
+    @pytest.mark.parametrize("pairwise_params", list(range(n_tests_pairwise)), indirect=True)
     def test_pairwise(self, pairwise_params):
         n_features, n_instances = pairwise_params
         xshape, yshape = (n_instances[0], n_features), (n_instances[1], n_features)
@@ -160,19 +150,13 @@ class TestMMDKernelMatrix:
         if not zero_diag:
             kernel_mat -= torch.diag(kernel_mat.diag())
             kernel_mat_2 -= torch.diag(kernel_mat_2.diag())
-        mmd = mmd2_from_kernel_matrix(
-            kernel_mat, m, permute=permute, zero_diag=zero_diag
-        )
-        mmd_2 = mmd2_from_kernel_matrix(
-            kernel_mat_2, m, permute=permute, zero_diag=zero_diag
-        )
+        mmd = mmd2_from_kernel_matrix(kernel_mat, m, permute=permute, zero_diag=zero_diag)
+        mmd_2 = mmd2_from_kernel_matrix(kernel_mat_2, m, permute=permute, zero_diag=zero_diag)
         if not permute:
             assert mmd_2.numpy() < mmd.numpy()
 
 
-@pytest.mark.parametrize(
-    "device", [None, torch.device("cpu"), "cpu", "gpu", "cuda", "random"]
-)
+@pytest.mark.parametrize("device", [None, torch.device("cpu"), "cpu", "gpu", "cuda", "random"])
 def test_drift_get_device(device):
     assert isinstance(get_device(device), torch.device)
 

@@ -7,10 +7,7 @@ from daml.metrics import drift
 
 __all__ = ["BER", "Divergence", "UAP", "drift"]
 
-if (
-    find_spec("tensorflow") is not None
-    and find_spec("tensorflow_probability") is not None
-):  # pragma: no cover
+if find_spec("tensorflow") is not None and find_spec("tensorflow_probability") is not None:  # pragma: no cover
     from . import outlier_detection
 
     __all__ += ["outlier_detection"]

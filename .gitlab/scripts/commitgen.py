@@ -130,14 +130,10 @@ class _Merge:
     """
 
     def __init__(self, response: Dict[str, Any]):
-        self.time: datetime = datetime.strptime(
-            response["merged_at"][0:19], "%Y-%m-%dT%H:%M:%S"
-        ).astimezone(UTC)
+        self.time: datetime = datetime.strptime(response["merged_at"][0:19], "%Y-%m-%dT%H:%M:%S").astimezone(UTC)
         self.hash: str = response["merge_commit_sha"]
         self.shorthash: str = response["merge_commit_sha"][0:8]
-        self.description: str = (
-            response["title"].replace('Resolve "', "").replace('"', "")
-        )
+        self.description: str = response["title"].replace('Resolve "', "").replace('"', "")
         self.category: _Category = _Category.from_label(response["labels"])
         match = release_notes_pattern.match(response["description"])
         groupdict = {} if match is None else match.groupdict()
@@ -195,27 +191,21 @@ class CommitGen:
         merges.sort(reverse=True)
 
         # get version buckets and sort
-        tags: List[_Tag] = [
-            _Tag(pending_version=(self.pending_version, merges[0].hash))
-        ]
+        tags: List[_Tag] = [_Tag(pending_version=(self.pending_version, merges[0].hash))]
         for tag in self.gl.list_tags():
             if _get_version_tuple(tag["name"]) is not None:
                 tags.append(_Tag(tag))
         tags.sort(reverse=True)
 
         # populate the categorized merge issues
-        categorized: Dict[_Tag, Dict[_Category, List[_Merge]]] = defaultdict(
-            lambda: defaultdict(lambda: [])
-        )
+        categorized: Dict[_Tag, Dict[_Category, List[_Merge]]] = defaultdict(lambda: defaultdict(lambda: []))
 
         tag_it = iter(tags)
         tag = next(tag_it)
         next_tag = next(tag_it, None)
         for merge in merges:
             # check if we need to move to next tag
-            while next_tag is not None and (
-                merge.hash == next_tag.hash or merge.time <= next_tag.time
-            ):
+            while next_tag is not None and (merge.hash == next_tag.hash or merge.time <= next_tag.time):
                 # return early if hash is already present
                 if next_tag.hash == last_hash:
                     return categorized
@@ -293,9 +283,7 @@ class CommitGen:
         except Exception:
             return True
 
-    def _generate_actions(
-        self, old_files: List[str], new_files: List[str]
-    ) -> List[Dict[str, str]]:
+    def _generate_actions(self, old_files: List[str], new_files: List[str]) -> List[Dict[str, str]]:
         actions: List[Dict[str, str]] = []
 
         for old_file in old_files:
@@ -351,9 +339,7 @@ class CommitGen:
         output_path = path.join("output", cache_path)
         self.gl.get_artifacts(job="docs", dest="./", ref=ref)
         if not path.exists(output_path):
-            raise FileNotFoundError(
-                f"Artifacts downloaded from {ref} does not contain {output_path}"
-            )
+            raise FileNotFoundError(f"Artifacts downloaded from {ref} does not contain {output_path}")
         if not path.exists(cache_path):
             raise FileNotFoundError(f"Current path does not contain {cache_path}")
 

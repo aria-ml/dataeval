@@ -27,9 +27,7 @@ def get_outlier(level, distance, dist_arr):
         return ""
 
 
-def get_distance(
-    cluster, level, sample, distance_array, distance_matrix, sample_clusters
-):
+def get_distance(cluster, level, sample, distance_array, distance_matrix, sample_clusters):
     # Convert the condensed distance matrix to a square form
     square_distance_matrix = squareform(distance_matrix)
 
@@ -39,13 +37,8 @@ def get_distance(
             samples = level_info[level]["samples"]
 
             for other_sample in samples:
-                if (
-                    square_distance_matrix[sample, other_sample]
-                    < distance_array[cluster]
-                ):
-                    distance_array[cluster] = square_distance_matrix[
-                        sample, other_sample
-                    ]
+                if square_distance_matrix[sample, other_sample] < distance_array[cluster]:
+                    distance_array[cluster] = square_distance_matrix[sample, other_sample]
 
     return distance_array
 
@@ -77,9 +70,7 @@ def reorganize_clusters(clusters):
         if level not in new_structure[cluster_num] and level == 1:
             new_structure[cluster_num][level] = {"samples": []}
         elif level not in new_structure[cluster_num] and level > 1:
-            new_structure[cluster_num][level] = {
-                "samples": deepcopy(new_structure[cluster_num][level - 1]["samples"])
-            }
+            new_structure[cluster_num][level] = {"samples": deepcopy(new_structure[cluster_num][level - 1]["samples"])}
 
         # Extending the samples list.
         new_structure[cluster_num][level]["samples"].extend(samples)
@@ -162,9 +153,7 @@ def get_sample_info(arr, distance_matrix):
             cluster = values["cluster_num"]
             for sample in values["samples_added"]:
                 sample_tracking[sample]["cluster"][level] = values["cluster_num"]
-                sample_tracking[sample]["distance"][level, cluster] = values[
-                    "sample_dist"
-                ]
+                sample_tracking[sample]["distance"][level, cluster] = values["sample_dist"]
                 sample_tracking[sample]["distance"][level, :] = get_distance(
                     cluster,
                     level,
