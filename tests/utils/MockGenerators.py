@@ -74,12 +74,8 @@ class MockImageClassificationGenerator:
         assert len(mock_data) == self._num_labels
         assert len(mock_labels) == self._num_labels
 
-        mock_data = np.concatenate(
-            [x * label for x, label in zip(mock_data, self._labels)]
-        )
-        mock_labels = np.concatenate(
-            [x * label for x, label in zip(mock_labels, self._labels)]
-        )
+        mock_data = np.concatenate([x * label for x, label in zip(mock_data, self._labels)])
+        mock_labels = np.concatenate([x * label for x, label in zip(mock_labels, self._labels)])
 
         return (mock_data, mock_labels)
 

@@ -172,9 +172,7 @@ class Gitlab:
         r = self._request(get, TAGS)
         return r
 
-    def add_tag(
-        self, tag_name: str, ref: str = "main", message: Optional[str] = None
-    ) -> Dict[str, Any]:
+    def add_tag(self, tag_name: str, ref: str = "main", message: Optional[str] = None) -> Dict[str, Any]:
         """
         Create a new tag
 
@@ -344,9 +342,7 @@ class Gitlab:
         )
         return r
 
-    def update_merge_request(
-        self, mr_iid: int, title: str, description: str
-    ) -> Dict[str, Any]:
+    def update_merge_request(self, mr_iid: int, title: str, description: str) -> Dict[str, Any]:
         """
         Updates a merge request
 
@@ -420,9 +416,7 @@ class Gitlab:
         r = self._request(get, [FILES, filepath], {"ref": ref})
         return r
 
-    def push_file(
-        self, filepath: str, branch: str, commit_message: str, content: str
-    ) -> Dict[str, Any]:
+    def push_file(self, filepath: str, branch: str, commit_message: str, content: str) -> Dict[str, Any]:
         """
         Update a file in the repository
 
@@ -541,9 +535,7 @@ class Gitlab:
         return r
 
     def create_merge_request_note(self, merge_request_iid: int, body: str):
-        r = self._request(
-            post, [MERGE_REQUESTS, str(merge_request_iid), NOTES], {"body": body}
-        )
+        r = self._request(post, [MERGE_REQUESTS, str(merge_request_iid), NOTES], {"body": body})
         return r
 
     def run_pipeline(self, pipeline_id: int):

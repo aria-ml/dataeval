@@ -128,12 +128,8 @@ class TestClassifierUncertainty:
     def test_classifier_uncertainty(self, cu_params):
         preds_type = cu_params
         clf = LogisticRegression().fit(self.X_train, self.y_train_clf)
-        model_fn = (
-            clf.predict_log_proba if preds_type == "logits" else clf.predict_proba
-        )
-        uncertainties = classifier_uncertainty(
-            self.X_test, model_fn, preds_type=preds_type
-        )
+        model_fn = clf.predict_log_proba if preds_type == "logits" else clf.predict_proba
+        uncertainties = classifier_uncertainty(self.X_test, model_fn, preds_type=preds_type)
         assert uncertainties.shape == (self.X_test.shape[0], 1)
 
     def test_classifier_uncertainty_notimplementederror(self):

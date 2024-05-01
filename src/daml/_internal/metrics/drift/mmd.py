@@ -76,22 +76,14 @@ class MMDDrift(BaseDrift):
         if configure_kernel_from_x_ref and isinstance(sigma, np.ndarray):
             self.infer_sigma = False
 
-        self.n_permutations = (
-            n_permutations  # nb of iterations through permutation test
-        )
+        self.n_permutations = n_permutations  # nb of iterations through permutation test
 
         # set device
         self.device = get_device(device)
 
         # initialize kernel
-        sigma_tensor = (
-            torch.from_numpy(sigma).to(self.device)
-            if isinstance(sigma, np.ndarray)
-            else None
-        )
-        self.kernel = (
-            kernel(sigma_tensor).to(self.device) if kernel == GaussianRBF else kernel
-        )
+        sigma_tensor = torch.from_numpy(sigma).to(self.device) if isinstance(sigma, np.ndarray) else None
+        self.kernel = kernel(sigma_tensor).to(self.device) if kernel == GaussianRBF else kernel
 
         # compute kernel matrix for the reference data
         if self.infer_sigma or isinstance(sigma_tensor, torch.Tensor):
@@ -104,15 +96,9 @@ class MMDDrift(BaseDrift):
     def _kernel_matrix(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         """Compute and return full kernel matrix between arrays x and y."""
         k_xy = self.kernel(x, y, self.infer_sigma)
-        k_xx = (
-            self.k_xx
-            if self.k_xx is not None and self.update_x_ref is None
-            else self.kernel(x, x)
-        )
+        k_xx = self.k_xx if self.k_xx is not None and self.update_x_ref is None else self.kernel(x, x)
         k_yy = self.kernel(y, y)
-        kernel_mat = torch.cat(
-            [torch.cat([k_xx, k_xy], 1), torch.cat([k_xy.T, k_yy], 1)], 0
-        )
+        kernel_mat = torch.cat([torch.cat([k_xx, k_xy], 1), torch.cat([k_xy.T, k_yy], 1)], 0)
         return kernel_mat
 
     @preprocess_x
@@ -138,18 +124,13 @@ class MMDDrift(BaseDrift):
         kernel_mat = kernel_mat - torch.diag(kernel_mat.diag())  # zero diagonal
         mmd2 = mmd2_from_kernel_matrix(kernel_mat, n, permute=False, zero_diag=False)
         mmd2_permuted = torch.Tensor(
-            [
-                mmd2_from_kernel_matrix(kernel_mat, n, permute=True, zero_diag=False)
-                for _ in range(self.n_permutations)
-            ]
+            [mmd2_from_kernel_matrix(kernel_mat, n, permute=True, zero_diag=False) for _ in range(self.n_permutations)]
         )
         mmd2, mmd2_permuted = mmd2.cpu(), mmd2_permuted.cpu()
         p_val = (mmd2 <= mmd2_permuted).float().mean()
         # compute distance threshold
         idx_threshold = int(self.p_val * len(mmd2_permuted))
-        distance_threshold = torch.sort(mmd2_permuted, descending=True).values[
-            idx_threshold
-        ]
+        distance_threshold = torch.sort(mmd2_permuted, descending=True).values[idx_threshold]
         return p_val.numpy().item(), mmd2.numpy().item(), distance_threshold.numpy()
 
     @preprocess_x

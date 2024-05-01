@@ -95,9 +95,7 @@ def validate_output(data: Dict[str, np.ndarray]):
         if m == STEPS_KEY:
             continue
         if c != len(v):
-            raise ValueError(
-                "f{m} does not contain the expected number ({c}) of data points."
-            )
+            raise ValueError("f{m} does not contain the expected number ({c}) of data points.")
 
 
 def project_steps(
@@ -188,9 +186,7 @@ class Sufficiency(EvaluateMixin):
         train_ds: Dataset,
         test_ds: Dataset,
         train_fn: Callable[[nn.Module, Dataset, Sequence[int]], None],
-        eval_fn: Callable[
-            [nn.Module, Dataset], Union[Dict[str, float], Dict[str, np.ndarray]]
-        ],
+        eval_fn: Callable[[nn.Module, Dataset], Union[Dict[str, float], Dict[str, np.ndarray]]],
         runs: int = 1,
         substeps: int = 5,
         train_kwargs: Optional[Dict[str, Any]] = None,
@@ -243,9 +239,7 @@ class Sufficiency(EvaluateMixin):
     @eval_fn.setter
     def eval_fn(
         self,
-        value: Callable[
-            [nn.Module, Dataset], Union[Dict[str, float], Dict[str, np.ndarray]]
-        ],
+        value: Callable[[nn.Module, Dataset], Union[Dict[str, float], Dict[str, np.ndarray]]],
     ):
         if not callable(value):
             raise TypeError("Must provide a callable for eval_fn.")
@@ -315,11 +309,7 @@ class Sufficiency(EvaluateMixin):
                         raise KeyError(f"Cannot use '{STEPS_KEY}' as a metric name.")
 
                     if name not in metric_outputs:
-                        shape = (
-                            (self.substeps, len(value))
-                            if isinstance(value, np.ndarray)
-                            else self.substeps
-                        )
+                        shape = (self.substeps, len(value)) if isinstance(value, np.ndarray) else self.substeps
                         metric_outputs[name] = np.zeros(shape)
 
                     # Sum result into current substep iteration to be averaged later
@@ -327,9 +317,7 @@ class Sufficiency(EvaluateMixin):
 
         output = {STEPS_KEY: ranges}
         # The mean for each measure must be calculated before being returned
-        output.update(
-            {name: value / self.runs for name, value in metric_outputs.items()}
-        )
+        output.update({name: value / self.runs for name, value in metric_outputs.items()})
 
         return output
 
@@ -358,9 +346,7 @@ class Sufficiency(EvaluateMixin):
         """
         validate_output(data)
         projection = [projection] if isinstance(projection, int) else projection
-        projection = (
-            np.array(projection) if isinstance(projection, Sequence) else projection
-        )
+        projection = np.array(projection) if isinstance(projection, Sequence) else projection
         if not isinstance(projection, np.ndarray):
             raise ValueError("'steps' must be an int, Sequence[int] or ndarray")
 
@@ -373,9 +359,7 @@ class Sufficiency(EvaluateMixin):
             if len(measure.shape) > 1:
                 result = []
                 for i in range(measure.shape[1]):
-                    projected = project_steps(
-                        measure[:, i], data[STEPS_KEY], projection
-                    )
+                    projected = project_steps(measure[:, i], data[STEPS_KEY], projection)
                     result.append(projected)
                 output[name] = np.array(result).T
             else:
@@ -383,9 +367,7 @@ class Sufficiency(EvaluateMixin):
         return output
 
     @classmethod
-    def plot(
-        cls, data: Dict[str, np.ndarray], class_names: Optional[Sequence[str]] = None
-    ) -> List[Figure]:
+    def plot(cls, data: Dict[str, np.ndarray], class_names: Optional[Sequence[str]] = None) -> List[Figure]:
         """Plotting function for data sufficiency tasks
 
         Parameters

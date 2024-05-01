@@ -54,9 +54,7 @@ class OD_Base(ABC):
 
     @staticmethod
     def _update_kwargs_with_locals(kwargs_to_update, **kwargs):
-        kwargs_to_update.update(
-            {k: v for k, v in kwargs.items() if k != "self" and v is not None}
-        )
+        kwargs_to_update.update({k: v for k, v in kwargs.items() if k != "self" and v is not None})
 
     @abstractmethod
     def set_prediction_args(self) -> None:

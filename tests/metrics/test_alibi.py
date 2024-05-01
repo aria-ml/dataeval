@@ -37,14 +37,10 @@ class TestAlibiDetect_Functional:
         metric = method()
 
         # Initialize a dataset of 32 images of size 32x32x3, containing all 1's
-        all_ones = MockImageClassificationGenerator(
-            limit=1, labels=1, img_dims=input_shape
-        )
+        all_ones = MockImageClassificationGenerator(limit=1, labels=1, img_dims=input_shape)
 
         # Initialize a dataset of 32 images of size 32x32x3, containing all 5's
-        all_fives = MockImageClassificationGenerator(
-            limit=1, labels=5, img_dims=input_shape
-        )
+        all_fives = MockImageClassificationGenerator(limit=1, labels=5, img_dims=input_shape)
 
         # Get model input from each dataset
         X_all_ones = all_ones.dataset.images
@@ -87,9 +83,7 @@ class TestAlibiDetect_Functional:
         # Initialize the autoencoder-based outlier detector from alibi-detect
 
         # Initialize a dataset of 32 images of size 32x32x3, containing all 1's
-        all_ones = MockImageClassificationGenerator(
-            limit=1, labels=1, img_dims=input_shape
-        )
+        all_ones = MockImageClassificationGenerator(limit=1, labels=1, img_dims=input_shape)
 
         X_all_ones = all_ones.dataset.images
         if metric._dataset_type is not None:
@@ -225,11 +219,7 @@ class TestAlibiDetect:
     def test_set_prediction_args(self, method):
         self._is_mock_expected = False
         metric = method()
-        expected = {
-            k: v
-            for k, v in metric._predict_kwargs.items()
-            if k != "return_instance_score"
-        }
+        expected = {k: v for k, v in metric._predict_kwargs.items() if k != "return_instance_score"}
         metric.set_prediction_args(return_instance_score=False)
         assert not metric._predict_kwargs["return_instance_score"]
         for key in expected:
