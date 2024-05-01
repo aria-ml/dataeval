@@ -124,9 +124,7 @@ def predict_batch(
                 for j, p in enumerate(preds_tmp):
                     if isinstance(p, torch.Tensor):
                         p = p.cpu()
-                    preds[j].append(
-                        p if not return_np or isinstance(p, np.ndarray) else p.numpy()
-                    )
+                    preds[j].append(p if not return_np or isinstance(p, np.ndarray) else p.numpy())
             elif isinstance(preds_tmp, (np.ndarray, torch.Tensor)):
                 if isinstance(preds_tmp, torch.Tensor):
                     preds_tmp = preds_tmp.cpu()
@@ -300,9 +298,7 @@ class GaussianRBF(nn.Module):
 
         if infer_sigma or self.init_required:
             if self.trainable and infer_sigma:
-                raise ValueError(
-                    "Gradients cannot be computed w.r.t. an inferred sigma value"
-                )
+                raise ValueError("Gradients cannot be computed w.r.t. an inferred sigma value")
             sigma = self.init_sigma_fn(x, y, dist)
             with torch.no_grad():
                 self.log_sigma.copy_(sigma.log().clone())
@@ -310,7 +306,5 @@ class GaussianRBF(nn.Module):
 
         gamma = 1.0 / (2.0 * self.sigma**2)  # [Ns,]
         # TODO: do matrix multiplication after all?
-        kernel_mat = torch.exp(
-            -torch.cat([(g * dist)[None, :, :] for g in gamma], dim=0)
-        )  # [Ns, Nx, Ny]
+        kernel_mat = torch.exp(-torch.cat([(g * dist)[None, :, :] for g in gamma], dim=0))  # [Ns, Nx, Ny]
         return kernel_mat.mean(dim=0)  # [Nx, Ny]

@@ -50,11 +50,7 @@ def _get_file(
                 os.remove(fpath)
             raise
 
-        if (
-            os.path.exists(fpath)
-            and file_hash is not None
-            and not _validate_file(fpath, file_hash)
-        ):
+        if os.path.exists(fpath) and file_hash is not None and not _validate_file(fpath, file_hash):
             raise ValueError(
                 "Incomplete or corrupted file detected. "
                 f"The sha256 file hash does not match the provided value "

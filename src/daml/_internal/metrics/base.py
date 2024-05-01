@@ -77,7 +77,5 @@ class MethodsMixin(ABC, Generic[TMethods, TCallable]):
         """This setter is to fix pyright incorrect detection of
         incorrectly overriding the 'method' property"""
         if value not in self.methods():
-            raise KeyError(
-                f"Specified method not available for class ({self.methods()})."
-            )
+            raise KeyError(f"Specified method not available for class ({self.methods()}).")
         self._method_key = value

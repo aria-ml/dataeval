@@ -29,9 +29,7 @@ class TestCVMDrift:
         n_feat = cvmdrift_params
 
         # Reference data
-        x_ref = np.random.normal(
-            0, 1, size=(self.n, n_feat)
-        ).squeeze()  # squeeze to test vec input in 1D case
+        x_ref = np.random.normal(0, 1, size=(self.n, n_feat)).squeeze()  # squeeze to test vec input in 1D case
 
         # Instantiate detector
         cd = CVMDrift(x_ref=x_ref, p_val=0.05)

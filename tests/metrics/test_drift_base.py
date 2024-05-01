@@ -32,9 +32,7 @@ class TestUpdateReference:
     def update_params(self, request):
         return self.tests_update[request.param]
 
-    @pytest.mark.parametrize(
-        "update_params", list(range(n_tests_update)), indirect=True
-    )
+    @pytest.mark.parametrize("update_params", list(range(n_tests_update)), indirect=True)
     def test_update_reference(self, update_params):
         n, n_features, update_method = update_params
         n_ref = np.random.randint(1, n)
