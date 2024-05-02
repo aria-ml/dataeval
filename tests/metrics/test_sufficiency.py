@@ -343,12 +343,27 @@ class TestSufficiencyExtraFeatures:
         accuracies = num_samples / 100
         # num_samples being too long may take too many iters for calc_params to converge
 
+        # Mock arguments to initialize a Sufficiency object
+        eval_fn = MagicMock()
+        eval_fn.return_value = {"test": 1.0}
+        patch("torch.utils.data.DataLoader").start()
+
+        suff = Sufficiency(
+            model=MagicMock(),
+            train_ds=mock_ds(2),
+            test_ds=mock_ds(2),
+            train_fn=MagicMock(),
+            eval_fn=eval_fn,
+            runs=1,
+            substeps=2,
+        )
+
         data = {}
         data["_STEPS_"] = num_samples
         data["Accuracy"] = accuracies
 
         desired_accuracies = np.array([0.2, 0.4, 0.6])
-        needed_data = dms.data_to_produce_accuracy(desired_accuracies, data)
+        needed_data = suff.inv_project(desired_accuracies, data)
 
         target_needed_data = np.array([20, 40, 60])
         assert np.all(np.isclose(needed_data, target_needed_data, atol=1))

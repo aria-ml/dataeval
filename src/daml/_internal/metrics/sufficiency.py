@@ -469,41 +469,39 @@ class Sufficiency(EvaluateMixin):
 
         return plots
 
-    # @classmethod
+    @classmethod
+    def inv_project(cls, targets, data: Dict[str, np.ndarray]):
+        """
+        How many training samples in data are needed to achieve the model metric values
+        specified in targets?
 
+        Parameters
+        ----------
+        targets : np.ndarray
+            List of the target metric scores (from 0.0 to 1.0) that we want to achieve.
 
-def data_to_produce_accuracy(desired_accuracies, data: Dict[str, np.ndarray]):
-    """
-    How many training samples in data are needed to achieve the model accuracies
-    specified in desired_accuracies?
+        data : Dict[str, np.ndarray]
+            Dataclass containing the average of each measure per substep
 
-    Parameters
-    ----------
-    desired_accuracies : np.ndarray
-        List of the accuracies (from 0.0 to 1.0) that we want to achieve.
+        Returns
+        -------
+        num_samples_needed : np.ndarray(np.int64)
+            List of the numbe of training samples needed to achieve each
+            corresponding entry in targets
+        """
 
-    data : Dict[str, np.ndarray]
-        Dataclass containing the average of each measure per substep
+        validate_output(data)
 
-    Returns
-    -------
-    num_samples_needed : np.ndarray(np.int64)
-        List of the numbe of training samples needed to achieve each
-        corresponding accuracy entry in desired_accuracies
-    """
+        # X, y data
+        steps = data[STEPS_KEY]
 
-    validate_output(data)
+        # Iterate through the elements of the data dictionary until
+        # we reach the array of measures, which are then used to predict
+        # the number of needed training samples
+        for name, measure in data.items():
+            if name == STEPS_KEY:
+                continue
 
-    # X, y data
-    steps = data[STEPS_KEY]
-
-    # Iterate through the elements of the data dictionary until
-    # we reach the array of measures, which are then used to predict
-    # the number of needed training samples
-    for name, measure in data.items():
-        if name == STEPS_KEY:
-            continue
-
-        num_samples_needed = inv_project_steps(measure, steps, desired_accuracies)
-        num_samples_needed = np.int64(np.ceil(num_samples_needed))
-        return num_samples_needed
+            num_samples_needed = inv_project_steps(measure, steps, targets)
+            num_samples_needed = np.int64(np.ceil(num_samples_needed))
+            return num_samples_needed
