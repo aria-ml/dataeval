@@ -71,11 +71,37 @@ def calc_params(p_i: np.ndarray, n_i: np.ndarray, niter: int) -> np.ndarray:
         Array of parameters to recreate line of best fit
     """
 
+    def is_valid_x(f_new, x_new, f_old, x_old):
+        # return x_new[0] >= 0
+        x = x_new
+        # if x[0] < 0:
+        #    return False
+        try:
+            np.sum(np.square(p_i - x[0] * n_i ** (-x[1]) - x[2]))
+        except ArithmeticError:
+            return False
+        return True
+
     def f(x):
+        # if x[0] < 0:
+        #    return np.inf
+        # try:
+        #    inner = np.sum(np.square(p_i - x[0] * n_i ** (-x[1]) - x[2]))
+        # with warnings.catch_warnings():
+        #    warnings.filterwarnings("error")
+        #   try:
+        # Problem: Sometimes x[0]*n_i goes negative which results in complex results
+        # This appears to happen when x[0] < 0
         inner = np.sum(np.square(p_i - x[0] * n_i ** (-x[1]) - x[2]))
+
+        #    except Warning:
+        #  # Warnings likely correspond to out-of-bounds errors
+        #        return np.inf
         return inner
 
-    res = basinhopping(f, np.array([0.5, 0.5, 0.1]), niter=niter)
+    res = basinhopping(
+        f, np.array([0.5, 0.5, 0.1]), niter=niter, accept_test=is_valid_x
+    )
     return res.x
 
 
