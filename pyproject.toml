@@ -162,7 +162,7 @@ docstring-code-format = true
 docstring-code-line-length = "dynamic"
 
 [tool.codespell]
-skip = '*env*,docs/.jupyter_cache,CHANGELOG.md,poetry.lock,output'
+skip = '*env*,docs/.jupyter_cache,CHANGELOG.md,poetry.lock,output,*.html'
 
 [build-system]
 requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning"]

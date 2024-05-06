@@ -13,7 +13,7 @@ Metrics
 - [Drift Detection Tutorial](notebooks/DriftDetectionTutorial) [![Open In Colab][colab-badge]][drift-colab]
 - [HP Divergence Tutorial](notebooks/HPDivergenceTutorial) [![Open In Colab][colab-badge]][div-colab]
 - [Outlier Detection Tutorial](notebooks/OutlierDetectionTutorial) [![Open In Colab][colab-badge]][out-colab]
-
+- [Dataset Sufficiency Analysis for Object Detection Tutorial](html/ODLearningCurvesTutorial.rst)
 :::{toctree}
 :hidden:
 :maxdepth: 1
@@ -23,6 +23,7 @@ notebooks/ClassLearningCurvesTutorial.ipynb
 notebooks/DriftDetectionTutorial.ipynb
 notebooks/HPDivergenceTutorial.ipynb
 notebooks/OutlierDetectionTutorial.ipynb
+html/ODLearningCurvesTutorial.rst
 :::
 
 Models
