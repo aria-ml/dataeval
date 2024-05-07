@@ -99,9 +99,7 @@ def calc_params(p_i: np.ndarray, n_i: np.ndarray, niter: int) -> np.ndarray:
         #        return np.inf
         return inner
 
-    res = basinhopping(
-        f, np.array([0.5, 0.5, 0.1]), niter=niter, accept_test=is_valid_x
-    )
+    res = basinhopping(f, np.array([0.5, 0.5, 0.1]), niter=niter, accept_test=is_valid_x)
     return res.x
 
 
@@ -332,23 +330,32 @@ class Sufficiency(EvaluateMixin):
     def eval_kwargs(self, value: Optional[Dict[str, Any]]):
         self._eval_kwargs = {} if value is None else value
 
-    def evaluate(self) -> Dict[str, np.ndarray]:
+    def evaluate(self, forced_range=None) -> Dict[str, np.ndarray]:
         """
         Creates data indices, trains models, and returns plotting data
+
+        Inputs
+        ------
+        forced_range : (Optional)np.ndarray
+            Specify this to collect accuracies over a specific set of dataset lengths,
+            rather than letting Sufficiency internally create the lengths
+            to evaluate at.
 
         Returns
         -------
         Dict[str, np.ndarray]
             Dictionary containing the average of each measure per substep
         """
-
-        geomshape = (
-            0.01 * self._length,
-            self._length,
-            self.substeps,
-        )  # Start, Stop, Num steps
-        ranges = np.geomspace(*geomshape).astype(np.int64)
-
+        if forced_range is not None:
+            ranges = forced_range
+        else:
+            geomshape = (
+                0.01 * self._length,
+                self._length,
+                self.substeps,
+            )  # Start, Stop, Num steps
+            ranges = np.geomspace(*geomshape).astype(np.int64)
+        substeps = len(ranges)
         metric_outputs = {}
 
         # Run each model over all indices
@@ -359,6 +366,7 @@ class Sufficiency(EvaluateMixin):
             model = reset_parameters(self.model)
             # Run the model with each substep of data
             for iteration, substep in enumerate(ranges):
+                model = reset_parameters(self.model)
                 # train on subset of train data
                 self.train_fn(
                     model,
@@ -380,7 +388,7 @@ class Sufficiency(EvaluateMixin):
                         raise KeyError(f"Cannot use '{STEPS_KEY}' as a metric name.")
 
                     if name not in metric_outputs:
-                        shape = (self.substeps, len(value)) if isinstance(value, np.ndarray) else self.substeps
+                        shape = (substeps, len(value)) if isinstance(value, np.ndarray) else substeps
                         metric_outputs[name] = np.zeros(shape)
 
                     # Sum result into current substep iteration to be averaged later
