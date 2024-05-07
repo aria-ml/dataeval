@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Sequence, Tuple, cast
 from unittest.mock import MagicMock, NonCallableMagicMock, patch
 
 import numpy as np
@@ -6,8 +6,14 @@ import numpy.testing as npt
 import pytest
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+import torchmetrics
+import torchvision.datasets as datasets
+import torchvision.transforms.v2 as v2
 from matplotlib.figure import Figure
-from torch.utils.data import DataLoader
+from pytest import approx
+from torch.utils.data import DataLoader, Dataset, Subset
 
 import daml._internal.metrics.sufficiency as dms
 from daml._internal.metrics.sufficiency import STEPS_KEY
@@ -27,6 +33,25 @@ class MockNet(nn.Module):
 
     def forward(self, x):
         pass
+
+
+class RealisticNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv1 = nn.Conv2d(1, 6, 5)
+        self.conv2 = nn.Conv2d(6, 16, 5)
+        self.fc1 = nn.Linear(6400, 120)
+        self.fc2 = nn.Linear(120, 84)
+        self.fc3 = nn.Linear(84, 10)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = torch.flatten(x, 1)  # flatten all dimensions except batch
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
 
 
 def load_cls_dataset() -> Tuple[DamlDataset, DamlDataset]:
@@ -62,6 +87,55 @@ def mock_ds(length: Optional[int]):
     else:
         ds.__len__.return_value = length
     return ds
+
+
+def realistic_train(model: nn.Module, dataset: Dataset, indices: Sequence[int]):
+    # Defined only for this testing scenario
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    criterion = torch.nn.CrossEntropyLoss().to(device)
+    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+    epochs = 100  # 10
+
+    # Define the dataloader for training
+    dataloader = DataLoader(Subset(dataset, indices), batch_size=16)
+
+    for epoch in range(epochs):
+        for batch in dataloader:
+            # Load data/images to device
+            X = torch.Tensor(batch[0]).to(device)
+            # Load targets/labels to device
+            y = torch.Tensor(batch[1]).to(device)
+            # Zero out gradients
+            optimizer.zero_grad()
+            # Forward propagation
+            outputs = model(X)
+            # Compute loss
+            loss = criterion(outputs, y)
+            # Back prop
+            loss.backward()
+            # Update weights/parameters
+            optimizer.step()
+
+
+def realistic_eval(model: nn.Module, dataset: Dataset) -> Dict[str, float]:
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    metric = torchmetrics.Accuracy(task="multiclass", num_classes=10).to(device)
+    result = 0
+
+    # Set model layers into evaluation mode
+    model.eval()
+    dataloader = DataLoader(dataset, batch_size=16)
+    # Tell PyTorch to not track gradients, greatly speeds up processing
+    with torch.no_grad():
+        for batch in dataloader:
+            # Load data/images to device
+            X = torch.Tensor(batch[0]).to(device)
+            # Load targets/labels to device
+            y = torch.Tensor(batch[1]).to(device)
+            preds = model(X)
+            metric.update(preds, y)
+        result = metric.compute()
+    return {"Accuracy": result}
 
 
 class TestSufficiency:
@@ -367,3 +441,90 @@ class TestSufficiencyExtraFeatures:
 
         target_needed_data = np.array([20, 40, 60])
         assert np.all(np.isclose(needed_data, target_needed_data, atol=1))
+
+    def test_predicts_on_real_data(self):
+        np.random.seed(0)
+        np.set_printoptions(formatter={"float": lambda x: f"{x:0.4f}"})
+        torch.manual_seed(0)
+        torch.set_float32_matmul_precision("high")
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        torch._dynamo.config.suppress_errors = True
+        datasets.MNIST("./data", train=True, download=True)
+        datasets.MNIST("./data", train=False, download=True)
+
+        # Download the mnist dataset and preview the images
+        to_tensor = v2.Compose([v2.ToImage(), v2.ToDtype(torch.float32, scale=True)])
+        train_ds = datasets.MNIST(
+            "./data", train=True, download=True, transform=to_tensor
+        )
+        test_ds = datasets.MNIST(
+            "./data", train=False, download=True, transform=to_tensor
+        )
+
+        # Take a subset of 2000 training images and 500 test images
+        train_ds = Subset(train_ds, range(2000))
+        test_ds = Subset(test_ds, range(500))
+
+        # Compile the model
+        model = torch.compile(RealisticNet().to(device))
+
+        # Type cast the model back to Net as torch.compile returns a Unknown
+        # Nothing internally changes from the cast; we are simply signaling the type
+        model = cast(RealisticNet, model)
+
+        # Instantiate sufficiency metric
+        suff = Sufficiency(
+            model=model,
+            train_ds=train_ds,
+            test_ds=test_ds,
+            train_fn=realistic_train,
+            eval_fn=realistic_eval,
+            runs=5,
+            substeps=10,
+        )
+
+        # Train & test model
+        output = suff.evaluate()
+
+        # Print out projected output values
+        projection = Sufficiency.project(output, [1000, 2000, 4000])
+
+        assert output["Accuracy"][-1] == approx(0.93, abs=0.03)
+        assert projection["Accuracy"][-1] == approx(0.95, abs=0.04)
+
+        # Initialize the array of desired accuracies
+        desired_accuracies = np.array([0.5, 0.8, 0.9])
+
+        # Evaluate the learning curve to infer the needed amount of training data
+        num_needed_samples = Sufficiency.inv_project(desired_accuracies, output)
+
+        # Train model and see if we achieve desired accuracy
+        output_actual = suff.evaluate(num_needed_samples)
+        assert np.all(
+            np.isclose(output_actual["Accuracy"], desired_accuracies, atol=0.03)
+        )
+
+        # Interesting bug: suff.evaluate seems to fit Accuracy one to the
+        # left of the _STEP_ in "output"
+        """
+        output
+        {'_STEPS_': array([  20,   33,   55,   92,  154,  258,  430,  718, 1198, 2000]),
+        'Accuracy': array([0.1164, 0.2840, 0.3964, 0.6208, 0.7492, 0.8188, 0.8616, 0.8880,
+       0.9152, 0.9344])}
+
+        output_forced
+        {'_STEPS_': [20, 33, 55, 92, 154, 258, 430, 718, 1198, 2000],
+        'Accuracy': array([0.1244, 0.2464, 0.5140, 0.6204, 0.7376, 0.7884, 0.8508, 0.8848,
+       0.9116, 0.9268])}
+
+       It seems like there's a "memory" here. Like the model's not being reset right
+       suff.evaluate([1,33])
+        {'_STEPS_': [1, 33], 'Accuracy': array([0.1048, 0.1204])}
+        suff.evaluate([22,33])
+        {'_STEPS_': [22, 33], 'Accuracy': array([0.1024, 0.3744])}
+        """
+
+        # Another issue: Seems to get within 2% or so, until we start
+        # extrapolating. It missed asymptote;
+        # model empirically stops around 0.93, but the projection
+        # will go out to 0.96
