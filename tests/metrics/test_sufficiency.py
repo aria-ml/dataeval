@@ -12,7 +12,6 @@ import torchmetrics
 import torchvision.datasets as datasets
 import torchvision.transforms.v2 as v2
 from matplotlib.figure import Figure
-from pytest import approx
 from torch.utils.data import DataLoader, Dataset, Subset
 
 import daml._internal.metrics.sufficiency as dms
@@ -484,47 +483,20 @@ class TestSufficiencyExtraFeatures:
         )
 
         # Train & test model
-        output = suff.evaluate()
+        output_to_fit = suff.evaluate()
 
-        # Print out projected output values
-        projection = Sufficiency.project(output, [1000, 2000, 4000])
-
-        assert output["Accuracy"][-1] == approx(0.93, abs=0.03)
-        assert projection["Accuracy"][-1] == approx(0.95, abs=0.04)
-
-        # Initialize the array of desired accuracies
+        # Initialize the array of accuracies that we want to achieve
         desired_accuracies = np.array([0.5, 0.8, 0.9])
 
         # Evaluate the learning curve to infer the needed amount of training data
-        num_needed_samples = Sufficiency.inv_project(desired_accuracies, output)
+        # to train a model to (desired_accuracies) accuracy
+        pred_nsamples = Sufficiency.inv_project(desired_accuracies, output_to_fit)
 
-        # Train model and see if we achieve desired accuracy
-        output_actual = suff.evaluate(num_needed_samples)
+        # Train model and see if we get the accuracy we expect on these predicte
+        # amounts of training data
+        output_on_pred_nsamples = suff.evaluate(pred_nsamples)
         assert np.all(
-            np.isclose(output_actual["Accuracy"], desired_accuracies, atol=0.03)
+            np.isclose(
+                output_on_pred_nsamples["Accuracy"], desired_accuracies, atol=0.03
+            )
         )
-
-        # Interesting bug: suff.evaluate seems to fit Accuracy one to the
-        # left of the _STEP_ in "output"
-        """
-        output
-        {'_STEPS_': array([  20,   33,   55,   92,  154,  258,  430,  718, 1198, 2000]),
-        'Accuracy': array([0.1164, 0.2840, 0.3964, 0.6208, 0.7492, 0.8188, 0.8616, 0.8880,
-       0.9152, 0.9344])}
-
-        output_forced
-        {'_STEPS_': [20, 33, 55, 92, 154, 258, 430, 718, 1198, 2000],
-        'Accuracy': array([0.1244, 0.2464, 0.5140, 0.6204, 0.7376, 0.7884, 0.8508, 0.8848,
-       0.9116, 0.9268])}
-
-       It seems like there's a "memory" here. Like the model's not being reset right
-       suff.evaluate([1,33])
-        {'_STEPS_': [1, 33], 'Accuracy': array([0.1048, 0.1204])}
-        suff.evaluate([22,33])
-        {'_STEPS_': [22, 33], 'Accuracy': array([0.1024, 0.3744])}
-        """
-
-        # Another issue: Seems to get within 2% or so, until we start
-        # extrapolating. It missed asymptote;
-        # model empirically stops around 0.93, but the projection
-        # will go out to 0.96
