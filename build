@@ -243,8 +243,6 @@ export build_image="${registry}/daml-build:${deps_hash}"
 
 if [[ -z $verbose ]]; then
     verbosity="--quiet"
-else
-    verbosity="--progress=plain"
 fi
 export verbosity
 
