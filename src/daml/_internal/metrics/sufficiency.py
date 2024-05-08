@@ -157,9 +157,18 @@ def project_steps(
         Steps of the taken measures
     projection : np.ndarray
         Steps to extrapolate
+
+    Returns
+    ----------
+    projected_steps : np.ndarray
+        Extrapolated meausure values at each projection step
+    params : np.ndarray
+        length-3 array of the parameters for the fit curve.
+
     """
     params = calc_params(p_i=(1 - measure), n_i=steps, niter=1000)
-    return (1 - f_out(projection, params)), params
+    projected_steps = 1 - f_out(projection, params)
+    return projected_steps, params
 
 
 def inv_project_steps(
@@ -178,6 +187,10 @@ def inv_project_steps(
         Steps of the taken measures
     accuracies : np.ndarray
         Desired accuracy values
+    params : np.ndarray
+        length-3 array of the parameters for the sufficiency curve to study.
+        If not provided, we curve-fit the parameters at runtime. Curve-fitting
+        is very slow, and we recommend pre-computing the parameters.
 
     Returns
     -------
@@ -509,7 +522,9 @@ class Sufficiency(EvaluateMixin):
         return plots
 
     @classmethod
-    def inv_project(cls, targets, data: Dict[str, np.ndarray], params_cache=[]):
+    def inv_project(
+        cls, targets, data: Dict[str, np.ndarray], params_cache=np.zeros((1, 0))
+    ):
         """
         How many training samples in data are needed to achieve the model metric values
         specified in targets?
@@ -521,6 +536,13 @@ class Sufficiency(EvaluateMixin):
 
         data : Dict[str, np.ndarray]
             Dataclass containing the average of each measure per substep
+
+        params_cache : np.ndarray
+            1 x 3 List of cached parameters for the sufficiency curve. The parameters
+            can be precomputed by using the project() function.
+            TODO: The first axis should represent the number of data columns. It's
+            currently hardcoded to assume only one column.
+
 
         Returns
         -------
@@ -540,11 +562,10 @@ class Sufficiency(EvaluateMixin):
         for name, measure in data.items():
             if name == STEPS_KEY:
                 continue
-            # TODO: We currently assume measure shape == 1
-            if len(params_cache) > 0:
-                params = params_cache[0]
-            else:
-                params = np.zeros(0)
+
+            # Select the cached parameters associated with the current column of measure
+            # TODO: We currently assume measure only has one axis
+            params = params_cache[0]
 
             num_samples_needed = inv_project_steps(measure, steps, targets, params)
             num_samples_needed = np.int64(np.ceil(num_samples_needed))

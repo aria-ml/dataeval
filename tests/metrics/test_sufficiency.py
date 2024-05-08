@@ -384,7 +384,9 @@ class TestSufficiencyProject:
 
 class TestSufficiencyExtraFeatures:
     def test_f_inv_out(self):
-        """Tests that f_inv_out inverts the line of best fit"""
+        """
+        Tests that f_inv_out exactly inverts f_out.
+        """
 
         n_i = np.array([1.234])
         x = np.array([1.1, 2.2, 3.3])
@@ -396,6 +398,9 @@ class TestSufficiencyExtraFeatures:
         assert np.isclose(n_i[0], n_i_recovered[0])
 
     def test_inv_project_steps(self):
+        """
+        Verifies that inv_project_steps is the inverse of project_steps (within 1%)
+        """
         measure = np.array([1.1, 2.2, 3.3])
         steps = np.array([4.4, 5.5, 6.6])
         projection = np.array([7.7, 8.8, 9.9])
@@ -412,6 +417,13 @@ class TestSufficiencyExtraFeatures:
         assert percent_error < 0.01
 
     def test_cached_params(self):
+        """
+        Similar to the above test_inv_project_steps, except we use the cached
+        parameters from project_steps for the inverse function, rather than
+        re-doing the curve fit inside inv_project_steps.
+        """
+        # TODO: A good test would be to verify that inv_project_steps actually
+        # uses the cached params rather than re-calculating them.
         measure = np.array([1.1, 2.2, 3.3])
         steps = np.array([4.4, 5.5, 6.6])
         projection = np.array([7.7, 8.8, 9.9])
@@ -428,6 +440,12 @@ class TestSufficiencyExtraFeatures:
         assert percent_error < 0.01
 
     def test_can_invert_sufficiency(self):
+        """
+        This loads mock sufficiency data, fits a sufficiency curve to it,
+        and then predicts how many steps are required to achieve various
+        levels of model accuracy. The test passes if the accuracy values
+        of the model at the predicted steps is within 0.05 of the desired accuracies.
+        """
         num_samples = np.arange(1, 80, step=10)
         accuracies = num_samples / 100
         # num_samples being too long may take too many iters for calc_params to converge
@@ -458,6 +476,13 @@ class TestSufficiencyExtraFeatures:
         assert np.all(np.isclose(needed_data, target_needed_data, atol=1))
 
     def test_predicts_on_real_data(self):
+        """
+        End-to-end functional test of sufficiency. This loads the MNIST dataset,
+        fits a sufficiency curve to it, and then predicts how many steps are required
+        to achieve various levels of model accuracy. The test passes if the accuracy
+        values of the model at the predicted steps is within 0.05 of the desired
+        accuracies.
+        """
         np.random.seed(0)
         np.set_printoptions(formatter={"float": lambda x: f"{x:0.4f}"})
         torch.manual_seed(0)
