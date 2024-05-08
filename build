@@ -236,7 +236,7 @@ export -f docker_run
 
 export deps_hash=$(sha256sum poetry.lock | cut -c 1-8)
 
-registry="harbor.jatic.net:443/daml"
+registry="harbor.jatic.net/daml"
 export base_image="${registry}/daml-deps:base"
 export deps_image="${registry}/daml-deps:${deps_hash}"
 export build_image="${registry}/daml-build:${deps_hash}"
