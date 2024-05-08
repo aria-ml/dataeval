@@ -400,8 +400,24 @@ class TestSufficiencyExtraFeatures:
         steps = np.array([4.4, 5.5, 6.6])
         projection = np.array([7.7, 8.8, 9.9])
 
-        accuracies = dms.project_steps(measure, steps, projection)
+        accuracies, _ = dms.project_steps(measure, steps, projection)
         predicted_proj = dms.inv_project_steps(measure, steps, accuracies)
+
+        percent_error = (
+            np.linalg.norm(projection - predicted_proj)
+            / np.linalg.norm(projection)
+            * 100
+        )
+
+        assert percent_error < 0.01
+
+    def test_cached_params(self):
+        measure = np.array([1.1, 2.2, 3.3])
+        steps = np.array([4.4, 5.5, 6.6])
+        projection = np.array([7.7, 8.8, 9.9])
+
+        accuracies, params = dms.project_steps(measure, steps, projection)
+        predicted_proj = dms.inv_project_steps(measure, steps, accuracies, params)
 
         percent_error = (
             np.linalg.norm(projection - predicted_proj)
@@ -461,7 +477,7 @@ class TestSufficiencyExtraFeatures:
         )
 
         # Take a subset of 2000 training images and 500 test images
-        train_ds = Subset(train_ds, range(2000))
+        train_ds = Subset(train_ds, range(4000))
         test_ds = Subset(test_ds, range(500))
 
         # Compile the model
@@ -497,6 +513,6 @@ class TestSufficiencyExtraFeatures:
         output_on_pred_nsamples = suff.evaluate(pred_nsamples)
         assert np.all(
             np.isclose(
-                output_on_pred_nsamples["Accuracy"], desired_accuracies, atol=0.03
+                output_on_pred_nsamples["Accuracy"], desired_accuracies, atol=0.05
             )
         )

@@ -146,7 +146,7 @@ def project_steps(
     measure: np.ndarray,
     steps: np.ndarray,
     projection: np.ndarray,
-) -> np.ndarray:
+) -> tuple:
     """Projects the measures for each value of X
 
     Parameters
@@ -159,13 +159,14 @@ def project_steps(
         Steps to extrapolate
     """
     params = calc_params(p_i=(1 - measure), n_i=steps, niter=1000)
-    return 1 - f_out(projection, params)
+    return (1 - f_out(projection, params)), params
 
 
 def inv_project_steps(
     measure: np.ndarray,
     steps: np.ndarray,
     accuracies: np.ndarray,
+    params: np.ndarray = np.zeros(0),
 ) -> np.ndarray:
     """Inverse function for project_steps()
 
@@ -183,7 +184,8 @@ def inv_project_steps(
     np.ndarray
         Array of sample sizes
     """
-    params = calc_params(p_i=(1 - measure), n_i=steps, niter=1000)
+    if len(params) == 0:
+        params = calc_params(p_i=(1 - measure), n_i=steps, niter=1000)
     return f_inv_out(1 - np.array(accuracies), params)
 
 
@@ -209,7 +211,7 @@ def plot_measure(
     # Plot extrapolation
     ax.plot(
         projection,
-        project_steps(measure, steps, projection),
+        project_steps(measure, steps, projection)[0],
         linestyle="dashed",
         label=f"Potential Model Results ({name})",
     )
@@ -431,6 +433,7 @@ class Sufficiency(EvaluateMixin):
 
         output = {}
         output[STEPS_KEY] = projection
+        params_cache = []
         for name, measure in data.items():
             if name == STEPS_KEY:
                 continue
@@ -438,11 +441,13 @@ class Sufficiency(EvaluateMixin):
             if len(measure.shape) > 1:
                 result = []
                 for i in range(measure.shape[1]):
-                    projected = project_steps(measure[:, i], data[STEPS_KEY], projection)
+                    projected, params = project_steps(measure[:, i], data[STEPS_KEY], projection)
+                    params_cache.append(params)
                     result.append(projected)
                 output[name] = np.array(result).T
             else:
-                output[name] = project_steps(measure, data[STEPS_KEY], projection)
+                output[name], params = project_steps(measure, data[STEPS_KEY], projection)
+                params_cache.append(params)
         return output
 
     @classmethod
@@ -504,7 +509,7 @@ class Sufficiency(EvaluateMixin):
         return plots
 
     @classmethod
-    def inv_project(cls, targets, data: Dict[str, np.ndarray]):
+    def inv_project(cls, targets, data: Dict[str, np.ndarray], params_cache=[]):
         """
         How many training samples in data are needed to achieve the model metric values
         specified in targets?
@@ -535,7 +540,12 @@ class Sufficiency(EvaluateMixin):
         for name, measure in data.items():
             if name == STEPS_KEY:
                 continue
+            # TODO: We currently assume measure shape == 1
+            if len(params_cache) > 0:
+                params = params_cache[0]
+            else:
+                params = np.zeros(0)
 
-            num_samples_needed = inv_project_steps(measure, steps, targets)
+            num_samples_needed = inv_project_steps(measure, steps, targets, params)
             num_samples_needed = np.int64(np.ceil(num_samples_needed))
             return num_samples_needed
