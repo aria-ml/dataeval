@@ -48,7 +48,7 @@ if [[ $verbose ]]; then verbosity="-v"; fi
 # if no python versions are specified, the devcontainer will have all
 if [[ ${#pvers[@]} == 0 ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
 
-export deps_image="harbor.jatic.net:443/daml/daml-deps"
+export deps_image="harbor.jatic.net/daml/daml-deps"
 export deps_hash=$(sha256sum poetry.lock | cut -c 1-8)
 export DOCKER_BUILDKIT=1
 
