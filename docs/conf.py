@@ -72,6 +72,8 @@ html_theme_options = {
 }
 html_static_path = ["_static"]
 
+doctest_test_doctest_blocks = ""
+
 
 @contextmanager
 def cwd(path):
@@ -81,6 +83,7 @@ def cwd(path):
         yield
     finally:
         chdir(old_path)
+
 
 def predownload_data():
     import keras.api._v2.keras.datasets as kds
@@ -103,6 +106,7 @@ def predownload_data():
         tfds.load("mnist", split="train")
         tfds.load("mnist_corrupted/translate", split="train")
 
+
 # because we expose private modules in public namespaces
 # and rename some classes, documentation recognizes these
 # public classes as aliases, which we don't want
@@ -116,12 +120,15 @@ def normalize_module(mod_names):
             cls.__name__ = cls_name
             cls.__module__ = mod_name
 
+
 def setup(app):
     predownload_data()
     normalize_module(
         [
             "daml.metrics",
             "daml.metrics.drift",
-            "daml.metrics.outlier_detection",
+            "daml.metrics.outlier",
+            "daml.models.tensorflow",
+            "daml.models.torch",
         ]
     )
