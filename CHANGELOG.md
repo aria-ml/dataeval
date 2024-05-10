@@ -1,6 +1,13 @@
-[//]: # (e3c4b66010176cbb89a04493c263291e2d59ef18)
+[//]: # (07b12ac2719ce2fd541c98ff0f89e30be0dd8a49)
 
 # DAML Change Log
+
+## v0.52.0
+
+🛠️ **Improvements and Enhancements**
+- `07b12ac2` - Fully integrate outlier detection into DAML
+
+    Outlier Detection API has been changed.  Additional details are available in our documentation.
 
 ## v0.51.0
 
