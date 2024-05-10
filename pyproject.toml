@@ -117,7 +117,6 @@ files = ["src/daml/__init__.py"]
 
 [tool.pyright]
 reportMissingImports = false
-exclude = ["src/daml/_alibi_detect"]
 
 [tool.pytest.ini_options]
 markers = [
@@ -134,7 +133,6 @@ exclude = [
   ".jupyter_cache",
   "*env*",
   "output",
-  "_alibi_detect",
   "_build"
 ]
 line-length = 120
