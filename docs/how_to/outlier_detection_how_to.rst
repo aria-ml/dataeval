@@ -13,14 +13,14 @@ Initialize an Outlier Detector with Custom Prediction Arguments
 
 .. testcode::
     
-    from daml.metrics.outlier_detection import OD_VAE, Threshold, ThresholdType
-
+    from daml.metrics.outlier import VAEOutlier
+    from daml.models.tensorflow import VAE, create_model
+    
     # instantiate an outlier detector metric
-    metric = OD_VAE()
+    metric = VAEOutlier(create_model(VAE, dataset[0].shape))
 
-    # update the metric's prediction args to make use of additional available compute
-    metric.set_prediction_args(batch_size=128, outlier_perc=80)
-
-    # fit and evaluate to detect outliers
-    metric.fit_dataset(dataset)
-    metric.evaluate(dataset)
+    # the training set has about 15% outliers so set the fit threshold at 85%
+    metric.fit(dataset, threshold_perc=85, batch_size=128, verbose=False)
+    
+    # detect outliers at the 'feature' level
+    metric.predict(dataset, outlier_type="feature")
