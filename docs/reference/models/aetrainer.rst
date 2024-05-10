@@ -32,6 +32,6 @@ If there are scenarios that you want us to explain, contact us!
 DAML API
 --------
 
-.. autoclass:: daml.models.ae.AETrainer
+.. autoclass:: daml.models.torch.AETrainer
    :members:
    :inherited-members:
