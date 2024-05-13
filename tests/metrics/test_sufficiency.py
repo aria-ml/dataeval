@@ -475,6 +475,7 @@ class TestSufficiencyExtraFeatures:
         target_needed_data = np.array([20, 40, 60])
         assert np.all(np.isclose(needed_data, target_needed_data, atol=1))
 
+    @pytest.mark.functional
     def test_predicts_on_real_data(self):
         """
         End-to-end functional test of sufficiency. This loads the MNIST dataset,
