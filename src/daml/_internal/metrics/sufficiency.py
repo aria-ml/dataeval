@@ -161,7 +161,7 @@ def project_steps(
     Returns
     ----------
     projected_steps : np.ndarray
-        Extrapolated meausure values at each projection step
+        Extrapolated measure values at each projection step
     params : np.ndarray
         length-3 array of the parameters for the fit curve.
 
@@ -522,9 +522,7 @@ class Sufficiency(EvaluateMixin):
         return plots
 
     @classmethod
-    def inv_project(
-        cls, targets, data: Dict[str, np.ndarray], params_cache=np.zeros((1, 0))
-    ):
+    def inv_project(cls, targets, data: Dict[str, np.ndarray], params_cache=np.zeros((1, 0))) -> int:
         """
         How many training samples in data are needed to achieve the model metric values
         specified in targets?
@@ -547,7 +545,7 @@ class Sufficiency(EvaluateMixin):
         Returns
         -------
         num_samples_needed : np.ndarray(np.int64)
-            List of the numbe of training samples needed to achieve each
+            List of the number of training samples needed to achieve each
             corresponding entry in targets
         """
 
@@ -568,5 +566,7 @@ class Sufficiency(EvaluateMixin):
             params = params_cache[0]
 
             num_samples_needed = inv_project_steps(measure, steps, targets, params)
-            num_samples_needed = np.int64(np.ceil(num_samples_needed))
-            return num_samples_needed
+            return np.int64(np.ceil(num_samples_needed)).item()
+
+        # TODO: Is this a reasonable error response
+        return -1

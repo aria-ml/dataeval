@@ -7,6 +7,7 @@ Licensed under Apache Software License (Apache 2.0)
 """
 
 from itertools import product
+from typing import cast
 
 import keras.api._v2.keras as keras
 import numpy as np
@@ -27,7 +28,7 @@ n_tests = len(tests)
 
 # load iris data
 X, y = load_iris(return_X_y=True)
-X = X.astype(np.float32)
+X = cast(np.ndarray, X.astype(np.float32))
 
 input_dim = X.shape[1]
 encoding_dim = 1
