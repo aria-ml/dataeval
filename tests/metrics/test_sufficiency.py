@@ -408,11 +408,7 @@ class TestSufficiencyExtraFeatures:
         accuracies, _ = dms.project_steps(measure, steps, projection)
         predicted_proj = dms.inv_project_steps(measure, steps, accuracies)
 
-        percent_error = (
-            np.linalg.norm(projection - predicted_proj)
-            / np.linalg.norm(projection)
-            * 100
-        )
+        percent_error = np.linalg.norm(projection - predicted_proj) / np.linalg.norm(projection) * 100
 
         assert percent_error < 0.01
 
@@ -431,11 +427,7 @@ class TestSufficiencyExtraFeatures:
         accuracies, params = dms.project_steps(measure, steps, projection)
         predicted_proj = dms.inv_project_steps(measure, steps, accuracies, params)
 
-        percent_error = (
-            np.linalg.norm(projection - predicted_proj)
-            / np.linalg.norm(projection)
-            * 100
-        )
+        percent_error = np.linalg.norm(projection - predicted_proj) / np.linalg.norm(projection) * 100
 
         assert percent_error < 0.01
 
@@ -473,7 +465,7 @@ class TestSufficiencyExtraFeatures:
         needed_data = suff.inv_project(desired_accuracies, data)
 
         target_needed_data = np.array([20, 40, 60])
-        assert np.all(np.isclose(needed_data, target_needed_data, atol=1))
+        assert np.isclose(needed_data, target_needed_data, atol=1)
 
     @pytest.mark.functional
     def test_predicts_on_real_data(self):
@@ -489,18 +481,14 @@ class TestSufficiencyExtraFeatures:
         torch.manual_seed(0)
         torch.set_float32_matmul_precision("high")
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        torch._dynamo.config.suppress_errors = True
+        torch._dynamo.config.suppress_errors = True  # type: ignore
         datasets.MNIST("./data", train=True, download=True)
         datasets.MNIST("./data", train=False, download=True)
 
         # Download the mnist dataset and preview the images
         to_tensor = v2.Compose([v2.ToImage(), v2.ToDtype(torch.float32, scale=True)])
-        train_ds = datasets.MNIST(
-            "./data", train=True, download=True, transform=to_tensor
-        )
-        test_ds = datasets.MNIST(
-            "./data", train=False, download=True, transform=to_tensor
-        )
+        train_ds = datasets.MNIST("./data", train=True, download=True, transform=to_tensor)
+        test_ds = datasets.MNIST("./data", train=False, download=True, transform=to_tensor)
 
         # Take a subset of 2000 training images and 500 test images
         train_ds = Subset(train_ds, range(4000))
@@ -537,8 +525,4 @@ class TestSufficiencyExtraFeatures:
         # Train model and see if we get the accuracy we expect on these predicte
         # amounts of training data
         output_on_pred_nsamples = suff.evaluate(pred_nsamples)
-        assert np.all(
-            np.isclose(
-                output_on_pred_nsamples["Accuracy"], desired_accuracies, atol=0.05
-            )
-        )
+        assert np.all(np.isclose(output_on_pred_nsamples["Accuracy"], desired_accuracies, atol=0.05))
