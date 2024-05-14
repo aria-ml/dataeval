@@ -465,7 +465,7 @@ class TestSufficiencyExtraFeatures:
         needed_data = suff.inv_project(desired_accuracies, data)
 
         target_needed_data = np.array([20, 40, 60])
-        assert np.isclose(needed_data, target_needed_data, atol=1)
+        assert np.all(np.isclose(needed_data, target_needed_data, atol=1))
 
     @pytest.mark.functional
     def test_predicts_on_real_data(self):
