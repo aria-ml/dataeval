@@ -170,7 +170,6 @@ function build_image() {
         $load_arg \
         --builder $builder_name \
         --build-arg python_version=$python_version \
-        --build-arg BUILDKIT_INLINE_CACHE=1 \
         $python_optimization_args \
         $image_args \
         $cache_from_arg \
