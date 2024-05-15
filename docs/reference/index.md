@@ -17,15 +17,15 @@ metrics/sufficiency
 metrics/uap
 :::
 
-Model Trainers
---------------
+Supported Model Backends
+------------------------
 
 The models and model trainers provided by DAML are meant to assist users in setting up architectures that are guaranteed to work with applicable DAML metrics. \
-Below is a list of trainers and models available. 
+Below is a list of backends with available trainers and models. 
 
 :::{toctree}
 :maxdepth: 1
 
-models/aetrainer
+models/torch
 models/tensorflow
 :::
