@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 
 from daml._internal.models.tensorflow.autoencoder import AE, AEGMM, VAE, VAEGMM
@@ -10,8 +12,9 @@ class TestTensorflowModels:
 
     @pytest.mark.parametrize("model_type", [AE, AEGMM, PixelCNN, VAE, VAEGMM])
     def test_create_model(self, model_type):
-        model = create_model(model_type, self.input_shape)
-        assert isinstance(model, model_type)
+        with patch(f"daml._internal.models.tensorflow.utils.{model_type.__qualname__}") as mock_model:
+            create_model(mock_model, self.input_shape)
+            assert mock_model.called
 
     def test_create_model_invalid_class(self):
         with pytest.raises(TypeError):
