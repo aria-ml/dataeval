@@ -146,6 +146,7 @@ function build_image() {
     cache_image="${tag/:/-buildcache:}"
 
     cache_from_arg="\
+        --cache-from type=registry,ref=$main_build_cache \
         --cache-from type=registry,ref=$cache_image \
         --cache-from type=registry,ref=$cache_from_tag"
 
@@ -153,6 +154,10 @@ function build_image() {
     # don't want to force users to login to the registry just to build.
     if [[ $push_to_repo ]]; then
         cache_to_arg="--cache-to type=registry,mode=max,image-manifest=true,ref=$cache_image"
+        # Only update the main build cache via pipeline builds running the main branch
+        if [[ $CI_COMMIT_BRANCH && $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH ]]; then
+            cache_to_arg="${cache_to_arg} --cache-to type=registry,mode=max,image-manifest=true,ref=$main_build_cache"
+        fi
     fi
 
     output_arg="--output type=image,name=$tag"
