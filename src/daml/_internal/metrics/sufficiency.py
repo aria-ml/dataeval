@@ -146,6 +146,7 @@ def project_steps(
     measure: np.ndarray,
     steps: np.ndarray,
     projection: np.ndarray,
+    niter: int = 1000,
 ) -> tuple:
     """Projects the measures for each value of X
 
@@ -166,7 +167,7 @@ def project_steps(
         length-3 array of the parameters for the fit curve.
 
     """
-    params = calc_params(p_i=(1 - measure), n_i=steps, niter=1000)
+    params = calc_params(p_i=(1 - measure), n_i=steps, niter=niter)
     projected_steps = 1 - f_out(projection, params)
     return projected_steps, params
 
@@ -420,6 +421,7 @@ class Sufficiency(EvaluateMixin):
         cls,
         data: Dict[str, np.ndarray],
         projection: Union[int, Sequence[int], np.ndarray],
+        niter: int = 1000,
     ) -> Dict[str, np.ndarray]:
         """Projects the measures for each value of X
 
@@ -454,12 +456,12 @@ class Sufficiency(EvaluateMixin):
             if len(measure.shape) > 1:
                 result = []
                 for i in range(measure.shape[1]):
-                    projected, params = project_steps(measure[:, i], data[STEPS_KEY], projection)
+                    projected, params = project_steps(measure[:, i], data[STEPS_KEY], projection, niter)
                     params_cache.append(params)
                     result.append(projected)
                 output[name] = np.array(result).T
             else:
-                output[name], params = project_steps(measure, data[STEPS_KEY], projection)
+                output[name], params = project_steps(measure, data[STEPS_KEY], projection, niter)
                 params_cache.append(params)
         return output
 
