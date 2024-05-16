@@ -521,8 +521,13 @@ class TestSufficiencyExtraFeatures:
         # Initialize the array of accuracies that we want to achieve
         desired_accuracies = np.array([0.5, 0.8, 0.9])
 
-        output_to_fit = {'_STEPS_': np.array([  40,   66,  111,  185,  309,  516,  861, 1437, 2397, 4000]), 'Accuracy': np.array([0.5976, 0.6732, 0.7584, 0.8048, 0.8428, 0.8936, 0.9136, 0.9388,
-        0.9448, 0.9644])}
+        output_to_fit = {
+            '_STEPS_': np.array([  40,   66,  111,  185,  309,
+                                   516,  861, 1437, 2397, 4000]),
+            'Accuracy': np.array([0.5976, 0.6732, 0.7584, 0.8048,
+                                   0.8428, 0.8936, 0.9136, 0.9388,
+                                    0.9448, 0.9644])
+        }
 
         # Evaluate the learning curve to infer the needed amount of training data
         # to train a model to (desired_accuracies) accuracy
