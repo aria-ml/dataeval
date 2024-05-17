@@ -179,6 +179,7 @@ function build_image() {
         --builder $builder_name \
         --build-arg python_version=$python_version \
         $no_cache_filter_arg \
+        --build-arg SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct) \
         $cache_from_arg \
         $cache_to_arg \
         $output_arg \
