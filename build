@@ -121,7 +121,7 @@ function build_image() {
 
         # Set the various image vars if there's a cached image available
         image_args="\
-            --build-arg base_image=${base_image}-${python_version} \
+            --build-arg base_image=${base_image}:${python_version} \
             --build-arg deps_image=${deps_image}-${python_version} \
             --build-arg build_image=${build_image}-${python_version}"
 
@@ -190,17 +190,15 @@ function ensure_image() {
     python_version=$2
 
     if [[ $target == "pybase" ]]; then
-        tag=$base_image
+        tag="${base_image}:${python_version}"
     elif [[ $target == "pydeps" ]]; then
-        tag=$deps_image
+        tag="${deps_image}-${python_version}"
     elif [[ $target == "build" ]]; then
-        tag=$build_image
+        tag="${build_image}-${python_version}"
     else
         echo "unknown target: ${target}"
         exit 1
     fi
-
-    tag="${tag}-${python_version}"
 
     echo "Checking $tag image..."
     if ! $(docker manifest inspect $tag > /dev/null 2>&1); then
@@ -237,9 +235,9 @@ export -f docker_run
 export deps_hash=$(sha256sum poetry.lock | cut -c 1-8)
 
 registry="harbor.jatic.net/daml"
-export base_image="${registry}/daml-deps:base"
-export deps_image="${registry}/daml-deps:${deps_hash}"
-export build_image="${registry}/daml-build:${deps_hash}"
+export base_image="${registry}/pybase"
+export deps_image="${registry}/pydeps:${deps_hash}"
+export build_image="${registry}/build:${deps_hash}"
 
 if [[ -z $verbose ]]; then
     verbosity="--quiet"
