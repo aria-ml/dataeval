@@ -468,7 +468,7 @@ class TestSufficiencyExtraFeatures:
         assert np.all(np.isclose(needed_data, target_needed_data, atol=1))
 
     @pytest.mark.functional
-    def test_predicts_on_real_data(self):
+    def test_predicts_on_real_data(self, mnist):
         """
         End-to-end functional test of sufficiency. This loads the MNIST dataset,
         fits a sufficiency curve to it, and then predicts how many steps are required
@@ -483,19 +483,26 @@ class TestSufficiencyExtraFeatures:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         torch._dynamo.config.suppress_errors = True  # type: ignore
 
+
+        train_ds = DamlDataset(*mnist(4000, "train", np.float32, "channels_first", 1))
+        test_ds = DamlDataset(*mnist(500, "test", np.float32, "channels_first", 1))
         
+        """
         datasets.MNIST("./data", train=True, download=True)
         datasets.MNIST("./data", train=False, download=True)
-
+        """
         # Download the mnist dataset and preview the images
         to_tensor = v2.Compose([v2.ToImage(), v2.ToDtype(torch.float32, scale=True)])
-        train_ds = datasets.MNIST("./data", train=True, download=True, transform=to_tensor)
-        test_ds = datasets.MNIST("./data", train=False, download=True, transform=to_tensor)
+        tr_ds = datasets.MNIST("./data", train=True, download=True, transform=to_tensor)
+        tds = datasets.MNIST("./data", train=False, download=True, transform=to_tensor)
 
+        ours = np.float64(tds[0][0])
+        theirs = np.float64(test_ds[0][0])
         # Take a subset of 2000 training images and 500 test images
-        train_ds = Subset(train_ds, range(4000))
-        test_ds = Subset(test_ds, range(500))
-        
+        #train_ds = Subset(train_ds, range(4000))
+        #test_ds = Subset(test_ds, range(500))
+        """
+        """
 
         # Compile the model
         model = torch.compile(RealisticNet().to(device))
