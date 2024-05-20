@@ -9,8 +9,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torchmetrics
-import torchvision.datasets as datasets
-import torchvision.transforms.v2 as v2
 from matplotlib.figure import Figure
 from torch.utils.data import DataLoader, Dataset, Subset
 
@@ -486,23 +484,6 @@ class TestSufficiencyExtraFeatures:
 
         train_ds = DamlDataset(*mnist(4000, "train", np.float32, "channels_first", 1))
         test_ds = DamlDataset(*mnist(500, "test", np.float32, "channels_first", 1))
-        
-        """
-        datasets.MNIST("./data", train=True, download=True)
-        datasets.MNIST("./data", train=False, download=True)
-        """
-        # Download the mnist dataset and preview the images
-        to_tensor = v2.Compose([v2.ToImage(), v2.ToDtype(torch.float32, scale=True)])
-        tr_ds = datasets.MNIST("./data", train=True, download=True, transform=to_tensor)
-        tds = datasets.MNIST("./data", train=False, download=True, transform=to_tensor)
-
-        ours = np.float64(tds[0][0])
-        theirs = np.float64(test_ds[0][0])
-        # Take a subset of 2000 training images and 500 test images
-        #train_ds = Subset(train_ds, range(4000))
-        #test_ds = Subset(test_ds, range(500))
-        """
-        """
 
         # Compile the model
         model = torch.compile(RealisticNet().to(device))
@@ -523,11 +504,15 @@ class TestSufficiencyExtraFeatures:
         )
 
         # Train & test model
-        #output_to_fit = suff.evaluate()
 
         # Initialize the array of accuracies that we want to achieve
         desired_accuracies = np.array([0.5, 0.8, 0.9])
 
+        """
+        Normally we would write output_to_fit = suff.evaluate()
+        However, this takes a very long time to evaluate, so for this test,
+        the output from suff.evaluate() is pasted below.
+        """
         output_to_fit = {
             '_STEPS_': np.array([  40,   66,  111,  185,  309,
                                    516,  861, 1437, 2397, 4000]),
