@@ -92,6 +92,15 @@ for task in "${!tasks[@]}"; do
 done
 if [[ ${tasks[lint]} || ${tasks[docs]} || ${tasks[qdocs]} ]]; then pvers[3.11]=1; fi
 
+export builder_name="daml"
+if [[ -z $(docker builder ls --format '{{.Name}}' | grep $builder_name) ]]; then
+    echo "builder instance named $builder_name doesn't exist, creating it now..."
+    docker builder create \
+        --driver docker-container \
+        --bootstrap \
+        --name $builder_name
+fi
+
 function post_build_cleanup() {
     temp=$1
     tag=$2
@@ -126,16 +135,29 @@ function build_image() {
             --build-arg build_image=${build_image}-${python_version}"
 
         docker pull $cache_from_tag
-        cache_from_arg="--cache-from $cache_from_tag"
+        cache_from_arg="--cache-from type=registry,ref=$cache_from_tag"
     fi
 
-    docker_build_cmd="docker build $verbosity \
+    output_arg="--output type=image,name=$tag"
+    if [[ $push_to_repo ]]; then
+        output_arg="${output_arg},push=true"
+    fi
+
+    if [[ $save_build_images || $load_image ]]; then
+        # By default the docker-container driver doesn't load images to the
+        # local docker images store, these args will cause it to do so.
+        load_arg="--tag ${tag} --load"
+    fi
+
+    docker_build_cmd="docker buildx build $verbosity \
+        $load_arg \
+        --builder $builder_name \
         --build-arg python_version=$python_version \
         --build-arg BUILDKIT_INLINE_CACHE=1 \
         $python_optimization_args \
         $image_args \
         $cache_from_arg \
-        --tag $tag \
+        $output_arg \
         --target $target \
         ."
 
@@ -159,6 +181,7 @@ function docker_run() {
 
     trap "post_build_cleanup $temp $tag" EXIT
 
+    export load_image=1
     build_image $tag run $pver "${build_image}-${pver}"
     docker_run_args="--name $tag $gpuflag $tag"
 
@@ -204,10 +227,6 @@ function ensure_image() {
     if ! $(docker manifest inspect $tag > /dev/null 2>&1); then
         build_image $tag $target $python_version $tag
         echo "Finished building $tag."
-        if [[ $push_to_repo ]]; then
-            echo "Pushing $tag..."
-            docker push $tag
-        fi
     fi
 
     # Base tag images do not have a main tag equivalent so we can skip main tag update
@@ -227,7 +246,6 @@ function ensure_image() {
     fi
 }
 
-export DOCKER_BUILDKIT=1
 export -f post_build_cleanup
 export -f build_image
 export -f docker_run
