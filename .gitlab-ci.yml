@@ -136,7 +136,7 @@ dependency tests:
   rules: *on_run
 
 .run_tests:
-  extends: [.docker, .python_version_matrix]
+  extends: [.harbor, .python_version_matrix]
   script:
     - FAILURES=0
     - trap 'FAILURES=$((FAILURES+1))' ERR
@@ -195,7 +195,7 @@ coverage:
 
 docs:
   stage: docs
-  extends: .docker
+  extends: .harbor
   needs: [build image]
   tags: [multi-gpu]
   script:
