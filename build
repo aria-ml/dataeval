@@ -104,11 +104,12 @@ fi
 function post_build_cleanup() {
     temp=$1
     tag=$2
+    container_name=$3
 
     rm -f $temp
 
-    if [[ $(docker container ls --all --filter name=$tag) ]]; then
-        docker container rm --force $tag &> /dev/null
+    if [[ $(docker container ls --all --filter name=$container_name) ]]; then
+        docker container rm --force $container_name &> /dev/null
     fi
 
     if [[ -z $save_build_images && $(docker image ls --filter reference=$tag) ]]; then
@@ -173,20 +174,21 @@ function build_image() {
 function docker_run() {
     temp=$(mktemp)
     IFS=- read -r task pver <<< $1
-    tag="daml-$task-$pver"
+    tag="${run_image}-${pver}"
 
+    container_name="run-${task}-${pver}"
     if [[ $CI_PIPELINE_ID ]]; then
-        tag="${tag}-${CI_PIPELINE_ID}"
+        container_name="${container_name}-${CI_PIPELINE_ID}"
     fi
 
-    trap "post_build_cleanup $temp $tag" EXIT
+    trap "post_build_cleanup $temp $tag $container_name" EXIT
 
     export load_image=1
     build_image $tag run $pver "${build_image}-${pver}"
-    docker_run_args="--name $tag $gpuflag $tag"
+    docker_run_args="--name $container_name $gpuflag $tag"
 
     if [[ $verbose ]]; then
-        (echo "Running $tag..."; echo docker run $docker_run_args $task; docker run $docker_run_args $task | tee -a $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
+        (echo "Running $container_name..."; echo docker run $docker_run_args $task; docker run $docker_run_args $task | tee -a $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
     else
         docker run $docker_run_args $task &> $temp || result="FAILED"
     fi
@@ -201,7 +203,7 @@ function docker_run() {
     else
         if [[ ! $verbose ]]; then echo SUCCEEDED; fi
         case "$task" in
-            unit|func|docs) docker cp $tag:/daml/output ./;;
+            unit|func|docs) docker cp $container_name:/daml/output ./;;
         esac
     fi
 
@@ -256,6 +258,7 @@ registry="harbor.jatic.net/daml"
 export base_image="${registry}/pybase"
 export deps_image="${registry}/pydeps:${deps_hash}"
 export build_image="${registry}/build:${deps_hash}"
+export run_image="${registry}/run:${deps_hash}"
 
 if [[ -z $verbose ]]; then
     verbosity="--quiet"
