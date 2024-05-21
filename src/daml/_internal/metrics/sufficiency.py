@@ -64,6 +64,8 @@ def calc_params(p_i: np.ndarray, n_i: np.ndarray, niter: int) -> np.ndarray:
         Array of corresponding losses
     n_i : np.ndarray
         Array of sample sizes
+    niter: int
+        How many iterations to perform on the basin hopping scheme
 
     Returns
     -------
@@ -72,32 +74,14 @@ def calc_params(p_i: np.ndarray, n_i: np.ndarray, niter: int) -> np.ndarray:
     """
 
     def is_valid_x(f_new, x_new, f_old, x_old):
-        # return x_new[0] >= 0
-        x = x_new
-        # if x[0] < 0:
-        #    return False
         try:
-            np.sum(np.square(p_i - x[0] * n_i ** (-x[1]) - x[2]))
+            np.sum(np.square(p_i - x_new[0] * n_i ** (-x_new[1]) - x_new[2]))
         except ArithmeticError:
             return False
         return True
 
     def f(x):
-        # if x[0] < 0:
-        #    return np.inf
-        # try:
-        #    inner = np.sum(np.square(p_i - x[0] * n_i ** (-x[1]) - x[2]))
-        # with warnings.catch_warnings():
-        #    warnings.filterwarnings("error")
-        #   try:
-        # Problem: Sometimes x[0]*n_i goes negative which results in complex results
-        # This appears to happen when x[0] < 0
-        inner = np.sum(np.square(p_i - x[0] * n_i ** (-x[1]) - x[2]))
-
-        #    except Warning:
-        #  # Warnings likely correspond to out-of-bounds errors
-        #        return np.inf
-        return inner
+        return np.sum(np.square(p_i - x[0] * n_i ** (-x[1]) - x[2]))
 
     res = basinhopping(f, np.array([0.5, 0.5, 0.1]), niter=niter, accept_test=is_valid_x)
     return res.x
@@ -158,12 +142,15 @@ def project_steps(
         Steps of the taken measures
     projection : np.ndarray
         Steps to extrapolate
+    niter : int, default 1000
+        Number of iterations to perform in the numerical process
+        to curve-fit measure
 
     Returns
-    ----------
-    projected_steps : np.ndarray
+    -------
+    np.ndarray
         Extrapolated measure values at each projection step
-    params : np.ndarray
+    np.ndarray
         length-3 array of the parameters for the fit curve.
 
     """
@@ -188,7 +175,7 @@ def inv_project_steps(
         Steps of the taken measures
     accuracies : np.ndarray
         Desired accuracy values
-    params : np.ndarray
+    params : np.ndarray, default np.zeros(0)
         length-3 array of the parameters for the sufficiency curve to study.
         If not provided, we curve-fit the parameters at runtime. Curve-fitting
         is very slow, and we recommend pre-computing the parameters.
@@ -255,9 +242,9 @@ class Sufficiency(EvaluateMixin):
         (torch.utils.data.Dataset) and returns a dictionary of metric
         values (Dict[str, float]) which is used to assess model performance
         given the model and data.
-    runs : int
+    runs : int, default 1
         Number of models to run over all subsets
-    substeps : int
+    substeps : int, default 5
         Total number of dataset partitions that each model will train on
     train_kwargs : Dict[str, Any] | None, default None
         Additional arguments required for custom training function
@@ -346,13 +333,13 @@ class Sufficiency(EvaluateMixin):
     def eval_kwargs(self, value: Optional[Dict[str, Any]]):
         self._eval_kwargs = {} if value is None else value
 
-    def evaluate(self, forced_range=None) -> Dict[str, np.ndarray]:
+    def evaluate(self, forced_range : Optional[np.ndarray] = None) -> Dict[str, np.ndarray]:
         """
         Creates data indices, trains models, and returns plotting data
 
         Inputs
         ------
-        forced_range : (Optional)np.ndarray
+        forced_range : Optional[np.ndarray]
             Specify this to collect accuracies over a specific set of dataset lengths,
             rather than letting Sufficiency internally create the lengths
             to evaluate at.
@@ -382,7 +369,6 @@ class Sufficiency(EvaluateMixin):
             model = reset_parameters(self.model)
             # Run the model with each substep of data
             for iteration, substep in enumerate(ranges):
-                #model = reset_parameters(self.model)
                 # train on subset of train data
                 self.train_fn(
                     model,
@@ -524,7 +510,7 @@ class Sufficiency(EvaluateMixin):
         return plots
 
     @classmethod
-    def inv_project(cls, targets, data: Dict[str, np.ndarray], params_cache=np.zeros((1, 0))) -> np.int64:
+    def inv_project(cls, targets: np.ndarray, data: Dict[str, np.ndarray], params_cache : np.ndarray = np.zeros((1, 0))) -> np.int64:
         """
         How many training samples in data are needed to achieve the model metric values
         specified in targets?
@@ -537,7 +523,7 @@ class Sufficiency(EvaluateMixin):
         data : Dict[str, np.ndarray]
             Dataclass containing the average of each measure per substep
 
-        params_cache : np.ndarray
+        params_cache : np.ndarray, default np.zeros((1,0))
             1 x 3 List of cached parameters for the sufficiency curve. The parameters
             can be precomputed by using the project() function.
             TODO: The first axis should represent the number of data columns. It's
@@ -546,7 +532,7 @@ class Sufficiency(EvaluateMixin):
 
         Returns
         -------
-        num_samples_needed : np.ndarray(np.int64)
+        np.ndarray(np.int64)
             List of the number of training samples needed to achieve each
             corresponding entry in targets
         """
