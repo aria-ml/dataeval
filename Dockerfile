@@ -127,6 +127,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         openssh-server \
         parallel
 RUN addgroup --gid 1001 docker
+# UID is used when build script dynamically appends COPY --chown=${UID} dependency binaries from pydeps images
+ARG UID
 ARG USER
 RUN usermod -a -G docker ${USER}
 USER ${USER}

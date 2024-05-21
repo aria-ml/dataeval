@@ -7,10 +7,10 @@ Usage:
 
 Options:
   -b, --build-only  only build dependency images
+  -d, --devenv      only build the developer environment image
   -h, --help        display this help information
   -v, --verbose     print output to console during container execution
       --gpu         enable gpu support on task execution
-      --no-cache    runs docker build without using the cache
       --push        push all built images to repository
 
 Default:
@@ -33,15 +33,15 @@ EOF
 exit $1
 }
 
-options=$(getopt -l "help,verbose,gpu,no-cache,build-only,push" -o "hvb" -n "build" -- "$@")
+options=$(getopt -l "help,verbose,gpu,build-only,devenv,push" -o "hvbd" -n "build" -- "$@")
 eval set -- "$options"
 while true; do
     case "$1" in
         -h|--help)       showHelp;;
         -v|--verbose)    export verbose=1;;
         --gpu)           export gpuflag="--gpus all";;
-        --no-cache)      cache_arg="--no-cache";;
         -b|--build-only) build_only=1;;
+        -d|--devenv)     devenv=1;;
         --push)          export push_to_repo=1;;
         --)              shift; break;;
     esac
@@ -265,7 +265,7 @@ if [[ -z $verbose ]]; then
 fi
 export verbosity
 
-if [[ $build_only ]]; then
+if [[ $build_only ]] || [[ $devenv ]]; then
     if [[ ${#pvers[@]} == 0 ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
     for pver in ${!pvers[@]}; do
         ensure_image pybase $pver
@@ -274,6 +274,14 @@ if [[ $build_only ]]; then
             ensure_image build $pver
         fi
     done
+
+    if [[ $devenv ]]; then
+        echo "Building devcontainer with python ${!pvers[@]}..."
+        (cat Dockerfile && echo ENV versions=\"${!pvers[@]}\" && echo -n ${!pvers[@]} | xargs -d' ' -I{} echo COPY --chown=\${UID}/ --link --from=$deps_image-{} \${PYENV_ROOT}/ \${PYENV_ROOT}/) |
+        docker build $verbosity --tag daml-devcontainer --target devcontainer -
+        docker image prune -f
+    fi
+
     exit $?
 fi
 
