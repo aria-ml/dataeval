@@ -3,17 +3,30 @@ import numpy.testing as npt
 import pytest
 import sklearn.datasets as dsets
 
-from daml._prototype.clusterer import (
+from daml._internal.metrics.clustering import (
+    Cluster,
     Clusterer,
+    ClusterPosition,
     extend_linkage,
-    get_distance_matrix,
-    get_extended_linkage,
-    get_linkage_arr,
 )
 
 
-@pytest.fixture
-def func_data():
+def union_find(lis):
+    lis = map(set, lis)
+    unions = []
+    for item in lis:
+        temp = []
+        for s in unions:
+            if not s.isdisjoint(item):
+                item = s.union(item)
+            else:
+                temp.append(s)
+        temp.append(item)
+        unions = temp
+    return unions
+
+
+def get_functional_data():
     blobs, _ = dsets.make_blobs(  # type: ignore
         n_samples=100,
         centers=[(-1.5, 1.8), (-1, 3), (0.8, 2.1), (2.8, 1.5), (2.5, 3.5)],  # type: ignore
@@ -21,103 +34,177 @@ def func_data():
         random_state=33,
     )
     # test_data = np.vstack([moons, blobs])
-    test_data = blobs
-    test_data[79] = test_data[24]
-    test_data[63] = test_data[58] + 1e-5
+    functional_data = blobs
+    functional_data[79] = functional_data[24]
+    functional_data[63] = functional_data[58] + 1e-5
 
-    return test_data
+    return functional_data
 
 
-@pytest.fixture
-def dupe_data():
-    # rand_inds = np.random.randint(0, 25, size=(5))
-    x = np.ones(shape=(25, 2))
-    # x[rand_inds] += 1
+def get_duplicate_data():
+    x = np.ones(shape=(6, 2))
     return x
 
 
-@pytest.fixture
-def outlier_data():
+def get_outlier_data():
     blobs, _ = dsets.make_blobs(  # type: ignore
-        n_samples=100,
+        n_samples=10,
         centers=[(-1.5, 1.8), (-1, 3), (0.8, 2.1), (2.8, 1.5), (2.5, 3.5)],  # type: ignore
         cluster_std=0.3,
         random_state=33,
     )
     # test_data = np.vstack([moons, blobs])
     test_data = blobs
-    rand_indices = np.random.randint(0, 100, size=5)
+    rand_indices = np.random.randint(0, 10, size=2)
     test_data[rand_indices] *= 3.0
 
     return test_data
 
 
+@pytest.fixture
+def functional_data():
+    return get_functional_data()
+
+
+@pytest.fixture
+def duplicate_data():
+    return get_duplicate_data()
+
+
+@pytest.fixture
+def outlier_data():
+    return get_outlier_data()
+
+
 class TestMatrixOps:
     @pytest.mark.parametrize(
-        "rows, cols",
+        "shape",
         (
-            (2, 1),
-            (4, 4),
-            (100, 2),
-            (100, 100),
+            (2, 0),  # No features
+            (2, 1),  # Minimum size
+            (4, 4),  # Square small
+            (100, 2),  # High sample, low features
+            (2, 100),  # Low samples, high features
+            (100, 100),  # Square large
         ),
     )
-    def test_matrices(self, rows, cols):
-        # PyTest parameterize doesn't like fixtures, so manually creating
-        # random data, duplicate data, and outlier data
+    def test_matrices(self, shape):
+        """Test sample size (rows), feature size (cols) and non-uniform shapes can create matrix"""
+        rows, cols = shape
         rand_arr = np.random.random(size=(rows, cols))
         dup_arr = np.ones(shape=(rows, cols))
 
         test_sets = (rand_arr, dup_arr)
 
         for test_set in test_sets:
-            # Distance matrix
+            c = Clusterer(test_set)
 
-            dm = get_distance_matrix(test_set)
-            assert not any(np.isnan(dm))
-            assert all(dm >= 0)
-            assert len(dm) == rows * (rows - 1) / 2  #  condensed form
+            # Distance matrix
+            assert not any(np.isnan(c._darr))  # Should contain no NaN
+            assert all(c._darr >= 0)  # Distances are always positive or 0 (same data point)
+            assert len(c._darr) == rows * (rows - 1) / 2  #  condensed form of matrix
+
+            # Square distance matrix
+            assert len(set(c._sqdmat.shape)) == 1  # All dims are equal size
+            assert np.all(c._sqdmat == c._sqdmat.T)  # Matrix is symmetrical
+
+            # Extend function
+            arr = np.ones(shape=(rows, cols))
+            ext_matrix = extend_linkage(arr)
+            assert ext_matrix.shape == (rows, cols + 1)  # Adds a column to the right
+            # New column contains new max_row number of ids starting from max row + 1
+            # i.e. [1, 2, 3] -> [[1, 2, 3], [4, 5, 6]]
+            npt.assert_array_equal(ext_matrix[:, -1], np.arange(rows + 1, 2 * rows + 1))
 
             # Linkage arr
-            Z = get_linkage_arr(dm)
-            assert Z.shape == (rows - 1, 4)
-            assert not np.any(np.isnan(Z))
+            assert not np.any(np.isnan(c._larr))  # Should contain no NaN
+
+    @pytest.mark.parametrize(
+        "shape",
+        (
+            (0, 0),  # Empty array
+            (0, 1),  # No samples
+            (1, 1),  # Minimum logical size
+            (2, 2, 2),  # Invalid shape
+            (10),  # Invalid shape
+            (10,),  # Invalid shape
+        ),
+    )
+    def test_matrices_invalid(self, shape):
+        if isinstance(shape, int) or len(shape) == 1:
+            rows, cols = shape, 0
+        else:
+            rows, cols = shape[0], shape[1]
+
+        test_set = np.ones(shape=shape)
+        with pytest.raises(ValueError):
+            c = Clusterer(test_set)
+            # Distance matrix
+            assert not any(np.isnan(c._darr))  # Should contain no NaN
+            assert all(c._darr >= 0)  # Distances are always positive or 0 (same data point)
+            assert len(c._darr) == rows * (rows - 1) / 2  #  condensed form of matrix
+
+            # Square distance matrix
+            assert len(set(c._sqdmat.shape)) == 1  # All dims are equal size
+            assert np.all(c._sqdmat == c._sqdmat.T)  # Matrix is symmetrical
+
+            # Linkage arr
+            assert not np.any(np.isnan(c._larr))  # Should contain no NaN
 
             # Extend function
             arr = np.ones(shape=(rows, cols))
             ext_matrix = extend_linkage(arr)
 
-            assert ext_matrix.shape == (rows, cols + 1)
+            assert ext_matrix.shape == (rows, cols + 1)  # Adds a column to the right
+            # New column contains new max_row number of ids starting from max row + 1
+            # i.e. [1, 2, 3] -> [[1, 2, 3], [4, 5, 6]]
             npt.assert_array_equal(ext_matrix[:, -1], np.arange(rows + 1, 2 * rows + 1))
 
 
 class TestClusterer:
-    def test_init(self, func_data):
+    def test_on_init(self, functional_data):
         """Tests that the init correctly sets the distance matrix and linkage array"""
+        cl = Clusterer(functional_data)
+        assert cl._num_samples is not None
+        assert cl._darr is not None
+        assert cl._sqdmat is not None
+        assert cl._larr is not None
+        assert cl._max_clusters is not None
+        assert cl._min_num_samples_per_cluster is not None
+        assert cl._clusters == {}
 
-        cl = Clusterer(func_data)
+    @pytest.mark.parametrize(
+        "shape",
+        (
+            (0, 0),  # Empty array
+            (0, 1),  # No samples
+            (1, 1),  # Minimum logical size
+            (2, 2, 2),  # Invalid shape
+            (10),  # Invalid shape
+            (10,),  # Invalid shape
+        ),
+    )
+    def test_on_init_fail(self, shape):
+        dataset = np.ones(shape=shape)
+        with pytest.raises(ValueError):
+            Clusterer(dataset)
 
-        ans_dmat = get_distance_matrix(func_data)
-        ans_larr = get_extended_linkage(ans_dmat)
-
-        npt.assert_array_equal(cl.dmat, ans_dmat)
-        npt.assert_array_equal(cl.larr, ans_larr)
-
-    def test_reset_results_on_new_data(self, func_data, dupe_data):
+    def test_reset_results_on_new_data(self, functional_data, duplicate_data):
         """
         When new data is given to clusterer,
         recalculate the distance matrix and linkage arr
         """
-        cl = Clusterer(func_data)
-        npt.assert_array_equal(get_distance_matrix(func_data), cl.dmat)
-        npt.assert_array_equal(get_extended_linkage(cl.dmat), cl.larr)
+        cl = Clusterer(functional_data)
+        npt.assert_array_equal(cl._data, functional_data)
 
-        cl.data = dupe_data
-        npt.assert_array_equal(cl.data, dupe_data)
-        npt.assert_array_equal(get_distance_matrix(dupe_data), cl.dmat)
-        npt.assert_array_equal(get_extended_linkage(cl.dmat), cl.larr)
+        cl.data = duplicate_data
+        npt.assert_array_equal(cl._data, duplicate_data)
 
-    def test_create_clusters(self, func_data, dupe_data, outlier_data):
+    def test_data_getter(self, functional_data):
+        npt.assert_array_equal(Clusterer(functional_data).data, functional_data)
+
+    @pytest.mark.parametrize("data_func", [get_functional_data, get_duplicate_data, get_outlier_data])
+    def test_create_clusters(self, data_func):
         """
         Tests to confirm:
         1. All keys are present in outer and inner dicts
@@ -125,129 +212,171 @@ class TestClusterer:
         3. Distances are all positive
         4. All samples have a cluster
         """
-        for dataset in (func_data, dupe_data, outlier_data):
-            clusterer = Clusterer(dataset)
-            result_clusters, max_levels, max_clusters = clusterer.create_clusters()
+        dataset = data_func()
+        clusterer = Clusterer(dataset)
+        clusterer.create_clusters()
 
-            # All inner keys are present, and none are added
-            inner_key_set = {
-                "cluster_num",
-                "level",
-                "count",
-                "avg_dist",
-                "dist_std",
-                "samples",
-                "sample_dist",
-                "cluster_merged",
-            }
-            for value_dict in result_clusters.values():
-                assert set(value_dict) == inner_key_set
+        # Max level and max clusters are empirically correct
+        n = len(dataset)
+        assert clusterer._max_level <= n  # Max levels must be less than samples
+        assert clusterer._max_clusters <= n // 2  # Minimum 2 samples for a valid cluster
+        assert clusterer._max_level >= 1
+        assert clusterer._max_clusters >= 1
 
-            # Max level and max clusters are empirically correct
-            n = len(dataset)
-            assert max_levels <= n  # Max levels must be less than samples
-            assert max_clusters <= n // 2  # Minimum 2 samples for a valid cluster
-            assert max_levels >= 1
-            assert max_clusters >= 1
+        result_all_levels = {}
+        result_all_clusters = {}
 
-            result_max_level = -1
-            result_max_cluster = -1
+        all_samples = set()
 
-            all_samples = set()
-
-            for v in result_clusters.values():
-                res_level = v.get("level")
-                res_cluster_num = v.get("cluster_num")
-                assert res_level
-                assert res_cluster_num
-
-                result_max_level = max(result_max_level, res_level)
-                result_max_cluster = max(result_max_cluster, res_cluster_num)
-
+        # Collect all samples in results to confirm they have been added to the dict
+        for cluster_id_dict in clusterer._clusters.values():
+            for cluster in cluster_id_dict.values():
                 # All distances must be positive
-                assert v.get("avg_dist", -1) >= 0
-                assert v.get("dist_std", -1) >= 0
+                assert cluster.dist_avg >= 0
+                assert cluster.dist_std >= 0
+                assert np.all(cluster.sample_dist >= 0)
 
-                # pseudo assert: will crash on no samples since list is unhashable
-                all_samples.update(set(v.get("samples", [])))
-                # TODO -> last level should contain all samples
-                # -> can just check that result_clusters[sample_size+len(clusterer.larr)]["count"] == sample_size
-                # --> to get the last level you need sample_size+len(clusterer.larr) because the inner dict starts
-                # --> at sample_size and adds one for each row of clusterer.larr
+                samples = cluster.samples
+                all_samples.update(set(samples))
+            # Max of all clusters, checking at each level
+            result_all_clusters.update(cluster_id_dict)
+        result_all_levels = set(clusterer._clusters)
 
-            # Max levels and clusters were tracked correctly,
-            # but we subtracted one doing the return to account for final merge
-            assert max_levels == result_max_level
-            assert max_clusters == result_max_cluster
+        result_max_cluster = max(result_all_clusters)
+        result_max_level = max(result_all_levels)
 
-            assert len(all_samples) == n
+        # Quick check that no levels or cluster_ids are skipped, both are 0-indexed
+        assert len(result_all_levels) == result_max_level + 1
+        assert len(result_all_clusters) == result_max_cluster + 1
 
-    def test_reorganize(self, func_data, dupe_data, outlier_data):
-        # for dataset in (func_data, dupe_data, outlier_data):
-        for dataset in (dupe_data,):
-            cl = Clusterer(dataset)
-            res, max_levels, max_clusters = cl.create_clusters()
-            clusters_per_lvl, merge_groups, outliers, potential_outliers = cl.reorganize_clusters(
-                res, min_num_samples_per_cluster=2
-            )
+        # Confirm that over all results, last level has all samples
+        last_level_results = clusterer._clusters.get(result_max_level)
+        assert last_level_results is not None
+        # Should only contain one cluster
+        last_level_cluster = list(last_level_results.values())
+        assert len(last_level_cluster) == 1
+        # Confirm final cluster contains all samples, and is the same as all samples found in results
+        last_cluster_info = last_level_cluster[0]
+        assert last_cluster_info.count == len(all_samples)
+        assert sorted(last_cluster_info.samples) == sorted(all_samples)
 
-            for lvl in range(1, max_levels):
-                assert lvl in clusters_per_lvl
+        # result_max_cluster is 0-indexed, so adjust for total number
+        assert clusterer._max_clusters == result_max_cluster + 1
 
-            cluster_set = set()
-
-            for clusters in merge_groups.values():
-                sck = set(clusters.keys())
-                cluster_set.update(sck)
-
-            assert max(cluster_set) <= max_clusters
-
-            """
-            TODO: determine size of sample, compare with min num samples per cluster value
-            we need to come up with a default minimum based on sample size - 5%??
-            Need to hard code min_num_samples_per_cluster >=2 and <= some max?? like 50, 100?
-
-            c1 - 51 -> 49
-            c2 - ?
-            5% -> 5 samples come outliers
-            100 samples
-            check 5%
-            min_num has to be at at least 2
-            """
-
-            # Checks that no indices are shared
-            assert set(outliers).isdisjoint(set(potential_outliers))
+        assert len(all_samples) == n
 
 
-class TestFunctional:
-    def test_run_results(self, blobs):
-        data = blobs
+class TestClustererNoInit:
+    clusterer = Clusterer(np.zeros((3, 1)))
 
-        clusterer = Clusterer(data)
+    def test_fill_level(self):
+        dummy_data = Cluster(False, np.ndarray([0]), 0.0, True)
+        x = {
+            0: {
+                0: dummy_data,
+                1: dummy_data,
+            },
+            1: {
+                0: dummy_data,
+            },
+            2: {
+                0: dummy_data,
+            },
+            3: {
+                0: dummy_data,
+            },
+        }
+
+        self.clusterer._clusters = x
+
+        # Fill 0,1 up to 2,1
+        self.clusterer._fill_levels(ClusterPosition(0, 1), ClusterPosition(2, 1))
+
+        # Confirm cluster info has been placed into levels up to merge level (3)
+        # assert cluster_1 in [0, 1, 2, 3)
+        assert [1 in self.clusterer.clusters[i] for i in (0, 1, 2)]
+        assert 1 not in self.clusterer.clusters[3]
+
+    def test_get_cluster_distances(self):
+        pass
+
+    def test_calc_merge_indices(self):
+        x = [np.array([1, 1.1, 1.2, 1.3, 5])]
+        m = [5.0]
+        merge_indices = self.clusterer._calc_merge_indices(x, m)
+
+        assert len(merge_indices) == len(x)
+        npt.assert_equal(merge_indices, np.array([[True, True, True, True, False]]))
+
+    def test_calc_merge_indices_multidim(self):
+        x = [np.array([1, 1.1, 1.2, 1.3, 5]), np.array([1, 1.1, 1.2, 1.3, 5]), np.array([1, 1.1, 1.2, 1.3, 5])]
+        m = [5.0, 5.0, 5.0]
+        merge_indices = self.clusterer._calc_merge_indices(x, m)
+
+        assert len(merge_indices) == len(x)
+        npt.assert_equal(
+            merge_indices,
+            np.array(
+                [[True, True, True, True, False], [True, True, True, True, False], [True, True, True, True, False]]
+            ),
+        )
+
+    def test_generate_merge_list(self):
+        pass
+
+    def test_get_last_merge_levels(self):
+        pass
+
+    def test_find_outliers(self):
+        pass
+
+    def test_calc_duplicate_std(self):
+        pass
+
+    def test_find_duplicates(self):
+        pass
+
+
+class TestClustererFunctional:
+    """Tests individual dataset results for pseudo-functional, duplicate, and outlier data"""
+
+    def test_run_results(self, functional_data):
+        clusterer = Clusterer(functional_data)
         results = clusterer.run()
 
-        assert results["outliers"] == [21, 6, 4, 71, 38, 11]
-        assert results["potential_outliers"] == [42, 48, 9, 1, 43]
-        assert results["duplicates"] == [(24, 79), (58, 63)]
+        assert results["outliers"] == [4, 6, 11, 21, 38, 71]
+        assert results["potential_outliers"] == [1, 9, 42, 43, 48]
+        assert results["duplicates"] == [[24, 79], [58, 63]]
         assert results["near_duplicates"] == [
-            (8, 27),
-            (10, 65),
-            (16, 99),
-            (19, 64),
-            (22, 87),
-            (27, 29),
-            (33, 76),
-            (39, 55),
-            (40, 72),
-            (41, 62),
-            (80, 81),
-            (80, 93),
-            (81, 93),
-            (87, 95),
+            [8, 27, 29],
+            [10, 65],
+            [16, 99],
+            [19, 64],
+            [22, 87, 95],
+            [33, 76],
+            [39, 55],
+            [40, 72],
+            [41, 62],
+            [80, 81, 93],
         ]
 
-    def test_duplicate_images(self, dupes):
-        cl = Clusterer(dupes)
-        results = cl.run()
+        # Sorts related tuples into sets
+        setlist = union_find(results["near_duplicates"])
+        # Calculates the length of all items in bins
+        sum_lens = sum([len(s) for s in setlist])
+        # Calculates all unique values in near_duplicates list
+        unique_counts = {x for xs in results["near_duplicates"] for x in xs}
+        # The length of all sets is the same as the unique values
+        assert sum_lens == len(unique_counts)
 
-        assert results is None
+    def test_duplicate_images(self, duplicate_data):
+        cl = Clusterer(duplicate_data)
+
+        results = cl.run()
+        duplicates = results["duplicates"]
+        near_duplicates = results["near_duplicates"]
+
+        setlist = union_find(duplicates)
+        # Only 1 set (all dupes) in list of sets
+        assert len(setlist[0]) == len(duplicate_data)
+        assert near_duplicates == []
