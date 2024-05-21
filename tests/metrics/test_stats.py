@@ -1,113 +1,142 @@
+from enum import Flag, auto
+from typing import Dict
+
 import numpy as np
 import pytest
 
+from daml._internal.metrics.flags import ImageStatistics, auto_all
 from daml._internal.metrics.stats import (
+    BaseStatsMetric,
+    ChannelStatisticsMetric,
     ChannelStats,
-    DatasetStats,
+    ImageHashMetric,
+    ImageStatisticsMetric,
     ImageStats,
-    edge_filter,
-    get_bitdepth,
-    normalize_image_shape,
-    rescale,
 )
 
 
-def test_get_bitdepth_negatives():
-    image = np.random.random((3, 28, 28)) - 0.5
-    bitdepth = get_bitdepth(image)
-    assert bitdepth == (0, np.min(image), np.max(image))
+class MockFlag(Flag):
+    RED = auto()
+    GREEN = auto()
+    BLUE = auto()
+    ALL = auto_all()
 
 
-def test_get_bitdepth_float():
-    image = np.random.random((3, 28, 28))
-    bitdepth = get_bitdepth(image)
-    assert bitdepth == (1, 0, 1)
+mock_func_map = {
+    MockFlag.RED: lambda: "RED",
+    MockFlag.GREEN: lambda: "GREEN",
+    MockFlag.BLUE: lambda: "BLUE",
+}
+
+mock_bad_func_map = {
+    MockFlag(0): lambda: "NONE",
+}
 
 
-def test_get_bitdepth_8bit():
-    image = (np.random.random((3, 28, 28)) * (2**8 - 1)).astype(np.uint8)
-    bitdepth = get_bitdepth(image)
-    assert bitdepth == (8, 0, (2**8 - 1))
+def get_dataset(count: int, channels: int):
+    return [np.random.random((channels, 16, 16)) for _ in range(count)]
 
 
-def test_get_bitdepth_16bit():
-    image = (np.random.random((3, 28, 28)) * (2**16 - 1)).astype(np.uint16)
-    bitdepth = get_bitdepth(image)
-    assert bitdepth == (16, 0, (2**16 - 1))
+class MockStatsMetric(BaseStatsMetric):
+    def __init__(self, flags: MockFlag, func_map: Dict):
+        super().__init__(flags)
+        self.func_map = func_map
+
+    def update(self, batch):
+        results = []
+        for _ in batch:
+            results = self._map(self.func_map)
+        self.results.append(results)
 
 
-def test_get_bitdepth_64bit():
-    image = (np.random.random((3, 28, 28)) * (2**64 - 1)).astype(np.uint64)
-    bitdepth = get_bitdepth(image)
-    assert bitdepth == (32, 0, (2**32 - 1))
+class TestFlags:
+    def test_auto_all(self):
+        assert MockFlag.RED & MockFlag.ALL
+        assert MockFlag.GREEN & MockFlag.ALL
+        assert MockFlag.BLUE & MockFlag.ALL
 
 
-def test_rescale_noop():
-    image = np.random.random((3, 28, 28))
-    scaled = rescale(image)
-    assert np.min(scaled) == np.min(image)
-    assert np.max(scaled) == np.max(image)
+class TestBaseStatsMetric:
+    def test_map_all(self):
+        mm = MockStatsMetric(MockFlag.ALL, mock_func_map)
+        mm.update([0])
+        assert len(mm.results) == 1
+        assert len(mm.results[0]) == 3
+
+    def test_map_one(self):
+        mm = MockStatsMetric(MockFlag.RED, mock_func_map)
+        mm.update([0])
+        assert len(mm.results) == 1
+        assert len(mm.results[0]) == 1
+        assert mm.results[0] == {"red": "RED"}
+
+    def test_map_invalid_type(self):
+        mm = MockStatsMetric(1000, mock_func_map)  # type: ignore
+        with pytest.raises(TypeError):
+            mm.update([0])
+
+    def test_map_invalid_value(self):
+        mm = MockStatsMetric(MockFlag.RED, mock_bad_func_map)
+        with pytest.raises(ValueError):
+            mm.update([0])
 
 
-def test_rescale_8bit():
-    image = np.random.random((3, 28, 28))
-    scaled = rescale(image, 8)
-    assert np.min(scaled) == np.min(image) * (2**8 - 1)
-    assert np.max(scaled) == np.max(image) * (2**8 - 1)
+class TestImageStats:
+    def run_stats(self, stat_class, count, channels, metrics=None):
+        stats = stat_class(metrics)
+        stats.update(get_dataset(count, channels))
+        stats.compute()
+        return stats
 
+    def test_image_stats_single_channel(self):
+        stats = self.run_stats(ImageStats, 100, 1)
+        assert stats.length == 100
+        assert len(stats.stats) == 19
+        assert len(stats.stats["mean"]) == 100
 
-def test_rescale_float():
-    image = (np.random.random((3, 28, 28)) * 255).astype(np.uint8)
-    scaled = rescale(image)
-    assert np.min(scaled) == np.min(image) / (2**8 - 1)
-    assert np.max(scaled) == np.max(image) / (2**8 - 1)
+    def test_image_stats_triple_channel(self):
+        stats = self.run_stats(ImageStats, 100, 3)
+        assert stats.length == 100
+        assert len(stats.stats) == 19
+        assert len(stats.stats["mean"]) == 100
 
+    def test_image_stats_single_channel_hashes_only(self):
+        stats = self.run_stats(ImageStats, 100, 1, [ImageHashMetric()])
+        assert stats.length == 100
+        assert len(stats.stats) == 2
+        assert len(stats.stats["xxhash"]) == 100
 
-def test_normalize_image_shape_expand():
-    image = np.zeros((28, 28))
-    normalized = normalize_image_shape(image)
-    assert normalized.shape == (1, 28, 28)
+    def test_image_stats_single_channel_mean_only(self):
+        stats = self.run_stats(ImageStats, 100, 1, [ImageStatisticsMetric(ImageStatistics.MEAN)]).compute()
+        assert stats.length == 100
+        assert len(stats.stats) == 1
+        assert len(stats.stats["mean"]) == 100
 
+    def test_channel_stats_single_channel(self):
+        stats = self.run_stats(ChannelStats, 100, 1).compute()
+        assert len(stats.stats) == 9
+        assert len(stats.stats["mean"]) == 1
+        assert stats.stats["mean"][1].shape == (1, 100)
 
-def test_normalize_image_shape_noop():
-    image = np.zeros((1, 28, 28))
-    normalized = normalize_image_shape(image)
-    assert normalized.shape == (1, 28, 28)
+    def test_channel_stats_triple_channel(self):
+        stats = self.run_stats(ChannelStats, 100, 3)
+        assert stats.length == 100
+        assert len(stats.stats) == 9
+        assert len(stats.stats["mean"]) == 1
+        assert stats.stats["mean"][3].shape == (3, 100)
 
+    def test_channel_stats_triple_channel_mean_only(self):
+        stats = self.run_stats(ChannelStats, 100, 3, ChannelStatisticsMetric(ImageStatistics.MEAN))
+        assert stats.length == 100
+        assert len(stats.stats) == 2
+        assert stats.stats["mean"][3].shape == (3, 100)
 
-def test_normalize_image_shape_slice():
-    image = np.zeros((10, 3, 28, 28))
-    normalized = normalize_image_shape(image)
-    assert normalized.shape == (3, 28, 28)
-
-
-def test_normalize_image_valueerror():
-    image = np.zeros(10)
-    with pytest.raises(ValueError):
-        normalize_image_shape(image)
-
-
-def test_edge_filter():
-    image = np.zeros((28, 28))
-    edge = edge_filter(image, 0.5)
-    np.testing.assert_array_equal(image + 0.5, edge)
-
-
-def test_get_channel_mask_channels_only():
-    ds = DatasetStats([np.zeros((28, 28)), np.zeros((3, 32, 32)), np.zeros((1, 28, 28)), np.zeros((3, 32, 32))])
-    mask = ds.get_channel_mask(3)
-    np.testing.assert_array_equal(mask, (False, True, True, True, False, True, True, True))
-
-
-def test_get_channel_mask_channels_channel():
-    ds = DatasetStats([np.zeros((28, 28)), np.zeros((3, 32, 32)), np.zeros((1, 28, 28)), np.zeros((3, 32, 32))])
-    mask = ds.get_channel_mask(3, 1)
-    np.testing.assert_array_equal(mask, (False, False, True, False, False, False, True, False))
-
-
-def test_aggregated_stats():
-    ds = DatasetStats([np.zeros((28, 28)), np.zeros((3, 32, 32)), np.zeros((1, 28, 28)), np.zeros((3, 32, 32))])
-    for stat in ImageStats.__annotations__:
-        assert getattr(ds, stat).shape[0] == 4
-    for stat in ChannelStats.__annotations__:
-        assert getattr(ds, stat).shape[0] == 8
+    def test_channel_stats_mixed_channels(self):
+        data_triple = [np.random.random((3, 16, 16)) for _ in range(50)]
+        data_single = [np.random.random((1, 16, 16)) for _ in range(50)]
+        stats = ChannelStats(data_triple + data_single)
+        assert stats.length == 100
+        assert len(stats.stats) == 9
+        assert len(stats.stats["mean"]) == 2
+        assert stats.stats["mean"][3].shape == (3, 50)
+        assert stats.stats["mean"][1].shape == (1, 50)

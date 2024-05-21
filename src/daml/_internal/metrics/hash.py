@@ -3,7 +3,7 @@ import xxhash as xxh
 from PIL import Image
 from scipy.fftpack import dct
 
-from daml._internal.metrics.stats import normalize_image_shape, rescale
+from daml._internal.metrics.utils import normalize_image_shape, rescale
 
 HASH_SIZE = 8
 MAX_FACTOR = 4
