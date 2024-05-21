@@ -140,8 +140,8 @@ dependency tests:
   script:
     - FAILURES=0
     - trap 'FAILURES=$((FAILURES+1))' ERR
-    - ./build --verbose ${PYTHON_VERSION} ${TASK} ${ARGS}
-    - ./build --verbose ${PYTHON_VERSION} type
+    - ./build --verbose --push ${PYTHON_VERSION} ${TASK} ${ARGS}
+    - ./build --verbose --push ${PYTHON_VERSION} type
     - exit $FAILURES
   artifacts:
     reports:
@@ -199,7 +199,7 @@ docs:
   needs: [build image]
   tags: [multi-gpu]
   script:
-    - ./build --verbose docs --gpu
+    - ./build --verbose --push docs --gpu
   artifacts:
     paths:
       - output/docs/.jupyter_cache/
