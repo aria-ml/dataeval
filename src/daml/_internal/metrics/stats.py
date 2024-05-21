@@ -1,220 +1,249 @@
-from dataclasses import dataclass
-from typing import Generic, NamedTuple, Optional, TypeVar, Union
+from enum import Flag
+from typing import Any, Callable, Dict, Generic, Iterable, List, Optional, Sequence, TypeVar
 
 import numpy as np
-from scipy.signal import convolve2d
 from scipy.stats import entropy, kurtosis, skew
 
-EDGE_KERNEL = np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]], dtype=np.int8)
-BIT_DEPTH = (1, 8, 12, 16, 32)
+from daml._internal.metrics.flags import ImageHash, ImageProperty, ImageStatistics, ImageVisuals
+from daml._internal.metrics.hash import pchash, xxhash
+from daml._internal.metrics.utils import edge_filter, get_bitdepth, normalize_image_shape, rescale
 
-TStatValue = TypeVar("TStatValue", np.number, np.ndarray)
+QUARTILES = (0, 25, 50, 75, 100)
 
-
-class BitDepth(NamedTuple):
-    depth: int
-    pmin: Union[float, int]
-    pmax: Union[float, int]
+TBatch = TypeVar("TBatch", bound=Sequence)
+TFlag = TypeVar("TFlag", bound=Flag)
 
 
-def get_bitdepth(image: np.ndarray) -> BitDepth:
-    """
-    Approximates the bit depth of the image using the
-    min and max pixel values.
-    """
-    pmin, pmax = np.min(image), np.max(image)
-    if pmin < 0:
-        return BitDepth(0, pmin, pmax)
-    else:
-        depth = ([x for x in BIT_DEPTH if 2**x > pmax] or [max(BIT_DEPTH)])[0]
-        return BitDepth(depth, 0, 2**depth - 1)
+class BaseStatsMetric(Generic[TBatch, TFlag]):
+    def __init__(self, flags: TFlag):
+        self.flags = flags
+        self.results = []
 
+    def update(self, batch: TBatch) -> None:
+        """Update internal metric cache for later calculation."""
 
-def rescale(image: np.ndarray, depth: int = 1) -> np.ndarray:
-    """
-    Rescales the image using the bit depth provided.
-    """
-    bitdepth = get_bitdepth(image)
-    if bitdepth.depth == depth:
-        return image
-    else:
-        normalized = (image + bitdepth.pmin) / (bitdepth.pmax - bitdepth.pmin)
-        return normalized * (2**depth - 1)
+    def compute(self) -> list:
+        return self.results
 
+    def reset(self) -> None:
+        self.results = []
 
-def normalize_image_shape(image: np.ndarray) -> np.ndarray:
-    """
-    Normalizes the image shape into (C,H,W).
-    """
-    ndim = image.ndim
-    if ndim == 2:
-        return np.expand_dims(image, axis=0)
-    elif ndim == 3:
-        return image
-    elif ndim > 3:
-        # Slice all but the last 3 dimensions
-        return image[(0,) * (ndim - 3)]
-    else:
-        raise ValueError("Images must have 2 or more dimensions.")
+    def _map(self, func_map: Dict[Flag, Callable]) -> Dict[str, Any]:
+        """Calculates the measures for each flag if it is selected."""
+        results = {}
+        for flag, func in func_map.items():
+            if not flag.name:
+                raise ValueError("Provided flag to set value does not have a name.")
+            if flag & self.flags:
+                results[flag.name.lower()] = func()
+        return results
 
-
-def edge_filter(image: np.ndarray, offset: float = 0.5) -> np.ndarray:
-    """
-    Returns the image filtered using a 3x3 edge detection kernel:
-    [[ -1, -1, -1 ],
-     [ -1,  8, -1 ],
-     [ -1, -1, -1 ]]
-    """
-    edges = convolve2d(image, EDGE_KERNEL, mode="same", boundary="symm") + offset
-    np.clip(edges, 0, 255, edges)
-    return edges
-
-
-@dataclass
-class ImageStats(Generic[TStatValue]):
-    """
-    Dataclass containing annotations for all of the supported
-    metrics for image statistics.
-    """
-
-    height: TStatValue
-    width: TStatValue
-    size: TStatValue
-    aspect_ratio: TStatValue
-    depth: TStatValue
-    channels: TStatValue
-    missing: TStatValue
-    brightness: TStatValue
-    blurriness: TStatValue
-    mean: TStatValue
-    zero: TStatValue
-    var: TStatValue
-    skew: TStatValue
-    kurtosis: TStatValue
-    percentiles: np.ndarray
-    histogram: np.ndarray
-    entropy: TStatValue
-
-
-@dataclass
-class ChannelStats:
-    """
-    Dataclass containing annotations for all of the supported
-    metrics for channel specific statistics.
-    """
-
-    ch_mean: np.ndarray
-    ch_var: np.ndarray
-    ch_skew: np.ndarray
-    ch_kurtosis: np.ndarray
-    ch_percentiles: np.ndarray
-    ch_histogram: np.ndarray
-
-
-def get_image_stats(image: np.ndarray) -> ImageStats:
-    image = normalize_image_shape(image)
-    width = np.int32(image.shape[-1])
-    height = np.int32(image.shape[-2])
-    scaled = rescale(image)
-    histogram = np.histogram(scaled, bins=256, range=(0, 1))[0]
-
-    return ImageStats(
-        height=height,
-        width=width,
-        size=width * height,
-        aspect_ratio=width / height,
-        depth=np.int32(get_bitdepth(image).depth),
-        channels=np.int32(image.shape[-3]),
-        missing=np.sum(np.isnan(image)),
-        brightness=np.mean(scaled),  # TODO: replace with better calculation
-        blurriness=np.std(edge_filter(np.mean(image, axis=0))),
-        mean=np.mean(scaled),
-        zero=np.int32(np.count_nonzero(image == 0)),
-        var=np.var(scaled),
-        skew=np.float32(skew(scaled.ravel())),
-        kurtosis=np.float32(kurtosis(scaled.ravel())),
-        percentiles=np.percentile(scaled, q=[0, 25, 50, 75, 100]),
-        histogram=histogram,
-        entropy=np.float32(entropy(histogram)),
-    )
-
-
-def get_channel_stats(image: np.ndarray) -> ChannelStats:
-    image = normalize_image_shape(image)
-    scaled = rescale(image)
-    flattened = scaled.reshape(image.shape[0], -1)
-
-    return ChannelStats(
-        ch_mean=np.mean(scaled, axis=(1, 2)),
-        ch_var=np.var(scaled, axis=(1, 2)),
-        ch_skew=skew(flattened, axis=1),
-        ch_kurtosis=kurtosis(flattened, axis=1),
-        ch_percentiles=np.percentile(scaled, q=[0, 25, 50, 75, 100], axis=(1, 2)).T,
-        ch_histogram=np.apply_along_axis(lambda x: np.histogram(x, bins=256, range=(0, 1))[0], 1, flattened),
-    )
-
-
-# Pulls in a dataset and then gets the individual image stats
-# then runs group stats
-# Class to encapsulate dataset statistics calculations
-class DatasetStats(ImageStats[np.ndarray], ChannelStats):
-    def __init__(
-        self,
-        images,
-        labels: Optional[np.ndarray] = None,
-        boxes: Optional[np.ndarray] = None,
-    ) -> None:
-        # Initialization of DatasetStats with datasets images, optional labels, and optional bounding boxes.
-        # self.images = images
-        # self.labels = labels
-        # self.boxes = boxes
-        self.length = len(images)
-        channel_map = []
-        channel_stats = {}
-
-        # Iterate through images
-        for i, image in enumerate(images):
-            # stats = SingleImageStats(image)
-            img_stats = get_image_stats(image)
-
-            # Aggregate the image statistics
-            for stat in ImageStats.__annotations__:
-                image_stat = getattr(img_stats, stat)
-                aggregated_stat = getattr(self, stat, None)
-                if aggregated_stat is None:
-                    shape = () if np.isscalar(image_stat) else image_stat.shape
-                    aggregated_stat = np.empty((self.length,) + shape)
-                    setattr(self, stat, aggregated_stat)
-                aggregated_stat[i] = image_stat
-
-            # Build the image and channel mapping for each channel
-            c = int(img_stats.channels)
-            channel_map.append(np.linspace((i, c, 0), (i, c, c - 1), c, dtype=np.uint32))
-
-            # Aggregate the channel statistics into channel_stats dictionary
-            ch_stats = get_channel_stats(image)
-            for stat in ChannelStats.__annotations__:
-                channel_stat = getattr(ch_stats, stat)
-                channel_stats.setdefault(stat, []).append(channel_stat)
-
-        # Aggregate all channel indices and stats
-        self.ch_map = np.concatenate(channel_map)
-        for stat, channel_stat in channel_stats.items():
-            aggregated_channel_stat = np.concatenate(channel_stat)
-            setattr(self, stat, aggregated_channel_stat)
-
-    def get_channel_mask(self, channels: int, channel: Optional[int] = None) -> np.ndarray:
-        """
-        Returns a mask for channel stats based on desired channel count and channel
-        """
-        return (
-            self.ch_map[:, 1] == channels
-            if channel is None
-            else (self.ch_map[:, (1, 2)] == (channels, channel)).all(axis=1)
+    def _keys(self) -> List[str]:
+        """Returns the list of measures to be calculated."""
+        flags = (
+            self.flags
+            if isinstance(self.flags, Iterable)  # py3.11
+            else [flag for flag in list(self.flags.__class__) if flag & self.flags]
         )
+        return [flag.name.lower() for flag in flags if flag.name is not None]
 
-    def get_image_stats(self) -> dict:
-        return {k: getattr(self, k) for k in ImageStats.__annotations__}
 
-    def get_channel_stats(self, channels: int, channel: Optional[int] = None) -> dict:
-        return {k: getattr(self, k)[self.get_channel_mask(channels, channel)] for k in ChannelStats.__annotations__}
+class ImageHashMetric(BaseStatsMetric):
+    def __init__(self, flags: ImageHash = ImageHash.ALL):
+        super().__init__(flags)
+
+    def update(self, batch: Sequence[np.ndarray]):
+        for data in batch:
+            results = self._map(
+                {
+                    ImageHash.XXHASH: lambda: xxhash(data),
+                    ImageHash.PCHASH: lambda: pchash(data),
+                }
+            )
+            self.results.append(results)
+
+
+class ImagePropertyMetric(BaseStatsMetric):
+    def __init__(self, flags: ImageProperty = ImageProperty.ALL):
+        super().__init__(flags)
+
+    def update(self, batch: Sequence[np.ndarray]):
+        for data in batch:
+            results = self._map(
+                {
+                    ImageProperty.WIDTH: lambda: np.int32(data.shape[-1]),
+                    ImageProperty.HEIGHT: lambda: np.int32(data.shape[-2]),
+                    ImageProperty.SIZE: lambda: np.int32(data.shape[-1] * data.shape[-2]),
+                    ImageProperty.ASPECT_RATIO: lambda: data.shape[-1] / np.int32(data.shape[-2]),
+                    ImageProperty.CHANNELS: lambda: data.shape[-3],
+                    ImageProperty.DEPTH: lambda: get_bitdepth(data).depth,
+                }
+            )
+            self.results.append(results)
+
+
+class ImageVisualsMetric(BaseStatsMetric):
+    def __init__(self, flags: ImageVisuals = ImageVisuals.ALL):
+        super().__init__(flags)
+
+    def update(self, batch: Sequence[np.ndarray]):
+        for data in batch:
+            results = self._map(
+                {
+                    ImageVisuals.MISSING: lambda: np.sum(np.isnan(data)),
+                    ImageVisuals.BRIGHTNESS: lambda: np.mean(rescale(data)),
+                    ImageVisuals.BLURRINESS: lambda: np.std(edge_filter(np.mean(data, axis=0))),
+                }
+            )
+            self.results.append(results)
+
+
+class ImageStatisticsMetric(BaseStatsMetric):
+    def __init__(self, flags: ImageStatistics = ImageStatistics.ALL):
+        super().__init__(flags)
+
+    def update(self, batch: Sequence[np.ndarray]):
+        for data in batch:
+            scaled = rescale(data)
+            if (ImageStatistics.HISTOGRAM | ImageStatistics.ENTROPY) & self.flags:
+                hist = np.histogram(scaled, bins=256, range=(0, 1))[0]
+
+            results = self._map(
+                {
+                    ImageStatistics.MEAN: lambda: np.mean(scaled),
+                    ImageStatistics.ZERO: lambda: np.int32(np.count_nonzero(scaled == 0)),
+                    ImageStatistics.VAR: lambda: np.var(scaled),
+                    ImageStatistics.SKEW: lambda: np.float32(skew(scaled.ravel())),
+                    ImageStatistics.KURTOSIS: lambda: np.float32(kurtosis(scaled.ravel())),
+                    ImageStatistics.PERCENTILES: lambda: np.percentile(scaled, q=QUARTILES),
+                    ImageStatistics.HISTOGRAM: lambda: hist,
+                    ImageStatistics.ENTROPY: lambda: np.float32(entropy(hist)),
+                }
+            )
+            self.results.append(results)
+
+
+class ChannelStatisticsMetric(BaseStatsMetric):
+    def __init__(self, flags: ImageStatistics = ImageStatistics.ALL):
+        super().__init__(flags)
+
+    def update(self, batch: Sequence[np.ndarray]):
+        for data in batch:
+            scaled = rescale(data)
+            flattened = scaled.reshape(data.shape[0], -1)
+
+            if (ImageStatistics.HISTOGRAM | ImageStatistics.ENTROPY) & self.flags:
+                hist = np.apply_along_axis(lambda x: np.histogram(x, bins=256, range=(0, 1))[0], 1, flattened)
+
+            results = self._map(
+                {
+                    ImageStatistics.MEAN: lambda: np.mean(flattened, axis=1),
+                    ImageStatistics.ZERO: lambda: np.count_nonzero(flattened == 0, axis=1),
+                    ImageStatistics.VAR: lambda: np.var(flattened, axis=1),
+                    ImageStatistics.SKEW: lambda: skew(flattened, axis=1),
+                    ImageStatistics.KURTOSIS: lambda: kurtosis(flattened, axis=1),
+                    ImageStatistics.PERCENTILES: lambda: np.percentile(flattened, q=QUARTILES, axis=1).T,
+                    ImageStatistics.HISTOGRAM: lambda: hist,
+                    ImageStatistics.ENTROPY: lambda: entropy(hist, axis=1),
+                }
+            )
+            self.results.append(results)
+
+
+class ImageStats(BaseStatsMetric):
+    IMAGESTATS_METRICS = [ImageHashMetric, ImagePropertyMetric, ImageVisualsMetric, ImageStatisticsMetric]
+
+    def __init__(self, metrics: Optional[Sequence[BaseStatsMetric]] = None) -> None:
+        metrics_dict: Dict[BaseStatsMetric, List[Dict[str, Any]]] = {
+            metric: [] for metric in (metrics if metrics else [metric() for metric in self.IMAGESTATS_METRICS])
+        }
+        self.metrics_dict = metrics_dict
+        self.length = 0
+
+    def update(self, batch: Sequence[np.ndarray]):
+        # Run the images through each metric
+        for image in batch:
+            self.length += 1
+            img = normalize_image_shape(image)
+            for metric in self.metrics_dict:
+                metric.update([img])
+
+    def compute(self):
+        # Compute each metric
+        for metric in self.metrics_dict:
+            self.metrics_dict[metric] = metric.compute()
+
+        # Aggregate all metrics into a single dictionary
+        self.stats = {}
+        for metric, results in self.metrics_dict.items():
+            for i, result in enumerate(results):
+                for stat in metric._keys():
+                    value = result[stat]
+                    if not isinstance(value, (np.ndarray, np.generic)):
+                        if stat not in self.stats:
+                            self.stats[stat] = []
+                        self.stats[stat].append(result[stat])
+                    else:
+                        if stat not in self.stats:
+                            shape = () if np.isscalar(result[stat]) else result[stat].shape
+                            self.stats[stat] = np.empty((self.length,) + shape)
+                        self.stats[stat][i] = result[stat]
+
+    def reset(self):
+        self.length = 0
+        for metric in self.metrics_dict:
+            metric.reset()
+            self.metrics_dict[metric] = []
+
+
+class ChannelStats(BaseStatsMetric):
+    CHANNELSTATS_METRICS = [ChannelStatisticsMetric]
+    IDX_MAP = "idx_map"
+
+    def __init__(self, metrics: Optional[ChannelStatisticsMetric] = None) -> None:
+        if not metrics:
+            metrics = ChannelStatisticsMetric()
+
+        metrics_dict: Dict[ChannelStatisticsMetric, List[Dict[str, Any]]] = {metric: [] for metric in [metrics]}
+        self.metrics_dict = metrics_dict
+        self.length = 0
+
+    def update(self, batch: Sequence[np.ndarray]):
+        # Run the images through each metric
+        for image in batch:
+            self.length += 1
+            img = normalize_image_shape(image)
+            for metric in self.metrics_dict:
+                metric.update([img])
+
+        # Compute each metric
+        for metric in self.metrics_dict:
+            self.metrics_dict[metric] = metric.compute()
+
+    def compute(self):
+        # Aggregate all metrics into a single dictionary
+        stats = {}
+        channel_stats = set()
+        for metric, results in self.metrics_dict.items():
+            for i, result in enumerate(results):
+                for stat in metric._keys():
+                    channel_stats.update(metric._keys())
+                    channels = result[stat].shape[0]
+                    stats.setdefault(self.IDX_MAP, {}).setdefault(channels, {})[i] = None
+                    stats.setdefault(stat, {}).setdefault(channels, []).append(result[stat])
+
+        # Concatenate list of channel statistics numpy
+        for stat in channel_stats:
+            for channel in stats[stat]:
+                stats[stat][channel] = np.array(stats[stat][channel]).T
+
+        for channel in stats[self.IDX_MAP]:
+            stats[self.IDX_MAP][channel] = list(stats[self.IDX_MAP][channel].keys())
+
+        return stats
+
+    def reset(self):
+        self.length = 0
+        for metric in self.metrics_dict:
+            metric.reset()
+            self.metrics_dict[metric] = []
