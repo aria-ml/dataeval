@@ -90,7 +90,7 @@ class TestSufficiencyUtils:
         n_i = np.geomspace(30, 3000, 20).astype(int)
         answer = [3.2633, 0.4160, 0.0053]
 
-        output = calc_params(p_i, n_i,100)
+        output = calc_params(p_i, n_i, 100)
 
         npt.assert_almost_equal(output, answer, decimal=4)
 
