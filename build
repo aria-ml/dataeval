@@ -123,20 +123,41 @@ function build_image() {
     python_version=$3
     cache_from_tag=$4
 
-    if [[ $(docker manifest inspect $cache_from_tag) ]]; then
-        # Optimizations are only enabled if there's a cached image to use
+    base_tag="${base_image}:${python_version}"
+    deps_tag="${deps_image}-${python_version}"
+    build_tag="${build_image}-${python_version}"
+
+    if [[ $(docker manifest inspect $base_tag) && \
+          $(docker manifest inspect $deps_tag) && \
+          $(docker manifest inspect $build_tag) ]]; then
+
         python_optimization_args="\
             --build-arg pyenv_enable_opt=--enable-optimizations \
             --build-arg pyenv_with_lto=--with-lto"
 
-        # Set the various image vars if there's a cached image available
         image_args="\
-            --build-arg base_image=${base_image}:${python_version} \
-            --build-arg deps_image=${deps_image}-${python_version} \
-            --build-arg build_image=${build_image}-${python_version}"
+            --build-arg base_image=$base_tag \
+            --build-arg deps_image=$deps_tag \
+            --build-arg build_image=$build_tag"
+    fi
 
-        docker pull $cache_from_tag
-        cache_from_arg="--cache-from type=registry,ref=$cache_from_tag"
+    main_build_cache="${registry}/main/${target}-buildcache:${python_version}"
+
+    cache_image="${tag/:/-buildcache:}"
+
+    cache_from_arg="\
+        --cache-from type=registry,ref=$main_build_cache \
+        --cache-from type=registry,ref=$cache_image \
+        --cache-from type=registry,ref=$cache_from_tag"
+
+    # Writing to the cache means that you must be able to push to the registry, therefore
+    # don't want to force users to login to the registry just to build.
+    if [[ $push_to_repo ]]; then
+        cache_to_arg="--cache-to type=registry,mode=max,image-manifest=true,ref=$cache_image"
+        # Only update the main build cache via pipeline builds running the main branch
+        if [[ $CI_COMMIT_BRANCH && $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH ]]; then
+            cache_to_arg="${cache_to_arg} --cache-to type=registry,mode=max,image-manifest=true,ref=$main_build_cache"
+        fi
     fi
 
     output_arg="--output type=image,name=$tag"
@@ -154,10 +175,10 @@ function build_image() {
         $load_arg \
         --builder $builder_name \
         --build-arg python_version=$python_version \
-        --build-arg BUILDKIT_INLINE_CACHE=1 \
         $python_optimization_args \
         $image_args \
         $cache_from_arg \
+        $cache_to_arg \
         $output_arg \
         --target $target \
         ."
@@ -225,11 +246,7 @@ function ensure_image() {
         exit 1
     fi
 
-    echo "Checking $tag image..."
-    if ! $(docker manifest inspect $tag > /dev/null 2>&1); then
-        build_image $tag $target $python_version $tag
-        echo "Finished building $tag."
-    fi
+    build_image $tag $target $python_version $tag
 
     # Base tag images do not have a main tag equivalent so we can skip main tag update
     if [[ $CI && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $push_to_repo && $target != pybase ]]; then
