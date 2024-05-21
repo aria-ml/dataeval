@@ -382,7 +382,7 @@ class Sufficiency(EvaluateMixin):
             model = reset_parameters(self.model)
             # Run the model with each substep of data
             for iteration, substep in enumerate(ranges):
-                model = reset_parameters(self.model)
+                #model = reset_parameters(self.model)
                 # train on subset of train data
                 self.train_fn(
                     model,
