@@ -481,7 +481,6 @@ class TestSufficiencyExtraFeatures:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         torch._dynamo.config.suppress_errors = True  # type: ignore
 
-
         train_ds = DamlDataset(*mnist(4000, "train", np.float32, "channels_first", 1))
         test_ds = DamlDataset(*mnist(500, "test", np.float32, "channels_first", 1))
 
@@ -514,11 +513,8 @@ class TestSufficiencyExtraFeatures:
         the output from suff.evaluate() is pasted below.
         """
         output_to_fit = {
-            '_STEPS_': np.array([  40,   66,  111,  185,  309,
-                                   516,  861, 1437, 2397, 4000]),
-            'Accuracy': np.array([0.5976, 0.6732, 0.7584, 0.8048,
-                                   0.8428, 0.8936, 0.9136, 0.9388,
-                                    0.9448, 0.9644])
+            "_STEPS_": np.array([40, 66, 111, 185, 309, 516, 861, 1437, 2397, 4000]),
+            "Accuracy": np.array([0.5976, 0.6732, 0.7584, 0.8048, 0.8428, 0.8936, 0.9136, 0.9388, 0.9448, 0.9644]),
         }
 
         # Evaluate the learning curve to infer the needed amount of training data

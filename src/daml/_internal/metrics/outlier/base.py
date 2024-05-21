@@ -28,6 +28,7 @@ class OutlierScore(NamedTuple):
     feature_score : Optional[np.ndarray], default None
         Feature score, if available, of the evaluated dataset.
     """
+
     instance_score: np.ndarray
     feature_score: Optional[np.ndarray] = None
 
