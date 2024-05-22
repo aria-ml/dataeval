@@ -512,7 +512,7 @@ class Sufficiency(EvaluateMixin):
     @classmethod
     def inv_project(
         cls, targets: np.ndarray, data: Dict[str, np.ndarray], params_cache: np.ndarray = np.zeros((1, 0))
-    ) -> np.int64:
+    ) -> np.ndarray:
         """
         How many training samples in data are needed to achieve the model metric values
         specified in targets?
@@ -559,4 +559,4 @@ class Sufficiency(EvaluateMixin):
             return np.int64(np.ceil(num_samples_needed))  # .item()
 
         # TODO: Is this a reasonable error response
-        return np.int64(-1)
+        return np.array([np.int64(-1)])
