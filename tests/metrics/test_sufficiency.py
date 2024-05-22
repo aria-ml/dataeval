@@ -502,8 +502,6 @@ class TestSufficiencyExtraFeatures:
             substeps=10,
         )
 
-        # Train & test model
-
         # Initialize the array of accuracies that we want to achieve
         desired_accuracies = np.array([0.5, 0.8, 0.9])
 
