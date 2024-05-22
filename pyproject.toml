@@ -65,20 +65,20 @@ optional = true
 ruff = "*"
 codespell = "*"
 
-[tool.poetry.group.test]
+[tool.poetry.group.dev]
 optional = true
 
-[tool.poetry.group.test.dependencies]
+[tool.poetry.group.dev.dependencies]
+# lint
+ruff = "*"
+codespell = "*"
+# test
 pytest = "*"
 coverage = "*"
 pyright = {version = "*, !=1.1.340"}
 torchmetrics = {version = ">=1.0.0", source = "pytorch"}
 matplotlib = {version = "*"}
-
-[tool.poetry.group.docs]
-optional = true
-
-[tool.poetry.group.docs.dependencies]
+# docs
 ipykernel = {version = "6.26.0", python = ">=3.9,<3.12"}
 ipywidgets = {version = "8.1.1", python = ">=3.9,<3.12"}
 jupyter-client = {version = "8.6.0", python = ">=3.9,<3.12"}
@@ -91,15 +91,6 @@ sphinx-tabs = {version = "*", python = ">=3.9,<3.12"}
 Sphinx = {version = "7.2.6", python = ">=3.9,<3.12"}
 tensorflow-datasets = {version = "*", python = ">=3.9,<3.12"}
 torchvision = {version = ">=0.16.0", source = "pytorch", python = ">=3.9,<3.12"}
-torchmetrics = {version = ">=1.0.0", source = "pytorch", python = ">=3.9,<3.12"}
-matplotlib = {version = "*", python = ">=3.9,<3.12"}
-pytest = {version = "*", python = ">=3.9,<3.12"}
-
-[tool.poetry.group.jatic]
-optional = true
-
-[tool.poetry.group.jatic.dependencies]
-maite = {version = "*"}
 
 [[tool.poetry.source]]
 name = "pytorch"

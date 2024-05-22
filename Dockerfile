@@ -61,7 +61,7 @@ RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/pip install --no-cache-dir --
 RUN touch README.md
 ARG UID
 COPY --chown=${UID} pyproject.toml poetry.lock ./
-RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/poetry install --no-cache --no-root --all-extras --with test,lint,docs
+RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/poetry install --no-cache --no-root --all-extras --with dev
 
 
 FROM scratch as pydeps
@@ -103,7 +103,7 @@ RUN touch README.md
 ARG UID
 COPY --chown=${UID} pyproject.toml poetry.lock ./
 COPY --chown=${UID} src/ src/
-RUN poetry install --no-cache --all-extras --with test,lint,docs
+RUN poetry install --no-cache --all-extras --with dev
 
 
 FROM versioned as run
