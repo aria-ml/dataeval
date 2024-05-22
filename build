@@ -204,8 +204,6 @@ function docker_run() {
 
     trap "post_build_cleanup $temp $tag $container_name" EXIT
 
-    export load_image=1
-    build_image $tag run $pver "${build_image}-${pver}"
     docker_run_args="--name $container_name $gpuflag $tag"
 
     if [[ $verbose ]]; then
@@ -282,8 +280,9 @@ if [[ -z $verbose ]]; then
 fi
 export verbosity
 
+if [[ ${#pvers[@]} == 0 ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
+
 if [[ $build_only ]] || [[ $devenv ]]; then
-    if [[ ${#pvers[@]} == 0 ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
     for pver in ${!pvers[@]}; do
         ensure_image pybase $pver
         ensure_image pydeps $pver
@@ -301,6 +300,11 @@ if [[ $build_only ]] || [[ $devenv ]]; then
 
     exit $?
 fi
+
+for pver in ${!pvers[@]}; do
+    export load_image=1
+    build_image "${run_image}-${pver}" run $pver "${build_image}-${pver}"
+done
 
 # execute jobs
 echo "Running ${!jobs[@]}..."
