@@ -556,8 +556,7 @@ class Sufficiency(EvaluateMixin):
             params = params_cache[0]
 
             num_samples_needed = inv_project_steps(measure, steps, targets, params)
-            #return np.int64(np.ceil(num_samples_needed))  # .item()
-            return np.array(np.ceil(num_samples_needed), dtype=np.int64)  # .item()
+            return np.array(np.ceil(num_samples_needed), dtype=np.int64)
 
         # TODO: Is this a reasonable error response
         return np.array([np.int64(-1)])
