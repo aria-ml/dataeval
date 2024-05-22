@@ -7,10 +7,10 @@ Usage:
 
 Options:
   -b, --build-only  only build dependency images
+  -d, --devenv      only build the developer environment image
   -h, --help        display this help information
   -v, --verbose     print output to console during container execution
       --gpu         enable gpu support on task execution
-      --no-cache    runs docker build without using the cache
       --push        push all built images to repository
 
 Default:
@@ -33,15 +33,15 @@ EOF
 exit $1
 }
 
-options=$(getopt -l "help,verbose,gpu,no-cache,build-only,push" -o "hvb" -n "build" -- "$@")
+options=$(getopt -l "help,verbose,gpu,build-only,devenv,push" -o "hvbd" -n "build" -- "$@")
 eval set -- "$options"
 while true; do
     case "$1" in
         -h|--help)       showHelp;;
         -v|--verbose)    export verbose=1;;
         --gpu)           export gpuflag="--gpus all";;
-        --no-cache)      cache_arg="--no-cache";;
         -b|--build-only) build_only=1;;
+        -d|--devenv)     devenv=1;;
         --push)          export push_to_repo=1;;
         --)              shift; break;;
     esac
@@ -104,11 +104,12 @@ fi
 function post_build_cleanup() {
     temp=$1
     tag=$2
+    container_name=$3
 
     rm -f $temp
 
-    if [[ $(docker container ls --all --filter name=$tag) ]]; then
-        docker container rm --force $tag &> /dev/null
+    if [[ $(docker container ls --all --filter name=$container_name) ]]; then
+        docker container rm --force $container_name &> /dev/null
     fi
 
     if [[ -z $save_build_images && $(docker image ls --filter reference=$tag) ]]; then
@@ -122,20 +123,41 @@ function build_image() {
     python_version=$3
     cache_from_tag=$4
 
-    if [[ $(docker manifest inspect $cache_from_tag) ]]; then
-        # Optimizations are only enabled if there's a cached image to use
+    base_tag="${base_image}:${python_version}"
+    deps_tag="${deps_image}-${python_version}"
+    build_tag="${build_image}-${python_version}"
+
+    if [[ $(docker manifest inspect $base_tag) && \
+          $(docker manifest inspect $deps_tag) && \
+          $(docker manifest inspect $build_tag) ]]; then
+
         python_optimization_args="\
             --build-arg pyenv_enable_opt=--enable-optimizations \
             --build-arg pyenv_with_lto=--with-lto"
 
-        # Set the various image vars if there's a cached image available
         image_args="\
-            --build-arg base_image=${base_image}:${python_version} \
-            --build-arg deps_image=${deps_image}-${python_version} \
-            --build-arg build_image=${build_image}-${python_version}"
+            --build-arg base_image=$base_tag \
+            --build-arg deps_image=$deps_tag \
+            --build-arg build_image=$build_tag"
+    fi
 
-        docker pull $cache_from_tag
-        cache_from_arg="--cache-from type=registry,ref=$cache_from_tag"
+    main_build_cache="${registry}/main/${target}-buildcache:${python_version}"
+
+    cache_image="${tag/:/-buildcache:}"
+
+    cache_from_arg="\
+        --cache-from type=registry,ref=$main_build_cache \
+        --cache-from type=registry,ref=$cache_image \
+        --cache-from type=registry,ref=$cache_from_tag"
+
+    # Writing to the cache means that you must be able to push to the registry, therefore
+    # don't want to force users to login to the registry just to build.
+    if [[ $push_to_repo ]]; then
+        cache_to_arg="--cache-to type=registry,mode=max,image-manifest=true,ref=$cache_image"
+        # Only update the main build cache via pipeline builds running the main branch
+        if [[ $CI_COMMIT_BRANCH && $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH ]]; then
+            cache_to_arg="${cache_to_arg} --cache-to type=registry,mode=max,image-manifest=true,ref=$main_build_cache"
+        fi
     fi
 
     output_arg="--output type=image,name=$tag"
@@ -153,10 +175,10 @@ function build_image() {
         $load_arg \
         --builder $builder_name \
         --build-arg python_version=$python_version \
-        --build-arg BUILDKIT_INLINE_CACHE=1 \
         $python_optimization_args \
         $image_args \
         $cache_from_arg \
+        $cache_to_arg \
         $output_arg \
         --target $target \
         ."
@@ -173,20 +195,19 @@ function build_image() {
 function docker_run() {
     temp=$(mktemp)
     IFS=- read -r task pver <<< $1
-    tag="daml-$task-$pver"
+    tag="${run_image}-${pver}"
 
+    container_name="run-${task}-${pver}"
     if [[ $CI_PIPELINE_ID ]]; then
-        tag="${tag}-${CI_PIPELINE_ID}"
+        container_name="${container_name}-${CI_PIPELINE_ID}"
     fi
 
-    trap "post_build_cleanup $temp $tag" EXIT
+    trap "post_build_cleanup $temp $tag $container_name" EXIT
 
-    export load_image=1
-    build_image $tag run $pver "${build_image}-${pver}"
-    docker_run_args="--name $tag $gpuflag $tag"
+    docker_run_args="--name $container_name $gpuflag $tag"
 
     if [[ $verbose ]]; then
-        (echo "Running $tag..."; echo docker run $docker_run_args $task; docker run $docker_run_args $task | tee -a $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
+        (echo "Running $container_name..."; echo docker run $docker_run_args $task; docker run $docker_run_args $task | tee -a $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
     else
         docker run $docker_run_args $task &> $temp || result="FAILED"
     fi
@@ -201,7 +222,7 @@ function docker_run() {
     else
         if [[ ! $verbose ]]; then echo SUCCEEDED; fi
         case "$task" in
-            unit|func|docs) docker cp $tag:/daml/output ./;;
+            unit|func|docs) docker cp $container_name:/daml/output ./;;
         esac
     fi
 
@@ -223,11 +244,7 @@ function ensure_image() {
         exit 1
     fi
 
-    echo "Checking $tag image..."
-    if ! $(docker manifest inspect $tag > /dev/null 2>&1); then
-        build_image $tag $target $python_version $tag
-        echo "Finished building $tag."
-    fi
+    build_image $tag $target $python_version $tag
 
     # Base tag images do not have a main tag equivalent so we can skip main tag update
     if [[ $CI && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $push_to_repo && $target != pybase ]]; then
@@ -252,18 +269,20 @@ export -f docker_run
 
 export deps_hash=$(sha256sum poetry.lock | cut -c 1-8)
 
-registry="harbor.jatic.net/daml"
+export registry="harbor.jatic.net/daml"
 export base_image="${registry}/pybase"
 export deps_image="${registry}/pydeps:${deps_hash}"
 export build_image="${registry}/build:${deps_hash}"
+export run_image="${registry}/run:${deps_hash}"
 
 if [[ -z $verbose ]]; then
     verbosity="--quiet"
 fi
 export verbosity
 
-if [[ $build_only ]]; then
-    if [[ ${#pvers[@]} == 0 ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
+if [[ ${#pvers[@]} == 0 ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
+
+if [[ $build_only ]] || [[ $devenv ]]; then
     for pver in ${!pvers[@]}; do
         ensure_image pybase $pver
         ensure_image pydeps $pver
@@ -271,8 +290,21 @@ if [[ $build_only ]]; then
             ensure_image build $pver
         fi
     done
+
+    if [[ $devenv ]]; then
+        echo "Building devcontainer with python ${!pvers[@]}..."
+        (cat Dockerfile && echo ENV versions=\"${!pvers[@]}\" && echo -n ${!pvers[@]} | xargs -d' ' -I{} echo COPY --chown=\${UID}/ --link --from=$deps_image-{} \${PYENV_ROOT}/ \${PYENV_ROOT}/) |
+        docker build $verbosity --tag daml-devcontainer --target devcontainer -
+        docker image prune -f
+    fi
+
     exit $?
 fi
+
+for pver in ${!pvers[@]}; do
+    export load_image=1
+    build_image "${run_image}-${pver}" run $pver "${build_image}-${pver}"
+done
 
 # execute jobs
 echo "Running ${!jobs[@]}..."

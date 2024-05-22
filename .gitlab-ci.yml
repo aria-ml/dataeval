@@ -136,12 +136,12 @@ dependency tests:
   rules: *on_run
 
 .run_tests:
-  extends: [.docker, .python_version_matrix]
+  extends: [.harbor, .python_version_matrix]
   script:
     - FAILURES=0
     - trap 'FAILURES=$((FAILURES+1))' ERR
-    - ./build --verbose ${PYTHON_VERSION} ${TASK} ${ARGS}
-    - ./build --verbose ${PYTHON_VERSION} type
+    - ./build --verbose --push ${PYTHON_VERSION} ${TASK} ${ARGS}
+    - ./build --verbose --push ${PYTHON_VERSION} type
     - exit $FAILURES
   artifacts:
     reports:
@@ -195,11 +195,11 @@ coverage:
 
 docs:
   stage: docs
-  extends: .docker
+  extends: .harbor
   needs: [build image]
   tags: [multi-gpu]
   script:
-    - ./build --verbose docs --gpu
+    - ./build --verbose --push docs --gpu
   artifacts:
     paths:
       - output/docs/.jupyter_cache/
@@ -272,7 +272,7 @@ secret_detection:
 #     - poetry check
 #     - poetry self add poetry-lock-groups-plugin
 #   script:
-#     - poetry lock --without test,lint,docs
+#     - poetry lock --without dev
 #   artifacts:
 #     paths:
 #       - poetry.lock
