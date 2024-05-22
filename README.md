@@ -53,12 +53,7 @@ cd daml
 
 Install DAML with optional dependencies for development.
 ```
-poetry install --all-extras --with test,lint
-```
-
-Alternatively, you can install with optional dependencies used to generate documentation as well.
-```
-poetry install --all-extras --with test,lint,docs
+poetry install --all-extras --with dev
 ```
 
 Now that DAML is installed, you can run commands in the poetry virtual environment by prefixing shell commands with `poetry run`, or activate the virtual environment directly in the shell.

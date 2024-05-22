@@ -272,7 +272,7 @@ secret_detection:
 #     - poetry check
 #     - poetry self add poetry-lock-groups-plugin
 #   script:
-#     - poetry lock --without test,lint,docs
+#     - poetry lock --without dev
 #   artifacts:
 #     paths:
 #       - poetry.lock
