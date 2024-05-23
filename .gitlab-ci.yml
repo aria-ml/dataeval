@@ -115,6 +115,22 @@ verify lock:
     - poetry check
   rules: *on_run
 
+docker info:
+  stage: build
+  extends: .docker
+  script:
+    - echo ===========================================================
+    - |
+      docker info
+      echo ===========================================================
+    - |
+      docker version
+      echo ===========================================================
+    - |
+      docker buildx ls
+      echo ===========================================================
+  rules: *on_run
+
 ### TEST ###
 
 linting:
