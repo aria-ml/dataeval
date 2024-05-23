@@ -65,7 +65,8 @@ def calc_params(p_i: np.ndarray, n_i: np.ndarray, niter: int) -> np.ndarray:
     n_i : np.ndarray
         Array of sample sizes
     niter : int
-        How many iterations to perform on the basin hopping scheme
+        Number of iterations to perform in the basin-hopping
+        numerical process to curve-fit p_i
 
     Returns
     -------
@@ -131,7 +132,7 @@ def project_steps(
     steps: np.ndarray,
     projection: np.ndarray,
     niter: int = 1000,
-) -> tuple:
+) -> tuple[np.ndarray, np.ndarray]:
     """Projects the measures for each value of X
 
     Parameters
@@ -143,8 +144,8 @@ def project_steps(
     projection : np.ndarray
         Steps to extrapolate
     niter : int, default 1000
-        Number of iterations to perform in the numerical process
-        to curve-fit measure
+        Number of iterations to perform in the basin-hopping
+        numerical process to curve-fit measure
 
     Returns
     -------
@@ -333,13 +334,13 @@ class Sufficiency(EvaluateMixin):
     def eval_kwargs(self, value: Optional[Dict[str, Any]]):
         self._eval_kwargs = {} if value is None else value
 
-    def evaluate(self, forced_range: Optional[np.ndarray] = None) -> Dict[str, np.ndarray]:
+    def evaluate(self, eval_at: Optional[np.ndarray] = None) -> Dict[str, np.ndarray]:
         """
         Creates data indices, trains models, and returns plotting data
 
         Inputs
         ------
-        forced_range : Optional[np.ndarray]
+        eval_at : Optional[np.ndarray]
             Specify this to collect accuracies over a specific set of dataset lengths,
             rather than letting Sufficiency internally create the lengths
             to evaluate at.
@@ -349,8 +350,8 @@ class Sufficiency(EvaluateMixin):
         Dict[str, np.ndarray]
             Dictionary containing the average of each measure per substep
         """
-        if forced_range is not None:
-            ranges = forced_range
+        if eval_at is not None:
+            ranges = eval_at
         else:
             geomshape = (
                 0.01 * self._length,
@@ -418,8 +419,8 @@ class Sufficiency(EvaluateMixin):
         steps : Union[int, np.ndarray]
             Step or steps to project
         niter : int, default 1000
-            Number of iterations to perform in the numerical process
-            to curve-fit measure
+            Number of iterations to perform in the basin-hopping
+            numerical process to curve-fit data
 
         Raises
         ------
@@ -442,7 +443,7 @@ class Sufficiency(EvaluateMixin):
             if name == STEPS_KEY:
                 continue
 
-            if len(measure.shape) > 1:
+            if measure.ndim > 1:
                 result = []
                 for i in range(measure.shape[1]):
                     projected, params = project_steps(measure[:, i], data[STEPS_KEY], projection, niter)
@@ -517,8 +518,8 @@ class Sufficiency(EvaluateMixin):
         cls, targets: np.ndarray, data: Dict[str, np.ndarray], params_cache: np.ndarray = np.zeros((1, 0))
     ) -> np.ndarray:
         """
-        How many training samples in data are needed to achieve the model metric values
-        specified in targets?
+        Calculate he number of training samples needed to achieve the target model
+        metric values.
 
         Parameters
         ----------

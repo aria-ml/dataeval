@@ -32,7 +32,7 @@ def mnist():
         category: Literal["train", "test"] = "train",
         dtype: Optional[type] = None,
         add_channels: Literal["channels_first", "channels_last", "none"] = "none",
-        normalization: Optional[int] = 256,
+        normalization: int = 256,
     ) -> Tuple[np.ndarray, np.ndarray]:
         path = download_mnist()
         with np.load(path, allow_pickle=True) as fp:
@@ -40,7 +40,7 @@ def mnist():
         if dtype is not None:
             images = images.astype(dtype)
         if add_channels == "channels_last":
-            images = images[..., np.newaxis]
+            images = images[..., np.newaxis] * normalization / 256
         elif add_channels == "channels_first":
             images = images[:, np.newaxis] * normalization / 256
         return images, labels
