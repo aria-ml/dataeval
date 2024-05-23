@@ -66,7 +66,8 @@ def edge_filter(image: np.ndarray, offset: float = 0.5) -> np.ndarray:
      [ -1, -1, -1 ]]
     """
     edges = convolve2d(image, EDGE_KERNEL, mode="same", boundary="symm") + offset
-    return np.clip(edges, 0, 255)
+    np.clip(edges, 0, 255, edges)
+    return edges
 
 
 @dataclass
@@ -110,46 +111,47 @@ class ChannelStats:
     ch_histogram: np.ndarray
 
 
-class SingleImageStats(ImageStats[np.number], ChannelStats):
-    """
-    Calculates image and channel statistics.
-    """
+def get_image_stats(image: np.ndarray) -> ImageStats:
+    image = normalize_image_shape(image)
+    width = np.int32(image.shape[-1])
+    height = np.int32(image.shape[-2])
+    scaled = rescale(image)
+    histogram = np.histogram(scaled, bins=256, range=(0, 1))[0]
 
-    def __init__(self, image: np.ndarray):
-        # Normalize the image dimensions
-        image = normalize_image_shape(image)
-        bitdepth = get_bitdepth(image)
-        scaled = rescale(image)
+    return ImageStats(
+        height=height,
+        width=width,
+        size=width * height,
+        aspect_ratio=width / height,
+        depth=np.int32(get_bitdepth(image).depth),
+        channels=np.int32(image.shape[-3]),
+        missing=np.sum(np.isnan(image)),
+        brightness=np.mean(scaled),  # TODO: replace with better calculation
+        blurriness=np.std(edge_filter(np.mean(image, axis=0))),
+        mean=np.mean(scaled),
+        zero=np.int32(np.count_nonzero(image == 0)),
+        var=np.var(scaled),
+        skew=np.float32(skew(scaled.ravel())),
+        kurtosis=np.float32(kurtosis(scaled.ravel())),
+        percentiles=np.percentile(scaled, q=[0, 25, 50, 75, 100]),
+        histogram=histogram,
+        entropy=np.float32(entropy(histogram)),
+    )
 
-        # Image stats
-        self.channels = np.int32(image.shape[0])
-        self.height = np.int32(image.shape[-2])
-        self.width = np.int32(image.shape[-1])
-        self.size = self.height * self.width
-        self.aspect_ratio = self.width / self.height
-        self.depth = np.int32(bitdepth.depth)
-        self.blurriness = np.std(edge_filter(np.mean(image, axis=0)))
-        self.missing = np.sum(np.isnan(image))
-        self.zero = np.int32(np.count_nonzero(image == 0))
 
-        self.mean = np.mean(scaled)
-        self.brightness = self.mean  # TODO: replace with a better calculation
-        self.var = np.var(scaled)
-        self.skew = np.float32(skew(scaled.ravel()))
-        self.kurtosis = np.float32(kurtosis(scaled.ravel()))
-        self.percentiles = np.percentile(scaled, q=[0, 25, 50, 75, 100])
+def get_channel_stats(image: np.ndarray) -> ChannelStats:
+    image = normalize_image_shape(image)
+    scaled = rescale(image)
+    flattened = scaled.reshape(image.shape[0], -1)
 
-        # Channel stats
-        ch_flat = scaled.reshape(self.channels, -1)
-        self.ch_mean = np.mean(scaled, axis=(1, 2))
-        self.ch_var = np.var(scaled, axis=(1, 2))
-        self.ch_skew = skew(ch_flat, axis=1)
-        self.ch_kurtosis = kurtosis(ch_flat, axis=1)
-        self.ch_percentiles = np.percentile(scaled, q=[0, 25, 50, 75, 100], axis=(1, 2)).T
-        self.ch_histogram = np.apply_along_axis(lambda x: np.histogram(x, bins=256, range=(0, 1))[0], 1, ch_flat)
-
-        self.histogram = np.sum(self.ch_histogram, axis=0)
-        self.entropy = np.float32(entropy(self.histogram))
+    return ChannelStats(
+        ch_mean=np.mean(scaled, axis=(1, 2)),
+        ch_var=np.var(scaled, axis=(1, 2)),
+        ch_skew=skew(flattened, axis=1),
+        ch_kurtosis=kurtosis(flattened, axis=1),
+        ch_percentiles=np.percentile(scaled, q=[0, 25, 50, 75, 100], axis=(1, 2)).T,
+        ch_histogram=np.apply_along_axis(lambda x: np.histogram(x, bins=256, range=(0, 1))[0], 1, flattened),
+    )
 
 
 # Pulls in a dataset and then gets the individual image stats
@@ -167,16 +169,17 @@ class DatasetStats(ImageStats[np.ndarray], ChannelStats):
         # self.labels = labels
         # self.boxes = boxes
         self.length = len(images)
-        self.ch_map = np.empty((0, 3), dtype=np.uint32)  # [index, channels, channel_index]
+        channel_map = []
         channel_stats = {}
 
         # Iterate through images
         for i, image in enumerate(images):
-            stats = SingleImageStats(image)
+            # stats = SingleImageStats(image)
+            img_stats = get_image_stats(image)
 
             # Aggregate the image statistics
             for stat in ImageStats.__annotations__:
-                image_stat = getattr(stats, stat)
+                image_stat = getattr(img_stats, stat)
                 aggregated_stat = getattr(self, stat, None)
                 if aggregated_stat is None:
                     shape = () if np.isscalar(image_stat) else image_stat.shape
@@ -185,19 +188,17 @@ class DatasetStats(ImageStats[np.ndarray], ChannelStats):
                 aggregated_stat[i] = image_stat
 
             # Build the image and channel mapping for each channel
-            c = int(stats.channels)
-            image_ch_map = np.linspace((i, c, 0), (i, c, c - 1), c, dtype=np.uint32)
-            self.ch_map = np.concatenate((self.ch_map, image_ch_map))
+            c = int(img_stats.channels)
+            channel_map.append(np.linspace((i, c, 0), (i, c, c - 1), c, dtype=np.uint32))
 
-            # Aggregate the channel statistics
+            # Aggregate the channel statistics into channel_stats dictionary
+            ch_stats = get_channel_stats(image)
             for stat in ChannelStats.__annotations__:
-                channel_stat = getattr(stats, stat)
-                if stat not in channel_stats:
-                    channel_stats[stat] = [channel_stat]
-                else:
-                    channel_stats[stat].append(channel_stat)
+                channel_stat = getattr(ch_stats, stat)
+                channel_stats.setdefault(stat, []).append(channel_stat)
 
-        # Concatenate all channel_stats into aggregatged stats
+        # Aggregate all channel indices and stats
+        self.ch_map = np.concatenate(channel_map)
         for stat, channel_stat in channel_stats.items():
             aggregated_channel_stat = np.concatenate(channel_stat)
             setattr(self, stat, aggregated_channel_stat)
@@ -211,3 +212,9 @@ class DatasetStats(ImageStats[np.ndarray], ChannelStats):
             if channel is None
             else (self.ch_map[:, (1, 2)] == (channels, channel)).all(axis=1)
         )
+
+    def get_image_stats(self) -> dict:
+        return {k: getattr(self, k) for k in ImageStats.__annotations__}
+
+    def get_channel_stats(self, channels: int, channel: Optional[int] = None) -> dict:
+        return {k: getattr(self, k)[self.get_channel_mask(channels, channel)] for k in ChannelStats.__annotations__}
