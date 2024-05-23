@@ -6,6 +6,9 @@ Usage:
   run <task> [pyenv python version]
 
 Tasks:
+  help    show this help message
+  quick   quick CI validation (qdocs) (default)
+  full    full CI validation (docs)
   unit    run unit tests
   func    run functional tests
   deps    run dependency tests
@@ -20,13 +23,14 @@ EOF
 exit $1
 }
 
-declare -A supported_tasks=([unit]=1 [func]=1 [deps]=1 [type]=1 [lint]=1 [docs]=1 [qdocs]=1)
+declare -A supported_tasks=([quick]=1 [full]=1 [unit]=1 [func]=1 [deps]=1 [type]=1 [lint]=1 [docs]=1 [qdocs]=1)
 declare -A supported_pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1)
 
 # validate args
-if (( $# == 0 )); then showHelp 0; fi
+if (( $# == 0 )); then task=quick; else task=$1; fi
+if [[ $task == "help" ]] || [[ $task == "--help" ]] || [[ $task == "-h" ]]; then showHelp 0; fi
 if (( $# > 2 )); then echo Too many parameters; showHelp 1; fi
-if [[ ! ${supported_tasks[$1]} ]]; then echo Invalid task; showHelp 1; fi
+if [[ ! ${supported_tasks[$task]} ]]; then echo Invalid task; showHelp 1; fi
 if [[ $# == 2 ]]; then
     if [[ ! ${supported_pvers[$2]} ]]; then echo Unsupported Python version; showHelp 1; fi
     if ! (pyenv versions 2>/dev/null | grep -q $2); then echo Pyenv installation of Python version not found; exit 1; fi
@@ -40,25 +44,36 @@ poetry_run="$python -m poetry --quiet run"
 
 # deps task skips poetry check as it builds its own virtual environment for the test
 # all other tests use poetry environment for execution
-if ! [ $1 == "deps" ] && ! ($poetry_run pip freeze | grep daml) >/dev/null 2>&1; then
+if ! [ $task == "deps" ] && ! ($poetry_run pip freeze | grep daml) >/dev/null 2>&1; then
     echo "DAML environment not found.  Please rebuild your devcontainer or install using poetry with all extras and groups."
     exit 1
 fi
 
-echo "Running $1 task in Python $pver..."
-
 FAILURES=0
 trap 'FAILURES=$((FAILURES+1))' ERR
 
-case $1 in
+case $task in
+    "quick"|"full")
+        ./run lint $pver || failure="lint "
+        ./run type $pver || failure="${failure}type "
+        ./run unit $pver || failure="${failure}unit "
+        if [[ "$task" == "quick" ]]; then docstask=qdocs; else docstask=docs; fi
+        ./run $docstask $pver || failure="${failure}${docstask} "
+
+        if [[ $failure ]]; then echo && echo "The following tasks failed: $failure" && exit 1; fi
+        echo && echo "All tasks succeeded."
+        ;;
+    *)
+        echo "Running $task task in Python $pver..."
+        ;;&
     "unit"|"func")
-        if [ "$1" == "unit" ]; then export CUDA_VISIBLE_DEVICES=-1; fi
-        if [ "$1" == "func" ]; then args="--runfunctional"; fi
+        if [ "$task" == "unit" ]; then export CUDA_VISIBLE_DEVICES=-1; fi
+        if [ "$task" == "func" ]; then args="--runfunctional"; fi
         $poetry_run pytest tests/check_prototype.py --verbose --pythonwarnings ignore::DeprecationWarning
-        $poetry_run coverage run --data-file=output/.coverage.$1.$pver --source=daml --branch -m pytest $args --junitxml=output/junit.$1.$pver.xml --verbose --durations=0 --pythonwarnings ignore::DeprecationWarning
-        $poetry_run coverage report --data-file=output/.coverage.$1.$pver
-        $poetry_run coverage xml --data-file=output/.coverage.$1.$pver --skip-empty -o output/coverage.$1.$pver.xml
-        $poetry_run coverage html --data-file=output/.coverage.$1.$pver --skip-empty -d output/htmlcov.$1.$pver
+        $poetry_run coverage run --data-file=output/.coverage.$task.$pver --source=daml --branch -m pytest $args --junitxml=output/junit.$task.$pver.xml --verbose --durations=0 --pythonwarnings ignore::DeprecationWarning
+        $poetry_run coverage report --data-file=output/.coverage.$task.$pver
+        $poetry_run coverage xml --data-file=output/.coverage.$task.$pver --skip-empty -o output/coverage.$task.$pver.xml
+        $poetry_run coverage html --data-file=output/.coverage.$task.$pver --skip-empty -d output/htmlcov.$task.$pver
         ;;
     "deps")
         $python -m pip install virtualenv
@@ -79,7 +94,7 @@ case $1 in
     "docs"|"qdocs")
         pushd docs
         if [[ $pver == 3.8 ]]; then echo "Generating docs is not supported in python 3.8"; exit 1; fi
-        if [ "$1" == "docs" ]; then $poetry_run jcache cache clear -f; fi
+        if [ "$task" == "docs" ]; then $poetry_run jcache cache clear -f; fi
         export TF_CPP_MIN_LOG_LEVEL=3
         export PYDEVD_DISABLE_FILE_VALIDATION=1
         NB_EXECUTION_MODE_OVERRIDE=off $poetry_run sphinx-build -M doctest . ../output/docs
