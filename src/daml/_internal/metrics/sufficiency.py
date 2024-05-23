@@ -74,17 +74,10 @@ def calc_params(p_i: np.ndarray, n_i: np.ndarray, niter: int) -> np.ndarray:
         Array of parameters to recreate line of best fit
     """
 
-    def is_valid_x(f_new, x_new, f_old, x_old):
-        try:
-            np.sum(np.square(p_i - x_new[0] * n_i ** (-x_new[1]) - x_new[2]))
-        except ArithmeticError:
-            return False
-        return True
-
     def f(x):
         return np.sum(np.square(p_i - x[0] * n_i ** (-x[1]) - x[2]))
 
-    res = basinhopping(f, np.array([0.5, 0.5, 0.1]), niter=niter, accept_test=is_valid_x)
+    res = basinhopping(f, np.array([0.5, 0.5, 0.1]), niter=niter)
     return res.x
 
 
@@ -545,8 +538,7 @@ class Sufficiency(EvaluateMixin):
 
         validate_output(data)
 
-        # X, y data
-        steps = data[STEPS_KEY]
+        
 
         # Iterate through the elements of the data dictionary until
         # we reach the array of measures, which are then used to predict
@@ -558,6 +550,9 @@ class Sufficiency(EvaluateMixin):
             # Select the cached parameters associated with the current column of measure
             # TODO: We currently assume measure only has one axis
             params = params_cache[0]
+            
+            # X, y data
+            steps = data[STEPS_KEY]
 
             num_samples_needed = inv_project_steps(measure, steps, targets, params)
             return np.array(np.ceil(num_samples_needed), dtype=np.int64)
