@@ -490,9 +490,6 @@ class TestSufficiencyExtraFeatures:
         levels of model accuracy. The test passes if the accuracy values
         of the model at the predicted steps is within 0.05 of the desired accuracies.
         """
-        num_samples = np.arange(1, 80, step=10)
-        accuracies = num_samples / 100
-        # num_samples being too long may take too many iters for calc_params to converge
 
         # Mock arguments to initialize a Sufficiency object
         eval_fn = MagicMock()

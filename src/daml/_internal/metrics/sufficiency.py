@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union, cast
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -125,7 +125,7 @@ def project_steps(
     steps: np.ndarray,
     projection: np.ndarray,
     niter: int = 1000,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray]:
     """Projects the measures for each value of X
 
     Parameters
@@ -550,7 +550,7 @@ class Sufficiency(EvaluateMixin):
             # Select the cached parameters associated with the current column of measure
             # TODO: We currently assume measure only has one axis
             params = params_cache[0]
-            
+
             # X, y data
             steps = data[STEPS_KEY]
 
