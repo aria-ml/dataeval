@@ -64,7 +64,7 @@ def calc_params(p_i: np.ndarray, n_i: np.ndarray, niter: int) -> np.ndarray:
         Array of corresponding losses
     n_i : np.ndarray
         Array of sample sizes
-    niter: int
+    niter : int
         How many iterations to perform on the basin hopping scheme
 
     Returns
@@ -417,6 +417,9 @@ class Sufficiency(EvaluateMixin):
             Dataclass containing the average of each measure per substep
         steps : Union[int, np.ndarray]
             Step or steps to project
+        niter : int, default 1000
+            Number of iterations to perform in the numerical process
+            to curve-fit measure
 
         Raises
         ------
