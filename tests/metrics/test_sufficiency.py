@@ -153,6 +153,24 @@ class TestSufficiency:
 
         results = suff.evaluate()
         assert isinstance(results, dict)
+    
+    def test_mock_run_at_value(self) -> None:
+        eval_fn = MagicMock()
+        eval_fn.return_value = {"test": 1.0}
+        patch("torch.utils.data.DataLoader").start()
+
+        suff = Sufficiency(
+            model=MagicMock(),
+            train_ds=mock_ds(2),
+            test_ds=mock_ds(2),
+            train_fn=MagicMock(),
+            eval_fn=eval_fn,
+            runs=1,
+            substeps=2,
+        )
+
+        results = suff.evaluate(np.array([1]))
+        assert isinstance(results, dict)
 
     def test_mock_run_with_kwargs(self) -> None:
         train_fn = MagicMock()
@@ -464,6 +482,40 @@ class TestSufficiencyExtraFeatures:
 
         target_needed_data = np.array([20, 40, 60])
         assert np.all(np.isclose(needed_data, target_needed_data, atol=1))
+    
+    def test_empty_data(self):
+        """
+        This loads mock sufficiency data, fits a sufficiency curve to it,
+        and then predicts how many steps are required to achieve various
+        levels of model accuracy. The test passes if the accuracy values
+        of the model at the predicted steps is within 0.05 of the desired accuracies.
+        """
+        num_samples = np.arange(1, 80, step=10)
+        accuracies = num_samples / 100
+        # num_samples being too long may take too many iters for calc_params to converge
+
+        # Mock arguments to initialize a Sufficiency object
+        eval_fn = MagicMock()
+        eval_fn.return_value = {"test": 1.0}
+        patch("torch.utils.data.DataLoader").start()
+
+        suff = Sufficiency(
+            model=MagicMock(),
+            train_ds=mock_ds(2),
+            test_ds=mock_ds(2),
+            train_fn=MagicMock(),
+            eval_fn=eval_fn,
+            runs=1,
+            substeps=2,
+        )
+
+        data = {}
+        data["_STEPS_"] = np.array([])
+        #data["Accuracy"] = np.array([])
+
+        desired_accuracies = np.array([0.2, 0.4, 0.6])
+        needed_data = suff.inv_project(desired_accuracies, data)
+        assert np.all(needed_data == np.array([-1]))
 
     @pytest.mark.functional
     def test_predicts_on_real_data(self, mnist):
@@ -519,7 +571,7 @@ class TestSufficiencyExtraFeatures:
         # to train a model to (desired_accuracies) accuracy
         pred_nsamples = Sufficiency.inv_project(desired_accuracies, output_to_fit)
 
-        # Train model and see if we get the accuracy we expect on these predicte
+        # Train model and see if we get the accuracy we expect on these predicted
         # amounts of training data
         output_on_pred_nsamples = suff.evaluate(pred_nsamples)
         assert np.all(np.isclose(output_on_pred_nsamples["Accuracy"], desired_accuracies, atol=0.05))
