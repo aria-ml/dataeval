@@ -114,6 +114,7 @@ markers = [
   "interop: marks external library interop tests",
   "functional: marks slower functional tests",
 ]
+norecursedirs = ["prototype"]
 
 # Ruff rules - https://docs.astral.sh/ruff/rules/
 [tool.ruff]
