@@ -3,6 +3,7 @@
   "python.terminal.activateEnvInCurrentTerminal": true,
   "python.testing.pytestArgs": [
     "${workspaceFolder}/tests/",
+    "${workspaceFolder}/prototype/",
     "--runfunctional"
   ],
   "python.testing.pytestEnabled": true,
