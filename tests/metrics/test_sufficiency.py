@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Sequence, Tuple, cast
+from typing import Dict, Optional, Sequence, Tuple
 from unittest.mock import MagicMock, NonCallableMagicMock, patch
 
 import numpy as np
@@ -396,7 +396,7 @@ class TestSufficiencyProject:
         assert result["test1"].shape == (4, 2)
         assert result["test2"].shape == (4,)
 
-class TestSufficiencyExtraFeatures():
+class TestSufficiencyExtraFeatures:
     def test_empty_data(self):
         """
         Verifies that inv_project crashes when fed empty data

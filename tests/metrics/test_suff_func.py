@@ -1,5 +1,5 @@
-from typing import Dict, Sequence, Optional, cast
-from unittest.mock import MagicMock, NonCallableMagicMock, patch
+from typing import Dict, Optional, Sequence, cast
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import numpy.testing as npt
@@ -9,12 +9,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torchmetrics
-from torch.utils.data import DataLoader, Subset, Dataset
+from torch.utils.data import DataLoader, Dataset, Subset
 
 import daml._internal.metrics.sufficiency as dms
 from daml._internal.metrics.sufficiency import STEPS_KEY
 from daml.metrics import Sufficiency
 from tests.utils.data import DamlDataset
+
 
 class MockNet(nn.Module):
     def __init__(self) -> None:
