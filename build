@@ -281,6 +281,8 @@ export run_image="${registry}/run:${deps_hash}"
 
 if [[ -z $verbose ]]; then
     verbosity="--quiet"
+else
+    keep_order="--keep-order"
 fi
 export verbosity
 
@@ -315,5 +317,5 @@ echo "Running ${!jobs[@]}..."
 case ${#jobs[@]} in
     0)  showHelp 1;;
     1)  export verbose=1; docker_run ${!jobs[@]};;
-    *)  LANG=C parallel --lb --tag docker_run ::: ${!jobs[@]};;
+    *)  LANG=C parallel $keep_order --lb --tag docker_run ::: ${!jobs[@]};;
 esac
