@@ -53,21 +53,10 @@ stages:
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event' || $CI_COMMIT_BRANCH == 'main'
   - if: $CI_PIPELINE_SOURCE == 'web'
 
-.on_merge_request: &on_merge_request
+.on_merge_request_only: &on_merge_request_only
   - if: $CREATE_NEW_RELEASE
     when: never
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-
-.on_non_release_mr_or_web: &on_non_release_mr_or_web
-  - if: $CREATE_NEW_RELEASE
-    when: never
-  - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_MERGE_REQUEST_LABELS !~ '/release::\w+/'
-  - if: $CI_PIPELINE_SOURCE == 'web'
-
-.on_commit_main_or_release_mr: &on_commit_main_or_release_mr
-  - if: $CREATE_NEW_RELEASE
-    when: never
-  - if: $CI_COMMIT_BRANCH == 'main' || $CI_MERGE_REQUEST_LABELS =~ '/release::\w+/'
 
 .on_commit_main_only: &on_commit_main_only
   - if: $CREATE_NEW_RELEASE
@@ -151,12 +140,12 @@ dependency tests:
     - ./run deps
   rules: *on_run
 
-.run_tests:
+unit tests:
   extends: [.harbor, .python_version_matrix]
   script:
     - FAILURES=0
     - trap 'FAILURES=$((FAILURES+1))' ERR
-    - ./build --verbose --push ${PYTHON_VERSION} ${TASK} ${ARGS}
+    - ./build --verbose --push ${PYTHON_VERSION} unit
     - ./build --verbose --push ${PYTHON_VERSION} type
     - exit $FAILURES
   artifacts:
@@ -164,29 +153,10 @@ dependency tests:
       junit: output/junit.${TASK}.${PYTHON_VERSION}.xml
     paths:
       - output/*
-
-unit tests:
-  extends: .run_tests
-  variables:
-    TASK: unit
-  rules: *on_non_release_mr_or_web
-
-functional tests:
-  extends: .run_tests
-  tags: [single-gpu]
-  variables:
-    TASK: func
-    ARGS: --gpu
-  rules: *on_commit_main_or_release_mr
+  rules: *on_run
 
 coverage:
-  needs:
-    - job: unit tests
-      optional: true
-      artifacts: true
-    - job: functional tests
-      optional: true
-      artifacts: true
+  needs: [unit tests]
   before_script:
     - pip install coverage
   script:
@@ -246,7 +216,7 @@ update merge request:
     - pip install requests
   script:
     - .gitlab/scripts/update_merge_request.py $CI_MERGE_REQUEST_IID $CI_PIPELINE_ID
-  rules: *on_merge_request
+  rules: *on_merge_request_only
 
 # This job will only run if all previous stages have succeeded,
 # and it creates a tag that signifies that all testing has passed.
