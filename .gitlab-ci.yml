@@ -140,23 +140,20 @@ dependency tests:
     - ./run deps
   rules: *on_run
 
-unit tests:
+tests:
   extends: [.harbor, .python_version_matrix]
   script:
-    - FAILURES=0
-    - trap 'FAILURES=$((FAILURES+1))' ERR
-    - ./build --verbose ${PYTHON_VERSION} unit
-    - ./build --verbose ${PYTHON_VERSION} type
-    - exit $FAILURES
+    - apk add --no-cache parallel
+    - ./build --verbose ${PYTHON_VERSION} unit type
   artifacts:
     reports:
-      junit: output/junit.${TASK}.${PYTHON_VERSION}.xml
+      junit: output/junit.${PYTHON_VERSION}.xml
     paths:
       - output/*
   rules: *on_run
 
 coverage:
-  needs: [unit tests]
+  needs: [tests]
   before_script:
     - pip install coverage
   script:

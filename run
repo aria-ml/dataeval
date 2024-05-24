@@ -66,10 +66,10 @@ case $task in
         echo "Running $task task in Python $pver..."
         ;;&
     "unit")
-        $poetry_run coverage run --data-file=output/.coverage.$task.$pver --source=daml --branch -m pytest $args --junitxml=output/junit.$task.$pver.xml --verbose --durations=0 --pythonwarnings ignore::DeprecationWarning
-        $poetry_run coverage report --data-file=output/.coverage.$task.$pver
-        $poetry_run coverage xml --data-file=output/.coverage.$task.$pver --skip-empty -o output/coverage.$task.$pver.xml
-        $poetry_run coverage html --data-file=output/.coverage.$task.$pver --skip-empty -d output/htmlcov.$task.$pver
+        $poetry_run coverage run --data-file=output/.coverage.$pver --source=daml --branch -m pytest $args --junitxml=output/junit.$pver.xml --verbose --durations=0 --pythonwarnings ignore::DeprecationWarning
+        $poetry_run coverage report --data-file=output/.coverage.$pver
+        $poetry_run coverage xml --data-file=output/.coverage.$pver --skip-empty -o output/coverage.$pver.xml
+        $poetry_run coverage html --data-file=output/.coverage.$pver --skip-empty -d output/htmlcov.$pver
         ;;
     "deps")
         $python -m pip install virtualenv
