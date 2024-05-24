@@ -3,7 +3,6 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import numpy.testing as npt
-import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -27,6 +26,7 @@ class MockNet(nn.Module):
     def forward(self, x):
         pass
 
+
 class Net(nn.Module):
     def __init__(self) -> None:
         super().__init__()
@@ -44,7 +44,8 @@ class Net(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
-    
+
+
 def mock_ds(length: Optional[int]):
     ds = MagicMock()
     if length is None:
@@ -52,6 +53,7 @@ def mock_ds(length: Optional[int]):
     else:
         ds.__len__.return_value = length
     return ds
+
 
 def realistic_train(model: nn.Module, dataset: Dataset, indices: Sequence[int]):
     # Defined only for this testing scenario
@@ -100,6 +102,7 @@ def realistic_eval(model: nn.Module, dataset: Dataset) -> Dict[str, float]:
             metric.update(preds, y)
         result = metric.compute()
     return {"Accuracy": result}
+
 
 def custom_train(model, dataset, indices):
     """
@@ -161,7 +164,6 @@ def custom_eval(model, dataset) -> Dict[str, float]:
     return {"Accuracy": result}
 
 
-# @pytest.mark.functional
 class TestSufficiencyFunctional:
     def test_classification(self, mnist) -> None:
         model = Net()
@@ -196,7 +198,7 @@ class TestSufficiencyFunctional:
         geomshape_answer = np.geomspace(0.01 * length, length, steps).astype(np.int64)
         npt.assert_array_equal(geomshape, geomshape_answer)
 
-# @pytest.mark.functional
+
 class TestSufficiencyExtraFeaturesFunc:
     def test_f_inv_out(self):
         """
@@ -281,10 +283,7 @@ class TestSufficiencyExtraFeaturesFunc:
 
         target_needed_data = np.array([20, 40, 60])
         assert np.all(np.isclose(needed_data, target_needed_data, atol=1))
-    
-    
 
-    @pytest.mark.functional
     def test_predicts_on_real_data(self, mnist):
         """
         End-to-end functional test of sufficiency. This loads the MNIST dataset,
