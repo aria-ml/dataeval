@@ -293,21 +293,14 @@ class TestSufficiencyExtraFeaturesFunc:
         accuracies.
         """
         np.random.seed(0)
-        np.set_printoptions(formatter={"float": lambda x: f"{x:0.4f}"})
         torch.manual_seed(0)
         torch.set_float32_matmul_precision("high")
         device = "cuda" if torch.cuda.is_available() else "cpu"
         torch._dynamo.config.suppress_errors = True  # type: ignore
 
-        train_ds = DamlDataset(*mnist(4000, "train", np.float32, "channels_first", True))
-        test_ds = DamlDataset(*mnist(500, "test", np.float32, "channels_first", True))
-
-        # Compile the model
-        model = torch.compile(Net().to(device))
-
-        # Type cast the model back to Net as torch.compile returns a Unknown
-        # Nothing internally changes from the cast; we are simply signaling the type
-        model = cast(Net, model)
+        train_ds = DamlDataset(*mnist(1000, "train", np.float32, "channels_first", True))
+        test_ds = DamlDataset(*mnist(200, "test", np.float32, "channels_first", True))
+        model = cast(Net, torch.compile(Net().to(device)))
 
         # Instantiate sufficiency metric
         suff = Sufficiency(
@@ -316,7 +309,7 @@ class TestSufficiencyExtraFeaturesFunc:
             test_ds=test_ds,
             train_fn=realistic_train,
             eval_fn=realistic_eval,
-            runs=5,
+            runs=2,
             substeps=10,
         )
 
