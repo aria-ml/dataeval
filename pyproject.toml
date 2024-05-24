@@ -112,10 +112,6 @@ files = ["src/daml/__init__.py"]
 reportMissingImports = false
 
 [tool.pytest.ini_options]
-markers = [
-  "interop: marks external library interop tests",
-  "functional: marks slower functional tests",
-]
 norecursedirs = ["prototype"]
 
 # Ruff rules - https://docs.astral.sh/ruff/rules/
