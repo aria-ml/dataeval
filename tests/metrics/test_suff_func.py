@@ -93,7 +93,6 @@ def custom_eval(model, dataset) -> Dict[str, float]:
     return {"Accuracy": result}
 
 
-# @pytest.mark.functional
 class TestSufficiencyFunctional:
     def test_classification(self, mnist) -> None:
         model = Net()

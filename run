@@ -10,7 +10,6 @@ Tasks:
   quick   quick CI validation (qdocs) (default)
   full    full CI validation (docs)
   unit    run unit tests
-  func    run functional tests
   deps    run dependency tests
   type    run typecheck
   lint    run static code analysis
@@ -23,7 +22,7 @@ EOF
 exit $1
 }
 
-declare -A supported_tasks=([quick]=1 [full]=1 [unit]=1 [func]=1 [deps]=1 [type]=1 [lint]=1 [docs]=1 [qdocs]=1)
+declare -A supported_tasks=([quick]=1 [full]=1 [unit]=1 [deps]=1 [type]=1 [lint]=1 [docs]=1 [qdocs]=1)
 declare -A supported_pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1)
 
 # validate args
@@ -54,10 +53,10 @@ trap 'FAILURES=$((FAILURES+1))' ERR
 
 case $task in
     "quick"|"full")
+        if [[ "$task" == "quick" ]]; then docstask=qdocs; else docstask=docs; fi
         ./run lint $pver || failure="lint "
         ./run type $pver || failure="${failure}type "
         ./run unit $pver || failure="${failure}unit "
-        if [[ "$task" == "quick" ]]; then docstask=qdocs; else docstask=docs; fi
         ./run $docstask $pver || failure="${failure}${docstask} "
 
         if [[ $failure ]]; then echo && echo "The following tasks failed: $failure" && exit 1; fi
@@ -66,9 +65,7 @@ case $task in
     *)
         echo "Running $task task in Python $pver..."
         ;;&
-    "unit"|"func")
-        if [ "$task" == "unit" ]; then export CUDA_VISIBLE_DEVICES=-1; fi
-        if [ "$task" == "func" ]; then args="--runfunctional"; fi
+    "unit")
         $poetry_run coverage run --data-file=output/.coverage.$task.$pver --source=daml --branch -m pytest $args --junitxml=output/junit.$task.$pver.xml --verbose --durations=0 --pythonwarnings ignore::DeprecationWarning
         $poetry_run coverage report --data-file=output/.coverage.$task.$pver
         $poetry_run coverage xml --data-file=output/.coverage.$task.$pver --skip-empty -o output/coverage.$task.$pver.xml
