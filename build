@@ -243,7 +243,12 @@ function ensure_image() {
         exit 1
     fi
 
-    build_image $tag $target $python_version $tag
+    # Rebuild and push the image on main branch commits, or just skip if exists
+    if [[ $CI && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $(docker manifest inspect $tag > /dev/null 2>&1; echo $?) == 1 ]]; then
+        build_image $tag $target $python_version $tag
+    else
+        echo "Verified $tag image in registry"
+    fi
 
     # Base tag images do not have a main tag equivalent so we can skip main tag update
     if [[ $CI && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $push_to_repo && $target != pybase ]]; then
@@ -276,6 +281,8 @@ export run_image="${registry}/run:${deps_hash}"
 
 if [[ -z $verbose ]]; then
     verbosity="--quiet"
+else
+    keep_order="--keep-order"
 fi
 export verbosity
 
@@ -310,5 +317,5 @@ echo "Running ${!jobs[@]}..."
 case ${#jobs[@]} in
     0)  showHelp 1;;
     1)  export verbose=1; docker_run ${!jobs[@]};;
-    *)  LANG=C parallel --lb --tag docker_run ::: ${!jobs[@]};;
+    *)  LANG=C parallel $keep_order --lb --tag docker_run ::: ${!jobs[@]};;
 esac
