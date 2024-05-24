@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Sequence, Tuple
+from typing import Dict, Optional, Tuple
 from unittest.mock import MagicMock, NonCallableMagicMock, patch
 
 import numpy as np
@@ -6,11 +6,8 @@ import numpy.testing as npt
 import pytest
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-import torchmetrics
 from matplotlib.figure import Figure
-from torch.utils.data import DataLoader, Dataset, Subset
+from torch.utils.data import DataLoader
 
 from daml._internal.metrics.sufficiency import STEPS_KEY
 from daml.metrics import Sufficiency
@@ -29,25 +26,6 @@ class MockNet(nn.Module):
 
     def forward(self, x):
         pass
-
-
-class RealisticNet(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv1 = nn.Conv2d(1, 6, 5)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(6400, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 10)
-
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = torch.flatten(x, 1)  # flatten all dimensions except batch
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
 
 
 def load_cls_dataset() -> Tuple[DamlDataset, DamlDataset]:
@@ -83,55 +61,6 @@ def mock_ds(length: Optional[int]):
     else:
         ds.__len__.return_value = length
     return ds
-
-
-def realistic_train(model: nn.Module, dataset: Dataset, indices: Sequence[int]):
-    # Defined only for this testing scenario
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    criterion = torch.nn.CrossEntropyLoss().to(device)
-    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
-    epochs = 100  # 10
-
-    # Define the dataloader for training
-    dataloader = DataLoader(Subset(dataset, indices), batch_size=16)
-
-    for epoch in range(epochs):
-        for batch in dataloader:
-            # Load data/images to device
-            X = torch.Tensor(batch[0]).to(device)
-            # Load targets/labels to device
-            y = torch.Tensor(batch[1]).to(device)
-            # Zero out gradients
-            optimizer.zero_grad()
-            # Forward propagation
-            outputs = model(X)
-            # Compute loss
-            loss = criterion(outputs, y)
-            # Back prop
-            loss.backward()
-            # Update weights/parameters
-            optimizer.step()
-
-
-def realistic_eval(model: nn.Module, dataset: Dataset) -> Dict[str, float]:
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    metric = torchmetrics.Accuracy(task="multiclass", num_classes=10).to(device)
-    result = 0
-
-    # Set model layers into evaluation mode
-    model.eval()
-    dataloader = DataLoader(dataset, batch_size=16)
-    # Tell PyTorch to not track gradients, greatly speeds up processing
-    with torch.no_grad():
-        for batch in dataloader:
-            # Load data/images to device
-            X = torch.Tensor(batch[0]).to(device)
-            # Load targets/labels to device
-            y = torch.Tensor(batch[1]).to(device)
-            preds = model(X)
-            metric.update(preds, y)
-        result = metric.compute()
-    return {"Accuracy": result}
 
 
 class TestSufficiency:
