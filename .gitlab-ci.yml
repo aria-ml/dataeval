@@ -145,8 +145,8 @@ unit tests:
   script:
     - FAILURES=0
     - trap 'FAILURES=$((FAILURES+1))' ERR
-    - ./build --verbose --push ${PYTHON_VERSION} unit
-    - ./build --verbose --push ${PYTHON_VERSION} type
+    - ./build --verbose ${PYTHON_VERSION} unit
+    - ./build --verbose ${PYTHON_VERSION} type
     - exit $FAILURES
   artifacts:
     reports:
@@ -185,7 +185,7 @@ docs:
   needs: [build image]
   tags: [multi-gpu]
   script:
-    - ./build --verbose --push docs --gpu
+    - ./build --verbose docs --gpu
   artifacts:
     paths:
       - output/docs/.jupyter_cache/
