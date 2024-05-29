@@ -256,8 +256,11 @@ export -f docker_run
 
 export deps_hash=$(sha256sum poetry.lock | cut -c 1-8)
 
-if [[ $CI_COMMIT_REF_NAME ]]; then
-    export branch_name=$CI_COMMIT_REF_NAME
+# In CI pipelines use commit branch name or merge request source branch name
+# These are mutually exclusive when set
+# https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
+if [[ $CI ]]; then
+    export branch_name=$CI_COMMIT_BRANCH$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME
 else
     export branch_name=$(git rev-parse --abbrev-ref HEAD)
 fi
