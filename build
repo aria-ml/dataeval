@@ -131,18 +131,9 @@ function build_image() {
 
     base_tag="${base_image}-${python_version}"
     deps_tag="${deps_image}-${python_version}"
-    build_tag="${build_image}-${python_version}"
 
     if [[ $(docker manifest inspect $base_tag 2> /dev/null) ]]; then
-        image_args="--build-arg base_image=$base_tag"
-    fi
-
-    if [[ $(docker manifest inspect $deps_tag 2> /dev/null) ]]; then
-        image_args="$image_args --build-arg deps_image=$deps_tag"
-    fi
-
-    if [[ $(docker manifest inspect $build_tag 2> /dev/null) ]]; then
-        image_args="$image_args --build-arg build_image=$build_tag"
+        image_args="$image_args --build-arg base_image=$base_tag"
     fi
 
     cache="${tag/\/${image_name}:${branch_prefix}/\/cache:}"
@@ -241,8 +232,6 @@ function ensure_image() {
         tag="${base_image}-${python_version}"
     elif [[ $target == "pydeps" ]]; then
         tag="${deps_image}-${python_version}"
-    elif [[ $target == "build" ]]; then
-        tag="${build_image}-${python_version}"
     else
         echo "unknown target: ${target}"
         exit 1
@@ -260,7 +249,7 @@ export -f post_build_cleanup
 export -f build_image
 export -f build_and_run
 
-export deps_hash=$(sha256sum poetry.lock | cut -c 1-8)
+export deps_hash=$(sha256sum environment/requirements.txt | cut -c 1-8)
 
 # In CI pipelines use commit branch name or merge request source branch name
 # These are mutually exclusive when set
@@ -315,7 +304,11 @@ done
 
 if [[ $devenv ]]; then
     echo "Building devcontainer with python ${!pvers[@]}..."
-    (cat Dockerfile && echo ENV versions=\"${!pvers[@]}\" && echo -n ${!pvers[@]} | xargs -d' ' -I{} echo COPY --chown=\${UID}/ --link --from=$deps_image-{} \${PYENV_ROOT}/ \${PYENV_ROOT}/) |
+    (
+        cat Dockerfile && echo ENV versions=\"${!pvers[@]}\" && \
+        (echo -n ${!pvers[@]} | xargs -d' ' -I{} echo COPY --chown=\${UID} --link --from=$base_image-{} \${PYENV_ROOT}/ \${PYENV_ROOT}/) && \
+        (echo -n ${!pvers[@]} | xargs -d' ' -I{} echo COPY --chown=\${UID} --link --from=$base_image-{} \${UV_CACHE}/ \${UV_CACHE}/)
+    ) |
     docker build $verbosity --tag daml-devcontainer --target devcontainer -
     docker image prune -f
 fi
@@ -335,5 +328,5 @@ echo "Running ${!jobs[@]}..."
 case ${#jobs[@]} in
     0)  showHelp 1;;
     1)  build_and_run ${!jobs[@]};;
-    *)  LANG=C parallel $keep_order --lb --tag 'set -o pipefail; build_and_run' ::: ${!jobs[@]};;
+    *)  parallel $keep_order --lb --tag 'set -o pipefail; build_and_run' ::: ${!jobs[@]};;
 esac

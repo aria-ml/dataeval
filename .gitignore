@@ -12,5 +12,8 @@ docs/tutorials/notebooks/data/
 output/
 .coverage*
 
+.tox/
+.python-version
+
 # Used to store user customizable settings
 .settings

@@ -142,6 +142,11 @@ verify lock:
     - pip install poetry
   script:
     - poetry check
+    - poetry config warnings.export false
+    - poetry export --all-extras --without-hashes -o environment/requirements.check
+    - cmp -s environment/requirements.txt environment/requirements.check
+    - poetry export --only=dev --without-hashes -o environment/requirements-dev.check
+    - cmp -s environment/requirements-dev.txt environment/requirements-dev.check
   rules: *on_run
 
 docker info:

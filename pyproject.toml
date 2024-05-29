@@ -78,6 +78,10 @@ all = ["maite", "matplotlib", "nvidia-cudnn-cu11", "tensorflow", "tensorflow-io-
 optional = true
 
 [tool.poetry.group.dev.dependencies]
+tox = {version = "*"}
+tox-uv = {version = "*"}
+uv = {version = "*"}
+poetry = {version = "*"}
 # lint
 ruff = {version = "*"}
 codespell = {version = "*", extras = ["toml"]}
@@ -154,6 +158,7 @@ exclude = [
   "*env*",
   "output",
   "_build",
+  ".tox"
 ]
 line-length = 120
 indent-width = 4
@@ -180,7 +185,7 @@ docstring-code-format = true
 docstring-code-line-length = "dynamic"
 
 [tool.codespell]
-skip = '*env*,prototype,docs/.jupyter_cache,CHANGELOG.md,poetry.lock,output,*.html'
+skip = './*env*,./prototype,./docs/.jupyter_cache,./.tox,CHANGELOG.md,poetry.lock,./output,*.html'
 
 [build-system]
 requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning"]
