@@ -1,21 +1,23 @@
 import numpy as np
 import pytest
 
+from daml._internal.metrics.ber import _knn_lowerbound
 from daml._internal.metrics.utils import get_classes_counts
 from daml.metrics import BER
 
 
 class TestMulticlassBER:
     @pytest.mark.parametrize(
-        "method, expected",
+        "method, k, expected",
         [
-            ("MST", {"ber": 0.137, "ber_lower": 0.07132636098401203}),
-            ("KNN", {"ber": 0.118, "ber_lower": 0.061072112753426215}),
+            ("MST", 1, {"ber": 0.137, "ber_lower": 0.07132636098401203}),
+            ("KNN", 1, {"ber": 0.118, "ber_lower": 0.061072112753426215}),
+            ("KNN", 10, {"ber": 0.143, "ber_lower": 0.0745910104681437}),
         ],
     )
-    def test_ber_on_mnist(self, method, expected, mnist):
+    def test_ber_on_mnist(self, method, k, expected, mnist):
         data, labels = mnist()
-        metric = BER(data, labels, method)
+        metric = BER(data, labels, method, k)
         result = metric.evaluate()
         assert result == expected
 
@@ -35,3 +37,19 @@ class TestMulticlassBER:
     def test_list_class_methods(self):
         methods = BER.methods()
         assert len(methods) == 2
+
+    @pytest.mark.parametrize(
+        "value, classes, k, expected",
+        [
+            (0.0, 5, 1, 0.0),
+            (0.5, 2, 1, 0.5),
+            (0.5, 2, 2, 0.25),
+            (0.5, 2, 4, 0.3333333333333333),
+            (0.5, 2, 6, 0.3394049878693466),
+            (0.5, 5, 2, 0.31010205144336445),
+            (0.5, 5, 6, 0.31010205144336445),
+        ],
+    )
+    def test_knn_lower_bound_2_classes(self, value, classes, k, expected):
+        result = _knn_lowerbound(value, classes, k)
+        assert result == expected
