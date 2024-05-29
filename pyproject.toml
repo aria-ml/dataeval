@@ -148,7 +148,6 @@ exclude = [
   "*env*",
   "output",
   "_build",
-  "prototype"
 ]
 line-length = 120
 indent-width = 4

@@ -7,18 +7,18 @@ from scipy.spatial.distance import pdist, squareform
 
 def extend_linkage(link_arr: np.ndarray) -> np.ndarray:
     """
-    Adds a column to the linkage matrix Z that tracks the new id assigned
+    Adds a column to the linkage matrix link_arr that tracks the new id assigned
     to each row
 
     Parameters
     ----------
-    Z
+    link_arr : np.ndarray
         linkage matrix
 
     Returns
     -------
-    arr
-        linkage matrix with adjusted shape, new shape (Z.shape[0], Z.shape[1]+1)
+    np.ndarray
+        linkage matrix with adjusted shape, new shape (link_arr.shape[0], link_arr.shape[1]+1)
     """
     # Adjusting linkage matrix to accommodate renumbering
     rows, cols = link_arr.shape
@@ -30,15 +30,17 @@ def extend_linkage(link_arr: np.ndarray) -> np.ndarray:
 
 
 class Cluster:
-    __slots__ = "merged", "samples", "sample_dist", "count", "dist_avg", "dist_std", "out1", "out2"
+    __slots__ = "merged", "samples", "sample_dist", "is_copy", "count", "dist_avg", "dist_std", "out1", "out2"
 
     def __init__(self, merged: int, samples: np.ndarray, sample_dist: Union[float, np.ndarray], is_copy: bool = False):
         self.merged = merged
         self.samples = np.array(samples, dtype=np.int32)
         self.sample_dist = np.array([sample_dist] if np.isscalar(sample_dist) else sample_dist)
+        self.is_copy = is_copy
+
         dist = float(self.sample_dist[-1])
 
-        self.count = self.samples.shape[0]
+        self.count = len(self.samples)
         if is_copy:
             self.dist_avg = 0.0
             self.dist_std = 0.0
@@ -46,7 +48,7 @@ class Cluster:
             self.out2 = False
         else:
             self.dist_avg = float(np.mean(self.sample_dist))
-            self.dist_std = float(np.std(self.sample_dist)) if self.sample_dist.shape[0] > 1 else 1e-5
+            self.dist_std = float(np.std(self.sample_dist)) if len(self.sample_dist) > 1 else 1e-5
             out1 = self.dist_avg + self.dist_std
             out2 = out1 + self.dist_std
             self.out1 = dist > out1
@@ -56,10 +58,18 @@ class Cluster:
         return Cluster(False, self.samples, self.sample_dist, True)
 
     def __repr__(self) -> str:
-        return {"merged": self.merged, "samples": self.samples, "sample_dist": self.sample_dist}.__repr__()
+        _params = {
+            "merged": self.merged,
+            "samples": self.samples,
+            "sample_dist": self.sample_dist,
+            "is_copy": self.is_copy,
+        }
+        return f"{self.__class__.__name__}(**{repr(_params)})"
 
 
 class ClusterPosition(NamedTuple):
+    """Keeps track of a cluster's level and ID"""
+
     level: int
     cid: int
 
@@ -81,12 +91,21 @@ class ClusterMergeEntry:
 
 
 class Clusterer:
+    """
+    Uses hierarchical clustering to flag dataset properties of interest like outliers and duplicates
+
+    Parameters
+    ----------
+    dataset : np.ndarray
+        An array of images or image embeddings to perform clustering
+    """
+
     def __init__(self, dataset: np.ndarray):
-        """ """
-        # This is done to update the state rather than instantiate a new class when new data is passed in
+        # Allows an update to dataset to reset the state rather than instantiate a new class
         self._on_init(dataset)
 
     def _on_init(self, dataset: np.ndarray):
+        self._validate_data(dataset)
         self._data: np.ndarray = dataset
         self._num_samples = len(dataset)
 
@@ -100,6 +119,7 @@ class Clusterer:
         self._min_num_samples_per_cluster = min(max(2, min_num), 100)
 
         self._clusters: Dict[int, Dict[int, Cluster]] = {}  # Dictionary to store clusters
+        self._last_good_merge_levels: Dict = {}
 
     @property
     def data(self) -> np.ndarray:
@@ -112,10 +132,17 @@ class Clusterer:
     @property
     def clusters(self) -> Dict[int, Dict[int, Cluster]]:
         if not self._clusters:
-            self.create_clusters()
+            self._clusters = self._create_clusters()
         return self._clusters
 
-    def _validate_data(self, x: np.ndarray):
+    @property
+    def last_good_merge_levels(self) -> Dict[int, int]:
+        if not self._last_good_merge_levels:
+            self._last_good_merge_levels = self._get_last_merge_levels()
+        return self._last_good_merge_levels
+
+    @classmethod
+    def _validate_data(cls, x: np.ndarray):
         """Checks that the data has the correct size, shape, and format"""
         if not isinstance(x, np.ndarray):
             raise TypeError(f"Data should be of type np.ndarray; got {type(x)}")
@@ -130,10 +157,11 @@ class Clusterer:
         if features < 1:
             raise ValueError(f"Samples should have at least 1 feature; got {features}")
 
-    def create_clusters(self):
+    def _create_clusters(self) -> Dict[int, Dict[int, Cluster]]:
         """Generates clusters based on linkage matrix"""
         next_cluster_id = 0
         cluster_map: Dict[int, ClusterPosition] = {}  # Dictionary to associate new cluster ids with actual clusters
+        clusters: Dict[int, Dict[int, Cluster]] = {}
 
         # Walking through the linkage array to generate clusters
         for arr_i in self._larr:
@@ -148,8 +176,8 @@ class Clusterer:
 
             if left and right:
                 merged = max([left.cid, right.cid])
-                lc = self._clusters[left.level][left.cid]
-                rc = self._clusters[right.level][right.cid]
+                lc = clusters[left.level][left.cid]
+                rc = clusters[right.level][right.cid]
                 left_first = len(lc.samples) >= len(rc.samples)
                 samples = np.concatenate([lc.samples, rc.samples] if left_first else [rc.samples, lc.samples])
                 sample_dist = np.concatenate([rc.sample_dist, lc.sample_dist, sample_dist])
@@ -158,10 +186,10 @@ class Clusterer:
                 # Only tracking the levels in which clusters merge for the cluster distance matrix
                 self._max_level = max(self._max_level, left.level, right.level)
                 # Update clusters to include previously skipped levels
-                self._fill_levels(left, right)
+                clusters = self._fill_levels(clusters, left, right)
             elif left or right:
                 child, other_id = cast(Tuple[ClusterPosition, int], (left, right_id) if left else (right, left_id))
-                cc = self._clusters[child.level][child.cid]
+                cc = clusters[child.level][child.cid]
                 samples = np.concatenate([cc.samples, [other_id]])
                 sample_dist = np.concatenate([cc.sample_dist, sample_dist])
                 level, cid = child.level + 1, child.cid
@@ -171,33 +199,42 @@ class Clusterer:
                 next_cluster_id += 1
 
             # Set the cluster and associate the linkage id with the cluster
-            if level not in self._clusters:
-                self._clusters[level] = {}
+            if level not in clusters:
+                clusters[level] = {}
 
-            self._clusters[level][cid] = Cluster(merged, samples, sample_dist)
+            clusters[level][cid] = Cluster(merged, samples, sample_dist)
             cluster_map[int(arr_i[-1])] = ClusterPosition(level, cid)
 
-    def _fill_levels(self, left: ClusterPosition, right: ClusterPosition):
+        return clusters
+
+    def _fill_levels(
+        self, clusters: Dict[int, Dict[int, Cluster]], left: ClusterPosition, right: ClusterPosition
+    ) -> Dict[int, Dict[int, Cluster]]:
         # Sets each level's cluster info if it does not exist
         if left.level != right.level:
             (level, cid), max_level = (left, right[0]) if left[0] < right[0] else (right, left[0])
-            cluster = self._clusters[level][cid].copy()
+            cluster = clusters[level][cid].copy()
             for level_id in range(max_level, level, -1):
-                self._clusters[level_id].setdefault(cid, cluster)
+                clusters[level_id].setdefault(cid, cluster)
+        return clusters
 
     def _get_cluster_distances(self) -> np.ndarray:
-        # this is the cluster distance matrix
+        """Calculates the minimum distances between clusters are each level"""
+        # Must call self.clusters before creating matrix because
+        # self._max_level and self._max_clusters are calculated by self.clusters property
+        clusters = self.clusters
+        # Cluster distance matrix
         cluster_matrix = np.full((self._max_level, self._max_clusters, self._max_clusters), -1.0, dtype=np.float32)
 
-        for level, cluster_set in self._clusters.items():
+        for level, cluster_set in clusters.items():
             if level < self._max_level:
                 cluster_ids = sorted(cluster_set.keys())
                 for i, cluster_id in enumerate(cluster_ids):
-                    cluster_matrix[level, cluster_id, cluster_id] = self._clusters[level][cluster_id].dist_avg
+                    cluster_matrix[level, cluster_id, cluster_id] = clusters[level][cluster_id].dist_avg
                     for int_id in range(i + 1, len(cluster_ids)):
                         compare_id = cluster_ids[int_id]
-                        sample_a = self._clusters[level][cluster_id].samples
-                        sample_b = self._clusters[level][compare_id].samples
+                        sample_a = clusters[level][cluster_id].samples
+                        sample_b = clusters[level][compare_id].samples
                         min_mat = self._sqdmat[np.ix_(sample_a, sample_b)].min()
                         cluster_matrix[level, cluster_id, compare_id] = min_mat
                         cluster_matrix[level, compare_id, cluster_id] = min_mat
@@ -234,19 +271,19 @@ class Clusterer:
 
         Parameters
         ----------
-        clusters:
-            A dictionary containing the original clusters information.
+        cluster_matrix:
+            The distance matrix for all clusters to all others
 
         Returns
         -------
-        merge_clusters:
-            A dictionary with each clusters merge history
+        List[ClusterMergeEntry]:
+            A list with each cluster's merge history
         """
         intra_max = []
         merge_mean = []
         merge_list: List[ClusterMergeEntry] = []
 
-        for level, cluster_set in self._clusters.items():
+        for level, cluster_set in self.clusters.items():
             for outer_cluster, cluster in cluster_set.items():
                 inner_cluster = cluster.merged
                 if not inner_cluster:
@@ -282,7 +319,15 @@ class Clusterer:
 
         return merge_list
 
-    def get_last_merge_levels(self) -> Dict[int, int]:
+    def _get_last_merge_levels(self) -> Dict[int, int]:
+        """
+        Creates a dictionary for important cluster ids mapped to their last good merge level
+
+        Returns
+        -------
+        Dict[int, int]
+            A mapping of a cluster id to its last good merge level
+        """
         last_merge_levels: Dict[int, int] = {}
 
         if self._max_clusters <= 1:
@@ -293,9 +338,9 @@ class Clusterer:
             for entry in merge_list:
                 if not entry.status:
                     if entry.outer_cluster not in last_merge_levels:
-                        last_merge_levels[entry.outer_cluster] = 1
+                        last_merge_levels[entry.outer_cluster] = 0
                     if entry.inner_cluster not in last_merge_levels:
-                        last_merge_levels[entry.inner_cluster] = 1
+                        last_merge_levels[entry.inner_cluster] = 0
                     if last_merge_levels[entry.outer_cluster] > entry.level:
                         last_merge_levels[entry.outer_cluster] = entry.level - 1
                 else:
@@ -308,18 +353,23 @@ class Clusterer:
 
     def find_outliers(self, last_merge_levels: Dict[int, int]) -> Tuple[List[int], List[int]]:
         """
-        The clusters dictionary contains whether the added sample/cluster
-        was outside 1 standard deviation or outside 2 standard deviations.
-        last_merge_levels contains the last good merge for each cluster we care about
-        Using this information to determine when the sample was added to the cluster
+        Retrieves outliers based on when the sample was added to the cluster
         and how far it was from the cluster when it was added
 
+        Parameters
+        ----------
+        last_merge_levels : Dict[int, int]
+            A mapping of a cluster id to its last good merge level
+
+        Returns
+        -------
+        Tuple[List[int], List[int]]
+            The outliers and possible outliers as sorted lists of indices
         """
         outliers = set()
         possible_outliers = set()
 
-        for level, cluster_set in self._clusters.items():
-            # cluster_ids = sorted(cluster_set.keys())
+        for level, cluster_set in self.clusters.items():
             for cluster_id, cluster in cluster_set.items():
                 if not cluster.merged and cluster_id in last_merge_levels and level > last_merge_levels[cluster_id]:
                     if cluster.out2:
@@ -331,47 +381,68 @@ class Clusterer:
 
         return sorted(outliers), sorted(possible_outliers)
 
-    def _group_pairs(self, a: Iterable[int], b: Iterable[int]) -> List[List[int]]:
+    def _sorted_union_find(self, index_groups: Iterable[Iterable[int]]) -> List[List[int]]:
+        """Merges and sorts groups of indices that share any common index"""
         groups: List[List[int]] = []
-        for pair in zip(a, b):
-            pair = set(pair)
+        for indices in zip(*index_groups):
+            indices = set(indices)
             temp = []
             for group in groups:
-                if not set(group).isdisjoint(pair):
-                    pair.update(group)
+                if not set(group).isdisjoint(indices):
+                    indices.update(group)
                 else:
                     temp.append(group)
-            temp.append(sorted(pair))
+            temp.append(sorted(indices))
             groups = temp
         return sorted(groups)
 
     def find_duplicates(self, last_merge_levels: Dict[int, int]) -> Tuple[List[List[int]], List[List[int]]]:
+        """
+        Finds duplicate and near duplicate data based on the last good merge levels when building the cluster
+
+        Parameters
+        ----------
+        last_merge_levels : Dict[int, int]
+            A mapping of a cluster id to its last good merge level
+
+        Returns
+        -------
+        Tuple[List[List[int]], List[List[int]]]
+            The exact duplicates and near duplicates as lists of related indices
+        """
+
         duplicates_std = []
         for cluster_id, level in last_merge_levels.items():
-            samples = self._clusters[level][cluster_id].samples
+            samples = self.clusters[level][cluster_id].samples
             if len(samples) >= self._min_num_samples_per_cluster:
-                duplicates_std.append(self._clusters[level][cluster_id].dist_std)
+                duplicates_std.append(self.clusters[level][cluster_id].dist_std)
         diag_mask = np.ones_like(self._sqdmat, dtype=bool)
         np.fill_diagonal(diag_mask, 0)
         diag_mask = np.triu(diag_mask)
 
         exact_mask = self._sqdmat <= (np.mean(duplicates_std) / 100)
         exact_indices = np.nonzero(exact_mask & diag_mask)
-        exact_dupes = self._group_pairs(exact_indices[0], exact_indices[1])
+        exact_dupes = self._sorted_union_find(exact_indices)
 
         near_mask = self._sqdmat <= np.mean(duplicates_std)
         near_indices = np.nonzero(near_mask & diag_mask & ~exact_mask)
-        near_dupes = self._group_pairs(near_indices[0], near_indices[1])
+        near_dupes = self._sorted_union_find(near_indices)
 
         return exact_dupes, near_dupes
 
-    def run(self):
-        """Finds and flags indices of the data"""
-        self.create_clusters()
+    def evaluate(self):
+        """Finds and flags indices of the data for outliers and duplicates
 
-        last_good_merge_levels = self.get_last_merge_levels()
-        outliers, potential_outliers = self.find_outliers(last_good_merge_levels)
-        duplicates, near_duplicates = self.find_duplicates(last_good_merge_levels)
+        Returns
+        -------
+
+        Dict[str, Union[List[int]], List[List[int]]]
+            Dictionary containing list of outliers, potential outliers, duplicates, and near duplicates in keys
+            "outliers", "potential_outliers", "duplicates", "near_duplicates" respectively
+        """
+
+        outliers, potential_outliers = self.find_outliers(self.last_good_merge_levels)
+        duplicates, near_duplicates = self.find_duplicates(self.last_good_merge_levels)
 
         ret = {
             "outliers": outliers,
