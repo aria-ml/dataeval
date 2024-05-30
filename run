@@ -66,17 +66,15 @@ case $task in
         echo "Running $task task in Python $pver..."
         ;;&
     "unit")
-        $poetry_run coverage run --data-file=output/.coverage.$pver --source=daml --branch -m pytest $args --junitxml=output/junit.$pver.xml --verbose --durations=0 --pythonwarnings ignore::DeprecationWarning
-        $poetry_run coverage report --data-file=output/.coverage.$pver
-        $poetry_run coverage xml --data-file=output/.coverage.$pver --skip-empty -o output/coverage.$pver.xml
-        $poetry_run coverage html --data-file=output/.coverage.$pver --skip-empty -d output/htmlcov.$pver
+        $poetry_run pytest --cov -n auto --junitxml=output/junit.$pver.xml --cov-report term --cov-report xml:output/coverage.$pver.xml --cov-report html:output/htmlcov.$pver
+        mv .coverage output/.coverage.$pver
         ;;
     "deps")
         $python -m pip install virtualenv
         $python -m virtualenv .venv-deps
         source .venv-deps/bin/activate
         pip install . pytest
-        pytest --verbose --pythonwarnings ignore::DeprecationWarning tests/metrics/test_ber.py tests/metrics/test_divergence.py tests/metrics/test_uap.py
+        pytest tests/metrics/test_ber.py tests/metrics/test_divergence.py tests/metrics/test_uap.py
         rm -rf .venv-deps
         ;;
     "type")
