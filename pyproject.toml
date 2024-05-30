@@ -32,6 +32,10 @@ classifiers = [
   "Topic :: Scientific/Engineering",
 ]
 
+packages = [
+  {include = "daml", from = "src"}
+]
+
 [tool.poetry.dependencies]
 python = ">=3.8.1,<3.12"
 hdbscan = {version = ">=0.8.36"}
@@ -77,7 +81,9 @@ ruff = {version = "*"}
 codespell = {version = "*"}
 # test
 pytest = {version = "*"}
-coverage = {version = "*"}
+pytest-cov = {version = "*"}
+pytest-xdist = {version = "*"}
+coverage = {version = "*", extras = ["toml"]}
 pyright = {version = "*, !=1.1.340"}
 torchmetrics = {version = ">=1.0.0", source = "pytorch"}
 matplotlib = {version = "*"}
@@ -114,6 +120,23 @@ reportMissingImports = false
 
 [tool.pytest.ini_options]
 norecursedirs = ["prototype"]
+addopts = ["--pythonwarnings=ignore::DeprecationWarning", "--verbose", "--durations=20", "--durations-min=1.0"]
+
+[tool.coverage.run]
+source = ["daml"]
+branch = true
+
+[tool.coverage.report]
+exclude_also = [
+    "raise NotImplementedError"
+]
+omit = [
+  "*/_internal/models/tensorflow/pixelcnn.py",
+  "*/_prototype/*",
+  "/tmp/*",
+  "tests/*"
+]
+fail_under = 90
 
 # Ruff rules - https://docs.astral.sh/ruff/rules/
 [tool.ruff]

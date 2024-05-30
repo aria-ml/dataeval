@@ -1,8 +1,39 @@
 import hashlib
 import os
 import typing
+import warnings
+from contextlib import contextmanager
+from os import makedirs
+from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import urlretrieve
+
+
+@contextmanager
+def wait_lock(name: str, timeout: int = 60):
+    try:
+        from filelock import FileLock
+    except ImportError:
+        warnings.warn("FileLock dependency not found, read/write collisions possible when running in parallel.")
+        yield
+        return
+
+    path = Path(name) if "output/" in name else Path.joinpath(Path("output"), name)
+
+    assert isinstance(path, Path), f"Not Path object: {path}"
+
+    if not path.is_absolute():
+        path = path.resolve()
+
+    # If we are writing to a new temp folder, create any parent paths
+    makedirs(path.parent, exist_ok=True)
+
+    # https://stackoverflow.com/a/60281933/315168
+    lock_file = path.parent / (path.name + ".lock")
+
+    lock = FileLock(lock_file, timeout=timeout)
+    with lock:
+        yield
 
 
 def _validate_file(fpath, file_hash, chunk_size=65535):
@@ -65,10 +96,11 @@ def download_mnist() -> str:
     https://github.com/keras-team/keras/blob/v2.15.0/keras/datasets/mnist.py#L25-L86
     """
     origin_folder = "https://storage.googleapis.com/tensorflow/tf-keras-datasets/"
-    path = _get_file(
-        "mnist.npz",
-        origin=origin_folder + "mnist.npz",
-        file_hash=("731c5ac602752760c8e48fbffcf8c3b850d9dc2a2aedcf2cc48468fc17b673d1"),
-    )
+    with wait_lock("mnist"):
+        path = _get_file(
+            "mnist.npz",
+            origin=origin_folder + "mnist.npz",
+            file_hash=("731c5ac602752760c8e48fbffcf8c3b850d9dc2a2aedcf2cc48468fc17b673d1"),
+        )
 
     return path
