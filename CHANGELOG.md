@@ -1,6 +1,11 @@
-[//]: # (07b12ac2719ce2fd541c98ff0f89e30be0dd8a49)
+[//]: # (3117d3928717d45cc6f845099ff287d1e714e197)
 
 # DAML Change Log
+
+## v0.53.0
+
+🌟 **Feature Release**
+- `322fc830` - Add parameter `k` to BER estimator for KNN to enable `k>1` for better consistency with ground truth in certain cases
 
 ## v0.52.0
 
