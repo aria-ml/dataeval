@@ -290,6 +290,8 @@ export verbosity
 
 if [[ ${#pvers[@]} == 0 ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
 
+START=$(date +%s)
+
 if [[ $build_only ]] || [[ $devenv ]]; then
     for pver in ${!pvers[@]}; do
         ensure_image pybase $pver
@@ -313,6 +315,12 @@ for pver in ${!pvers[@]}; do
     export load_image=1
     build_image "${run_image}-${pver}" run $pver "${build_image}-${pver}"
 done
+
+END=$(date +%s)
+DIFF=$(( $END - $START ))
+echo "------"
+echo "Image build preparation completed in $DIFF seconds"
+echo "------"
 
 # execute jobs
 echo "Running ${!jobs[@]}..."
