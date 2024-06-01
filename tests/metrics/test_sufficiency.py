@@ -9,7 +9,7 @@ import torch.nn as nn
 from matplotlib.figure import Figure
 from torch.utils.data import DataLoader
 
-from daml._internal.metrics.sufficiency import STEPS_KEY
+from daml._internal.metrics.sufficiency import PARAMS_KEY, STEPS_KEY
 from daml.metrics import Sufficiency
 from tests.utils.data import DamlDataset
 
@@ -79,9 +79,9 @@ class TestSufficiency:
             substeps=2,
         )
 
-        results = suff.evaluate()
+        results = suff.evaluate(niter=100)
         assert isinstance(results, dict)
-    
+
     def test_mock_run_at_value(self) -> None:
         eval_fn = MagicMock()
         eval_fn.return_value = {"test": 1.0}
@@ -120,7 +120,7 @@ class TestSufficiency:
             eval_kwargs=eval_kwargs,
         )
 
-        results = suff.evaluate()
+        results = suff.evaluate(niter=100)
 
         assert train_fn.call_count == 2
         assert train_kwargs == train_fn.call_args.kwargs
@@ -146,7 +146,45 @@ class TestSufficiency:
         )
 
         with pytest.raises(KeyError):
-            suff.evaluate()
+            suff.evaluate(niter=100)
+
+    def test_run_multiple_metrics(self) -> None:
+        eval_fn = MagicMock()
+        eval_fn.return_value = {"Accuracy": 1.0, "Precision": 1.0}
+        patch("torch.utils.data.DataLoader").start()
+
+        suff = Sufficiency(
+            model=MagicMock(),
+            train_ds=mock_ds(2),
+            test_ds=mock_ds(2),
+            train_fn=MagicMock(),
+            eval_fn=eval_fn,
+            runs=1,
+            substeps=2,
+        )
+
+        output = suff.evaluate(niter=100)
+        assert len(output[PARAMS_KEY]) == 2
+        assert len(output) == 4
+
+    def test_run_classwise(self) -> None:
+        eval_fn = MagicMock()
+        eval_fn.return_value = {"Accuracy": np.array([0.2, 0.4, 0.6, 0.8])}
+        patch("torch.utils.data.DataLoader").start()
+
+        suff = Sufficiency(
+            model=MagicMock(),
+            train_ds=mock_ds(2),
+            test_ds=mock_ds(2),
+            train_fn=MagicMock(),
+            eval_fn=eval_fn,
+            runs=1,
+            substeps=2,
+        )
+
+        output = suff.evaluate(niter=100)
+        assert output[PARAMS_KEY]["Accuracy"].shape == (4, 3)
+        assert len(output) == 3
 
     @pytest.mark.parametrize(
         "train_ds_len, test_ds_len, expected_error",
@@ -202,6 +240,7 @@ class TestSufficiencyPlot:
         # Only needed for plotting test
         output = {
             STEPS_KEY: np.array([10, 100, 1000]),
+            PARAMS_KEY: {"test": np.array([-0.1, -1.0, 1.0])},
             "test": np.array([0.2, 0.6, 0.9]),
         }
         result = Sufficiency.plot(output)
@@ -212,6 +251,11 @@ class TestSufficiencyPlot:
         """Tests that the multiple plots are generated"""
         output = {
             STEPS_KEY: np.array([10, 100, 1000]),
+            PARAMS_KEY: {
+                "test1": np.array([-0.1, -1.0, 1.0]),
+                "test2": np.array([-0.1, -1.0, 1.0]),
+                "test3": np.array([-0.1, -1.0, 1.0]),
+            },
             "test1": np.array([0.2, 0.6, 0.9]),
             "test2": np.array([0.2, 0.6, 0.9]),
             "test3": np.array([0.2, 0.6, 0.9]),
@@ -224,7 +268,8 @@ class TestSufficiencyPlot:
     def test_multiplot_classwise(self):
         output = {
             STEPS_KEY: np.array([10, 100, 1000]),
-            "test1": np.array([[0.2, 0.3], [0.6, 0.4], [0.9, 0.8]]),
+            PARAMS_KEY: {"test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 1.0]])},
+            "test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]]),
         }
 
         result = Sufficiency.plot(output)
@@ -234,7 +279,8 @@ class TestSufficiencyPlot:
     def test_multiplot_classwise_invalid_names(self):
         output = {
             STEPS_KEY: np.array([10, 100, 1000]),
-            "test1": np.array([[0.2, 0.3], [0.6, 0.4], [0.9, 0.8]]),
+            PARAMS_KEY: {"test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 1.0]])},
+            "test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]]),
         }
 
         with pytest.raises(IndexError):
@@ -243,7 +289,8 @@ class TestSufficiencyPlot:
     def test_multiplot_classwise_with_names(self):
         output = {
             STEPS_KEY: np.array([10, 100, 1000]),
-            "test1": np.array([[0.2, 0.3], [0.6, 0.4], [0.9, 0.8]]),
+            PARAMS_KEY: {"test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 1.0]])},
+            "test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]]),
         }
 
         result = Sufficiency.plot(output, ["A", "B"])
@@ -252,7 +299,8 @@ class TestSufficiencyPlot:
     def test_multiplot_classwise_without_names(self):
         output = {
             STEPS_KEY: np.array([10, 100, 1000]),
-            "test1": np.array([[0.2, 0.3], [0.6, 0.4], [0.9, 0.8]]),
+            PARAMS_KEY: {"test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 1.0]])},
+            "test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]]),
         }
 
         result = Sufficiency.plot(output)
@@ -261,7 +309,11 @@ class TestSufficiencyPlot:
     def test_multiplot_mixed(self):
         output = {
             STEPS_KEY: np.array([10, 100, 1000]),
-            "test1": np.array([[0.2, 0.3], [0.6, 0.4], [0.9, 0.8]]),
+            PARAMS_KEY: {
+                "test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 1.0]]),
+                "test2": np.array([-0.1, -1.0, 1.0]),
+            },
+            "test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]]),
             "test2": np.array([0.2, 0.6, 0.9]),
         }
 
@@ -274,13 +326,19 @@ class TestSufficiencyPlot:
 
 class TestSufficiencyProject:
     def test_no_steps_key(self):
-        output = {"test1": np.array([0.2, 0.6, 0.9])}
+        output = {PARAMS_KEY: {"test1": np.array([-0.1, -1.0, 1.0])}, "test1": np.array([0.2, 0.6, 0.9])}
         with pytest.raises(KeyError):
-            Sufficiency.project(output, 10000)
+            Sufficiency.project(output, 10000)  # type: ignore
+
+    def test_no_params_key(self):
+        output = {STEPS_KEY: np.array([10, 100]), "test1": np.array([0.2, 0.6, 0.9])}
+        with pytest.raises(KeyError):
+            Sufficiency.project(output, 10000)  # type: ignore
 
     def test_measure_length_invalid(self):
         output = {
             STEPS_KEY: np.array([10, 100]),
+            PARAMS_KEY: {"test1": np.array([-0.1, -1.0, 1.0])},
             "test1": np.array([0.2, 0.6, 0.9]),
         }
         with pytest.raises(ValueError):
@@ -290,14 +348,16 @@ class TestSufficiencyProject:
     def test_project(self, steps):
         output = {
             STEPS_KEY: np.array([10, 100, 1000]),
+            PARAMS_KEY: {"test1": np.array([-0.1, -1.0, 1.0])},
             "test1": np.array([0.2, 0.6, 0.9]),
         }
         result = Sufficiency.project(output, steps)
-        npt.assert_almost_equal(result["test1"], [0.6], decimal=4)
+        npt.assert_almost_equal(result["test1"], [10.0], decimal=4)
 
     def test_project_invalid_steps(self):
         output = {
             STEPS_KEY: np.array([10, 100, 1000]),
+            PARAMS_KEY: {"test1": np.array([-0.1, -1.0, 1.0])},
             "test1": np.array([0.2, 0.6, 0.9]),
         }
         with pytest.raises(ValueError):
@@ -306,7 +366,8 @@ class TestSufficiencyProject:
     def test_project_classwise(self):
         output = {
             STEPS_KEY: np.array([10, 100, 1000]),
-            "test1": np.array([[0.2, 0.3], [0.6, 0.4], [0.9, 0.8]]),
+            PARAMS_KEY: {"test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 1.0]])},
+            "test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]]),
         }
 
         result = Sufficiency.project(output, [1000, 2000, 4000, 8000])
@@ -316,7 +377,11 @@ class TestSufficiencyProject:
     def test_project_mixed(self):
         output = {
             STEPS_KEY: np.array([10, 100, 1000]),
-            "test1": np.array([[0.2, 0.3], [0.6, 0.4], [0.9, 0.8]]),
+            PARAMS_KEY: {
+                "test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 1.0]]),
+                "test2": np.array([-0.1, -1.0, 1.0]),
+            },
+            "test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]]),
             "test2": np.array([0.2, 0.6, 0.9]),
         }
 
@@ -325,30 +390,31 @@ class TestSufficiencyProject:
         assert result["test1"].shape == (4, 2)
         assert result["test2"].shape == (4,)
 
+    def test_inv_project_mixed(self):
+        output = {
+            STEPS_KEY: np.array([10, 100, 1000]),
+            PARAMS_KEY: {
+                "test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 1.0]]),
+                "test2": np.array([-0.1, -1.0, 1.0]),
+            },
+            "test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]]),
+            "test2": np.array([0.2, 0.6, 0.9]),
+        }
+
+        targets = {"test1": np.array([0.6, 0.7, 0.8, 0.9]), "test2": np.array([0.6, 0.7, 0.8, 0.9])}
+
+        result = Sufficiency.inv_project(targets, output)
+        assert len(result.keys()) == 2
+        assert result["test1"].shape == (2, 4)
+        assert result["test2"].shape == (4,)
+
+
 class TestSufficiencyExtraFeatures:
     def test_empty_data(self):
         """
-        Verifies that inv_project crashes when fed empty data
+        Verifies that inv_project returns empty data when fed empty data
         """
+        data = {STEPS_KEY: np.array([]), PARAMS_KEY: {}}
 
-        # Mock arguments to initialize a Sufficiency object
-        eval_fn = MagicMock()
-        eval_fn.return_value = {"test": 1.0}
-        patch("torch.utils.data.DataLoader").start()
-
-        suff = Sufficiency(
-            model=MagicMock(),
-            train_ds=mock_ds(2),
-            test_ds=mock_ds(2),
-            train_fn=MagicMock(),
-            eval_fn=eval_fn,
-            runs=1,
-            substeps=2,
-        )
-
-        data = {}
-        data["_STEPS_"] = np.array([])
-
-        desired_accuracies = np.array([0.2, 0.4, 0.6])
-        needed_data = suff.inv_project(desired_accuracies, data)
-        assert np.all(needed_data == np.array([-1]))
+        desired_accuracies = {}
+        assert len(Sufficiency.inv_project(desired_accuracies, data)) == 0
