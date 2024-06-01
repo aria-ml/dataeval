@@ -36,7 +36,7 @@ def _knn(X: np.ndarray, y: np.ndarray, k: int) -> Tuple[float, float]:
     X = X.reshape((X.shape[0], -1))
     nn_indices = compute_neighbors(X, X, k=k)
     nn_indices = np.expand_dims(nn_indices, axis=1) if nn_indices.ndim == 1 else nn_indices
-    modal_class = mode(y[nn_indices], axis=1).mode.squeeze()
+    modal_class = mode(y[nn_indices], axis=1, keepdims=True).mode.squeeze()
     upper = float(np.count_nonzero(modal_class - y) / N)
     lower = _knn_lowerbound(upper, M, k)
     return upper, lower
