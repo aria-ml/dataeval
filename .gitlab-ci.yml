@@ -84,7 +84,6 @@ stages:
     - echo ${DAML_HARBOR_TOKEN} | docker login harbor.jatic.net -u 'robot$daml+daml-build' --password-stdin
   after_script:
     - docker logout harbor.jatic.net
-  allow_failure: true
 
 ### BUILD ###
 
@@ -95,6 +94,7 @@ build image:
   script:
     - ./build --verbose --build-only --push ${PYTHON_VERSION}
   rules: *on_run
+  allow_failure: true
 
 verify lock:
   stage: build
