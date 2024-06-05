@@ -185,9 +185,11 @@ function build_image() {
         ."
 
     if [[ $verbose ]]; then
+        echo "========================================"
         echo "Building $tag..."
         echo $docker_build_cmd
-        $docker_build_cmd
+        time $docker_build_cmd
+        echo "========================================"
     else
         $docker_build_cmd &> /dev/null
     fi
