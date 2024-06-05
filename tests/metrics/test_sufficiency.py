@@ -422,7 +422,6 @@ class TestSufficiencyInverseProject:
         num_samples = np.arange(20, 80, step=10)
         accuracies = num_samples / 100
 
-        # params = calc_params(1 - accuracies, num_samples, 1000)
         params = np.array([-0.01, -1.0, 1.0])
 
         data = {STEPS_KEY: num_samples, PARAMS_KEY: {"Accuracy": params}, "Accuracy": accuracies}
@@ -431,7 +430,7 @@ class TestSufficiencyInverseProject:
         needed_data = Sufficiency.inv_project(desired_accuracies, data)["Accuracy"]
 
         target_needed_data = np.array([40, 60])
-        npt.assert_allclose(needed_data, target_needed_data, rtol=0.1, atol=1)
+        npt.assert_array_equal(needed_data, target_needed_data)
 
     def test_f_inv_out(self):
         """
@@ -445,7 +444,8 @@ class TestSufficiencyInverseProject:
         # Feed y into inverse function to get the original n_i back out
         n_i_recovered = f_inv_out(y, x)
 
-        npt.assert_allclose(n_i[0], n_i_recovered[0])
+        # Float calculation can create very small trailing values
+        npt.assert_almost_equal(n_i[0], n_i_recovered[0], decimal=4)
 
     def test_inv_project_steps(self):
         """
@@ -461,4 +461,4 @@ class TestSufficiencyInverseProject:
         predicted_proj = inv_project_steps(params, accuracies)
 
         # assert np.all(np.isclose(projection, predicted_proj, atol=1))
-        npt.assert_allclose(projection, predicted_proj, rtol=0.1, atol=1)
+        npt.assert_array_equal(projection, predicted_proj)
