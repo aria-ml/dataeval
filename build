@@ -142,23 +142,18 @@ function build_image() {
         --build-arg pyenv_enable_opt=--enable-optimizations \
         --build-arg pyenv_with_lto=--with-lto"
 
-    main_build_cache="${registry}/main/${target}-buildcache:${python_version}"
-
-    cache_image="${tag/:/-buildcache:}"
+    branch_cache="${tag/:/-buildcache:}"
+    main_cache="${branch_cache/${branch_name}/${main_branch}}"
 
     cache_from_arg="\
-        --cache-from type=registry,ref=$main_build_cache \
-        --cache-from type=registry,ref=$cache_image \
+        --cache-from type=registry,ref=$main_cache \
+        --cache-from type=registry,ref=$branch_cache \
         --cache-from type=registry,ref=$cache_from_tag"
 
     # Writing to the cache means that you must be able to push to the registry, therefore
     # don't want to force users to login to the registry just to build.
     if [[ $push_to_repo ]]; then
-        cache_to_arg="--cache-to type=registry,mode=max,image-manifest=true,ref=$cache_image"
-        # Only update the main build cache via pipeline builds running the main branch
-        if [[ $CI_COMMIT_BRANCH && $CI_DEFAULT_BRANCH && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH ]]; then
-            cache_to_arg="${cache_to_arg} --cache-to type=registry,mode=max,image-manifest=true,ref=$main_build_cache"
-        fi
+        cache_to_arg="--cache-to type=registry,mode=max,image-manifest=true,ref=$branch_cache"
     fi
 
     output_arg="--output type=image,name=$tag"
@@ -185,9 +180,11 @@ function build_image() {
         ."
 
     if [[ $verbose ]]; then
+        echo "========================================"
         echo "Building $tag..."
         echo $docker_build_cmd
-        $docker_build_cmd
+        time $docker_build_cmd
+        echo "========================================"
     else
         $docker_build_cmd &> /dev/null
     fi
@@ -246,26 +243,10 @@ function ensure_image() {
     fi
 
     # Rebuild and push the image on main branch commits, or just skip if exists
-    if [[ $CI && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $(docker manifest inspect $tag > /dev/null 2>&1; echo $?) == 1 ]]; then
+    if [[ $CI && $branch_name == $main_branch || $(docker manifest inspect $tag > /dev/null 2>&1; echo $?) == 1 ]]; then
         build_image $tag $target $python_version $tag
     else
         echo "Verified $tag image in registry"
-    fi
-
-    # Base tag images do not have a main tag equivalent so we can skip main tag update
-    if [[ $CI && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $push_to_repo && $target != pybase ]]; then
-        # Replace the hash with "main" to form the main tag.
-        main_tag="${tag/${deps_hash}/main}"
-        local main_manifest=$(docker manifest inspect $main_tag 2> /dev/null) || true
-        local hash_manifest=$(docker manifest inspect $tag 2> /dev/null) || true
-        if [[ "$main_manifest" != "$hash_manifest" ]]; then
-            echo "Updating $main_tag image with $deps_hash build..."
-            docker pull $tag
-            docker image tag $tag $main_tag
-            docker push $main_tag
-        else
-            echo "$main_tag is up to date with $tag."
-        fi
     fi
 }
 
@@ -275,7 +256,22 @@ export -f docker_run
 
 export deps_hash=$(sha256sum poetry.lock | cut -c 1-8)
 
-export registry="harbor.jatic.net/daml"
+# In CI pipelines use commit branch name or merge request source branch name
+# These are mutually exclusive when set
+# https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
+if [[ $CI ]]; then
+    export branch_name=$CI_COMMIT_BRANCH$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME
+else
+    export branch_name=$(git rev-parse --abbrev-ref HEAD)
+fi
+
+if [[ $CI_DEFAULT_BRANCH ]]; then
+    export main_branch=$CI_DEFAULT_BRANCH
+else
+    export main_branch="main"
+fi
+
+registry="harbor.jatic.net/daml/${branch_name}"
 export base_image="${registry}/pybase"
 export deps_image="${registry}/pydeps:${deps_hash}"
 export build_image="${registry}/build:${deps_hash}"
