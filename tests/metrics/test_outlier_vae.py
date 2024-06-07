@@ -79,13 +79,13 @@ def test_vae(vae_params):
     vae = VAEOutlier(VAE(encoder_net, decoder_net, latent_dim), samples=samples)
 
     # fit OutlierVAE, infer threshold and compute scores
-    vae.fit(X, threshold_perc=threshold_perc, loss_fn=loss_fn, epochs=5, verbose=False)
-    iscore = vae.score(X).instance_score
+    vae.fit(X, threshold_perc=threshold_perc, loss_fn=loss_fn, epochs=5, verbose=False)  # type: ignore
+    iscore = vae.score(X).instance_score  # type: ignore
     perc_score = 100 * (iscore < vae._threshold_score()).astype(int).sum() / iscore.shape[0]
     assert threshold_perc + 5 > perc_score > threshold_perc - 5
 
     # make and check predictions
-    od_preds = vae.predict(X, outlier_type=outlier_type)
+    od_preds = vae.predict(X, outlier_type=outlier_type)  # type: ignore
     scores = vae._threshold_score(outlier_type)
 
     if outlier_type == "instance":
