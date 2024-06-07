@@ -161,7 +161,7 @@ function build_image() {
         output_arg="${output_arg},push=true"
     fi
 
-    if [[ $save_build_images || $load_image ]]; then
+    if [[ $save_build_images ]]; then
         # By default the docker-container driver doesn't load images to the
         # local docker images store, these args will cause it to do so.
         load_arg="--tag ${tag} --load"
@@ -288,29 +288,25 @@ if [[ ${#pvers[@]} == 0 ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
 
 START=$(date +%s)
 
-if [[ $build_only ]] || [[ $devenv ]]; then
-    for pver in ${!pvers[@]}; do
-        ensure_image pybase $pver
-        ensure_image pydeps $pver
-        if [[ $CI ]]; then
-            ensure_image build $pver
-        fi
-    done
-
-    if [[ $devenv ]]; then
-        echo "Building devcontainer with python ${!pvers[@]}..."
-        (cat Dockerfile && echo ENV versions=\"${!pvers[@]}\" && echo -n ${!pvers[@]} | xargs -d' ' -I{} echo COPY --chown=\${UID}/ --link --from=$deps_image-{} \${PYENV_ROOT}/ \${PYENV_ROOT}/) |
-        docker build $verbosity --tag daml-devcontainer --target devcontainer -
-        docker image prune -f
+for pver in ${!pvers[@]}; do
+    ensure_image pybase $pver
+    ensure_image pydeps $pver
+    if [[ ! $devenv ]]; then
+        ensure_image build $pver
+        build_image "${run_image}-${pver}" run $pver "${build_image}-${pver}"
     fi
+done
 
-    exit $?
+if [[ $devenv ]]; then
+    echo "Building devcontainer with python ${!pvers[@]}..."
+    (cat Dockerfile && echo ENV versions=\"${!pvers[@]}\" && echo -n ${!pvers[@]} | xargs -d' ' -I{} echo COPY --chown=\${UID}/ --link --from=$deps_image-{} \${PYENV_ROOT}/ \${PYENV_ROOT}/) |
+    docker build $verbosity --tag daml-devcontainer --target devcontainer -
+    docker image prune -f
 fi
 
-for pver in ${!pvers[@]}; do
-    export load_image=1
-    build_image "${run_image}-${pver}" run $pver "${build_image}-${pver}"
-done
+if [[ $build_only || $devenv ]]; then
+    exit $?
+fi
 
 END=$(date +%s)
 DIFF=$(( $END - $START ))
