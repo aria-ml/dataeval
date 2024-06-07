@@ -1,5 +1,5 @@
 from enum import Flag
-from typing import Any, Callable, Dict, Generic, Iterable, List, Optional, Sequence, TypeVar
+from typing import Any, Callable, Dict, Generic, Iterable, List, Optional, Sequence, TypeVar, Union
 
 import numpy as np
 from scipy.stats import entropy, kurtosis, skew
@@ -20,12 +20,30 @@ class BaseStatsMetric(Generic[TBatch, TFlag]):
         self.results = []
 
     def update(self, batch: TBatch) -> None:
-        """Update internal metric cache for later calculation."""
+        """
+        Updates internal metric cache for later calculation
 
-    def compute(self) -> list:
-        return self.results
+        Parameters
+        ----------
+        batch : Sequence
+            Sequence of images to be processed
+        """
+
+    def compute(self) -> Dict[str, Any]:
+        """
+        Computes the specified measures on the cached values
+
+        Returns
+        -------
+        List[Dict[str, Any]]
+            Dictionary results of the specified measures
+        """
+        return {key: [i[key] for i in self.results] for key in self.results[0]}
 
     def reset(self) -> None:
+        """
+        Resets the internal metric cache
+        """
         self.results = []
 
     def _map(self, func_map: Dict[Flag, Callable]) -> Dict[str, Any]:
@@ -49,6 +67,15 @@ class BaseStatsMetric(Generic[TBatch, TFlag]):
 
 
 class ImageHashMetric(BaseStatsMetric):
+    """
+    Hashes images using the specified algorithms
+
+    Parameters
+    ----------
+    flags : ImageHash
+        Algorithm(s) to calculate a hash as hex digest
+    """
+
     def __init__(self, flags: ImageHash = ImageHash.ALL):
         super().__init__(flags)
 
@@ -64,6 +91,15 @@ class ImageHashMetric(BaseStatsMetric):
 
 
 class ImagePropertyMetric(BaseStatsMetric):
+    """
+    Calculates specified image properties
+
+    Parameters
+    ----------
+    flags: ImageProperty
+        Property(ies) to calculate for each image
+    """
+
     def __init__(self, flags: ImageProperty = ImageProperty.ALL):
         super().__init__(flags)
 
@@ -83,6 +119,15 @@ class ImagePropertyMetric(BaseStatsMetric):
 
 
 class ImageVisualsMetric(BaseStatsMetric):
+    """
+    Calculates specified visual image properties
+
+    Parameters
+    ----------
+    flags: ImageVisuals
+        Property(ies) to calculate for each image
+    """
+
     def __init__(self, flags: ImageVisuals = ImageVisuals.ALL):
         super().__init__(flags)
 
@@ -99,6 +144,15 @@ class ImageVisualsMetric(BaseStatsMetric):
 
 
 class ImageStatisticsMetric(BaseStatsMetric):
+    """
+    Calculates descriptive statistics for each image
+
+    Parameters
+    ----------
+    flags: ImageStatistics
+        Statistic(s) to calculate for each image
+    """
+
     def __init__(self, flags: ImageStatistics = ImageStatistics.ALL):
         super().__init__(flags)
 
@@ -124,6 +178,15 @@ class ImageStatisticsMetric(BaseStatsMetric):
 
 
 class ChannelStatisticsMetric(BaseStatsMetric):
+    """
+    Calculates descriptive statistics for each image per channel
+
+    Parameters
+    ----------
+    flags: ImageStatistics
+        Statistic(s) to calculate for each image per channel
+    """
+
     def __init__(self, flags: ImageStatistics = ImageStatistics.ALL):
         super().__init__(flags)
 
@@ -150,81 +213,102 @@ class ChannelStatisticsMetric(BaseStatsMetric):
             self.results.append(results)
 
 
-class ImageStats(BaseStatsMetric):
-    IMAGESTATS_METRICS = [ImageHashMetric, ImagePropertyMetric, ImageVisualsMetric, ImageStatisticsMetric]
+class BaseAggregateMetric(BaseStatsMetric, Generic[TFlag]):
+    FLAG_METRIC_MAP: Dict[type, type]
+    DEFAULT_FLAGS: Sequence[TFlag]
 
-    def __init__(self, metrics: Optional[Sequence[BaseStatsMetric]] = None) -> None:
-        metrics_dict: Dict[BaseStatsMetric, List[Dict[str, Any]]] = {
-            metric: [] for metric in (metrics if metrics else [metric() for metric in self.IMAGESTATS_METRICS])
+    def __init__(self, flags: Optional[Sequence[TFlag]] = None):
+        flag_dict = {}
+        for flag in flags or self.DEFAULT_FLAGS:
+            flag_dict[type(flag)] = flag_dict.setdefault(type(flag), type(flag)(0)) | flag
+        self._metrics_dict = {
+            metric: []
+            for metric in (
+                self.FLAG_METRIC_MAP[flag_class](flag) for flag_class, flag in flag_dict.items() if flag.value != 0
+            )
         }
-        self.metrics_dict = metrics_dict
-        self.length = 0
+
+
+class ImageStats(BaseAggregateMetric):
+    """
+    Calculates various image property statistics
+
+    Parameters
+    ----------
+    flags: [ImageHash | ImageProperty | ImageStatistics | ImageVisuals], default None
+        Metric(s) to calculate for each image per channel - calculates all metrics if None
+    """
+
+    FLAG_METRIC_MAP = {
+        ImageHash: ImageHashMetric,
+        ImageProperty: ImagePropertyMetric,
+        ImageStatistics: ImageStatisticsMetric,
+        ImageVisuals: ImageVisualsMetric,
+    }
+    DEFAULT_FLAGS = [ImageHash.ALL, ImageProperty.ALL, ImageStatistics.ALL, ImageVisuals.ALL]
+
+    def __init__(
+        self, flags: Optional[Sequence[Union[ImageHash, ImageProperty, ImageStatistics, ImageVisuals]]] = None
+    ):
+        super().__init__(flags)
+        self._length = 0
 
     def update(self, batch: Sequence[np.ndarray]):
-        # Run the images through each metric
         for image in batch:
-            self.length += 1
+            self._length += 1
             img = normalize_image_shape(image)
-            for metric in self.metrics_dict:
+            for metric in self._metrics_dict:
                 metric.update([img])
 
-    def compute(self):
-        # Compute each metric
-        for metric in self.metrics_dict:
-            self.metrics_dict[metric] = metric.compute()
+    def compute(self) -> Dict[str, Any]:
+        for metric in self._metrics_dict:
+            self._metrics_dict[metric] = metric.results
 
-        # Aggregate all metrics into a single dictionary
-        self.stats = {}
-        for metric, results in self.metrics_dict.items():
+        stats = {}
+        for metric, results in self._metrics_dict.items():
             for i, result in enumerate(results):
                 for stat in metric._keys():
                     value = result[stat]
                     if not isinstance(value, (np.ndarray, np.generic)):
-                        if stat not in self.stats:
-                            self.stats[stat] = []
-                        self.stats[stat].append(result[stat])
+                        if stat not in stats:
+                            stats[stat] = []
+                        stats[stat].append(result[stat])
                     else:
-                        if stat not in self.stats:
+                        if stat not in stats:
                             shape = () if np.isscalar(result[stat]) else result[stat].shape
-                            self.stats[stat] = np.empty((self.length,) + shape)
-                        self.stats[stat][i] = result[stat]
+                            stats[stat] = np.empty((self._length,) + shape)
+                        stats[stat][i] = result[stat]
+        return stats
 
     def reset(self):
-        self.length = 0
-        for metric in self.metrics_dict:
+        self._length = 0
+        for metric in self._metrics_dict:
             metric.reset()
-            self.metrics_dict[metric] = []
+            self._metrics_dict[metric] = []
 
 
-class ChannelStats(BaseStatsMetric):
-    CHANNELSTATS_METRICS = [ChannelStatisticsMetric]
+class ChannelStats(BaseAggregateMetric):
+    FLAG_METRIC_MAP = {ImageStatistics: ChannelStatisticsMetric}
+    DEFAULT_FLAGS = [ImageStatistics.ALL]
     IDX_MAP = "idx_map"
 
-    def __init__(self, metrics: Optional[ChannelStatisticsMetric] = None) -> None:
-        if not metrics:
-            metrics = ChannelStatisticsMetric()
+    def __init__(self, flags: Optional[ImageStatistics] = None) -> None:
+        super().__init__([flags] if flags else None)
 
-        metrics_dict: Dict[ChannelStatisticsMetric, List[Dict[str, Any]]] = {metric: [] for metric in [metrics]}
-        self.metrics_dict = metrics_dict
-        self.length = 0
-
-    def update(self, batch: Sequence[np.ndarray]):
-        # Run the images through each metric
+    def update(self, batch: Sequence[np.ndarray]) -> None:
         for image in batch:
-            self.length += 1
             img = normalize_image_shape(image)
-            for metric in self.metrics_dict:
+            for metric in self._metrics_dict:
                 metric.update([img])
 
-        # Compute each metric
-        for metric in self.metrics_dict:
-            self.metrics_dict[metric] = metric.compute()
+        for metric in self._metrics_dict:
+            self._metrics_dict[metric] = metric.results
 
-    def compute(self):
+    def compute(self) -> Dict[str, Any]:
         # Aggregate all metrics into a single dictionary
         stats = {}
         channel_stats = set()
-        for metric, results in self.metrics_dict.items():
+        for metric, results in self._metrics_dict.items():
             for i, result in enumerate(results):
                 for stat in metric._keys():
                     channel_stats.update(metric._keys())
@@ -242,8 +326,7 @@ class ChannelStats(BaseStatsMetric):
 
         return stats
 
-    def reset(self):
-        self.length = 0
-        for metric in self.metrics_dict:
+    def reset(self) -> None:
+        for metric in self._metrics_dict:
             metric.reset()
-            self.metrics_dict[metric] = []
+            self._metrics_dict[metric] = []
