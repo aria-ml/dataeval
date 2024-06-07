@@ -35,10 +35,10 @@ class BaseStatsMetric(Generic[TBatch, TFlag]):
 
         Returns
         -------
-        List[Dict[str, Any]]
+        Dict[str, Any]
             Dictionary results of the specified measures
         """
-        return {key: [i[key] for i in self.results] for key in self.results[0]}
+        return {stat: [result[stat] for result in self.results] for stat in self.results[0]}
 
     def reset(self) -> None:
         """
