@@ -1,6 +1,7 @@
 *env*/
 __pycache__/
 dist/
+data
 
 docs/_*/
 !docs/_static

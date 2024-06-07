@@ -94,6 +94,7 @@ def predownload_data():
     with cwd("./tutorials/notebooks"):
         # AETrainerTutorial.ipynb
         # ClassLearningCurvesTutorial.ipynb
+        # ClassLabelAnalysisTutorial.ipynb
         MNIST(root="./data/", train=True, download=True)
         MNIST(root="./data/", train=False, download=True)
 
