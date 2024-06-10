@@ -1,11 +1,8 @@
 from pathlib import Path
+from typing import Any, Dict, Union
 
-# import maite.protocols.object_detection as od
-# import maite.protocols.image_classification as ic
-from typing import Any, Dict
-
-import torch.nn as nn
-from torch.utils.data import Dataset
+import maite.protocols.image_classification as ic
+import maite.protocols.object_detection as od
 
 
 class TestStage:
@@ -21,19 +18,19 @@ class TestStage:
     def __init__(self, *args, **kwargs):
         self.outputs = {}
 
-    def load_model(self, model: nn.Module) -> None:
+    def load_model(self, model: Union[od.Model, ic.Model]) -> None:
         """Provide the model under test to the test stage"""
         self.model = model
 
-    def load_comparison_model(self, model: nn.Module) -> None:
+    def load_comparison_model(self, model: Union[od.Model, ic.Model]) -> None:
         """Provide the comparison model to the test stage"""
         self.comparison_model = model
 
-    def load_development_dataset(self, dataset: Dataset) -> None:
+    def load_development_dataset(self, dataset: Union[od.Dataset, ic.Dataset]) -> None:
         """Provide the development dataset to the test stage"""
         self.dev_dataset = dataset
 
-    def load_operational_dataset(self, dataset: Dataset) -> None:
+    def load_operational_dataset(self, dataset: Union[od.Dataset, ic.Dataset]) -> None:
         """Provide the operational dataset to the test stage"""
         self.operational_dataset = dataset
 

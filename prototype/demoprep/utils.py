@@ -1,18 +1,15 @@
-from typing import Any, Dict, Sequence
+from typing import Any, Dict, Sequence, Union
 
-import torch.nn as nn
+import maite.protocols.image_classification as ic
+import maite.protocols.object_detection as od
 from test_stage import TestStage
-from torch.utils.data import Dataset
-
-# import maite.protocols.object_detection as od
-# import maite.protocols.image_classification as ic
 
 
 def load_models_and_datasets(
-    dev_dataset: Dataset,
-    op_dataset: Dataset,
-    model: nn.Module,
-    comparison_model: nn.Module,
+    dev_dataset: Union[od.Dataset, ic.Dataset],
+    op_dataset: Union[od.Dataset, ic.Dataset],
+    model: Union[od.Model, ic.Model],
+    comparison_model: Union[od.Model, ic.Model],
     target_performance: float,
     stages: Sequence[TestStage],
 ):
