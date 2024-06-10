@@ -61,7 +61,7 @@ def test_ae(ae_params):
     ae = AEOutlier(AE(encoder_net=encoder_net, decoder_net=decoder_net))
 
     # fit OutlierAE
-    ae.fit(X, threshold_perc=threshold_perc, epochs=5, verbose=True)
+    ae.fit(X, threshold_perc=threshold_perc, epochs=5, verbose=True)  # type: ignore
 
     # check thresholds and scores
     iscore = ae._ref_score.instance_score
@@ -69,7 +69,7 @@ def test_ae(ae_params):
     assert threshold_perc + 5 > perc_score > threshold_perc - 5
 
     # make and check predictions
-    od_preds = ae.predict(X, outlier_type=outlier_type)
+    od_preds = ae.predict(X, outlier_type=outlier_type)  # type: ignore
     scores = ae._threshold_score(outlier_type)
 
     if outlier_type == "instance":

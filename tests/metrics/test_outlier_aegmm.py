@@ -17,6 +17,7 @@ from keras.api._v2.keras.layers import Dense, InputLayer
 from daml._internal.metrics.outlier.aegmm import AEGMMOutlier
 from daml._internal.models.tensorflow.autoencoder import AEGMM
 from daml._internal.models.tensorflow.losses import LossGMM
+from tests.utils.datasets import wait_lock
 
 n_gmm = [1, 2]
 w_energy = [0.1, 0.5]
@@ -26,7 +27,8 @@ tests = list(product(n_gmm, w_energy, threshold_perc))
 n_tests = len(tests)
 
 # load and preprocess MNIST data
-(X_train, _), (X_test, _) = keras.datasets.mnist.load_data()
+with wait_lock("mnist"):
+    (X_train, _), (X_test, _) = keras.datasets.mnist.load_data()
 X = X_train.reshape(X_train.shape[0], -1)[:1000]  # only train on 1000 instances
 X = X.astype(np.float32)
 X /= 255

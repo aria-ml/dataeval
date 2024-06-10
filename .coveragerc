@@ -1,7 +1,0 @@
-[report]
-exclude_lines = 
-    pragma: no cover
-    raise NotImplementedError
-omit =
-    */_internal/models/tensorflow/pixelcnn.py
-    */_prototype/*

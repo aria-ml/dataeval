@@ -14,6 +14,7 @@ Metrics
 - [HP Divergence Tutorial](notebooks/HPDivergenceTutorial) [![Open In Colab][colab-badge]][div-colab]
 - [Outlier Detection Tutorial](notebooks/OutlierDetectionTutorial) [![Open In Colab][colab-badge]][out-colab]
 - [Dataset Sufficiency Analysis for Object Detection Tutorial](html/ODLearningCurvesTutorial.rst)
+
 :::{toctree}
 :hidden:
 :maxdepth: 1

@@ -108,7 +108,6 @@ RUN poetry install --no-cache --all-extras --with dev
 
 FROM versioned as run
 ARG UID
-COPY --chown=${UID} .coveragerc ./
 COPY --chown=${UID} tests/ tests/
 COPY --chown=${UID} docs/ docs/
 COPY --chown=${UID} *.md ./

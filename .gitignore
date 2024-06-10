@@ -1,6 +1,7 @@
 *env*/
 __pycache__/
 dist/
+data
 
 docs/_*/
 !docs/_static
@@ -9,6 +10,7 @@ docs/tutorials/notebooks/checkpoints/
 docs/tutorials/notebooks/data/
 
 output/
+.coverage*
 
 # Used to store user customizable settings
 .settings

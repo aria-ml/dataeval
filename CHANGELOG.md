@@ -1,6 +1,18 @@
-[//]: # (07b12ac2719ce2fd541c98ff0f89e30be0dd8a49)
+[//]: # (f36cfdb1a3259650b02a2f1f26058eb5789b730d)
 
 # DAML Change Log
+
+## v0.54.0
+
+🛠️ **Improvements and Enhancements**
+- `58263ac7` - Move niter param to evaluate and calculate and retain curve coefficients in output dictionary
+
+    This change enhances the output of the `Sufficiency` metric to provide the coefficients for the learning curve by measure/class when running the metric. These parameters were previously recalculated each call to project and plot. The parameters are provided as a `Dict[str, np.ndarray]` under the `_CURVE_PARAMS_` key in the output dictionary.
+
+## v0.53.0
+
+🌟 **Feature Release**
+- `322fc830` - Add parameter `k` to BER estimator for KNN to enable `k>1` for better consistency with ground truth in certain cases
 
 ## v0.52.0
 
