@@ -18,104 +18,62 @@ TARGET_OPTS = ["Target", "Both"]
 class DamlStage(TestStage):
     def __init__(
         self,
-        feasibility_opt="Both",
-        bias_opt="Both",
-        linting_opt="Both",
-        sufficiency_opt="Both",
-        outlier_detector=AEOutlier(create_model(AE, (100, 10, 10))),
+        feasibility_dataset="Both",
+        bias_dataset="Both",
+        linting_dataset="Both",
+        sufficiency_dataset="Both",
         *args,
         **kwargs,
     ):
-        super().__init__()
+        super().__init__(*args, **kwargs)
 
-        # TODO: All of these should be in args/kwargs from Panel
-        self.feasibility_opt = feasibility_opt
-        self.bias_opt = bias_opt
-        self.linting_opt = linting_opt
-        self.sufficiency_opt = sufficiency_opt
+        self.feasibility_dataset = feasibility_dataset
+        self.bias_dataset = bias_dataset
+        self.linting_dataset = linting_dataset
+        self.sufficiency_dataset = sufficiency_dataset
 
-        # TODO: Instantiated class done in backend script
-        self.outlier_detector = outlier_detector
+        self.outlier_detector = AEOutlier(create_model(AE, (28, 28, 1)))
 
         self.base_str = "dev_train"
         self.target_str = "op_val"
 
-        self.cached_ae = None
+        # Runtime caching < Multiple metrics need preprocessing by an AE >
+        self.cached_ae_path = None
+        self.cached_images = {}  # {dataset: embeddings}
+        self.cached_labels = {}  # {dataset: embeddings}
 
-    def run(self):
-        cache_path = Path(".daml_cache/cache.json")
-        self.load_cached_results(cache_path)
+        self.load_cached_results(Path(".daml_cache/cache.json"))
 
-        base_dataset = self.dev_dataset if "dev" in self.base_str else self.operational_dataset
-        target_dataset = self.dev_dataset if "dev" in self.target_str else self.operational_dataset
+    def run(self) -> None:
+        """Run the test stage, and store any outputs of the evaluation in test stage"""
+        self.base_dataset = self.dev_dataset if "dev" in self.base_str else self.operational_dataset
+        self.target_dataset = self.dev_dataset if "dev" in self.target_str else self.operational_dataset
 
         metric_outputs = defaultdict(dict)
 
-        # Feasibility
-        if self.feasibility_opt in BASE_OPTS:
-            # Check cache for cached split
-            f_cache = self.cache.get(self.base_str)
-            # Use cache if found, else calculate
-            result = f_cache if f_cache is not None else self.feasibility(base_dataset)
-            metric_outputs[self.base_str].update(result)
-        if self.feasibility_opt in TARGET_OPTS:
-            # Check cache for cached split
-            f_cache = self.cache.get(self.target_str)
-            # Use cache if found, else calculate
-            result = f_cache if f_cache is not None else self.feasibility(target_dataset)
-            metric_outputs[self.target_str].update(result)
-
-        # Bias
-        if self.feasibility_opt in BASE_OPTS:
-            # Check cache for cached split
-            f_cache = self.cache.get(self.base_str)
-            # Use cache if found, else calculate
-            result = f_cache if f_cache is not None else self.bias(base_dataset)
-            metric_outputs[self.base_str].update(result)
-        if self.feasibility_opt in TARGET_OPTS:
-            # Check cache for cached split
-            f_cache = self.cache.get(self.target_str)
-            # Use cache if found, else calculate
-            result = f_cache if f_cache is not None else self.bias(base_dataset)
-            metric_outputs[self.target_str].update(result)
-
-        # # Linting
-        # if self.feasibility_opt in BASE_OPTS:
-        #     self.outputs.update(self.linting(base_dataset))
-        # if self.feasibility_opt in TARGET_OPTS:
-        #     self.outputs.update(self.linting(target_dataset))
-
-        # # Sufficiency
-        # if self.feasibility_opt in BASE_OPTS:
-        #     self.outputs.update(self.sufficiency(base_dataset))
-        # if self.feasibility_opt in TARGET_OPTS:
-        #     self.outputs.update(self.sufficiency(target_dataset))
+        for k, v in self.feasibility().items():
+            metric_outputs[k].update(v)
+        for k, v in self.bias().items():
+            metric_outputs[k].update(v)
+        for k, v in self.linting().items():
+            metric_outputs[k].update(v)
+        for k, v in self.sufficiency().items():
+            metric_outputs[k].update(v)
 
         self.outputs = metric_outputs
 
+        # TODO: Update and save outputs to cache file (Could split into multiple cache files?)
+
     def load_cached_results(self, results: Path) -> None:
+        """Load cached results from a previous run so that they may be accessed with the collect_metrics and the
+        collect_report_consumables methods"""
         if Path.is_file(results):
+            print("Cache hit")
             with results.open() as f:
-                cache = json.load(f)
-                print("Cache hit")
+                self.cache = json.load(f)
         else:
-            self.cache = {}
             print("Cache miss")
-            return
-
-        """
-        Get all feasibility cached results
-        Find split specific cached results for cache ID (if cached)
-        """
-        # TODO: Handle missing cache/None values -> Potentailly use dict.update(dict.get(str))?
-        loaded_cache = {}
-        feasibility_cache = cache.get("feasibility_cache")
-        if self.feasibility_opt in BASE_OPTS:
-            loaded_cache[self.base_str] = feasibility_cache[self.base_str]
-        if self.feasibility_opt in TARGET_OPTS:
-            loaded_cache[self.target_str] = feasibility_cache[self.target_str]
-
-        self.cache = loaded_cache
+            self.cache = {}
 
     def collect_metrics(self):
         print("Returning metrics")
@@ -125,47 +83,91 @@ class DamlStage(TestStage):
         print("Returning Gradient parameters")
         return self.outputs
 
-    def feasibility(self, dataset) -> dict:
-        images = []
-        labels = []
+    def _run_base(self, func):
+        return func(self.base_dataset)
 
-        ae = self.cached_ae if self.cached_ae is not None else lambda x: x
+    def _run_target(self, func):
+        return func(self.target_dataset)
+
+    def feasibility(self):
+        feasibility_output = defaultdict(dict)
+        feasibility_cache = self.cache.get("feasibility", {})
+        METRIC = self._ber
+
+        # First run on base, then target. Only run if no cache found
+        if self.feasibility_dataset in BASE_OPTS:
+            cache = feasibility_cache.get(self.base_str)
+            result = cache if cache else self._run_base(METRIC)
+            feasibility_output[self.base_str].update(result)
+        if self.feasibility_dataset in TARGET_OPTS:
+            cache = feasibility_cache.get(self.base_str)
+            result = cache if cache else self._run_target(METRIC)
+            feasibility_output[self.target_str].update(result)
+
+        return feasibility_output
+
+    def _ber(self, dataset) -> dict:
+        images, labels = [], []
 
         # Using a dataloader transforms CHW to NCHW needed for dim_zero_cat
-        dataloader = DataLoader(dataset)
-        for i, (image, label, _) in enumerate(dataloader):
-            # Currently no preprocessing, so BER takes a long time
-            if i == 100:
+        for i, (image, label, _) in enumerate(DataLoader(dataset)):
+            if i == 100:  # Only need a subset for testing
                 break
+            images.append(image if isinstance(image, torch.Tensor) else torch.tensor(image))
+            labels.append(label if isinstance(label, torch.Tensor) else torch.tensor(label))
 
-            images = ae(images)
+        images = dim_zero_cat(images).detach().cpu().numpy()
+        labels = dim_zero_cat(labels).detach().cpu().numpy()
 
-            images.append(torch.tensor(image))
-            labels.append(torch.tensor(label))
+        return BER(images, labels).evaluate()
 
-        images = dim_zero_cat(images)
-        labels = dim_zero_cat(labels)
+    def bias(self) -> dict:
+        bias_output = defaultdict(dict)
+        bias_cache = self.cache.get("bias", {})
+        METRICS = [self._balance, self._coverage, self._parity]
 
-        ber = BER(images.detach().cpu().numpy(), labels.detach().cpu().numpy(), "MST")
-        ber_output = ber.evaluate()
+        if self.bias_dataset in BASE_OPTS:
+            cache = bias_cache.get(self.base_str)
+            if cache is not None:
+                result = cache
+            else:
+                result = {}
+                for metric in METRICS:
+                    result.update(self._run_base(metric))
+            bias_output[self.base_str].update(result)
+        if self.bias_dataset in TARGET_OPTS:
+            cache = bias_cache.get(self.target_str)
+            if cache is not None:
+                result = cache
+            else:
+                result = {}
+                for metric in METRICS:
+                    result.update(self._run_target(metric))
+            bias_output[self.target_str].update(result)
 
-        return ber_output
+        return bias_output
 
-    def bias(self, dataset) -> dict:
-        return {"bias": 0.50}
+    def _coverage(self, dataset) -> dict:
+        return {"coverage": 0.90}
 
-    def linting(self, dataset) -> dict:
+    def _parity(self, dataset) -> dict:
+        return {"parity": 0.25}
+
+    def _balance(self, dataset) -> dict:
+        return {"balance": 0.5}
+
+    def linting(self) -> dict:
         return {}
 
-    def sufficiency(self, dataset) -> dict:
+    def sufficiency(self) -> dict:
         return {}
 
-    def outlier_detection(self, train_dataset, val_dataset) -> dict:
+    def outlier_detection(self) -> dict:
         # TODO: Need to swap PyTorch NCHW to TensorFlow NHWC
         # self.outlier_detector.fit(train_dataset)
         # output = self.outlier_detector.predict(val_dataset)
         # return output
         return {}
 
-    def drift_detection(self, dataset) -> dict:
+    def drift_detection(self) -> dict:
         return {}
