@@ -96,8 +96,8 @@ class DemoClassifier():
         eval_pbar = tqdm(eval_loader)
         with torch.no_grad():
             for val_img, val_labels in eval_pbar:
-                val_img.to(self.device, memory_format=torch.channels_last)
-                val_labels.to(self.device)
+                val_img = val_img.to(self.device, memory_format=torch.channels_last)
+                val_labels = val_labels.to(self.device)
                 val_pred = self.model(val_img)
                 acc_metric.update(val_pred, val_labels)
                 vloss = self.loss_fn(val_pred, val_labels)
@@ -170,7 +170,7 @@ class DemoClassifier():
 
 def main():
     config = {
-        "batch_size": 128,
+        "batch_size": 512,
         "backbone": "alex",
         "lr": 5e-4,
         "epochs": 5,
