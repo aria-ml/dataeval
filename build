@@ -188,48 +188,72 @@ function build_image() {
     fi
 }
 
-function docker_run() {
-    temp=$(mktemp)
+function build_and_run() {
     IFS=- read -r task pver <<< $1
-    tag="${run_image}-${pver}"
 
     container_name="run-${task}-${pver}"
     if [[ $CI_PIPELINE_ID ]]; then
         container_name="${container_name}-${CI_PIPELINE_ID}"
     fi
 
-    trap "post_build_cleanup $temp $tag $container_name" EXIT
-
     # If the image was pushed, then we need to be sure to pull the updated image
     if [[ $push_to_repo ]]; then
         pull_arg="--pull always"
     fi
 
-    docker_run_cmd="docker run $pull_arg --name $container_name $gpuflag $tag $task"
+    if [[ $task == "docs" || $task == "qdocs" ]]; then
+        tag="${run_image}-${pver}"
+        build_image $tag run $pver
 
-    if [[ $verbose ]]; then
-        echo "Running $container_name..."
-        echo $docker_run_cmd
-        $docker_run_cmd | tee $temp || result="FAILED"
+        temp=$(mktemp)
+        trap "post_build_cleanup $temp $tag $container_name" EXIT
+
+        docker_run_cmd="docker run $pull_arg --name $container_name $gpuflag $tag $task"
+
+        if [[ $verbose ]]; then
+            echo "Running $container_name..."
+            echo $docker_run_cmd
+            $docker_run_cmd | tee $temp || result="FAILED"
+        else
+            $docker_run_cmd &> $temp || result="FAILED"
+        fi
+
+        if [[ $result == "FAILED" ]]; then
+            log_file="output/logs/daml-${task}-${pver}_failure_$(date +%s).log"
+            echo "FAILED (see log file ${log_file})"
+            mkdir -p output/logs
+            cat $temp > $log_file
+            if [[ ! $verbose ]]; then cat $temp; fi
+            exit 1
+        else
+            if [[ ! $verbose ]]; then echo SUCCEEDED; fi
+            docker cp $container_name:/daml/output ./
+        fi
     else
-        $docker_run_cmd &> $temp || result="FAILED"
-    fi
+        tag="${registry}/${task}:${deps_hash}-${pver}"
 
-    if [[ $result == "FAILED" ]]; then
-        log_file="output/logs/daml-${task}-${pver}_failure_$(date +%s).log"
-        echo "FAILED (see log file ${log_file})"
-        mkdir -p output/logs
-        cat $temp > $log_file
-        if [[ ! $verbose ]]; then cat $temp; fi
-        exitcode=1
-    else
-        if [[ ! $verbose ]]; then echo SUCCEEDED; fi
-        case "$task" in
-            unit|docs) docker cp $container_name:/daml/output ./;;
-        esac
-    fi
+        build_image $tag $task $pver
 
-    exit $exitcode
+        docker create $pull_arg --name $container_name $tag
+        mkdir -p output
+        docker cp $container_name:/daml/output/ .
+
+        echo "======================================================================"
+        echo "Output from ${container_name}"
+        echo "----------------"
+        set +e
+        docker start --interactive $container_name
+        exitcode=$?
+        set -e
+        echo "----------------"
+        echo "${container_name} exit code: ${exitcode}"
+        echo "======================================================================"
+        docker container rm --force $container_name > /dev/null
+
+        if [[ $exitcode != 0 ]]; then
+            exit $exitcode
+        fi
+    fi
 }
 
 function ensure_image() {
@@ -257,7 +281,7 @@ function ensure_image() {
 
 export -f post_build_cleanup
 export -f build_image
-export -f docker_run
+export -f build_and_run
 
 export deps_hash=$(sha256sum poetry.lock | cut -c 1-8)
 
@@ -276,11 +300,10 @@ else
     export main_branch="main"
 fi
 
-registry="harbor.jatic.net/daml/${branch_name}"
+export registry="harbor.jatic.net/daml/${branch_name}"
 export base_image="${registry}/pybase"
 export deps_image="${registry}/pydeps:${deps_hash}"
 export build_image="${registry}/build:${deps_hash}"
-export run_image="${registry}/run:${deps_hash}"
 
 if [[ -z $verbose ]]; then
     verbosity="--quiet"
@@ -298,7 +321,12 @@ for pver in ${!pvers[@]}; do
     ensure_image pydeps $pver
     if [[ ! $devenv ]]; then
         ensure_image build $pver
-        build_image "${run_image}-${pver}" run $pver
+        if [[ $build_only ]]; then
+            build_image "${run_image}-${pver}" run $pver
+            for task in "type" "unit"; do
+                build_image "${registry}/${task}:${deps_hash}-${pver}" ${task} $pver
+            done
+        fi
     fi
 done
 
@@ -323,6 +351,6 @@ echo "------"
 echo "Running ${!jobs[@]}..."
 case ${#jobs[@]} in
     0)  showHelp 1;;
-    1)  export verbose=1; docker_run ${!jobs[@]};;
-    *)  LANG=C parallel $keep_order --lb --tag 'set -o pipefail; docker_run' ::: ${!jobs[@]};;
+    1)  export verbose=1; build_and_run ${!jobs[@]};;
+    *)  LANG=C parallel $keep_order --lb --tag 'set -o pipefail; build_and_run' ::: ${!jobs[@]};;
 esac

@@ -143,7 +143,7 @@ tests:
   extends: [.harbor, .python_version_matrix]
   script:
     - apk add --no-cache parallel
-    - ./build --verbose ${PYTHON_VERSION} unit type
+    - ./build --verbose --push ${PYTHON_VERSION} unit type
   artifacts:
     reports:
       junit: output/junit.${PYTHON_VERSION}.xml
@@ -181,7 +181,7 @@ docs:
   needs: [build image]
   tags: [multi-gpu]
   script:
-    - ./build --verbose docs --gpu
+    - ./build --verbose --push docs --gpu
   artifacts:
     paths:
       - output/docs/.jupyter_cache/
