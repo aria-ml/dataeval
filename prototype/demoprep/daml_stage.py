@@ -8,8 +8,6 @@ from torch.utils.data import DataLoader
 from torchmetrics.utilities.data import dim_zero_cat
 
 from daml.metrics import BER
-from daml.metrics.outlier import AEOutlier
-from daml.models.tensorflow import AE, create_model
 
 BASE_OPTS = ["Base", "Both"]
 TARGET_OPTS = ["Target", "Both"]
@@ -32,17 +30,18 @@ class DamlStage(TestStage):
         self.linting_dataset = linting_dataset
         self.sufficiency_dataset = sufficiency_dataset
 
-        self.outlier_detector = AEOutlier(create_model(AE, (28, 28, 1)))
-
         self.base_str = "dev_train"
-        self.target_str = "op_val"
+        self.target_str = "dev_test"
 
         # Runtime caching < Multiple metrics need preprocessing by an AE >
         self.cached_ae_path = None
         self.cached_images = {}  # {dataset: embeddings}
         self.cached_labels = {}  # {dataset: embeddings}
 
-        self.load_cached_results(Path(".daml_cache/cache.json"))
+        self._cache_dir = Path(".daml_cache")
+        self._cache_file = Path("cache.json")
+
+        self.load_cached_results(self._cache_dir / self._cache_file)
 
     def run(self) -> None:
         """Run the test stage, and store any outputs of the evaluation in test stage"""
@@ -63,6 +62,7 @@ class DamlStage(TestStage):
         self.outputs = metric_outputs
 
         # TODO: Update and save outputs to cache file (Could split into multiple cache files?)
+        self._save_cache()
 
     def load_cached_results(self, results: Path) -> None:
         """Load cached results from a previous run so that they may be accessed with the collect_metrics and the
@@ -71,9 +71,27 @@ class DamlStage(TestStage):
             print("Cache hit")
             with results.open() as f:
                 self.cache = json.load(f)
+            print(self.cache)
         else:
             print("Cache miss")
             self.cache = {}
+
+    def _save_cache(self) -> None:
+        # Update cache
+        for metric, dataset_results in self.outputs.items():
+            if metric not in self.cache:
+                self.cache[metric] = {}
+            self.cache[metric].update(dataset_results)
+
+        # Check path
+        folder = self._cache_dir
+
+        folder.mkdir(exist_ok=True)
+        cache_file_path = folder / self._cache_file
+
+        # Save results
+        with cache_file_path.open("w+") as f:
+            json.dump(self.cache, f, indent=4, sort_keys=True)
 
     def collect_metrics(self):
         print("Returning metrics")
@@ -95,16 +113,19 @@ class DamlStage(TestStage):
         METRIC = self._ber
 
         # First run on base, then target. Only run if no cache found
+
         if self.feasibility_dataset in BASE_OPTS:
             cache = feasibility_cache.get(self.base_str)
             result = cache if cache else self._run_base(METRIC)
+            print(f"Base String: {self.base_str}")
             feasibility_output[self.base_str].update(result)
         if self.feasibility_dataset in TARGET_OPTS:
             cache = feasibility_cache.get(self.base_str)
             result = cache if cache else self._run_target(METRIC)
             feasibility_output[self.target_str].update(result)
 
-        return feasibility_output
+        print({"feasibility": feasibility_output})
+        return {"feasibility": feasibility_output}
 
     def _ber(self, dataset) -> dict:
         images, labels = [], []
@@ -145,7 +166,7 @@ class DamlStage(TestStage):
                     result.update(self._run_target(metric))
             bias_output[self.target_str].update(result)
 
-        return bias_output
+        return {"bias": bias_output}
 
     def _coverage(self, dataset) -> dict:
         return {"coverage": 0.90}
@@ -163,6 +184,7 @@ class DamlStage(TestStage):
         return {}
 
     def outlier_detection(self) -> dict:
+        # outlier_detector = AEOutlier(create_model(AE, (28, 28, 1)))
         # TODO: Need to swap PyTorch NCHW to TensorFlow NHWC
         # self.outlier_detector.fit(train_dataset)
         # output = self.outlier_detector.predict(val_dataset)
