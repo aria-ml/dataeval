@@ -4,6 +4,7 @@ from typing import Any, Callable, Dict, Generic, Iterable, List, Optional, Seque
 import numpy as np
 from scipy.stats import entropy, kurtosis, skew
 
+from daml._internal.metrics.base import MetricMixin
 from daml._internal.metrics.flags import ImageHash, ImageProperty, ImageStatistics, ImageVisuals
 from daml._internal.metrics.hash import pchash, xxhash
 from daml._internal.metrics.utils import edge_filter, get_bitdepth, normalize_image_shape, rescale
@@ -14,7 +15,7 @@ TBatch = TypeVar("TBatch", bound=Sequence)
 TFlag = TypeVar("TFlag", bound=Flag)
 
 
-class BaseStatsMetric(Generic[TBatch, TFlag]):
+class BaseStatsMetric(MetricMixin, Generic[TBatch, TFlag]):
     def __init__(self, flags: TFlag):
         self.flags = flags
         self.results = []
