@@ -4,7 +4,7 @@ from typing import Dict, Tuple, TypeVar
 import numpy as np
 import pytest
 
-from daml._internal.metrics.flags import ImageHash, ImageStatistics, auto_all
+from daml._internal.metrics.flags import ImageHash, ImageProperty, ImageStatistics, ImageVisuals, auto_all
 from daml._internal.metrics.stats import BaseStatsMetric, ChannelStats, ImageStats
 
 
@@ -35,9 +35,9 @@ class MockStatsMetric(BaseStatsMetric):
         super().__init__(flags)
         self.func_map = func_map
 
-    def update(self, batch):
+    def update(self, preds, targets=None):
         results = []
-        for _ in batch:
+        for _ in preds:
             results.append(self._map(self.func_map))
         self.results.extend(results)
 
@@ -112,23 +112,23 @@ class TestImageStats:
     def test_image_stats_single_channel(self):
         stats, results = run_stats(ImageStats(), 100, 1)
         assert stats._length == 100
-        assert len(results) == 19
+        assert len(results) == len(ImageHash) + len(ImageStatistics) + len(ImageProperty) + len(ImageVisuals)
         assert len(results["mean"]) == 100
 
     def test_image_stats_triple_channel(self):
         stats, results = run_stats(ImageStats(), 100, 3)
         assert stats._length == 100
-        assert len(results) == 19
+        assert len(results) == len(ImageHash) + len(ImageStatistics) + len(ImageProperty) + len(ImageVisuals)
         assert len(results["mean"]) == 100
 
     def test_image_stats_hashes_only(self):
-        stats, results = run_stats(ImageStats([ImageHash.ALL]), 100, 1)
+        stats, results = run_stats(ImageStats(ImageHash.ALL), 100, 1)
         assert stats._length == 100
         assert len(results) == 2
         assert len(results["xxhash"]) == 100
 
     def test_image_stats_mean_only(self):
-        stats, results = run_stats(ImageStats([ImageStatistics.MEAN]), 100, 1)
+        stats, results = run_stats(ImageStats(ImageStatistics.MEAN), 100, 1)
         assert stats._length == 100
         assert len(results) == 1
         assert len(results["mean"]) == 100
@@ -157,7 +157,7 @@ class TestImageStats:
         assert len(results["entropy"]) == 100
 
     def test_image_stats_reset(self):
-        stats, _ = run_stats(ImageStats([ImageStatistics.MEAN]), 100, 1)
+        stats, _ = run_stats(ImageStats(ImageStatistics.MEAN), 100, 1)
         stats.reset()
         assert stats._length == 0
         assert len(stats._metrics_dict) == 1
@@ -167,13 +167,13 @@ class TestImageStats:
 class TestChannelStats:
     def test_channel_stats_single_channel(self):
         stats, results = run_stats(ChannelStats(), 100, 1)
-        assert len(results) == 9
+        assert len(results) == len(ImageStatistics) + 1
         assert len(results["mean"]) == 1
         assert results["mean"][1].shape == (1, 100)
 
     def test_channel_stats_triple_channel(self):
         stats, results = run_stats(ChannelStats(), 100, 3)
-        assert len(results) == 9
+        assert len(results) == len(ImageStatistics) + 1
         assert len(results["mean"]) == 1
         assert results["mean"][3].shape == (3, 100)
 
@@ -189,7 +189,7 @@ class TestChannelStats:
         stats.update(data_triple)
         stats.update(data_single)
         results = stats.compute()
-        assert len(results) == 9
+        assert len(results) == len(ImageStatistics) + 1
         assert len(results["mean"]) == 2
         assert results["mean"][3].shape == (3, 50)
         assert results["mean"][1].shape == (1, 50)
