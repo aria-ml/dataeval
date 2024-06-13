@@ -1,13 +1,8 @@
-import random
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-
-# from intrinsic_factors import (box_location_features, compute_hwa,
-#                                get_image_sizes)
-from intrinsic_factors import box_location_features
+from intrinsic_factors import box_location_features, compute_hwa_xyxy, get_image_sizes
 from matplotlib.patches import Rectangle
 from scipy.stats import entropy
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
@@ -25,7 +20,7 @@ def infer_categorical(X, threshold: float = 0.25):
         X = np.expand_dims(X, axis=1)
     num_samples = X.shape[0]
     pct_unique = np.empty(X.shape[0])
-    for col in X.shape[1]:
+    for col in X.shape[1]:  # type: ignore
         uvals = np.unique(X[:, col], axis=0)
         pct_unique[col] = len(uvals) / num_samples
     return pct_unique < threshold
@@ -55,7 +50,7 @@ def compute_mi_class(props, class_var, cat_vars, con_vars, return_sorted=True):
     feat_cat = np.array([props[var] for var in cat_vars]).T
     feat_con = np.array([props[var].astype(float) for var in con_vars]).T
     all_feat = np.concatenate([feat_cat, feat_con], axis=1)
-    vars = list(cat_vars) + list(con_vars)
+    _vars = list(cat_vars) + list(con_vars)
     cat_mask = [True for _ in range(len(cat_vars))] + [False for _ in range(len(con_vars))]
     # units: nat
     mi = mutual_info_classif(all_feat, tgt, discrete_features=cat_mask)
@@ -66,17 +61,17 @@ def compute_mi_class(props, class_var, cat_vars, con_vars, return_sorted=True):
 
     if return_sorted:
         srt_inds = np.argsort(mi)
-        vars = [vars[i] for i in srt_inds]  # vars[srt_inds]
+        _vars = [_vars[i] for i in srt_inds]  # vars[srt_inds]
         nmi = nmi[srt_inds]
 
-    return nmi, vars
+    return nmi, _vars
 
 
 def compute_mutual_information(factors, is_categorical, num_neighbors=5, return_sorted=False):
     # filter categorical/discrete and continuous variables
-    vars = list(factors.keys())
-    cat_vars = [v for v in vars if is_categorical[v]]
-    con_vars = [v for v in vars if not is_categorical[v]]
+    _vars = list(factors.keys())
+    cat_vars = [v for v in _vars if is_categorical[v]]
+    con_vars = [v for v in _vars if not is_categorical[v]]
 
     num_cat, num_con = len(cat_vars), len(con_vars)
     num_feat = num_cat + num_con
@@ -86,7 +81,7 @@ def compute_mutual_information(factors, is_categorical, num_neighbors=5, return_
     feat_con = np.array([factors[var].astype(float) for var in con_vars]).T
     all_feat = np.concatenate([feat_cat, feat_con], axis=1)
     cat_mask = [True for _ in range(len(cat_vars))] + [False for _ in range(len(con_vars))]
-    vars = list(cat_vars) + list(con_vars)
+    _vars = list(cat_vars) + list(con_vars)
     # classification MI for discrete/categorical features
     for idx, tgt_var in enumerate(cat_vars):
         tgt = factors[tgt_var]
@@ -105,7 +100,7 @@ def compute_mutual_information(factors, is_categorical, num_neighbors=5, return_
     norm_factor = np.sqrt(np.outer(ent_all, ent_all))
     nmi = 0.5 * (mi + mi.T) / norm_factor
 
-    return nmi, vars
+    return nmi, _vars
 
 
 def compute_mutual_information_class(factors, is_categorical, class_var="class", num_neighbors=5, return_sorted=False):
@@ -116,9 +111,9 @@ def compute_mutual_information_class(factors, is_categorical, class_var="class",
     """
 
     # filter categorical/discrete and continuous variables
-    vars = list(factors.keys())
-    cat_vars = [v for v in vars if is_categorical[v]]
-    con_vars = [v for v in vars if not is_categorical[v]]
+    _vars = list(factors.keys())
+    cat_vars = [v for v in _vars if is_categorical[v]]
+    con_vars = [v for v in _vars if not is_categorical[v]]
     cat_vars.remove(class_var)
 
     u_cls = np.unique(factors[class_var])
@@ -132,7 +127,7 @@ def compute_mutual_information_class(factors, is_categorical, class_var="class",
     feat_con = np.array([factors[var].astype(float) for var in con_vars]).T
     all_feat = np.concatenate([feat_cat, feat_con], axis=1)
     cat_mask = [True for _ in range(len(cat_vars))] + [False for _ in range(len(con_vars))]
-    vars = list(cat_vars) + list(con_vars)
+    _vars = list(cat_vars) + list(con_vars)
     # classification MI for discrete/categorical features
     for idx, cls in enumerate(u_cls):
         tgt = factors[class_var] == cls
@@ -144,7 +139,7 @@ def compute_mutual_information_class(factors, is_categorical, class_var="class",
     norm_factor = np.sqrt(np.outer(ent_tgt, ent_all))
     nmi = mi / norm_factor
 
-    return nmi, vars
+    return nmi, _vars
 
 
 def compute_corr_matrix(props, cat_vars, con_vars, num_neighbors=7):
@@ -156,7 +151,7 @@ def compute_corr_matrix(props, cat_vars, con_vars, num_neighbors=7):
     feat_con = np.array([props[var].astype(float) for var in con_vars]).T
     all_feat = np.concatenate([feat_cat, feat_con], axis=1)
     cat_mask = [True for _ in range(len(cat_vars))] + [False for _ in range(len(con_vars))]
-    vars = list(cat_vars) + list(con_vars)
+    _vars = list(cat_vars) + list(con_vars)
     # classification MI for discrete/categorical features
     for idx, tgt_var in enumerate(cat_vars):
         tgt = props[tgt_var]
@@ -184,7 +179,7 @@ def compute_corr_matrix(props, cat_vars, con_vars, num_neighbors=7):
     # vars = vars[srt_inds]
     # mi = mi[srt_inds]
 
-    return nmi, vars
+    return nmi, _vars
 
 
 def entropy_(X, discrete_features):
@@ -223,8 +218,8 @@ def cat_to_int(x):
     map categorical variables to numbers that mutual_information can accommodate
     """
     ux, mapped_vals = np.unique(x, return_inverse=True)
-    rand_classes = random.sample(list(np.arange(len(ux))), len(ux))
-    rand_mapped = [rand_classes[c] for c in mapped_vals]
+    # rand_classes = random.sample(list(np.arange(len(ux))), len(ux))
+    # rand_mapped = [rand_classes[c] for c in mapped_vals]
     return np.array(mapped_vals), ux
 
 
@@ -248,14 +243,14 @@ if __name__ == "__main__":
     sz = get_image_sizes("/mnt/nas_device_0/xview/data/train_images")
     # exploded -- none values indicate labels in the dataframe with no
     #   corresponding image
-    sz_exp = np.array([sz[id] if id in sz.keys() else [None, None] for id in df.fn])
-    missing_imgs = sz_exp[:, 0] == None
+    sz_exp = np.array([sz.get(_id, [None, None]) for _id in df.fn])
+    missing_imgs = sz_exp[:, 0] is None
     df = df[~missing_imgs]
     sz_exp = sz_exp[~missing_imgs, :]
     boxes = boxes[~missing_imgs, :]
 
     prop = {}
-    prop["height"], prop["width"], prop["box_size"], prop["aspect_ratio"] = compute_hwa(boxes)
+    prop["height"], prop["width"], prop["box_size"], prop["aspect_ratio"] = compute_hwa_xyxy(boxes)
     prop["dist_to_center"], prop["dist_to_edge"] = box_location_features(boxes, sz_exp)
     # convert to int
     prop["size_cat"], size_map = cat_to_int(df["size"])
