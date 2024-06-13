@@ -1,12 +1,15 @@
-from typing import Any, Literal, Tuple, Union
+from typing import Any, Literal, NamedTuple, Tuple, Union
 
 import numpy as np
+from scipy.signal import convolve2d
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import minimum_spanning_tree as mst
 from scipy.spatial.distance import pdist, squareform
 from sklearn.neighbors import NearestNeighbors
 
 EPSILON = 1e-5
+EDGE_KERNEL = np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]], dtype=np.int8)
+BIT_DEPTH = (1, 8, 12, 16, 32)
 
 
 def minimum_spanning_tree(X: np.ndarray) -> Any:
@@ -62,7 +65,7 @@ def compute_neighbors(
     B: np.ndarray,
     k: int = 1,
     algorithm: Literal["auto", "ball_tree", "kd_tree"] = "auto",
-    return_dist: bool = False
+    return_dist: bool = False,
 ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
     """
     For each sample in A, compute the nearest neighbor in B
@@ -95,6 +98,65 @@ def compute_neighbors(
     nbrs = NearestNeighbors(n_neighbors=k + 1, algorithm=algorithm).fit(B)
     dist, nns = nbrs.kneighbors(A)
     nns = nns[:, 1:].squeeze()
-    dist = dist[:,1:].squeeze()
+    dist = dist[:, 1:].squeeze()
 
     return (dist, nns) if return_dist else nns
+
+
+class BitDepth(NamedTuple):
+    depth: int
+    pmin: Union[float, int]
+    pmax: Union[float, int]
+
+
+def get_bitdepth(image: np.ndarray) -> BitDepth:
+    """
+    Approximates the bit depth of the image using the
+    min and max pixel values.
+    """
+    pmin, pmax = np.min(image), np.max(image)
+    if pmin < 0:
+        return BitDepth(0, pmin, pmax)
+    else:
+        depth = ([x for x in BIT_DEPTH if 2**x > pmax] or [max(BIT_DEPTH)])[0]
+        return BitDepth(depth, 0, 2**depth - 1)
+
+
+def rescale(image: np.ndarray, depth: int = 1) -> np.ndarray:
+    """
+    Rescales the image using the bit depth provided.
+    """
+    bitdepth = get_bitdepth(image)
+    if bitdepth.depth == depth:
+        return image
+    else:
+        normalized = (image + bitdepth.pmin) / (bitdepth.pmax - bitdepth.pmin)
+        return normalized * (2**depth - 1)
+
+
+def normalize_image_shape(image: np.ndarray) -> np.ndarray:
+    """
+    Normalizes the image shape into (C,H,W).
+    """
+    ndim = image.ndim
+    if ndim == 2:
+        return np.expand_dims(image, axis=0)
+    elif ndim == 3:
+        return image
+    elif ndim > 3:
+        # Slice all but the last 3 dimensions
+        return image[(0,) * (ndim - 3)]
+    else:
+        raise ValueError("Images must have 2 or more dimensions.")
+
+
+def edge_filter(image: np.ndarray, offset: float = 0.5) -> np.ndarray:
+    """
+    Returns the image filtered using a 3x3 edge detection kernel:
+    [[ -1, -1, -1 ],
+     [ -1,  8, -1 ],
+     [ -1, -1, -1 ]]
+    """
+    edges = convolve2d(image, EDGE_KERNEL, mode="same", boundary="symm") + offset
+    np.clip(edges, 0, 255, edges)
+    return edges

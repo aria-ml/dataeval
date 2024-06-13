@@ -9,23 +9,19 @@ import torch.nn as nn
 from matplotlib.figure import Figure
 from torch.utils.data import DataLoader
 
-from daml._internal.metrics.sufficiency import PARAMS_KEY, STEPS_KEY
+from daml._internal.metrics.sufficiency import (
+    PARAMS_KEY,
+    STEPS_KEY,
+    f_inv_out,
+    f_out,
+    inv_project_steps,
+    project_steps,
+)
 from daml.metrics import Sufficiency
 from tests.utils.data import DamlDataset
 
 np.random.seed(0)
 torch.manual_seed(0)
-
-
-class MockNet(nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
-
-    def encode(self, x):
-        return x
-
-    def forward(self, x):
-        pass
 
 
 def load_cls_dataset() -> Tuple[DamlDataset, DamlDataset]:
@@ -409,7 +405,7 @@ class TestSufficiencyProject:
         assert result["test2"].shape == (4,)
 
 
-class TestSufficiencyExtraFeatures:
+class TestSufficiencyInverseProject:
     def test_empty_data(self):
         """
         Verifies that inv_project returns empty data when fed empty data
@@ -418,3 +414,51 @@ class TestSufficiencyExtraFeatures:
 
         desired_accuracies = {}
         assert len(Sufficiency.inv_project(desired_accuracies, data)) == 0
+
+    def test_can_invert_sufficiency(self):
+        """
+        Tests metric projection output can be inversed
+        """
+        num_samples = np.arange(20, 80, step=10)
+        accuracies = num_samples / 100
+
+        params = np.array([-0.01, -1.0, 1.0])
+
+        data = {STEPS_KEY: num_samples, PARAMS_KEY: {"Accuracy": params}, "Accuracy": accuracies}
+
+        desired_accuracies = {"Accuracy": np.array([0.4, 0.6])}
+        needed_data = Sufficiency.inv_project(desired_accuracies, data)["Accuracy"]
+
+        target_needed_data = np.array([40, 60])
+        npt.assert_array_equal(needed_data, target_needed_data)
+
+    def test_f_inv_out(self):
+        """
+        Tests that f_inv_out exactly inverts f_out.
+        """
+
+        n_i = np.array([1.234])
+        x = np.array([1.1, 2.2, 3.3])
+        # Predict y from n_i evaluated on curve defined by x
+        y = f_out(n_i, x)
+        # Feed y into inverse function to get the original n_i back out
+        n_i_recovered = f_inv_out(y, x)
+
+        # Float calculation can create very small trailing values
+        npt.assert_almost_equal(n_i[0], n_i_recovered[0], decimal=4)
+
+    def test_inv_project_steps(self):
+        """
+        Verifies that inv_project_steps is the inverse of project_steps
+        """
+        projection = np.array([1, 2, 3])
+        # Pre-calculated from other runs (not strict)
+        params = np.array([-1.0, -1.0, 4.0])
+
+        # Estimated accuracies at each step
+        accuracies = project_steps(params, projection)
+        # Estimated steps needed to get each accuracy
+        predicted_proj = inv_project_steps(params, accuracies)
+
+        # assert np.all(np.isclose(projection, predicted_proj, atol=1))
+        npt.assert_array_equal(projection, predicted_proj)

@@ -81,10 +81,9 @@ stages:
   extends: .docker
   before_script:
     - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
-    - echo ${DAML_HARBOR_TOKEN} | docker login harbor.jatic.net -u 'robot$daml+daml-build' --password-stdin
+    - echo ${DAML_HARBOR_TOKEN} | docker login harbor.jatic.net -u 'robot$daml+daml-build' --password-stdin || echo "Failed to login to Harbor..."
   after_script:
-    - docker logout harbor.jatic.net
-  allow_failure: true
+    - docker logout harbor.jatic.net|| echo "Failed to logout from Harbor..."
 
 ### BUILD ###
 

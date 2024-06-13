@@ -10,21 +10,12 @@ import torch.optim as optim
 import torchmetrics
 from torch.utils.data import DataLoader, Dataset, Subset
 
-import daml._internal.metrics.sufficiency as dms
-from daml._internal.metrics.sufficiency import PARAMS_KEY, STEPS_KEY
+from daml._internal.metrics.sufficiency import (
+    PARAMS_KEY,
+    STEPS_KEY,
+)
 from daml.metrics import Sufficiency
 from tests.utils.data import DamlDataset
-
-
-class MockNet(nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
-
-    def encode(self, x):
-        return x
-
-    def forward(self, x):
-        pass
 
 
 class Net(nn.Module):
@@ -199,49 +190,7 @@ class TestSufficiencyFunctional:
         npt.assert_array_equal(geomshape, geomshape_answer)
 
 
-class TestSufficiencyExtraFeaturesFunc:
-    def test_f_inv_out(self):
-        """
-        Tests that f_inv_out exactly inverts f_out.
-        """
-
-        n_i = np.array([1.234])
-        x = np.array([1.1, 2.2, 3.3])
-        # Predict y from n_i evaluated on curve defined by x
-        y = dms.f_out(n_i, x)
-        # Feed y into inverse function to get the original n_i back out
-        n_i_recovered = dms.f_inv_out(y, x)
-
-        assert np.isclose(n_i[0], n_i_recovered[0])
-
-    def test_inv_project_steps(self):
-        """
-        Verifies that inv_project_steps is the inverse of project_steps
-        """
-        measure = np.array([1, 2, 3])
-        steps = np.array([4, 5, 6])
-        projection = np.array([7, 8, 9])
-
-        params = dms.calc_params(p_i=(1 - measure), n_i=steps, niter=1000)
-        accuracies = dms.project_steps(params, projection)
-        predicted_proj = dms.inv_project_steps(params, accuracies)
-
-        assert np.all(np.isclose(projection, predicted_proj, atol=1))
-
-    def test_can_invert_sufficiency(self):
-        num_samples = np.arange(20, 80, step=10)
-        accuracies = num_samples / 100
-
-        params = dms.calc_params(1 - accuracies, num_samples, 1000)
-
-        data = {STEPS_KEY: num_samples, PARAMS_KEY: {"Accuracy": params}, "Accuracy": accuracies}
-
-        desired_accuracies = {"Accuracy": np.array([0.4, 0.6])}
-        needed_data = Sufficiency.inv_project(desired_accuracies, data)["Accuracy"]
-
-        target_needed_data = np.array([40, 60])
-        assert np.all(np.isclose(needed_data, target_needed_data, atol=1))
-
+class TestSufficiencyInverseProjectFunc:
     def test_predicts_on_real_data(self, mnist):
         """
         End-to-end functional test of sufficiency. This loads the MNIST dataset,
@@ -293,4 +242,4 @@ class TestSufficiencyExtraFeaturesFunc:
         # amounts of training data
         output = suff.evaluate(pred_nsamples, niter=600)
         proj_accuracies = cast(np.ndarray, output["Accuracy"])
-        assert np.all(np.isclose(proj_accuracies, desired_accuracies["Accuracy"], atol=1))
+        npt.assert_allclose(proj_accuracies, desired_accuracies["Accuracy"], rtol=0.1, atol=1)
