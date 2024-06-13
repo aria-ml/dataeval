@@ -1,4 +1,4 @@
-from typing import Any, Literal, Tuple
+from typing import Any, Literal, Tuple, Union
 
 import numpy as np
 from scipy.sparse import csr_matrix
@@ -62,7 +62,8 @@ def compute_neighbors(
     B: np.ndarray,
     k: int = 1,
     algorithm: Literal["auto", "ball_tree", "kd_tree"] = "auto",
-) -> np.ndarray:
+    return_dist: bool = False
+) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
     """
     For each sample in A, compute the nearest neighbor in B
 
@@ -74,6 +75,8 @@ def compute_neighbors(
         The number of neighbors to find
     algorithm : Literal
         Tree method for nearest neighbor (auto, ball_tree or kd_tree)
+    return_dist : bool
+        return a tuple of distances and k nearest neighbor indices
 
     Note
     ----
@@ -90,7 +93,8 @@ def compute_neighbors(
     """
 
     nbrs = NearestNeighbors(n_neighbors=k + 1, algorithm=algorithm).fit(B)
-    nns = nbrs.kneighbors(A)[1]
+    dist, nns = nbrs.kneighbors(A)
     nns = nns[:, 1:].squeeze()
+    dist = dist[:,1:].squeeze()
 
-    return nns
+    return (dist, nns) if return_dist else nns
