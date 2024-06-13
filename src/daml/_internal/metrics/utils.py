@@ -65,8 +65,7 @@ def compute_neighbors(
     B: np.ndarray,
     k: int = 1,
     algorithm: Literal["auto", "ball_tree", "kd_tree"] = "auto",
-    return_dist: bool = False,
-) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+) -> np.ndarray:
     """
     For each sample in A, compute the nearest neighbor in B
 
@@ -78,8 +77,6 @@ def compute_neighbors(
         The number of neighbors to find
     algorithm : Literal
         Tree method for nearest neighbor (auto, ball_tree or kd_tree)
-    return_dist : bool
-        return a tuple of distances and k nearest neighbor indices
 
     Note
     ----
@@ -87,8 +84,8 @@ def compute_neighbors(
 
     Returns
     -------
-    np.ndarray, np.ndarray:
-        Tuple of indices of k nearest neighbors, and distances
+    List:
+        Closest points to each point in A and B
 
     See Also
     --------
@@ -96,11 +93,10 @@ def compute_neighbors(
     """
 
     nbrs = NearestNeighbors(n_neighbors=k + 1, algorithm=algorithm).fit(B)
-    dist, nns = nbrs.kneighbors(A)
+    nns = nbrs.kneighbors(A)[1]
     nns = nns[:, 1:].squeeze()
-    dist = dist[:, 1:].squeeze()
 
-    return (dist, nns) if return_dist else nns
+    return nns
 
 
 class BitDepth(NamedTuple):
