@@ -67,7 +67,7 @@ def extrinsic_factors_fmow(df):
     ext["day_of_year"] = get_day_of_year(df)
     ext["season"] = get_season(df)
 
-    var_names = [
+    _vars = [
         "utm",
         "country_code",
         "cloud_cover",
@@ -76,7 +76,7 @@ def extrinsic_factors_fmow(df):
         "sun_elevation_dbl",
         "off_nadir_angle_dbl",
     ]
-    for v in var_names:
+    for v in _vars:
         ext[v] = df[v].to_numpy()
 
     # map variable names to boolean is_categorical
@@ -94,7 +94,7 @@ def extrinsic_factors_fmow(df):
         "day_of_year": True,
     }
 
-    assert all([k in is_categorical for k in ext])
+    assert all(k in is_categorical for k in ext)
 
     return ext, is_categorical
 

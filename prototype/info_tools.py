@@ -1,7 +1,4 @@
 import numpy as np
-
-# from intrinsic_factors import (box_location_features, compute_hwa,
-#                                get_image_sizes)
 from scipy.stats import entropy
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 
@@ -18,7 +15,7 @@ def infer_categorical(X, threshold: float = 0.25):
         X = np.expand_dims(X, axis=1)
     num_samples = X.shape[0]
     pct_unique = np.empty(X.shape[0])
-    for col in X.shape[1]:
+    for col in X.shape[1]:  # type: ignore
         uvals = np.unique(X[:, col], axis=0)
         pct_unique[col] = len(uvals) / num_samples
     return pct_unique < threshold
@@ -48,7 +45,7 @@ def compute_mi_class(props, class_var, cat_vars, con_vars, return_sorted=True):
     feat_cat = np.array([props[var] for var in cat_vars]).T
     feat_con = np.array([props[var].astype(float) for var in con_vars]).T
     all_feat = np.concatenate([feat_cat, feat_con], axis=1)
-    var_names = list(cat_vars) + list(con_vars)
+    _vars = list(cat_vars) + list(con_vars)
     cat_mask = [True for _ in range(len(cat_vars))] + [False for _ in range(len(con_vars))]
     # units: nat
     mi = mutual_info_classif(all_feat, tgt, discrete_features=cat_mask)
@@ -59,17 +56,17 @@ def compute_mi_class(props, class_var, cat_vars, con_vars, return_sorted=True):
 
     if return_sorted:
         srt_inds = np.argsort(mi)
-        var_names = [var_names[i] for i in srt_inds]
+        _vars = [_vars[i] for i in srt_inds]  # vars[srt_inds]
         nmi = nmi[srt_inds]
 
-    return nmi, var_names
+    return nmi, _vars
 
 
 def compute_mutual_information(factors, is_categorical, num_neighbors=5, return_sorted=False):
     # filter categorical/discrete and continuous variables
-    var_names = list(factors.keys())
-    cat_vars = [v for v in var_names if is_categorical[v]]
-    con_vars = [v for v in var_names if not is_categorical[v]]
+    _vars = list(factors.keys())
+    cat_vars = [v for v in _vars if is_categorical[v]]
+    con_vars = [v for v in _vars if not is_categorical[v]]
 
     num_cat, num_con = len(cat_vars), len(con_vars)
     num_feat = num_cat + num_con
@@ -94,7 +91,6 @@ def compute_mutual_information(factors, is_categorical, num_neighbors=5, return_
         )
 
     ent_all = entropy_(all_feat, cat_mask)
-    norm_factor = np.sqrt(np.outer(ent_all, ent_all))
     norm_factor = 0.5 * np.sum.outer(ent_all, ent_all) + 1e-6
     nmi = 0.5 * (mi + mi.T) / norm_factor
 
@@ -109,9 +105,9 @@ def compute_mutual_information_class(factors, is_categorical, class_var="class",
     """
 
     # filter categorical/discrete and continuous variables
-    var_names = list(factors.keys())
-    cat_vars = [v for v in var_names if is_categorical[v]]
-    con_vars = [v for v in var_names if not is_categorical[v]]
+    _vars = list(factors.keys())
+    cat_vars = [v for v in _vars if is_categorical[v]]
+    con_vars = [v for v in _vars if not is_categorical[v]]
     cat_vars.remove(class_var)
 
     u_cls = np.unique(factors[class_var])
@@ -148,7 +144,7 @@ def compute_corr_matrix(props, cat_vars, con_vars, num_neighbors=7):
     feat_con = np.array([props[var].astype(float) for var in con_vars]).T
     all_feat = np.concatenate([feat_cat, feat_con], axis=1)
     cat_mask = [True for _ in range(len(cat_vars))] + [False for _ in range(len(con_vars))]
-    var_names = list(cat_vars) + list(con_vars)
+    _vars = list(cat_vars) + list(con_vars)
     # classification MI for discrete/categorical features
     for idx, tgt_var in enumerate(cat_vars):
         tgt = props[tgt_var]
@@ -167,7 +163,7 @@ def compute_corr_matrix(props, cat_vars, con_vars, num_neighbors=7):
     norm_factor = 0.5 * np.sum.outer(ent_all, ent_all) + 1e-6
     nmi = 0.5 * (mi + mi.T) / norm_factor
 
-    return nmi, var_names
+    return nmi, _vars
 
 
 def entropy_(X, discrete_features):

@@ -87,8 +87,8 @@ def compute_neighbors(
 
     Returns
     -------
-    List:
-        Closest points to each point in A and B
+    np.ndarray, np.ndarray:
+        Tuple of indices of k nearest neighbors, and distances
 
     See Also
     --------
