@@ -5,7 +5,7 @@ import numpy as np
 from scipy.stats import entropy, kurtosis, skew
 
 from daml._internal.metrics.base import MetricMixin
-from daml._internal.metrics.flags import ImageHash, ImageProperty, ImageStatistics, ImageVisuals
+from daml._internal.metrics.flags import ImageHash, ImageProperty, ImageStatistics, ImageStatsFlags, ImageVisuals
 from daml._internal.metrics.hash import pchash, xxhash
 from daml._internal.metrics.utils import edge_filter, get_bitdepth, normalize_image_shape, rescale
 
@@ -20,7 +20,7 @@ class BaseStatsMetric(MetricMixin, Generic[TBatch, TFlag]):
         self.flags = flags
         self.results = []
 
-    def update(self, batch: TBatch) -> None:
+    def update(self, preds: TBatch, targets=None) -> None:
         """
         Updates internal metric cache for later calculation
 
@@ -80,8 +80,8 @@ class ImageHashMetric(BaseStatsMetric):
     def __init__(self, flags: ImageHash = ImageHash.ALL):
         super().__init__(flags)
 
-    def update(self, batch: Sequence[np.ndarray]):
-        for data in batch:
+    def update(self, preds: Iterable[np.ndarray], targets=None) -> None:
+        for data in preds:
             results = self._map(
                 {
                     ImageHash.XXHASH: lambda: xxhash(data),
@@ -104,8 +104,8 @@ class ImagePropertyMetric(BaseStatsMetric):
     def __init__(self, flags: ImageProperty = ImageProperty.ALL):
         super().__init__(flags)
 
-    def update(self, batch: Sequence[np.ndarray]):
-        for data in batch:
+    def update(self, preds: Iterable[np.ndarray], targets=None) -> None:
+        for data in preds:
             results = self._map(
                 {
                     ImageProperty.WIDTH: lambda: np.int32(data.shape[-1]),
@@ -132,13 +132,14 @@ class ImageVisualsMetric(BaseStatsMetric):
     def __init__(self, flags: ImageVisuals = ImageVisuals.ALL):
         super().__init__(flags)
 
-    def update(self, batch: Sequence[np.ndarray]):
-        for data in batch:
+    def update(self, preds: Iterable[np.ndarray], targets=None) -> None:
+        for data in preds:
             results = self._map(
                 {
-                    ImageVisuals.MISSING: lambda: np.sum(np.isnan(data)),
                     ImageVisuals.BRIGHTNESS: lambda: np.mean(rescale(data)),
                     ImageVisuals.BLURRINESS: lambda: np.std(edge_filter(np.mean(data, axis=0))),
+                    ImageVisuals.MISSING: lambda: np.sum(np.isnan(data)),
+                    ImageVisuals.ZERO: lambda: np.int32(np.count_nonzero(data == 0)),
                 }
             )
             self.results.append(results)
@@ -157,8 +158,8 @@ class ImageStatisticsMetric(BaseStatsMetric):
     def __init__(self, flags: ImageStatistics = ImageStatistics.ALL):
         super().__init__(flags)
 
-    def update(self, batch: Sequence[np.ndarray]):
-        for data in batch:
+    def update(self, preds: Iterable[np.ndarray], targets=None) -> None:
+        for data in preds:
             scaled = rescale(data)
             if (ImageStatistics.HISTOGRAM | ImageStatistics.ENTROPY) & self.flags:
                 hist = np.histogram(scaled, bins=256, range=(0, 1))[0]
@@ -166,7 +167,7 @@ class ImageStatisticsMetric(BaseStatsMetric):
             results = self._map(
                 {
                     ImageStatistics.MEAN: lambda: np.mean(scaled),
-                    ImageStatistics.ZERO: lambda: np.int32(np.count_nonzero(scaled == 0)),
+                    ImageStatistics.STD: lambda: np.std(scaled),
                     ImageStatistics.VAR: lambda: np.var(scaled),
                     ImageStatistics.SKEW: lambda: np.float32(skew(scaled.ravel())),
                     ImageStatistics.KURTOSIS: lambda: np.float32(kurtosis(scaled.ravel())),
@@ -191,8 +192,8 @@ class ChannelStatisticsMetric(BaseStatsMetric):
     def __init__(self, flags: ImageStatistics = ImageStatistics.ALL):
         super().__init__(flags)
 
-    def update(self, batch: Sequence[np.ndarray]):
-        for data in batch:
+    def update(self, preds: Iterable[np.ndarray], targets=None) -> None:
+        for data in preds:
             scaled = rescale(data)
             flattened = scaled.reshape(data.shape[0], -1)
 
@@ -202,7 +203,7 @@ class ChannelStatisticsMetric(BaseStatsMetric):
             results = self._map(
                 {
                     ImageStatistics.MEAN: lambda: np.mean(flattened, axis=1),
-                    ImageStatistics.ZERO: lambda: np.count_nonzero(flattened == 0, axis=1),
+                    ImageStatistics.STD: lambda: np.std(flattened, axis=1),
                     ImageStatistics.VAR: lambda: np.var(flattened, axis=1),
                     ImageStatistics.SKEW: lambda: skew(flattened, axis=1),
                     ImageStatistics.KURTOSIS: lambda: kurtosis(flattened, axis=1),
@@ -218,9 +219,9 @@ class BaseAggregateMetric(BaseStatsMetric, Generic[TFlag]):
     FLAG_METRIC_MAP: Dict[type, type]
     DEFAULT_FLAGS: Sequence[TFlag]
 
-    def __init__(self, flags: Optional[Sequence[TFlag]] = None):
+    def __init__(self, flags: Optional[Union[TFlag, Sequence[TFlag]]] = None):
         flag_dict = {}
-        for flag in flags or self.DEFAULT_FLAGS:
+        for flag in flags if isinstance(flags, Sequence) else self.DEFAULT_FLAGS if not flags else [flags]:
             flag_dict[type(flag)] = flag_dict.setdefault(type(flag), type(flag)(0)) | flag
         self._metrics_dict = {
             metric: []
@@ -248,14 +249,12 @@ class ImageStats(BaseAggregateMetric):
     }
     DEFAULT_FLAGS = [ImageHash.ALL, ImageProperty.ALL, ImageStatistics.ALL, ImageVisuals.ALL]
 
-    def __init__(
-        self, flags: Optional[Sequence[Union[ImageHash, ImageProperty, ImageStatistics, ImageVisuals]]] = None
-    ):
+    def __init__(self, flags: Optional[Union[ImageStatsFlags, Sequence[ImageStatsFlags]]] = None):
         super().__init__(flags)
         self._length = 0
 
-    def update(self, batch: Sequence[np.ndarray]):
-        for image in batch:
+    def update(self, preds: Iterable[np.ndarray], targets=None) -> None:
+        for image in preds:
             self._length += 1
             img = normalize_image_shape(image)
             for metric in self._metrics_dict:
@@ -294,10 +293,10 @@ class ChannelStats(BaseAggregateMetric):
     IDX_MAP = "idx_map"
 
     def __init__(self, flags: Optional[ImageStatistics] = None) -> None:
-        super().__init__([flags] if flags else None)
+        super().__init__(flags)
 
-    def update(self, batch: Sequence[np.ndarray]) -> None:
-        for image in batch:
+    def update(self, preds: Iterable[np.ndarray], targets=None) -> None:
+        for image in preds:
             img = normalize_image_shape(image)
             for metric in self._metrics_dict:
                 metric.update([img])
