@@ -2,7 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from intrinsic_factors import box_location_features, compute_hwa_xyxy, get_image_sizes
+from fmow_utils import get_image_sizes
+from intrinsic_factors import box_location_features, compute_hwa_xyxy
 from matplotlib.patches import Rectangle
 from scipy.stats import entropy
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
