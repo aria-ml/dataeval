@@ -203,7 +203,9 @@ function docker_run() {
     docker_run_cmd="docker run --name $container_name $gpuflag $tag $task"
 
     if [[ $verbose ]]; then
-        (echo "Running $container_name..."; echo $docker_run_cmd; $docker_run_cmd | tee -a $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
+        echo "Running $container_name..."
+        echo $docker_run_cmd
+        ($docker_run_cmd | tee -a $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
     else
         $docker_run_cmd &> $temp || result="FAILED"
     fi
