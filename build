@@ -200,12 +200,12 @@ function docker_run() {
 
     trap "post_build_cleanup $temp $tag $container_name" EXIT
 
-    docker_run_args="--name $container_name $gpuflag $tag"
+    docker_run_cmd="docker run --name $container_name $gpuflag $tag $task"
 
     if [[ $verbose ]]; then
-        (echo "Running $container_name..."; echo docker run $docker_run_args $task; docker run $docker_run_args $task | tee -a $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
+        (echo "Running $container_name..."; echo $docker_run_cmd; $docker_run_cmd | tee -a $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
     else
-        docker run $docker_run_args $task &> $temp || result="FAILED"
+        $docker_run_cmd &> $temp || result="FAILED"
     fi
 
     if [[ $result == "FAILED" ]]; then
