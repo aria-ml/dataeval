@@ -1,4 +1,5 @@
 from enum import Flag, auto
+from typing import Union
 
 
 class auto_all:
@@ -23,15 +24,16 @@ class ImageProperty(Flag):
 
 
 class ImageVisuals(Flag):
-    MISSING = auto()
     BRIGHTNESS = auto()
     BLURRINESS = auto()
+    MISSING = auto()
+    ZERO = auto()
     ALL = auto_all()
 
 
 class ImageStatistics(Flag):
     MEAN = auto()
-    ZERO = auto()
+    STD = auto()
     VAR = auto()
     SKEW = auto()
     KURTOSIS = auto()
@@ -39,3 +41,7 @@ class ImageStatistics(Flag):
     PERCENTILES = auto()
     HISTOGRAM = auto()
     ALL = auto_all()
+
+
+ImageStatsFlags = Union[ImageHash, ImageProperty, ImageVisuals, ImageStatistics]
+LinterFlags = Union[ImageProperty, ImageVisuals, ImageStatistics]
