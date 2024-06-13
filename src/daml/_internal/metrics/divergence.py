@@ -20,7 +20,7 @@ def _mst(data: np.ndarray, labels: np.ndarray) -> int:
 
 
 def _fnn(data: np.ndarray, labels: np.ndarray) -> int:
-    nn_indices = compute_neighbors(data, data)[0]
+    nn_indices = compute_neighbors(data, data)
     errors = np.sum(np.abs(labels[nn_indices] - labels))
     return errors
 
