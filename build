@@ -160,7 +160,8 @@ function build_image() {
         output_arg="${output_arg},push=true"
     fi
 
-    if [[ $save_build_images ]]; then
+    # Save the images locally if we're not pushing images to the repo (or of the setting is set)
+    if [[ $save_build_images || -z $push_to_repo ]]; then
         # By default the docker-container driver doesn't load images to the
         # local docker images store, these args will cause it to do so.
         load_arg="--tag ${tag} --load"
@@ -201,7 +202,12 @@ function docker_run() {
 
     trap "post_build_cleanup $temp $tag $container_name" EXIT
 
-    docker_run_cmd="docker run --name $container_name $gpuflag $tag $task"
+    # If the image was pushed, then we need to be sure to pull the updated image
+    if [[ $push_to_repo ]]; then
+        pull_arg="--pull always"
+    fi
+
+    docker_run_cmd="docker run $pull_arg --name $container_name $gpuflag $tag $task"
 
     if [[ $verbose ]]; then
         echo "Running $container_name..."
