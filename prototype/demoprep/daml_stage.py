@@ -1,68 +1,79 @@
 import json
 from collections import defaultdict
 from pathlib import Path
+from typing import List, Literal, Optional, TypeAlias
 
-import torch
 from test_stage import TestStage
-from torch.utils.data import DataLoader
-from torchmetrics.utilities.data import dim_zero_cat
 
-from daml.metrics import BER
-
-BASE_OPTS = ["Base", "Both"]
-TARGET_OPTS = ["Target", "Both"]
+Dataset_T: TypeAlias = List[Literal["development", "operational", "both"]]
+Checkbox: TypeAlias = Optional[List[str]]
 
 
-class DamlStage(TestStage):
+class DamlTestStage(TestStage):
+    DEV_OPTS = ["development", "both"]
+    OPR_OPTS = ["operational", "both"]
+    BOTH = ["development", "operational"]
+    _cache_dir = Path(".daml_cache")
+    _cache_file = Path("cache.json")
+
     def __init__(
         self,
-        feasibility_dataset="Both",
-        bias_dataset="Both",
-        linting_dataset="Both",
-        sufficiency_dataset="Both",
+        target_performance: float = 0.0,
+        linting_options: Checkbox = None,
+        linting_dataset: Dataset_T = ["development", "operational"],
+        bias_options: Checkbox = ["balance", "coverage", "parity"],
+        bias_dataset: Dataset_T = ["development"],
+        drift: bool = False,
+        ood_detection: bool = False,
+        feasibility_dataset: Dataset_T = ["development"],
+        sufficiency_dataset: Dataset_T = ["development"],
         *args,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
+        self.target_performance = target_performance
+
+        self.linting_opts = linting_options if linting_options else []
+        self.linting_ds = linting_dataset
+
+        self.bias_opts = bias_options if bias_options else []
+        self.bias_dataset = bias_dataset
+
+        self.do_drift = drift
+        self.do_ood_detection = ood_detection
 
         self.feasibility_dataset = feasibility_dataset
-        self.bias_dataset = bias_dataset
-        self.linting_dataset = linting_dataset
         self.sufficiency_dataset = sufficiency_dataset
 
-        self.base_str = "dev_train"
-        self.target_str = "dev_test"
-
-        # Runtime caching < Multiple metrics need preprocessing by an AE >
+        # Runtime caching <Multiple metrics need preprocessing by an AE>
         self.cached_ae_path = None
         self.cached_images = {}  # {dataset: embeddings}
         self.cached_labels = {}  # {dataset: embeddings}
-
-        self._cache_dir = Path(".daml_cache")
-        self._cache_file = Path("cache.json")
 
         self.load_cached_results(self._cache_dir / self._cache_file)
 
     def run(self) -> None:
         """Run the test stage, and store any outputs of the evaluation in test stage"""
-        self.base_dataset = self.dev_dataset if "dev" in self.base_str else self.operational_dataset
-        self.target_dataset = self.dev_dataset if "dev" in self.target_str else self.operational_dataset
+
+        if self.cache:
+            self.outputs = self.cache
+            return
 
         metric_outputs = defaultdict(dict)
 
+        # Run metrics that take individual datasets
         for k, v in self.feasibility().items():
             metric_outputs[k].update(v)
-        for k, v in self.bias().items():
-            metric_outputs[k].update(v)
-        for k, v in self.linting().items():
+        for k, v in self.bias.items():
             metric_outputs[k].update(v)
         for k, v in self.sufficiency().items():
             metric_outputs[k].update(v)
 
+        # metric_outputs.update(self.drift_detection())
+
         self.outputs = metric_outputs
 
-        # TODO: Update and save outputs to cache file (Could split into multiple cache files?)
-        self._save_cache()
+        # self._save_cache()
 
     def load_cached_results(self, results: Path) -> None:
         """Load cached results from a previous run so that they may be accessed with the collect_metrics and the
@@ -78,14 +89,13 @@ class DamlStage(TestStage):
 
     def _save_cache(self) -> None:
         # Update cache
-        for metric, dataset_results in self.outputs.items():
-            if metric not in self.cache:
-                self.cache[metric] = {}
-            self.cache[metric].update(dataset_results)
+        for dataset, metric in self.outputs.items():
+            if dataset not in self.cache:
+                self.cache[dataset] = {}
+            self.cache[dataset].update(metric)
 
         # Check path
         folder = self._cache_dir
-
         folder.mkdir(exist_ok=True)
         cache_file_path = folder / self._cache_file
 
@@ -101,87 +111,88 @@ class DamlStage(TestStage):
         print("Returning Gradient parameters")
         return self.outputs
 
-    def _run_base(self, func):
-        return func(self.base_dataset)
+    def get_dataset(self, select: str):
+        if select == "development":
+            return {"development": self.dev_dataset}
+        elif select == "operational":
+            return {"operational": self.operational_dataset}
+        else:
+            return {"development": self.dev_dataset, "operational": self.operational_dataset}
 
-    def _run_target(self, func):
-        return func(self.target_dataset)
+    def run_metric(self, select, metric_dict, opts):
+        output = defaultdict(dict)
+
+        for dataset in self.get_dataset(select=select):
+            results = {}
+            for name in opts:
+                result = metric_dict[name](dataset)
+                results.update(result)
+            output[dataset].update(results)
+
+        return output
 
     def feasibility(self):
-        feasibility_output = defaultdict(dict)
-        feasibility_cache = self.cache.get("feasibility", {})
-        METRIC = self._ber
+        METRICS_DICT = {"ber": self._ber}
+        opts = ["ber"]
 
-        # First run on base, then target. Only run if no cache found
+        feasibility_output = self.run_metric(self.feasibility_dataset, METRICS_DICT, opts)
 
-        if self.feasibility_dataset in BASE_OPTS:
-            cache = feasibility_cache.get(self.base_str)
-            result = cache if cache else self._run_base(METRIC)
-            print(f"Base String: {self.base_str}")
-            feasibility_output[self.base_str].update(result)
-        if self.feasibility_dataset in TARGET_OPTS:
-            cache = feasibility_cache.get(self.base_str)
-            result = cache if cache else self._run_target(METRIC)
-            feasibility_output[self.target_str].update(result)
-
-        print({"feasibility": feasibility_output})
-        return {"feasibility": feasibility_output}
+        return feasibility_output
 
     def _ber(self, dataset) -> dict:
-        images, labels = [], []
-
-        # Using a dataloader transforms CHW to NCHW needed for dim_zero_cat
-        for i, (image, label, _) in enumerate(DataLoader(dataset)):
-            if i == 100:  # Only need a subset for testing
-                break
-            images.append(image if isinstance(image, torch.Tensor) else torch.tensor(image))
-            labels.append(label if isinstance(label, torch.Tensor) else torch.tensor(label))
-
-        images = dim_zero_cat(images).detach().cpu().numpy()
-        labels = dim_zero_cat(labels).detach().cpu().numpy()
-
-        return BER(images, labels).evaluate()
+        return {"ber": {"ber": 0.18, "ber_lower": 0.095}}
 
     def bias(self) -> dict:
-        bias_output = defaultdict(dict)
-        bias_cache = self.cache.get("bias", {})
-        METRICS = [self._balance, self._coverage, self._parity]
+        METRICS_DICT = {"balance": self._balance, "coverage": self._coverage, "parity": self._parity}
+        opts: Checkbox = self.bias_opts
 
-        if self.bias_dataset in BASE_OPTS:
-            cache = bias_cache.get(self.base_str)
-            if cache is not None:
-                result = cache
-            else:
-                result = {}
-                for metric in METRICS:
-                    result.update(self._run_base(metric))
-            bias_output[self.base_str].update(result)
-        if self.bias_dataset in TARGET_OPTS:
-            cache = bias_cache.get(self.target_str)
-            if cache is not None:
-                result = cache
-            else:
-                result = {}
-                for metric in METRICS:
-                    result.update(self._run_target(metric))
-            bias_output[self.target_str].update(result)
+        bias_output = self.run_metric(self.bias_dataset, METRICS_DICT, opts)
 
-        return {"bias": bias_output}
+        return bias_output
 
     def _coverage(self, dataset) -> dict:
-        return {"coverage": 0.90}
+        return {"coverage": {"value": 0.90}}
 
     def _parity(self, dataset) -> dict:
-        return {"parity": 0.25}
+        return {"parity": {"value": 0.25}}
 
     def _balance(self, dataset) -> dict:
-        return {"balance": 0.5}
+        return {"balance": {"value": 0.5}}
 
     def linting(self) -> dict:
         return {}
 
     def sufficiency(self) -> dict:
-        return {}
+        METRICS_DICT = {"sufficiency": self._sufficiency}
+        opts = ["sufficiency"]
+
+        sufficiency_output = self.run_metric(self.sufficiency_dataset, METRICS_DICT, opts)
+
+        return sufficiency_output
+
+    def _sufficiency(self, dataset) -> dict:
+        """
+        res = daml.Sufficiency(model, dataset).evaluate()
+        res -->
+        {
+            "Accuracy": [1, 2, 3],
+            "steps": [4, 5, 6]
+        }
+
+        res2 = daml.Sufficiency(model, dataset).evaluate()
+        res2 -->
+        {
+            "Accuracy": [1, 2, 3],
+            "steps": [4, 5, 6]
+        }
+
+        model1_res = { "model": res["Accuracy"], "comp_model": res2["Accuracy"], "steps": res["__STEPS__"] }
+
+        """
+
+        output = {"sufficiency": {"model": [1, 2, 3], "comp_model": [2, 3, 4], "steps": [1, 2, 3]}}
+
+        return output
 
     def outlier_detection(self) -> dict:
         # outlier_detector = AEOutlier(create_model(AE, (28, 28, 1)))
