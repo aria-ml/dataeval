@@ -84,7 +84,7 @@ def compute_mutual_information(factors, is_categorical, num_neighbors=5):
         )
 
     ent_all = entropy_(all_feat, cat_mask)
-    norm_factor = 0.5 * np.sum.outer(ent_all, ent_all) + 1e-6
+    norm_factor = 0.5 * np.add.outer(ent_all, ent_all) + 1e-6
     nmi = 0.5 * (mi + mi.T) / norm_factor
 
     return nmi, _vars
@@ -155,15 +155,40 @@ def compute_mutual_information_class(factors, is_categorical, class_var="class",
 
     ent_all = entropy_(all_feat, cat_mask)
     ent_tgt = entropy_(factors[class_var], [True])
-    norm_factor = 0.5 * np.sum.outer(ent_tgt, ent_all) + 1e-6
+    norm_factor = 0.5 * np.add.outer(ent_tgt, ent_all) + 1e-6
     nmi = mi / norm_factor
     return nmi, _vars
 
 
-def entropy_(X, discrete_features):
+def entropy_(X, discrete_features, normalized=False):
     """
     Compute entropy for discrete/categorical variables and, through standard
     histogram binning, for continuous variables.
+
+    Parameters
+    ----------
+    X: np.ndarray
+        Array [n_samples, n_features] of feature values where each column is a
+        separate variable.  Compute entropy down columns.
+    discrete_features: np.ndarray[bool]
+        Boolean mask to indicate which columns of X represent
+        discrete/categorical features.  Categorical features will use unique
+        values as bins rather than a range of values.
+
+    Notes
+    -----
+    For continuous variables, histogram bins are chosen automatically.  See
+    numpy.histogram for details.
+
+    Returns
+    -------
+    ent: np.ndarray
+        Entropy estimate per column of X
+
+    See Also
+    --------
+    numpy.histogram
+
     """
     if X.ndim == 1:
         X = np.expand_dims(X, axis=1)
@@ -179,8 +204,104 @@ def entropy_(X, discrete_features):
 
         # entropy in nats, normalizes counts
         ent[col] = entropy(counts)
+        if normalized:
+            ent[col] /= np.log(len(counts))
 
     return ent
+
+
+def evenness_simpson(X, discrete_features):
+    """
+    Compute evenness for discrete/categorical variables and, through standard
+    histogram binning, for continuous variables.
+
+    We define evenness as a normalized form of the Simpson diversity index
+
+    Parameters
+    ----------
+    X: np.ndarray
+        Array [n_samples, n_features] of feature values where each column is a
+        separate variable.  Compute entropy down columns.
+    discrete_features: np.ndarray[bool]
+        Boolean mask to indicate which columns of X represent
+        discrete/categorical features.  Categorical features will use unique
+        values as bins rather than a range of values.
+
+    Notes
+    -----
+    - For continuous variables, histogram bins are chosen automatically.  See
+    numpy.histogram for details.
+    - The expression is undefined for q=1, but it approaches the Shannon entropy
+    in the limit.
+
+    Returns
+    -------
+    ev_index: np.ndarray
+        Evenness index per column of X
+
+    See Also
+    --------
+    numpy.histogram
+
+    """
+    if X.ndim == 1:
+        X = np.expand_dims(X, axis=1)
+    num_vars = X.shape[1]
+    ev_index = np.empty(num_vars)
+    # loop over columns for convenience
+    for col in range(num_vars):
+        if discrete_features[col]:
+            # if discrete, use unique values as bins
+            _, counts = np.unique(X[:, col], return_counts=True)
+        else:
+            counts, _ = np.histogram(X[:, col], bins="auto", density=True)
+
+        # number of classes/bins
+        R = len(counts)
+        # relative frequencies
+        p_i = counts / counts.sum()
+        # inverse Simpson index normalized by 'richness' (R)
+        ev_index[col] = 1 / np.sum(p_i**2) / R
+
+    return ev_index
+
+
+def evenness_shannon(X, discrete_features):
+    """
+    Compute evenness for discrete/categorical variables and, through standard
+    histogram binning, for continuous variables.
+
+    We define evenness as a normalized form of the Shannon entropy.
+
+    Parameters
+    ----------
+    X: np.ndarray
+        Array [n_samples, n_features] of feature values where each column is a
+        separate variable.  Compute entropy down columns.
+    discrete_features: np.ndarray[bool]
+        Boolean mask to indicate which columns of X represent
+        discrete/categorical features.  Categorical features will use unique
+        values as bins rather than a range of values.
+
+    Notes
+    -----
+    - For continuous variables, histogram bins are chosen automatically.  See
+    numpy.histogram for details.
+    - The expression is undefined for q=1, but it approaches the Shannon entropy
+    in the limit.
+
+    Returns
+    -------
+    ev_index: np.ndarray
+        Evenness index per column of X
+
+    See Also
+    --------
+    numpy.histogram
+
+    """
+
+    return entropy_(X, discrete_features, normalized=True)
 
 
 def validate_dict(d):
