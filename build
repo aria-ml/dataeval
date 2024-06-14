@@ -206,7 +206,7 @@ function docker_run() {
     if [[ $verbose ]]; then
         echo "Running $container_name..."
         echo $docker_run_cmd
-        $docker_run_cmd | tee -a $temp || result="FAILED"
+        $docker_run_cmd | tee $temp || result="FAILED"
     else
         $docker_run_cmd &> $temp || result="FAILED"
     fi
