@@ -1,4 +1,5 @@
 #!/bin/bash -e
+set -o pipefail
 
 function showHelp() {
 cat << EOF
@@ -205,7 +206,7 @@ function docker_run() {
     if [[ $verbose ]]; then
         echo "Running $container_name..."
         echo $docker_run_cmd
-        ($docker_run_cmd | tee -a $temp; exit ${PIPESTATUS[0]}) || result="FAILED"
+        $docker_run_cmd | tee -a $temp || result="FAILED"
     else
         $docker_run_cmd &> $temp || result="FAILED"
     fi
@@ -319,5 +320,5 @@ echo "Running ${!jobs[@]}..."
 case ${#jobs[@]} in
     0)  showHelp 1;;
     1)  export verbose=1; docker_run ${!jobs[@]};;
-    *)  LANG=C parallel $keep_order --lb --tag docker_run ::: ${!jobs[@]};;
+    *)  LANG=C parallel $keep_order --lb --tag 'set -o pipefail; docker_run' ::: ${!jobs[@]};;
 esac
