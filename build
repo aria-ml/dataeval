@@ -56,24 +56,22 @@ fi
 
 # declare lookup maps
 declare -A supported_pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1)
-declare -A supported_tasks=([unit]=1 [type]=1)
-declare -A supported_other=([lint]=1 [docs]=1 [qdocs]=1)
+declare -A supported_tasks=([unit]=1 [type]=1 [lint]=1 [docs]=1 [qdocs]=1)
 
 # generate python and task lists
 declare -A pvers; declare -A tasks;
-count=0; c_pvers=0; c_tasks=0; c_other=0;
+count=0; c_pvers=0; c_tasks=0;
 
 # validate args
 for arg do
     if [[ $arg == -* ]]; then continue; fi
     if [[ ${supported_pvers["$arg"]} ]]; then pvers[$arg]=1; ((++c_pvers)); fi
     if [[ ${supported_tasks["$arg"]} ]]; then tasks[$arg]=1; ((++c_tasks)); fi
-    if [[ ${supported_other["$arg"]} ]]; then tasks[$arg]=1; ((++c_other)); fi
     ((++count))
 done
 
 # show help if arg count mismatch
-if [[ $((c_pvers + c_tasks + c_other)) != $count ]]; then showHelp 1; fi
+if [[ $((c_pvers + c_tasks)) != $count ]]; then showHelp 1; fi
 
 # set defaults if not specified
 if [[ ! $build_only ]]; then
