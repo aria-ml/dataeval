@@ -107,15 +107,6 @@ COPY --chown=${UID} src/ src/
 RUN poetry install --no-cache --all-extras --with dev
 
 
-FROM versioned as run
-ARG UID
-COPY --chown=${UID} tests/ tests/
-COPY --chown=${UID} docs/ docs/
-COPY --chown=${UID} *.md ./
-COPY --chown=${UID} run ./
-ENTRYPOINT [ "./run" ]
-
-
 ######################## Build task layers ########################
 # The *-run layers run individual tasks and capture the results
 FROM versioned as task-run
@@ -133,6 +124,18 @@ RUN ./run type || echo "Type check failed, results captured"
 
 FROM task-run as lint-run
 RUN ./run lint || echo "Lint failed, results captured"
+
+# docs works differently than other tasks because it requires GPU access.
+# The GPU requirement means that the docs image must be run as a container
+# since there's no access to GPU during the build.
+FROM task-run as docs
+ARG UID
+COPY --chown=${UID} docs/ docs/
+COPY --chown=${UID} *.md ./
+CMD ./run docs
+
+FROM docs as qdocs
+CMD ./run qdocs
 
 
 ######################## Results layers ########################

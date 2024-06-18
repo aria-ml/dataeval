@@ -200,14 +200,14 @@ function build_and_run() {
         pull_arg="--pull always"
     fi
 
-    if [[ $task == "docs" || $task == "qdocs" ]]; then
-        tag="${run_image}-${pver}"
-        build_image $tag run $pver
+    tag="${registry}/${task}:${deps_hash}-${pver}"
+    build_image $tag $task $pver
 
+    if [[ $task == "docs" || $task == "qdocs" ]]; then
         temp=$(mktemp)
         trap "post_build_cleanup $temp $tag $container_name" EXIT
 
-        docker_run_cmd="docker run $pull_arg --name $container_name $gpuflag $tag $task"
+        docker_run_cmd="docker run $pull_arg --name $container_name $gpuflag $tag"
 
         if [[ $verbose ]]; then
             echo "Running $container_name..."
@@ -229,10 +229,6 @@ function build_and_run() {
             docker cp $container_name:/daml/output ./
         fi
     else
-        tag="${registry}/${task}:${deps_hash}-${pver}"
-
-        build_image $tag $task $pver
-
         docker create $pull_arg --name $container_name $tag
         mkdir -p output
         docker cp $container_name:/daml/output/ .
@@ -321,8 +317,7 @@ for pver in ${!pvers[@]}; do
     if [[ ! $devenv ]]; then
         ensure_image build $pver
         if [[ $build_only ]]; then
-            build_image "${run_image}-${pver}" run $pver
-            for task in "type" "unit" "lint"; do
+            for task in "type" "unit" "lint" "docs"; do
                 build_image "${registry}/${task}:${deps_hash}-${pver}" ${task} $pver
             done
         fi
