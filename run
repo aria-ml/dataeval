@@ -1,4 +1,5 @@
 #!/bin/bash -e
+set -o pipefail
 
 function showHelp() {
 cat << EOF
@@ -48,8 +49,26 @@ if ! [ $task == "deps" ] && ! ($poetry_run pip freeze | grep daml) >/dev/null 2>
     exit 1
 fi
 
+mkdir -p output
+log="output/run-${task}-${pver}.log"
+exitcode_file="output/run-${task}-${pver}-exitcode"
+touch $log
 FAILURES=0
-trap 'FAILURES=$((FAILURES+1))' ERR
+
+function capture_results() {
+    set +e
+    $@ | tee -a $log
+    exitcode=$?
+    set -e
+
+    if [[ ! -f $exitcode_file ]]; then
+        echo $exitcode > $exitcode_file
+    fi
+
+    if [[ $exitcode != 0 ]]; then
+        FAILURES=$((FAILURES+1))
+    fi
+}
 
 case $task in
     "quick"|"full")
@@ -66,24 +85,24 @@ case $task in
         echo "Running $task task in Python $pver..."
         ;;&
     "unit")
-        $poetry_run pytest --cov -n auto --junitxml=output/junit.$pver.xml --cov-report term --cov-report xml:output/coverage.$pver.xml --cov-report html:output/htmlcov.$pver
+        capture_results $poetry_run pytest --cov -n auto --junitxml=output/junit.$pver.xml --cov-report term --cov-report xml:output/coverage.$pver.xml --cov-report html:output/htmlcov.$pver
         mv .coverage output/.coverage.$pver
         ;;
     "deps")
         $python -m pip install virtualenv
         $python -m virtualenv .venv-deps
         source .venv-deps/bin/activate
-        pip install . pytest
-        pytest tests/metrics/test_ber.py tests/metrics/test_divergence.py tests/metrics/test_uap.py
+        capture_results pip install . pytest
+        capture_results pytest tests/metrics/test_ber.py tests/metrics/test_divergence.py tests/metrics/test_uap.py
         rm -rf .venv-deps
         ;;
     "type")
-        $poetry_run pyright src/ tests/
-        $poetry_run pyright --ignoreexternal --verifytypes daml
+        capture_results $poetry_run pyright src/ tests/
+        capture_results $poetry_run pyright --ignoreexternal --verifytypes daml
         ;;
     "lint")
-        $poetry_run ruff check --exit-non-zero-on-fix --fix
-        $poetry_run codespell
+        capture_results $poetry_run ruff check --exit-non-zero-on-fix --fix
+        capture_results $poetry_run codespell
         ;;
     "docs"|"qdocs")
         pushd docs
