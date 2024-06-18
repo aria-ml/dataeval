@@ -132,14 +132,9 @@ docker info:
 ### TEST ###
 
 linting:
-  needs: []
-  before_script:
-    - pip install poetry
-    - poetry config virtualenvs.create false
-    - poetry install --only lint
-  script:
-    - ./run lint
-  rules: *on_run
+  extends: .build_task
+  variables:
+    TASK: lint
 
 dependency tests:
   image: python:$PYTHON_VERSION
