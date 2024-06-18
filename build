@@ -77,18 +77,17 @@ if [[ $((c_pvers + c_tasks)) != $count ]]; then showHelp 1; fi
 if [[ ! $build_only ]]; then
     if [[ $count == 0 || ($c_pvers == 0 && $c_tasks != 0) ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
     if [[ $count == 0 || ($c_tasks == 0 && $c_pvers != 0) ]]; then tasks[unit]=1; tasks[type]=1; fi
-    if [[ $count == 0 ]]; then tasks[lint]=1; fi
 fi
 
 # generate "task-pver" jobs
 declare -A jobs;
 for task in "${!tasks[@]}"; do
     case "$task" in
-        lint|docs|qdocs) jobs["$task-3.11"]=1;;
+        docs|qdocs) jobs["$task-3.11"]=1;;
         *) for pver in "${!pvers[@]}"; do jobs["$task-$pver"]=1; done;;
     esac
 done
-if [[ ${tasks[lint]} || ${tasks[docs]} || ${tasks[qdocs]} ]]; then pvers[3.11]=1; fi
+if [[ ${tasks[docs]} || ${tasks[qdocs]} ]]; then pvers[3.11]=1; fi
 
 export builder_name="daml"
 if [[ -z $(docker builder ls --format '{{.Name}}' | grep $builder_name) ]]; then
@@ -323,7 +322,7 @@ for pver in ${!pvers[@]}; do
         ensure_image build $pver
         if [[ $build_only ]]; then
             build_image "${run_image}-${pver}" run $pver
-            for task in "type" "unit"; do
+            for task in "type" "unit" "lint"; do
                 build_image "${registry}/${task}:${deps_hash}-${pver}" ${task} $pver
             done
         fi
