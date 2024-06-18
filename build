@@ -99,11 +99,8 @@ if [[ -z $(docker builder ls --format '{{.Name}}' | grep $builder_name) ]]; then
 fi
 
 function post_build_cleanup() {
-    temp=$1
-    tag=$2
-    container_name=$3
-
-    rm -f $temp
+    tag=$1
+    container_name=$2
 
     if [[ $(docker container ls --all --filter name=$container_name) ]]; then
         docker container rm --force $container_name &> /dev/null
@@ -201,53 +198,26 @@ function build_and_run() {
     fi
 
     tag="${registry}/${task}:${deps_hash}-${pver}"
+
+    trap "post_build_cleanup $tag $container_name" EXIT
     build_image $tag $task $pver
 
-    if [[ $task == "docs" || $task == "qdocs" ]]; then
-        temp=$(mktemp)
-        trap "post_build_cleanup $temp $tag $container_name" EXIT
+    echo "======================================================================"
+    echo "Output from ${container_name}"
+    echo "----------------"
+    set +e
+    docker run --interactive $pull_arg --name $container_name $gpuflag $tag
+    exitcode=$?
+    set -e
+    echo "----------------"
+    echo "${container_name} exit code: ${exitcode}"
+    echo "======================================================================"
 
-        docker_run_cmd="docker run $pull_arg --name $container_name $gpuflag $tag"
+    mkdir -p output
+    docker cp $container_name:/daml/output/ .
 
-        if [[ $verbose ]]; then
-            echo "Running $container_name..."
-            echo $docker_run_cmd
-            $docker_run_cmd | tee $temp || result="FAILED"
-        else
-            $docker_run_cmd &> $temp || result="FAILED"
-        fi
-
-        if [[ $result == "FAILED" ]]; then
-            log_file="output/logs/daml-${task}-${pver}_failure_$(date +%s).log"
-            echo "FAILED (see log file ${log_file})"
-            mkdir -p output/logs
-            cat $temp > $log_file
-            if [[ ! $verbose ]]; then cat $temp; fi
-            exit 1
-        else
-            if [[ ! $verbose ]]; then echo SUCCEEDED; fi
-            docker cp $container_name:/daml/output ./
-        fi
-    else
-        docker create $pull_arg --name $container_name $tag
-        mkdir -p output
-        docker cp $container_name:/daml/output/ .
-
-        echo "======================================================================"
-        echo "Output from ${container_name}"
-        echo "----------------"
-        set +e
-        docker start --interactive $container_name
-        exitcode=$?
-        set -e
-        echo "----------------"
-        echo "${container_name} exit code: ${exitcode}"
-        echo "======================================================================"
-        docker container rm --force $container_name > /dev/null
-
-        if [[ $exitcode != 0 ]]; then
-            exit $exitcode
-        fi
+    if [[ $exitcode != 0 ]]; then
+        exit $exitcode
     fi
 }
 
