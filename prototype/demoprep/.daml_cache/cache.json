@@ -1,74 +1,190 @@
 {
-    "development": {
+    "dev": {
+        "image properties": {},
+        "visual quality": {},
+        "duplicates": {
+            "indices": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9
+            ]
+        },
+        "outliers": {
+            "indices": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9
+            ]
+        },
         "balance": {
-            "classes": [],
-            "factors": []
+            "factors": [],
+            "classes": []
         },
         "coverage": {
-            "coverage": 0.9
+            "count": 9,
+            "threshold": 90,
+            "image_paths": [
+                "img.png"
+            ],
+            "scores": [
+                91,
+                92,
+                93,
+                94,
+                95,
+                96,
+                97,
+                98,
+                99
+            ]
         },
-        "duplicates": {},
+        "parity": {
+            "parity": 0.25
+        },
         "feasibility": {
             "ber": 0.18,
             "ber_lower": 0.095,
             "max_accuracy": 0.82
         },
-        "image properties": {},
-        "outliers": {},
-        "parity": {
-            "parity": 0.25
-        },
         "sufficiency": {
-            "comp_model": [
+            "Sufficiency": {
+                "model": {
+                    "Accuracy": [
+                        1,
+                        2,
+                        3
+                    ],
+                    "__STEPS__": [
+                        4,
+                        5,
+                        6
+                    ],
+                    "__PARAMS__": [
+                        7,
+                        8,
+                        9
+                    ]
+                },
+                "comparison_model": {
+                    "Accuracy": [
+                        1,
+                        2,
+                        3
+                    ],
+                    "__STEPS__": [
+                        4,
+                        5,
+                        6
+                    ],
+                    "__PARAMS__": [
+                        7,
+                        8,
+                        9
+                    ]
+                }
+            }
+        }
+    },
+    "op": {
+        "image properties": {},
+        "visual quality": {},
+        "duplicates": {
+            "indices": [
+                0,
+                1,
                 2,
                 3,
-                4
-            ],
-            "model": [
-                1,
-                2,
-                3
-            ],
-            "steps": [
-                1,
-                2,
-                3
+                4,
+                5,
+                6,
+                7,
+                8,
+                9
             ]
         },
-        "visual quality": {}
-    },
-    "operational": {
+        "outliers": {
+            "indices": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9
+            ]
+        },
         "balance": {
-            "classes": [],
-            "factors": []
+            "factors": [],
+            "classes": []
         },
         "coverage": {
-            "coverage": 0.9
+            "count": 9,
+            "threshold": 90,
+            "image_paths": [
+                "img.png"
+            ],
+            "scores": [
+                91,
+                92,
+                93,
+                94,
+                95,
+                96,
+                97,
+                98,
+                99
+            ]
         },
-        "drift": {
-            "cvm": {
-                "is_drift": false,
-                "pvalue": 0.6,
-                "val": 0.4
-            },
-            "ks": {
-                "is_drift": true,
-                "pvalue": 0.8,
-                "val": 0.1
-            },
-            "mmd": {
-                "is_drift": false,
-                "pvalue": 1.0,
-                "val": 0.7
-            }
-        },
-        "duplicates": {},
-        "image properties": {},
-        "out-of-distribution": {},
-        "outliers": {},
         "parity": {
             "parity": 0.25
         },
-        "visual quality": {}
+        "drift": {
+            "mmd": {
+                "pvalue": 1.0,
+                "is_drift": false,
+                "val": 0.7
+            },
+            "ks": {
+                "pvalue": 0.8,
+                "is_drift": true,
+                "val": 0.1
+            },
+            "cvm": {
+                "pvalue": 0.6,
+                "is_drift": false,
+                "val": 0.4
+            }
+        },
+        "out-of-distribution": {
+            "indices": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9
+            ]
+        }
     }
 }
