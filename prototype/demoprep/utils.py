@@ -36,5 +36,5 @@ def collect_metrics(stages: Sequence[TestStage]) -> Dict[str, float]:
 def collect_report_consumables(stages: Sequence[TestStage]) -> Dict[str, Any]:
     return_dict = {}
     for stage in stages:
-        return_dict.update(stage.collect_report_comsumables())
+        return_dict.update(stage.collect_report_consumables())
     return return_dict

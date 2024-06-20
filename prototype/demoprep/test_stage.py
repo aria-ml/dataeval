@@ -13,10 +13,11 @@ class TestStage:
     dev_dataset = None
     operational_dataset = None
     comparison_model = None
+    metric = None
     target_performance = None
 
     def __init__(self, *args, **kwargs):
-        self.outputs = {}
+        self.outputs = dict()
 
     def load_model(self, model: Union[od.Model, ic.Model]) -> None:
         """Provide the model under test to the test stage"""
@@ -38,6 +39,10 @@ class TestStage:
         """Provide a target performance that the test stage may need to evaluate against"""
         self.target_performance = target
 
+    def load_metric(self, metric: Union[od.Metric, ic.Metric]) -> None:
+        """Provide the metric to be measured to the test stage"""
+        self.metric = metric
+
     def load_cached_results(self, results: Path) -> None:
         """Load cached results from a previous run so that they may be accessed with the collect_metrics and the
         collect_report_consumables methods"""
@@ -47,12 +52,12 @@ class TestStage:
         """Run the test stage, and store any outputs of the evaluation in test stage"""
         pass
 
-    def collect_metrics(self) -> Dict[str, float]:
+    def collect_metrics(self) -> Dict[str, Union[int, float, bool, str]]:
         """Access any top-level metrics that the test stage computes in the run function or
         loads in the load_cached_results method"""
         return {}
 
-    def collect_report_comsumables(self) -> Dict[str, Any]:
+    def collect_report_consumables(self) -> Dict[str, Any]:
         """Access the in-depth data needed by Gradient to produce a report generated in the run method or in the
         load_cached_results method"""
         return {}

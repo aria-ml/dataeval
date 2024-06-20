@@ -1,0 +1,74 @@
+{
+    "development": {
+        "balance": {
+            "classes": [],
+            "factors": []
+        },
+        "coverage": {
+            "coverage": 0.9
+        },
+        "duplicates": {},
+        "feasibility": {
+            "ber": 0.18,
+            "ber_lower": 0.095,
+            "max_accuracy": 0.82
+        },
+        "image properties": {},
+        "outliers": {},
+        "parity": {
+            "parity": 0.25
+        },
+        "sufficiency": {
+            "comp_model": [
+                2,
+                3,
+                4
+            ],
+            "model": [
+                1,
+                2,
+                3
+            ],
+            "steps": [
+                1,
+                2,
+                3
+            ]
+        },
+        "visual quality": {}
+    },
+    "operational": {
+        "balance": {
+            "classes": [],
+            "factors": []
+        },
+        "coverage": {
+            "coverage": 0.9
+        },
+        "drift": {
+            "cvm": {
+                "is_drift": false,
+                "pvalue": 0.6,
+                "val": 0.4
+            },
+            "ks": {
+                "is_drift": true,
+                "pvalue": 0.8,
+                "val": 0.1
+            },
+            "mmd": {
+                "is_drift": false,
+                "pvalue": 1.0,
+                "val": 0.7
+            }
+        },
+        "duplicates": {},
+        "image properties": {},
+        "out-of-distribution": {},
+        "outliers": {},
+        "parity": {
+            "parity": 0.25
+        },
+        "visual quality": {}
+    }
+}
