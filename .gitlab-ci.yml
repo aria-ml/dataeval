@@ -137,12 +137,9 @@ linting:
     TASK: lint
 
 dependency tests:
-  image: python:$PYTHON_VERSION
-  extends: .python_version_matrix
-  needs: []
-  script:
-    - ./run deps
-  rules: *on_run
+  extends: .build_task
+  variables:
+    TASK: deps
 
 tests:
   extends: .build_task

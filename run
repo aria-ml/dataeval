@@ -11,7 +11,7 @@ Tasks:
   quick   quick CI validation (qdocs) (default)
   full    full CI validation (docs)
   unit    run unit tests
-  deps    run dependency tests
+  deps    run minimum dependency tests
   type    run typecheck
   lint    run static code analysis
   docs    generate documentation (Python 3.11 only)
