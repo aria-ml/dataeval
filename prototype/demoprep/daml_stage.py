@@ -7,8 +7,8 @@ from test_stage import TestStage
 from torch.utils.data import DataLoader
 from torchmetrics.utilities.data import dim_zero_cat
 
+from daml.detectors import OOD_AE
 from daml.metrics import BER
-from daml.metrics.outlier import AEOutlier
 from daml.models.tensorflow import AE, create_model
 
 BASE_OPTS = ["Base", "Both"]
@@ -32,7 +32,7 @@ class DamlStage(TestStage):
         self.linting_dataset = linting_dataset
         self.sufficiency_dataset = sufficiency_dataset
 
-        self.outlier_detector = AEOutlier(create_model(AE, (28, 28, 1)))
+        self.ood_detector = OOD_AE(create_model(AE, (28, 28, 1)))
 
         self.base_str = "dev_train"
         self.target_str = "op_val"
@@ -162,7 +162,7 @@ class DamlStage(TestStage):
     def sufficiency(self) -> dict:
         return {}
 
-    def outlier_detection(self) -> dict:
+    def ood_detection(self) -> dict:
         # TODO: Need to swap PyTorch NCHW to TensorFlow NHWC
         # self.outlier_detector.fit(train_dataset)
         # output = self.outlier_detector.predict(val_dataset)

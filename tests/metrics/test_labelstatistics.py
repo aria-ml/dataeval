@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from daml._internal.metrics.labelstatistics import LabelStatistics
+from daml._internal.metrics.parity import Parity
 
 
 class MockDistributionDataset(torch.utils.data.Dataset):
@@ -50,7 +50,7 @@ class TestLabelIndependenceUnit:
 
         with pytest.raises(Exception), warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            LabelStatistics(labels_expected, labels_observed)
+            Parity(labels_expected, labels_observed)
 
     def test_fails_with_unaccounted_for_zero(self):
         f_exp = [1, 0]
@@ -63,7 +63,7 @@ class TestLabelIndependenceUnit:
 
         with pytest.raises(Exception), warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            LabelStatistics(labels_expected, labels_observed)
+            Parity(labels_expected, labels_observed)
 
     def test_warns_with_not_enough_frequency(self):
         f_exp = [1, 1]
@@ -75,7 +75,7 @@ class TestLabelIndependenceUnit:
         labels_observed = MockDistributionDataset(f_obs).labels
 
         with pytest.warns():
-            LabelStatistics(labels_expected, labels_observed)
+            Parity(labels_expected, labels_observed)
     
     def test_warns_with_not_enough_frequency_rescaled_exp(self):
         f_exp = [10, 10000]
@@ -85,7 +85,7 @@ class TestLabelIndependenceUnit:
         labels_observed = MockDistributionDataset(f_obs).labels
 
         with pytest.warns():
-            LabelStatistics(labels_expected, labels_observed)
+            Parity(labels_expected, labels_observed)
 
     def test_passes_with_enough_frequency(self):
         f_exp = [10, 10]
@@ -98,7 +98,7 @@ class TestLabelIndependenceUnit:
 
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            LabelStatistics(labels_expected, labels_observed)
+            Parity(labels_expected, labels_observed)
 
     def test_passes_with_ncls(self):
         f_exp = [1]
@@ -110,7 +110,7 @@ class TestLabelIndependenceUnit:
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            LabelStatistics(labels_expected, labels_observed, num_classes=2)
+            Parity(labels_expected, labels_observed, num_classes=2)
 
     def test_fails_with_empty_exp_dataset(self):
         f_exp = np.array([], dtype=int)
@@ -123,7 +123,7 @@ class TestLabelIndependenceUnit:
 
         with pytest.raises(ValueError), warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            LabelStatistics(labels_expected, labels_observed)
+            Parity(labels_expected, labels_observed)
 
     def test_fails_with_empty_obs_dataset(self):
         f_exp = [0, 1]
@@ -136,7 +136,7 @@ class TestLabelIndependenceUnit:
 
         with pytest.raises(ValueError), warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            LabelStatistics(labels_expected, labels_observed)
+            Parity(labels_expected, labels_observed)
 
 
 class TestLabelIndependenceFunctional:
@@ -153,7 +153,7 @@ class TestLabelIndependenceFunctional:
         labels_expected = MockDistributionDataset(f_exp).labels
         labels_observed = MockDistributionDataset(f_obs).labels
 
-        lsi = LabelStatistics(labels_expected, labels_observed)
+        lsi = Parity(labels_expected, labels_observed)
 
         chisquared, p = lsi.evaluate()
 
@@ -172,7 +172,7 @@ class TestLabelIndependenceFunctional:
         labels_expected = MockDistributionDataset(f_exp).labels
         labels_observed = MockDistributionDataset(f_obs).labels
 
-        lsi = LabelStatistics(labels_expected, labels_observed)
+        lsi = Parity(labels_expected, labels_observed)
 
         chisquared, p = lsi.evaluate()
 

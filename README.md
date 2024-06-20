@@ -28,7 +28,7 @@ The Data-Analysis Metrics Library, or DAML, focuses on characterizing image data
 
 ### Installing DAML
 
-You can install DAML directly from pypi.org using the following command.  The optional dependencies of DAML are `torch`, `tensorflow` and `all`.  Using `torch` enables Sufficiency metrics, and `tensorflow` enables Outlier Detection.
+You can install DAML directly from pypi.org using the following command.  The optional dependencies of DAML are `torch`, `tensorflow` and `all`.  Using `torch` enables Sufficiency metrics, and `tensorflow` enables OOD Detection.
 
 ```
 pip install daml[all]
