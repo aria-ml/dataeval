@@ -36,9 +36,9 @@ These extras are **torch**, **tensorflow** and **all**. Any extra can be install
 * - torch
   - Sufficiency
 * - tensorflow
-  - Outlier Detection
+  - OOD Detection
 * - all
-  - Sufficiency, Outlier Detection
+  - Sufficiency, OOD Detection
 :::
 
 ## Installation

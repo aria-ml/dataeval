@@ -5,7 +5,7 @@ import numpy.testing as npt
 import pytest
 import sklearn.datasets as dsets
 
-from daml._internal.metrics.clustering import (
+from daml._internal.detectors.clustering import (
     Cluster,
     Clusterer,
     ClusterMergeEntry,
