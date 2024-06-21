@@ -101,7 +101,7 @@ case $task in
         capture_results $poetry_run pyright --ignoreexternal --verifytypes daml
         ;;
     "lint")
-        capture_results $poetry_run ruff check --exit-non-zero-on-fix --fix
+        capture_results $poetry_run ruff check --show-fixes --exit-non-zero-on-fix --fix
         capture_results $poetry_run codespell
         ;;
     "docs"|"qdocs")
