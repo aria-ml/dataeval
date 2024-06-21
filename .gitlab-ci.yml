@@ -85,6 +85,16 @@ stages:
   after_script:
     - docker logout harbor.jatic.net|| echo "Failed to logout from Harbor..."
 
+.build_task:
+  extends: [.harbor, .python_version_matrix]
+  needs: [build image]
+  script:
+    - ./build --verbose --push ${PYTHON_VERSION} ${TASK}
+  artifacts:
+    paths:
+      - output/*
+  rules: *on_run
+
 ### BUILD ###
 
 build image:
@@ -122,34 +132,27 @@ docker info:
 ### TEST ###
 
 linting:
-  needs: []
-  before_script:
-    - pip install poetry
-    - poetry config virtualenvs.create false
-    - poetry install --only lint
-  script:
-    - ./run lint
-  rules: *on_run
+  extends: .build_task
+  variables:
+    TASK: lint
 
 dependency tests:
-  image: python:$PYTHON_VERSION
-  extends: .python_version_matrix
-  needs: []
-  script:
-    - ./run deps
-  rules: *on_run
+  extends: .build_task
+  variables:
+    TASK: deps
 
 tests:
-  extends: [.harbor, .python_version_matrix]
-  script:
-    - apk add --no-cache parallel
-    - ./build --verbose ${PYTHON_VERSION} unit type
+  extends: .build_task
+  variables:
+    TASK: unit
   artifacts:
     reports:
       junit: output/junit.${PYTHON_VERSION}.xml
-    paths:
-      - output/*
-  rules: *on_run
+
+type checks:
+  extends: .build_task
+  variables:
+    TASK: type
 
 coverage:
   needs: [tests]
@@ -181,7 +184,7 @@ docs:
   needs: [build image]
   tags: [multi-gpu]
   script:
-    - ./build --verbose docs --gpu
+    - ./build --verbose --push docs --gpu
   artifacts:
     paths:
       - output/docs/.jupyter_cache/
