@@ -1,6 +1,28 @@
-[//]: # (f36cfdb1a3259650b02a2f1f26058eb5789b730d)
+[//]: # (278b4dc1de4f038b3aefa56658abc7489f60e213)
 
 # DAML Change Log
+
+## v0.55.0
+
+🌟 **Feature Release**
+- `278b4dc1` - Release Linter, Duplicates, ImageStats, ChannelStats and Parity
+
+    `Linter`, `Duplicates` detectors and `ImageStats`, `ChannelStats`, and `Parity` metrics are now released. The existing metrics available have also been moved into different modules (`detectors` and `workflows`) that better reflect their functionality.
+    
+    * `detectors`
+      * Drift detectors: `DriftCVM`, `DriftKS`, `DriftMMD`, `DriftUncertainty` and supporting classes
+      * Out-of-distribution detectors: `OOD_AE`, `OOD_AEGMM`, `OOD_LLR`, `OOD_VAE`, `OOD_VAEGMM` and supporting classes
+      * `Linter`
+      * `Duplicates`
+    * `metrics`
+      * `BER`
+      * `Divergence`
+      * `Parity`
+      * `ImageStats`
+      * `ChannelStats`
+      * `UAP`
+    * `workflows`
+      * `Sufficiency`
 
 ## v0.54.0
 
