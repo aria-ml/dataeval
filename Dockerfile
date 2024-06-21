@@ -10,6 +10,7 @@ ARG base_image="pybase"
 ARG pyenv_enable_opt=""
 ARG pyenv_with_lto=""
 ARG build_image="build"
+ARG output_dir="/daml/output"
 
 FROM ubuntu:22.04 as pybase
 ENV DEBIAN_FRONTEND noninteractive
@@ -106,15 +107,72 @@ COPY --chown=${UID} src/ src/
 RUN poetry install --no-cache --all-extras --with dev
 
 
-FROM versioned as run
+######################## Build task layers ########################
+# The *-run layers run individual tasks and capture the results
+FROM versioned as task-run
 ARG UID
 COPY --chown=${UID} tests/ tests/
+COPY --chown=${UID} run ./
+ARG output_dir
+RUN mkdir -p $output_dir
+
+FROM task-run as unit-run
+RUN ./run unit || echo "Unit tests failed, results captured"
+
+FROM task-run as type-run
+RUN ./run type || echo "Type check failed, results captured"
+
+FROM task-run as lint-run
+RUN ./run lint || echo "Lint failed, results captured"
+
+
+# deps works differently because it's based on vanilla Python
+FROM python:${python_version} as deps-run
+ARG output_dir
+WORKDIR ${output_dir}/..
+ARG UID
+COPY --chown=${UID} pyproject.toml poetry.lock ./
+COPY --chown=${UID} src/ src/
+COPY --chown=${UID} tests/ tests/
+COPY --chown=${UID} run ./
+ENV POETRY_DYNAMIC_VERSIONING_BYPASS="0.0.0"
+RUN touch README.md
+RUN ./run deps || echo "Dependencies check failed, results captured"
+
+# docs works differently than other tasks because it requires GPU access.
+# The GPU requirement means that the docs image must be run as a container
+# since there's no access to GPU during the build.
+FROM task-run as docs
+ARG UID
 COPY --chown=${UID} docs/ docs/
 COPY --chown=${UID} *.md ./
-COPY --chown=${UID} run ./
-ENTRYPOINT [ "./run" ]
+CMD ./run docs
+
+FROM docs as qdocs
+CMD ./run qdocs
 
 
+######################## Results layers ########################
+# These layers copy the results of the associated *-run layers into a scratch image in order to keep the created images as small as possible
+FROM busybox as results
+ARG output_dir
+ENV output_dir=${output_dir}
+CMD cat ${output_dir}/*.log && exit $(cat ${output_dir}/*-exitcode)
+
+FROM results as unit
+COPY --from=unit-run $output_dir $output_dir
+
+FROM results as type
+COPY --from=type-run $output_dir $output_dir
+
+FROM results as lint
+COPY --from=lint-run $output_dir $output_dir
+
+FROM results as deps
+COPY --from=deps-run $output_dir $output_dir
+
+
+######################## Dev container layer ########################
 FROM base as devcontainer
 USER root
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \

@@ -24,6 +24,7 @@ Tasks:
   unit    run unit tests
   type    run typecheck
   lint    run static code analysis
+  deps    run minimum dependency tests
   docs    generate documentation
   qdocs   generate documentation using cached notebooks
 
@@ -56,7 +57,7 @@ fi
 
 # declare lookup maps
 declare -A supported_pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1)
-declare -A supported_tasks=([unit]=1 [type]=1 [lint]=1 [docs]=1 [qdocs]=1)
+declare -A supported_tasks=([unit]=1 [type]=1 [lint]=1 [deps]=1 [docs]=1 [qdocs]=1)
 
 # generate python and task lists
 declare -A pvers; declare -A tasks;
@@ -77,18 +78,17 @@ if [[ $((c_pvers + c_tasks)) != $count ]]; then showHelp 1; fi
 if [[ ! $build_only ]]; then
     if [[ $count == 0 || ($c_pvers == 0 && $c_tasks != 0) ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
     if [[ $count == 0 || ($c_tasks == 0 && $c_pvers != 0) ]]; then tasks[unit]=1; tasks[type]=1; fi
-    if [[ $count == 0 ]]; then tasks[lint]=1; fi
 fi
 
 # generate "task-pver" jobs
 declare -A jobs;
 for task in "${!tasks[@]}"; do
     case "$task" in
-        lint|docs|qdocs) jobs["$task-3.11"]=1;;
+        docs|qdocs) jobs["$task-3.11"]=1;;
         *) for pver in "${!pvers[@]}"; do jobs["$task-$pver"]=1; done;;
     esac
 done
-if [[ ${tasks[lint]} || ${tasks[docs]} || ${tasks[qdocs]} ]]; then pvers[3.11]=1; fi
+if [[ ${tasks[docs]} || ${tasks[qdocs]} ]]; then pvers[3.11]=1; fi
 
 export builder_name="daml"
 if [[ -z $(docker builder ls --format '{{.Name}}' | grep $builder_name) ]]; then
@@ -100,11 +100,8 @@ if [[ -z $(docker builder ls --format '{{.Name}}' | grep $builder_name) ]]; then
 fi
 
 function post_build_cleanup() {
-    temp=$1
-    tag=$2
-    container_name=$3
-
-    rm -f $temp
+    tag=$1
+    container_name=$2
 
     if [[ $(docker container ls --all --filter name=$container_name) ]]; then
         docker container rm --force $container_name &> /dev/null
@@ -188,48 +185,41 @@ function build_image() {
     fi
 }
 
-function docker_run() {
-    temp=$(mktemp)
+function build_and_run() {
     IFS=- read -r task pver <<< $1
-    tag="${run_image}-${pver}"
 
     container_name="run-${task}-${pver}"
     if [[ $CI_PIPELINE_ID ]]; then
         container_name="${container_name}-${CI_PIPELINE_ID}"
     fi
 
-    trap "post_build_cleanup $temp $tag $container_name" EXIT
-
     # If the image was pushed, then we need to be sure to pull the updated image
     if [[ $push_to_repo ]]; then
         pull_arg="--pull always"
     fi
 
-    docker_run_cmd="docker run $pull_arg --name $container_name $gpuflag $tag $task"
+    tag="${registry}/${task}:${deps_hash}-${pver}"
 
-    if [[ $verbose ]]; then
-        echo "Running $container_name..."
-        echo $docker_run_cmd
-        $docker_run_cmd | tee $temp || result="FAILED"
-    else
-        $docker_run_cmd &> $temp || result="FAILED"
+    trap "post_build_cleanup $tag $container_name" EXIT
+    build_image $tag $task $pver
+
+    echo "======================================================================"
+    echo "Output from ${container_name}"
+    echo "----------------"
+    set +e
+    docker run --interactive $pull_arg --name $container_name $gpuflag $tag
+    exitcode=$?
+    set -e
+    echo "----------------"
+    echo "${container_name} exit code: ${exitcode}"
+    echo "======================================================================"
+
+    mkdir -p output
+    docker cp $container_name:/daml/output/ .
+
+    if [[ $exitcode != 0 ]]; then
+        exit $exitcode
     fi
-
-    if [[ $result == "FAILED" ]]; then
-        log_file="output/logs/daml-${task}-${pver}_failure_$(date +%s).log"
-        echo "FAILED (see log file ${log_file})"
-        mkdir -p output/logs
-        cat $temp > $log_file
-        if [[ ! $verbose ]]; then cat $temp; fi
-        exitcode=1
-    else
-        if [[ ! $verbose ]]; then echo SUCCEEDED; fi
-        case "$task" in
-            unit|docs) docker cp $container_name:/daml/output ./;;
-        esac
-    fi
-
-    exit $exitcode
 }
 
 function ensure_image() {
@@ -257,7 +247,7 @@ function ensure_image() {
 
 export -f post_build_cleanup
 export -f build_image
-export -f docker_run
+export -f build_and_run
 
 export deps_hash=$(sha256sum poetry.lock | cut -c 1-8)
 
@@ -276,11 +266,10 @@ else
     export main_branch="main"
 fi
 
-registry="harbor.jatic.net/daml/${branch_name}"
+export registry="harbor.jatic.net/daml/${branch_name}"
 export base_image="${registry}/pybase"
 export deps_image="${registry}/pydeps:${deps_hash}"
 export build_image="${registry}/build:${deps_hash}"
-export run_image="${registry}/run:${deps_hash}"
 
 if [[ -z $verbose ]]; then
     verbosity="--quiet"
@@ -298,7 +287,11 @@ for pver in ${!pvers[@]}; do
     ensure_image pydeps $pver
     if [[ ! $devenv ]]; then
         ensure_image build $pver
-        build_image "${run_image}-${pver}" run $pver
+        if [[ $build_only ]]; then
+            for task in "type" "unit" "lint" "deps" "docs"; do
+                build_image "${registry}/${task}:${deps_hash}-${pver}" ${task} $pver
+            done
+        fi
     fi
 done
 
@@ -323,6 +316,6 @@ echo "------"
 echo "Running ${!jobs[@]}..."
 case ${#jobs[@]} in
     0)  showHelp 1;;
-    1)  export verbose=1; docker_run ${!jobs[@]};;
-    *)  LANG=C parallel $keep_order --lb --tag 'set -o pipefail; docker_run' ::: ${!jobs[@]};;
+    1)  export verbose=1; build_and_run ${!jobs[@]};;
+    *)  LANG=C parallel $keep_order --lb --tag 'set -o pipefail; build_and_run' ::: ${!jobs[@]};;
 esac
