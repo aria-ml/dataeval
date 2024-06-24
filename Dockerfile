@@ -133,7 +133,7 @@ WORKDIR ${output_dir}/..
 ARG UID
 COPY --chown=${UID} pyproject.toml poetry.lock ./
 COPY --chown=${UID} src/ src/
-COPY --chown=${UID} tests/ tests/
+COPY --chown=${UID} tests/test_mindeps.py tests/
 COPY --chown=${UID} run ./
 ENV POETRY_DYNAMIC_VERSIONING_BYPASS="0.0.0"
 RUN touch README.md
