@@ -129,15 +129,10 @@ function build_image() {
         no_cache_filter_arg="--no-cache-filter $(tr ' ' ',' <<< $no_cache_layers)"
     fi
 
-    pybase_tag="${pybase_image}-${python_version}"
     base_tag="${base_image}-${python_version}"
 
-    if [[ $(docker manifest inspect $pybase_tag 2> /dev/null) ]]; then
-        image_args="--build-arg pybase_image=$pybase_tag"
-    fi
-
     if [[ $(docker manifest inspect $base_tag 2> /dev/null) ]]; then
-        image_args="$image_args --build-arg base_image=$base_tag"
+        base_image_arg="--build-arg base_image=$base_tag"
     fi
 
     cache="${tag/\/${image_name}:${branch_prefix}/\/cache:}"
@@ -167,7 +162,7 @@ function build_image() {
         --builder $builder_name \
         --build-arg python_version=$python_version \
         $no_cache_filter_arg \
-        $image_args \
+        $base_image_arg \
         $cache_from_arg \
         $cache_to_arg \
         $output_arg \
@@ -229,21 +224,13 @@ function build_and_run() {
 }
 
 function ensure_image() {
-    target=$1
-    python_version=$2
+    python_version=$1
 
-    if [[ $target == "pybase" ]]; then
-        tag="${pybase_image}-${python_version}"
-    elif [[ $target == "base" ]]; then
-        tag="${base_image}-${python_version}"
-    else
-        echo "unknown target: ${target}"
-        exit 1
-    fi
+    tag="${base_image}-${python_version}"
 
     # Rebuild and push the image on main branch commits, or just skip if exists
     if [[ ($CI && $branch_name == $main_branch) || ! $(docker manifest inspect $tag 2> /dev/null) ]]; then
-        build_image $tag $target $python_version
+        build_image $tag base $python_version
     else
         echo "Verified $tag image in registry"
     fi
@@ -278,7 +265,6 @@ else
 fi
 
 export image="harbor.jatic.net/daml/${image_name}"
-export pybase_image="${image}:${branch_prefix}pybase"
 export base_image="${image}:${branch_prefix}${deps_hash}-base"
 
 if [[ $quiet ]]; then
@@ -291,12 +277,12 @@ export verbosity
 START=$(date +%s)
 
 for pver in ${!pvers[@]}; do
-    ensure_image pybase $pver
-    ensure_image base $pver
+    ensure_image $pver
     if [[ ! $CI || $build_task ]]; then
         # In the CI pipeline - all tasks are prebuilt in the build stage with argument --build-task
         for task in ${!tasks[@]}; do
-            build_image "${image}:${branch_prefix}${deps_hash}-${task}-${pver}" ${task} $pver unit-run
+            # Force a rebuild because unit tests are not currently deterministic
+            build_image "${image}:${branch_prefix}${deps_hash}-${task}-${pver}" $task $pver unit-run
         done
     fi
 done
