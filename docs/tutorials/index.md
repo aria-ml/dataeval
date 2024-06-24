@@ -45,7 +45,7 @@ Workflows
 ---------
 
 - [Class Learning Curves Tutorial](notebooks/ClassLearningCurvesTutorial) [![Open In Colab][colab-badge]][suff-colab]
-- [Dataset Sufficiency Analysis for Object Detection Tutorial](html/ODLearningCurvesTutorial.rst)
+- [Dataset Sufficiency Analysis for Object Detection Tutorial](html/ODLearningCurvesTutorial.md)
 
 :::{toctree}
 :hidden:

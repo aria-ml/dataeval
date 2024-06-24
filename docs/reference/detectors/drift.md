@@ -1,15 +1,3 @@
-<!-->.. _drift_ref:
-
-.. _BBSE: https://arxiv.org/abs/1802.03916
-.. _Kolmogorov-Smirnov: https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test
-.. _Bonferroni: https://mathworld.wolfram.com/BonferroniCorrection.html
-.. _False Discovery Rate: http://www.math.tau.ac.il/~ybenja/MyPapers/benjamini_hochberg1995.pdf
-.. _Principal Component Analysis: https://en.wikipedia.org/wiki/Principal_component_analysis
-.. _Maximum Mean Discrepancy: http://jmlr.csail.mit.edu/papers/v13/gretton12a.html
-.. _radial basis function: https://en.wikipedia.org/wiki/Radial_basis_function_kernel
-.. _scikit-learn: https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.PCA.html
--->
-
 <table>
 <tbody>
 <tr class="odd">
@@ -45,7 +33,7 @@ pick up drift in the input data, while
 
 Check out this tutorial to begin using the `Drift Detection` class
 
-`Drift Detection Tutorial<../../tutorials/notebooks/DriftDetectionTutorial>`
+[Drift Detection Tutorial](../../tutorials/notebooks/DriftDetectionTutorial.ipynb)
 
 # DAML API
 

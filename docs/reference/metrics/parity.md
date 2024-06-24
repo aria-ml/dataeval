@@ -4,7 +4,7 @@
 
 Check out this tutorial to begin using the `Parity` class
 
-`Class Label Analysis Tutorial<../../tutorials/notebooks/ClassLabelAnalysisTutorial>`
+[Class Label Analysis Tutorial](../../tutorials/notebooks/ClassLabelAnalysisTutorial.ipynb)
 
 ## How To Guides
 

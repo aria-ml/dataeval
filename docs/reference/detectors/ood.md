@@ -5,11 +5,11 @@
 Check out this tutorial to begin using the Out-of-Distribution Detection
 class
 
-`Out-of-Distribution Detection Tutorial<../../tutorials/notebooks/OODDetectionTutorial>`
+[Out-of-Distribution Detection Tutorial](../../tutorials/notebooks/OODDetectionTutorial.ipynb)
 
 ## How To Guides
 
-1.  `Out-of-Distribution Detection How To<../../how_to/ood_detection_how_to>`
+1.  [Out-of-Distribution Detection How To](../../how_to/ood_detection_how_to.md)
 
 ## DAML API
 

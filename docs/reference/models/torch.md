@@ -9,7 +9,7 @@ and DAML's metrics.
 
 Check out this tutorial to begin using the `AETrainer` class
 
-`Autoencoder Trainer<../../tutorials/notebooks/AETrainerTutorial>`
+[Autoencoder Trainer](../../tutorials/notebooks/AETrainerTutorial.ipynb)
 
 ## How To Guides
 
