@@ -12,7 +12,8 @@ Checkbox: TypeAlias = Optional[List[str]]
 
 class DamlTestStage(TestStage):
     _cache_dir = Path(".daml_cache")
-    _cache_file = Path("cache.json")
+    # _cache_file = Path("cache.json")
+    _cache_file = Path("demo_cache.json")
 
     def __init__(
         self,
@@ -70,7 +71,7 @@ class DamlTestStage(TestStage):
 
         self.outputs = outputs
 
-        self._save_cache()
+        # self._save_cache()
 
     def load_cached_results(self, results: Path) -> None:
         """Load cached results from a previous run so that they may be accessed with the collect_metrics and the
@@ -91,7 +92,7 @@ class DamlTestStage(TestStage):
 
         # Save results
         with cache_file_path.open("w+") as f:
-            json.dump(self.outputs, f, indent=4)
+            json.dump(self.outputs, f, indent=4, sort_keys=True)
 
     def _image_properties(self, dataset) -> dict:
         return {}
@@ -109,7 +110,7 @@ class DamlTestStage(TestStage):
         return {"indices": list(range(10))}
 
     def _ber(self, dataset) -> dict:
-        return {"ber": 0.18, "ber_lower": 0.095, "max_accuracy": 0.82}
+        return {"ber": 0.18, "ber_lower": 0.095, "max_performance": 0.82}
 
     def _coverage(self, dataset) -> dict:
         scores = np.arange(100)
@@ -125,24 +126,24 @@ class DamlTestStage(TestStage):
         return {"parity": 0.25}
 
     def _balance(self, dataset) -> dict:
-        return {"factors": [], "classes": []}
+        return {"factors": [str(x) for x in range(10)], "mutual_information": [[i] * 10 for i in range(10)]}
 
     def _sufficiency(self, dataset) -> dict:
         # res = dm.Sufficiency(self.model, dataset).evaluate()
         res = {
-            "Accuracy": [1, 2, 3],
+            "performance": [1, 2, 3],
             "__STEPS__": [4, 5, 6],
             "__PARAMS__": [7, 8, 9],
         }
 
         # res2 = dm.Sufficiency(self.comparison_model, dataset).evaluate()
         res2 = {
-            "Accuracy": [1, 2, 3],
+            "performance": [1, 2, 3],
             "__STEPS__": [4, 5, 6],
             "__PARAMS__": [7, 8, 9],
         }
 
-        return {"Sufficiency": {"model": res, "comparison_model": res2}}
+        return {"model": res, "comparison_model": res2}
 
     def _drift(self, dataset):
         return {
@@ -197,28 +198,49 @@ class DamlTestStage(TestStage):
         return {f"Visual Quality - {name}": 1}
 
     def _rollup_duplicates(self, results, name):
-        percent = len(results["indices"]) / len(self.ds[name])
+        percent = 0.0 if self.ds[name] is None else len(results["indices"]) / len(self.ds[name])
         return {f"Duplicates (%) - {name}": round(percent, 3)}
 
     def _rollup_outliers(self, results, name):
-        percent = len(results["indices"]) / len(self.ds[name])
+        percent = 0.0 if self.ds[name] is None else len(results["indices"]) / len(self.ds[name])
         return {f"Outliers (%) - {name}": round(percent, 3)}
 
     def _rollup_coverage(self, results, name):
-        percent = results["count"] / len(self.ds[name])
+        percent = 0.0 if self.ds[name] is None else results["count"] / len(self.ds[name])
         return {f"Coverage (%) - {name}": round(percent, 3)}
 
     def _rollup_balance(self, results, name):
-        return {f"Balance (%) - {name}": 0.10}
+        rollup = np.mean(np.array(results["mutual_information"])[0, 1:] > 0.5)
+
+        return {f"Balance (%) - {name}": rollup}
 
     def _rollup_parity(self, results, name):
         return {f"Parity (%) - {name}": 0.10}
 
     def _rollup_ber(self, results, name):
-        return {f"Max Performance - {name}": results["max_accuracy"]}
+        return {f"Max Performance - {name}": results["max_performance"]}
 
     def _rollup_sufficiency(self, results, name):
-        return {f"Is {name} sufficient": True}
+        print(results)
+
+        if self.target_performance is None:
+            return {f"Is {name} sufficient": True}
+
+        model_res = results.get("model", {})
+        comp_model_res = results.get("comparison_model", {})
+
+        model_max_perf = model_res.get("performance", [-1]) if model_res else [-1]
+        comp_model_max_perf = comp_model_res.get("performance", [-1]) if comp_model_res else [-1]
+
+        print(self.target_performance)
+        print(max(model_max_perf))
+        print(max(comp_model_max_perf))
+
+        rollup = (max(model_max_perf) > self.target_performance) and (
+            max(comp_model_max_perf) > self.target_performance
+        )
+
+        return {f"Is {name} sufficient": rollup}
 
     def _rollup_drift(self, results, name):
         drift_methods = ["ks", "mmd", "cvm"]
@@ -230,9 +252,22 @@ class DamlTestStage(TestStage):
         return {"OOD": round(percent, 3)}
 
     def collect_report_consumables(self) -> Dict[str, Any]:
-        print("Returning Gradient parameters")
-        # return self.outputs
+        """
+        Can currently only test one gradient report slide at a time with return type Dict[str, Any]
+        This is being fixed to return List[Dict[str, Any]] so we can return all slides generated
+        The return dict format is as follows:
+        return {
+            "deck_name": "image_classification",
+            "slide_name": "Feasibility Table",
+            "table_content": mock_df,
+            "text": "This is mock data",
+        }
 
+        Where the keys are set (for this slide format), and the values are determined by calculations
+        """
+        print("Returning Gradient parameters")
+
+        # Example feasibility
         mock_dict = {
             "Is Feasible": [True],
             "Bayes Error Rate": [1.0],
@@ -247,3 +282,6 @@ class DamlTestStage(TestStage):
             "table_content": mock_df,
             "text": "This is mock data",
         }
+
+    def _report_balance(self):
+        pass
