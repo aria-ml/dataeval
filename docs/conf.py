@@ -33,6 +33,7 @@ extensions = [
     # "sphinx_tabs.tabs",
     # "sphinx_inline_tabs",
     "myst_nb",
+    "enum_tools.autoenum",
 ]
 
 source_suffix = [".rst", ".md"]
@@ -103,7 +104,7 @@ def predownload_data():
 
         # DriftDetectionTutorial.ipynb
         # HPDivergenceTutorial.ipynb
-        # OutlierDetectionTutorial.ipynb
+        # OODDetectionTutorial.ipynb
         tfds.load("mnist", split="train")
         tfds.load("mnist_corrupted/translate", split="train")
 
@@ -126,9 +127,10 @@ def setup(app):
     predownload_data()
     normalize_module(
         [
+            "daml.detectors",
             "daml.metrics",
-            "daml.metrics.drift",
-            "daml.metrics.outlier",
+            "daml.workflows",
+            "daml.flags",
             "daml.models.tensorflow",
             "daml.models.torch",
         ]

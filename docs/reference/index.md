@@ -1,6 +1,20 @@
 Reference Guide
 ===============
 
+Detectors
+---------
+
+Detectors can determine if a dataset or individual images in a dataset are indicative of a specific issue
+
+:::{toctree}
+:maxdepth: 1
+
+detectors/drift
+detectors/duplicates
+detectors/linter
+detectors/ood
+:::
+
 Metrics
 -------
 
@@ -16,6 +30,17 @@ metrics/labelindependence
 metrics/outlier
 metrics/sufficiency
 metrics/uap
+:::
+
+Workflows
+-------
+
+Workflows perform a sequence of actions to analyze the dataset and make predictions
+
+:::{toctree}
+:maxdepth: 1
+
+workflows/sufficiency
 :::
 
 Supported Model Backends

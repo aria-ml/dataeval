@@ -4,7 +4,7 @@ from typing import Dict, Tuple, TypeVar
 import numpy as np
 import pytest
 
-from daml._internal.metrics.flags import ImageHash, ImageProperty, ImageStatistics, ImageVisuals, auto_all
+from daml._internal.flags import ImageHash, ImageProperty, ImageStatistics, ImageVisuals, auto_all
 from daml._internal.metrics.stats import BaseStatsMetric, ChannelStats, ImageStats
 
 
