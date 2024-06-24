@@ -4,7 +4,7 @@
 
 Check out this tutorial to begin using the `BER` class
 
-`Bayes Error Rate Tutorial<../../tutorials/notebooks/BayesErrorRateEstimationTutorial>`
+[Bayes Error Rate Tutorial](../../tutorials/notebooks/BayesErrorRateEstimationTutorial.ipynb)
 
 ## How To Guides
 

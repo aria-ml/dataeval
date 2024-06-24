@@ -4,7 +4,7 @@
 
 Check out this tutorial to begin using the `Divergence` class
 
-`Divergence Tutorial<../../tutorials/notebooks/HPDivergenceTutorial>`
+[Divergence Tutorial](../../tutorials/notebooks/HPDivergenceTutorial.ipynb)
 
 ## How To Guides
 

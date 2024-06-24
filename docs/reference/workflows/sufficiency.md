@@ -4,11 +4,11 @@
 
 Check out this tutorial to begin using the `Sufficiency` class
 
-`Sufficiency Tutorial<../../tutorials/notebooks/ClassLearningCurvesTutorial>`
+[Sufficiency Tutorial](../../tutorials/notebooks/ClassLearningCurvesTutorial.ipynb)
 
 ## How To Guides
 
-1.  `Sufficiency How To<../../how_to/sufficiency_training_how_to>`
+1.  [Sufficiency How To](../../how_to/sufficiency_training_how_to.md)
 
 ## DAML API
 
