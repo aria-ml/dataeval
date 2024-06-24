@@ -6,8 +6,7 @@ customizations of DAML features for more advanced users.
 ## Out-of-Distribution Detection
 
 <div class="toctree" maxdepth="1">
-
-ood_detection_how_to
+<a href = "file:///./ood_detection_how_to.md"> Out of Distribution README </a>
 
 </div>
 
@@ -15,6 +14,6 @@ ood_detection_how_to
 
 <div class="toctree" maxdepth="1">
 
-sufficiency_training_how_to
+<a href = "file:///./sufficiency_training_how_to.md"> Sufficiency Training README </a>
 
 </div>
