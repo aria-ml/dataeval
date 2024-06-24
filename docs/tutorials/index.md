@@ -1,29 +1,51 @@
 Tutorials
 =========
 
-These static jupyter notebooks demonstrate how to use DAML to perform data analysis tasks using various metrics to assess the suitability of a dataset and/or model.
+These static jupyter notebooks demonstrate how to use DAML to perform data analysis tasks using various detectors, metrics and workflows to assess the suitability of a dataset and/or model.
 
 In addition to viewing them in our documentation, these notebooks can also be opened in Google Colab to be used interactively!
+
+Detectors
+---------
+
+- [Drift Detection Tutorial](notebooks/DriftDetectionTutorial) [![Open In Colab][colab-badge]][drift-colab]
+- [Out-of-Distribution Detection Tutorial](notebooks/OODDetectionTutorial) [![Open In Colab][colab-badge]][out-colab]
+
+:::{toctree}
+:hidden:
+:maxdepth: 1
+
+notebooks/DriftDetectionTutorial.ipynb
+notebooks/OODDetectionTutorial.ipynb
+:::
 
 Metrics
 -------
 
 - [Bayes Error Rate Estimation Tutorial](notebooks/BayesErrorRateEstimationTutorial) [![Open In Colab][colab-badge]][ber-colab]
-- [Class Learning Curves Tutorial](notebooks/ClassLearningCurvesTutorial) [![Open In Colab][colab-badge]][suff-colab]
-- [Drift Detection Tutorial](notebooks/DriftDetectionTutorial) [![Open In Colab][colab-badge]][drift-colab]
 - [HP Divergence Tutorial](notebooks/HPDivergenceTutorial) [![Open In Colab][colab-badge]][div-colab]
-- [Outlier Detection Tutorial](notebooks/OutlierDetectionTutorial) [![Open In Colab][colab-badge]][out-colab]
-- [Dataset Sufficiency Analysis for Object Detection Tutorial](html/ODLearningCurvesTutorial.rst)
+- [Class Label Analysis Tutorial](notebooks/ClassLabelAnalysisTutorial) [![Open In Colab][colab-badge]][lbl-colab]
 
 :::{toctree}
 :hidden:
 :maxdepth: 1
 
 notebooks/BayesErrorRateEstimationTutorial.ipynb
-notebooks/ClassLearningCurvesTutorial.ipynb
-notebooks/DriftDetectionTutorial.ipynb
 notebooks/HPDivergenceTutorial.ipynb
-notebooks/OutlierDetectionTutorial.ipynb
+notebooks/ClassLabelAnalysisTutorial.ipynb
+:::
+
+Workflows
+---------
+
+- [Class Learning Curves Tutorial](notebooks/ClassLearningCurvesTutorial) [![Open In Colab][colab-badge]][suff-colab]
+- [Dataset Sufficiency Analysis for Object Detection Tutorial](html/ODLearningCurvesTutorial.rst)
+
+:::{toctree}
+:hidden:
+:maxdepth: 1
+
+notebooks/ClassLearningCurvesTutorial.ipynb
 html/ODLearningCurvesTutorial.rst
 :::
 
@@ -44,5 +66,6 @@ notebooks/AETrainerTutorial.ipynb
 [suff-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/ClassLearningCurvesTutorial.ipynb
 [div-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/HPDivergenceTutorial.ipynb
 [drift-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/DriftDivergenceTutorial.ipynb
-[out-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/OutlierDetectionTutorial.ipynb
+[out-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/OODDetectionTutorial.ipynb
 [ae-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/AETrainerTutorial.ipynb
+[lbl-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/ClassLabelAnalysisTutorial.ipynb

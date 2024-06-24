@@ -19,7 +19,7 @@ Initializing Sufficiency
     from torch.utils.data import Dataset
     from unittest.mock import MagicMock, patch
 
-    from daml.metrics import Sufficiency
+    from daml.workflows import Sufficiency
     model = MagicMock()
     train_ds = MagicMock()
     train_ds.__len__.return_value = 2

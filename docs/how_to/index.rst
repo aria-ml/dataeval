@@ -6,14 +6,14 @@ How-to Guides
 
 These static guides demonstrate more in-depth features and customizations of DAML features for more advanced users. 
 
------------------
-Outlier Detection
------------------
+-----------------------------
+Out-of-Distribution Detection
+-----------------------------
 
 .. toctree::
    :maxdepth: 1
 
-   outlier_detection_how_to
+   ood_detection_how_to
 
 
 -----------

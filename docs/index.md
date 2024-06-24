@@ -53,10 +53,10 @@ We want to show visualizations of tutorials to peak the interest of a potential 
    Might be good to add a BER graph that a user would need (not necessarily from tutorial)
    i.e. A Graph with training accuracy curve, and a BER line (similar to sufficiency) -->
 
-<!--  :doc:`Outlier Detection Tutorial<tutorials/notebooks/OutlierDetectionTutorial>`
+<!--  :doc:`Out-of-Distribution (OOD) Detection Tutorial<tutorials/notebooks/OODDetectionTutorial>`
 
 We want to show visualizations of tutorials to peak the interest of a potential user
-   We could show 3 images from a training set class next to 1 that is an Outlier but classified the same
+   We could show 3 images from a training set class next to 1 that is out-of-dist but classified the same
    Could even make a few rows (multiple classes). -->
 
 DAML is a powerful toolkit for any data analysis workflow, so be sure to check out the **Quickstart Tutorials** page for a more comprehensive list of all the tools we offer.
@@ -102,10 +102,16 @@ how_to/index
 :::{toctree}
 :caption: Reference
 :hidden:
+:maxdepth: 2
+
+reference/index.md
+:::
+
+:::{toctree}
+:hidden:
 :titlesonly:
 :maxdepth: 1
 
-reference/index
 reference/changelog
 reference/about
 :::

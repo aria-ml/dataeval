@@ -35,5 +35,5 @@
     }
   },
 
-  "postCreateCommand": ".devcontainer/postcreate.sh"
+  "postStartCommand": ".devcontainer/postcreate.sh"
 }
