@@ -28,6 +28,8 @@ metrics/divergence
 metrics/parity
 metrics/stats
 metrics/uap
+metrics/basic_stats
+metrics/clusterer
 :::
 
 Workflows
