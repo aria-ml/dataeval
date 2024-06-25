@@ -10,6 +10,9 @@ Detectors
 
 - [Drift Detection Tutorial](notebooks/DriftDetectionTutorial) [![Open In Colab][colab-badge]][drift-colab]
 - [Out-of-Distribution Detection Tutorial](notebooks/OODDetectionTutorial) [![Open In Colab][colab-badge]][out-colab]
+- [Clustering Tutorial](notebooks/ClustererTutorial) [![Open In Colab][colab-badge]][clust-colab]
+- [Duplicates Tutorial](notebooks/DuplicatesTutorial) [![Open In Colab][colab-badge]][dup-colab]
+- [Linting Tutorial](notebooks/LintingTutorial) [![Open In Colab][colab-badge]][lint-colab]
 
 :::{toctree}
 :hidden:
@@ -17,6 +20,9 @@ Detectors
 
 notebooks/DriftDetectionTutorial.ipynb
 notebooks/OODDetectionTutorial.ipynb
+notebooks/ClustererTutorial.ipynb
+notebooks/DuplicatesTutorial.ipynb
+notebooks/LintingTutorial.ipynb
 :::
 
 Metrics
@@ -69,3 +75,6 @@ notebooks/AETrainerTutorial.ipynb
 [out-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/OODDetectionTutorial.ipynb
 [ae-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/AETrainerTutorial.ipynb
 [lbl-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/ClassLabelAnalysisTutorial.ipynb
+[clust-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/ClustererTutorial.ipynb
+[dup-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/DuplicatesTutorial.ipynb
+[lint-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/LintingTutorial.ipynb
