@@ -7,7 +7,8 @@ Usage:
   build [options] <tasks(s)> <python version(s)>
 
 Options:
-  -b, --build-only  only build dependency images
+      --build-base  only build base dependency images
+      --build-task  only build task images
   -d, --devenv      only build the developer environment image
   -h, --help        display this help information
   -v, --verbose     print output to console during container execution
@@ -34,14 +35,15 @@ EOF
 exit $1
 }
 
-options=$(getopt -l "help,verbose,gpu,build-only,devenv,push" -o "hvbd" -n "build" -- "$@")
+options=$(getopt -l "help,verbose,gpu,build-base,build-task,devenv,push" -o "hvd" -n "build" -- "$@")
 eval set -- "$options"
 while true; do
     case "$1" in
         -h|--help)       showHelp;;
         -v|--verbose)    export verbose=1;;
         --gpu)           export gpuflag="--gpus all";;
-        -b|--build-only) build_only=1;;
+        --build-base)    build_base=1;;
+        --build-task)    build_task=1;;
         -d|--devenv)     devenv=1;;
         --push)          export push_to_repo=1;;
         --)              shift; break;;
@@ -74,9 +76,11 @@ done
 # show help if arg count mismatch
 if [[ $((c_pvers + c_tasks)) != $count ]]; then showHelp 1; fi
 
+# set all python versions if none specified
+if [[ $count == 0 || ($c_pvers == 0 && $c_tasks != 0) ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
+
 # set defaults if not specified
-if [[ ! $build_only ]]; then
-    if [[ $count == 0 || ($c_pvers == 0 && $c_tasks != 0) ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
+if [[ ! $build_base && ! $build_task && ! $devenv ]]; then
     if [[ $count == 0 || ($c_tasks == 0 && $c_pvers != 0) ]]; then tasks[unit]=1; tasks[type]=1; fi
 fi
 
@@ -278,8 +282,6 @@ else
 fi
 export verbosity
 
-if [[ ${#pvers[@]} == 0 ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
-
 START=$(date +%s)
 
 for pver in ${!pvers[@]}; do
@@ -287,7 +289,7 @@ for pver in ${!pvers[@]}; do
     ensure_image pydeps $pver
     if [[ ! $devenv ]]; then
         ensure_image build $pver
-        if [[ $build_only ]]; then
+        if [[ $build_task ]]; then
             for task in "type" "unit" "lint" "deps" "docs"; do
                 build_image "${registry}/${task}:${deps_hash}-${pver}" ${task} $pver
             done
@@ -302,7 +304,7 @@ if [[ $devenv ]]; then
     docker image prune -f
 fi
 
-if [[ $build_only || $devenv ]]; then
+if [[ $build_base || $build_task || $devenv ]]; then
     exit $?
 fi
 
