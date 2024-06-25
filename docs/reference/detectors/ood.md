@@ -16,7 +16,8 @@ Check out this tutorial to begin using the Out-of-Distribution Detection class
 
 ## How To Guides
 
-1. {doc}`Out-of-Distribution Detection How To<../../tutorials/notebooks/ood_detection_how_to>`
+There are currently no how to's for Out-of-Distribution Detection.
+If there are scenarios that you want us to explain, contact us!
 
 ## DAML API
 
@@ -50,6 +51,30 @@ ______________________________________________________________________
    :inherited-members:
 ```
 
+```{eval-rst}
+.. testsetup:: *
+
+    import numpy as np
+    dataset = np.ones((10,3,25,25), dtype=np.float32)
+
+
+```
+```{eval-rst}
+.. testcode::
+    
+    from daml.detectors import OOD_VAE
+    from daml.models.tensorflow import VAE, create_model
+    
+    # instantiate an OOD detector metric
+    metric = OOD_VAE(create_model(VAE, dataset[0].shape))
+
+    # the training set has about 15% out-of-distribution so set the fit threshold at 85%
+    metric.fit(dataset, threshold_perc=85, batch_size=128, verbose=False)
+    
+    # detect OOD at the 'feature' level
+    metric.predict(dataset, ood_type="feature")
+
+```
 ______________________________________________________________________
 
 ```{eval-rst}
