@@ -27,6 +27,6 @@ Sufficiency
 ../tutorials/notebooks/sufficiency_training_how_to.ipynb
 :::
 
-
+[colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
 [oodht-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/ood_detection_how_to.ipynb
 [suffht-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/sufficiency_training_how_to.ipynb
