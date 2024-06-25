@@ -1,20 +1,32 @@
-# How-to Guides
+How-to Guides
+=========
 
-These static guides demonstrate more in-depth features and
-customizations of DAML features for more advanced users.
+These static guides demonstrate more in-depth features and customizations of DAML features for more advanced users.
 
-## Out-of-Distribution Detection
+Out-of-Distribution Detection
+---------
 
-<div class="toctree" maxdepth="1">
+- [Out-of-Distribution How-To](../tutorials/notebooks/ood_detection_how_to) [![Open In Colab][colab-badge]][oodht-colab]
 
-[Out of Distribution How-To](ood_detection_how_to.md)
+:::{toctree}
+:hidden:
+:maxdepth: 1
 
-</div>
+../tutorials/notebooks/ood_detection_how_to.ipynb
+:::
 
-## Sufficiency
+Sufficiency
+-------
 
-<div class="toctree" maxdepth="1">
+- [Sufficiency Training How-To](../tutorials/notebooks/sufficiency_training_how_to) [![Open In Colab][colab-badge]][suffht-colab]
 
-[Sufficiency Training How-To](sufficiency_training_how_to.md)
+:::{toctree}
+:hidden:
+:maxdepth: 1
 
-</div>
+../tutorials/notebooks/sufficiency_training_how_to.ipynb
+:::
+
+
+[oodht-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/ood_detection_how_to.ipynb
+[suffht-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/sufficiency_training_how_to.ipynb

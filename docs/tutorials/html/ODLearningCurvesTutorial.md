@@ -1,3 +1,5 @@
 # Dataset Sufficiency Analysis for Object Detection Tutorial
 
-[OOD Learning Curves](../../_static/tutorials/ODLearningCurvesTutorial.html)
+```{raw} html
+:file: ../../_static/tutorials/ODLearningCurvesTutorial.html
+```

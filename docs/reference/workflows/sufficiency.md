@@ -1,19 +1,27 @@
+(sufficiency-ref)=
+
 # Sufficiency
+
+% Create small blurb here that answers:
+
+% 1. What it is
+
+% 2. What does it solve
 
 ## Tutorials
 
 Check out this tutorial to begin using the `Sufficiency` class
 
-[Sufficiency Tutorial](../../tutorials/notebooks/ClassLearningCurvesTutorial.ipynb)
+{doc}`Sufficiency Tutorial<../../tutorials/notebooks/ClassLearningCurvesTutorial>`
 
 ## How To Guides
 
-1.  [Sufficiency How To](../../how_to/sufficiency_training_how_to.md)
+1. {doc}`Sufficiency How To<../../tutorials/notebooks/sufficiency_training_how_to>`
 
 ## DAML API
 
-<div class="autoclass" members="" inherited-members="">
-
-daml.workflows.Sufficiency
-
-</div>
+```{eval-rst}
+.. autoclass:: daml.workflows.Sufficiency
+   :members:
+   :inherited-members:
+```
