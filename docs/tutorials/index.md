@@ -45,14 +45,14 @@ Workflows
 ---------
 
 - [Class Learning Curves Tutorial](notebooks/ClassLearningCurvesTutorial) [![Open In Colab][colab-badge]][suff-colab]
-- [Dataset Sufficiency Analysis for Object Detection Tutorial](html/ODLearningCurvesTutorial.md)
+- [Dataset Sufficiency Analysis for Object Detection Tutorial](html/ODLearningCurvesTutorial) [![Open In Colab][colab-badge]][odlc-colab]
 
 :::{toctree}
 :hidden:
 :maxdepth: 1
 
 notebooks/ClassLearningCurvesTutorial.ipynb
-html/ODLearningCurvesTutorial.rst
+html/ODLearningCurvesTutorial.md
 :::
 
 Models
@@ -75,6 +75,7 @@ notebooks/AETrainerTutorial.ipynb
 [out-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/OODDetectionTutorial.ipynb
 [ae-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/AETrainerTutorial.ipynb
 [lbl-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/ClassLabelAnalysisTutorial.ipynb
+[odlc-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/ODLearningCurvesTutorial.ipynb
 [clust-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/ClustererTutorial.ipynb
 [dup-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/DuplicatesTutorial.ipynb
 [lint-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/LintingTutorial.ipynb
