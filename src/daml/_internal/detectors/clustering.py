@@ -167,7 +167,7 @@ class Clusterer:
         for arr_i in self._larr:
             left_id = int(arr_i[0])
             right_id = int(arr_i[1])
-            sample_dist = np.array([arr_i[2]], dtype=np.float16)
+            sample_dist = np.array([arr_i[2]], dtype=np.float32)
             merged = False
 
             # Determine if the id is already associated with a cluster
