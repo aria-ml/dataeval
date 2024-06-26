@@ -4,11 +4,11 @@ ARG USER="daml"
 ARG UID="1000"
 ARG HOME="/home/$USER"
 ARG PYENV_ROOT="$HOME/.pyenv"
-ARG UV="$HOME/.cargo/bin/uv"
+ARG UV_ROOT="$HOME/.cargo/bin"
 ARG UV_CACHE="$HOME/.cache/uv"
 ARG python_version="3.11"
 ARG base_image="base"
-ARG pyenv_image="pyenv"
+ARG pybase_image="pybase"
 ARG output_dir="/daml/output"
 
 FROM ubuntu:22.04 as pyenv
@@ -62,13 +62,14 @@ ARG USER
 RUN useradd -m -u ${UID} -s /bin/bash ${USER}
 USER ${USER}
 WORKDIR /daml
-ARG UV
 ARG PYENV_ROOT
-ARG python_version
 ENV PYENV_ROOT=${PYENV_ROOT}
 ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
 ENV TF_GPU_ALLOCATOR=cuda_malloc_async
 ENV UV_INDEX_STRATEGY=unsafe-best-match
+ENV LANGUAGE=en
+ENV LC_ALL=C.UTF-8
+ENV LANG=en_US.UTF-8
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 
@@ -79,11 +80,13 @@ COPY --chown=${UID} --link --from=base_image ${PYENV_ROOT} ${PYENV_ROOT}
 ARG python_version
 ARG UID
 COPY --chown=${UID} environment/requirements.txt environment/
-RUN ${UV} venv --python=$(which ${PYENV_ROOT}/versions/${python_version}.*/bin/python) && \
-    ${UV} pip install -r environment/requirements.txt && \
+ARG UV_ROOT
+ARG python_version
+RUN ${UV_ROOT}/uv venv --python=$(which ${PYENV_ROOT}/versions/${python_version}.*/bin/python) && \
+    ${UV_ROOT}/uv pip install -r environment/requirements.txt && \
     rm -rf .venv
 RUN grep nvidia-cudnn-cu11 environment/requirements.txt | cut -d' ' -f1 | \
-    xargs ${UV} pip install --python=$(which ${PYENV_ROOT}/versions/${python_version}.*/bin/python) tox tox-uv
+    xargs ${UV_ROOT}/uv pip install --python=$(which ${PYENV_ROOT}/versions/${python_version}.*/bin/python) tox tox-uv
 RUN ln -s ${PYENV_ROOT}/versions/$(${PYENV_ROOT}/bin/pyenv latest ${python_version}) ${PYENV_ROOT}/versions/${python_version}
 ENV PATH ${PYENV_ROOT}/versions/${python_version}/bin:${PYENV_ROOT}/bin:$PATH
 ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${PYENV_ROOT}/versions/${python_version}/lib/python${python_version}/site-packages/nvidia/cudnn/lib
@@ -164,16 +167,16 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         openssh-server \
         parallel
 RUN addgroup --gid 1001 docker
-# UID and UV_CACHE are used when build script dynamically appends COPY --chown=${UID} dependency binaries from pydeps images
-ARG UID
-ARG UV_CACHE
 ARG USER
 RUN usermod -a -G docker ${USER}
 USER ${USER}
-ENV LANGUAGE=en
-ENV LC_ALL=C.UTF-8
-ENV LANG=en_US.UTF-8
 ARG PYENV_ROOT
-ENV UV_INDEX_STRATEGY=unsafe-best-match
-ENV PATH=${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:${PATH}
+ARG UV_ROOT
+ENV PATH=${UV_ROOT}:${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:${PATH}
 RUN echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+ARG UID
+RUN mkdir ${HOME}/.cache
+COPY --chown=${UID} --link --from=harbor.jatic.net/daml/main:pybase-3.8 ${PYENV_ROOT} ${PYENV_ROOT}
+COPY --chown=${UID} --link --from=harbor.jatic.net/daml/main:pybase-3.9 ${PYENV_ROOT} ${PYENV_ROOT}
+COPY --chown=${UID} --link --from=harbor.jatic.net/daml/main:pybase-3.10 ${PYENV_ROOT} ${PYENV_ROOT}
+COPY --chown=${UID} --link --from=harbor.jatic.net/daml/main:pybase-3.11 ${PYENV_ROOT} ${PYENV_ROOT}
