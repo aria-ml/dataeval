@@ -121,7 +121,7 @@ function build_image() {
     target=$2
     python_version=$3
 
-    base_tag="${base_image}:${python_version}"
+    base_tag="${base_image}-${python_version}"
     deps_tag="${deps_image}-${python_version}"
     build_tag="${build_image}-${python_version}"
 
@@ -141,8 +141,8 @@ function build_image() {
         --build-arg pyenv_enable_opt=--enable-optimizations \
         --build-arg pyenv_with_lto=--with-lto"
 
-    branch_cache="${tag/:/-buildcache:}"
-    main_cache="${branch_cache/${branch_name}/${main_branch}}"
+    branch_cache="${tag/\/${image_name}:/\/${image_name}\/cache:}"
+    main_cache="${branch_cache/dev\/cache:${branch_name}-/${main_branch}\/cache:}"
 
     cache_from_arg="\
         --cache-from type=registry,ref=$main_cache \
@@ -202,7 +202,7 @@ function build_and_run() {
         pull_arg="--pull always"
     fi
 
-    tag="${registry}/${task}:${deps_hash}-${pver}"
+    tag="${image}:${branch_prefix}${deps_hash}-${task}-${pver}"
 
     trap "post_build_cleanup $tag $container_name" EXIT
     build_image $tag $task $pver
@@ -231,7 +231,7 @@ function ensure_image() {
     python_version=$2
 
     if [[ $target == "pybase" ]]; then
-        tag="${base_image}:${python_version}"
+        tag="${base_image}-${python_version}"
     elif [[ $target == "pydeps" ]]; then
         tag="${deps_image}-${python_version}"
     elif [[ $target == "build" ]]; then
@@ -270,10 +270,17 @@ else
     export main_branch="main"
 fi
 
-export registry="harbor.jatic.net/daml/${branch_name}"
-export base_image="${registry}/pybase"
-export deps_image="${registry}/pydeps:${deps_hash}"
-export build_image="${registry}/build:${deps_hash}"
+if [[ $branch_name == $main_branch ]]; then
+    export image_name="main"
+else
+    export image_name="dev"
+    export branch_prefix="${branch_name}-"
+fi
+
+export image="harbor.jatic.net/daml/${image_name}"
+export base_image="${image}:${branch_prefix}pybase"
+export deps_image="${image}:${branch_prefix}${deps_hash}-pydeps"
+export build_image="${image}:${branch_prefix}${deps_hash}-build"
 
 if [[ -z $verbose ]]; then
     verbosity="--quiet"
@@ -290,8 +297,8 @@ for pver in ${!pvers[@]}; do
     if [[ ! $devenv ]]; then
         ensure_image build $pver
         if [[ $build_task ]]; then
-            for task in "type" "unit" "lint" "deps" "docs"; do
-                build_image "${registry}/${task}:${deps_hash}-${pver}" ${task} $pver
+            for task in "type" "unit" "lint" "deps"; do
+                build_image "${image}:${branch_prefix}${deps_hash}-${task}-${pver}" ${task} $pver
             done
         fi
     fi
