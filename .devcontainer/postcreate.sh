@@ -2,6 +2,27 @@
 
 echo "\033[1;31mPlease wait for this script to complete before allowing vscode to Reload Window!\033[0m"
 echo
+unset versions
+rm -f .python-version
+available=$( pyenv versions --bare | xargs -n1 echo | cut -d '.' -f 1,2 | nl | sort -u -k2 | sort -n | cut -f2- )
+read -p "Enter space delimited desired versions of python (available versions: $available): " input
+for token in ${input}; do
+    token=$(echo $token | cut -d '.' -f 1,2)
+    if ( ! pyenv latest $token > /dev/null 2>&1 ); then
+        versions=$( pyenv versions --bare | tail -n1 | xargs echo -n | cut -d '.' -f 1,2 )
+        echo "Unrecognized input - defaulting to $versions"
+        break
+    else
+        versions="$versions $(echo $token | cut -d '.' -f 1,2)"
+    fi
+done
+versions=$( echo $versions | tr ' ' '\n' | nl | sort -u -k2 | sort -n | cut -f2- )
+
+if [ ! $versions ]; then
+    echo "Unable to find an installable pyenv installed python version. Please rebuild your development environment."
+    exit 1
+fi
+
 echo "Installing daml for Python ${versions}..."
 if [ ! -f ~/.cargo/bin/uv ]; then curl -LsSf https://astral.sh/uv/install.sh | sh; fi
 echo ${versions} | tr ' ' '\n' > .python-version
