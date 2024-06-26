@@ -123,6 +123,11 @@ function build_image() {
     tag=$1
     target=$2
     python_version=$3
+    no_cache_layers=${@:4}
+
+    if [[ $no_cache_layers ]]; then
+        no_cache_filter_arg="--no-cache-filter $(tr ' ' ',' <<< $no_cache_layers)"
+    fi
 
     base_tag="${base_image}-${python_version}"
     deps_tag="${deps_image}-${python_version}"
@@ -170,6 +175,7 @@ function build_image() {
         $load_arg \
         --builder $builder_name \
         --build-arg python_version=$python_version \
+        $no_cache_filter_arg \
         $python_optimization_args \
         $image_args \
         $cache_from_arg \
@@ -305,7 +311,8 @@ for pver in ${!pvers[@]}; do
         # In the CI pipeline - all tasks are prebuilt in the build stage with argument --build-task
         if [[ ! $CI || $build_task ]]; then
             for task in ${!tasks[@]}; do
-                build_image "${image}:${branch_prefix}${deps_hash}-${task}-${pver}" ${task} $pver
+                # Force a rebuild because unit tests are not currently deterministic
+                build_image "${image}:${branch_prefix}${deps_hash}-${task}-${pver}" $task $pver unit-run
             done
         fi
     fi
