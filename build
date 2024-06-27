@@ -45,7 +45,7 @@ while true; do
         --build-base)    build_base=1;;
         --build-task)    build_task=1;;
         -d|--devenv)     devenv=1;;
-        --push)          export push_to_repo=1;;
+        --push)          if [[ ! $CI ]]; then echo "Only CI pipelines should be pushing."; exit 1; else export push_to_repo=1; fi;;
         --)              shift; break;;
     esac
     shift
@@ -204,6 +204,10 @@ function build_and_run() {
     tag="${image}:${branch_prefix}${deps_hash}-${task}-${pver}"
 
     trap "post_build_cleanup $tag $container_name" EXIT
+
+    # NOTE: If you ./build --push at the same time as a pipeline in the same
+    # branch that is running you can potentially overwrite a results image that
+    # will be read from in that pipeline run.
     if [[ ! $(docker manifest inspect $tag) ]]; then
         build_image $tag $task $pver
     fi
@@ -299,9 +303,12 @@ for pver in ${!pvers[@]}; do
     ensure_image pydeps $pver
     if [[ ! $devenv ]]; then
         ensure_image build $pver
-        for task in ${!tasks[@]}; do
-            build_image "${image}:${branch_prefix}${deps_hash}-${task}-${pver}" ${task} $pver
-        done
+        # In the CI pipeline - all tasks are prebuilt in the build stage with argument --build-task
+        if [[ ! $CI ]]; then
+            for task in ${!tasks[@]}; do
+                build_image "${image}:${branch_prefix}${deps_hash}-${task}-${pver}" ${task} $pver
+            done
+        fi
     fi
 done
 
