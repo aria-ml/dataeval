@@ -173,8 +173,7 @@ dependency tests:
     TASK: deps
 
 tests:
-  # extends: .build_task
-  extends: .build_task_all
+  extends: .build_task
   variables:
     TASK: unit
   artifacts:
@@ -182,8 +181,7 @@ tests:
       junit: output/junit.${PYTHON_VERSION}.xml
 
 type checks:
-  # extends: .build_task
-  extends: .build_task_all
+  extends: .build_task
   variables:
     TASK: type
 
