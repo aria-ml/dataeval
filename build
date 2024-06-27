@@ -141,17 +141,19 @@ function build_image() {
         --build-arg pyenv_enable_opt=--enable-optimizations \
         --build-arg pyenv_with_lto=--with-lto"
 
-    branch_cache="${tag/\/${image_name}:/\/${image_name}\/cache:}"
-    main_cache="${branch_cache/dev\/cache:${branch_name}-/${main_branch}\/cache:}"
+    if [[ ! $no_cache ]]; then
+        branch_cache="${tag/\/${image_name}:/\/${image_name}\/cache:}"
+        main_cache="${branch_cache/dev\/cache:${branch_name}-/${main_branch}\/cache:}"
 
-    cache_from_arg="\
-        --cache-from type=registry,ref=$main_cache \
-        --cache-from type=registry,ref=$branch_cache"
+        cache_from_arg="\
+            --cache-from type=registry,ref=$main_cache \
+            --cache-from type=registry,ref=$branch_cache"
 
-    # Writing to the cache means that you must be able to push to the registry, therefore
-    # don't want to force users to login to the registry just to build.
-    if [[ $push_to_repo ]]; then
-        cache_to_arg="--cache-to type=registry,mode=max,image-manifest=true,ref=$branch_cache"
+        # Writing to the cache means that you must be able to push to the registry, therefore
+        # don't want to force users to login to the registry just to build.
+        if [[ $push_to_repo ]]; then
+            cache_to_arg="--cache-to type=registry,mode=max,image-manifest=true,ref=$branch_cache"
+        fi
     fi
 
     output_arg="--output type=image,name=$tag"
@@ -205,7 +207,9 @@ function build_and_run() {
     tag="${image}:${branch_prefix}${deps_hash}-${task}-${pver}"
 
     trap "post_build_cleanup $tag $container_name" EXIT
-    build_image $tag $task $pver
+    if [[ ! $(docker manifest inspect $tag) ]]; then
+        no_cache=1 build_image $tag $task $pver
+    fi
 
     echo "======================================================================"
     echo "Output from ${container_name}"
@@ -298,7 +302,7 @@ for pver in ${!pvers[@]}; do
         ensure_image build $pver
         if [[ $build_task ]]; then
             for task in "type" "unit" "lint" "deps"; do
-                build_image "${image}:${branch_prefix}${deps_hash}-${task}-${pver}" ${task} $pver
+                no_cache=1 build_image "${image}:${branch_prefix}${deps_hash}-${task}-${pver}" ${task} $pver
             done
         fi
     fi
