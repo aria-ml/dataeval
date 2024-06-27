@@ -144,13 +144,13 @@ function build_image() {
         --build-arg pyenv_enable_opt=--enable-optimizations \
         --build-arg pyenv_with_lto=--with-lto"
 
-    main_cache="${tag/\/${image_name}:${branch_prefix}/\/main\/cache:}"
-    cache_from_arg="--cache-from type=registry,ref=$main_cache"
+    cache="${tag/\/${image_name}:${branch_prefix}/\/cache:}"
+    cache_from_arg="--cache-from type=registry,ref=$cache"
 
     if [[ $cache_to && $push_to_repo ]]; then
         # Writing to the cache means that you must be able to push to the registry, therefore
         # don't want to force users to login to the registry just to build.
-        cache_to_arg="--cache-to type=registry,mode=max,image-manifest=true,ref=$main_cache"
+        cache_to_arg="--cache-to type=registry,mode=max,image-manifest=true,ref=$cache"
     fi
 
     output_arg="--output type=image,name=$tag"
@@ -243,8 +243,10 @@ function ensure_image() {
     fi
 
     # Rebuild and push the image on main branch commits, or just skip if exists
-    if [[ $CI && $branch_name == $main_branch || $(docker manifest inspect $tag > /dev/null 2>&1; echo $?) == 1 ]]; then
+    if [[ $CI && $branch_name == $main_branch ]]; then
         cache_to=1 build_image $tag $target $python_version
+    elif [[ ! $(docker manifest inspect $tag) ]]; then
+        build_image $tag $target $python_version
     else
         echo "Verified $tag image in registry"
     fi
@@ -276,7 +278,6 @@ if [[ $branch_name == $main_branch ]]; then
 else
     export image_name="dev"
     export branch_prefix="${branch_name}-"
-    export no_cache_to=1
 fi
 
 export image="harbor.jatic.net/daml/${image_name}"
