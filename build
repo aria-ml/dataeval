@@ -304,7 +304,7 @@ for pver in ${!pvers[@]}; do
     if [[ ! $devenv ]]; then
         ensure_image build $pver
         # In the CI pipeline - all tasks are prebuilt in the build stage with argument --build-task
-        if [[ ! $CI ]]; then
+        if [[ ! $CI || $build_task ]]; then
             for task in ${!tasks[@]}; do
                 build_image "${image}:${branch_prefix}${deps_hash}-${task}-${pver}" ${task} $pver
             done
