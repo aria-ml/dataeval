@@ -87,21 +87,21 @@ stages:
   after_script:
     - docker logout harbor.jatic.net|| echo "Failed to logout from Harbor..."
 
-# .build_task:
-#   extends: [.harbor, .python_version_matrix]
-#   needs: [build task]
-#   script:
-#     - ./build --verbose --push ${PYTHON_VERSION} ${TASK}
-#   artifacts:
-#     paths:
-#       - output/*
-#   rules: *on_run
-
-.build_task_all:
-  image: python:${PYTHON_VERSION}
-  extends: [.build_task, .python_version_matrix]
-
 .build_task:
+  extends: [.harbor, .python_version_matrix]
+  needs: [build task]
+  script:
+    - ./build --verbose --push ${PYTHON_VERSION} ${TASK}
+  artifacts:
+    paths:
+      - output/*
+  rules: *on_run
+
+### NO DOCKER TEMPLATE ###
+
+.build_task_no_docker:
+  image: python:${PYTHON_VERSION}
+  extends: [.python_version_matrix]
   needs: []
   before_script:
     - |
@@ -121,20 +121,20 @@ stages:
 
 ### BUILD ###
 
-# build base:
-#   stage: build
-#   extends: [.harbor, .python_version_matrix]
-#   script:
-#     - ./build --verbose --build-base --push ${PYTHON_VERSION}
-#   rules: *on_run
+build base:
+  stage: build
+  extends: [.harbor, .python_version_matrix]
+  script:
+    - ./build --verbose --build-base --push ${PYTHON_VERSION}
+  rules: *on_run
 
-# build task:
-#   stage: build
-#   extends: [.harbor, .python_version_matrix]
-#   needs: [build base]
-#   script:
-#     - ./build --verbose --build-task --push ${PYTHON_VERSION}
-#   rules: *on_run
+build task:
+  stage: build
+  extends: [.harbor, .python_version_matrix]
+  needs: [build base]
+  script:
+    - ./build --verbose --build-task --push ${PYTHON_VERSION}
+  rules: *on_run
 
 verify lock:
   stage: build
@@ -144,21 +144,21 @@ verify lock:
     - poetry check
   rules: *on_run
 
-# docker info:
-#   stage: build
-#   extends: .docker
-#   script:
-#     - echo ===========================================================
-#     - |
-#       docker info
-#       echo ===========================================================
-#     - |
-#       docker version
-#       echo ===========================================================
-#     - |
-#       docker buildx ls
-#       echo ===========================================================
-#   rules: *on_run
+docker info:
+  stage: build
+  extends: .docker
+  script:
+    - echo ===========================================================
+    - |
+      docker info
+      echo ===========================================================
+    - |
+      docker version
+      echo ===========================================================
+    - |
+      docker buildx ls
+      echo ===========================================================
+  rules: *on_run
 
 ### TEST ###
 
@@ -211,27 +211,13 @@ coverage:
 
 ### DOCS ###
 
-# docs:
-#   stage: docs
-#   extends: .harbor
-#   needs: [build base]
-#   tags: [multi-gpu]
-#   script:
-#     - ./build --verbose --push docs --gpu
-#   artifacts:
-#     paths:
-#       - output/docs/.jupyter_cache/
-#       - output/docs/html/
-#   rules: *on_run
-
 docs:
   stage: docs
-  needs: []
+  extends: .harbor
+  needs: [build base]
   tags: [multi-gpu]
-  before_script:
-    - pip install poetry && poetry install --all-extras --with dev
   script:
-    - ./run docs
+    - ./build --verbose --push docs --gpu
   artifacts:
     paths:
       - output/docs/.jupyter_cache/
