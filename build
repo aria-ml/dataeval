@@ -79,6 +79,9 @@ if [[ $((c_pvers + c_tasks)) != $count ]]; then showHelp 1; fi
 # set all python versions if none specified
 if [[ $count == 0 || ($c_pvers == 0 && $c_tasks != 0) ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
 
+# for build_task we should run these specific tasks
+if [[ $build_task ]]; then tasks=([unit]=1 [type]=1 [lint]=1 [deps]=1); fi
+
 # set defaults if not specified
 if [[ ! $build_base && ! $build_task && ! $devenv ]]; then
     if [[ $count == 0 || ($c_tasks == 0 && $c_pvers != 0) ]]; then tasks[unit]=1; tasks[type]=1; fi
@@ -141,18 +144,13 @@ function build_image() {
         --build-arg pyenv_enable_opt=--enable-optimizations \
         --build-arg pyenv_with_lto=--with-lto"
 
-    # TODO clean this up if experiment to cache to main only works
-    branch_cache="${tag/\/${image_name}:/\/${image_name}\/cache:}"
-    main_cache="${branch_cache/dev\/cache:${branch_name}-/${main_branch}\/cache:}"
-
+    main_cache="${tag/\/${image_name}:${branch_prefix}/\/main\/cache:}"
     cache_from_arg="--cache-from type=registry,ref=$main_cache"
 
-    if [[ ! $no_cache_to ]]; then
+    if [[ $cache_to && $push_to_repo ]]; then
         # Writing to the cache means that you must be able to push to the registry, therefore
         # don't want to force users to login to the registry just to build.
-        if [[ $push_to_repo ]]; then
-            cache_to_arg="--cache-to type=registry,mode=max,image-manifest=true,ref=$branch_cache"
-        fi
+        cache_to_arg="--cache-to type=registry,mode=max,image-manifest=true,ref=$main_cache"
     fi
 
     output_arg="--output type=image,name=$tag"
@@ -207,7 +205,7 @@ function build_and_run() {
 
     trap "post_build_cleanup $tag $container_name" EXIT
     if [[ ! $(docker manifest inspect $tag) ]]; then
-        no_cache_to=1 build_image $tag $task $pver
+        build_image $tag $task $pver
     fi
 
     echo "======================================================================"
@@ -246,7 +244,7 @@ function ensure_image() {
 
     # Rebuild and push the image on main branch commits, or just skip if exists
     if [[ $CI && $branch_name == $main_branch || $(docker manifest inspect $tag > /dev/null 2>&1; echo $?) == 1 ]]; then
-        build_image $tag $target $python_version
+        cache_to=1 build_image $tag $target $python_version
     else
         echo "Verified $tag image in registry"
     fi
@@ -300,11 +298,9 @@ for pver in ${!pvers[@]}; do
     ensure_image pydeps $pver
     if [[ ! $devenv ]]; then
         ensure_image build $pver
-        if [[ $build_task ]]; then
-            for task in "type" "unit" "lint" "deps"; do
-                no_cache_to=1 build_image "${image}:${branch_prefix}${deps_hash}-${task}-${pver}" ${task} $pver
-            done
-        fi
+        for task in ${!tasks[@]}; do
+            build_image "${image}:${branch_prefix}${deps_hash}-${task}-${pver}" ${task} $pver
+        done
     fi
 done
 
