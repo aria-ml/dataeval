@@ -141,14 +141,13 @@ function build_image() {
         --build-arg pyenv_enable_opt=--enable-optimizations \
         --build-arg pyenv_with_lto=--with-lto"
 
-    if [[ ! $no_cache ]]; then
-        branch_cache="${tag/\/${image_name}:/\/${image_name}\/cache:}"
-        main_cache="${branch_cache/dev\/cache:${branch_name}-/${main_branch}\/cache:}"
+    # TODO clean this up if experiment to cache to main only works
+    branch_cache="${tag/\/${image_name}:/\/${image_name}\/cache:}"
+    main_cache="${branch_cache/dev\/cache:${branch_name}-/${main_branch}\/cache:}"
 
-        cache_from_arg="\
-            --cache-from type=registry,ref=$main_cache \
-            --cache-from type=registry,ref=$branch_cache"
+    cache_from_arg="--cache-from type=registry,ref=$main_cache"
 
+    if [[ ! $no_cache_to ]]; then
         # Writing to the cache means that you must be able to push to the registry, therefore
         # don't want to force users to login to the registry just to build.
         if [[ $push_to_repo ]]; then
@@ -208,7 +207,7 @@ function build_and_run() {
 
     trap "post_build_cleanup $tag $container_name" EXIT
     if [[ ! $(docker manifest inspect $tag) ]]; then
-        no_cache=1 build_image $tag $task $pver
+        no_cache_to=1 build_image $tag $task $pver
     fi
 
     echo "======================================================================"
@@ -279,6 +278,7 @@ if [[ $branch_name == $main_branch ]]; then
 else
     export image_name="dev"
     export branch_prefix="${branch_name}-"
+    export no_cache_to=1
 fi
 
 export image="harbor.jatic.net/daml/${image_name}"
@@ -302,7 +302,7 @@ for pver in ${!pvers[@]}; do
         ensure_image build $pver
         if [[ $build_task ]]; then
             for task in "type" "unit" "lint" "deps"; do
-                no_cache=1 build_image "${image}:${branch_prefix}${deps_hash}-${task}-${pver}" ${task} $pver
+                no_cache_to=1 build_image "${image}:${branch_prefix}${deps_hash}-${task}-${pver}" ${task} $pver
             done
         fi
     fi
