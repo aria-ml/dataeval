@@ -39,7 +39,13 @@ extensions = [
 source_suffix = [".rst", ".md"]
 
 templates_path = ["_templates"]
-exclude_patterns = [".jupyter_cache", "_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = [
+    ".jupyter_cache",
+    "_build",
+    "Thumbs.db",
+    ".DS_Store",
+    "tutorials/notebooks/ODLearningCurvesTutorial.ipynb",
+]
 
 # -- Extension configurations ----------------------------------------------
 

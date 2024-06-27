@@ -1,14 +1,35 @@
-.. _sufficiency_how_to:
+(sufficiency-ref)=
 
-=================================
-Sufficiency Training How-To Guide
-=================================
+# Sufficiency
 
-.. *Add small blurb about why this how-to is useful or when you would use it and what it accomplishes*
+% Create small blurb here that answers:
 
-------------------------
-Initializing Sufficiency
-------------------------
+% 1. What it is
+
+% 2. What does it solve
+
+## Tutorials
+
+Check out this tutorial to begin using the `Sufficiency` class
+
+{doc}`Sufficiency Tutorial<../../tutorials/notebooks/ClassLearningCurvesTutorial>`
+
+## How To Guides
+
+There are currently no how to's for `Sufficiency`.
+If there are scenarios that you want us to explain, contact us!
+
+## DAML API
+
+```{eval-rst}
+.. autoclass:: daml.workflows.Sufficiency
+   :members:
+   :inherited-members:
+```
+
+### Initializing Sufficiency
+
+```{eval-rst}
 .. testsetup:: *
 
     from typing import Sequence
@@ -29,13 +50,13 @@ Initializing Sufficiency
     eval_fn = MagicMock()
     eval_fn.return_value = {"test": 1.0}
     device = "cpu"
+```
 
------------------------------------
-Defining a Custom Training Function
------------------------------------
+### Defining a Custom Training Function
 
 Use a small step size and around 50 epochs per step on the curve.
 
+```{eval-rst}
 .. testcode::
 
     def custom_train(model: nn.Module, dataset: Dataset, indices: Sequence[int]):
@@ -63,13 +84,13 @@ Use a small step size and around 50 epochs per step on the curve.
                 loss.backward()
                 # Update weights/parameters
                 optimizer.step()
+```
 
---------------------------------------
-Recommended parameters for Sufficiency
---------------------------------------
+### Recommended parameters for Sufficiency
 
 We recommend at least 5 bootstrap samples (runs) and 10 steps along the training curve per model (substeps). 
 
+```{eval-rst}
 .. testcode::
     
     # Create data indices for training
@@ -84,3 +105,4 @@ We recommend at least 5 bootstrap samples (runs) and 10 steps along the training
 
     # Train & test model
     output = suff.evaluate()
+```
