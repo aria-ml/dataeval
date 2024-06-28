@@ -1,29 +1,23 @@
-.. _duplicates_ref:
+(duplicates-ref)=
 
-====================
-Duplicates Detection
-====================
+# Duplicates Detection
 
 The duplicate detector helps prune out exact and near matches. Exact matches are found using a byte hash of the image
 information, while near matches use a perception based hash.
 
----------
-Tutorials
----------
+## Tutorials
 
-There are currently no tutorials for ``Duplicates``.
+There are currently no tutorials for `Duplicates`.
 
--------------
-How To Guides
--------------
+## How To Guides
 
-There are currently no how to's for ``Duplicates``. 
+There are currently no how to's for `Duplicates`.
 If there are scenarios that you want us to explain, contact us!
 
---------
-DAML API
---------
+## DAML API
 
+```{eval-rst}
 .. autoclass:: daml.detectors.Duplicates
    :members:
    :inherited-members:
+```

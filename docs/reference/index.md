@@ -30,6 +30,8 @@ metrics/labelindependence
 metrics/outlier
 metrics/sufficiency
 metrics/uap
+metrics/basic_stats
+metrics/clusterer
 :::
 
 Workflows

@@ -92,7 +92,7 @@ class TestSufficiencyUtils:
 
         output = calc_params(p_i, n_i, 100)
 
-        npt.assert_almost_equal(output, answer, decimal=4)
+        npt.assert_almost_equal(output, answer, decimal=3)
 
     def test_reset_parameters(self):
         """

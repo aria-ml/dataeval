@@ -93,7 +93,7 @@ case $task in
         $python -m virtualenv .venv-deps
         source .venv-deps/bin/activate
         capture_results pip install . pytest
-        capture_results pytest tests/metrics/test_ber.py tests/metrics/test_divergence.py tests/metrics/test_uap.py
+        capture_results pytest tests/test_mindeps.py
         rm -rf .venv-deps
         ;;
     "type")

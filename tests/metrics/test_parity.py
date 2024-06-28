@@ -2,12 +2,11 @@ import warnings
 
 import numpy as np
 import pytest
-import torch
 
 from daml._internal.metrics.parity import Parity
 
 
-class MockDistributionDataset(torch.utils.data.Dataset):
+class MockDistributionDataset:
     """
     Mock dataset with labels that obey a label distribution supplied at __init__
     """

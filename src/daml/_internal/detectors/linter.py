@@ -16,7 +16,7 @@ def _get_outlier_mask(
         return (abs_diff / std) > threshold
     elif method == "modzscore":
         threshold = threshold if threshold else 3.5
-        abs_diff = np.abs(values - np.mean(values))
+        abs_diff = np.abs(values - np.median(values))
         med_abs_diff = np.median(abs_diff)
         mod_z_score = 0.6745 * abs_diff / med_abs_diff
         return mod_z_score > threshold
