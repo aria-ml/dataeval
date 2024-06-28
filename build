@@ -148,7 +148,7 @@ function build_image() {
     cache_from_arg="--cache-from type=registry,ref=$cache"
 
     cache_to_arg=""
-    if [[ $cache_to && $push_to_repo ]]; then
+    if [[ $CI && $branch_name == $main_branch && $push_to_repo ]]; then
         # Writing to the cache means that you must be able to push to the registry, therefore
         # don't want to force users to login to the registry just to build.
         cache_to_arg="--cache-to type=registry,mode=max,image-manifest=true,ref=$cache"
@@ -248,9 +248,7 @@ function ensure_image() {
     fi
 
     # Rebuild and push the image on main branch commits, or just skip if exists
-    if [[ $CI && $branch_name == $main_branch ]]; then
-        cache_to=1 build_image $tag $target $python_version
-    elif [[ ! $(docker manifest inspect $tag) ]]; then
+    if [[ ($CI && $branch_name == $main_branch) || ! $(docker manifest inspect $tag) ]]; then
         build_image $tag $target $python_version
     else
         echo "Verified $tag image in registry"
