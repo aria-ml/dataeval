@@ -7,7 +7,6 @@ ARG PYENV_ROOT="$HOME/.pyenv"
 ARG UV_ROOT="$HOME/.cargo/bin"
 ARG python_version="3.11"
 ARG base_image="base"
-ARG pybase_image="pybase"
 ARG output_dir="/daml/output"
 
 FROM ubuntu:22.04 as pyenv
@@ -72,10 +71,9 @@ ENV LANG=en_US.UTF-8
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 
-FROM ${pybase_image} as pybase_image
 FROM cuda as base
 ARG PYENV_ROOT
-COPY --chown=${UID} --link --from=pybase_image ${PYENV_ROOT} ${PYENV_ROOT}
+COPY --chown=${UID} --link --from=pybase ${PYENV_ROOT} ${PYENV_ROOT}
 ARG python_version
 ARG UID
 COPY --chown=${UID} environment/requirements.txt environment/
