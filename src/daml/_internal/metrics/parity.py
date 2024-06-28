@@ -61,12 +61,30 @@ class Parity:
         self._validate_dist(expected_dist, f"expected for {np.sum(observed_dist)} observations")
         self._validate_class_balance(expected_dist, observed_dist)
 
-        
-
         self._observed_dist = observed_dist
         self._expected_dist = expected_dist
 
     def _normalize_expected_dist(self, expected_dist: np.ndarray, observed_dist: np.ndarray) -> np.ndarray:
+        """
+        Rescale the expected label distribution to have the same number of data points
+        as the observed label distribution. This enables a direct comparison between
+        the number of observed instances of a class label and the expected number of instances
+        of a class label.
+
+        Parameters
+        ----------
+        expected_dist : np.ndarray
+            Array representing expected label distributions
+        observed_dist : np.ndarray
+            Array representing observed label distributions
+
+        Returns
+        -------
+        np.ndarray
+            Array representing the rescaled expected label distribution
+
+
+        """
         exp_sum = np.sum(expected_dist)
         obs_sum = np.sum(observed_dist)
 
