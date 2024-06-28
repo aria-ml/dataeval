@@ -147,6 +147,7 @@ function build_image() {
     cache="${tag/\/${image_name}:${branch_prefix}/\/cache:}"
     cache_from_arg="--cache-from type=registry,ref=$cache"
 
+    cache_to_arg=""
     if [[ $cache_to && $push_to_repo ]]; then
         # Writing to the cache means that you must be able to push to the registry, therefore
         # don't want to force users to login to the registry just to build.
