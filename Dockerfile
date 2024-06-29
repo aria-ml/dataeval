@@ -5,7 +5,6 @@ ARG UID="1000"
 ARG HOME="/home/$USER"
 ARG PYENV_ROOT="$HOME/.pyenv"
 ARG UV_ROOT="$HOME/.cargo/bin"
-ARG UV_CACHE="$HOME/.cache/uv"
 ARG python_version="3.11"
 ARG base_image="base"
 ARG pybase_image="pybase"
@@ -73,22 +72,22 @@ ENV LANG=en_US.UTF-8
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 
-FROM ${base_image} as base_image
-FROM base as pydeps
+FROM ${pybase_image} as pybase_image
+FROM cuda as base
 ARG PYENV_ROOT
-COPY --chown=${UID} --link --from=base_image ${PYENV_ROOT} ${PYENV_ROOT}
+COPY --chown=${UID} --link --from=pybase_image ${PYENV_ROOT} ${PYENV_ROOT}
 ARG python_version
 ARG UID
 COPY --chown=${UID} environment/requirements.txt environment/
 ARG UV_ROOT
 ARG python_version
-RUN ${UV_ROOT}/uv venv --python=$(which ${PYENV_ROOT}/versions/${python_version}.*/bin/python) && \
-    ${UV_ROOT}/uv pip install -r environment/requirements.txt && \
+ENV PATH ${UV_ROOT}:${PYENV_ROOT}/versions/${python_version}/bin:${PYENV_ROOT}/bin:$PATH
+RUN uv venv --python=$(which ${PYENV_ROOT}/versions/${python_version}.*/bin/python) && \
+    uv pip install -r environment/requirements.txt && \
     rm -rf .venv
 RUN grep nvidia-cudnn-cu11 environment/requirements.txt | cut -d' ' -f1 | \
-    xargs ${UV_ROOT}/uv pip install --python=$(which ${PYENV_ROOT}/versions/${python_version}.*/bin/python) tox tox-uv
+    xargs uv pip install --python=$(which ${PYENV_ROOT}/versions/${python_version}.*/bin/python) tox tox-uv
 RUN ln -s ${PYENV_ROOT}/versions/$(${PYENV_ROOT}/bin/pyenv latest ${python_version}) ${PYENV_ROOT}/versions/${python_version}
-ENV PATH ${PYENV_ROOT}/versions/${python_version}/bin:${PYENV_ROOT}/bin:$PATH
 ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${PYENV_ROOT}/versions/${python_version}/lib/python${python_version}/site-packages/nvidia/cudnn/lib
 
 
