@@ -91,7 +91,7 @@ stages:
   extends: [.harbor, .python_version_matrix]
   needs: [build task]
   script:
-    - ./build --verbose --push ${PYTHON_VERSION} ${TASK}
+    - ./build --push ${PYTHON_VERSION} ${TASK}
   artifacts:
     paths:
       - output/*
@@ -125,7 +125,7 @@ build base:
   stage: build
   extends: [.harbor, .python_version_matrix]
   script:
-    - ./build --verbose --build-base --push ${PYTHON_VERSION}
+    - ./build --build-base --push ${PYTHON_VERSION}
   rules: *on_run
 
 build task:
@@ -133,7 +133,7 @@ build task:
   extends: [.harbor, .python_version_matrix]
   needs: [build base]
   script:
-    - ./build --verbose --build-task --push ${PYTHON_VERSION}
+    - ./build --build-task --push ${PYTHON_VERSION}
   rules: *on_run
 
 verify lock:
@@ -215,7 +215,7 @@ docs:
   needs: [build base]
   tags: [multi-gpu]
   script:
-    - ./build --verbose --push docs --gpu
+    - ./build --push docs --gpu
   artifacts:
     paths:
       - output/docs/.jupyter_cache/
