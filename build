@@ -11,7 +11,7 @@ Options:
       --build-task  only build task images
   -d, --devenv      only build the developer environment image
   -h, --help        display this help information
-  -v, --verbose     print output to console during container execution
+  -q, --quiet       do not print output to console during container execution
       --gpu         enable gpu support on task execution
       --push        push all built images to repository
 
@@ -35,12 +35,12 @@ EOF
 exit $1
 }
 
-options=$(getopt -l "help,verbose,gpu,build-base,build-task,devenv,push" -o "hvd" -n "build" -- "$@")
+options=$(getopt -l "help,quiet,gpu,build-base,build-task,devenv,push" -o "hqd" -n "build" -- "$@")
 eval set -- "$options"
 while true; do
     case "$1" in
         -h|--help)       showHelp;;
-        -v|--verbose)    export verbose=1;;
+        -q|--quiet)      export quiet=1;;
         --gpu)           export gpuflag="--gpus all";;
         --build-base)    build_base=1;;
         --build-task)    build_task=1;;
@@ -128,15 +128,15 @@ function build_image() {
     deps_tag="${deps_image}-${python_version}"
     build_tag="${build_image}-${python_version}"
 
-    if [[ $(docker manifest inspect $base_tag) ]]; then
+    if [[ $(docker manifest inspect $base_tag 2> /dev/null) ]]; then
         image_args="--build-arg base_image=$base_tag"
     fi
 
-    if [[ $(docker manifest inspect $deps_tag) ]]; then
+    if [[ $(docker manifest inspect $deps_tag 2> /dev/null) ]]; then
         image_args="$image_args --build-arg deps_image=$deps_tag"
     fi
 
-    if [[ $(docker manifest inspect $build_tag) ]]; then
+    if [[ $(docker manifest inspect $build_tag 2> /dev/null) ]]; then
         image_args="$image_args --build-arg build_image=$build_tag"
     fi
 
@@ -178,7 +178,7 @@ function build_image() {
         --target $target \
         ."
 
-    if [[ $verbose ]]; then
+    if [[ ! $quiet ]]; then
         echo "========================================"
         echo "Building $tag..."
         echo $docker_build_cmd
@@ -209,7 +209,7 @@ function build_and_run() {
     # NOTE: If you ./build --push at the same time as a pipeline in the same
     # branch that is running you can potentially overwrite a results image that
     # will be read from in that pipeline run.
-    if [[ ! $(docker manifest inspect $tag) ]]; then
+    if [[ ! $(docker manifest inspect $tag 2> /dev/null) ]]; then
         build_image $tag $task $pver
     fi
 
@@ -248,7 +248,7 @@ function ensure_image() {
     fi
 
     # Rebuild and push the image on main branch commits, or just skip if exists
-    if [[ ($CI && $branch_name == $main_branch) || ! $(docker manifest inspect $tag) ]]; then
+    if [[ ($CI && $branch_name == $main_branch) || ! $(docker manifest inspect $tag 2> /dev/null) ]]; then
         build_image $tag $target $python_version
     else
         echo "Verified $tag image in registry"
@@ -288,7 +288,7 @@ export base_image="${image}:${branch_prefix}pybase"
 export deps_image="${image}:${branch_prefix}${deps_hash}-pydeps"
 export build_image="${image}:${branch_prefix}${deps_hash}-build"
 
-if [[ -z $verbose ]]; then
+if [[ $quiet ]]; then
     verbosity="--quiet"
 else
     keep_order="--keep-order"
@@ -332,6 +332,6 @@ echo "------"
 echo "Running ${!jobs[@]}..."
 case ${#jobs[@]} in
     0)  showHelp 1;;
-    1)  export verbose=1; build_and_run ${!jobs[@]};;
+    1)  build_and_run ${!jobs[@]};;
     *)  LANG=C parallel $keep_order --lb --tag 'set -o pipefail; build_and_run' ::: ${!jobs[@]};;
 esac
