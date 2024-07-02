@@ -12,7 +12,7 @@ ARG pyenv_with_lto=""
 ARG build_image="build"
 ARG output_dir="/daml/output"
 
-FROM ubuntu:22.04 as pybase
+FROM ubuntu:22.04 as pyenv
 ENV DEBIAN_FRONTEND noninteractive
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -55,19 +55,33 @@ ARG python_version
 RUN ${PYENV_ROOT}/bin/pyenv install ${python_version}
 
 
-FROM ${base_image} as pyenv
+FROM scratch as pybase
 ARG PYENV_ROOT
+COPY --from=pyenv ${PYENV_ROOT} ${PYENV_ROOT}
+
+
+FROM ${base_image} as base_image
+FROM ubuntu:22.04 as pydeps-base
+ARG UID
+ARG USER
+RUN useradd -m -u ${UID} ${USER}
+USER ${USER}
+ARG HOME
+WORKDIR ${HOME}
+ARG PYENV_ROOT
+COPY --chown=${UID} --from=base_image ${PYENV_ROOT} ${PYENV_ROOT}
 ARG python_version
 RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/pip install --no-cache-dir --disable-pip-version-check poetry
 RUN touch README.md
-ARG UID
+ENV POETRY_VIRTUALENVS_CREATE=false
+ENV POETRY_INSTALLER_MAX_WORKERS=10
 COPY --chown=${UID} pyproject.toml poetry.lock ./
 RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/poetry install --no-cache --no-root --all-extras --with dev
 
 
 FROM scratch as pydeps
 ARG PYENV_ROOT
-COPY --link --from=pyenv  ${PYENV_ROOT}/ ${PYENV_ROOT}/
+COPY --link --from=pydeps-base  ${PYENV_ROOT}/ ${PYENV_ROOT}/
 
 
 # Base image for build runs and devcontainers
