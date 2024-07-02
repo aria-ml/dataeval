@@ -23,7 +23,7 @@ EOF
 exit $1
 }
 
-declare -A supported_tasks=([quick]=1 [full]=1 [unit]=1 [deps]=1 [type]=1 [lint]=1 [docs]=1 [qdocs]=1)
+declare -A supported_tasks=([quick]=1 [full]=1 [unit]=1 [deps]=1 [type]=1 [lint]=1 [docs]=1 [qdocs]=1 [lock]=1)
 declare -A supported_pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1)
 
 # validate args
@@ -44,7 +44,7 @@ poetry_run="$python -m poetry --quiet run"
 
 # deps task skips poetry check as it builds its own virtual environment for the test
 # all other tests use poetry environment for execution
-if ! [ $task == "deps" ] && ! ($poetry_run pip freeze | grep daml) >/dev/null 2>&1; then
+if ! [[ $task == "deps" || $task == "lock" ]] && ! ($poetry_run pip freeze | grep daml) >/dev/null 2>&1; then
     echo "DAML environment not found.  Please rebuild your devcontainer or install using poetry with all extras and groups."
     exit 1
 fi
@@ -116,6 +116,12 @@ case $task in
         popd
         if [[ $FAILURES != 0 ]]; then cat /tmp/sphinx*.log && mv /tmp/sphinx*.log output/docs; fi
         ;;
+    "lock")
+        poetry lock --no-update
+        poetry config warnings.export false
+        mkdir -p environment
+        poetry export --all-extras --without-hashes -o environment/requirements.txt
+        poetry export --only=dev --without-hashes -o environment/requirements-dev.txt        
 esac
 
 exit $FAILURES
