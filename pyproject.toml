@@ -37,42 +37,42 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
+# required
 python = ">=3.8.1,<3.12"
 hdbscan = {version = ">=0.8.36"}
-maite = {version = "*", optional = true}
-matplotlib = {version = "*", optional = true}
-numpy = {version = ">=1.24.2, <2"}
-nvidia-cudnn-cu11 = {version = ">=8.6.0.163", optional = true}
+numpy = [
+  {version = "=1.24.3", python = "~3.8.1"},
+  {version = ">1.24.3", python = ">=3.9"},
+] 
 pillow = {version = ">=10.3.0"}
 scipy = {version = ">=1.10" }
 scikit-learn = {version = ">=1.2.1" }
+xxhash = {version = ">=3.3"}
+# optional
+maite = {version = "*", optional = true}
+matplotlib = {version = "*", optional = true}
+nvidia-cudnn-cu11 = {version = ">=8.6.0.163", optional = true}
 tensorflow = [
   {version = "~2.13.1", python = "~3.8.1", optional = true},
-  {version = ">=2.14.1,<2.16", python = ">=3.9,<3.12", optional = true},
+  {version = ">=2.14.1,<2.16", python = ">=3.9", optional = true},
 ]
 tensorflow-io-gcs-filesystem = [
   {version = "~0.34.0", python = "~3.8.1", optional = true},
-  {version = ">=0.35.0,<0.37", python = ">=3.9,<3.12", optional = true},
+  {version = ">=0.35.0,<0.37", python = ">=3.9", optional = true},
 ]
 tensorflow_probability = [
   {version = "~0.21.0", python = "~3.8.1", optional = true},
-  {version = ">=0.22.1,<0.24", python = ">=3.9,<3.12", optional = true},
+  {version = ">=0.22.1,<0.24", python = ">=3.9", optional = true},
 ]
 torch = {version = ">=2.0.1, !=2.2.0", source = "pytorch", optional = true}
-xxhash = {version = ">=3.3"}
+# poetry export dependency solver breaks if typing-extensions >=4.6 for python 3.9 is specified
+typing-extensions = {version = "<4.6", python = "~3.8.1", optional = true} 
 
 [tool.poetry.extras]
-maite = ["maite"]
-tensorflow = ["tensorflow", "tensorflow-io-gcs-filesystem", "tensorflow_probability", "nvidia-cudnn-cu11"]
-torch = ["torch", "matplotlib", "nvidia-cudnn-cu11"]
-all = ["maite", "matplotlib", "nvidia-cudnn-cu11", "tensorflow", "tensorflow-io-gcs-filesystem", "tensorflow_probability", "torch"]
-
-[tool.poetry.group.lint]
-optional = true
-
-[tool.poetry.group.lint.dependencies]
-ruff = "*"
-codespell = "*"
+maite = ["maite", "typing-extensions"]
+tensorflow = ["tensorflow", "tensorflow-io-gcs-filesystem", "tensorflow_probability", "nvidia-cudnn-cu11", "typing-extensions"]
+torch = ["torch", "matplotlib", "nvidia-cudnn-cu11", "typing-extensions"]
+all = ["maite", "matplotlib", "nvidia-cudnn-cu11", "tensorflow", "tensorflow-io-gcs-filesystem", "tensorflow_probability", "torch", "typing-extensions"]
 
 [tool.poetry.group.dev]
 optional = true
@@ -80,29 +80,32 @@ optional = true
 [tool.poetry.group.dev.dependencies]
 # lint
 ruff = {version = "*"}
-codespell = {version = "*"}
-# test
+codespell = {version = "*", extras = ["toml"]}
+# unit
 pytest = {version = "*"}
 pytest-cov = {version = "*"}
 pytest-xdist = {version = "*"}
 coverage = {version = "*", extras = ["toml"]}
-pyright = {version = "*, !=1.1.340"}
 torchmetrics = {version = ">=1.0.0", source = "pytorch"}
-matplotlib = {version = "*"}
+# type
+pyright = {version = "*, !=1.1.340"}
 # docs
-enum_tools = {version = "0.12.0", extras = ["sphinx"], python = ">=3.9,<3.12"}
-ipykernel = {version = "6.26.0", python = ">=3.9,<3.12"}
-ipywidgets = {version = "8.1.1", python = ">=3.9,<3.12"}
-jupyter-client = {version = "8.6.0", python = ">=3.9,<3.12"}
-jupyter-cache = {version = "*", python = ">=3.9,<3.12"}
-myst-nb = {version = "1.0.0", python = ">=3.9,<3.12"} 
-sphinx-rtd-size = {version = "0.2.0", python = ">=3.9,<3.12"}
-sphinx-rtd-theme = {version = "1.3.0", python = ">=3.9,<3.12"}
-sphinx-design = {version = "*", python = ">=3.9,<3.12"}
-sphinx-tabs = {version = "*", python = ">=3.9,<3.12"}
-Sphinx = {version = "7.2.6", python = ">=3.9,<3.12"}
-tensorflow-datasets = {version = "*", python = ">=3.9,<3.12"}
-torchvision = {version = ">=0.16.0", source = "pytorch", python = ">=3.9,<3.12"}
+enum_tools = {version = "0.12.0", extras = ["sphinx"], python = ">=3.10"}
+ipykernel = {version = "6.26.0", python = ">=3.10"}
+ipywidgets = {version = "8.1.1", python = ">=3.10"}
+jupyter-client = {version = "8.6.0", python = ">=3.10"}
+jupyter-cache = {version = "*", python = ">=3.10"}
+myst-nb = {version = "1.0.0", python = ">=3.10"} 
+protobuf = {version = "4.25.3", python = ">=3.10"} 
+sphinx-rtd-size = {version = "0.2.0", python = ">=3.10"}
+sphinx-rtd-theme = {version = "1.3.0", python = ">=3.10"}
+sphinx-design = {version = "*", python = ">=3.10"}
+sphinx-tabs = {version = "*", python = ">=3.10"}
+Sphinx = {version = "7.2.6", python = ">=3.10"}
+tensorflow-datasets = {version = "*", python = ">=3.10"}
+torchvision = {version = ">=0.16.0", source = "pytorch", python = ">=3.10"}
+# typing-extensions will be solved for 4.5, but docs requires >=4.6
+typing-extensions = {version = ">=4.6", python = ">=3.10"}
 
 [[tool.poetry.source]]
 name = "pytorch"
@@ -131,7 +134,7 @@ branch = true
 
 [tool.coverage.report]
 exclude_also = [
-    "raise NotImplementedError"
+  "raise NotImplementedError"
 ]
 omit = [
   "*/_internal/models/tensorflow/pixelcnn.py",
