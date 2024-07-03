@@ -27,9 +27,10 @@ Tasks:
   deps    run minimum dependency tests
   docs    generate documentation
   qdocs   generate documentation using cached notebooks
+  doctest run documentation tests
 
 Note:
-  lint and docs are always performed on python 3.11
+  docs, qdocs and doctest are always performed on python 3.11
 EOF
 exit $1
 }
@@ -57,22 +58,24 @@ fi
 
 # declare lookup maps
 declare -A supported_pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1)
-declare -A supported_tasks=([unit]=1 [type]=1 [lint]=1 [deps]=1 [docs]=1 [qdocs]=1)
+declare -A supported_tasks=([unit]=1 [type]=1 [lint]=1 [deps]=1)
+declare -A supported_docs=([docs]=1 [qdocs]=1 [doctest]=1)
 
 # generate python and task lists
 declare -A pvers; declare -A tasks;
-count=0; c_pvers=0; c_tasks=0;
+count=0; c_pvers=0; c_tasks=0; c_docs=0;
 
 # validate args
 for arg do
     if [[ $arg == -* ]]; then continue; fi
     if [[ ${supported_pvers["$arg"]} ]]; then pvers[$arg]=1; ((++c_pvers)); fi
     if [[ ${supported_tasks["$arg"]} ]]; then tasks[$arg]=1; ((++c_tasks)); fi
+    if [[ ${supported_docs["$arg"]} ]]; then tasks[$arg]=1; ((++c_docs)); fi
     ((++count))
 done
 
 # show help if arg count mismatch
-if [[ $((c_pvers + c_tasks)) != $count ]]; then showHelp 1; fi
+if [[ $((c_pvers + c_tasks + c_docs)) != $count ]]; then showHelp 1; fi
 
 # set all python versions if none specified
 if [[ $count == 0 || ($c_pvers == 0 && $c_tasks != 0) ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
@@ -89,11 +92,10 @@ fi
 declare -A jobs;
 for task in "${!tasks[@]}"; do
     case "$task" in
-        docs|qdocs) jobs["$task-3.11"]=1;;
+        docs|qdocs|doctest) jobs["$task-3.11"]=1;;
         *) for pver in "${!pvers[@]}"; do jobs["$task-$pver"]=1; done;;
     esac
 done
-if [[ ${tasks[docs]} || ${tasks[qdocs]} ]]; then pvers[3.11]=1; fi
 
 export builder_name="daml"
 if [[ -z $(docker builder ls --format '{{.Name}}' | grep $builder_name) ]]; then
