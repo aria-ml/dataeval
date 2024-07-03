@@ -13,10 +13,10 @@ ARG build_image="build"
 ARG output_dir="/daml/output"
 
 
-# Ubuntu 22.04.4 LTS (Jammy Jellyfish)
-# https://releases.ubuntu.com/jammy/
-# Use a static tag since we're only using this image to build Python and install dependencies
-FROM ubuntu:jammy-20240627.1 as ubuntu-base
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 as cuda-base
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends libgl1
 ARG UID
 ARG USER
 RUN useradd -m -u ${UID} ${USER}
@@ -25,9 +25,13 @@ ARG HOME
 WORKDIR ${HOME}
 ARG PYENV_ROOT
 ENV PYENV_ROOT=${PYENV_ROOT}
+ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
+ENV POETRY_VIRTUALENVS_CREATE=false
+ENV POETRY_INSTALLER_MAX_WORKERS=10
+ENV TF_GPU_ALLOCATOR=cuda_malloc_async
 
 
-FROM ubuntu-base as pyenv
+FROM cuda-base as pyenv
 ENV DEBIAN_FRONTEND noninteractive
 USER root
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -69,14 +73,12 @@ COPY --from=pyenv ${PYENV_ROOT} ${PYENV_ROOT}
 
 
 FROM ${base_image} as base_image
-FROM ubuntu-base as pydeps-base
+FROM cuda-base as pydeps-base
 ARG UID
 COPY --chown=${UID} --from=base_image ${PYENV_ROOT} ${PYENV_ROOT}
 ARG python_version
 RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/pip install --no-cache-dir --disable-pip-version-check poetry
 RUN touch README.md
-ENV POETRY_VIRTUALENVS_CREATE=false
-ENV POETRY_INSTALLER_MAX_WORKERS=10
 COPY --chown=${UID} pyproject.toml poetry.lock ./
 RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/poetry install --no-cache --no-root --all-extras --with dev
 
@@ -87,21 +89,8 @@ COPY --link --from=pydeps-base  ${PYENV_ROOT}/ ${PYENV_ROOT}/
 
 
 # Base image for build runs and devcontainers
-FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 as base
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends libgl1
-ARG UID
-ARG USER
-RUN useradd -m -u ${UID} -s /bin/bash ${USER}
-USER ${USER}
+FROM cuda-base as base
 WORKDIR /daml
-ARG PYENV_ROOT
-ENV PYENV_ROOT=${PYENV_ROOT}
-ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
-ENV POETRY_VIRTUALENVS_CREATE=false
-ENV POETRY_INSTALLER_MAX_WORKERS=10
-ENV TF_GPU_ALLOCATOR=cuda_malloc_async
 
 
 FROM ${deps_image} as deps_image
