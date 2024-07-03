@@ -24,7 +24,7 @@ The Data-Analysis Metrics Library, or DAML, focuses on characterizing image data
 ## Getting Started
 
 ### Requirements
-- Python 3.8-3.11
+- Python 3.9-3.11
 
 ### Installing DAML
 

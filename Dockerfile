@@ -4,10 +4,10 @@ ARG USER="daml"
 ARG UID="1000"
 ARG HOME="/home/$USER"
 ARG PYENV_ROOT="$HOME/.pyenv"
+ARG UV_ROOT="$HOME/.cargo/bin"
 ARG python_version="3.11"
-ARG deps_image="pydeps"
-ARG base_image="pybase"
-ARG build_image="build"
+ARG base_image="base"
+ARG pybase_image="pybase"
 ARG output_dir="/daml/output"
 
 FROM ubuntu:22.04 as pyenv
@@ -51,35 +51,11 @@ ARG PYENV_ROOT
 COPY --from=pyenv ${PYENV_ROOT} ${PYENV_ROOT}
 
 
-FROM ${base_image} as base_image
-FROM ubuntu:22.04 as pydeps-base
-ARG UID
-ARG USER
-RUN useradd -m -u ${UID} ${USER}
-USER ${USER}
-ARG HOME
-WORKDIR ${HOME}
-ARG PYENV_ROOT
-COPY --chown=${UID} --from=base_image ${PYENV_ROOT} ${PYENV_ROOT}
-ARG python_version
-RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/pip install --no-cache-dir --disable-pip-version-check poetry
-RUN touch README.md
-ENV POETRY_VIRTUALENVS_CREATE=false
-ENV POETRY_INSTALLER_MAX_WORKERS=10
-COPY --chown=${UID} pyproject.toml poetry.lock ./
-RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/poetry install --no-cache --no-root --all-extras --with dev
-
-
-FROM scratch as pydeps
-ARG PYENV_ROOT
-COPY --link --from=pydeps-base  ${PYENV_ROOT}/ ${PYENV_ROOT}/
-
-
 # Base image for build runs and devcontainers
-FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 as base
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 as cuda
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends libgl1
+    apt-get update && apt-get install -y --no-install-recommends curl libgl1
 ARG UID
 ARG USER
 RUN useradd -m -u ${UID} -s /bin/bash ${USER}
@@ -88,61 +64,62 @@ WORKDIR /daml
 ARG PYENV_ROOT
 ENV PYENV_ROOT=${PYENV_ROOT}
 ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
-ENV POETRY_VIRTUALENVS_CREATE=false
-ENV POETRY_INSTALLER_MAX_WORKERS=10
 ENV TF_GPU_ALLOCATOR=cuda_malloc_async
+ENV UV_INDEX_STRATEGY=unsafe-best-match
+ENV LANGUAGE=en
+ENV LC_ALL=C.UTF-8
+ENV LANG=en_US.UTF-8
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 
-FROM ${deps_image} as deps_image
-FROM base as build
+FROM ${pybase_image} as pybase_image
+FROM cuda as base
 ARG PYENV_ROOT
+COPY --chown=${UID} --link --from=pybase_image ${PYENV_ROOT} ${PYENV_ROOT}
 ARG python_version
 ARG UID
-COPY --chown=${UID} --link --from=deps_image ${PYENV_ROOT} ${PYENV_ROOT}
+COPY --chown=${UID} environment/requirements.txt environment/
+ARG UV_ROOT
+ARG python_version
+ENV PATH ${UV_ROOT}:${PYENV_ROOT}/versions/${python_version}/bin:${PYENV_ROOT}/bin:$PATH
+RUN uv venv --python=$(which ${PYENV_ROOT}/versions/${python_version}.*/bin/python) && \
+    uv pip install -r environment/requirements.txt && \
+    rm -rf .venv
+RUN grep nvidia-cudnn-cu11 environment/requirements.txt | cut -d' ' -f1 | \
+    xargs uv pip install --python=$(which ${PYENV_ROOT}/versions/${python_version}.*/bin/python) tox tox-uv
 RUN ln -s ${PYENV_ROOT}/versions/$(${PYENV_ROOT}/bin/pyenv latest ${python_version}) ${PYENV_ROOT}/versions/${python_version}
-ENV PATH ${PYENV_ROOT}/versions/${python_version}/bin:${PYENV_ROOT}/bin:$PATH
 ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${PYENV_ROOT}/versions/${python_version}/lib/python${python_version}/site-packages/nvidia/cudnn/lib
-
-
-FROM ${build_image} as versioned
-RUN touch README.md
-ARG UID
-COPY --chown=${UID} pyproject.toml poetry.lock ./
-COPY --chown=${UID} src/ src/
-RUN poetry install --no-cache --all-extras --with dev
 
 
 ######################## Build task layers ########################
 # The *-run layers run individual tasks and capture the results
-FROM versioned as task-run
+FROM ${base_image} as task-run
 ARG UID
+RUN touch README.md
+COPY --chown=${UID} pyproject.toml poetry.lock ./
+COPY --chown=${UID} src/ src/
 COPY --chown=${UID} tests/ tests/
-COPY --chown=${UID} run ./
+COPY --chown=${UID} tox.ini ./
+COPY --chown=${UID} environment/requirements-dev.txt environment/
+COPY --chown=${UID} capture.sh ./
 ARG output_dir
 RUN mkdir -p $output_dir
 
 FROM task-run as unit-run
-RUN ./run unit || echo "Unit tests failed, results captured"
+ARG python_version
+RUN ./capture.sh unit ${python_version} tox -e py$(echo ${python_version} | sed "s/\.//g")
 
 FROM task-run as type-run
-RUN ./run type || echo "Type check failed, results captured"
+ARG python_version
+RUN ./capture.sh type ${python_version} tox -e type-py$(echo ${python_version} | sed "s/\.//g")
 
 FROM task-run as lint-run
-RUN ./run lint || echo "Lint failed, results captured"
+ARG python_version
+RUN ./capture.sh lint ${python_version} tox -e lint
 
-
-# deps works differently because it's based on vanilla Python
-FROM python:${python_version} as deps-run
-ARG output_dir
-WORKDIR ${output_dir}/..
-ARG UID
-COPY --chown=${UID} pyproject.toml poetry.lock ./
-COPY --chown=${UID} src/ src/
-COPY --chown=${UID} tests/test_mindeps.py tests/
-COPY --chown=${UID} run ./
-ENV POETRY_DYNAMIC_VERSIONING_BYPASS="0.0.0"
-RUN touch README.md
-RUN ./run deps || echo "Dependencies check failed, results captured"
+FROM task-run as deps-run
+ARG python_version
+RUN ./capture.sh deps ${python_version} tox -e deps
 
 # docs works differently than other tasks because it requires GPU access.
 # The GPU requirement means that the docs image must be run as a container
@@ -151,11 +128,14 @@ FROM task-run as docs
 ARG UID
 COPY --chown=${UID} docs/ docs/
 COPY --chown=${UID} *.md ./
-CMD ./run docs
+CMD tox -e docs
 
 FROM docs as qdocs
-CMD ./run qdocs
+CMD tox -e qdocs
 
+FROM docs as docs-run
+ARG python_version
+RUN ./capture.sh doctest ${python_version} tox -e doctest
 
 ######################## Results layers ########################
 # These layers copy the results of the associated *-run layers into a scratch image in order to keep the created images as small as possible
@@ -176,9 +156,11 @@ COPY --from=lint-run $output_dir $output_dir
 FROM results as deps
 COPY --from=deps-run $output_dir $output_dir
 
+FROM results as doctest
+COPY --from=docs-run $output_dir $output_dir
 
 ######################## Dev container layer ########################
-FROM base as devcontainer
+FROM cuda as devcontainer
 USER root
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -189,14 +171,15 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         openssh-server \
         parallel
 RUN addgroup --gid 1001 docker
-# UID is used when build script dynamically appends COPY --chown=${UID} dependency binaries from pydeps images
-ARG UID
 ARG USER
 RUN usermod -a -G docker ${USER}
 USER ${USER}
-ENV LANGUAGE=en
-ENV LC_ALL=C.UTF-8
-ENV LANG=en_US.UTF-8
 ARG PYENV_ROOT
-ENV PATH=${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:${PATH}
+ARG UV_ROOT
+ENV PATH=${UV_ROOT}:${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:${PATH}
 RUN echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+ARG UID
+RUN mkdir ${HOME}/.cache
+COPY --chown=${UID} --link --from=harbor.jatic.net/daml/main:pybase-3.9 ${PYENV_ROOT} ${PYENV_ROOT}
+COPY --chown=${UID} --link --from=harbor.jatic.net/daml/main:pybase-3.10 ${PYENV_ROOT} ${PYENV_ROOT}
+COPY --chown=${UID} --link --from=harbor.jatic.net/daml/main:pybase-3.11 ${PYENV_ROOT} ${PYENV_ROOT}

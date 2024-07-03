@@ -1,6 +1,9 @@
 // For format details, see https://aka.ms/devcontainer.json.
 {
-  "image": "daml-devcontainer",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "target": "devcontainer"
+  },
 
   "runArgs": [
     "--gpus",
@@ -9,7 +12,8 @@
 
   "mounts": [
     "source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/daml/.gitconfig,type=bind,consistency=cached",
-    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/daml/.ssh,type=bind,consistency=cached"
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/daml/.ssh,type=bind,consistency=cached",
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.cache/uv,target=/home/daml/.cache/uv,type=bind,consistency=cached"
   ],
 
   "features": {
@@ -35,5 +39,5 @@
     }
   },
 
-  "postStartCommand": ".devcontainer/postcreate.sh"
+  "postCreateCommand": [ ".devcontainer/postcreate.sh" ]
 }
