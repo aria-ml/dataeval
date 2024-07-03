@@ -12,8 +12,24 @@ ARG pyenv_with_lto=""
 ARG build_image="build"
 ARG output_dir="/daml/output"
 
-FROM ubuntu:22.04 as pyenv
+
+# Ubuntu 22.04.4 LTS (Jammy Jellyfish)
+# https://releases.ubuntu.com/jammy/
+# Use a static tag since we're only using this image to build Python and install dependencies
+FROM ubuntu:jammy-20240627.1 as ubuntu-base
+ARG UID
+ARG USER
+RUN useradd -m -u ${UID} ${USER}
+USER ${USER}
+ARG HOME
+WORKDIR ${HOME}
+ARG PYENV_ROOT
+ENV PYENV_ROOT=${PYENV_ROOT}
+
+
+FROM ubuntu-base as pyenv
 ENV DEBIAN_FRONTEND noninteractive
+USER root
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
@@ -35,22 +51,14 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         wget \
         xz-utils \
         zlib1g-dev
-ARG UID
 ARG USER
-RUN useradd -m -u ${UID} ${USER}
 USER ${USER}
-ARG HOME
-WORKDIR ${HOME}
 RUN curl https://pyenv.run | bash
 # ENV PYTHON_CONFIGURE_OPTS '--enable-optimizations --with-lto'
 # ENV PYTHON_CFLAGS '-march=native -mtune=native'
 ARG pyenv_enable_opt
 ARG pyenv_with_lto
 ENV PYTHON_CONFIGURE_OPTS="${pyenv_enable_opt} ${pyenv_with_lto}"
-ARG PYENV_ROOT
-ENV PYENV_ROOT=${PYENV_ROOT}
-ENV POETRY_VIRTUALENVS_CREATE=false
-ENV POETRY_INSTALLER_MAX_WORKERS=10
 ARG python_version
 RUN ${PYENV_ROOT}/bin/pyenv install ${python_version}
 
@@ -61,14 +69,8 @@ COPY --from=pyenv ${PYENV_ROOT} ${PYENV_ROOT}
 
 
 FROM ${base_image} as base_image
-FROM ubuntu:22.04 as pydeps-base
+FROM ubuntu-base as pydeps-base
 ARG UID
-ARG USER
-RUN useradd -m -u ${UID} ${USER}
-USER ${USER}
-ARG HOME
-WORKDIR ${HOME}
-ARG PYENV_ROOT
 COPY --chown=${UID} --from=base_image ${PYENV_ROOT} ${PYENV_ROOT}
 ARG python_version
 RUN ${PYENV_ROOT}/versions/${python_version}.*/bin/pip install --no-cache-dir --disable-pip-version-check poetry
