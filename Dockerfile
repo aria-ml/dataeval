@@ -133,6 +133,9 @@ CMD tox -e docs
 FROM docs as qdocs
 CMD tox -e qdocs
 
+FROM docs as docs-run
+ARG python_version
+RUN ./capture.sh doctest ${python_version} tox -e doctest
 
 ######################## Results layers ########################
 # These layers copy the results of the associated *-run layers into a scratch image in order to keep the created images as small as possible
@@ -153,6 +156,8 @@ COPY --from=lint-run $output_dir $output_dir
 FROM results as deps
 COPY --from=deps-run $output_dir $output_dir
 
+FROM results as doctest
+COPY --from=docs-run $output_dir $output_dir
 
 ######################## Dev container layer ########################
 FROM cuda as devcontainer
