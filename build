@@ -15,10 +15,10 @@ Options:
       --push        push all built images to repository
 
 Default:
-  run unit tests and type check for 3.8-3.11 as well as lint and docs
+  run unit tests and type check for 3.9-3.11 as well as lint and docs
 
 Python Versions:
-  3.8-3.11 are supported
+  3.9-3.11 are supported
 
 Tasks:
   unit    run unit tests
@@ -57,7 +57,7 @@ if [[ -f .settings ]]; then
 fi
 
 # declare lookup maps
-declare -A supported_pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1)
+declare -A supported_pvers=([3.9]=1 [3.10]=1 [3.11]=1)
 declare -A supported_tasks=([unit]=1 [type]=1 [lint]=1 [deps]=1)
 declare -A supported_docs=([docs]=1 [qdocs]=1 [doctest]=1)
 
@@ -78,7 +78,7 @@ done
 if [[ $((c_pvers + c_tasks + c_docs)) != $count ]]; then showHelp 1; fi
 
 # set all python versions if none specified
-if [[ $count == 0 || ($c_pvers == 0 && $c_tasks != 0) ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
+if [[ $count == 0 || ($c_pvers == 0 && $c_tasks != 0) ]]; then pvers=([3.9]=1 [3.10]=1 [3.11]=1); fi
 
 # for build_task we should run these specific tasks
 if [[ $build_task ]]; then tasks=([unit]=1 [type]=1 [lint]=1 [deps]=1); fi

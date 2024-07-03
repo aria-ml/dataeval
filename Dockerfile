@@ -180,7 +180,6 @@ ENV PATH=${UV_ROOT}:${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:${PATH}
 RUN echo 'eval "$(pyenv init -)"' >> ~/.bashrc
 ARG UID
 RUN mkdir ${HOME}/.cache
-COPY --chown=${UID} --link --from=harbor.jatic.net/daml/main:pybase-3.8 ${PYENV_ROOT} ${PYENV_ROOT}
 COPY --chown=${UID} --link --from=harbor.jatic.net/daml/main:pybase-3.9 ${PYENV_ROOT} ${PYENV_ROOT}
 COPY --chown=${UID} --link --from=harbor.jatic.net/daml/main:pybase-3.10 ${PYENV_ROOT} ${PYENV_ROOT}
 COPY --chown=${UID} --link --from=harbor.jatic.net/daml/main:pybase-3.11 ${PYENV_ROOT} ${PYENV_ROOT}

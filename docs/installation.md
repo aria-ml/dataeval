@@ -6,7 +6,7 @@ This guide will show you how to install the DAML that fits your needs!
 
 **Supported Python Versions**
 
-We currently support python versions ``3.8 - 3.11``
+We currently support python versions ``3.9 - 3.11``
 
 
 ## Base DAML Packages
