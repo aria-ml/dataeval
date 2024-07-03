@@ -160,7 +160,7 @@ function build_image() {
 
     # build output_arg as appropriate if image needs to be pushed, otherwise just populate the registry cache
     if [[ $image_tag ]]; then
-        output_arg="--output type=image,name=${image_tag}"
+        output_arg="--output type=image,rewrite-timestamp=true,name=${image_tag}"
         if [[ $push_to_repo ]]; then
             output_arg+=",push=true"
         fi
