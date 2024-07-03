@@ -251,7 +251,7 @@ export -f post_build_cleanup
 export -f build_image
 export -f build_and_run
 
-export deps_hash=$(sha256sum poetry.lock | cut -c 1-8)
+export deps_hash=$(sha256sum environment/requirements.txt | cut -c 1-8)
 
 # In CI pipelines use commit branch name or merge request source branch name
 # These are mutually exclusive when set
