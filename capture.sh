@@ -7,7 +7,7 @@ FAILURES=0
 
 set +e
 set -o pipefail
-${@:3} | tee -a $log
+${@:3} 2>&1 | tee -a $log
 exitcode=$?
 set -e
 
