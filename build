@@ -9,17 +9,16 @@ Usage:
 Options:
       --build-base  only build base dependency images
       --build-task  only build task images
-  -d, --devenv      only build the developer environment image
   -h, --help        display this help information
   -q, --quiet       do not print output to console during container execution
       --gpu         enable gpu support on task execution
       --push        push all built images to repository
 
 Default:
-  run unit tests and type check for 3.8-3.11 as well as lint and docs
+  run unit tests and type check for 3.9-3.11 as well as lint and docs
 
 Python Versions:
-  3.8-3.11 are supported
+  3.9-3.11 are supported
 
 Tasks:
   unit    run unit tests
@@ -28,14 +27,15 @@ Tasks:
   deps    run minimum dependency tests
   docs    generate documentation
   qdocs   generate documentation using cached notebooks
+  doctest run documentation tests
 
 Note:
-  lint and docs are always performed on python 3.11
+  docs, qdocs and doctest are always performed on python 3.11
 EOF
 exit $1
 }
 
-options=$(getopt -l "help,quiet,gpu,build-base,build-task,devenv,push" -o "hqd" -n "build" -- "$@")
+options=$(getopt -l "help,quiet,gpu,build-base,build-task,push" -o "hq" -n "build" -- "$@")
 eval set -- "$options"
 while true; do
     case "$1" in
@@ -44,7 +44,6 @@ while true; do
         --gpu)           export gpuflag="--gpus all";;
         --build-base)    build_base=1;;
         --build-task)    build_task=1;;
-        -d|--devenv)     devenv=1;;
         --push)          if [[ ! $CI ]]; then echo "Only CI pipelines should be pushing."; exit 1; else export push_to_repo=1; fi;;
         --)              shift; break;;
     esac
@@ -58,32 +57,34 @@ if [[ -f .settings ]]; then
 fi
 
 # declare lookup maps
-declare -A supported_pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1)
-declare -A supported_tasks=([unit]=1 [type]=1 [lint]=1 [deps]=1 [docs]=1 [qdocs]=1)
+declare -A supported_pvers=([3.9]=1 [3.10]=1 [3.11]=1)
+declare -A supported_tasks=([unit]=1 [type]=1 [lint]=1 [deps]=1)
+declare -A supported_docs=([docs]=1 [qdocs]=1 [doctest]=1)
 
 # generate python and task lists
 declare -A pvers; declare -A tasks;
-count=0; c_pvers=0; c_tasks=0;
+count=0; c_pvers=0; c_tasks=0; c_docs=0;
 
 # validate args
 for arg do
     if [[ $arg == -* ]]; then continue; fi
     if [[ ${supported_pvers["$arg"]} ]]; then pvers[$arg]=1; ((++c_pvers)); fi
     if [[ ${supported_tasks["$arg"]} ]]; then tasks[$arg]=1; ((++c_tasks)); fi
+    if [[ ${supported_docs["$arg"]} ]]; then tasks[$arg]=1; ((++c_docs)); fi
     ((++count))
 done
 
 # show help if arg count mismatch
-if [[ $((c_pvers + c_tasks)) != $count ]]; then showHelp 1; fi
+if [[ $((c_pvers + c_tasks + c_docs)) != $count ]]; then showHelp 1; fi
 
 # set all python versions if none specified
-if [[ $count == 0 || ($c_pvers == 0 && $c_tasks != 0) ]]; then pvers=([3.8]=1 [3.9]=1 [3.10]=1 [3.11]=1); fi
+if [[ $count == 0 || ($c_pvers == 0 && $c_tasks != 0) ]]; then pvers=([3.9]=1 [3.10]=1 [3.11]=1); fi
 
 # for build_task we should run these specific tasks
 if [[ $build_task ]]; then tasks=([unit]=1 [type]=1 [lint]=1 [deps]=1); fi
 
 # set defaults if not specified
-if [[ ! $build_base && ! $build_task && ! $devenv ]]; then
+if [[ ! $build_base && ! $build_task ]]; then
     if [[ $count == 0 || ($c_tasks == 0 && $c_pvers != 0) ]]; then tasks[unit]=1; tasks[type]=1; fi
 fi
 
@@ -91,11 +92,10 @@ fi
 declare -A jobs;
 for task in "${!tasks[@]}"; do
     case "$task" in
-        docs|qdocs) jobs["$task-3.11"]=1;;
+        docs|qdocs|doctest) jobs["$task-3.11"]=1;;
         *) for pver in "${!pvers[@]}"; do jobs["$task-$pver"]=1; done;;
     esac
 done
-if [[ ${tasks[docs]} || ${tasks[qdocs]} ]]; then pvers[3.11]=1; fi
 
 export builder_name="daml"
 if [[ -z $(docker builder ls --format '{{.Name}}' | grep $builder_name) ]]; then
@@ -129,20 +129,15 @@ function build_image() {
         no_cache_filter_arg="--no-cache-filter $(tr ' ' ',' <<< $no_cache_layers)"
     fi
 
+    pybase_tag="${pybase_image}-${python_version}"
     base_tag="${base_image}-${python_version}"
-    deps_tag="${deps_image}-${python_version}"
-    build_tag="${build_image}-${python_version}"
+
+    if [[ $(docker manifest inspect $pybase_tag 2> /dev/null) ]]; then
+        image_args="--build-arg pybase_image=$pybase_tag"
+    fi
 
     if [[ $(docker manifest inspect $base_tag 2> /dev/null) ]]; then
-        image_args="--build-arg base_image=$base_tag"
-    fi
-
-    if [[ $(docker manifest inspect $deps_tag 2> /dev/null) ]]; then
-        image_args="$image_args --build-arg deps_image=$deps_tag"
-    fi
-
-    if [[ $(docker manifest inspect $build_tag 2> /dev/null) ]]; then
-        image_args="$image_args --build-arg build_image=$build_tag"
+        image_args="$image_args --build-arg base_image=$base_tag"
     fi
 
     cache="${tag/\/${image_name}:${branch_prefix}/\/cache:}"
@@ -238,11 +233,9 @@ function ensure_image() {
     python_version=$2
 
     if [[ $target == "pybase" ]]; then
+        tag="${pybase_image}-${python_version}"
+    elif [[ $target == "base" ]]; then
         tag="${base_image}-${python_version}"
-    elif [[ $target == "pydeps" ]]; then
-        tag="${deps_image}-${python_version}"
-    elif [[ $target == "build" ]]; then
-        tag="${build_image}-${python_version}"
     else
         echo "unknown target: ${target}"
         exit 1
@@ -260,7 +253,7 @@ export -f post_build_cleanup
 export -f build_image
 export -f build_and_run
 
-export deps_hash=$(sha256sum poetry.lock | cut -c 1-8)
+export deps_hash=$(sha256sum environment/requirements.txt | cut -c 1-8)
 
 # In CI pipelines use commit branch name or merge request source branch name
 # These are mutually exclusive when set
@@ -285,9 +278,8 @@ else
 fi
 
 export image="harbor.jatic.net/daml/${image_name}"
-export base_image="${image}:${branch_prefix}pybase"
-export deps_image="${image}:${branch_prefix}${deps_hash}-pydeps"
-export build_image="${image}:${branch_prefix}${deps_hash}-build"
+export pybase_image="${image}:${branch_prefix}pybase"
+export base_image="${image}:${branch_prefix}${deps_hash}-base"
 
 if [[ $quiet ]]; then
     verbosity="--quiet"
@@ -300,27 +292,16 @@ START=$(date +%s)
 
 for pver in ${!pvers[@]}; do
     ensure_image pybase $pver
-    ensure_image pydeps $pver
-    if [[ ! $devenv ]]; then
-        ensure_image build $pver
+    ensure_image base $pver
+    if [[ ! $CI || $build_task ]]; then
         # In the CI pipeline - all tasks are prebuilt in the build stage with argument --build-task
-        if [[ ! $CI || $build_task ]]; then
-            for task in ${!tasks[@]}; do
-                # Force a rebuild because unit tests are not currently deterministic
-                build_image "${image}:${branch_prefix}${deps_hash}-${task}-${pver}" $task $pver unit-run
-            done
-        fi
+        for task in ${!tasks[@]}; do
+            build_image "${image}:${branch_prefix}${deps_hash}-${task}-${pver}" ${task} $pver unit-run
+        done
     fi
 done
 
-if [[ $devenv ]]; then
-    echo "Building devcontainer with python ${!pvers[@]}..."
-    (cat Dockerfile && echo ENV versions=\"${!pvers[@]}\" && echo -n ${!pvers[@]} | xargs -d' ' -I{} echo COPY --chown=\${UID}/ --link --from=$deps_image-{} \${PYENV_ROOT}/ \${PYENV_ROOT}/) |
-    docker build $verbosity --tag daml-devcontainer --target devcontainer -
-    docker image prune -f
-fi
-
-if [[ $build_base || $build_task || $devenv ]]; then
+if [[ $build_base || $build_task ]]; then
     exit $?
 fi
 
@@ -335,5 +316,5 @@ echo "Running ${!jobs[@]}..."
 case ${#jobs[@]} in
     0)  showHelp 1;;
     1)  build_and_run ${!jobs[@]};;
-    *)  LANG=C parallel $keep_order --lb --tag 'set -o pipefail; build_and_run' ::: ${!jobs[@]};;
+    *)  parallel $keep_order --lb --tag 'set -o pipefail; build_and_run' ::: ${!jobs[@]};;
 esac

@@ -70,7 +70,7 @@ stages:
 .python_version_matrix:
   parallel:
     matrix:
-      - PYTHON_VERSION: ["3.8", "3.9", "3.10", "3.11"]
+      - PYTHON_VERSION: ["3.9", "3.10", "3.11"]
 
 ### DOCKER TEMPLATES ###
 
@@ -142,6 +142,11 @@ verify lock:
     - pip install poetry
   script:
     - poetry check
+    - poetry config warnings.export false
+    - poetry export --all-extras --without-hashes -o environment/requirements.check
+    - cmp -s environment/requirements.txt environment/requirements.check
+    - poetry export --only=dev --without-hashes -o environment/requirements-dev.check
+    - cmp -s environment/requirements-dev.txt environment/requirements-dev.check
   rules: *on_run
 
 docker info:
