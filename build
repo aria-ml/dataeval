@@ -145,10 +145,6 @@ function build_image() {
         image_args="$image_args --build-arg build_image=$build_tag"
     fi
 
-    python_optimization_args="\
-        --build-arg pyenv_enable_opt=--enable-optimizations \
-        --build-arg pyenv_with_lto=--with-lto"
-
     cache="${tag/\/${image_name}:${branch_prefix}/\/cache:}"
     cache_from_arg="--cache-from type=registry,ref=$cache"
 
@@ -176,7 +172,6 @@ function build_image() {
         --builder $builder_name \
         --build-arg python_version=$python_version \
         $no_cache_filter_arg \
-        $python_optimization_args \
         $image_args \
         $cache_from_arg \
         $cache_to_arg \
