@@ -223,7 +223,7 @@ function build_and_run() {
     fi
 }
 
-function ensure_image() {
+function ensure_base_image() {
     python_version=$1
 
     tag="${base_image}-${python_version}"
@@ -277,7 +277,7 @@ export verbosity
 START=$(date +%s)
 
 for pver in ${!pvers[@]}; do
-    ensure_image $pver
+    ensure_base_image $pver
     if [[ ! $CI || $build_task ]]; then
         # In the CI pipeline - all tasks are prebuilt in the build stage with argument --build-task
         for task in ${!tasks[@]}; do
