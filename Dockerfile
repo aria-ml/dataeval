@@ -76,50 +76,48 @@ FROM ${pybase_image} as pybase_image
 FROM cuda as base
 ARG PYENV_ROOT
 COPY --chown=${UID} --link --from=pybase_image ${PYENV_ROOT} ${PYENV_ROOT}
+ARG UV_ROOT
+ENV VIRTUALENV_SYSTEM_SITE_PACKAGES=1
+ENV PATH ${UV_ROOT}:${PYENV_ROOT}/bin:${PYENV_ROOT}/shims:$PATH
 ARG python_version
+RUN pyenv global ${python_version}
 ARG UID
 COPY --chown=${UID} environment/requirements.txt environment/
-ARG UV_ROOT
-ARG python_version
-ENV PATH ${UV_ROOT}:${PYENV_ROOT}/versions/${python_version}/bin:${PYENV_ROOT}/bin:$PATH
-RUN uv venv --python=$(which ${PYENV_ROOT}/versions/${python_version}.*/bin/python) && \
-    uv pip install -r environment/requirements.txt && \
-    rm -rf .venv
-RUN grep nvidia-cudnn-cu11 environment/requirements.txt | cut -d' ' -f1 | \
-    xargs uv pip install --python=$(which ${PYENV_ROOT}/versions/${python_version}.*/bin/python) tox tox-uv
-RUN ln -s ${PYENV_ROOT}/versions/$(${PYENV_ROOT}/bin/pyenv latest ${python_version}) ${PYENV_ROOT}/versions/${python_version}
+RUN uv pip install --system -r environment/requirements.txt
+COPY --chown=${UID} environment/requirements-dev.txt environment/
+RUN uv pip install --system -r environment/requirements-dev.txt
+RUN uv pip install --system tox tox-uv
 ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${PYENV_ROOT}/versions/${python_version}/lib/python${python_version}/site-packages/nvidia/cudnn/lib
 
 
 ######################## Build task layers ########################
 # The *-run layers run individual tasks and capture the results
-FROM ${base_image} as task-run
+FROM base as task-run
 ARG UID
 RUN touch README.md
 COPY --chown=${UID} pyproject.toml poetry.lock ./
 COPY --chown=${UID} src/ src/
 COPY --chown=${UID} tests/ tests/
 COPY --chown=${UID} tox.ini ./
-COPY --chown=${UID} environment/requirements-dev.txt environment/
 COPY --chown=${UID} capture.sh ./
 ARG output_dir
 RUN mkdir -p $output_dir
 
-FROM task-run as unit-run
+FROM task-run as unit
 ARG python_version
-RUN ./capture.sh unit ${python_version} tox -e py$(echo ${python_version} | sed "s/\.//g")
+RUN ./capture.sh unit ${python_version} python -m tox -e py$(echo ${python_version} | sed "s/\.//g")
 
-FROM task-run as type-run
+FROM task-run as type
 ARG python_version
-RUN ./capture.sh type ${python_version} tox -e type-py$(echo ${python_version} | sed "s/\.//g")
+RUN ./capture.sh type ${python_version} python -m tox -e type-py$(echo ${python_version} | sed "s/\.//g")
 
-FROM task-run as lint-run
+FROM task-run as lint
 ARG python_version
-RUN ./capture.sh lint ${python_version} tox -e lint
+RUN ./capture.sh lint ${python_version} python -m tox -e lint
 
-FROM task-run as deps-run
+FROM task-run as deps
 ARG python_version
-RUN ./capture.sh deps ${python_version} tox -e deps
+RUN ./capture.sh deps ${python_version} python -m tox -e deps
 
 # docs works differently than other tasks because it requires GPU access.
 # The GPU requirement means that the docs image must be run as a container
@@ -128,36 +126,14 @@ FROM task-run as docs
 ARG UID
 COPY --chown=${UID} docs/ docs/
 COPY --chown=${UID} *.md ./
-CMD tox -e docs
+CMD python -m tox -e docs
 
 FROM docs as qdocs
-CMD tox -e qdocs
+CMD python -m tox -e qdocs
 
 FROM docs as docs-run
 ARG python_version
-RUN ./capture.sh doctest ${python_version} tox -e doctest
-
-######################## Results layers ########################
-# These layers copy the results of the associated *-run layers into a scratch image in order to keep the created images as small as possible
-FROM busybox as results
-ARG output_dir
-ENV output_dir=${output_dir}
-CMD cat ${output_dir}/*.log && exit $(cat ${output_dir}/*-exitcode)
-
-FROM results as unit
-COPY --from=unit-run $output_dir $output_dir
-
-FROM results as type
-COPY --from=type-run $output_dir $output_dir
-
-FROM results as lint
-COPY --from=lint-run $output_dir $output_dir
-
-FROM results as deps
-COPY --from=deps-run $output_dir $output_dir
-
-FROM results as doctest
-COPY --from=docs-run $output_dir $output_dir
+RUN ./capture.sh doctest ${python_version} python -m tox -e doctest
 
 ######################## Dev container layer ########################
 FROM cuda as devcontainer
