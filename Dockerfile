@@ -4,7 +4,6 @@ ARG USER="daml"
 ARG UID="1000"
 ARG HOME="/home/$USER"
 ARG PYENV_ROOT="$HOME/.pyenv"
-ARG UV_ROOT="$HOME/.cargo/bin"
 ARG python_version="3.11"
 ARG base_image="base"
 ARG output_dir="/daml/output"
@@ -54,7 +53,7 @@ COPY --from=pyenv ${PYENV_ROOT} ${PYENV_ROOT}
 FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 as cuda
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends curl libgl1
+    apt-get update && apt-get install -y --no-install-recommends libgl1
 ARG UID
 ARG USER
 RUN useradd -m -u ${UID} -s /bin/bash ${USER}
@@ -68,25 +67,21 @@ ENV UV_INDEX_STRATEGY=unsafe-best-match
 ENV LANGUAGE=en
 ENV LC_ALL=C.UTF-8
 ENV LANG=en_US.UTF-8
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 
 FROM cuda as base
+ARG UID
 ARG PYENV_ROOT
 COPY --chown=${UID} --link --from=pybase ${PYENV_ROOT} ${PYENV_ROOT}
+ENV PATH ${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:$PATH
 ARG python_version
-ARG UID
+RUN pyenv global ${python_version}
+RUN pip install tox tox-uv uv --no-cache
+RUN uv venv
 COPY --chown=${UID} environment/requirements.txt environment/
-ARG UV_ROOT
-ARG python_version
-ENV PATH ${UV_ROOT}:${PYENV_ROOT}/versions/${python_version}/bin:${PYENV_ROOT}/bin:$PATH
-RUN uv venv --python=$(which ${PYENV_ROOT}/versions/${python_version}.*/bin/python) && \
-    uv pip install -r environment/requirements.txt && \
-    rm -rf .venv
-RUN grep nvidia-cudnn-cu11 environment/requirements.txt | cut -d' ' -f1 | \
-    xargs uv pip install --python=$(which ${PYENV_ROOT}/versions/${python_version}.*/bin/python) tox tox-uv
-RUN ln -s ${PYENV_ROOT}/versions/$(${PYENV_ROOT}/bin/pyenv latest ${python_version}) ${PYENV_ROOT}/versions/${python_version}
-ENV LD_LIBRARY_PATH /usr/local/cuda/lib64:${PYENV_ROOT}/versions/${python_version}/lib/python${python_version}/site-packages/nvidia/cudnn/lib
+RUN uv pip install -r environment/requirements.txt
+COPY --chown=${UID} environment/requirements-dev.txt environment/
+RUN uv pip install -r environment/requirements-dev.txt
 
 
 ######################## Build task layers ########################
@@ -98,21 +93,24 @@ COPY --chown=${UID} pyproject.toml poetry.lock ./
 COPY --chown=${UID} src/ src/
 COPY --chown=${UID} tests/ tests/
 COPY --chown=${UID} tox.ini ./
-COPY --chown=${UID} environment/requirements-dev.txt environment/
 COPY --chown=${UID} capture.sh ./
 ARG output_dir
 RUN mkdir -p $output_dir
+RUN mkdir -p .tox
 
 FROM task-run as unit-run
 ARG python_version
+RUN ln -s /daml/.venv .tox/py$(echo ${python_version} | sed "s/\.//g")
 RUN ./capture.sh unit ${python_version} tox -e py$(echo ${python_version} | sed "s/\.//g")
 
 FROM task-run as type-run
 ARG python_version
+RUN ln -s /daml/.venv .tox/type-py$(echo ${python_version} | sed "s/\.//g")
 RUN ./capture.sh type ${python_version} tox -e type-py$(echo ${python_version} | sed "s/\.//g")
 
 FROM task-run as lint-run
 ARG python_version
+RUN ln -s /daml/.venv .tox/lint
 RUN ./capture.sh lint ${python_version} tox -e lint
 
 FROM task-run as deps-run
@@ -122,17 +120,22 @@ RUN ./capture.sh deps ${python_version} tox -e deps
 # docs works differently than other tasks because it requires GPU access.
 # The GPU requirement means that the docs image must be run as a container
 # since there's no access to GPU during the build.
-FROM task-run as docs
+FROM task-run as task-docs
 ARG UID
 COPY --chown=${UID} docs/ docs/
 COPY --chown=${UID} *.md ./
+
+FROM task-docs as docs
+RUN ln -s /daml/.venv .tox/docs
 CMD tox -e docs
 
-FROM docs as qdocs
+FROM task-docs as qdocs
+RUN ln -s /daml/.venv .tox/qdocs
 CMD tox -e qdocs
 
-FROM docs as docs-run
+FROM task-docs as docs-run
 ARG python_version
+RUN ln -s /daml/.venv .tox/doctest
 RUN ./capture.sh doctest ${python_version} tox -e doctest
 
 ######################## Results layers ########################
@@ -163,6 +166,7 @@ USER root
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
+        curl \
         git \
         git-lfs \
         gnupg2 \
@@ -172,12 +176,11 @@ RUN addgroup --gid 1001 docker
 ARG USER
 RUN usermod -a -G docker ${USER}
 USER ${USER}
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ARG PYENV_ROOT
-ARG UV_ROOT
-ENV PATH=${UV_ROOT}:${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:${PATH}
+ENV PATH=${HOME}/.cargo/bin:${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:${PATH}
 RUN echo 'eval "$(pyenv init -)"' >> ~/.bashrc
 ARG UID
-RUN mkdir ${HOME}/.cache
 COPY --chown=${UID} --link --from=harbor.jatic.net/daml/main:pybase-3.9 ${PYENV_ROOT} ${PYENV_ROOT}
 COPY --chown=${UID} --link --from=harbor.jatic.net/daml/main:pybase-3.10 ${PYENV_ROOT} ${PYENV_ROOT}
 COPY --chown=${UID} --link --from=harbor.jatic.net/daml/main:pybase-3.11 ${PYENV_ROOT} ${PYENV_ROOT}
