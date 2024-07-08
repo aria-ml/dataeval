@@ -24,11 +24,11 @@ if [ -z "$versions" ]; then
     exit 1
 fi
 if [ ! -f ~/.cargo/bin/uv ]; then curl -LsSf https://astral.sh/uv/install.sh | sh; fi
-export UV_INDEX_STRATEGY=unsafe-best-match
 echo ${versions} | tr ' ' '\n' > .python-version
 echo -n ${versions} | xargs -n1 bash -c '\
     echo "Installing in python $0..." && \
     export UV_PYTHON=$(which ${PYENV_ROOT}/versions/$0.*/bin/python) && \
+    export UV_INDEX_STRATEGY=unsafe-best-match && \
     uv pip install \
         -e . \
         -r environment/requirements.txt \
