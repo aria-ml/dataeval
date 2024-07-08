@@ -27,7 +27,7 @@ sd_hide_title: true
 ```{rubric} **Welcome to DAML's Documentation**
 ```
 
-DAML, the *Data Analysis and Monitoring Library*, is an open-source toolkit that focuses on characterizing image data and its impact on model performance across classification and object-detection tasks.
+DAML, the *Data-Analysis Metrics Library*, is an open-source toolkit that focuses on characterizing image data and its impact on model performance across classification and object-detection tasks.
 
 :::
 
@@ -41,7 +41,6 @@ Guides
 ### [Installation](installation)
 
 If DAML is not installed, follow this easy [step-by-step guide](installation.md)
-
 
 ### [Quickstart Tutorials](tutorials/index)
 
@@ -61,11 +60,9 @@ We want to show visualizations of tutorials to peak the interest of a potential 
 
 DAML is a powerful toolkit for any data analysis workflow, so be sure to check out the **Quickstart Tutorials** page for a more comprehensive list of all the tools we offer.
 
-
 ### [How-To's](how_to/index)
 
 For the more experienced user, or if you are just curious, these guides show different ways that DAML's features can be used that might fit operational use more closely
-
 
 Development
 ------------
