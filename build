@@ -261,7 +261,7 @@ if [[ $branch_name == $main_branch ]]; then
     export image_name="main"
 else
     export image_name="dev"
-    export branch_prefix="${branch_name}-"
+    export branch_prefix="${branch_name/[^a-zA-Z0-9]/-}-"
 fi
 
 export image="harbor.jatic.net/daml/${image_name}"
