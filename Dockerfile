@@ -49,6 +49,20 @@ ARG PYENV_ROOT
 COPY --from=pyenv ${PYENV_ROOT} ${PYENV_ROOT}
 
 
+######################## Data layer ########################
+FROM python:3.11 as data
+RUN pip install --no-cache \
+    tensorflow-cpu==2.15.1 \
+    tensorflow-datasets==4.9.3 \
+    --extra-index-url https://download.pytorch.org/whl/cpu \
+    torch==2.1.2+cpu \
+    torchvision==0.16.2+cpu
+WORKDIR /docs
+RUN mkdir -p tutorials/notebooks
+COPY docs/conf.py conf.py
+RUN python -c "import conf; conf.predownload_data();"
+
+
 # Base image for build runs and devcontainers
 FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 as cuda
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -122,6 +136,10 @@ RUN ./capture.sh deps ${python_version} tox -e deps
 # since there's no access to GPU during the build.
 FROM task-run as task-docs
 ARG UID
+ARG HOME
+COPY --link --chown=${UID} --from=data /root/tensorflow_datasets ${HOME}/tensorflow_datasets
+COPY --link --chown=${UID} --from=data /root/.keras ${HOME}/.keras
+COPY --link --chown=${UID} --from=data /docs docs
 COPY --chown=${UID} docs/ docs/
 COPY --chown=${UID} *.md ./
 
@@ -137,6 +155,7 @@ FROM task-docs as docs-run
 ARG python_version
 RUN ln -s /daml/.venv .tox/doctest
 RUN ./capture.sh doctest ${python_version} tox -e doctest
+
 
 ######################## Results layers ########################
 # These layers copy the results of the associated *-run layers into a scratch image in order to keep the created images as small as possible
@@ -159,6 +178,7 @@ COPY --from=deps-run $output_dir $output_dir
 
 FROM results as doctest
 COPY --from=docs-run $output_dir $output_dir
+
 
 ######################## Dev container layer ########################
 FROM cuda as devcontainer
