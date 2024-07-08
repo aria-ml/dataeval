@@ -50,7 +50,7 @@ COPY --from=pyenv ${PYENV_ROOT} ${PYENV_ROOT}
 
 
 ######################## Data layer ########################
-FROM python:3.11 as data-base
+FROM python:3.11 as data
 RUN pip install --no-cache \
     tensorflow-cpu==2.15.1 \
     tensorflow-datasets==4.9.3 \
@@ -61,13 +61,6 @@ WORKDIR /docs
 RUN mkdir -p tutorials/notebooks
 COPY docs/conf.py conf.py
 RUN python -c "import conf; conf.predownload_data();"
-
-
-FROM scratch as data
-ARG UID
-COPY --chown=${UID} --from=data-base /root/tensorflow_datasets /data/tensorflow_datasets
-COPY --chown=${UID} --from=data-base /root/.keras /data/.keras
-COPY --chown=${UID} --from=data-base /docs /data/docs
 
 
 # Base image for build runs and devcontainers
@@ -144,9 +137,9 @@ RUN ./capture.sh deps ${python_version} tox -e deps
 FROM task-run as task-docs
 ARG UID
 ARG HOME
-COPY --chown=${UID} --from=data data/docs/ docs/
-COPY --chown=${UID} --from=data data/.keras ${HOME}/.keras
-COPY --chown=${UID} --from=data data/tensorflow_datasets/ ${HOME}/tensorflow_datasets/
+COPY --link --chown=${UID} --from=data /root/tensorflow_datasets ${HOME}/tensorflow_datasets
+COPY --link --chown=${UID} --from=data /root/.keras ${HOME}/.keras
+COPY --link --chown=${UID} --from=data /docs docs
 COPY --chown=${UID} docs/ docs/
 COPY --chown=${UID} *.md ./
 
