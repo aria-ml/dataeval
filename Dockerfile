@@ -51,16 +51,16 @@ COPY --from=pyenv ${PYENV_ROOT} ${PYENV_ROOT}
 
 ######################## Data layer ########################
 FROM python:3.11 as data-base
-ENV VIRTUAL_ENV=/home/packages/.venv
-ADD https://astral.sh/uv/install.sh /install.sh
-RUN chmod -R 655 /install.sh && /install.sh && rm /install.sh
-RUN mkdir -p docs/tutorials/notebooks/data
-RUN /root/.cargo/bin/uv venv /home/packages/.venv
-RUN /root/.cargo/bin/uv pip install --no-cache tensorflow-cpu==2.15.1 tensorflow-datasets==4.9.3 --extra-index-url https://download.pytorch.org/whl/cpu torch==2.1.2+cpu torchvision==0.16.2+cpu
+RUN pip install --no-cache \
+    tensorflow-cpu==2.15.1 \
+    tensorflow-datasets==4.9.3 \
+    --extra-index-url https://download.pytorch.org/whl/cpu \
+    torch==2.1.2+cpu \
+    torchvision==0.16.2+cpu
 WORKDIR /docs
 RUN mkdir -p tutorials/notebooks
 COPY docs/conf.py conf.py
-RUN /home/packages/.venv/bin/python -c "import conf; conf.predownload_data();"
+RUN python -c "import conf; conf.predownload_data();"
 
 
 FROM scratch as data
