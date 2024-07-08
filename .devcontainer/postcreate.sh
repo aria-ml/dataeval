@@ -28,7 +28,7 @@ echo ${versions} | tr ' ' '\n' > .python-version
 echo -n ${versions} | xargs -n1 bash -c '\
     echo "Installing in python $0..." && \
     export UV_PYTHON=$(which ${PYENV_ROOT}/versions/$0.*/bin/python) && \
-    uv pip install tensorflow-datasets && \
+    export UV_INDEX_STRATEGY=unsafe-best-match && \
     uv pip install \
         -e . \
         -r environment/requirements.txt \
