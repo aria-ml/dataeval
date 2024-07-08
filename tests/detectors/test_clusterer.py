@@ -461,9 +461,9 @@ class TestClusterOutliers:
     @pytest.mark.parametrize(
         "indices",
         [
-            list(range(5)),
-            list(range(5)) * -1,
-            np.random.randint(0, 100, size=5),
+            list(range(4)),
+            list(range(4)) * -1,
+            np.random.randint(0, 100, size=4),
         ],
     )
     def test_outliers(self, indices):

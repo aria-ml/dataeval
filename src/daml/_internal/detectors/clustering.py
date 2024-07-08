@@ -368,15 +368,29 @@ class Clusterer:
         """
         outliers = set()
         possible_outliers = set()
+        already_seen = set()
+        last_level = {}
+
+        for level, cluster_set in self.clusters.items():
+            for cluster_id, cluster in cluster_set.items():
+                if cluster_id in last_merge_levels:
+                    last_level[cluster_id] = level
 
         for level, cluster_set in self.clusters.items():
             for cluster_id, cluster in cluster_set.items():
                 if not cluster.merged and cluster_id in last_merge_levels and level > last_merge_levels[cluster_id]:
-                    if cluster.out2:
+                    if cluster_id in already_seen and cluster.samples[-1] not in outliers:
                         outliers.add(cluster.samples[-1])
+                    elif cluster.out2:
+                        if len(cluster.samples) < self._min_num_samples_per_cluster:
+                            outliers.update(cluster.samples.tolist())
+                        elif cluster.samples[-1] not in outliers:
+                            outliers.add(cluster.samples[-1])
+                        if cluster_id not in already_seen:
+                            already_seen.add(cluster_id)
                     elif cluster.out1 and len(cluster.samples) >= self._min_num_samples_per_cluster:
                         possible_outliers.add(cluster.samples[-1])
-                    elif len(cluster.samples) < self._min_num_samples_per_cluster:
+                    elif level == last_level[cluster_id] and len(cluster.samples) < self._min_num_samples_per_cluster:
                         outliers.update(cluster.samples.tolist())
 
         return sorted(outliers), sorted(possible_outliers)
