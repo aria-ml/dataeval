@@ -5,11 +5,12 @@ import numpy.testing as npt
 import pytest
 import sklearn.datasets as dsets
 
-from daml._internal.detectors.clustering import (
+from daml._internal.detectors.clusterer import (
     Cluster,
     Clusterer,
     ClusterMergeEntry,
     ClusterPosition,
+    Clusters,
     extend_linkage,
 )
 
@@ -273,7 +274,8 @@ class TestClustererInit:
         assert cl._larr is not None
         assert cl._max_clusters is not None
         assert cl._min_num_samples_per_cluster is not None
-        assert cl._clusters == {}
+        assert cl._clusters is None
+        assert cl._last_good_merge_levels is None
 
     @pytest.mark.parametrize(
         "shape",
@@ -313,21 +315,23 @@ class TestCreateClusters:
     def test_fill_level(self):
         """Merged clusters fill levels with missing cluster data"""
         dummy_data = Cluster(False, np.ndarray([0]), 0.0, True)
-        x = {
-            0: {
-                0: dummy_data,
-                1: dummy_data,
-            },
-            1: {
-                0: dummy_data,
-            },
-            2: {
-                0: dummy_data,
-            },
-            3: {
-                0: dummy_data,
-            },
-        }
+        x = Clusters(
+            {
+                0: {
+                    0: dummy_data,
+                    1: dummy_data,
+                },
+                1: {
+                    0: dummy_data,
+                },
+                2: {
+                    0: dummy_data,
+                },
+                3: {
+                    0: dummy_data,
+                },
+            }
+        )
 
         # Fill 0,1 up to 2,1
         filled_clusters = self.clusterer._fill_levels(x, ClusterPosition(0, 1), ClusterPosition(2, 1))
@@ -352,10 +356,10 @@ class TestCreateClusters:
 
         # Max level and max clusters are empirically correct
         n = len(dataset)
-        assert clusterer._max_level <= n  # Max levels must be less than samples
-        assert clusterer._max_clusters <= n // 2  # Minimum 2 samples for a valid cluster
-        assert clusterer._max_level >= 1
         assert clusterer._max_clusters >= 1
+        assert clusterer._max_clusters <= n // 2  # Minimum 2 samples for a valid cluster
+        assert clusters.max_level >= 1
+        assert clusters.max_level <= n  # Max levels must be less than samples
 
         result_all_levels = {}
         result_all_clusters = {}
@@ -374,7 +378,7 @@ class TestCreateClusters:
                 all_samples.update(set(samples))
             # Max of all clusters, checking at each level
             result_all_clusters.update(cluster_id_dict)
-        result_all_levels = set(clusterer._clusters)
+        result_all_levels = set(clusters)  # type: ignore
 
         result_max_cluster = max(result_all_clusters)
         result_max_level = max(result_all_levels)
@@ -384,7 +388,7 @@ class TestCreateClusters:
         assert len(result_all_clusters) == result_max_cluster + 1
 
         # Confirm that over all results, last level has all samples
-        last_level_results = clusterer._clusters.get(result_max_level)
+        last_level_results = clusters.get(result_max_level)
         assert last_level_results is not None
         # Should only contain one cluster
         last_level_cluster = list(last_level_results.values())
@@ -401,7 +405,7 @@ class TestCreateClusters:
     def test_skip_create_clusters(self, functional_data):
         c = Clusterer(functional_data)
         x = {0: {0: Cluster(0, np.array([0]), np.array([0]))}}
-        c._clusters = x
+        c._clusters = x  # type: ignore
 
         assert c.clusters == x
 
@@ -423,7 +427,7 @@ class TestClusterOutliers:
     def test_find_outliers(self, cluster: Cluster, outs, pouts):
         """Specified outliers are added to lists"""
 
-        x = {1: {0: cluster}}
+        x = Clusters({1: {0: cluster}})
         last_merge_levels = {0: 0}
 
         c = Clusterer(np.zeros((3, 1)))
@@ -446,7 +450,7 @@ class TestClusterOutliers:
     )
     def test_no_outliers(self, mid, cid, merge_lvl, cluster):
         """No outliers are found"""
-        x = {1: {cid: cluster}}
+        x = Clusters({1: {cid: cluster}})
 
         last_merge_levels = {mid: merge_lvl}
 

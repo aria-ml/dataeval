@@ -67,6 +67,12 @@ class Cluster:
         return f"{self.__class__.__name__}(**{repr(_params)})"
 
 
+class Clusters(Dict[int, Dict[int, Cluster]]):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.max_level: int = 1
+
+
 class ClusterPosition(NamedTuple):
     """Keeps track of a cluster's level and ID"""
 
@@ -113,13 +119,12 @@ class Clusterer:
         self._sqdmat: np.ndarray = squareform(self._darr)
         self._larr: np.ndarray = extend_linkage(linkage(self._darr))
         self._max_clusters: int = np.count_nonzero(self._larr[:, 3] == 2)
-        self._max_level: int = 1
 
         min_num = int(self._num_samples * 0.05)
         self._min_num_samples_per_cluster = min(max(2, min_num), 100)
 
-        self._clusters: Dict[int, Dict[int, Cluster]] = {}  # Dictionary to store clusters
-        self._last_good_merge_levels: Dict = {}
+        self._clusters = None
+        self._last_good_merge_levels = None
 
     @property
     def data(self) -> np.ndarray:
@@ -130,14 +135,14 @@ class Clusterer:
         self._on_init(x)
 
     @property
-    def clusters(self) -> Dict[int, Dict[int, Cluster]]:
-        if not self._clusters:
+    def clusters(self) -> Clusters:
+        if self._clusters is None:
             self._clusters = self._create_clusters()
         return self._clusters
 
     @property
     def last_good_merge_levels(self) -> Dict[int, int]:
-        if not self._last_good_merge_levels:
+        if self._last_good_merge_levels is None:
             self._last_good_merge_levels = self._get_last_merge_levels()
         return self._last_good_merge_levels
 
@@ -157,11 +162,11 @@ class Clusterer:
         if features < 1:
             raise ValueError(f"Samples should have at least 1 feature; got {features}")
 
-    def _create_clusters(self) -> Dict[int, Dict[int, Cluster]]:
+    def _create_clusters(self) -> Clusters:
         """Generates clusters based on linkage matrix"""
         next_cluster_id = 0
         cluster_map: Dict[int, ClusterPosition] = {}  # Dictionary to associate new cluster ids with actual clusters
-        clusters: Dict[int, Dict[int, Cluster]] = {}
+        clusters: Clusters = Clusters()
 
         # Walking through the linkage array to generate clusters
         for arr_i in self._larr:
@@ -184,7 +189,7 @@ class Clusterer:
                 level, cid = max(left.level, right.level) + 1, min(left.cid, right.cid)
 
                 # Only tracking the levels in which clusters merge for the cluster distance matrix
-                self._max_level = max(self._max_level, left.level, right.level)
+                clusters.max_level = max(clusters.max_level, left.level, right.level)
                 # Update clusters to include previously skipped levels
                 clusters = self._fill_levels(clusters, left, right)
             elif left or right:
@@ -207,9 +212,7 @@ class Clusterer:
 
         return clusters
 
-    def _fill_levels(
-        self, clusters: Dict[int, Dict[int, Cluster]], left: ClusterPosition, right: ClusterPosition
-    ) -> Dict[int, Dict[int, Cluster]]:
+    def _fill_levels(self, clusters: Clusters, left: ClusterPosition, right: ClusterPosition) -> Clusters:
         # Sets each level's cluster info if it does not exist
         if left.level != right.level:
             (level, cid), max_level = (left, right[0]) if left[0] < right[0] else (right, left[0])
@@ -220,21 +223,19 @@ class Clusterer:
 
     def _get_cluster_distances(self) -> np.ndarray:
         """Calculates the minimum distances between clusters are each level"""
-        # Must call self.clusters before creating matrix because
-        # self._max_level and self._max_clusters are calculated by self.clusters property
-        clusters = self.clusters
         # Cluster distance matrix
-        cluster_matrix = np.full((self._max_level, self._max_clusters, self._max_clusters), -1.0, dtype=np.float32)
+        max_level = self.clusters.max_level
+        cluster_matrix = np.full((max_level, self._max_clusters, self._max_clusters), -1.0, dtype=np.float32)
 
-        for level, cluster_set in clusters.items():
-            if level < self._max_level:
+        for level, cluster_set in self.clusters.items():
+            if level < max_level:
                 cluster_ids = sorted(cluster_set.keys())
                 for i, cluster_id in enumerate(cluster_ids):
-                    cluster_matrix[level, cluster_id, cluster_id] = clusters[level][cluster_id].dist_avg
+                    cluster_matrix[level, cluster_id, cluster_id] = self.clusters[level][cluster_id].dist_avg
                     for int_id in range(i + 1, len(cluster_ids)):
                         compare_id = cluster_ids[int_id]
-                        sample_a = clusters[level][cluster_id].samples
-                        sample_b = clusters[level][compare_id].samples
+                        sample_a = self.clusters[level][cluster_id].samples
+                        sample_b = self.clusters[level][compare_id].samples
                         min_mat = self._sqdmat[np.ix_(sample_a, sample_b)].min()
                         cluster_matrix[level, cluster_id, compare_id] = min_mat
                         cluster_matrix[level, compare_id, cluster_id] = min_mat

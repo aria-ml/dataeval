@@ -61,8 +61,6 @@ class Parity:
         self._validate_dist(expected_dist, f"expected for {np.sum(observed_dist)} observations")
         self._validate_class_balance(expected_dist, observed_dist)
 
-        
-
         self._observed_dist = observed_dist
         self._expected_dist = expected_dist
 
