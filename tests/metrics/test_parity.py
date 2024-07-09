@@ -75,7 +75,7 @@ class TestLabelIndependenceUnit:
 
         with pytest.warns():
             Parity(labels_expected, labels_observed)
-    
+
     def test_warns_with_not_enough_frequency_rescaled_exp(self):
         f_exp = [10, 10000]
         f_obs = [100, 400]

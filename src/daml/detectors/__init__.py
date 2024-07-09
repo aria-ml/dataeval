@@ -1,12 +1,13 @@
 from importlib.util import find_spec
 
+from daml._internal.detectors.clusterer import Clusterer
 from daml._internal.detectors.drift.base import LastSeenUpdate, ReservoirSamplingUpdate
 from daml._internal.detectors.drift.cvm import DriftCVM
 from daml._internal.detectors.drift.ks import DriftKS
 from daml._internal.detectors.duplicates import Duplicates
 from daml._internal.detectors.linter import Linter
 
-__all__ = ["Duplicates", "Linter", "DriftCVM", "DriftKS", "LastSeenUpdate", "ReservoirSamplingUpdate"]
+__all__ = ["Clusterer", "Duplicates", "Linter", "DriftCVM", "DriftKS", "LastSeenUpdate", "ReservoirSamplingUpdate"]
 
 if find_spec("torch") is not None:  # pragma: no cover
     from daml._internal.detectors.drift.mmd import DriftMMD
