@@ -8,6 +8,7 @@ ARG python_version="3.11"
 ARG base_image="base"
 ARG output_dir="/daml/output"
 
+######################## pyenv layer ########################
 FROM ubuntu:22.04 as pyenv
 ENV DEBIAN_FRONTEND noninteractive
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -31,25 +32,21 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         wget \
         xz-utils \
         zlib1g-dev
-ARG UID
 ARG USER
-RUN useradd -m -u ${UID} ${USER}
+RUN useradd -m ${USER}
 USER ${USER}
-ARG HOME
-WORKDIR ${HOME}
 RUN curl https://pyenv.run | bash
+ENV PYTHON_CONFIGURE_OPTS "--enable-optimizations --with-lto"
 ARG PYENV_ROOT
-ENV PYENV_ROOT=${PYENV_ROOT}
 ARG python_version
 RUN ${PYENV_ROOT}/bin/pyenv install ${python_version}
-
 
 FROM scratch as pybase
 ARG PYENV_ROOT
 COPY --from=pyenv ${PYENV_ROOT} ${PYENV_ROOT}
 
 
-######################## Data layer ########################
+######################## data layer ########################
 FROM python:3.11 as data
 RUN pip install --no-cache \
     tensorflow-cpu==2.15.1 \
@@ -63,7 +60,7 @@ COPY docs/conf.py conf.py
 RUN python -c "import conf; conf.predownload_data();"
 
 
-# Base image for build runs and devcontainers
+######################## shared cuda layer ########################
 FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 as cuda
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -83,6 +80,7 @@ ENV LC_ALL=C.UTF-8
 ENV LANG=en_US.UTF-8
 
 
+######################## base task layer ########################
 FROM cuda as base
 ARG UID
 ARG PYENV_ROOT
@@ -98,7 +96,7 @@ COPY --chown=${UID} environment/requirements-dev.txt environment/
 RUN uv pip install -r environment/requirements-dev.txt
 
 
-######################## Build task layers ########################
+######################## task layers ########################
 # The *-run layers run individual tasks and capture the results
 FROM ${base_image} as task-run
 ARG UID
@@ -157,7 +155,7 @@ RUN ln -s /daml/.venv .tox/doctest
 RUN ./capture.sh doctest ${python_version} tox -e doctest
 
 
-######################## Results layers ########################
+######################## results layers ########################
 # These layers copy the results of the associated *-run layers into a scratch image in order to keep the created images as small as possible
 FROM busybox as results
 ARG output_dir
@@ -180,7 +178,7 @@ FROM results as doctest
 COPY --from=docs-run $output_dir $output_dir
 
 
-######################## Dev container layer ########################
+######################## devcontainer layer ########################
 FROM cuda as devcontainer
 USER root
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
