@@ -1,5 +1,5 @@
 import math
-from typing import Optional, Tuple
+from typing import Literal, Tuple
 
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
@@ -7,33 +7,30 @@ from scipy.spatial.distance import pdist, squareform
 
 class Coverage:
     """
-     Class for evaluating coverage and identifying images/samples which are in undercovered regions.
+    Class for evaluating coverage and identifying images/samples that are in undercovered regions.
 
-     Idea behind this implementation comes from https://dl.acm.org/doi/abs/10.1145/3448016.3457315.
+    This implementation is based on https://dl.acm.org/doi/abs/10.1145/3448016.3457315.
 
-     Parameters
-     ----------
-     embeddings : np.ndarray
-         n x p array of image embeddings from the dataset (reduced in dimension with an autoencoder or similar).
-        note: Embeddings should be on the unit interval.
-     radius_type : Optional[str]
-         Either "naive" or "adaptive", denoting the type of radius to consider for coverage (default = adaptive).
-    k: int
-        Number of observations required in order to be covered. Default is 20 (based on the above paper and
-          the central limit theorem).
-    percent: np.float64
-         Percent of observations to be considered uncovered. Only applies to adaptive radius (default is 0.01).
+    Parameters
+    ----------
+    embeddings : np.ndarray
+        n x p array of image embeddings from the dataset.
+    radius_type : Literal["adaptive", "naive"], default "adaptive"
+        The function used to determine radius.
+    k: int, default 20
+        Number of observations required in order to be covered.
+    percent: np.float64, default np.float(0.01)
+        Percent of observations to be considered uncovered. Only applies to adaptive radius.
 
-    Raises
-    ------
-    ValueError
-         If radius type is not one of the two accepted values.
+    Note
+    ----
+    Embeddings should be on the unit interval.
     """
 
     def __init__(
         self,
         embeddings: np.ndarray,
-        radius_type: Optional[str] = "adaptive",
+        radius_type: Literal["adaptive", "naive"] = "adaptive",
         k: int = 20,
         percent: np.float64 = np.float64(0.01),
     ):
@@ -47,21 +44,25 @@ class Coverage:
         Perform a one-way chi-squared test between observation frequencies and expected frequencies that
         tests the null hypothesis that the observed data has the expected frequencies.
 
-        This function acts as an interface to the scipy.stats.chisquare method, which is documented at
-        https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.chisquare.html
-
         Returns
         -------
         np.ndarray
             Array of uncovered indices
         np.ndarray
             Array of critical value radii
+
+        Raises
+        ------
+        ValueError
+            If length of embeddings is less than or equal to k
+        ValueError
+            If radius_type is unknown
         """
 
-        # Calculate distance matrix, look at the (k+1)st farthest neighbor for each image.
+        # Calculate distance matrix, look at the (k+1)th farthest neighbor for each image.
         n = len(self.embeddings)
         if n <= self.k:
-            raise ValueError("Number of observations less than specified number of neighbors.")
+            raise ValueError("Number of observations less than or equal to the specified number of neighbors.")
         mat = squareform(pdist(self.embeddings))
         sorted_dists = np.sort(mat, axis=1)
         crit = sorted_dists[:, self.k + 1]
