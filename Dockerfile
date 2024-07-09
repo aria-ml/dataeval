@@ -8,7 +8,7 @@ ARG python_version="3.11"
 ARG base_image="base"
 ARG output_dir="/daml/output"
 
-######################## pyenv layer ########################
+######################## pyenv image ########################
 FROM ubuntu:22.04 as pyenv
 ENV DEBIAN_FRONTEND noninteractive
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -46,7 +46,7 @@ ARG PYENV_ROOT
 COPY --from=pyenv ${PYENV_ROOT} ${PYENV_ROOT}
 
 
-######################## data layer ########################
+######################## data image ########################
 FROM python:3.11 as data
 RUN pip install --no-cache \
     tensorflow-cpu==2.15.1 \
@@ -60,7 +60,7 @@ COPY docs/conf.py conf.py
 RUN python -c "import conf; conf.predownload_data();"
 
 
-######################## shared cuda layer ########################
+######################## shared cuda image ########################
 FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 as cuda
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -80,7 +80,7 @@ ENV LC_ALL=C.UTF-8
 ENV LANG=en_US.UTF-8
 
 
-######################## base task layer ########################
+######################## base task image ########################
 FROM cuda as base
 ARG UID
 ARG PYENV_ROOT
@@ -178,7 +178,7 @@ FROM results as doctest
 COPY --from=docs-run $output_dir $output_dir
 
 
-######################## devcontainer layer ########################
+######################## devcontainer image ########################
 FROM cuda as devcontainer
 USER root
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
