@@ -11,7 +11,7 @@ class TestCoverageUnit:
     def test_fails_with_invalid_radius_type(self):
         embs = np.zeros((100, 2))
         with pytest.raises(ValueError), warnings.catch_warnings():
-            metric = Coverage(embs, "new")
+            metric = Coverage(embs, "new")  # type: ignore
             metric.evaluate()
 
     def test_n_too_small(self):
