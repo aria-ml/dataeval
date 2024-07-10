@@ -5,11 +5,10 @@ ARG UID="1000"
 ARG HOME="/home/$USER"
 ARG PYENV_ROOT="$HOME/.pyenv"
 ARG python_version="3.11"
-ARG base_image="base"
 ARG output_dir="/daml/output"
 
 ######################## pyenv image ########################
-FROM ubuntu:22.04 as pyenv
+FROM ubuntu:22.04 as pyenv-build
 ENV DEBIAN_FRONTEND noninteractive
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -41,9 +40,9 @@ ARG PYENV_ROOT
 ARG python_version
 RUN ${PYENV_ROOT}/bin/pyenv install ${python_version}
 
-FROM scratch as pybase
+FROM scratch as pyenv
 ARG PYENV_ROOT
-COPY --from=pyenv ${PYENV_ROOT} ${PYENV_ROOT}
+COPY --from=pyenv-build ${PYENV_ROOT} ${PYENV_ROOT}
 
 
 ######################## data image ########################
@@ -84,7 +83,7 @@ ENV LANG=en_US.UTF-8
 FROM cuda as base
 ARG UID
 ARG PYENV_ROOT
-COPY --chown=${UID} --link --from=pybase ${PYENV_ROOT} ${PYENV_ROOT}
+COPY --chown=${UID} --link --from=pyenv-build ${PYENV_ROOT} ${PYENV_ROOT}
 ENV PATH ${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:$PATH
 ARG python_version
 RUN pyenv global ${python_version}
@@ -98,7 +97,7 @@ RUN uv pip install -r environment/requirements-dev.txt
 
 ######################## task layers ########################
 # The *-run layers run individual tasks and capture the results
-FROM ${base_image} as task-run
+FROM base as task-run
 ARG UID
 RUN touch README.md
 COPY --chown=${UID} pyproject.toml poetry.lock ./
@@ -199,6 +198,6 @@ ARG PYENV_ROOT
 ENV PATH=${HOME}/.cargo/bin:${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:${PATH}
 RUN echo 'eval "$(pyenv init -)"' >> ~/.bashrc
 ARG UID
-COPY --chown=${UID} --link --from=harbor.jatic.net/daml/main:pybase-3.9 ${PYENV_ROOT} ${PYENV_ROOT}
-COPY --chown=${UID} --link --from=harbor.jatic.net/daml/main:pybase-3.10 ${PYENV_ROOT} ${PYENV_ROOT}
-COPY --chown=${UID} --link --from=harbor.jatic.net/daml/main:pybase-3.11 ${PYENV_ROOT} ${PYENV_ROOT}
+COPY --chown=${UID} --link --from=harbor.jatic.net/daml/pyenv:3.9 ${PYENV_ROOT} ${PYENV_ROOT}
+COPY --chown=${UID} --link --from=harbor.jatic.net/daml/pyenv:3.10 ${PYENV_ROOT} ${PYENV_ROOT}
+COPY --chown=${UID} --link --from=harbor.jatic.net/daml/pyenv:3.11 ${PYENV_ROOT} ${PYENV_ROOT}
