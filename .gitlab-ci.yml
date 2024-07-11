@@ -52,8 +52,20 @@ stages:
 .on_run: &on_run
   - if: $CREATE_NEW_RELEASE
     when: never
-  - if: $CI_PIPELINE_SOURCE == 'merge_request_event' || $CI_COMMIT_BRANCH == 'main'
-  - if: $CI_PIPELINE_SOURCE == 'web'
+  - if: $CI_PIPELINE_SOURCE == 'merge_request_event' || $CI_COMMIT_BRANCH == 'main' || $CI_PIPELINE_SOURCE == 'web'
+
+.on_run_with_docs: &on_run_with_docs
+  - if: $CREATE_NEW_RELEASE
+    when: never
+  - if: $CI_PIPELINE_SOURCE == 'merge_request_event' || $CI_PIPELINE_SOURCE == 'web'
+    changes:
+      compare_to: 'refs/head/main'
+      paths:
+        - src/**/*
+        - docs/**/*
+        - environment/*
+        - README.md
+  - if: $CI_COMMIT_BRANCH == 'main' 
 
 .on_merge_request_only: &on_merge_request_only
   - if: $CREATE_NEW_RELEASE
@@ -226,7 +238,7 @@ docs:
     paths:
       - output/docs/.jupyter_cache/
       - output/docs/html/
-  rules: *on_run
+  rules: *on_run_with_docs
 
 pages:
   stage: docs
@@ -247,7 +259,6 @@ pages:
 
 update merge request:
   stage: release
-  needs: [docs, coverage]
   before_script:
     - pip install requests
   script:
