@@ -106,30 +106,17 @@ if [[ -z $(docker builder ls --format '{{.Name}}' | grep $builder_name) ]]; then
         --name $builder_name
 fi
 
-function post_build_cleanup() {
-    tag=$1
-    container_name=$2
-
-    if [[ $(docker container ls --all --filter name=$container_name) ]]; then
-        docker container rm --force $container_name &> /dev/null
-    fi
-
-    if [[ -z $save_build_images && $(docker image ls --filter reference=$tag) ]]; then
-        docker image rm --force $tag &> /dev/null
-    fi
-}
-
 function build_image() {
     target=$1
     python_version=$2
     no_cache_layers=${@:3}
 
     # create cache array
-    cache=("${registry}/cache:pyenv-${python_version}")
+    cache=("${PYENV_CACHE}-${python_version}")
     if [[ $target != pyenv ]]; then
-        cache+=("${registry}/cache:${deps_hash}-base-${python_version}")
+        cache+=("${BUILD_CACHE}-${python_version}")
         if [[ $target != base ]]; then
-            cache+=("${registry}/cache:${deps_hash}-${target}-${python_version}")
+            cache+=("${BUILD_CACHE}-${target}-${python_version}")
         fi
     fi
 
@@ -148,28 +135,33 @@ function build_image() {
         no_cache_filter_arg="--no-cache-filter $(tr ' ' ',' <<< $no_cache_layers)"
     fi
 
-    # build image_tag only for pyenv (if not exist) or for task (non pyenv, base) images
-    if [[ $target == pyenv && ! $(docker manifest inspect "${registry}/pyenv:${python_version}" 2> /dev/null) ]]; then
-        image_tag="${registry}/pyenv:${python_version}"
+    # There are only 2 scenarios where we want to push an actual image up to the registry
+    # one is for the pyenv image if it does not exist, and the other is for task images to
+    # be loaded for playback of results.
+
+    # build image_tag for pyenv (if not exist) or for task images (not pyenv, not base)
+    if [[ $target == pyenv && ! $(docker manifest inspect "${PYENV_IMAGE}:${python_version}" 2> /dev/null) ]]; then
+        image_tag="${PYENV_IMAGE}:${python_version}"
     elif [[ $target != pyenv && $target != base ]]; then
-        image_tag="${registry}/${image}:${tag_prefix}${deps_hash}-${target}-${python_version}"
+        image_tag="${TASK_IMAGE}-${target}-${python_version}"
     else
         image_tag=""
     fi
 
-    # build output_arg to image only if image_tag is created
+    # build output_arg as appropriate if image needs to be pushed, otherwise just populate the registry cache
     if [[ $image_tag ]]; then
         output_arg="--output type=image,name=${image_tag}"
         if [[ $push_to_repo ]]; then
             output_arg+=",push=true"
         fi
-        if [[ $target != pyenv && ($save_build_images || -z $push_to_repo) ]]; then
-            # By default the docker-container driver doesn't load images to the
-            # local docker images store, these args will cause it to do so.
-            load_arg="--tag ${image_tag} --load"
-        fi
     else
         output_arg="--output type=cacheonly"
+    fi
+
+    if [[ $target != pyenv && $target != base && ($save_build_images || -z $push_to_repo) ]]; then
+        # By default the docker-container driver doesn't load images to the
+        # local docker images store, these args will cause it to do so.
+        load_arg="--tag ${image_tag} --load"
     fi
 
     docker_build_cmd="docker buildx build $quiet \
@@ -207,8 +199,7 @@ function build_and_run() {
         pull_arg="--pull always"
     fi
 
-    image_tag="${registry}/${image}:${tag_prefix}${deps_hash}-${task}-${python_version}"
-    trap "post_build_cleanup $image_tag $container_name" EXIT
+    image_tag="${TASK_IMAGE}-${task}-${python_version}"
 
     # NOTE: If you ./build --push at the same time as a pipeline in the same
     # branch that is running you can potentially overwrite a results image that
@@ -236,7 +227,6 @@ function build_and_run() {
     fi
 }
 
-export -f post_build_cleanup
 export -f build_image
 export -f build_and_run
 
@@ -251,22 +241,27 @@ else
     main_branch="main"
 fi
 
-# Set components used for image and tag and are built in general with:
-# ${registry}/${image}:${tag_prefix}${deps_hash}-${task}-${python_version}
-export registry="harbor.jatic.net/daml"
+namespace="harbor.jatic.net/daml"
 if [[ $branch_name == $main_branch ]]; then
-    export image="main"
+    repository="main"
 else
-    export image="dev"
-    export tag_prefix="${branch_name/[^a-zA-Z0-9]/-}-"
+    repository="dev"
+    tag_prefix="${branch_name/[^a-zA-Z0-9]/-}-"
 fi
-export deps_hash=$((cat environment/requirements.txt && cat environment/requirements-dev.txt) | sha256sum | cut -c 1-8)
+deps_hash=$((cat environment/requirements.txt && cat environment/requirements-dev.txt) | sha256sum | cut -c 1-8)
+
+# construct image and cache names
+export PYENV_IMAGE="${namespace}/pyenv"
+export TASK_IMAGE="${namespace}/${repository}:${tag_prefix}${deps_hash}"
+
+export PYENV_CACHE="${namespace}/cache:pyenv"
+export BUILD_CACHE="${namespace}/cache:${deps_hash}"
 
 if [[ ! $quiet ]]; then
     keep_order="--keep-order"
 fi
 
-START=$(date +%s)
+start=$(date +%s)
 
 for python_version in ${!pvers[@]}; do
     # In the CI pipeline, build_base and build_task are staged separately to allow docs to kick
@@ -287,8 +282,8 @@ if [[ $build_base || $build_task ]]; then
     exit $?
 fi
 
-END=$(date +%s)
-DIFF=$(( $END - $START ))
+end=$(date +%s)
+diff=$(( $end - $start ))
 echo "------"
 echo "Image build preparation completed in $DIFF seconds"
 echo "------"
