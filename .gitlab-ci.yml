@@ -133,6 +133,7 @@ build task:
   extends: [.harbor, .python_version_matrix]
   needs: [build base]
   script:
+    - apk add --no-cache parallel
     - ./build --build-task --push ${PYTHON_VERSION}
   rules: *on_run
 
