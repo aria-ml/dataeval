@@ -112,20 +112,30 @@ function build_image() {
     no_cache_layers=${@:3}
 
     # create cache array
-    cache=("${PYENV_CACHE}-${python_version}")
-    if [[ $target != pyenv ]]; then
-        cache+=("${BUILD_CACHE}-${python_version}")
-        if [[ $target != base ]]; then
-            cache+=("${BUILD_CACHE}-${target}-${python_version}")
+    cache=()
+    if [[ $target != base && $target != pyenv ]]; then
+        if [[ ${BUILD_CACHE_BRANCH} ]]; then
+            cache+=("${BUILD_CACHE_BRANCH}-${target}-${python_version}")
         fi
+        cache+=("${BUILD_CACHE}-${target}-${python_version}")
     fi
+    if [[ $target != pyenv ]]; then
+        if [[ ${BUILD_CACHE_BRANCH} ]]; then
+            cache+=("${BUILD_CACHE_BRANCH}-${python_version}")
+        fi
+        cache+=("${BUILD_CACHE}-${python_version}")
+    fi
+    if [[ ${PYENV_CACHE_BRANCH} ]]; then
+        cache+=("${PYENV_CACHE_BRANCH}-${python_version}")
+    fi
+    cache+=("${PYENV_CACHE}-${python_version}")
 
     # set cache_from and cache_to args
     cache_from_arg=$(echo ${cache[*]} | xargs -n1 sh -c 'echo --cache-from type=registry,ref=$0')
     if [[ $push_to_repo ]]; then
         # Writing to the cache means that you must be able to push to the registry, therefore
         # don't want to force users to login to the registry just to build.
-        cache_to_arg="--cache-to type=registry,mode=max,image-manifest=true,ref=${cache[-1]}"
+        cache_to_arg="--cache-to type=registry,mode=max,image-manifest=true,ref=${cache[0]}"
     else
         cache_to_arg=""
     fi
@@ -256,6 +266,11 @@ export TASK_IMAGE="${namespace}/${repository}:${tag_prefix}${deps_hash}"
 
 export PYENV_CACHE="${namespace}/cache:pyenv"
 export BUILD_CACHE="${namespace}/cache:${deps_hash}"
+
+if [[ $tag_prefix ]]; then
+    export PYENV_CACHE_BRANCH="${namespace}/cache:${tag_prefix}pyenv"
+    export BUILD_CACHE_BRANCH="${namespace}/cache:${tag_prefix}${deps_hash}"
+fi
 
 if [[ ! $quiet ]]; then
     keep_order="--keep-order"
