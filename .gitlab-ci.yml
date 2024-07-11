@@ -183,7 +183,7 @@ tests:
     TASK: unit
   artifacts:
     reports:
-      junit: output/junit.${PYTHON_VERSION}.xml
+      junit: output/junit.*.xml
 
 type checks:
   extends: .build_task
