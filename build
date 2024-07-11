@@ -183,15 +183,12 @@ function build_image() {
         --target $target \
         ."
 
-    if [[ ! $quiet ]]; then
-        echo "========================================"
-        echo "Building ${image_tag}..."
-        echo $docker_build_cmd
-        time $docker_build_cmd
-        echo "========================================"
-    else
-        $docker_build_cmd &> /dev/null
-    fi
+    echo "Building $target for $python_version"
+    echo "========================================"
+    echo $docker_build_cmd
+    time $docker_build_cmd
+    echo "========================================"
+    echo "Finished $target for $python_version"
 }
 
 function build_and_run() {
@@ -273,14 +270,21 @@ for python_version in ${!pvers[@]}; do
         build_image base $python_version
     fi
     if [[ ! $CI || $build_task ]]; then
+        pids=()
+        trap "for pid in ${pids[@]}; do kill $pid; done; exit 1" INT
         for task in ${!tasks[@]}; do
-            build_image $task $python_version
+            (verbosity="--quiet" build_image $task $python_version) &
+            pids+=($!)
         done
+        for pid in ${pids[@]}; do
+            wait $pid || exit_code=$?
+        done
+        trap - INT
     fi
 done
 
 if [[ $build_base || $build_task ]]; then
-    exit $?
+    exit $exit_code
 fi
 
 END=$(date +%s)
