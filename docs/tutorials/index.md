@@ -31,7 +31,7 @@ Metrics
 - [Bayes Error Rate Estimation Tutorial](notebooks/BayesErrorRateEstimationTutorial) [![Open In Colab][colab-badge]][ber-colab]
 - [HP Divergence Tutorial](notebooks/HPDivergenceTutorial) [![Open In Colab][colab-badge]][div-colab]
 - [Class Label Analysis Tutorial](notebooks/ClassLabelAnalysisTutorial) [![Open In Colab][colab-badge]][lbl-colab]
-
+- [Coverage Analysis Tutorial](notebooks/CoverageTutorial) [![Open In Colab][colab-badge]][cov-colab]
 :::{toctree}
 :hidden:
 :maxdepth: 1
@@ -39,6 +39,7 @@ Metrics
 notebooks/BayesErrorRateEstimationTutorial.ipynb
 notebooks/HPDivergenceTutorial.ipynb
 notebooks/ClassLabelAnalysisTutorial.ipynb
+notebooks/CoverageTutorial.ipynb
 :::
 
 Workflows
@@ -79,3 +80,4 @@ notebooks/AETrainerTutorial.ipynb
 [clust-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/tutorials/notebooks/ClustererTutorial.ipynb
 [dup-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/tutorials/notebooks/DuplicatesTutorial.ipynb
 [lint-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/tutorials/notebooks/LintingTutorial.ipynb
+[cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/tutorials/notebooks/CoverageTutorial.ipynb
