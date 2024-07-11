@@ -40,7 +40,7 @@ eval set -- "$options"
 while true; do
     case "$1" in
         -h|--help)       showHelp;;
-        -q|--quiet)      export quiet=1; export verbosity="--quiet";;
+        -q|--quiet)      export quiet="--quiet";;
         --gpu)           export gpuflag="--gpus all";;
         --build-base)    build_base=1;;
         --build-task)    build_task=1;;
@@ -172,7 +172,7 @@ function build_image() {
         output_arg="--output type=cacheonly"
     fi
 
-    docker_build_cmd="docker buildx build $verbosity \
+    docker_build_cmd="docker buildx build $quiet \
         $load_arg \
         --builder $builder_name \
         --build-arg python_version=$python_version \
@@ -182,13 +182,16 @@ function build_image() {
         $output_arg \
         --target $target \
         ."
-
-    echo "Building $target for $python_version"
-    echo "========================================"
-    echo $docker_build_cmd
-    time $docker_build_cmd
-    echo "========================================"
-    echo "Finished $target for $python_version"
+    
+    if [[ ! $quiet ]]; then
+        echo "========================================"
+        echo "Building $target-$python_version..."
+        echo $docker_build_cmd
+        time $docker_build_cmd
+        echo "========================================"
+    else
+        $docker_build_cmd &> /dev/null
+    fi
 }
 
 function build_and_run() {
@@ -259,6 +262,10 @@ else
 fi
 export deps_hash=$((cat environment/requirements.txt && cat environment/requirements-dev.txt) | sha256sum | cut -c 1-8)
 
+if [[ ! $quiet ]]; then
+    keep_order="--keep-order"
+fi
+
 START=$(date +%s)
 
 for python_version in ${!pvers[@]}; do
@@ -270,21 +277,14 @@ for python_version in ${!pvers[@]}; do
         build_image base $python_version
     fi
     if [[ ! $CI || $build_task ]]; then
-        pids=()
-        trap "for pid in ${pids[@]}; do kill $pid; done; exit 1" INT
-        for task in ${!tasks[@]}; do
-            (verbosity="--quiet" build_image $task $python_version) &
-            pids+=($!)
-        done
-        for pid in ${pids[@]}; do
-            wait $pid || exit_code=$?
-        done
-        trap - INT
+        echo "Building [${!tasks[@]}]-$python_version..."
+        python_version=$python_version quiet=$quiet \
+        parallel $keep_order --lb "build_image {} $python_version" ::: ${!tasks[@]}
     fi
 done
 
 if [[ $build_base || $build_task ]]; then
-    exit $exit_code
+    exit $?
 fi
 
 END=$(date +%s)
@@ -292,10 +292,6 @@ DIFF=$(( $END - $START ))
 echo "------"
 echo "Image build preparation completed in $DIFF seconds"
 echo "------"
-
-if [[ ! $quiet ]]; then
-    keep_order="--keep-order"
-fi
 
 # execute jobs
 echo "Running ${!jobs[@]}..."
