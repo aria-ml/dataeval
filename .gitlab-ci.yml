@@ -59,7 +59,6 @@ stages:
     when: never
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event' || $CI_PIPELINE_SOURCE == 'web'
     changes:
-      compare_to: 'refs/head/main'
       paths:
         - src/**/*
         - docs/**/*
