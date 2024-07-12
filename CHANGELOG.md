@@ -1,6 +1,15 @@
-[//]: # (278b4dc1de4f038b3aefa56658abc7489f60e213)
+[//]: # (6d0bd795f6f8c0032e004483e0ca03b583d393ad)
 
 # DAML Change Log
+
+## v0.56.0
+
+🌟 **Feature Release**
+- `64416675` - Update clusterer class and documentation
+
+    * `Clusterer` detector released
+    
+    This class assists in exploratory data analysis of unlabeled data by identifying duplicates and outliers. Additional information on usage is available in our documentation.
 
 ## v0.55.0
 
