@@ -114,21 +114,21 @@ function build_image() {
     # create cache array
     cache=()
     if [[ $target != base && $target != pyenv ]]; then
-        if [[ ${BUILD_CACHE_BRANCH} ]]; then
-            cache+=("${BUILD_CACHE_BRANCH}-${target}-${python_version}")
+        if [[ ${BRANCH_CACHE} ]]; then
+            cache+=("${BRANCH_CACHE}-${target}-${python_version}")
         fi
-        cache+=("${BUILD_CACHE}-${target}-${python_version}")
+        cache+=("${MAIN_CACHE}:${target}-${python_version}")
     fi
     if [[ $target != pyenv ]]; then
-        if [[ ${BUILD_CACHE_BRANCH} ]]; then
-            cache+=("${BUILD_CACHE_BRANCH}-${python_version}")
+        if [[ ${BRANCH_CACHE} ]]; then
+            cache+=("${BRANCH_CACHE}-base-${python_version}")
         fi
-        cache+=("${BUILD_CACHE}-${python_version}")
+        cache+=("${MAIN_CACHE}:base-${python_version}")
     fi
-    if [[ ${PYENV_CACHE_BRANCH} ]]; then
-        cache+=("${PYENV_CACHE_BRANCH}-${python_version}")
+    if [[ ${BRANCH_CACHE} ]]; then
+        cache+=("${BRANCH_CACHE}-pyenv-${python_version}")
     fi
-    cache+=("${PYENV_CACHE}-${python_version}")
+    cache+=("${MAIN_CACHE}:pyenv-${python_version}")
 
     # set cache_from and cache_to args
     cache_from_arg=$(echo ${cache[*]} | xargs -n1 sh -c 'echo --cache-from type=registry,ref=$0')
@@ -256,20 +256,16 @@ if [[ $branch_name == $main_branch ]]; then
     repository="main"
 else
     repository="dev"
-    tag_prefix="${branch_name/[^a-zA-Z0-9]/-}-"
+    tag_prefix="${branch_name/[^a-zA-Z0-9]/-}"
 fi
-deps_hash=$((cat environment/requirements.txt && cat environment/requirements-dev.txt) | sha256sum | cut -c 1-8)
 
 # construct image and cache names
 export PYENV_IMAGE="${namespace}/pyenv"
-export TASK_IMAGE="${namespace}/${repository}:${tag_prefix}${deps_hash}"
+export TASK_IMAGE="${namespace}/${repository}:${tag_prefix}"
 
-export PYENV_CACHE="${namespace}/cache:pyenv"
-export BUILD_CACHE="${namespace}/cache:${deps_hash}"
-
+export MAIN_CACHE="${namespace}/cache"
 if [[ $tag_prefix ]]; then
-    export PYENV_CACHE_BRANCH="${namespace}/cache:${tag_prefix}pyenv"
-    export BUILD_CACHE_BRANCH="${namespace}/cache:${tag_prefix}${deps_hash}"
+    export BRANCH_CACHE="${namespace}/cache:${tag_prefix}"
 fi
 
 if [[ ! $quiet ]]; then
@@ -288,8 +284,7 @@ for python_version in ${!pvers[@]}; do
     fi
     if [[ ! $CI || $build_task ]]; then
         echo "Building [${!tasks[@]}]-$python_version..."
-        python_version=$python_version quiet=$quiet \
-        parallel $keep_order --lb "build_image {} $python_version" ::: ${!tasks[@]}
+        python_version=$python_version parallel $keep_order --lb "build_image {} $python_version" ::: ${!tasks[@]}
     fi
 done
 
@@ -300,7 +295,7 @@ fi
 end=$(date +%s)
 diff=$(( $end - $start ))
 echo "------"
-echo "Image build preparation completed in $DIFF seconds"
+echo "Image build preparation completed in $diff seconds"
 echo "------"
 
 # execute jobs
