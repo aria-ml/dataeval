@@ -36,10 +36,9 @@ class RestWrapper:
         verbose: bool = False,
     ):
         self.project_url = project_url
-        token = environ[env_token] if override_token is None else override_token
-        if token is None or len(token) == 0:
+        self.token = environ[env_token] if override_token is None else override_token
+        if self.token is None or len(self.token) == 0:
             raise ValueError("No token provided")
-        self.headers = {"PRIVATE-TOKEN": token}
         self.timeout = timeout
         set_verbose(verbose)
 

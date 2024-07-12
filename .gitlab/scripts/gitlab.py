@@ -37,6 +37,7 @@ class Gitlab(RestWrapper):
         verbose: bool = False,
     ):
         super().__init__(DAML_PROJECT_URL, DAML_BUILD_PAT, token, timeout, verbose)
+        self.headers = {"PRIVATE-TOKEN": self.token}
 
     def list_tags(self) -> List[Dict[str, Any]]:
         """
