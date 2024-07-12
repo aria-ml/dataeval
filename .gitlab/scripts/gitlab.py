@@ -1,12 +1,14 @@
-from os import environ, path, remove
+from os import remove
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Union, cast
+from typing import Any, Dict, List, Literal, Optional
 from uuid import uuid4
 from zipfile import ZipFile
 
-from requests import JSONDecodeError, Response, delete, get, post, put
+from requests import delete, get, post, put
+from rest import RestWrapper
 
 DAML_PROJECT_URL = "https://gitlab.jatic.net/api/v4/projects/151/"
+DAML_BUILD_PAT = "DAML_BUILD_PAT"
 
 COMMITS = "repository/commits"
 FILES = "repository/files"
@@ -23,138 +25,18 @@ NOTES = "notes"
 LATEST_KNOWN_GOOD = "latest-known-good"
 
 
-class _VerboseSingleton:
-    verbose = False
-
-    def __new__(cls):
-        if not hasattr(cls, "instance"):
-            cls.instance = super().__new__(cls)
-        return cls.instance
-
-
-def verbose(text: str):
-    if _VerboseSingleton().verbose:
-        print(text)
-
-
-def set_verbose(value: bool):
-    _VerboseSingleton().verbose = value
-
-
-class Gitlab:
+class Gitlab(RestWrapper):
     """
     Helper class wrapping Gitlab REST API calls
     """
 
     def __init__(
         self,
-        project_url: Optional[str] = None,
         token: Optional[str] = None,
         timeout: int = 10,
         verbose: bool = False,
     ):
-        self.project_url = DAML_PROJECT_URL if project_url is None else project_url
-        # $DAML_BUILD_PAT is only available in production environments
-        token = environ["DAML_BUILD_PAT"] if token is None else token
-        if token is None or len(token) == 0:
-            raise ValueError("No token provided")
-        self.headers = {"PRIVATE-TOKEN": token}
-        self.timeout = timeout
-        set_verbose(verbose)
-
-    def _get_param_str(self, params: Optional[Dict[str, Any]]) -> str:
-        if params is None:
-            return ""
-        return "&".join({f"{k}={v}" for k, v in params.items()})
-
-    def _request(
-        self,
-        fncall: Callable,
-        resource: Union[str, Sequence[str]],
-        params: Optional[Dict[str, Any]] = None,
-        data: Optional[Dict[str, Any]] = None,
-        raw_data: bool = False,
-    ) -> Any:
-        """
-        Sends requests to Gitlab REST API
-
-        Calling with the following example:
-        _request(put, ["resource1", "subpath1"], {"pkey": "pvalue"}, {"dkey": "dvalue"})
-
-        Will run the approximated curl below:
-        curl -X PUT -d {"dkey":"dvalue"} https://.../resource1/subpath1?pkey=pvalue
-
-        Parameters
-        ----------
-        fncall : Callable
-            The requests function to call (get, post, put)
-        resource : Union[str, Sequence[str]]
-            The path(s) of the Gitlab API to call
-        params : Optional[Dict[str, Any]], default None
-            Optional parameters for the resource
-        data : Optional[Dict[str, Any]], default None
-            Optional data provided for the request (used in post or put)
-
-        Raises
-        ------
-        ConnectionError
-            Raises if the response status code is not successful (200-299)
-
-        Notes
-        --------
-        https://docs.gitlab.com/ee/api/rest/
-        """
-        if not isinstance(resource, str):
-            resource = path.join(*resource)
-
-        url = path.join(self.project_url, resource)
-
-        if params is None:
-            params = {}
-
-        if raw_data:
-            dtype = "data"
-            self.headers["Content-type"] = "application/octet-stream"
-        else:
-            dtype = "json"
-            self.headers["Content-type"] = "application/json"
-
-        last_page = 1
-        page = 1
-        result = []
-        while page <= last_page:
-            args = {
-                "url": f"{url}?{self._get_param_str(params)}",
-                "headers": self.headers,
-                dtype: data,
-                "timeout": self.timeout,
-            }
-
-            response = cast(Response, fncall(**args))
-
-            args_to_print = {x: args[x] for x in args if x != "headers"}
-            verbose(f"Request '{fncall.__name__}' issued: {args_to_print}")
-            verbose(f"Response received: {response}")
-            if response.status_code not in range(200, 299):
-                raise ConnectionError(response.status_code)
-
-            try:
-                response_json = response.json()
-            except JSONDecodeError:
-                return response
-
-            if "X-Total-Pages" in response.headers:
-                last_page = int(response.headers["X-Total-Pages"])
-            else:
-                assert isinstance(response_json, dict)
-                return response_json
-
-            assert isinstance(response_json, list)
-            page += 1
-            params["page"] = str(page)
-            result += response_json
-
-        return result
+        super().__init__(DAML_PROJECT_URL, DAML_BUILD_PAT, token, timeout, verbose)
 
     def list_tags(self) -> List[Dict[str, Any]]:
         """

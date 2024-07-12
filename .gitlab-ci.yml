@@ -274,6 +274,14 @@ tag release candidate:
     - .gitlab/scripts/update_latest_known_good.py
   rules: *on_commit_main_only
 
+remove image tags:
+  stage: release
+  before_script:
+    - pip install requests
+  script:
+    - .gitlab/scripts/remove_image_tags.py
+  rules: *on_commit_main_only
+
 # This job updates the changelog and tags the commit hash with a
 # new version tag, which gets picked up and published from a GitHub
 # action defined in .github/workflows/publish.yml
