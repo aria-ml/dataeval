@@ -35,6 +35,7 @@ class RestWrapper:
         timeout: int = 10,
         verbose: bool = False,
     ):
+        self.headers: dict
         self.project_url = project_url
         self.token = environ[env_token] if override_token is None else override_token
         if self.token is None or len(self.token) == 0:
@@ -98,9 +99,11 @@ class RestWrapper:
         last_page = 1
         page = 1
         result = []
+        params_str = self._get_param_str(params)
+        url_with_params = f"{url}?{params_str}" if params_str else url
         while page <= last_page:
             args = {
-                "url": f"{url}?{self._get_param_str(params)}",
+                "url": url_with_params,
                 "headers": self.headers,
                 dtype: data,
                 "timeout": self.timeout,
