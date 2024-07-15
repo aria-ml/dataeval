@@ -17,7 +17,5 @@ if __name__ == "__main__":
 
     for repository, tags in repository_tags.items():
         for tag in tags:
-            print(f"Remove {tag} from {repository}")
-            # Harbor 2.10 does not provide full permissions to OIDC robot accounts
-            # https://github.com/goharbor/harbor/issues/8723
-            # hb.delete_tag(repository, tag)
+            print(f"Removing {tag} from {repository}...")
+            hb.delete_tag(repository, tag)
