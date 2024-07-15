@@ -9,11 +9,11 @@ Licensed under Apache Software License (Apache 2.0)
 import math
 from typing import Callable, Optional, Tuple, Type, Union, cast
 
-import keras.api._v2.keras as keras
+import keras as keras
 import numpy as np
 import tensorflow as tf
-from keras.api._v2.keras import Sequential
-from keras.api._v2.keras.layers import (
+from keras import Sequential
+from keras.layers import (
     Conv2D,
     Conv2DTranspose,
     Dense,

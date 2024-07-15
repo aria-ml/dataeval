@@ -12,7 +12,7 @@ import functools
 import warnings
 from typing import Optional
 
-import keras.api._v2.keras as keras
+import keras
 import numpy as np
 import tensorflow as tf
 from tensorflow_probability.python.bijectors import bijector

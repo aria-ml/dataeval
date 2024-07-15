@@ -37,7 +37,7 @@ class Duplicates:
     def evaluate(self) -> Dict[Literal["exact", "near"], List[int]]:
         """
         Returns duplicate image indices for both exact matches and near matches
-    
+
         Returns
         -------
         Dict[Literal["exact", "near"], List[int]]

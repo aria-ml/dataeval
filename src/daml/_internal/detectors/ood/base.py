@@ -9,7 +9,7 @@ Licensed under Apache Software License (Apache 2.0)
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, List, Literal, NamedTuple, Optional, Tuple, cast
 
-import keras.api._v2.keras as keras
+import keras
 import numpy as np
 import tensorflow as tf
 
