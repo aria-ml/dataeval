@@ -1,10 +1,10 @@
 from importlib.util import find_spec
 
-from . import flags, metrics
+from . import detectors, flags, metrics
 
 __version__ = "0.0.0"
 
-__all__ = ["metrics", "flags"]
+__all__ = ["detectors", "flags", "metrics"]
 
 if find_spec("torch") is not None:  # pragma: no cover
     from . import models, workflows
