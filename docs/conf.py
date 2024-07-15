@@ -93,7 +93,7 @@ def cwd(path):
 
 
 def predownload_data():
-    import keras.api._v2.keras.datasets as kds
+    import keras.datasets as kds
     import tensorflow_datasets as tfds
     from torchvision.datasets import MNIST
 

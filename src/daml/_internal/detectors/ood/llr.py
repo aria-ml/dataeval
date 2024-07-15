@@ -9,11 +9,11 @@ Licensed under Apache Software License (Apache 2.0)
 from functools import partial
 from typing import Callable, Optional, Tuple
 
+import keras
 import numpy as np
 import tensorflow as tf
-from keras.api._v2 import keras
-from keras.api._v2.keras.layers import Input
-from keras.api._v2.keras.models import Model
+from keras.layers import Input
+from keras.models import Model
 
 from daml._internal.detectors.ood.base import OODBase, OODScore
 from daml._internal.models.tensorflow.pixelcnn import PixelCNN

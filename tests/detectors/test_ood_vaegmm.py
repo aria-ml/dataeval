@@ -8,11 +8,11 @@ Licensed under Apache Software License (Apache 2.0)
 
 from itertools import product
 
-import keras.api._v2.keras as keras
+import keras as keras
 import numpy as np
 import pytest
 import tensorflow as tf
-from keras.api._v2.keras.layers import Dense, InputLayer
+from keras.layers import Dense, InputLayer
 
 from daml._internal.detectors.ood.vaegmm import OOD_VAEGMM
 from daml._internal.models.tensorflow.autoencoder import VAEGMM
