@@ -274,8 +274,11 @@ tag release candidate:
     - .gitlab/scripts/update_latest_known_good.py
   rules: *on_commit_main_only
 
+# This job cleans up the image tags from the harbor registry
+# associated with the last merged branch.
 remove image tags:
   stage: release
+  needs: []
   before_script:
     - pip install requests
   script:
