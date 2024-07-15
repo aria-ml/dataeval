@@ -4,7 +4,7 @@ from requests import delete, get
 from rest import RestWrapper
 
 DAML_PROJECT_URL = "https://harbor.jatic.net/api/v2.0/projects/daml/"
-DAML_HARBOR_TOKEN = "DAML_HARBOR_TOKEN"
+DAML_HARBOR_TOKEN = "DAML_HARBOR_API_TOKEN"
 
 REPOSITORIES = "repositories"
 ARTIFACTS = "artifacts"
