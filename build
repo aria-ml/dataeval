@@ -115,18 +115,18 @@ function build_image() {
     cache=()
     if [[ $target != base && $target != pyenv ]]; then
         if [[ ${BRANCH_CACHE} ]]; then
-            cache+=("${BRANCH_CACHE}-${target}-${python_version}")
+            cache+=("${BRANCH_CACHE}${target}-${python_version}")
         fi
         cache+=("${MAIN_CACHE}:${target}-${python_version}")
     fi
     if [[ $target != pyenv ]]; then
         if [[ ${BRANCH_CACHE} ]]; then
-            cache+=("${BRANCH_CACHE}-base-${python_version}")
+            cache+=("${BRANCH_CACHE}base-${python_version}")
         fi
         cache+=("${MAIN_CACHE}:base-${python_version}")
     fi
     if [[ ${BRANCH_CACHE} ]]; then
-        cache+=("${BRANCH_CACHE}-pyenv-${python_version}")
+        cache+=("${BRANCH_CACHE}pyenv-${python_version}")
     fi
     cache+=("${MAIN_CACHE}:pyenv-${python_version}")
 
