@@ -8,8 +8,8 @@ Licensed under Apache Software License (Apache 2.0)
 
 from typing import Callable
 
+import keras
 import numpy as np
-from keras.api._v2 import keras
 
 from daml._internal.detectors.ood.base import OODGMMBase, OODScore
 from daml._internal.models.tensorflow.autoencoder import VAEGMM
