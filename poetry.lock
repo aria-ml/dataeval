@@ -1307,6 +1307,7 @@ description = "Python AST that abstracts the underlying Python version"
 optional = true
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7"
 files = [
+    {file = "gast-0.6.0-py3-none-any.whl", hash = "sha256:52b182313f7330389f72b069ba00f174cfe2a06411099547288839c6cbafbd54"},
     {file = "gast-0.6.0.tar.gz", hash = "sha256:88fc5300d32c7ac6ca7b515310862f71e6fdf2c029bbec7c66c0f5dd47b6b1fb"},
 ]
 
@@ -5542,4 +5543,4 @@ torch = ["matplotlib", "nvidia-cudnn-cu11", "torch"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.12"
-content-hash = "38322e5f1a75729049bbf64b37c2b0bca42e64086797b64ea0283b4f9d4c5f68"
+content-hash = "45587fd6eb88ec9044f7891c3ef200e50e29619b69a8a818803910ee3f800f23"
