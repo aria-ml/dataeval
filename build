@@ -153,7 +153,7 @@ function build_image() {
     if [[ $target == pyenv && ! $(docker manifest inspect "${PYENV_IMAGE}:${python_version}" 2> /dev/null) ]]; then
         image_tag="${PYENV_IMAGE}:${python_version}"
     elif [[ $target != pyenv && $target != base ]]; then
-        image_tag="${TASK_IMAGE}-${target}-${python_version}"
+        image_tag="${TASK_IMAGE}${target}-${python_version}"
     else
         image_tag=""
     fi
@@ -209,7 +209,7 @@ function build_and_run() {
         pull_arg="--pull always"
     fi
 
-    image_tag="${TASK_IMAGE}-${task}-${python_version}"
+    image_tag="${TASK_IMAGE}${task}-${python_version}"
 
     # NOTE: If you ./build --push at the same time as a pipeline in the same
     # branch that is running you can potentially overwrite a results image that
@@ -256,7 +256,7 @@ if [[ $branch_name == $main_branch ]]; then
     repository="main"
 else
     repository="dev"
-    tag_prefix="${branch_name/[^a-zA-Z0-9]/-}"
+    tag_prefix="${branch_name/[^a-zA-Z0-9]/-}-"
 fi
 
 # construct image and cache names
