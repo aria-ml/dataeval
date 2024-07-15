@@ -10,9 +10,9 @@ Licensed under Apache Software License (Apache 2.0)
 
 from typing import Callable, Tuple, cast
 
+import keras
 import tensorflow as tf
-from keras.api._v2 import keras
-from keras.api._v2.keras.layers import (
+from keras.layers import (
     Dense,
     Flatten,
     Layer,

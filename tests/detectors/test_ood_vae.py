@@ -9,11 +9,11 @@ Licensed under Apache Software License (Apache 2.0)
 from itertools import product
 from typing import cast
 
-import keras.api._v2.keras as keras
+import keras as keras
 import numpy as np
 import pytest
 import tensorflow as tf
-from keras.api._v2.keras.layers import Dense, InputLayer
+from keras.layers import Dense, InputLayer
 from sklearn.datasets import load_iris
 
 from daml._internal.detectors.ood.vae import OOD_VAE

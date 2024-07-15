@@ -10,7 +10,7 @@ from typing import Literal, Optional, Union, cast
 
 import numpy as np
 import tensorflow as tf
-from keras.api._v2.keras.layers import Flatten
+from keras.layers import Flatten
 from tensorflow_probability.python.distributions.mvn_diag import MultivariateNormalDiag
 from tensorflow_probability.python.distributions.mvn_tril import MultivariateNormalTriL
 from tensorflow_probability.python.stats import covariance
