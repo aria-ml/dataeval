@@ -23,7 +23,7 @@ class Harbor(RestWrapper):
         verbose: bool = False,
     ):
         super().__init__(DAML_PROJECT_URL, DAML_HARBOR_TOKEN, token, timeout, verbose)
-        self.headers = {"Authorization": f"Bearer {self.token}"}
+        self.headers = {"Authorization": f"Basic {self.token}"}
 
     def list_artifacts(self, repository_name: str, tag_filter: Optional[str]) -> List[Dict[str, Any]]:
         """
