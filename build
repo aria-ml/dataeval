@@ -141,7 +141,7 @@ function build_image() {
     if [[ $push_to_repo ]]; then
         # Writing to the cache means that you must be able to push to the registry, therefore
         # don't want to force users to login to the registry just to build.
-        cache_to_arg="--cache-to type=registry,mode=max,image-manifest=true,ref=${cache[0]}"
+        cache_to_arg="--cache-to type=registry,image-manifest=true,ref=${cache[0]}"
     else
         cache_to_arg=""
     fi
