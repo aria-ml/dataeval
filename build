@@ -117,18 +117,24 @@ function build_image() {
         if [[ ${BRANCH_CACHE} ]]; then
             cache+=("${BRANCH_CACHE}${target}-${python_version}")
         fi
-        cache+=("${MAIN_CACHE}:${target}-${python_version}")
+        if [[ ! ${BRANCH_CACHE} || ! $(docker manifest inspect ${cache[-1]} 2> /dev/null) ]]; then
+            cache+=("${MAIN_CACHE}:${target}-${python_version}")
+        fi
     fi
     if [[ $target != pyenv ]]; then
         if [[ ${BRANCH_CACHE} ]]; then
             cache+=("${BRANCH_CACHE}base-${python_version}")
         fi
-        cache+=("${MAIN_CACHE}:base-${python_version}")
+        if [[ ! ${BRANCH_CACHE} || ! $(docker manifest inspect ${cache[-1]} 2> /dev/null) ]]; then
+            cache+=("${MAIN_CACHE}:base-${python_version}")
+        fi
     fi
     if [[ ${BRANCH_CACHE} ]]; then
         cache+=("${BRANCH_CACHE}pyenv-${python_version}")
     fi
-    cache+=("${MAIN_CACHE}:pyenv-${python_version}")
+    if [[ ! ${BRANCH_CACHE} || ! $(docker manifest inspect ${cache[-1]} 2> /dev/null) ]]; then
+        cache+=("${MAIN_CACHE}:pyenv-${python_version}")
+    fi
 
     # set cache_from and cache_to args
     cache_from_arg=$(echo ${cache[*]} | xargs -n1 sh -c 'echo --cache-from type=registry,ref=$0')
