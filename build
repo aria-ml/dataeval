@@ -114,26 +114,26 @@ function build_image() {
     # create cache array
     cache=()
     if [[ $target != base && $target != pyenv ]]; then
-        if [[ ${BRANCH_CACHE} ]]; then
-            cache+=("${BRANCH_CACHE}${target}-${python_version}")
+        if [[ ${REPOSITORY} != main ]]; then
+            cache+=("${TASK_IMAGE}:${target}-${python_version}-cache")
         fi
-        if [[ ! ${BRANCH_CACHE} || ! $(docker manifest inspect ${cache[-1]} 2> /dev/null) ]]; then
-            cache+=("${MAIN_CACHE}:${target}-${python_version}")
+        if [[ ${REPOSITORY} == main || ! $(docker manifest inspect ${cache[-1]} 2> /dev/null) ]]; then
+            cache+=("${CACHE_IMAGE}:${target}-${python_version}")
         fi
     fi
     if [[ $target != pyenv ]]; then
-        if [[ ${BRANCH_CACHE} ]]; then
-            cache+=("${BRANCH_CACHE}base-${python_version}")
+        if [[ ${REPOSITORY} != main ]]; then
+            cache+=("${TASK_IMAGE}:base-${python_version}-cache")
         fi
-        if [[ ! ${BRANCH_CACHE} || ! $(docker manifest inspect ${cache[-1]} 2> /dev/null) ]]; then
-            cache+=("${MAIN_CACHE}:base-${python_version}")
+        if [[ ${REPOSITORY} == main || ! $(docker manifest inspect ${cache[-1]} 2> /dev/null) ]]; then
+            cache+=("${CACHE_IMAGE}:base-${python_version}")
         fi
     fi
-    if [[ ${BRANCH_CACHE} ]]; then
-        cache+=("${BRANCH_CACHE}pyenv-${python_version}")
+    if [[ ${REPOSITORY} != main ]]; then
+        cache+=("${TASK_IMAGE}:pyenv-${python_version}-cache")
     fi
-    if [[ ! ${BRANCH_CACHE} || ! $(docker manifest inspect ${cache[-1]} 2> /dev/null) ]]; then
-        cache+=("${MAIN_CACHE}:pyenv-${python_version}")
+    if [[ ${REPOSITORY} == main || ! $(docker manifest inspect ${cache[-1]} 2> /dev/null) ]]; then
+        cache+=("${CACHE_IMAGE}:pyenv-${python_version}")
     fi
 
     # set cache_from and cache_to args
@@ -159,7 +159,7 @@ function build_image() {
     if [[ $target == pyenv && ! $(docker manifest inspect "${PYENV_IMAGE}:${python_version}" 2> /dev/null) ]]; then
         image_tag="${PYENV_IMAGE}:${python_version}"
     elif [[ $target != pyenv && $target != base ]]; then
-        image_tag="${TASK_IMAGE}${target}-${python_version}"
+        image_tag="${TASK_IMAGE}:${target}-${python_version}"
     else
         image_tag=""
     fi
@@ -215,7 +215,7 @@ function build_and_run() {
         pull_arg="--pull always"
     fi
 
-    image_tag="${TASK_IMAGE}${task}-${python_version}"
+    image_tag="${TASK_IMAGE}:${task}-${python_version}"
 
     # NOTE: If you ./build --push at the same time as a pipeline in the same
     # branch that is running you can potentially overwrite a results image that
@@ -259,22 +259,17 @@ fi
 
 namespace="harbor.jatic.net/daml"
 if [[ $branch_name == $main_branch ]]; then
-    repository="main"
+    export REPOSITORY="main"
 else
-    repository="dev"
     shopt -s extglob
-    tag_prefix="${branch_name//+([^a-zA-Z0-9])/-}-"
+    export REPOSITORY="${branch_name//+([^a-zA-Z0-9])/-}"
     shopt -u extglob
 fi
 
 # construct image and cache names
+export CACHE_IMAGE="${namespace}/cache"
 export PYENV_IMAGE="${namespace}/pyenv"
-export TASK_IMAGE="${namespace}/${repository}:${tag_prefix}"
-
-export MAIN_CACHE="${namespace}/cache"
-if [[ $tag_prefix ]]; then
-    export BRANCH_CACHE="${namespace}/cache:${tag_prefix}"
-fi
+export TASK_IMAGE="${namespace}/${REPOSITORY}"
 
 if [[ ! $quiet ]]; then
     keep_order="--keep-order"
