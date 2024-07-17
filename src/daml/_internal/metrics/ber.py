@@ -10,6 +10,7 @@ https://arxiv.org/abs/1811.06419
 from typing import Callable, Dict, Literal, Tuple
 
 import numpy as np
+from maite.protocols import ArrayLike
 from scipy.sparse import coo_matrix
 from scipy.stats import mode
 
@@ -88,7 +89,7 @@ class BER(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
 
     """
 
-    def __init__(self, data: np.ndarray, labels: np.ndarray, method: _METHODS = "KNN", k: int = 1) -> None:
+    def __init__(self, data: ArrayLike, labels: ArrayLike, method: _METHODS = "KNN", k: int = 1) -> None:
         self.data = data
         self.labels = labels
         self.k = k
@@ -117,5 +118,7 @@ class BER(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
         ValueError
             If unique classes M < 2
         """
-        upper, lower = self._method(self.data, self.labels, self.k)
+        data = np.asarray(self.data)
+        labels = np.asarray(self.labels)
+        upper, lower = self._method(data, labels, self.k)
         return {"ber": upper, "ber_lower": lower}
