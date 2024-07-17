@@ -45,51 +45,6 @@ class Harbor(RestWrapper):
         r = self._request(get, [REPOSITORIES, repository_name, ARTIFACTS], params)
         return r
 
-    def list_repositories(self, name_filter: Optional[str]) -> List[Dict[str, Any]]:
-        """
-        List repositories
-
-        Returns
-        -------
-        List[Dict[str, Any]]
-            List of repositories
-
-        Notes
-        --------
-        https://harbor.jatic.net/#/repository/listRepositories
-        """
-        params = {"page_size": "20"}
-        if name_filter:
-            params.update({"q": f"name=~{name_filter}"})
-
-        r = self._request(get, [REPOSITORIES], params)
-        return r
-
-    def delete_repository(self, repository_name: str):
-        """
-        Delete a repository 'repository_name'
-
-        Parameters
-        ----------
-        repository_name : str
-            The name of the repository (i.e. 'cache')
-
-        Returns
-        -------
-        None
-
-        Notes
-        --------
-        https://harbor.jatic.net/#/repository/deleteRepository
-        """
-        try:
-            self._request(delete, [REPOSITORIES, repository_name])
-        except ConnectionError as e:
-            status_code = int(str(e))
-            # Don't fail if the tag doesn't exist (i.e. function is idempotent)
-            if status_code != 404:
-                raise e
-
     def delete_tag(self, repository_name: str, tag_name: str):
         """
         Delete a tag 'repository_name:tag_name'
