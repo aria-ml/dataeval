@@ -38,7 +38,7 @@ class Harbor(RestWrapper):
         --------
         https://harbor.jatic.net/#/artifact/listArtifacts
         """
-        params = {"with_tag": "true", "page_size": "60"}
+        params = {"with_tag": "true", "page_size": "100"}
         if tag_filter:
             params.update({"q": f"tags=~{tag_filter}"})
 

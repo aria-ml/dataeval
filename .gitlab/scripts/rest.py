@@ -124,6 +124,8 @@ class RestWrapper:
 
             if "X-Total-Pages" in response.headers:
                 last_page = int(response.headers["X-Total-Pages"])
+            elif response.links and len(response.links) > 0:
+                last_page = len(response.links) + 1
             else:
                 assert isinstance(response_json, (dict, list))
                 return response_json
