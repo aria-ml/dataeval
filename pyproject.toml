@@ -141,7 +141,8 @@ exclude = [
   "*env*",
   "output",
   "_build",
-  ".tox"
+  ".tox",
+  "prototype",
 ]
 line-length = 120
 indent-width = 4
