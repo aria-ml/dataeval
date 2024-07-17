@@ -25,7 +25,7 @@ class Harbor(RestWrapper):
         super().__init__(DAML_PROJECT_URL, DAML_HARBOR_TOKEN, token, timeout, verbose)
         self.headers = {"Authorization": f"Basic {self.token}"}
 
-    def list_artifacts(self, repository_name: str, tag_filter: Optional[str]) -> List[Dict[str, Any]]:
+    def list_artifacts(self, repository_name: str, tag_filter: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         List artifacts
 
@@ -38,7 +38,7 @@ class Harbor(RestWrapper):
         --------
         https://harbor.jatic.net/#/artifact/listArtifacts
         """
-        params = {"with_tag": "true", "page_size": "20"}
+        params = {"with_tag": "true", "page_size": "60"}
         if tag_filter:
             params.update({"q": f"tags=~{tag_filter}"})
 

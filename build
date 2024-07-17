@@ -262,7 +262,9 @@ if [[ $branch_name == $main_branch ]]; then
     repository="main"
 else
     repository="dev"
-    tag_prefix="${branch_name/[^a-zA-Z0-9]/-}-"
+    shopt -s extglob
+    tag_prefix="${branch_name//+([^a-zA-Z0-9])/-}-"
+    shopt -u extglob
 fi
 
 # construct image and cache names

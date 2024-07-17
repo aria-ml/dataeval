@@ -157,6 +157,7 @@ class Gitlab(RestWrapper):
         target_branch: Optional[str] = None,
         source_branch: Optional[str] = None,
         search_title: Optional[str] = None,
+        order_by: Optional[Literal["created_at", "title", "merged_at", "updated_at"]] = None,
     ) -> List[Dict[str, Any]]:
         """
         List merge requests
@@ -179,6 +180,8 @@ class Gitlab(RestWrapper):
             params.update({"source_branch": source_branch})
         if search_title is not None:
             params.update({"search": search_title, "in": "title"})
+        if order_by is not None:
+            params.update({"order_by": order_by})
         r = self._request(get, MERGE_REQUESTS, params)
         return r
 
