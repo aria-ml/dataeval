@@ -7,7 +7,8 @@ from re import MULTILINE, compile
 from shutil import move, rmtree
 from typing import Any, Dict, List, Optional, Tuple
 
-from gitlab import Gitlab, verbose
+from gitlab import Gitlab
+from rest import verbose
 
 CHANGELOG_FILE = "CHANGELOG.md"
 TAB = "    "
