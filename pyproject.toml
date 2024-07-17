@@ -41,11 +41,12 @@ python = ">=3.9,<3.12"
 hdbscan = {version = ">=0.8.36"}
 numpy = {version = ">1.24.3"}
 pillow = {version = ">=10.3.0"}
-scipy = {version = ">=1.10" }
-scikit-learn = {version = ">=1.2.1" }
+scipy = {version = ">=1.10"}
+scikit-learn = {version = ">=1.2.1"}
 xxhash = {version = ">=3.3"}
+maite = {version = "*"}
+
 # optional
-maite = {version = "*", optional = true}
 matplotlib = {version = "*", optional = true}
 nvidia-cudnn-cu11 = {version = ">=8.6.0.163", optional = true}
 tensorflow = {version = ">=2.14.1, <2.16", optional = true}
@@ -54,10 +55,9 @@ tensorflow_probability = {version = ">=0.22.1, <0.24", optional = true}
 torch = {version = ">=2.0.1, !=2.2.0", source = "pytorch", optional = true}
 
 [tool.poetry.extras]
-maite = ["maite"]
 tensorflow = ["tensorflow", "tensorflow-io-gcs-filesystem", "tensorflow_probability", "nvidia-cudnn-cu11"]
 torch = ["torch", "matplotlib", "nvidia-cudnn-cu11"]
-all = ["maite", "matplotlib", "nvidia-cudnn-cu11", "tensorflow", "tensorflow-io-gcs-filesystem", "tensorflow_probability", "torch"]
+all = ["matplotlib", "nvidia-cudnn-cu11", "tensorflow", "tensorflow-io-gcs-filesystem", "tensorflow_probability", "torch"]
 
 [tool.poetry.group.dev]
 optional = true

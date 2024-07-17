@@ -2156,7 +2156,7 @@ typing = ["mypy (>=1.0.0)", "types-setuptools"]
 name = "maite"
 version = "0.6.0"
 description = "Library of common types, protocols (a.k.a. structural subtypes), and utilities to support AI test and evaluation"
-optional = true
+optional = false
 python-versions = ">=3.8"
 files = [
     {file = "maite-0.6.0-py3-none-any.whl", hash = "sha256:518bd5071c4a619687c72b37e4512e655533d2ac82ba94ece4864eade2f755c9"},
@@ -5535,12 +5535,11 @@ doc = ["furo", "jaraco.packaging (>=9.3)", "jaraco.tidelift (>=1.4)", "rst.linke
 test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", "jaraco.test", "more-itertools", "pytest (>=6,!=8.1.*)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=2.2)", "pytest-ignore-flaky", "pytest-mypy", "pytest-ruff (>=0.2.1)"]
 
 [extras]
-all = ["maite", "matplotlib", "nvidia-cudnn-cu11", "tensorflow", "tensorflow-io-gcs-filesystem", "tensorflow_probability", "torch"]
-maite = ["maite"]
+all = ["matplotlib", "nvidia-cudnn-cu11", "tensorflow", "tensorflow-io-gcs-filesystem", "tensorflow_probability", "torch"]
 tensorflow = ["nvidia-cudnn-cu11", "tensorflow", "tensorflow-io-gcs-filesystem", "tensorflow_probability"]
 torch = ["matplotlib", "nvidia-cudnn-cu11", "torch"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.12"
-content-hash = "45587fd6eb88ec9044f7891c3ef200e50e29619b69a8a818803910ee3f800f23"
+content-hash = "c57fc8fcd8d9b9979dede168ceebc2ae13de0650ec69b6e899194731bfbd1b33"

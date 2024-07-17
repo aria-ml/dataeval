@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import torch
 
 from daml._internal.metrics.ber import _knn_lowerbound
 from daml._internal.metrics.utils import get_classes_counts
@@ -53,3 +54,32 @@ class TestMulticlassBER:
     def test_knn_lower_bound_2_classes(self, value, classes, k, expected):
         result = _knn_lowerbound(value, classes, k)
         assert result == expected
+
+
+class TestBERArrayLike:
+    @pytest.mark.parametrize(
+        "arr, larr",
+        [
+            (np.random.randint(0, 100, (10, 10)), np.arange(10)),
+            (torch.randint(0, 100, (10, 10)), torch.arange(0, 10)),
+        ],
+    )
+    def test_arraylike(self, arr, larr):
+        """Test maite.protocols.ArrayLike objects pass evaluation"""
+
+        ber = BER(arr, larr)
+        ber.evaluate()
+
+    @pytest.mark.parametrize(
+        "arr, larr",
+        [
+            ([[0, 0, 0], [1, 1], [0, 1], [1, 0]], [0, 0, 1, 1]),
+            ([["0", "0"], ["1", "1"], ["0", "1"], ["1", "0"]], ["0", "0", "1", "1"]),
+        ],
+    )
+    def test_invalid_array(self, arr, larr):
+        """Test non-arraylike objects fail evaluation"""
+
+        ber = BER(arr, larr)
+        with pytest.raises(ValueError):
+            ber.evaluate()
