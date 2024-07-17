@@ -1,6 +1,7 @@
 from datetime import date
 
-from gitlab import Gitlab, verbose
+from gitlab import Gitlab
+from rest import verbose
 
 # fmt: off
 # Bi-weekly sprints starting 8/2/2023
