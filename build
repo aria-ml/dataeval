@@ -121,24 +121,16 @@ function build_image() {
             cache+=("${MAIN_CACHE}:${target}-${python_version}")
         fi
     fi
-    if [[ $target != pyenv ]]; then
-        if [[ ${BRANCH_CACHE} ]]; then
-            cache+=("${BRANCH_CACHE}base-${python_version}")
-        fi
-        if [[ ! ${BRANCH_CACHE} || ! $(docker manifest inspect ${cache[-1]} 2> /dev/null) ]]; then
-            cache+=("${MAIN_CACHE}:base-${python_version}")
-        fi
-    fi
     if [[ ${BRANCH_CACHE} ]]; then
-        cache+=("${BRANCH_CACHE}pyenv-${python_version}")
+        cache+=("${BRANCH_CACHE}base-${python_version}")
     fi
     if [[ ! ${BRANCH_CACHE} || ! $(docker manifest inspect ${cache[-1]} 2> /dev/null) ]]; then
-        cache+=("${MAIN_CACHE}:pyenv-${python_version}")
+        cache+=("${MAIN_CACHE}:base-${python_version}")
     fi
 
     # set cache_from and cache_to args
     cache_from_arg=$(echo ${cache[*]} | xargs -n1 sh -c 'echo --cache-from type=registry,ref=$0')
-    if [[ $push_to_repo ]]; then
+    if [[ $target != pyenv && $push_to_repo ]]; then
         # Writing to the cache means that you must be able to push to the registry, therefore
         # don't want to force users to login to the registry just to build.
         cache_to_arg="--cache-to type=registry,mode=max,image-manifest=true,ref=${cache[0]}"
@@ -156,7 +148,7 @@ function build_image() {
     # be loaded for playback of results.
 
     # build image_tag for pyenv (if not exist) or for task images (not pyenv, not base)
-    if [[ $target == pyenv && ! $(docker manifest inspect "${PYENV_IMAGE}:${python_version}" 2> /dev/null) ]]; then
+    if [[ $target == pyenv ]]; then
         image_tag="${PYENV_IMAGE}:${python_version}"
     elif [[ $target != pyenv && $target != base ]]; then
         image_tag="${TASK_IMAGE}${target}-${python_version}"
@@ -287,8 +279,10 @@ for python_version in ${!pvers[@]}; do
     # off quicker. These checks allow us to run either base or task exclusively. Removing this
     # optimization would mean we could just combine both and remove the conditional checks.
     if [[ ! $CI || $build_base ]]; then
-        build_image pyenv $python_version
         build_image base $python_version
+        if [[ $branch_name == $main_branch ]]; then
+            build_image pyenv $python_version
+        fi
     fi
     if [[ ! $CI || $build_task ]]; then
         echo "Building [${!tasks[@]}]-$python_version..."

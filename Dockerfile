@@ -83,7 +83,7 @@ ENV LANG=en_US.UTF-8
 FROM cuda as base
 ARG UID
 ARG PYENV_ROOT
-COPY --chown=${UID} --link --from=pyenv-build ${PYENV_ROOT} ${PYENV_ROOT}
+COPY --chown=${UID} --link --from=pyenv ${PYENV_ROOT} ${PYENV_ROOT}
 ENV PATH ${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:$PATH
 ARG python_version
 RUN pyenv global ${python_version}
