@@ -42,7 +42,7 @@ hdbscan = {version = ">=0.8.36"}
 numpy = {version = ">1.24.3"}
 pillow = {version = ">=10.3.0"}
 scipy = {version = ">=1.10"}
-scikit-learn = {version = ">=1.2.1"}
+scikit-learn = {version = ">=1.5.0"}
 xxhash = {version = ">=3.3"}
 maite = {version = "*"}
 
@@ -79,6 +79,7 @@ torchmetrics = {version = ">=1.0.0", source = "pytorch"}
 # type
 pyright = {version = "*, !=1.1.340"}
 # docs
+certifi = {version = ">=2024.07.04", python = "~3.11"}
 enum_tools = {version = "0.12.0", extras = ["sphinx"], python = "~3.11"}
 ipykernel = {version = "6.26.0", python = "~3.11"}
 ipywidgets = {version = "8.1.1", python = "~3.11"}
