@@ -1,6 +1,19 @@
-[//]: # (6d0bd795f6f8c0032e004483e0ca03b583d393ad)
+[//]: # (cd59debbfff26ecaa60e992ef0798a16dceb6c60)
 
 # DataEval Change Log
+
+## v0.61.0
+
+🛠️ **Improvements and Enhancements**
+- `cd59debb` - Remove logo with name
+
+    DAML is now officially rebranded as DataEval!  New name, same great camel flavor.
+- `cd59debb` - Remove logo with name
+
+    DAML is now officially rebranded as DataEval!  New name, same great camel flavor.
+- `cd59debb` - Remove logo with name
+
+    DAML is now officially rebranded as DataEval!  New name, same great camel flavor.
 
 ## v0.56.0
 
