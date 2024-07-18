@@ -15,11 +15,11 @@ import pytest
 import torch
 import torch.nn as nn
 
-from daml._internal.detectors.drift.base import (
+from dataeval._internal.detectors.drift.base import (
     LastSeenUpdate,
     ReservoirSamplingUpdate,
 )
-from daml.detectors import DriftMMD, preprocess_drift
+from dataeval.detectors import DriftMMD, preprocess_drift
 
 n, n_hidden, n_classes = 500, 10, 5
 

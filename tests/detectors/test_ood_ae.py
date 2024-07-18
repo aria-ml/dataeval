@@ -16,8 +16,8 @@ import tensorflow as tf
 from keras.layers import Dense, InputLayer
 from sklearn.datasets import load_iris
 
-from daml._internal.detectors.ood.ae import OOD_AE
-from daml._internal.models.tensorflow.autoencoder import AE
+from dataeval._internal.detectors.ood.ae import OOD_AE
+from dataeval._internal.models.tensorflow.autoencoder import AE
 
 threshold_perc = [90.0]
 ood_perc = [50, 100]

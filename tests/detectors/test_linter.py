@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from daml._internal.detectors.linter import Linter, _get_outlier_mask
-from daml._internal.flags import ImageStatistics
+from dataeval._internal.detectors.linter import Linter, _get_outlier_mask
+from dataeval._internal.flags import ImageStatistics
 
 
 class TestLinter:

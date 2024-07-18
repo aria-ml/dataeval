@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
-from daml._internal.models.tensorflow.trainer import trainer
+from dataeval._internal.models.tensorflow.trainer import trainer
 
 Indexable = Union[np.ndarray, tf.Tensor, list]
 

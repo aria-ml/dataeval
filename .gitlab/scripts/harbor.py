@@ -3,8 +3,8 @@ from typing import Any, Dict, List, Optional
 from requests import delete, get
 from rest import RestWrapper
 
-DAML_PROJECT_URL = "https://harbor.jatic.net/api/v2.0/projects/daml/"
-DAML_HARBOR_TOKEN = "DAML_HARBOR_API_TOKEN"
+DATAEVAL_PROJECT_URL = "https://harbor.jatic.net/api/v2.0/projects/dataeval/"
+DATAEVAL_HARBOR_TOKEN = "DATAEVAL_HARBOR_API_TOKEN"
 
 REPOSITORIES = "repositories"
 ARTIFACTS = "artifacts"
@@ -22,7 +22,7 @@ class Harbor(RestWrapper):
         timeout: int = 10,
         verbose: bool = False,
     ):
-        super().__init__(DAML_PROJECT_URL, DAML_HARBOR_TOKEN, token, timeout, verbose)
+        super().__init__(DATAEVAL_PROJECT_URL, DATAEVAL_HARBOR_TOKEN, token, timeout, verbose)
         self.headers = {"Authorization": f"Basic {self.token}"}
 
     def list_artifacts(self, repository_name: str, tag_filter: Optional[str] = None) -> List[Dict[str, Any]]:

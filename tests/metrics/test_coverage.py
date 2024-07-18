@@ -4,7 +4,7 @@ import warnings
 import numpy as np
 import pytest
 
-from daml._internal.metrics.coverage import Coverage
+from dataeval._internal.metrics.coverage import Coverage
 
 
 class TestCoverageUnit:

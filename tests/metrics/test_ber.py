@@ -2,9 +2,9 @@ import numpy as np
 import pytest
 import torch
 
-from daml._internal.metrics.ber import _knn_lowerbound
-from daml._internal.metrics.utils import get_classes_counts
-from daml.metrics import BER
+from dataeval._internal.metrics.ber import _knn_lowerbound
+from dataeval._internal.metrics.utils import get_classes_counts
+from dataeval.metrics import BER
 
 
 class TestMulticlassBER:

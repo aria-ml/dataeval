@@ -9,7 +9,7 @@ Licensed under Apache Software License (Apache 2.0)
 import numpy as np
 import pytest
 
-from daml.detectors import DriftCVM
+from dataeval.detectors import DriftCVM
 
 np.random.seed(0)
 

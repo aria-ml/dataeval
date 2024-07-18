@@ -3,7 +3,7 @@ from statistics import NormalDist
 import matplotlib.pyplot as plt
 import numpy as np
 
-from daml.metrics import BER
+from dataeval.metrics import BER
 
 
 def generate_toy_data(num_classes=2, num_feat=32, num_samples_per_class=1000):
@@ -72,4 +72,4 @@ if __name__ == "__main__":
     plt.plot(plt.xlim(), ber_0 * np.ones(2), marker=".", lw=2, label="True BER", color="k")
     plt.title(f"{num_classes} classes, {num_feat} features")
     plt.legend()
-    plt.savefig(f"src/daml/_prototype/figs/ber_knn_convergence_{num_feat}feat.png")
+    plt.savefig(f"src/dataeval/_prototype/figs/ber_knn_convergence_{num_feat}feat.png")

@@ -1,6 +1,6 @@
 [//]: # (6d0bd795f6f8c0032e004483e0ca03b583d393ad)
 
-# DAML Change Log
+# DataEval Change Log
 
 ## v0.56.0
 
@@ -48,7 +48,7 @@
 ## v0.52.0
 
 🛠️ **Improvements and Enhancements**
-- `07b12ac2` - Fully integrate outlier detection into DAML
+- `07b12ac2` - Fully integrate outlier detection
 
     Outlier Detection API has been changed.  Additional details are available in our documentation.
 

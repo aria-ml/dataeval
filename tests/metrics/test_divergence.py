@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from daml.metrics import Divergence
+from dataeval.metrics import Divergence
 
 np.random.seed(0)
 

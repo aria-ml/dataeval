@@ -14,7 +14,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from daml._internal.detectors.drift.torch import (
+from dataeval._internal.detectors.drift.torch import (
     GaussianRBF,
     get_device,
     mmd2_from_kernel_matrix,

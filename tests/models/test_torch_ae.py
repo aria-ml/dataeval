@@ -2,14 +2,14 @@ import pytest
 import torch
 from torch.utils.data import DataLoader
 
-from daml._internal.models.pytorch.autoencoder import get_images_from_batch
-from daml.models.torch import AETrainer, AriaAutoencoder, Decoder, Encoder
-from tests.utils.data import DamlDataset
+from dataeval._internal.models.pytorch.autoencoder import get_images_from_batch
+from dataeval.models.torch import AETrainer, AriaAutoencoder, Decoder, Encoder
+from tests.utils.data import DataEvalDataset
 
 
 @pytest.fixture
 def dataset(images=None, labels=None, bboxes=None):
-    return DamlDataset(images, labels, bboxes)
+    return DataEvalDataset(images, labels, bboxes)
 
 
 @pytest.mark.parametrize(
@@ -60,7 +60,7 @@ class TestTrainer:
     def test_train_aria_ae(self):
         """Aria provided autoencoder can be trained"""
         images = torch.ones(size=(5, 3, 32, 32))
-        dataset = DamlDataset(images)
+        dataset = DataEvalDataset(images)
         ae = AriaAutoencoder(channels=3)
         trainer = AETrainer(model=ae)
         trainer.train(dataset, epochs=5)
@@ -70,7 +70,7 @@ class TestTrainer:
         If model output image shape != input image shape, it's likely not an AE
         """
         images = torch.ones(size=(5, 3, 32, 32))
-        dataset = DamlDataset(images)
+        dataset = DataEvalDataset(images)
         model = Encoder()
         trainer = AETrainer(model)
 
@@ -81,7 +81,7 @@ class TestTrainer:
     def test_eval_aria_ae(self):
         """Aria provided autoencoder has evaluate on new data"""
         images = torch.ones(size=[5, 3, 32, 32])
-        dataset = DamlDataset(images)
+        dataset = DataEvalDataset(images)
         ae = AriaAutoencoder(channels=3)
         trainer = AETrainer(model=ae)
         loss = trainer.eval(dataset)
@@ -89,7 +89,7 @@ class TestTrainer:
 
     def test_encode_aria_ae(self):
         images = torch.ones(size=(5, 3, 32, 32))
-        dataset = DamlDataset(images)
+        dataset = DataEvalDataset(images)
         ae = AriaAutoencoder(channels=3)
         trainer = AETrainer(model=ae)
         embeddings = trainer.encode(dataset)
@@ -97,7 +97,7 @@ class TestTrainer:
 
     def test_encode_batch(self):
         images = torch.ones(size=(20, 3, 32, 32))
-        dataset = DamlDataset(images)
+        dataset = DataEvalDataset(images)
         ae = AriaAutoencoder(channels=3)
         trainer = AETrainer(model=ae)
         embeddings = trainer.encode(dataset)
@@ -106,7 +106,7 @@ class TestTrainer:
 
     def test_encode_missing_encode(self):
         images = torch.ones(size=(5, 3, 32, 32))
-        dataset = DamlDataset(images)
+        dataset = DataEvalDataset(images)
         ae = Encoder(channels=3)
         trainer = AETrainer(model=ae)
         embeddings = trainer.encode(dataset)
@@ -115,7 +115,7 @@ class TestTrainer:
 
     # Parameterizing the 3 following tests causes errors, so split into 3 tests
     def test_images_from_batch_imgs(self):
-        ds = DamlDataset(torch.ones(size=(8, 3, 32, 32)))
+        ds = DataEvalDataset(torch.ones(size=(8, 3, 32, 32)))
         imgs = []
         for batch in DataLoader(dataset=ds, batch_size=8):
             imgs = get_images_from_batch(batch)
@@ -123,7 +123,7 @@ class TestTrainer:
             assert imgs.shape == (8, 3, 32, 32)
 
     def test_images_from_batch_lbls(self):
-        ds = DamlDataset(torch.ones(size=(8, 3, 32, 32)), torch.ones(size=(8, 1)))
+        ds = DataEvalDataset(torch.ones(size=(8, 3, 32, 32)), torch.ones(size=(8, 1)))
         imgs = []
         for batch in DataLoader(dataset=ds, batch_size=8):
             # print("Batch:", batch)
@@ -132,7 +132,7 @@ class TestTrainer:
             assert imgs.shape == (8, 3, 32, 32)
 
     def test_images_from_batch_bxs(self):
-        ds = DamlDataset(
+        ds = DataEvalDataset(
             torch.ones(size=(8, 3, 32, 32)),
             torch.ones(size=(8, 1)),
             torch.ones(size=(8, 2)),

@@ -1,12 +1,12 @@
 [tool.poetry]
-name = "daml"
+name = "dataeval"
 version = "0.0.0" # dynamic
-description = "DAML provides a simple interface to characterize image data and its impact on model performance across classification and object-detection tasks"
+description = "DataEval provides a simple interface to characterize image data and its impact on model performance across classification and object-detection tasks"
 license = "MIT"
 readme = "README.md"
-homepage = "https://daml.ai/"
-repository = "https://github.com/aria-ml/daml/"
-documentation = "https://daml.readthedocs.io/"
+homepage = "https://dataeval.ai/"
+repository = "https://github.com/aria-ml/dataeval/"
+documentation = "https://dataeval.readthedocs.io/"
 
 authors = [
   "Andrew Weng <andrew.weng@ariacoustics.com>",
@@ -16,7 +16,7 @@ authors = [
   "Thayer Fisher <thayer.fisher@ariacoustics.com>",
 ]
 maintainers = [
-  "ARiA <daml@ariacoustics.com>"
+  "ARiA <dataeval@ariacoustics.com>"
 ]
 
 classifiers = [
@@ -32,7 +32,7 @@ classifiers = [
 ]
 
 packages = [
-  {include = "daml", from = "src"}
+  {include = "dataeval", from = "src"}
 ]
 
 [tool.poetry.dependencies]
@@ -107,7 +107,7 @@ style = "semver"
 pattern = "v(?P<base>\\d+\\.\\d+\\.\\d+)$"
 
 [tool.poetry-dynamic-versioning.substitution]
-files = ["src/daml/__init__.py"]
+files = ["src/dataeval/__init__.py"]
 
 [tool.pyright]
 reportMissingImports = false
@@ -117,7 +117,7 @@ norecursedirs = ["prototype"]
 addopts = ["--pythonwarnings=ignore::DeprecationWarning", "--verbose", "--durations=20", "--durations-min=1.0"]
 
 [tool.coverage.run]
-source = ["daml"]
+source = ["dataeval"]
 branch = true
 
 [tool.coverage.report]
@@ -159,7 +159,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 per-file-ignores = { "*.ipynb" = ["E402"] }
 
 [tool.ruff.lint.isort]
-known-first-party = ["daml"]
+known-first-party = ["dataeval"]
 
 [tool.ruff.format]
 quote-style = "double"

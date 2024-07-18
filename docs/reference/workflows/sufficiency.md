@@ -19,10 +19,10 @@ Check out this tutorial to begin using the `Sufficiency` class
 There are currently no how to's for `Sufficiency`.
 If there are scenarios that you want us to explain, contact us!
 
-## DAML API
+## DataEval API
 
 ```{eval-rst}
-.. autoclass:: daml.workflows.Sufficiency
+.. autoclass:: dataeval.workflows.Sufficiency
    :members:
    :inherited-members:
 ```
@@ -40,7 +40,7 @@ If there are scenarios that you want us to explain, contact us!
     from torch.utils.data import Dataset
     from unittest.mock import MagicMock, patch
 
-    from daml.workflows import Sufficiency
+    from dataeval.workflows import Sufficiency
     model = MagicMock()
     train_ds = MagicMock()
     train_ds.__len__.return_value = 2

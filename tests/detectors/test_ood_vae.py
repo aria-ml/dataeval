@@ -16,9 +16,9 @@ import tensorflow as tf
 from keras.layers import Dense, InputLayer
 from sklearn.datasets import load_iris
 
-from daml._internal.detectors.ood.vae import OOD_VAE
-from daml._internal.models.tensorflow.autoencoder import VAE
-from daml._internal.models.tensorflow.losses import Elbo
+from dataeval._internal.detectors.ood.vae import OOD_VAE
+from dataeval._internal.models.tensorflow.autoencoder import VAE
+from dataeval._internal.models.tensorflow.losses import Elbo
 
 score_type = ["mse"]
 samples = [10]

@@ -1,8 +1,8 @@
-# Data-Analysis Metrics Library (DAML)
+# DataEval
 
-## About DAML
+## About DataEval
 
-The Data-Analysis Metrics Library, or DAML, focuses on characterizing image data and its impact on model performance across classification and object-detection tasks.
+DataEval focuses on characterizing image data and its impact on model performance across classification and object-detection tasks.
 
 <!-- start about -->
 
@@ -26,43 +26,43 @@ The Data-Analysis Metrics Library, or DAML, focuses on characterizing image data
 ### Requirements
 - Python 3.9-3.11
 
-### Installing DAML
+### Installing DataEval
 
-You can install DAML directly from pypi.org using the following command.  The optional dependencies of DAML are `torch`, `tensorflow` and `all`.  Using `torch` enables Sufficiency metrics, and `tensorflow` enables OOD Detection.
+You can install DataEval directly from pypi.org using the following command.  The optional dependencies of DataEval are `torch`, `tensorflow` and `all`.  Using `torch` enables Sufficiency metrics, and `tensorflow` enables OOD Detection.
 
 ```
-pip install daml[all]
+pip install dataeval[all]
 ```
 
-### Installing DAML from GitHub
+### Installing DataEval from GitHub
 
-To install DAML from source locally on Ubuntu, you will need `git-lfs` to download larger, binary source files and `poetry` for project dependency management.
+To install DataEval from source locally on Ubuntu, you will need `git-lfs` to download larger, binary source files and `poetry` for project dependency management.
 
 ```
 sudo apt-get install git-lfs
 pip install poetry
 ```
 
-Pull the source down and change to the DAML project directory.
+Pull the source down and change to the DataEval project directory.
 ```
-git clone https://github.com/aria-ml/daml.git
-cd daml
+git clone https://github.com/aria-ml/dataeval.git
+cd dataeval
 ```
 
 
 
-Install DAML with optional dependencies for development.
+Install DataEval with optional dependencies for development.
 ```
 poetry install --all-extras --with dev
 ```
 
-Now that DAML is installed, you can run commands in the poetry virtual environment by prefixing shell commands with `poetry run`, or activate the virtual environment directly in the shell.
+Now that DataEval is installed, you can run commands in the poetry virtual environment by prefixing shell commands with `poetry run`, or activate the virtual environment directly in the shell.
 ```
 poetry shell
 ```
 
 ### Documentation and Tutorials
-For more ideas on getting started using DAML in your workflow, additional information and tutorials are in our Sphinx documentation hosted on [Read the Docs](https://daml.readthedocs.io/).
+For more ideas on getting started using DataEval in your workflow, additional information and tutorials are in our Sphinx documentation hosted on [Read the Docs](https://dataeval.readthedocs.io/).
 
 ## Attribution
 This project uses code from the [Alibi-Detect](https://github.com/SeldonIO/alibi-detect) python library developed by SeldonIO.  Additional documentation from the developers are also available [here](https://docs.seldon.io/projects/alibi-detect/en/stable/).

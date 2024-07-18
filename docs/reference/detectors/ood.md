@@ -19,10 +19,10 @@ Check out this tutorial to begin using the Out-of-Distribution Detection class
 There are currently no how to's for Out-of-Distribution Detection.
 If there are scenarios that you want us to explain, contact us!
 
-## DAML API
+## DataEval API
 
 ```{eval-rst}
-.. autoclass:: daml.detectors.OOD_AE
+.. autoclass:: dataeval.detectors.OOD_AE
    :members:
    :inherited-members:
 ```
@@ -30,7 +30,7 @@ If there are scenarios that you want us to explain, contact us!
 ______________________________________________________________________
 
 ```{eval-rst}
-.. autoclass:: daml.detectors.OOD_AEGMM
+.. autoclass:: dataeval.detectors.OOD_AEGMM
    :members:
    :inherited-members:
 ```
@@ -38,7 +38,7 @@ ______________________________________________________________________
 ______________________________________________________________________
 
 ```{eval-rst}
-.. autoclass:: daml.detectors.OOD_LLR
+.. autoclass:: dataeval.detectors.OOD_LLR
    :members:
    :inherited-members:
 ```
@@ -46,7 +46,7 @@ ______________________________________________________________________
 ______________________________________________________________________
 
 ```{eval-rst}
-.. autoclass:: daml.detectors.OOD_VAE
+.. autoclass:: dataeval.detectors.OOD_VAE
    :members:
    :inherited-members:
 ```
@@ -62,8 +62,8 @@ ______________________________________________________________________
 ```{eval-rst}
 .. testcode::
     
-    from daml.detectors import OOD_VAE
-    from daml.models.tensorflow import VAE, create_model
+    from dataeval.detectors import OOD_VAE
+    from dataeval.models.tensorflow import VAE, create_model
     
     # instantiate an OOD detector metric
     metric = OOD_VAE(create_model(VAE, dataset[0].shape))
@@ -78,7 +78,7 @@ ______________________________________________________________________
 ______________________________________________________________________
 
 ```{eval-rst}
-.. autoclass:: daml.detectors.OOD_VAEGMM
+.. autoclass:: dataeval.detectors.OOD_VAEGMM
    :members:
    :inherited-members:
 ```
@@ -86,5 +86,5 @@ ______________________________________________________________________
 ______________________________________________________________________
 
 ```{eval-rst}
-.. autoclass:: daml.detectors.OODScore
+.. autoclass:: dataeval.detectors.OODScore
 ```

@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from daml._internal.detectors.ood.base import OODGMMBase, OODScore
-from daml._internal.models.tensorflow.autoencoder import AE
-from daml._internal.models.tensorflow.utils import create_model
+from dataeval._internal.detectors.ood.base import OODGMMBase, OODScore
+from dataeval._internal.models.tensorflow.autoencoder import AE
+from dataeval._internal.models.tensorflow.utils import create_model
 
 image_shape = (32, 32, 1)
 model = create_model(AE, image_shape)

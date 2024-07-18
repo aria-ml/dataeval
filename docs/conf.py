@@ -7,13 +7,13 @@ from contextlib import contextmanager
 from os import chdir, getcwd, getenv
 
 # -- Project information ---------------------------------------------------
-project = "DAML"
+project = "DataEval"
 copyright = "2024, ARiA"  # noqa: A001
 author = "ARiA"
 
-site_url = "https://github.com/aria-ml/daml/"
-repo_url = "https://github.com/aria-ml/daml/"
-repo_name = "DAML"
+site_url = "https://github.com/aria-ml/dataeval/"
+repo_url = "https://github.com/aria-ml/dataeval/"
+repo_name = "DataEval"
 
 root_doc = "index"
 language = "en"
@@ -67,9 +67,9 @@ myst_enable_extensions = ["colon_fence", "html_image"]
 # -- HTML output ----------------------------------------------------------
 
 html_theme = "sphinx_rtd_theme"
-html_logo = "_static/DAML_Logo_Name.png"
-# html_logo = "_static/DAML_LogoOnly.png"
-html_favicon = "_static/DAML_Favicon.png"
+html_logo = "_static/DataEval_Logo_Name.png"
+# html_logo = "_static/DataEval_LogoOnly.png"
+html_favicon = "_static/DataEval_Favicon.png"
 
 
 html_show_sourcelink = False
@@ -133,11 +133,11 @@ def setup(app):
     predownload_data()
     normalize_module(
         [
-            "daml.detectors",
-            "daml.metrics",
-            "daml.workflows",
-            "daml.flags",
-            "daml.models.tensorflow",
-            "daml.models.torch",
+            "dataeval.detectors",
+            "dataeval.metrics",
+            "dataeval.workflows",
+            "dataeval.flags",
+            "dataeval.models.tensorflow",
+            "dataeval.models.torch",
         ]
     )
