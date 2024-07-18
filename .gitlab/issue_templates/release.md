@@ -1,7 +1,7 @@
 <!--
 Release Issue Template
 
-This template is to be used when a new feature ready to be released to the DAML public API. /
+This template is to be used when a new feature ready to be released to the DataEval public API. /
 Any changes after this feature has merged should only be hot fixes and enhancements. 
 It is crucial that all code has been tested and all documentation is complete
 -->

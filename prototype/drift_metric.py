@@ -3,7 +3,7 @@ import torch
 from torchmetrics import Metric
 from torchmetrics.utilities.data import dim_zero_cat
 
-from daml.detectors import DriftKS
+from dataeval.detectors import DriftKS
 
 
 class DriftMetric(Metric):

@@ -3,7 +3,7 @@ import warnings
 import numpy as np
 import pytest
 
-from daml._internal.metrics.parity import Parity
+from dataeval._internal.metrics.parity import Parity
 
 
 class MockDistributionDataset:
@@ -141,7 +141,7 @@ class TestLabelIndependenceUnit:
 class TestLabelIndependenceFunctional:
     def test_scipy_example_data(self):
         """
-        Verify that using daml tools, we can reconstruct the example at:
+        Verify that using dataeval tools, we can reconstruct the example at:
         https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.chisquare.html
         """
 

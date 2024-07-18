@@ -2,7 +2,7 @@
 
 # Tensorflow Models
 
-The Tensorflow models provided are tailored for usage with the outlier detection metrics. DAML provides
+The Tensorflow models provided are tailored for usage with the outlier detection metrics. DataEval provides
 both basic default models through the utility function `create_model` as well as constructors which allow
 for customization of the encoder, decoder and any other applicable layers used by the model.
 
@@ -24,48 +24,48 @@ There are no tutorials for Tensorflow models yet, but we will be adding one soon
 There are currently no how to's for Tensorflow models.
 If there are scenarios that you want us to explain, contact us!
 
-## DAML API
+## DataEval API
 
 ### Models
 
 ```{eval-rst}
-.. autoclass:: daml.models.tensorflow.AE(encoder_net: keras.Model, decoder_net: keras.Model)
+.. autoclass:: dataeval.models.tensorflow.AE(encoder_net: keras.Model, decoder_net: keras.Model)
 ```
 
 ```{eval-rst}
-.. autoclass:: daml.models.tensorflow.AEGMM(encoder_net: keras.Model, decoder_net: keras.Model, gmm_density_net: keras.Model, n_gmm: int, recon_features: Callable = eucl_cosim_features)
+.. autoclass:: dataeval.models.tensorflow.AEGMM(encoder_net: keras.Model, decoder_net: keras.Model, gmm_density_net: keras.Model, n_gmm: int, recon_features: Callable = eucl_cosim_features)
 ```
 
 ```{eval-rst}
-.. autoclass:: daml.models.tensorflow.PixelCNN(image_shape: tuple, conditional_shape: Optional[tuple] = None, num_resnet: int = 5, num_hierarchies: int = 3, num_filters: int = 160, num_logistic_mix: int = 10, receptive_field_dims: tuple = (3, 3), dropout_p: float = 0.5, resnet_activation: str = "concat_elu", l2_weight: float = 0.0, use_weight_norm: bool = True, use_data_init: bool = True, high: int = 255, low: int = 0, dtype=tf.float32, name: str = "PixelCNN")
+.. autoclass:: dataeval.models.tensorflow.PixelCNN(image_shape: tuple, conditional_shape: Optional[tuple] = None, num_resnet: int = 5, num_hierarchies: int = 3, num_filters: int = 160, num_logistic_mix: int = 10, receptive_field_dims: tuple = (3, 3), dropout_p: float = 0.5, resnet_activation: str = "concat_elu", l2_weight: float = 0.0, use_weight_norm: bool = True, use_data_init: bool = True, high: int = 255, low: int = 0, dtype=tf.float32, name: str = "PixelCNN")
 ```
 
 ```{eval-rst}
-.. autoclass:: daml.models.tensorflow.VAE(encoder_net: keras.Model, decoder_net: keras.Model, latent_dim: int, beta: float = 1.0)
+.. autoclass:: dataeval.models.tensorflow.VAE(encoder_net: keras.Model, decoder_net: keras.Model, latent_dim: int, beta: float = 1.0)
 ```
 
 ```{eval-rst}
-.. autoclass:: daml.models.tensorflow.VAEGMM(encoder_net: keras.Model, decoder_net: keras.Model, gmm_density_net: keras.Model, n_gmm: int, latent_dim: int, recon_features: Callable = eucl_cosim_features, beta: float = 1.0)
+.. autoclass:: dataeval.models.tensorflow.VAEGMM(encoder_net: keras.Model, decoder_net: keras.Model, gmm_density_net: keras.Model, n_gmm: int, latent_dim: int, recon_features: Callable = eucl_cosim_features, beta: float = 1.0)
 ```
 
 ### Reconstruction Functions
 
 ```{eval-rst}
-.. autofunction:: daml.models.tensorflow.eucl_cosim_features
+.. autofunction:: dataeval.models.tensorflow.eucl_cosim_features
 ```
 
 ### Loss Function Classes
 
 ```{eval-rst}
-.. autoclass:: daml.models.tensorflow.LossGMM
+.. autoclass:: dataeval.models.tensorflow.LossGMM
 ```
 
 ```{eval-rst}
-.. autoclass:: daml.models.tensorflow.Elbo
+.. autoclass:: dataeval.models.tensorflow.Elbo
 ```
 
 ### Utility Functions
 
 ```{eval-rst}
-.. autofunction:: daml.models.tensorflow.create_model
+.. autofunction:: dataeval.models.tensorflow.create_model
 ```

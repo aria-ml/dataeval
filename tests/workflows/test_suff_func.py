@@ -10,12 +10,12 @@ import torch.optim as optim
 import torchmetrics
 from torch.utils.data import DataLoader, Dataset, Subset
 
-from daml._internal.workflows.sufficiency import (
+from dataeval._internal.workflows.sufficiency import (
     PARAMS_KEY,
     STEPS_KEY,
 )
-from daml.workflows import Sufficiency
-from tests.utils.data import DamlDataset
+from dataeval.workflows import Sufficiency
+from tests.utils.data import DataEvalDataset
 
 
 class Net(nn.Module):
@@ -159,8 +159,8 @@ class TestSufficiencyFunctional:
     def test_classification(self, mnist) -> None:
         model = Net()
         length = 1000
-        train_ds = DamlDataset(*mnist(length, "train", np.float32, "channels_first"))
-        test_ds = DamlDataset(*mnist(100, "test", np.float32, "channels_first"))
+        train_ds = DataEvalDataset(*mnist(length, "train", np.float32, "channels_first"))
+        test_ds = DataEvalDataset(*mnist(100, "test", np.float32, "channels_first"))
         m_count = 1
         steps = 3
 
@@ -205,8 +205,8 @@ class TestSufficiencyInverseProjectFunc:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         torch._dynamo.config.suppress_errors = True  # type: ignore
 
-        train_ds = DamlDataset(*mnist(1000, "train", np.float32, "channels_first", True))
-        test_ds = DamlDataset(*mnist(200, "test", np.float32, "channels_first", True))
+        train_ds = DataEvalDataset(*mnist(1000, "train", np.float32, "channels_first", True))
+        test_ds = DataEvalDataset(*mnist(200, "test", np.float32, "channels_first", True))
         model = cast(Net, torch.compile(Net().to(device)))
 
         # Instantiate sufficiency metric

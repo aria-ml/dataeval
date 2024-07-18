@@ -2,9 +2,9 @@
 
 # PyTorch Models
 
-DAML uses PyTorch as its main backend for metrics that require neural networks.
-While these metrics can take in custom models, DAML provides utility classes
-to create a seamless integration between custom models and DAML's metrics.
+DataEval uses PyTorch as its main backend for metrics that require neural networks.
+While these metrics can take in custom models, DataEval provides utility classes
+to create a seamless integration between custom models and DataEval's metrics.
 
 ## Tutorials
 
@@ -17,12 +17,12 @@ Check out this tutorial to begin using the `AETrainer` class
 There are currently no how to's for AETrainer.
 If there are scenarios that you want us to explain, contact us!
 
-## DAML API
+## DataEval API
 
 ### Trainers
 
 ```{eval-rst}
-.. autoclass:: daml.models.torch.AETrainer
+.. autoclass:: dataeval.models.torch.AETrainer
    :members:
    :inherited-members:
 ```

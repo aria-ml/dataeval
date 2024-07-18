@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1.4
 
-ARG USER="daml"
+ARG USER="dataeval"
 ARG UID="1000"
 ARG HOME="/home/$USER"
 ARG PYENV_ROOT="$HOME/.pyenv"
 ARG python_version="3.11"
-ARG output_dir="/daml/output"
+ARG output_dir="/dataeval/output"
 
 ######################## pyenv image ########################
 FROM ubuntu:22.04 as pyenv-build
@@ -68,7 +68,7 @@ ARG UID
 ARG USER
 RUN useradd -m -u ${UID} -s /bin/bash ${USER}
 USER ${USER}
-WORKDIR /daml
+WORKDIR /dataeval
 ARG PYENV_ROOT
 ENV PYENV_ROOT=${PYENV_ROOT}
 ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
@@ -111,17 +111,17 @@ RUN mkdir -p .tox
 
 FROM task-run as unit-run
 ARG python_version
-RUN ln -s /daml/.venv .tox/py$(echo ${python_version} | sed "s/\.//g")
+RUN ln -s /dataeval/.venv .tox/py$(echo ${python_version} | sed "s/\.//g")
 RUN ./capture.sh unit ${python_version} tox -e py$(echo ${python_version} | sed "s/\.//g")
 
 FROM task-run as type-run
 ARG python_version
-RUN ln -s /daml/.venv .tox/type-py$(echo ${python_version} | sed "s/\.//g")
+RUN ln -s /dataeval/.venv .tox/type-py$(echo ${python_version} | sed "s/\.//g")
 RUN ./capture.sh type ${python_version} tox -e type-py$(echo ${python_version} | sed "s/\.//g")
 
 FROM task-run as lint-run
 ARG python_version
-RUN ln -s /daml/.venv .tox/lint
+RUN ln -s /dataeval/.venv .tox/lint
 RUN ./capture.sh lint ${python_version} tox -e lint
 
 FROM task-run as deps-run
@@ -141,16 +141,16 @@ COPY --chown=${UID} docs/ docs/
 COPY --chown=${UID} *.md ./
 
 FROM task-docs as docs
-RUN ln -s /daml/.venv .tox/docs
+RUN ln -s /dataeval/.venv .tox/docs
 CMD tox -e docs
 
 FROM task-docs as qdocs
-RUN ln -s /daml/.venv .tox/qdocs
+RUN ln -s /dataeval/.venv .tox/qdocs
 CMD tox -e qdocs
 
 FROM task-docs as docs-run
 ARG python_version
-RUN ln -s /daml/.venv .tox/doctest
+RUN ln -s /dataeval/.venv .tox/doctest
 RUN ./capture.sh doctest ${python_version} tox -e doctest
 
 
@@ -198,6 +198,6 @@ ARG PYENV_ROOT
 ENV PATH=${HOME}/.cargo/bin:${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:${PATH}
 RUN echo 'eval "$(pyenv init -)"' >> ~/.bashrc
 ARG UID
-COPY --chown=${UID} --link --from=harbor.jatic.net/daml/pyenv:3.9 ${PYENV_ROOT} ${PYENV_ROOT}
-COPY --chown=${UID} --link --from=harbor.jatic.net/daml/pyenv:3.10 ${PYENV_ROOT} ${PYENV_ROOT}
-COPY --chown=${UID} --link --from=harbor.jatic.net/daml/pyenv:3.11 ${PYENV_ROOT} ${PYENV_ROOT}
+COPY --chown=${UID} --link --from=harbor.jatic.net/dataeval/pyenv:3.9 ${PYENV_ROOT} ${PYENV_ROOT}
+COPY --chown=${UID} --link --from=harbor.jatic.net/dataeval/pyenv:3.10 ${PYENV_ROOT} ${PYENV_ROOT}
+COPY --chown=${UID} --link --from=harbor.jatic.net/dataeval/pyenv:3.11 ${PYENV_ROOT} ${PYENV_ROOT}

@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from daml._internal.workflows.sufficiency import calc_params, f_out, reset_parameters
+from dataeval._internal.workflows.sufficiency import calc_params, f_out, reset_parameters
 
 np.random.seed(0)
 torch.manual_seed(0)
