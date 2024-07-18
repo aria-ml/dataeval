@@ -67,8 +67,7 @@ myst_enable_extensions = ["colon_fence", "html_image"]
 # -- HTML output ----------------------------------------------------------
 
 html_theme = "sphinx_rtd_theme"
-html_logo = "_static/DataEval_Logo_Name.png"
-# html_logo = "_static/DataEval_LogoOnly.png"
+html_logo = "_static/DataEval_Logo.png"
 html_favicon = "_static/DataEval_Favicon.png"
 
 
