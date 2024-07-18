@@ -15,10 +15,10 @@ There are currently no tutorials for `Linter`.
 There are currently no how to's for `Linter`.
 If there are scenarios that you want us to explain, contact us!
 
-## DAML API
+## DataEval API
 
 ```{eval-rst}
-.. autoclass:: daml.detectors.Linter
+.. autoclass:: dataeval.detectors.Linter
    :members:
    :inherited-members:
 ```

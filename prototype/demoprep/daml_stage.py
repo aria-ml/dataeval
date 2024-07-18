@@ -7,9 +7,9 @@ from test_stage import TestStage
 from torch.utils.data import DataLoader
 from torchmetrics.utilities.data import dim_zero_cat
 
-from daml.detectors import OOD_AE
-from daml.metrics import BER
-from daml.models.tensorflow import AE, create_model
+from dataeval.detectors import OOD_AE
+from dataeval.metrics import BER
+from dataeval.models.tensorflow import AE, create_model
 
 BASE_OPTS = ["Base", "Both"]
 TARGET_OPTS = ["Target", "Both"]
@@ -42,7 +42,7 @@ class DamlStage(TestStage):
         self.cached_images = {}  # {dataset: embeddings}
         self.cached_labels = {}  # {dataset: embeddings}
 
-        self.load_cached_results(Path(".daml_cache/cache.json"))
+        self.load_cached_results(Path(".dataeval_cache/cache.json"))
 
     def run(self) -> None:
         """Run the test stage, and store any outputs of the evaluation in test stage"""

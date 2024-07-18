@@ -12,7 +12,7 @@ There is likely to be little code involved, and most of the results will be put 
 
 ## Related Papers
 
-<!-- (What papers were researched? What were the relevant points to DAML?) -->
+<!-- (What papers were researched? What were the relevant points to DataEval?) -->
 
 ## Alternatives
 

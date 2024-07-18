@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from daml._internal.metrics.hash import pchash, xxhash
+from dataeval._internal.metrics.hash import pchash, xxhash
 
 
 def test_xxhash():

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import sys
 
-GITLAB_URL = "https://gitlab.jatic.net/jatic/aria/daml/-"
-PAGES_URL = "https://jatic.pages.jatic.net/-/aria/daml/-"
+GITLAB_URL = "https://gitlab.jatic.net/jatic/aria/dataeval/-"
+PAGES_URL = "https://jatic.pages.jatic.net/-/aria/dataeval/-"
 
 if __name__ == "__main__":
     from gitlab import Gitlab

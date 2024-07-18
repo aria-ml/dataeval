@@ -14,9 +14,9 @@ import pytest
 import tensorflow as tf
 from keras.layers import Dense, InputLayer
 
-from daml._internal.detectors.ood.vaegmm import OOD_VAEGMM
-from daml._internal.models.tensorflow.autoencoder import VAEGMM
-from daml._internal.models.tensorflow.losses import LossGMM
+from dataeval._internal.detectors.ood.vaegmm import OOD_VAEGMM
+from dataeval._internal.models.tensorflow.autoencoder import VAEGMM
+from dataeval._internal.models.tensorflow.losses import LossGMM
 from tests.utils.datasets import wait_lock
 
 n_gmm = [1, 2]

@@ -15,7 +15,7 @@ import torchvision.models as models
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, Dataset
 
-from tests.utils.data import DamlDataset
+from tests.utils.data import DataEvalDataset
 
 np.random.seed(0)
 torch.manual_seed(0)
@@ -38,7 +38,7 @@ class TestDrift:
     def test_forcedlabeldataset(self, mnist):
         model = ConstantNet()
 
-        train_ds = DamlDataset(*mnist(50, "train", np.float32, "channels_first"))
+        train_ds = DataEvalDataset(*mnist(50, "train", np.float32, "channels_first"))
 
         forced_label_ds = dd.DatasetForcedLabels(model, train_ds)
 
@@ -54,7 +54,7 @@ class TestDrift:
         """
         model = Net()
 
-        train_ds = DamlDataset(*mnist(1000, "train", np.float32, "channels_first"))
+        train_ds = DataEvalDataset(*mnist(1000, "train", np.float32, "channels_first"))
 
         drift_metric = dd.DriftDetector()
 
@@ -76,8 +76,8 @@ class TestDrift:
 
         model = Net()
 
-        train_ds = DamlDataset(*mnist(1000, "train", np.float32, "channels_first"))
-        test_ds = DamlDataset(*mnist(100, "test", np.float32, "channels_first"))
+        train_ds = DataEvalDataset(*mnist(1000, "train", np.float32, "channels_first"))
+        test_ds = DataEvalDataset(*mnist(100, "test", np.float32, "channels_first"))
 
         test_ds_1 = torch.utils.data.Subset(test_ds, range(30))  # test_ds[:30]
         test_ds_2 = torch.utils.data.Subset(test_ds, range(30, 60))  # test_ds[30:60]
@@ -112,8 +112,8 @@ class TestDrift:
 
         model = Net()
 
-        train_ds = DamlDataset(*mnist(1000, "train", np.float32, "channels_first"))
-        test_ds = DamlDataset(*mnist(200, "test", np.float32, "channels_first"))
+        train_ds = DataEvalDataset(*mnist(1000, "train", np.float32, "channels_first"))
+        test_ds = DataEvalDataset(*mnist(200, "test", np.float32, "channels_first"))
 
         test_ds_1 = torch.utils.data.Subset(test_ds, range(100, 130))  # test_ds[:30]
         test_ds_2 = torch.utils.data.Subset(test_ds, range(130, 160))  # test_ds[30:60]
@@ -147,8 +147,8 @@ class TestDrift:
 
         model = Net()
 
-        train_ds = DamlDataset(*mnist(1000, "train", np.float32, "channels_first"))
-        test_ds = DamlDataset(*mnist(2500, "test", np.float32, "channels_first"))
+        train_ds = DataEvalDataset(*mnist(1000, "train", np.float32, "channels_first"))
+        test_ds = DataEvalDataset(*mnist(2500, "test", np.float32, "channels_first"))
 
         test_ds_1 = torch.utils.data.Subset(test_ds, range(300))
         test_ds_2 = torch.utils.data.Subset(test_ds, range(300, 600))
@@ -227,9 +227,9 @@ class TestDrift:
             seed=random_seeds[2],
         )
 
-        # train_ds = DamlDataset(*mnist(10000, "train", np.float32, "channels_first"))
+        # train_ds = DataEvalDataset(*mnist(10000, "train", np.float32, "channels_first"))
 
-        # id_test = DamlDataset(*mnist(2000, "test", np.float32, "channels_first"))
+        # id_test = DataEvalDataset(*mnist(2000, "test", np.float32, "channels_first"))
         # id_test_1 = torch.utils.data.Subset(id_test, range(0, 1000))
         # id_test_2 = torch.utils.data.Subset(id_test, range(1000, 2000))
         labeled_test_datasets = [valset_iid, valset_iid2]
@@ -408,23 +408,23 @@ class Net(nn.Module):
         return x
 
 
-def load_cls_dataset() -> Tuple[DamlDataset, DamlDataset]:
+def load_cls_dataset() -> Tuple[DataEvalDataset, DataEvalDataset]:
     images = np.ones(shape=(1, 32, 32, 3))
     labels = np.ones(shape=(1, 1))
 
-    train_ds = DamlDataset(images, labels)
-    test_ds = DamlDataset(images, labels)
+    train_ds = DataEvalDataset(images, labels)
+    test_ds = DataEvalDataset(images, labels)
 
     return train_ds, test_ds
 
 
-def load_od_dataset() -> Tuple[DamlDataset, DamlDataset]:
+def load_od_dataset() -> Tuple[DataEvalDataset, DataEvalDataset]:
     images = np.ones(shape=(1, 32, 32, 3))
     labels = np.ones(shape=(1, 1))
     boxes = np.ones(shape=(1, 1, 4))
 
-    train_ds = DamlDataset(images, labels, boxes)
-    test_ds = DamlDataset(images, labels, boxes)
+    train_ds = DataEvalDataset(images, labels, boxes)
+    test_ds = DataEvalDataset(images, labels, boxes)
 
     return train_ds, test_ds
 

@@ -1,7 +1,7 @@
 <!--
 Release Merge Request Template
 
-This template is to be used when a change will affect the functionality of DAML.
+This template is to be used when a change will affect the functionality of DataEval.
 This includes changes that add new features, fix existing features, update or
 enhance existing features, or remove features that are no longer supported.
 

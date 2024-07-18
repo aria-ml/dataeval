@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
-from daml._internal.models.tensorflow.autoencoder import (
+from dataeval._internal.models.tensorflow.autoencoder import (
     relative_euclidean_distance,
 )
 

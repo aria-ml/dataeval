@@ -19,10 +19,10 @@ Check out this tutorial to begin using the `Parity` class
 There are currently no how to's for `Parity`.
 If there are scenarios that you want us to explain, contact us!
 
-## DAML API
+## DataEval API
 
 ```{eval-rst}
-.. autoclass:: daml.metrics.Parity
+.. autoclass:: dataeval.metrics.Parity
    :members:
    :inherited-members:
 ```

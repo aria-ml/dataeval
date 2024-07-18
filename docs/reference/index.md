@@ -46,7 +46,7 @@ workflows/sufficiency
 Supported Model Backends
 ------------------------
 
-The models and model trainers provided by DAML are meant to assist users in setting up architectures that are guaranteed to work with applicable DAML metrics. \
+The models and model trainers provided by DataEval are meant to assist users in setting up architectures that are guaranteed to work with applicable DataEval metrics. \
 Below is a list of backends with available trainers and models. 
 
 :::{toctree}

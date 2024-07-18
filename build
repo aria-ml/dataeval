@@ -97,7 +97,7 @@ for task in "${!tasks[@]}"; do
     esac
 done
 
-export builder_name="daml"
+export builder_name="dataeval"
 if [[ -z $(docker builder ls --format '{{.Name}}' | grep $builder_name) ]]; then
     echo "builder instance named $builder_name doesn't exist, creating it now..."
     docker builder create \
@@ -228,7 +228,7 @@ function build_and_run() {
     echo "======================================================================"
 
     mkdir -p output
-    docker cp $container_name:/daml/output/ .
+    docker cp $container_name:/dataeval/output/ .
 
     if [[ $exitcode != 0 ]]; then
         exit $exitcode
@@ -249,7 +249,7 @@ else
     main_branch="main"
 fi
 
-namespace="harbor.jatic.net/daml"
+namespace="harbor.jatic.net/dataeval"
 if [[ $branch_name == $main_branch ]]; then
     repository="main"
 else

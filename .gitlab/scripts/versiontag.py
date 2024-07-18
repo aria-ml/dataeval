@@ -17,7 +17,7 @@ MINOR_VERSION_SPRINT_MAPPING = [
 
 class VersionTag:
     """
-    Provides current and pending/next version number for DAML
+    Provides current and pending/next version number for DataEval
     """
 
     def __init__(self, gitlab: Gitlab):
@@ -28,7 +28,7 @@ class VersionTag:
     @property
     def current(self) -> str:
         """
-        The current version of DAML retrieved from repository tags
+        The current version of DataEval retrieved from repository tags
         """
         if self._current is None:
             tags = self.gl.list_tags()

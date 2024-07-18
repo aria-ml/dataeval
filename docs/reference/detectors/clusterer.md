@@ -21,10 +21,10 @@ Check out this tutorial to begin using the `Clusterer` class
 There are currently no how to's for the Clusterer.
 If there are scenarios that you want us to explain, contact us!
 
-## DAML API
+## DataEval API
 
 ```{eval-rst}
-.. autoclass:: daml.detectors.Clusterer
+.. autoclass:: dataeval.detectors.Clusterer
    :members:
    :inherited-members:
 ```
