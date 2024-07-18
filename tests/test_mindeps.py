@@ -1,7 +1,7 @@
 import numpy as np
 
-from daml.detectors import DriftCVM, DriftKS, Duplicates, Linter
-from daml.metrics import BER, UAP, ChannelStats, Divergence, ImageStats, Parity
+from dataeval.detectors import DriftCVM, DriftKS, Duplicates, Linter
+from dataeval.metrics import BER, UAP, ChannelStats, Divergence, ImageStats, Parity
 
 
 class TestMinimalDependencies:

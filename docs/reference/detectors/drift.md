@@ -19,7 +19,7 @@ Check out this tutorial to begin using the `Drift Detection` class
 
 {doc}`Drift Detection Tutorial<../../tutorials/notebooks/DriftDetectionTutorial>`
 
-## DAML API
+## DataEval API
 
 ### Cramér-von Mises
 
@@ -42,7 +42,7 @@ for high-dimensional data, we typically want to reduce the dimensionality before
 tests and aggregating those via the chosen correction method.
 
 ```{eval-rst}
-.. autoclass:: daml.detectors.DriftCVM
+.. autoclass:: dataeval.detectors.DriftCVM
    :members:
    :inherited-members:
 ```
@@ -55,7 +55,7 @@ The Bonferroni correction is more conservative and controls for the probability 
 correction on the other hand allows for an expected fraction of false positives to occur.
 
 ```{eval-rst}
-.. autoclass:: daml.detectors.DriftKS
+.. autoclass:: dataeval.detectors.DriftKS
    :members:
    :inherited-members:
 ```
@@ -75,7 +75,7 @@ We use by default a radial basis function kernel, but users are free to pass the
 We obtain a $p$-value via a permutation test on the values of $MMD^2$.
 
 ```{eval-rst}
-.. autoclass:: daml.detectors.DriftMMD
+.. autoclass:: dataeval.detectors.DriftMMD
    :members:
    :inherited-members:
 ```
@@ -90,7 +90,7 @@ are detected (via a [Kolmogorov-Smirnov] test) then drift is flagged. The detect
 the model's training set (on which the model's confidence may be higher).
 
 ```{eval-rst}
-.. autoclass:: daml.detectors.DriftUncertainty
+.. autoclass:: dataeval.detectors.DriftUncertainty
    :members:
    :inherited-members:
 ```
@@ -101,14 +101,14 @@ The GaussianRBF class implements a Gaussian kernel, also known as a [radial basi
 to construct a covariance matrix for gaussian processes and is the default kernel used in the MMD drift detection test.
 
 ```{eval-rst}
-.. autoclass:: daml.detectors.GaussianRBF
+.. autoclass:: dataeval.detectors.GaussianRBF
    :members:
 ```
 
 ### LastSeenUpdate
 
 ```{eval-rst}
-.. autoclass:: daml.detectors.LastSeenUpdate
+.. autoclass:: dataeval.detectors.LastSeenUpdate
    :members:
    :inherited-members:
 ```
@@ -116,7 +116,7 @@ to construct a covariance matrix for gaussian processes and is the default kerne
 ### ReservoirSamplingUpdate
 
 ```{eval-rst}
-.. autoclass:: daml.detectors.ReservoirSamplingUpdate
+.. autoclass:: dataeval.detectors.ReservoirSamplingUpdate
    :members:
    :inherited-members:
 ```

@@ -1,7 +1,7 @@
 Tutorials
 =========
 
-These static jupyter notebooks demonstrate how to use DAML to perform data analysis tasks using various detectors, metrics and workflows to assess the suitability of a dataset and/or model.
+These static jupyter notebooks demonstrate how to use DataEval to perform data analysis tasks using various detectors, metrics and workflows to assess the suitability of a dataset and/or model.
 
 In addition to viewing them in our documentation, these notebooks can also be opened in Google Colab to be used interactively!
 
@@ -68,14 +68,14 @@ notebooks/AETrainerTutorial.ipynb
 :::
 
 [colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
-[ber-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/BayesErrorRateEstimationTutorial.ipynb
-[suff-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/ClassLearningCurvesTutorial.ipynb
-[div-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/HPDivergenceTutorial.ipynb
-[drift-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/DriftDivergenceTutorial.ipynb
-[out-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/OODDetectionTutorial.ipynb
-[ae-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/AETrainerTutorial.ipynb
-[lbl-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/ClassLabelAnalysisTutorial.ipynb
-[odlc-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/ODLearningCurvesTutorial.ipynb
-[clust-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/ClustererTutorial.ipynb
-[dup-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/DuplicatesTutorial.ipynb
-[lint-colab]: https://colab.research.google.com/github/aria-ml/daml/blob/main/docs/tutorials/notebooks/LintingTutorial.ipynb
+[ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/tutorials/notebooks/BayesErrorRateEstimationTutorial.ipynb
+[suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/tutorials/notebooks/ClassLearningCurvesTutorial.ipynb
+[div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/tutorials/notebooks/HPDivergenceTutorial.ipynb
+[drift-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/tutorials/notebooks/DriftDivergenceTutorial.ipynb
+[out-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/tutorials/notebooks/OODDetectionTutorial.ipynb
+[ae-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/tutorials/notebooks/AETrainerTutorial.ipynb
+[lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/tutorials/notebooks/ClassLabelAnalysisTutorial.ipynb
+[odlc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/tutorials/notebooks/ODLearningCurvesTutorial.ipynb
+[clust-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/tutorials/notebooks/ClustererTutorial.ipynb
+[dup-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/tutorials/notebooks/DuplicatesTutorial.ipynb
+[lint-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/tutorials/notebooks/LintingTutorial.ipynb

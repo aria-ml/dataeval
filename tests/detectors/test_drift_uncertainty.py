@@ -15,12 +15,12 @@ import torch
 import torch.nn as nn
 from sklearn.linear_model import LogisticRegression
 
-from daml._internal.detectors.drift.base import (
+from dataeval._internal.detectors.drift.base import (
     LastSeenUpdate,
     ReservoirSamplingUpdate,
 )
-from daml._internal.detectors.drift.uncertainty import classifier_uncertainty
-from daml.detectors import DriftUncertainty
+from dataeval._internal.detectors.drift.uncertainty import classifier_uncertainty
+from dataeval.detectors import DriftUncertainty
 
 
 class PtModel(nn.Module):

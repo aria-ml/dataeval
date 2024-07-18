@@ -1,6 +1,6 @@
 import numpy as np
 
-from daml.metrics import UAP
+from dataeval.metrics import UAP
 
 
 class TestUAP:

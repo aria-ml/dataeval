@@ -9,7 +9,7 @@ Licensed under Apache Software License (Apache 2.0)
 import numpy as np
 import tensorflow as tf
 
-from daml._internal.models.tensorflow.gmm import gmm_energy, gmm_params
+from dataeval._internal.models.tensorflow.gmm import gmm_energy, gmm_params
 
 N, K, D = 10, 5, 1
 z = tf.convert_to_tensor(np.random.rand(N, D).astype(np.float32))

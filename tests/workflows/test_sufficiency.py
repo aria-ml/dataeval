@@ -9,7 +9,7 @@ import torch.nn as nn
 from matplotlib.figure import Figure
 from torch.utils.data import DataLoader
 
-from daml._internal.workflows.sufficiency import (
+from dataeval._internal.workflows.sufficiency import (
     PARAMS_KEY,
     STEPS_KEY,
     f_inv_out,
@@ -17,30 +17,30 @@ from daml._internal.workflows.sufficiency import (
     inv_project_steps,
     project_steps,
 )
-from daml.workflows import Sufficiency
-from tests.utils.data import DamlDataset
+from dataeval.workflows import Sufficiency
+from tests.utils.data import DataEvalDataset
 
 np.random.seed(0)
 torch.manual_seed(0)
 
 
-def load_cls_dataset() -> Tuple[DamlDataset, DamlDataset]:
+def load_cls_dataset() -> Tuple[DataEvalDataset, DataEvalDataset]:
     images = np.ones(shape=(1, 32, 32, 3))
     labels = np.ones(shape=(1, 1))
 
-    train_ds = DamlDataset(images, labels)
-    test_ds = DamlDataset(images, labels)
+    train_ds = DataEvalDataset(images, labels)
+    test_ds = DataEvalDataset(images, labels)
 
     return train_ds, test_ds
 
 
-def load_od_dataset() -> Tuple[DamlDataset, DamlDataset]:
+def load_od_dataset() -> Tuple[DataEvalDataset, DataEvalDataset]:
     images = np.ones(shape=(1, 32, 32, 3))
     labels = np.ones(shape=(1, 1))
     boxes = np.ones(shape=(1, 1, 4))
 
-    train_ds = DamlDataset(images, labels, boxes)
-    test_ds = DamlDataset(images, labels, boxes)
+    train_ds = DataEvalDataset(images, labels, boxes)
+    test_ds = DataEvalDataset(images, labels, boxes)
 
     return train_ds, test_ds
 

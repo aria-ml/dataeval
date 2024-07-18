@@ -19,10 +19,10 @@ There are no tutorials for UAP yet, but we will be adding one soon.
 There are currently no how to's for UAP.
 If there are scenarios that you want us to explain, contact us!
 
-## DAML API
+## DataEval API
 
 ```{eval-rst}
-.. autoclass:: daml.metrics.UAP
+.. autoclass:: dataeval.metrics.UAP
    :members:
    :inherited-members:
 ```

@@ -11,11 +11,11 @@ from itertools import product
 import numpy as np
 import pytest
 
-from daml._internal.detectors.drift.base import (
+from dataeval._internal.detectors.drift.base import (
     LastSeenUpdate,
     ReservoirSamplingUpdate,
 )
-from daml.detectors import DriftKS
+from dataeval.detectors import DriftKS
 
 
 class TestKSDrift:

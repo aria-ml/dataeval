@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from daml._internal.detectors.drift.base import (
+from dataeval._internal.detectors.drift.base import (
     BaseUnivariateDrift,
     LastSeenUpdate,
     ReservoirSamplingUpdate,

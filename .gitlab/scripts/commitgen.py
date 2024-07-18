@@ -263,7 +263,7 @@ class CommitGen:
         if not lines:
             return {}
 
-        header = [f"[//]: # ({tags[0].hash})", "", "# DAML Change Log"]
+        header = [f"[//]: # ({tags[0].hash})", "", "# DataEval Change Log"]
         content = "\n".join(header + lines) + "\n"
 
         for oldline in current[3:]:

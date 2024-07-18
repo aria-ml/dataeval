@@ -7,8 +7,8 @@ from zipfile import ZipFile
 from requests import delete, get, post, put
 from rest import RestWrapper
 
-DAML_PROJECT_URL = "https://gitlab.jatic.net/api/v4/projects/151/"
-DAML_BUILD_PAT = "DAML_BUILD_PAT"
+DATAEVAL_PROJECT_URL = "https://gitlab.jatic.net/api/v4/projects/151/"
+DATAEVAL_BUILD_PAT = "DATAEVAL_BUILD_PAT"
 
 COMMITS = "repository/commits"
 FILES = "repository/files"
@@ -36,7 +36,7 @@ class Gitlab(RestWrapper):
         timeout: int = 10,
         verbose: bool = False,
     ):
-        super().__init__(DAML_PROJECT_URL, DAML_BUILD_PAT, token, timeout, verbose)
+        super().__init__(DATAEVAL_PROJECT_URL, DATAEVAL_BUILD_PAT, token, timeout, verbose)
         self.headers = {"PRIVATE-TOKEN": self.token}
 
     def list_tags(self) -> List[Dict[str, Any]]:

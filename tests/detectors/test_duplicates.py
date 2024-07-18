@@ -1,6 +1,6 @@
 import numpy as np
 
-from daml._internal.detectors.duplicates import Duplicates
+from dataeval._internal.detectors.duplicates import Duplicates
 
 
 def get_dataset(count: int, channels: int):

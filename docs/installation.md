@@ -1,18 +1,18 @@
 # Installation Guide
 
-DAML is a lightweight toolkit that offers powerful metric classes that can be extended through additional package installations.
+DataEval is a lightweight toolkit that offers powerful metric classes that can be extended through additional package installations.
 
-This guide will show you how to install the DAML that fits your needs!
+This guide will show you how to install the DataEval that fits your needs!
 
 **Supported Python Versions**
 
 We currently support python versions ``3.9 - 3.11``
 
 
-## Base DAML Packages
+## Base DataEval Packages
 
 
-To keep DAML lightweight but powerful, only the following metrics come with the base installation
+To keep DataEval lightweight but powerful, only the following metrics come with the base installation
 
 :::{list-table}
 :header-rows: 1
@@ -25,8 +25,8 @@ To keep DAML lightweight but powerful, only the following metrics come with the 
 
 ## Extras
 
-However, DAML also has installable *extras* that provide a more expansive and powerful toolkit for any user.  \
-These extras are **torch**, **tensorflow** and **all**. Any extra can be installed using daml[*extra*]
+However, DataEval also has installable *extras* that provide a more expansive and powerful toolkit for any user.  \
+These extras are **torch**, **tensorflow** and **all**. Any extra can be installed using dataeval[*extra*]
 
 :::{list-table}
 :header-rows: 1
@@ -43,42 +43,42 @@ These extras are **torch**, **tensorflow** and **all**. Any extra can be install
 
 ## Installation
 
-Now that you have a chosen which DAML to install, the following methods will show you how to install using your preferred method. \
-Be sure to add [*extra*] if you are not installing the base DAML 
+Now that you have a chosen which DataEval to install, the following methods will show you how to install using your preferred method. \
+Be sure to add [*extra*] if you are not installing the base DataEval 
 
 ::::{tab-set}
 
 :::{tab-item} pip
 Installing from `pip` 
 ```python
-    pip install daml[all]
+    pip install dataeval[all]
 ```
 :::
 
 :::{tab-item} conda-forge
 Installing from `conda`
 ```python
-    conda install daml[all]
+    conda install dataeval[all]
 ```
 :::
 
 :::{tab-item} source
 
-To install DAML from source locally on Ubuntu, you will need git-lfs to download larger, binary source files and poetry for project dependency management.
+To install DataEval from source locally on Ubuntu, you will need git-lfs to download larger, binary source files and poetry for project dependency management.
 
 ```pycon
     sudo apt-get install git-lfs
     pip install poetry
 ```
 
-Pull the source down and change to the DAML project directory.
+Pull the source down and change to the DataEval project directory.
 
 ```pycon
-    git clone https://github.com/aria-ml/daml.git
-    cd daml
+    git clone https://github.com/aria-ml/dataeval.git
+    cd dataeval
 ```
 
-Install DAML with optional dependencies for development.
+Install DataEval with optional dependencies for development.
 
 ```pycon
     poetry install --all-extras --with dev
@@ -90,7 +90,7 @@ Alternatively, you can install with optional dependencies used to generate docum
     poetry install --all-extras --with dev --with docs
 ```
 
-Now that DAML is installed, you can run commands in the poetry virtual environment by prefixing shell commands with poetry run, or activate the virtual environment directly in the shell.
+Now that DataEval is installed, you can run commands in the poetry virtual environment by prefixing shell commands with poetry run, or activate the virtual environment directly in the shell.
 
 ```pycon
     poetry shell

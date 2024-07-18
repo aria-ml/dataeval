@@ -85,10 +85,10 @@ There are currently no tutorials for `ImageStats`.
 There are currently no how to's for `ImageStats`.
 If there are scenarios that you want us to explain, contact us!
 
-## DAML API
+## DataEval API
 
 ```{eval-rst}
-.. autoclass:: daml.metrics.ImageStats
+.. autoclass:: dataeval.metrics.ImageStats
    :members:
    :inherited-members:
 ```
@@ -110,10 +110,10 @@ There are currently no tutorials for `ChannelStats`.
 There are currently no how to's for `ChannelStats`.
 If there are scenarios that you want us to explain, contact us!
 
-## DAML API
+## DataEval API
 
 ```{eval-rst}
-.. autoclass:: daml.metrics.ChannelStats
+.. autoclass:: dataeval.metrics.ChannelStats
    :members:
    :inherited-members:
 ```
@@ -121,17 +121,17 @@ If there are scenarios that you want us to explain, contact us!
 # Image Flags
 
 ```{eval-rst}
-.. autoflag:: daml.flags.ImageHash
+.. autoflag:: dataeval.flags.ImageHash
 ```
 
 ```{eval-rst}
-.. autoflag:: daml.flags.ImageProperty
+.. autoflag:: dataeval.flags.ImageProperty
 ```
 
 ```{eval-rst}
-.. autoflag:: daml.flags.ImageVisuals
+.. autoflag:: dataeval.flags.ImageVisuals
 ```
 
 ```{eval-rst}
-.. autoflag:: daml.flags.ImageStatistics
+.. autoflag:: dataeval.flags.ImageStatistics
 ```

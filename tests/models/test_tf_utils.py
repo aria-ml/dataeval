@@ -2,9 +2,9 @@ from unittest.mock import patch
 
 import pytest
 
-from daml._internal.models.tensorflow.autoencoder import AE, AEGMM, VAE, VAEGMM
-from daml._internal.models.tensorflow.pixelcnn import PixelCNN
-from daml._internal.models.tensorflow.utils import create_model
+from dataeval._internal.models.tensorflow.autoencoder import AE, AEGMM, VAE, VAEGMM
+from dataeval._internal.models.tensorflow.pixelcnn import PixelCNN
+from dataeval._internal.models.tensorflow.utils import create_model
 
 
 class TestTensorflowModels:
@@ -12,7 +12,7 @@ class TestTensorflowModels:
 
     @pytest.mark.parametrize("model_type", [AE, AEGMM, PixelCNN, VAE, VAEGMM])
     def test_create_model(self, model_type):
-        with patch(f"daml._internal.models.tensorflow.utils.{model_type.__qualname__}") as mock_model:
+        with patch(f"dataeval._internal.models.tensorflow.utils.{model_type.__qualname__}") as mock_model:
             create_model(mock_model, self.input_shape)
             assert mock_model.called
 

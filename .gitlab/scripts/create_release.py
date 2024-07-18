@@ -17,6 +17,6 @@ if __name__ == "__main__":
             payload,
         )
         commit_id = response["id"]
-        gl.add_tag(pending_version, commit_id, message=f"DAML {pending_version}")
+        gl.add_tag(pending_version, commit_id, message=f"DataEval {pending_version}")
     else:
         print("No changes to commit and tag.")

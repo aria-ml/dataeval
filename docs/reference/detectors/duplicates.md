@@ -14,10 +14,10 @@ There are currently no tutorials for `Duplicates`.
 There are currently no how to's for `Duplicates`.
 If there are scenarios that you want us to explain, contact us!
 
-## DAML API
+## DataEval API
 
 ```{eval-rst}
-.. autoclass:: daml.detectors.Duplicates
+.. autoclass:: dataeval.detectors.Duplicates
    :members:
    :inherited-members:
 ```

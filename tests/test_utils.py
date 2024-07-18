@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from daml._internal.metrics.stats import (
+from dataeval._internal.metrics.stats import (
     edge_filter,
     get_bitdepth,
     normalize_image_shape,
