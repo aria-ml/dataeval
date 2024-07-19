@@ -211,12 +211,13 @@ function build_and_run() {
 
     # NOTE: If you ./build --push at the same time as a pipeline in the same
     # branch that is running you can potentially overwrite a results image that
-    # will be read from in that pipeline run.
-    if [[ ! $(docker manifest inspect $image_tag 2> /dev/null) ]]; then
+    # will be read from in that pipeline run.  Building docs always requires a
+    # fresh build as it is not pre-executed during build_task.
+    if [[ $task == docs || ! $(docker manifest inspect $image_tag 2> /dev/null) ]]; then
         build_image $task $python_version
     fi
 
-    docker rm $container_name 2> /dev/null || echo -n ""
+    docker rm $container_name 2> /dev/null || true
 
     echo "======================================================================"
     echo "Output from ${container_name}"
