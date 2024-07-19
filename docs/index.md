@@ -12,7 +12,7 @@ sd_hide_title: true
 :::{grid-item}
 :columns: 12 4 4 4
 
-```{image} _static/DataEval_LogoOnly.png
+```{image} _static/DataEval_Logo.png
 :width: 200px
 :class: sd-m-auto
 ```
@@ -27,7 +27,7 @@ sd_hide_title: true
 ```{rubric} **Welcome to DataEval's Documentation**
 ```
 
-DataEval, the *Data-Analysis Metrics Library*, is an open-source toolkit that focuses on characterizing image data and its impact on model performance across classification and object-detection tasks.
+DataEval is an open-source toolkit that focuses on characterizing image data and its impact on model performance across classification and object-detection tasks.
 
 :::
 
