@@ -216,6 +216,8 @@ function build_and_run() {
         build_image $task $python_version
     fi
 
+    docker rm $container_name 2> /dev/null || echo -n ""
+
     echo "======================================================================"
     echo "Output from ${container_name}"
     echo "----------------"

@@ -131,14 +131,21 @@ RUN ./capture.sh deps ${python_version} tox -e deps
 # docs works differently than other tasks because it requires GPU access.
 # The GPU requirement means that the docs image must be run as a container
 # since there's no access to GPU during the build.
-FROM task-run as task-docs
+FROM base as task-docs
 ARG UID
 ARG HOME
 COPY --link --chown=${UID} --from=data /root/tensorflow_datasets ${HOME}/tensorflow_datasets
 COPY --link --chown=${UID} --from=data /root/.keras ${HOME}/.keras
 COPY --link --chown=${UID} --from=data /docs docs
+COPY --chown=${UID} pyproject.toml poetry.lock ./
+COPY --chown=${UID} src/ src/
 COPY --chown=${UID} docs/ docs/
 COPY --chown=${UID} *.md ./
+COPY --chown=${UID} tox.ini ./
+COPY --chown=${UID} capture.sh ./
+ARG output_dir
+RUN mkdir -p $output_dir
+RUN mkdir -p .tox
 
 FROM task-docs as docs
 RUN ln -s /dataeval/.venv .tox/docs
