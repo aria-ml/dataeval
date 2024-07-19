@@ -127,10 +127,12 @@ class RestWrapper:
             elif response.links and len(response.links) > 0:
                 last_page = len(response.links) + 1
             else:
-                assert isinstance(response_json, (dict, list))
+                if not isinstance(response_json, (dict, list)):
+                    raise TypeError("Response JSON type is not a dict or list")
                 return response_json
 
-            assert isinstance(response_json, list)
+            if not isinstance(response_json, list):
+                raise TypeError("Response JSON type is not a list")
             page += 1
             params["page"] = str(page)
             result += response_json
