@@ -19,10 +19,10 @@ Check out this tutorial to begin using the `coverage` class
 There are currently no how to's for coverage.
 If there are scenarios that you want us to explain, contact us!
 
-## DAML API
+## DataEval API
 
 ```{eval-rst}
-.. autoclass:: daml.metrics.coverage
+.. autoclass:: dataeval.metrics.Coverage
    :members:
    :inherited-members:
 ```
