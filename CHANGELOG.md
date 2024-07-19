@@ -5,7 +5,7 @@
 ## v0.61.0
 
 🛠️ **Improvements and Enhancements**
-- `cd59debb` - Remove logo with name
+- `cd59debb` - Release DataEval v0.61.0!
 
     DAML is now officially rebranded as DataEval!  New name, same great camel flavor.
 
