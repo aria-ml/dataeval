@@ -57,44 +57,46 @@ if [[ -f .settings ]]; then
 fi
 
 # declare lookup maps
-declare -A supported_pvers=([3.9]=1 [3.10]=1 [3.11]=1)
-declare -A supported_tasks=([unit]=1 [type]=1 [lint]=1 [deps]=1)
-declare -A supported_docs=([docs]=1 [qdocs]=1 [doctest]=1)
+declare -A PYTHON_VERSIONS=([3.9]=1 [3.10]=1 [3.11]=1)
+declare -A TEST_TASKS=([unit]=1 [type]=1 [lint]=1 [deps]=1)
+declare -A DOCS_TASKS=([docs]=1 [qdocs]=1 [doctest]=1)
 
 # generate python and task lists
-declare -A pvers; declare -A tasks;
-count=0; c_pvers=0; c_tasks=0; c_docs=0;
+declare -A python_versions; declare -A test_tasks; declare -A docs_tasks;
+count=0; c_python_versions=0; c_test_tasks=0; c_docs_tasks=0;
 
 # validate args
 for arg do
     if [[ $arg == -* ]]; then continue; fi
-    if [[ ${supported_pvers["$arg"]} ]]; then pvers[$arg]=1; ((++c_pvers)); fi
-    if [[ ${supported_tasks["$arg"]} ]]; then tasks[$arg]=1; ((++c_tasks)); fi
-    if [[ ${supported_docs["$arg"]} ]]; then tasks[$arg]=1; ((++c_docs)); fi
+    if [[ ${PYTHON_VERSIONS["$arg"]} ]]; then python_versions[$arg]=1; ((++c_python_versions)); fi
+    if [[ ${TEST_TASKS["$arg"]} ]]; then test_tasks[$arg]=1; ((++c_test_tasks)); fi
+    if [[ ${DOCS_TASKS["$arg"]} ]]; then docs_tasks[$arg]=1; ((++c_docs_tasks)); fi
     ((++count))
 done
 
 # show help if arg count mismatch
-if [[ $((c_pvers + c_tasks + c_docs)) != $count ]]; then showHelp 1; fi
+if [[ $((c_python_versions + c_test_tasks + c_docs_tasks)) != $count ]]; then showHelp 1; fi
 
-# set all python versions if none specified
-if [[ $count == 0 || ($c_pvers == 0 && $c_tasks != 0) ]]; then pvers=([3.9]=1 [3.10]=1 [3.11]=1); fi
-
-# for build_task we should run these specific tasks
-if [[ $build_task ]]; then tasks=([unit]=1 [type]=1 [lint]=1 [deps]=1); fi
-
-# set defaults for single python version if no tasks specified
-if [[ ! $build_base && ! $build_task && ($count == 0 || ($c_tasks == 0 && $c_pvers != 0)) ]]; then
-    tasks=([unit]=1 [type]=1 [deps]=1 [lint]=1)
+# set defaults if not specified
+if [[ $count == 0 || ($c_python_versions != 0 && $c_test_tasks == 0) ]]; then
+    test_tasks=([unit]=1 [type]=1 [deps]=1 [lint]=1)
+fi
+if [[ $count == 0 || (${python_versions[3.11]} && $c_test_tasks == 0 && $c_docs_tasks == 0) ]]; then
+    docs_tasks=([docs]=1)
+fi
+if [[ $count == 0 || ($c_python_versions == 0 && $c_test_tasks != 0) ]]; then
+    python_versions=([3.9]=1 [3.10]=1 [3.11]=1)
 fi
 
-# generate "task-python_version" jobs
-declare -A jobs;
-for task in "${!tasks[@]}"; do
-    case "$task" in
-        docs|qdocs|doctest) jobs["$task-3.11"]=1;;
-        *) for python_version in "${!pvers[@]}"; do jobs["$task-$python_version"]=1; done;;
-    esac
+# create a mapping of tasks to python_versions
+declare -A task_map;
+for python_version in ${!python_versions[@]}; do
+    for task in ${!test_tasks[@]}; do
+        task_map[$python_version]+="$task "
+    done
+done
+for task in ${!docs_tasks[@]}; do
+    task_map[3.11]+="$task "
 done
 
 export builder_name="dataeval"
@@ -111,22 +113,21 @@ function build_image() {
     python_version=$2
     no_cache_layers=${@:3}
 
+    cache_images=()
+    if [[ $target != base && $target != pyenv ]]; then cache_images+=("$target"); fi
+    if [[ $target == docs || $target == qdocs ]]; then cache_images+=("data"); fi
+    if [[ $target != data ]]; then cache_images+=("base"); fi
+
     # create cache array
     cache=()
-    if [[ $target != base && $target != pyenv ]]; then
+    for cache_image in ${cache_images[@]}; do
         if [[ ${BRANCH_CACHE} ]]; then
-            cache+=("${BRANCH_CACHE}${target}-${python_version}")
+            cache+=("${BRANCH_CACHE}${cache_image}-${python_version}")
         fi
         if [[ ! ${BRANCH_CACHE} || ! $(docker manifest inspect ${cache[-1]} 2> /dev/null) ]]; then
-            cache+=("${MAIN_CACHE}:${target}-${python_version}")
+            cache+=("${MAIN_CACHE}:${cache_image}-${python_version}")
         fi
-    fi
-    if [[ ${BRANCH_CACHE} ]]; then
-        cache+=("${BRANCH_CACHE}base-${python_version}")
-    fi
-    if [[ ! ${BRANCH_CACHE} || ! $(docker manifest inspect ${cache[-1]} 2> /dev/null) ]]; then
-        cache+=("${MAIN_CACHE}:base-${python_version}")
-    fi
+    done
 
     # set cache_from and cache_to args
     cache_from_arg=$(echo ${cache[*]} | xargs -n1 sh -c 'echo --cache-from type=registry,ref=$0')
@@ -150,7 +151,7 @@ function build_image() {
     # build image_tag for pyenv (if not exist) or for task images (not pyenv, not base)
     if [[ $target == pyenv ]]; then
         image_tag="${PYENV_IMAGE}:${python_version}"
-    elif [[ $target != pyenv && $target != base ]]; then
+    elif [[ $target != pyenv && $target != base && $target != data ]]; then
         image_tag="${TASK_IMAGE}${target}-${python_version}"
     else
         image_tag=""
@@ -158,6 +159,9 @@ function build_image() {
 
     # build output_arg as appropriate if image needs to be pushed, otherwise just populate the registry cache
     if [[ $image_tag ]]; then
+        if [[ $CI_PIPELINE_ID ]]; then
+            image_tag="${image_tag}-${CI_PIPELINE_ID}"
+        fi
         output_arg="--output type=image,name=${image_tag}"
         if [[ $push_to_repo ]]; then
             output_arg+=",push=true"
@@ -166,7 +170,7 @@ function build_image() {
         output_arg="--output type=cacheonly"
     fi
 
-    if [[ $target != pyenv && $target != base && ($save_build_images || -z $push_to_repo) ]]; then
+    if [[ $target != pyenv && $target != base && $target != data && ($save_build_images || -z $push_to_repo) ]]; then
         # By default the docker-container driver doesn't load images to the
         # local docker images store, these args will cause it to do so.
         load_arg="--tag ${image_tag} --load"
@@ -202,22 +206,21 @@ function build_and_run() {
         container_name="${container_name}-${CI_PIPELINE_ID}"
     fi
 
-    # If the image was pushed, then we need to be sure to pull the updated image
-    if [[ $push_to_repo ]]; then
-        pull_arg="--pull always"
-    fi
+    # Clear any residual containers from previous runs
+    docker rm -f $container_name 2> /dev/null || true
 
     image_tag="${TASK_IMAGE}${task}-${python_version}"
-
-    # NOTE: If you ./build --push at the same time as a pipeline in the same
-    # branch that is running you can potentially overwrite a results image that
-    # will be read from in that pipeline run.  Building docs always requires a
-    # fresh build as it is not pre-executed during build_task.
-    if [[ $task == docs || ! $(docker manifest inspect $image_tag 2> /dev/null) ]]; then
-        build_image $task $python_version
+    if [[ $CI_PIPELINE_ID ]]; then
+        image_tag="${image_tag}-${CI_PIPELINE_ID}"
     fi
 
-    docker rm $container_name 2> /dev/null || true
+    # NOTE: If we are pushing to the repo and the image is present,
+    # we should pull the latest image, otherwise build the image.
+    if [[ $push_to_repo && $(docker manifest inspect $image_tag 2> /dev/null) ]]; then
+        pull_arg="--pull always"
+    else
+        build_image $task $python_version
+    fi
 
     echo "======================================================================"
     echo "Output from ${container_name}"
@@ -277,7 +280,7 @@ fi
 
 start=$(date +%s)
 
-for python_version in ${!pvers[@]}; do
+for python_version in ${!task_map[@]}; do
     # In the CI pipeline, build_base and build_task are staged separately to allow docs to kick
     # off quicker. These checks allow us to run either base or task exclusively. Removing this
     # optimization would mean we could just combine both and remove the conditional checks.
@@ -286,10 +289,15 @@ for python_version in ${!pvers[@]}; do
         if [[ $branch_name == $main_branch ]]; then
             build_image pyenv $python_version
         fi
+        # Only build the data cache layer for if building docs or in build-base in CI
+        if [[ $python_version == 3.11 && ($build_base || $c_docs_tasks != 0) ]]; then
+            build_image data $python_version
+        fi
     fi
     if [[ ! $CI || $build_task ]]; then
-        echo "Building [${!tasks[@]}]-$python_version..."
-        python_version=$python_version parallel $keep_order --lb "build_image {} $python_version" ::: ${!tasks[@]}
+        tasks=$(echo -n ${task_map[$python_version]} | xargs)
+        echo "Building [${tasks}]-$python_version..."
+        python_version=$python_version parallel $keep_order --lb "build_image {} $python_version" ::: ${tasks}
     fi
 done
 
@@ -304,9 +312,16 @@ echo "Image build preparation completed in $diff seconds"
 echo "------"
 
 # execute jobs
-echo "Running ${!jobs[@]}..."
+jobs=();
+for python_version in ${!task_map[@]}; do
+    for task in ${task_map[$python_version]}; do
+        jobs+=("$task-$python_version")
+    done
+done
+
+echo "Running ${jobs[@]}..."
 case ${#jobs[@]} in
     0)  showHelp 1;;
-    1)  build_and_run ${!jobs[@]};;
-    *)  parallel $keep_order --lb --tag 'set -o pipefail; build_and_run' ::: ${!jobs[@]};;
+    1)  build_and_run ${jobs[@]};;
+    *)  parallel $keep_order --lb --tag 'set -o pipefail; build_and_run' ::: ${jobs[@]};;
 esac
