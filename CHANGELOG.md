@@ -8,12 +8,6 @@
 - `cd59debb` - Remove logo with name
 
     DAML is now officially rebranded as DataEval!  New name, same great camel flavor.
-- `cd59debb` - Remove logo with name
-
-    DAML is now officially rebranded as DataEval!  New name, same great camel flavor.
-- `cd59debb` - Remove logo with name
-
-    DAML is now officially rebranded as DataEval!  New name, same great camel flavor.
 
 ## v0.56.0
 
