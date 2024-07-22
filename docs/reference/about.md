@@ -1,6 +1,6 @@
 # About
 
-The Data-Analysis Metrics Library, or DataEval, focuses on characterizing image data and its impact on model performance across classification and object-detection tasks.
+DataEval focuses on characterizing image data and its impact on model performance across classification and object-detection tasks.
 
 ## Data Analytics
 
