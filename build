@@ -7,8 +7,7 @@ Usage:
   build [options] <tasks(s)> <python version(s)>
 
 Options:
-      --build-base  only build base dependency images
-      --build-task  only build task images
+      --build-only  only build base dependency and task images
   -h, --help        display this help information
   -q, --quiet       do not print output to console during container execution
       --gpu         enable gpu support on task execution
@@ -35,15 +34,14 @@ EOF
 exit $1
 }
 
-options=$(getopt -l "help,quiet,gpu,build-base,build-task,push" -o "hq" -n "build" -- "$@")
+options=$(getopt -l "help,quiet,gpu,build-only,push" -o "hq" -n "build" -- "$@")
 eval set -- "$options"
 while true; do
     case "$1" in
         -h|--help)       showHelp;;
         -q|--quiet)      export quiet="--quiet";;
         --gpu)           export gpuflag="--gpus all";;
-        --build-base)    build_base=1;;
-        --build-task)    build_task=1;;
+        --build-only)    build_only=1;;
         --push)          if [[ ! $CI ]]; then echo "Only CI pipelines should be pushing."; exit 1; else export push_to_repo=1; fi;;
         --)              shift; break;;
     esac
@@ -281,27 +279,24 @@ fi
 start=$(date +%s)
 
 for python_version in ${!task_map[@]}; do
-    # In the CI pipeline, build_base and build_task are staged separately to allow docs to kick
-    # off quicker. These checks allow us to run either base or task exclusively. Removing this
-    # optimization would mean we could just combine both and remove the conditional checks.
-    if [[ ! $CI || $build_base ]]; then
+    if [[ ! $CI || $build_only ]]; then
         build_image base $python_version
+        # Only export pyenv images in main branch runs
         if [[ $branch_name == $main_branch ]]; then
             build_image pyenv $python_version
         fi
-        # Only build the data cache layer for if building docs or in build-base in CI
-        if [[ $python_version == 3.11 && ($build_base || $c_docs_tasks != 0) ]]; then
+        # Only build the data cache layer for docs or build-only in CI
+        if [[ $python_version == 3.11 && ($build_only || $c_docs_tasks != 0) ]]; then
             build_image data $python_version
         fi
-    fi
-    if [[ ! $CI || $build_task ]]; then
+        # Build each task image in parallel
         tasks=$(echo -n ${task_map[$python_version]} | xargs)
         echo "Building [${tasks}]-$python_version..."
         python_version=$python_version parallel $keep_order --lb "build_image {} $python_version" ::: ${tasks}
     fi
 done
 
-if [[ $build_base || $build_task ]]; then
+if [[ $build_only ]]; then
     exit $?
 fi
 
