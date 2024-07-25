@@ -55,8 +55,8 @@ RUN pip install --no-cache \
     torchvision==0.16.2+cpu
 WORKDIR /docs
 RUN mkdir -p tutorials/notebooks
-COPY docs/conf.py conf.py
-RUN python -c "import conf; conf.predownload_data();"
+COPY docs/data.py data.py
+RUN python -c "import data; data.download();"
 
 
 ######################## shared cuda image ########################
@@ -154,11 +154,6 @@ CMD tox -e docs
 FROM task-docs as qdocs
 RUN ln -s /dataeval/.venv .tox/qdocs
 CMD tox -e qdocs
-
-FROM task-docs as docs-run
-ARG python_version
-RUN ln -s /dataeval/.venv .tox/doctest
-RUN ./capture.sh doctest ${python_version} tox -e doctest
 
 
 ######################## results layers ########################
