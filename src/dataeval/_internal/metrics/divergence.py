@@ -7,23 +7,8 @@ from typing import Any, Callable, Dict, Literal
 
 import numpy as np
 
+from dataeval._internal.functional.divergence import divergence_fnn, divergence_mst
 from dataeval._internal.metrics.base import EvaluateMixin, MethodsMixin
-
-from .utils import compute_neighbors, minimum_spanning_tree
-
-
-def _mst(data: np.ndarray, labels: np.ndarray) -> int:
-    mst = minimum_spanning_tree(data).toarray()
-    edgelist = np.transpose(np.nonzero(mst))
-    errors = np.sum(labels[edgelist[:, 0]] != labels[edgelist[:, 1]])
-    return errors
-
-
-def _fnn(data: np.ndarray, labels: np.ndarray) -> int:
-    nn_indices = compute_neighbors(data, data)
-    errors = np.sum(np.abs(labels[nn_indices] - labels))
-    return errors
-
 
 _METHODS = Literal["MST", "FNN"]
 _FUNCTION = Callable[[np.ndarray, np.ndarray], int]
@@ -69,7 +54,7 @@ class Divergence(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
 
     @classmethod
     def _methods(cls) -> Dict[str, _FUNCTION]:
-        return {"FNN": _fnn, "MST": _mst}
+        return {"FNN": divergence_fnn, "MST": divergence_mst}
 
     def evaluate(self) -> Dict[str, Any]:
         """
