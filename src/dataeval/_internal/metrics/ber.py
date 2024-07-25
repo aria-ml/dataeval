@@ -14,9 +14,8 @@ from maite.protocols import ArrayLike
 from scipy.sparse import coo_matrix
 from scipy.stats import mode
 
+from dataeval._internal.functional.utils import compute_neighbors, get_classes_counts, minimum_spanning_tree
 from dataeval._internal.metrics.base import EvaluateMixin, MethodsMixin
-
-from .utils import compute_neighbors, get_classes_counts, minimum_spanning_tree
 
 
 def _mst(X: np.ndarray, y: np.ndarray, _: int) -> Tuple[float, float]:
