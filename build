@@ -151,15 +151,15 @@ function build_image() {
         image_tag="${PYENV_IMAGE}:${python_version}"
     elif [[ $target != pyenv && $target != base && $target != data ]]; then
         image_tag="${TASK_IMAGE}${target}-${python_version}"
+        if [[ $CI_PIPELINE_ID ]]; then
+            image_tag="${image_tag}-${CI_PIPELINE_ID}"
+        fi
     else
         image_tag=""
     fi
 
     # build output_arg as appropriate if image needs to be pushed, otherwise just populate the registry cache
     if [[ $image_tag ]]; then
-        if [[ $CI_PIPELINE_ID ]]; then
-            image_tag="${image_tag}-${CI_PIPELINE_ID}"
-        fi
         output_arg="--output type=image,name=${image_tag}"
         if [[ $push_to_repo ]]; then
             output_arg+=",push=true"
