@@ -11,10 +11,11 @@ def cwd(path):
     finally:
         chdir(old_path)
 
+
 def download():
     import keras.datasets as kds
     import tensorflow_datasets as tfds
-    from torchvision.datasets import MNIST
+    from torchvision.datasets import MNIST, VOCDetection
 
     # Assume we are running in the docs directory with notebooks in tutorials/notebooks
     with cwd("./tutorials/notebooks"):
@@ -32,3 +33,7 @@ def download():
         # OODDetectionTutorial.ipynb
         tfds.load("mnist", split="train")
         tfds.load("mnist_corrupted/translate", split="train")
+
+    with cwd("./how_to"):
+        # EDA.ipynb
+        VOCDetection("./data", year="2011", image_set="train", download=True)
