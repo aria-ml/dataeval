@@ -11,6 +11,9 @@ documentation = "https://dataeval.readthedocs.io/"
 authors = [
   "Andrew Weng <andrew.weng@ariacoustics.com>",
   "James Gleeson <james.gleeson@ariacoustics.com>",
+  "Jon Botts <jonathan.botts@ariacoustics.com>",
+  "Max Bright <max.bright@ariacoustics.com>",
+  "Ryan Wood <ryan.wood@ariacoustics.com>",
   "Scott Swan <scott.swan@ariacoustics.com>",
   "Shaun Jullens <shaun.jullens@ariacoustics.com>",
   "Thayer Fisher <thayer.fisher@ariacoustics.com>",

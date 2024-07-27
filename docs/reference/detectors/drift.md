@@ -6,7 +6,8 @@ Drift refers to the phenomenon where the statistical properties of the data chan
 distribution of the input features or the target variable (what the model is trying to predict) shifts, leading to a discrepancy
 between the training data and the real-world data the model encounters during deployment.
 
-Through concepts examined in the NeurIPS 2019 paper [Failing Loudly: An Empirical Study of Methods for Detecting Dataset Shift](https://arxiv.org/abs/1810.11953), we can utilize various methods in order to determine if drift is detected. For high-dimensional
+Through concepts examined in the NeurIPS 2019 paper [Failing Loudly: An Empirical Study of Methods for Detecting Dataset Shift](https://arxiv.org/abs/1810.11953),
+we can utilize various methods in order to determine if drift is detected. For high-dimensional
 data, we typically want to reduce the dimensionality before performing tests against the dataset. To do so, we incorporate Untrained
 AutoEncoders (UAE) and Black-Box Shift Estimation ([BBSE]) predictors using the classifier's softmax outputs as out-of-the box
 preprocessing methods and note that [Principal Component Analysis] can also be easily implemented using [scikit-learn].

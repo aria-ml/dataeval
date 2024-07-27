@@ -1,80 +1,46 @@
 (stats_ref)=
 
-% ============================
-
-% Dataset Stats
-
-% ============================
-
-% The basic Dataset Stats class assists with exploratory dataset analysis (EDA).
-
-% The class delivers stats for the following aspects of images:
-
-% * height
-
-% * width
-
-% * size
-
-% * aspect ratio
-
-% * number of channels
-
-% * pixel value range
-
-% * mean pixel value
-
-% * missing values (NaNs)
-
-% * number of 0 value pixels
-
-% * pixel variance
-
-% * pixel skew
-
-% * pixel kurtosis
-
-% * max/min pixel value along with the 25th and 75th percentiles
-
-% * overall brightness of the image
-
-% * blurriness of the image
-
-% * entropy of the image
-
-% The above stats are also calculated on a per channel basis if the images have more than one channel.
-
-% This class can be used to determine if there are any issues with any of the images in the dataset.
-
-% As well as give a big picture view of how similar the images are to one another.
-
-% ---------
-
-% Tutorials
-
-% ---------
-
-% Check out this tutorial to begin using the basic ``DatasetStats`` class
-
-% :doc:`Dataset Stats and Deduplication Tutorial<../../tutorials/notebooks/DatasetStats-HashTutorial>`
-
-% -------------
-
-% How To Guides
-
-% -------------
-
-% There are currently no how to's for the Basic Stats Class.
-
-% If there are scenarios that you want us to explain, contact us!
-
 # Image Statistics
 
-% Create small blurb here that answers:
+The basic `ImageStats` class assists with understanding the dataset.
+This class can be used in conjunction with the `Linter` class to determine
+if there are any issues with any of the images in the dataset.
 
-% 1. What it is
+This class can be used to get a big picture view of the dataset and it's underlying distribution.
 
-% 2. What does it solve
+The stats delievered by the class is broken down into 3 main categories:
+* statistics covering image properties,
+* statistics covering the visual aspect of images,
+* and normal statistics about pixel values.
+
+Below shows the statistics each category calculates.
+
+* Image Properties
+ - height
+ - width
+ - size
+ - aspect ratio
+ - number of channels
+ - pixel value range
+
+* Image Visuals
+ - image brightness
+ - image blurriness
+ - missing values (NaNs)
+ - number of 0 value pixels
+
+* Pixel Statistics
+ - mean pixel value
+ - pixel value standard deviation
+ - pixel value variance
+ - pixel value skew
+ - pixel value kurtosis
+ - entropy of the image
+ - pixel percentiles (min, max, 25th, 50th, and 75th percentile values)
+ - histogram of pixel values
+
+In addition to the above stats, the `ImageStats` class also defines a hash for each image to be used
+in conjunction with the `Duplicates` class in order to identify duplicate images.
 
 ## Tutorials
 
@@ -82,8 +48,10 @@ There are currently no tutorials for `ImageStats`.
 
 ## How To Guides
 
-There are currently no how to's for `ImageStats`.
-If there are scenarios that you want us to explain, contact us!
+There is an _Exploratory Data Analysis_ guide which shows how to use the `ImageStats`
+in conjunction with several other data analysis classes from DataEval.
+
+{doc}`Exploratory Data Analysis<../../how_to/EDA>`
 
 ## DataEval API
 
@@ -95,11 +63,8 @@ If there are scenarios that you want us to explain, contact us!
 
 # Channel Statistics
 
-% Create small blurb here that answers:
-
-% 1. What it is
-
-% 2. What does it solve
+The `ChannelStats` class is similar to the `ImageStats` class except that it only calculates
+the normal statistics for each pixel value on a per channel basis.
 
 ## Tutorials
 
@@ -107,8 +72,10 @@ There are currently no tutorials for `ChannelStats`.
 
 ## How To Guides
 
-There are currently no how to's for `ChannelStats`.
-If there are scenarios that you want us to explain, contact us!
+There is an _Exploratory Data Analysis_ guide which shows how to use the `ChannelStats`
+in conjunction with several other data analysis classes from DataEval.
+
+{doc}`Exploratory Data Analysis<../../how_to/EDA>`
 
 ## DataEval API
 

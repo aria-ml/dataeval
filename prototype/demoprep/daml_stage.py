@@ -15,7 +15,7 @@ BASE_OPTS = ["Base", "Both"]
 TARGET_OPTS = ["Target", "Both"]
 
 
-class DamlStage(TestStage):
+class DataEvalStage(TestStage):
     def __init__(
         self,
         feasibility_dataset="Both",
