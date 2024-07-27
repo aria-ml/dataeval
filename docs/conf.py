@@ -98,8 +98,10 @@ def setup(app):
     # pre-download data used in notebooks
     from os import getcwd
     from sys import path
+
     path.append(getcwd())
     import data
+
     data.download()
 
     normalize_module(

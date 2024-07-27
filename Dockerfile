@@ -54,7 +54,7 @@ RUN pip install --no-cache \
     torch==2.1.2+cpu \
     torchvision==0.16.2+cpu
 WORKDIR /docs
-RUN mkdir -p tutorials/notebooks
+RUN mkdir -p tutorials/notebooks how_to
 COPY docs/data.py data.py
 RUN python -c "import data; data.download();"
 

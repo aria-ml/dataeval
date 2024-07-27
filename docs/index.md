@@ -58,18 +58,21 @@ We want to show visualizations of tutorials to peak the interest of a potential 
    We could show 3 images from a training set class next to 1 that is out-of-dist but classified the same
    Could even make a few rows (multiple classes). -->
 
-DataEval is a powerful toolkit for any data analysis workflow, so be sure to check out the **Quickstart Tutorials** page for a more comprehensive list of all the tools we offer.
+DataEval is a powerful toolkit for any data analysis workflow, so be sure to check out the
+**Quickstart Tutorials** page for a more comprehensive list of all the tools we offer.
 
 ### [How-To's](how_to/index)
 
-For the more experienced user, or if you are just curious, these guides show different ways that DataEval's features can be used that might fit operational use more closely
+For the more experienced user, or if you are just curious, these guides show different ways
+that DataEval's features can be used that might fit operational use more closely
 
 Development
 ------------
 
 ### [Reference](reference/index)
 
-Looking for a specific function or class? This reference guide has all the technical details needed to understand the DataEval Ecosystem
+Looking for a specific function or class?
+This reference guide has all the technical details needed to understand the DataEval Ecosystem
 
 ### [Changelog](reference/changelog)
     
