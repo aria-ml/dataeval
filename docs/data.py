@@ -13,20 +13,21 @@ def cwd(path):
 
 
 def download():
-    import keras.datasets as kds
     import tensorflow_datasets as tfds
-    from torchvision.datasets import MNIST, VOCDetection
+    from torchvision.datasets import CIFAR10, MNIST, VOCDetection
 
     # Assume we are running in the docs directory with notebooks in tutorials/notebooks
     with cwd("./tutorials/notebooks"):
         # AETrainerTutorial.ipynb
+        # BayesErrorRateEstimationTutorial.ipynb
         # ClassLearningCurvesTutorial.ipynb
         # ClassLabelAnalysisTutorial.ipynb
-        MNIST(root="./data/", train=True, download=True)
-        MNIST(root="./data/", train=False, download=True)
+        MNIST.mirrors = ["https://ossci-datasets.s3.amazonaws.com/mnist/"]
+        MNIST(root="./data", train=True, download=True)
+        MNIST(root="./data", train=False, download=True)
 
-        # BayesErrorRateEstimationTutorial.ipynb
-        kds.mnist.load_data()
+        # LintingTutorial.ipynb
+        CIFAR10(root="./data", train=False, download=True)
 
         # DriftDetectionTutorial.ipynb
         # HPDivergenceTutorial.ipynb
