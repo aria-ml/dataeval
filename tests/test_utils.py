@@ -1,12 +1,18 @@
 import numpy as np
 import pytest
 
-from dataeval._internal.metrics.stats import (
+from dataeval._internal.functional.utils import (
     edge_filter,
     get_bitdepth,
+    get_classes_counts,
     normalize_image_shape,
     rescale,
 )
+
+
+def test_class_min():
+    with pytest.raises(ValueError):
+        get_classes_counts(np.ones(1))
 
 
 def test_get_bitdepth_negatives():
