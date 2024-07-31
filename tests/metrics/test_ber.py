@@ -2,42 +2,24 @@ import numpy as np
 import pytest
 import torch
 
-from dataeval._internal.functional.utils import get_classes_counts
-from dataeval._internal.metrics.ber import _knn_lowerbound
+from dataeval._internal.functional.ber import _knn_lowerbound, ber_knn, ber_mst
 from dataeval.metrics import BER
 
 
-class TestMulticlassBER:
+class TestFunctionalBER:
     @pytest.mark.parametrize(
         "method, k, expected",
         [
-            ("MST", 1, {"ber": 0.137, "ber_lower": 0.07132636098401203}),
-            ("KNN", 1, {"ber": 0.118, "ber_lower": 0.061072112753426215}),
-            ("KNN", 10, {"ber": 0.143, "ber_lower": 0.0745910104681437}),
+            (ber_mst, 1, (0.137, 0.07132636098401203)),
+            (ber_knn, 1, (0.118, 0.061072112753426215)),
+            (ber_knn, 10, (0.143, 0.0745910104681437)),
         ],
     )
     def test_ber_on_mnist(self, method, k, expected, mnist):
+        """Methods correctly calculate BER with given params"""
         data, labels = mnist()
-        metric = BER(data, labels, method, k)
-        result = metric.evaluate()
+        result = method(data, labels, k)
         assert result == expected
-
-    def test_invalid_method(self):
-        with pytest.raises(KeyError):
-            BER(np.empty([]), np.empty([]), "NOT_A_METHOD")  # type: ignore
-
-    def test_invalid_method_setter(self):
-        b = BER(np.empty([]), np.empty([]))
-        with pytest.raises(KeyError):
-            b.method = "NOT_A_METHOD"  # type: ignore
-
-    def test_class_min(self):
-        with pytest.raises(ValueError):
-            get_classes_counts(np.ones(20))
-
-    def test_list_class_methods(self):
-        methods = BER.methods()
-        assert len(methods) == 2
 
     @pytest.mark.parametrize(
         "value, classes, k, expected",
@@ -56,7 +38,40 @@ class TestMulticlassBER:
         assert result == expected
 
 
-class TestBERArrayLike:
+class TestAPIBER:
+    def test_invalid_method(self):
+        """Raises error when method is not KNN or MST"""
+        with pytest.raises(KeyError):
+            BER(np.empty([]), np.empty([]), "NOT_A_METHOD")  # type: ignore
+
+    def test_invalid_method_setter(self):
+        """Raises error when method key is not KNN or MST"""
+        b = BER(np.empty([]), np.empty([]))
+        with pytest.raises(KeyError):
+            b.method = "NOT_A_METHOD"  # type: ignore
+
+    def test_list_class_methods(self):
+        methods = BER.methods()
+        assert len(methods) == 2
+
+    @pytest.mark.parametrize(
+        "method, k, expected",
+        [
+            ("MST", 1, {"ber": 0.137, "ber_lower": 0.07132636098401203}),
+            ("KNN", 1, {"ber": 0.118, "ber_lower": 0.061072112753426215}),
+        ],
+    )
+    def test_ber_output_format(self, method, k, expected, mnist):
+        """Confirms BER class transforms functional results into correct format"""
+
+        # TODO: Convert calculations to mock, just check output tuple -> dict
+        data, labels = mnist()
+        ber = BER(data=data, labels=labels, method=method, k=k)
+        result = ber.evaluate()
+        assert result == expected
+
+
+class TestArrayLikeBER:
     @pytest.mark.parametrize(
         "arr, larr",
         [
