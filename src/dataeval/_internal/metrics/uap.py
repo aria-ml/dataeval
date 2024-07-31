@@ -7,8 +7,8 @@ average precision using empirical mean precision
 from typing import Dict
 
 import numpy as np
-from sklearn.metrics import average_precision_score
 
+from dataeval._internal.functional.uap import uap
 from dataeval._internal.metrics.base import EvaluateMixin
 
 
@@ -41,5 +41,5 @@ class UAP(EvaluateMixin):
         ValueError
             If unique classes M < 2
         """
-        uap = float(average_precision_score(self.labels, self.scores, average="weighted"))
-        return {"uap": uap}
+
+        return {"uap": uap(self.labels, self.scores)}
