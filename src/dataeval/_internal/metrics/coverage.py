@@ -1,8 +1,8 @@
-import math
 from typing import Literal, Tuple
 
 import numpy as np
-from scipy.spatial.distance import pdist, squareform
+
+from dataeval._internal.functional.coverage import coverage
 
 
 class Coverage:
@@ -41,8 +41,9 @@ class Coverage:
 
     def evaluate(self) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Perform a one-way chi-squared test between observation frequencies and expected frequencies that
-        tests the null hypothesis that the observed data has the expected frequencies.
+        Identifies images which come from under sampled regions.
+        Also returns the corresponding radius in embedding space within
+        which we expect to see a particular number of images.
 
         Returns
         -------
@@ -59,22 +60,7 @@ class Coverage:
             If radius_type is unknown
         """
 
-        # Calculate distance matrix, look at the (k+1)th farthest neighbor for each image.
-        n = len(self.embeddings)
-        if n <= self.k:
-            raise ValueError("Number of observations less than or equal to the specified number of neighbors.")
-        mat = squareform(pdist(self.embeddings))
-        sorted_dists = np.sort(mat, axis=1)
-        crit = sorted_dists[:, self.k + 1]
+        if self.radius_type not in ["adaptive", "naive"]:
+            raise ValueError(f"Invalid radius type {self.radius_type}")
 
-        d = np.shape(self.embeddings)[1]
-        if self.radius_type == "naive":
-            self.rho = (1 / math.sqrt(math.pi)) * ((2 * self.k * math.gamma(d / 2 + 1)) / (n)) ** (1 / d)
-            pvals = np.where(crit > self.rho)[0]
-        elif self.radius_type == "adaptive":
-            # Use data adaptive cutoff
-            cutoff = int(n * self.percent)
-            pvals = np.argsort(crit)[::-1][:cutoff]
-        else:
-            raise ValueError("Invalid radius type.")
-        return pvals, crit
+        return coverage(self.embeddings, self.k, self.radius_type, self.percent)

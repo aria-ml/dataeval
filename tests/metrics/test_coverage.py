@@ -2,12 +2,14 @@ import math
 import warnings
 
 import numpy as np
+import numpy.testing as npt
 import pytest
 
+from dataeval._internal.functional.coverage import sort_neighbors
 from dataeval.metrics import Coverage
 
 
-class TestCoverageUnit:
+class TestAPICoverage:
     def test_fails_with_invalid_radius_type(self):
         embs = np.zeros((100, 2))
         with pytest.raises(ValueError), warnings.catch_warnings():
@@ -33,7 +35,7 @@ class TestCoverageUnit:
         assert (crit == np.zeros(100)).all()
 
 
-class TestCoverageFunctional:
+class TestFunctionalCoverage:
     def test_naive_answer(self):
         embs = np.zeros((100, 2))
         embs = np.concatenate((embs, np.ones((1, 2))))
@@ -49,3 +51,19 @@ class TestCoverageFunctional:
         pvals, dists = metric.evaluate()
         assert pvals[0] == 100
         assert dists[100] == pytest.approx(1.41421356)
+
+    def test_naive_radius(self):
+        pass
+
+    def test_adaptive_radius(self):
+        pass
+
+    def test_sort_neighbors(self):
+        embs = np.arange(100)
+        k = 20
+        crit = sort_neighbors(embs, k=k)
+
+        npt.assert_array_equal(crit, np.arange(k + 1))
+
+    def test_coverage(self):
+        pass
