@@ -43,7 +43,7 @@ exclude_patterns = [
     "_build",
     "Thumbs.db",
     ".DS_Store",
-    "tutorials/notebooks/ODLearningCurvesTutorial.ipynb",
+    "how_to/notebooks/ODLearningCurvesTutorial.ipynb",
 ]
 
 # -- Extension configurations ----------------------------------------------
