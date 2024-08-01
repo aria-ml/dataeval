@@ -3,16 +3,81 @@ How-to Guides
 
 These guides demonstrate more in-depth features and customizations of DataEval features for more advanced users.
 
-% There are currently no How-tos but they are on their way! 😃
+In addition to viewing them in our documentation, these notebooks can also be opened in Google Colab to be used interactively!
 
-- [Exploratory Data Analysis](EDA_Part1) [![Open In Colab][colab-badge]][eda-colab]
+Detectors
+---------
+
+- [Drift Detection Tutorial](notebooks/DriftDetectionTutorial) [![Open In Colab][colab-badge]][drift-colab]
+- [Out-of-Distribution Detection Tutorial](notebooks/OODDetectionTutorial) [![Open In Colab][colab-badge]][out-colab]
+- [Clustering Tutorial](notebooks/ClustererTutorial) [![Open In Colab][colab-badge]][clust-colab]
+- [Duplicates Tutorial](notebooks/DuplicatesTutorial) [![Open In Colab][colab-badge]][dup-colab]
+- [Linting Tutorial](notebooks/LintingTutorial) [![Open In Colab][colab-badge]][lint-colab]
 
 :::{toctree}
 :hidden:
 :maxdepth: 1
 
-EDA_Part1.ipynb
+notebooks/DriftDetectionTutorial.ipynb
+notebooks/OODDetectionTutorial.ipynb
+notebooks/ClustererTutorial.ipynb
+notebooks/DuplicatesTutorial.ipynb
+notebooks/LintingTutorial.ipynb
+:::
+
+Metrics
+-------
+
+- [Bayes Error Rate Estimation Tutorial](notebooks/BayesErrorRateEstimationTutorial) [![Open In Colab][colab-badge]][ber-colab]
+- [HP Divergence Tutorial](notebooks/HPDivergenceTutorial) [![Open In Colab][colab-badge]][div-colab]
+- [Class Label Analysis Tutorial](notebooks/ClassLabelAnalysisTutorial) [![Open In Colab][colab-badge]][lbl-colab]
+- [Coverage Analysis Tutorial](notebooks/CoverageTutorial) [![Open In Colab][colab-badge]][cov-colab]
+:::{toctree}
+:hidden:
+:maxdepth: 1
+
+notebooks/BayesErrorRateEstimationTutorial.ipynb
+notebooks/HPDivergenceTutorial.ipynb
+notebooks/ClassLabelAnalysisTutorial.ipynb
+notebooks/CoverageTutorial.ipynb
+:::
+
+Workflows
+---------
+
+- [Class Learning Curves Tutorial](notebooks/ClassLearningCurvesTutorial) [![Open In Colab][colab-badge]][suff-colab]
+- [Dataset Sufficiency Analysis for Object Detection Tutorial](html/ODLearningCurvesTutorial) [![Open In Colab][colab-badge]][odlc-colab]
+
+:::{toctree}
+:hidden:
+:maxdepth: 1
+
+notebooks/ClassLearningCurvesTutorial.ipynb
+html/ODLearningCurvesTutorial.md
+:::
+
+Models
+------
+
+- [AE Trainer Tutorial](notebooks/AETrainerTutorial) [![Open In Colab][colab-badge]][ae-colab]
+
+:::{toctree}
+:hidden:
+:maxdepth: 1
+
+notebooks/AETrainerTutorial.ipynb
 :::
 
 [colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
-[eda-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/EDA_Part1.ipynb
+[ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/BayesErrorRateEstimationTutorial.ipynb
+[suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/ClassLearningCurvesTutorial.ipynb
+[div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/HPDivergenceTutorial.ipynb
+[drift-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/DriftDivergenceTutorial.ipynb
+[out-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/OODDetectionTutorial.ipynb
+[ae-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/AETrainerTutorial.ipynb
+[lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/ClassLabelAnalysisTutorial.ipynb
+[odlc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/ODLearningCurvesTutorial.ipynb
+[clust-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/ClustererTutorial.ipynb
+[dup-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/DuplicatesTutorial.ipynb
+[lint-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/LintingTutorial.ipynb
+[cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/CoverageTutorial.ipynb
