@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from os import chdir, getcwd, path
+from os import chdir, getcwd, makedirs, path
 
 
 @contextmanager
@@ -7,6 +7,7 @@ def cwd(rel_path):
     old_path = getcwd()
     new_path = path.abspath(rel_path)
     print(f"push: {old_path} -> {new_path}")
+    makedirs(new_path, exist_ok=True)
     chdir(new_path)
     try:
         yield
