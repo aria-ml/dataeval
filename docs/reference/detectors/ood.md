@@ -8,16 +8,11 @@
 
 % 2. What does it solve
 
-## Tutorials
+## How-To Guides
 
-Check out this tutorial to begin using the Out-of-Distribution Detection class
+Check out this **how to** to begin using the Out-of-Distribution Detection class
 
-{doc}`Out-of-Distribution Detection Tutorial<../../tutorials/notebooks/OODDetectionTutorial>`
-
-## How To Guides
-
-There are currently no how to's for Out-of-Distribution Detection.
-If there are scenarios that you want us to explain, contact us!
+{doc}`Out-of-Distribution Detection Tutorial<../../how_to/notebooks/OODDetectionTutorial>`
 
 ## DataEval API
 

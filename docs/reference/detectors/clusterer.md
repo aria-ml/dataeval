@@ -13,18 +13,18 @@ The Clusterer identifies outliers based on their distance.
 After defining where the splits are in the data for the different groups,
 outliers are defined as samples that lie outside of 2 standard deviations of the average intra-cluster distance.
 
+## How-To Guides
+
+Check out this **how to** to begin using the `Clusterer` class
+
+{doc}`Clusterer Tutorial<../../how_to/notebooks/ClustererTutorial>`
+
 ## Tutorials
 
-Check out this tutorial to begin using the `Clusterer` class
-
-{doc}`Clusterer Tutorial<../../tutorials/notebooks/ClustererTutorial>`
-
-## How To Guides
-
-There is also an _Exploratory Data Analysis_ guide which shows how to use the `Clusterer`
+There is also an _Exploratory Data Analysis_ tutorial which shows how to use the `Clusterer`
 in conjunction with several other data analysis classes from DataEval.
 
-{doc}`Exploratory Data Analysis<../../how_to/EDA>`
+{doc}`Exploratory Data Analysis<../../tutorials/EDA_Part1>`
 
 ## DataEval API
 

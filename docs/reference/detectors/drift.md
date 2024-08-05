@@ -14,11 +14,11 @@ preprocessing methods and note that [Principal Component Analysis] can also be e
 Preprocessing methods which do not rely on the classifier will usually pick up drift in the input data, while [BBSE] focuses
 on label shift.
 
-## Tutorials
+## How-To Guides
 
-Check out this tutorial to begin using the `Drift Detection` class
+Check out this **how to** to begin using the `Drift Detection` class
 
-{doc}`Drift Detection Tutorial<../../tutorials/notebooks/DriftDetectionTutorial>`
+{doc}`Drift Detection Tutorial<../../how_to/notebooks/DriftDetectionTutorial>`
 
 ## DataEval API
 
