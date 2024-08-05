@@ -26,12 +26,11 @@ then be analyzed in the context of a given problem
 :maxdepth: 1
 
 metrics/ber
+metrics/coverage
 metrics/divergence
 metrics/parity
 metrics/stats
 metrics/uap
-metrics/basic_stats
-metrics/coverage
 :::
 
 Workflows

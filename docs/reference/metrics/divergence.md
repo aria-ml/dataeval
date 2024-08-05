@@ -8,16 +8,11 @@
 
 % 2. What does it solve
 
-## Tutorials
+## How-To Guides
 
-Check out this tutorial to begin using the `Divergence` class
+Check out this **how to** to begin using the `Divergence` class
 
-{doc}`Divergence Tutorial<../../tutorials/notebooks/HPDivergenceTutorial>`
-
-## How To Guides
-
-There are currently no how to's for Divergence.
-If there are scenarios that you want us to explain, contact us!
+{doc}`Divergence Tutorial<../../how_to/notebooks/HPDivergenceTutorial>`
 
 ## DataEval API
 

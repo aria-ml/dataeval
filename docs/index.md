@@ -100,6 +100,14 @@ how_to/index
 :::
 
 :::{toctree}
+:caption: Concepts
+:hidden:
+:maxdepth: 2
+
+concepts/index.md
+:::
+
+:::{toctree}
 :caption: Reference
 :hidden:
 :maxdepth: 2

@@ -8,16 +8,11 @@
 
 % 2. What does it solve
 
-## Tutorials
+## How-To Guides
 
-Check out this tutorial to begin using the `Sufficiency` class
+Check out this **how to** to begin using the `Sufficiency` class
 
-{doc}`Sufficiency Tutorial<../../tutorials/notebooks/ClassLearningCurvesTutorial>`
-
-## How To Guides
-
-There are currently no how to's for `Sufficiency`.
-If there are scenarios that you want us to explain, contact us!
+{doc}`Sufficiency Tutorial<../../how_to/notebooks/ClassLearningCurvesTutorial>`
 
 ## DataEval API
 

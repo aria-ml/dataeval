@@ -44,14 +44,10 @@ in conjunction with the `Duplicates` class in order to identify duplicate images
 
 ## Tutorials
 
-There are currently no tutorials for `ImageStats`.
-
-## How To Guides
-
-There is an _Exploratory Data Analysis_ guide which shows how to use the `ImageStats`
+There is an _Exploratory Data Analysis_ tutorial which shows how to use the `ImageStats`
 in conjunction with several other data analysis classes from DataEval.
 
-{doc}`Exploratory Data Analysis<../../how_to/EDA>`
+{doc}`Exploratory Data Analysis<../../tutorials/EDA_Part1>`
 
 ## DataEval API
 
@@ -68,14 +64,10 @@ the normal statistics for each pixel value on a per channel basis.
 
 ## Tutorials
 
-There are currently no tutorials for `ChannelStats`.
-
-## How To Guides
-
-There is an _Exploratory Data Analysis_ guide which shows how to use the `ChannelStats`
+There is an _Exploratory Data Analysis_ tutorial which shows how to use the `ChannelStats`
 in conjunction with several other data analysis classes from DataEval.
 
-{doc}`Exploratory Data Analysis<../../how_to/EDA>`
+{doc}`Exploratory Data Analysis<../../tutorials/EDA_Part1>`
 
 ## DataEval API
 
