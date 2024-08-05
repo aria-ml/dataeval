@@ -1,17 +1,17 @@
 from contextlib import contextmanager
-from os import chdir, getcwd, path, walk
+from os import chdir, getcwd, path
 
 
 @contextmanager
 def cwd(rel_path):
     old_path = getcwd()
     new_path = path.abspath(rel_path)
-    print(f"{old_path} -> {new_path}")
+    print(f"push: {old_path} -> {new_path}")
     chdir(new_path)
     try:
         yield
     finally:
-        print(f"{old_path} <- {new_path}")
+        print(f"pop: {old_path} <- {new_path}")
         chdir(old_path)
 
 
@@ -19,12 +19,8 @@ def download():
     import tensorflow_datasets as tfds
     from torchvision.datasets import CIFAR10, MNIST, VOCDetection
 
-    for root, dirs, _ in walk(getcwd()):
-        for d in dirs:
-            print(path.join(root, d))
-
     # Assume we are running in the docs directory with notebooks in tutorials/notebooks
-    with cwd("tutorials/notebooks"):
+    with cwd("how_to/notebooks"):
         # AETrainerTutorial.ipynb
         # BayesErrorRateEstimationTutorial.ipynb
         # ClassLearningCurvesTutorial.ipynb
@@ -42,6 +38,6 @@ def download():
         tfds.load("mnist", split="train")
         tfds.load("mnist_corrupted/translate", split="train")
 
-    with cwd("how_to"):
-        # EDA.ipynb
+    with cwd("tutorials"):
+        # EDA_Part1.ipynb
         VOCDetection("./data", year="2011", image_set="train", download=True)
