@@ -30,6 +30,8 @@ metrics/divergence
 metrics/parity
 metrics/stats
 metrics/uap
+metrics/basic_stats
+metrics/coverage
 :::
 
 Workflows
@@ -55,4 +57,13 @@ Below is a list of backends with available trainers and models.
 
 models/torch
 models/tensorflow
+:::
+
+Glossary
+--------------
+:::{toctree}
+:maxdepth: 1
+
+glossary.md
+
 :::

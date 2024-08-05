@@ -22,7 +22,7 @@ Check out this tutorial to begin using the `Drift Detection` class
 
 ## DataEval API
 
-### Cramér-von Mises
+### Cramér-von Mises (CVM)
 
 The CVM drift detector is a non-parametric drift detector, which applies feature-wise two-sample Cramér-von Mises (CVM) tests.
 For two empirical distributions $F(z)$ and $F_{ref}(z)$, the CVM test statistic is defined as
