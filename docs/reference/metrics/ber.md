@@ -8,16 +8,11 @@
 
 % 2. What does it solve
 
-## Tutorials
+## How-To Guides
 
-Check out this tutorial to begin using the `BER` class
+Check out this **how to** to begin using the `BER` class
 
-{doc}`Bayes Error Rate Tutorial<../../tutorials/notebooks/BayesErrorRateEstimationTutorial>`
-
-## How To Guides
-
-There are currently no how to's for BER.
-If there are scenarios that you want us to explain, contact us!
+{doc}`Bayes Error Rate Tutorial<../../how_to/notebooks/BayesErrorRateEstimationTutorial>`
 
 ## DataEval API
 

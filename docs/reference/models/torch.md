@@ -6,16 +6,11 @@ DataEval uses PyTorch as its main backend for metrics that require neural networ
 While these metrics can take in custom models, DataEval provides utility classes
 to create a seamless integration between custom models and DataEval's metrics.
 
-## Tutorials
+## How-To Guides
 
-Check out this tutorial to begin using the `AETrainer` class
+Check out this **how to** to begin using the `AETrainer` class
 
-{doc}`Autoencoder Trainer<../../tutorials/notebooks/AETrainerTutorial>`
-
-## How To Guides
-
-There are currently no how to's for AETrainer.
-If there are scenarios that you want us to explain, contact us!
+{doc}`Autoencoder Trainer<../../how_to/notebooks/AETrainerTutorial>`
 
 ## DataEval API
 

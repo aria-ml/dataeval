@@ -8,16 +8,11 @@
 
 % 2. What does it solve
 
-## Tutorials
+## How-To Guides
 
-Check out this tutorial to begin using the `coverage` class
+Check out this **how to** to begin using the `coverage` class
 
-{doc}`Coverage Tutorial<../../tutorials/notebooks/CoverageTutorial>`
-
-## How To Guides
-
-There are currently no how to's for coverage.
-If there are scenarios that you want us to explain, contact us!
+{doc}`Coverage Tutorial<../../how_to/notebooks/CoverageTutorial>`
 
 ## DataEval API
 
