@@ -8,16 +8,11 @@
 
 % 2. What does it solve
 
-## Tutorials
+## How-To Guides
 
-Check out this tutorial to begin using the `Parity` class
+Check out this **how to** to begin using the `Parity` class
 
-{doc}`Class Label Analysis Tutorial<../../tutorials/notebooks/ClassLabelAnalysisTutorial>`
-
-## How To Guides
-
-There are currently no how to's for `Parity`.
-If there are scenarios that you want us to explain, contact us!
+{doc}`Class Label Analysis Tutorial<../../how_to/notebooks/ClassLabelAnalysisTutorial>`
 
 ## DataEval API
 
