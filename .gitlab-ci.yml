@@ -296,12 +296,14 @@ export-merged-sbom:
     - apk add --update jq curl
   script:
     - >
-      curl --header "Authorization: Bearer $DATAEVAL_BUILD_PAT"
+      curl --header "Authorization: Bearer $PRIVATE_TOKEN"
       --output export.sh --url "https://gitlab.jatic.net/api/v4/snippets/7/raw"
     - /bin/sh export.sh
   artifacts:
     paths:
       - "gl-sbom-merged-*.cdx.json"
+  variables:
+    PRIVATE_TOKEN: $DATAEVAL_BUILD_PAT
   rules: *on_release
 
 ### SECURITY ###
