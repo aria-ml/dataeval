@@ -255,7 +255,6 @@ One way to capture the precision-recall curve in a single metric.  F1-score comb
 
 See [**Precision**](#precision) and [**Recall**](#recall).
 
-
 ### **False Discovery Rate (FDR)**
 
 The FDR is defined as the ratio of the number of [**False Positive (FP)**](#false-positive-rate-fp) classifications (false discoveries) to the total number of [**True Positive (TP)**](#true-positive-rate-tp) classifications (rejections of the null). 
@@ -386,7 +385,6 @@ In mathematics, a manifold is a topological space that locally resembles Euclide
 Method used in the [**Pooling Layer**](#pooling-layer) of a [**Convolutional Neural Network**](#convolutional-neural-network-cnn). It uses the maximum value in a group of pixel values (typically a 2 x 2 or 3 x 3 area) produced from the [**Convolutional Layer**](#convolutional-layer) to reduce the dimensionality of the result. An image of the operation is shown below.
 
 See [**Pooling Layer**](#pooling-layer).
-
 
 ![Maximum Pooling Example](./images/max_pooling.png)
 
@@ -536,8 +534,6 @@ See [**Dimensionality Reduction**](#dimensionality-reduction).
 
 A Probability Distribution is a mathematical function that gives the probabilities of occurrence of different possible random outcomes for an experiment. It can be defined for both discrete and continuous variables. 
 
-## Q
-
 ## R
 
 ### **Recall**
@@ -654,11 +650,3 @@ In probability theory and statistics, variance is the expected value of the squa
 A type of [**Autoencoder**](#autoencoder) used extensively in generative models (e.g. Large Language Models (LLMs)) because of its ability to generate new content. The encoder maps each data point (such as an image) from a large complex dataset into a distribution (e.g. Guassian) within a [**Latent**](#latent-space) or encoded space, rather than a single point. 
 
 See [**Autoencoder**](#autoencoder) and [**Latent Space**](#latent-space).
-
-## W
-
-## X
-
-## Y
-
-## Z

@@ -95,8 +95,8 @@ self
 :maxdepth: 2
 
 installation.md
-tutorials/index.md
 how_to/index
+tutorials/index.md
 :::
 
 :::{toctree}
@@ -105,6 +105,13 @@ how_to/index
 :maxdepth: 2
 
 concepts/index.md
+:::
+
+:::{toctree}
+:hidden:
+:titlesonly:
+
+concepts/glossary.md
 :::
 
 :::{toctree}
@@ -118,7 +125,6 @@ reference/index.md
 :::{toctree}
 :hidden:
 :titlesonly:
-:maxdepth: 1
 
 reference/changelog
 reference/about
