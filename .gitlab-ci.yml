@@ -289,6 +289,21 @@ create release:
     - .gitlab/scripts/create_release.py
   rules: *on_release
 
+export-merged-sbom:
+  stage: release
+  image: docker:stable
+  before_script:
+    - apk add --update jq curl
+  script:
+    - >
+      curl --header "Authorization: Bearer $DATAEVAL_BUILD_PAT"
+      --output export.sh --url "https://gitlab.jatic.net/api/v4/snippets/7/raw"
+    - /bin/sh export.sh
+  artifacts:
+    paths:
+      - "gl-sbom-merged-*.cdx.json"
+  rules: *on_release
+
 ### SECURITY ###
 
 include:
