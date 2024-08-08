@@ -8,7 +8,6 @@ Licensed under Apache Software License (Apache 2.0)
 
 from abc import ABC, abstractmethod
 from functools import wraps
-from random import random
 from typing import Callable, Dict, Literal, Optional, Tuple, Union
 
 import numpy as np
@@ -94,7 +93,7 @@ class ReservoirSamplingUpdate(UpdateStrategy):
                 x_reservoir[n_ref, :] = item
                 n_ref += 1
             else:
-                r = int(random() * count)
+                r = np.random.randint(0, count)
                 if r < self.n:
                     x_reservoir[r, :] = item
         return x_reservoir
