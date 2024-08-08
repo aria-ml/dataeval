@@ -61,6 +61,10 @@ We want to show visualizations of tutorials to peak the interest of a potential 
 DataEval is a powerful toolkit for any data analysis workflow, so be sure to check out the
 **Quickstart Tutorials** page for a more comprehensive list of all the tools we offer.
 
+### [Workflows](workflows/index)
+
+Workflows give a user an idea of what sort of data evaluation their role necessitates and why. They are great for a non-technical explanation of data analysis.
+
 ### [How-To's](how_to/index)
 
 For the more experienced user, or if you are just curious, these guides show different ways
@@ -95,6 +99,7 @@ self
 :maxdepth: 2
 
 installation.md
+workflows/index.md
 how_to/index
 tutorials/index.md
 :::
