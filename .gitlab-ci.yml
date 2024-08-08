@@ -115,28 +115,6 @@ stages:
       - output/*
   rules: *on_run
 
-### NO DOCKER TEMPLATE ###
-
-.build_task_no_docker:
-  image: python:${PYTHON_VERSION}
-  extends: [.python_version_matrix]
-  needs: []
-  before_script:
-    - |
-      if [[ ${TASK} == lint ]]; then
-        pip install poetry
-        poetry run pip install -e . ruff codespell[toml]
-      elif [[ ${TASK} == unit || ${TASK} == type ]]; then
-        pip install poetry
-        poetry install --all-extras --with dev
-      fi
-  script:
-    - ./run ${TASK}
-  artifacts:
-    paths:
-      - output/*
-  rules: *on_run
-
 ### BUILD ###
 
 build:
@@ -152,8 +130,9 @@ verify lock:
   before_script:
     - pip install poetry
   script:
-    - poetry check
     - poetry config warnings.export false
+    - poetry check
+    - poetry lock --no-update
     - poetry export --all-extras --without-hashes -o environment/requirements.check
     - cmp -s environment/requirements.txt environment/requirements.check
     - poetry export --only=dev --without-hashes -o environment/requirements-dev.check

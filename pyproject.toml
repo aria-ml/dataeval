@@ -70,6 +70,7 @@ tox = {version = "*"}
 tox-uv = {version = "*"}
 uv = {version = "*"}
 poetry = {version = "*"}
+poetry-lock-groups-plugin = {version = "*"}
 # lint
 ruff = {version = "*"}
 codespell = {version = "*", extras = ["toml"]}
