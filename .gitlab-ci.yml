@@ -31,6 +31,7 @@ variables:
   PIP_ROOT_USER_ACTION: ignore
   PIP_DISABLE_PIP_VERSION_CHECK: 1
   SAST_EXCLUDED_PATHS: spec,test,tests,tmp,.tox,output,prototype
+  DOCS_RUNNER_TAG: multi-gpu
 
 image: python:$PYTHON_LATEST_SUPPORTED_VERSION
 
@@ -71,7 +72,12 @@ stages:
         - docs/**/*
         - environment/*
         - README.md
+    variables:
+      TASK: qdocs
+      DOCS_RUNNER_TAG: single-gpu
   - if: $CI_COMMIT_BRANCH == 'main'
+    variables:
+      TASK: docs
 
 .on_merge_request_only: &on_merge_request_only
   - if: $CREATE_NEW_RELEASE
@@ -208,9 +214,10 @@ docs:
   stage: docs
   extends: .harbor
   needs: [build]
-  tags: [multi-gpu]
+  tags:
+    - $DOCS_RUNNER_TAG
   script:
-    - ./build --push docs --gpu
+    - ./build --push $TASK --gpu
   artifacts:
     paths:
       - output/docs/.jupyter_cache/
