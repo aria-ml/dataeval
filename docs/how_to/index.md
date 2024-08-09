@@ -8,11 +8,11 @@ In addition to viewing them in our documentation, these notebooks can also be op
 Detectors
 ---------
 
-- [Drift Detection Tutorial](notebooks/DriftDetectionTutorial) [![Open In Colab][colab-badge]][drift-colab]
-- [Out-of-Distribution Detection Tutorial](notebooks/OODDetectionTutorial) [![Open In Colab][colab-badge]][out-colab]
-- [Clustering Tutorial](notebooks/ClustererTutorial) [![Open In Colab][colab-badge]][clust-colab]
-- [Duplicates Tutorial](notebooks/DuplicatesTutorial) [![Open In Colab][colab-badge]][dup-colab]
-- [Linting Tutorial](notebooks/LintingTutorial) [![Open In Colab][colab-badge]][lint-colab]
+- [How to detect if the data distribution is changing](notebooks/DriftDetectionTutorial) [![Open In Colab][colab-badge]][drift-colab]
+- [How to monitor for outliers during deployment](notebooks/OODDetectionTutorial) [![Open In Colab][colab-badge]][out-colab]
+- [How to identify outliers and/or anomalies in a dataset](notebooks/ClustererTutorial) [![Open In Colab][colab-badge]][clust-colab]
+- [How to detect duplicates in a dataset](notebooks/DuplicatesTutorial) [![Open In Colab][colab-badge]][dup-colab]
+- [How to identify poor quality images in a dataset](notebooks/LintingTutorial) [![Open In Colab][colab-badge]][lint-colab]
 
 :::{toctree}
 :hidden:
@@ -28,10 +28,11 @@ notebooks/LintingTutorial.ipynb
 Metrics
 -------
 
-- [Bayes Error Rate Estimation Tutorial](notebooks/BayesErrorRateEstimationTutorial) [![Open In Colab][colab-badge]][ber-colab]
-- [HP Divergence Tutorial](notebooks/HPDivergenceTutorial) [![Open In Colab][colab-badge]][div-colab]
-- [Class Label Analysis Tutorial](notebooks/ClassLabelAnalysisTutorial) [![Open In Colab][colab-badge]][lbl-colab]
-- [Coverage Analysis Tutorial](notebooks/CoverageTutorial) [![Open In Colab][colab-badge]][cov-colab]
+- [How to determine if a dataset can meet performance requirements](notebooks/BayesErrorRateEstimationTutorial) [![Open In Colab][colab-badge]][ber-colab]
+- [How to compare data distributions between 2 datasets](notebooks/HPDivergenceTutorial) [![Open In Colab][colab-badge]][div-colab]
+- [How to compare label distributions between 2 datasets](notebooks/ClassLabelAnalysisTutorial) [![Open In Colab][colab-badge]][lbl-colab]
+- [How to detect undersampled data subsets](notebooks/CoverageTutorial) [![Open In Colab][colab-badge]][cov-colab]
+
 :::{toctree}
 :hidden:
 :maxdepth: 1
@@ -45,8 +46,8 @@ notebooks/CoverageTutorial.ipynb
 Workflows
 ---------
 
-- [Class Learning Curves Tutorial](notebooks/ClassLearningCurvesTutorial) [![Open In Colab][colab-badge]][suff-colab]
-- [Dataset Sufficiency Analysis for Object Detection Tutorial](html/ODLearningCurvesTutorial) [![Open In Colab][colab-badge]][odlc-colab]
+- [How to determine the amount of data needed to meet image classification performance requirements](notebooks/ClassLearningCurvesTutorial) [![Open In Colab][colab-badge]][suff-colab]
+- [How to determine the amount of data needed to meet object detection performance requirements](html/ODLearningCurvesTutorial) [![Open In Colab][colab-badge]][odlc-colab]
 
 :::{toctree}
 :hidden:
@@ -59,7 +60,8 @@ html/ODLearningCurvesTutorial.md
 Models
 ------
 
-- [AE Trainer Tutorial](notebooks/AETrainerTutorial) [![Open In Colab][colab-badge]][ae-colab]
+- [How to create image embeddings with an autoencoder](notebooks/AETrainerTutorial) [![Open In Colab][colab-badge]][ae-colab]
+% - How to use the AETrainer with different model architectures (future how-to)
 
 :::{toctree}
 :hidden:
