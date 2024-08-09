@@ -1,3 +1,12 @@
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PYTHON_LATEST_SUPPORTED_VERSION: "3.11"
+  DOCKER_DRIVER: overlay2
+  PIP_ROOT_USER_ACTION: ignore
+  PIP_DISABLE_PIP_VERSION_CHECK: 1
+  SAST_EXCLUDED_PATHS: spec,test,tests,tmp,.tox,output,prototype
+  DOCS_RUNNER_TAG: single-gpu
+
 workflow:
   # Allows jobs in this workflow to be interrupted:
   # https://gitlab.jatic.net/help/ci/yaml/index.md#workflowauto_cancelon_new_commit
@@ -12,9 +21,12 @@ workflow:
     - if: $CI_COMMIT_BRANCH == 'main'
       changes: ["CHANGELOG.md"]
       when: never
+    # Gitlab web UI trigger
+    - if: $CI_PIPELINE_SOURCE == 'web'
     # Commit Main Branch Workflow
     - if: $CI_COMMIT_BRANCH == 'main'
-    - if: $CI_PIPELINE_SOURCE == 'web'
+      variables:
+        DOCS_RUNNER_TAG: multi-gpu
 
 default:
   # This should allow pipelines to auto-cancel when redundant:
@@ -23,15 +35,6 @@ default:
   interruptible: true
   tags:
     - autoscaler
-
-variables:
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  PYTHON_LATEST_SUPPORTED_VERSION: "3.11"
-  DOCKER_DRIVER: overlay2
-  PIP_ROOT_USER_ACTION: ignore
-  PIP_DISABLE_PIP_VERSION_CHECK: 1
-  SAST_EXCLUDED_PATHS: spec,test,tests,tmp,.tox,output,prototype
-  DOCS_RUNNER_TAG: multi-gpu
 
 image: python:$PYTHON_LATEST_SUPPORTED_VERSION
 
@@ -74,7 +77,6 @@ stages:
         - README.md
     variables:
       TASK: qdocs
-      DOCS_RUNNER_TAG: single-gpu
   - if: $CI_COMMIT_BRANCH == 'main'
     variables:
       TASK: docs
