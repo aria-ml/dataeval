@@ -7,43 +7,6 @@ ARG PYENV_ROOT="$HOME/.pyenv"
 ARG python_version="3.11"
 ARG output_dir="/dataeval/output"
 
-######################## pyenv image ########################
-FROM ubuntu:22.04 as pyenv-build
-ENV DEBIAN_FRONTEND noninteractive
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        ca-certificates \
-        curl \
-        git \
-        libbz2-dev \
-        libffi-dev \
-        liblzma-dev \
-        libncursesw5-dev \
-        libreadline-dev \
-        libsqlite3-dev \
-        libssl-dev \
-        libxml2-dev \
-        libxmlsec1-dev \
-        llvm \
-        tk-dev \
-        wget \
-        xz-utils \
-        zlib1g-dev
-ARG USER
-RUN useradd -m ${USER}
-USER ${USER}
-RUN curl https://pyenv.run | bash
-ENV PYTHON_CONFIGURE_OPTS "--enable-optimizations --with-lto"
-ARG PYENV_ROOT
-ARG python_version
-RUN ${PYENV_ROOT}/bin/pyenv install ${python_version}
-
-FROM scratch as pyenv
-ARG PYENV_ROOT
-COPY --from=pyenv-build ${PYENV_ROOT} ${PYENV_ROOT}
-
 
 ######################## data image ########################
 FROM python:3.11 as data
@@ -79,10 +42,42 @@ ENV LANG=en_US.UTF-8
 
 
 ######################## base task image ########################
+FROM ubuntu:22.04 as pyenv-build
+ENV DEBIAN_FRONTEND noninteractive
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        curl \
+        git \
+        libbz2-dev \
+        libffi-dev \
+        liblzma-dev \
+        libncursesw5-dev \
+        libreadline-dev \
+        libsqlite3-dev \
+        libssl-dev \
+        libxml2-dev \
+        libxmlsec1-dev \
+        llvm \
+        tk-dev \
+        wget \
+        xz-utils \
+        zlib1g-dev
+ARG USER
+RUN useradd -m ${USER}
+USER ${USER}
+RUN curl https://pyenv.run | bash
+ENV PYTHON_CONFIGURE_OPTS "--enable-optimizations --with-lto"
+ARG PYENV_ROOT
+ARG python_version
+RUN ${PYENV_ROOT}/bin/pyenv install ${python_version}
+
 FROM cuda as base
 ARG UID
 ARG PYENV_ROOT
-COPY --chown=${UID} --link --from=pyenv ${PYENV_ROOT} ${PYENV_ROOT}
+COPY --chown=${UID} --link --from=pyenv-build ${PYENV_ROOT} ${PYENV_ROOT}
 ENV PATH ${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:$PATH
 ARG python_version
 RUN pyenv global ${python_version}
@@ -92,6 +87,12 @@ COPY --chown=${UID} environment/requirements.txt environment/
 RUN uv pip install -r environment/requirements.txt
 COPY --chown=${UID} environment/requirements-dev.txt environment/
 RUN uv pip install -r environment/requirements-dev.txt
+
+
+######################## pyenv image ########################
+FROM scratch as pyenv
+ARG PYENV_ROOT
+COPY --from=pyenv-build ${PYENV_ROOT} ${PYENV_ROOT}
 
 
 ######################## task layers ########################
@@ -133,9 +134,9 @@ RUN ./capture.sh deps ${python_version} tox -e deps
 FROM base as task-docs
 ARG UID
 ARG HOME
-COPY --link --chown=${UID} --from=data /root/tensorflow_datasets ${HOME}/tensorflow_datasets
-COPY --link --chown=${UID} --from=data /root/.keras ${HOME}/.keras
-COPY --link --chown=${UID} --from=data /docs docs
+COPY --chown=${UID} --link --from=data /root/tensorflow_datasets ${HOME}/tensorflow_datasets
+COPY --chown=${UID} --link --from=data /root/.keras ${HOME}/.keras
+COPY --chown=${UID} --link --from=data /docs docs
 COPY --chown=${UID} pyproject.toml poetry.lock ./
 COPY --chown=${UID} src/ src/
 COPY --chown=${UID} docs/ docs/
