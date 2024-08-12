@@ -13,6 +13,7 @@ Detectors
 - [How to identify outliers and/or anomalies in a dataset](notebooks/ClustererTutorial) [![Open In Colab][colab-badge]][clust-colab]
 - [How to detect duplicates in a dataset](notebooks/DuplicatesTutorial) [![Open In Colab][colab-badge]][dup-colab]
 - [How to identify poor quality images in a dataset](notebooks/LintingTutorial) [![Open In Colab][colab-badge]][lint-colab]
+- [How to customize the metrics for data cleaning](linting_flags.md)
 
 :::{toctree}
 :hidden:
@@ -23,6 +24,7 @@ notebooks/OODDetectionTutorial.ipynb
 notebooks/ClustererTutorial.ipynb
 notebooks/DuplicatesTutorial.ipynb
 notebooks/LintingTutorial.ipynb
+linting_flags.md
 :::
 
 Metrics
