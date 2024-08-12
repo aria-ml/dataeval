@@ -8,7 +8,15 @@ from dataeval._internal.functional.utils import compute_neighbors, get_classes_c
 
 
 def ber_mst(X: np.ndarray, y: np.ndarray, _: int) -> Tuple[float, float]:
-    """Calculates the Bayes Error Rate using a minimum spanning tree"""
+    """Calculates the Bayes Error Rate using a minimum spanning tree
+
+    Parameters
+    ----------
+    X : np.ndarray (N, :)
+        Data points with arbitrary dimensionality
+    y : np.ndarray (N, 1)
+        Labels for each data point
+    """
 
     M, N = get_classes_counts(y)
 
