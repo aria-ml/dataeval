@@ -167,7 +167,7 @@ triton==2.1.0 ; platform_system == "Linux" and platform_machine == "x86_64" and 
 trove-classifiers==2024.7.2 ; python_version >= "3.9" and python_version < "3.12"
 typing-extensions==4.12.2 ; python_version >= "3.9" and python_version < "3.12"
 urllib3==2.2.2 ; python_version >= "3.9" and python_version < "3.12"
-uv==0.2.34 ; python_version >= "3.9" and python_version < "3.12"
+uv==0.2.35 ; python_version >= "3.9" and python_version < "3.12"
 virtualenv==20.26.3 ; python_version >= "3.9" and python_version < "3.12"
 wcwidth==0.2.13 ; python_version >= "3.11" and python_version < "3.12"
 webencodings==0.5.1 ; python_version >= "3.11" and python_version < "3.12"
