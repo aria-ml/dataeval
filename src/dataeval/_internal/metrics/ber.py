@@ -41,9 +41,9 @@ class BER(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
     """
 
     def __init__(self, data: np.ndarray, labels: np.ndarray, method: _METHODS = "KNN", k: int = 1) -> None:
-        self.data = data
-        self.labels = labels
-        self.k = k
+        self.data: np.ndarray = data
+        self.labels: np.ndarray = labels
+        self.k: int = k
         self._set_method(method)
 
     @classmethod
