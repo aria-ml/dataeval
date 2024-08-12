@@ -31,24 +31,44 @@ def _get_outlier_mask(
 
 class Linter:
     """
-    Calculates statistical outliers of a dataset using various statistical
-    tests applied to each image
+    Calculates statistical outliers of a dataset using various statistical tests applied to each image
+
+    There are 3 different statistical methods:
+
+    - zscore
+    - modzscore
+    - iqr
+
+    The default statistical method is `modzscore`.
+
+    The z score method is based on the difference between the data point and the mean of the data.
+    The default threshold value for `zscore` is 3.
+    Z score = \|x_i - mu| / sigma
+
+    The modified z score method is based on the difference between the data point and the median of the data.
+    The default threshold value for `modzscore` is 3.5.
+    Modified z score = 0.6745 * \|x_i - x̃| / MAD, where MAD is the median absolute deviation
+
+    The interquartile range method is based on the difference between the data point and
+    the difference between the 75th and 25th qartile.
+    The default threshold value for `iqr` is 1.5.
+    Interquartile range $= threshold * (Q_3 - Q_1)$
     """
 
     def __init__(
         self,
         images: np.ndarray,
         flags: Optional[Union[LinterFlags, Sequence[LinterFlags]]] = None,
+        outlier_method: Literal["zscore", "modzscore", "iqr"] = "modzscore",
+        outlier_threshold: Optional[float] = None,
     ):
         flags = flags if flags is not None else (ImageProperty.ALL, ImageVisuals.ALL)
         self.stats = ImageStats(flags)
         self.images = images
+        self.outlier_method: Literal["zscore", "modzscore", "iqr"] = outlier_method
+        self.outlier_threshold = outlier_threshold
 
-    def _get_outliers(
-        self,
-        outlier_method: Literal["zscore", "modzscore", "iqr"] = "modzscore",
-        outlier_threshold: Optional[float] = None,
-    ) -> dict:
+    def _get_outliers(self) -> dict:
         flagged_images = {}
 
         for stat, values in self.results.items():
@@ -56,7 +76,7 @@ class Linter:
                 continue
 
             if values.ndim == 1 and np.std(values) != 0:
-                mask = _get_outlier_mask(values, outlier_method, outlier_threshold)
+                mask = _get_outlier_mask(values, self.outlier_method, self.outlier_threshold)
                 indices = np.flatnonzero(mask)
                 for i, value in zip(indices, values[mask]):
                     flagged_images.setdefault(i, {}).update({stat: np.round(value, 2)})

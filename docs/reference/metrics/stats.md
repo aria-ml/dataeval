@@ -44,10 +44,15 @@ in conjunction with the `Duplicates` class in order to identify duplicate images
 
 ## Tutorials
 
-There is an _Exploratory Data Analysis_ tutorial which shows how to use the `ImageStats`
-in conjunction with several other data analysis classes from DataEval.
+To see how the ImageStats class can be used while doing exploratory data analysis, check out the _EDA Part 1_ tutorial.
 
-{doc}`Exploratory Data Analysis<../../tutorials/EDA_Part1>`
+{doc}`Exploratory Data Analysis Part 1<../../tutorials/EDA_Part1>`
+
+## How To Guides
+
+There is a how-to guide that applies to the `ImageStats` class.
+
+* [How to customize the metrics for data cleaning](../../how_to/linting_flags.md)
 
 ## DataEval API
 
@@ -64,10 +69,15 @@ the normal statistics for each pixel value on a per channel basis.
 
 ## Tutorials
 
-There is an _Exploratory Data Analysis_ tutorial which shows how to use the `ChannelStats`
-in conjunction with several other data analysis classes from DataEval.
+To see how the ChannelStats class can be used while doing exploratory data analysis, check out the _EDA Part 1_ tutorial.
 
-{doc}`Exploratory Data Analysis<../../tutorials/EDA_Part1>`
+{doc}`Exploratory Data Analysis Part 1<../../tutorials/EDA_Part1>`
+
+## How To Guides
+
+There is a how-to guide that applies to the `ChannelStats` class.
+
+* [How to customize the metrics for data cleaning](../../how_to/linting_flags.md)
 
 ## DataEval API
 
@@ -78,6 +88,9 @@ in conjunction with several other data analysis classes from DataEval.
 ```
 
 # Image Flags
+
+Each category of flags contains a specific set of image metrics that can be used with the ImageStats, the ChannelStats, and the Linter classes.
+The how-to [How to customize the metrics for data cleaning](../../how_to/linting_flags.md) shows how to customize the metrics from a flag category.
 
 ```{eval-rst}
 .. autoflag:: dataeval.flags.ImageHash

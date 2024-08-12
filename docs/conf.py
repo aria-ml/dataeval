@@ -60,7 +60,7 @@ nb_execution_mode = "cache" if EXECUTION_MODE is None else EXECUTION_MODE
 nb_execution_raise_on_error = True
 nb_execution_timeout = -1
 
-myst_enable_extensions = ["colon_fence", "html_image", "dollarmath"]
+myst_enable_extensions = ["colon_fence", "dollarmath", "html_image"]
 myst_heading_anchors = 4
 
 # -- HTML output ----------------------------------------------------------
