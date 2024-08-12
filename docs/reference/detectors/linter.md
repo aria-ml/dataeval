@@ -13,18 +13,18 @@ Issues detected in the image properties category include the width, height, dept
 Being able to identify and remove images that lie in the extremes in each of these categories
 can help ensure that you have high quality data for training.
 
+## Tutorials
+To see how the Linter class can be used while doing exploratory data analysis, check out the _EDA Part 1_ tutorial.
+
+{doc}`Exploratory Data Analysis Part 1<../../tutorials/EDA_Part1>`
+
 ## How-To Guides
 
-Check out this **how to** to begin using the `Linting` class
+There are a couple how-to guides for the `Linter` class.
 
-{doc}`Linting Tutorial<../../how_to/notebooks/LintingTutorial>`
+* {doc}`Linting How-To Guide<../../how_to/notebooks/LintingTutorial>`
+* [How to customize the metrics for data cleaning](../../how_to/linting_flags.md)
 
-## Tutorials
-
-There is also an _Exploratory Data Analysis_ tutorial which shows how to use the `Linter`
-in conjunction with several other data analysis classes from DataEval.
-
-{doc}`Exploratory Data Analysis<../../tutorials/EDA_Part1>`
 
 ## DataEval API
 

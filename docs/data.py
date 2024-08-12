@@ -33,6 +33,7 @@ def download():
         # LintingTutorial.ipynb
         CIFAR10(root="./data", train=False, download=True)
 
+        # DuplicatesTutorial.ipynb
         # DriftDetectionTutorial.ipynb
         # HPDivergenceTutorial.ipynb
         # OODDetectionTutorial.ipynb
