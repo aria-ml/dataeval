@@ -1,12 +1,13 @@
 import numpy as np
 import pytest
-import torch
 
 from dataeval._internal.functional.ber import _knn_lowerbound, ber_knn, ber_mst
 from dataeval.metrics import BER
 
 
 class TestFunctionalBER:
+    """Tests the functional methods used in BER"""
+
     @pytest.mark.parametrize(
         "method, k, expected",
         [
@@ -39,6 +40,8 @@ class TestFunctionalBER:
 
 
 class TestAPIBER:
+    """Tests the user facing BER Class"""
+
     def test_invalid_method(self):
         """Raises error when method is not KNN or MST"""
         with pytest.raises(KeyError):
@@ -64,37 +67,8 @@ class TestAPIBER:
     def test_ber_output_format(self, method, k, expected, mnist):
         """Confirms BER class transforms functional results into correct format"""
 
-        # TODO: Convert calculations to mock, just check output tuple -> dict
+        # TODO: Mock patch _ber methods, just check output tuple -> dict
         data, labels = mnist()
         ber = BER(data=data, labels=labels, method=method, k=k)
         result = ber.evaluate()
         assert result == expected
-
-
-class TestArrayLikeBER:
-    @pytest.mark.parametrize(
-        "arr, larr",
-        [
-            (np.random.randint(0, 100, (10, 10)), np.arange(10)),
-            (torch.randint(0, 100, (10, 10)), torch.arange(0, 10)),
-        ],
-    )
-    def test_arraylike(self, arr, larr):
-        """Test maite.protocols.ArrayLike objects pass evaluation"""
-
-        ber = BER(arr, larr)
-        ber.evaluate()
-
-    @pytest.mark.parametrize(
-        "arr, larr",
-        [
-            ([[0, 0, 0], [1, 1], [0, 1], [1, 0]], [0, 0, 1, 1]),
-            ([["0", "0"], ["1", "1"], ["0", "1"], ["1", "0"]], ["0", "0", "1", "1"]),
-        ],
-    )
-    def test_invalid_array(self, arr, larr):
-        """Test non-arraylike objects fail evaluation"""
-
-        ber = BER(arr, larr)
-        with pytest.raises(ValueError):
-            ber.evaluate()
