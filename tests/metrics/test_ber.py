@@ -48,9 +48,8 @@ class TestAPIBER:
 
     def test_invalid_method_setter(self):
         """Raises error when method key is not KNN or MST"""
-        b = BER()
         with pytest.raises(KeyError):
-            b.method = "NOT_A_METHOD"  # type: ignore
+            BER("NOT_A_METHOD")  # type: ignore
 
     def test_list_class_methods(self):
         methods = BER.methods()
@@ -67,7 +66,7 @@ class TestAPIBER:
         """Confirms BER class transforms functional results into correct format"""
 
         # TODO: Mock patch _ber methods, just check output tuple -> dict
-        data, labels = mnist()
+        images, labels = mnist()
         ber = BER(method=method, k=k)
-        result = ber.evaluate(data=data, labels=labels)
+        result = ber.evaluate(images=images, labels=labels)
         assert result == expected
