@@ -40,7 +40,7 @@ An example scale might be:
 - 0.8–0.9: Excellent
 - 1: A perfect model that can correctly distinguish between all positive and negative class points
 
-See [**Classification**](#classification) and [**ROC**](#receiver-operating-characteristic-roc-curve) 
+See [**Classification**](#classification) and [**ROC**](#receiver-operating-characteristic-curve) 
 
 ### **Artificial Intelligence (AI)**
 
@@ -144,7 +144,7 @@ See [**Drift**](#drift).
 
 ### **Confidence Level**
 
-In statistics, the confidence level indicates the probability with which the estimation of the location of a statistical parameter (e.g., an arithmetic mean) in a sample survey is also true for the actual population.
+In statistics, the confidence level indicates the probability with which the estimation of the location of a statistical parameter (for example an arithmetic mean) in a sample survey is also true for the actual population.
 
 ### **Confusion Matrix**
 
@@ -158,9 +158,6 @@ See [**False Negatives**](#false-negative-rate-fn), [**False Positives**](#false
 
 A type of [**Autoencoder**](#autoencoder) which is designed to be sensitive to small changes in the training dataset. It attempts to increase the robustness of the model by emphasizing the accurate encoding of small changes in the training data. 
 
-### **Coverage**
-
-A measure of the distribution of the images in a dataset. A covered dataset has at least one image for every distinguishing property of the data set.
 
 ### **Convolutional Layer**
 
@@ -173,6 +170,10 @@ See [**Convolutional Neural Network (CNN)**](#convolutional-neural-network-cnn).
 A type of [**Deep Neural Network (DNN)**](#deep-neural-networks-dnn) used in computer vision applications such as image classification, image segmentation and image and video recognition. It uses at a minimum of 3 layers; the convolutional layer, the pooling layer and the [**Fully Connected (FC) Layer**](#fully-connected-layer). With each layer, the CNN increases its complexity, identifying greater portions of the input image.
 
 See [**Deep Neural Network (DNN)**](#deep-neural-networks-dnn) and [**Fully Connected (FC) Layer**](#fully-connected-layer).
+
+### **Coverage**
+
+A measure of the distribution of the images in a dataset. A covered dataset has at least one image for every distinguishing property of the data set.
 
 ### **Cramér-von Mises (CVM) Drift Detection**
 
@@ -254,6 +255,7 @@ One way to capture the precision-recall curve in a single metric.  F1-score comb
 - $F1 = 2* \frac{\text{( Precision * Recall)}}{\text{(Precision + Recall)}}$
 
 See [**Precision**](#precision) and [**Recall**](#recall).
+
 
 ### **False Discovery Rate (FDR)**
 
@@ -386,6 +388,7 @@ Method used in the [**Pooling Layer**](#pooling-layer) of a [**Convolutional Neu
 
 See [**Pooling Layer**](#pooling-layer).
 
+
 ![Maximum Pooling Example](./images/max_pooling.png)
 
 ### **Maximum Mean Discrepancy (MMD) Drift Detection**
@@ -441,20 +444,6 @@ Object Detection is a computer vision technique for locating instances of object
 
 See [**Machine Learning**](#machine-learning-ml).
 
-### **Outliers (Images)**
-
-Images which differ significantly from all or most of the other images in a dataset.
-
-### **Outlier Detection**
-
-Outlier Detection is process of detecting data/images that significantly deviate from the rest of the data/images.  [**DataEval**](#dataeval) uses the measure of two standard deviations of the  average of the relevant distance measure to identify outliers.
-
-### **Out-of-distribution (OOD)**
-
-Out-of-distribution (OOD) data refers to data that is different from the data used to train the machine learning model. For example, data collected in a different way, at a different time, under different conditions, or for a different task than the data on which the model was originally trained. An illustration is shown below:
-
-![Out Of Distribution Illustration](./images/out_of_distribution.png)
-
 ### **Operational Dataset**
 
 Dataset used while a machine learning model is in operation and not used or seen during training.  It may or may not match the characteristics of the [**Developmental Dataset**](#developmental-dataset) (see [**Drift**](#drift)).
@@ -466,6 +455,20 @@ See [**Drift**](#drift).
 Operational drift is specific type of [**Drift**](#drift) defined as data drift during data model operations.  It occurs when the data used in operation is not like data used during training of a machine learning model. It can make the model less accurate in its predictions/classifications.
 
 See [**Drift**](#drift).
+
+### **Outlier Detection**
+
+Outlier Detection is process of detecting data/images that significantly deviate from the rest of the data/images.  [**DataEval**](#dataeval) uses the measure of two standard deviations of the  average of the relevant distance measure to identify outliers.
+
+### **Outliers (Images)**
+
+Images which differ significantly from all or most of the other images in a dataset.
+
+### **Out-of-distribution (OOD)**
+
+Out-of-distribution (OOD) data refers to data that is different from the data used to train the machine learning model. For example, data collected in a different way, at a different time, under different conditions, or for a different task than the data on which the model was originally trained. An illustration is shown below:
+
+![Out Of Distribution Illustration](./images/out_of_distribution.png)
 
 ### **Overfitting**
 
@@ -534,6 +537,8 @@ See [**Dimensionality Reduction**](#dimensionality-reduction).
 
 A Probability Distribution is a mathematical function that gives the probabilities of occurrence of different possible random outcomes for an experiment. It can be defined for both discrete and continuous variables. 
 
+## Q
+
 ## R
 
 ### **Recall**
@@ -547,6 +552,14 @@ where:
 
 See [**Accuracy**](#accuracy), [**False Negative (FN)**](#false-negative-rate-fn), and [**True Positive (TP)**](#true-positive-rate-tp).
 
+### **Receiver Operating Characteristic Curve**
+
+A curve frequently used to evaluate the performance of [**Binary Classification**](#binary-classification) algorithms. It provides a graphical representation of a classifier's performance. It plots the [**True Positive (TP) Rate**](#true-positive-rate-tp) vs the [**False Positive (FP) Rate**](#false-positive-rate-fp) at a variety of thresholds. An example image is shown below:
+
+See [**Binary Classification**](#binary-classification), [**False Positive (FP)**](#false-positive-rate-fp) and [**True Positive (TP)**](#true-positive-rate-tp).
+
+![Example ROC Curve](./images/ROC_curve.png)
+
 ### **Regularized Autoencoder**
 
 A type of [**Autoencoder** ](#autoencoder) used mostly in [**Classification**](#classification) tasks. Types include *Sparse*, *Denoising* and *Contractive*. Regularization is a method for constraining the model in order to prevent [**Overfitting**](#overfitting) and improve its ability to generalize to new data.
@@ -559,13 +572,9 @@ A manifold where distances and angles can be measured.  Type of manifold where [
 
 See [**Divergence**](#divergence).
 
-### **Receiver Operating Characteristic (ROC) Curve**
+### **ROC Curve**
 
-A curve frequently used to evaluate the performance of [**Binary Classification**](#binary-classification) algorithms. It provides a graphical representation of a classifier's performance. It plots the [**True Positive (TP) Rate**](#true-positive-rate-tp) vs the [**False Positive (FP) Rate**](#false-positive-rate-fp) at a variety of thresholds. An example image is shown below:
-
-See [**Binary Classification**](#binary-classification), [**False Positive (FP)**](#false-positive-rate-fp) and [**True Positive (TP)**](#true-positive-rate-tp).
-
-![Example ROC Curve](./images/ROC_curve.png)
+See [**Receiver Operating Characteristic Curve**](#receiver-operating-characteristic-curve)
 
 ## S
 
@@ -575,9 +584,6 @@ A type of [**Autoencoder**](#autoencoder) inspired by the sparse coding hypothes
 
 See [**Autoencoder**](#autoencoder)
 
-### **Statistics**
-
-Statistics is a branch of applied mathematics that involves the collection, description, analysis, and inference of conclusions from quantitative data. 
 
 ### **Statistical Independence** 
 
@@ -588,6 +594,10 @@ Two events are statistically independent of one another if the probability of on
 An abstract space where each point is a probability distribution. An illustration of the concept is shown below:
 
 ![statistical manifold](./images/statistical_manifold.png)
+
+### **Statistics**
+
+Statistics is a branch of applied mathematics that involves the collection, description, analysis, and inference of conclusions from quantitative data. 
 
 ### **Sufficiency**
 
@@ -647,6 +657,14 @@ In probability theory and statistics, variance is the expected value of the squa
 
 ### **Variational Autoencoder: (VAE)**
 
-A type of [**Autoencoder**](#autoencoder) used extensively in generative models (e.g. Large Language Models (LLMs)) because of its ability to generate new content. The encoder maps each data point (such as an image) from a large complex dataset into a distribution (e.g. Gaussian) within a [**Latent**](#latent-space) or encoded space, rather than a single point. 
+A type of [**Autoencoder**](#autoencoder) used extensively in generative models (for example Large Language Models (LLMs)) because of its ability to generate new content. The encoder maps each data point (such as an image) from a large complex dataset into a distribution (for example Gaussian) within a [**Latent**](#latent-space) or encoded space, rather than a single point. 
 
 See [**Autoencoder**](#autoencoder) and [**Latent Space**](#latent-space).
+
+## W
+
+## X
+
+## Y
+
+## Z
