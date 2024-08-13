@@ -13,6 +13,9 @@ workflow:
   auto_cancel:
     on_new_commit: interruptible
   rules:
+    # Skip on automated jupyter-cache updates
+    - if: $CI_COMMIT_MESSAGE == "Update jupyter-cache"
+      when: never
     # Release Workflow
     - if: $CI_PIPELINE_SOURCE == 'schedule' && $CREATE_NEW_RELEASE
     # Merge Request Workflow
@@ -228,6 +231,18 @@ docs:
       - output/docs/.jupyter_cache/
       - output/docs/html/
   rules: *on_run_with_docs
+
+update cache:
+  stage: docs
+  needs:
+    - job: docs
+      artifacts: true
+  script:
+    - cp -R output/docs/.jupyter_cache/* docs/.jupyter_cache
+    - if [[ ! $(git status --porcelain | grep --invert-match global.db) ]]; then echo "No cache changes"; exit 0; fi
+    - git add --all
+    - git commit --message "Update jupyter-cache"
+    - git push https://dataeval-bot:${DATAEVAL_BUILD_PAT}@gitlab.jatic.net/jatic/aria/dataeval.git
 
 pages:
   stage: docs
