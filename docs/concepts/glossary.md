@@ -358,7 +358,7 @@ The Laplacian filter is an edge detection filter. It uses the second derivatives
 
 ### **Latent Space**
 
-Also known as a Latent Feature Space or Encoded Space, is an embedding of a set of items within a [**Manifold**](#manifold) in which items resembling each other under some encoding are positioned close to one another.  Positions are defined by a set of *latent* variables that emerge from the properties of the objects. For example, placing images within a Guassian Distribution based upon their color properties defines the parameters of the Guassian and reduces the number of parameters for the images.  
+Also known as a Latent Feature Space or Encoded Space, is an embedding of a set of items within a [**Manifold**](#manifold) in which items resembling each other under some encoding are positioned close to one another.  Positions are defined by a set of *latent* variables that emerge from the properties of the objects. For example, placing images within a Gaussian Distribution based upon their color properties defines the parameters of the Gaussian and reduces the number of parameters for the images.  
 
 See [**Manifold**](#manifold).
 
@@ -378,7 +378,7 @@ See [**Artificial Intelligence (AI)**](#artificial-intelligence-ai) and [**Class
 
 ### **Manifold**
 
-In mathematics, a manifold is a topological space that locally resembles Euclidean space near each point. One dimensional manifolds include lines and circles. Two dimensional manifolds are also called surfaces. One example is the family of Guassian or Normal Functions. They form a manifold parameterized by the expected value and [**Variance**](#variance) of the Guassian functions. 
+In mathematics, a manifold is a topological space that locally resembles Euclidean space near each point. One dimensional manifolds include lines and circles. Two dimensional manifolds are also called surfaces. One example is the family of Gaussian or Normal Functions. They form a manifold parameterized by the expected value and [**Variance**](#variance) of the Gaussian functions. 
 
 ### **Maximum Pooling**
 
@@ -647,6 +647,6 @@ In probability theory and statistics, variance is the expected value of the squa
 
 ### **Variational Autoencoder: (VAE)**
 
-A type of [**Autoencoder**](#autoencoder) used extensively in generative models (e.g. Large Language Models (LLMs)) because of its ability to generate new content. The encoder maps each data point (such as an image) from a large complex dataset into a distribution (e.g. Guassian) within a [**Latent**](#latent-space) or encoded space, rather than a single point. 
+A type of [**Autoencoder**](#autoencoder) used extensively in generative models (e.g. Large Language Models (LLMs)) because of its ability to generate new content. The encoder maps each data point (such as an image) from a large complex dataset into a distribution (e.g. Gaussian) within a [**Latent**](#latent-space) or encoded space, rather than a single point. 
 
 See [**Autoencoder**](#autoencoder) and [**Latent Space**](#latent-space).
