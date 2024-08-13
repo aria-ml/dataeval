@@ -14,7 +14,7 @@ workflow:
     on_new_commit: interruptible
   rules:
     # Skip on automated jupyter-cache updates
-    - if: $CI_COMMIT_MESSAGE == "Update jupyter-cache"
+    - if: $CI_COMMIT_TITLE == 'Update jupyter-cache'
       when: never
     # Release Workflow
     - if: $CI_PIPELINE_SOURCE == 'schedule' && $CREATE_NEW_RELEASE
