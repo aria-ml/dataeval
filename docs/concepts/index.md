@@ -11,7 +11,7 @@ These explanations dive into the what, why and theory behind each of DataEval's 
 - [Model Training Techniques](ModelTraining.md)
 - [Detecting Out of Distribution Data](OOD.md)
 - [Sufficiency of Datasets per Model](Sufficiency.md)
-- [Upperbound on Average Percision Estimation](UAP.md)
+- [Upperbound on Average Precision Estimation](UAP.md)
 
 
 :::{toctree}

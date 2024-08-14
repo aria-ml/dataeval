@@ -9,11 +9,11 @@ In this workflow, we will describe how a artificial intelligence (AI) engineer c
 
 First, in the **data engineering** stage, AI engineers assess the quality of the data for the desired task. For example, if a higher percentage of image are difficult to classify, and the operational requirements are high, the problem may need to be reformulated or reposed, or additional data will need to be collected. The diagnostic part of this stage is sometimes called *exploratory data analysis* (EDA). The AI engineer can make decisions with respect to problem feasibility or data hygiene following EDA.
 
-AI Engineers can first analyze raw datasets through the *linting* feature. <!---TODO: Link the relevent turorials/how-tos.--> This tool will identify images which are too dark, too blurry, etc. The AI Engineer can then decide if these images are acceptable as is, or ought to be edited/removed from the dataset. The point of dataset linting is to identify qualitative patterns in the image data that may impact model training downstream. In cases where substantial issues exist in some images, they can be filtered out or adjusted in some way. An example output of linting can be seen below:
+AI Engineers can first analyze raw datasets through the *linting* feature. <!---TODO: Link the relevant tutorials/how-tos.--> This tool will identify images which are too dark, too blurry, etc. The AI Engineer can then decide if these images are acceptable as is, or ought to be edited/removed from the dataset. The point of dataset linting is to identify qualitative patterns in the image data that may impact model training downstream. In cases where substantial issues exist in some images, they can be filtered out or adjusted in some way. An example output of linting can be seen below:
 
 ![Linting](./figures/linting.png)
 
-In this case, some of the bright and dark images in particular are nearly unusable, and would be very difficult for even a knowledgable human to identify. Other quality extremes are less problematic.
+In this case, some of the bright and dark images in particular are nearly unusable, and would be very difficult for even a knowledgeable human to identify. Other quality extremes are less problematic.
 
 Following basic dataset linting and analysis of the images themselves, AI engineers can perform metadata analyses, checking if certain metadata factors are imbalanced or are associated with label. They can do this via the *classwise balance* and *diversity* features. The former checks if individual class labels and image metadata factors have strong *mutual information*, a measure of association. The latter measures if there is sufficient metadata spread within each class label distribution.
 
@@ -43,19 +43,19 @@ Following these analyses, the AI engineer would use the processed data from the 
 
 As an AI engineer, one is also responsible for *monitoring* deployed models. The purpose of the monitoring stage is to ensure that the data the model is being applied to resemble those on which the model was trained. It is not necessary for these data to be identically distributed, merely that differences between training and operational data will not affect performance. Detection of dataset drift or anomalous images can indicate to the AI engineer that additional training, or complete retraining, will need to occur in order for the model to perform similarly to test set performance.
 
-There are several tools an engineer can leverage to analyze and evaluate the performance of a deployed model, and potential changes in operational data. The first of these tools is *coverage*. Coverage tells the AI engineer which images in the operational set have few other images which are similar to it. Such images can tell an AI engineer which image factors may be undersampled in operational data. This is critical as regions of the image space that were densely sampled in the training data, and therefore fit quite accurately, may not correspond to regions that are densely sampled in the operational dataset. Such a difference can lead to performance degredation *even if* the operational environment itself has not changed. An example of a coverage output can be seen below:
+There are several tools an engineer can leverage to analyze and evaluate the performance of a deployed model, and potential changes in operational data. The first of these tools is *coverage*. Coverage tells the AI engineer which images in the operational set have few other images which are similar to it. Such images can tell an AI engineer which image factors may be undersampled in operational data. This is critical as regions of the image space that were densely sampled in the training data, and therefore fit quite accurately, may not correspond to regions that are densely sampled in the operational dataset. Such a difference can lead to performance degradation *even if* the operational environment itself has not changed. An example of a coverage output can be seen below:
 
 ![Coverage](./figures/coverage.png)
 
 In this example, the AI engineer was able to identify high-contrast electric substations as a potentially problematic subclass in the operational dataset.
 
-Another image assesment tool is *out of distribution* (OOD) detection. This tool detects images which look entirely dissimilar to those on which the model was trained. Such images can indicate to an AI engineer that there has been a qualitative shift in image distribtuion, or that a new, operationally relevent class has emerged. An example OOD output can be seen below:
+Another image assessment tool is *out of distribution* (OOD) detection. This tool detects images which look entirely dissimilar to those on which the model was trained. Such images can indicate to an AI engineer that there has been a qualitative shift in image distribution, or that a new, operationally relevant class has emerged. An example OOD output can be seen below:
 
 ![Coverage](./figures/OOD.png)
 
 Here, we can see that a new type of powerplant, a solar farm, has emerged in the operational dataset. This type of powerplant was not present in the training set, and is therefore flagged as out-of-distribution. This would constitute a retraining event for the AI engineer.
 
-Finally, the AI engineer can look at overall *dataset drift*. Dataeval has several tests which determine if the operational dataset is significantly different from the training data. Such changes are known to be associated with performance degredation, so the AI engineer would trigger retraining as a result of significant drift. An example output can be seen below:
+Finally, the AI engineer can look at overall *dataset drift*. Dataeval has several tests which determine if the operational dataset is significantly different from the training data. Such changes are known to be associated with performance degradation, so the AI engineer would trigger retraining as a result of significant drift. An example output can be seen below:
 
 ![Drift](./figures/drift.png)
 
