@@ -119,14 +119,17 @@ ARG python_version
 RUN ln -s /dataeval/.venv .tox/type-py$(echo ${python_version} | sed "s/\.//g")
 RUN ./capture.sh type ${python_version} tox -e type-py$(echo ${python_version} | sed "s/\.//g")
 
-FROM task-run as lint-run
-ARG python_version
-RUN ln -s /dataeval/.venv .tox/lint
-RUN ./capture.sh lint ${python_version} tox -e lint
-
 FROM task-run as deps-run
 ARG python_version
 RUN ./capture.sh deps ${python_version} tox -e deps
+
+FROM task-run as lint-run
+ARG UID
+COPY --chown=${UID} docs/ docs/
+COPY --chown=${UID} *.md ./
+ARG python_version
+RUN ln -s /dataeval/.venv .tox/lint
+RUN ./capture.sh lint ${python_version} tox -e lint
 
 # docs works differently than other tasks because it requires GPU access.
 # The GPU requirement means that the docs image must be run as a container
