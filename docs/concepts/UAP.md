@@ -1,4 +1,4 @@
-# Upperbound on Average Percision
+# Upperbound on Average Precision
 
 ## What is it
 
