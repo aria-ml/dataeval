@@ -239,6 +239,7 @@ update cache:
   script:
     - cp -R output/docs/.jupyter_cache/* docs/.jupyter_cache
     - if [[ ! $(git status --porcelain | grep --invert-match global.db) ]]; then echo "No cache changes"; exit 0; fi
+    - git fetch --all --depth 1
     - git checkout ${CI_COMMIT_BRANCH}${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}
     - git add docs/.jupyter_cache/*
     - git config --global user.email "${GITLAB_USER_EMAIL}"
