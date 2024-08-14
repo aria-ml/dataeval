@@ -185,9 +185,7 @@ class CommitGen:
     def _get_entries(self, last_hash: str) -> Dict[_Tag, Dict[_Category, List[_Merge]]]:
         # get merges in to develop and main and sort
         merges: List[_Merge] = []
-        m_main = self.gl.list_merge_requests(state="merged", target_branch="main")
-        m_develop = self.gl.list_merge_requests(state="merged", target_branch="develop")
-        for merge in m_main + m_develop:
+        for merge in self.gl.list_merge_requests(state="merged", target_branch="main", order_by="merged_at"):
             merges.append(_Merge(merge))
         merges.sort(reverse=True)
 
