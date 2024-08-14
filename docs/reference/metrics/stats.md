@@ -8,7 +8,7 @@ if there are any issues with any of the images in the dataset.
 
 This class can be used to get a big picture view of the dataset and it's underlying distribution.
 
-The stats delievered by the class is broken down into 3 main categories:
+The stats delivered by the class is broken down into 3 main categories:
 * statistics covering image properties,
 * statistics covering the visual aspect of images,
 * and normal statistics about pixel values.
