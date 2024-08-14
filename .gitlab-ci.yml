@@ -58,15 +58,14 @@ stages:
 .on_release: &on_release
   - if: $CREATE_NEW_RELEASE
 
+.exclude_main: &exclude_main
+  - if: $CI_COMMIT_BRANCH == 'main'
+    when: never
+
 .on_run: &on_run
   - if: $CREATE_NEW_RELEASE
     when: never
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event' || $CI_COMMIT_BRANCH == 'main' || $CI_PIPELINE_SOURCE == 'web'
-
-.on_run_excluding_main: &on_run_excluding_main
-  - if: $CREATE_NEW_RELEASE || $CI_COMMIT_BRANCH == 'main'
-    when: never
-  - if: $CI_PIPELINE_SOURCE == 'merge_request_event' || $CI_PIPELINE_SOURCE == 'web'
 
 .on_run_with_docs: &on_run_with_docs
   - if: $CREATE_NEW_RELEASE
@@ -246,7 +245,9 @@ update cache:
     - git config --global user.name "${GITLAB_USER_NAME}"
     - git commit --message "Update jupyter-cache"
     - git push https://dataeval-bot:${DATAEVAL_BUILD_PAT}@gitlab.jatic.net/jatic/aria/dataeval.git
-  rules: *on_run_with_docs
+  rules:
+    - *exclude_main
+    - *on_run_with_docs
 
 pages:
   stage: docs
@@ -333,14 +334,20 @@ include:
 secret_detection:
   stage: security
   needs: []
-  rules: *on_run_excluding_main
+  rules:
+    - *exclude_main
+    - *on_run
 
 gemnasium-python-dependency_scanning:
   stage: security
   needs: []
-  rules: *on_run_excluding_main
+  rules:
+    - *exclude_main
+    - *on_run
 
 semgrep-sast:
   stage: security
   needs: []
-  rules: *on_run_excluding_main
+  rules:
+    - *exclude_main
+    - *on_run
