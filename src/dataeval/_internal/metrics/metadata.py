@@ -24,7 +24,8 @@ def validate_dict(d: Dict) -> None:
     lengths = []
     for arr in d.values():
         lengths.append(arr.shape)
-    assert lengths[1:] == lengths[:-1]
+    if lengths[1:] != lengths[:-1]:
+        raise ValueError("Lengths of all arrays in the dictionary must be equal")
 
 
 def str_to_int(d: Dict) -> Dict:
