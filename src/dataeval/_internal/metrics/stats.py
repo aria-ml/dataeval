@@ -5,9 +5,9 @@ import numpy as np
 from scipy.stats import entropy, kurtosis, skew
 
 from dataeval._internal.flags import ImageHash, ImageProperty, ImageStatistics, ImageStatsFlags, ImageVisuals
+from dataeval._internal.functional.hash import pchash, xxhash
 from dataeval._internal.functional.utils import edge_filter, get_bitdepth, normalize_image_shape, rescale
 from dataeval._internal.metrics.base import MetricMixin
-from dataeval._internal.metrics.hash import pchash, xxhash
 
 QUARTILES = (0, 25, 50, 75, 100)
 
