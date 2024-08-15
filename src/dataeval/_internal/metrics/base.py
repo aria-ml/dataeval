@@ -8,7 +8,7 @@ TCallable = TypeVar("TCallable", bound=Callable)
 
 class MetricMixin(ABC, Generic[TOutput]):
     @abstractmethod
-    def update(self, preds, targets): ...
+    def update(self, *args, **kwargs): ...
 
     @abstractmethod
     def compute(self) -> TOutput: ...
@@ -19,7 +19,7 @@ class MetricMixin(ABC, Generic[TOutput]):
 
 class EvaluateMixin(ABC, Generic[TOutput]):
     @abstractmethod
-    def evaluate(self) -> TOutput:
+    def evaluate(self, *args, **kwargs) -> TOutput:
         """Abstract method to calculate metric based off of constructor parameters"""
 
 
