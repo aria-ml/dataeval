@@ -1,5 +1,4 @@
 (divergence-ref)=
-
 # Divergence
 
 % Create small blurb here that answers:

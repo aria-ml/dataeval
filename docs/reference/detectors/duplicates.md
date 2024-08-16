@@ -1,6 +1,5 @@
 (duplicates-ref)=
-
-# Duplicates Detection
+# Duplicates
 
 The duplicate detector helps prune out exact and near matches.
 Exact matches are found using a byte hash of the image information,
