@@ -1,6 +1,5 @@
-(drift-ref)=
-
-# Drift Detection
+(driftcvm-ref)=
+# Drift CVM
 
 Drift refers to the phenomenon where the statistical properties of the data change over time. It occurs when the underlying
 distribution of the input features or the target variable (what the model is trying to predict) shifts, leading to a discrepancy
@@ -48,79 +47,6 @@ tests and aggregating those via the chosen correction method.
    :inherited-members:
 ```
 
-### Kolmogorov-Smirnov
-
-The drift detector applies feature-wise two-sample [Kolmogorov-Smirnov] (K-S) tests. For multivariate data, the obtained
-p-values for each feature are aggregated either via the [Bonferroni] or the [False Discovery Rate] (FDR) correction.
-The Bonferroni correction is more conservative and controls for the probability of at least one false positive. The FDR
-correction on the other hand allows for an expected fraction of false positives to occur.
-
-```{eval-rst}
-.. autoclass:: dataeval.detectors.DriftKS
-   :members:
-   :inherited-members:
-```
-
-### Maximum Mean Discrepancy
-
-The [Maximum Mean Discrepancy] (MMD) detector is a kernel-based method for multivariate 2 sample testing. The MMD is
-a distance-based measure between 2 distributions *p* and *q* based on the mean embeddings $\mu_{p}$ and $\mu_{q}$
-in a reproducing kernel Hilbert space $F$:
-
-$$
-MMD(F, p, q) = || \mu_{p} - \mu_{q} ||^2_{F}
-$$
-
-We can compute unbiased estimates of $MMD^2$ from the samples of the 2 distributions after applying the kernel trick.
-We use by default a radial basis function kernel, but users are free to pass their own kernel of preference to the detector.
-We obtain a $p$-value via a permutation test on the values of $MMD^2$.
-
-```{eval-rst}
-.. autoclass:: dataeval.detectors.DriftMMD
-   :members:
-   :inherited-members:
-```
-
-### Classifier Uncertainty
-
-The classifier uncertainty drift detector aims to directly detect drift that is likely to effect the performance of a model
-of interest. The approach is to test for change in the number of instances falling into regions of the input space on which
-the model is uncertain in its predictions. For each instance in the reference set the detector obtains the model's prediction
-and some associated notion of uncertainty. The same is done for the test set and if significant differences in uncertainty
-are detected (via a [Kolmogorov-Smirnov] test) then drift is flagged. The detector's reference set should be disjoint from
-the model's training set (on which the model's confidence may be higher).
-
-```{eval-rst}
-.. autoclass:: dataeval.detectors.DriftUncertainty
-   :members:
-   :inherited-members:
-```
-
-### GaussianRBF
-
-The GaussianRBF class implements a Gaussian kernel, also known as a [radial basis function] (RBF) kernel. It is used
-to construct a covariance matrix for gaussian processes and is the default kernel used in the MMD drift detection test.
-
-```{eval-rst}
-.. autoclass:: dataeval.detectors.GaussianRBF
-   :members:
-```
-
-### LastSeenUpdate
-
-```{eval-rst}
-.. autoclass:: dataeval.detectors.LastSeenUpdate
-   :members:
-   :inherited-members:
-```
-
-### ReservoirSamplingUpdate
-
-```{eval-rst}
-.. autoclass:: dataeval.detectors.ReservoirSamplingUpdate
-   :members:
-   :inherited-members:
-```
 
 [bbse]: https://arxiv.org/abs/1802.03916
 [bonferroni]: https://mathworld.wolfram.com/BonferroniCorrection.html

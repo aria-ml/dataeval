@@ -1,48 +1,172 @@
 Reference Guide
 ===============
 
+```{currentmodule} dataeval
+```
+
 Detectors
 ---------
 
-Detectors can determine if a dataset or individual images in a dataset are indicative of a specific issue
-
 :::{toctree}
-:maxdepth: 1
+:hidden:
+:titlesonly:
 
 detectors/clusterer
-detectors/drift
 detectors/duplicates
 detectors/linter
-detectors/ood
+detectors/drift_cvm
+detectors/drift_ks
+detectors/drift_mmd
+detectors/drift_uncertainty
+detectors/gaussianrbf
+detectors/lastseenupdate
+detectors/reservoirsamplingupdate
+detectors/ood_ae
+detectors/ood_aegmm
+detectors/ood_llr
+detectors/ood_vae
+detectors/ood_vaegmm
+detectors/oodscore
 :::
+
+Detectors can determine if a dataset or individual images in a dataset are indicative of a specific issue
+
+:::
+### Data Exploration
+:::
+
+```{eval-rst}
+.. autosummary::
+
+    detectors.Clusterer
+    detectors.Duplicates
+    detectors.Linter
+```
+
+:::
+### Data Monitoring
+#### Drift
+:::
+
+```{eval-rst}
+.. autosummary::
+
+    detectors.DriftCVM
+    detectors.DriftKS
+    detectors.DriftUncertainty
+    detectors.DriftMMD
+    detectors.GaussianRBF
+    detectors.LastSeenUpdate
+    detectors.ReservoirSamplingUpdate
+```
+:::
+#### Out of Distribution
+:::
+
+```{eval-rst}
+.. autosummary::
+
+    detectors.OOD_AE
+    detectors.OOD_AEGMM
+    detectors.OOD_LLR
+    detectors.OOD_VAE
+    detectors.OOD_VAEGMM
+    detectors.OODScore
+```
 
 Metrics
 -------
 
-Metrics are a way to measure the performance of your models or datasets that can
-then be analyzed in the context of a given problem
-
 :::{toctree}
-:maxdepth: 1
+:hidden:
+:titlesonly:
 
-metrics/ber
+metrics/channelstats
+metrics/imagestats
 metrics/coverage
 metrics/divergence
 metrics/parity
-metrics/stats
+metrics/ber
 metrics/uap
 :::
+
+Metrics are a way to measure the performance of your models or datasets that can
+then be analyzed in the context of a given problem
+
+:::
+### Data Exploration
+:::
+
+```{eval-rst}
+.. autosummary::
+
+    metrics.ChannelStats
+    metrics.ImageStats
+```
+:::
+### Metadata/Label Exploration
+:::
+
+```{eval-rst}
+.. autosummary::
+
+    metrics.Coverage
+    metrics.Divergence
+    metrics.Parity
+```
+
+:::
+### Data Performance
+:::
+
+```{eval-rst}
+.. autosummary::
+
+    metrics.BER
+    metrics.UAP
+```
+
+Flags
+-----
+
+:::{toctree}
+:hidden:
+:titlesonly:
+
+flags/imagehash
+flags/imageproperty
+flags/imagestatistics
+flags/imagevisuals
+:::
+
+Flags are used by the ImageStats, ChannelStats, Duplicates and Linter classes
+
+```{eval-rst}
+.. autosummary::
+
+    flags.ImageHash
+    flags.ImageProperty
+    flags.ImageStatistics
+    flags.ImageVisuals
+```
 
 Workflows
 -------
 
-Workflows perform a sequence of actions to analyze the dataset and make predictions
-
 :::{toctree}
-:maxdepth: 1
+:hidden:
+:titlesonly:
 
 workflows/sufficiency
 :::
+
+Workflows perform a sequence of actions to analyze the dataset and make predictions
+
+```{eval-rst}
+.. autosummary::
+
+    workflows.Sufficiency
+```
 
 Supported Model Backends
 ------------------------

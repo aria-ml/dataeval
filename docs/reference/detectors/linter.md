@@ -1,5 +1,4 @@
 (linter-ref)=
-
 # Linter
 
 Linting identifies potential issues (lints) in the data of the type that are typically

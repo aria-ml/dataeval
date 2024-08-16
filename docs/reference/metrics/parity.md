@@ -1,5 +1,4 @@
 (parity-ref)=
-
 # Parity
 
 % Create small blurb here that answers:

@@ -1,5 +1,4 @@
-(stats_ref)=
-
+(imagestats_ref)=
 # Image Statistics
 
 The basic `ImageStats` class assists with understanding the dataset.
@@ -60,50 +59,4 @@ There is a how-to guide that applies to the `ImageStats` class.
 .. autoclass:: dataeval.metrics.ImageStats
    :members:
    :inherited-members:
-```
-
-# Channel Statistics
-
-The `ChannelStats` class is similar to the `ImageStats` class except that it only calculates
-the normal statistics for each pixel value on a per channel basis.
-
-## Tutorials
-
-To see how the ChannelStats class can be used while doing exploratory data analysis, check out the _EDA Part 1_ tutorial.
-
-{doc}`Exploratory Data Analysis Part 1<../../tutorials/EDA_Part1>`
-
-## How To Guides
-
-There is a how-to guide that applies to the `ChannelStats` class.
-
-* [How to customize the metrics for data cleaning](../../how_to/linting_flags.md)
-
-## DataEval API
-
-```{eval-rst}
-.. autoclass:: dataeval.metrics.ChannelStats
-   :members:
-   :inherited-members:
-```
-
-# Image Flags
-
-Each category of flags contains a specific set of image metrics that can be used with the ImageStats, the ChannelStats, and the Linter classes.
-The how-to [How to customize the metrics for data cleaning](../../how_to/linting_flags.md) shows how to customize the metrics from a flag category.
-
-```{eval-rst}
-.. autoflag:: dataeval.flags.ImageHash
-```
-
-```{eval-rst}
-.. autoflag:: dataeval.flags.ImageProperty
-```
-
-```{eval-rst}
-.. autoflag:: dataeval.flags.ImageVisuals
-```
-
-```{eval-rst}
-.. autoflag:: dataeval.flags.ImageStatistics
 ```

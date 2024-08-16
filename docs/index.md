@@ -122,7 +122,7 @@ concepts/glossary.md
 :::{toctree}
 :caption: Reference
 :hidden:
-:maxdepth: 2
+:maxdepth: 1
 
 reference/index.md
 :::
