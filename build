@@ -272,8 +272,8 @@ for python_version in ${!python_versions[@]}; do
     done
 
     if [[ $CI && $build_only ]]; then
-        # export pyenv in main branch pipeline runs
-        if [[ $branch_name == $main_branch ]]; then
+        # export pyenv in main branch pipeline runs if pyenv is not present
+        if [[ $branch_name == $main_branch && ! $(docker manifest inspect "$PYENV_IMAGE:$python_version" 2> /dev/null) ]]; then
             task_map[$python_version]+="pyenv "
         fi
         # build data layer in build-only pipeline runs for 3.11
