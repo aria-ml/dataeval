@@ -1,4 +1,4 @@
-from typing import Dict, List, Literal
+from typing import Dict, Iterable, List, Literal
 
 import numpy as np
 
@@ -12,12 +12,8 @@ class Duplicates:
     and pchash for near duplicates
     """
 
-    def __init__(
-        self,
-        images: np.ndarray,
-    ):
+    def __init__(self):
         self.stats = ImageStats(ImageHash.ALL)
-        self.images = images
 
     def _get_duplicates(self) -> dict:
         exact = {}
@@ -34,9 +30,14 @@ class Duplicates:
             "near": sorted(near),
         }
 
-    def evaluate(self) -> Dict[Literal["exact", "near"], List[int]]:
+    def evaluate(self, images: Iterable[np.ndarray]) -> Dict[Literal["exact", "near"], List[int]]:
         """
         Returns duplicate image indices for both exact matches and near matches
+
+        Parameters
+        ----------
+        images : Iterable[np.ndarray]
+            A set of images where each individual image is a numpy array in CxHxW format
 
         Returns
         -------
@@ -44,6 +45,6 @@ class Duplicates:
             Dictionary of exact and near match indices
         """
         self.stats.reset()
-        self.stats.update(self.images)
+        self.stats.update(images)
         self.results = self.stats.compute()
         return self._get_duplicates()
