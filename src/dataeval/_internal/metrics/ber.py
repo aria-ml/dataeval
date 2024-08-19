@@ -24,10 +24,6 @@ class BER(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
 
     Parameters
     ----------
-    data : np.ndarray
-        Array of images or image embeddings
-    labels : np.ndarray
-        Array of labels for each image or image embedding
     method : Literal["MST", "KNN"], default "KNN"
         Method to use when estimating the Bayes error rate
     k : int, default 1
@@ -40,21 +36,24 @@ class BER(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
 
     """
 
-    def __init__(self, data: np.ndarray, labels: np.ndarray, method: _METHODS = "KNN", k: int = 1) -> None:
-        self.data: np.ndarray = data
-        self.labels: np.ndarray = labels
+    def __init__(self, method: _METHODS = "KNN", k: int = 1) -> None:
         self.k: int = k
         self._set_method(method)
 
     @classmethod
-    def _methods(
-        cls,
-    ) -> Dict[str, _FUNCTION]:
+    def _methods(cls) -> Dict[str, _FUNCTION]:
         return {"KNN": ber_knn, "MST": ber_mst}
 
-    def evaluate(self) -> Dict[str, float]:
+    def evaluate(self, data: np.ndarray, labels: np.ndarray) -> Dict[str, float]:
         """
         Calculates the Bayes Error Rate estimate using the provided method
+
+        Parameters
+        ----------
+        data : ArrayLike
+            Array of images or image embeddings
+        labels : ArrayLike
+            Array of labels for each image or image embedding
 
         Returns
         -------
@@ -70,5 +69,5 @@ class BER(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
             If unique classes M < 2
         """
 
-        upper, lower = self._method(np.asarray(self.data), np.asarray(self.labels), self.k)
+        upper, lower = self._method(data, labels, self.k)
         return {"ber": upper, "ber_lower": lower}

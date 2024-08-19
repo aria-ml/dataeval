@@ -24,15 +24,15 @@ class TestMinimalDependencies:
         duplicates.evaluate()
 
     def testFeasibility(self):
-        ber = BER(self.images, self.labels)
-        ber.evaluate()
+        ber = BER()
+        ber.evaluate(self.images, self.labels)
 
-        uap = UAP(self.labels, self.scores)
-        uap.evaluate()
+        uap = UAP()
+        uap.evaluate(self.labels, self.scores)
 
     def testDivergence(self):
-        divergence = Divergence(self.images, self.images)
-        divergence.evaluate()
+        divergence = Divergence()
+        divergence.evaluate(self.images, self.images)
 
     def testStats(self):
         imagestats = ImageStats()
@@ -44,5 +44,5 @@ class TestMinimalDependencies:
         channelstats.compute()
 
     def testBias(self):
-        parity = Parity(self.labels, self.labels)
-        parity.evaluate()
+        parity = Parity()
+        parity.evaluate(self.labels, self.labels)
