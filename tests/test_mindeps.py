@@ -17,11 +17,11 @@ class TestMinimalDependencies:
         drift_ks.predict(self.images)
 
     def testLinters(self):
-        linter = Linter(self.images)
-        linter.evaluate()
+        linter = Linter()
+        linter.evaluate(self.images)
 
-        duplicates = Duplicates(self.images)
-        duplicates.evaluate()
+        duplicates = Duplicates()
+        duplicates.evaluate(self.images)
 
     def testFeasibility(self):
         ber = BER()
