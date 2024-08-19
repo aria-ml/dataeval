@@ -1,3 +1,5 @@
+from typing import Dict
+
 import maite.protocols.image_classification as ic
 import numpy as np
 from maite.protocols import ArrayLike
@@ -13,15 +15,10 @@ class BERArrayLike(BER):
 
     Parameters
     ----------
-    data : ArrayLike
-        Images or image embeddings
-    labels : ArrayLike
-        Label for each image or image embedding
     method : Literal["MST", "KNN"], default "KNN"
         Method to use when estimating the Bayes error rate
     k : int, default 1
         number of nearest neighbors for KNN estimator -- ignored by MST estimator
-
 
     See Also
     --------
@@ -29,8 +26,32 @@ class BERArrayLike(BER):
 
     """
 
-    def __init__(self, data: ArrayLike, labels: ArrayLike, method: _METHODS = "KNN", k: int = 1):
-        super().__init__(data=arraylike_to_numpy(data), labels=arraylike_to_numpy(labels), method=method, k=k)
+    def __init__(self, method: _METHODS = "KNN", k: int = 1):
+        super().__init__(method=method, k=k)
+
+    def evaluate(self, data: ArrayLike, labels: ArrayLike) -> Dict[str, float]:
+        """
+        Parameters
+        ----------
+        data : ArrayLike
+            Images or image embeddings
+        labels : ArrayLike
+            Label for each image or image embedding
+
+        Returns
+        -------
+        Dict[str, float]
+            ber : float
+                The estimated lower bounds of the Bayes Error Rate
+            ber_lower : float
+                The estimated upper bounds of the Bayes Error Rate
+
+        Raises
+        ------
+        ValueError
+            If unique classes M < 2
+        """
+        return super().evaluate(data=arraylike_to_numpy(data), labels=arraylike_to_numpy(labels))
 
 
 class BERDataset(BER):
@@ -39,8 +60,6 @@ class BERDataset(BER):
 
     Parameters
     ----------
-    dataset : `maite.protocols.image_classification.Dataset`
-        Dataset of images and labels
     method : Literal["MST", "KNN"], default "KNN"
         Method to use when estimating the Bayes error rate
     k : int, default 1
@@ -53,6 +72,30 @@ class BERDataset(BER):
 
     """
 
-    def __init__(self, dataset: ic.Dataset, method: _METHODS = "KNN", k: int = 1):
-        images, labels = extract_to_numpy(dataset=dataset)
-        super().__init__(np.asarray(images), np.asarray(labels), method=method, k=k)
+    def __init__(self, method: _METHODS = "KNN", k: int = 1):
+        super().__init__(method=method, k=k)
+
+    def evaluate_dataset(self, data: ic.Dataset) -> Dict[str, float]:
+        """
+        Parameters
+        ----------
+        data : `maite.protocols.image_classification.Dataset`
+            Dataset of images and labels
+        labels: None
+            Unused (labels are a component of the Dataset)
+
+        Returns
+        -------
+        Dict[str, float]
+            ber : float
+                The estimated lower bounds of the Bayes Error Rate
+            ber_lower : float
+                The estimated upper bounds of the Bayes Error Rate
+
+        Raises
+        ------
+        ValueError
+            If unique classes M < 2
+        """
+        images, labels = extract_to_numpy(dataset=data)
+        return super().evaluate(np.asarray(images), np.asarray(labels))

@@ -28,6 +28,6 @@ class TestDivergence:
         odd = covariates[rev_inds, :, :]
         even = even.reshape((even.shape[0], -1))
         odd = odd.reshape((odd.shape[0], -1))
-        metric = Divergence(even, odd, method)
-        result = metric.evaluate()
+        metric = Divergence(method)
+        result = metric.evaluate(even, odd)
         assert result == output

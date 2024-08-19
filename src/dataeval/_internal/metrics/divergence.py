@@ -20,10 +20,6 @@ class Divergence(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
 
     Parameters
     ----------
-    data_a : np.ndarray
-        Array of images or image embeddings to compare
-    data_b : np.ndarray
-        Array of images or image embeddings to compare
     method : Literal["MST, "FNN"], default "MST"
         Method used to estimate dataset divergence
 
@@ -42,23 +38,23 @@ class Divergence(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
         1nn and scipy mst function the remaining 90%
     """
 
-    def __init__(
-        self,
-        data_a: np.ndarray,
-        data_b: np.ndarray,
-        method: _METHODS = "MST",
-    ) -> None:
-        self.data_a = data_a
-        self.data_b = data_b
+    def __init__(self, method: _METHODS = "MST") -> None:
         self._set_method(method)
 
     @classmethod
     def _methods(cls) -> Dict[str, _FUNCTION]:
         return {"FNN": divergence_fnn, "MST": divergence_mst}
 
-    def evaluate(self) -> Dict[str, Any]:
+    def evaluate(self, data_a: np.ndarray, data_b: np.ndarray) -> Dict[str, Any]:
         """
         Calculates the divergence and any errors between the datasets
+
+        Parameters
+        ----------
+        data_a : np.ndarray
+            Array of images or image embeddings to compare
+        data_b : np.ndarray
+            Array of images or image embeddings to compare
 
         Returns
         -------
@@ -68,10 +64,10 @@ class Divergence(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
             errors : int
                 the number of differing edges
         """
-        N = self.data_a.shape[0]
-        M = self.data_b.shape[0]
+        N = data_a.shape[0]
+        M = data_b.shape[0]
 
-        stacked_data = np.vstack((self.data_a, self.data_b))
+        stacked_data = np.vstack((data_a, data_b))
         labels = np.vstack([np.zeros([N, 1]), np.ones([M, 1])])
 
         errors = self._method(stacked_data, labels)
