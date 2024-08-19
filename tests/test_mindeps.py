@@ -1,5 +1,6 @@
 import numpy as np
 
+from dataeval._internal.interop import to_numpy
 from dataeval.detectors import DriftCVM, DriftKS, Duplicates, Linter
 from dataeval.metrics import BER, UAP, ChannelStats, Divergence, ImageStats, Parity
 
@@ -46,3 +47,8 @@ class TestMinimalDependencies:
     def testBias(self):
         parity = Parity()
         parity.evaluate(self.labels, self.labels)
+
+    def testToNumpy(self):
+        actual = to_numpy([[1, 2], [3, 4]])  # type: ignore
+        expected = np.array([[1, 2], [3, 4]])
+        np.testing.assert_equal(actual, expected)

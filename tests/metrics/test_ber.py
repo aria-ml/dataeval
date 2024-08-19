@@ -1,4 +1,7 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
+import torch
 
 from dataeval._internal.functional.ber import _knn_lowerbound, ber_knn, ber_mst
 from dataeval.metrics import BER
@@ -48,8 +51,9 @@ class TestAPIBER:
 
     def test_invalid_method_setter(self):
         """Raises error when method key is not KNN or MST"""
+        b = BER()
         with pytest.raises(KeyError):
-            BER("NOT_A_METHOD")  # type: ignore
+            b.method = "NOT_A_METHOD"  # type: ignore
 
     def test_list_class_methods(self):
         methods = BER.methods()
@@ -70,3 +74,14 @@ class TestAPIBER:
         ber = BER(method=method, k=k)
         result = ber.evaluate(images=images, labels=labels)
         assert result == expected
+
+    @patch("dataeval._internal.metrics.ber.ber_knn")
+    def test_torch_inputs(self, mock_knn: MagicMock):
+        """Torch class correctly calls functional numpy math"""
+        mock_knn.return_value = (0, 0)
+        images = torch.ones((5, 10, 10))
+        labels = torch.ones(5)
+
+        BER().evaluate(images, labels)
+
+        mock_knn.assert_called_once()
