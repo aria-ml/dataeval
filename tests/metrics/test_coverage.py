@@ -23,13 +23,13 @@ class TestCoverageUnit:
     def test_naive(self):
         embs = np.zeros((3, 2))
         metric = Coverage("naive", k=1)
-        metric.evaluate(embs)
-        assert abs(metric.rho - math.sqrt(2 / 3) / math.sqrt(math.pi)) < 0.01
+        result = metric.evaluate(embs)
+        assert abs(result[2] - math.sqrt(2 / 3) / math.sqrt(math.pi)) < 0.01
 
     def test_adaptive(self):
         embs = np.zeros((100, 2))
         metric = Coverage("adaptive", k=1)
-        _, crit = metric.evaluate(embs)
+        _, crit, _ = metric.evaluate(embs)
         assert (crit == np.zeros(100)).all()
 
 
@@ -38,7 +38,7 @@ class TestCoverageFunctional:
         embs = np.zeros((100, 2))
         embs = np.concatenate((embs, np.ones((1, 2))))
         metric = Coverage("naive", k=20)
-        pvals, dists = metric.evaluate(embs)
+        pvals, dists, _ = metric.evaluate(embs)
         assert pvals[0] == 100
         assert dists[100] == pytest.approx(1.41421356)
 
@@ -46,6 +46,6 @@ class TestCoverageFunctional:
         embs = np.zeros((100, 2))
         embs = np.concatenate((embs, np.ones((1, 2))))
         metric = Coverage("adaptive", k=20)
-        pvals, dists = metric.evaluate(embs)
+        pvals, dists, _ = metric.evaluate(embs)
         assert pvals[0] == 100
         assert dists[100] == pytest.approx(1.41421356)

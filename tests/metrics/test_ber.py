@@ -1,4 +1,3 @@
-import numpy as np
 import pytest
 
 from dataeval._internal.functional.ber import _knn_lowerbound, ber_knn, ber_mst
@@ -45,11 +44,11 @@ class TestAPIBER:
     def test_invalid_method(self):
         """Raises error when method is not KNN or MST"""
         with pytest.raises(KeyError):
-            BER(np.empty([]), np.empty([]), "NOT_A_METHOD")  # type: ignore
+            BER("NOT_A_METHOD")  # type: ignore
 
     def test_invalid_method_setter(self):
         """Raises error when method key is not KNN or MST"""
-        b = BER(np.empty([]), np.empty([]))
+        b = BER()
         with pytest.raises(KeyError):
             b.method = "NOT_A_METHOD"  # type: ignore
 
@@ -69,6 +68,6 @@ class TestAPIBER:
 
         # TODO: Mock patch _ber methods, just check output tuple -> dict
         data, labels = mnist()
-        ber = BER(data=data, labels=labels, method=method, k=k)
-        result = ber.evaluate()
+        ber = BER(method=method, k=k)
+        result = ber.evaluate(data=data, labels=labels)
         assert result == expected

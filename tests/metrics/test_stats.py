@@ -35,9 +35,9 @@ class MockStatsMetric(BaseStatsMetric):
         super().__init__(flags)
         self.func_map = func_map
 
-    def update(self, preds, targets=None):
+    def update(self, images):
         results = []
-        for _ in preds:
+        for _ in images:
             results.append(self._map(self.func_map))
         self.results.extend(results)
 
