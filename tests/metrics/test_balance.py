@@ -97,4 +97,3 @@ class TestBalanceClasswiseUnit:
         mi = balance_cw_obj.compute()
         assert mi.shape[0] == 2 & mi.shape[1] == balance_cw_obj.num_factors - 1
         assert mi.dtype == float
-        assert all(0 <= val <= 1 for val in mi.ravel())

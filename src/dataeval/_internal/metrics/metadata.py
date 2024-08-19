@@ -10,25 +10,6 @@ from torchmetrics import Metric
 from dataeval._internal.functional.metadata import _entropy, _get_counts, _get_num_bins, _infer_categorical
 
 
-def validate_dict(d: Dict) -> None:
-    """
-    Verify that dict-of-arrays (proxy for dataframe) contains arrays of equal
-    length.  Future iterations could include type checking, conversion from
-    string to numeric types, etc.
-
-    Parameters
-    ----------
-    d: Dict
-        dictionary of {variable_name: values}
-    """
-    # assert that length of all arrays are equal -- could expand to other properties
-    lengths = []
-    for arr in d.values():
-        lengths.append(arr.shape)
-    if lengths[1:] != lengths[:-1]:
-        raise ValueError("Lengths of all arrays in the dictionary must be equal")
-
-
 def str_to_int(d: Dict) -> Dict:
     """
     Map columns of dict that are not numeric (e.g. string) to numeric values

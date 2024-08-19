@@ -1,28 +1,10 @@
 import warnings
-from typing import Dict, Tuple
+from typing import Tuple
 
 import numpy as np
 import scipy
 
-
-def validate_dict(d: Dict) -> None:
-    """
-    Verify that dict-of-arrays (proxy for dataframe) contains arrays of equal
-    length.  Future iterations could include type checking, conversion from
-    string to numeric types, etc.
-
-    Parameters
-    ----------
-    d: Dict
-        dictionary of {variable_name: values}
-    """
-    # assert that length of all arrays are equal -- could expand to other properties
-    lengths = []
-    for arr in d.values():
-        lengths.append(arr.shape)
-
-    if lengths[1:] != lengths[:-1]:
-        raise ValueError("The lengths of each entry in the dictionary are not equal." f" Found lengths {lengths}")
+from dataeval._internal.functional.metadatatools import _validate_dict
 
 
 def digitize_factor_bins(continuous_values: np.ndarray, bins: int, factor_name: str):
@@ -106,7 +88,7 @@ def format_discretize_factors(
     metadata_factors = {}
 
     # make sure each factor has the same number of entries
-    validate_dict(data_factors)
+    _validate_dict(data_factors)
 
     labels = data_factors["class"]
 
