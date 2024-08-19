@@ -1,3 +1,4 @@
+import warnings
 from typing import Dict, List
 
 import numpy as np
@@ -104,12 +105,12 @@ class BaseBiasMetric(Metric):
         self.num_factors = 0
         self.num_samples = 0
 
-    def update(self, class_label: ArrayLike, metadata: Dict):
+    def update(self, class_label: ArrayLike, metadata: List[Dict]):
         self.metadata.extend(metadata)
         self.class_label.append(class_label)
 
     def _collect_data(self):
-        metadata_dict = {"class_label": torch.cat(self.class_label).numpy()}
+        metadata_dict = {"class_label": np.concatenate(self.class_label)}
         metadata_dict = {**metadata_dict, **list_to_dict(self.metadata)}
 
         # convert string variables to int
@@ -119,6 +120,7 @@ class BaseBiasMetric(Metric):
 
         self.is_categorical = [_infer_categorical(metadata_dict[var], 0.25)[0] for var in self.names]
 
+        # class_label is also in self.names
         self.num_factors = len(self.names)
         self.num_samples = len(self.metadata)
 
@@ -166,6 +168,18 @@ class Balance(BaseBiasMetric):
 
     def __init__(self, num_neighbors: int = 5):
         super().__init__()
+        if not isinstance(num_neighbors, (int, float)):
+            raise TypeError(
+                f"Variable {num_neighbors} is not real-valued numeric type.  num_neighbors should be an int, greater than 0 and less than the number of samples in the dataset"
+            )
+        if num_neighbors < 1:
+            raise ValueError(
+                f"Invalid value for {num_neighbors}.  Choose a value greater than 0 and less than number of samples in the dataset."
+            )
+        if isinstance(num_neighbors, float):
+            num_neighbors = int(num_neighbors)
+            warnings.warn(f"Variable {num_neighbors} is currently type float and will be truncated to type int.")
+
         self.num_neighbors = num_neighbors
 
     def compute(self) -> NDArray:
@@ -254,6 +268,17 @@ class BalanceClasswise(BaseBiasMetric):
 
     def __init__(self, num_neighbors: int = 5):
         super().__init__()
+        if not isinstance(num_neighbors, (int, float)):
+            raise TypeError(
+                f"Variable {num_neighbors} is not real-valued numeric type.  num_neighbors should be an int, greater than 0 and less than the number of samples in the dataset"
+            )
+        if num_neighbors < 1:
+            raise ValueError(
+                f"Invalid value for {num_neighbors}.  Choose a value greater than 0 and less than number of samples in the dataset."
+            )
+        if isinstance(num_neighbors, float):
+            num_neighbors = int(num_neighbors)
+            warnings.warn(f"Variable {num_neighbors} is currently type float and will be truncated to type int.")
         self.num_neighbors = num_neighbors
 
     def compute(self) -> NDArray:
