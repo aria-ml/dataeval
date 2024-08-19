@@ -7,17 +7,17 @@ from dataeval._internal.flags import ImageStatistics
 
 class TestLinter:
     def test_linter(self):
-        linter = Linter(np.random.random((1000, 3, 16, 16)))
-        results = linter.evaluate()
+        linter = Linter()
+        results = linter.evaluate(np.random.random((1000, 3, 16, 16)))
         assert len(linter.stats._metrics_dict) == 2
         assert results is not None
 
     def test_linter_custom(self):
-        linter = Linter(np.random.random((1000, 3, 16, 16)), (ImageStatistics.ENTROPY))
+        linter = Linter(ImageStatistics.ENTROPY)
         assert len(linter.stats._metrics_dict) == 1
         metric = next(iter(linter.stats._metrics_dict))
         assert metric.flags == ImageStatistics.ENTROPY
-        results = linter.evaluate()
+        results = linter.evaluate(np.random.random((1000, 3, 16, 16)))
         assert results is not None
 
     @pytest.mark.parametrize("method", ["zscore", "modzscore", "iqr"])

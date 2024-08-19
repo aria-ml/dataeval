@@ -10,14 +10,14 @@ def get_dataset(count: int, channels: int):
 class TestDuplicates:
     def test_duplicates(self):
         data = np.random.random((20, 3, 16, 16))
-        dupes = Duplicates(np.concatenate((data, data)))
-        results = dupes.evaluate()
+        dupes = Duplicates()
+        results = dupes.evaluate(np.concatenate((data, data)))
         assert len(results["exact"]) == 20
         assert len(results["near"]) == 0
 
     def test_near_duplicates(self):
         data = np.random.random((20, 3, 16, 16))
-        dupes = Duplicates(np.concatenate((data, data + 0.001)))
-        results = dupes.evaluate()
+        dupes = Duplicates()
+        results = dupes.evaluate(np.concatenate((data, data + 0.001)))
         assert len(results["exact"]) < 20
         assert len(results["near"]) > 0
