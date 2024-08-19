@@ -1,4 +1,4 @@
-from typing import Literal, Optional, Sequence, Union
+from typing import Iterable, Literal, Optional, Sequence, Union
 
 import numpy as np
 
@@ -57,14 +57,12 @@ class Linter:
 
     def __init__(
         self,
-        images: np.ndarray,
         flags: Optional[Union[LinterFlags, Sequence[LinterFlags]]] = None,
         outlier_method: Literal["zscore", "modzscore", "iqr"] = "modzscore",
         outlier_threshold: Optional[float] = None,
     ):
         flags = flags if flags is not None else (ImageProperty.ALL, ImageVisuals.ALL)
         self.stats = ImageStats(flags)
-        self.images = images
         self.outlier_method: Literal["zscore", "modzscore", "iqr"] = outlier_method
         self.outlier_threshold = outlier_threshold
 
@@ -83,9 +81,14 @@ class Linter:
 
         return dict(sorted(flagged_images.items()))
 
-    def evaluate(self) -> dict:
+    def evaluate(self, images: Iterable[np.ndarray]) -> dict:
         """
         Returns indices of outliers with and the issues identified for each
+
+        Parameters
+        ----------
+        images : Iterable[np.ndarray]
+            A set of images where each individual image is a numpy array in CxHxW format
 
         Returns
         -------
@@ -93,6 +96,6 @@ class Linter:
             Dictionary containing the indices of outliers and a dictionary issues and calculated values
         """
         self.stats.reset()
-        self.stats.update(self.images)
+        self.stats.update(images)
         self.results = self.stats.compute()
         return self._get_outliers()
