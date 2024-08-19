@@ -10,59 +10,7 @@ class Parity:
     Class for evaluating statistics of observed and expected class labels, including:
 
     - Chi Squared test for statistical independence between expected and observed labels
-
-    Parameters
-    ----------
-    expected_labels : np.ndarray
-        List of class labels in the expected dataset
-    observed_labels : np.ndarray
-        List of class labels in the observed dataset
-    num_classes : Optional[int]
-        The number of unique classes in the datasets. If this is not specified, it will
-        be inferred from the set of unique labels in expected_labels and observed_labels
     """
-
-    def __init__(self, expected_labels: np.ndarray, observed_labels: np.ndarray, num_classes: Optional[int] = None):
-        self.set_labels(expected_labels, observed_labels, num_classes)
-
-    def set_labels(self, expected_labels: np.ndarray, observed_labels: np.ndarray, num_classes: Optional[int] = None):
-        """
-        Calculates the label distributions for expected and observed labels
-        and performs validation on the results.
-
-        Parameters
-        ----------
-        expected_labels : np.ndarray
-            List of class labels in the expected dataset
-        observed_labels : np.ndarray
-            List of class labels in the observed dataset
-        num_classes : Optional[int]
-            The number of unique classes in the datasets. If this is not specified, it will
-            be inferred from the set of unique labels in expected_labels and observed_labels
-
-        Raises
-        ------
-        ValueError
-            If x is empty
-        """
-        self.num_classes = num_classes
-
-        # Calculate
-        observed_dist = self._calculate_label_dist(observed_labels)
-        expected_dist = self._calculate_label_dist(expected_labels)
-
-        # Validate
-        self._validate_dist(observed_dist, "observed")
-
-        # Normalize
-        expected_dist = self._normalize_expected_dist(expected_dist, observed_dist)
-
-        # Validate normalized expected distribution
-        self._validate_dist(expected_dist, f"expected for {np.sum(observed_dist)} observations")
-        self._validate_class_balance(expected_dist, observed_dist)
-
-        self._observed_dist = observed_dist
-        self._expected_dist = expected_dist
 
     def _normalize_expected_dist(self, expected_dist: np.ndarray, observed_dist: np.ndarray) -> np.ndarray:
         exp_sum = np.sum(expected_dist)
@@ -81,7 +29,7 @@ class Parity:
 
         return expected_dist
 
-    def _calculate_label_dist(self, labels: np.ndarray) -> np.ndarray:
+    def _calculate_label_dist(self, labels: np.ndarray, num_classes: int) -> np.ndarray:
         """
         Calculate the class frequencies associated with a dataset
 
@@ -89,13 +37,15 @@ class Parity:
         ----------
         labels : np.ndarray
             List of class labels in a dataset
+        num_classes: int
+            The number of unique classes in the datasets
 
         Returns
         -------
         label_dist : np.ndarray
             Array representing label distributions
         """
-        label_dist = np.bincount(labels, minlength=(self.num_classes if self.num_classes else 0))
+        label_dist = np.bincount(labels, minlength=num_classes)
         return label_dist
 
     def _validate_class_balance(self, expected_dist: np.ndarray, observed_dist: np.ndarray):
@@ -157,7 +107,9 @@ class Parity:
                 " to invalid chi-squared evaluation."
             )
 
-    def evaluate(self) -> Tuple[np.float64, np.float64]:
+    def evaluate(
+        self, expected_labels: np.ndarray, observed_labels: np.ndarray, num_classes: Optional[int] = None
+    ) -> Tuple[np.float64, np.float64]:
         """
         Perform a one-way chi-squared test between observation frequencies and expected frequencies that
         tests the null hypothesis that the observed data has the expected frequencies.
@@ -166,14 +118,46 @@ class Parity:
         https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.chisquare.html
         https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.chisquare.html
 
+        Parameters
+        ----------
+        expected_labels : np.ndarray
+            List of class labels in the expected dataset
+        observed_labels : np.ndarray
+            List of class labels in the observed dataset
+        num_classes : Optional[int]
+            The number of unique classes in the datasets. If this is not specified, it will
+            be inferred from the set of unique labels in expected_labels and observed_labels
+
         Returns
         -------
         np.float64
             chi-squared value of the test
         np.float64
             p-value of the test
+
+        Raises
+        ------
+        ValueError
+            If x is empty
         """
-        cs_result = scipy.stats.chisquare(f_obs=self._observed_dist, f_exp=self._expected_dist)
+        # Calculate
+        if not num_classes:
+            num_classes = 0
+
+        observed_dist = self._calculate_label_dist(observed_labels, num_classes)
+        expected_dist = self._calculate_label_dist(expected_labels, num_classes)
+
+        # Validate
+        self._validate_dist(observed_dist, "observed")
+
+        # Normalize
+        expected_dist = self._normalize_expected_dist(expected_dist, observed_dist)
+
+        # Validate normalized expected distribution
+        self._validate_dist(expected_dist, f"expected for {np.sum(observed_dist)} observations")
+        self._validate_class_balance(expected_dist, observed_dist)
+
+        cs_result = scipy.stats.chisquare(f_obs=observed_dist, f_exp=expected_dist)
 
         chisquared = cs_result.statistic
         p_value = cs_result.pvalue

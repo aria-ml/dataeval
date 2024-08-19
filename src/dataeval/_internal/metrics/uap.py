@@ -16,21 +16,19 @@ class UAP(EvaluateMixin):
     """
     FR Test Statistic based estimate of the empirical mean precision
 
-    Parameters
-    ----------
-    labels : np.ndarray
-        A numpy array of n_samples of class labels with M unique classes.
-
-    scores : np.ndarray
-        A 2D array of class probabilities per image
     """
 
-    def __init__(self, labels: np.ndarray, scores: np.ndarray) -> None:
-        self.labels = labels
-        self.scores = scores
-
-    def evaluate(self) -> Dict[str, float]:
+    def evaluate(self, labels: np.ndarray, scores: np.ndarray) -> Dict[str, float]:
         """
+        Estimates the upperbound average precision
+
+        Parameters
+        ----------
+        labels : np.ndarray
+            A numpy array of n_samples of class labels with M unique classes.
+        scores : np.ndarray
+            A 2D array of class probabilities per image
+
         Returns
         -------
         Dict[str, float]
@@ -42,4 +40,4 @@ class UAP(EvaluateMixin):
             If unique classes M < 2
         """
 
-        return {"uap": uap(self.labels, self.scores)}
+        return {"uap": uap(labels, scores)}
