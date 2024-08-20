@@ -1,6 +1,5 @@
 (clusterer-ref)=
-
-# Clustering, Deduplication and Outlier Detection
+# Clusterer
 
 As part of data exploration, we often want to know how the data groups.
 The Clusterer class uses hierarchal clustering to group the data and flags duplicate images as well as outlier images.

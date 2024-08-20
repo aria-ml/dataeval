@@ -1,5 +1,4 @@
 (ber-ref)=
-
 # Bayes Error Rate
 
 % Create small blurb here that answers:

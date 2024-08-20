@@ -1,6 +1,5 @@
-(ood-detection-ref)=
-
-# Out-of-Distribution Detection
+(oodvae-ref)=
+# Out-of-Distribution VAE
 
 % Create small blurb here that answers:
 
@@ -15,30 +14,6 @@ Check out this **how to** to begin using the Out-of-Distribution Detection class
 {doc}`Out-of-Distribution Detection Tutorial<../../how_to/notebooks/OODDetectionTutorial>`
 
 ## DataEval API
-
-```{eval-rst}
-.. autoclass:: dataeval.detectors.OOD_AE
-   :members:
-   :inherited-members:
-```
-
-______________________________________________________________________
-
-```{eval-rst}
-.. autoclass:: dataeval.detectors.OOD_AEGMM
-   :members:
-   :inherited-members:
-```
-
-______________________________________________________________________
-
-```{eval-rst}
-.. autoclass:: dataeval.detectors.OOD_LLR
-   :members:
-   :inherited-members:
-```
-
-______________________________________________________________________
 
 ```{eval-rst}
 .. autoclass:: dataeval.detectors.OOD_VAE
@@ -69,17 +44,4 @@ ______________________________________________________________________
     # detect OOD at the 'feature' level
     metric.predict(dataset, ood_type="feature")
 
-```
-______________________________________________________________________
-
-```{eval-rst}
-.. autoclass:: dataeval.detectors.OOD_VAEGMM
-   :members:
-   :inherited-members:
-```
-
-______________________________________________________________________
-
-```{eval-rst}
-.. autoclass:: dataeval.detectors.OODScore
 ```
