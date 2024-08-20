@@ -499,6 +499,7 @@ description = "Python AST that abstracts the underlying Python version"
 optional = true
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7"
 files = [
+    {file = "gast-0.6.0-py3-none-any.whl", hash = "sha256:52b182313f7330389f72b069ba00f174cfe2a06411099547288839c6cbafbd54"},
     {file = "gast-0.6.0.tar.gz", hash = "sha256:88fc5300d32c7ac6ca7b515310862f71e6fdf2c029bbec7c66c0f5dd47b6b1fb"},
 ]
 
@@ -887,6 +888,7 @@ description = "Clang Python Bindings, mirrored from the official LLVM repo: http
 optional = true
 python-versions = "*"
 files = [
+    {file = "libclang-18.1.1-1-py2.py3-none-macosx_11_0_arm64.whl", hash = "sha256:0b2e143f0fac830156feb56f9231ff8338c20aecfe72b4ffe96f19e5a1dbb69a"},
     {file = "libclang-18.1.1-py2.py3-none-macosx_10_9_x86_64.whl", hash = "sha256:6f14c3f194704e5d09769108f03185fce7acaf1d1ae4bbb2f30a72c2400cb7c5"},
     {file = "libclang-18.1.1-py2.py3-none-macosx_11_0_arm64.whl", hash = "sha256:83ce5045d101b669ac38e6da8e58765f12da2d3aafb3b9b98d88b286a60964d8"},
     {file = "libclang-18.1.1-py2.py3-none-manylinux2010_x86_64.whl", hash = "sha256:c533091d8a3bbf7460a00cb6c1a71da93bffe148f172c7d03b1c31fbf8aa2a0b"},
@@ -897,25 +899,6 @@ files = [
     {file = "libclang-18.1.1-py2.py3-none-win_arm64.whl", hash = "sha256:3f0e1f49f04d3cd198985fea0511576b0aee16f9ff0e0f0cad7f9c57ec3c20e8"},
     {file = "libclang-18.1.1.tar.gz", hash = "sha256:a1214966d08d73d971287fc3ead8dfaf82eb07fb197680d8b3859dbbbbf78250"},
 ]
-
-[[package]]
-name = "maite"
-version = "0.6.0"
-description = "Library of common types, protocols (a.k.a. structural subtypes), and utilities to support AI test and evaluation"
-optional = false
-python-versions = ">=3.8"
-files = [
-    {file = "maite-0.6.0-py3-none-any.whl", hash = "sha256:518bd5071c4a619687c72b37e4512e655533d2ac82ba94ece4864eade2f755c9"},
-    {file = "maite-0.6.0.tar.gz", hash = "sha256:9e2dd28dbb38725ed63ce9e22d4b3299baa357ff290609ed1e4305ccc3d710f5"},
-]
-
-[package.dependencies]
-numpy = ">=1.17"
-typing-extensions = ">=4.5,<4.6 || >4.6"
-
-[package.extras]
-build-docs = ["pytest (>=7.0.0)", "torch (>=1.7,!=1.12.0)"]
-test = ["hypothesis (>=6.61.0)", "jupytext (>=1.14.0)", "numpydoc (>=1.5.0)", "pyright (>=1.1.280)", "pytest (>=7.0.0)", "pytest-mock (>=3.10.0)", "torch (>=1.7,!=1.12.0)"]
 
 [[package]]
 name = "markdown"
@@ -1196,6 +1179,8 @@ optional = true
 python-versions = ">=3"
 files = [
     {file = "nvidia_cublas_cu11-11.11.3.6-py3-none-manylinux1_x86_64.whl", hash = "sha256:39fb40e8f486dd8a2ddb8fdeefe1d5b28f5b99df01c87ab3676f057a74a5a6f3"},
+    {file = "nvidia_cublas_cu11-11.11.3.6-py3-none-manylinux2014_aarch64.whl", hash = "sha256:5ccae9e069a2c6be9af9cb5a0b0c6928c19c7915e390d15f598a1eead2a01a7a"},
+    {file = "nvidia_cublas_cu11-11.11.3.6-py3-none-manylinux2014_x86_64.whl", hash = "sha256:60252822adea5d0b10cd990a7dc7bedf7435f30ae40083c7a624a85a43225abc"},
     {file = "nvidia_cublas_cu11-11.11.3.6-py3-none-win_amd64.whl", hash = "sha256:6ab12b1302bef8ac1ff4414edd1c059e57f4833abef9151683fb8f4de25900be"},
 ]
 
@@ -1922,7 +1907,7 @@ tutorials = ["matplotlib", "pandas", "tabulate"]
 name = "typing-extensions"
 version = "4.12.2"
 description = "Backported and Experimental Type Hints for Python 3.8+"
-optional = false
+optional = true
 python-versions = ">=3.8"
 files = [
     {file = "typing_extensions-4.12.2-py3-none-any.whl", hash = "sha256:04e5ca0351e0f3f85c6853954072df659d0d13fac324d0072316b67d7794700d"},
@@ -2200,4 +2185,4 @@ torch = ["matplotlib", "nvidia-cudnn-cu11", "torch"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.12"
-content-hash = "a144aee72f25b4ccd605559f6dca798ccd8b65c2cd6f4768252a49edccf61aad"
+content-hash = "4dceda1f366dfadcac1f3376eff03f3798901401d95483f545c42940db458c8d"
