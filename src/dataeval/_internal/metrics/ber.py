@@ -12,6 +12,7 @@ from typing import Callable, Dict, Literal, Tuple
 import numpy as np
 
 from dataeval._internal.functional.ber import ber_knn, ber_mst
+from dataeval._internal.interop import ArrayLike, to_numpy
 from dataeval._internal.metrics.base import EvaluateMixin, MethodsMixin
 
 _METHODS = Literal["MST", "KNN"]
@@ -44,15 +45,15 @@ class BER(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
     def _methods(cls) -> Dict[str, _FUNCTION]:
         return {"KNN": ber_knn, "MST": ber_mst}
 
-    def evaluate(self, data: np.ndarray, labels: np.ndarray) -> Dict[str, float]:
+    def evaluate(self, images: ArrayLike, labels: ArrayLike) -> Dict[str, float]:
         """
         Calculates the Bayes Error Rate estimate using the provided method
 
         Parameters
         ----------
-        data : ArrayLike
+        images : ArrayLike (N, : )
             Array of images or image embeddings
-        labels : ArrayLike
+        labels : ArrayLike (N, 1)
             Array of labels for each image or image embedding
 
         Returns
@@ -69,5 +70,5 @@ class BER(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
             If unique classes M < 2
         """
 
-        upper, lower = self._method(data, labels, self.k)
+        upper, lower = self._method(to_numpy(images), to_numpy(labels), self.k)
         return {"ber": upper, "ber_lower": lower}

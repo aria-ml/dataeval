@@ -1,4 +1,7 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
+import torch
 
 from dataeval._internal.functional.ber import _knn_lowerbound, ber_knn, ber_mst
 from dataeval.metrics import BER
@@ -67,7 +70,18 @@ class TestAPIBER:
         """Confirms BER class transforms functional results into correct format"""
 
         # TODO: Mock patch _ber methods, just check output tuple -> dict
-        data, labels = mnist()
+        images, labels = mnist()
         ber = BER(method=method, k=k)
-        result = ber.evaluate(data=data, labels=labels)
+        result = ber.evaluate(images=images, labels=labels)
         assert result == expected
+
+    @patch("dataeval._internal.metrics.ber.ber_knn")
+    def test_torch_inputs(self, mock_knn: MagicMock):
+        """Torch class correctly calls functional numpy math"""
+        mock_knn.return_value = (0, 0)
+        images = torch.ones((5, 10, 10))
+        labels = torch.ones(5)
+
+        BER().evaluate(images, labels)
+
+        mock_knn.assert_called_once()
