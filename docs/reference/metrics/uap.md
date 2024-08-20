@@ -1,5 +1,4 @@
 (uap-ref)=
-
 # Upperbound Average Precision
 
 % Create small blurb here that answers:

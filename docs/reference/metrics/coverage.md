@@ -1,5 +1,4 @@
 (coverage-ref)=
-
 # Coverage
 
 % Create small blurb here that answers:
