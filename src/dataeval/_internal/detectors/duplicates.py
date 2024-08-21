@@ -1,8 +1,7 @@
 from typing import Dict, Iterable, List, Literal
 
-import numpy as np
-
 from dataeval._internal.flags import ImageHash
+from dataeval._internal.interop import ArrayLike
 from dataeval._internal.metrics.stats import ImageStats
 
 
@@ -30,7 +29,7 @@ class Duplicates:
             "near": sorted(near),
         }
 
-    def evaluate(self, images: Iterable[np.ndarray]) -> Dict[Literal["exact", "near"], List[int]]:
+    def evaluate(self, images: Iterable[ArrayLike]) -> Dict[Literal["exact", "near"], List[int]]:
         """
         Returns duplicate image indices for both exact matches and near matches
 

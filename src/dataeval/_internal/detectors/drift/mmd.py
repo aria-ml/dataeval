@@ -8,8 +8,9 @@ Licensed under Apache Software License (Apache 2.0)
 
 from typing import Callable, Dict, Optional, Tuple, Union
 
-import numpy as np
 import torch
+
+from dataeval._internal.interop import ArrayLike, to_numpy
 
 from .base import BaseDrift, UpdateStrategy, preprocess_x, update_x_ref
 from .torch import GaussianRBF, get_device, mmd2_from_kernel_matrix
@@ -21,7 +22,7 @@ class DriftMMD(BaseDrift):
 
     Parameters
     ----------
-    x_ref : np.ndarray
+    x_ref : ArrayLike
         Data used as reference distribution.
     p_val : float, default 0.05
         p-value used for the significance of the permutation test.
@@ -44,7 +45,7 @@ class DriftMMD(BaseDrift):
         Function to preprocess the data before computing the data drift metrics.
     kernel : Callable, default :py:class:`dataeval.detectors.GaussianRBF`
         Kernel used for the MMD computation, defaults to Gaussian RBF kernel.
-    sigma : Optional[np.ndarray], default None
+    sigma : Optional[ArrayLike], default None
         Optionally set the GaussianRBF kernel bandwidth. Can also pass multiple
         bandwidth values as an array. The kernel evaluation is then averaged over
         those bandwidths.
@@ -59,13 +60,13 @@ class DriftMMD(BaseDrift):
 
     def __init__(
         self,
-        x_ref: np.ndarray,
+        x_ref: ArrayLike,
         p_val: float = 0.05,
         x_ref_preprocessed: bool = False,
         update_x_ref: Optional[UpdateStrategy] = None,
-        preprocess_fn: Optional[Callable[[np.ndarray], np.ndarray]] = None,
+        preprocess_fn: Optional[Callable[[ArrayLike], ArrayLike]] = None,
         kernel: Callable = GaussianRBF,
-        sigma: Optional[np.ndarray] = None,
+        sigma: Optional[ArrayLike] = None,
         configure_kernel_from_x_ref: bool = True,
         n_permutations: int = 100,
         device: Optional[str] = None,
@@ -73,7 +74,7 @@ class DriftMMD(BaseDrift):
         super().__init__(x_ref, p_val, x_ref_preprocessed, update_x_ref, preprocess_fn)
 
         self.infer_sigma = configure_kernel_from_x_ref
-        if configure_kernel_from_x_ref and isinstance(sigma, np.ndarray):
+        if configure_kernel_from_x_ref and isinstance(sigma, ArrayLike):
             self.infer_sigma = False
 
         self.n_permutations = n_permutations  # nb of iterations through permutation test
@@ -82,7 +83,7 @@ class DriftMMD(BaseDrift):
         self.device = get_device(device)
 
         # initialize kernel
-        sigma_tensor = torch.from_numpy(sigma).to(self.device) if isinstance(sigma, np.ndarray) else None
+        sigma_tensor = torch.from_numpy(to_numpy(sigma)).to(self.device) if isinstance(sigma, ArrayLike) else None
         self.kernel = kernel(sigma_tensor).to(self.device) if kernel == GaussianRBF else kernel
 
         # compute kernel matrix for the reference data
@@ -102,7 +103,7 @@ class DriftMMD(BaseDrift):
         return kernel_mat
 
     @preprocess_x
-    def score(self, x: np.ndarray) -> Tuple[float, float, float]:
+    def score(self, x: ArrayLike) -> Tuple[float, float, float]:
         """
         Compute the p-value resulting from a permutation test using the maximum mean
         discrepancy as a distance measure between the reference data and the data to
@@ -110,7 +111,7 @@ class DriftMMD(BaseDrift):
 
         Parameters
         ----------
-        x
+        x : ArrayLike
             Batch of instances.
 
         Returns
@@ -118,6 +119,7 @@ class DriftMMD(BaseDrift):
         p-value obtained from the permutation test, the MMD^2 between the reference and
         test set, and the MMD^2 threshold above which drift is flagged.
         """
+        x = to_numpy(x)
         x_ref = torch.from_numpy(self.x_ref).to(self.device)
         n = x.shape[0]
         kernel_mat = self._kernel_matrix(x_ref, torch.from_numpy(x).to(self.device))
@@ -137,7 +139,7 @@ class DriftMMD(BaseDrift):
     @update_x_ref
     def predict(
         self,
-        x: np.ndarray,
+        x: ArrayLike,
     ) -> Dict[str, Union[int, float]]:
         """
         Predict whether a batch of data has drifted from the reference data and then
@@ -145,7 +147,7 @@ class DriftMMD(BaseDrift):
 
         Parameters
         ----------
-        x
+        x : ArrayLike
             Batch of instances.
 
         Returns

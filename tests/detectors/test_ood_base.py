@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from dataeval._internal.detectors.ood.base import OODGMMBase, OODScore
+from dataeval._internal.interop import ArrayLike
 from dataeval._internal.models.tensorflow.autoencoder import AE
 from dataeval._internal.models.tensorflow.utils import create_model
 
@@ -10,7 +11,7 @@ model = create_model(AE, image_shape)
 
 
 class MockOutlier(OODGMMBase):
-    def score(self, X: np.ndarray, batch_size: int = int(1e10)) -> OODScore:
+    def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScore:
         return OODScore(np.array([0.0]), np.array([0.0]))
 
 

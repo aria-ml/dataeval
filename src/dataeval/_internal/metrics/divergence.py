@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, Literal
 import numpy as np
 
 from dataeval._internal.functional.divergence import divergence_fnn, divergence_mst
+from dataeval._internal.interop import ArrayLike, to_numpy
 from dataeval._internal.metrics.base import EvaluateMixin, MethodsMixin
 
 _METHODS = Literal["MST", "FNN"]
@@ -45,15 +46,15 @@ class Divergence(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
     def _methods(cls) -> Dict[str, _FUNCTION]:
         return {"FNN": divergence_fnn, "MST": divergence_mst}
 
-    def evaluate(self, data_a: np.ndarray, data_b: np.ndarray) -> Dict[str, Any]:
+    def evaluate(self, data_a: ArrayLike, data_b: ArrayLike) -> Dict[str, Any]:
         """
         Calculates the divergence and any errors between the datasets
 
         Parameters
         ----------
-        data_a : np.ndarray
+        data_a : ArrayLike
             Array of images or image embeddings to compare
-        data_b : np.ndarray
+        data_b : ArrayLike
             Array of images or image embeddings to compare
 
         Returns
@@ -64,10 +65,12 @@ class Divergence(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
             errors : int
                 the number of differing edges
         """
-        N = data_a.shape[0]
-        M = data_b.shape[0]
+        a = to_numpy(data_a)
+        b = to_numpy(data_b)
+        N = a.shape[0]
+        M = b.shape[0]
 
-        stacked_data = np.vstack((data_a, data_b))
+        stacked_data = np.vstack((a, b))
         labels = np.vstack([np.zeros([N, 1]), np.ones([M, 1])])
 
         errors = self._method(stacked_data, labels)
