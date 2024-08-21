@@ -11,6 +11,8 @@ from typing import Callable, Literal, Optional, Tuple
 import numpy as np
 from scipy.stats import cramervonmises_2samp
 
+from dataeval._internal.interop import ArrayLike, to_numpy
+
 from .base import BaseUnivariateDrift, UpdateStrategy, preprocess_x
 
 
@@ -23,7 +25,7 @@ class DriftCVM(BaseUnivariateDrift):
 
     Parameters
     ----------
-    x_ref : np.ndarray
+    x_ref : ArrayLike
         Data used as reference distribution.
     p_val : float, default 0.05
         p-value used for significance of the statistical test for each feature.
@@ -40,7 +42,7 @@ class DriftCVM(BaseUnivariateDrift):
         :py:class:`dataeval.detectors.LastSeenUpdateStrategy`
         or via reservoir sampling with
         :py:class:`dataeval.detectors.ReservoirSamplingUpdateStrategy`.
-    preprocess_fn : Optional[Callable[[np.ndarray], np.ndarray]], default None
+    preprocess_fn : Optional[Callable[[ArrayLike], ArrayLike]], default None
         Function to preprocess the data before computing the data drift metrics.
         Typically a dimensionality reduction technique.
     correction : Literal["bonferroni", "fdr"], default "bonferroni"
@@ -54,11 +56,11 @@ class DriftCVM(BaseUnivariateDrift):
 
     def __init__(
         self,
-        x_ref: np.ndarray,
+        x_ref: ArrayLike,
         p_val: float = 0.05,
         x_ref_preprocessed: bool = False,
         update_x_ref: Optional[UpdateStrategy] = None,
-        preprocess_fn: Optional[Callable[[np.ndarray], np.ndarray]] = None,
+        preprocess_fn: Optional[Callable[[ArrayLike], ArrayLike]] = None,
         correction: Literal["bonferroni", "fdr"] = "bonferroni",
         n_features: Optional[int] = None,
     ) -> None:
@@ -73,25 +75,26 @@ class DriftCVM(BaseUnivariateDrift):
         )
 
     @preprocess_x
-    def score(self, x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def score(self, x: ArrayLike) -> Tuple[np.ndarray, np.ndarray]:
         """
         Performs the two-sample Cramér-von Mises test(s), computing the p-value and
         test statistic per feature.
 
         Parameters
         ----------
-        x
+        x : ArrayLike
             Batch of instances.
 
         Returns
         -------
         Feature level p-values and CVM statistics.
         """
-        x = x.reshape(x.shape[0], -1)
+        x_np = to_numpy(x)
+        x_np = x_np.reshape(x_np.shape[0], -1)
         x_ref = self.x_ref.reshape(self.x_ref.shape[0], -1)
         p_val = np.zeros(self.n_features, dtype=np.float32)
         dist = np.zeros_like(p_val)
         for f in range(self.n_features):
-            result = cramervonmises_2samp(x_ref[:, f], x[:, f], method="auto")
+            result = cramervonmises_2samp(x_ref[:, f], x_np[:, f], method="auto")
             p_val[f], dist[f] = result.pvalue, result.statistic
         return p_val, dist

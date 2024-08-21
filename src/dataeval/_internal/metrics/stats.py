@@ -7,11 +7,12 @@ from scipy.stats import entropy, kurtosis, skew
 from dataeval._internal.flags import ImageHash, ImageProperty, ImageStatistics, ImageStatsFlags, ImageVisuals
 from dataeval._internal.functional.hash import pchash, xxhash
 from dataeval._internal.functional.utils import edge_filter, get_bitdepth, normalize_image_shape, rescale
+from dataeval._internal.interop import ArrayLike, to_numpy_iter
 from dataeval._internal.metrics.base import EvaluateMixin, MetricMixin
 
 QUARTILES = (0, 25, 50, 75, 100)
 
-TBatch = TypeVar("TBatch", bound=Sequence)
+TBatch = TypeVar("TBatch", bound=Sequence[ArrayLike])
 TFlag = TypeVar("TFlag", bound=Flag)
 
 
@@ -90,12 +91,12 @@ class ImageHashMetric(BaseStatsMetric):
     def __init__(self, flags: ImageHash = ImageHash.ALL):
         super().__init__(flags)
 
-    def update(self, images: Iterable[np.ndarray]) -> None:
-        for data in images:
+    def update(self, images: Iterable[ArrayLike]) -> None:
+        for image in to_numpy_iter(images):
             results = self._map(
                 {
-                    ImageHash.XXHASH: lambda: xxhash(data),
-                    ImageHash.PCHASH: lambda: pchash(data),
+                    ImageHash.XXHASH: lambda: xxhash(image),
+                    ImageHash.PCHASH: lambda: pchash(image),
                 }
             )
             self.results.append(results)
@@ -114,16 +115,16 @@ class ImagePropertyMetric(BaseStatsMetric):
     def __init__(self, flags: ImageProperty = ImageProperty.ALL):
         super().__init__(flags)
 
-    def update(self, images: Iterable[np.ndarray]) -> None:
-        for data in images:
+    def update(self, images: Iterable[ArrayLike]) -> None:
+        for image in to_numpy_iter(images):
             results = self._map(
                 {
-                    ImageProperty.WIDTH: lambda: np.int32(data.shape[-1]),
-                    ImageProperty.HEIGHT: lambda: np.int32(data.shape[-2]),
-                    ImageProperty.SIZE: lambda: np.int32(data.shape[-1] * data.shape[-2]),
-                    ImageProperty.ASPECT_RATIO: lambda: data.shape[-1] / np.int32(data.shape[-2]),
-                    ImageProperty.CHANNELS: lambda: data.shape[-3],
-                    ImageProperty.DEPTH: lambda: get_bitdepth(data).depth,
+                    ImageProperty.WIDTH: lambda: np.int32(image.shape[-1]),
+                    ImageProperty.HEIGHT: lambda: np.int32(image.shape[-2]),
+                    ImageProperty.SIZE: lambda: np.int32(image.shape[-1] * image.shape[-2]),
+                    ImageProperty.ASPECT_RATIO: lambda: image.shape[-1] / np.int32(image.shape[-2]),
+                    ImageProperty.CHANNELS: lambda: image.shape[-3],
+                    ImageProperty.DEPTH: lambda: get_bitdepth(image).depth,
                 }
             )
             self.results.append(results)
@@ -142,14 +143,14 @@ class ImageVisualsMetric(BaseStatsMetric):
     def __init__(self, flags: ImageVisuals = ImageVisuals.ALL):
         super().__init__(flags)
 
-    def update(self, images: Iterable[np.ndarray]) -> None:
-        for data in images:
+    def update(self, images: Iterable[ArrayLike]) -> None:
+        for image in to_numpy_iter(images):
             results = self._map(
                 {
-                    ImageVisuals.BRIGHTNESS: lambda: np.mean(rescale(data)),
-                    ImageVisuals.BLURRINESS: lambda: np.std(edge_filter(np.mean(data, axis=0))),
-                    ImageVisuals.MISSING: lambda: np.sum(np.isnan(data)),
-                    ImageVisuals.ZERO: lambda: np.int32(np.count_nonzero(data == 0)),
+                    ImageVisuals.BRIGHTNESS: lambda: np.mean(rescale(image)),
+                    ImageVisuals.BLURRINESS: lambda: np.std(edge_filter(np.mean(image, axis=0))),
+                    ImageVisuals.MISSING: lambda: np.sum(np.isnan(image)),
+                    ImageVisuals.ZERO: lambda: np.int32(np.count_nonzero(image == 0)),
                 }
             )
             self.results.append(results)
@@ -168,9 +169,9 @@ class ImageStatisticsMetric(BaseStatsMetric):
     def __init__(self, flags: ImageStatistics = ImageStatistics.ALL):
         super().__init__(flags)
 
-    def update(self, images: Iterable[np.ndarray]) -> None:
-        for data in images:
-            scaled = rescale(data)
+    def update(self, images: Iterable[ArrayLike]) -> None:
+        for image in to_numpy_iter(images):
+            scaled = rescale(image)
             if (ImageStatistics.HISTOGRAM | ImageStatistics.ENTROPY) & self.flags:
                 hist = np.histogram(scaled, bins=256, range=(0, 1))[0]
 
@@ -202,10 +203,10 @@ class ChannelStatisticsMetric(BaseStatsMetric):
     def __init__(self, flags: ImageStatistics = ImageStatistics.ALL):
         super().__init__(flags)
 
-    def update(self, images: Iterable[np.ndarray]) -> None:
-        for data in images:
-            scaled = rescale(data)
-            flattened = scaled.reshape(data.shape[0], -1)
+    def update(self, images: Iterable[ArrayLike]) -> None:
+        for image in to_numpy_iter(images):
+            scaled = rescale(image)
+            flattened = scaled.reshape(image.shape[0], -1)
 
             if (ImageStatistics.HISTOGRAM | ImageStatistics.ENTROPY) & self.flags:
                 hist = np.apply_along_axis(lambda x: np.histogram(x, bins=256, range=(0, 1))[0], 1, flattened)
@@ -263,8 +264,8 @@ class ImageStats(BaseAggregateMetric):
         super().__init__(flags)
         self._length = 0
 
-    def update(self, images: Iterable[np.ndarray]) -> None:
-        for image in images:
+    def update(self, images: Iterable[ArrayLike]) -> None:
+        for image in to_numpy_iter(images):
             self._length += 1
             img = normalize_image_shape(image)
             for metric in self._metrics_dict:
@@ -305,8 +306,8 @@ class ChannelStats(BaseAggregateMetric):
     def __init__(self, flags: Optional[ImageStatistics] = None) -> None:
         super().__init__(flags)
 
-    def update(self, images: Iterable[np.ndarray]) -> None:
-        for image in images:
+    def update(self, images: Iterable[ArrayLike]) -> None:
+        for image in to_numpy_iter(images):
             img = normalize_image_shape(image)
             for metric in self._metrics_dict:
                 metric.update([img])

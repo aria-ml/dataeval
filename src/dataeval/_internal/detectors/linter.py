@@ -3,6 +3,7 @@ from typing import Iterable, Literal, Optional, Sequence, Union
 import numpy as np
 
 from dataeval._internal.flags import ImageProperty, ImageVisuals, LinterFlags
+from dataeval._internal.interop import ArrayLike
 from dataeval._internal.metrics.stats import ImageStats
 
 
@@ -119,13 +120,13 @@ class Linter:
 
         return dict(sorted(flagged_images.items()))
 
-    def evaluate(self, images: Iterable[np.ndarray]) -> dict:
+    def evaluate(self, images: Iterable[ArrayLike]) -> dict:
         """
         Returns indices of outliers with the issues identified for each
 
         Parameters
         ----------
-        images : Iterable[np.ndarray]
+        images : Iterable[ArrayLike]
             A set of images where each individual image is a numpy array in CxHxW format
 
         Returns

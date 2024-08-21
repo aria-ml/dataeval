@@ -12,6 +12,7 @@ import keras
 import numpy as np
 
 from dataeval._internal.detectors.ood.base import OODGMMBase, OODScore
+from dataeval._internal.interop import ArrayLike, to_numpy
 from dataeval._internal.models.tensorflow.autoencoder import VAEGMM
 from dataeval._internal.models.tensorflow.gmm import gmm_energy
 from dataeval._internal.models.tensorflow.losses import Elbo, LossGMM
@@ -35,7 +36,7 @@ class OOD_VAEGMM(OODGMMBase):
 
     def fit(
         self,
-        x_ref: np.ndarray,
+        x_ref: ArrayLike,
         threshold_perc: float = 100.0,
         loss_fn: Callable = LossGMM(elbo=Elbo(0.05)),
         optimizer: keras.optimizers.Optimizer = keras.optimizers.Adam,
@@ -48,7 +49,7 @@ class OOD_VAEGMM(OODGMMBase):
 
         Parameters
         ----------
-        X : np.ndarray
+        X : ArrayLike
             Training batch.
         threshold_perc : float, default 100.0
             Percentage of reference data that is normal.
@@ -65,8 +66,8 @@ class OOD_VAEGMM(OODGMMBase):
         """
         super().fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
 
-    def score(self, X: np.ndarray, batch_size: int = int(1e10)) -> OODScore:
-        self._validate(X)
+    def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScore:
+        self._validate(X := to_numpy(X))
 
         # draw samples from latent space
         X_samples = np.repeat(X, self.samples, axis=0)

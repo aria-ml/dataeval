@@ -16,6 +16,7 @@ from keras.layers import Input
 from keras.models import Model
 
 from dataeval._internal.detectors.ood.base import OODBase, OODScore
+from dataeval._internal.interop import ArrayLike, to_numpy
 from dataeval._internal.models.tensorflow.pixelcnn import PixelCNN
 from dataeval._internal.models.tensorflow.trainer import trainer
 from dataeval._internal.models.tensorflow.utils import predict_batch
@@ -125,7 +126,7 @@ class OOD_LLR(OODBase):
 
     def fit(
         self,
-        x_ref: np.ndarray,
+        x_ref: ArrayLike,
         threshold_perc: float = 100.0,
         loss_fn: Optional[Callable] = None,
         optimizer: keras.optimizers.Optimizer = keras.optimizers.Adam,
@@ -141,7 +142,7 @@ class OOD_LLR(OODBase):
 
         Parameters
         ----------
-        x_ref : np.ndarray
+        x_ref : ArrayLike
             Training batch.
         threshold_perc : float, default 100.0
             Percentage of reference data that is normal.
@@ -163,6 +164,7 @@ class OOD_LLR(OODBase):
         mutate_batch_size: int, default int(1e10)
             Batch size used to generate the mutations for the background dataset.
         """
+        x_ref = to_numpy(x_ref)
         input_shape = x_ref.shape[1:]
         optimizer = optimizer() if isinstance(optimizer, type) else optimizer
         # Separate into two separate optimizers, one for semantic model and one for background model
@@ -275,10 +277,10 @@ class OOD_LLR(OODBase):
 
     def score(
         self,
-        X: np.ndarray,
+        X: ArrayLike,
         batch_size: int = int(1e10),
     ) -> OODScore:
-        self._validate(X)
+        self._validate(X := to_numpy(X))
         fscore = -self._llr(X, True, batch_size=batch_size)
         iscore = -self._llr(X, False, batch_size=batch_size)
         return OODScore(iscore, fscore)
