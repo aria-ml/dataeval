@@ -201,7 +201,7 @@ coverage:
     # TODO: Move coverage report generation in to build script (and/or resolve issue with using symlinks instead of a full recursive copy)
     - cp --recursive $(pwd) /dataeval
     - coverage combine ./output
-    - coverage report -m --skip-empty
+    - coverage report -m --skip-empty --precision=2
     - coverage xml --skip-empty
     - coverage html --skip-empty
   coverage: "/(?i)total.*? (100(?:\\.0+)?\\%|[1-9]?\\d(?:\\.\\d+)?\\%)$/"
