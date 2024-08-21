@@ -13,6 +13,7 @@ import keras
 import numpy as np
 import tensorflow as tf
 
+from dataeval._internal.interop import ArrayLike, to_numpy
 from dataeval._internal.models.tensorflow.gmm import GaussianMixtureModelParams, gmm_params
 from dataeval._internal.models.tensorflow.trainer import trainer
 
@@ -66,13 +67,13 @@ class OODBase(ABC):
         self._validate(X)
 
     @abstractmethod
-    def score(self, X: np.ndarray, batch_size: int = int(1e10)) -> OODScore:
+    def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScore:
         """
         Compute instance and (optionally) feature level outlier scores.
 
         Parameters
         ----------
-        X : np.ndarray
+        X : ArrayLike
             Batch of instances.
         batch_size : int, default int(1e10)
             Batch size used when making predictions with the autoencoder.
@@ -87,7 +88,7 @@ class OODBase(ABC):
 
     def fit(
         self,
-        x_ref: np.ndarray,
+        x_ref: ArrayLike,
         threshold_perc: float,
         loss_fn: Callable,
         optimizer: keras.optimizers.Optimizer,
@@ -100,7 +101,7 @@ class OODBase(ABC):
 
         Parameters
         ----------
-        x_ref: : np.ndarray
+        x_ref: : ArrayLike
             Training batch.
         threshold_perc : float
             Percentage of reference data that is normal.
@@ -119,7 +120,7 @@ class OODBase(ABC):
         trainer(
             model=self.model,
             loss_fn=loss_fn,
-            x_train=x_ref,
+            x_train=to_numpy(x_ref),
             optimizer=optimizer,
             epochs=epochs,
             batch_size=batch_size,
@@ -132,7 +133,7 @@ class OODBase(ABC):
 
     def predict(
         self,
-        X: np.ndarray,
+        X: ArrayLike,
         batch_size: int = int(1e10),
         ood_type: Literal["feature", "instance"] = "instance",
     ) -> Dict[str, np.ndarray]:
@@ -141,18 +142,18 @@ class OODBase(ABC):
 
         Parameters
         ----------
-        X
+        X : ArrayLike
             Batch of instances.
-        ood_type
-            Predict out-of-distribution at the 'feature' or 'instance' level.
-        batch_size
+        batch_size : int, default int(1e10)
             Batch size used when making predictions with the autoencoder.
+        ood_type : Literal["feature", "instance"], default "instance"
+            Predict out-of-distribution at the 'feature' or 'instance' level.
 
         Returns
         -------
         Dictionary containing the outlier predictions and both feature and instance level outlier scores.
         """
-        self._validate_state(X)
+        self._validate_state(X := to_numpy(X))
         # compute outlier scores
         score = self.score(X, batch_size=batch_size)
         ood_pred = (score.get(ood_type) > self._threshold_score(ood_type)).astype(int)
@@ -171,7 +172,7 @@ class OODGMMBase(OODBase):
 
     def fit(
         self,
-        x_ref: np.ndarray,
+        x_ref: ArrayLike,
         threshold_perc: float,
         loss_fn: Callable[[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor], tf.Tensor],
         optimizer: keras.optimizers.Optimizer,
@@ -183,7 +184,7 @@ class OODGMMBase(OODBase):
         trainer(
             model=self.model,
             loss_fn=loss_fn,
-            x_train=x_ref,
+            x_train=to_numpy(x_ref),
             optimizer=optimizer,
             epochs=epochs,
             batch_size=batch_size,

@@ -6,9 +6,8 @@ average precision using empirical mean precision
 
 from typing import Dict
 
-import numpy as np
-
 from dataeval._internal.functional.uap import uap
+from dataeval._internal.interop import ArrayLike, to_numpy
 from dataeval._internal.metrics.base import EvaluateMixin
 
 
@@ -18,15 +17,15 @@ class UAP(EvaluateMixin):
 
     """
 
-    def evaluate(self, labels: np.ndarray, scores: np.ndarray) -> Dict[str, float]:
+    def evaluate(self, labels: ArrayLike, scores: ArrayLike) -> Dict[str, float]:
         """
         Estimates the upperbound average precision
 
         Parameters
         ----------
-        labels : np.ndarray
+        labels : ArrayLike
             A numpy array of n_samples of class labels with M unique classes.
-        scores : np.ndarray
+        scores : ArrayLike
             A 2D array of class probabilities per image
 
         Returns
@@ -40,4 +39,4 @@ class UAP(EvaluateMixin):
             If unique classes M < 2
         """
 
-        return {"uap": uap(labels, scores)}
+        return {"uap": uap(to_numpy(labels), to_numpy(scores))}

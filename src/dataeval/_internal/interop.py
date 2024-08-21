@@ -1,5 +1,5 @@
 from importlib import import_module
-from typing import Any, Optional, runtime_checkable
+from typing import Any, Iterable, Optional, runtime_checkable
 
 import numpy as np
 
@@ -45,3 +45,8 @@ def to_numpy(array: Optional[ArrayLike]) -> np.ndarray:
         return array.detach().cpu().numpy()  # type: ignore
 
     return np.asarray(array)
+
+
+def to_numpy_iter(iterable: Iterable[ArrayLike]):
+    for array in iterable:
+        yield to_numpy(array)

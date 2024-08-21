@@ -13,6 +13,8 @@ import numpy as np
 from scipy.special import softmax
 from scipy.stats import entropy
 
+from dataeval._internal.interop import ArrayLike
+
 from .base import UpdateStrategy
 from .ks import DriftKS
 from .torch import get_device, preprocess_drift
@@ -64,7 +66,7 @@ class DriftUncertainty:
 
     Parameters
     ----------
-    x_ref : np.ndarray
+    x_ref : ArrayLike
         Data used as reference distribution. Should be disjoint from the data the
         model was trained on for accurate p-values.
     model : Callable
@@ -100,7 +102,7 @@ class DriftUncertainty:
 
     def __init__(
         self,
-        x_ref: np.ndarray,
+        x_ref: ArrayLike,
         model: Callable,
         p_val: float = 0.05,
         x_ref_preprocessed: bool = False,
@@ -130,16 +132,16 @@ class DriftUncertainty:
             p_val=p_val,
             x_ref_preprocessed=x_ref_preprocessed,
             update_x_ref=update_x_ref,
-            preprocess_fn=preprocess_fn,
+            preprocess_fn=preprocess_fn,  # type: ignore
         )
 
-    def predict(self, x: np.ndarray) -> Dict[str, Union[int, float, np.ndarray]]:
+    def predict(self, x: ArrayLike) -> Dict[str, Union[int, float, np.ndarray]]:
         """
         Predict whether a batch of data has drifted from the reference data.
 
         Parameters
         ----------
-        x
+        x : ArrayLike
             Batch of instances.
 
         Returns

@@ -11,6 +11,8 @@ from typing import Callable, Literal, Optional, Tuple
 import numpy as np
 from scipy.stats import ks_2samp
 
+from dataeval._internal.interop import ArrayLike, to_numpy
+
 from .base import BaseUnivariateDrift, UpdateStrategy, preprocess_x
 
 
@@ -55,11 +57,11 @@ class DriftKS(BaseUnivariateDrift):
 
     def __init__(
         self,
-        x_ref: np.ndarray,
+        x_ref: ArrayLike,
         p_val: float = 0.05,
         x_ref_preprocessed: bool = False,
         update_x_ref: Optional[UpdateStrategy] = None,
-        preprocess_fn: Optional[Callable[[np.ndarray], np.ndarray]] = None,
+        preprocess_fn: Optional[Callable[[ArrayLike], ArrayLike]] = None,
         correction: Literal["bonferroni", "fdr"] = "bonferroni",
         alternative: Literal["two-sided", "less", "greater"] = "two-sided",
         n_features: Optional[int] = None,
@@ -78,7 +80,7 @@ class DriftKS(BaseUnivariateDrift):
         self.alternative = alternative
 
     @preprocess_x
-    def score(self, x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def score(self, x: ArrayLike) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute K-S scores and statistics per feature.
 
@@ -91,6 +93,7 @@ class DriftKS(BaseUnivariateDrift):
         -------
         Feature level p-values and K-S statistics.
         """
+        x = to_numpy(x)
         x = x.reshape(x.shape[0], -1)
         x_ref = self.x_ref.reshape(self.x_ref.shape[0], -1)
         p_val = np.zeros(self.n_features, dtype=np.float32)

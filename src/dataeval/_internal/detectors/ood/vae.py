@@ -12,6 +12,7 @@ import keras
 import numpy as np
 
 from dataeval._internal.detectors.ood.base import OODBase, OODScore
+from dataeval._internal.interop import ArrayLike, to_numpy
 from dataeval._internal.models.tensorflow.autoencoder import VAE
 from dataeval._internal.models.tensorflow.losses import Elbo
 from dataeval._internal.models.tensorflow.utils import predict_batch
@@ -34,7 +35,7 @@ class OOD_VAE(OODBase):
 
     def fit(
         self,
-        x_ref: np.ndarray,
+        x_ref: ArrayLike,
         threshold_perc: float = 100.0,
         loss_fn: Callable = Elbo(0.05),
         optimizer: keras.optimizers.Optimizer = keras.optimizers.Adam,
@@ -47,7 +48,7 @@ class OOD_VAE(OODBase):
 
         Parameters
         ----------
-        x_ref : np.ndarray
+        x_ref : ArrayLike
             Training batch.
         threshold_perc : float, default 100.0
             Percentage of reference data that is normal.
@@ -64,8 +65,8 @@ class OOD_VAE(OODBase):
         """
         super().fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
 
-    def score(self, X: np.ndarray, batch_size: int = int(1e10)) -> OODScore:
-        self._validate(X)
+    def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScore:
+        self._validate(X := to_numpy(X))
 
         # sample reconstructed instances
         X_samples = np.repeat(X, self.samples, axis=0)
