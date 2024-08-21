@@ -5,7 +5,10 @@
 
 from os import getenv
 
-# -- Project information ---------------------------------------------------
+# -----------------------------------------------------------------------------
+# Project configuration
+# -----------------------------------------------------------------------------
+
 project = "DataEval"
 copyright = "2024, ARiA"  # noqa: A001
 author = "ARiA"
@@ -17,7 +20,9 @@ repo_name = "DataEval"
 root_doc = "index"
 language = "en"
 
-# -- General configuration -------------------------------------------------
+# -----------------------------------------------------------------------------
+# General configuration
+# -----------------------------------------------------------------------------
 
 extensions = [
     # Internal Sphinx extensions
@@ -26,32 +31,42 @@ extensions = [
     "sphinx.ext.doctest",
     "sphinx.ext.napoleon",
     "sphinx.ext.graphviz",
+    "sphinx.ext.mathjax",
     # External extensions
     "sphinx_rtd_size",
     "sphinx_design",
-    # "sphinx_tabs.tabs",
-    # "sphinx_inline_tabs",
     "myst_nb",
     "enum_tools.autoenum",
 ]
 
+# The suffix of source filenames.
 source_suffix = [".rst", ".md"]
 
+# Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
+
+# List of items that shouldn't be included in the build.
 exclude_patterns = [
-    ".jupyter_cache",
-    "_build",
+    # Patterns
     "Thumbs.db",
     ".DS_Store",
+    # Specific directories -- relative to source directories
+    ".jupyter_cache",
+    "_build",
+    # Specific documents
     "how_to/notebooks/ODLearningCurvesTutorial.ipynb",
 ]
 
-# -- Extension configurations ----------------------------------------------
+# -----------------------------------------------------------------------------
+# Extension configurations
+# -----------------------------------------------------------------------------
 
 autosummary_generate = False
 sphinx_rtd_size_width = "80%"
 
-# -- MyST-NB settings ------------------------------------------------------
+# -----------------------------------------------------------------------------
+# MyST-NB settings
+# -----------------------------------------------------------------------------
 
 EXECUTION_MODE = getenv("NB_EXECUTION_MODE_OVERRIDE")
 nb_execution_allow_errors = False
@@ -63,7 +78,9 @@ nb_execution_timeout = -1
 myst_enable_extensions = ["colon_fence", "dollarmath", "html_image"]
 myst_heading_anchors = 4
 
-# -- HTML output ----------------------------------------------------------
+# -----------------------------------------------------------------------------
+# HTML output
+# -----------------------------------------------------------------------------
 
 html_theme = "sphinx_rtd_theme"
 html_logo = "_static/DataEval_Logo.png"
@@ -76,8 +93,6 @@ html_theme_options = {
     "logo_only": True,
 }
 html_static_path = ["_static"]
-
-doctest_test_doctest_blocks = ""
 
 
 # because we expose private modules in public namespaces

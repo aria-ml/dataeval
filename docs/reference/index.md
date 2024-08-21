@@ -151,7 +151,7 @@ Flags are used by the ImageStats, ChannelStats, Duplicates and Linter classes
 ```
 
 Workflows
--------
+---------
 
 :::{toctree}
 :hidden:
