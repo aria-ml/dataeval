@@ -30,29 +30,67 @@ def _get_outlier_mask(
 
 
 class Linter:
-    """
+    r"""
     Calculates statistical outliers of a dataset using various statistical tests applied to each image
 
+    Parameters
+    ----------
+    images : numpy.ndarray
+        Dataset in the form of (N, C, H, W)
+    flags : [ImageProperty | ImageStatistics | ImageVisuals], default None
+        Metric(s) to calculate for each image - calculates all metrics if None
+    outlier_method : ["modzscore" | "zscore" | "iqr"], optional - default "modzscore"
+        Statistical method used to identify outliers
+    outlier_threshold : float, optional - default None
+        Threshold value for the given ``outlier_method``, above which data is considered an outlier.
+        Uses method specific default if `None`
+
+    Attributes
+    ----------
+    stats : ImageStats
+        Class to hold the value of each metric for each image
+
+    See Also
+    --------
+    Duplicates
+
+    Notes
+    ------
     There are 3 different statistical methods:
 
     - zscore
     - modzscore
     - iqr
 
-    The default statistical method is `modzscore`.
+    | The z score method is based on the difference between the data point and the mean of the data.
+        The default threshold value for `zscore` is 3.
+    | Z score = :math:`|x_i - \mu| / \sigma`
 
-    The z score method is based on the difference between the data point and the mean of the data.
-    The default threshold value for `zscore` is 3.
-    Z score = \|x_i - mu| / sigma
+    | The modified z score method is based on the difference between the data point and the median of the data.
+        The default threshold value for `modzscore` is 3.5.
+    | Modified z score = :math:`0.6745 * |x_i - x̃| / MAD`, where :math:`MAD` is the median absolute deviation
 
-    The modified z score method is based on the difference between the data point and the median of the data.
-    The default threshold value for `modzscore` is 3.5.
-    Modified z score = 0.6745 * \|x_i - x̃| / MAD, where MAD is the median absolute deviation
+    | The interquartile range method is based on the difference between the data point and
+        the difference between the 75th and 25th qartile. The default threshold value for `iqr` is 1.5.
+    | Interquartile range = :math:`threshold * (Q_3 - Q_1)`
 
-    The interquartile range method is based on the difference between the data point and
-    the difference between the 75th and 25th qartile.
-    The default threshold value for `iqr` is 1.5.
-    Interquartile range $= threshold * (Q_3 - Q_1)$
+    Examples
+    --------
+    Initialize the Linter class:
+
+    >>> lint = Linter(dataset)
+
+    Specifying specific metrics:
+
+    >>> lint = Linter(dataset, flags=[ImageProperty.SIZE, ImageVisuals.ALL])
+
+    Specifying an outlier method:
+
+    >>> lint = Linter(dataset, outlier_method="iqr")
+
+    Specifying an outlier method and threshold:
+
+    >>> lint = Linter(dataset, outlier_method="zscore", outlier_threshold=2.5)
     """
 
     def __init__(
@@ -83,7 +121,7 @@ class Linter:
 
     def evaluate(self, images: Iterable[np.ndarray]) -> dict:
         """
-        Returns indices of outliers with and the issues identified for each
+        Returns indices of outliers with the issues identified for each
 
         Parameters
         ----------
@@ -93,7 +131,15 @@ class Linter:
         Returns
         -------
         Dict[int, Dict[str, float]]
-            Dictionary containing the indices of outliers and a dictionary issues and calculated values
+            Dictionary containing the indices of outliers and a dictionary showing
+            the issues and calculated values for the given index.
+
+        Example
+        -------
+        Evaluate the dataset:
+
+        >>> lint.evaluate()
+        {18: {'brightness': 0.78}, 25: {'brightness': 0.98}}
         """
         self.stats.reset()
         self.stats.update(images)
