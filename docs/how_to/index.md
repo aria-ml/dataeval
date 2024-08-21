@@ -76,7 +76,7 @@ notebooks/AETrainerTutorial.ipynb
 [ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/BayesErrorRateEstimationTutorial.ipynb
 [suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/ClassLearningCurvesTutorial.ipynb
 [div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/HPDivergenceTutorial.ipynb
-[drift-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/DriftDivergenceTutorial.ipynb
+[drift-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/DriftDetectionTutorial.ipynb
 [out-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/OODDetectionTutorial.ipynb
 [ae-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/AETrainerTutorial.ipynb
 [lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/how_to/notebooks/ClassLabelAnalysisTutorial.ipynb
