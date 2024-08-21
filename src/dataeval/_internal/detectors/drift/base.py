@@ -12,6 +12,8 @@ from typing import Callable, Dict, Literal, Optional, Tuple, Union
 
 import numpy as np
 
+from dataeval._internal.interop import ArrayLike, to_numpy
+
 
 def update_x_ref(fn):
     @wraps(fn)
@@ -104,11 +106,11 @@ class BaseDrift:
 
     def __init__(
         self,
-        x_ref: np.ndarray,
+        x_ref: ArrayLike,
         p_val: float = 0.05,
         x_ref_preprocessed: bool = False,
         update_x_ref: Optional[UpdateStrategy] = None,
-        preprocess_fn: Optional[Callable[[np.ndarray], np.ndarray]] = None,
+        preprocess_fn: Optional[Callable[[ArrayLike], ArrayLike]] = None,
         correction: Literal["bonferroni", "fdr"] = "bonferroni",
     ) -> None:
         # Type checking
@@ -127,7 +129,7 @@ class BaseDrift:
         self.update_x_ref = update_x_ref
         self.preprocess_fn = preprocess_fn
         self.correction = correction
-        self.n = len(x_ref)
+        self.n = len(self._x_ref)  # type: ignore
 
         # Ref counter for preprocessed x
         self._x_refcount = 0
@@ -139,9 +141,10 @@ class BaseDrift:
             if self.preprocess_fn is not None:
                 self._x_ref = self.preprocess_fn(self._x_ref)
 
+        self._x_ref = to_numpy(self._x_ref)
         return self._x_ref
 
-    def _preprocess(self, x: np.ndarray) -> np.ndarray:
+    def _preprocess(self, x: ArrayLike) -> ArrayLike:
         """Data preprocessing before computing the drift scores."""
         if self.preprocess_fn is not None:
             x = self.preprocess_fn(x)
@@ -158,11 +161,11 @@ class BaseUnivariateDrift(BaseDrift):
 
     def __init__(
         self,
-        x_ref: np.ndarray,
+        x_ref: ArrayLike,
         p_val: float = 0.05,
         x_ref_preprocessed: bool = False,
         update_x_ref: Optional[UpdateStrategy] = None,
-        preprocess_fn: Optional[Callable[[np.ndarray], np.ndarray]] = None,
+        preprocess_fn: Optional[Callable[[ArrayLike], ArrayLike]] = None,
         correction: Literal["bonferroni", "fdr"] = "bonferroni",
         n_features: Optional[int] = None,
     ) -> None:
@@ -187,14 +190,14 @@ class BaseUnivariateDrift(BaseDrift):
                 self._n_features = self.x_ref.reshape(self.x_ref.shape[0], -1).shape[-1]
             else:
                 # infer number of features after applying preprocessing step
-                x = self.preprocess_fn(self.x_ref[0:1])
+                x = to_numpy(self.preprocess_fn(self._x_ref[0:1]))  # type: ignore
                 self._n_features = x.reshape(x.shape[0], -1).shape[-1]
 
         return self._n_features
 
     @preprocess_x
     @abstractmethod
-    def score(self, x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def score(self, x: ArrayLike) -> Tuple[np.ndarray, np.ndarray]:
         """Abstract method to calculate feature score after preprocessing"""
 
     def _apply_correction(self, p_vals: np.ndarray) -> Tuple[int, float]:
@@ -220,7 +223,7 @@ class BaseUnivariateDrift(BaseDrift):
     @update_x_ref
     def predict(
         self,
-        x: np.ndarray,
+        x: ArrayLike,
         drift_type: Literal["batch", "feature"] = "batch",
     ) -> Dict[str, Union[int, float, np.ndarray]]:
         """
@@ -229,7 +232,7 @@ class BaseUnivariateDrift(BaseDrift):
 
         Parameters
         ----------
-        x : np.ndarray
+        x : ArrayLike
             Batch of instances.
         drift_type : Literal["batch", "feature"], default "batch"
             Predict drift at the 'feature' or 'batch' level. For 'batch', the test

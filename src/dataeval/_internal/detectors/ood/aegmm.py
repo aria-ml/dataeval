@@ -9,9 +9,9 @@ Licensed under Apache Software License (Apache 2.0)
 from typing import Callable
 
 import keras
-import numpy as np
 
 from dataeval._internal.detectors.ood.base import OODGMMBase, OODScore
+from dataeval._internal.interop import ArrayLike, to_numpy
 from dataeval._internal.models.tensorflow.autoencoder import AEGMM
 from dataeval._internal.models.tensorflow.gmm import gmm_energy
 from dataeval._internal.models.tensorflow.losses import LossGMM
@@ -32,7 +32,7 @@ class OOD_AEGMM(OODGMMBase):
 
     def fit(
         self,
-        x_ref: np.ndarray,
+        x_ref: ArrayLike,
         threshold_perc: float = 100.0,
         loss_fn: Callable = LossGMM(),
         optimizer: keras.optimizers.Optimizer = keras.optimizers.Adam,
@@ -45,7 +45,7 @@ class OOD_AEGMM(OODGMMBase):
 
         Parameters
         ----------
-        x_ref : np.ndarray
+        x_ref : ArrayLike
             Training batch.
         threshold_perc : float, default 100.0
             Percentage of reference data that is normal.
@@ -62,8 +62,8 @@ class OOD_AEGMM(OODGMMBase):
         """
         super().fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
 
-    def score(self, X: np.ndarray, batch_size: int = int(1e10)) -> OODScore:
-        self._validate(X)
+    def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScore:
+        self._validate(X := to_numpy(X))
         _, z, _ = predict_batch(X, self.model, batch_size=batch_size)
         energy, _ = gmm_energy(z, self.gmm_params, return_mean=False)
         return OODScore(energy.numpy())  # type: ignore

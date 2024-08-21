@@ -4,6 +4,8 @@ import numpy as np
 from scipy.cluster.hierarchy import linkage
 from scipy.spatial.distance import pdist, squareform
 
+from dataeval._internal.interop import ArrayLike, to_numpy
+
 
 def extend_linkage(link_arr: np.ndarray) -> np.ndarray:
     """
@@ -102,20 +104,20 @@ class Clusterer:
 
     Parameters
     ----------
-    dataset : np.ndarray
+    dataset : ArrayLike
         An array of images or image embeddings to perform clustering
     """
 
-    def __init__(self, dataset: np.ndarray):
+    def __init__(self, dataset: ArrayLike):
         # Allows an update to dataset to reset the state rather than instantiate a new class
         self._on_init(dataset)
 
-    def _on_init(self, dataset: np.ndarray):
-        self._validate_data(dataset)
-        self._data: np.ndarray = dataset
-        self._num_samples = len(dataset)
+    def _on_init(self, dataset: ArrayLike):
+        self._data: np.ndarray = to_numpy(dataset)
+        self._validate_data(self._data)
+        self._num_samples = len(self._data)
 
-        self._darr: np.ndarray = pdist(dataset, metric="euclidean")
+        self._darr: np.ndarray = pdist(self._data, metric="euclidean")
         self._sqdmat: np.ndarray = squareform(self._darr)
         self._larr: np.ndarray = extend_linkage(linkage(self._darr))
         self._max_clusters: int = np.count_nonzero(self._larr[:, 3] == 2)
@@ -131,7 +133,7 @@ class Clusterer:
         return self._data
 
     @data.setter
-    def data(self, x: np.ndarray):
+    def data(self, x: ArrayLike):
         self._on_init(x)
 
     @property
