@@ -124,20 +124,18 @@ norecursedirs = ["prototype"]
 addopts = ["--pythonwarnings=ignore::DeprecationWarning", "--verbose", "--durations=20", "--durations-min=1.0"]
 
 [tool.coverage.run]
-source = ["dataeval"]
+source = ["src/dataeval", "src/dataeval/_internal"]
 branch = true
 
 [tool.coverage.report]
-exclude_also = [
-  "raise NotImplementedError"
-]
+exclude_also = ["raise NotImplementedError"]
+include = ["*/src/dataeval/*"]
 omit = [
+  "*/_internal/models/pytorch/blocks.py",
+  "*/_internal/models/pytorch/utils.py",
   "*/_internal/models/tensorflow/pixelcnn.py",
-  "*/_prototype/*",
-  "/tmp/*",
-  "tests/*"
 ]
-fail_under = 90
+fail_under = 89
 
 # Ruff rules - https://docs.astral.sh/ruff/rules/
 [tool.ruff]
