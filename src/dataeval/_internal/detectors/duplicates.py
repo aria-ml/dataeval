@@ -9,6 +9,17 @@ class Duplicates:
     """
     Finds the duplicate images in a dataset using xxhash for exact duplicates
     and pchash for near duplicates
+
+    Attributes
+    ----------
+    stats : ImageStats(flags=ImageHash.ALL)
+        Base stats class with the flags for checking duplicates
+
+    Example
+    -------
+    Initialize the Duplicates class:
+
+    >>> dups = Duplicates()
     """
 
     def __init__(self):
@@ -35,13 +46,25 @@ class Duplicates:
 
         Parameters
         ----------
-        images : Iterable[np.ndarray]
-            A set of images where each individual image is a numpy array in CxHxW format
+        images : Iterable[ArrayLike], shape - (N, C, H, W)
+            A set of images in an ArrayLike format
 
         Returns
         -------
-        Dict[Literal["exact", "near"], List[int]]
-            Dictionary of exact and near match indices
+        Dict[str, List[int]]
+            exact :
+                List of groups of indices that are exact matches
+            near :
+                List of groups of indices that are near matches
+
+        See Also
+        --------
+        ImageStats
+
+        Example
+        -------
+        >>> dups.evaluate(images)
+        {'exact': [[3, 20], [16, 37]], 'near': [[3, 20, 22], [12, 18], [13, 36], [14, 31], [17, 27], [19, 38, 47]]}
         """
         self.stats.reset()
         self.stats.update(images)

@@ -42,3 +42,10 @@ Modified z score $= 0.6745 * |x_i - x̃| / MAD$, where [$MAD$](https://en.wikipe
 The [interquartile range](https://en.wikipedia.org/wiki/Interquartile_range) method is based on the difference between the data point and the difference between the 75th and 25th qartile.  
 The default threshold value for `iqr` is 1.5.  
 Interquartile range $= threshold * (Q_3 - Q_1)$
+
+
+### Duplicates
+
+The duplicate detector helps prune out exact and near matches.
+Exact matches are found using a byte hash of the image information,
+while near matches (such as a crop of another image or a distoration of another image) use a perception based hash.
