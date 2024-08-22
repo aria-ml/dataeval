@@ -104,8 +104,24 @@ class Clusterer:
 
     Parameters
     ----------
-    dataset : ArrayLike
-        An array of images or image embeddings to perform clustering
+    dataset : ArrayLike, shape - (N, P)
+        A dataset in an ArrayLike format.
+        Function expects the data to have 2 dimensions, N number of observations in a P-dimensional space.
+
+    Warning
+    -------
+    The Clusterer class is heavily dependent on computational resources, and may fail due to insufficient memory.
+
+    Note
+    ----
+    The Clusterer works best when the length of the feature dimension, P, is less than 500.
+    If flattening a CxHxW image results in a dimension larger than 500, then it is recommended to reduce the dimensions.
+
+    Example
+    -------
+    Initialize the Clusterer class:
+
+    >>> cluster = Clusterer(dataset)
     """
 
     def __init__(self, dataset: ArrayLike):
@@ -452,20 +468,30 @@ class Clusterer:
 
         Returns
         -------
+        Dict[str, List[int]]
+            outliers :
+                List of indices that do not fall within a cluster
+            potential_outliers :
+                List of indices which are near the border between belonging in the cluster and being an outlier
+            duplicates :
+                List of groups of indices that are exact duplicates
+            potential_duplicates :
+                List of groups of indices which are not exact but closely related data points
 
-        Dict[str, Union[List[int]], List[List[int]]]
-            Dictionary containing list of outliers, potential outliers, duplicates, and near duplicates in keys
-            "outliers", "potential_outliers", "duplicates", "near_duplicates" respectively
-        """
+        Example
+        -------
+        >>> cluster.evaluate()
+        {'outliers': [18, 21, 34, 35, 45], 'potential_outliers': [13, 15, 42], 'duplicates': [[9, 24], [23, 48]], 'potential_duplicates': [[1, 11]]}
+        """  # noqa: E501
 
         outliers, potential_outliers = self.find_outliers(self.last_good_merge_levels)
-        duplicates, near_duplicates = self.find_duplicates(self.last_good_merge_levels)
+        duplicates, potential_duplicates = self.find_duplicates(self.last_good_merge_levels)
 
         ret = {
             "outliers": outliers,
             "potential_outliers": potential_outliers,
             "duplicates": duplicates,
-            "near_duplicates": near_duplicates,
+            "potential_duplicates": potential_duplicates,
         }
 
         return ret
