@@ -1,19 +1,14 @@
 (divergence-ref)=
 # Divergence
 
-% Create small blurb here that answers:
+```{testsetup}
+import numpy as np
+import sklearn.datasets as dsets
+from dataeval.metrics import Divergence
 
-% 1. What it is
-
-% 2. What does it solve
-
-## How-To Guides
-
-Check out this **how to** to begin using the `Divergence` class
-
-{doc}`Divergence Tutorial<../../how_to/notebooks/HPDivergenceTutorial>`
-
-## DataEval API
+datasetA, _ = dsets.make_blobs(n_samples=50, centers=[(-1,-1), (1,1)], cluster_std=0.3, random_state=712)
+datasetB, _ = dsets.make_blobs(n_samples=50, centers=[(-0.5,-0.5), (1,1)], cluster_std=0.3, random_state=712)
+```
 
 ```{eval-rst}
 .. autoclass:: dataeval.metrics.Divergence
