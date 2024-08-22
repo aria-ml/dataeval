@@ -1,19 +1,13 @@
 (coverage-ref)=
 # Coverage
 
-% Create small blurb here that answers:
+```{testsetup}
+import numpy as np
+import sklearn.datasets as dsets
+from dataeval.metrics import Coverage
 
-% 1. What it is
-
-% 2. What does it solve
-
-## How-To Guides
-
-Check out this **how to** to begin using the `coverage` class
-
-{doc}`Coverage Tutorial<../../how_to/notebooks/CoverageTutorial>`
-
-## DataEval API
+embeddings, _ = dsets.make_blobs(n_samples=50, centers=[(1,1)], cluster_std=0.5, random_state=498)
+```
 
 ```{eval-rst}
 .. autoclass:: dataeval.metrics.Coverage
