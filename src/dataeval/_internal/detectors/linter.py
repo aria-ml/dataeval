@@ -36,8 +36,6 @@ class Linter:
 
     Parameters
     ----------
-    images : numpy.ndarray
-        Dataset in the form of (N, C, H, W)
     flags : [ImageProperty | ImageStatistics | ImageVisuals], default None
         Metric(s) to calculate for each image - calculates all metrics if None
     outlier_method : ["modzscore" | "zscore" | "iqr"], optional - default "modzscore"
@@ -79,19 +77,19 @@ class Linter:
     --------
     Initialize the Linter class:
 
-    >>> lint = Linter(dataset)
+    >>> lint = Linter()
 
-    Specifying specific metrics:
+    Specifying specific metrics to analyze:
 
-    >>> lint = Linter(dataset, flags=[ImageProperty.SIZE, ImageVisuals.ALL])
+    >>> lint = Linter(flags=[ImageProperty.SIZE, ImageVisuals.ALL])
 
     Specifying an outlier method:
 
-    >>> lint = Linter(dataset, outlier_method="iqr")
+    >>> lint = Linter(outlier_method="iqr")
 
     Specifying an outlier method and threshold:
 
-    >>> lint = Linter(dataset, outlier_method="zscore", outlier_threshold=2.5)
+    >>> lint = Linter(outlier_method="zscore", outlier_threshold=2.5)
     """
 
     def __init__(
@@ -126,8 +124,9 @@ class Linter:
 
         Parameters
         ----------
-        images : Iterable[ArrayLike]
-            A set of images where each individual image is a numpy array in CxHxW format
+        images : Iterable[ArrayLike], shape - (N, C, H, W)
+            A dataset in an ArrayLike format.
+            Function expects the data to have 3 dimensions, CxHxW.
 
         Returns
         -------
@@ -139,7 +138,7 @@ class Linter:
         -------
         Evaluate the dataset:
 
-        >>> lint.evaluate()
+        >>> lint.evaluate(images)
         {18: {'brightness': 0.78}, 25: {'brightness': 0.98}}
         """
         self.stats.reset()
