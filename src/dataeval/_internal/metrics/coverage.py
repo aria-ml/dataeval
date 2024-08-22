@@ -2,9 +2,9 @@ from typing import Literal, Tuple
 
 import numpy as np
 
-from dataeval._internal.functional.coverage import coverage
 from dataeval._internal.interop import ArrayLike, to_numpy
 from dataeval._internal.metrics.base import EvaluateMixin
+from dataeval._internal.metrics.functional import coverage
 
 
 class Coverage(EvaluateMixin):

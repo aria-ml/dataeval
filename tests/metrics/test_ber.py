@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import torch
 
-from dataeval._internal.functional.ber import _knn_lowerbound, ber_knn, ber_mst
+from dataeval._internal.metrics.functional import ber_knn, ber_mst, knn_lowerbound
 from dataeval.metrics import BER
 
 
@@ -37,7 +37,7 @@ class TestFunctionalBER:
         ],
     )
     def test_knn_lower_bound_2_classes(self, value, classes, k, expected):
-        result = _knn_lowerbound(value, classes, k)
+        result = knn_lowerbound(value, classes, k)
         assert result == expected
 
 

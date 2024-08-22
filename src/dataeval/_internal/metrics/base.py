@@ -6,17 +6,6 @@ TMethods = TypeVar("TMethods")
 TCallable = TypeVar("TCallable", bound=Callable)
 
 
-class MetricMixin(ABC, Generic[TOutput]):
-    @abstractmethod
-    def update(self, *args, **kwargs): ...
-
-    @abstractmethod
-    def compute(self) -> TOutput: ...
-
-    @abstractmethod
-    def reset(self): ...
-
-
 class EvaluateMixin(ABC, Generic[TOutput]):
     @abstractmethod
     def evaluate(self, *args, **kwargs) -> TOutput:

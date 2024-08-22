@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from enum import Flag
 from typing import Any, Callable, Dict, Generic, Iterable, List, Optional, Sequence, TypeVar, Union
 
@@ -5,10 +6,10 @@ import numpy as np
 from scipy.stats import entropy, kurtosis, skew
 
 from dataeval._internal.flags import ImageHash, ImageProperty, ImageStatistics, ImageStatsFlags, ImageVisuals
-from dataeval._internal.functional.hash import pchash, xxhash
-from dataeval._internal.functional.utils import edge_filter, get_bitdepth, normalize_image_shape, rescale
 from dataeval._internal.interop import ArrayLike, to_numpy_iter
-from dataeval._internal.metrics.base import EvaluateMixin, MetricMixin
+from dataeval._internal.metrics.base import EvaluateMixin
+from dataeval._internal.metrics.functional import pchash, xxhash
+from dataeval._internal.metrics.utils import edge_filter, get_bitdepth, normalize_image_shape, rescale
 
 QUARTILES = (0, 25, 50, 75, 100)
 
@@ -16,11 +17,12 @@ TBatch = TypeVar("TBatch", bound=Sequence[ArrayLike])
 TFlag = TypeVar("TFlag", bound=Flag)
 
 
-class BaseStatsMetric(EvaluateMixin, MetricMixin, Generic[TBatch, TFlag]):
+class BaseStatsMetric(EvaluateMixin, Generic[TBatch, TFlag]):
     def __init__(self, flags: TFlag):
         self.flags = flags
         self.results = []
 
+    @abstractmethod
     def update(self, images: TBatch) -> None:
         """
         Updates internal metric cache for later calculation

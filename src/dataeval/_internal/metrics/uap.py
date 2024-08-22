@@ -6,9 +6,9 @@ average precision using empirical mean precision
 
 from typing import Dict
 
-from dataeval._internal.functional.uap import uap
 from dataeval._internal.interop import ArrayLike, to_numpy
 from dataeval._internal.metrics.base import EvaluateMixin
+from dataeval._internal.metrics.functional import uap
 
 
 class UAP(EvaluateMixin):

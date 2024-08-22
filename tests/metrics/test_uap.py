@@ -1,6 +1,6 @@
 import numpy as np
 
-from dataeval._internal.functional.uap import uap
+from dataeval._internal.metrics.functional import uap
 from dataeval.metrics import UAP
 
 
