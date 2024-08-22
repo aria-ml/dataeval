@@ -17,17 +17,12 @@ _FUNCTION = Callable[[np.ndarray, np.ndarray], int]
 
 class Divergence(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
     """
-    Calculates the estimated divergence between two datasets
+    Calculates the estimated HP divergence between two datasets
 
     Parameters
     ----------
     method : Literal["MST, "FNN"], default "MST"
         Method used to estimate dataset divergence
-
-    See Also
-    --------
-        For more information about this divergence, its formal definition,
-        and its associated estimators see https://arxiv.org/abs/1412.6534.
 
     Warning
     -------
@@ -37,6 +32,21 @@ class Divergence(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
         Source of slowdown:
         conversion to and from CSR format adds ~10% of the time diff between
         1nn and scipy mst function the remaining 90%
+
+    References
+    ----------
+    For more information about this divergence, its formal definition,
+    and its associated estimators see https://arxiv.org/abs/1412.6534.
+
+    Examples
+    --------
+    Initialize the Divergence class:
+
+    >>> divert = Divergence()
+
+    Specify the method:
+
+    >>> divert = Divergence(method="FNN")
     """
 
     def __init__(self, method: _METHODS = "MST") -> None:
@@ -52,18 +62,32 @@ class Divergence(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
 
         Parameters
         ----------
-        data_a : ArrayLike
-            Array of images or image embeddings to compare
-        data_b : ArrayLike
-            Array of images or image embeddings to compare
+        data_a : ArrayLike, shape - (N, P)
+            A dataset in an ArrayLike format to compare.
+            Function expects the data to have 2 dimensions, N number of observations in a P-dimesionial space.
+        data_b : ArrayLike, shape - (N, P)
+            A dataset in an ArrayLike format to compare.
+            Function expects the data to have 2 dimensions, N number of observations in a P-dimesionial space.
 
         Returns
         -------
         Dict[str, Any]
-            dp : float
+            divergence : float
                 divergence value between 0.0 and 1.0
-            errors : int
-                the number of differing edges
+            error : int
+                the number of differing edges between the datasets
+
+        Notes
+        -----
+        The divergence value indicates how similar the 2 datasets are
+        with 0 indicating approximately identical data distributions.
+
+        Examples
+        --------
+        Evaluate the datasets:
+
+        >>> divert.evaluate(datasetA, datasetB)
+        {'divergence': 0.28, 'error': 36.0}
         """
         a = to_numpy(data_a)
         b = to_numpy(data_b)
