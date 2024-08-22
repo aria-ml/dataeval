@@ -509,11 +509,11 @@ class TestClusterDuplicates:
 
         results = cl.evaluate()
         duplicates = results["duplicates"]
-        near_duplicates = results["near_duplicates"]
+        potential_duplicates = results["potential_duplicates"]
 
         # Only 1 set (all dupes) in list of sets
         assert len(duplicates[0]) == len(duplicate_data)
-        assert near_duplicates == []
+        assert potential_duplicates == []
 
     def test_no_duplicates(self):
         """`Clusterer` finds no duplicates during evaluate"""
@@ -521,7 +521,7 @@ class TestClusterDuplicates:
         c = Clusterer(data)
         results = c.evaluate()
         assert not len(results["duplicates"])
-        assert not len(results["near_duplicates"])
+        assert not len(results["potential_duplicates"])
 
 
 class TestClustererGetLastMergeLevels:
@@ -590,7 +590,7 @@ class TestClustererEvaluate:
         assert results["outliers"] == [4, 6, 11, 21, 38, 71]
         assert results["potential_outliers"] == [1, 9, 42, 43, 48]
         assert results["duplicates"] == [[24, 79], [58, 63]]
-        assert results["near_duplicates"] == [
+        assert results["potential_duplicates"] == [
             [8, 27, 29],
             [10, 65],
             [16, 99],
