@@ -1,3 +1,4 @@
+import warnings
 from typing import Dict, List
 
 import numpy as np
@@ -7,25 +8,6 @@ from sklearn.feature_selection import mutual_info_classif, mutual_info_regressio
 from torchmetrics import Metric
 
 from dataeval._internal.functional.metadata import _entropy, _get_counts, _get_num_bins, _infer_categorical
-
-
-def validate_dict(d: Dict) -> None:
-    """
-    Verify that dict-of-arrays (proxy for dataframe) contains arrays of equal
-    length.  Future iterations could include type checking, conversion from
-    string to numeric types, etc.
-
-    Parameters
-    ----------
-    d: Dict
-        dictionary of {variable_name: values}
-    """
-    # assert that length of all arrays are equal -- could expand to other properties
-    lengths = []
-    for arr in d.values():
-        lengths.append(arr.shape)
-    if lengths[1:] != lengths[:-1]:
-        raise ValueError("Lengths of all arrays in the dictionary must be equal")
 
 
 def str_to_int(d: Dict) -> Dict:
@@ -104,12 +86,12 @@ class BaseBiasMetric(Metric):
         self.num_factors = 0
         self.num_samples = 0
 
-    def update(self, class_label: ArrayLike, metadata: Dict):
+    def update(self, class_label: ArrayLike, metadata: List[Dict]):
         self.metadata.extend(metadata)
         self.class_label.append(class_label)
 
     def _collect_data(self):
-        metadata_dict = {"class_label": torch.cat(self.class_label).numpy()}
+        metadata_dict = {"class_label": np.concatenate(self.class_label).astype(int)}
         metadata_dict = {**metadata_dict, **list_to_dict(self.metadata)}
 
         # convert string variables to int
@@ -119,11 +101,39 @@ class BaseBiasMetric(Metric):
 
         self.is_categorical = [_infer_categorical(metadata_dict[var], 0.25)[0] for var in self.names]
 
+        # class_label is also in self.names
         self.num_factors = len(self.names)
         self.num_samples = len(self.metadata)
 
 
-class Balance(BaseBiasMetric):
+class BaseBalanceMetric(BaseBiasMetric):
+    """
+    Base class for balance (mutual information) metrics.  Contains input
+    validation for balance metrics.
+    """
+
+    def __init__(self, num_neighbors: int):
+        super().__init__()
+        if not isinstance(num_neighbors, (int, float)):
+            raise TypeError(
+                f"Variable {num_neighbors} is not real-valued numeric type."
+                "num_neighbors should be an int, greater than 0 and less than"
+                "the number of samples in the dataset"
+            )
+        if num_neighbors < 1:
+            raise ValueError(
+                f"Invalid value for {num_neighbors}."
+                "Choose a value greater than 0 and less than number of samples"
+                "in the dataset."
+            )
+        if isinstance(num_neighbors, float):
+            num_neighbors = int(num_neighbors)
+            warnings.warn(f"Variable {num_neighbors} is currently type float and will be truncated to type int.")
+
+        self.num_neighbors = num_neighbors
+
+
+class Balance(BaseBalanceMetric):
     """
     Metadata balance measures distributional correlation between metadata
     factors and class label to identify opportunities for shortcut learning or
@@ -165,8 +175,7 @@ class Balance(BaseBiasMetric):
     """
 
     def __init__(self, num_neighbors: int = 5):
-        super().__init__()
-        self.num_neighbors = num_neighbors
+        super().__init__(num_neighbors=num_neighbors)
 
     def compute(self) -> NDArray:
         """
@@ -222,7 +231,7 @@ class Balance(BaseBiasMetric):
         return nmi
 
 
-class BalanceClasswise(BaseBiasMetric):
+class BalanceClasswise(BaseBalanceMetric):
     """
     Computes mutual information (analogous to correlation) between metadata
         factors (class label, metadata, label/image properties) with individual
@@ -253,8 +262,7 @@ class BalanceClasswise(BaseBiasMetric):
     """
 
     def __init__(self, num_neighbors: int = 5):
-        super().__init__()
-        self.num_neighbors = num_neighbors
+        super().__init__(num_neighbors)
 
     def compute(self) -> NDArray:
         """
@@ -355,7 +363,7 @@ class BaseDiversityMetric(BaseBiasMetric):
         Number of samples in the dataset
     """
 
-    def __init__(self, metric: str = "simpson"):
+    def __init__(self, metric: str):
         super().__init__()
         allowed_metrics = ["simpson", "shannon"]
         if metric.lower() not in allowed_metrics:
