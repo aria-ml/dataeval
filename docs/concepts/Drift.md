@@ -1,13 +1,10 @@
 # Detecting Drift in Datasets
-% Includes Drift and Divergence
 
 ## What is it
 
 ## When to use it
 
 The `dataeval.metrics.drift` detector classes should be used when you would like to measure new data for operational drift.
-
-The `Divergence` class should be used when you would like to know how far two datasets are diverged for one another. For example, if you would like to measure operational drift.
 
 ## Theory behind it
 
