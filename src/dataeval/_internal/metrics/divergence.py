@@ -7,9 +7,9 @@ from typing import Any, Callable, Dict, Literal
 
 import numpy as np
 
-from dataeval._internal.functional.divergence import divergence_fnn, divergence_mst
 from dataeval._internal.interop import ArrayLike, to_numpy
 from dataeval._internal.metrics.base import EvaluateMixin, MethodsMixin
+from dataeval._internal.metrics.functional import divergence_fnn, divergence_mst
 
 _METHODS = Literal["MST", "FNN"]
 _FUNCTION = Callable[[np.ndarray, np.ndarray], int]

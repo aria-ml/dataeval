@@ -11,9 +11,9 @@ from typing import Callable, Dict, Literal, Tuple
 
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval._internal.functional.ber import ber_knn, ber_mst
 from dataeval._internal.interop import to_numpy
 from dataeval._internal.metrics.base import EvaluateMixin, MethodsMixin
+from dataeval._internal.metrics.functional import ber_knn, ber_mst
 
 _METHODS = Literal["KNN", "MST"]
 _FUNCTION = Callable[[NDArray, NDArray, int], Tuple[float, float]]

@@ -7,7 +7,7 @@ from numpy.typing import ArrayLike, NDArray
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 from torchmetrics import Metric
 
-from dataeval._internal.functional.metadata import _entropy, _get_counts, _get_num_bins, _infer_categorical
+from dataeval._internal.metrics.functional import entropy, get_counts, get_num_bins, infer_categorical
 
 
 def str_to_int(d: Dict) -> Dict:
@@ -99,7 +99,7 @@ class BaseBiasMetric(Metric):
         self.data = np.stack(list(metadata_dict.values()), axis=-1)
         self.names = list(metadata_dict.keys())
 
-        self.is_categorical = [_infer_categorical(metadata_dict[var], 0.25)[0] for var in self.names]
+        self.is_categorical = [infer_categorical(metadata_dict[var], 0.25)[0] for var in self.names]
 
         # class_label is also in self.names
         self.num_factors = len(self.names)
@@ -223,7 +223,7 @@ class Balance(BaseBalanceMetric):
                     n_neighbors=self.num_neighbors,
                 )
 
-        ent_all = _entropy(self.data, self.names, self.is_categorical, normalized=False)
+        ent_all = entropy(self.data, self.names, self.is_categorical, normalized=False)
         norm_factor = 0.5 * np.add.outer(ent_all, ent_all) + 1e-6
         # in principle MI should be symmetric, but it is not in practice.
         nmi = 0.5 * (mi + mi.T) / norm_factor
@@ -327,7 +327,7 @@ class BalanceClasswise(BaseBalanceMetric):
             )
 
         # let this recompute for all features including class label
-        ent_all = _entropy(self.data, self.names, self.is_categorical)
+        ent_all = entropy(self.data, self.names, self.is_categorical)
         ent_tgt = ent_all[class_idx]
         ent_all = np.concatenate((ent_all[:class_idx], ent_all[(class_idx + 1) :]), axis=0)
         norm_factor = 0.5 * np.add.outer(ent_tgt, ent_all) + 1e-6
@@ -406,9 +406,9 @@ class BaseDiversityMetric(BaseBiasMetric):
         """
 
         # hist_counts,_ = _get_counts(subset_mask)
-        hist_counts, _ = _get_counts(self.data, self.names, self.is_categorical, subset_mask)
+        hist_counts, _ = get_counts(self.data, self.names, self.is_categorical, subset_mask)
         # normalize by global counts, not classwise counts
-        num_bins = _get_num_bins(self.data, self.names, self.is_categorical)
+        num_bins = get_num_bins(self.data, self.names, self.is_categorical)
 
         ev_index = np.empty(self.num_factors)
         # loop over columns for convenience
@@ -451,11 +451,11 @@ class BaseDiversityMetric(BaseBiasMetric):
         """
 
         # entropy computed using global auto bins so that we can properly normalize
-        ent_unnormalized = _entropy(
+        ent_unnormalized = entropy(
             self.data, self.names, self.is_categorical, normalized=False, subset_mask=subset_mask
         )
         # normalize by global counts rather than classwise counts
-        num_bins = _get_num_bins(self.data, self.names, is_categorical=self.is_categorical, subset_mask=subset_mask)
+        num_bins = get_num_bins(self.data, self.names, is_categorical=self.is_categorical, subset_mask=subset_mask)
         return ent_unnormalized / np.log(num_bins)
 
 
