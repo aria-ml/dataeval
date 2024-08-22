@@ -1,8 +1,9 @@
 from typing import Tuple
 
-import maite.protocols.image_classification as ic
 import numpy as np
 import torch
+
+import maite.protocols.image_classification as ic
 from maite.protocols import ArrayLike
 
 
