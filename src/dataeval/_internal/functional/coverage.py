@@ -15,16 +15,16 @@ def coverage(
     Perform a one-way chi-squared test between observation frequencies and expected frequencies that
     tests the null hypothesis that the observed data has the expected frequencies.
 
-    This implementation is based on https://dl.acm.org/doi/abs/10.1145/3448016.3457315.
-
     Parameters
     ----------
-    embeddings : np.ndarray
-        n x p array of image embeddings from the dataset.
+    embeddings : ArrayLike, shape - (N, P)
+        A dataset in an ArrayLike format.
+        Function expects the data to have 2 dimensions, N number of observations in a P-dimesionial space.
     radius_type : Literal["adaptive", "naive"], default "adaptive"
         The function used to determine radius.
     k: int, default 20
         Number of observations required in order to be covered.
+        [1] suggests that a minimum of 20-50 samples is necessary.
     percent: np.float64, default np.float(0.01)
         Percent of observations to be considered uncovered. Only applies to adaptive radius.
 
@@ -47,6 +47,11 @@ def coverage(
     Note
     ----
     Embeddings should be on the unit interval.
+
+    Reference
+    ---------
+    This implementation is based on https://dl.acm.org/doi/abs/10.1145/3448016.3457315.
+    [1] Seymour Sudman. 1976. Applied sampling. Academic Press New York (1976).
     """
 
     # Calculate distance matrix, look at the (k+1)th farthest neighbor for each image.
