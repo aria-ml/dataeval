@@ -1,6 +1,26 @@
-[//]: # (cd59debbfff26ecaa60e992ef0798a16dceb6c60)
+[//]: # (b425469129990049ac25fac3a75cae419e31e5c0)
 
 # DataEval Change Log
+
+## v0.63.0
+
+🛠️ **Improvements and Enhancements**
+- `3225cf18` - Convert remaining metrics and detectors to ArrayLike
+- `3225cf18` - Convert remaining metrics and detectors to ArrayLike
+- `3225cf18` - Convert remaining metrics and detectors to ArrayLike
+- `3225cf18` - Convert remaining metrics and detectors to ArrayLike
+- `5d88b82a` - Add Torch and Tensorflow interop through ArrayLike protocol and to_numpy converter
+- `5d88b82a` - Add Torch and Tensorflow interop through ArrayLike protocol and to_numpy converter
+- `5d88b82a` - Add Torch and Tensorflow interop through ArrayLike protocol and to_numpy converter
+- `5d88b82a` - Add Torch and Tensorflow interop through ArrayLike protocol and to_numpy converter
+- `d3342275` - Refactor linter and duplicates to call evaluate with data
+- `d3342275` - Refactor linter and duplicates to call evaluate with data
+- `d3342275` - Refactor linter and duplicates to call evaluate with data
+- `d3342275` - Refactor linter and duplicates to call evaluate with data
+- `65d5aaa8` - Refactor metrics to call evaluate with data
+- `65d5aaa8` - Refactor metrics to call evaluate with data
+- `65d5aaa8` - Refactor metrics to call evaluate with data
+- `65d5aaa8` - Refactor metrics to call evaluate with data
 
 ## v0.61.0
 
