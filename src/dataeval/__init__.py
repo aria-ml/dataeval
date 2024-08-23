@@ -7,9 +7,9 @@ __version__ = "0.0.0"
 __all__ = ["detectors", "flags", "metrics"]
 
 if find_spec("torch") is not None:  # pragma: no cover
-    from . import models, workflows
+    from . import models, utils, workflows
 
-    __all__ += ["models", "workflows"]
+    __all__ += ["models", "utils", "workflows"]
 elif find_spec("tensorflow") is not None:  # pragma: no cover
     from . import models
 
