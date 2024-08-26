@@ -1,15 +1,9 @@
-from typing import Callable, Dict, List, Tuple
+from typing import List, Tuple
 
 from numpy.typing import ArrayLike
 from torch.utils.data import Dataset
 
 from dataeval._internal.interop import is_arraylike
-
-
-def get_method(method_map: Dict[str, Callable], method: str) -> Callable:
-    if method not in method_map:
-        raise ValueError(f"Specified method {method} is not a valid method: {method_map}.")
-    return method_map[method]
 
 
 def _validate_getitem(dataset: Dataset, min_length: int):

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, NamedTuple, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Literal, NamedTuple, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import xxhash as xxh
@@ -16,6 +16,12 @@ EDGE_KERNEL = np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]], dtype=np.int8)
 BIT_DEPTH = (1, 8, 12, 16, 32)
 HASH_SIZE = 8
 MAX_FACTOR = 4
+
+
+def get_method(method_map: Dict[str, Callable], method: str) -> Callable:
+    if method not in method_map:
+        raise ValueError(f"Specified method {method} is not a valid method: {method_map}.")
+    return method_map[method]
 
 
 def get_counts(
@@ -248,7 +254,7 @@ def compute_neighbors(
 
     See Also
     --------
-    :func:`sklearn.neighbors.NearestNeighbors`
+    sklearn.neighbors.NearestNeighbors
     """
 
     nbrs = NearestNeighbors(n_neighbors=k + 1, algorithm=algorithm).fit(B)

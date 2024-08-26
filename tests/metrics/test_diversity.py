@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval._internal.metrics.diversity import diversity, diversity_classwise
+from dataeval.metrics import diversity, diversity_classwise
 
 num_samples = 20
 vals = ["a", "b"]
