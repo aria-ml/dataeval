@@ -1,21 +1,27 @@
 from typing import Tuple
 
 import numpy as np
+from numpy.typing import NDArray
 from scipy.sparse import coo_matrix
 from scipy.stats import mode
 
 from dataeval._internal.functional.utils import compute_neighbors, get_classes_counts, minimum_spanning_tree
 
 
-def ber_mst(X: np.ndarray, y: np.ndarray, _: int) -> Tuple[float, float]:
+def ber_mst(X: NDArray, y: NDArray, _: int) -> Tuple[float, float]:
     """Calculates the Bayes Error Rate using a minimum spanning tree
 
     Parameters
     ----------
-    X : np.ndarray (N, :)
-        Data points with arbitrary dimensionality
-    y : np.ndarray (N, 1)
-        Labels for each data point
+    X : NDArray, shape - (N, ... )
+        n_samples containing n_features
+    y : NDArray, shape - (N, 1)
+        Labels corresponding to each sample
+
+    Returns
+    -------
+    Tuple[float, float]
+        The upper and lower bounds of the bayes error rate
     """
 
     M, N = get_classes_counts(y)
@@ -28,8 +34,21 @@ def ber_mst(X: np.ndarray, y: np.ndarray, _: int) -> Tuple[float, float]:
     return upper, lower
 
 
-def ber_knn(X: np.ndarray, y: np.ndarray, k: int) -> Tuple[float, float]:
-    """Calculates the Bayes Error Rate using K-nearest neighbors"""
+def ber_knn(X: NDArray, y: NDArray, k: int) -> Tuple[float, float]:
+    """Calculates the Bayes Error Rate using K-nearest neighbors
+
+    Parameters
+    ----------
+    X : NDArray, shape - (N, ... )
+        n_samples containing n_features
+    y : NDArray, shape - (N, 1)
+        Labels corresponding to each sample
+
+    Returns
+    -------
+    Tuple[float, float]
+        The upper and lower bounds of the bayes error rate
+    """
 
     M, N = get_classes_counts(y)
 
