@@ -10,9 +10,10 @@ from typing import Callable
 
 import keras
 import numpy as np
+from numpy.typing import ArrayLike
 
 from dataeval._internal.detectors.ood.base import OODGMMBase, OODScore
-from dataeval._internal.interop import ArrayLike, to_numpy
+from dataeval._internal.interop import to_numpy
 from dataeval._internal.models.tensorflow.autoencoder import VAEGMM
 from dataeval._internal.models.tensorflow.gmm import gmm_energy
 from dataeval._internal.models.tensorflow.losses import Elbo, LossGMM

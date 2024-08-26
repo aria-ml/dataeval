@@ -1,10 +1,11 @@
 from typing import Dict, Iterable, List, NamedTuple, Tuple, Union, cast
 
 import numpy as np
+from numpy.typing import ArrayLike
 from scipy.cluster.hierarchy import linkage
 from scipy.spatial.distance import pdist, squareform
 
-from dataeval._internal.interop import ArrayLike, to_numpy
+from dataeval._internal.interop import to_numpy
 
 
 def extend_linkage(link_arr: np.ndarray) -> np.ndarray:

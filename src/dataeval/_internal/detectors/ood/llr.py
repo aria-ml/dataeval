@@ -14,9 +14,10 @@ import numpy as np
 import tensorflow as tf
 from keras.layers import Input
 from keras.models import Model
+from numpy.typing import ArrayLike
 
 from dataeval._internal.detectors.ood.base import OODBase, OODScore
-from dataeval._internal.interop import ArrayLike, to_numpy
+from dataeval._internal.interop import to_numpy
 from dataeval._internal.models.tensorflow.pixelcnn import PixelCNN
 from dataeval._internal.models.tensorflow.trainer import trainer
 from dataeval._internal.models.tensorflow.utils import predict_batch
@@ -180,7 +181,7 @@ class OOD_LLR(OODBase):
 
         # create background data
         mutate_fn = partial(mutate_fn, **mutate_fn_kwargs)
-        X_back = predict_batch(x_ref, mutate_fn, batch_size=mutate_batch_size, dtype=x_ref.dtype)
+        X_back = predict_batch(x_ref, mutate_fn, batch_size=mutate_batch_size, dtype=x_ref.dtype)  # type: ignore
 
         # prepare sequential data
         if self.sequential and not self.has_log_prob:

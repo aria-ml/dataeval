@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.metrics import Divergence
+from dataeval.metrics import divergence
 
 np.random.seed(0)
 
@@ -28,6 +28,5 @@ class TestDivergence:
         odd = covariates[rev_inds, :, :]
         even = even.reshape((even.shape[0], -1))
         odd = odd.reshape((odd.shape[0], -1))
-        metric = Divergence(method)
-        result = metric.evaluate(even, odd)
+        result = divergence(even, odd, method)
         assert result == output

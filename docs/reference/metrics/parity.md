@@ -9,14 +9,13 @@
 
 ## How-To Guides
 
-Check out this **how to** to begin using the `Parity` class
+Check out this **how to** to begin using the `parity` metric.
 
 {doc}`Class Label Analysis Tutorial<../../how_to/notebooks/ClassLabelAnalysisTutorial>`
 
 ## DataEval API
 
 ```{eval-rst}
-.. autoclass:: dataeval.metrics.Parity
-   :members:
-   :inherited-members:
+.. autofunction:: dataeval.metrics.parity
+.. autofunction:: dataeval.metrics.parity_metadata
 ```

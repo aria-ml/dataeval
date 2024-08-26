@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval._internal.metrics.diversity import Diversity, DiversityClasswise
+from dataeval._internal.metrics.diversity import diversity, diversity_classwise
 
 num_samples = 20
 vals = ["a", "b"]
@@ -11,19 +11,15 @@ metadata = [
 class_labels = [np.random.randint(low=0, high=2) for _ in range(num_samples)]
 
 
-@pytest.mark.parametrize("div_class", [Diversity, DiversityClasswise])
+@pytest.mark.parametrize("div_fn", [diversity, diversity_classwise])
 class TestDiversityUnit:
     @pytest.mark.parametrize("met", ["Simpson", "ShANnOn"])
-    def test_invalid_method(self, div_class, met):
-        with pytest.raises(KeyError):
-            div_class(method=met)  # type: ignore
+    def test_invalid_method(self, div_fn, met):
+        with pytest.raises(ValueError):
+            div_fn([], [], method=met)  # type: ignore
 
     @pytest.mark.parametrize("met", ["simpson", "shannon"])
-    def test_valid_method(self, div_class, met):
-        div_class(method=met)
-
-    @pytest.mark.parametrize("met", ["simpson", "shannon"])
-    def test_range_of_values(self, div_class, met):
-        div = div_class(method=met).evaluate(class_labels, metadata)
+    def test_range_of_values(self, div_fn, met):
+        div = div_fn(class_labels, metadata, method=met)
         assert div.dtype == float
         assert np.logical_and(div >= 0, div <= 1).all()

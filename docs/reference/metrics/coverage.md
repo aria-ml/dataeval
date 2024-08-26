@@ -10,7 +10,5 @@ embeddings, _ = dsets.make_blobs(n_samples=50, centers=[(1,1)], cluster_std=0.5,
 ```
 
 ```{eval-rst}
-.. autoclass:: dataeval.metrics.Coverage
-   :members:
-   :inherited-members:
+.. autofunction:: dataeval.metrics.coverage
 ```
