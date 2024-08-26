@@ -15,8 +15,7 @@ from scipy.sparse import coo_matrix
 from scipy.stats import mode
 
 from dataeval._internal.interop import to_numpy
-from dataeval._internal.metrics.utils import compute_neighbors, get_classes_counts, minimum_spanning_tree
-from dataeval._internal.utils import get_method
+from dataeval._internal.metrics.utils import compute_neighbors, get_classes_counts, get_method, minimum_spanning_tree
 
 
 def ber_mst(X: NDArray, y: NDArray) -> Tuple[float, float]:

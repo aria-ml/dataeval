@@ -9,11 +9,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 from dataeval._internal.interop import to_numpy
-from dataeval._internal.metrics.utils import (
-    compute_neighbors,
-    minimum_spanning_tree,
-)
-from dataeval._internal.utils import get_method
+from dataeval._internal.metrics.utils import compute_neighbors, get_method, minimum_spanning_tree
 
 
 def divergence_mst(data: np.ndarray, labels: np.ndarray) -> int:

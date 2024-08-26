@@ -57,9 +57,9 @@ def balance(class_labels: Sequence[int], metadata: List[Dict], num_neighbors: in
 
     See Also
     --------
-    `sklearn.feature_selection.mutual_info_classif`
-    `sklearn.feature_selection.mutual_info_regression`
-    `sklearn.metrics.mutual_info_score`
+    sklearn.feature_selection.mutual_info_classif
+    sklearn.feature_selection.mutual_info_regression
+    sklearn.metrics.mutual_info_score
     """
     num_neighbors = validate_num_neighbors(num_neighbors)
     data, names, is_categorical = preprocess_metadata(class_labels, metadata)
@@ -125,10 +125,10 @@ def balance_classwise(class_labels: Sequence[int], metadata: List[Dict], num_nei
 
     See Also
     --------
-    `sklearn.feature_selection.mutual_info_classif`
-    `sklearn.feature_selection.mutual_info_regression`
-    `sklearn.metrics.mutual_info_score`
-    `compute_mutual_information`
+    sklearn.feature_selection.mutual_info_classif
+    sklearn.feature_selection.mutual_info_regression
+    sklearn.metrics.mutual_info_score
+    compute_mutual_information
     """
     num_neighbors = validate_num_neighbors(num_neighbors)
     data, names, is_categorical = preprocess_metadata(class_labels, metadata)

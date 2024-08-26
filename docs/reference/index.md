@@ -86,6 +86,7 @@ metrics/imagestats
 metrics/balance
 metrics/coverage
 metrics/divergence
+metrics/diversity
 metrics/parity
 metrics/ber
 metrics/uap
@@ -115,6 +116,8 @@ then be analyzed in the context of a given problem
     metrics.balance_classwise
     metrics.coverage
     metrics.divergence
+    metrics.diversity
+    metrics.diversity_classwise
     metrics.parity
     metrics.parity_metadata
 ```

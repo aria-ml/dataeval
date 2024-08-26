@@ -3,8 +3,7 @@ from typing import Dict, List, Literal, Optional, Sequence
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval._internal.metrics.utils import entropy, get_counts, get_num_bins, preprocess_metadata
-from dataeval._internal.utils import get_method
+from dataeval._internal.metrics.utils import entropy, get_counts, get_method, get_num_bins, preprocess_metadata
 
 
 def diversity_shannon(
@@ -29,8 +28,7 @@ def diversity_shannon(
 
     Notes
     -----
-    - For continuous variables, histogram bins are chosen automatically.  See
-    numpy.histogram for details.
+    For continuous variables, histogram bins are chosen automatically.  See `numpy.histogram` for details.
 
     Returns
     -------
@@ -129,8 +127,7 @@ def diversity(
 
     Notes
     -----
-    - For continuous variables, histogram bins are chosen automatically.  See
-    numpy.histogram for details.
+    - For continuous variables, histogram bins are chosen automatically. See numpy.histogram for details.
 
     Returns
     -------
@@ -140,7 +137,6 @@ def diversity(
     See Also
     --------
     numpy.histogram
-
     """
     diversity_fn = get_method(DIVERSITY_FN_MAP, method)
     data, names, is_categorical = preprocess_metadata(class_labels, metadata)
@@ -169,12 +165,9 @@ def diversity_classwise(
 
     Notes
     -----
-    For continuous variables, histogram bins are chosen automatically.  See
-        numpy.histogram for details.
-    The expression is undefined for q=1, but it approaches the Shannon entropy
-        in the limit.
-    If there is only one category, the diversity index takes a value of 1 =
-        1/N = 1/1.  Entropy will take a value of 0.
+    - For continuous variables, histogram bins are chosen automatically. See numpy.histogram for details.
+    - The expression is undefined for q=1, but it approaches the Shannon entropy in the limit.
+    - If there is only one category, the diversity index takes a value of 1 = 1/N = 1/1. Entropy will take a value of 0.
 
     Returns
     -------
