@@ -3,7 +3,7 @@ import warnings
 import numpy as np
 import pytest
 
-from dataeval._internal.metrics.parity import MetadataParity, Parity
+from dataeval._internal.metrics.parity import parity, parity_metadata
 
 
 class MockDistributionDataset:
@@ -49,7 +49,7 @@ class TestLabelIndependenceUnit:
 
         with pytest.raises(Exception), warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            Parity().evaluate(labels_expected, labels_observed)
+            parity(labels_expected, labels_observed)
 
     def test_fails_with_unaccounted_for_zero(self):
         f_exp = [1, 0]
@@ -62,7 +62,7 @@ class TestLabelIndependenceUnit:
 
         with pytest.raises(Exception), warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            Parity().evaluate(labels_expected, labels_observed)
+            parity(labels_expected, labels_observed)
 
     def test_warns_with_not_enough_frequency(self):
         f_exp = [1, 1]
@@ -74,7 +74,7 @@ class TestLabelIndependenceUnit:
         labels_observed = MockDistributionDataset(f_obs).labels
 
         with pytest.warns():
-            Parity().evaluate(labels_expected, labels_observed)
+            parity(labels_expected, labels_observed)
 
     def test_warns_with_not_enough_frequency_rescaled_exp(self):
         f_exp = [10, 10000]
@@ -84,7 +84,7 @@ class TestLabelIndependenceUnit:
         labels_observed = MockDistributionDataset(f_obs).labels
 
         with pytest.warns():
-            Parity().evaluate(labels_expected, labels_observed)
+            parity(labels_expected, labels_observed)
 
     def test_passes_with_enough_frequency(self):
         f_exp = [10, 10]
@@ -97,7 +97,7 @@ class TestLabelIndependenceUnit:
 
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            Parity().evaluate(labels_expected, labels_observed)
+            parity(labels_expected, labels_observed)
 
     def test_passes_with_ncls(self):
         f_exp = [1]
@@ -109,7 +109,7 @@ class TestLabelIndependenceUnit:
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            Parity().evaluate(labels_expected, labels_observed, num_classes=2)
+            parity(labels_expected, labels_observed, num_classes=2)
 
     def test_fails_with_empty_exp_dataset(self):
         f_exp = np.array([], dtype=int)
@@ -122,7 +122,7 @@ class TestLabelIndependenceUnit:
 
         with pytest.raises(ValueError), warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            Parity().evaluate(labels_expected, labels_observed)
+            parity(labels_expected, labels_observed)
 
     def test_fails_with_empty_obs_dataset(self):
         f_exp = [0, 1]
@@ -135,7 +135,7 @@ class TestLabelIndependenceUnit:
 
         with pytest.raises(ValueError), warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            Parity().evaluate(labels_expected, labels_observed)
+            parity(labels_expected, labels_observed)
 
 
 class TestLabelIndependenceFunctional:
@@ -152,7 +152,7 @@ class TestLabelIndependenceFunctional:
         labels_expected = MockDistributionDataset(f_exp).labels
         labels_observed = MockDistributionDataset(f_obs).labels
 
-        chisquared, p = Parity().evaluate(labels_expected, labels_observed)
+        chisquared, p = parity(labels_expected, labels_observed)
 
         assert np.isclose(chisquared, 228.23515947653874)
         assert np.isclose(p, 3.3295585338846486e-49)
@@ -169,7 +169,7 @@ class TestLabelIndependenceFunctional:
         labels_expected = MockDistributionDataset(f_exp).labels
         labels_observed = MockDistributionDataset(f_obs).labels
 
-        chisquared, p = Parity().evaluate(labels_expected, labels_observed)
+        chisquared, p = parity(labels_expected, labels_observed)
 
         assert np.isclose(chisquared, 0)
         assert np.isclose(p, 1)
@@ -191,7 +191,7 @@ class TestMDParityUnit:
         }
 
         with pytest.warns():
-            MetadataParity().evaluate(factors)
+            parity_metadata(factors)
 
     def test_passes_with_enough_frequency(self):
         factors = {
@@ -201,7 +201,7 @@ class TestMDParityUnit:
 
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            MetadataParity().evaluate(factors)
+            parity_metadata(factors)
 
     def test_cant_quantize_strings(self):
         factors = {
@@ -211,7 +211,7 @@ class TestMDParityUnit:
         continuous_bincounts = {"factor1": 2}
 
         with pytest.raises(TypeError):
-            MetadataParity().evaluate(factors, continuous_bincounts)
+            parity_metadata(factors, continuous_bincounts)
 
     def test_bad_factor_ref(self):
         factors = {
@@ -221,7 +221,7 @@ class TestMDParityUnit:
         continuous_bincounts = {"something_else": 2}
 
         with pytest.raises(Exception):
-            MetadataParity().evaluate(factors, continuous_bincounts)
+            parity_metadata(factors, continuous_bincounts)
 
     def test_uneven_factor_lengths(self):
         factors = {
@@ -231,7 +231,7 @@ class TestMDParityUnit:
         }
 
         with pytest.raises(ValueError):
-            MetadataParity().evaluate(factors)
+            parity_metadata(factors)
 
 
 class TestMDParityFunctional:
@@ -246,7 +246,7 @@ class TestMDParityFunctional:
             "factor1": np.concatenate(([10] * 5, [20] * 5)),
         }
 
-        output = MetadataParity().evaluate(factors)
+        output = parity_metadata(factors)
         _, p = output["chi_squares"], output["p_values"]
 
         # Checks that factor1 is highly correlated with class
@@ -262,7 +262,7 @@ class TestMDParityFunctional:
             "factor1": np.array(["foo"] * 10),
         }
 
-        output = MetadataParity().evaluate(factors)
+        output = parity_metadata(factors)
         chi, p = output["chi_squares"], output["p_values"]
 
         # Checks that factor1 is uncorrelated with class
@@ -280,7 +280,7 @@ class TestMDParityFunctional:
         }
         continuous_bincounts = {"factor1": 2}
 
-        output1 = MetadataParity().evaluate(continuous_dataset, continuous_bincounts)
+        output1 = parity_metadata(continuous_dataset, continuous_bincounts)
         chi1, p1 = output1["chi_squares"], output1["p_values"]
 
         discrete_dataset = {
@@ -288,7 +288,7 @@ class TestMDParityFunctional:
             "factor2": np.concatenate(([10] * 5, [20] * 5)),
         }
 
-        output2 = MetadataParity().evaluate(discrete_dataset)
+        output2 = parity_metadata(discrete_dataset)
         chi2, p2 = output2["chi_squares"], output2["p_values"]
 
         # Checks that the test on the quantization continuous_dataset is
@@ -307,7 +307,7 @@ class TestMDParityFunctional:
         }
         continuous_bincounts = {"factor1": 1}
 
-        output = MetadataParity().evaluate(factors, continuous_bincounts)
+        output = parity_metadata(factors, continuous_bincounts)
         chi, p = output["chi_squares"], output["p_values"]
 
         # Checks if factor1 and class are perfectly uncorrelated
@@ -327,4 +327,4 @@ class TestMDParityFunctional:
 
         # Looks for a warning that there are (class,factor1) pairs with too low frequency
         with pytest.warns():
-            MetadataParity().evaluate(factors, continuous_bincounts)
+            parity_metadata(factors, continuous_bincounts)

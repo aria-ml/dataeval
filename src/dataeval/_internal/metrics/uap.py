@@ -6,37 +6,33 @@ average precision using empirical mean precision
 
 from typing import Dict
 
-from dataeval._internal.interop import ArrayLike, to_numpy
-from dataeval._internal.metrics.base import EvaluateMixin
-from dataeval._internal.metrics.functional import uap
+from numpy.typing import ArrayLike
+from sklearn.metrics import average_precision_score
+
+from dataeval._internal.interop import to_numpy
 
 
-class UAP(EvaluateMixin):
+def uap(labels: ArrayLike, scores: ArrayLike) -> Dict[str, float]:
     """
-    FR Test Statistic based estimate of the empirical mean precision
+    FR Test Statistic based estimate of the empirical mean precision for
+    the upperbound average precision
 
+    Parameters
+    ----------
+    labels : ArrayLike
+        A numpy array of n_samples of class labels with M unique classes.
+    scores : ArrayLike
+        A 2D array of class probabilities per image
+
+    Returns
+    -------
+    Dict[str, float]
+        uap : The empirical mean precision estimate
+
+    Raises
+    ------
+    ValueError
+        If unique classes M < 2
     """
 
-    def evaluate(self, labels: ArrayLike, scores: ArrayLike) -> Dict[str, float]:
-        """
-        Estimates the upperbound average precision
-
-        Parameters
-        ----------
-        labels : ArrayLike
-            A numpy array of n_samples of class labels with M unique classes.
-        scores : ArrayLike
-            A 2D array of class probabilities per image
-
-        Returns
-        -------
-        Dict[str, float]
-            uap : The empirical mean precision estimate
-
-        Raises
-        ------
-        ValueError
-            If unique classes M < 2
-        """
-
-        return {"uap": uap(to_numpy(labels), to_numpy(scores))}
+    return {"uap": float(average_precision_score(to_numpy(labels), to_numpy(scores), average="weighted"))}

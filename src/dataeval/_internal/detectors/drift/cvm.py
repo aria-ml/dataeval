@@ -9,9 +9,10 @@ Licensed under Apache Software License (Apache 2.0)
 from typing import Callable, Literal, Optional, Tuple
 
 import numpy as np
+from numpy.typing import ArrayLike
 from scipy.stats import cramervonmises_2samp
 
-from dataeval._internal.interop import ArrayLike, to_numpy
+from dataeval._internal.interop import to_numpy
 
 from .base import BaseUnivariateDrift, UpdateStrategy, preprocess_x
 

@@ -1,9 +1,9 @@
 from typing import Iterable, Literal, Optional, Sequence, Union
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from dataeval._internal.flags import ImageProperty, ImageVisuals, LinterFlags
-from dataeval._internal.interop import ArrayLike
 from dataeval._internal.metrics.stats import ImageStats
 
 

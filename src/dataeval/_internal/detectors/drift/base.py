@@ -11,8 +11,9 @@ from functools import wraps
 from typing import Callable, Dict, Literal, Optional, Tuple, Union
 
 import numpy as np
+from numpy.typing import ArrayLike
 
-from dataeval._internal.interop import ArrayLike, to_numpy
+from dataeval._internal.interop import to_numpy
 
 
 def update_x_ref(fn):

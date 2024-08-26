@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
+from numpy.typing import ArrayLike
 
 from dataeval._internal.detectors.ood.base import OODGMMBase, OODScore
-from dataeval._internal.interop import ArrayLike
 from dataeval._internal.models.tensorflow.autoencoder import AE
 from dataeval._internal.models.tensorflow.utils import create_model
 

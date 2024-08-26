@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from dataeval._internal.interop import ArrayLike
+from dataeval._internal.interop import is_arraylike
 from dataeval._internal.utils import _validate_getitem
 from dataeval.utils import read_dataset
 
@@ -32,8 +32,8 @@ class TestDatasetReader:
 
         assert isinstance(images, list)
         assert isinstance(labels, list)
-        assert isinstance(images[0], ArrayLike)
-        assert isinstance(labels[0], ArrayLike)
+        assert is_arraylike(images[0])
+        assert is_arraylike(labels[0])
         assert len(images) == len(labels) == 10
         assert labels == [np.ones(shape=(1)) for _ in range(10)]
 
@@ -73,7 +73,7 @@ class TestValidateData:
     def test_invalid_type_data_pos_0(self):
         """Tests function raises TypeError when data[0] is not ArrayLike"""
         mock_dataset = MagicMock()
-        mock_dataset.__iter__.return_value = [(i, np.ones((1,))) for i in range(10)]  # type int instead of ArrayLike
+        mock_dataset.__iter__.return_value = [({i: i}, np.ones((1,))) for i in range(10)]  # dict instead of ArrayLike
 
         with pytest.raises(TypeError):
             _validate_getitem(mock_dataset, 2)
@@ -82,7 +82,7 @@ class TestValidateData:
         """Tests function raises TypeError when data[1] is not ArrayLike"""
         mock_dataset = MagicMock()
         mock_dataset.__iter__.return_value = [
-            (np.ones((1, 5, 5)), i) for i in range(10)
+            (np.ones((1, 5, 5)), {i: i}) for i in range(10)
         ]  # type int instead of ArrayLike
 
         with pytest.raises(TypeError):
