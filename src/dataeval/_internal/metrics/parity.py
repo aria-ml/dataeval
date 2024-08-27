@@ -1,5 +1,5 @@
 import warnings
-from typing import Dict, Generic, Mapping, NamedTuple, Optional, Tuple, TypeVar
+from typing import Dict, Mapping, NamedTuple, Optional, Tuple
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -7,21 +7,33 @@ from scipy.stats import chi2_contingency, chisquare
 
 from dataeval._internal.interop import to_numpy
 
-TValue = TypeVar("TValue", np.float64, NDArray[np.float64])
 
-
-class ParityOutput(Generic[TValue], NamedTuple):
+class ParityOutput(NamedTuple):
     """
     Attributes
     ----------
-    score : np.float64 | NDArray[np.float64]
-        chi-squared value(s) of the test
-    p_value : np.float64 | NDArray[np.float64]
-        p-value(s) of the test
+    score : np.float64
+        chi-squared value of the test
+    p_value : np.float64
+        p-value of the test
     """
 
-    score: TValue
-    p_value: TValue
+    score: np.float64
+    p_value: np.float64
+
+
+class ParityMetadataOutput(NamedTuple):
+    """
+    Attributes
+    ----------
+    scores : NDArray[np.float64]
+        chi-squared values of the test
+    p_values : NDArray[np.float64]
+        p-values of the test
+    """
+
+    score: NDArray[np.float64]
+    p_value: NDArray[np.float64]
 
 
 def digitize_factor_bins(continuous_values: np.ndarray, bins: int, factor_name: str):
@@ -165,7 +177,7 @@ def parity(
     expected_labels: ArrayLike,
     observed_labels: ArrayLike,
     num_classes: Optional[int] = None,
-) -> ParityOutput[np.float64]:
+) -> ParityOutput:
     """
     Perform a one-way chi-squared test between observation frequencies and expected frequencies that
     tests the null hypothesis that the observed data has the expected frequencies.
@@ -227,7 +239,7 @@ def parity(
 def parity_metadata(
     data_factors: Mapping[str, ArrayLike],
     continuous_factor_bincounts: Optional[Dict[str, int]] = None,
-) -> ParityOutput[NDArray[np.float64]]:
+) -> ParityMetadataOutput:
     """
     Evaluates the statistical independence of metadata factors from class labels.
     This performs a chi-square test, which provides a score and a p-value for
@@ -294,4 +306,4 @@ def parity_metadata(
         chi_scores[i] = chi2
         p_values[i] = p
 
-    return ParityOutput(chi_scores, p_values)
+    return ParityMetadataOutput(chi_scores, p_values)
