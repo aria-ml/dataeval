@@ -5,7 +5,7 @@ from enum import IntEnum
 from os import path, remove, walk
 from re import MULTILINE, compile
 from shutil import move, rmtree
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from gitlab import Gitlab
 from rest import verbose
@@ -54,13 +54,13 @@ def _get_version_tuple(version: str) -> Optional[Tuple[int, int, int]]:
 
 
 class _Category(IntEnum):
-    TAG = 0
-    UNKNOWN = 1
+    MAJOR = 0
+    FEATURE = 1
     IMPROVEMENT = 2
-    FIX = 3
-    FEATURE = 4
-    DEPRECATION = 5
-    MAJOR = 6
+    DEPRECATION = 3
+    FIX = 4
+    UNKNOWN = 5
+    TAG = 6
 
     @classmethod
     def from_label(cls, value: str) -> "_Category":
@@ -91,26 +91,31 @@ class _Category(IntEnum):
         else:
             return "📝 **Miscellaneous**"
 
+    @classmethod
+    def as_version_type(cls, value: "_Category") -> Literal["MAJOR", "MINOR", "PATCH"]:
+        match value:
+            case _Category.FEATURE | _Category.DEPRECATION:
+                return "MINOR"
+            case _Category.MAJOR:
+                return "MAJOR"
+        return "PATCH"
+
 
 class _Tag:
-    def __init__(
-        self,
-        response: Optional[Dict[str, Any]] = None,
-        pending_version: Optional[Tuple[str, str]] = None,
-    ):
+    def __init__(self, response: Optional[Dict[str, Any]] = None, pending: Optional[bool] = None):
         if response is not None:
             time = response["commit"]["committed_date"]
             self.time: datetime = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S.%f%z")
             self.hash: str = response["commit"]["id"]
             self.shorthash: str = response["commit"]["short_id"]
             self.description: str = response["name"]
-        elif pending_version is not None:
+        elif pending:
             self.time: datetime = datetime.now(UTC)
-            self.hash: str = pending_version[1]
-            self.shorthash: str = pending_version[1][0:8]
-            self.description: str = pending_version[0]
+            self.hash: str = "pending"
+            self.shorthash: str = "pending"
+            self.description: str = "pending"
         else:
-            raise ValueError("Must provide a response or pending version string")
+            raise ValueError("Must provide a response or specify pending")
 
     def to_markdown(self) -> str:
         return f"## {self.description}"
@@ -160,7 +165,7 @@ class _Merge:
         return f"Entry({entry_type}, {self.time}, {self.hash}, {self.description})"
 
 
-class CommitGen:
+class ReleaseGen:
     """
     Generates commit payload for changes for used in the documentation cache
     and changelog updates
@@ -168,7 +173,6 @@ class CommitGen:
 
     def __init__(self, gitlab: Gitlab):
         self.gl = gitlab
-        self._pending = "0.0.0"
 
     def _read_changelog(self) -> List[str]:
         temp = False
@@ -190,16 +194,12 @@ class CommitGen:
 
     def _get_entries(self, last_hash: str) -> Dict[_Tag, Dict[_Category, List[_Merge]]]:
         # get merges in to develop and main and sort
-        merges: List[_Merge] = []
-        for merge in self.gl.list_merge_requests(state="merged", target_branch="main", order_by="merged_at"):
-            merges.append(_Merge(merge))
+        merges: List[_Merge] = [_Merge(m) for m in self.gl.list_merge_requests(state="merged", target_branch="main")]
         merges.sort(reverse=True)
 
         # get version buckets and sort
-        tags: List[_Tag] = []
-        for tag in self.gl.list_tags():
-            if _get_version_tuple(tag["name"]) is not None:
-                tags.append(_Tag(tag))
+        tags: List[_Tag] = [_Tag(pending=True)]
+        tags.extend([_Tag(t) for t in self.gl.list_tags() if _get_version_tuple(t["name"]) is not None])
         tags.sort(reverse=True)
 
         # populate the categorized merge issues
@@ -223,29 +223,22 @@ class CommitGen:
             if merge.hash == last_hash:
                 return categorized
 
-            # drop merges that are not categorized
             merge_log = f"COMMITGEN: {merge.description} @ {merge.hash}"
-            if merge.category != _Category.UNKNOWN:
-                verbose(merge_log + f" - ADDED as {_Category(merge.category).name}")
-                categorized[tag][merge.category].append(merge)
-            else:
-                verbose(merge_log + " - SKIPPED")
+            verbose(merge_log + f" - ADDED as {_Category(merge.category).name}")
+            categorized[tag][merge.category].append(merge)
 
         return categorized
 
-    def _generate_changelog_action(self) -> Dict[str, str]:
+    def _generate_version_and_changelog_action(self) -> Tuple[str, Dict[str, str]]:
         current = self._read_changelog()
         last_hash = self._get_last_hash(current[0]) if current else ""
 
         # Return empty dict if nothing to update
         entries = self._get_entries(last_hash)
         tags = list(entries)
-        vTag = VersionTag(self.gl)
-        # generate the new pending version and set it on VersionTag and locally for use.
-        pending_version = self.get_next_version_type(entries, last_hash, vTag)
-        self._pending = pending_version  # get this value for the new release tag
-        vTag.pending = pending_version
+        vt = VersionTag(self.gl)
         lines: List[str] = []
+        next_category = _Category.UNKNOWN
 
         for tag in tags:
             if tag.hash == last_hash:
@@ -267,9 +260,11 @@ class CommitGen:
                         break
 
                     lines.append(merge.to_markdown())
+                    verbose(f"Adding - {merge.to_markdown()}")
+                    next_category = min(next_category, category)
 
         if not lines:
-            return {}
+            return "", {}
 
         header = [f"[//]: # ({tags[0].hash})", "", "# DataEval Change Log"]
         content = "\n".join(header + lines) + "\n"
@@ -277,7 +272,12 @@ class CommitGen:
         for oldline in current[3:]:
             content += oldline
 
-        return {"action": "update", "file_path": CHANGELOG_FILE, "encoding": "text", "content": content}
+        return vt.next(_Category.as_version_type(next_category)), {
+            "action": "update",
+            "file_path": CHANGELOG_FILE,
+            "encoding": "text",
+            "content": content,
+        }
 
     def _is_binary_file(self, file: str) -> bool:
         try:
@@ -353,44 +353,11 @@ class CommitGen:
         actions = self._generate_actions(old_files, self._get_files(cache_path))
         return actions
 
-    def generate(self) -> List[Dict[str, str]]:
-        changelog_action = self._generate_changelog_action()
+    def generate(self) -> Tuple[str, List[Dict[str, str]]]:
+        version, changelog_action = self._generate_version_and_changelog_action()
         if not changelog_action:
-            return []
+            return "", []
 
         actions = self._generate_jupyter_cache_actions()
         actions.append(changelog_action)
-        return actions
-
-    def get_next_version_type(self, entries, last_hash, vTag: VersionTag) -> str:
-        # Get the last hash from the repository. Used for getting all the changes since the last release.
-        # create a list of Categories from the entries. Use the largest one for the overall label.
-        tags = list(entries)  # convert to a list
-        # loop through the list
-        change = _Category.TAG  # 0
-        for tag in tags:
-            if tag.hash == last_hash:  # stop if no changes
-                break
-            if not entries[tag]:  # if no tag skip logic
-                continue
-            categories = sorted(entries[tag])  # sorted by tag
-            for category in categories:
-                if (
-                    category > change
-                ):  # use strictly greater than to limit changes on duplicates. Change types are ordered
-                    change = category
-        match change:
-            case _Category.TAG | _Category.UNKNOWN:  # 0,1
-                version = vTag.current
-            case _Category.FIX | _Category.IMPROVEMENT:  # 2,3
-                version = vTag.next("PATCH")
-            case _Category.FEATURE | _Category.DEPRECATION:  # 4,5
-                version = vTag.next("MINOR")
-            case _Category.MAJOR:  # 6
-                version = vTag.next("MAJOR")
-            case _:
-                verbose(f"Default Case: No Version Change. change is {change}")
-                version = vTag.current  # default is no change
-
-        self._pending_version = version
-        return version
+        return version, actions
