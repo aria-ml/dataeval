@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval._internal.functional.utils import (
+from dataeval._internal.metrics.utils import (
     edge_filter,
     get_bitdepth,
     get_classes_counts,

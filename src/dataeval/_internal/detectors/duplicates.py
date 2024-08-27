@@ -1,7 +1,8 @@
 from typing import Dict, Iterable, List, Literal
 
+from numpy.typing import ArrayLike
+
 from dataeval._internal.flags import ImageHash
-from dataeval._internal.interop import ArrayLike
 from dataeval._internal.metrics.stats import ImageStats
 
 

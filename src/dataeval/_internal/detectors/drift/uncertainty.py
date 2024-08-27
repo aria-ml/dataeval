@@ -10,10 +10,9 @@ from functools import partial
 from typing import Callable, Dict, Literal, Optional, Union
 
 import numpy as np
+from numpy.typing import ArrayLike
 from scipy.special import softmax
 from scipy.stats import entropy
-
-from dataeval._internal.interop import ArrayLike
 
 from .base import UpdateStrategy
 from .ks import DriftKS

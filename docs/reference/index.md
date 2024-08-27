@@ -83,8 +83,10 @@ Metrics
 
 metrics/channelstats
 metrics/imagestats
+metrics/balance
 metrics/coverage
 metrics/divergence
+metrics/diversity
 metrics/parity
 metrics/ber
 metrics/uap
@@ -110,9 +112,14 @@ then be analyzed in the context of a given problem
 ```{eval-rst}
 .. autosummary::
 
-    metrics.Coverage
-    metrics.Divergence
-    metrics.Parity
+    metrics.balance
+    metrics.balance_classwise
+    metrics.coverage
+    metrics.divergence
+    metrics.diversity
+    metrics.diversity_classwise
+    metrics.parity
+    metrics.parity_metadata
 ```
 
 :::
@@ -122,8 +129,8 @@ then be analyzed in the context of a given problem
 ```{eval-rst}
 .. autosummary::
 
-    metrics.BER
-    metrics.UAP
+    metrics.ber
+    metrics.uap
 ```
 
 Flags

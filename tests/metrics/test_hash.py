@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval._internal.functional.hash import pchash, xxhash
+from dataeval._internal.metrics.utils import pchash, xxhash
 
 
 def test_xxhash():

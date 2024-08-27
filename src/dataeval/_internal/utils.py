@@ -1,8 +1,9 @@
 from typing import List, Tuple
 
+from numpy.typing import ArrayLike
 from torch.utils.data import Dataset
 
-from dataeval._internal.interop import ArrayLike
+from dataeval._internal.interop import is_arraylike
 
 
 def _validate_getitem(dataset: Dataset, min_length: int):
@@ -28,7 +29,7 @@ def _validate_getitem(dataset: Dataset, min_length: int):
         raise ValueError(f"Expected length of {min_length} or more in tuple, got {len(data)}")
 
     for i in range(min_length):
-        if not isinstance(data[i], ArrayLike):
+        if not is_arraylike(data[i]):
             raise TypeError(f"Expected ArrayLike in return position {i}, got {type(data[i])}")
 
 
