@@ -1,51 +1,145 @@
 # Cleaning Datasets
-% Includes the Stats classes, the Linter class and the Duplicates class
 
-## What is it
-### Linter
+## What is Data Cleaning?
 
-Linting identifies potential issues (lints) in the data of the type that are typically
-identified and removed during the manual process of cleaning the data.
-The `Linter` class can be used to verify that the data have been cleaned or to help automate the data-cleaning process.
+Data cleaning is the process of detecting and correcting inaccurate, incomplete, or irrelevant data from a dataset.
+This process involves identifying and fixing errors, handling missing values, standardizing data formats, and removing duplicates.
+The goal is to ensure that the data is accurate, consistent, and ready for analysis.
 
-Currently, the `Linter` class identifies issues in two major categories, _image properties_ and _visual quality_.
-Issues detected in the visual quality category include the brightness and blurriness of an image
-as well as images with missing data or high number of zeros (usually really dark images) in the image.
-Issues detected in the image properties category include the width, height, depth and value range of the images.
-Being able to identify and remove images that lie in the extremes in each of these categories
-can help ensure that you have high quality data for training.
+## Why Should You Clean Your Data?
 
-## When to use it
+When training models, the quality of the dataset can greatly impact the usefulness of the model.
+The goal of machine learning and AI is to create robust, reliable, and generalizable models.
+A dataset contributes to the usefulness of a model in the following ways:
 
-The Linting class should be used during the initial EDA process or if you are trying to verify that you have the right data in your dataset.
+1. **Accuracy**:
+Data cleaning improves the accuracy or representation of your dataset.
+Dirty data, which may include incorrect or inconsistent entries, can result in misleading analyses and incorrect conclusions.
 
-The Duplicates class should be used if you need to check for duplicates in your dataset.
+2. **Reliability**:
+Clean data enhances the reliability and reproducibility of your results.
+When data is consistent and free of errors, your analysis is more likely to be replicable and trustworthy.
 
-## Theory behind it
+3. **Efficiency**:
+Clean data allows for more efficient processing and analysis.
+By removing irrelevant or duplicate data, you reduce the computational load and time.
+This can lead to both faster and more targeted improvements as your model is able to focus on the most important information.
 
-There are 3 different methods that the Linter class can use for detecting abnormal images.
+4. **Improved Insights**:
+Data cleaning helps reveal true patterns and relationships within the data.
+With clean data, your insights are more likely to be valid and actionable.
+Explainability is an important concept in the AI world, and having pristine
+data improves the translation of how and why the model works.
 
-- zscore
-- modzscore
-- iqr
+## When Should You Clean Your Data?
 
-The default value used for the Linter class is `modzscore`.
+Data cleaning should be an ongoing process throughout the data lifecycle,
+but there are specific times when it becomes particularly crucial:
 
-The [z score](https://en.wikipedia.org/wiki/Standard_score) method is based on the difference between the data point and the mean of the data.  
-The default threshold value for `zscore` is 3.  
-Z score $= |x_i - \mu| / \sigma$
+1. **During Data Collection**:
+Data collection and entry are key areas to ensure that you have accurate and reliable data.
+Consider implementing data validation techniques through built-in redundancies and multi-person verification,
+such as having multiple data recorders and/or different collection and entry people.
+This will greatly reduce the need for extensive cleaning later.
 
-The [modified z score](https://www.statology.org/modified-z-score/) method is based on the difference between the data point and the median of the data.  
-The default threshold value for `modzscore` is 3.5.  
-Modified z score $= 0.6745 * |x_i - x̃| / MAD$, where [$MAD$](https://en.wikipedia.org/wiki/Median_absolute_deviation) is the median absolute deviation
+2. **After Merging Datasets**:
+When combining multiple datasets, data cleaning is essential to ensure consistency and 
+avoid issues like duplicate entries or conflicting formats.
 
-The [interquartile range](https://en.wikipedia.org/wiki/Interquartile_range) method is based on the difference between the data point and the difference between the 75th and 25th qartile.  
-The default threshold value for `iqr` is 1.5.  
-Interquartile range $= threshold * (Q_3 - Q_1)$
+3. **Before Analysis and Reporting**:
+Always clean your data before performing any statistical analysis or model building.
+Consider having a subject matter expert verify sample statistics with known population dynamics to ensure that the data is representative.
+For images, the data cleaning process should include verifying image properties (like size and metadata)
+as well as the visual aspects of the image (like brightness and blurriness). 
+This ensures that your results are based on accurate and relevant information.
+
+## Inaccurate, Incomplete and/or Irrelevant Data
+
+Having inaccurate, incomplete and/or irrelevant data leads to unreliable conclusions which can range in the severity of the consequences.
+These consequences include scenarios like your model mislabelling an animal because you mixed up the labels or losing money because your market analysis left out a key competitor.
+Some examples for each type of data error are shown below:
+- Inaccurate data
+    * Typographical errors such as misspelled words or incorrect entries
+    * Formatting errors such as inputting the data in the wrong units
+    * Representation errors such as combining two important groups or splitting out a subset which shouldn't be 
+    * Anomalies/Outliers
+- Incomplete data
+    * Missing values or entire groups
+    * Partial records
+    * Lacking enough samples in a group 
+- Irrelevant data
+    * Including data or groups that are not related to the task at hand
+    * Outdated information
+
+Because of the variety of ways in which data quality can degrade,
+the process for correcting inaccurate, incomplete and/or irrelevant data
+depends greatly on the data itself and the context in which it is being used.
+This can could involve simply adding in a missing group or value,
+using a spell checker or a second pair of eyes to catch data entry errors,
+removing a data point or group from the analysis, or something else entirely.
+
+## Theory Behind Data Cleaning
+
+Data cleaning is grounded in the principles of data quality and data integrity.
+A guiding principle for data cleaning is _garbage in, garbage out_.
+
+**Garbage In, Garbage Out Principle**:
+This principle emphasizes that the quality of output from analysis and models is 
+determined by the quality of input data.
+If the input data is flawed, the output will be unreliable,
+regardless of the sophistication of the analysis.
 
 
-### Duplicates
+## Data Cleaning with DataEval
 
-The duplicate detector helps prune out exact and near matches.
-Exact matches are found using a byte hash of the image information,
-while near matches (such as a crop of another image or a distoration of another image) use a perception based hash.
+DataEval is a data analysis and monitoring library with some dedicated classes to data cleaning.
+
+DataEval's data cleaning classes are:
+* [Linter](Linter.md) class,
+* [Duplicates](../reference/detectors/duplicates.md) class,
+* [ImageStats](../reference/metrics/imagestats.md) class,
+* [ChannelStats](../reference/metrics/channelstats.md) class, and
+* [Clusterer](../reference/detectors/clusterer.md) class.
+
+These classes facilitate the creation of dataset statistics and
+the identification of abnormal data points and duplicates. 
+The **ImageStats** and **ChannelStats** classes create dataset statistics on a per image and a per image per channel basis, respectively.
+The **Linter** class analyzes the dataset statistics for outliers based on the chosen statistical method.
+The **Duplicates** class identifies duplicate images.
+The **Clusterer** class clusters the data and identifies data points which do not fit into a cluster.
+
+To see data cleaning in action using DataEval, check out our [Exploratory Data Analysis](../tutorials/EDA_Part1.ipynb) tutorial.
+
+(data-clean-metrics)=
+### Data Cleaning Metrics
+
+Below is a list of all of the metrics available for analysis and the overarching flag category the metric belongs to.
+Each category has an _ALL_ method which selects all metrics in that category.
+
+* ImageHash
+  - XXHASH
+  - PCHASH
+
+* ImageProperty
+  - WIDTH
+  - HEIGHT
+  - SIZE
+  - ASPECT_RATIO
+  - CHANNELS
+  - DEPTH
+
+* ImageStatistics
+  - MEAN
+  - STD
+  - VAR
+  - SKEW
+  - KURTOSIS
+  - ENTROPY
+  - PERCENTILES
+  - HISTOGRAM
+
+* ImageVisuals
+  - BRIGHTNESS
+  - BLURRINESS
+  - MISSING
+  - ZERO
