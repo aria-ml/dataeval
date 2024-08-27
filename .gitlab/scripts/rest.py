@@ -99,9 +99,9 @@ class RestWrapper:
         last_page = 1
         page = 1
         result = []
-        params_str = self._get_param_str(params)
-        url_with_params = f"{url}?{params_str}" if params_str else url
         while page <= last_page:
+            params_str = self._get_param_str(params)
+            url_with_params = f"{url}?{params_str}" if params_str else url
             args = {
                 "url": url_with_params,
                 "headers": self.headers,
