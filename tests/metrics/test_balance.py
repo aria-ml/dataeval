@@ -41,6 +41,6 @@ class TestBalanceUnit:
         [(balance, (3, 3)), (balance_classwise, (2, 2))],
     )
     def test_correct_mi_shape_and_dtype(self, balance_fn, expected_shape):
-        mi = balance_fn(class_labels, metadata)
+        mi = balance_fn(class_labels, metadata).mutual_information
         assert mi.shape == expected_shape
         assert mi.dtype == float

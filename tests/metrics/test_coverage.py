@@ -21,12 +21,12 @@ class TestCoverageUnit:
     def test_naive(self):
         embs = np.zeros((3, 2))
         result = coverage(embs, "naive", k=1)
-        assert abs(result[2] - math.sqrt(2 / 3) / math.sqrt(math.pi)) < 0.01
+        assert abs(result.critical_value - math.sqrt(2 / 3) / math.sqrt(math.pi)) < 0.01
 
     def test_adaptive(self):
         embs = np.zeros((100, 2))
-        _, crit, _ = coverage(embs, "adaptive", k=1)
-        assert (crit == np.zeros(100)).all()
+        result = coverage(embs, "adaptive", k=1)
+        assert (result.radii == np.zeros(100)).all()
 
 
 class TestCoverageFunctional:
