@@ -9,6 +9,7 @@ These explanations dive into the what, why and theory behind each of DataEval's 
 - [Cleaning Datasets](DataCleaning.md)
 - [Dataset Divergence](Divergence.md)
 - [Detecting Drift in Datasets](Drift.md)
+- [Detecting Duplicates](Duplicates.md)
 - [ImageStats and ChannelStats Classes](Stats.md)
 - [Linter Class](Linter.md)
 - [Model Training Techniques](ModelTraining.md)
@@ -27,6 +28,7 @@ Clusterer.md
 DataCleaning.md
 Divergence.md
 Drift.md
+Duplicates.md
 Stats.md
 Linter.md
 ModelTraining.md
