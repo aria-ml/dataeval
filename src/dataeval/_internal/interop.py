@@ -1,7 +1,8 @@
 from importlib import import_module
-from typing import Any, Iterable, Optional, runtime_checkable
+from typing import Iterable, Optional, Sequence
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 module_cache = {}
 
@@ -19,14 +20,14 @@ def try_import(module_name):
     return module
 
 
-try:
-    from maite.protocols import ArrayLike  # type: ignore
-except ImportError:  # pragma: no cover - covered by test_mindeps.py
-    from typing import Protocol
-
-    @runtime_checkable
-    class ArrayLike(Protocol):
-        def __array__(self) -> Any: ...
+def is_arraylike(obj) -> bool:
+    if obj is None:
+        return False
+    if obj is (bool, int, float, complex, str, bytes):
+        return True
+    if isinstance(obj, Sequence):
+        return True
+    return bool(hasattr(obj, "__array__"))
 
 
 def to_numpy(array: Optional[ArrayLike]) -> np.ndarray:

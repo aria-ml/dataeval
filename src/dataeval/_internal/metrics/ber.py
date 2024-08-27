@@ -7,28 +7,106 @@ Learning to Bound the Multi-class Bayes Error (Th. 3 and Th. 4)
 https://arxiv.org/abs/1811.06419
 """
 
-from typing import Callable, Dict, Literal, Tuple
+from typing import Dict, Literal, Tuple
 
+import numpy as np
 from numpy.typing import ArrayLike, NDArray
+from scipy.sparse import coo_matrix
+from scipy.stats import mode
 
-from dataeval._internal.functional.ber import ber_knn, ber_mst
 from dataeval._internal.interop import to_numpy
-from dataeval._internal.metrics.base import EvaluateMixin, MethodsMixin
-
-_METHODS = Literal["KNN", "MST"]
-_FUNCTION = Callable[[NDArray, NDArray, int], Tuple[float, float]]
+from dataeval._internal.metrics.utils import compute_neighbors, get_classes_counts, get_method, minimum_spanning_tree
 
 
-class BER(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
+def ber_mst(X: NDArray, y: NDArray) -> Tuple[float, float]:
+    """Calculates the Bayes Error Rate using a minimum spanning tree
+
+    Parameters
+    ----------
+    X : NDArray, shape - (N, ... )
+        n_samples containing n_features
+    y : NDArray, shape - (N, 1)
+        Labels corresponding to each sample
+
+    Returns
+    -------
+    Tuple[float, float]
+        The upper and lower bounds of the bayes error rate
+    """
+    M, N = get_classes_counts(y)
+
+    tree = coo_matrix(minimum_spanning_tree(X))
+    matches = np.sum([y[tree.row[i]] != y[tree.col[i]] for i in range(N - 1)])
+    deltas = matches / (2 * N)
+    upper = 2 * deltas
+    lower = ((M - 1) / (M)) * (1 - max(1 - 2 * ((M) / (M - 1)) * deltas, 0) ** 0.5)
+    return upper, lower
+
+
+def ber_knn(X: NDArray, y: NDArray, k: int) -> Tuple[float, float]:
+    """Calculates the Bayes Error Rate using K-nearest neighbors
+
+    Parameters
+    ----------
+    X : NDArray, shape - (N, ... )
+        n_samples containing n_features
+    y : NDArray, shape - (N, 1)
+        Labels corresponding to each sample
+
+    Returns
+    -------
+    Tuple[float, float]
+        The upper and lower bounds of the bayes error rate
+    """
+    M, N = get_classes_counts(y)
+
+    # All features belong on second dimension
+    X = X.reshape((X.shape[0], -1))
+    nn_indices = compute_neighbors(X, X, k=k)
+    nn_indices = np.expand_dims(nn_indices, axis=1) if nn_indices.ndim == 1 else nn_indices
+    modal_class = mode(y[nn_indices], axis=1, keepdims=True).mode.squeeze()
+    upper = float(np.count_nonzero(modal_class - y) / N)
+    lower = knn_lowerbound(upper, M, k)
+    return upper, lower
+
+
+def knn_lowerbound(value: float, classes: int, k: int) -> float:
+    """Several cases for computing the BER lower bound"""
+    if value <= 1e-10:
+        return 0.0
+
+    if classes == 2 and k != 1:
+        if k > 5:
+            # Property 2 (Devroye, 1981) cited in Snoopy paper, not in snoopy repo
+            alpha = 0.3399
+            beta = 0.9749
+            a_k = alpha * np.sqrt(k) / (k - 3.25) * (1 + beta / (np.sqrt(k - 3)))
+            return value / (1 + a_k)
+        if k > 2:
+            return value / (1 + (1 / np.sqrt(k)))
+        # k == 2:
+        return value / 2
+
+    return ((classes - 1) / classes) * (1 - np.sqrt(max(0, 1 - ((classes / (classes - 1)) * value))))
+
+
+BER_FN_MAP = {"KNN": ber_knn, "MST": ber_mst}
+
+
+def ber(images: ArrayLike, labels: ArrayLike, k: int = 1, method: Literal["KNN", "MST"] = "KNN") -> Dict[str, float]:
     """
     An estimator for Multi-class Bayes Error Rate using FR or KNN test statistic basis
 
     Parameters
     ----------
-    method : Literal["KNN", "MST"], default "KNN"
-        Method to use when estimating the Bayes error rate
+    images : ArrayLike (N, ... )
+        Array of images or image embeddings
+    labels : ArrayLike (N, 1)
+        Array of labels for each image or image embedding
     k : int, default 1
         Number of nearest neighbors for KNN estimator -- ignored by MST estimator
+    method : Literal["KNN", "MST"], default "KNN"
+        Method to use when estimating the Bayes error rate
 
     References
     ----------
@@ -37,47 +115,15 @@ class BER(EvaluateMixin, MethodsMixin[_METHODS, _FUNCTION]):
     Examples
     --------
     >>> import sklearn.datasets as dsets
-    >>> from dataeval.metrics import BER
+    >>> from dataeval.metrics import ber
 
     >>> images, labels = dsets.make_blobs(n_samples=50, centers=2, n_features=2, random_state=0)
 
-    >>> ber = BER()
-    >>> ber.evaluate(images, labels)
+    >>> ber(images, labels)
     {'ber': 0.04, 'ber_lower': 0.020416847668728033}
     """
-
-    def __init__(self, method: _METHODS = "KNN", k: int = 1) -> None:
-        self.k: int = k
-        self._set_method(method)
-
-    @classmethod
-    def _methods(cls) -> Dict[str, _FUNCTION]:
-        return {"KNN": ber_knn, "MST": ber_mst}
-
-    def evaluate(self, images: ArrayLike, labels: ArrayLike) -> Dict[str, float]:
-        """
-        Calculates the Bayes Error Rate estimate using the provided method
-
-        Parameters
-        ----------
-        images : ArrayLike (N, ... )
-            Array of images or image embeddings
-        labels : ArrayLike (N, 1)
-            Array of labels for each image or image embedding
-
-        Returns
-        -------
-        Dict[str, float]
-            ber : float
-                The estimated lower bounds of the Bayes Error Rate
-            ber_lower : float
-                The estimated upper bounds of the Bayes Error Rate
-
-        Raises
-        ------
-        ValueError
-            If unique classes M < 2
-        """
-
-        upper, lower = self._method(to_numpy(images), to_numpy(labels), self.k)  # type: ignore
-        return {"ber": upper, "ber_lower": lower}
+    ber_fn = get_method(BER_FN_MAP, method)
+    X = to_numpy(images)
+    y = to_numpy(labels)
+    upper, lower = ber_fn(X, y, k) if method == "KNN" else ber_fn(X, y)
+    return {"ber": upper, "ber_lower": lower}

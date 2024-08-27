@@ -9,8 +9,9 @@ Licensed under Apache Software License (Apache 2.0)
 from typing import Callable, Dict, Optional, Tuple, Union
 
 import torch
+from numpy.typing import ArrayLike
 
-from dataeval._internal.interop import ArrayLike, to_numpy
+from dataeval._internal.interop import to_numpy
 
 from .base import BaseDrift, UpdateStrategy, preprocess_x, update_x_ref
 from .torch import GaussianRBF, get_device, mmd2_from_kernel_matrix
@@ -74,7 +75,7 @@ class DriftMMD(BaseDrift):
         super().__init__(x_ref, p_val, x_ref_preprocessed, update_x_ref, preprocess_fn)
 
         self.infer_sigma = configure_kernel_from_x_ref
-        if configure_kernel_from_x_ref and isinstance(sigma, ArrayLike):
+        if configure_kernel_from_x_ref and sigma is not None:
             self.infer_sigma = False
 
         self.n_permutations = n_permutations  # nb of iterations through permutation test
@@ -83,7 +84,7 @@ class DriftMMD(BaseDrift):
         self.device = get_device(device)
 
         # initialize kernel
-        sigma_tensor = torch.from_numpy(to_numpy(sigma)).to(self.device) if isinstance(sigma, ArrayLike) else None
+        sigma_tensor = torch.from_numpy(to_numpy(sigma)).to(self.device) if sigma is not None else None
         self.kernel = kernel(sigma_tensor).to(self.device) if kernel == GaussianRBF else kernel
 
         # compute kernel matrix for the reference data

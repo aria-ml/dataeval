@@ -7,15 +7,8 @@
 
 % 2. What does it solve
 
-## How-To Guides
-
-There are currently no how to's for UAP.
-If there are scenarios that you want us to explain, contact us!
-
 ## DataEval API
 
 ```{eval-rst}
-.. autoclass:: dataeval.metrics.UAP
-   :members:
-   :inherited-members:
+.. autofunction: dataeval.metrics.uap
 ```

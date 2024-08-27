@@ -1,10 +1,10 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 import torch
 
-from dataeval._internal.functional.ber import _knn_lowerbound, ber_knn, ber_mst
-from dataeval.metrics import BER
+from dataeval._internal.metrics.ber import ber_knn, ber_mst, knn_lowerbound
+from dataeval.metrics import ber
 
 
 class TestFunctionalBER:
@@ -13,7 +13,7 @@ class TestFunctionalBER:
     @pytest.mark.parametrize(
         "method, k, expected",
         [
-            (ber_mst, 1, (0.137, 0.07132636098401203)),
+            (ber_mst, None, (0.137, 0.07132636098401203)),
             (ber_knn, 1, (0.118, 0.061072112753426215)),
             (ber_knn, 10, (0.143, 0.0745910104681437)),
         ],
@@ -21,7 +21,7 @@ class TestFunctionalBER:
     def test_ber_on_mnist(self, method, k, expected, mnist):
         """Methods correctly calculate BER with given params"""
         data, labels = mnist()
-        result = method(data, labels, k)
+        result = method(data, labels, k) if k else method(data, labels)
         assert result == expected
 
     @pytest.mark.parametrize(
@@ -37,7 +37,7 @@ class TestFunctionalBER:
         ],
     )
     def test_knn_lower_bound_2_classes(self, value, classes, k, expected):
-        result = _knn_lowerbound(value, classes, k)
+        result = knn_lowerbound(value, classes, k)
         assert result == expected
 
 
@@ -46,18 +46,8 @@ class TestAPIBER:
 
     def test_invalid_method(self):
         """Raises error when method is not KNN or MST"""
-        with pytest.raises(KeyError):
-            BER("NOT_A_METHOD")  # type: ignore
-
-    def test_invalid_method_setter(self):
-        """Raises error when method key is not KNN or MST"""
-        b = BER()
-        with pytest.raises(KeyError):
-            b.method = "NOT_A_METHOD"  # type: ignore
-
-    def test_list_class_methods(self):
-        methods = BER.methods()
-        assert len(methods) == 2
+        with pytest.raises(ValueError):
+            ber([], [], method="NOT_A_METHOD")  # type: ignore
 
     @pytest.mark.parametrize(
         "method, k, expected",
@@ -71,17 +61,19 @@ class TestAPIBER:
 
         # TODO: Mock patch _ber methods, just check output tuple -> dict
         images, labels = mnist()
-        ber = BER(method=method, k=k)
-        result = ber.evaluate(images=images, labels=labels)
+        result = ber(images=images, labels=labels, k=k, method=method)
         assert result == expected
 
-    @patch("dataeval._internal.metrics.ber.ber_knn")
-    def test_torch_inputs(self, mock_knn: MagicMock):
+    def test_torch_inputs(self):
         """Torch class correctly calls functional numpy math"""
+        mock_knn = MagicMock()
         mock_knn.return_value = (0, 0)
+        from dataeval._internal.metrics.ber import BER_FN_MAP
+
+        BER_FN_MAP["KNN"] = mock_knn
+
         images = torch.ones((5, 10, 10))
         labels = torch.ones(5)
-
-        BER().evaluate(images, labels)
+        ber(images, labels)
 
         mock_knn.assert_called_once()

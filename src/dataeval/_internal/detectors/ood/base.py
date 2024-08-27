@@ -12,8 +12,9 @@ from typing import Callable, Dict, List, Literal, NamedTuple, Optional, Tuple, c
 import keras
 import numpy as np
 import tensorflow as tf
+from numpy.typing import ArrayLike
 
-from dataeval._internal.interop import ArrayLike, to_numpy
+from dataeval._internal.interop import to_numpy
 from dataeval._internal.models.tensorflow.gmm import GaussianMixtureModelParams, gmm_params
 from dataeval._internal.models.tensorflow.trainer import trainer
 

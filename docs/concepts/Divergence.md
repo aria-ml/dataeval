@@ -6,6 +6,6 @@ HP divergence is a nonparametric divergence metric which gives the distance betw
 
 ## When to use it
 
-The `Divergence` class should be used when you would like to know how far two datasets are diverged for one another. For example, if you would like to measure operational drift.
+The `divergence` metric should be used when you would like to know how far two datasets are diverged for one another. For example, if you would like to measure operational drift.
 
 ## Theory behind it
