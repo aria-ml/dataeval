@@ -1,10 +1,22 @@
 import warnings
-from typing import Dict, List, Sequence
+from typing import Dict, List, NamedTuple, Sequence
 
 import numpy as np
+from numpy.typing import NDArray
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 
 from dataeval._internal.metrics.utils import entropy, preprocess_metadata
+
+
+class BalanceOutput(NamedTuple):
+    """
+    Attributes
+    ----------
+    mutual_information : NDArray[np.float64]
+        Estimate of mutual information between metadata factors and class label
+    """
+
+    mutual_information: NDArray[np.float64]
 
 
 def validate_num_neighbors(num_neighbors: int) -> int:
@@ -27,7 +39,7 @@ def validate_num_neighbors(num_neighbors: int) -> int:
     return num_neighbors
 
 
-def balance(class_labels: Sequence[int], metadata: List[Dict], num_neighbors: int = 5) -> np.ndarray:
+def balance(class_labels: Sequence[int], metadata: List[Dict], num_neighbors: int = 5) -> BalanceOutput:
     """
     Mutual information (MI) between factors (class label, metadata, label/image properties)
 
@@ -43,7 +55,7 @@ def balance(class_labels: Sequence[int], metadata: List[Dict], num_neighbors: in
 
     Returns
     -------
-    NDArray
+    BalanceOutput
         (num_factors+1) x (num_factors+1) estimate of mutual information
         between num_factors metadata factors and class label. Symmetry is enforced.
 
@@ -92,10 +104,10 @@ def balance(class_labels: Sequence[int], metadata: List[Dict], num_neighbors: in
     # in principle MI should be symmetric, but it is not in practice.
     nmi = 0.5 * (mi + mi.T) / norm_factor
 
-    return nmi
+    return BalanceOutput(nmi)
 
 
-def balance_classwise(class_labels: Sequence[int], metadata: List[Dict], num_neighbors: int = 5) -> np.ndarray:
+def balance_classwise(class_labels: Sequence[int], metadata: List[Dict], num_neighbors: int = 5) -> BalanceOutput:
     """
     Compute mutual information (analogous to correlation) between metadata factors
     (class label, metadata, label/image properties) with individual class labels.
@@ -119,7 +131,7 @@ def balance_classwise(class_labels: Sequence[int], metadata: List[Dict], num_nei
 
     Returns
     -------
-    NDArray
+    BalanceOutput
         (num_classes x num_factors) estimate of mutual information between
         num_factors metadata factors and individual class labels.
 
@@ -165,4 +177,4 @@ def balance_classwise(class_labels: Sequence[int], metadata: List[Dict], num_nei
     ent_all = np.concatenate((ent_all[:class_idx], ent_all[(class_idx + 1) :]), axis=0)
     norm_factor = 0.5 * np.add.outer(ent_tgt, ent_all) + 1e-6
     nmi = mi / norm_factor
-    return nmi
+    return BalanceOutput(nmi)

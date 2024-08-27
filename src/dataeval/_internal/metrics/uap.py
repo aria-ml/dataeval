@@ -35,4 +35,5 @@ def uap(labels: ArrayLike, scores: ArrayLike) -> Dict[str, float]:
         If unique classes M < 2
     """
 
-    return {"uap": float(average_precision_score(to_numpy(labels), to_numpy(scores), average="weighted"))}
+    precision = float(average_precision_score(to_numpy(labels), to_numpy(scores), average="weighted"))
+    return {"uap": precision}

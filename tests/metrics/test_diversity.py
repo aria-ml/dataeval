@@ -20,6 +20,6 @@ class TestDiversityUnit:
 
     @pytest.mark.parametrize("met", ["simpson", "shannon"])
     def test_range_of_values(self, div_fn, met):
-        div = div_fn(class_labels, metadata, method=met)
+        div = div_fn(class_labels, metadata, method=met).diversity_index
         assert div.dtype == float
         assert np.logical_and(div >= 0, div <= 1).all()

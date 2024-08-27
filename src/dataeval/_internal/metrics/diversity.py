@@ -1,9 +1,20 @@
-from typing import Dict, List, Literal, Optional, Sequence
+from typing import Dict, List, Literal, NamedTuple, Optional, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
 
 from dataeval._internal.metrics.utils import entropy, get_counts, get_method, get_num_bins, preprocess_metadata
+
+
+class DiversityOutput(NamedTuple):
+    """
+    Attributes
+    ----------
+    diversity_index : NDArray[np.float64]
+        Diversity index for classes and factors
+    """
+
+    diversity_index: NDArray[np.float64]
 
 
 def diversity_shannon(
@@ -107,7 +118,7 @@ DIVERSITY_FN_MAP = {"simpson": diversity_simpson, "shannon": diversity_shannon}
 
 def diversity(
     class_labels: Sequence[int], metadata: List[Dict], method: Literal["shannon", "simpson"] = "simpson"
-) -> NDArray[np.float64]:
+) -> DiversityOutput:
     """
     Compute diversity for discrete/categorical variables and, through standard
     histogram binning, for continuous variables.
@@ -131,7 +142,7 @@ def diversity(
 
     Returns
     -------
-    NDArray[np.float64]
+    DiversityOutput
         Diversity index per column of self.data or each factor in self.names
 
     See Also
@@ -140,12 +151,13 @@ def diversity(
     """
     diversity_fn = get_method(DIVERSITY_FN_MAP, method)
     data, names, is_categorical = preprocess_metadata(class_labels, metadata)
-    return diversity_fn(data, names, is_categorical, None).astype(np.float64)
+    diversity_index = diversity_fn(data, names, is_categorical, None).astype(np.float64)
+    return DiversityOutput(diversity_index)
 
 
 def diversity_classwise(
     class_labels: Sequence[int], metadata: List[Dict], method: Literal["shannon", "simpson"] = "simpson"
-) -> NDArray[np.float64]:
+) -> DiversityOutput:
     """
     Compute diversity for discrete/categorical variables and, through standard
     histogram binning, for continuous variables.
@@ -171,13 +183,11 @@ def diversity_classwise(
 
     Returns
     -------
-    NDArray[np.float64]
+    DiversityOutput
         Diversity index [n_class x n_factor]
 
     See Also
     --------
-    diversity_simpson
-    diversity_shannon
     numpy.histogram
     """
     diversity_fn = get_method(DIVERSITY_FN_MAP, method)
@@ -193,4 +203,4 @@ def diversity_classwise(
         subset_mask = class_lbl == cls
         diversity[idx, :] = diversity_fn(data, names, is_categorical, subset_mask)
     div_no_class = np.concatenate((diversity[:, :class_idx], diversity[:, (class_idx + 1) :]), axis=1)
-    return div_no_class
+    return DiversityOutput(div_no_class)

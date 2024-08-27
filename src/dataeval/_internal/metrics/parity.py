@@ -1,11 +1,27 @@
 import warnings
-from typing import Dict, Mapping, Optional, Tuple
+from typing import Dict, Generic, Mapping, NamedTuple, Optional, Tuple, TypeVar
 
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 from scipy.stats import chi2_contingency, chisquare
 
 from dataeval._internal.interop import to_numpy
+
+TValue = TypeVar("TValue", np.float64, NDArray[np.float64])
+
+
+class ParityOutput(Generic[TValue], NamedTuple):
+    """
+    Attributes
+    ----------
+    score : np.float64 | NDArray[np.float64]
+        chi-squared value(s) of the test
+    p_value : np.float64 | NDArray[np.float64]
+        p-value(s) of the test
+    """
+
+    score: TValue
+    p_value: TValue
 
 
 def digitize_factor_bins(continuous_values: np.ndarray, bins: int, factor_name: str):
@@ -149,7 +165,7 @@ def parity(
     expected_labels: ArrayLike,
     observed_labels: ArrayLike,
     num_classes: Optional[int] = None,
-) -> Tuple[np.float64, np.float64]:
+) -> ParityOutput[np.float64]:
     """
     Perform a one-way chi-squared test between observation frequencies and expected frequencies that
     tests the null hypothesis that the observed data has the expected frequencies.
@@ -169,10 +185,8 @@ def parity(
 
     Returns
     -------
-    np.float64
-        chi-squared value of the test
-    np.float64
-        p-value of the test
+    ParityOutput[np.float64]
+        chi-squared score and p-value of the test
 
     Raises
     ------
@@ -206,14 +220,14 @@ def parity(
             "zero instances are still included in the distributions."
         )
 
-    chisquared, p_value = chisquare(f_obs=observed_dist, f_exp=expected_dist)
-    return chisquared, p_value
+    cs, p = chisquare(f_obs=observed_dist, f_exp=expected_dist)
+    return ParityOutput(cs, p)
 
 
 def parity_metadata(
     data_factors: Mapping[str, ArrayLike],
     continuous_factor_bincounts: Optional[Dict[str, int]] = None,
-) -> dict[str, np.ndarray]:
+) -> ParityOutput[NDArray[np.float64]]:
     """
     Evaluates the statistical independence of metadata factors from class labels.
     This performs a chi-square test, which provides a score and a p-value for
@@ -234,15 +248,10 @@ def parity_metadata(
 
     Returns
     -------
-    Dict[str, np.ndarray]
-        chi_square: np.ndarray
-            Array of length (num_factors) whose (i)th element corresponds to
-            the chi-square score for the relationship between factor i
-            and the class labels in the dataset.
-        p_values: np.ndarray
-            Array of length (num_factors) whose (i)th element corresponds to
-            the p-value for the chi-square test for the relationship between
-            factor i and the class labels in the dataset.
+    ParityOutput[NDArray[np.float64]]
+        Arrays of length (num_factors) whose (i)th element corresponds to the
+        chi-square score and p-value for the relationship between factor i and
+        the class labels in the dataset.
     """
     data_factors_np = {k: to_numpy(v) for k, v in data_factors.items()}
     continuous_factor_bincounts = continuous_factor_bincounts if continuous_factor_bincounts else {}
@@ -285,4 +294,4 @@ def parity_metadata(
         chi_scores[i] = chi2
         p_values[i] = p
 
-    return {"chi_squares": chi_scores, "p_values": p_values}
+    return ParityOutput(chi_scores, p_values)

@@ -74,7 +74,7 @@ def divergence(data_a: ArrayLike, data_b: ArrayLike, method: Literal["FNN", "MST
     --------
     Evaluate the datasets:
 
-    >>> divert.evaluate(datasetA, datasetB)
+    >>> divergence(datasetA, datasetB)
     {'divergence': 0.28, 'error': 36.0}
     """
     div_fn = get_method(DIVERGENCE_FN_MAP, method)

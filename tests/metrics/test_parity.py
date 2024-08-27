@@ -246,8 +246,7 @@ class TestMDParityFunctional:
             "factor1": np.concatenate(([10] * 5, [20] * 5)),
         }
 
-        output = parity_metadata(factors)
-        _, p = output["chi_squares"], output["p_values"]
+        _, p = parity_metadata(factors)
 
         # Checks that factor1 is highly correlated with class
         assert p[0] < 0.05
@@ -262,8 +261,7 @@ class TestMDParityFunctional:
             "factor1": np.array(["foo"] * 10),
         }
 
-        output = parity_metadata(factors)
-        chi, p = output["chi_squares"], output["p_values"]
+        chi, p = parity_metadata(factors)
 
         # Checks that factor1 is uncorrelated with class
         assert np.isclose(chi[0], 0)
@@ -280,16 +278,14 @@ class TestMDParityFunctional:
         }
         continuous_bincounts = {"factor1": 2}
 
-        output1 = parity_metadata(continuous_dataset, continuous_bincounts)
-        chi1, p1 = output1["chi_squares"], output1["p_values"]
+        chi1, p1 = parity_metadata(continuous_dataset, continuous_bincounts)
 
         discrete_dataset = {
             "class": np.concatenate(([0] * 5, [1] * 5)),
             "factor2": np.concatenate(([10] * 5, [20] * 5)),
         }
 
-        output2 = parity_metadata(discrete_dataset)
-        chi2, p2 = output2["chi_squares"], output2["p_values"]
+        chi2, p2 = parity_metadata(discrete_dataset)
 
         # Checks that the test on the quantization continuous_dataset is
         # equivalent to the test on the discrete dataset discrete_dataset
@@ -307,8 +303,7 @@ class TestMDParityFunctional:
         }
         continuous_bincounts = {"factor1": 1}
 
-        output = parity_metadata(factors, continuous_bincounts)
-        chi, p = output["chi_squares"], output["p_values"]
+        chi, p = parity_metadata(factors, continuous_bincounts)
 
         # Checks if factor1 and class are perfectly uncorrelated
         assert np.isclose(chi[0], 0)

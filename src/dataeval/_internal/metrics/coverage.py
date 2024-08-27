@@ -1,5 +1,5 @@
 import math
-from typing import Literal, Tuple
+from typing import Literal, NamedTuple
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -8,12 +8,29 @@ from scipy.spatial.distance import pdist, squareform
 from dataeval._internal.interop import to_numpy
 
 
+class CoverageOutput(NamedTuple):
+    """
+    Attributes
+    ----------
+    indices : np.ndarray
+        Array of uncovered indices
+    radii : np.ndarray
+        Array of critical value radii
+    critical_value : float
+        Radius for coverage
+    """
+
+    indices: NDArray[np.intp]
+    radii: NDArray[np.float64]
+    critical_value: float
+
+
 def coverage(
     embeddings: ArrayLike,
     radius_type: Literal["adaptive", "naive"] = "adaptive",
     k: int = 20,
     percent: np.float64 = np.float64(0.01),
-) -> Tuple[NDArray[np.intp], NDArray[np.float64], float]:
+) -> CoverageOutput:
     """
     Class for evaluating coverage and identifying images/samples that are in undercovered regions.
 
@@ -32,12 +49,8 @@ def coverage(
 
     Returns
     -------
-    np.ndarray
-        Array of uncovered indices
-    np.ndarray
-        Array of critical value radii
-    float
-        Radius for coverage
+    CoverageOutput
+        Array of uncovered indices, critical value radii, and the radius for coverage
 
     Raises
     ------
@@ -53,22 +66,22 @@ def coverage(
     Example
     -------
     >>> coverage(embeddings)
-    (array([31,  7, 22, 37, 11]), array([0.35938604, 0.26462789, 0.20319609, 0.34140912, 0.31069921,
-            0.2308378 , 0.33300179, 0.69881025, 0.53587532, 0.35689803,
-            0.39333634, 0.67497874, 0.21788128, 0.43510162, 0.38601861,
-            0.34171868, 0.16941337, 0.66438044, 0.20319609, 0.19732733,
-            0.48660288, 0.5135814 , 0.69352653, 0.26946943, 0.31120605,
-            0.33067705, 0.30508271, 0.32802489, 0.51805702, 0.31120605,
-            0.40843265, 0.74996768, 0.31069921, 0.52263763, 0.26654013,
-            0.33113507, 0.40814838, 0.67723008, 0.48124375, 0.37243185,
-            0.29760001, 0.30907904, 0.59023236, 0.57778087, 0.21839853,
-            0.46067782, 0.31078966, 0.65199049, 0.26410603, 0.19542706]))
+    CoverageOutput(indices=array([], dtype=int64), radii=array([0.59307666, 0.56956307, 0.56328616, 0.70660265, 0.57778087,
+        0.53738624, 0.58968217, 1.27721334, 0.84378694, 0.67767021,
+        0.69680335, 1.35532621, 0.59764166, 0.8691945 , 0.83627602,
+        0.84187303, 0.62212358, 1.09039732, 0.67956797, 0.60134383,
+        0.83713908, 0.91784263, 1.12901193, 0.73907618, 0.63943983,
+        0.61188447, 0.47872713, 0.57207771, 0.92885883, 0.54750511,
+        0.83015726, 1.20721778, 0.50421928, 0.98312246, 0.59764166,
+        0.61009202, 0.73864073, 1.0381061 , 0.77598609, 0.72984036,
+        0.67573006, 0.48056064, 1.00050879, 0.89532971, 0.58395529,
+        0.95954793, 0.60134383, 1.10096454, 0.51955314, 0.73038702]), critical_value=0)
 
     Reference
     ---------
     This implementation is based on https://dl.acm.org/doi/abs/10.1145/3448016.3457315.
     [1] Seymour Sudman. 1976. Applied sampling. Academic Press New York (1976).
-    """
+    """  # noqa: E501
 
     # Calculate distance matrix, look at the (k+1)th farthest neighbor for each image.
     embeddings = to_numpy(embeddings)
@@ -89,4 +102,4 @@ def coverage(
         pvals = np.argsort(crit)[::-1][:rho]
     else:
         raise ValueError("Invalid radius type.")
-    return pvals, crit, rho
+    return CoverageOutput(pvals, crit, rho)
