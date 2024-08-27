@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from gitlab import Gitlab
 from rest import verbose
+from versiontag import VersionTag
 
 CHANGELOG_FILE = "CHANGELOG.md"
 TAB = "    "
@@ -54,11 +55,12 @@ def _get_version_tuple(version: str) -> Optional[Tuple[int, int, int]]:
 
 class _Category(IntEnum):
     TAG = 0
-    FEATURE = 1
+    UNKNOWN = 1
     IMPROVEMENT = 2
     FIX = 3
-    DEPRECATION = 4
-    UNKNOWN = 5
+    FEATURE = 4
+    DEPRECATION = 5
+    MAJOR = 6
 
     @classmethod
     def from_label(cls, value: str) -> "_Category":
@@ -70,6 +72,8 @@ class _Category(IntEnum):
             return _Category.FIX
         elif "release::deprecation" in value:
             return _Category.DEPRECATION
+        elif "release::major" in value:
+            return _Category.MAJOR
         return _Category.UNKNOWN
 
     @classmethod
@@ -82,6 +86,8 @@ class _Category(IntEnum):
             return "👾 **Fixes**"
         elif value == _Category.DEPRECATION:
             return "🚧 **Deprecations and Removals**"
+        elif value == _Category.MAJOR:
+            return "🚀 **Major Release**"
         else:
             return "📝 **Miscellaneous**"
 
@@ -160,9 +166,9 @@ class CommitGen:
     and changelog updates
     """
 
-    def __init__(self, pending_version: str, gitlab: Gitlab):
+    def __init__(self, gitlab: Gitlab):
         self.gl = gitlab
-        self.pending_version = pending_version
+        self._pending = "0.0.0"
 
     def _read_changelog(self) -> List[str]:
         temp = False
@@ -190,7 +196,7 @@ class CommitGen:
         merges.sort(reverse=True)
 
         # get version buckets and sort
-        tags: List[_Tag] = [_Tag(pending_version=(self.pending_version, merges[0].hash))]
+        tags: List[_Tag] = []
         for tag in self.gl.list_tags():
             if _get_version_tuple(tag["name"]) is not None:
                 tags.append(_Tag(tag))
@@ -234,7 +240,11 @@ class CommitGen:
         # Return empty dict if nothing to update
         entries = self._get_entries(last_hash)
         tags = list(entries)
-
+        vTag = VersionTag(self.gl)
+        # generate the new pending version and set it on VersionTag and locally for use.
+        pending_version = self.get_next_version_type(entries, last_hash, vTag)
+        self._pending = pending_version  # get this value for the new release tag
+        vTag.pending = pending_version
         lines: List[str] = []
 
         for tag in tags:
@@ -267,12 +277,7 @@ class CommitGen:
         for oldline in current[3:]:
             content += oldline
 
-        return {
-            "action": "update",
-            "file_path": CHANGELOG_FILE,
-            "encoding": "text",
-            "content": content,
-        }
+        return {"action": "update", "file_path": CHANGELOG_FILE, "encoding": "text", "content": content}
 
     def _is_binary_file(self, file: str) -> bool:
         try:
@@ -356,3 +361,36 @@ class CommitGen:
         actions = self._generate_jupyter_cache_actions()
         actions.append(changelog_action)
         return actions
+
+    def get_next_version_type(self, entries, last_hash, vTag: VersionTag) -> str:
+        # Get the last hash from the repository. Used for getting all the changes since the last release.
+        # create a list of Categories from the entries. Use the largest one for the overall label.
+        tags = list(entries)  # convert to a list
+        # loop through the list
+        change = _Category.TAG  # 0
+        for tag in tags:
+            if tag.hash == last_hash:  # stop if no changes
+                break
+            if not entries[tag]:  # if no tag skip logic
+                continue
+            categories = sorted(entries[tag])  # sorted by tag
+            for category in categories:
+                if (
+                    category > change
+                ):  # use strictly greater than to limit changes on duplicates. Change types are ordered
+                    change = category
+        match change:
+            case _Category.TAG | _Category.UNKNOWN:  # 0,1
+                version = vTag.current
+            case _Category.FIX | _Category.IMPROVEMENT:  # 2,3
+                version = vTag.next("PATCH")
+            case _Category.FEATURE | _Category.DEPRECATION:  # 4,5
+                version = vTag.next("MINOR")
+            case _Category.MAJOR:  # 6
+                version = vTag.next("MAJOR")
+            case _:
+                verbose(f"Default Case: No Version Change. change is {change}")
+                version = vTag.current  # default is no change
+
+        self._pending_version = version
+        return version
