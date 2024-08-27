@@ -1,18 +1,7 @@
-from datetime import date
+from typing import Literal
 
 from gitlab import Gitlab
 from rest import verbose
-
-# fmt: off
-# Bi-weekly sprints starting 8/2/2023
-MINOR_VERSION_SPRINT_MAPPING = [
-    21, 22, 23, 24, 25,
-    31, 32, 33, 34, 35, 36, 37, 38,
-    41, 42, 43, 44, 45, 46,
-    51, 52, 53, 54, 55, 56,
-    61, 62, 63, 64, 65, 66,
-]
-# fmt: on
 
 
 class VersionTag:
@@ -45,18 +34,42 @@ class VersionTag:
     @property
     def pending(self) -> str:
         """
-        The calculated next version based off of calendar and sprint cycle
+        Release value is structured as "Major.Minor.Patch"
+        Calculate the next version based off of the kind of change(s) since the last release.  Largest change wins
+        For example, a FIX or IMPROVEMENT leads to a Patch increment but a new FEATURE or DEPRECATION of an old feature
+        leads to a Minor version increase and a Major change increments the Major version number.
         """
+
         if self._pending is None:
-            major, minor, patch = self.current.split(".")
-            sprint = int((date.today() - date(2023, 8, 2)).days / 14)
-            pending_minor = MINOR_VERSION_SPRINT_MAPPING[sprint]
-            verbose(f"Current minor: {int(minor)} Pending minor: {pending_minor}")
-            if int(minor) == pending_minor:
-                verbose(f"Bumping patch to {int(patch) + 1}")
-                version = f"{major}.{minor}.{int(patch) + 1}"
-            else:
-                verbose(f"Bumping minor version to {pending_minor}")
-                version = f"{major}.{pending_minor}.0"
-            self._pending = version
-        return self._pending
+            verbose("Getting a pending value before it has been set")
+            return "0.0.0"
+        else:
+            verbose(f"Getting a new pending value {self._pending}")
+            return self._pending  # if it's been set from the outside return it.
+
+    # add a setter so it can be set by commitgen.
+    @pending.setter
+    def pending(self, value):
+        verbose(f"Setting a new pending value. Value is {value}")
+        self._pending = value
+
+    def next(self, version_type: Literal["MAJOR", "MINOR", "PATCH"]):
+        current = self.current
+        version = current
+        major, minor, patch = current.split(".")
+        if version_type == "PATCH":
+            pending_patch = str(int(patch) + 1)
+            version = f"{major}.{minor}.{pending_patch}"
+            verbose(f"Bumping patch version to {pending_patch}, change is {version_type}")
+        elif version_type == "MINOR":
+            pending_minor = str(int(minor) + 1)
+            version = f"{major}.{pending_minor}.0"
+            verbose(f"Bumping minor version to {pending_minor}, change is {version_type}")
+        elif version_type == "MAJOR":  # 6
+            # strip off the 'v' add 1 and add the v back in.
+            temp = major[1:]  # make sure to hand 1+ digits.
+            pending_major = "v" + str(int(temp) + 1)
+            version = f"{pending_major}.0.0"
+            verbose(f"Bumping major version to {pending_major}, change is {version_type}")
+
+        return version
