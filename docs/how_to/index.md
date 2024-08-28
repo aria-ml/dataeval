@@ -49,7 +49,7 @@ Workflows
 ---------
 
 - [How to determine the amount of data needed to meet image classification performance requirements](notebooks/ClassLearningCurvesTutorial) [![Open In Colab][colab-badge]][suff-colab]
-- [How to determine the amount of data needed to meet object detection performance requirements](html/ODLearningCurvesTutorial) [![Open In Colab][colab-badge]][odlc-colab]
+- [How to determine the amount of data needed to meet object detection performance requirements](html/ODLearningCurvesTutorial)
 
 :::{toctree}
 :hidden:

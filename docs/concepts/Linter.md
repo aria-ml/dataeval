@@ -3,7 +3,7 @@
 ## What is it
 
 The Linter class is a data cleaning class used to identify images that are reducing the quality or integrity of the dataset.
-It identifies the images by calculating the statistical outliers of a dataset using various statistical tests applied to each metric from the base [ImageStats](../reference/metrics/imagestats.md) class.
+It identifies the images by calculating the statistical outliers of a dataset using various statistical tests applied to each metric from the base [ImageStats](Stats.md) class.
 
 ## When to use it
 
@@ -11,7 +11,7 @@ The Linter class should be used anytime someone is working with a new dataset.
 Whether you are tasked with trying to find the right dataset to train a model or with verifying someone else's stuff,
 the Linter class helps you gain an understanding of the data.
 
-The [Exploratory Data Analysis](../tutorials/EDA_Part1.ipynb) tutorial shows how the Linter class can be used in conjunction with other DataEval classes to explore and clean a dataset. 
+The [Data Cleaning Guide](../tutorials/EDA_Part1.ipynb) shows how the Linter class can be used in conjunction with other DataEval classes to explore and clean a dataset. 
 
 ## Theory behind it
 
@@ -46,4 +46,4 @@ The Linter class outputs a results dictionary with the keys being the images whi
 The value for each image in the results dictionary is a dictionary with the metric and the image's value in the given metric as the key-value pair.
 
 For more information on the flags and metrics used, see the [list](DataCleaning.md#data-cleaning-metrics).
-If you are having trouble changing the flags/metrics, check out our [Linting Flags](../how_to/linting_flags.md) how-to.
+If you are having trouble changing the flags/metrics, check out our how-to [How to customize the metrics for data cleaning](../how_to/linting_flags.md).
