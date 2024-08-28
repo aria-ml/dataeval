@@ -117,7 +117,8 @@ def setup(app):
     path.append(getcwd())
     import data
 
-    data.download()
+    if nb_execution_mode != "off":
+        data.download()
 
     normalize_module(
         [
