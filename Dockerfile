@@ -123,13 +123,20 @@ FROM task-run as deps-run
 ARG python_version
 RUN ./capture.sh deps ${python_version} tox -e deps
 
-FROM task-run as lint-run
+FROM task-run as task-run-with-docs
 ARG UID
 COPY --chown=${UID} docs/ docs/
 COPY --chown=${UID} *.md ./
+
+FROM task-run-with-docs as lint-run
 ARG python_version
 RUN ln -s /dataeval/.venv .tox/lint
 RUN ./capture.sh lint ${python_version} tox -e lint
+
+FROM task-run-with-docs as doctest-run
+ARG python_version
+RUN ln -s /dataeval/.venv .tox/lint
+RUN ./capture.sh doctest ${python_version} tox -e doctest
 
 # docs works differently than other tasks because it requires GPU access.
 # The GPU requirement means that the docs image must be run as a container
@@ -179,7 +186,7 @@ FROM results as deps
 COPY --from=deps-run $output_dir $output_dir
 
 FROM results as doctest
-COPY --from=docs-run $output_dir $output_dir
+COPY --from=doctest-run $output_dir $output_dir
 
 
 ######################## devcontainer image ########################
