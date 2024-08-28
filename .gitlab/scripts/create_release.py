@@ -6,16 +6,10 @@ if __name__ == "__main__":
 
     gl = Gitlab(verbose=True)
     rg = ReleaseGen(gl)
-    tag, payload = rg.generate()  # This computes and sets the pending version
-    if payload:
-        print(f"Updating jupyter cache and changelog and tagging to {tag}:")
-        branch = "main"
-        response = gl.commit(
-            branch,
-            f"Release {tag}",
-            payload,
-        )
-        commit_id = response["id"]
-        gl.add_tag(tag, commit_id, message=f"DataEval {tag}")
+    version_tag, payload = rg.generate()  # This computes and sets the pending version
+    if version_tag and payload:
+        print(f"Updating jupyter cache and changelog and tagging to {version_tag}:")
+        commit_id = gl.commit("main", f"Release {version_tag}", payload)["id"]
+        gl.add_tag(version_tag, commit_id, message=f"DataEval {version_tag}")
     else:
         print("No changes to commit and tag.")
