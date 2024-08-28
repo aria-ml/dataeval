@@ -108,9 +108,8 @@ function build_image() {
         if [[ ${BRANCH_CACHE} ]]; then
             cache+=("${BRANCH_CACHE}${cache_image}-${python_version}")
         fi
-        if [[ ! ${BRANCH_CACHE} || ! $(docker manifest inspect ${cache[-1]} 2> /dev/null) ]]; then
-            cache+=("${MAIN_CACHE}:${cache_image}-${python_version}")
-        fi
+        # always cache from main
+        cache+=("${MAIN_CACHE}:${cache_image}-${python_version}")
     done
 
     # set cache_from and cache_to args
