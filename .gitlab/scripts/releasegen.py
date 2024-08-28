@@ -56,8 +56,8 @@ def _get_version_tuple(version: str) -> Optional[Tuple[int, int, int]]:
 class _Category(IntEnum):
     MAJOR = 0
     FEATURE = 1
-    IMPROVEMENT = 2
-    DEPRECATION = 3
+    DEPRECATION = 2
+    IMPROVEMENT = 3
     FIX = 4
     UNKNOWN = 5
     TAG = 6
@@ -92,13 +92,14 @@ class _Category(IntEnum):
             return "📝 **Miscellaneous**"
 
     @classmethod
-    def as_version_type(cls, value: "_Category") -> Literal["MAJOR", "MINOR", "PATCH"]:
+    def version_type(cls, value: "_Category") -> Literal["MAJOR", "MINOR", "PATCH"]:
         match value:
-            case _Category.FEATURE | _Category.DEPRECATION:
-                return "MINOR"
             case _Category.MAJOR:
                 return "MAJOR"
-        return "PATCH"
+            case _Category.FEATURE | _Category.DEPRECATION:
+                return "MINOR"
+            case _:
+                return "PATCH"
 
 
 class _Tag:
@@ -198,8 +199,7 @@ class ReleaseGen:
         merges.sort(reverse=True)
 
         # get version buckets and sort
-        tags: List[_Tag] = [_Tag(pending=True)]
-        tags.extend([_Tag(t) for t in self.gl.list_tags() if _get_version_tuple(t["name"]) is not None])
+        tags: List[_Tag] = [_Tag(t) for t in self.gl.list_tags() if _get_version_tuple(t["name"]) is not None]
         tags.sort(reverse=True)
 
         # populate the categorized merge issues
@@ -236,7 +236,6 @@ class ReleaseGen:
         # Return empty dict if nothing to update
         entries = self._get_entries(last_hash)
         tags = list(entries)
-        vt = VersionTag(self.gl)
         lines: List[str] = []
         next_category = _Category.UNKNOWN
 
@@ -246,9 +245,6 @@ class ReleaseGen:
 
             if not entries[tag]:
                 continue
-
-            lines.append("")
-            lines.append(tag.to_markdown())
 
             categories = sorted(entries[tag])
             for category in categories:
@@ -266,13 +262,16 @@ class ReleaseGen:
         if not lines:
             return "", {}
 
-        header = [f"[//]: # ({tags[0].hash})", "", "# DataEval Change Log"]
+        vt = VersionTag(self.gl)
+        next_version = vt.next(_Category.version_type(next_category))
+
+        header = [f"[//]: # ({tags[0].hash})", "", "# DataEval Change Log", "", f"## {next_version}"]
         content = "\n".join(header + lines) + "\n"
 
         for oldline in current[3:]:
             content += oldline
 
-        return vt.next(_Category.as_version_type(next_category)), {
+        return next_version, {
             "action": "update",
             "file_path": CHANGELOG_FILE,
             "encoding": "text",
