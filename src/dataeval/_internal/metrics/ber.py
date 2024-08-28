@@ -7,7 +7,7 @@ Learning to Bound the Multi-class Bayes Error (Th. 3 and Th. 4)
 https://arxiv.org/abs/1811.06419
 """
 
-from typing import Dict, Literal, Tuple
+from typing import Literal, NamedTuple, Tuple
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -16,6 +16,20 @@ from scipy.stats import mode
 
 from dataeval._internal.interop import to_numpy
 from dataeval._internal.metrics.utils import compute_neighbors, get_classes_counts, get_method, minimum_spanning_tree
+
+
+class BEROutput(NamedTuple):
+    """
+    Attributes
+    ----------
+    ber : float
+        The upper bounds of the Bayes Error Rate
+    ber_lower : float
+        The lower bounds of the Bayes Error Rate
+    """
+
+    ber: float
+    ber_lower: float
 
 
 def ber_mst(X: NDArray, y: NDArray) -> Tuple[float, float]:
@@ -93,7 +107,7 @@ def knn_lowerbound(value: float, classes: int, k: int) -> float:
 BER_FN_MAP = {"KNN": ber_knn, "MST": ber_mst}
 
 
-def ber(images: ArrayLike, labels: ArrayLike, k: int = 1, method: Literal["KNN", "MST"] = "KNN") -> Dict[str, float]:
+def ber(images: ArrayLike, labels: ArrayLike, k: int = 1, method: Literal["KNN", "MST"] = "KNN") -> BEROutput:
     """
     An estimator for Multi-class Bayes Error Rate using FR or KNN test statistic basis
 
@@ -108,6 +122,11 @@ def ber(images: ArrayLike, labels: ArrayLike, k: int = 1, method: Literal["KNN",
     method : Literal["KNN", "MST"], default "KNN"
         Method to use when estimating the Bayes error rate
 
+    Returns
+    -------
+    BEROutput
+        The upper and lower bounds of the Bayes Error Rate
+
     References
     ----------
     [1] `Learning to Bound the Multi-class Bayes Error (Th. 3 and Th. 4) <https://arxiv.org/abs/1811.06419>`_
@@ -120,10 +139,10 @@ def ber(images: ArrayLike, labels: ArrayLike, k: int = 1, method: Literal["KNN",
     >>> images, labels = dsets.make_blobs(n_samples=50, centers=2, n_features=2, random_state=0)
 
     >>> ber(images, labels)
-    {'ber': 0.04, 'ber_lower': 0.020416847668728033}
+    BEROutput(ber=0.04, ber_lower=0.020416847668728033)
     """
     ber_fn = get_method(BER_FN_MAP, method)
     X = to_numpy(images)
     y = to_numpy(labels)
     upper, lower = ber_fn(X, y, k) if method == "KNN" else ber_fn(X, y)
-    return {"ber": upper, "ber_lower": lower}
+    return BEROutput(upper, lower)
