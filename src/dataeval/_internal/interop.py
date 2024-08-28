@@ -1,5 +1,5 @@
 from importlib import import_module
-from typing import Iterable, Optional, Sequence
+from typing import Iterable, Optional
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -18,16 +18,6 @@ def try_import(module_name):
 
     module_cache[module_name] = module
     return module
-
-
-def is_arraylike(obj) -> bool:
-    if obj is None:
-        return False
-    if obj is (bool, int, float, complex, str, bytes):
-        return True
-    if isinstance(obj, Sequence):
-        return True
-    return bool(hasattr(obj, "__array__"))
 
 
 def to_numpy(array: Optional[ArrayLike]) -> np.ndarray:
