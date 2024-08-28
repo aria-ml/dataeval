@@ -8,4 +8,4 @@ class TestUAP:
         _, labels = mnist()
         scores = np.zeros((1000, 10), dtype=float)
         result = uap(labels, scores)
-        assert result["uap"] > 0
+        assert result.uap > 0

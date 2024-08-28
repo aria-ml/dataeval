@@ -62,7 +62,7 @@ class TestAPIBER:
         # TODO: Mock patch _ber methods, just check output tuple -> dict
         images, labels = mnist()
         result = ber(images=images, labels=labels, k=k, method=method)
-        assert result == expected
+        assert result._asdict() == expected
 
     def test_torch_inputs(self):
         """Torch class correctly calls functional numpy math"""

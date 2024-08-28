@@ -10,8 +10,8 @@ class TestDivergence:
     @pytest.mark.parametrize(
         "method, output",
         [
-            ("MST", {"divergence": 0.8377897755491117, "error": 81}),
-            ("FNN", {"divergence": 0.8618209199122062, "error": 69}),
+            ("MST", {"divergence": 0.8377897755491117, "errors": 81}),
+            ("FNN", {"divergence": 0.8618209199122062, "errors": 69}),
         ],
     )
     def test_divergence(self, mnist, method, output):
@@ -29,4 +29,4 @@ class TestDivergence:
         even = even.reshape((even.shape[0], -1))
         odd = odd.reshape((odd.shape[0], -1))
         result = divergence(even, odd, method)
-        assert result == output
+        assert result._asdict() == output
