@@ -4,7 +4,7 @@ In this workflow, we will describe how a artificial intelligence (AI) engineer c
 
 ![DataEval Lifecycle](./figures/DataEval.png)
 
-# Data engineering
+## Data engineering
 
 
 First, in the **data engineering** stage, AI engineers assess the quality of the data for the desired task. For example, if a higher percentage of image are difficult to classify, and the operational requirements are high, the problem may need to be reformulated or reposed, or additional data will need to be collected. The diagnostic part of this stage is sometimes called *exploratory data analysis* (EDA). The AI engineer can make decisions with respect to problem feasibility or data hygiene following EDA.
@@ -27,7 +27,7 @@ In this particular case, there seems to be quite low diversity in cloud coverage
 
 Following these and potentially other analyses, the AI Engineer passes off the dataset for corresponding model development.
 
-# Model development
+## Model development
 
 The main responsibility of an AI engineer, and what differentiates them from others, is the selection and development of an AI/ML model for a desired task. Firstly, an AI engineer must determine if a model is *sufficient* for a given task. They can do this by estimating model performance on a dataset, and extrapolating that estimate out to the target dataset size. If the resulting estimate exceeds requirements, that is a good indication to the AI engineer that the model is sufficient for the task. An example visualization of this sufficiency check can be seen below: 
 
@@ -39,7 +39,7 @@ One other value displayed above is the maximum attainable performance. This valu
 
 Following these analyses, the AI engineer would use the processed data from the above section, and the selected model from this section, to train and deploy a machine learning model to perform the desired task. This model is now intelligently selected from candidate architectures, and is trained on a dataset which has been carefully checked for potential errors/bias.
 
-# Monitoring
+## Monitoring
 
 As an AI engineer, one is also responsible for *monitoring* deployed models. The purpose of the monitoring stage is to ensure that the data the model is being applied to resemble those on which the model was trained. It is not necessary for these data to be identically distributed, merely that differences between training and operational data will not affect performance. Detection of dataset drift or anomalous images can indicate to the AI engineer that additional training, or complete retraining, will need to occur in order for the model to perform similarly to test set performance.
 
