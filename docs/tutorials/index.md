@@ -6,7 +6,7 @@ various detectors, metrics and workflows to assess the suitability of a dataset 
 
 In addition to viewing them in our documentation, these notebooks can also be opened in Google Colab to be used interactively!
 
-- [Exploratory Data Analysis](EDA_Part1) [![Open In Colab][colab-badge]][eda-colab]
+- [Data Cleaning Guide](EDA_Part1) [![Open In Colab][colab-badge]][eda-colab]
 % [Identify Outliers and Assess Data Coverage](EDA Part2)
 % [Identifying Bias and Correlations Guide](EDA_Part3)
 
