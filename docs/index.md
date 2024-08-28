@@ -63,7 +63,8 @@ DataEval is a powerful toolkit for any data analysis workflow, so be sure to che
 
 ### [Workflows](workflows/index)
 
-Workflows give a user an idea of what sort of data evaluation their role necessitates and why. They are great for a non-technical explanation of data analysis.
+Workflows are role-specific guides that give an idea of the types of data analysis that will be done. \
+These guides are no-code, basic explanations for people getting started, but want more in-depth understanding!
 
 ### [How-To's](how_to/index)
 
