@@ -217,6 +217,14 @@ coverage:
 
 ### DOCS ###
 
+doctest:
+  stage: docs
+  extends: .harbor
+  needs: [build]
+  script:
+    - ./build --push doctest
+  rules: *on_run
+
 docs:
   stage: docs
   extends: .harbor
