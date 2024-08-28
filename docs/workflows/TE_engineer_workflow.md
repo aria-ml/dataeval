@@ -4,7 +4,7 @@ In this workflow, we will describe how a testing and evaluation (T&E) engineer c
 
 ![DataEval Lifecycle](./figures/DataEval.png)
 
-# Data engineering
+## Data engineering
 
 
 First, in the **data engineering** stage, T&E engineers assess the quality of the data for the desired task. For example, if a higher percentage of image are difficult to classify, and the operational requirements are high, the problem may need to be reformulated or reposed, or additional data will need to be collected. The diagnostic part of this stage is sometimes called *expratory data analysis* (EDA). The T&E engineer can make decisions with respect to problem feasibility or data hygiene following EDA.
@@ -27,7 +27,7 @@ In this particular case, there seems to be quite low diversity in cloud coverage
 
 Following these and potentially other analyses, the T&E Engineer passes off the dataset for corresponding model development.
 
-# Monitoring
+## Monitoring
 
 
 As a T&E engineer, one is also responsible for *monitoring* deployed models. The purpose of the monitoring stage is to ensure that the data the model is being applied to resemble those on which the model was trained. It is not necessary for these data to be identically distributed, merely that differences between training and operational data will not affect performance. Detection of dataset drift or anomalous images can indicate to the T&E engineer that additional training, or complete retraining, will need to occur in order for the model to perform similarly to test set performance.
