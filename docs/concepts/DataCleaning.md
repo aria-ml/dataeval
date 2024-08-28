@@ -92,14 +92,14 @@ regardless of the sophistication of the analysis.
 
 ## Data Cleaning with DataEval
 
-DataEval is a data analysis and monitoring library with some dedicated classes to data cleaning.
+DataEval is a data analysis and monitoring library with some dedicated classes for data cleaning.
 
 DataEval's data cleaning classes are:
 * [Linter](Linter.md) class,
-* [Duplicates](../reference/detectors/duplicates.md) class,
-* [ImageStats](../reference/metrics/imagestats.md) class,
-* [ChannelStats](../reference/metrics/channelstats.md) class, and
-* [Clusterer](../reference/detectors/clusterer.md) class.
+* [Duplicates](Duplicates.md) class,
+* [ImageStats](Stats.md#imagestats) class,
+* [ChannelStats](Stats.md#channelstats) class, and
+* [Clusterer](Clusterer.md) class.
 
 These classes facilitate the creation of dataset statistics and
 the identification of abnormal data points and duplicates. 
@@ -108,7 +108,7 @@ The **Linter** class analyzes the dataset statistics for outliers based on the c
 The **Duplicates** class identifies duplicate images.
 The **Clusterer** class clusters the data and identifies data points which do not fit into a cluster.
 
-To see data cleaning in action using DataEval, check out our [Exploratory Data Analysis](../tutorials/EDA_Part1.ipynb) tutorial.
+To see data cleaning in action using DataEval, check out our [Data Cleaning Guide](../tutorials/EDA_Part1.ipynb).
 
 (data-clean-metrics)=
 ### Data Cleaning Metrics

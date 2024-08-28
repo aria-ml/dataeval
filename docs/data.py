@@ -26,6 +26,7 @@ def download():
         # BayesErrorRateEstimationTutorial.ipynb
         # ClassLearningCurvesTutorial.ipynb
         # ClassLabelAnalysisTutorial.ipynb
+        # DuplicatesTutorial.ipynb
         MNIST.mirrors = ["https://ossci-datasets.s3.amazonaws.com/mnist/"]
         MNIST(root="./data", train=True, download=True)
         MNIST(root="./data", train=False, download=True)
@@ -33,7 +34,6 @@ def download():
         # LintingTutorial.ipynb
         CIFAR10(root="./data", train=False, download=True)
 
-        # DuplicatesTutorial.ipynb
         # DriftDetectionTutorial.ipynb
         # HPDivergenceTutorial.ipynb
         # OODDetectionTutorial.ipynb
