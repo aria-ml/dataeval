@@ -102,8 +102,8 @@ then be analyzed in the context of a given problem
 ```{eval-rst}
 .. autosummary::
 
-    metrics.ChannelStats
-    metrics.ImageStats
+    metrics.channelstats
+    metrics.imagestats
 ```
 :::
 ### Metadata/Label Exploration
@@ -146,7 +146,7 @@ flags/imagestatistics
 flags/imagevisuals
 :::
 
-Flags are used by the ImageStats, ChannelStats, Duplicates and Linter classes
+Flags are used by the `imagestats` and `channelstats` functions, as well as the `Duplicates` and `Linter` classes
 
 ```{eval-rst}
 .. autosummary::

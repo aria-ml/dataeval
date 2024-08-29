@@ -94,16 +94,16 @@ regardless of the sophistication of the analysis.
 
 DataEval is a data analysis and monitoring library with some dedicated classes for data cleaning.
 
-DataEval's data cleaning classes are:
+DataEval's data cleaning classes and functions are:
 * [Linter](Linter.md) class,
 * [Duplicates](Duplicates.md) class,
-* [ImageStats](Stats.md#imagestats) class,
-* [ChannelStats](Stats.md#channelstats) class, and
+* [imagestats](Stats.md#imagestats) function,
+* [channelstats](Stats.md#channelstats) function, and
 * [Clusterer](Clusterer.md) class.
 
 These classes facilitate the creation of dataset statistics and
 the identification of abnormal data points and duplicates. 
-The **ImageStats** and **ChannelStats** classes create dataset statistics on a per image and a per image per channel basis, respectively.
+The **imagestats** and **channelstats** functions create dataset statistics on a per image and a per image per channel basis, respectively.
 The **Linter** class analyzes the dataset statistics for outliers based on the chosen statistical method.
 The **Duplicates** class identifies duplicate images.
 The **Clusterer** class clusters the data and identifies data points which do not fit into a cluster.

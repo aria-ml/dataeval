@@ -38,32 +38,24 @@ from dataeval.flags import ImageHash, ImageProperties, ImageStatistics, ImageVis
 
 Then select the desired metrics and pass them to the desired class.
 
-ImageStats class example:
+imagestats function example:
 
 ```python
 # Select the desired data cleaning metrics
 flags = [ImageProperties.SIZE, ImageStatistics.MEAN]
 
-# Set the flags for the class
-stats = ImageStats(flags=flags)
-# Add the dataset
-stats.update(dataset)
-# Compute the stats
-result = stats.compute()
+# Compute the stats for the dataset
+result = imagestats(dataset, flags=flags)
 ```
 
-ChannelStats class example:
+channelstats function example:
 
 ```python
 # Select the desired data cleaning metrics
 flags = [ImageStatistics.MEAN, ImageStatistics.STD, ImageStatistics.ENTROPY]
 
-# Set the flags for the class
-stats = ChannelStats(flags=flags)
-# Add the dataset
-stats.update(dataset)
-# Compute the stats
-result = stats.compute()
+# Compute the stats for the dataset
+result = channelstats(dataset, flags=flags)
 ```
 
 Linter class example:
