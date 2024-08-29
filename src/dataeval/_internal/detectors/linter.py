@@ -4,7 +4,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 from dataeval._internal.flags import ImageProperty, ImageVisuals, LinterFlags
-from dataeval._internal.metrics.stats import ImageStats
+from dataeval.metrics import imagestats
 
 
 def _get_outlier_mask(
@@ -46,8 +46,8 @@ class Linter:
 
     Attributes
     ----------
-    stats : ImageStats
-        Class to hold the value of each metric for each image
+    stats : Dict[str, Any]
+        Dictionary to hold the value of each metric for each image
 
     See Also
     --------
@@ -98,15 +98,14 @@ class Linter:
         outlier_method: Literal["zscore", "modzscore", "iqr"] = "modzscore",
         outlier_threshold: Optional[float] = None,
     ):
-        flags = flags if flags is not None else (ImageProperty.ALL, ImageVisuals.ALL)
-        self.stats = ImageStats(flags)
+        self.flags = flags if flags is not None else (ImageProperty.ALL, ImageVisuals.ALL)
         self.outlier_method: Literal["zscore", "modzscore", "iqr"] = outlier_method
         self.outlier_threshold = outlier_threshold
 
     def _get_outliers(self) -> dict:
         flagged_images = {}
 
-        for stat, values in self.results.items():
+        for stat, values in self.stats.items():
             if not isinstance(values, np.ndarray):
                 continue
 
@@ -141,7 +140,5 @@ class Linter:
         >>> lint.evaluate(images)
         {18: {'brightness': 0.78}, 25: {'brightness': 0.98}}
         """
-        self.stats.reset()
-        self.stats.update(images)
-        self.results = self.stats.compute()
+        self.stats = imagestats(images, self.flags)
         return self._get_outliers()

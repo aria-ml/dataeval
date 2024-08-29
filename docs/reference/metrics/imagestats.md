@@ -1,8 +1,8 @@
 (imagestats_ref)=
 # Image Statistics
 
-The basic `ImageStats` class assists with understanding the dataset.
-This class can be used in conjunction with the `Linter` class to determine
+The `imagestats` function assists with understanding the dataset.
+This function can be used in conjunction with the `Linter` class to determine
 if there are any issues with any of the images in the dataset.
 
 This class can be used to get a big picture view of the dataset and it's underlying distribution.
@@ -38,25 +38,23 @@ Below shows the statistics each category calculates.
  - pixel percentiles (min, max, 25th, 50th, and 75th percentile values)
  - histogram of pixel values
 
-In addition to the above stats, the `ImageStats` class also defines a hash for each image to be used
+In addition to the above stats, the `imagestats` function also defines a hash for each image to be used
 in conjunction with the `Duplicates` class in order to identify duplicate images.
 
 ## Tutorials
 
-To see how the ImageStats class can be used while doing exploratory data analysis, check out the _EDA Part 1_ tutorial.
+To see how the `imagestats` function can be used while doing exploratory data analysis, check out the _EDA Part 1_ tutorial.
 
 {doc}`Exploratory Data Analysis Part 1<../../tutorials/EDA_Part1>`
 
 ## How To Guides
 
-There is a how-to guide that applies to the `ImageStats` class.
+There is a how-to guide that applies to the `imagestats` function.
 
 * [How to customize the metrics for data cleaning](../../how_to/linting_flags.md)
 
 ## DataEval API
 
 ```{eval-rst}
-.. autoclass:: dataeval.metrics.ImageStats
-   :members:
-   :inherited-members:
+.. autofunction:: dataeval.metrics.imagestats
 ```

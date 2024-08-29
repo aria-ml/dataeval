@@ -2,22 +2,21 @@ import numpy as np
 import pytest
 
 from dataeval._internal.detectors.linter import Linter, _get_outlier_mask
-from dataeval._internal.flags import ImageStatistics
+from dataeval._internal.flags import ImageProperty, ImageStatistics, ImageVisuals
 
 
 class TestLinter:
     def test_linter(self):
         linter = Linter()
         results = linter.evaluate(np.random.random((1000, 3, 16, 16)))
-        assert len(linter.stats._metrics_dict) == 2
+        assert len(linter.stats) == len(ImageVisuals.ALL) + len(ImageProperty.ALL)
         assert results is not None
 
     def test_linter_custom(self):
         linter = Linter(ImageStatistics.ENTROPY)
-        assert len(linter.stats._metrics_dict) == 1
-        metric = next(iter(linter.stats._metrics_dict))
-        assert metric.flags == ImageStatistics.ENTROPY
         results = linter.evaluate(np.random.random((1000, 3, 16, 16)))
+        assert len(linter.stats) == 1
+        assert "entropy" in linter.stats
         assert results is not None
 
     @pytest.mark.parametrize("method", ["zscore", "modzscore", "iqr"])
