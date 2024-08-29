@@ -2,7 +2,7 @@ from typing import Dict, Iterable, List, Literal
 
 from numpy.typing import ArrayLike
 
-from dataeval._internal.flags import ImageHash
+from dataeval.flags import ImageStat
 from dataeval.metrics import imagestats
 
 
@@ -22,6 +22,9 @@ class Duplicates:
 
     >>> dups = Duplicates()
     """
+
+    def __init__(self):
+        self.stats = {}
 
     def _get_duplicates(self) -> dict:
         exact = {}
@@ -64,5 +67,5 @@ class Duplicates:
         >>> dups.evaluate(images)
         {'exact': [[3, 20], [16, 37]], 'near': [[3, 20, 22], [12, 18], [13, 36], [14, 31], [17, 27], [19, 38, 47]]}
         """
-        self.stats = imagestats(images, ImageHash.ALL)
+        self.stats = imagestats(images, ImageStat.ALL_HASHES)
         return self._get_duplicates()

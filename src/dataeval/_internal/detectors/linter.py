@@ -1,9 +1,10 @@
-from typing import Iterable, Literal, Optional, Sequence, Union
+from typing import Iterable, Literal, Optional
 
 import numpy as np
 from numpy.typing import ArrayLike
 
-from dataeval._internal.flags import ImageProperty, ImageVisuals, LinterFlags
+from dataeval._internal.flags import verify_supported
+from dataeval.flags import ImageStat
 from dataeval.metrics import imagestats
 
 
@@ -36,8 +37,9 @@ class Linter:
 
     Parameters
     ----------
-    flags : [ImageProperty | ImageStatistics | ImageVisuals], default None
+    flags : ImageStat, default ImageStat.ALL_PROPERTIES | ImageStat.ALL_VISUALS
         Metric(s) to calculate for each image - calculates all metrics if None
+        Only supports ImageStat.ALL_PROPERTIES | ImageStat.ALL_VISUALS | ImageStat.ALL_STATISTICS
     outlier_method : ["modzscore" | "zscore" | "iqr"], optional - default "modzscore"
         Statistical method used to identify outliers
     outlier_threshold : float, optional - default None
@@ -81,7 +83,7 @@ class Linter:
 
     Specifying specific metrics to analyze:
 
-    >>> lint = Linter(flags=[ImageProperty.SIZE, ImageVisuals.ALL])
+    >>> lint = Linter(flags=ImageStat.SIZE | ImageStat.ALL_VISUALS)
 
     Specifying an outlier method:
 
@@ -94,11 +96,12 @@ class Linter:
 
     def __init__(
         self,
-        flags: Optional[Union[LinterFlags, Sequence[LinterFlags]]] = None,
+        flags: ImageStat = ImageStat.ALL_PROPERTIES | ImageStat.ALL_VISUALS,
         outlier_method: Literal["zscore", "modzscore", "iqr"] = "modzscore",
         outlier_threshold: Optional[float] = None,
     ):
-        self.flags = flags if flags is not None else (ImageProperty.ALL, ImageVisuals.ALL)
+        verify_supported(flags, ImageStat.ALL_PROPERTIES | ImageStat.ALL_VISUALS | ImageStat.ALL_STATISTICS)
+        self.flags = flags
         self.outlier_method: Literal["zscore", "modzscore", "iqr"] = outlier_method
         self.outlier_threshold = outlier_threshold
 

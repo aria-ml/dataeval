@@ -1,68 +1,75 @@
 # How to customize the metrics for data cleaning
 
-There are 4 categories of metrics for data cleaning:
+There are 4 categories of metrics for data cleaning which are available on the [ImageStat](../reference/flags/imagestat.md) class.
 
-* ImageHash
-  - XXHASH
-  - PCHASH
+* Image Hashing
+  - `XXHASH`
+  - `PCHASH`
   
-* ImageProperties
-  - WIDTH
-  - HEIGHT
-  - SIZE
-  - ASPECT_RATIO
-  - CHANNELS
-  - DEPTH
+* Image Properties
+  - `WIDTH`
+  - `HEIGHT`
+  - `SIZE`
+  - `ASPECT_RATIO`
+  - `CHANNELS`
+  - `DEPTH`
 
-* ImageStatistics
-  - MEAN
-  - STD
-  - VAR
-  - SKEW
-  - KURTOSIS
-  - ENTROPY
-  - PERCENTILES
-  - HISTOGRAM
+* Image Statistics
+  - `MEAN`
+  - `STD`
+  - `VAR`
+  - `SKEW`
+  - `KURTOSIS`
+  - `ENTROPY`
+  - `PERCENTILES`
+  - `HISTOGRAM`
 
-* ImageVisuals
-  - BRIGHTNESS
-  - BLURRINESS
-  - MISSING
-  - ZERO
+* Image Visuals
+  - `BRIGHTNESS`
+  - `BLURRINESS`
+  - `MISSING`
+  - `ZERO`
+
+Additionally there are flag groups which are convenient groupings of all metrics in a category:
+
+* `ALL_HASHES`
+* `ALL_PROPERTIES`
+* `ALL_STATISTICS`
+* `ALL_VISUALS`
 
 To select a custom set of metrics, load in the category:
 
 ```python
-from dataeval.flags import ImageHash, ImageProperties, ImageStatistics, ImageVisuals
+from dataeval.metrics import ImageStat
 ```
 
 Then select the desired metrics and pass them to the desired class.
 
-imagestats function example:
+`imagestats` function example:
 
 ```python
 # Select the desired data cleaning metrics
-flags = [ImageProperties.SIZE, ImageStatistics.MEAN]
+flags = ImageStat.SIZE | ImageStat.MEAN
 
 # Compute the stats for the dataset
 result = imagestats(dataset, flags=flags)
 ```
 
-channelstats function example:
+`channelstats` function example:
 
 ```python
 # Select the desired data cleaning metrics
-flags = [ImageStatistics.MEAN, ImageStatistics.STD, ImageStatistics.ENTROPY]
+flags = ImageStat.MEAN | ImageStat.STD | ImageStat.ENTROPY
 
 # Compute the stats for the dataset
 result = channelstats(dataset, flags=flags)
 ```
 
-Linter class example:
+`Linter` class example:
 
 ```python
 # Select the desired data cleaning metrics
-flags = [ImageVisuals.BRIGHTNESS]
+flags = ImageStat.BRIGHTNESS
 
 # Set the flags for the class
 lints = Linter(dataset, flags=flags)
