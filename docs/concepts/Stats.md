@@ -6,18 +6,14 @@
 
 The imagestats function is an aggregate metric that calculates various values for each individual image for the selected metrics.  
 
-The available metrics are defined by their respective flag class:
-* [ImageHash](../reference/flags/imagehash.md)
-* [ImageProperty](../reference/flags/imageproperty.md)
-* [ImageStatistics](../reference/flags/imagestatistics.md)
-* [ImageVisuals](../reference/flags/imagevisuals.md)
+The available metrics are defined in the [ImageStat](../reference/flags/imagestat.md) flags.
 
 ## channelstats
 
 ### What is the channelstats function
 
 The channelstats function is an aggregate metric that calculates various values for each individual image on a per channel basis for the selected metrics.
-Unlike the imagestats function, this function only works with the [ImageStatistics](../reference/flags/imagestatistics.md) flags.
+Unlike the imagestats function, this function only works with the Image Statistics subset of the [ImageStat](../reference/flags/imagestat.md) flags.
 
 ### When to use the channelstats function
 

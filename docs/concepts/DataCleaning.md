@@ -92,16 +92,16 @@ regardless of the sophistication of the analysis.
 
 ## Data Cleaning with DataEval
 
-DataEval is a data analysis and monitoring library with some dedicated classes for data cleaning.
+DataEval is a data analysis and monitoring library with some dedicated functions and classes for data cleaning.
 
-DataEval's data cleaning classes and functions are:
-* [Linter](Linter.md) class,
-* [Duplicates](Duplicates.md) class,
+DataEval's data cleaning functions and classes are:
 * [imagestats](Stats.md#imagestats) function,
-* [channelstats](Stats.md#channelstats) function, and
+* [channelstats](Stats.md#channelstats) function,
+* [Linter](Linter.md) class,
+* [Duplicates](Duplicates.md) class, and
 * [Clusterer](Clusterer.md) class.
 
-These classes facilitate the creation of dataset statistics and
+These functions and classes facilitate the creation of dataset statistics and
 the identification of abnormal data points and duplicates. 
 The **imagestats** and **channelstats** functions create dataset statistics on a per image and a per image per channel basis, respectively.
 The **Linter** class analyzes the dataset statistics for outliers based on the chosen statistical method.
@@ -116,11 +116,11 @@ To see data cleaning in action using DataEval, check out our [Data Cleaning Guid
 Below is a list of all of the metrics available for analysis and the overarching flag category the metric belongs to.
 Each category has an _ALL_ method which selects all metrics in that category.
 
-* ImageHash
+* Image Hash (ALL_HASHES)
   - XXHASH
   - PCHASH
 
-* ImageProperty
+* Image Properties (ALL_PROPERTIES)
   - WIDTH
   - HEIGHT
   - SIZE
@@ -128,7 +128,7 @@ Each category has an _ALL_ method which selects all metrics in that category.
   - CHANNELS
   - DEPTH
 
-* ImageStatistics
+* Image Statistics (ALL_STATISTICS)
   - MEAN
   - STD
   - VAR
@@ -138,7 +138,7 @@ Each category has an _ALL_ method which selects all metrics in that category.
   - PERCENTILES
   - HISTOGRAM
 
-* ImageVisuals
+* Image Visuals (ALL_VISUALS)
   - BRIGHTNESS
   - BLURRINESS
   - MISSING

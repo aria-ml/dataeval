@@ -1,37 +1,29 @@
-from enum import Flag, auto
-from typing import Union
+from enum import IntFlag, auto
+from functools import reduce
+from typing import Iterable, Set, TypeVar, Union, cast
 
 
-class auto_all:
-    def __get__(self, _, cls):
-        return ~cls(0)
+class ImageStat(IntFlag):
+    """
+    Flags for calculating image and channel statistics
+    """
 
-
-class ImageHash(Flag):
+    # HASHES
     XXHASH = auto()
     PCHASH = auto()
-    ALL = auto_all()
-
-
-class ImageProperty(Flag):
+    # PROPERTIES
     WIDTH = auto()
     HEIGHT = auto()
     SIZE = auto()
     ASPECT_RATIO = auto()
     CHANNELS = auto()
     DEPTH = auto()
-    ALL = auto_all()
-
-
-class ImageVisuals(Flag):
+    # VISUALS
     BRIGHTNESS = auto()
     BLURRINESS = auto()
     MISSING = auto()
     ZERO = auto()
-    ALL = auto_all()
-
-
-class ImageStatistics(Flag):
+    # STATS
     MEAN = auto()
     STD = auto()
     VAR = auto()
@@ -40,8 +32,33 @@ class ImageStatistics(Flag):
     ENTROPY = auto()
     PERCENTILES = auto()
     HISTOGRAM = auto()
-    ALL = auto_all()
+    # JOINT FLAGS
+    ALL_HASHES = XXHASH | PCHASH
+    ALL_PROPERTIES = WIDTH | HEIGHT | SIZE | ASPECT_RATIO | CHANNELS | DEPTH
+    ALL_VISUALS = BRIGHTNESS | BLURRINESS | MISSING | ZERO
+    ALL_STATISTICS = MEAN | STD | VAR | SKEW | KURTOSIS | ENTROPY | PERCENTILES | HISTOGRAM
+    ALL = ALL_HASHES | ALL_PROPERTIES | ALL_VISUALS | ALL_STATISTICS
 
 
-ImageStatsFlags = Union[ImageHash, ImageProperty, ImageVisuals, ImageStatistics]
-LinterFlags = Union[ImageProperty, ImageVisuals, ImageStatistics]
+TFlag = TypeVar("TFlag", bound=IntFlag)
+
+
+def to_set(flag: TFlag) -> Set[TFlag]:
+    """
+    Returns a distinct set of all flags set on the input flag
+
+    NOTE: this is supported natively in Python 3.11, but for earlier versions we need
+    to use a combination of list comprehension and bit fiddling to determine distinct
+    flag values from joint aliases.
+    """
+    if isinstance(flag, Iterable):  # >= py311
+        return set(flag)
+    else:  # < py311
+        return {f for f in list(flag.__class__) if f & flag and (f & (f - 1) == 0) and f != 0}
+
+
+def verify_supported(flag: TFlag, flags: Union[TFlag, Iterable[TFlag]]):
+    supported = flags if isinstance(flags, flag.__class__) else cast(TFlag, reduce(lambda a, b: a | b, flags))  # type: ignore
+    unsupported = flag & ~supported
+    if unsupported:
+        raise ValueError(f"Unsupported flags {unsupported} called.  Only {supported} flags are supported.")

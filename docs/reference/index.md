@@ -140,21 +140,15 @@ Flags
 :hidden:
 :titlesonly:
 
-flags/imagehash
-flags/imageproperty
-flags/imagestatistics
-flags/imagevisuals
+flags/imagestat
 :::
 
-Flags are used by the `imagestats` and `channelstats` functions, as well as the `Duplicates` and `Linter` classes
+Flags are used by the `imagestats` and `channelstats` functions, as well as the `Linter` class
 
 ```{eval-rst}
 .. autosummary::
 
-    flags.ImageHash
-    flags.ImageProperty
-    flags.ImageStatistics
-    flags.ImageVisuals
+    flags.ImageStat
 ```
 
 Workflows
