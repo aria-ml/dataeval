@@ -100,7 +100,7 @@ class Linter:
         outlier_method: Literal["zscore", "modzscore", "iqr"] = "modzscore",
         outlier_threshold: Optional[float] = None,
     ):
-        verify_supported(flags, ImageStat.ALL_PROPERTIES | ImageStat.ALL_VISUALS | ImageStat.ALL_PIXELSTATS)
+        verify_supported(flags, ImageStat.ALL_STATS)
         self.flags = flags
         self.outlier_method: Literal["zscore", "modzscore", "iqr"] = outlier_method
         self.outlier_threshold = outlier_threshold
