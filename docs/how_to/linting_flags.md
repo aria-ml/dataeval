@@ -1,6 +1,6 @@
 # How to customize the metrics for data cleaning
 
-There are 4 categories of metrics for data cleaning which are available on the [ImageStat](../reference/flags/imagestat.md) class.
+There are 4 categories of metrics for data cleaning which are available on the [ImageStat](../reference/flags/imagestat.md) flag class.
 
 * Image Hashing
   - `XXHASH`
