@@ -6,15 +6,7 @@ There are 4 categories of metrics for data cleaning which are available on the [
   - `XXHASH`
   - `PCHASH`
   
-* Image Properties
-  - `WIDTH`
-  - `HEIGHT`
-  - `SIZE`
-  - `ASPECT_RATIO`
-  - `CHANNELS`
-  - `DEPTH`
-
-* Image Statistics
+* Image Pixel Statistics
   - `MEAN`
   - `STD`
   - `VAR`
@@ -23,6 +15,14 @@ There are 4 categories of metrics for data cleaning which are available on the [
   - `ENTROPY`
   - `PERCENTILES`
   - `HISTOGRAM`
+
+* Image Properties
+  - `WIDTH`
+  - `HEIGHT`
+  - `SIZE`
+  - `ASPECT_RATIO`
+  - `CHANNELS`
+  - `DEPTH`
 
 * Image Visuals
   - `BRIGHTNESS`
@@ -33,8 +33,8 @@ There are 4 categories of metrics for data cleaning which are available on the [
 Additionally there are flag groups which are convenient groupings of all metrics in a category:
 
 * `ALL_HASHES`
+* `ALL_PIXELSTATS`
 * `ALL_PROPERTIES`
-* `ALL_STATISTICS`
 * `ALL_VISUALS`
 
 To select a custom set of metrics, load in the category:

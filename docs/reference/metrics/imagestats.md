@@ -15,28 +15,28 @@ The stats delivered by the class is broken down into 3 main categories:
 Below shows the statistics each category calculates.
 
 * Image Properties
- - height
- - width
- - size
- - aspect ratio
- - number of channels
- - pixel value range
+ - height (uint16)
+ - width (uint16)
+ - channels (uint8)
+ - size (uint32)
+ - aspect ratio (float16)
+ - pixel value range (uint8)
 
 * Image Visuals
- - image brightness
- - image blurriness
- - missing values (NaNs)
- - number of 0 value pixels
+ - image brightness (float16)
+ - image blurriness (float16)
+ - missing values (NaNs) (float16)
+ - number of 0 value pixels (float16)
 
 * Pixel Statistics
- - mean pixel value
- - pixel value standard deviation
- - pixel value variance
- - pixel value skew
- - pixel value kurtosis
- - entropy of the image
- - pixel percentiles (min, max, 25th, 50th, and 75th percentile values)
- - histogram of pixel values
+ - mean pixel value (float16)
+ - pixel value standard deviation (float16)
+ - pixel value variance (float16)
+ - pixel value skew (float16)
+ - pixel value kurtosis (float16)
+ - entropy of the image (float16)
+ - pixel percentiles (min, max, 25th, 50th, and 75th percentile values) (float32)
+ - histogram of pixel values (uint32)
 
 In addition to the above stats, the `imagestats` function also defines a hash for each image to be used
 in conjunction with the `Duplicates` class in order to identify duplicate images.
