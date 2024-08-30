@@ -120,16 +120,6 @@ Each category has an _ALL_ method which selects all metrics in that category.
   - XXHASH
   - PCHASH
 
-* Image Pixel Statistics (ALL_PIXELSTATS)
-  - MEAN
-  - STD
-  - VAR
-  - SKEW
-  - KURTOSIS
-  - ENTROPY
-  - PERCENTILES
-  - HISTOGRAM
-
 * Image Properties (ALL_PROPERTIES)
   - WIDTH
   - HEIGHT
@@ -143,3 +133,13 @@ Each category has an _ALL_ method which selects all metrics in that category.
   - BLURRINESS
   - MISSING
   - ZERO
+
+* Pixel Statistics (ALL_PIXELSTATS)
+  - MEAN
+  - STD
+  - VAR
+  - SKEW
+  - KURTOSIS
+  - ENTROPY
+  - PERCENTILES
+  - HISTOGRAM

@@ -11,7 +11,7 @@ the normal statistics for each pixel value on a per channel basis.
  - pixel value skew (float16)
  - pixel value kurtosis (float16)
  - entropy of the image (float16)
- - pixel percentiles (min, max, 25th, 50th, and 75th percentile values) (float32)
+ - pixel percentiles (min, max, 25th, 50th, and 75th percentile values) (float16)
  - histogram of pixel values (uint32)
 
 ## Tutorials
