@@ -4,6 +4,16 @@
 The `channelstats` function is similar to the `imagestats` function except that it only calculates
 the normal statistics for each pixel value on a per channel basis.
 
+* Pixel Statistics (Per Channel)
+ - mean pixel value (float16)
+ - pixel value standard deviation (float16)
+ - pixel value variance (float16)
+ - pixel value skew (float16)
+ - pixel value kurtosis (float16)
+ - entropy of the image (float16)
+ - pixel percentiles (min, max, 25th, 50th, and 75th percentile values) (float32)
+ - histogram of pixel values (uint32)
+
 ## Tutorials
 
 To see how the `channelstats` function can be used while doing exploratory data analysis, check out the _EDA Part 1_ tutorial.

@@ -4,7 +4,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 from scipy.stats import entropy, kurtosis, skew
 
-from dataeval._internal.flags import ImageStat, to_set, verify_supported
+from dataeval._internal.flags import ImageStat, to_distinct, verify_supported
 from dataeval._internal.interop import to_numpy_iter
 from dataeval._internal.metrics.utils import edge_filter, get_bitdepth, normalize_image_shape, pchash, rescale, xxhash
 
@@ -13,35 +13,35 @@ QUARTILES = (0, 25, 50, 75, 100)
 IMAGESTATS_FN_MAP: Dict[ImageStat, Callable[[np.ndarray], Any]] = {
     ImageStat.XXHASH: lambda x: xxhash(x),
     ImageStat.PCHASH: lambda x: pchash(x),
-    ImageStat.WIDTH: lambda x: np.int32(x.shape[-1]),
-    ImageStat.HEIGHT: lambda x: np.int32(x.shape[-2]),
-    ImageStat.CHANNELS: lambda x: np.int32(x.shape[-3]),
-    ImageStat.SIZE: lambda x: np.int32(x.shape[-1] * x.shape[-2]),
-    ImageStat.ASPECT_RATIO: lambda x: x.shape[-1] / np.int32(x.shape[-2]),
-    ImageStat.DEPTH: lambda x: get_bitdepth(x).depth,
-    ImageStat.BRIGHTNESS: lambda x: np.mean(x),
-    ImageStat.BLURRINESS: lambda x: np.std(edge_filter(np.mean(x, axis=0))),
-    ImageStat.MISSING: lambda x: np.sum(np.isnan(x)),
-    ImageStat.ZERO: lambda x: np.int32(np.count_nonzero(x == 0)),
-    ImageStat.MEAN: lambda x: np.mean(x),
-    ImageStat.STD: lambda x: np.std(x),
-    ImageStat.VAR: lambda x: np.var(x),
-    ImageStat.SKEW: lambda x: np.float32(skew(x.ravel())),
-    ImageStat.KURTOSIS: lambda x: np.float32(kurtosis(x.ravel())),
-    ImageStat.PERCENTILES: lambda x: np.percentile(x, q=QUARTILES),
-    ImageStat.HISTOGRAM: lambda x: np.histogram(x, 256, (0, 1))[0],
-    ImageStat.ENTROPY: lambda x: np.float32(entropy(x)),
+    ImageStat.WIDTH: lambda x: np.uint16(x.shape[-1]),
+    ImageStat.HEIGHT: lambda x: np.uint16(x.shape[-2]),
+    ImageStat.CHANNELS: lambda x: np.uint8(x.shape[-3]),
+    ImageStat.SIZE: lambda x: np.uint32(np.prod(x.shape[-2:])),
+    ImageStat.ASPECT_RATIO: lambda x: np.float16(x.shape[-1] / x.shape[-2]),
+    ImageStat.DEPTH: lambda x: np.uint8(get_bitdepth(x).depth),
+    ImageStat.BRIGHTNESS: lambda x: np.float16(np.mean(x)),
+    ImageStat.BLURRINESS: lambda x: np.float16(np.std(edge_filter(np.mean(x, axis=0)))),
+    ImageStat.MISSING: lambda x: np.float16(np.sum(np.isnan(x)) / np.prod(x.shape[-2:])),
+    ImageStat.ZERO: lambda x: np.float16(np.count_nonzero(x == 0) / np.prod(x.shape[-2:])),
+    ImageStat.MEAN: lambda x: np.float16(np.mean(x)),
+    ImageStat.STD: lambda x: np.float16(np.std(x)),
+    ImageStat.VAR: lambda x: np.float16(np.var(x)),
+    ImageStat.SKEW: lambda x: np.float16(skew(x.ravel())),
+    ImageStat.KURTOSIS: lambda x: np.float16(kurtosis(x.ravel())),
+    ImageStat.PERCENTILES: lambda x: np.float16(np.percentile(x, q=QUARTILES)),
+    ImageStat.HISTOGRAM: lambda x: np.uint32(np.histogram(x, 256, (0, 1))[0]),
+    ImageStat.ENTROPY: lambda x: np.float16(entropy(x)),
 }
 
 CHANNELSTATS_FN_MAP: Dict[ImageStat, Callable[[np.ndarray], Any]] = {
-    ImageStat.MEAN: lambda x: np.mean(x, axis=1),
-    ImageStat.STD: lambda x: np.std(x, axis=1),
-    ImageStat.VAR: lambda x: np.var(x, axis=1),
-    ImageStat.SKEW: lambda x: skew(x, axis=1),
-    ImageStat.KURTOSIS: lambda x: kurtosis(x, axis=1),
-    ImageStat.PERCENTILES: lambda x: np.percentile(x, q=QUARTILES, axis=1).T,
-    ImageStat.HISTOGRAM: lambda x: np.apply_along_axis(lambda y: np.histogram(y, 256, (0, 1))[0], 1, x),
-    ImageStat.ENTROPY: lambda x: entropy(x, axis=1),
+    ImageStat.MEAN: lambda x: np.float16(np.mean(x, axis=1)),
+    ImageStat.STD: lambda x: np.float16(np.std(x, axis=1)),
+    ImageStat.VAR: lambda x: np.float16(np.var(x, axis=1)),
+    ImageStat.SKEW: lambda x: np.float16(skew(x, axis=1)),
+    ImageStat.KURTOSIS: lambda x: np.float16(kurtosis(x, axis=1)),
+    ImageStat.PERCENTILES: lambda x: np.float16(np.percentile(x, q=QUARTILES, axis=1).T),
+    ImageStat.HISTOGRAM: lambda x: np.uint32(np.apply_along_axis(lambda y: np.histogram(y, 256, (0, 1))[0], 1, x)),
+    ImageStat.ENTROPY: lambda x: np.float16(entropy(x, axis=1)),
 }
 
 
@@ -52,7 +52,7 @@ def run_stats(
     flatten: bool,
 ):
     verify_supported(flags, fn_map)
-    flag_set = to_set(flags)
+    flag_dict = to_distinct(flags)
 
     results_list: List[Dict[str, np.ndarray]] = []
     for image in to_numpy_iter(images):
@@ -60,11 +60,8 @@ def run_stats(
         scaled = None
         hist = None
         output: Dict[str, np.ndarray] = {}
-        for flag in flag_set:
-            if flag.name is None:
-                raise TypeError(f"Unrecognized stat flag {flag}")
-            stat = flag.name.lower()
-            if flag & (ImageStat.ALL_STATISTICS | ImageStat.BRIGHTNESS):
+        for flag, stat in flag_dict.items():
+            if flag & (ImageStat.ALL_PIXELSTATS | ImageStat.BRIGHTNESS):
                 if scaled is None:
                     scaled = rescale(normalized).reshape(image.shape[0], -1) if flatten else rescale(normalized)
                 if flag & (ImageStat.HISTOGRAM | ImageStat.ENTROPY):
@@ -79,7 +76,7 @@ def run_stats(
     return results_list
 
 
-def imagestats(images: Iterable[ArrayLike], flags: ImageStat = ImageStat.ALL) -> Dict[str, Any]:
+def imagestats(images: Iterable[ArrayLike], flags: ImageStat = ImageStat.ALL_STATS) -> Dict[str, Any]:
     """
     Calculates various image property statistics
 
@@ -87,14 +84,14 @@ def imagestats(images: Iterable[ArrayLike], flags: ImageStat = ImageStat.ALL) ->
     ----------
     images : Iterable[ArrayLike]
         Images to run statistical tests on
-    flags : ImageStat, default ImageStat.ALL
+    flags : ImageStat, default ImageStat.ALL_STATS
         Metric(s) to calculate for each image
 
     Returns
     -------
     Dict[str, Any]
     """
-    stats = run_stats(images, flags or ImageStat.ALL, IMAGESTATS_FN_MAP, False)
+    stats = run_stats(images, flags, IMAGESTATS_FN_MAP, False)
     output = {}
     length = len(stats)
     for i, results in enumerate(stats):
@@ -107,7 +104,7 @@ def imagestats(images: Iterable[ArrayLike], flags: ImageStat = ImageStat.ALL) ->
     return output
 
 
-def channelstats(images: Iterable[ArrayLike], flags=ImageStat.ALL_STATISTICS) -> Dict[str, Any]:
+def channelstats(images: Iterable[ArrayLike], flags=ImageStat.ALL_PIXELSTATS) -> Dict[str, Any]:
     """
     Calculates various image statistics per channel
 
@@ -115,9 +112,9 @@ def channelstats(images: Iterable[ArrayLike], flags=ImageStat.ALL_STATISTICS) ->
     ----------
     images : Iterable[ArrayLike]
         Images to run statistical tests on
-    flags: ImageStat, default ImageStat.ALL_STATISTICS
+    flags: ImageStat, default ImageStat.ALL_PIXELSTATS
         Statistic(s) to calculate for each image per channel
-        Only flags in the ImageStat.ALL_STATISTICS category are supported
+        Only flags in the ImageStat.ALL_PIXELSTATS category are supported
 
     Returns
     -------

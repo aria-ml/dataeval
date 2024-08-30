@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval._internal.flags import ImageStat, to_set
+from dataeval._internal.flags import ImageStat, to_distinct
 from dataeval.metrics import channelstats, imagestats
 
 
@@ -12,12 +12,12 @@ def get_dataset(count: int, channels: int):
 class TestImageStats:
     def test_image_stats_single_channel(self):
         results = imagestats(get_dataset(100, 1))
-        assert len(results) == len(to_set(ImageStat.ALL))
+        assert len(results) == len(to_distinct(ImageStat.ALL_STATS))
         assert len(results["mean"]) == 100
 
     def test_image_stats_triple_channel(self):
         results = imagestats(get_dataset(100, 3))
-        assert len(results) == len(to_set(ImageStat.ALL))
+        assert len(results) == len(to_distinct(ImageStat.ALL_STATS))
         assert len(results["mean"]) == 100
 
     def test_image_stats_hashes_only(self):
@@ -52,13 +52,13 @@ class TestImageStats:
 class TestChannelStats:
     def test_channel_stats_single_channel(self):
         results = channelstats(get_dataset(100, 1))
-        assert len(results) == len(to_set(ImageStat.ALL_STATISTICS)) + 1
+        assert len(results) == len(to_distinct(ImageStat.ALL_PIXELSTATS)) + 1
         assert len(results["mean"]) == 1
         assert results["mean"][1].shape == (1, 100)
 
     def test_channel_stats_triple_channel(self):
         results = channelstats(get_dataset(100, 3))
-        assert len(results) == len(to_set(ImageStat.ALL_STATISTICS)) + 1
+        assert len(results) == len(to_distinct(ImageStat.ALL_PIXELSTATS)) + 1
         assert len(results["mean"]) == 1
         assert results["mean"][3].shape == (3, 100)
 
@@ -71,7 +71,7 @@ class TestChannelStats:
         data_triple = get_dataset(50, 3)
         data_single = get_dataset(50, 1)
         results = channelstats(data_triple + data_single)
-        assert len(results) == len(to_set(ImageStat.ALL_STATISTICS)) + 1
+        assert len(results) == len(to_distinct(ImageStat.ALL_PIXELSTATS)) + 1
         assert len(results["mean"]) == 2
         assert results["mean"][3].shape == (3, 50)
         assert results["mean"][1].shape == (1, 50)

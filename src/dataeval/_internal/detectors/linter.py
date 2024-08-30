@@ -39,7 +39,7 @@ class Linter:
     ----------
     flags : ImageStat, default ImageStat.ALL_PROPERTIES | ImageStat.ALL_VISUALS
         Metric(s) to calculate for each image - calculates all metrics if None
-        Only supports ImageStat.ALL_PROPERTIES | ImageStat.ALL_VISUALS | ImageStat.ALL_STATISTICS
+        Only supports ImageStat.ALL_STATS
     outlier_method : ["modzscore" | "zscore" | "iqr"], optional - default "modzscore"
         Statistical method used to identify outliers
     outlier_threshold : float, optional - default None
@@ -100,7 +100,7 @@ class Linter:
         outlier_method: Literal["zscore", "modzscore", "iqr"] = "modzscore",
         outlier_threshold: Optional[float] = None,
     ):
-        verify_supported(flags, ImageStat.ALL_PROPERTIES | ImageStat.ALL_VISUALS | ImageStat.ALL_STATISTICS)
+        verify_supported(flags, ImageStat.ALL_PROPERTIES | ImageStat.ALL_VISUALS | ImageStat.ALL_PIXELSTATS)
         self.flags = flags
         self.outlier_method: Literal["zscore", "modzscore", "iqr"] = outlier_method
         self.outlier_threshold = outlier_threshold
