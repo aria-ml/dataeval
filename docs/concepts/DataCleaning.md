@@ -58,16 +58,16 @@ This ensures that your results are based on accurate and relevant information.
 Having inaccurate, incomplete and/or irrelevant data leads to unreliable conclusions which can range in the severity of the consequences.
 These consequences include scenarios like your model mislabelling an animal because you mixed up the labels or losing money because your market analysis left out a key competitor.
 Some examples for each type of data error are shown below:
-- Inaccurate data
+* Inaccurate data
     * Typographical errors such as misspelled words or incorrect entries
     * Formatting errors such as inputting the data in the wrong units
     * Representation errors such as combining two important groups or splitting out a subset which shouldn't be 
     * Anomalies/Outliers
-- Incomplete data
+* Incomplete data
     * Missing values or entire groups
     * Partial records
     * Lacking enough samples in a group 
-- Irrelevant data
+* Irrelevant data
     * Including data or groups that are not related to the task at hand
     * Outdated information
 
@@ -117,29 +117,29 @@ Below is a list of all of the metrics available for analysis and the overarching
 Each category has an _ALL_ method which selects all metrics in that category.
 
 * Image Hash (ALL_HASHES)
-  - XXHASH
-  - PCHASH
+    * XXHASH
+    * PCHASH
 
 * Image Properties (ALL_PROPERTIES)
-  - WIDTH
-  - HEIGHT
-  - SIZE
-  - ASPECT_RATIO
-  - CHANNELS
-  - DEPTH
+    * WIDTH
+    * HEIGHT
+    * SIZE
+    * ASPECT_RATIO
+    * CHANNELS
+    * DEPTH
 
 * Image Visuals (ALL_VISUALS)
-  - BRIGHTNESS
-  - BLURRINESS
-  - MISSING
-  - ZERO
+    * BRIGHTNESS
+    * BLURRINESS
+    * MISSING
+    * ZERO
 
 * Pixel Statistics (ALL_PIXELSTATS)
-  - MEAN
-  - STD
-  - VAR
-  - SKEW
-  - KURTOSIS
-  - ENTROPY
-  - PERCENTILES
-  - HISTOGRAM
+    * MEAN
+    * STD
+    * VAR
+    * SKEW
+    * KURTOSIS
+    * ENTROPY
+    * PERCENTILES
+    * HISTOGRAM
