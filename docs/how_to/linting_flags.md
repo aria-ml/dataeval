@@ -3,32 +3,32 @@
 There are 4 categories of metrics for data cleaning which are available on the [ImageStat](../reference/flags/imagestat.md) flag class.
 
 * Image Hashing (`ALL_HASHES`)
-  - `XXHASH`
-  - `PCHASH`
+    * `XXHASH`
+    * `PCHASH`
   
 * Image Properties (`ALL_PROPERTIES`)
-  - `WIDTH`
-  - `HEIGHT`
-  - `SIZE`
-  - `ASPECT_RATIO`
-  - `CHANNELS`
-  - `DEPTH`
+    * `WIDTH`
+    * `HEIGHT`
+    * `SIZE`
+    * `ASPECT_RATIO`
+    * `CHANNELS`
+    * `DEPTH`
 
 * Image Visuals (`ALL_VISUALS`)
-  - `BRIGHTNESS`
-  - `BLURRINESS`
-  - `MISSING`
-  - `ZERO`
+    * `BRIGHTNESS`
+    * `BLURRINESS`
+    * `MISSING`
+    * `ZERO`
 
 * Pixel Statistics (`ALL_PIXELSTATS`)
-  - `MEAN`
-  - `STD`
-  - `VAR`
-  - `SKEW`
-  - `KURTOSIS`
-  - `ENTROPY`
-  - `PERCENTILES`
-  - `HISTOGRAM`
+    * `MEAN`
+    * `STD`
+    * `VAR`
+    * `SKEW`
+    * `KURTOSIS`
+    * `ENTROPY`
+    * `PERCENTILES`
+    * `HISTOGRAM`
 
 To select a custom set of metrics, load in the category:
 
