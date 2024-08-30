@@ -1,6 +1,30 @@
-[//]: # (b425469129990049ac25fac3a75cae419e31e5c0)
+[//]: # (c3b759cd6af61e1c81824b6520714ac64e20527f)
 
 # DataEval Change Log
+
+## v0.64.0
+
+🌟 **Feature Release**
+- `bea0446c` - Torch Dataset Reader
+
+🛠️ **Improvements and Enhancements**
+- `eda88822` - Refactor metrics
+
+📝 **Miscellaneous**
+- `a4b8e919` - Created new documentation issue templates
+- `1028d082` - Remove is_arraylike function
+- `dbcecec6` - Refactored read_dataset to handle common dataset returns
+- `61b1f854` - Updated Workflow Landing Page
+- `cf96c7f2` - Run doctest in CI pipeline
+- `ecfcf89b` - Adjusted notebooks to work on google colab and added environment requirements
+- `5f863782` - Update remaining metric output to NamedTuple
+- `e58f4dba` - Add metadata parity documentation
+- `6319a1d4` - Adding Duplicates concept
+- `787545f5` - Adding ImageStats and ChannelStats concept document
+- `7826405c` - Update Data Cleaning concept
+- `50047116` - Change to Semantic Versioning
+- `9e43399c` - Bayes Error Rate - explanation documentation
+- `266ad738` - Updated BER docstrings with NDArray, shapes, and examples
 
 ## v0.63.0
 
