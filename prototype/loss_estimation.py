@@ -47,8 +47,8 @@ class LossEstimator():
                 if has_labels:
                     y = torch.Tensor(batch[1]).int()
                     dict_out["y"] = np.concatenate((dict_out["y"], y), dtype=int)
-                for i in range(10):
-                    key = f"y_pred_proba_{i}"
+                for i, class_name in enumerate(class_names):
+                    key = f"y_pred_proba_{class_name}"
                     dict_out[key] = np.concatenate((dict_out[key], output[:, i]))
 
         return dict_out
