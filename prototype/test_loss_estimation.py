@@ -18,11 +18,10 @@ import nannyml as nml
 from IPython.display import display
 from PIL import Image
 
-def custom_train(model: nn.Module, dataset: Dataset, device):
+def custom_train(model: nn.Module, dataset: Dataset, device, epochs=10):
     # Defined only for this testing scenario
     criterion = torch.nn.CrossEntropyLoss().to(device)
     optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
-    epochs = 10
 
     # Define the dataloader for training
     dataloader = DataLoader(dataset, batch_size=16)
@@ -171,3 +170,52 @@ class TestLEFunc():
         ds_c_acc = results["Op_Predicted_Accuracy"]
 
         assert np.isclose(ds_acc, ds_c_acc)
+
+    def test_degrades_on_corrupted_dataset(self):
+        torch._dynamo.disable()
+        torch._dynamo.config.suppress_errors = True
+        np.random.seed(0)
+
+        ds = LargeMockDataset()
+        ds_c = LargeMockDataset()
+        
+        for i, img in enumerate(ds_c.images):
+            #img[0,:,:] -= 1.5
+            #img[1,:,:] += 1.5
+            #img[:,:,:] + 
+            #x = img / 2
+            #rands = torch.normal(x, std=0.3)
+            #x = torch.clip(rands, 0, 1)
+            #x = img# / 2
+            #x = x + x * np.random.randn()#np.random.normal(size=x.shape, scale=5)
+            #x = x + np.random.randn()
+            #img[:,:,:] = x
+            ds.images[i] = ds.images[i] + np.random.normal(size=ds.images[i].shape, scale=0.5)
+            ds_c.images[i] = ds_c.images[i] + np.random.normal(size=ds_c.images[i].shape, scale=2) + np.random.randn()
+
+        class_names = np.unique(ds.labels)
+
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model = torch.compile(MockNet().to(device))
+        model = cast(MockNet, model)
+        le = LossEstimator()
+
+        model = reset_parameters(model)
+        # Run the model with each substep of data
+        # train on subset of train data
+        train_kwargs = {}
+        eval_kwargs = {}
+        custom_train(
+            model,
+            ds,
+            device,
+            epochs=30
+        )
+
+        estimator = LossEstimator("CBPE", "classification_multiclass")
+        results = estimator.evaluate(model, ds, ds_c, ds.class_names, 2)
+
+        ds_acc = results["Reference_Accuracy"]
+        ds_c_acc = results["Op_Predicted_Accuracy"]
+
+        assert ds_c_acc < 0.95*ds_acc
