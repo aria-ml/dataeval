@@ -53,7 +53,7 @@ class LossEstimator():
 
         return dict_out
 
-    def evaluate(self, model, ref_data, op_data, class_names, eval_kwargs={}):
+    def evaluate(self, model, ref_data, op_data, class_names, chunk_size=50, eval_kwargs={}):
 
         ref_dict = self._eval_model(model, ref_data, class_names, True, **eval_kwargs)
         ref_df = pd.DataFrame(ref_dict)
@@ -71,7 +71,7 @@ class LossEstimator():
         y_pred="y_pred",
         y_true="y",
         metrics=["accuracy"],
-        chunk_size=50,
+        chunk_size=chunk_size,
     )
         
 

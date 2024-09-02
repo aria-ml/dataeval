@@ -18,7 +18,48 @@ import nannyml as nml
 from IPython.display import display
 from PIL import Image
 
+def custom_train(model: nn.Module, dataset: Dataset, device):
+    # Defined only for this testing scenario
+    criterion = torch.nn.CrossEntropyLoss().to(device)
+    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+    epochs = 10
 
+    # Define the dataloader for training
+    dataloader = DataLoader(dataset, batch_size=16)
+
+    for epoch in range(epochs):
+        for batch in dataloader:
+            # Load data/images to device
+            X = torch.Tensor(batch[0]).to(device)
+            # Load targets/labels to device
+            y = torch.Tensor(batch[1]).to(device)
+            # Zero out gradients
+            optimizer.zero_grad()
+            # Forward propagation
+            outputs = model(X)
+            # Compute loss
+            loss = criterion(outputs, y)
+            # Back prop
+            loss.backward()
+            # Update weights/parameters
+            optimizer.step()
+
+def reset_parameters(model: nn.Module):
+    """
+    Re-initializes each layer in the model using
+    the layer's defined weight_init function
+    """
+
+    @torch.no_grad()
+    def weight_reset(m: nn.Module):
+        # Check if the current module has reset_parameters
+        reset_parameters = getattr(m, "reset_parameters", None)
+        if callable(reset_parameters):
+            m.reset_parameters()  # type: ignore
+
+    # Applies fn recursively to every submodule see:
+    # https://pytorch.org/docs/stable/generated/torch.nn.Module.html
+    return model.apply(fn=weight_reset)
 
 class MockNet(nn.Module):
     def __init__(self):
@@ -47,7 +88,7 @@ class SimpleDataset(datasets.VisionDataset):
     def __getitem__(self, idx):
         img = torch.tensor(self.images[idx]).float()
 
-        label = torch.tensor(self.labels[idx]).float()
+        label = torch.tensor(self.labels[idx])
 
         return img, label
 
@@ -57,14 +98,29 @@ class MockDataset(SimpleDataset):
             np.zeros((3,10,10)),
             np.ones((3,10,10)),
             2*np.ones((3,10,10)),
+            np.zeros((3,10,10)),
             255*np.ones((3,10,10)),
+            252*np.ones((3,10,10)),
+            
         ]
         labels = [
             1,
             2,
+            2,
             1,
+            0,
             0
         ]
+        super().__init__(images, labels)
+
+class LargeMockDataset(SimpleDataset):
+    def __init__(self):
+        # sklearn fails when dataset is too small due to "test_size=1" error
+        # more info in https://github.com/interpretml/interpret/issues/142
+        labels = [0,1,2] * 10
+        images = []
+        for i, label in enumerate(labels):
+            images.append(label * np.ones((3,10,10)))
         super().__init__(images, labels)
 
 class TestLEUnit():
@@ -82,3 +138,36 @@ class TestLEUnit():
 
         ds_dict = le._eval_model(model, ds, ds.class_names, True)
         assert sorted(ds_dict["y"]) == sorted(ds.labels)
+
+class TestLEFunc():
+    def test_no_degradation_on_same_dataset(self):
+        torch._dynamo.disable()
+        torch._dynamo.config.suppress_errors = True
+
+        ds = LargeMockDataset()
+        ds_c = LargeMockDataset()
+        class_names = np.unique(ds.labels)
+
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model = torch.compile(MockNet().to(device))
+        model = cast(MockNet, model)
+        le = LossEstimator()
+
+        model = reset_parameters(model)
+        # Run the model with each substep of data
+        # train on subset of train data
+        train_kwargs = {}
+        eval_kwargs = {}
+        custom_train(
+            model,
+            ds,
+            device
+        )
+
+        estimator = LossEstimator("CBPE", "classification_multiclass")
+        results = estimator.evaluate(model, ds, ds_c, ds.class_names, 2)
+
+        ds_acc = results["Reference_Accuracy"]
+        ds_c_acc = results["Op_Predicted_Accuracy"]
+
+        assert np.isclose(ds_acc, ds_c_acc)
