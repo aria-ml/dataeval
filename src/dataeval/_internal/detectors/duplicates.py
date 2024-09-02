@@ -14,7 +14,7 @@ class Duplicates:
     Attributes
     ----------
     stats : Dict[str, Any]
-        Dictionary with the stored statistics for the images
+        Dictionary with the stored hashes for each image
 
     Example
     -------

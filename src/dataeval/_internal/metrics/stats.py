@@ -78,7 +78,7 @@ def run_stats(
 
 def imagestats(images: Iterable[ArrayLike], flags: ImageStat = ImageStat.ALL_STATS) -> Dict[str, Any]:
     """
-    Calculates various image property statistics
+    Calculates image and pixel statistics for each image
 
     Parameters
     ----------
@@ -106,7 +106,7 @@ def imagestats(images: Iterable[ArrayLike], flags: ImageStat = ImageStat.ALL_STA
 
 def channelstats(images: Iterable[ArrayLike], flags=ImageStat.ALL_PIXELSTATS) -> Dict[str, Any]:
     """
-    Calculates various image statistics per channel
+    Calculates pixel statistics for each image per channel
 
     Parameters
     ----------

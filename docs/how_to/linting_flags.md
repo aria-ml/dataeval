@@ -1,6 +1,6 @@
 # How to customize the metrics for data cleaning
 
-There are 4 categories of metrics for data cleaning which are available on the [ImageStat](../reference/flags/imagestat.md) flag class.
+There are 4 categories of metrics for data cleaning which are available in the [ImageStat](../reference/flags/imagestat.md) flag class.
 
 * Image Hashing (`ALL_HASHES`)
     * `XXHASH`
@@ -36,7 +36,7 @@ To select a custom set of metrics, load in the category:
 from dataeval.metrics import ImageStat
 ```
 
-Then select the desired metrics and pass them to the desired class.
+Then select the desired metrics and pass them to the desired function or class.
 
 `imagestats` function example:
 
@@ -62,7 +62,7 @@ result = channelstats(dataset, flags=flags)
 
 ```python
 # Select the desired data cleaning metrics
-flags = ImageStat.BRIGHTNESS
+flags = ImageStat.ALL_VISUALS
 
 # Set the flags for the class
 lints = Linter(dataset, flags=flags)
