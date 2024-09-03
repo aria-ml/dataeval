@@ -3,7 +3,7 @@
 ## What is it
 
 The Linter class is a data cleaning class used to identify images that are reducing the quality or integrity of the dataset.
-It identifies the images by calculating the statistical outliers of a dataset using various statistical tests applied to each metric from the base [ImageStats](Stats.md) class.
+It identifies the images by calculating the statistical outliers of a dataset using various statistical tests applied to each metric from the [imagestats](Stats.md) function.
 
 ## When to use it
 
@@ -15,7 +15,7 @@ The [Data Cleaning Guide](../tutorials/EDA_Part1.ipynb) shows how the Linter cla
 
 ## Theory behind it
 
-The Linter class heavily relies upon the ImageStats class to create a data distribution for specific metrics.
+The Linter class heavily relies upon the imagestats function to create a data distribution for specific metrics.
 The Linter then analyzes the distribution through a statistical test.
 
 There are 3 different statistical tests that the Linter class can use for detecting abnormal images:
@@ -38,7 +38,7 @@ Interquartile range $= distance > threshold * (Q_3 - Q_1)$, where distance is th
 
 The [Linter](../reference/detectors/linter.md) API will give more information on how to use the functionality.
 The user has the option to specify:
-- the metrics that the ImageStats class should create a distribution for by selecting which flags the Linter consumes,
+- the metrics that the imagestats function should create a distribution for by selecting which flags the Linter consumes,
 - the statistical method used by the class, and
 - the threshold the Linter should compare with for identifying outliers.
 

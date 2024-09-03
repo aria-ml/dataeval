@@ -1,37 +1,31 @@
-from enum import Flag, auto
-from typing import Union
+from enum import IntFlag, auto
+from functools import reduce
+from typing import Dict, Iterable, TypeVar, Union, cast
+
+TFlag = TypeVar("TFlag", bound=IntFlag)
 
 
-class auto_all:
-    def __get__(self, _, cls):
-        return ~cls(0)
+class ImageStat(IntFlag):
+    """
+    Flags for calculating image and channel statistics
+    """
 
-
-class ImageHash(Flag):
+    # HASHES
     XXHASH = auto()
     PCHASH = auto()
-    ALL = auto_all()
-
-
-class ImageProperty(Flag):
+    # PROPERTIES
     WIDTH = auto()
     HEIGHT = auto()
     SIZE = auto()
     ASPECT_RATIO = auto()
     CHANNELS = auto()
     DEPTH = auto()
-    ALL = auto_all()
-
-
-class ImageVisuals(Flag):
+    # VISUALS
     BRIGHTNESS = auto()
     BLURRINESS = auto()
     MISSING = auto()
     ZERO = auto()
-    ALL = auto_all()
-
-
-class ImageStatistics(Flag):
+    # PIXEL STATS
     MEAN = auto()
     STD = auto()
     VAR = auto()
@@ -40,8 +34,35 @@ class ImageStatistics(Flag):
     ENTROPY = auto()
     PERCENTILES = auto()
     HISTOGRAM = auto()
-    ALL = auto_all()
+    # JOINT FLAGS
+    ALL_HASHES = XXHASH | PCHASH
+    ALL_PROPERTIES = WIDTH | HEIGHT | SIZE | ASPECT_RATIO | CHANNELS | DEPTH
+    ALL_VISUALS = BRIGHTNESS | BLURRINESS | MISSING | ZERO
+    ALL_PIXELSTATS = MEAN | STD | VAR | SKEW | KURTOSIS | ENTROPY | PERCENTILES | HISTOGRAM
+    ALL_STATS = ALL_PROPERTIES | ALL_VISUALS | ALL_PIXELSTATS
+    ALL = ALL_HASHES | ALL_STATS
 
 
-ImageStatsFlags = Union[ImageHash, ImageProperty, ImageVisuals, ImageStatistics]
-LinterFlags = Union[ImageProperty, ImageVisuals, ImageStatistics]
+def is_distinct(flag: IntFlag) -> bool:
+    return (flag & (flag - 1) == 0) and flag != 0
+
+
+def to_distinct(flag: TFlag) -> Dict[TFlag, str]:
+    """
+    Returns a distinct set of all flags set on the input flag and their names
+
+    NOTE: this is supported natively in Python 3.11, but for earlier versions we need
+    to use a combination of list comprehension and bit fiddling to determine distinct
+    flag values from joint aliases.
+    """
+    if isinstance(flag, Iterable):  # >= py311
+        return {f: f.name.lower() for f in flag if f.name}
+    else:  # < py311
+        return {f: f.name.lower() for f in list(flag.__class__) if f & flag and is_distinct(f) and f.name}
+
+
+def verify_supported(flag: TFlag, flags: Union[TFlag, Iterable[TFlag]]):
+    supported = flags if isinstance(flags, flag.__class__) else cast(TFlag, reduce(lambda a, b: a | b, flags))  # type: ignore
+    unsupported = flag & ~supported
+    if unsupported:
+        raise ValueError(f"Unsupported flags {unsupported} called.  Only {supported} flags are supported.")

@@ -58,16 +58,16 @@ This ensures that your results are based on accurate and relevant information.
 Having inaccurate, incomplete and/or irrelevant data leads to unreliable conclusions which can range in the severity of the consequences.
 These consequences include scenarios like your model mislabelling an animal because you mixed up the labels or losing money because your market analysis left out a key competitor.
 Some examples for each type of data error are shown below:
-- Inaccurate data
+* Inaccurate data
     * Typographical errors such as misspelled words or incorrect entries
     * Formatting errors such as inputting the data in the wrong units
     * Representation errors such as combining two important groups or splitting out a subset which shouldn't be 
     * Anomalies/Outliers
-- Incomplete data
+* Incomplete data
     * Missing values or entire groups
     * Partial records
     * Lacking enough samples in a group 
-- Irrelevant data
+* Irrelevant data
     * Including data or groups that are not related to the task at hand
     * Outdated information
 
@@ -92,18 +92,18 @@ regardless of the sophistication of the analysis.
 
 ## Data Cleaning with DataEval
 
-DataEval is a data analysis and monitoring library with some dedicated classes for data cleaning.
+DataEval is a data analysis and monitoring library with some dedicated functions and classes for data cleaning.
 
-DataEval's data cleaning classes are:
+DataEval's data cleaning functions and classes are:
+* [imagestats](Stats.md#imagestats) function,
+* [channelstats](Stats.md#channelstats) function,
 * [Linter](Linter.md) class,
-* [Duplicates](Duplicates.md) class,
-* [ImageStats](Stats.md#imagestats) class,
-* [ChannelStats](Stats.md#channelstats) class, and
+* [Duplicates](Duplicates.md) class, and
 * [Clusterer](Clusterer.md) class.
 
-These classes facilitate the creation of dataset statistics and
+These functions and classes facilitate the creation of dataset statistics and
 the identification of abnormal data points and duplicates. 
-The **ImageStats** and **ChannelStats** classes create dataset statistics on a per image and a per image per channel basis, respectively.
+The **imagestats** and **channelstats** functions create dataset statistics on a per image and a per image per channel basis, respectively.
 The **Linter** class analyzes the dataset statistics for outliers based on the chosen statistical method.
 The **Duplicates** class identifies duplicate images.
 The **Clusterer** class clusters the data and identifies data points which do not fit into a cluster.
@@ -116,30 +116,30 @@ To see data cleaning in action using DataEval, check out our [Data Cleaning Guid
 Below is a list of all of the metrics available for analysis and the overarching flag category the metric belongs to.
 Each category has an _ALL_ method which selects all metrics in that category.
 
-* ImageHash
-  - XXHASH
-  - PCHASH
+* Image Hash (ALL_HASHES)
+    * XXHASH
+    * PCHASH
 
-* ImageProperty
-  - WIDTH
-  - HEIGHT
-  - SIZE
-  - ASPECT_RATIO
-  - CHANNELS
-  - DEPTH
+* Image Properties (ALL_PROPERTIES)
+    * WIDTH
+    * HEIGHT
+    * SIZE
+    * ASPECT_RATIO
+    * CHANNELS
+    * DEPTH
 
-* ImageStatistics
-  - MEAN
-  - STD
-  - VAR
-  - SKEW
-  - KURTOSIS
-  - ENTROPY
-  - PERCENTILES
-  - HISTOGRAM
+* Image Visuals (ALL_VISUALS)
+    * BRIGHTNESS
+    * BLURRINESS
+    * MISSING
+    * ZERO
 
-* ImageVisuals
-  - BRIGHTNESS
-  - BLURRINESS
-  - MISSING
-  - ZERO
+* Pixel Statistics (ALL_PIXELSTATS)
+    * MEAN
+    * STD
+    * VAR
+    * SKEW
+    * KURTOSIS
+    * ENTROPY
+    * PERCENTILES
+    * HISTOGRAM

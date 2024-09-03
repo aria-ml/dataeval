@@ -11,7 +11,7 @@ These explanations dive into the what, why and theory behind each of DataEval's 
 - [Dataset Divergence](Divergence.md)
 - [Detecting Drift in Datasets](Drift.md)
 - [Detecting Duplicates](Duplicates.md)
-- [ImageStats and ChannelStats Classes](Stats.md)
+- [Image Statistics Functions](Stats.md)
 - [Linter Class](Linter.md)
 - [Model Training Techniques](ModelTraining.md)
 - [Detecting Out of Distribution Data](OOD.md)
