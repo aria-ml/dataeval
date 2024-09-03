@@ -1,12 +1,15 @@
-from typing import Dict, List, Literal, NamedTuple, Optional, Sequence
+from dataclasses import dataclass
+from typing import Dict, List, Literal, Optional, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
 
 from dataeval._internal.metrics.utils import entropy, get_counts, get_method, get_num_bins, preprocess_metadata
+from dataeval._internal.output import OutputMetadata, set_metadata
 
 
-class DiversityOutput(NamedTuple):
+@dataclass(frozen=True)
+class DiversityOutput(OutputMetadata):
     """
     Attributes
     ----------
@@ -116,6 +119,7 @@ def diversity_simpson(
 DIVERSITY_FN_MAP = {"simpson": diversity_simpson, "shannon": diversity_shannon}
 
 
+@set_metadata("dataeval.metrics.diversity")
 def diversity(
     class_labels: Sequence[int], metadata: List[Dict], method: Literal["shannon", "simpson"] = "simpson"
 ) -> DiversityOutput:
@@ -155,6 +159,7 @@ def diversity(
     return DiversityOutput(diversity_index)
 
 
+@set_metadata("dataeval.metrics.diversity_classwise")
 def diversity_classwise(
     class_labels: Sequence[int], metadata: List[Dict], method: Literal["shannon", "simpson"] = "simpson"
 ) -> DiversityOutput:

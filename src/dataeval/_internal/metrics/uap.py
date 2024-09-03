@@ -4,15 +4,17 @@ FR Test Statistic based estimate for the upperbound
 average precision using empirical mean precision
 """
 
-from typing import NamedTuple
+from dataclasses import dataclass
 
 from numpy.typing import ArrayLike
 from sklearn.metrics import average_precision_score
 
 from dataeval._internal.interop import to_numpy
+from dataeval._internal.output import OutputMetadata, set_metadata
 
 
-class UAPOutput(NamedTuple):
+@dataclass(frozen=True)
+class UAPOutput(OutputMetadata):
     """
     Attributes
     ----------
@@ -23,6 +25,7 @@ class UAPOutput(NamedTuple):
     uap: float
 
 
+@set_metadata("dataeval.metrics.uap")
 def uap(labels: ArrayLike, scores: ArrayLike) -> UAPOutput:
     """
     FR Test Statistic based estimate of the empirical mean precision for
