@@ -83,6 +83,9 @@ def balance(class_labels: Sequence[int], metadata: List[Dict], num_neighbors: in
         tgt = data[:, idx]
 
         if is_categorical[idx]:
+            if tgt.dtype == float:
+                # map to unique integers if categorical
+                _, tgt = np.unique(tgt, return_inverse=True)
             # categorical target
             mi[idx, :] = mutual_info_classif(
                 data,
