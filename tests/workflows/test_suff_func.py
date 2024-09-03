@@ -10,10 +10,7 @@ import torch.optim as optim
 import torchmetrics
 from torch.utils.data import DataLoader, Dataset, Subset
 
-from dataeval._internal.workflows.sufficiency import (
-    PARAMS_KEY,
-    STEPS_KEY,
-)
+from dataeval._internal.workflows.sufficiency import SufficiencyOutput
 from dataeval.workflows import Sufficiency
 from tests.utils.data import DataEvalDataset
 
@@ -179,13 +176,13 @@ class TestSufficiencyFunctional:
         output = suff.evaluate(niter=100)
 
         # Accuracy should be bounded
-        accuracy = cast(np.ndarray, output["Accuracy"])
+        accuracy = cast(np.ndarray, output.measures["Accuracy"])
         assert np.all(accuracy >= 0)
         assert np.all(accuracy <= 1)
         assert len(accuracy) == 3
 
         # Geomshape should calculate deterministically
-        geomshape = cast(np.ndarray, output[STEPS_KEY])
+        geomshape = cast(np.ndarray, output.steps)
         geomshape_answer = np.geomspace(0.01 * length, length, steps).astype(np.int64)
         npt.assert_array_equal(geomshape, geomshape_answer)
 
@@ -228,11 +225,11 @@ class TestSufficiencyInverseProjectFunc:
         However, this takes a very long time to evaluate, so for this test,
         the output from suff.evaluate() is pasted below.
         """
-        output_to_fit = {
-            STEPS_KEY: np.array([10, 16, 27, 46, 77, 129, 215, 359, 599, 1000]),
-            PARAMS_KEY: {"Accuracy": np.array([-0.32791097, -0.27294133, 1.16538843])},
-            "Accuracy": np.array([0.345, 0.24, 0.2975, 0.32, 0.335, 0.4, 0.8275, 0.855, 0.8725, 0.9075]),
-        }
+        output_to_fit = SufficiencyOutput(
+            steps=np.array([10, 16, 27, 46, 77, 129, 215, 359, 599, 1000]),
+            params={"Accuracy": np.array([-0.32791097, -0.27294133, 1.16538843])},
+            measures={"Accuracy": np.array([0.345, 0.24, 0.2975, 0.32, 0.335, 0.4, 0.8275, 0.855, 0.8725, 0.9075])},
+        )
 
         # Evaluate the learning curve to infer the needed amount of training data
         # to train a model to (desired_accuracies) accuracy
@@ -241,5 +238,5 @@ class TestSufficiencyInverseProjectFunc:
         # Train model and see if we get the accuracy we expect on these predicted
         # amounts of training data
         output = suff.evaluate(pred_nsamples, niter=600)
-        proj_accuracies = cast(np.ndarray, output["Accuracy"])
+        proj_accuracies = cast(np.ndarray, output.measures["Accuracy"])
         npt.assert_allclose(proj_accuracies, desired_accuracies["Accuracy"], rtol=0.1, atol=1)

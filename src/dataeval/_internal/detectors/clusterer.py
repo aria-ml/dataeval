@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Dict, Iterable, List, NamedTuple, Tuple, Union, cast
 
 import numpy as np
@@ -7,6 +8,15 @@ from scipy.spatial.distance import pdist, squareform
 
 from dataeval._internal.interop import to_numpy
 from dataeval._internal.metrics.utils import flatten
+from dataeval._internal.output import OutputMetadata, set_metadata
+
+
+@dataclass(frozen=True)
+class ClustererOutput(OutputMetadata):
+    outliers: List[int]
+    potential_outliers: List[int]
+    duplicates: List[List[int]]
+    potential_duplicates: List[List[int]]
 
 
 def extend_linkage(link_arr: np.ndarray) -> np.ndarray:
@@ -465,7 +475,9 @@ class Clusterer:
 
         return exact_dupes, near_dupes
 
-    def evaluate(self):
+    # TODO: Move data input to evaluate from class
+    @set_metadata("dataeval.detectors.Clusterer", ["data"])
+    def evaluate(self) -> ClustererOutput:
         """Finds and flags indices of the data for outliers and duplicates
 
         Returns
@@ -489,11 +501,6 @@ class Clusterer:
         outliers, potential_outliers = self.find_outliers(self.last_good_merge_levels)
         duplicates, potential_duplicates = self.find_duplicates(self.last_good_merge_levels)
 
-        ret = {
-            "outliers": outliers,
-            "potential_outliers": potential_outliers,
-            "duplicates": duplicates,
-            "potential_duplicates": potential_duplicates,
-        }
+        output = ClustererOutput(outliers, potential_outliers, duplicates, potential_duplicates)
 
-        return ret
+        return output

@@ -1,12 +1,59 @@
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, List
 
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 from scipy.stats import entropy, kurtosis, skew
 
 from dataeval._internal.flags import ImageStat, to_distinct, verify_supported
 from dataeval._internal.interop import to_numpy_iter
 from dataeval._internal.metrics.utils import edge_filter, get_bitdepth, normalize_image_shape, pchash, rescale, xxhash
+from dataeval._internal.output import OutputMetadata, set_metadata
+
+CH_IDX_MAP = "channel_indices"
+
+
+@dataclass(frozen=True)
+class StatsOutput(OutputMetadata):
+    xxhash: List[str]
+    pchash: List[str]
+    width: NDArray[np.uint16]
+    height: NDArray[np.uint16]
+    channels: NDArray[np.uint8]
+    size: NDArray[np.uint32]
+    aspect_ratio: NDArray[np.float16]
+    depth: NDArray[np.uint8]
+    brightness: NDArray[np.float16]
+    blurriness: NDArray[np.float16]
+    missing: NDArray[np.float16]
+    zero: NDArray[np.float16]
+    mean: NDArray[np.float16]
+    std: NDArray[np.float16]
+    var: NDArray[np.float16]
+    skew: NDArray[np.float16]
+    kurtosis: NDArray[np.float16]
+    percentiles: NDArray[np.float16]
+    histogram: NDArray[np.uint32]
+    entropy: NDArray[np.float16]
+    channel_indices: Dict[int, List[int]]
+
+    def dict(self):
+        return {k: v for k, v in super().dict().items() if len(v) != 0}
+
+
+def default(key):
+    if key == CH_IDX_MAP:
+        return {}
+    if key in ["xxhash", "pchash"]:
+        return []
+    if key in ["channels", "depth"]:
+        return np.array([], dtype=np.uint8)
+    if key in ["width", "height"]:
+        return np.array([], dtype=np.uint16)
+    if key in ["size", "histogram"]:
+        return np.array([], dtype=np.uint32)
+    return np.array([], dtype=np.float16)
+
 
 QUARTILES = (0, 25, 50, 75, 100)
 
@@ -76,7 +123,8 @@ def run_stats(
     return results_list
 
 
-def imagestats(images: Iterable[ArrayLike], flags: ImageStat = ImageStat.ALL_STATS) -> Dict[str, Any]:
+@set_metadata("dataeval.metrics.imagestats")
+def imagestats(images: Iterable[ArrayLike], flags: ImageStat = ImageStat.ALL_STATS) -> StatsOutput:
     """
     Calculates image and pixel statistics for each image
 
@@ -101,10 +149,12 @@ def imagestats(images: Iterable[ArrayLike], flags: ImageStat = ImageStat.ALL_STA
             else:
                 shape = () if np.isscalar(result) else result.shape
                 output.setdefault(stat, np.empty((length,) + shape))[i] = result
-    return output
+    result = {k: output[k] if k in output else default(k) for k in StatsOutput.__annotations__}
+    return StatsOutput(**result)  # type: ignore
 
 
-def channelstats(images: Iterable[ArrayLike], flags=ImageStat.ALL_PIXELSTATS) -> Dict[str, Any]:
+@set_metadata("dataeval.metrics.channelstats")
+def channelstats(images: Iterable[ArrayLike], flags=ImageStat.ALL_PIXELSTATS) -> StatsOutput:
     """
     Calculates pixel statistics for each image per channel
 
@@ -120,24 +170,25 @@ def channelstats(images: Iterable[ArrayLike], flags=ImageStat.ALL_PIXELSTATS) ->
     -------
     Dict[str, Any]
     """
-    IDX_MAP = "idx_map"
     stats = run_stats(images, flags, CHANNELSTATS_FN_MAP, True)
 
     output = {}
     for i, results in enumerate(stats):
         for stat, result in results.items():
             channels = result.shape[0]
-            output.setdefault(IDX_MAP, {}).setdefault(channels, {})[i] = None
             output.setdefault(stat, {}).setdefault(channels, []).append(result)
+            output.setdefault(CH_IDX_MAP, {}).setdefault(channels, {})[i] = None
 
     # Concatenate list of channel statistics numpy
     for stat in output:
-        if stat == IDX_MAP:
+        if stat == CH_IDX_MAP:
             continue
         for channel in output[stat]:
             output[stat][channel] = np.array(output[stat][channel]).T
 
-    for channel in output[IDX_MAP]:
-        output[IDX_MAP][channel] = list(output[IDX_MAP][channel].keys())
+    for channel in output[CH_IDX_MAP]:
+        output[CH_IDX_MAP][channel] = list(output[CH_IDX_MAP][channel].keys())
 
-    return output
+    result = {k: output[k] if k in output else default(k) for k in StatsOutput.__annotations__}
+
+    return StatsOutput(**result)  # type: ignore

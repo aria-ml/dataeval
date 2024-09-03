@@ -445,7 +445,7 @@ class TestClusterOutliers:
         data[indices] *= 10.0
         c = Clusterer(np.array(data))
         results = c.evaluate()
-        outliers = results["outliers"]
+        outliers = results.outliers
 
         # Only need to check specified outliers in results, but there might be other outliers
         assert all(x in outliers for x in indices)
@@ -477,8 +477,8 @@ class TestClusterDuplicates:
         cl = Clusterer(duplicate_data)
 
         results = cl.evaluate()
-        duplicates = results["duplicates"]
-        potential_duplicates = results["potential_duplicates"]
+        duplicates = results.duplicates
+        potential_duplicates = results.potential_duplicates
 
         # Only 1 set (all dupes) in list of sets
         assert len(duplicates[0]) == len(duplicate_data)
@@ -489,8 +489,8 @@ class TestClusterDuplicates:
         data = np.array([[0, 0], [1, 1], [2, 2]])
         c = Clusterer(data)
         results = c.evaluate()
-        assert not len(results["duplicates"])
-        assert not len(results["potential_duplicates"])
+        assert not len(results.duplicates)
+        assert not len(results.potential_duplicates)
 
 
 class TestClustererGetLastMergeLevels:
@@ -556,10 +556,10 @@ class TestClustererEvaluate:
         clusterer = Clusterer(functional_data)
         results = clusterer.evaluate()
 
-        assert results["outliers"] == [4, 6, 11, 21, 38, 71]
-        assert results["potential_outliers"] == [1, 9, 42, 43, 48]
-        assert results["duplicates"] == [[24, 79], [58, 63]]
-        assert results["potential_duplicates"] == [
+        assert results.outliers == [4, 6, 11, 21, 38, 71]
+        assert results.potential_outliers == [1, 9, 42, 43, 48]
+        assert results.duplicates == [[24, 79], [58, 63]]
+        assert results.potential_duplicates == [
             [8, 27, 29],
             [10, 65],
             [16, 99],

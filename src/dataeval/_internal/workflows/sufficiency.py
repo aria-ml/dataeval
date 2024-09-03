@@ -1,4 +1,5 @@
 import warnings
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Sequence, Union, cast
 
 import matplotlib.pyplot as plt
@@ -6,13 +7,30 @@ import numpy as np
 import torch
 import torch.nn as nn
 from matplotlib.figure import Figure
+from numpy.typing import NDArray
 from scipy.optimize import basinhopping
 from torch.utils.data import Dataset
+
+from dataeval._internal.output import OutputMetadata, set_metadata
 
 STEPS_KEY = "_STEPS_"
 PARAMS_KEY = "_CURVE_PARAMS_"
 
-SufficiencyOutput = Dict[str, Union[np.ndarray, Dict[str, np.ndarray]]]
+
+@dataclass(frozen=True)
+class SufficiencyOutput(OutputMetadata):
+    steps: NDArray
+    params: Dict[str, NDArray]
+    measures: Dict[str, NDArray]
+
+    def __post_init__(self):
+        c = len(self.steps)
+        if set(self.params) != set(self.measures):
+            raise ValueError("params and measures have a key mismatch")
+        for m, v in self.measures.items():
+            c_v = v.shape[1] if v.ndim > 1 else len(v)
+            if c != c_v:
+                raise ValueError(f"{m} does not contain the expected number ({c}) of data points.")
 
 
 def f_out(n_i: np.ndarray, x: np.ndarray) -> np.ndarray:
@@ -124,20 +142,6 @@ def validate_dataset_len(dataset: Dataset) -> int:
     if length <= 0:
         raise ValueError("Dataset length must be greater than 0")
     return length
-
-
-def validate_output(data: SufficiencyOutput):
-    """Ensure the sufficiency data used is not malformed"""
-    if not all(key in data for key in [STEPS_KEY, PARAMS_KEY]):
-        raise KeyError(f"{STEPS_KEY} and {PARAMS_KEY} are required keys for Sufficiency output.")
-    c = len(data[STEPS_KEY])
-    for m, v in data.items():
-        if m in [STEPS_KEY, PARAMS_KEY]:
-            continue
-        v = cast(np.ndarray, v)
-        c_v = v.shape[1] if v.ndim > 1 else len(v)
-        if c != c_v:
-            raise ValueError("f{m} does not contain the expected number ({c}) of data points.")
 
 
 def project_steps(params: np.ndarray, projection: np.ndarray) -> np.ndarray:
@@ -338,6 +342,7 @@ class Sufficiency:
     def eval_kwargs(self, value: Optional[Dict[str, Any]]):
         self._eval_kwargs = {} if value is None else value
 
+    @set_metadata("dataeval.workflows.Sufficiency", ["runs", "substeps"])
     def evaluate(self, eval_at: Optional[np.ndarray] = None, niter: int = 1000) -> SufficiencyOutput:
         """
         Creates data indices, trains models, and returns plotting data
@@ -388,9 +393,6 @@ class Sufficiency:
 
                 # Keep track of each measures values
                 for name, value in measure.items():
-                    if name in [STEPS_KEY, PARAMS_KEY]:
-                        raise KeyError(f"Cannot use reserved name '{name}' as a metric name.")
-
                     # Sum result into current substep iteration to be averaged later
                     value = np.array(value).ravel()
                     if name not in measures:
@@ -400,9 +402,7 @@ class Sufficiency:
         # The mean for each measure must be calculated before being returned
         measures = {k: (v / self.runs).T for k, v in measures.items()}
         params_output = get_curve_params(measures, ranges, niter)
-        output = {STEPS_KEY: ranges, PARAMS_KEY: params_output}
-        output.update(measures)
-        return output
+        return SufficiencyOutput(ranges, params_output, measures)
 
     @classmethod
     def project(
@@ -430,7 +430,6 @@ class Sufficiency:
             If the length of data points in the measures do not match
             If the steps are not int, Sequence[int] or an ndarray
         """
-        validate_output(data)
         projection = [projection] if isinstance(projection, int) else projection
         projection = np.array(projection) if isinstance(projection, Sequence) else projection
         if not isinstance(projection, np.ndarray):
@@ -438,18 +437,15 @@ class Sufficiency:
 
         output = {}
         output[STEPS_KEY] = projection
-        for name, measures in data.items():
-            if name in [STEPS_KEY, PARAMS_KEY]:
-                continue
-            measures = cast(np.ndarray, measures)
+        for name, measures in data.measures.items():
             if measures.ndim > 1:
                 result = []
                 for i in range(len(measures)):
-                    projected = project_steps(data[PARAMS_KEY][name][i], projection)
+                    projected = project_steps(data.params[name][i], projection)
                     result.append(projected)
                 output[name] = np.array(result).T
             else:
-                output[name] = project_steps(data[PARAMS_KEY][name], projection)
+                output[name] = project_steps(data.params[name], projection)
         return output
 
     @classmethod
@@ -473,24 +469,16 @@ class Sufficiency:
         ValueError
             If the length of data points in the measures do not match
         """
-        validate_output(data)
-
-        # X, y data
-        steps = cast(np.ndarray, data[STEPS_KEY])
-
         # Extrapolation parameters
-        last_X = steps[-1]
-        geomshape = (0.01 * last_X, last_X * 4, len(steps))
+        last_X = data.steps[-1]
+        geomshape = (0.01 * last_X, last_X * 4, len(data.steps))
         extrapolated = np.geomspace(*geomshape).astype(np.int64)
 
         # Stores all plots
         plots = []
 
         # Create a plot for each measure on one figure
-        for name, measures in data.items():
-            if name in [STEPS_KEY, PARAMS_KEY]:
-                continue
-            measures = cast(np.ndarray, measures)
+        for name, measures in data.measures.items():
             if measures.ndim > 1:
                 if class_names is not None and len(measures) != len(class_names):
                     raise IndexError("Class name count does not align with measures")
@@ -498,15 +486,15 @@ class Sufficiency:
                     class_name = str(i) if class_names is None else class_names[i]
                     fig = plot_measure(
                         f"{name}_{class_name}",
-                        steps,
+                        data.steps,
                         measure,
-                        data[PARAMS_KEY][name][i],
+                        data.params[name][i],
                         extrapolated,
                     )
                     plots.append(fig)
 
             else:
-                fig = plot_measure(name, steps, measures, data[PARAMS_KEY][name], extrapolated)
+                fig = plot_measure(name, data.steps, measures, data.params[name], extrapolated)
                 plots.append(fig)
 
         return plots
@@ -532,22 +520,20 @@ class Sufficiency:
             corresponding entry in targets
         """
 
-        validate_output(data)
-
         projection = {}
 
         for name, target in targets.items():
-            if name not in data:
+            if name not in data.measures:
                 continue
 
-            measure = cast(np.ndarray, data[name])
+            measure = cast(np.ndarray, data.measures[name])
             if measure.ndim > 1:
                 projection[name] = np.zeros((len(measure), len(target)))
                 for i in range(len(measure)):
                     projection[name][i] = inv_project_steps(
-                        data[PARAMS_KEY][name][i], target[i] if target.ndim == measure.ndim else target
+                        data.params[name][i], target[i] if target.ndim == measure.ndim else target
                     )
             else:
-                projection[name] = inv_project_steps(data[PARAMS_KEY][name], target)
+                projection[name] = inv_project_steps(data.params[name], target)
 
         return projection

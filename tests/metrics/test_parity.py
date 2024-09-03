@@ -152,10 +152,10 @@ class TestLabelIndependenceFunctional:
         labels_expected = MockDistributionDataset(f_exp).labels
         labels_observed = MockDistributionDataset(f_obs).labels
 
-        chisquared, p = parity(labels_expected, labels_observed)
+        result = parity(labels_expected, labels_observed)
 
-        assert np.isclose(chisquared, 228.23515947653874)
-        assert np.isclose(p, 3.3295585338846486e-49)
+        assert np.isclose(result.score, 228.23515947653874)
+        assert np.isclose(result.p_value, 3.3295585338846486e-49)
 
     def test_5050_data(self):
         """
@@ -169,13 +169,10 @@ class TestLabelIndependenceFunctional:
         labels_expected = MockDistributionDataset(f_exp).labels
         labels_observed = MockDistributionDataset(f_obs).labels
 
-        chisquared, p = parity(labels_expected, labels_observed)
+        result = parity(labels_expected, labels_observed)
 
-        assert np.isclose(chisquared, 0)
-        assert np.isclose(p, 1)
-        assert np.isclose(p, 1)
-
-        assert np.isclose(p, 1)
+        assert np.isclose(result.score, 0)
+        assert np.isclose(result.p_value, 1)
 
 
 class TestMDParityUnit:
@@ -246,10 +243,10 @@ class TestMDParityFunctional:
             "factor1": np.concatenate(([10] * 5, [20] * 5)),
         }
 
-        _, p = parity_metadata(factors)
+        result = parity_metadata(factors)
 
         # Checks that factor1 is highly correlated with class
-        assert p[0] < 0.05
+        assert result.p_value[0] < 0.05
 
     def test_uncorrelated_factors(self):
         """
@@ -261,11 +258,11 @@ class TestMDParityFunctional:
             "factor1": np.array(["foo"] * 10),
         }
 
-        chi, p = parity_metadata(factors)
+        result = parity_metadata(factors)
 
         # Checks that factor1 is uncorrelated with class
-        assert np.isclose(chi[0], 0)
-        assert np.isclose(p[0], 1)
+        assert np.isclose(result.score[0], 0)
+        assert np.isclose(result.p_value[0], 1)
 
     def test_quantized_factors(self):
         """
@@ -278,19 +275,19 @@ class TestMDParityFunctional:
         }
         continuous_bincounts = {"factor1": 2}
 
-        chi1, p1 = parity_metadata(continuous_dataset, continuous_bincounts)
+        result1 = parity_metadata(continuous_dataset, continuous_bincounts)
 
         discrete_dataset = {
             "class": np.concatenate(([0] * 5, [1] * 5)),
             "factor2": np.concatenate(([10] * 5, [20] * 5)),
         }
 
-        chi2, p2 = parity_metadata(discrete_dataset)
+        result2 = parity_metadata(discrete_dataset)
 
         # Checks that the test on the quantization continuous_dataset is
         # equivalent to the test on the discrete dataset discrete_dataset
-        assert p1[0] == p2[0]
-        assert chi1[0] == chi2[0]
+        assert result1.score[0] == result2.score[0]
+        assert result1.p_value[0] == result2.p_value[0]
 
     def test_overquantized_factors(self):
         """
@@ -303,11 +300,11 @@ class TestMDParityFunctional:
         }
         continuous_bincounts = {"factor1": 1}
 
-        chi, p = parity_metadata(factors, continuous_bincounts)
+        result = parity_metadata(factors, continuous_bincounts)
 
         # Checks if factor1 and class are perfectly uncorrelated
-        assert np.isclose(chi[0], 0)
-        assert np.isclose(p[0], 1)
+        assert np.isclose(result.score[0], 0)
+        assert np.isclose(result.p_value[0], 1)
 
     def test_underquantized_has_low_freqs(self):
         """

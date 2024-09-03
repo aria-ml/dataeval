@@ -10,9 +10,19 @@ class TestOutput(OutputMetadata):
     test3: str
 
 
-@set_metadata("dataeval.test.mock_metric")
+@set_metadata("mock_func")
 def mock_metric(arg1: int, arg2: bool, arg3: str) -> TestOutput:
     return TestOutput(arg1, arg2, arg3)
+
+
+class MockMetric:
+    state1: int = 1
+    state2: float = 1.5
+    state3: str = "mock"
+
+    @set_metadata("mock_meth", ["state1", "state2", "state3"])
+    def evaluate(self, arg1: int, arg2: bool, arg3: str = "mock_default") -> TestOutput:
+        return TestOutput(arg1, arg2, arg3)
 
 
 class TestOutputMetadata:
@@ -28,8 +38,21 @@ class TestOutputMetadata:
 
     def test_output_metadata_meta(self):
         output_meta = mock_metric(1, True, "value").meta()
-        assert output_meta["name"] == "dataeval.test.mock_metric"
+        assert output_meta["name"] == "mock_func"
         assert output_meta["execution_time"]
         assert output_meta["execution_duration"] > 0
         assert set(output_meta["arguments"]) == {"arg1", "arg2", "arg3"}
+        assert output_meta["state"] == {}
+        assert output_meta["version"]
+
+    def test_output_default_args_kwargs(self):
+        output = MockMetric().evaluate(1, True)
+        output_dict = output.dict()
+        assert output_dict == {"test1": 1, "test2": True, "test3": "mock_default"}
+        output_meta = output.meta()
+        assert output_meta["name"] == "mock_meth"
+        assert output_meta["execution_time"]
+        assert output_meta["execution_duration"] > 0
+        assert output_meta["arguments"] == {"arg1": "int: 1", "arg2": "bool: True", "arg3": "str: mock_default"}
+        assert output_meta["state"] == {"state1": "int: 1", "state2": "float: 1.5", "state3": "str: mock"}
         assert output_meta["version"]
