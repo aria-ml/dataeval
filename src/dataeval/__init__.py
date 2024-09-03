@@ -1,8 +1,8 @@
+__version__ = "0.0.0"
+
 from importlib.util import find_spec
 
 from . import detectors, flags, metrics
-
-__version__ = "0.0.0"
 
 __all__ = ["detectors", "flags", "metrics"]
 

@@ -9,8 +9,6 @@ from matplotlib.figure import Figure
 from scipy.optimize import basinhopping
 from torch.utils.data import Dataset
 
-from dataeval._internal.metrics.base import EvaluateMixin
-
 STEPS_KEY = "_STEPS_"
 PARAMS_KEY = "_CURVE_PARAMS_"
 
@@ -228,7 +226,7 @@ def plot_measure(
     return fig
 
 
-class Sufficiency(EvaluateMixin):
+class Sufficiency:
     """
     Project dataset sufficiency using given a model and evaluation criteria
 
