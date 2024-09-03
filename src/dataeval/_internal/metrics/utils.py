@@ -154,7 +154,9 @@ def infer_categorical(X: np.ndarray, threshold: float = 0.5) -> np.ndarray:
     return pct_unique < threshold
 
 
-def preprocess_metadata(class_labels: Sequence[int], metadata: List[Dict]) -> Tuple[np.ndarray, List[str], List[bool]]:
+def preprocess_metadata(
+    class_labels: Sequence[int], metadata: List[Dict], cat_thresh: float = 0.2
+) -> Tuple[np.ndarray, List[str], List[bool]]:
     # convert class_labels and list of metadata dicts to dict of ndarrays
     metadata_dict: Dict[str, np.ndarray] = {
         "class_label": np.asarray(class_labels, dtype=int),
@@ -172,7 +174,7 @@ def preprocess_metadata(class_labels: Sequence[int], metadata: List[Dict]) -> Tu
 
     data = np.stack(list(metadata_dict.values()), axis=-1)
     names = list(metadata_dict.keys())
-    is_categorical = [infer_categorical(metadata_dict[var], 0.25)[0] for var in names]
+    is_categorical = [infer_categorical(metadata_dict[var], cat_thresh)[0] for var in names]
 
     return data, names, is_categorical
 
