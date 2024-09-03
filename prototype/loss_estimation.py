@@ -19,15 +19,19 @@ class LossEstimator():
     def __init__(self, method="CBPE", problem_type="classification_multiclass"):
         self.method = method
         self.problem_type = problem_type
+        self.classification = "classification" in problem_type
+        self.metric = 'accuracy' if self.classification else 'rmse'
     
     def _eval_model(self, model: nn.Module, dataset: Dataset, class_names, has_labels: bool = False, device="cuda" if torch.cuda.is_available() else "cpu") -> Dict[str, list]:
         #TODO: Let user set their own custom eval function
-        dict_out = {"y_pred": np.zeros(0, dtype=int)}
+        pred_type = int if self.classification else float
+        dict_out = {"y_pred": np.zeros(0, dtype=pred_type)}
         if has_labels:
-            dict_out["y"] = np.zeros(0, dtype=int)
+            dict_out["y"] = np.zeros(0, dtype=pred_type)
 
-        for class_name in class_names:
-            dict_out[f"y_pred_proba_{class_name}"] = np.zeros(0)
+        if self.classification:
+            for class_name in class_names:
+                dict_out[f"y_pred_proba_{class_name}"] = np.zeros(0)
 
         # Set model layers into evaluation mode
         model.eval()
@@ -40,16 +44,24 @@ class LossEstimator():
                 # Load targets/labels to device
                 
                 output = model(X).cpu()
-                preds = np.int64(torch.argmax(output, dim=1))
+                
 
-                dict_out["y_pred"] = np.concatenate((dict_out["y_pred"], preds), dtype=int)
+                if self.classification:
+                    preds = np.int64(torch.argmax(output, dim=1))
+                    for i, class_name in enumerate(class_names):
+                        key = f"y_pred_proba_{class_name}"
+                        dict_out[key] = np.concatenate((dict_out[key], output[:, i]))
+                else:
+                    preds = output[:,0]
+                dict_out["y_pred"] = np.concatenate((dict_out["y_pred"], preds), dtype=pred_type)
 
                 if has_labels:
-                    y = torch.Tensor(batch[1]).int()
-                    dict_out["y"] = np.concatenate((dict_out["y"], y), dtype=int)
-                for i, class_name in enumerate(class_names):
-                    key = f"y_pred_proba_{class_name}"
-                    dict_out[key] = np.concatenate((dict_out[key], output[:, i]))
+                    if self.classification:
+                        y = torch.Tensor(batch[1]).int()
+                    else:
+                        y = torch.Tensor(batch[1]).float()
+                    dict_out["y"] = np.concatenate((dict_out["y"], y), dtype=pred_type)
+                
 
         return dict_out
 
@@ -61,18 +73,38 @@ class LossEstimator():
         op_dict = self._eval_model(model, op_data, class_names, False, **eval_kwargs)
         op_df = pd.DataFrame(op_dict)
 
-        y_pred_keys = {}
-        for class_name in class_names:
-            y_pred_keys[class_name] = f"y_pred_proba_{class_name}"
+        if self.classification:
+            y_pred_keys = {}
+            for class_name in class_names:
+                y_pred_keys[class_name] = f"y_pred_proba_{class_name}"
+        else:
+            feature_keys = []#set(class_names)
 
-        estimator = nml.CBPE(
-        problem_type=self.problem_type,
-        y_pred_proba=y_pred_keys,
-        y_pred="y_pred",
-        y_true="y",
-        metrics=["accuracy"],
-        chunk_size=chunk_size,
-    )
+        est_kwargs = {
+            #'problem_type': self.problem_type,
+            #'y_pred_proba': y_pred_keys,
+            'y_pred': 'y_pred',
+            'y_true': 'y',
+            'metrics': [self.metric],
+            'chunk_size': chunk_size
+        }
+
+        if self.classification:
+            estimator = nml.CBPE(problem_type=self.problem_type,
+                                y_pred_proba = y_pred_keys,
+                                **est_kwargs)
+        else:
+            estimator = nml.DLE(feature_column_names = feature_keys,
+                **est_kwargs)
+
+        #estimator = nml.CBPE(
+        #problem_type=self.problem_type,
+        #y_pred_proba=y_pred_keys,
+        #y_pred="y_pred",
+        #y_true="y",
+        #metrics=["accuracy"],
+        #chunk_size=chunk_size,
+        #)
         
 
         estimator.fit(ref_df)
@@ -80,12 +112,12 @@ class LossEstimator():
 
         reference_df = results.filter(period="reference").to_df()
         results_df = results.filter(period="analysis").to_df()
-        ref_accuracy = np.mean(reference_df['accuracy']['value'])
-        pred_accuracy = np.mean(results_df['accuracy']['value'])
-        alert = np.any(results_df['accuracy']['alert'])
+        ref_accuracy = np.mean(reference_df[self.metric]['value'])
+        pred_accuracy = np.mean(results_df[self.metric]['value'])
+        alert = np.any(results_df[self.metric]['alert'])
 
         return {
-            "Reference_Accuracy": ref_accuracy,
-            "Op_Predicted_Accuracy": pred_accuracy,
+            "Reference_Metric": ref_accuracy,
+            "Op_Predicted_Metric": pred_accuracy,
             "Has_Drifted": alert
         }

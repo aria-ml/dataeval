@@ -18,7 +18,7 @@ import nannyml as nml
 from IPython.display import display
 from PIL import Image
 
-def custom_train(model: nn.Module, dataset: Dataset, device, epochs=10):
+def custom_train_class(model: nn.Module, dataset: Dataset, device, epochs=10):
     # Defined only for this testing scenario
     criterion = torch.nn.CrossEntropyLoss().to(device)
     optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
@@ -38,6 +38,31 @@ def custom_train(model: nn.Module, dataset: Dataset, device, epochs=10):
             outputs = model(X)
             # Compute loss
             loss = criterion(outputs, y)
+            # Back prop
+            loss.backward()
+            # Update weights/parameters
+            optimizer.step()
+
+def custom_train_regress(model: nn.Module, dataset: Dataset, device, epochs=10):
+    # Defined only for this testing scenario
+    criterion = torch.nn.MSELoss().to(device)
+    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+
+    # Define the dataloader for training
+    dataloader = DataLoader(dataset, batch_size=16)
+
+    for epoch in range(epochs):
+        for batch in dataloader:
+            # Load data/images to device
+            X = torch.Tensor(batch[0]).to(device)
+            # Load targets/labels to device
+            y = torch.Tensor(batch[1]).to(device)
+            # Zero out gradients
+            optimizer.zero_grad()
+            # Forward propagation
+            outputs = model(X)
+            # Compute loss
+            loss = criterion(outputs.float(), y.float())
             # Back prop
             loss.backward()
             # Update weights/parameters
@@ -72,6 +97,20 @@ class MockNet(nn.Module):
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
         x = self.softmax(x)
+        return x
+
+class RegressNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.fc1 = nn.Linear(10*10*3, 84)
+        self.fc2 = nn.Linear(84, 3)
+        self.fc3 = nn.Linear(3, 1)
+    
+    def forward(self,x):
+        x = torch.flatten(x, 1)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
         return x
 
 class SimpleDataset(datasets.VisionDataset):
@@ -121,6 +160,7 @@ class LargeMockDataset(SimpleDataset):
         for i, label in enumerate(labels):
             images.append(label * np.ones((3,10,10)))
         super().__init__(images, labels)
+    
 
 class TestLEUnit():
     def test_eval_builds_dict(self):
@@ -138,8 +178,8 @@ class TestLEUnit():
         ds_dict = le._eval_model(model, ds, ds.class_names, True)
         assert sorted(ds_dict["y"]) == sorted(ds.labels)
 
-class TestLEFunc():
-    def test_no_degradation_on_same_dataset(self):
+class TestLEFunc_class():
+    def test_no_degradation_on_same_dataset_class(self):
         torch._dynamo.disable()
         torch._dynamo.config.suppress_errors = True
 
@@ -150,24 +190,58 @@ class TestLEFunc():
         device = "cuda" if torch.cuda.is_available() else "cpu"
         model = torch.compile(MockNet().to(device))
         model = cast(MockNet, model)
-        le = LossEstimator()
 
         model = reset_parameters(model)
         # Run the model with each substep of data
         # train on subset of train data
         train_kwargs = {}
         eval_kwargs = {}
-        custom_train(
+        custom_train_class(
             model,
             ds,
             device
         )
 
-        estimator = LossEstimator("CBPE", "classification_multiclass")
+        #for method in ("regression", "classification_multiclass"):
+        method = "classification_multiclass"
+        estimator = LossEstimator("CBPE", method)
         results = estimator.evaluate(model, ds, ds_c, ds.class_names, 2)
 
-        ds_acc = results["Reference_Accuracy"]
-        ds_c_acc = results["Op_Predicted_Accuracy"]
+        ds_acc = results["Reference_Metric"]
+        ds_c_acc = results["Op_Predicted_Metric"]
+
+        assert np.isclose(ds_acc, ds_c_acc)
+    
+    def test_no_degradation_on_same_dataset_regress(self):
+        torch._dynamo.disable()
+        torch._dynamo.config.suppress_errors = True
+
+        ds = LargeMockDataset()
+        ds_c = LargeMockDataset()
+        class_names = np.unique(ds.labels)
+
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model = torch.compile(RegressNet().to(device))
+        model = cast(RegressNet, model)
+
+        model = reset_parameters(model)
+        # Run the model with each substep of data
+        # train on subset of train data
+        train_kwargs = {}
+        eval_kwargs = {}
+        custom_train_regress(
+            model,
+            ds,
+            device
+        )
+
+        #for method in ("regression", "classification_multiclass"):
+        method = "regression"
+        estimator = LossEstimator("CBPE", method)
+        results = estimator.evaluate(model, ds, ds_c, ds.class_names, 2)
+
+        ds_acc = results["Reference_Metric"]
+        ds_c_acc = results["Op_Predicted_Metric"]
 
         assert np.isclose(ds_acc, ds_c_acc)
 
@@ -205,17 +279,18 @@ class TestLEFunc():
         # train on subset of train data
         train_kwargs = {}
         eval_kwargs = {}
-        custom_train(
+        custom_train_class(
             model,
             ds,
             device,
             epochs=30
         )
 
-        estimator = LossEstimator("CBPE", "classification_multiclass")
+        method = "classification_multiclass"
+        estimator = LossEstimator("CBPE", method)
         results = estimator.evaluate(model, ds, ds_c, ds.class_names, 2)
 
-        ds_acc = results["Reference_Accuracy"]
-        ds_c_acc = results["Op_Predicted_Accuracy"]
+        ds_acc = results["Reference_Metric"]
+        ds_c_acc = results["Op_Predicted_Metric"]
 
         assert ds_c_acc < 0.95*ds_acc
