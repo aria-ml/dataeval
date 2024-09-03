@@ -2,23 +2,23 @@ import numpy as np
 import pytest
 
 from dataeval._internal.detectors.linter import Linter, _get_outlier_mask
-from dataeval._internal.flags import ImageStatistics
+from dataeval.flags import ImageStat
 
 
 class TestLinter:
     def test_linter(self):
         linter = Linter()
         results = linter.evaluate(np.random.random((1000, 3, 16, 16)))
-        assert len(linter.stats._metrics_dict) == 2
         assert results is not None
 
     def test_linter_custom(self):
-        linter = Linter(ImageStatistics.ENTROPY)
-        assert len(linter.stats._metrics_dict) == 1
-        metric = next(iter(linter.stats._metrics_dict))
-        assert metric.flags == ImageStatistics.ENTROPY
+        linter = Linter(ImageStat.ENTROPY)
         results = linter.evaluate(np.random.random((1000, 3, 16, 16)))
         assert results is not None
+
+    def test_linter_value_error(self):
+        with pytest.raises(ValueError):
+            Linter(ImageStat.XXHASH)
 
     @pytest.mark.parametrize("method", ["zscore", "modzscore", "iqr"])
     def test_get_outlier_mask(self, method):

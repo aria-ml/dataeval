@@ -1,10 +1,11 @@
-from typing import Iterable, Literal, Optional, Sequence, Union
+from typing import Iterable, Literal, Optional
 
 import numpy as np
 from numpy.typing import ArrayLike
 
-from dataeval._internal.flags import ImageProperty, ImageVisuals, LinterFlags
-from dataeval._internal.metrics.stats import ImageStats
+from dataeval._internal.flags import verify_supported
+from dataeval.flags import ImageStat
+from dataeval.metrics import imagestats
 
 
 def _get_outlier_mask(
@@ -18,7 +19,7 @@ def _get_outlier_mask(
     elif method == "modzscore":
         threshold = threshold if threshold else 3.5
         abs_diff = np.abs(values - np.median(values))
-        med_abs_diff = np.median(abs_diff) if np.median(abs_diff) != 0 else 1
+        med_abs_diff = np.median(abs_diff) if np.median(abs_diff) != 0 else np.mean(abs_diff)
         mod_z_score = 0.6745 * abs_diff / med_abs_diff
         return mod_z_score > threshold
     elif method == "iqr":
@@ -36,8 +37,9 @@ class Linter:
 
     Parameters
     ----------
-    flags : [ImageProperty | ImageStatistics | ImageVisuals], default None
+    flags : ImageStat, default ImageStat.ALL_PROPERTIES | ImageStat.ALL_VISUALS
         Metric(s) to calculate for each image - calculates all metrics if None
+        Only supports ImageStat.ALL_STATS
     outlier_method : ["modzscore" | "zscore" | "iqr"], optional - default "modzscore"
         Statistical method used to identify outliers
     outlier_threshold : float, optional - default None
@@ -46,8 +48,8 @@ class Linter:
 
     Attributes
     ----------
-    stats : ImageStats
-        Class to hold the value of each metric for each image
+    stats : Dict[str, Any]
+        Dictionary to hold the value of each metric for each image
 
     See Also
     --------
@@ -81,7 +83,7 @@ class Linter:
 
     Specifying specific metrics to analyze:
 
-    >>> lint = Linter(flags=[ImageProperty.SIZE, ImageVisuals.ALL])
+    >>> lint = Linter(flags=ImageStat.SIZE | ImageStat.ALL_VISUALS)
 
     Specifying an outlier method:
 
@@ -94,19 +96,19 @@ class Linter:
 
     def __init__(
         self,
-        flags: Optional[Union[LinterFlags, Sequence[LinterFlags]]] = None,
+        flags: ImageStat = ImageStat.ALL_PROPERTIES | ImageStat.ALL_VISUALS,
         outlier_method: Literal["zscore", "modzscore", "iqr"] = "modzscore",
         outlier_threshold: Optional[float] = None,
     ):
-        flags = flags if flags is not None else (ImageProperty.ALL, ImageVisuals.ALL)
-        self.stats = ImageStats(flags)
+        verify_supported(flags, ImageStat.ALL_STATS)
+        self.flags = flags
         self.outlier_method: Literal["zscore", "modzscore", "iqr"] = outlier_method
         self.outlier_threshold = outlier_threshold
 
     def _get_outliers(self) -> dict:
         flagged_images = {}
 
-        for stat, values in self.results.items():
+        for stat, values in self.stats.items():
             if not isinstance(values, np.ndarray):
                 continue
 
@@ -141,7 +143,5 @@ class Linter:
         >>> lint.evaluate(images)
         {18: {'brightness': 0.78}, 25: {'brightness': 0.98}}
         """
-        self.stats.reset()
-        self.stats.update(images)
-        self.results = self.stats.compute()
+        self.stats = imagestats(images, self.flags)
         return self._get_outliers()
