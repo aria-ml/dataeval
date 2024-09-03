@@ -78,7 +78,7 @@ def balance(class_labels: Sequence[int], metadata: List[Dict], num_neighbors: in
     sklearn.metrics.mutual_info_score
     """
     num_neighbors = validate_num_neighbors(num_neighbors)
-    data, names, is_categorical = preprocess_metadata(class_labels, metadata)
+    data, names, is_categorical = preprocess_metadata(class_labels, metadata, cat_thresh=0.2)
     num_factors = len(names)
     mi = np.empty((num_factors, num_factors))
     mi[:] = np.nan

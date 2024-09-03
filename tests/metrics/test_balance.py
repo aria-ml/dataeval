@@ -66,6 +66,13 @@ metadata = [
     }
     for idx in range(20)
 ]
+metadata_no_cnt = [
+    {
+        "var_cat": [md["var_cat"] for md in metadata],
+    }
+    for idx in range(20)
+]
+
 
 # for functional testing
 N = 1000
@@ -111,6 +118,10 @@ class TestBalanceUnit:
         assert not is_categorical[idx]
         assert all(is_categorical[:idx] + is_categorical[idx + 1 :])
         assert data.dtype == float
+
+    # def test_preprocess_no_float(self):
+    #     # test case with no float data
+    #     balance(class_labels=class_labels, metadata=metadata_no_cnt)
 
     @pytest.mark.parametrize(
         "balance_fn, expected_shape",
