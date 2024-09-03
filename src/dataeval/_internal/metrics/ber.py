@@ -7,7 +7,8 @@ Learning to Bound the Multi-class Bayes Error (Th. 3 and Th. 4)
 https://arxiv.org/abs/1811.06419
 """
 
-from typing import Literal, NamedTuple, Tuple
+from dataclasses import dataclass
+from typing import Literal, Tuple
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -16,9 +17,11 @@ from scipy.stats import mode
 
 from dataeval._internal.interop import to_numpy
 from dataeval._internal.metrics.utils import compute_neighbors, get_classes_counts, get_method, minimum_spanning_tree
+from dataeval._internal.output import OutputMetadata, set_metadata
 
 
-class BEROutput(NamedTuple):
+@dataclass(frozen=True)
+class BEROutput(OutputMetadata):
     """
     Attributes
     ----------
@@ -104,6 +107,7 @@ def knn_lowerbound(value: float, classes: int, k: int) -> float:
 BER_FN_MAP = {"KNN": ber_knn, "MST": ber_mst}
 
 
+@set_metadata("dataeval.metrics.ber")
 def ber(images: ArrayLike, labels: ArrayLike, k: int = 1, method: Literal["KNN", "MST"] = "KNN") -> BEROutput:
     """
     An estimator for Multi-class Bayes Error Rate using FR or KNN test statistic basis
