@@ -166,11 +166,6 @@ def validate_dist(label_dist: np.ndarray, label_name: str):
             " dataset have frequencies less than 5. This may lead"
             " to invalid chi-squared evaluation."
         )
-        warnings.warn(
-            f"Labels {np.where(label_dist<5)[0]} in {label_name}"
-            " dataset have frequencies less than 5. This may lead"
-            " to invalid chi-squared evaluation."
-        )
 
 
 def parity(
