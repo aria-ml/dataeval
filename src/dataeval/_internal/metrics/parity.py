@@ -18,7 +18,7 @@ class ParityOutput(Generic[TData], OutputMetadata):
     Attributes
     ----------
     score : np.float64 | NDArray[np.float64]
-        chi-squared value(s) of the test
+        chi-squared score(s) of the test
     p_value : np.float64 | NDArray[np.float64]
         p-value(s) of the test
     """

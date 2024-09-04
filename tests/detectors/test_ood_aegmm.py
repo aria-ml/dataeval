@@ -75,10 +75,10 @@ def test_aegmm(aegmm_params):
     loss_fn = LossGMM(w_energy=w_energy)
     aegmm.fit(X, threshold_perc=threshold_perc, loss_fn=loss_fn, epochs=5, batch_size=1000, verbose=False)
     energy = aegmm.score(X).instance_score
-    perc_score = 100 * (energy < aegmm._threshold_score()).astype(int).sum() / energy.shape[0]
+    perc_score = 100 * (energy < aegmm._threshold_score()).sum() / energy.shape[0]
     assert threshold_perc + 5 > perc_score > threshold_perc - 5
 
     # make and check predictions
     od_preds = aegmm.predict(X)
-    assert od_preds["is_ood"].shape == (X.shape[0],)
-    assert od_preds["is_ood"].sum() == (od_preds["instance_score"] > aegmm._threshold_score()).astype(int).sum()
+    assert od_preds.is_ood.shape == (X.shape[0],)
+    assert od_preds.is_ood.sum() == (od_preds.instance_score > aegmm._threshold_score()).sum()

@@ -15,6 +15,53 @@ CH_IDX_MAP = "ch_idx_map"
 
 @dataclass(frozen=True)
 class StatsOutput(OutputMetadata):
+    """
+    Attributes
+    ----------
+    xxhash : List[str]
+        xxHash hash of the images as a hex string
+    pchash : List[str]
+        Perception hash of the images as a hex string
+    width: NDArray[np.uint16]
+        Width of the images in pixels
+    height: NDArray[np.uint16]
+        Height of the images in pixels
+    channels: NDArray[np.uint8]
+        Channel count of the images in pixels
+    size: NDArray[np.uint32]
+        Size of the images in pixels
+    aspect_ratio: NDArray[np.float16]
+        Aspect ratio of the images (width/height)
+    depth: NDArray[np.uint8]
+        Color depth of the images in bits
+    brightness: NDArray[np.float16]
+        Brightness of the images
+    blurriness: NDArray[np.float16]
+        Blurriness of the images
+    missing: NDArray[np.float16]
+        Percentage of the images with missing pixels
+    zero: NDArray[np.float16]
+        Percentage of the images with zero value pixels
+    mean: NDArray[np.float16]
+        Mean of the pixel values of the images
+    std: NDArray[np.float16]
+        Standard deviation of the pixel values of the images
+    var: NDArray[np.float16]
+        Variance of the pixel values of the images
+    skew: NDArray[np.float16]
+        Skew of the pixel values of the images
+    kurtosis: NDArray[np.float16]
+        Kurtosis of the pixel values of the images
+    percentiles: NDArray[np.float16]
+        Percentiles of the pixel values of the images with quartiles of (0,25,50,75,100)
+    histogram: NDArray[np.uint32]
+        Histogram of the pixel values of the images across 256 bins scaled between 0 and 1
+    entropy: NDArray[np.float16]
+        Entropy of the pixel values of the images
+    ch_idx_map: Dict[int, List[int]]
+        Per-channel mapping of indices for each metric
+    """
+
     xxhash: List[str]
     pchash: List[str]
     width: NDArray[np.uint16]
