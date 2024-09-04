@@ -73,9 +73,6 @@ def ber_knn(X: NDArray, y: NDArray, k: int) -> Tuple[float, float]:
         The upper and lower bounds of the bayes error rate
     """
     M, N = get_classes_counts(y)
-
-    # All features belong on second dimension
-    X = X.reshape((X.shape[0], -1))
     nn_indices = compute_neighbors(X, X, k=k)
     nn_indices = np.expand_dims(nn_indices, axis=1) if nn_indices.ndim == 1 else nn_indices
     modal_class = mode(y[nn_indices], axis=1, keepdims=True).mode.squeeze()

@@ -6,7 +6,7 @@ using the Fast Nearest Neighbor and Minimum Spanning Tree algorithms
 from typing import Literal, NamedTuple
 
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 
 from dataeval._internal.interop import to_numpy
 from dataeval._internal.metrics.utils import compute_neighbors, get_method, minimum_spanning_tree
@@ -26,14 +26,44 @@ class DivergenceOutput(NamedTuple):
     errors: int
 
 
-def divergence_mst(data: np.ndarray, labels: np.ndarray) -> int:
+def divergence_mst(data: NDArray, labels: NDArray) -> int:
+    """
+    Calculates the estimated label errors based on the minimum spanning tree
+
+    Parameters
+    ----------
+    data : NDArray, shape - (N, ... )
+        Input images to be grouped
+    labels : NDArray
+        Corresponding labels for each data point
+
+    Returns
+    -------
+    int
+        Number of label errors when creating the minimum spanning tree
+    """
     mst = minimum_spanning_tree(data).toarray()
     edgelist = np.transpose(np.nonzero(mst))
     errors = np.sum(labels[edgelist[:, 0]] != labels[edgelist[:, 1]])
     return errors
 
 
-def divergence_fnn(data: np.ndarray, labels: np.ndarray) -> int:
+def divergence_fnn(data: NDArray, labels: NDArray) -> int:
+    """
+    Calculates the estimated label errors based on their nearest neighbors
+
+    Parameters
+    ----------
+    data : NDArray, shape - (N, ... )
+        Input images to be grouped
+    labels : NDArray
+        Corresponding labels for each data point
+
+    Returns
+    -------
+    int
+        Number of label errors when finding nearest neighbors
+    """
     nn_indices = compute_neighbors(data, data)
     errors = np.sum(np.abs(labels[nn_indices] - labels))
     return errors
@@ -50,10 +80,10 @@ def divergence(data_a: ArrayLike, data_b: ArrayLike, method: Literal["FNN", "MST
     ----------
     data_a : ArrayLike, shape - (N, P)
         A dataset in an ArrayLike format to compare.
-        Function expects the data to have 2 dimensions, N number of observations in a P-dimesionial space.
+        Function expects the data to have 2 dimensions, N number of observations in a P-dimensionial space.
     data_b : ArrayLike, shape - (N, P)
         A dataset in an ArrayLike format to compare.
-        Function expects the data to have 2 dimensions, N number of observations in a P-dimesionial space.
+        Function expects the data to have 2 dimensions, N number of observations in a P-dimensionial space.
     method : Literal["MST, "FNN"], default "FNN"
         Method used to estimate dataset divergence
 

@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 import torch
 
@@ -37,8 +38,26 @@ class TestFunctionalBER:
         ],
     )
     def test_knn_lower_bound_2_classes(self, value, classes, k, expected):
+        """All logical pathways are correctly calculated"""
         result = knn_lowerbound(value, classes, k)
         assert result == expected
+
+    @pytest.mark.parametrize(
+        "method, k",
+        [
+            (ber_mst, None),
+            (ber_knn, 1),
+        ],
+    )
+    def test_ber_mst_redundant_shape(self, method, k):
+        """Unflattened and flattened input should have equivalent outputs"""
+        images = np.random.random(size=(10, 3, 3))
+        labels = np.arange(10)
+
+        args = (images, labels, k) if k else (images, labels)
+        args_flat = (images, labels, k) if k else (images.reshape(10, -1), labels)
+
+        assert method(*args) == method(*args_flat)
 
 
 class TestAPIBER:
