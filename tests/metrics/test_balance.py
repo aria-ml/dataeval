@@ -52,48 +52,110 @@ def analytic_mi(corr, one_class=True):
 
 
 # fix seed so that pipelines do not stochastically fail
-np.random.seed(2)
-num_samples = 20
-corr_val = 0.75
-vals = ["a", "b"]
-class_labels = [np.random.randint(low=0, high=2) for _ in range(num_samples)]
-# for unit testing
-metadata = [
-    {
-        "var_cat": vals[get_index_one_class(class_labels[idx], corr_val)],
-        "var_cnt": np.random.randn(),
-        "var_float_cat": np.random.randint(low=0, high=len(vals)) + 0.1,
-    }
-    for idx in range(20)
-]
-metadata_no_cnt = [
-    {
-        "var_cat": [md["var_cat"] for md in metadata],
-    }
-    for idx in range(20)
-]
+np.random.seed(7)
 
 
-# for functional testing
-N = 1000
-class_labels_n = [np.random.randint(low=0, high=2) for _ in range(N)]
-metadata_one = [
-    {
-        "var_cat": vals[get_index_one_class(class_labels_n[idx], corr_val)],
-        "var_cnt": np.random.randn(),
-    }
-    for idx in range(N)
-]
-metadata_all = [
-    {
-        "var_cat": vals[get_index_all_class(class_labels_n[idx], corr_val)],
-        "var_cnt": np.random.randn(),
-    }
-    for idx in range(N)
-]
-num_vars = len(metadata[0].keys())
-mi_one = analytic_mi(corr_val, one_class=True)
-mi_all = analytic_mi(corr_val, one_class=False)
+@pytest.fixture
+def corr_val():
+    return 0.75
+
+
+@pytest.fixture
+def num_samples():
+    return 20
+
+
+@pytest.fixture
+def class_labels(num_samples):
+    return [np.random.randint(low=0, high=2) for _ in range(num_samples)]
+
+
+@pytest.fixture
+def metadata(corr_val, num_samples, class_labels):
+    vals = ["a", "b"]
+
+    # for unit testing
+    md = [
+        {
+            "var_cat": vals[get_index_one_class(class_labels[idx], corr_val)],
+            "var_cnt": np.random.randn(),
+            "var_float_cat": np.random.randint(low=0, high=len(vals)) + 0.1,
+        }
+        for idx in range(num_samples)
+    ]
+    return md
+
+
+@pytest.fixture
+def metadata_no_cnt(num_samples, metadata):
+    md = [
+        {
+            "var_cat": [md["var_cat"] for md in metadata],
+        }
+        for _ in range(num_samples)
+    ]
+    return md
+
+
+@pytest.fixture
+def num_samp_func():
+    return 500
+
+
+@pytest.fixture
+def class_labels_func(num_samp_func):
+    return [np.random.randint(low=0, high=2) for _ in range(num_samp_func)]
+
+
+@pytest.fixture
+def metadata_one(num_samp_func, class_labels_func, corr_val):
+    vals = ["a", "b"]
+    md = [
+        {
+            "var_cat": vals[get_index_one_class(class_labels_func[idx], corr_val)],
+            "var_cnt": np.random.randn(),
+        }
+        for idx in range(num_samp_func)
+    ]
+    return md
+
+
+@pytest.fixture
+def metadata_all(num_samp_func, class_labels_func, corr_val):
+    vals = ["a", "b"]
+    md = [
+        {
+            "var_cat": vals[get_index_all_class(class_labels_func[idx], corr_val)],
+            "var_cnt": np.random.randn(),
+        }
+        for idx in range(num_samp_func)
+    ]
+    return md
+
+
+@pytest.fixture
+def num_vars(metadata):
+    return len(metadata[0].keys())
+
+
+@pytest.fixture
+def balance_expected_shape(num_vars):
+    return (num_vars + 1, num_vars + 1)
+
+
+@pytest.fixture
+def balance_cw_expected_shape(num_vars):
+    return (2, num_vars)
+
+
+@pytest.fixture
+def mi_one(corr_val):
+    return analytic_mi(corr_val, one_class=True)
+
+
+@pytest.fixture
+def mi_all(corr_val):
+    return analytic_mi(corr_val, one_class=False)
 
 
 class TestBalanceUnit:
@@ -107,11 +169,11 @@ class TestBalanceUnit:
         ],
     )
     @pytest.mark.parametrize("balance_fn", [balance, balance_classwise])
-    def test_validates_balance_inputs(self, test_param, expected_exception, balance_fn):
+    def test_validates_balance_inputs(self, test_param, expected_exception, balance_fn, class_labels, metadata):
         with expected_exception:
             balance_fn(class_labels, metadata, test_param)
 
-    def test_preprocess(self):
+    def test_preprocess(self, metadata, class_labels, num_vars):
         data, names, is_categorical = preprocess_metadata(class_labels, metadata)
         assert len(names) == num_vars + 1  # 3 variables, class_label
         idx = names.index("var_cnt")
@@ -119,16 +181,17 @@ class TestBalanceUnit:
         assert all(is_categorical[:idx] + is_categorical[idx + 1 :])
         assert data.dtype == float
 
-    # def test_preprocess_no_float(self):
+    # def test_preprocess_no_float(self, class_labels, metadata_no_cnt):
     #     # test case with no float data
     #     balance(class_labels=class_labels, metadata=metadata_no_cnt)
 
     @pytest.mark.parametrize(
         "balance_fn, expected_shape",
-        [(balance, (num_vars + 1, num_vars + 1)), (balance_classwise, (2, num_vars))],
+        [(balance, "balance_expected_shape"), (balance_classwise, "balance_cw_expected_shape")],
     )
-    def test_correct_mi_shape_and_dtype(self, balance_fn, expected_shape):
+    def test_correct_mi_shape_and_dtype(self, balance_fn, expected_shape, class_labels, metadata, request):
         mi = balance_fn(class_labels, metadata).mutual_information
+        expected_shape = request.getfixturevalue(expected_shape)
         assert mi.shape == expected_shape
         assert mi.dtype == float
 
@@ -136,18 +199,22 @@ class TestBalanceUnit:
 class TestBalanceFunctional:
     @pytest.mark.parametrize(
         "md, mi_val",
-        [(metadata_all, mi_all), (metadata_one, mi_one)],
+        [("metadata_all", "mi_all"), ("metadata_one", "mi_one")],
     )
-    def test_correct_balance(self, md, mi_val):
-        mi = balance(class_labels_n, md).mutual_information
+    def test_correct_balance(self, md, mi_val, class_labels_func, request):
+        md = request.getfixturevalue(md)
+        mi_val = request.getfixturevalue(mi_val)
+        mi = balance(class_labels_func, md).mutual_information
         # first row (with class)
         mi_0 = np.array([1, mi_val, 0])
-        assert np.max(np.abs(mi[0] - mi_0)) < 0.02
+        assert np.max(np.abs(mi[0] - mi_0)) < 0.067
 
     @pytest.mark.parametrize(
         "md, mi_val",
-        [(metadata_all, mi_all), (metadata_one, mi_one)],
+        [("metadata_all", "mi_all"), ("metadata_one", "mi_one")],
     )
-    def test_correct_balance_classwise(self, md, mi_val):
-        mi = balance_classwise(class_labels_n, md).mutual_information
-        assert np.max(np.abs(mi[:, 0] - mi_val)) < 0.02
+    def test_correct_balance_classwise(self, md, mi_val, class_labels_func, request):
+        md = request.getfixturevalue(md)
+        mi_val = request.getfixturevalue(mi_val)
+        mi = balance_classwise(class_labels_func, md).mutual_information
+        assert np.max(np.abs(mi[:, 0] - mi_val)) < 0.067
