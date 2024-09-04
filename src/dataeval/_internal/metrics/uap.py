@@ -25,7 +25,7 @@ class UAPOutput(OutputMetadata):
     uap: float
 
 
-@set_metadata("dataeval.metrics.uap")
+@set_metadata("dataeval.metrics")
 def uap(labels: ArrayLike, scores: ArrayLike) -> UAPOutput:
     """
     FR Test Statistic based estimate of the empirical mean precision for

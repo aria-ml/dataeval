@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from dataeval._internal.detectors.drift.base import (
-    BaseUnivariateDrift,
+    BaseDriftUnivariate,
     LastSeenUpdate,
     ReservoirSamplingUpdate,
     preprocess_x,
@@ -49,35 +49,26 @@ class TestUpdateReference:
 
 def test_base_init_preprocess_fn_valueerror():
     with pytest.raises(ValueError):
-        BaseUnivariateDrift(np.empty([]), preprocess_fn="NotCallable")  # type: ignore
+        BaseDriftUnivariate(np.empty([]), preprocess_fn="NotCallable")  # type: ignore
 
 
 def test_base_init_update_x_ref_valueerror():
     with pytest.raises(ValueError):
-        BaseUnivariateDrift(np.empty([]), update_x_ref="invalid")  # type: ignore
+        BaseDriftUnivariate(np.empty([]), update_x_ref="invalid")  # type: ignore
 
 
 def test_base_init_correction_valueerror():
     with pytest.raises(ValueError):
-        BaseUnivariateDrift(np.empty([]), n_features=2, correction="invalid")  # type: ignore
+        BaseDriftUnivariate(np.empty([]), n_features=2, correction="invalid")  # type: ignore
 
 
 def test_base_init_set_n_features():
-    base = BaseUnivariateDrift(np.zeros(1), n_features=1)
+    base = BaseDriftUnivariate(np.zeros(1), n_features=1)
     assert base.n_features == 1
 
 
-def test_base_predict_valueerror():
-    base = BaseUnivariateDrift(np.zeros(1), n_features=1)
-    mock_score = MagicMock()
-    mock_score.return_value = (np.array(0.5), np.array(0.5))
-    base.score = mock_score
-    with pytest.raises(ValueError):
-        base.predict(np.empty([]), drift_type="invalid")  # type: ignore
-
-
 def test_base_predict_correction_valueerror():
-    base = BaseUnivariateDrift(np.zeros(1), n_features=1)
+    base = BaseDriftUnivariate(np.zeros(1), n_features=1)
     mock_score = MagicMock()
     mock_score.return_value = (np.array(0.5), np.array(0.5))
     base.score = mock_score
@@ -87,12 +78,12 @@ def test_base_predict_correction_valueerror():
 
 
 def test_base_preprocess_infer_features():
-    base = BaseUnivariateDrift(np.zeros((3, 3)), preprocess_fn=lambda x: x)
+    base = BaseDriftUnivariate(np.zeros((3, 3)), preprocess_fn=lambda x: x)
     assert base.n_features == 3
 
 
 def test_base_preprocess():
-    base = BaseUnivariateDrift(np.zeros(3), n_features=1, preprocess_fn=lambda x: x)
+    base = BaseDriftUnivariate(np.zeros(3), n_features=1, preprocess_fn=lambda x: x)
     np.testing.assert_equal(base._preprocess(base._x_ref), np.zeros(3))
     np.testing.assert_equal(base._preprocess(np.ones(3)), np.ones(3))
 

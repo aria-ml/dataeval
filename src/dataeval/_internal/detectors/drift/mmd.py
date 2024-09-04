@@ -6,15 +6,24 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
-from typing import Callable, Dict, Optional, Tuple, Union
+from dataclasses import dataclass
+from typing import Callable, Optional, Tuple
 
 import torch
 from numpy.typing import ArrayLike
 
 from dataeval._internal.interop import to_numpy
+from dataeval._internal.output import set_metadata
 
-from .base import BaseDrift, UpdateStrategy, preprocess_x, update_x_ref
+from .base import BaseDrift, DriftOutput, UpdateStrategy, preprocess_x, update_x_ref
 from .torch import GaussianRBF, get_device, mmd2_from_kernel_matrix
+
+
+@dataclass(frozen=True)
+class DriftMMDOutput(DriftOutput):
+    p_val: float
+    distance: float
+    distance_threshold: float
 
 
 class DriftMMD(BaseDrift):
@@ -129,19 +138,17 @@ class DriftMMD(BaseDrift):
         mmd2_permuted = torch.Tensor(
             [mmd2_from_kernel_matrix(kernel_mat, n, permute=True, zero_diag=False) for _ in range(self.n_permutations)]
         )
-        mmd2, mmd2_permuted = mmd2.cpu(), mmd2_permuted.cpu()
+        mmd2, mmd2_permuted = mmd2.detach().cpu(), mmd2_permuted.detach().cpu()
         p_val = (mmd2 <= mmd2_permuted).float().mean()
         # compute distance threshold
         idx_threshold = int(self.p_val * len(mmd2_permuted))
         distance_threshold = torch.sort(mmd2_permuted, descending=True).values[idx_threshold]
         return p_val.numpy().item(), mmd2.numpy().item(), distance_threshold.numpy()
 
+    @set_metadata("dataeval.detectors")
     @preprocess_x
     @update_x_ref
-    def predict(
-        self,
-        x: ArrayLike,
-    ) -> Dict[str, Union[int, float]]:
+    def predict(self, x: ArrayLike) -> DriftMMDOutput:
         """
         Predict whether a batch of data has drifted from the reference data and then
         updates reference data using specified strategy.
@@ -157,13 +164,7 @@ class DriftMMD(BaseDrift):
         """
         # compute drift scores
         p_val, dist, distance_threshold = self.score(x)
-        drift_pred = int(p_val < self.p_val)
+        drift_pred = bool(p_val < self.p_val)
 
         # populate drift dict
-        return {
-            "is_drift": drift_pred,
-            "p_val": p_val,
-            "threshold": self.p_val,
-            "distance": dist,
-            "distance_threshold": distance_threshold,
-        }
+        return DriftMMDOutput(drift_pred, self.p_val, p_val, dist, distance_threshold)

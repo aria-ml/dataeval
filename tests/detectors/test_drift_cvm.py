@@ -37,10 +37,10 @@ class TestCVMDrift:
         # Test predict on reference data
         x_h0 = x_ref.copy()
         preds = cd.predict(x_h0)
-        assert preds["is_drift"] == 0 and (preds["p_val"] >= cd.p_val).any()  # type: ignore
+        assert not preds.is_drift and (preds.p_vals >= cd.p_val).any()
 
         # Test predict on heavily drifted data
         x_h1 = np.random.normal(2, 2, size=(self.n, n_feat)).squeeze()
         preds = cd.predict(x_h1)
-        assert preds["is_drift"] == 1
-        assert preds["distance"].min() >= 0.0  # type: ignore
+        assert preds.is_drift
+        assert preds.distances.min() >= 0.0

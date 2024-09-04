@@ -476,7 +476,7 @@ class Clusterer:
         return exact_dupes, near_dupes
 
     # TODO: Move data input to evaluate from class
-    @set_metadata("dataeval.detectors.Clusterer", ["data"])
+    @set_metadata("dataeval.detectors", ["data"])
     def evaluate(self) -> ClustererOutput:
         """Finds and flags indices of the data for outliers and duplicates
 

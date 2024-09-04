@@ -10,7 +10,7 @@ from dataeval._internal.interop import to_numpy_iter
 from dataeval._internal.metrics.utils import edge_filter, get_bitdepth, normalize_image_shape, pchash, rescale, xxhash
 from dataeval._internal.output import OutputMetadata, set_metadata
 
-CH_IDX_MAP = "channel_indices"
+CH_IDX_MAP = "ch_idx_map"
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,7 @@ class StatsOutput(OutputMetadata):
     percentiles: NDArray[np.float16]
     histogram: NDArray[np.uint32]
     entropy: NDArray[np.float16]
-    channel_indices: Dict[int, List[int]]
+    ch_idx_map: Dict[int, List[int]]
 
     def dict(self):
         return {k: v for k, v in super().dict().items() if len(v) != 0}
@@ -123,7 +123,7 @@ def run_stats(
     return results_list
 
 
-@set_metadata("dataeval.metrics.imagestats")
+@set_metadata("dataeval.metrics")
 def imagestats(images: Iterable[ArrayLike], flags: ImageStat = ImageStat.ALL_STATS) -> StatsOutput:
     """
     Calculates image and pixel statistics for each image
@@ -153,7 +153,7 @@ def imagestats(images: Iterable[ArrayLike], flags: ImageStat = ImageStat.ALL_STA
     return StatsOutput(**result)  # type: ignore
 
 
-@set_metadata("dataeval.metrics.channelstats")
+@set_metadata("dataeval.metrics")
 def channelstats(images: Iterable[ArrayLike], flags=ImageStat.ALL_PIXELSTATS) -> StatsOutput:
     """
     Calculates pixel statistics for each image per channel

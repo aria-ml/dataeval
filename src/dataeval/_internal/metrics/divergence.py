@@ -75,7 +75,7 @@ def divergence_fnn(data: NDArray, labels: NDArray) -> int:
 DIVERGENCE_FN_MAP = {"FNN": divergence_fnn, "MST": divergence_mst}
 
 
-@set_metadata("dataeval.metrics.divergence")
+@set_metadata("dataeval.metrics")
 def divergence(data_a: ArrayLike, data_b: ArrayLike, method: Literal["FNN", "MST"] = "FNN") -> DivergenceOutput:
     """
     Calculates the divergence and any errors between the datasets

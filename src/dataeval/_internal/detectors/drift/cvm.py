@@ -9,15 +9,15 @@ Licensed under Apache Software License (Apache 2.0)
 from typing import Callable, Literal, Optional, Tuple
 
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 from scipy.stats import cramervonmises_2samp
 
 from dataeval._internal.interop import to_numpy
 
-from .base import BaseUnivariateDrift, UpdateStrategy, preprocess_x
+from .base import BaseDriftUnivariate, UpdateStrategy, preprocess_x
 
 
-class DriftCVM(BaseUnivariateDrift):
+class DriftCVM(BaseDriftUnivariate):
     """
     Cramér-von Mises (CVM) data drift detector, which tests for any change in the
     distribution of continuous univariate data. For multivariate data, a separate
@@ -76,7 +76,7 @@ class DriftCVM(BaseUnivariateDrift):
         )
 
     @preprocess_x
-    def score(self, x: ArrayLike) -> Tuple[np.ndarray, np.ndarray]:
+    def score(self, x: ArrayLike) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
         """
         Performs the two-sample Cramér-von Mises test(s), computing the p-value and
         test statistic per feature.
