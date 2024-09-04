@@ -87,7 +87,7 @@ class UpdateStrategy(ABC):
         self.n = n
 
     @abstractmethod
-    def __call__(self, x_ref: np.ndarray, x: np.ndarray, count: int) -> np.ndarray:
+    def __call__(self, x_ref: NDArray, x: NDArray, count: int) -> NDArray:
         """Abstract implementation of update strategy"""
 
 
@@ -101,7 +101,7 @@ class LastSeenUpdate(UpdateStrategy):
         Update with last n instances seen by the detector.
     """
 
-    def __call__(self, x_ref: np.ndarray, x: np.ndarray, count: int) -> np.ndarray:
+    def __call__(self, x_ref: NDArray, x: NDArray, count: int) -> NDArray:
         x_updated = np.concatenate([x_ref, x], axis=0)
         return x_updated[-self.n :]
 
@@ -116,7 +116,7 @@ class ReservoirSamplingUpdate(UpdateStrategy):
         Update with reservoir sampling of size n.
     """
 
-    def __call__(self, x_ref: np.ndarray, x: np.ndarray, count: int) -> np.ndarray:
+    def __call__(self, x_ref: NDArray, x: NDArray, count: int) -> NDArray:
         if x.shape[0] + count <= self.n:
             return np.concatenate([x_ref, x], axis=0)
 
@@ -171,7 +171,7 @@ class BaseDrift:
         self._x_refcount = 0
 
     @property
-    def x_ref(self) -> np.ndarray:
+    def x_ref(self) -> NDArray:
         if not self.x_ref_preprocessed:
             self.x_ref_preprocessed = True
             if self.preprocess_fn is not None:
@@ -236,7 +236,7 @@ class BaseDriftUnivariate(BaseDrift):
     def score(self, x: ArrayLike) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
         """Abstract method to calculate feature score after preprocessing"""
 
-    def _apply_correction(self, p_vals: np.ndarray) -> Tuple[bool, float]:
+    def _apply_correction(self, p_vals: NDArray) -> Tuple[bool, float]:
         if self.correction == "bonferroni":
             threshold = self.p_val / self.n_features
             drift_pred = bool((p_vals < threshold).any())

@@ -134,7 +134,7 @@ class TestMMDDrift:
 
         x_h1 = np.random.randn(n * n_features).reshape(n, n_features).astype(np.float32)
         preds = cd.predict(x_h1)
-        if preds.is_drift == 1:
+        if preds.is_drift:
             assert preds.p_val < preds.threshold == cd.p_val
             assert preds.distance > preds.distance_threshold
         else:

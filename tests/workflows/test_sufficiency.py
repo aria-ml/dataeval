@@ -406,8 +406,8 @@ class TestSufficiencyInverseProject:
         # Feed y into inverse function to get the original n_i back out
         n_i_recovered = f_inv_out(y, x)
 
-        # Float calculation can create very small trailing values
-        npt.assert_almost_equal(n_i[0], n_i_recovered[0], decimal=4)
+        # Convert to uint32 for step sizes
+        npt.assert_equal(np.uint32(n_i[0]), n_i_recovered[0])
 
     def test_inv_project_steps(self):
         """

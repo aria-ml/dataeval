@@ -10,7 +10,7 @@ from functools import partial
 from typing import Callable, Literal, Optional
 
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 from scipy.special import softmax
 from scipy.stats import entropy
 
@@ -20,10 +20,10 @@ from .torch import get_device, preprocess_drift
 
 
 def classifier_uncertainty(
-    x: np.ndarray,
+    x: NDArray,
     model_fn: Callable,
     preds_type: Literal["probs", "logits"] = "probs",
-) -> np.ndarray:
+) -> NDArray:
     """
     Evaluate model_fn on x and transform predictions to prediction uncertainties.
 
@@ -111,7 +111,7 @@ class DriftUncertainty:
         preprocess_batch_fn: Optional[Callable] = None,
         device: Optional[str] = None,
     ) -> None:
-        def model_fn(x: np.ndarray) -> np.ndarray:
+        def model_fn(x: NDArray) -> NDArray:
             return preprocess_drift(
                 x,
                 model,  # type: ignore

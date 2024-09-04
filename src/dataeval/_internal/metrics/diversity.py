@@ -21,11 +21,11 @@ class DiversityOutput(OutputMetadata):
 
 
 def diversity_shannon(
-    data: np.ndarray,
+    data: NDArray,
     names: List[str],
     is_categorical: List[bool],
-    subset_mask: Optional[np.ndarray] = None,
-) -> np.ndarray:
+    subset_mask: Optional[NDArray[np.bool_]] = None,
+) -> NDArray:
     """
     Compute diversity for discrete/categorical variables and, through standard
     histogram binning, for continuous variables.
@@ -37,7 +37,7 @@ def diversity_shannon(
 
     Parameters
     ----------
-    subset_mask: Optional[np.ndarray[bool]]
+    subset_mask: Optional[NDArray[np.bool_]]
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
     Notes
@@ -46,7 +46,7 @@ def diversity_shannon(
 
     Returns
     -------
-    diversity_index: np.ndarray
+    diversity_index: NDArray
         Diversity index per column of X
 
     See Also
@@ -62,11 +62,11 @@ def diversity_shannon(
 
 
 def diversity_simpson(
-    data: np.ndarray,
+    data: NDArray,
     names: List[str],
     is_categorical: List[bool],
-    subset_mask: Optional[np.ndarray] = None,
-) -> np.ndarray:
+    subset_mask: Optional[NDArray[np.bool_]] = None,
+) -> NDArray:
     """
     Compute diversity for discrete/categorical variables and, through standard
     histogram binning, for continuous variables.
@@ -79,7 +79,7 @@ def diversity_simpson(
 
     Parameters
     ----------
-    subset_mask: Optional[np.ndarray[bool]]
+    subset_mask: Optional[NDArray[np.bool_]]
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
     Notes
@@ -93,7 +93,7 @@ def diversity_simpson(
 
     Returns
     -------
-    np.ndarray
+    NDArray
         Diversity index per column of X
 
     See Also

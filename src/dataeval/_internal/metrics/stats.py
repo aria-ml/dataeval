@@ -8,7 +8,7 @@ from scipy.stats import entropy, kurtosis, skew
 from dataeval._internal.flags import ImageStat, to_distinct, verify_supported
 from dataeval._internal.interop import to_numpy_iter
 from dataeval._internal.metrics.utils import edge_filter, get_bitdepth, normalize_image_shape, pchash, rescale, xxhash
-from dataeval._internal.output import OutputMetadata, set_metadata
+from dataeval._internal.output import OutputMetadata, populate_defaults, set_metadata
 
 CH_IDX_MAP = "ch_idx_map"
 
@@ -53,7 +53,7 @@ class StatsOutput(OutputMetadata):
     kurtosis: NDArray[np.float16]
         Kurtosis of the pixel values of the images
     percentiles: NDArray[np.float16]
-        Percentiles of the pixel values of the images with quartiles of (0,25,50,75,100)
+        Percentiles of the pixel values of the images with quartiles of (0, 25, 50, 75, 100)
     histogram: NDArray[np.uint32]
         Histogram of the pixel values of the images across 256 bins scaled between 0 and 1
     entropy: NDArray[np.float16]
@@ -88,23 +88,9 @@ class StatsOutput(OutputMetadata):
         return {k: v for k, v in super().dict().items() if len(v) != 0}
 
 
-def default(key):
-    if key == CH_IDX_MAP:
-        return {}
-    if key in ["xxhash", "pchash"]:
-        return []
-    if key in ["channels", "depth"]:
-        return np.array([], dtype=np.uint8)
-    if key in ["width", "height"]:
-        return np.array([], dtype=np.uint16)
-    if key in ["size", "histogram"]:
-        return np.array([], dtype=np.uint32)
-    return np.array([], dtype=np.float16)
-
-
 QUARTILES = (0, 25, 50, 75, 100)
 
-IMAGESTATS_FN_MAP: Dict[ImageStat, Callable[[np.ndarray], Any]] = {
+IMAGESTATS_FN_MAP: Dict[ImageStat, Callable[[NDArray], Any]] = {
     ImageStat.XXHASH: lambda x: xxhash(x),
     ImageStat.PCHASH: lambda x: pchash(x),
     ImageStat.WIDTH: lambda x: np.uint16(x.shape[-1]),
@@ -127,7 +113,7 @@ IMAGESTATS_FN_MAP: Dict[ImageStat, Callable[[np.ndarray], Any]] = {
     ImageStat.ENTROPY: lambda x: np.float16(entropy(x)),
 }
 
-CHANNELSTATS_FN_MAP: Dict[ImageStat, Callable[[np.ndarray], Any]] = {
+CHANNELSTATS_FN_MAP: Dict[ImageStat, Callable[[NDArray], Any]] = {
     ImageStat.MEAN: lambda x: np.float16(np.mean(x, axis=1)),
     ImageStat.STD: lambda x: np.float16(np.std(x, axis=1)),
     ImageStat.VAR: lambda x: np.float16(np.var(x, axis=1)),
@@ -142,18 +128,18 @@ CHANNELSTATS_FN_MAP: Dict[ImageStat, Callable[[np.ndarray], Any]] = {
 def run_stats(
     images: Iterable[ArrayLike],
     flags: ImageStat,
-    fn_map: Dict[ImageStat, Callable[[np.ndarray], Any]],
+    fn_map: Dict[ImageStat, Callable[[NDArray], Any]],
     flatten: bool,
 ):
     verify_supported(flags, fn_map)
     flag_dict = to_distinct(flags)
 
-    results_list: List[Dict[str, np.ndarray]] = []
+    results_list: List[Dict[str, NDArray]] = []
     for image in to_numpy_iter(images):
         normalized = normalize_image_shape(image)
         scaled = None
         hist = None
-        output: Dict[str, np.ndarray] = {}
+        output: Dict[str, NDArray] = {}
         for flag, stat in flag_dict.items():
             if flag & (ImageStat.ALL_PIXELSTATS | ImageStat.BRIGHTNESS):
                 if scaled is None:
@@ -196,8 +182,7 @@ def imagestats(images: Iterable[ArrayLike], flags: ImageStat = ImageStat.ALL_STA
             else:
                 shape = () if np.isscalar(result) else result.shape
                 output.setdefault(stat, np.empty((length,) + shape))[i] = result
-    result = {k: output[k] if k in output else default(k) for k in StatsOutput.__annotations__}
-    return StatsOutput(**result)  # type: ignore
+    return StatsOutput(**populate_defaults(output, StatsOutput))
 
 
 @set_metadata("dataeval.metrics")
@@ -236,6 +221,4 @@ def channelstats(images: Iterable[ArrayLike], flags=ImageStat.ALL_PIXELSTATS) ->
     for channel in output[CH_IDX_MAP]:
         output[CH_IDX_MAP][channel] = list(output[CH_IDX_MAP][channel].keys())
 
-    result = {k: output[k] if k in output else default(k) for k in StatsOutput.__annotations__}
-
-    return StatsOutput(**result)  # type: ignore
+    return StatsOutput(**populate_defaults(output, StatsOutput))

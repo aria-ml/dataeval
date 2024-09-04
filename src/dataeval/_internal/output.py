@@ -64,3 +64,16 @@ def set_metadata(module_name: str = "", state_attr: Optional[List[str]] = None):
         return wrapper
 
     return decorator
+
+
+def populate_defaults(d: dict, c: type) -> dict:
+    def default(t):
+        if t == "Dict":
+            return {}
+        if t == "List":
+            return []
+        if t == "ndarray":
+            return np.array([])
+        raise TypeError("Unrecognized annotation type")
+
+    return {k: d[k] if k in d else default(t.__name__) for k, t in c.__annotations__.items()}

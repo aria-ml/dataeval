@@ -44,46 +44,46 @@ class SufficiencyOutput(OutputMetadata):
                 raise ValueError(f"{m} does not contain the expected number ({c}) of data points.")
 
 
-def f_out(n_i: np.ndarray, x: np.ndarray) -> np.ndarray:
+def f_out(n_i: NDArray, x: NDArray) -> NDArray:
     """
     Calculates the line of best fit based on its free parameters
 
     Parameters
     ----------
-    n_i : np.ndarray
+    n_i : NDArray
         Array of sample sizes
-    x : np.ndarray
+    x : NDArray
         Array of inverse power curve coefficients
 
     Returns
     -------
-    np.ndarray
+    NDArray
         Data points for the line of best fit
     """
     return x[0] * n_i ** (-x[1]) + x[2]
 
 
-def f_inv_out(y_i: np.ndarray, x: np.ndarray) -> NDArray[np.uint32]:
+def f_inv_out(y_i: NDArray, x: NDArray) -> NDArray[np.uint32]:
     """
     Inverse function for f_out()
 
     Parameters
     ----------
-    y_i : np.ndarray
+    y_i : NDArray
         Data points for the line of best fit
-    x : np.ndarray
+    x : NDArray
         Array of inverse power curve coefficients
 
     Returns
     -------
-    np.ndarray
+    NDArray
         Array of sample sizes
     """
-    n_i: np.ndarray = ((y_i - x[2]) / x[0]) ** (-1 / x[1])
+    n_i: NDArray = ((y_i - x[2]) / x[0]) ** (-1 / x[1])
     return n_i.astype(np.uint32)
 
 
-def calc_params(p_i: np.ndarray, n_i: np.ndarray, niter: int) -> np.ndarray:
+def calc_params(p_i: NDArray, n_i: NDArray, niter: int) -> NDArray:
     """
     Retrieves the inverse power curve coefficients for the line of best fit.
     Global minimization is done via basin hopping. More info on this algorithm
@@ -91,9 +91,9 @@ def calc_params(p_i: np.ndarray, n_i: np.ndarray, niter: int) -> np.ndarray:
 
     Parameters
     ----------
-    p_i : np.ndarray
+    p_i : NDArray
         Array of corresponding losses
-    n_i : np.ndarray
+    n_i : NDArray
         Array of sample sizes
     niter : int
         Number of iterations to perform in the basin-hopping
@@ -101,7 +101,7 @@ def calc_params(p_i: np.ndarray, n_i: np.ndarray, niter: int) -> np.ndarray:
 
     Returns
     -------
-    np.ndarray
+    NDArray
         Array of parameters to recreate line of best fit
     """
 
@@ -155,38 +155,38 @@ def validate_dataset_len(dataset: Dataset) -> int:
     return length
 
 
-def project_steps(params: np.ndarray, projection: np.ndarray) -> np.ndarray:
+def project_steps(params: NDArray, projection: NDArray) -> NDArray:
     """Projects the measures for each value of X
 
     Parameters
     ----------
-    params : np.ndarray
+    params : NDArray
         Inverse power curve coefficients used to calculate projection
-    projection : np.ndarray
+    projection : NDArray
         Steps to extrapolate
 
     Returns
     -------
-    np.ndarray
+    NDArray
         Extrapolated measure values at each projection step
 
     """
     return 1 - f_out(projection, params)
 
 
-def inv_project_steps(params: np.ndarray, targets: np.ndarray) -> np.ndarray:
+def inv_project_steps(params: NDArray, targets: NDArray) -> NDArray:
     """Inverse function for project_steps()
 
     Parameters
     ----------
-    params : np.ndarray
+    params : NDArray
         Inverse power curve coefficients used to calculate projection
-    targets : np.ndarray
+    targets : NDArray
         Desired measure values
 
     Returns
     -------
-    np.ndarray
+    NDArray
         Array of sample sizes, or 0 if overflow
     """
     steps = f_inv_out(1 - np.array(targets), params)
@@ -194,7 +194,7 @@ def inv_project_steps(params: np.ndarray, targets: np.ndarray) -> np.ndarray:
     return np.ceil(steps).astype(np.int64)
 
 
-def get_curve_params(measures: Dict[str, np.ndarray], ranges: np.ndarray, niter: int) -> Dict[str, np.ndarray]:
+def get_curve_params(measures: Dict[str, NDArray], ranges: NDArray, niter: int) -> Dict[str, NDArray]:
     """Calculates and aggregates parameters for both single and multi-class metrics"""
     output = {}
     for name, measure in measures.items():
@@ -211,10 +211,10 @@ def get_curve_params(measures: Dict[str, np.ndarray], ranges: np.ndarray, niter:
 
 def plot_measure(
     name: str,
-    steps: np.ndarray,
-    measure: np.ndarray,
-    params: np.ndarray,
-    projection: np.ndarray,
+    steps: NDArray,
+    measure: NDArray,
+    params: NDArray,
+    projection: NDArray,
 ) -> Figure:
     fig = plt.figure()
     fig = cast(Figure, fig)
@@ -278,7 +278,7 @@ class Sufficiency:
         train_ds: Dataset,
         test_ds: Dataset,
         train_fn: Callable[[nn.Module, Dataset, Sequence[int]], None],
-        eval_fn: Callable[[nn.Module, Dataset], Union[Dict[str, float], Dict[str, np.ndarray]]],
+        eval_fn: Callable[[nn.Module, Dataset], Union[Dict[str, float], Dict[str, NDArray]]],
         runs: int = 1,
         substeps: int = 5,
         train_kwargs: Optional[Dict[str, Any]] = None,
@@ -325,13 +325,13 @@ class Sufficiency:
     @property
     def eval_fn(
         self,
-    ) -> Callable[[nn.Module, Dataset], Union[Dict[str, float], Dict[str, np.ndarray]]]:
+    ) -> Callable[[nn.Module, Dataset], Union[Dict[str, float], Dict[str, NDArray]]]:
         return self._eval_fn
 
     @eval_fn.setter
     def eval_fn(
         self,
-        value: Callable[[nn.Module, Dataset], Union[Dict[str, float], Dict[str, np.ndarray]]],
+        value: Callable[[nn.Module, Dataset], Union[Dict[str, float], Dict[str, NDArray]]],
     ):
         if not callable(value):
             raise TypeError("Must provide a callable for eval_fn.")
@@ -354,13 +354,13 @@ class Sufficiency:
         self._eval_kwargs = {} if value is None else value
 
     @set_metadata("dataeval.workflows", ["runs", "substeps"])
-    def evaluate(self, eval_at: Optional[np.ndarray] = None, niter: int = 1000) -> SufficiencyOutput:
+    def evaluate(self, eval_at: Optional[NDArray] = None, niter: int = 1000) -> SufficiencyOutput:
         """
         Creates data indices, trains models, and returns plotting data
 
         Parameters
         ----------
-        eval_at : Optional[np.ndarray]
+        eval_at : Optional[NDArray]
             Specify this to collect accuracies over a specific set of dataset lengths, rather
             than letting Sufficiency internally create the lengths to evaluate at.
         niter : int, default 1000
@@ -368,7 +368,7 @@ class Sufficiency:
 
         Returns
         -------
-        Dict[str, Union[np.ndarray, Dict[str, np.ndarray]]]
+        Dict[str, Union[NDArray, Dict[str, NDArray]]]
             Dictionary containing the average of each measure per substep
         """
         if eval_at is not None:
@@ -419,15 +419,15 @@ class Sufficiency:
     def project(
         cls,
         data: SufficiencyOutput,
-        projection: Union[int, Sequence[int], np.ndarray],
-    ) -> Dict[str, np.ndarray]:
+        projection: Union[int, Sequence[int], NDArray],
+    ) -> Dict[str, NDArray]:
         """Projects the measures for each value of X
 
         Parameters
         ----------
-        data : Dict[str, Union[np.ndarray, Dict[str, np.ndarray]]]
+        data : Dict[str, Union[NDArray, Dict[str, NDArray]]]
             Dataclass containing the average of each measure per substep
-        steps : Union[int, np.ndarray]
+        steps : Union[int, NDArray]
             Step or steps to project
         niter : int, default 200
             Number of iterations to perform in the basin-hopping
@@ -465,7 +465,7 @@ class Sufficiency:
 
         Parameters
         ----------
-        data : Dict[str, Union[np.ndarray, Dict[str, np.ndarray]]]
+        data : Dict[str, Union[NDArray, Dict[str, NDArray]]]
             Dataclass containing the average of each measure per substep
 
         Returns
@@ -511,22 +511,22 @@ class Sufficiency:
         return plots
 
     @classmethod
-    def inv_project(cls, targets: Dict[str, np.ndarray], data: SufficiencyOutput) -> Dict[str, np.ndarray]:
+    def inv_project(cls, targets: Dict[str, NDArray], data: SufficiencyOutput) -> Dict[str, NDArray]:
         """
         Calculate training samples needed to achieve target model metric values.
 
         Parameters
         ----------
-        targets : Dict[str, np.ndarray]
+        targets : Dict[str, NDArray]
             Dictionary of target metric scores (from 0.0 to 1.0) that we want
             to achieve, where the key is the name of the metric.
 
-        data : Dict[str, Union[np.ndarray, Dict[str, np.ndarray]]]
+        data : Dict[str, Union[NDArray, Dict[str, NDArray]]]
             Dataclass containing the average of each measure per substep
 
         Returns
         -------
-        Dict[str, np.ndarray]
+        Dict[str, NDArray]
             List of the number of training samples needed to achieve each
             corresponding entry in targets
         """

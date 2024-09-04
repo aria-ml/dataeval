@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Iterable, List
+from typing import Dict, Iterable, List
 
 from numpy.typing import ArrayLike
 
@@ -31,8 +31,8 @@ class Duplicates:
 
     Attributes
     ----------
-    stats : Dict[str, Any]
-        Dictionary with the stored hashes for each image
+    stats : StatsOutput
+        Output class of stats
 
     Example
     -------
@@ -46,19 +46,23 @@ class Duplicates:
         self.find_exact = find_exact
         self.find_near = find_near
 
-    def _get_duplicates(self) -> dict:
+    def _get_duplicates(self) -> Dict[str, List[List[int]]]:
         stats_dict = self.stats.dict()
-        exact = {}
         if "xxhash" in stats_dict:
+            exact = {}
             for i, value in enumerate(stats_dict["xxhash"]):
                 exact.setdefault(value, []).append(i)
             exact = [v for v in exact.values() if len(v) > 1]
+        else:
+            exact = []
 
-        near = {}
         if "pchash" in stats_dict:
+            near = {}
             for i, value in enumerate(stats_dict["pchash"]):
                 near.setdefault(value, []).append(i)
             near = [v for v in near.values() if len(v) > 1 and not any(set(v).issubset(x) for x in exact)]
+        else:
+            near = []
 
         return {
             "exact": sorted(exact),
