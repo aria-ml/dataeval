@@ -71,6 +71,23 @@ def balance(class_labels: Sequence[int], metadata: List[Dict], num_neighbors: in
     we attempt to infer whether a variable is categorical by the fraction of unique
     values in the dataset.
 
+    Example
+    -------
+    Return balance (mutual information) of factors with class_labels
+
+    >>> balance(class_labels, metadata).mutual_information[0]
+    array([0.99999856, 0.07559599, 0.        , 0.00732561])
+
+    Return balance (mutual information) of metadata factors with class_labels
+    and each other
+
+    >>> balance(class_labels, metadata).mutual_information
+    array([[0.99999856, 0.07559599, 0.        , 0.00732561],
+           [0.07559599, 0.99999846, 0.04157321, 0.02401938],
+           [0.        , 0.04157321, 0.76510531, 0.02596108],
+           [0.00732561, 0.02401938, 0.02596108, 0.99999855]])
+
+
     See Also
     --------
     sklearn.feature_selection.mutual_info_classif
@@ -142,6 +159,14 @@ def balance_classwise(class_labels: Sequence[int], metadata: List[Dict], num_nei
     BalanceOutput
         (num_classes x num_factors) estimate of mutual information between
         num_factors metadata factors and individual class labels.
+
+    Example
+    -------
+    Return classwise balance (mutual information) of factors with individual class_labels
+
+    >>> balance_classwise(class_labels, metadata).mutual_information
+    array([[0.07559599, 0.59098396, 0.        ],
+           [0.07559599, 0.59098396, 0.18424171]])
 
     See Also
     --------

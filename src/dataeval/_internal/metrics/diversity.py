@@ -149,6 +149,16 @@ def diversity(
     DiversityOutput
         Diversity index per column of self.data or each factor in self.names
 
+    Example
+    -------
+    Compute Simpson diversity index of metadata and class labels
+    >>> diversity(class_labels, metadata, method="simpson").diversity_index
+    jflkdsjflkdsjflkds
+
+    Compute Shannon diversity index of metadata and class labels
+    >>> diversity(class_labels, metadata, method="shannon").diversity_index
+    jflkdsjflkds
+
     See Also
     --------
     numpy.histogram
