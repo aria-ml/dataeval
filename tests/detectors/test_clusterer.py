@@ -92,47 +92,6 @@ class TestMatrixOps:
             # Linkage arr
             assert not np.any(np.isnan(c._larr))  # Should contain no NaN
 
-    @pytest.mark.parametrize(
-        "shape",
-        (
-            (0, 0),  # Empty array
-            (0, 1),  # No samples
-            (1, 1),  # Minimum logical size
-            (2, 2, 2),  # Invalid shape
-            (10),  # Invalid shape
-            (10,),  # Invalid shape
-        ),
-    )
-    def test_matrices_invalid(self, shape):
-        if isinstance(shape, int) or len(shape) == 1:
-            rows, cols = shape, 0
-        else:
-            rows, cols = shape[0], shape[1]
-
-        test_set = np.ones(shape=shape)
-        with pytest.raises(ValueError):
-            c = Clusterer(test_set)
-            # Distance matrix
-            assert not any(np.isnan(c._darr))  # Should contain no NaN
-            assert all(c._darr >= 0)  # Distances are always positive or 0 (same data point)
-            assert len(c._darr) == rows * (rows - 1) / 2  #  condensed form of matrix
-
-            # Square distance matrix
-            assert len(set(c._sqdmat.shape)) == 1  # All dims are equal size
-            assert np.all(c._sqdmat == c._sqdmat.T)  # Matrix is symmetrical
-
-            # Linkage arr
-            assert not np.any(np.isnan(c._larr))  # Should contain no NaN
-
-            # Extend function
-            arr = np.ones(shape=(rows, cols))
-            ext_matrix = extend_linkage(arr)
-
-            assert ext_matrix.shape == (rows, cols + 1)  # Adds a column to the right
-            # New column contains new max_row number of ids starting from max row + 1
-            # i.e. [1, 2, 3] -> [[1, 2, 3], [4, 5, 6]]
-            npt.assert_array_equal(ext_matrix[:, -1], np.arange(rows + 1, 2 * rows + 1))
-
 
 class TestCluster:
     def test_init_not_copy(self):
@@ -268,12 +227,12 @@ class TestClustererInit:
     def test_on_init(self, functional_data):
         """Tests that the init correctly sets the distance matrix and linkage array"""
         cl = Clusterer(functional_data)
-        assert cl._num_samples is not None
-        assert cl._darr is not None
-        assert cl._sqdmat is not None
-        assert cl._larr is not None
-        assert cl._max_clusters is not None
-        assert cl._min_num_samples_per_cluster is not None
+        assert cl._num_samples == 100
+        assert cl._darr.shape == (4950,)
+        assert cl._sqdmat.shape == (100, 100)
+        assert cl._larr.shape == (99, 5)
+        assert cl._max_clusters == 29
+        assert cl._min_num_samples_per_cluster == 5
         assert cl._clusters is None
         assert cl._last_good_merge_levels is None
 
@@ -283,9 +242,6 @@ class TestClustererInit:
             (0, 0),  # Empty array
             (0, 1),  # No samples
             (1, 1),  # Minimum logical size
-            (2, 2, 2),  # Invalid shape
-            (10),  # Invalid shape
-            (10,),  # Invalid shape
         ),
     )
     def test_on_init_fail(self, shape):
@@ -293,6 +249,19 @@ class TestClustererInit:
         dataset = np.ones(shape=shape)
         with pytest.raises(ValueError):
             Clusterer(dataset)
+
+    @pytest.mark.parametrize(
+        "shape",
+        [
+            (100, 10),
+            (10, 10, 10),
+            (100, 2),
+            (10),  # Invalid shape
+            (10,),  # Invalid shape
+        ],
+    )
+    def test_on_init_good_dims(self, shape):
+        Clusterer(np.ones(shape=shape))
 
     def test_reset_results_on_new_data(self, functional_data, duplicate_data):
         """The distance matrix and linkage arr are recalculated when new data is given to clusterer"""

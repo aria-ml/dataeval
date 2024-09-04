@@ -2,6 +2,7 @@ from typing import Any, Callable, Dict, List, Literal, NamedTuple, Optional, Seq
 
 import numpy as np
 import xxhash as xxh
+from numpy.typing import NDArray
 from PIL import Image
 from scipy.fftpack import dct
 from scipy.signal import convolve2d
@@ -25,7 +26,7 @@ def get_method(method_map: Dict[str, Callable], method: str) -> Callable:
 
 
 def get_counts(
-    data: np.ndarray, names: List[str], is_categorical: List[bool], subset_mask: Optional[np.ndarray] = None
+    data: NDArray, names: List[str], is_categorical: List[bool], subset_mask: Optional[NDArray] = None
 ) -> tuple[Dict, Dict]:
     """
     Initialize dictionary of histogram counts --- treat categorical values
@@ -33,7 +34,7 @@ def get_counts(
 
     Parameters
     ----------
-    subset_mask: Optional[np.ndarray[bool]]
+    subset_mask: Optional[NDArray[bool]]
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
     Returns
@@ -66,24 +67,24 @@ def get_counts(
 
 
 def entropy(
-    data: np.ndarray,
+    data: NDArray,
     names: List[str],
     is_categorical: List[bool],
     normalized: bool = False,
-    subset_mask: Optional[np.ndarray] = None,
-) -> np.ndarray:
+    subset_mask: Optional[NDArray] = None,
+) -> NDArray:
     """
     Meant for use with Bias metrics, Balance, Diversity, ClasswiseBalance,
     and Classwise Diversity.
 
-    Compute entropy for discrete/categorical variables and, through standard
-    histogram binning, for continuous variables.
+    Compute entropy for discrete/categorical variables and for continuous variables through standard
+    histogram binning.
 
     Parameters
     ----------
     normalized: bool
         Flag that determines whether or not to normalize entropy by log(num_bins)
-    subset_mask: Optional[np.ndarray[bool]]
+    subset_mask: Optional[NDArray[bool]]
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
     Notes
@@ -93,7 +94,7 @@ def entropy(
 
     Returns
     -------
-    ent: np.ndarray[float]
+    ent: NDArray[float]
         Entropy estimate per column of X
 
     See Also
@@ -119,15 +120,15 @@ def entropy(
 
 
 def get_num_bins(
-    data: np.ndarray, names: List[str], is_categorical: List[bool], subset_mask: Optional[np.ndarray] = None
-) -> np.ndarray:
+    data: NDArray, names: List[str], is_categorical: List[bool], subset_mask: Optional[NDArray] = None
+) -> NDArray:
     """
     Number of bins or unique values for each metadata factor, used to
     normalize entropy/diversity.
 
     Parameters
     ----------
-    subset_mask: Optional[np.ndarray[bool]]
+    subset_mask: Optional[NDArray[bool]]
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
     """
     # likely cached
@@ -139,7 +140,7 @@ def get_num_bins(
     return num_bins
 
 
-def infer_categorical(X: np.ndarray, threshold: float = 0.5) -> np.ndarray:
+def infer_categorical(X: NDArray, threshold: float = 0.5) -> NDArray:
     """
     Compute fraction of feature values that are unique --- intended to be used
     for inferring whether variables are categorical.
@@ -156,9 +157,9 @@ def infer_categorical(X: np.ndarray, threshold: float = 0.5) -> np.ndarray:
 
 def preprocess_metadata(
     class_labels: Sequence[int], metadata: List[Dict], cat_thresh: float = 0.2
-) -> Tuple[np.ndarray, List[str], List[bool]]:
+) -> Tuple[NDArray, List[str], List[bool]]:
     # convert class_labels and list of metadata dicts to dict of ndarrays
-    metadata_dict: Dict[str, np.ndarray] = {
+    metadata_dict: Dict[str, NDArray] = {
         "class_label": np.asarray(class_labels, dtype=int),
         **{k: np.array([d[k] for d in metadata]) for k in metadata[0]},
     }
@@ -179,13 +180,30 @@ def preprocess_metadata(
     return data, names, is_categorical
 
 
-def minimum_spanning_tree(X: np.ndarray) -> Any:
+def flatten(X: NDArray):
+    """
+    Flattens input array from (N, ... ) to (N, -1) where all samples N have all data in their last dimension
+
+    Parameters
+    ----------
+    X : NDArray, shape - (N, ... )
+        Input array
+
+    Returns
+    -------
+    NDArray, shape - (N, -1)
+    """
+
+    return X.reshape((X.shape[0], -1))
+
+
+def minimum_spanning_tree(X: NDArray) -> Any:
     """
     Returns the minimum spanning tree from a NumPy image array.
 
     Parameters
     ----------
-    X: np.ndarray
+    X : NDArray
         Numpy image array
 
     Returns
@@ -193,7 +211,7 @@ def minimum_spanning_tree(X: np.ndarray) -> Any:
         Data representing the minimum spanning tree
     """
     # All features belong on second dimension
-    X = X.reshape((X.shape[0], -1))
+    X = flatten(X)
     # We add a small constant to the distance matrix to ensure scipy interprets
     # the input graph as fully-connected.
     dense_eudist = squareform(pdist(X)) + EPSILON
@@ -201,13 +219,13 @@ def minimum_spanning_tree(X: np.ndarray) -> Any:
     return mst(eudist_csr)
 
 
-def get_classes_counts(labels: np.ndarray) -> Tuple[int, int]:
+def get_classes_counts(labels: NDArray) -> Tuple[int, int]:
     """
     Returns the classes and counts of from an array of labels
 
     Parameters
     ----------
-    label: np.ndarray
+    label : NDArray
         Numpy labels array
 
     Returns
@@ -228,17 +246,17 @@ def get_classes_counts(labels: np.ndarray) -> Tuple[int, int]:
 
 
 def compute_neighbors(
-    A: np.ndarray,
-    B: np.ndarray,
+    A: NDArray,
+    B: NDArray,
     k: int = 1,
     algorithm: Literal["auto", "ball_tree", "kd_tree"] = "auto",
-) -> np.ndarray:
+) -> NDArray:
     """
     For each sample in A, compute the nearest neighbor in B
 
     Parameters
     ----------
-    A, B : np.ndarray
+    A, B : NDArray
         The n_samples and n_features respectively
     k : int
         The number of neighbors to find
@@ -254,10 +272,23 @@ def compute_neighbors(
     List:
         Closest points to each point in A and B
 
+    Raises
+    ------
+    ValueError
+        If algorithm is not "auto", "ball_tree", or "kd_tree"
+
     See Also
     --------
     sklearn.neighbors.NearestNeighbors
     """
+
+    if k < 1:
+        raise ValueError("k must be >= 1")
+    if algorithm not in ["auto", "ball_tree", "kd_tree"]:
+        raise ValueError("Algorithm must be 'auto', 'ball_tree', or 'kd_tree'")
+
+    A = flatten(A)
+    B = flatten(B)
 
     nbrs = NearestNeighbors(n_neighbors=k + 1, algorithm=algorithm).fit(B)
     nns = nbrs.kneighbors(A)[1]
@@ -272,7 +303,7 @@ class BitDepth(NamedTuple):
     pmax: Union[float, int]
 
 
-def get_bitdepth(image: np.ndarray) -> BitDepth:
+def get_bitdepth(image: NDArray) -> BitDepth:
     """
     Approximates the bit depth of the image using the
     min and max pixel values.
@@ -285,7 +316,7 @@ def get_bitdepth(image: np.ndarray) -> BitDepth:
         return BitDepth(depth, 0, 2**depth - 1)
 
 
-def rescale(image: np.ndarray, depth: int = 1) -> np.ndarray:
+def rescale(image: NDArray, depth: int = 1) -> NDArray:
     """
     Rescales the image using the bit depth provided.
     """
@@ -297,7 +328,7 @@ def rescale(image: np.ndarray, depth: int = 1) -> np.ndarray:
         return normalized * (2**depth - 1)
 
 
-def normalize_image_shape(image: np.ndarray) -> np.ndarray:
+def normalize_image_shape(image: NDArray) -> NDArray:
     """
     Normalizes the image shape into (C,H,W).
     """
@@ -313,7 +344,7 @@ def normalize_image_shape(image: np.ndarray) -> np.ndarray:
         raise ValueError("Images must have 2 or more dimensions.")
 
 
-def edge_filter(image: np.ndarray, offset: float = 0.5) -> np.ndarray:
+def edge_filter(image: NDArray, offset: float = 0.5) -> NDArray:
     """
     Returns the image filtered using a 3x3 edge detection kernel:
     [[ -1, -1, -1 ],
@@ -325,7 +356,7 @@ def edge_filter(image: np.ndarray, offset: float = 0.5) -> np.ndarray:
     return edges
 
 
-def pchash(image: np.ndarray) -> str:
+def pchash(image: NDArray) -> str:
     """
     Performs a perceptual hash on an image by resizing to a square NxN image
     using the Lanczos algorithm where N is 32x32 or the largest multiple of
@@ -336,7 +367,7 @@ def pchash(image: np.ndarray) -> str:
 
     Parameters
     ----------
-    image : np.ndarray
+    image : NDArray
         An image as a numpy array in CxHxW format
 
     Returns
@@ -376,7 +407,7 @@ def pchash(image: np.ndarray) -> str:
     return hash_hex if hash_hex else "0"
 
 
-def xxhash(image: np.ndarray) -> str:
+def xxhash(image: NDArray) -> str:
     """
     Performs a fast non-cryptographic hash using the xxhash algorithm
     (xxhash.com) against the image as a flattened bytearray.  The hash
@@ -384,7 +415,7 @@ def xxhash(image: np.ndarray) -> str:
 
     Parameters
     ----------
-    image : np.ndarray
+    image : NDArray
         An image as a numpy array
 
     Returns

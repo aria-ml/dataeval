@@ -1,10 +1,15 @@
+from unittest.mock import MagicMock
+
 import numpy as np
 import pytest
 
 from dataeval._internal.metrics.utils import (
+    compute_neighbors,
     edge_filter,
+    flatten,
     get_bitdepth,
     get_classes_counts,
+    minimum_spanning_tree,
     normalize_image_shape,
     rescale,
 )
@@ -94,3 +99,69 @@ def test_edge_filter():
     image = np.zeros((28, 28))
     edge = edge_filter(image, 0.5)
     np.testing.assert_array_equal(image + 0.5, edge)
+
+
+def test_flatten_noop():
+    images = np.ones(shape=(10, 3))
+    assert flatten(images).shape == (10, 3)
+
+
+def test_flatten_0dim():
+    images = np.ones(shape=(10))
+    assert flatten(images).shape == (10, 1)
+
+
+def test_flatten_1dim():
+    images = np.ones(shape=(10, 1))
+    assert flatten(images).shape == (10, 1)
+
+
+def test_flatten_3dim():
+    images = np.ones(shape=(10, 3, 3))
+    assert flatten(images).shape == (10, 9)
+
+
+def test_mst():
+    images = np.ones((10, 3, 3))
+    assert minimum_spanning_tree(images).shape == (10, 10)
+
+
+def test_compute_neighbors():
+    images_0 = np.zeros((10, 3, 3))
+    images_1 = np.ones((10, 3, 3))
+
+    assert compute_neighbors(images_0, images_1).shape == (10,)
+
+
+def test_compute_neighbors_k0():
+    images_0 = np.zeros((10, 3, 3))
+    images_1 = np.ones((10, 3, 3))
+
+    with pytest.raises(ValueError):
+        compute_neighbors(images_0, images_1, k=0).shape
+
+
+def test_compute_neighbors_k2():
+    images_0 = np.zeros((10, 3, 3))
+    images_1 = np.ones((10, 3, 3))
+
+    assert compute_neighbors(images_0, images_1, k=2).shape == (10, 2)
+
+
+def test_compute_neighbors_kdtree():
+    images_0 = np.zeros((10, 3, 3))
+    images_1 = np.ones((10, 3, 3))
+    assert compute_neighbors(images_0, images_1, algorithm="kd_tree").shape == (10,)
+
+
+def test_compute_neighbors_balltree():
+    images_0 = np.zeros((10, 3, 3))
+    images_1 = np.ones((10, 3, 3))
+    assert compute_neighbors(images_0, images_1, algorithm="ball_tree").shape == (10,)
+
+
+def test_compute_neighbors_invalid_alg():
+    """Brute algorithm is valid for sklearn.NearestNeighbor, but is invalid for DataEval"""
+
+    with pytest.raises(ValueError):
+        compute_neighbors(MagicMock(), MagicMock(), algorithm="brute")  # type: ignore #
