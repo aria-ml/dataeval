@@ -26,7 +26,7 @@ def get_method(method_map: Dict[str, Callable], method: str) -> Callable:
 
 
 def get_counts(
-    data: NDArray, names: List[str], is_categorical: List[bool], subset_mask: Optional[NDArray] = None
+    data: NDArray, names: List[str], is_categorical: List[bool], subset_mask: Optional[NDArray[np.bool_]] = None
 ) -> tuple[Dict, Dict]:
     """
     Initialize dictionary of histogram counts --- treat categorical values
@@ -34,7 +34,7 @@ def get_counts(
 
     Parameters
     ----------
-    subset_mask: Optional[NDArray[bool]]
+    subset_mask: Optional[NDArray[np.bool_]]
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
     Returns
@@ -71,8 +71,8 @@ def entropy(
     names: List[str],
     is_categorical: List[bool],
     normalized: bool = False,
-    subset_mask: Optional[NDArray] = None,
-) -> NDArray:
+    subset_mask: Optional[NDArray[np.bool_]] = None,
+) -> NDArray[np.float64]:
     """
     Meant for use with Bias metrics, Balance, Diversity, ClasswiseBalance,
     and Classwise Diversity.
@@ -84,7 +84,7 @@ def entropy(
     ----------
     normalized: bool
         Flag that determines whether or not to normalize entropy by log(num_bins)
-    subset_mask: Optional[NDArray[bool]]
+    subset_mask: Optional[NDArray[np.bool_]]
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
     Notes
@@ -94,7 +94,7 @@ def entropy(
 
     Returns
     -------
-    ent: NDArray[float]
+    ent: NDArray[np.float64]
         Entropy estimate per column of X
 
     See Also
@@ -120,16 +120,20 @@ def entropy(
 
 
 def get_num_bins(
-    data: NDArray, names: List[str], is_categorical: List[bool], subset_mask: Optional[NDArray] = None
-) -> NDArray:
+    data: NDArray, names: List[str], is_categorical: List[bool], subset_mask: Optional[NDArray[np.bool_]] = None
+) -> NDArray[np.float64]:
     """
     Number of bins or unique values for each metadata factor, used to
     normalize entropy/diversity.
 
     Parameters
     ----------
-    subset_mask: Optional[NDArray[bool]]
+    subset_mask: Optional[NDArray[np.bool_]]
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
+
+    Returns
+    -------
+    NDArray[np.float64]
     """
     # likely cached
     hist_counts, _ = get_counts(data, names, is_categorical, subset_mask)

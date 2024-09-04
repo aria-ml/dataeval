@@ -198,7 +198,7 @@ class TestClustererValidate:
     @pytest.mark.parametrize(
         "data, error, error_msg",
         [
-            ([], TypeError, "Data should be of type np.ndarray; got <class 'list'>"),
+            ([], TypeError, "Data should be of type NDArray; got <class 'list'>"),
             (
                 np.array([1, 2, 3]),
                 ValueError,

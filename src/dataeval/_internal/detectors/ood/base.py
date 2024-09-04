@@ -54,7 +54,7 @@ class OODScore(NamedTuple):
     instance_score: NDArray[np.float32]
     feature_score: Optional[NDArray[np.float32]] = None
 
-    def get(self, ood_type: Literal["instance", "feature"]) -> np.ndarray:
+    def get(self, ood_type: Literal["instance", "feature"]) -> NDArray:
         return self.instance_score if ood_type == "instance" or self.feature_score is None else self.feature_score
 
 
@@ -69,18 +69,18 @@ class OODBase(ABC):
         if not isinstance(model, keras.Model):
             raise TypeError("Model should be of type 'keras.Model'.")
 
-    def _get_data_info(self, X: np.ndarray) -> Tuple[tuple, type]:
+    def _get_data_info(self, X: NDArray) -> Tuple[tuple, type]:
         if not isinstance(X, np.ndarray):
-            raise TypeError("Dataset should of type: `np.ndarray`.")
+            raise TypeError("Dataset should of type: `NDArray`.")
         return X.shape[1:], X.dtype.type
 
-    def _validate(self, X: np.ndarray) -> None:
+    def _validate(self, X: NDArray) -> None:
         check_data_info = self._get_data_info(X)
         if self._data_info is not None and check_data_info != self._data_info:
             raise RuntimeError(f"Expect data of type: {self._data_info[1]} and shape: {self._data_info[0]}. \
                                Provided data is type: {check_data_info[1]} and shape: {check_data_info[0]}.")
 
-    def _validate_state(self, X: np.ndarray, additional_attrs: Optional[List[str]] = None) -> None:
+    def _validate_state(self, X: NDArray, additional_attrs: Optional[List[str]] = None) -> None:
         attrs = ["_data_info", "_threshold_perc", "_ref_score"]
         attrs = attrs if additional_attrs is None else attrs + additional_attrs
         if not all(hasattr(self, attr) for attr in attrs) or any(getattr(self, attr) for attr in attrs) is None:
@@ -187,7 +187,7 @@ class OODGMMBase(OODBase):
         super().__init__(model)
         self.gmm_params: GaussianMixtureModelParams
 
-    def _validate_state(self, X: np.ndarray, additional_attrs: Optional[List[str]] = None) -> None:
+    def _validate_state(self, X: NDArray, additional_attrs: Optional[List[str]] = None) -> None:
         if additional_attrs is None:
             additional_attrs = ["gmm_params"]
         super()._validate_state(X, additional_attrs)

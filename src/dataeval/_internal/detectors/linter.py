@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Dict, Iterable, Literal, Optional
 
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 
 from dataeval._internal.flags import verify_supported
 from dataeval._internal.output import OutputMetadata, set_metadata
@@ -24,8 +24,8 @@ class LinterOutput(OutputMetadata):
 
 
 def _get_outlier_mask(
-    values: np.ndarray, method: Literal["zscore", "modzscore", "iqr"], threshold: Optional[float]
-) -> np.ndarray:
+    values: NDArray, method: Literal["zscore", "modzscore", "iqr"], threshold: Optional[float]
+) -> NDArray:
     if method == "zscore":
         threshold = threshold if threshold else 3.0
         std = np.std(values)
@@ -148,8 +148,8 @@ class Linter:
 
         Returns
         -------
-        Dict[int, Dict[str, float]]
-            Dictionary containing the indices of outliers and a dictionary showing
+        LinterOutput
+            Output class containing the indices of outliers and a dictionary showing
             the issues and calculated values for the given index.
 
         Example

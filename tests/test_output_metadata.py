@@ -2,20 +2,21 @@ from dataclasses import dataclass
 from typing import Iterable
 
 import numpy as np
+import pytest
 
-from dataeval._internal.output import OutputMetadata, set_metadata
+from dataeval._internal.output import OutputMetadata, populate_defaults, set_metadata
 
 
 @dataclass
-class TestOutput(OutputMetadata):
+class MockOutput(OutputMetadata):
     test1: int
     test2: bool
     test3: str
 
 
 @set_metadata("mock_module")
-def mock_metric(arg1: int, arg2: bool, arg3: str) -> TestOutput:
-    return TestOutput(arg1, arg2, arg3)
+def mock_metric(arg1: int, arg2: bool, arg3: str) -> MockOutput:
+    return MockOutput(arg1, arg2, arg3)
 
 
 class MockMetric:
@@ -24,8 +25,8 @@ class MockMetric:
     state3: list = ["a", "very", "long", "input", "list"]
 
     @set_metadata("mock_class_module", ["state1", "state2", "state3"])
-    def evaluate(self, arg1: int, arg2: bool, arg3: str = "mock_default") -> TestOutput:
-        return TestOutput(arg1, arg2, arg3)
+    def evaluate(self, arg1: int, arg2: bool, arg3: str = "mock_default") -> MockOutput:
+        return MockOutput(arg1, arg2, arg3)
 
 
 class TestOutputMetadata:
@@ -62,8 +63,8 @@ class TestOutputMetadata:
 
     def test_output_metadata_text(self):
         @set_metadata()
-        def mock_metric(a: np.ndarray, s: list, d: dict, i: Iterable, t: tuple, z: bytes, n: MockMetric) -> TestOutput:
-            return TestOutput(1, True, "hello")
+        def mock_metric(a: np.ndarray, s: list, d: dict, i: Iterable, t: tuple, z: bytes, n: MockMetric) -> MockOutput:
+            return MockOutput(1, True, "hello")
 
         result = mock_metric(
             np.array([[1, 2], [3, 4], [5, 6]]), [1, 2, 3], {1: 1, 2: 2}, range(5), (1, 2, 3, 4), b"bytes", MockMetric()
@@ -79,3 +80,10 @@ class TestOutputMetadata:
             "z": b"bytes",
             "n": "MockMetric",
         }
+
+    def test_populate_defaults(self):
+        class MockDefault:
+            unsupported: set
+
+        with pytest.raises(TypeError):
+            populate_defaults({}, MockDefault)

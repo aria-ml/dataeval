@@ -24,7 +24,7 @@ class DriftKS(BaseDriftUnivariate):
 
     Parameters
     ----------
-    x_ref : np.ndarray
+    x_ref : NDArray
         Data used as reference distribution.
     p_val : float, default 0.05
         p-value used for significance of the statistical test for each feature.
@@ -41,7 +41,7 @@ class DriftKS(BaseDriftUnivariate):
         :py:class:`dataeval.detectors.LastSeenUpdateStrategy`
         or via reservoir sampling with
         :py:class:`dataeval.detectors.ReservoirSamplingUpdateStrategy`.
-    preprocess_fn : Optional[Callable[[np.ndarray], np.ndarray]], default None
+    preprocess_fn : Optional[Callable[[NDArray], NDArray]], default None
         Function to preprocess the data before computing the data drift metrics.
         Typically a dimensionality reduction technique.
     correction : Literal["bonferroni", "fdr"], default "bonferroni"

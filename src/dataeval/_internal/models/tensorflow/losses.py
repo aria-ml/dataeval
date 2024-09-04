@@ -8,9 +8,9 @@ Licensed under Apache Software License (Apache 2.0)
 
 from typing import Literal, Optional, Union, cast
 
-import numpy as np
 import tensorflow as tf
 from keras.layers import Flatten
+from numpy.typing import NDArray
 from tensorflow_probability.python.distributions.mvn_diag import MultivariateNormalDiag
 from tensorflow_probability.python.distributions.mvn_tril import MultivariateNormalTriL
 from tensorflow_probability.python.stats import covariance
@@ -35,12 +35,12 @@ class Elbo:
     def __init__(
         self,
         cov_type: Union[Literal["cov_full", "cov_diag"], float] = 1.0,
-        x: Optional[Union[tf.Tensor, np.ndarray]] = None,
+        x: Optional[Union[tf.Tensor, NDArray]] = None,
     ):
         if isinstance(cov_type, float):
             self.cov = ("sim", cov_type)
         elif cov_type in ["cov_full", "cov_diag"]:
-            x_np: np.ndarray = x.numpy() if tf.is_tensor(x) else x  # type: ignore
+            x_np: NDArray = x.numpy() if tf.is_tensor(x) else x  # type: ignore
             cov = covariance(x_np.reshape(x_np.shape[0], -1))  # type: ignore py38
             if cov_type == "cov_diag":  # infer standard deviation from covariance matrix
                 cov = tf.math.sqrt(tf.linalg.diag_part(cov))

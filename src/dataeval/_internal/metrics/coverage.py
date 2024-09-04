@@ -16,9 +16,9 @@ class CoverageOutput(OutputMetadata):
     """
     Attributes
     ----------
-    indices : np.ndarray
+    indices : NDArray
         Array of uncovered indices
-    radii : np.ndarray
+    radii : NDArray
         Array of critical value radii
     critical_value : float
         Radius for coverage
