@@ -6,6 +6,7 @@ from scipy.cluster.hierarchy import linkage
 from scipy.spatial.distance import pdist, squareform
 
 from dataeval._internal.interop import to_numpy
+from dataeval._internal.metrics.utils import flatten
 
 
 def extend_linkage(link_arr: np.ndarray) -> np.ndarray:
@@ -130,7 +131,7 @@ class Clusterer:
         self._on_init(dataset)
 
     def _on_init(self, dataset: ArrayLike):
-        self._data: np.ndarray = to_numpy(dataset)
+        self._data: np.ndarray = flatten(to_numpy(dataset))
         self._validate_data(self._data)
         self._num_samples = len(self._data)
 
