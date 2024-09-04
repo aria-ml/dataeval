@@ -26,6 +26,25 @@ class DriftOutput(OutputMetadata):
 
 @dataclass(frozen=True)
 class DriftUnivariateOutput(DriftOutput):
+    """
+    Attributes
+    ----------
+    is_drift : bool
+        Drift prediction for the images
+    threshold : float
+        Threshold after multivariate correction if needed
+    feature_drift : NDArray[np.bool_]
+        Feature-level array of images detected to have drifted
+    feature_threshold : float
+        Feature-level threshold to determine drift
+    p_vals : NDArray[np.float32]
+        Feature-level p-values
+    distances : NDArray[np.float32]
+        Feature-level distances
+    """
+
+    # is_drift: bool
+    # threshold: float
     feature_drift: NDArray[np.bool_]
     feature_threshold: float
     p_vals: NDArray[np.float32]

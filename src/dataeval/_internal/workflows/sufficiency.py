@@ -19,9 +19,20 @@ PARAMS_KEY = "_CURVE_PARAMS_"
 
 @dataclass(frozen=True)
 class SufficiencyOutput(OutputMetadata):
-    steps: NDArray
-    params: Dict[str, NDArray]
-    measures: Dict[str, NDArray]
+    """
+    Attributes
+    ----------
+    steps : NDArray[np.uint32]
+        Array of sample sizes
+    params : Dict[str, NDArray[np.float32]]
+        Inverse power curve coefficients for the line of best fit for each measure
+    measures : Dict[str, NDArray[np.float32]]
+        Average of values observed for each sample size step for each measure
+    """
+
+    steps: NDArray[np.uint32]
+    params: Dict[str, NDArray[np.float32]]
+    measures: Dict[str, NDArray[np.float32]]
 
     def __post_init__(self):
         c = len(self.steps)
@@ -52,7 +63,7 @@ def f_out(n_i: np.ndarray, x: np.ndarray) -> np.ndarray:
     return x[0] * n_i ** (-x[1]) + x[2]
 
 
-def f_inv_out(y_i: np.ndarray, x: np.ndarray) -> np.ndarray:
+def f_inv_out(y_i: np.ndarray, x: np.ndarray) -> NDArray[np.uint32]:
     """
     Inverse function for f_out()
 
@@ -68,8 +79,8 @@ def f_inv_out(y_i: np.ndarray, x: np.ndarray) -> np.ndarray:
     np.ndarray
         Array of sample sizes
     """
-    n_i = ((y_i - x[2]) / x[0]) ** (-1 / x[1])
-    return n_i
+    n_i: np.ndarray = ((y_i - x[2]) / x[0]) ** (-1 / x[1])
+    return n_i.astype(np.uint32)
 
 
 def calc_params(p_i: np.ndarray, n_i: np.ndarray, niter: int) -> np.ndarray:
@@ -368,7 +379,7 @@ class Sufficiency:
                 self._length,
                 self.substeps,
             )  # Start, Stop, Num steps
-            ranges = np.geomspace(*geomshape).astype(np.int64)
+            ranges = np.geomspace(*geomshape).astype(np.uint32)
         substeps = len(ranges)
         measures = {}
 

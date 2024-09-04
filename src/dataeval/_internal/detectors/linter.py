@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Dict, Iterable, Literal, Optional
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import ArrayLike
 
 from dataeval._internal.flags import verify_supported
 from dataeval._internal.output import OutputMetadata, set_metadata
@@ -12,7 +12,15 @@ from dataeval.metrics import imagestats
 
 @dataclass(frozen=True)
 class LinterOutput(OutputMetadata):
-    issues: Dict[str, NDArray]
+    """
+    Attributes
+    ----------
+    issues : Dict[int, Dict[str, float]]
+        Dictionary containing the indices of outliers and a dictionary showing
+        the issues and calculated values for the given index.
+    """
+
+    issues: Dict[int, Dict[str, float]]
 
 
 def _get_outlier_mask(

@@ -21,6 +21,23 @@ from .torch import GaussianRBF, get_device, mmd2_from_kernel_matrix
 
 @dataclass(frozen=True)
 class DriftMMDOutput(DriftOutput):
+    """
+    Attributes
+    ----------
+    is_drift : bool
+        Drift prediction for the images
+    threshold : float
+        P-value used for significance of the permutation test
+    p_val : float
+        P-value obtained from the permutation test
+    distance : float
+        MMD^2 between the reference and test set
+    distance_threshold : float
+        MMD^2 threshold above which drift is flagged
+    """
+
+    # is_drift: bool
+    # threshold: float
     p_val: float
     distance: float
     distance_threshold: float
@@ -160,7 +177,8 @@ class DriftMMD(BaseDrift):
 
         Returns
         -------
-        Dictionary containing the drift prediction, p-value, threshold and MMD metric.
+        DriftMMDOutput
+            Output class containing the drift prediction, p-value, threshold and MMD metric.
         """
         # compute drift scores
         p_val, dist, distance_threshold = self.score(x)

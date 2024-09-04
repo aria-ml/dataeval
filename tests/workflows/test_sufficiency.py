@@ -381,7 +381,7 @@ class TestSufficiencyInverseProject:
         """
         Tests metric projection output can be inversed
         """
-        num_samples = np.arange(20, 80, step=10)
+        num_samples = np.arange(20, 80, step=10, dtype=np.uint)
         accuracies = num_samples / 100
 
         params = np.array([-0.01, -1.0, 1.0])

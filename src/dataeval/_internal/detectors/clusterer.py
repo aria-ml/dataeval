@@ -13,6 +13,19 @@ from dataeval._internal.output import OutputMetadata, set_metadata
 
 @dataclass(frozen=True)
 class ClustererOutput(OutputMetadata):
+    """
+    Attributes
+    ----------
+    outliers : List[int]
+        List of indices that do not fall within a cluster
+    potential_outliers : List[int]
+        List of indices which are near the border between belonging in the cluster and being an outlier
+    duplicates : List[List[int]]
+        List of groups of indices that are exact duplicates
+    potential_duplicates : List[List[int]]
+        List of groups of indices which are not exact but closely related data points
+    """
+
     outliers: List[int]
     potential_outliers: List[int]
     duplicates: List[List[int]]
@@ -482,15 +495,8 @@ class Clusterer:
 
         Returns
         -------
-        Dict[str, List[int]]
-            outliers :
-                List of indices that do not fall within a cluster
-            potential_outliers :
-                List of indices which are near the border between belonging in the cluster and being an outlier
-            duplicates :
-                List of groups of indices that are exact duplicates
-            potential_duplicates :
-                List of groups of indices which are not exact but closely related data points
+        ClustererOutput
+            The outliers and duplicate indices found in the data
 
         Example
         -------

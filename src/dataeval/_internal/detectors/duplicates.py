@@ -11,8 +11,17 @@ from dataeval.metrics import imagestats
 
 @dataclass(frozen=True)
 class DuplicatesOutput(OutputMetadata):
-    exact: List[int]
-    near: List[int]
+    """
+    Attributes
+    ----------
+    exact : List[List[int]]
+        Indices of images that are exact matches
+    near: List[List[int]]
+        Indices of images that are near matches
+    """
+
+    exact: List[List[int]]
+    near: List[List[int]]
 
 
 class Duplicates:
