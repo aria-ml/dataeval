@@ -90,9 +90,9 @@ def metadata(corr_val, num_samples, class_labels):
 def metadata_no_cnt(num_samples, metadata):
     md = [
         {
-            "var_cat": [md["var_cat"] for md in metadata],
+            "var_cat": metadata[idx]["var_cat"],
         }
-        for _ in range(num_samples)
+        for idx in range(num_samples)
     ]
     return md
 
@@ -181,9 +181,9 @@ class TestBalanceUnit:
         assert all(is_categorical[:idx] + is_categorical[idx + 1 :])
         assert data.dtype == float
 
-    # def test_preprocess_no_float(self, class_labels, metadata_no_cnt):
-    #     # test case with no float data
-    #     balance(class_labels=class_labels, metadata=metadata_no_cnt)
+    def test_preprocess_no_float(self, class_labels, metadata_no_cnt):
+        # test case with no float data
+        balance(class_labels=class_labels, metadata=metadata_no_cnt)
 
     @pytest.mark.parametrize(
         "balance_fn, expected_shape",
