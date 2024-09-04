@@ -42,7 +42,7 @@ def validate_num_neighbors(num_neighbors: int) -> int:
     return num_neighbors
 
 
-@set_metadata("dataeval.metrics.balance")
+@set_metadata("dataeval.metrics")
 def balance(class_labels: Sequence[int], metadata: List[Dict], num_neighbors: int = 5) -> BalanceOutput:
     """
     Mutual information (MI) between factors (class label, metadata, label/image properties)
@@ -114,7 +114,7 @@ def balance(class_labels: Sequence[int], metadata: List[Dict], num_neighbors: in
     return BalanceOutput(nmi)
 
 
-@set_metadata("dataeval.metrics.balance_classwise")
+@set_metadata("dataeval.metrics")
 def balance_classwise(class_labels: Sequence[int], metadata: List[Dict], num_neighbors: int = 5) -> BalanceOutput:
     """
     Compute mutual information (analogous to correlation) between metadata factors

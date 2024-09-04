@@ -159,7 +159,7 @@ def validate_dist(label_dist: np.ndarray, label_name: str):
         )
 
 
-@set_metadata("dataeval.metrics.parity")
+@set_metadata("dataeval.metrics")
 def parity(
     expected_labels: ArrayLike,
     observed_labels: ArrayLike,
@@ -223,7 +223,7 @@ def parity(
     return ParityOutput(cs, p)
 
 
-@set_metadata("dataeval.metrics.parity_metadata")
+@set_metadata("dataeval.metrics")
 def parity_metadata(
     data_factors: Mapping[str, ArrayLike],
     continuous_factor_bincounts: Optional[Dict[str, int]] = None,

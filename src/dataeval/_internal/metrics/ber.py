@@ -107,7 +107,7 @@ def knn_lowerbound(value: float, classes: int, k: int) -> float:
 BER_FN_MAP = {"KNN": ber_knn, "MST": ber_mst}
 
 
-@set_metadata("dataeval.metrics.ber")
+@set_metadata("dataeval.metrics")
 def ber(images: ArrayLike, labels: ArrayLike, k: int = 1, method: Literal["KNN", "MST"] = "KNN") -> BEROutput:
     """
     An estimator for Multi-class Bayes Error Rate using FR or KNN test statistic basis

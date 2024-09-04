@@ -2,6 +2,8 @@ import inspect
 from datetime import datetime, timezone
 from typing import Callable, Dict, List, Optional
 
+import numpy as np
+
 from dataeval import __version__
 
 
@@ -20,11 +22,17 @@ class OutputMetadata:
         return {k.removeprefix("_"): v for k, v in self.__dict__.items() if k.startswith("_")}
 
 
-def set_metadata(name: str, state_attr: Optional[List[str]] = None):
+def set_metadata(module_name: str = "", state_attr: Optional[List[str]] = None):
     def decorator(fn: Callable[..., OutputMetadata]):
         def wrapper(*args, **kwargs):
             def fmt(v):
-                return f"{v.__class__.__name__}: {getattr(v, 'shape', v)}"
+                if np.isscalar(v):
+                    return v
+                if hasattr(v, "shape"):
+                    return f"{v.__class__.__name__}: shape={getattr(v, 'shape')}"
+                if hasattr(v, "__len__"):
+                    return f"{v.__class__.__name__}: len={len(v)}"
+                return f"{v.__class__.__name__}"
 
             time = datetime.now(timezone.utc)
             result = fn(*args, **kwargs)
@@ -40,8 +48,9 @@ def set_metadata(name: str, state_attr: Optional[List[str]] = None):
                 if "self" in arguments and state_attr
                 else {}
             )
+            name = args[0].__class__.__name__ if "self" in arguments else fn.__name__
             metadata = {
-                "_name": name,
+                "_name": f"{module_name}.{name}",
                 "_execution_time": time,
                 "_execution_duration": duration,
                 "_arguments": {k: v for k, v in arguments.items() if k != "self"},

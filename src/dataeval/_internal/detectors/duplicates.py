@@ -56,7 +56,7 @@ class Duplicates:
             "near": sorted(near),
         }
 
-    @set_metadata("dataeval.detectors.Duplicates", ["find_exact", "find_near"])
+    @set_metadata("dataeval.detectors", ["find_exact", "find_near"])
     def evaluate(self, images: Iterable[ArrayLike]) -> DuplicatesOutput:
         """
         Returns duplicate image indices for both exact matches and near matches

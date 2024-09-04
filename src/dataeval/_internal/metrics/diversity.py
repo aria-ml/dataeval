@@ -119,7 +119,7 @@ def diversity_simpson(
 DIVERSITY_FN_MAP = {"simpson": diversity_simpson, "shannon": diversity_shannon}
 
 
-@set_metadata("dataeval.metrics.diversity")
+@set_metadata("dataeval.metrics")
 def diversity(
     class_labels: Sequence[int], metadata: List[Dict], method: Literal["shannon", "simpson"] = "simpson"
 ) -> DiversityOutput:
@@ -159,7 +159,7 @@ def diversity(
     return DiversityOutput(diversity_index)
 
 
-@set_metadata("dataeval.metrics.diversity_classwise")
+@set_metadata("dataeval.metrics")
 def diversity_classwise(
     class_labels: Sequence[int], metadata: List[Dict], method: Literal["shannon", "simpson"] = "simpson"
 ) -> DiversityOutput:

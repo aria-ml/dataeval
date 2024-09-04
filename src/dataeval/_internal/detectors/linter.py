@@ -127,7 +127,7 @@ class Linter:
 
         return dict(sorted(flagged_images.items()))
 
-    @set_metadata("dataeval.detectors.Linter", ["flags", "outlier_method", "outlier_threshold"])
+    @set_metadata("dataeval.detectors", ["flags", "outlier_method", "outlier_threshold"])
     def evaluate(self, images: Iterable[ArrayLike]) -> LinterOutput:
         """
         Returns indices of outliers with the issues identified for each

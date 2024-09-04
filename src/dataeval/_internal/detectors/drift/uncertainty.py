@@ -7,14 +7,14 @@ Licensed under Apache Software License (Apache 2.0)
 """
 
 from functools import partial
-from typing import Callable, Dict, Literal, Optional, Union
+from typing import Callable, Literal, Optional
 
 import numpy as np
 from numpy.typing import ArrayLike
 from scipy.special import softmax
 from scipy.stats import entropy
 
-from .base import UpdateStrategy
+from .base import DriftUnivariateOutput, UpdateStrategy
 from .ks import DriftKS
 from .torch import get_device, preprocess_drift
 
@@ -134,7 +134,7 @@ class DriftUncertainty:
             preprocess_fn=preprocess_fn,  # type: ignore
         )
 
-    def predict(self, x: ArrayLike) -> Dict[str, Union[int, float, np.ndarray]]:
+    def predict(self, x: ArrayLike) -> DriftUnivariateOutput:
         """
         Predict whether a batch of data has drifted from the reference data.
 

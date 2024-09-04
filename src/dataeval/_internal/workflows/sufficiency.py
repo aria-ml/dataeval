@@ -342,7 +342,7 @@ class Sufficiency:
     def eval_kwargs(self, value: Optional[Dict[str, Any]]):
         self._eval_kwargs = {} if value is None else value
 
-    @set_metadata("dataeval.workflows.Sufficiency", ["runs", "substeps"])
+    @set_metadata("dataeval.workflows", ["runs", "substeps"])
     def evaluate(self, eval_at: Optional[np.ndarray] = None, niter: int = 1000) -> SufficiencyOutput:
         """
         Creates data indices, trains models, and returns plotting data

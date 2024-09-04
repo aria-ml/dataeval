@@ -58,28 +58,29 @@ class TestKSDrift:
             alternative=alternative,
         )
         x = x_ref.copy()
-        preds_batch = cd.predict(x)
-        assert preds_batch["is_drift"] == 0
+        preds = cd.predict(x)
+        assert not preds.is_drift
         assert cd.n == x.shape[0] + x_ref.shape[0]
         assert cd.x_ref.shape[0] == min(update_x_ref.n, x.shape[0] + x_ref.shape[0])  # type: ignore
-
-        preds_feature = cd.predict(x, drift_type="feature")
-        assert preds_feature["is_drift"].shape[0] == cd.n_features  # type: ignore
-        preds_by_feature = (preds_feature["p_val"] < cd.p_val).astype(int)  # type: ignore
-        assert (preds_feature["is_drift"] == preds_by_feature).all()  # type: ignore
+        assert preds.feature_drift.shape[0] == cd.n_features
+        assert (preds.feature_drift == (preds.p_vals < cd.p_val)).all()  # type: ignore
+        assert preds.feature_threshold == cd.p_val
 
         np.random.seed(0)
         X_randn = np.random.randn(self.n * n_features).reshape(self.n, n_features).astype("float32")
         mu, sigma = 5, 5
         X_low = sigma * X_randn - mu
         X_high = sigma * X_randn + mu
-        preds_batch = cd.predict(X_high)
+
+        preds_high = cd.predict(X_high)
         if alternative != "less":
-            assert preds_batch["is_drift"] == 1
-        preds_batch = cd.predict(X_low)
+            assert preds_high.is_drift
+
+        preds_low = cd.predict(X_low)
         if alternative != "greater":
-            assert preds_batch["is_drift"] == 1
-        assert preds_batch["distance"].min() >= 0.0  # type: ignore
-        assert preds_feature["threshold"] == cd.p_val
+            assert preds_low.is_drift
+
+        assert preds_low.distances.min() >= 0.0  # type: ignore
+
         if correction == "bonferroni":
-            assert preds_batch["threshold"] == cd.p_val / cd.n_features
+            assert preds_low.threshold == cd.p_val / cd.n_features

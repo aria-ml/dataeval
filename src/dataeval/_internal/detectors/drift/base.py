@@ -7,13 +7,29 @@ Licensed under Apache Software License (Apache 2.0)
 """
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from functools import wraps
-from typing import Callable, Dict, Literal, Optional, Tuple, Union
+from typing import Callable, Literal, Optional, Tuple
 
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 
 from dataeval._internal.interop import to_numpy
+from dataeval._internal.output import OutputMetadata, set_metadata
+
+
+@dataclass(frozen=True)
+class DriftOutput(OutputMetadata):
+    is_drift: bool
+    threshold: float
+
+
+@dataclass(frozen=True)
+class DriftUnivariateOutput(DriftOutput):
+    feature_drift: NDArray[np.bool_]
+    feature_threshold: float
+    p_vals: NDArray[np.float32]
+    distances: NDArray[np.float32]
 
 
 def update_x_ref(fn):
@@ -152,7 +168,7 @@ class BaseDrift:
         return x
 
 
-class BaseUnivariateDrift(BaseDrift):
+class BaseDriftUnivariate(BaseDrift):
     """
     Generic drift detector component which serves as a base class for methods using
     univariate tests. If n_features > 1, a multivariate correction is applied such
@@ -198,13 +214,13 @@ class BaseUnivariateDrift(BaseDrift):
 
     @preprocess_x
     @abstractmethod
-    def score(self, x: ArrayLike) -> Tuple[np.ndarray, np.ndarray]:
+    def score(self, x: ArrayLike) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
         """Abstract method to calculate feature score after preprocessing"""
 
-    def _apply_correction(self, p_vals: np.ndarray) -> Tuple[int, float]:
+    def _apply_correction(self, p_vals: np.ndarray) -> Tuple[bool, float]:
         if self.correction == "bonferroni":
             threshold = self.p_val / self.n_features
-            drift_pred = int((p_vals < threshold).any())
+            drift_pred = bool((p_vals < threshold).any())
             return drift_pred, threshold
         elif self.correction == "fdr":
             n = p_vals.shape[0]
@@ -215,18 +231,18 @@ class BaseUnivariateDrift(BaseDrift):
             try:
                 idx_threshold = int(np.where(below_threshold)[0].max())
             except ValueError:  # sorted p-values not below thresholds
-                return int(below_threshold.any()), q_threshold.min()
-            return int(below_threshold.any()), q_threshold[idx_threshold]
+                return bool(below_threshold.any()), q_threshold.min()
+            return bool(below_threshold.any()), q_threshold[idx_threshold]
         else:
             raise ValueError("`correction` needs to be either `bonferroni` or `fdr`.")
 
+    @set_metadata("dataeval.detectors")
     @preprocess_x
     @update_x_ref
     def predict(
         self,
         x: ArrayLike,
-        drift_type: Literal["batch", "feature"] = "batch",
-    ) -> Dict[str, Union[int, float, np.ndarray]]:
+    ) -> DriftUnivariateOutput:
         """
         Predict whether a batch of data has drifted from the reference data and update
         reference data using specified update strategy.
@@ -235,10 +251,6 @@ class BaseUnivariateDrift(BaseDrift):
         ----------
         x : ArrayLike
             Batch of instances.
-        drift_type : Literal["batch", "feature"], default "batch"
-            Predict drift at the 'feature' or 'batch' level. For 'batch', the test
-            statistics for each feature are aggregated using the Bonferroni or False
-            Discovery Rate correction (if n_features>1).
 
         Returns
         -------
@@ -249,20 +261,6 @@ class BaseUnivariateDrift(BaseDrift):
         # compute drift scores
         p_vals, dist = self.score(x)
 
-        # TODO: return both feature-level and batch-level drift predictions by default
-        # values below p-value threshold are drift
-        if drift_type == "feature":
-            drift_pred = (p_vals < self.p_val).astype(int)
-            threshold = self.p_val
-        elif drift_type == "batch":
-            drift_pred, threshold = self._apply_correction(p_vals)
-        else:
-            raise ValueError("`drift_type` needs to be either `feature` or `batch`.")
-
-        # populate drift dict
-        return {
-            "is_drift": drift_pred,
-            "p_val": p_vals,
-            "threshold": threshold,
-            "distance": dist,
-        }
+        feature_drift = (p_vals < self.p_val).astype(np.bool_)
+        drift_pred, threshold = self._apply_correction(p_vals)
+        return DriftUnivariateOutput(drift_pred, threshold, feature_drift, self.p_val, p_vals, dist)

@@ -29,7 +29,7 @@ class CoverageOutput(OutputMetadata):
     critical_value: float
 
 
-@set_metadata("dataeval.metrics.coverage")
+@set_metadata("dataeval.metrics")
 def coverage(
     embeddings: ArrayLike,
     radius_type: Literal["adaptive", "naive"] = "adaptive",
