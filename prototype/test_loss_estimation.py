@@ -294,3 +294,53 @@ class TestLEFunc_class():
         ds_c_acc = results["Op_Predicted_Metric"]
 
         assert ds_c_acc < 0.95*ds_acc
+    
+    def test_regress_degrades_on_corrupted_dataset(self):
+        torch._dynamo.disable()
+        torch._dynamo.config.suppress_errors = True
+        np.random.seed(0)
+
+        ds = LargeMockDataset()
+        ds_c = LargeMockDataset()
+        
+        for i, img in enumerate(ds_c.images):
+            #img[0,:,:] -= 1.5
+            #img[1,:,:] += 1.5
+            #img[:,:,:] + 
+            #x = img / 2
+            #rands = torch.normal(x, std=0.3)
+            #x = torch.clip(rands, 0, 1)
+            #x = img# / 2
+            #x = x + x * np.random.randn()#np.random.normal(size=x.shape, scale=5)
+            #x = x + np.random.randn()
+            #img[:,:,:] = x
+            ds.images[i] = ds.images[i] + np.random.normal(size=ds.images[i].shape, scale=0.5)
+            ds_c.images[i] = ds_c.images[i] + np.random.normal(size=ds_c.images[i].shape, scale=2) + np.random.randn()
+
+        class_names = np.unique(ds.labels)
+
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model = torch.compile(RegressNet().to(device))
+        model = cast(RegressNet, model)
+        le = LossEstimator()
+
+        model = reset_parameters(model)
+        # Run the model with each substep of data
+        # train on subset of train data
+        train_kwargs = {}
+        eval_kwargs = {}
+        custom_train_regress(
+            model,
+            ds,
+            device,
+            epochs=30
+        )
+
+        method = "regression"
+        estimator = LossEstimator("CBPE", method)
+        results = estimator.evaluate(model, ds, ds_c, ds.class_names, 2)
+
+        ds_err = results["Reference_Metric"]
+        ds_c_err = results["Op_Predicted_Metric"]
+
+        assert ds_err < 0.95*ds_c_err
