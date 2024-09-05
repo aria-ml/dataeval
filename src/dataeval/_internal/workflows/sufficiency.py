@@ -13,9 +13,6 @@ from torch.utils.data import Dataset
 
 from dataeval._internal.output import OutputMetadata, set_metadata
 
-STEPS_KEY = "_STEPS_"
-PARAMS_KEY = "_CURVE_PARAMS_"
-
 
 @dataclass(frozen=True)
 class SufficiencyOutput(OutputMetadata):
@@ -24,15 +21,15 @@ class SufficiencyOutput(OutputMetadata):
     ----------
     steps : NDArray[np.uint32]
         Array of sample sizes
-    params : Dict[str, NDArray[np.float32]]
+    params : Dict[str, NDArray[np.float64]]
         Inverse power curve coefficients for the line of best fit for each measure
-    measures : Dict[str, NDArray[np.float32]]
+    measures : Dict[str, NDArray[np.float64]]
         Average of values observed for each sample size step for each measure
     """
 
     steps: NDArray[np.uint32]
-    params: Dict[str, NDArray[np.float32]]
-    measures: Dict[str, NDArray[np.float32]]
+    params: Dict[str, NDArray[np.float64]]
+    measures: Dict[str, NDArray[np.float64]]
 
     def __post_init__(self):
         c = len(self.steps)
@@ -63,7 +60,7 @@ def f_out(n_i: NDArray, x: NDArray) -> NDArray:
     return x[0] * n_i ** (-x[1]) + x[2]
 
 
-def f_inv_out(y_i: NDArray, x: NDArray) -> NDArray[np.uint32]:
+def f_inv_out(y_i: NDArray, x: NDArray) -> NDArray[np.uint64]:
     """
     Inverse function for f_out()
 
@@ -76,11 +73,11 @@ def f_inv_out(y_i: NDArray, x: NDArray) -> NDArray[np.uint32]:
 
     Returns
     -------
-    NDArray
+    NDArray[np.uint64]
         Array of sample sizes
     """
-    n_i: NDArray = ((y_i - x[2]) / x[0]) ** (-1 / x[1])
-    return n_i.astype(np.uint32)
+    n_i = ((y_i - x[2]) / x[0]) ** (-1 / x[1])
+    return np.asarray(n_i, dtype=np.uint64)
 
 
 def calc_params(p_i: NDArray, n_i: NDArray, niter: int) -> NDArray:
@@ -174,7 +171,7 @@ def project_steps(params: NDArray, projection: NDArray) -> NDArray:
     return 1 - f_out(projection, params)
 
 
-def inv_project_steps(params: NDArray, targets: NDArray) -> NDArray:
+def inv_project_steps(params: NDArray, targets: NDArray) -> NDArray[np.uint64]:
     """Inverse function for project_steps()
 
     Parameters
@@ -186,12 +183,12 @@ def inv_project_steps(params: NDArray, targets: NDArray) -> NDArray:
 
     Returns
     -------
-    NDArray
+    NDArray[np.uint64]
         Array of sample sizes, or 0 if overflow
     """
     steps = f_inv_out(1 - np.array(targets), params)
     steps[np.isnan(steps)] = 0
-    return np.ceil(steps).astype(np.int64)
+    return np.ceil(steps)
 
 
 def get_curve_params(measures: Dict[str, NDArray], ranges: NDArray, niter: int) -> Dict[str, NDArray]:
@@ -368,8 +365,8 @@ class Sufficiency:
 
         Returns
         -------
-        Dict[str, Union[NDArray, Dict[str, NDArray]]]
-            Dictionary containing the average of each measure per substep
+        SufficiencyOutput
+            Dataclass containing the average of each measure per substep
         """
         if eval_at is not None:
             ranges = eval_at
@@ -379,7 +376,7 @@ class Sufficiency:
                 self._length,
                 self.substeps,
             )  # Start, Stop, Num steps
-            ranges = np.geomspace(*geomshape).astype(np.uint32)
+            ranges = np.geomspace(*geomshape, dtype=np.uint32)
         substeps = len(ranges)
         measures = {}
 
@@ -395,7 +392,7 @@ class Sufficiency:
                 self.train_fn(
                     model,
                     self.train_ds,
-                    indices[:substep].tolist(),
+                    indices[: int(substep)].tolist(),
                     **self.train_kwargs,
                 )
 
@@ -419,24 +416,24 @@ class Sufficiency:
     def project(
         cls,
         data: SufficiencyOutput,
-        projection: Union[int, Sequence[int], NDArray],
-    ) -> Dict[str, NDArray]:
+        projection: Union[int, Sequence[int], NDArray[np.uint]],
+    ) -> SufficiencyOutput:
         """Projects the measures for each value of X
 
         Parameters
         ----------
-        data : Dict[str, Union[NDArray, Dict[str, NDArray]]]
+        data : SufficiencyOutput
             Dataclass containing the average of each measure per substep
-        steps : Union[int, NDArray]
+        projection : Union[int, Sequence[int], NDArray[np.uint]]
             Step or steps to project
-        niter : int, default 200
-            Number of iterations to perform in the basin-hopping
-            numerical process to curve-fit data
+
+        Returns
+        -------
+        SufficiencyOutput
+            Dataclass containing the projected measures per projection
 
         Raises
         ------
-        KeyError
-            If STEPS_KEY or measure is not a valid key
         ValueError
             If the length of data points in the measures do not match
             If the steps are not int, Sequence[int] or an ndarray
@@ -447,17 +444,16 @@ class Sufficiency:
             raise ValueError("'steps' must be an int, Sequence[int] or ndarray")
 
         output = {}
-        output[STEPS_KEY] = projection
         for name, measures in data.measures.items():
             if measures.ndim > 1:
                 result = []
                 for i in range(len(measures)):
                     projected = project_steps(data.params[name][i], projection)
                     result.append(projected)
-                output[name] = np.array(result).T
+                output[name] = np.array(result)
             else:
                 output[name] = project_steps(data.params[name], projection)
-        return output
+        return SufficiencyOutput(projection, data.params, output)
 
     @classmethod
     def plot(cls, data: SufficiencyOutput, class_names: Optional[Sequence[str]] = None) -> List[Figure]:
@@ -465,7 +461,7 @@ class Sufficiency:
 
         Parameters
         ----------
-        data : Dict[str, Union[NDArray, Dict[str, NDArray]]]
+        data : SufficiencyOutput
             Dataclass containing the average of each measure per substep
 
         Returns
@@ -475,8 +471,6 @@ class Sufficiency:
 
         Raises
         ------
-        KeyError
-            If STEPS_KEY or measure is not a valid key
         ValueError
             If the length of data points in the measures do not match
         """
@@ -521,7 +515,7 @@ class Sufficiency:
             Dictionary of target metric scores (from 0.0 to 1.0) that we want
             to achieve, where the key is the name of the metric.
 
-        data : Dict[str, Union[NDArray, Dict[str, NDArray]]]
+        data : SufficiencyOutput
             Dataclass containing the average of each measure per substep
 
         Returns
@@ -537,7 +531,7 @@ class Sufficiency:
             if name not in data.measures:
                 continue
 
-            measure = cast(np.ndarray, data.measures[name])
+            measure = data.measures[name]
             if measure.ndim > 1:
                 projection[name] = np.zeros((len(measure), len(target)))
                 for i in range(len(measure)):
