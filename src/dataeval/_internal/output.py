@@ -1,6 +1,7 @@
 import inspect
 from datetime import datetime, timezone
-from typing import Callable, Dict, List, Optional
+from functools import wraps
+from typing import Dict, List, Optional
 
 import numpy as np
 
@@ -23,7 +24,8 @@ class OutputMetadata:
 
 
 def set_metadata(module_name: str = "", state_attr: Optional[List[str]] = None):
-    def decorator(fn: Callable[..., OutputMetadata]):
+    def decorator(fn):
+        @wraps(fn)
         def wrapper(*args, **kwargs):
             def fmt(v):
                 if np.isscalar(v):

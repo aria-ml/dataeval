@@ -157,7 +157,7 @@ class Linter:
         Evaluate the dataset:
 
         >>> lint.evaluate(images)
-        {18: {'brightness': 0.78}, 25: {'brightness': 0.98}}
+        LinterOutput(issues={18: {'brightness': 0.78}, 25: {'brightness': 0.98}})
         """
         self.stats = imagestats(images, self.flags)
         return LinterOutput(self._get_outliers())
