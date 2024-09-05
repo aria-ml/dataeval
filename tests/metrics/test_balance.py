@@ -207,6 +207,7 @@ class TestBalanceFunctional:
         mi = balance(class_labels_func, md).mutual_information
         # first row (with class)
         mi_0 = np.array([1, mi_val, 0])
+        print(np.max(np.abs(mi[0] - mi_0)))
         assert np.max(np.abs(mi[0] - mi_0)) < 0.067
 
     @pytest.mark.parametrize(
@@ -217,4 +218,5 @@ class TestBalanceFunctional:
         md = request.getfixturevalue(md)
         mi_val = request.getfixturevalue(mi_val)
         mi = balance_classwise(class_labels_func, md).mutual_information
+        print(np.max(np.abs(mi[:, 0] - mi_val)))
         assert np.max(np.abs(mi[:, 0] - mi_val)) < 0.067
