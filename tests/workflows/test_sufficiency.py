@@ -316,7 +316,7 @@ class TestSufficiencyProject:
             measures={"test1": np.array([0.2, 0.6, 0.9])},
         )
         result = Sufficiency.project(output, steps)
-        npt.assert_almost_equal(result["test1"], [10.0], decimal=4)
+        npt.assert_almost_equal(result.measures["test1"], [10.0], decimal=4)
 
     def test_project_invalid_steps(self):
         output = SufficiencyOutput(
@@ -334,9 +334,10 @@ class TestSufficiencyProject:
             measures={"test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]])},
         )
 
+        assert output.measures["test1"].shape == (2, 3)
         result = Sufficiency.project(output, [1000, 2000, 4000, 8000])
-        assert len(result.keys()) == 2
-        assert result["test1"].shape == (4, 2)
+        assert len(result.measures) == 1
+        assert result.measures["test1"].shape == (2, 4)
 
     def test_project_mixed(self):
         output = SufficiencyOutput(
@@ -345,10 +346,12 @@ class TestSufficiencyProject:
             measures={"test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]]), "test2": np.array([0.2, 0.6, 0.9])},
         )
 
+        assert output.measures["test1"].shape == (2, 3)
+        assert output.measures["test2"].shape == (3,)
         result = Sufficiency.project(output, [1000, 2000, 4000, 8000])
-        assert len(result.keys()) == 3
-        assert result["test1"].shape == (4, 2)
-        assert result["test2"].shape == (4,)
+        assert len(result.measures) == 2
+        assert result.measures["test1"].shape == (2, 4)
+        assert result.measures["test2"].shape == (4,)
 
     def test_inv_project_mixed(self):
         output = SufficiencyOutput(
@@ -382,7 +385,7 @@ class TestSufficiencyInverseProject:
         Tests metric projection output can be inversed
         """
         num_samples = np.arange(20, 80, step=10, dtype=np.uint)
-        accuracies = num_samples / 100
+        accuracies = num_samples / 100.0
 
         params = np.array([-0.01, -1.0, 1.0])
 
