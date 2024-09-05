@@ -68,12 +68,13 @@ def set_metadata(module_name: str = "", state_attr: Optional[List[str]] = None):
 
 def populate_defaults(d: dict, c: type) -> dict:
     def default(t):
-        if t == "Dict":
+        name = t._name if hasattr(t, "_name") else t.__name__  # py3.9 : _name, py3.10 : __name__
+        if name == "Dict":
             return {}
-        if t == "List":
+        if name == "List":
             return []
-        if t == "ndarray":
+        if name == "ndarray":
             return np.array([])
         raise TypeError("Unrecognized annotation type")
 
-    return {k: d[k] if k in d else default(t.__name__) for k, t in c.__annotations__.items()}
+    return {k: d[k] if k in d else default(t) for k, t in c.__annotations__.items()}
