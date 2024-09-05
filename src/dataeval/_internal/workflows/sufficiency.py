@@ -1,4 +1,5 @@
 import warnings
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Sequence, Union, cast
 
 import matplotlib.pyplot as plt
@@ -6,57 +7,83 @@ import numpy as np
 import torch
 import torch.nn as nn
 from matplotlib.figure import Figure
+from numpy.typing import NDArray
 from scipy.optimize import basinhopping
 from torch.utils.data import Dataset
 
-from dataeval._internal.metrics.base import EvaluateMixin
+from dataeval._internal.output import OutputMetadata, set_metadata
 
 STEPS_KEY = "_STEPS_"
 PARAMS_KEY = "_CURVE_PARAMS_"
 
-SufficiencyOutput = Dict[str, Union[np.ndarray, Dict[str, np.ndarray]]]
+
+@dataclass(frozen=True)
+class SufficiencyOutput(OutputMetadata):
+    """
+    Attributes
+    ----------
+    steps : NDArray[np.uint32]
+        Array of sample sizes
+    params : Dict[str, NDArray[np.float32]]
+        Inverse power curve coefficients for the line of best fit for each measure
+    measures : Dict[str, NDArray[np.float32]]
+        Average of values observed for each sample size step for each measure
+    """
+
+    steps: NDArray[np.uint32]
+    params: Dict[str, NDArray[np.float32]]
+    measures: Dict[str, NDArray[np.float32]]
+
+    def __post_init__(self):
+        c = len(self.steps)
+        if set(self.params) != set(self.measures):
+            raise ValueError("params and measures have a key mismatch")
+        for m, v in self.measures.items():
+            c_v = v.shape[1] if v.ndim > 1 else len(v)
+            if c != c_v:
+                raise ValueError(f"{m} does not contain the expected number ({c}) of data points.")
 
 
-def f_out(n_i: np.ndarray, x: np.ndarray) -> np.ndarray:
+def f_out(n_i: NDArray, x: NDArray) -> NDArray:
     """
     Calculates the line of best fit based on its free parameters
 
     Parameters
     ----------
-    n_i : np.ndarray
+    n_i : NDArray
         Array of sample sizes
-    x : np.ndarray
+    x : NDArray
         Array of inverse power curve coefficients
 
     Returns
     -------
-    np.ndarray
+    NDArray
         Data points for the line of best fit
     """
     return x[0] * n_i ** (-x[1]) + x[2]
 
 
-def f_inv_out(y_i: np.ndarray, x: np.ndarray) -> np.ndarray:
+def f_inv_out(y_i: NDArray, x: NDArray) -> NDArray[np.uint32]:
     """
     Inverse function for f_out()
 
     Parameters
     ----------
-    y_i : np.ndarray
+    y_i : NDArray
         Data points for the line of best fit
-    x : np.ndarray
+    x : NDArray
         Array of inverse power curve coefficients
 
     Returns
     -------
-    np.ndarray
+    NDArray
         Array of sample sizes
     """
-    n_i = ((y_i - x[2]) / x[0]) ** (-1 / x[1])
-    return n_i
+    n_i: NDArray = ((y_i - x[2]) / x[0]) ** (-1 / x[1])
+    return n_i.astype(np.uint32)
 
 
-def calc_params(p_i: np.ndarray, n_i: np.ndarray, niter: int) -> np.ndarray:
+def calc_params(p_i: NDArray, n_i: NDArray, niter: int) -> NDArray:
     """
     Retrieves the inverse power curve coefficients for the line of best fit.
     Global minimization is done via basin hopping. More info on this algorithm
@@ -64,9 +91,9 @@ def calc_params(p_i: np.ndarray, n_i: np.ndarray, niter: int) -> np.ndarray:
 
     Parameters
     ----------
-    p_i : np.ndarray
+    p_i : NDArray
         Array of corresponding losses
-    n_i : np.ndarray
+    n_i : NDArray
         Array of sample sizes
     niter : int
         Number of iterations to perform in the basin-hopping
@@ -74,7 +101,7 @@ def calc_params(p_i: np.ndarray, n_i: np.ndarray, niter: int) -> np.ndarray:
 
     Returns
     -------
-    np.ndarray
+    NDArray
         Array of parameters to recreate line of best fit
     """
 
@@ -128,52 +155,38 @@ def validate_dataset_len(dataset: Dataset) -> int:
     return length
 
 
-def validate_output(data: SufficiencyOutput):
-    """Ensure the sufficiency data used is not malformed"""
-    if not all(key in data for key in [STEPS_KEY, PARAMS_KEY]):
-        raise KeyError(f"{STEPS_KEY} and {PARAMS_KEY} are required keys for Sufficiency output.")
-    c = len(data[STEPS_KEY])
-    for m, v in data.items():
-        if m in [STEPS_KEY, PARAMS_KEY]:
-            continue
-        v = cast(np.ndarray, v)
-        c_v = v.shape[1] if v.ndim > 1 else len(v)
-        if c != c_v:
-            raise ValueError("f{m} does not contain the expected number ({c}) of data points.")
-
-
-def project_steps(params: np.ndarray, projection: np.ndarray) -> np.ndarray:
+def project_steps(params: NDArray, projection: NDArray) -> NDArray:
     """Projects the measures for each value of X
 
     Parameters
     ----------
-    params : np.ndarray
+    params : NDArray
         Inverse power curve coefficients used to calculate projection
-    projection : np.ndarray
+    projection : NDArray
         Steps to extrapolate
 
     Returns
     -------
-    np.ndarray
+    NDArray
         Extrapolated measure values at each projection step
 
     """
     return 1 - f_out(projection, params)
 
 
-def inv_project_steps(params: np.ndarray, targets: np.ndarray) -> np.ndarray:
+def inv_project_steps(params: NDArray, targets: NDArray) -> NDArray:
     """Inverse function for project_steps()
 
     Parameters
     ----------
-    params : np.ndarray
+    params : NDArray
         Inverse power curve coefficients used to calculate projection
-    targets : np.ndarray
+    targets : NDArray
         Desired measure values
 
     Returns
     -------
-    np.ndarray
+    NDArray
         Array of sample sizes, or 0 if overflow
     """
     steps = f_inv_out(1 - np.array(targets), params)
@@ -181,7 +194,7 @@ def inv_project_steps(params: np.ndarray, targets: np.ndarray) -> np.ndarray:
     return np.ceil(steps).astype(np.int64)
 
 
-def get_curve_params(measures: Dict[str, np.ndarray], ranges: np.ndarray, niter: int) -> Dict[str, np.ndarray]:
+def get_curve_params(measures: Dict[str, NDArray], ranges: NDArray, niter: int) -> Dict[str, NDArray]:
     """Calculates and aggregates parameters for both single and multi-class metrics"""
     output = {}
     for name, measure in measures.items():
@@ -198,10 +211,10 @@ def get_curve_params(measures: Dict[str, np.ndarray], ranges: np.ndarray, niter:
 
 def plot_measure(
     name: str,
-    steps: np.ndarray,
-    measure: np.ndarray,
-    params: np.ndarray,
-    projection: np.ndarray,
+    steps: NDArray,
+    measure: NDArray,
+    params: NDArray,
+    projection: NDArray,
 ) -> Figure:
     fig = plt.figure()
     fig = cast(Figure, fig)
@@ -228,7 +241,7 @@ def plot_measure(
     return fig
 
 
-class Sufficiency(EvaluateMixin):
+class Sufficiency:
     """
     Project dataset sufficiency using given a model and evaluation criteria
 
@@ -265,7 +278,7 @@ class Sufficiency(EvaluateMixin):
         train_ds: Dataset,
         test_ds: Dataset,
         train_fn: Callable[[nn.Module, Dataset, Sequence[int]], None],
-        eval_fn: Callable[[nn.Module, Dataset], Union[Dict[str, float], Dict[str, np.ndarray]]],
+        eval_fn: Callable[[nn.Module, Dataset], Union[Dict[str, float], Dict[str, NDArray]]],
         runs: int = 1,
         substeps: int = 5,
         train_kwargs: Optional[Dict[str, Any]] = None,
@@ -312,13 +325,13 @@ class Sufficiency(EvaluateMixin):
     @property
     def eval_fn(
         self,
-    ) -> Callable[[nn.Module, Dataset], Union[Dict[str, float], Dict[str, np.ndarray]]]:
+    ) -> Callable[[nn.Module, Dataset], Union[Dict[str, float], Dict[str, NDArray]]]:
         return self._eval_fn
 
     @eval_fn.setter
     def eval_fn(
         self,
-        value: Callable[[nn.Module, Dataset], Union[Dict[str, float], Dict[str, np.ndarray]]],
+        value: Callable[[nn.Module, Dataset], Union[Dict[str, float], Dict[str, NDArray]]],
     ):
         if not callable(value):
             raise TypeError("Must provide a callable for eval_fn.")
@@ -340,13 +353,14 @@ class Sufficiency(EvaluateMixin):
     def eval_kwargs(self, value: Optional[Dict[str, Any]]):
         self._eval_kwargs = {} if value is None else value
 
-    def evaluate(self, eval_at: Optional[np.ndarray] = None, niter: int = 1000) -> SufficiencyOutput:
+    @set_metadata("dataeval.workflows", ["runs", "substeps"])
+    def evaluate(self, eval_at: Optional[NDArray] = None, niter: int = 1000) -> SufficiencyOutput:
         """
         Creates data indices, trains models, and returns plotting data
 
         Parameters
         ----------
-        eval_at : Optional[np.ndarray]
+        eval_at : Optional[NDArray]
             Specify this to collect accuracies over a specific set of dataset lengths, rather
             than letting Sufficiency internally create the lengths to evaluate at.
         niter : int, default 1000
@@ -354,7 +368,7 @@ class Sufficiency(EvaluateMixin):
 
         Returns
         -------
-        Dict[str, Union[np.ndarray, Dict[str, np.ndarray]]]
+        Dict[str, Union[NDArray, Dict[str, NDArray]]]
             Dictionary containing the average of each measure per substep
         """
         if eval_at is not None:
@@ -365,7 +379,7 @@ class Sufficiency(EvaluateMixin):
                 self._length,
                 self.substeps,
             )  # Start, Stop, Num steps
-            ranges = np.geomspace(*geomshape).astype(np.int64)
+            ranges = np.geomspace(*geomshape).astype(np.uint32)
         substeps = len(ranges)
         measures = {}
 
@@ -390,9 +404,6 @@ class Sufficiency(EvaluateMixin):
 
                 # Keep track of each measures values
                 for name, value in measure.items():
-                    if name in [STEPS_KEY, PARAMS_KEY]:
-                        raise KeyError(f"Cannot use reserved name '{name}' as a metric name.")
-
                     # Sum result into current substep iteration to be averaged later
                     value = np.array(value).ravel()
                     if name not in measures:
@@ -402,23 +413,21 @@ class Sufficiency(EvaluateMixin):
         # The mean for each measure must be calculated before being returned
         measures = {k: (v / self.runs).T for k, v in measures.items()}
         params_output = get_curve_params(measures, ranges, niter)
-        output = {STEPS_KEY: ranges, PARAMS_KEY: params_output}
-        output.update(measures)
-        return output
+        return SufficiencyOutput(ranges, params_output, measures)
 
     @classmethod
     def project(
         cls,
         data: SufficiencyOutput,
-        projection: Union[int, Sequence[int], np.ndarray],
-    ) -> Dict[str, np.ndarray]:
+        projection: Union[int, Sequence[int], NDArray],
+    ) -> Dict[str, NDArray]:
         """Projects the measures for each value of X
 
         Parameters
         ----------
-        data : Dict[str, Union[np.ndarray, Dict[str, np.ndarray]]]
+        data : Dict[str, Union[NDArray, Dict[str, NDArray]]]
             Dataclass containing the average of each measure per substep
-        steps : Union[int, np.ndarray]
+        steps : Union[int, NDArray]
             Step or steps to project
         niter : int, default 200
             Number of iterations to perform in the basin-hopping
@@ -432,7 +441,6 @@ class Sufficiency(EvaluateMixin):
             If the length of data points in the measures do not match
             If the steps are not int, Sequence[int] or an ndarray
         """
-        validate_output(data)
         projection = [projection] if isinstance(projection, int) else projection
         projection = np.array(projection) if isinstance(projection, Sequence) else projection
         if not isinstance(projection, np.ndarray):
@@ -440,18 +448,15 @@ class Sufficiency(EvaluateMixin):
 
         output = {}
         output[STEPS_KEY] = projection
-        for name, measures in data.items():
-            if name in [STEPS_KEY, PARAMS_KEY]:
-                continue
-            measures = cast(np.ndarray, measures)
+        for name, measures in data.measures.items():
             if measures.ndim > 1:
                 result = []
                 for i in range(len(measures)):
-                    projected = project_steps(data[PARAMS_KEY][name][i], projection)
+                    projected = project_steps(data.params[name][i], projection)
                     result.append(projected)
                 output[name] = np.array(result).T
             else:
-                output[name] = project_steps(data[PARAMS_KEY][name], projection)
+                output[name] = project_steps(data.params[name], projection)
         return output
 
     @classmethod
@@ -460,7 +465,7 @@ class Sufficiency(EvaluateMixin):
 
         Parameters
         ----------
-        data : Dict[str, Union[np.ndarray, Dict[str, np.ndarray]]]
+        data : Dict[str, Union[NDArray, Dict[str, NDArray]]]
             Dataclass containing the average of each measure per substep
 
         Returns
@@ -475,24 +480,16 @@ class Sufficiency(EvaluateMixin):
         ValueError
             If the length of data points in the measures do not match
         """
-        validate_output(data)
-
-        # X, y data
-        steps = cast(np.ndarray, data[STEPS_KEY])
-
         # Extrapolation parameters
-        last_X = steps[-1]
-        geomshape = (0.01 * last_X, last_X * 4, len(steps))
+        last_X = data.steps[-1]
+        geomshape = (0.01 * last_X, last_X * 4, len(data.steps))
         extrapolated = np.geomspace(*geomshape).astype(np.int64)
 
         # Stores all plots
         plots = []
 
         # Create a plot for each measure on one figure
-        for name, measures in data.items():
-            if name in [STEPS_KEY, PARAMS_KEY]:
-                continue
-            measures = cast(np.ndarray, measures)
+        for name, measures in data.measures.items():
             if measures.ndim > 1:
                 if class_names is not None and len(measures) != len(class_names):
                     raise IndexError("Class name count does not align with measures")
@@ -500,56 +497,54 @@ class Sufficiency(EvaluateMixin):
                     class_name = str(i) if class_names is None else class_names[i]
                     fig = plot_measure(
                         f"{name}_{class_name}",
-                        steps,
+                        data.steps,
                         measure,
-                        data[PARAMS_KEY][name][i],
+                        data.params[name][i],
                         extrapolated,
                     )
                     plots.append(fig)
 
             else:
-                fig = plot_measure(name, steps, measures, data[PARAMS_KEY][name], extrapolated)
+                fig = plot_measure(name, data.steps, measures, data.params[name], extrapolated)
                 plots.append(fig)
 
         return plots
 
     @classmethod
-    def inv_project(cls, targets: Dict[str, np.ndarray], data: SufficiencyOutput) -> Dict[str, np.ndarray]:
+    def inv_project(cls, targets: Dict[str, NDArray], data: SufficiencyOutput) -> Dict[str, NDArray]:
         """
         Calculate training samples needed to achieve target model metric values.
 
         Parameters
         ----------
-        targets : Dict[str, np.ndarray]
+        targets : Dict[str, NDArray]
             Dictionary of target metric scores (from 0.0 to 1.0) that we want
             to achieve, where the key is the name of the metric.
 
-        data : Dict[str, Union[np.ndarray, Dict[str, np.ndarray]]]
+        data : Dict[str, Union[NDArray, Dict[str, NDArray]]]
             Dataclass containing the average of each measure per substep
 
         Returns
         -------
-        Dict[str, np.ndarray]
+        Dict[str, NDArray]
             List of the number of training samples needed to achieve each
             corresponding entry in targets
         """
 
-        validate_output(data)
-
         projection = {}
 
         for name, target in targets.items():
-            if name not in data:
+            if name not in data.measures:
                 continue
 
-            measure = cast(np.ndarray, data[name])
+            measure = cast(np.ndarray, data.measures[name])
             if measure.ndim > 1:
                 projection[name] = np.zeros((len(measure), len(target)))
                 for i in range(len(measure)):
                     projection[name][i] = inv_project_steps(
-                        data[PARAMS_KEY][name][i], target[i] if target.ndim == measure.ndim else target
+                        data.params[name][i], target[i] if target.ndim == measure.ndim else target
                     )
             else:
-                projection[name] = inv_project_steps(data[PARAMS_KEY][name], target)
+                projection[name] = inv_project_steps(data.params[name], target)
 
         return projection

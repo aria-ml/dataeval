@@ -11,12 +11,13 @@ from typing import Callable, Iterable, Optional, Tuple, cast
 import keras
 import numpy as np
 import tensorflow as tf
+from numpy.typing import NDArray
 
 
 def trainer(
     model: keras.Model,
-    x_train: np.ndarray,
-    y_train: Optional[np.ndarray] = None,
+    x_train: NDArray,
+    y_train: Optional[NDArray] = None,
     loss_fn: Optional[Callable[..., tf.Tensor]] = None,
     optimizer: keras.optimizers.Optimizer = keras.optimizers.Adam,
     preprocess_fn: Optional[Callable[[tf.Tensor], tf.Tensor]] = None,

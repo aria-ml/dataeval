@@ -1,48 +1,39 @@
 import warnings
-from typing import Dict, Mapping, NamedTuple, Optional, Tuple
+from dataclasses import dataclass
+from typing import Dict, Generic, Mapping, Optional, Tuple, TypeVar
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy.stats import chi2_contingency, chisquare
 
 from dataeval._internal.interop import to_numpy
+from dataeval._internal.output import OutputMetadata, set_metadata
+
+TData = TypeVar("TData", np.float64, NDArray[np.float64])
 
 
-class ParityOutput(NamedTuple):
+@dataclass(frozen=True)
+class ParityOutput(Generic[TData], OutputMetadata):
     """
     Attributes
     ----------
-    score : np.float64
-        chi-squared value of the test
-    p_value : np.float64
-        p-value of the test
+    score : np.float64 | NDArray[np.float64]
+        chi-squared score(s) of the test
+    p_value : np.float64 | NDArray[np.float64]
+        p-value(s) of the test
     """
 
-    score: np.float64
-    p_value: np.float64
+    score: TData
+    p_value: TData
 
 
-class ParityMetadataOutput(NamedTuple):
-    """
-    Attributes
-    ----------
-    scores : NDArray[np.float64]
-        chi-squared values of the test
-    p_values : NDArray[np.float64]
-        p-values of the test
-    """
-
-    score: NDArray[np.float64]
-    p_value: NDArray[np.float64]
-
-
-def digitize_factor_bins(continuous_values: np.ndarray, bins: int, factor_name: str):
+def digitize_factor_bins(continuous_values: NDArray, bins: int, factor_name: str) -> NDArray:
     """
     Digitizes a list of values into a given number of bins.
 
     Parameters
     ----------
-    continuous_values: np.ndarray
+    continuous_values: NDArray
         The values to be digitized.
     bins: int
         The number of bins for the discrete values that continuous_values will be digitized into.
@@ -51,7 +42,7 @@ def digitize_factor_bins(continuous_values: np.ndarray, bins: int, factor_name: 
 
     Returns
     -------
-    np.ndarray
+    NDArray
         The digitized values
 
     """
@@ -69,14 +60,14 @@ def digitize_factor_bins(continuous_values: np.ndarray, bins: int, factor_name: 
 
 
 def format_discretize_factors(
-    data_factors: dict[str, np.ndarray], continuous_factor_bincounts: Dict[str, int]
-) -> Tuple[dict, np.ndarray]:
+    data_factors: Dict[str, NDArray], continuous_factor_bincounts: Dict[str, int]
+) -> Tuple[Dict[str, NDArray], NDArray]:
     """
     Sets up the internal list of metadata factors.
 
     Parameters
     ----------
-    data_factors: Dict[str, np.ndarray]
+    data_factors: Dict[str, NDArray]
         The dataset factors, which are per-image attributes including class label and metadata.
         Each key of dataset_factors is a factor, whose value is the per-image factor values.
     continuous_factor_bincounts : Dict[str, int]
@@ -87,11 +78,10 @@ def format_discretize_factors(
 
     Returns
     -------
-    Dict[str, np.ndarray]
-        Intrinsic per-image metadata information with the formatting that input data_factors uses.
-        Each key is a metadata factor, whose value is the discrete per-image factor values.
-    np.ndarray
-        Per-image labels, whose ith element is the label for the ith element of the dataset.
+    Tuple[Dict[str, NDArray], NDArray]
+        - Intrinsic per-image metadata information with the formatting that input data_factors uses.
+          Each key is a metadata factor, whose value is the discrete per-image factor values.
+        - Per-image labels, whose ith element is the label for the ith element of the dataset.
     """
     invalid_keys = set(continuous_factor_bincounts.keys()) - set(data_factors.keys())
     if invalid_keys:
@@ -123,7 +113,7 @@ def format_discretize_factors(
     return metadata_factors, labels
 
 
-def normalize_expected_dist(expected_dist: np.ndarray, observed_dist: np.ndarray) -> np.ndarray:
+def normalize_expected_dist(expected_dist: NDArray, observed_dist: NDArray) -> NDArray:
     exp_sum = np.sum(expected_dist)
     obs_sum = np.sum(observed_dist)
 
@@ -141,14 +131,14 @@ def normalize_expected_dist(expected_dist: np.ndarray, observed_dist: np.ndarray
     return expected_dist
 
 
-def validate_dist(label_dist: np.ndarray, label_name: str):
+def validate_dist(label_dist: NDArray, label_name: str):
     """
     Verifies that the given label distribution has labels and checks if
     any labels have frequencies less than 5.
 
     Parameters
     ----------
-    label_dist : np.ndarray
+    label_dist : NDArray
         Array representing label distributions
 
     Raises
@@ -168,11 +158,12 @@ def validate_dist(label_dist: np.ndarray, label_name: str):
         )
 
 
+@set_metadata("dataeval.metrics")
 def parity(
     expected_labels: ArrayLike,
     observed_labels: ArrayLike,
     num_classes: Optional[int] = None,
-) -> ParityOutput:
+) -> ParityOutput[np.float64]:
     """
     Perform a one-way chi-squared test between observation frequencies and expected frequencies that
     tests the null hypothesis that the observed data has the expected frequencies.
@@ -231,10 +222,11 @@ def parity(
     return ParityOutput(cs, p)
 
 
+@set_metadata("dataeval.metrics")
 def parity_metadata(
     data_factors: Mapping[str, ArrayLike],
     continuous_factor_bincounts: Optional[Dict[str, int]] = None,
-) -> ParityMetadataOutput:
+) -> ParityOutput[NDArray[np.float64]]:
     """
     Evaluates the statistical independence of metadata factors from class labels.
     This performs a chi-square test, which provides a score and a p-value for
@@ -301,4 +293,4 @@ def parity_metadata(
         chi_scores[i] = chi2
         p_values[i] = p
 
-    return ParityMetadataOutput(chi_scores, p_values)
+    return ParityOutput(chi_scores, p_values)

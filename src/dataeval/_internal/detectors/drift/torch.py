@@ -12,6 +12,7 @@ from typing import Callable, Optional, Type, Union
 import numpy as np
 import torch
 import torch.nn as nn
+from numpy.typing import NDArray
 
 
 def get_device(device: Optional[Union[str, torch.device]] = None) -> torch.device:
@@ -74,13 +75,13 @@ def mmd2_from_kernel_matrix(
 
 
 def predict_batch(
-    x: Union[np.ndarray, torch.Tensor],
+    x: Union[NDArray, torch.Tensor],
     model: Union[Callable, nn.Module, nn.Sequential],
     device: Optional[torch.device] = None,
     batch_size: int = int(1e10),
     preprocess_fn: Optional[Callable] = None,
     dtype: Union[Type[np.generic], torch.dtype] = np.float32,
-) -> Union[np.ndarray, torch.Tensor, tuple]:
+) -> Union[NDArray, torch.Tensor, tuple]:
     """
     Make batch predictions on a model.
 
@@ -138,7 +139,7 @@ def predict_batch(
             else:
                 raise TypeError(
                     f"Model output type {type(preds_tmp)} not supported. The model \
-                    output type needs to be one of list, tuple, np.ndarray or \
+                    output type needs to be one of list, tuple, NDArray or \
                     torch.Tensor."
                 )
     concat = partial(np.concatenate, axis=0) if return_np else partial(torch.cat, dim=0)
@@ -149,13 +150,13 @@ def predict_batch(
 
 
 def preprocess_drift(
-    x: np.ndarray,
+    x: NDArray,
     model: nn.Module,
     device: Optional[torch.device] = None,
     preprocess_batch_fn: Optional[Callable] = None,
     batch_size: int = int(1e10),
     dtype: Union[Type[np.generic], torch.dtype] = np.float32,
-) -> Union[np.ndarray, torch.Tensor, tuple]:
+) -> Union[NDArray, torch.Tensor, tuple]:
     """
     Prediction function used for preprocessing step of drift detector.
 

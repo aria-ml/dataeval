@@ -77,11 +77,12 @@ def test_llr(llr_params):
 
     scores = od._threshold_score(ood_type)
     if ood_type == "instance":
-        assert od_preds["is_ood"].shape == (X_test.shape[0],)
-        assert od_preds["is_ood"].sum() == (od_preds["instance_score"] > scores).astype(int).sum()
+        assert od_preds.is_ood.shape == (X_test.shape[0],)
+        assert od_preds.is_ood.sum() == (od_preds.instance_score > scores).sum()
     elif ood_type == "feature":
-        assert od_preds["is_ood"].shape == (X_test.shape[0], X_test.shape[1] - 1)
-        assert od_preds["is_ood"].sum() == (od_preds["feature_score"] > scores).astype(int).sum()
+        assert od_preds.is_ood.shape == (X_test.shape[0], X_test.shape[1] - 1)
+        assert od_preds.feature_score is not None
+        assert od_preds.feature_score.shape == (X_test.shape[0], X_test.shape[1] - 1)
+        assert od_preds.is_ood.sum() == (od_preds.feature_score > scores).sum()
 
-    assert od_preds["feature_score"].shape == (X_test.shape[0], X_test.shape[1] - 1)
-    assert od_preds["instance_score"].shape == (X_test.shape[0],)
+    assert od_preds.instance_score.shape == (X_test.shape[0],)

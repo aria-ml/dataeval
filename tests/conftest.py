@@ -2,6 +2,7 @@ from typing import Literal, Optional, Tuple
 
 import numpy as np
 import pytest
+from numpy.typing import NDArray
 
 from tests.utils.datasets import download_mnist
 
@@ -14,7 +15,7 @@ def mnist():
         dtype: Optional[type] = None,
         add_channels: Literal["channels_first", "channels_last", "none"] = "none",
         unit_normalize: bool = False,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> Tuple[NDArray, NDArray]:
         path = download_mnist()
         with np.load(path, allow_pickle=True) as fp:
             images, labels = fp["x_" + category][:size], fp["y_" + category][:size]

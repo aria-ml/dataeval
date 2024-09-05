@@ -14,7 +14,7 @@ import numpy as np
 import tensorflow as tf
 from keras.layers import Input
 from keras.models import Model
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 
 from dataeval._internal.detectors.ood.base import OODBase, OODScore
 from dataeval._internal.interop import to_numpy
@@ -52,7 +52,7 @@ def build_model(
 
 
 def mutate_categorical(
-    X: np.ndarray,
+    X: NDArray,
     rate: float,
     seed: int = 0,
     feature_range: tuple = (0, 255),
@@ -221,10 +221,10 @@ class OOD_LLR(OODBase):
     def _logp(
         self,
         dist,
-        X: np.ndarray,
+        X: NDArray,
         return_per_feature: bool = False,
         batch_size: int = int(1e10),
-    ) -> np.ndarray:
+    ) -> NDArray:
         """
         Compute log probability of a batch of instances under the generative model.
         """
@@ -235,10 +235,10 @@ class OOD_LLR(OODBase):
     def _logp_alt(
         self,
         model: keras.Model,
-        X: np.ndarray,
+        X: NDArray,
         return_per_feature: bool = False,
         batch_size: int = int(1e10),
-    ) -> np.ndarray:
+    ) -> NDArray:
         """
         Compute log probability of a batch of instances with the user defined log_prob function.
         """
@@ -254,7 +254,7 @@ class OOD_LLR(OODBase):
             axis = tuple(np.arange(len(logp.shape))[1:])
             return np.mean(logp, axis=axis)
 
-    def _llr(self, X: np.ndarray, return_per_feature: bool, batch_size: int = int(1e10)) -> np.ndarray:
+    def _llr(self, X: NDArray, return_per_feature: bool, batch_size: int = int(1e10)) -> NDArray:
         """
         Compute likelihood ratios.
 

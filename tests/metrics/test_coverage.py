@@ -45,13 +45,13 @@ class TestCoverageFunctional:
     def test_naive_answer(self):
         embs = np.zeros((100, 2))
         embs = np.concatenate((embs, np.ones((1, 2))))
-        pvals, dists, _ = coverage(embs, "naive", k=20)
-        assert pvals[0] == 100
-        assert dists[100] == pytest.approx(1.41421356)
+        result = coverage(embs, "naive", k=20)
+        assert result.indices[0] == 100
+        assert result.radii[100] == pytest.approx(1.41421356)
 
     def test_adaptive_answer(self):
         embs = np.zeros((100, 2))
         embs = np.concatenate((embs, np.ones((1, 2))))
-        pvals, dists, _ = coverage(embs, "adaptive", k=20)
-        assert pvals[0] == 100
-        assert dists[100] == pytest.approx(1.41421356)
+        result = coverage(embs, "adaptive", k=20)
+        assert result.indices[0] == 100
+        assert result.radii[100] == pytest.approx(1.41421356)
