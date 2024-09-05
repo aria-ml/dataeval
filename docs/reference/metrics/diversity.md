@@ -11,16 +11,14 @@ import numpy as np
 from dataeval.metrics import diversity, diversity_classwise
 np.random.seed(7)
 vals = ["a", "b"]
-corr_val = 0.75
-num_samples = 20
-class_labels = [np.random.randint(low=0, high=2) for _ in range(num_samples)]
+class_labels = [np.random.randint(low=0, high=2) for _ in range(20)]
 metadata = [
     {
         "var_cat": vals[np.random.randint(low=0, high=len(vals))],
         "var_cnt": np.random.randn(),
         "var_float_cat": np.random.randint(low=0, high=len(vals)) + 0.1,
     }
-    for idx in range(num_samples)
+    for idx in range(20)
 ]
 ```
 

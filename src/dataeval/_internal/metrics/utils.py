@@ -26,11 +26,7 @@ def get_method(method_map: Dict[str, Callable], method: str) -> Callable:
 
 
 def get_counts(
-<<<<<<< HEAD
     data: NDArray, names: List[str], is_categorical: List[bool], subset_mask: Optional[NDArray[np.bool_]] = None
-=======
-    data: NDArray, names: List[str], is_categorical: List[bool], subset_mask: Optional[NDArray] = None
->>>>>>> 9da9078 (add fixtures to test_balance, update NDArray typing in utils)
 ) -> tuple[Dict, Dict]:
     """
     Initialize dictionary of histogram counts --- treat categorical values
@@ -38,11 +34,7 @@ def get_counts(
 
     Parameters
     ----------
-<<<<<<< HEAD
     subset_mask: Optional[NDArray[np.bool_]]
-=======
-    subset_mask: Optional[NDArray[bool]]
->>>>>>> 9da9078 (add fixtures to test_balance, update NDArray typing in utils)
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
     Returns
