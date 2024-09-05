@@ -153,7 +153,7 @@ def diversity(
     -------
     Compute Simpson diversity index of metadata and class labels
     >>> diversity(class_labels, metadata, method="simpson").diversity_index
-    jflkdsjflkdsjflkds
+    array([0.99999856, 0.07559599, 0.        , 0.00732561])
 
     Compute Shannon diversity index of metadata and class labels
     >>> diversity(class_labels, metadata, method="shannon").diversity_index
