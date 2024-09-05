@@ -126,7 +126,7 @@ class TestMMDDrift:
         )
         x = x_ref.copy()
         preds = cd.predict(x)
-        assert preds["is_drift"] == 0 and preds["p_val"] >= cd.p_val
+        assert not preds.is_drift and preds.p_val >= cd.p_val
         if isinstance(update_x_ref, dict):
             k = list(update_x_ref.keys())[0]
             assert cd.n == len(x) + len(x_ref)
@@ -134,12 +134,12 @@ class TestMMDDrift:
 
         x_h1 = np.random.randn(n * n_features).reshape(n, n_features).astype(np.float32)
         preds = cd.predict(x_h1)
-        if preds["is_drift"] == 1:
-            assert preds["p_val"] < preds["threshold"] == cd.p_val
-            assert preds["distance"] > preds["distance_threshold"]
+        if preds.is_drift:
+            assert preds.p_val < preds.threshold == cd.p_val
+            assert preds.distance > preds.distance_threshold
         else:
-            assert preds["p_val"] >= preds["threshold"] == cd.p_val
-            assert preds["distance"] <= preds["distance_threshold"]
+            assert preds.p_val >= preds.threshold == cd.p_val
+            assert preds.distance <= preds.distance_threshold
 
 
 def test_mmd_init_preprocess_fn_valueerror():

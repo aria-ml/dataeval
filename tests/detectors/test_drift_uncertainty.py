@@ -99,14 +99,14 @@ class TestFunctionalClassifierUncertainty:
 
         preds_0 = cd.predict(x_test0)
         assert cd._detector.n == len(x_test0) + len(x_ref)
-        assert preds_0["is_drift"] == 0
-        assert preds_0["distance"] >= 0
+        assert not preds_0.is_drift
+        assert preds_0.distances >= 0
 
         preds_1 = cd.predict(x_test1)
         assert cd._detector.n == len(x_test1) + len(x_test0) + len(x_ref)
-        assert preds_1["is_drift"] == 1
-        assert preds_1["distance"] >= 0
-        assert preds_0["distance"] < preds_1["distance"]
+        assert preds_1.is_drift
+        assert preds_1.distances >= 0
+        assert preds_0.distances < preds_1.distances
 
 
 class TestClassifierUncertainty:

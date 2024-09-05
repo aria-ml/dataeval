@@ -1,16 +1,31 @@
-from typing import Iterable, Literal, Optional
+from dataclasses import dataclass
+from typing import Dict, Iterable, Literal, Optional
 
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 
 from dataeval._internal.flags import verify_supported
+from dataeval._internal.output import OutputMetadata, set_metadata
 from dataeval.flags import ImageStat
 from dataeval.metrics import imagestats
 
 
+@dataclass(frozen=True)
+class LinterOutput(OutputMetadata):
+    """
+    Attributes
+    ----------
+    issues : Dict[int, Dict[str, float]]
+        Dictionary containing the indices of outliers and a dictionary showing
+        the issues and calculated values for the given index.
+    """
+
+    issues: Dict[int, Dict[str, float]]
+
+
 def _get_outlier_mask(
-    values: np.ndarray, method: Literal["zscore", "modzscore", "iqr"], threshold: Optional[float]
-) -> np.ndarray:
+    values: NDArray, method: Literal["zscore", "modzscore", "iqr"], threshold: Optional[float]
+) -> NDArray:
     if method == "zscore":
         threshold = threshold if threshold else 3.0
         std = np.std(values)
@@ -107,8 +122,8 @@ class Linter:
 
     def _get_outliers(self) -> dict:
         flagged_images = {}
-
-        for stat, values in self.stats.items():
+        stats_dict = self.stats.dict()
+        for stat, values in stats_dict.items():
             if not isinstance(values, np.ndarray):
                 continue
 
@@ -120,7 +135,8 @@ class Linter:
 
         return dict(sorted(flagged_images.items()))
 
-    def evaluate(self, images: Iterable[ArrayLike]) -> dict:
+    @set_metadata("dataeval.detectors", ["flags", "outlier_method", "outlier_threshold"])
+    def evaluate(self, images: Iterable[ArrayLike]) -> LinterOutput:
         """
         Returns indices of outliers with the issues identified for each
 
@@ -132,8 +148,8 @@ class Linter:
 
         Returns
         -------
-        Dict[int, Dict[str, float]]
-            Dictionary containing the indices of outliers and a dictionary showing
+        LinterOutput
+            Output class containing the indices of outliers and a dictionary showing
             the issues and calculated values for the given index.
 
         Example
@@ -141,7 +157,7 @@ class Linter:
         Evaluate the dataset:
 
         >>> lint.evaluate(images)
-        {18: {'brightness': 0.78}, 25: {'brightness': 0.98}}
+        LinterOutput(issues={18: {'brightness': 0.78}, 25: {'brightness': 0.98}})
         """
         self.stats = imagestats(images, self.flags)
-        return self._get_outliers()
+        return LinterOutput(self._get_outliers())

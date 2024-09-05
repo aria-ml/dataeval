@@ -21,6 +21,7 @@ from keras.layers import (
     InputLayer,
     Reshape,
 )
+from numpy.typing import NDArray
 from tensorflow._api.v2.nn import relu, softmax, tanh
 
 from dataeval._internal.models.tensorflow.autoencoder import AE, AEGMM, VAE, VAEGMM
@@ -28,12 +29,12 @@ from dataeval._internal.models.tensorflow.pixelcnn import PixelCNN
 
 
 def predict_batch(
-    x: Union[list, np.ndarray, tf.Tensor],
+    x: Union[list, NDArray, tf.Tensor],
     model: Union[Callable, keras.Model],
     batch_size: int = int(1e10),
     preprocess_fn: Optional[Callable] = None,
     dtype: Union[Type[np.generic], tf.DType] = np.float32,
-) -> Union[np.ndarray, tf.Tensor, tuple, list]:
+) -> Union[NDArray, tf.Tensor, tuple, list]:
     """
     Make batch predictions on a model.
 
@@ -80,7 +81,7 @@ def predict_batch(
         else:
             raise TypeError(
                 f"Model output type {type(preds_tmp)} not supported. The model output "
-                f"type needs to be one of list, tuple, np.ndarray or tf.Tensor."
+                f"type needs to be one of list, tuple, NDArray or tf.Tensor."
             )
     concat = np.concatenate if return_np else tf.concat
     out = cast(

@@ -1,27 +1,50 @@
+from dataclasses import dataclass
 from typing import Dict, Iterable, List, NamedTuple, Tuple, Union, cast
 
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 from scipy.cluster.hierarchy import linkage
 from scipy.spatial.distance import pdist, squareform
 
 from dataeval._internal.interop import to_numpy
 from dataeval._internal.metrics.utils import flatten
+from dataeval._internal.output import OutputMetadata, set_metadata
 
 
-def extend_linkage(link_arr: np.ndarray) -> np.ndarray:
+@dataclass(frozen=True)
+class ClustererOutput(OutputMetadata):
+    """
+    Attributes
+    ----------
+    outliers : List[int]
+        Indices that do not fall within a cluster
+    potential_outliers : List[int]
+        Indices which are near the border between belonging in the cluster and being an outlier
+    duplicates : List[List[int]]
+        Groups of indices that are exact duplicates
+    potential_duplicates : List[List[int]]
+        Groups of indices which are not exact but closely related data points
+    """
+
+    outliers: List[int]
+    potential_outliers: List[int]
+    duplicates: List[List[int]]
+    potential_duplicates: List[List[int]]
+
+
+def extend_linkage(link_arr: NDArray) -> NDArray:
     """
     Adds a column to the linkage matrix link_arr that tracks the new id assigned
     to each row
 
     Parameters
     ----------
-    link_arr : np.ndarray
+    link_arr : NDArray
         linkage matrix
 
     Returns
     -------
-    np.ndarray
+    NDArray
         linkage matrix with adjusted shape, new shape (link_arr.shape[0], link_arr.shape[1]+1)
     """
     # Adjusting linkage matrix to accommodate renumbering
@@ -36,7 +59,7 @@ def extend_linkage(link_arr: np.ndarray) -> np.ndarray:
 class Cluster:
     __slots__ = "merged", "samples", "sample_dist", "is_copy", "count", "dist_avg", "dist_std", "out1", "out2"
 
-    def __init__(self, merged: int, samples: np.ndarray, sample_dist: Union[float, np.ndarray], is_copy: bool = False):
+    def __init__(self, merged: int, samples: NDArray, sample_dist: Union[float, NDArray], is_copy: bool = False):
         self.merged = merged
         self.samples = np.array(samples, dtype=np.int32)
         self.sample_dist = np.array([sample_dist] if np.isscalar(sample_dist) else sample_dist)
@@ -131,13 +154,13 @@ class Clusterer:
         self._on_init(dataset)
 
     def _on_init(self, dataset: ArrayLike):
-        self._data: np.ndarray = flatten(to_numpy(dataset))
+        self._data: NDArray = flatten(to_numpy(dataset))
         self._validate_data(self._data)
         self._num_samples = len(self._data)
 
-        self._darr: np.ndarray = pdist(self._data, metric="euclidean")
-        self._sqdmat: np.ndarray = squareform(self._darr)
-        self._larr: np.ndarray = extend_linkage(linkage(self._darr))
+        self._darr: NDArray = pdist(self._data, metric="euclidean")
+        self._sqdmat: NDArray = squareform(self._darr)
+        self._larr: NDArray = extend_linkage(linkage(self._darr))
         self._max_clusters: int = np.count_nonzero(self._larr[:, 3] == 2)
 
         min_num = int(self._num_samples * 0.05)
@@ -147,7 +170,7 @@ class Clusterer:
         self._last_good_merge_levels = None
 
     @property
-    def data(self) -> np.ndarray:
+    def data(self) -> NDArray:
         return self._data
 
     @data.setter
@@ -167,10 +190,10 @@ class Clusterer:
         return self._last_good_merge_levels
 
     @classmethod
-    def _validate_data(cls, x: np.ndarray):
+    def _validate_data(cls, x: NDArray):
         """Checks that the data has the correct size, shape, and format"""
         if not isinstance(x, np.ndarray):
-            raise TypeError(f"Data should be of type np.ndarray; got {type(x)}")
+            raise TypeError(f"Data should be of type NDArray; got {type(x)}")
 
         if x.ndim != 2:
             raise ValueError(
@@ -241,7 +264,7 @@ class Clusterer:
                 clusters[level_id].setdefault(cid, cluster)
         return clusters
 
-    def _get_cluster_distances(self) -> np.ndarray:
+    def _get_cluster_distances(self) -> NDArray:
         """Calculates the minimum distances between clusters are each level"""
         # Cluster distance matrix
         max_level = self.clusters.max_level
@@ -262,7 +285,7 @@ class Clusterer:
 
         return cluster_matrix
 
-    def _calc_merge_indices(self, merge_mean: List[np.ndarray], intra_max: List[float]) -> np.ndarray:
+    def _calc_merge_indices(self, merge_mean: List[NDArray], intra_max: List[float]) -> NDArray:
         """
         Determine what clusters should be merged and return their indices
         """
@@ -285,7 +308,7 @@ class Clusterer:
         mask2 = mask2_vals < one_std_check
         return np.logical_or(desired_merge, mask2)
 
-    def _generate_merge_list(self, cluster_matrix: np.ndarray) -> List[ClusterMergeEntry]:
+    def _generate_merge_list(self, cluster_matrix: NDArray) -> List[ClusterMergeEntry]:
         """
         Runs through the clusters dictionary determining when clusters merge,
         and how close are those clusters when they merge.
@@ -465,35 +488,23 @@ class Clusterer:
 
         return exact_dupes, near_dupes
 
-    def evaluate(self):
+    # TODO: Move data input to evaluate from class
+    @set_metadata("dataeval.detectors", ["data"])
+    def evaluate(self) -> ClustererOutput:
         """Finds and flags indices of the data for outliers and duplicates
 
         Returns
         -------
-        Dict[str, List[int]]
-            outliers :
-                List of indices that do not fall within a cluster
-            potential_outliers :
-                List of indices which are near the border between belonging in the cluster and being an outlier
-            duplicates :
-                List of groups of indices that are exact duplicates
-            potential_duplicates :
-                List of groups of indices which are not exact but closely related data points
+        ClustererOutput
+            The outliers and duplicate indices found in the data
 
         Example
         -------
         >>> cluster.evaluate()
-        {'outliers': [18, 21, 34, 35, 45], 'potential_outliers': [13, 15, 42], 'duplicates': [[9, 24], [23, 48]], 'potential_duplicates': [[1, 11]]}
+        ClustererOutput(outliers=[18, 21, 34, 35, 45], potential_outliers=[13, 15, 42], duplicates=[[9, 24], [23, 48]], potential_duplicates=[[1, 11]])
         """  # noqa: E501
 
         outliers, potential_outliers = self.find_outliers(self.last_good_merge_levels)
         duplicates, potential_duplicates = self.find_duplicates(self.last_good_merge_levels)
 
-        ret = {
-            "outliers": outliers,
-            "potential_outliers": potential_outliers,
-            "duplicates": duplicates,
-            "potential_duplicates": potential_duplicates,
-        }
-
-        return ret
+        return ClustererOutput(outliers, potential_outliers, duplicates, potential_duplicates)

@@ -9,22 +9,22 @@ Licensed under Apache Software License (Apache 2.0)
 from typing import Callable, Literal, Optional, Tuple
 
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 from scipy.stats import ks_2samp
 
 from dataeval._internal.interop import to_numpy
 
-from .base import BaseUnivariateDrift, UpdateStrategy, preprocess_x
+from .base import BaseDriftUnivariate, UpdateStrategy, preprocess_x
 
 
-class DriftKS(BaseUnivariateDrift):
+class DriftKS(BaseDriftUnivariate):
     """
     Kolmogorov-Smirnov (K-S) data drift detector with Bonferroni or False Discovery
     Rate (FDR) correction for multivariate data.
 
     Parameters
     ----------
-    x_ref : np.ndarray
+    x_ref : NDArray
         Data used as reference distribution.
     p_val : float, default 0.05
         p-value used for significance of the statistical test for each feature.
@@ -41,7 +41,7 @@ class DriftKS(BaseUnivariateDrift):
         :py:class:`dataeval.detectors.LastSeenUpdateStrategy`
         or via reservoir sampling with
         :py:class:`dataeval.detectors.ReservoirSamplingUpdateStrategy`.
-    preprocess_fn : Optional[Callable[[np.ndarray], np.ndarray]], default None
+    preprocess_fn : Optional[Callable[[NDArray], NDArray]], default None
         Function to preprocess the data before computing the data drift metrics.
         Typically a dimensionality reduction technique.
     correction : Literal["bonferroni", "fdr"], default "bonferroni"
@@ -81,7 +81,7 @@ class DriftKS(BaseUnivariateDrift):
         self.alternative = alternative
 
     @preprocess_x
-    def score(self, x: ArrayLike) -> Tuple[np.ndarray, np.ndarray]:
+    def score(self, x: ArrayLike) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
         """
         Compute K-S scores and statistics per feature.
 

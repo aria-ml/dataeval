@@ -1,5 +1,6 @@
 import math
-from typing import Literal, NamedTuple
+from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -7,15 +8,17 @@ from scipy.spatial.distance import pdist, squareform
 
 from dataeval._internal.interop import to_numpy
 from dataeval._internal.metrics.utils import flatten
+from dataeval._internal.output import OutputMetadata, set_metadata
 
 
-class CoverageOutput(NamedTuple):
+@dataclass(frozen=True)
+class CoverageOutput(OutputMetadata):
     """
     Attributes
     ----------
-    indices : np.ndarray
+    indices : NDArray
         Array of uncovered indices
-    radii : np.ndarray
+    radii : NDArray
         Array of critical value radii
     critical_value : float
         Radius for coverage
@@ -26,6 +29,7 @@ class CoverageOutput(NamedTuple):
     critical_value: float
 
 
+@set_metadata("dataeval.metrics")
 def coverage(
     embeddings: ArrayLike,
     radius_type: Literal["adaptive", "naive"] = "adaptive",

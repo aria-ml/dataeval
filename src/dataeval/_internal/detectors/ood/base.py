@@ -7,16 +7,36 @@ Licensed under Apache Software License (Apache 2.0)
 """
 
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, List, Literal, NamedTuple, Optional, Tuple, cast
+from dataclasses import dataclass
+from typing import Callable, List, Literal, NamedTuple, Optional, Tuple, cast
 
 import keras
 import numpy as np
 import tensorflow as tf
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 
 from dataeval._internal.interop import to_numpy
 from dataeval._internal.models.tensorflow.gmm import GaussianMixtureModelParams, gmm_params
 from dataeval._internal.models.tensorflow.trainer import trainer
+from dataeval._internal.output import OutputMetadata, set_metadata
+
+
+@dataclass(frozen=True)
+class OODOutput(OutputMetadata):
+    """
+    Attributes
+    ----------
+    is_ood : NDArray[np.bool_]
+        Array of images that are detected as out of distribution
+    instance_score : NDArray[np.float32]
+        Instance score of the evaluated dataset
+    feature_score : Optional[NDArray[np.float32]]
+        Feature score, if available, of the evaluated dataset
+    """
+
+    is_ood: NDArray[np.bool_]
+    instance_score: NDArray[np.float32]
+    feature_score: Optional[NDArray[np.float32]]
 
 
 class OODScore(NamedTuple):
@@ -25,16 +45,16 @@ class OODScore(NamedTuple):
 
     Parameters
     ----------
-    instance_score : np.ndarray
+    instance_score : NDArray[np.float32]
         Instance score of the evaluated dataset.
-    feature_score : Optional[np.ndarray], default None
+    feature_score : Optional[NDArray[np.float32]], default None
         Feature score, if available, of the evaluated dataset.
     """
 
-    instance_score: np.ndarray
-    feature_score: Optional[np.ndarray] = None
+    instance_score: NDArray[np.float32]
+    feature_score: Optional[NDArray[np.float32]] = None
 
-    def get(self, ood_type: Literal["instance", "feature"]) -> np.ndarray:
+    def get(self, ood_type: Literal["instance", "feature"]) -> NDArray:
         return self.instance_score if ood_type == "instance" or self.feature_score is None else self.feature_score
 
 
@@ -49,18 +69,18 @@ class OODBase(ABC):
         if not isinstance(model, keras.Model):
             raise TypeError("Model should be of type 'keras.Model'.")
 
-    def _get_data_info(self, X: np.ndarray) -> Tuple[tuple, type]:
+    def _get_data_info(self, X: NDArray) -> Tuple[tuple, type]:
         if not isinstance(X, np.ndarray):
-            raise TypeError("Dataset should of type: `np.ndarray`.")
+            raise TypeError("Dataset should of type: `NDArray`.")
         return X.shape[1:], X.dtype.type
 
-    def _validate(self, X: np.ndarray) -> None:
+    def _validate(self, X: NDArray) -> None:
         check_data_info = self._get_data_info(X)
         if self._data_info is not None and check_data_info != self._data_info:
             raise RuntimeError(f"Expect data of type: {self._data_info[1]} and shape: {self._data_info[0]}. \
                                Provided data is type: {check_data_info[1]} and shape: {check_data_info[0]}.")
 
-    def _validate_state(self, X: np.ndarray, additional_attrs: Optional[List[str]] = None) -> None:
+    def _validate_state(self, X: NDArray, additional_attrs: Optional[List[str]] = None) -> None:
         attrs = ["_data_info", "_threshold_perc", "_ref_score"]
         attrs = attrs if additional_attrs is None else attrs + additional_attrs
         if not all(hasattr(self, attr) for attr in attrs) or any(getattr(self, attr) for attr in attrs) is None:
@@ -132,12 +152,13 @@ class OODBase(ABC):
         self._ref_score = self.score(x_ref, batch_size)
         self._threshold_perc = threshold_perc
 
+    @set_metadata("dataeval.detectors")
     def predict(
         self,
         X: ArrayLike,
         batch_size: int = int(1e10),
         ood_type: Literal["feature", "instance"] = "instance",
-    ) -> Dict[str, np.ndarray]:
+    ) -> OODOutput:
         """
         Predict whether instances are out-of-distribution or not.
 
@@ -157,8 +178,8 @@ class OODBase(ABC):
         self._validate_state(X := to_numpy(X))
         # compute outlier scores
         score = self.score(X, batch_size=batch_size)
-        ood_pred = (score.get(ood_type) > self._threshold_score(ood_type)).astype(int)
-        return {**{"is_ood": ood_pred}, **score._asdict()}
+        ood_pred = score.get(ood_type) > self._threshold_score(ood_type)
+        return OODOutput(is_ood=ood_pred, **score._asdict())
 
 
 class OODGMMBase(OODBase):
@@ -166,7 +187,7 @@ class OODGMMBase(OODBase):
         super().__init__(model)
         self.gmm_params: GaussianMixtureModelParams
 
-    def _validate_state(self, X: np.ndarray, additional_attrs: Optional[List[str]] = None) -> None:
+    def _validate_state(self, X: NDArray, additional_attrs: Optional[List[str]] = None) -> None:
         if additional_attrs is None:
             additional_attrs = ["gmm_params"]
         super()._validate_state(X, additional_attrs)

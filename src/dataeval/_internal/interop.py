@@ -2,7 +2,7 @@ from importlib import import_module
 from typing import Iterable, Optional
 
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 
 module_cache = {}
 
@@ -20,7 +20,7 @@ def try_import(module_name):
     return module
 
 
-def to_numpy(array: Optional[ArrayLike]) -> np.ndarray:
+def to_numpy(array: Optional[ArrayLike]) -> NDArray:
     if array is None:
         return np.ndarray([])
 
