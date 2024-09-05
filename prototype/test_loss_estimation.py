@@ -1,5 +1,5 @@
 import pytest
-from loss_estimation import LossEstimator
+from loss_estimation import LossEstimator, outputs_to_nannyml
 import os
 import random
 from typing import Dict, cast
@@ -13,10 +13,12 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torchvision.datasets as datasets
 import torchvision.transforms.v2 as v2
+import torchmetrics
 from torch.utils.data import DataLoader, Dataset, Subset
 import nannyml as nml
 from IPython.display import display
 from PIL import Image
+
 
 def custom_train_class(model: nn.Module, dataset: Dataset, device, epochs=10):
     # Defined only for this testing scenario
@@ -67,6 +69,66 @@ def custom_train_regress(model: nn.Module, dataset: Dataset, device, epochs=10):
             loss.backward()
             # Update weights/parameters
             optimizer.step()
+
+def custom_eval(model: nn.Module, dataset: Dataset, class_names, has_labels: bool = False, device="cuda" if torch.cuda.is_available() else "cpu") -> Dict[str, list]:
+        outputs = []
+        labels = []
+
+        # Set model layers into evaluation mode
+        model.eval()
+        dataloader = DataLoader(dataset, batch_size=16)
+        # Tell PyTorch to not track gradients, greatly speeds up processing
+        with torch.no_grad():
+            for batch in dataloader:
+                # Load data/images to device
+                X = torch.Tensor(batch[0]).to(device)
+                # Load targets/labels to device
+                
+                output = model(X).cpu()
+                outputs.append(output)
+                if has_labels:
+                    labels.append(batch[1])
+                
+
+        return outputs, labels
+
+def get_accuracy(model: nn.Module, dataset: Dataset, class_names, device="cuda" if torch.cuda.is_available() else "cpu") -> Dict[str, list]:
+    # metric = torchmetrics.Accuracy(task="multiclass", num_classes=10).to(device)
+    # result = 0
+    # batch_dicts = []
+    metric = torchmetrics.Accuracy(task="multiclass", num_classes=len(class_names)).to(device)
+
+    # dict_out = {"conf": np.zeros(0), "preds": np.zeros(0), "ground_truth": np.zeros(0)}
+    dict_out = {"y_pred": np.zeros(0, dtype=int), "y": np.zeros(0, dtype=int)}
+    for class_name in class_names:
+        dict_out[f"y_pred_proba_{class_name}"] = np.zeros(0)
+
+    # Set model layers into evaluation mode
+    model.eval()
+    dataloader = DataLoader(dataset, batch_size=16)
+    # Tell PyTorch to not track gradients, greatly speeds up processing
+    with torch.no_grad():
+        for batch in dataloader:
+            # Load data/images to device
+            X = torch.Tensor(batch[0]).to(device)
+            # Load targets/labels to device
+            y = torch.Tensor(batch[1]).int()
+            output = model(X).cpu()
+            processed_output = torch.max(output, dim=1)
+            confs = processed_output[0]
+            preds = np.int64(processed_output[1])
+
+            # batch_dict = {"conf": confs, "preds": preds, "ground_truth": y}
+            # dict_out["conf"] = np.concatenate((dict_out["conf"], confs))
+            dict_out["y_pred"] = np.concatenate((dict_out["y_pred"], preds), dtype=int)
+            dict_out["y"] = np.concatenate((dict_out["y"], y), dtype=int)
+            for i, class_name in enumerate(class_names):
+                key = f"y_pred_proba_{class_name}"
+                dict_out[key] = np.concatenate((dict_out[key], output[:, i]))
+
+            metric.update(output, y)
+        result = metric.compute().cpu()
+    return {"Accuracy": result}
 
 def reset_parameters(model: nn.Module):
     """
@@ -175,7 +237,9 @@ class TestLEUnit():
         model = cast(MockNet, model)
         le = LossEstimator()
 
-        ds_dict = le._eval_model(model, ds, ds.class_names, True)
+        #ds_dict = le._eval_model(model, ds, ds.class_names, True)
+        ds_outputs, ds_labels = custom_eval(model, ds, ds.class_names, True)
+        ds_dict = outputs_to_nannyml("classification", ds_outputs, ds.class_names, ds_labels)
         assert sorted(ds_dict["y"]) == sorted(ds.labels)
 
 class TestLEFunc_class():
@@ -205,7 +269,14 @@ class TestLEFunc_class():
         #for method in ("regression", "classification_multiclass"):
         method = "classification_multiclass"
         estimator = LossEstimator("CBPE", method)
-        results = estimator.evaluate(model, ds, ds_c, ds.class_names, 2)
+        #results = estimator.evaluate(model, ds, ds_c, ds.class_names, 2)
+        ds_c_outputs, _ = custom_eval(model, ds_c, ds_c.class_names, False)
+        ds_c_dict = outputs_to_nannyml("classification", ds_c_outputs, ds_c.class_names)
+
+        ds_outputs, ds_labels = custom_eval(model, ds, ds.class_names, True)
+        ds_dict = outputs_to_nannyml("classification", ds_outputs, ds.class_names, ds_labels)
+
+        results = estimator.evaluate(ds_dict, ds_c_dict, class_names, 2)
 
         ds_acc = results["Reference_Metric"]
         ds_c_acc = results["Op_Predicted_Metric"]
@@ -288,12 +359,70 @@ class TestLEFunc_class():
 
         method = "classification_multiclass"
         estimator = LossEstimator("CBPE", method)
-        results = estimator.evaluate(model, ds, ds_c, ds.class_names, 2)
+        #results = estimator.evaluate(model, ds, ds_c, ds.class_names, 2)
+        ds_c_outputs, _ = custom_eval(model, ds_c, ds_c.class_names, False)
+        ds_c_dict = outputs_to_nannyml("classification", ds_c_outputs, ds_c.class_names)
+
+        ds_outputs, ds_labels = custom_eval(model, ds, ds.class_names, True)
+        ds_dict = outputs_to_nannyml("classification", ds_outputs, ds.class_names, ds_labels)
+
+        results = estimator.evaluate(ds_dict, ds_c_dict, class_names, 2)
 
         ds_acc = results["Reference_Metric"]
         ds_c_acc = results["Op_Predicted_Metric"]
 
         assert ds_c_acc < 0.95*ds_acc
+    
+    def test_predicts_accuracy(self):
+        torch._dynamo.disable()
+        torch._dynamo.config.suppress_errors = True
+        np.random.seed(0)
+
+        ds = LargeMockDataset()
+        ds_c = LargeMockDataset()
+        
+        for i, img in enumerate(ds_c.images):
+            ds.images[i] = ds.images[i] + np.random.normal(size=ds.images[i].shape, scale=0.5)
+            ds_c.images[i] = ds_c.images[i] + np.random.normal(size=ds_c.images[i].shape, scale=2) + np.random.randn()
+
+        class_names = np.unique(ds.labels)
+
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model = torch.compile(MockNet().to(device))
+        model = cast(MockNet, model)
+        le = LossEstimator()
+
+        model = reset_parameters(model)
+        # Run the model with each substep of data
+        # train on subset of train data
+        train_kwargs = {}
+        eval_kwargs = {}
+        custom_train_class(
+            model,
+            ds,
+            device,
+            epochs=30
+        )
+
+        method = "classification_multiclass"
+        estimator = LossEstimator("CBPE", method)
+        #results = estimator.evaluate(model, ds, ds_c, ds.class_names, 2)
+        ds_c_outputs, _ = custom_eval(model, ds_c, ds_c.class_names, False)
+        ds_c_dict = outputs_to_nannyml("classification", ds_c_outputs, ds_c.class_names)
+
+        ds_outputs, ds_labels = custom_eval(model, ds, ds.class_names, True)
+        ds_dict = outputs_to_nannyml("classification", ds_outputs, ds.class_names, ds_labels)
+
+        results = estimator.evaluate(ds_dict, ds_c_dict, class_names, 2)
+
+        #ds_acc = results["Reference_Metric"]
+        pred_ds_c_acc = results["Op_Predicted_Metric"]
+        true_ds_c_acc = get_accuracy(model, ds_c, ds_c.class_names)["Accuracy"].float()
+
+        percent_diff = np.abs(pred_ds_c_acc - true_ds_c_acc)* 100
+        assert percent_diff < 30 # Should see if we can get this bound lower
+
+
     
     def test_regress_degrades_on_corrupted_dataset(self):
         torch._dynamo.disable()
