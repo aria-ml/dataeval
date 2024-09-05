@@ -22,6 +22,17 @@ from dataeval._internal.output import OutputMetadata, set_metadata
 
 @dataclass(frozen=True)
 class DriftOutput(OutputMetadata):
+    """
+    Output class for Drift
+
+    Attributes
+    ----------
+    is_drift : bool
+        Drift prediction for the images
+    threshold : float
+        Threshold after multivariate correction if needed
+    """
+
     is_drift: bool
     threshold: float
 
@@ -29,19 +40,21 @@ class DriftOutput(OutputMetadata):
 @dataclass(frozen=True)
 class DriftUnivariateOutput(DriftOutput):
     """
+    Output class for DriftCVM and DriftKS
+
     Attributes
     ----------
     is_drift : bool
         Drift prediction for the images
     threshold : float
         Threshold after multivariate correction if needed
-    feature_drift : NDArray[np.bool_]
+    feature_drift : NDArray
         Feature-level array of images detected to have drifted
     feature_threshold : float
         Feature-level threshold to determine drift
-    p_vals : NDArray[np.float32]
+    p_vals : NDArray
         Feature-level p-values
-    distances : NDArray[np.float32]
+    distances : NDArray
         Feature-level distances
     """
 
@@ -85,6 +98,15 @@ def preprocess_x(fn):
 
 
 class UpdateStrategy(ABC):
+    """
+    Updates reference dataset for drift detector
+
+    Parameters
+    ----------
+    n : int
+        Update with last n instances seen by the detector.
+    """
+
     def __init__(self, n: int):
         self.n = n
 
@@ -115,7 +137,7 @@ class ReservoirSamplingUpdate(UpdateStrategy):
     Parameters
     ----------
     n : int
-        Update with reservoir sampling of size n.
+        Update with last n instances seen by the detector.
     """
 
     def __call__(self, x_ref: NDArray, x: NDArray, count: int) -> NDArray:
@@ -140,7 +162,56 @@ class ReservoirSamplingUpdate(UpdateStrategy):
 
 
 class BaseDrift:
-    """Generic drift detector component handling preprocessing of data and correction"""
+    """
+    A generic drift detection component for preprocessing data and applying statistical correction.
+
+    This class handles common tasks related to drift detection, such as preprocessing
+    the reference data (`x_ref`), performing statistical correction (e.g., Bonferroni, FDR),
+    and updating the reference data if needed.
+
+    Parameters
+    ----------
+    x_ref : ArrayLike
+        The reference dataset used for drift detection. This is the baseline data against
+        which new data points will be compared.
+    p_val : float, optional
+        The significance level for detecting drift, by default 0.05.
+    x_ref_preprocessed : bool, optional
+        Flag indicating whether the reference data has already been preprocessed, by default False.
+    update_x_ref : UpdateStrategy, optional
+        A strategy object specifying how the reference data should be updated when drift is detected,
+        by default None.
+    preprocess_fn : Callable[[ArrayLike], ArrayLike], optional
+        A function to preprocess the data before drift detection, by default None.
+    correction : {'bonferroni', 'fdr'}, optional
+        Statistical correction method applied to p-values, by default "bonferroni".
+
+    Attributes
+    ----------
+    _x_ref : ArrayLike
+        The reference dataset that is either raw or preprocessed.
+    p_val : float
+        The significance level for drift detection.
+    update_x_ref : UpdateStrategy or None
+        The strategy for updating the reference data if applicable.
+    preprocess_fn : Callable or None
+        Function used for preprocessing input data before drift detection.
+    correction : str
+        Statistical correction method applied to p-values.
+    n : int
+        The number of samples in the reference dataset (`x_ref`).
+    x_ref_preprocessed : bool
+        A flag that indicates whether the reference dataset has been preprocessed.
+    _x_refcount : int
+        Counter for how many times the reference data has been accessed after preprocessing.
+
+    Methods
+    -------
+    x_ref:
+        Property that returns the reference dataset, and applies preprocessing if not already done.
+    _preprocess(x):
+        Preprocesses the given data using the specified `preprocess_fn` if provided.
+    """
 
     def __init__(
         self,
@@ -174,6 +245,14 @@ class BaseDrift:
 
     @property
     def x_ref(self) -> NDArray:
+        """
+        Retrieve the reference data, applying preprocessing if not already done.
+
+        Returns
+        -------
+        NDArray
+            The reference dataset (`x_ref`), preprocessed if needed.
+        """
         if not self.x_ref_preprocessed:
             self.x_ref_preprocessed = True
             if self.preprocess_fn is not None:
@@ -183,7 +262,19 @@ class BaseDrift:
         return self._x_ref
 
     def _preprocess(self, x: ArrayLike) -> ArrayLike:
-        """Data preprocessing before computing the drift scores."""
+        """
+        Preprocess the given data before computing the drift scores.
+
+        Parameters
+        ----------
+        x : ArrayLike
+            The input data to preprocess.
+
+        Returns
+        -------
+        ArrayLike
+            The preprocessed input data.
+        """
         if self.preprocess_fn is not None:
             x = self.preprocess_fn(x)
         return x
@@ -191,10 +282,55 @@ class BaseDrift:
 
 class BaseDriftUnivariate(BaseDrift):
     """
-    Generic drift detector component which serves as a base class for methods using
-    univariate tests. If n_features > 1, a multivariate correction is applied such
-    that the false positive rate is upper bounded by the specified p-value, with
-    equality in the case of independent features.
+    Base class for drift detection methods using univariate statistical tests.
+
+    This class inherits from `BaseDrift` and serves as a generic component for detecting
+    distribution drift in univariate features. If the number of features `n_features` is greater
+    than 1, a multivariate correction method (e.g., Bonferroni or FDR) is applied to control
+    the false positive rate, ensuring it does not exceed the specified p-value.
+
+    Parameters
+    ----------
+    x_ref : ArrayLike
+        Reference data used as the baseline to compare against when detecting drift.
+    p_val : float, default 0.05
+        Significance level used for detecting drift.
+    x_ref_preprocessed : bool, default False
+        Indicates whether the reference data has been preprocessed.
+    update_x_ref : UpdateStrategy | None, default None
+        Strategy for updating the reference data when drift is detected.
+    preprocess_fn : Callable[ArrayLike] | None, default None
+        Function used to preprocess input data before detecting drift.
+    correction : 'bonferroni' | 'fdr', default 'bonferroni'
+        Multivariate correction method applied to p-values.
+    n_features : int | None, default None
+        Number of features used in the univariate drift tests. If not provided, it will
+        be inferred from the data.
+
+    Attributes
+    ----------
+    _n_features : int | None
+        Number of features in the data. If not provided, it is lazily inferred from the
+        input data and any preprocessing function.
+    p_val : float
+        The significance level for drift detection.
+    correction : str
+        The method for controlling the false discovery rate or applying a Bonferroni correction.
+    update_x_ref : UpdateStrategy | None
+        Strategy for updating the reference data if applicable.
+    preprocess_fn : Callable | None
+        Function used for preprocessing input data before drift detection.
+
+    Methods
+    -------
+    n_features:
+        Property that returns the number of features, inferring it if necessary.
+    score(x):
+        Abstract method to compute univariate feature scores after preprocessing.
+    _apply_correction(p_vals):
+        Apply a statistical correction to p-values to account for multiple testing.
+    predict(x):
+        Predict whether drift has occurred on a batch of data, applying multivariate correction if needed.
     """
 
     def __init__(
@@ -220,6 +356,18 @@ class BaseDriftUnivariate(BaseDrift):
 
     @property
     def n_features(self) -> int:
+        """
+        Get the number of features in the reference data.
+
+        If the number of features is not provided during initialization, it will be inferred
+        from the reference data (``x_ref``). If a preprocessing function is provided, the number
+        of features will be inferred after applying the preprocessing function.
+
+        Returns
+        -------
+        int
+            Number of features in the reference data.
+        """
         # lazy process n_features as needed
         if not isinstance(self._n_features, int):
             # compute number of features for the univariate tests
@@ -236,9 +384,40 @@ class BaseDriftUnivariate(BaseDrift):
     @preprocess_x
     @abstractmethod
     def score(self, x: ArrayLike) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
-        """Abstract method to calculate feature score after preprocessing"""
+        """
+        Abstract method to calculate feature scores after preprocessing.
+
+        Parameters
+        ----------
+        x : ArrayLike
+            The batch of data to calculate univariate drift scores for each feature.
+
+        Returns
+        -------
+        tuple[NDArray, NDArray]
+            A tuple containing p-values and distance statistics for each feature.
+        """
+        pass
 
     def _apply_correction(self, p_vals: NDArray) -> tuple[bool, float]:
+        """
+        Apply the specified correction method (Bonferroni or FDR) to the p-values.
+
+        If the correction method is Bonferroni, the threshold for detecting drift
+        is divided by the number of features. For FDR, the correction is applied
+        using the Benjamini-Hochberg procedure.
+
+        Parameters
+        ----------
+        p_vals : NDArray
+            Array of p-values from the univariate tests for each feature.
+
+        Returns
+        -------
+        tuple[bool, float]
+            A tuple containing a boolean indicating if drift was detected and the
+            threshold after correction.
+        """
         if self.correction == "bonferroni":
             threshold = self.p_val / self.n_features
             drift_pred = bool((p_vals < threshold).any())
@@ -275,9 +454,9 @@ class BaseDriftUnivariate(BaseDrift):
 
         Returns
         -------
-        Dictionary containing the drift prediction and optionally the feature level
-                p-values, threshold after multivariate correction if needed and test
-                statistics.
+        DriftUnivariateOutput
+            Dictionary containing the drift prediction and optionally the feature level
+            p-values, threshold after multivariate correction if needed and test statistics.
         """
         # compute drift scores
         p_vals, dist = self.score(x)

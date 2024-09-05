@@ -21,38 +21,38 @@ from .base import BaseDriftUnivariate, UpdateStrategy, preprocess_x
 
 class DriftKS(BaseDriftUnivariate):
     """
-    Kolmogorov-Smirnov (K-S) data drift detector with Bonferroni or False Discovery
-    Rate (FDR) correction for multivariate data.
+    Drift detector employing the Kolmogorov-Smirnov (KS) distribution test.
+
+    The KS test detects changes in the maximum distance between two data
+    distributions with Bonferroni or False Discovery Rate (FDR) correction
+    for multivariate data.
 
     Parameters
     ----------
-    x_ref : NDArray
+    x_ref : ArrayLike
         Data used as reference distribution.
-    p_val : float, default 0.05
+    p_val : float | None, default 0.05
         p-value used for significance of the statistical test for each feature.
         If the FDR correction method is used, this corresponds to the acceptable
         q-value.
     x_ref_preprocessed : bool, default False
-        Whether the given reference data `x_ref` has been preprocessed yet. If
-        `x_ref_preprocessed=True`, only the test data `x` will be preprocessed at
-        prediction time. If `x_ref_preprocessed=False`, the reference data will also
-        be preprocessed.
+        Whether the given reference data ``x_ref`` has been preprocessed yet.
+        If ``True``, only the test data ``x`` will be preprocessed at prediction time.
+        If ``False``, the reference data will also be preprocessed.
     update_x_ref : UpdateStrategy | None, default None
         Reference data can optionally be updated using an UpdateStrategy class. Update
-        using the last n instances seen by the detector with
-        :py:class:`dataeval.detectors.LastSeenUpdateStrategy`
-        or via reservoir sampling with
-        :py:class:`dataeval.detectors.ReservoirSamplingUpdateStrategy`.
-    preprocess_fn : Callable[[ArrayLike], ArrayLike] | None, default None
+        using the last n instances seen by the detector with LastSeenUpdateStrategy
+        or via reservoir sampling with ReservoirSamplingUpdateStrategy.
+    preprocess_fn : Callable | None, default None
         Function to preprocess the data before computing the data drift metrics.
         Typically a dimensionality reduction technique.
-    correction : Literal["bonferroni", "fdr"], default "bonferroni"
+    correction : "bonferroni" | "fdr", default "bonferroni"
         Correction type for multivariate data. Either 'bonferroni' or 'fdr' (False
         Discovery Rate).
-    alternative : Literal["two-sided", "less", "greater"], default "two-sided"
+    alternative : "two-sided" | "less" | "greater", default "two-sided"
         Defines the alternative hypothesis. Options are 'two-sided', 'less' or
         'greater'.
-    n_features
+    n_features : int | None, default None
         Number of features used in the statistical test. No need to pass it if no
         preprocessing takes place. In case of a preprocessing step, this can also
         be inferred automatically but could be more expensive to compute.
@@ -85,16 +85,17 @@ class DriftKS(BaseDriftUnivariate):
     @preprocess_x
     def score(self, x: ArrayLike) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         """
-        Compute K-S scores and statistics per feature.
+        Compute KS scores and statistics per feature.
 
         Parameters
         ----------
-        x
+        x : ArrayLike
             Batch of instances.
 
         Returns
         -------
-        Feature level p-values and K-S statistics.
+        tuple[NDArray, NDArray]
+            Feature level p-values and KS statistic
         """
         x = to_numpy(x)
         x = x.reshape(x.shape[0], -1)
