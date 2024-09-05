@@ -501,7 +501,7 @@ class Clusterer:
         Example
         -------
         >>> cluster.evaluate()
-        {'outliers': [18, 21, 34, 35, 45], 'potential_outliers': [13, 15, 42], 'duplicates': [[9, 24], [23, 48]], 'potential_duplicates': [[1, 11]]}
+        ClustererOutput(outliers=[18, 21, 34, 35, 45], potential_outliers=[13, 15, 42], duplicates=[[9, 24], [23, 48]], potential_duplicates=[[1, 11]])
         """  # noqa: E501
 
         outliers, potential_outliers = self.find_outliers(self.last_good_merge_levels)

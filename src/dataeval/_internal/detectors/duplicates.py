@@ -91,8 +91,8 @@ class Duplicates:
         Example
         -------
         >>> dups.evaluate(images)
-        {'exact': [[3, 20], [16, 37]], 'near': [[3, 20, 22], [12, 18], [13, 36], [14, 31], [17, 27], [19, 38, 47]]}
-        """
+        DuplicatesOutput(exact=[[3, 20], [16, 37]], near=[[3, 20, 22], [12, 18], [13, 36], [14, 31], [17, 27], [19, 38, 47]])
+        """  # noqa: E501
         flag_exact = ImageStat.XXHASH if self.find_exact else ImageStat(0)
         flag_near = ImageStat.PCHASH if self.find_near else ImageStat(0)
         self.stats = imagestats(images, flag_exact | flag_near)
