@@ -85,7 +85,7 @@ class StatsOutput(OutputMetadata):
     ch_idx_map: Dict[int, List[int]]
 
     def dict(self):
-        return {k: v for k, v in super().dict().items() if len(v) != 0}
+        return {k: v for k, v in self.__dict__.items() if not k.startswith("_") and len(v) > 0}
 
 
 QUARTILES = (0, 25, 50, 75, 100)
