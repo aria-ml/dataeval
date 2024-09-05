@@ -23,9 +23,9 @@ def get_device(device: str | torch.device | None = None) -> torch.device:
 
     Parameters
     ----------
-    device
-        Either `None`, a str ('gpu' or 'cpu') indicating the device to choose, or an
-        already instantiated device object. If `None`, the GPU is selected if it is
+    device : str | torch.device | None, default None
+        Either ``None``, a str ('gpu' or 'cpu') indicating the device to choose, or an
+        already instantiated device object. If ``None``, the GPU is selected if it is
         detected, otherwise the CPU is used as a fallback.
 
     Returns
@@ -51,18 +51,19 @@ def mmd2_from_kernel_matrix(
 
     Parameters
     ----------
-    kernel_mat
+    kernel_mat : torch.Tensor
         Kernel matrix between samples x and y.
-    m
+    m : int
         Number of instances in y.
-    permute
+    permute : bool, default False
         Whether to permute the row indices. Used for permutation tests.
-    zero_diag
+    zero_diag : bool, default True
         Whether to zero out the diagonal of the kernel matrix.
 
     Returns
     -------
-    MMD^2 between the samples from the kernel matrix.
+    torch.Tensor
+        MMD^2 between the samples from the kernel matrix.
     """
     n = kernel_mat.shape[0] - m
     if zero_diag:
@@ -89,23 +90,24 @@ def predict_batch(
 
     Parameters
     ----------
-    x
+    x : np.ndarray | torch.Tensor
         Batch of instances.
-    model
+    model : Callable | nn.Module | nn.Sequential
         PyTorch model.
-    device
+    device : torch.device | None, default None
         Device type used. The default None tries to use the GPU and falls back on CPU.
         Can be specified by passing either torch.device('cuda') or torch.device('cpu').
-    batch_size
+    batch_size : int, default 1e10
         Batch size used during prediction.
-    preprocess_fn
+    preprocess_fn : Callable | None, default None
         Optional preprocessing function for each batch.
-    dtype
-        Model output type, e.g. np.float32 or torch.float32.
+    dtype : np.dtype | torch.dtype, default np.float32
+        Model output type, either a numpy or torch dtype, e.g. np.float32 or torch.float32.
 
     Returns
     -------
-    Numpy array, torch tensor or tuples of those with model outputs.
+    NDArray | torch.Tensor | tuple
+        Numpy array, torch tensor or tuples of those with model outputs.
     """
     device = get_device(device)
     if isinstance(x, np.ndarray):
@@ -164,24 +166,25 @@ def preprocess_drift(
 
     Parameters
     ----------
-    x
+    x : NDArray
         Batch of instances.
-    model
+    model : nn.Module
         Model used for preprocessing.
-    device
+    device : torch.device | None, default None
         Device type used. The default None tries to use the GPU and falls back on CPU.
         Can be specified by passing either torch.device('cuda') or torch.device('cpu').
-    preprocess_batch_fn
+    preprocess_batch_fn : Callable | None, default None
         Optional batch preprocessing function. For example to convert a list of objects
         to a batch which can be processed by the PyTorch model.
-    batch_size
+    batch_size : int, default 1e10
         Batch size used during prediction.
-    dtype
-        Model output type, e.g. np.float32 or torch.float32.
+    dtype : np.dtype | torch.dtype, default np.float32
+        Model output type, either a numpy or torch dtype, e.g. np.float32 or torch.float32.
 
     Returns
     -------
-    Numpy array or torch tensor with predictions.
+    NDArray | torch.Tensor | tuple
+        Numpy array, torch tensor or tuples of those with model outputs.
     """
     return predict_batch(
         x,
@@ -202,15 +205,17 @@ def squared_pairwise_distance(
 
     Parameters
     ----------
-    x
+    x : torch.Tensor
         Batch of instances of shape [Nx, features].
-    y
+    y : torch.Tensor
         Batch of instances of shape [Ny, features].
-    a_min
+    a_min : float
         Lower bound to clip distance values.
+
     Returns
     -------
-    Pairwise squared Euclidean distance [Nx, Ny].
+    torch.Tensor
+        Pairwise squared Euclidean distance [Nx, Ny].
     """
     x2 = x.pow(2).sum(dim=-1, keepdim=True)
     y2 = y.pow(2).sum(dim=-1, keepdim=True)
@@ -224,17 +229,18 @@ def sigma_median(x: torch.Tensor, y: torch.Tensor, dist: torch.Tensor) -> torch.
 
     Parameters
     ----------
-    x
+    x : torch.Tensor
         Tensor of instances with dimension [Nx, features].
-    y
+    y : torch.Tensor
         Tensor of instances with dimension [Ny, features].
-    dist
+    dist : torch.Tensor
         Tensor with dimensions [Nx, Ny], containing the pairwise distances
         between `x` and `y`.
 
     Returns
     -------
-    The computed bandwidth, `sigma`.
+    torch.Tensor
+        The computed bandwidth, `sigma`.
     """
     n = min(x.shape[0], y.shape[0])
     n = n if (x[:n] == y[:n]).all() and x.shape == y.shape else 0
@@ -245,9 +251,10 @@ def sigma_median(x: torch.Tensor, y: torch.Tensor, dist: torch.Tensor) -> torch.
 
 class GaussianRBF(nn.Module):
     """
-    Gaussian RBF kernel: k(x,y) = exp(-(1/(2*sigma^2)||x-y||^2). A forward pass
-    takes a batch of instances x [Nx, features] and y [Ny, features] and returns
-    the kernel matrix [Nx, Ny].
+    Gaussian RBF kernel: k(x,y) = exp(-(1/(2*sigma^2)||x-y||^2).
+
+    A forward pass takes a batch of instances x [Nx, features] and
+    y [Ny, features] and returns the kernel matrix [Nx, Ny].
 
     Parameters
     ----------
@@ -255,10 +262,9 @@ class GaussianRBF(nn.Module):
         Bandwidth used for the kernel. Needn't be specified if being inferred or
         trained. Can pass multiple values to eval kernel with and then average.
     init_sigma_fn : Callable | None, default None
-        Function used to compute the bandwidth `sigma`. Used when `sigma` is to be
-        inferred. The function's signature should take in the tensors `x`, `y` and
-        `dist` and return `sigma`. If `None`, it is set to
-        :func:`~dataeval._internal.detectors.drift.torch.sigma_median`.
+        Function used to compute the bandwidth ``sigma``. Used when ``sigma`` is to be
+        inferred. The function's signature should take in the tensors ``x``, ``y`` and
+        ``dist`` and return ``sigma``. If ``None``, it is set to ``sigma_median``.
     trainable : bool, default False
         Whether or not to track gradients w.r.t. `sigma` to allow it to be trained.
     """

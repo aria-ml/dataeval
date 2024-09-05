@@ -24,6 +24,8 @@ from .torch import GaussianRBF, get_device, mmd2_from_kernel_matrix
 @dataclass(frozen=True)
 class DriftMMDOutput(DriftOutput):
     """
+    Output class for DriftMMD
+
     Attributes
     ----------
     is_drift : bool
@@ -53,26 +55,22 @@ class DriftMMD(BaseDrift):
     ----------
     x_ref : ArrayLike
         Data used as reference distribution.
-    p_val : float, default 0.05
-        p-value used for the significance of the permutation test.
+    p_val : float | None, default 0.05
+        p-value used for significance of the statistical test for each feature.
+        If the FDR correction method is used, this corresponds to the acceptable
+        q-value.
     x_ref_preprocessed : bool, default False
-        Whether the given reference data `x_ref` has been preprocessed yet. If
-        `x_ref_preprocessed=True`, only the test data `x` will be preprocessed
-        at prediction time. If `x_ref_preprocessed=False`, the reference data
-        will also be preprocessed.
-    preprocess_at_init : bool, default True
-        Whether to preprocess the reference data when the detector is instantiated.
-        Otherwise, the reference data will be preprocessed at prediction time. Only
-        applies if `x_ref_preprocessed=False`.
+        Whether the given reference data ``x_ref`` has been preprocessed yet.
+        If ``True``, only the test data ``x`` will be preprocessed at prediction time.
+        If ``False``, the reference data will also be preprocessed.
     update_x_ref : UpdateStrategy | None, default None
         Reference data can optionally be updated using an UpdateStrategy class. Update
-        using the last n instances seen by the detector with
-        :py:class:`dataeval.detectors.LastSeenUpdateStrategy`
-        or via reservoir sampling with
-        :py:class:`dataeval.detectors.ReservoirSamplingUpdateStrategy`.
-    preprocess_fn : Callable[[ArrayLike], ArrayLike] | None, default None
+        using the last n instances seen by the detector with LastSeenUpdateStrategy
+        or via reservoir sampling with ReservoirSamplingUpdateStrategy.
+    preprocess_fn : Callable | None, default None
         Function to preprocess the data before computing the data drift metrics.
-    kernel : Callable, default :py:class:`dataeval.detectors.GaussianRBF`
+        Typically a dimensionality reduction technique.
+    kernel : Callable, default GaussianRBF
         Kernel used for the MMD computation, defaults to Gaussian RBF kernel.
     sigma : ArrayLike | None, default None
         Optionally set the GaussianRBF kernel bandwidth. Can also pass multiple
@@ -145,8 +143,9 @@ class DriftMMD(BaseDrift):
 
         Returns
         -------
-        p-value obtained from the permutation test, the MMD^2 between the reference and
-        test set, and the MMD^2 threshold above which drift is flagged.
+        tuple(float, float, float)
+            p-value obtained from the permutation test, MMD^2 between the reference and test set,
+            and MMD^2 threshold above which drift is flagged
         """
         x = to_numpy(x)
         x_ref = torch.from_numpy(self.x_ref).to(self.device)
