@@ -60,7 +60,10 @@ def diversity_shannon(
     ent_unnormalized = entropy(data, names, is_categorical, normalized=False, subset_mask=subset_mask)
     # normalize by global counts rather than classwise counts
     num_bins = get_num_bins(data, names, is_categorical=is_categorical, subset_mask=subset_mask)
-    return ent_unnormalized / np.log(num_bins)
+    ent_norm = np.empty(ent_unnormalized.shape)
+    ent_norm[num_bins != 1] = ent_unnormalized[num_bins != 1] / np.log(num_bins[num_bins != 1])
+    ent_norm[num_bins == 1] = 0
+    return ent_norm
 
 
 def diversity_simpson(
@@ -151,6 +154,19 @@ def diversity(
     DiversityOutput
         Diversity index per column of self.data or each factor in self.names
 
+    Example
+    -------
+    Compute Simpson diversity index of metadata and class labels
+
+    >>> diversity(class_labels, metadata, method="simpson").diversity_index
+    array([0.34482759, 0.34482759, 0.90909091])
+
+    Compute Shannon diversity index of metadata and class labels
+
+    >>> diversity(class_labels, metadata, method="shannon").diversity_index
+    array([0.37955133, 0.37955133, 0.96748876])
+
+
     See Also
     --------
     numpy.histogram
@@ -192,6 +208,21 @@ def diversity_classwise(
     -------
     DiversityOutput
         Diversity index [n_class x n_factor]
+
+    Example
+    -------
+    Compute classwise Simpson diversity index of metadata and class labels
+
+    >>> diversity_classwise(class_labels, metadata, method="simpson").diversity_index
+    array([[0.33793103, 0.51578947],
+           [0.36      , 0.36      ]])
+
+    Compute classwise Shannon diversity index of metadata and class labels
+
+    >>> diversity_classwise(class_labels, metadata, method="shannon").diversity_index
+    array([[0.43156028, 0.83224889],
+           [0.57938016, 0.57938016]])
+
 
     See Also
     --------
