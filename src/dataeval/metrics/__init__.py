@@ -1,6 +1,4 @@
-from typing import List
-
-__all__: List[str] = []
+__all__ = []
 
 from dataeval._internal.metrics.balance import balance, balance_classwise
 from dataeval._internal.metrics.ber import ber

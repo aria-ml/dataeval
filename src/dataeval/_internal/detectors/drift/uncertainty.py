@@ -6,8 +6,10 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
+from __future__ import annotations
+
 from functools import partial
-from typing import Callable, Literal, Optional
+from typing import Callable, Literal
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -77,7 +79,7 @@ class DriftUncertainty:
         `x_ref_preprocessed=True`, only the test data `x` will be preprocessed at
         prediction time. If `x_ref_preprocessed=False`, the reference data will
         also be preprocessed.
-    update_x_ref : Optional[UpdateStrategy], default None
+    update_x_ref : UpdateStrategy | None, default None
         Reference data can optionally be updated using an UpdateStrategy class. Update
         using the last n instances seen by the detector with
         :py:class:`dataeval.detectors.LastSeenUpdateStrategy`
@@ -89,13 +91,13 @@ class DriftUncertainty:
     batch_size : int, default 32
         Batch size used to evaluate model. Only relevant when backend has been
         specified for batch prediction.
-    preprocess_batch_fn : Optional[Callable], default None
+    preprocess_batch_fn : Callable | None, default None
         Optional batch preprocessing function. For example to convert a list of
         objects to a batch which can be processed by the model.
-    device : Optional[str], default None
+    device : str | None, default None
         Device type used. The default None tries to use the GPU and falls back on
         CPU if needed. Can be specified by passing either 'cuda', 'gpu' or 'cpu'.
-    input_shape : Optional[tuple], default None
+    input_shape : tuple | None, default None
         Shape of input data.
     """
 
@@ -105,11 +107,11 @@ class DriftUncertainty:
         model: Callable,
         p_val: float = 0.05,
         x_ref_preprocessed: bool = False,
-        update_x_ref: Optional[UpdateStrategy] = None,
+        update_x_ref: UpdateStrategy | None = None,
         preds_type: Literal["probs", "logits"] = "probs",
         batch_size: int = 32,
-        preprocess_batch_fn: Optional[Callable] = None,
-        device: Optional[str] = None,
+        preprocess_batch_fn: Callable | None = None,
+        device: str | None = None,
     ) -> None:
         def model_fn(x: NDArray) -> NDArray:
             return preprocess_drift(

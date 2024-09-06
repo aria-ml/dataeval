@@ -6,8 +6,10 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
+from __future__ import annotations
+
 import math
-from typing import Callable, Optional, Tuple, Type, Union, cast
+from typing import Callable, Union, cast
 
 import keras as keras
 import numpy as np
@@ -29,12 +31,12 @@ from dataeval._internal.models.tensorflow.pixelcnn import PixelCNN
 
 
 def predict_batch(
-    x: Union[list, NDArray, tf.Tensor],
-    model: Union[Callable, keras.Model],
+    x: list | NDArray | tf.Tensor,
+    model: Callable | keras.Model,
     batch_size: int = int(1e10),
-    preprocess_fn: Optional[Callable] = None,
-    dtype: Union[Type[np.generic], tf.DType] = np.float32,
-) -> Union[NDArray, tf.Tensor, tuple, list]:
+    preprocess_fn: Callable | None = None,
+    dtype: type[np.generic] | tf.DType = np.float32,
+) -> NDArray | tf.Tensor | tuple | list:
     """
     Make batch predictions on a model.
 
@@ -59,7 +61,7 @@ def predict_batch(
     n_minibatch = int(np.ceil(n / batch_size))
     return_np = not isinstance(dtype, tf.DType)
     return_list = False
-    preds: Union[list, tuple] = []
+    preds: list | tuple = []
     for i in range(n_minibatch):
         istart, istop = i * batch_size, min((i + 1) * batch_size, n)
         x_batch = x[istart:istop]  # type: ignore
@@ -93,7 +95,7 @@ def predict_batch(
     return out
 
 
-def _get_default_encoder_net(input_shape: Tuple[int, int, int], encoding_dim: int):
+def _get_default_encoder_net(input_shape: tuple[int, int, int], encoding_dim: int):
     return Sequential(
         [
             InputLayer(input_shape=input_shape),
@@ -106,7 +108,7 @@ def _get_default_encoder_net(input_shape: Tuple[int, int, int], encoding_dim: in
     )
 
 
-def _get_default_decoder_net(input_shape: Tuple[int, int, int], encoding_dim: int):
+def _get_default_decoder_net(input_shape: tuple[int, int, int], encoding_dim: int):
     return Sequential(
         [
             InputLayer(input_shape=(encoding_dim,)),
@@ -122,11 +124,11 @@ def _get_default_decoder_net(input_shape: Tuple[int, int, int], encoding_dim: in
 
 
 def create_model(
-    model_type: Union[AE, AEGMM, PixelCNN, VAE, VAEGMM],
-    input_shape: Tuple[int, int, int],
-    encoding_dim: Optional[int] = None,
-    n_gmm: Optional[int] = None,
-    gmm_latent_dim: Optional[int] = None,
+    model_type: AE | AEGMM | PixelCNN | VAE | VAEGMM,
+    input_shape: tuple[int, int, int],
+    encoding_dim: int | None = None,
+    n_gmm: int | None = None,
+    gmm_latent_dim: int | None = None,
 ):
     """
     Create a default model for the specified model type.

@@ -6,8 +6,9 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
+from __future__ import annotations
+
 from itertools import product
-from typing import Optional
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -90,7 +91,7 @@ def test_base_preprocess():
 
 class TestPreprocessDecorator:
     _x_refcount = 0
-    _x: Optional[np.ndarray]
+    _x: np.ndarray | None
 
     def _preprocess(self, x: np.ndarray) -> np.ndarray:
         return x

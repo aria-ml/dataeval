@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from enum import IntFlag, auto
 from functools import reduce
-from typing import Dict, Iterable, TypeVar, Union, cast
+from typing import Iterable, TypeVar, cast
 
 TFlag = TypeVar("TFlag", bound=IntFlag)
 
@@ -47,7 +49,7 @@ def is_distinct(flag: IntFlag) -> bool:
     return (flag & (flag - 1) == 0) and flag != 0
 
 
-def to_distinct(flag: TFlag) -> Dict[TFlag, str]:
+def to_distinct(flag: TFlag) -> dict[TFlag, str]:
     """
     Returns a distinct set of all flags set on the input flag and their names
 
@@ -61,7 +63,7 @@ def to_distinct(flag: TFlag) -> Dict[TFlag, str]:
         return {f: f.name.lower() for f in list(flag.__class__) if f & flag and is_distinct(f) and f.name}
 
 
-def verify_supported(flag: TFlag, flags: Union[TFlag, Iterable[TFlag]]):
+def verify_supported(flag: TFlag, flags: TFlag | Iterable[TFlag]):
     supported = flags if isinstance(flags, flag.__class__) else cast(TFlag, reduce(lambda a, b: a | b, flags))  # type: ignore
     unsupported = flag & ~supported
     if unsupported:

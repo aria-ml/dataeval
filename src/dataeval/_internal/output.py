@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 import inspect
 from datetime import datetime, timezone
 from functools import wraps
-from typing import Dict, List, Optional
 
 import numpy as np
 
@@ -12,18 +13,18 @@ class OutputMetadata:
     _name: str
     _execution_time: str
     _execution_duration: float
-    _arguments: Dict[str, str]
-    _state: Dict[str, str]
+    _arguments: dict[str, str]
+    _state: dict[str, str]
     _version: str
 
-    def dict(self) -> Dict:
+    def dict(self) -> dict:
         return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
 
-    def meta(self) -> Dict:
+    def meta(self) -> dict:
         return {k.removeprefix("_"): v for k, v in self.__dict__.items() if k.startswith("_")}
 
 
-def set_metadata(module_name: str = "", state_attr: Optional[List[str]] = None):
+def set_metadata(module_name: str = "", state_attr: list[str] | None = None):
     def decorator(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
@@ -70,12 +71,14 @@ def set_metadata(module_name: str = "", state_attr: Optional[List[str]] = None):
 
 def populate_defaults(d: dict, c: type) -> dict:
     def default(t):
-        name = t._name if hasattr(t, "_name") else t.__name__  # py3.9 : _name, py3.10 : __name__
-        if name == "Dict":
+        t = (
+            t if isinstance(t, str) else t._name if hasattr(t, "_name") else t.__name__
+        ).lower()  # py3.9 : _name, py3.10 : __name__
+        if t.startswith("dict"):
             return {}
-        if name == "List":
+        if t.startswith("list"):
             return []
-        if name == "ndarray":
+        if t.startswith("ndarray"):
             return np.array([])
         raise TypeError("Unrecognized annotation type")
 

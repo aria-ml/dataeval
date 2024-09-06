@@ -6,9 +6,11 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
+from __future__ import annotations
+
 from functools import partial
 from itertools import product
-from typing import Callable, List, Union
+from typing import Callable
 
 import numpy as np
 import pytest
@@ -27,7 +29,7 @@ n, n_hidden, n_classes = 500, 10, 5
 class HiddenOutput(nn.Module):
     def __init__(
         self,
-        model: Union[nn.Module, nn.Sequential],
+        model: nn.Module | nn.Sequential,
         layer: int = -1,
         flatten: bool = False,
     ) -> None:
@@ -53,7 +55,7 @@ class MyModel(nn.Module):
 
 
 # test List[Any] inputs to the detector
-def preprocess_list(x: List[np.ndarray]) -> np.ndarray:
+def preprocess_list(x: list[np.ndarray]) -> np.ndarray:
     return np.concatenate(x, axis=0)
 
 

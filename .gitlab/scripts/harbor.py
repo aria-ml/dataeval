@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from requests import delete, get
 from rest import RestWrapper
@@ -18,14 +18,14 @@ class Harbor(RestWrapper):
 
     def __init__(
         self,
-        token: Optional[str] = None,
+        token: str | None = None,
         timeout: int = 10,
         verbose: bool = False,
     ):
         super().__init__(DATAEVAL_PROJECT_URL, DATAEVAL_HARBOR_TOKEN, token, timeout, verbose)
         self.headers = {"Authorization": f"Basic {self.token}"}
 
-    def list_artifacts(self, repository_name: str, tag_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_artifacts(self, repository_name: str, tag_filter: str | None = None) -> List[Dict[str, Any]]:
         """
         List artifacts
 

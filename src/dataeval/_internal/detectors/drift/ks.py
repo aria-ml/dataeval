@@ -6,7 +6,9 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
-from typing import Callable, Literal, Optional, Tuple
+from __future__ import annotations
+
+from typing import Callable, Literal
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -35,13 +37,13 @@ class DriftKS(BaseDriftUnivariate):
         `x_ref_preprocessed=True`, only the test data `x` will be preprocessed at
         prediction time. If `x_ref_preprocessed=False`, the reference data will also
         be preprocessed.
-    update_x_ref : Optional[UpdateStrategy], default None
+    update_x_ref : UpdateStrategy | None, default None
         Reference data can optionally be updated using an UpdateStrategy class. Update
         using the last n instances seen by the detector with
         :py:class:`dataeval.detectors.LastSeenUpdateStrategy`
         or via reservoir sampling with
         :py:class:`dataeval.detectors.ReservoirSamplingUpdateStrategy`.
-    preprocess_fn : Optional[Callable[[NDArray], NDArray]], default None
+    preprocess_fn : Callable[[ArrayLike], ArrayLike] | None, default None
         Function to preprocess the data before computing the data drift metrics.
         Typically a dimensionality reduction technique.
     correction : Literal["bonferroni", "fdr"], default "bonferroni"
@@ -61,11 +63,11 @@ class DriftKS(BaseDriftUnivariate):
         x_ref: ArrayLike,
         p_val: float = 0.05,
         x_ref_preprocessed: bool = False,
-        update_x_ref: Optional[UpdateStrategy] = None,
-        preprocess_fn: Optional[Callable[[ArrayLike], ArrayLike]] = None,
+        update_x_ref: UpdateStrategy | None = None,
+        preprocess_fn: Callable[[ArrayLike], ArrayLike] | None = None,
         correction: Literal["bonferroni", "fdr"] = "bonferroni",
         alternative: Literal["two-sided", "less", "greater"] = "two-sided",
-        n_features: Optional[int] = None,
+        n_features: int | None = None,
     ) -> None:
         super().__init__(
             x_ref=x_ref,
@@ -81,7 +83,7 @@ class DriftKS(BaseDriftUnivariate):
         self.alternative = alternative
 
     @preprocess_x
-    def score(self, x: ArrayLike) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
+    def score(self, x: ArrayLike) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         """
         Compute K-S scores and statistics per feature.
 

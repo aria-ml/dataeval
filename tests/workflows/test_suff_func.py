@@ -1,4 +1,6 @@
-from typing import Dict, Optional, Sequence, cast
+from __future__ import annotations
+
+from typing import Sequence, cast
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -34,7 +36,7 @@ class Net(nn.Module):
         return x
 
 
-def mock_ds(length: Optional[int]):
+def mock_ds(length: int | None):
     ds = MagicMock()
     if length is None:
         delattr(ds, "__len__")
@@ -71,7 +73,7 @@ def realistic_train(model: nn.Module, dataset: Dataset, indices: Sequence[int]):
             optimizer.step()
 
 
-def realistic_eval(model: nn.Module, dataset: Dataset) -> Dict[str, float]:
+def realistic_eval(model: nn.Module, dataset: Dataset) -> dict[str, float]:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     metric = torchmetrics.Accuracy(task="multiclass", num_classes=10).to(device)
     result = 0
@@ -121,7 +123,7 @@ def custom_train(model, dataset, indices):
         optimizer.step()
 
 
-def custom_eval(model, dataset) -> Dict[str, float]:
+def custom_eval(model, dataset) -> dict[str, float]:
     """
     Evaluate a model on a single pass with a given metric
 
