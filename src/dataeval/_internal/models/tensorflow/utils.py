@@ -135,15 +135,15 @@ def create_model(
 
     Parameters
     ----------
-    model_type
+    model_type : Union[AE, AEGMM, PixelCNN, VAE, VAEGMM]
         The model type to create.
-    input_shape
+    input_shape : Tuple[int, int, int]
         The input shape of the data used.
-    encoding_dim
+    encoding_dim : int, optional - default None
         The target encoding dimensionality.
-    n_gmm
+    n_gmm : int, optional - default None
         Number of components used in the GMM layer.
-    gmm_latent_dim
+    gmm_latent_dim : int, optional - default None
         Latent dimensionality of the GMM layer.
     """
     input_dim = math.prod(input_shape)
