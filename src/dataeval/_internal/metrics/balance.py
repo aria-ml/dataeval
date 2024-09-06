@@ -73,6 +73,22 @@ def balance(class_labels: Sequence[int], metadata: list[dict], num_neighbors: in
     we attempt to infer whether a variable is categorical by the fraction of unique
     values in the dataset.
 
+    Example
+    -------
+    Return balance (mutual information) of factors with class_labels
+
+    >>> balance(class_labels, metadata).mutual_information[0]
+    array([0.99999822, 0.13363788, 0.        , 0.02994455])
+
+    Return balance (mutual information) of metadata factors with class_labels
+    and each other
+
+    >>> balance(class_labels, metadata).mutual_information
+    array([[0.99999822, 0.13363788, 0.        , 0.02994455],
+           [0.13363788, 0.99999843, 0.01389763, 0.09725766],
+           [0.        , 0.01389763, 0.48549233, 0.15314612],
+           [0.02994455, 0.09725766, 0.15314612, 0.99999856]])
+
     See Also
     --------
     sklearn.feature_selection.mutual_info_classif
@@ -98,14 +114,15 @@ def balance(class_labels: Sequence[int], metadata: list[dict], num_neighbors: in
                 tgt,
                 discrete_features=is_categorical,  # type: ignore
                 n_neighbors=num_neighbors,
+                random_state=0,
             )
         else:
-            # continuous variables
             mi[idx, :] = mutual_info_regression(
                 data,
                 tgt,
                 discrete_features=is_categorical,  # type: ignore
                 n_neighbors=num_neighbors,
+                random_state=0,
             )
 
     ent_all = entropy(data, names, is_categorical, normalized=False)
@@ -145,6 +162,15 @@ def balance_classwise(class_labels: Sequence[int], metadata: list[dict], num_nei
         (num_classes x num_factors) estimate of mutual information between
         num_factors metadata factors and individual class labels.
 
+    Example
+    -------
+    Return classwise balance (mutual information) of factors with individual class_labels
+
+    >>> balance_classwise(class_labels, metadata).mutual_information
+    array([[0.13363788, 0.54085156, 0.        ],
+           [0.13363788, 0.54085156, 0.        ]])
+
+
     See Also
     --------
     sklearn.feature_selection.mutual_info_classif
@@ -179,6 +205,7 @@ def balance_classwise(class_labels: Sequence[int], metadata: list[dict], num_nei
             tgt,
             discrete_features=cat_mask,  # type: ignore
             n_neighbors=num_neighbors,
+            random_state=0,
         )
 
     # let this recompute for all features including class label
