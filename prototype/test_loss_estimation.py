@@ -216,7 +216,6 @@ class TestLEUnit():
         torch._dynamo.config.suppress_errors = True
 
         ds = MockDataset()
-        class_names = np.unique(ds.labels)
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
         model = torch.compile(MockNet().to(device))
@@ -244,8 +243,6 @@ class TestLEFunc_class():
         model = reset_parameters(model)
         # Run the model with each substep of data
         # train on subset of train data
-        train_kwargs = {}
-        eval_kwargs = {}
         custom_train_class(
             model,
             ds,
@@ -275,7 +272,6 @@ class TestLEFunc_class():
 
         ds = LargeMockDataset()
         ds_c = LargeMockDataset()
-        class_names = np.unique(ds.labels)
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
         model = torch.compile(RegressNet().to(device))
@@ -284,8 +280,7 @@ class TestLEFunc_class():
         model = reset_parameters(model)
         # Run the model with each substep of data
         # train on subset of train data
-        train_kwargs = {}
-        eval_kwargs = {}
+
         custom_train_regress(
             model,
             ds,
@@ -329,13 +324,10 @@ class TestLEFunc_class():
         device = "cuda" if torch.cuda.is_available() else "cpu"
         model = torch.compile(MockNet().to(device))
         model = cast(MockNet, model)
-        le = LossEstimator()
 
         model = reset_parameters(model)
         # Run the model with each substep of data
         # train on subset of train data
-        train_kwargs = {}
-        eval_kwargs = {}
         custom_train_class(
             model,
             ds,
@@ -376,13 +368,12 @@ class TestLEFunc_class():
         device = "cuda" if torch.cuda.is_available() else "cpu"
         model = torch.compile(MockNet().to(device))
         model = cast(MockNet, model)
-        le = LossEstimator()
+
 
         model = reset_parameters(model)
         # Run the model with each substep of data
         # train on subset of train data
-        train_kwargs = {}
-        eval_kwargs = {}
+
         custom_train_class(
             model,
             ds,
@@ -432,18 +423,17 @@ class TestLEFunc_class():
             ds.images[i] = ds.images[i] + np.random.normal(size=ds.images[i].shape, scale=0.5)
             ds_c.images[i] = ds_c.images[i] + np.random.normal(size=ds_c.images[i].shape, scale=2) + np.random.randn()
 
-        class_names = np.unique(ds.labels)
+
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
         model = torch.compile(RegressNet().to(device))
         model = cast(RegressNet, model)
-        le = LossEstimator()
+
 
         model = reset_parameters(model)
         # Run the model with each substep of data
         # train on subset of train data
-        train_kwargs = {}
-        eval_kwargs = {}
+
         custom_train_regress(
             model,
             ds,
