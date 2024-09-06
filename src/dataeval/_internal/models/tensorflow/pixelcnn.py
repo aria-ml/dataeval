@@ -239,40 +239,40 @@ class PixelCNN(distribution.Distribution):
 
     Parameters
     ----------
-    image_shape
+    image_shape : tuple
         3D `TensorShape` or tuple for the `[height, width, channels]` dimensions of the image.
-    conditional_shape
+    conditional_shape : tuple, optional - default None
         `TensorShape` or tuple for the shape of the conditional input, or `None` if there is no conditional input.
-    num_resnet
+    num_resnet : int, default 5
         The number of layers (shown in Figure 2 of [2]) within each highest-level block of Figure 2 of [1].
-    num_hierarchies
+    num_hierarchies : int, default 3
         The number of highest-level blocks (separated by expansions/contractions of dimensions in Figure 2 of [1].)
-    num_filters
+    num_filters : int, default 160
         The number of convolutional filters.
-    num_logistic_mix
+    num_logistic_mix : int, default 10
         Number of components in the logistic mixture distribution.
-    receptive_field_dims
+    receptive_field_dims tuple, default (3, 3)
         Height and width in pixels of the receptive field of the convolutional layers above and to the left
         of a given pixel. The width (second element of the tuple) should be odd. Figure 1 (middle) of [2]
         shows a receptive field of (3, 5) (the row containing the current pixel is included in the height).
         The default of (3, 3) was used to produce the results in [1].
-    dropout_p
+    dropout_p : float, default 0.0
         The dropout probability. Should be between 0 and 1.
-    resnet_activation
+    resnet_activation : str, default "concat_elu"
         The type of activation to use in the resnet blocks. May be 'concat_elu', 'elu', or 'relu'.
-    l2_weight
+    l2_weight : float, default 0.0
         The L2 regularization weight.
-    use_weight_norm
+    use_weight_norm : bool, default True
         If `True` then use weight normalization (works only in Eager mode).
-    use_data_init
+    use_data_init : bool, default True
         If `True` then use data-dependent initialization (has no effect if `use_weight_norm` is `False`).
-    high
+    high : int, default 255
         The maximum value of the input data (255 for an 8-bit image).
-    low
+    low : int, default 0
         The minimum value of the input data.
-    dtype
+    dtype : tensorflow dtype, default tf.float32
         Data type of the `Distribution`.
-    name
+    name : str, default "PixelCNN"
         The name of the `Distribution`.
     """
 

@@ -1,32 +1,7 @@
 (tensorflow-models-ref)=
-
 # Tensorflow Models
 
-The Tensorflow models provided are tailored for usage with the outlier detection metrics. DataEval provides
-both basic default models through the utility function `create_model` as well as constructors which allow
-for customization of the encoder, decoder and any other applicable layers used by the model.
-
-**How does it work?**
-
-The encoder is trained to create dense embeddings for the images while the decoder is trained
-to reconstruct the new embedding into the original input image. The distances from the reconstructions
-between the test images and original images, or the probability distribution differences are used to
-measure how different they are and allow for the detection of outliers.
-
-## Tutorials
-
-There are no tutorials for Tensorflow models yet, but we will be adding one soon.
-
-% TODO: Create Tensorflow Model Tutorials
-
-## How To Guides
-
-There are currently no how to's for Tensorflow models.
-If there are scenarios that you want us to explain, contact us!
-
-## DataEval API
-
-### Models
+## Models
 
 ```{eval-rst}
 .. autoclass:: dataeval.models.tensorflow.AE(encoder_net: keras.Model, decoder_net: keras.Model)
@@ -48,13 +23,13 @@ If there are scenarios that you want us to explain, contact us!
 .. autoclass:: dataeval.models.tensorflow.VAEGMM(encoder_net: keras.Model, decoder_net: keras.Model, gmm_density_net: keras.Model, n_gmm: int, latent_dim: int, recon_features: Callable = eucl_cosim_features, beta: float = 1.0)
 ```
 
-### Reconstruction Functions
+## Reconstruction Functions
 
 ```{eval-rst}
 .. autofunction:: dataeval.models.tensorflow.eucl_cosim_features
 ```
 
-### Loss Function Classes
+## Loss Function Classes
 
 ```{eval-rst}
 .. autoclass:: dataeval.models.tensorflow.LossGMM
@@ -64,7 +39,7 @@ If there are scenarios that you want us to explain, contact us!
 .. autoclass:: dataeval.models.tensorflow.Elbo
 ```
 
-### Utility Functions
+## Utility Functions
 
 ```{eval-rst}
 .. autofunction:: dataeval.models.tensorflow.create_model

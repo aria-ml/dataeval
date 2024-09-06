@@ -22,15 +22,17 @@ from dataeval._internal.models.tensorflow.gmm import gmm_energy, gmm_params
 
 class Elbo:
     """
-    Compute ELBO loss. The covariance matrix can be specified by passing the full covariance matrix, the matrix
+    Compute ELBO loss.
+
+    The covariance matrix can be specified by passing the full covariance matrix, the matrix
     diagonal, or a scale identity multiplier. Only one of these should be specified. If none are specified, the
     identity matrix is used.
 
     Parameters
     ----------
-    cov_type
+    cov_type : Union[Literal["cov_full", "cov_diag"], float], default 1.0
         Full covariance matrix, diagonal variance matrix, or scale identity multiplier.
-    x
+    x : ArrayLike, optional - default None
         Dataset used to calculate the covariance matrix.  Required for full and diagonal covariance matrix types.
     """
 
@@ -69,13 +71,13 @@ class LossGMM:
 
     Parameters
     ----------
-    w_recon
+    w_recon : float, default 1e-7
         Weight on elbo loss term.
-    w_energy
+    w_energy : float, default 0.1
         Weight on sample energy loss term.
-    w_cov_diag
+    w_cov_diag : float, default 0.005
         Weight on covariance regularizing loss term.
-    elbo
+    elbo : Elbo, optional - default None
         ELBO loss function used to calculate w_recon.
     """
 
