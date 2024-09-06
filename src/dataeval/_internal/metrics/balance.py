@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import warnings
 from dataclasses import dataclass
-from typing import Dict, List, Sequence
+from typing import Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -43,7 +45,7 @@ def validate_num_neighbors(num_neighbors: int) -> int:
 
 
 @set_metadata("dataeval.metrics")
-def balance(class_labels: Sequence[int], metadata: List[Dict], num_neighbors: int = 5) -> BalanceOutput:
+def balance(class_labels: Sequence[int], metadata: list[dict], num_neighbors: int = 5) -> BalanceOutput:
     """
     Mutual information (MI) between factors (class label, metadata, label/image properties)
 
@@ -115,7 +117,7 @@ def balance(class_labels: Sequence[int], metadata: List[Dict], num_neighbors: in
 
 
 @set_metadata("dataeval.metrics")
-def balance_classwise(class_labels: Sequence[int], metadata: List[Dict], num_neighbors: int = 5) -> BalanceOutput:
+def balance_classwise(class_labels: Sequence[int], metadata: list[dict], num_neighbors: int = 5) -> BalanceOutput:
     """
     Compute mutual information (analogous to correlation) between metadata factors
     (class label, metadata, label/image properties) with individual class labels.

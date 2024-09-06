@@ -6,9 +6,9 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
-from __future__ import annotations  # py39: support Type | None
+from __future__ import annotations
 
-from typing import Callable, Literal, Tuple
+from typing import Callable, Literal
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -83,7 +83,7 @@ class DriftKS(BaseDriftUnivariate):
         self.alternative = alternative
 
     @preprocess_x
-    def score(self, x: ArrayLike) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
+    def score(self, x: ArrayLike) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         """
         Compute K-S scores and statistics per feature.
 

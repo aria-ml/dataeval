@@ -6,10 +6,10 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
-from __future__ import annotations  # py39: support Type | None
+from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Tuple
+from typing import Callable
 
 import torch
 from numpy.typing import ArrayLike
@@ -132,7 +132,7 @@ class DriftMMD(BaseDrift):
         return kernel_mat
 
     @preprocess_x
-    def score(self, x: ArrayLike) -> Tuple[float, float, float]:
+    def score(self, x: ArrayLike) -> tuple[float, float, float]:
         """
         Compute the p-value resulting from a permutation test using the maximum mean
         discrepancy as a distance measure between the reference data and the data to

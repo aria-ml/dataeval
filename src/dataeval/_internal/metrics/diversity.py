@@ -1,7 +1,7 @@
-from __future__ import annotations  # py39: support Type | None
+from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Literal, Sequence
+from typing import Literal, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -24,8 +24,8 @@ class DiversityOutput(OutputMetadata):
 
 def diversity_shannon(
     data: NDArray,
-    names: List[str],
-    is_categorical: List[bool],
+    names: list[str],
+    is_categorical: list[bool],
     subset_mask: NDArray[np.bool_] | None = None,
 ) -> NDArray:
     """
@@ -65,8 +65,8 @@ def diversity_shannon(
 
 def diversity_simpson(
     data: NDArray,
-    names: List[str],
-    is_categorical: List[bool],
+    names: list[str],
+    is_categorical: list[bool],
     subset_mask: NDArray[np.bool_] | None = None,
 ) -> NDArray:
     """
@@ -123,7 +123,7 @@ DIVERSITY_FN_MAP = {"simpson": diversity_simpson, "shannon": diversity_shannon}
 
 @set_metadata("dataeval.metrics")
 def diversity(
-    class_labels: Sequence[int], metadata: List[Dict], method: Literal["shannon", "simpson"] = "simpson"
+    class_labels: Sequence[int], metadata: list[dict], method: Literal["shannon", "simpson"] = "simpson"
 ) -> DiversityOutput:
     """
     Compute diversity for discrete/categorical variables and, through standard
@@ -163,7 +163,7 @@ def diversity(
 
 @set_metadata("dataeval.metrics")
 def diversity_classwise(
-    class_labels: Sequence[int], metadata: List[Dict], method: Literal["shannon", "simpson"] = "simpson"
+    class_labels: Sequence[int], metadata: list[dict], method: Literal["shannon", "simpson"] = "simpson"
 ) -> DiversityOutput:
     """
     Compute diversity for discrete/categorical variables and, through standard

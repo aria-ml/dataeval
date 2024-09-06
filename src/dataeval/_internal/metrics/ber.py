@@ -7,8 +7,10 @@ Learning to Bound the Multi-class Bayes Error (Th. 3 and Th. 4)
 https://arxiv.org/abs/1811.06419
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Literal, Tuple
+from typing import Literal
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -35,7 +37,7 @@ class BEROutput(OutputMetadata):
     ber_lower: float
 
 
-def ber_mst(X: NDArray, y: NDArray) -> Tuple[float, float]:
+def ber_mst(X: NDArray, y: NDArray) -> tuple[float, float]:
     """Calculates the Bayes Error Rate using a minimum spanning tree
 
     Parameters
@@ -60,7 +62,7 @@ def ber_mst(X: NDArray, y: NDArray) -> Tuple[float, float]:
     return upper, lower
 
 
-def ber_knn(X: NDArray, y: NDArray, k: int) -> Tuple[float, float]:
+def ber_knn(X: NDArray, y: NDArray, k: int) -> tuple[float, float]:
     """Calculates the Bayes Error Rate using K-nearest neighbors
 
     Parameters

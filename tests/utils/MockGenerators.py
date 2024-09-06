@@ -1,4 +1,6 @@
-from typing import Sequence, Tuple, Union
+from __future__ import annotations
+
+from typing import Sequence
 
 import numpy as np
 
@@ -27,8 +29,8 @@ class MockImageClassificationGenerator:
     def __init__(
         self,
         limit: int,
-        labels: Union[int, Sequence[int]],
-        img_dims: Union[int, Sequence[int]],
+        labels: int | Sequence[int],
+        img_dims: int | Sequence[int],
         channels: int = 1,
     ) -> None:
         self._limit = limit
@@ -56,7 +58,7 @@ class MockImageClassificationGenerator:
         images, labels = self._create_data()
         self._dataset = MockImageClassificationDataset(images, labels)
 
-    def _create_data(self) -> Tuple[np.ndarray, np.ndarray]:
+    def _create_data(self) -> tuple[np.ndarray, np.ndarray]:
         # Create an index for each label
         mock_data = np.ones(shape=(self._limit, *self._img_dims))
         mock_labels = np.ones(shape=(self._limit), dtype=int)
@@ -79,7 +81,7 @@ class MockImageClassificationGenerator:
 
         return (mock_data, mock_labels)
 
-    def _set_dims(self, dims: Sequence[int], channels: int = 1) -> Tuple[int, int, int]:
+    def _set_dims(self, dims: Sequence[int], channels: int = 1) -> tuple[int, int, int]:
         dim_size = len(dims)
         if dim_size == 3:
             return (dims[0], dims[1], dims[2])

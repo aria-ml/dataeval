@@ -1,6 +1,6 @@
-from __future__ import annotations  # py39: support Type | None
+from __future__ import annotations
 
-from typing import Literal, Tuple
+from typing import Literal
 
 import numpy as np
 import pytest
@@ -17,7 +17,7 @@ def mnist():
         dtype: type | None = None,
         add_channels: Literal["channels_first", "channels_last", "none"] = "none",
         unit_normalize: bool = False,
-    ) -> Tuple[NDArray, NDArray]:
+    ) -> tuple[NDArray, NDArray]:
         path = download_mnist()
         with np.load(path, allow_pickle=True) as fp:
             images, labels = fp["x_" + category][:size], fp["y_" + category][:size]

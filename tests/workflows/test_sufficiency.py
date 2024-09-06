@@ -1,6 +1,5 @@
-from __future__ import annotations  # py39: support Type | None
+from __future__ import annotations
 
-from typing import Dict, Tuple
 from unittest.mock import MagicMock, NonCallableMagicMock, patch
 
 import numpy as np
@@ -25,7 +24,7 @@ np.random.seed(0)
 torch.manual_seed(0)
 
 
-def load_cls_dataset() -> Tuple[DataEvalDataset, DataEvalDataset]:
+def load_cls_dataset() -> tuple[DataEvalDataset, DataEvalDataset]:
     images = np.ones(shape=(1, 32, 32, 3))
     labels = np.ones(shape=(1, 1))
 
@@ -35,7 +34,7 @@ def load_cls_dataset() -> Tuple[DataEvalDataset, DataEvalDataset]:
     return train_ds, test_ds
 
 
-def load_od_dataset() -> Tuple[DataEvalDataset, DataEvalDataset]:
+def load_od_dataset() -> tuple[DataEvalDataset, DataEvalDataset]:
     images = np.ones(shape=(1, 32, 32, 3))
     labels = np.ones(shape=(1, 1))
     boxes = np.ones(shape=(1, 1, 4))
@@ -46,7 +45,7 @@ def load_od_dataset() -> Tuple[DataEvalDataset, DataEvalDataset]:
     return train_ds, test_ds
 
 
-def eval_100(model: nn.Module, dl: DataLoader) -> Dict[str, float]:
+def eval_100(model: nn.Module, dl: DataLoader) -> dict[str, float]:
     """Eval should always return a float, and error if not"""
     return {"eval": 1.0}
 

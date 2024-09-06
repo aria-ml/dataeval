@@ -6,10 +6,10 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
-from __future__ import annotations  # py39: support Type | None
+from __future__ import annotations
 
 from functools import partial
-from typing import Callable, Type, Union
+from typing import Callable
 
 import numpy as np
 import torch
@@ -17,7 +17,7 @@ import torch.nn as nn
 from numpy.typing import NDArray
 
 
-def get_device(device: Union[str, torch.device] | None = None) -> torch.device:
+def get_device(device: str | torch.device | None = None) -> torch.device:
     """
     Instantiates a PyTorch device object.
 
@@ -77,13 +77,13 @@ def mmd2_from_kernel_matrix(
 
 
 def predict_batch(
-    x: Union[NDArray, torch.Tensor],
-    model: Union[Callable, nn.Module, nn.Sequential],
+    x: NDArray | torch.Tensor,
+    model: Callable | nn.Module | nn.Sequential,
     device: torch.device | None = None,
     batch_size: int = int(1e10),
     preprocess_fn: Callable | None = None,
-    dtype: Union[Type[np.generic], torch.dtype] = np.float32,
-) -> Union[NDArray, torch.Tensor, tuple]:
+    dtype: type[np.generic] | torch.dtype = np.float32,
+) -> NDArray | torch.Tensor | tuple:
     """
     Make batch predictions on a model.
 
@@ -145,7 +145,7 @@ def predict_batch(
                     torch.Tensor."
                 )
     concat = partial(np.concatenate, axis=0) if return_np else partial(torch.cat, dim=0)
-    out: Union[tuple, np.ndarray, torch.Tensor] = (
+    out: tuple | np.ndarray | torch.Tensor = (
         tuple(concat(p) for p in preds) if isinstance(preds, tuple) else concat(preds)  # type: ignore
     )
     return out
@@ -157,8 +157,8 @@ def preprocess_drift(
     device: torch.device | None = None,
     preprocess_batch_fn: Callable | None = None,
     batch_size: int = int(1e10),
-    dtype: Union[Type[np.generic], torch.dtype] = np.float32,
-) -> Union[NDArray, torch.Tensor, tuple]:
+    dtype: type[np.generic] | torch.dtype = np.float32,
+) -> NDArray | torch.Tensor | tuple:
     """
     Prediction function used for preprocessing step of drift detector.
 
@@ -292,8 +292,8 @@ class GaussianRBF(nn.Module):
 
     def forward(
         self,
-        x: Union[np.ndarray, torch.Tensor],
-        y: Union[np.ndarray, torch.Tensor],
+        x: np.ndarray | torch.Tensor,
+        y: np.ndarray | torch.Tensor,
         infer_sigma: bool = False,
     ) -> torch.Tensor:
         x, y = torch.as_tensor(x), torch.as_tensor(y)
