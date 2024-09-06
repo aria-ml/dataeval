@@ -6,10 +6,13 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
+from __future__ import annotations
+
 from typing import Callable
 
 import keras
 import numpy as np
+import tensorflow as tf
 from numpy.typing import ArrayLike
 
 from dataeval._internal.detectors.ood.base import OODBase, OODScore
@@ -20,17 +23,33 @@ from dataeval._internal.models.tensorflow.utils import predict_batch
 
 
 class OOD_VAE(OODBase):
-    def __init__(self, model: VAE, samples: int = 10) -> None:
-        """
-        VAE based outlier detector.
+    """
+    VAE based outlier detector.
 
-        Parameters
-        ----------
-        model : VAE
-            A VAE model.
-        samples : int, default 10
-            Number of samples sampled to evaluate each instance.
-        """
+    Parameters
+    ----------
+    model : VAE
+        A VAE model.
+    samples : int, default 10
+        Number of samples sampled to evaluate each instance.
+
+    Examples
+    --------
+    Instantiate an OOD detector metric with a generic dataset - batch of images with shape (3,25,25)
+
+    >>> metric = OOD_VAE(create_model(VAE, dataset[0].shape))
+
+    Adjusting fit parameters,
+    including setting the fit threshold at 85% for a training set with about 15% out-of-distribution
+
+    >>> metric.fit(dataset, threshold_perc=85, batch_size=128, verbose=False)
+
+    Detect out of distribution samples at the 'feature' level
+
+    >>> result = metric.predict(dataset, ood_type="feature")
+    """
+
+    def __init__(self, model: VAE, samples: int = 10) -> None:
         super().__init__(model)
         self.samples = samples
 
@@ -38,32 +57,14 @@ class OOD_VAE(OODBase):
         self,
         x_ref: ArrayLike,
         threshold_perc: float = 100.0,
-        loss_fn: Callable = Elbo(0.05),
+        loss_fn: Callable[..., tf.Tensor] | None = None,
         optimizer: keras.optimizers.Optimizer = keras.optimizers.Adam,
         epochs: int = 20,
         batch_size: int = 64,
         verbose: bool = True,
     ) -> None:
-        """
-        Train the VAE model.
-
-        Parameters
-        ----------
-        x_ref : ArrayLike
-            Training batch.
-        threshold_perc : float, default 100.0
-            Percentage of reference data that is normal.
-        loss_fn : Callable, default Elbo(0.05)
-            Loss function used for training.
-        optimizer : keras.optimizers.Optimizer, default keras.optimizers.Adam
-            Optimizer used for training.
-        epochs : int, default 20
-            Number of training epochs.
-        batch_size : int, default 64
-            Batch size used for training.
-        verbose : bool, default True
-            Whether to print training progress.
-        """
+        if loss_fn is None:
+            loss_fn = Elbo(0.05)
         super().fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
 
     def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScore:
