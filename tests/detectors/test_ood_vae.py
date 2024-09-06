@@ -22,9 +22,8 @@ from dataeval._internal.models.tensorflow.losses import Elbo
 
 score_type = ["mse"]
 samples = [10]
-loss_fn = [Elbo, keras.losses.mse]
+loss_fn = [Elbo, keras.losses.mse, None]
 threshold_perc = [90.0]
-ood_perc = [50, 100]
 ood_type = ["instance", "feature"]
 
 tests = list(
@@ -32,10 +31,9 @@ tests = list(
         samples,
         loss_fn,
         threshold_perc,
-        ood_perc,
         ood_type,
     )
-)
+)[:-1]
 n_tests = len(tests)
 
 # load iris data
@@ -54,13 +52,7 @@ def vae_params(request):
 @pytest.mark.parametrize("vae_params", list(range(n_tests)), indirect=True)
 def test_vae(vae_params):
     # OutlierVAE parameters
-    (
-        samples,
-        loss_fn,
-        threshold_perc,
-        ood_perc,
-        ood_type,
-    ) = vae_params
+    samples, loss_fn, threshold_perc, ood_type = vae_params
 
     # define encoder and decoder
     encoder_net = keras.Sequential(

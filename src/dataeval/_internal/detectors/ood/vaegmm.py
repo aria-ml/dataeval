@@ -6,10 +6,13 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
+from __future__ import annotations
+
 from typing import Callable
 
 import keras
 import numpy as np
+import tensorflow as tf
 from numpy.typing import ArrayLike
 
 from dataeval._internal.detectors.ood.base import OODGMMBase, OODScore
@@ -21,17 +24,18 @@ from dataeval._internal.models.tensorflow.utils import predict_batch
 
 
 class OOD_VAEGMM(OODGMMBase):
-    def __init__(self, model: VAEGMM, samples: int = 10) -> None:
-        """
-        VAE with Gaussian Mixture Model based outlier detector.
+    """
+    VAE with Gaussian Mixture Model based outlier detector.
 
-        Parameters
-        ----------
-        model : VAEGMM
-            A VAEGMM model.
-        samples
-            Number of samples sampled to evaluate each instance.
-        """
+    Parameters
+    ----------
+    model : VAEGMM
+        A VAEGMM model.
+    samples
+        Number of samples sampled to evaluate each instance.
+    """
+
+    def __init__(self, model: VAEGMM, samples: int = 10) -> None:
         super().__init__(model)
         self.samples = samples
 
@@ -39,35 +43,37 @@ class OOD_VAEGMM(OODGMMBase):
         self,
         x_ref: ArrayLike,
         threshold_perc: float = 100.0,
-        loss_fn: Callable = LossGMM(elbo=Elbo(0.05)),
+        loss_fn: Callable[..., tf.Tensor] | None = None,
         optimizer: keras.optimizers.Optimizer = keras.optimizers.Adam,
         epochs: int = 20,
         batch_size: int = 64,
         verbose: bool = True,
     ) -> None:
+        if loss_fn is None:
+            loss_fn = LossGMM(elbo=Elbo(0.05))
+        super().fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
+
+    def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScore:
         """
-        Train the AE model with recommended loss function and optimizer.
+        Compute the out-of-distribution (OOD) score for a given dataset.
 
         Parameters
         ----------
         X : ArrayLike
-            Training batch.
-        threshold_perc : float, default 100.0
-            Percentage of reference data that is normal.
-        loss_fn : Callable, default LossGMM(elbo=Elbo(0.05))
-            Loss function used for training.
-        optimizer : keras.optimizers.Optimizer, default keras.optimizers.Adam
-            Optimizer used for training.
-        epochs : int, default 20
-            Number of training epochs.
-        batch_size : int, default 64
-            Batch size used for training.
-        verbose : bool, default True
-            Whether to print training progress.
-        """
-        super().fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
+            Input data to score.
+        batch_size : int, default 1e10
+            Number of instances to process in each batch.
+            Use a smaller batch size if your dataset is large or if you encounter memory issues.
 
-    def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScore:
+        Returns
+        -------
+        OODScore
+            An object containing the instance-level OOD score.
+
+        Note
+        ----
+        This model does not produce a feature level score like the OOD_AE or OOD_VAE models.
+        """
         self._validate(X := to_numpy(X))
 
         # draw samples from latent space

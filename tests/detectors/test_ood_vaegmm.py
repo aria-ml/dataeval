@@ -24,8 +24,10 @@ w_energy = [0.1, 0.5]
 w_recon = [0.0, 1e-7]
 samples = [1, 10]
 threshold_perc = [90.0]
+loss_fn = [True]
 
-tests = list(product(n_gmm, w_energy, w_recon, samples, threshold_perc))
+tests = list(product(n_gmm, w_energy, w_recon, samples, threshold_perc, loss_fn))
+tests.append((n_gmm[0], w_energy[0], w_recon[0], samples[0], threshold_perc[0], False))
 n_tests = len(tests)
 
 # load and preprocess MNIST data
@@ -47,7 +49,7 @@ def vaegmm_params(request):
 @pytest.mark.parametrize("vaegmm_params", list(range(n_tests)), indirect=True)
 def test_vaegmm(vaegmm_params):
     # OutlierVAEGMM parameters
-    n_gmm, w_energy, w_recon, samples, threshold_perc = vaegmm_params
+    n_gmm, w_energy, w_recon, samples, threshold_perc, loss_fn = vaegmm_params
 
     # define encoder, decoder and GMM density net
     encoder_net = keras.Sequential(
@@ -70,12 +72,15 @@ def test_vaegmm(vaegmm_params):
         ]
     )
 
-    # init OutlierAEGMM
+    # init OutlierVAEGMM
     vaegmm = OOD_VAEGMM(VAEGMM(encoder_net, decoder_net, gmm_density_net, n_gmm, latent_dim), samples=samples)
 
-    # fit OutlierAEGMM, infer threshold and compute scores
-    loss_fn = LossGMM(w_recon=w_recon, w_energy=w_energy)
-    vaegmm.fit(X, threshold_perc=threshold_perc, loss_fn=loss_fn, epochs=5, batch_size=1000, verbose=False)
+    # fit OutlierVAEGMM, infer threshold and compute scores
+    if loss_fn:
+        loss_fn = LossGMM(w_recon=w_recon, w_energy=w_energy)
+        vaegmm.fit(X, threshold_perc=threshold_perc, loss_fn=loss_fn, epochs=5, batch_size=1000, verbose=False)
+    else:
+        vaegmm.fit(X, threshold_perc=threshold_perc, epochs=5, batch_size=1000, verbose=False)
     energy = vaegmm.score(X).instance_score
     perc_score = 100 * (energy < vaegmm._threshold_score()).sum() / energy.shape[0]
     assert threshold_perc + 5 > perc_score > threshold_perc - 5
