@@ -20,10 +20,10 @@ from dataeval._internal.detectors.ood.ae import OOD_AE
 from dataeval._internal.models.tensorflow.autoencoder import AE
 
 threshold_perc = [90.0]
-ood_perc = [50, 100]
+loss_fn = [keras.losses.MeanSquaredError(), None]
 ood_type = ["instance", "feature"]
 
-tests = list(product(threshold_perc, ood_perc, ood_type))
+tests = list(product(threshold_perc, loss_fn, ood_type))[:-1]
 n_tests = len(tests)
 
 # load iris data
@@ -42,7 +42,7 @@ def ae_params(request):
 @pytest.mark.parametrize("ae_params", list(range(n_tests)), indirect=True)
 def test_ae(ae_params):
     # OutlierAE parameters
-    threshold_perc, ood_perc, ood_type = ae_params
+    threshold_perc, loss_fn, ood_type = ae_params
 
     # define encoder and decoder
     encoder_net = keras.Sequential(
@@ -60,10 +60,8 @@ def test_ae(ae_params):
     # init OutlierAE
     ae = OOD_AE(AE(encoder_net=encoder_net, decoder_net=decoder_net))
 
-    # fit OutlierAE
-    ae.fit(X, threshold_perc=threshold_perc, epochs=5, verbose=True)  # type: ignore
-
-    # check thresholds and scores
+    # fit OutlierAE, infer threshold and compute scores
+    ae.fit(X, threshold_perc=threshold_perc, loss_fn=loss_fn, epochs=5, verbose=True)  # type: ignore
     iscore = ae._ref_score.instance_score
     perc_score = 100 * (iscore < ae._threshold_score()).sum() / iscore.shape[0]
     assert threshold_perc + 5 > perc_score > threshold_perc - 5

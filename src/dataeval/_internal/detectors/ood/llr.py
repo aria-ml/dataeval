@@ -89,6 +89,22 @@ def mutate_categorical(
 
 
 class OOD_LLR(OODBase):
+    """
+    Likelihood Ratios based outlier detector.
+
+    Parameters
+    ----------
+    model : PixelCNN
+        Generative distribution model.
+    model_background : Optional[PixelCNN], default None
+        Optional model for the background. Only needed if it is different from `model`.
+    log_prob : Optional[Callable], default None
+        Function used to evaluate log probabilities under the model
+        if the model does not have a `log_prob` function.
+    sequential : bool, default False
+        Whether the data is sequential. Used to create targets during training.
+    """
+
     def __init__(
         self,
         model: PixelCNN,
@@ -96,21 +112,6 @@ class OOD_LLR(OODBase):
         log_prob: Callable | None = None,
         sequential: bool = False,
     ) -> None:
-        """
-        Likelihood Ratios based outlier detector.
-
-        Parameters
-        ----------
-        model : PixelCNN
-            Generative distribution model.
-        model_background : PixelCNN | None, default None
-            Optional model for the background. Only needed if it is different from `model`.
-        log_prob : Callable | None, default None
-            Function used to evaluate log probabilities under the model
-            if the model does not have a `log_prob` function.
-        sequential : bool, default False
-            Whether the data is sequential. Used to create targets during training.
-        """
         self.dist_s = model
         self.dist_b = (
             model.copy()
@@ -146,7 +147,7 @@ class OOD_LLR(OODBase):
         Parameters
         ----------
         x_ref : ArrayLike
-            Training batch.
+            Training data.
         threshold_perc : float, default 100.0
             Percentage of reference data that is normal.
         loss_fn : Callable | None, default None
