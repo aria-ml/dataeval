@@ -1,14 +1,11 @@
 (uap-ref)=
 # Upperbound Average Precision
 
-% Create small blurb here that answers:
-
-% 1. What it is
-
-% 2. What does it solve
-
-## DataEval API
+```{testsetup}
+import numpy as np
+from dataeval.metrics import uap
+```
 
 ```{eval-rst}
-.. autofunction: dataeval.metrics.uap
+.. autofunction:: dataeval.metrics.uap
 ```
