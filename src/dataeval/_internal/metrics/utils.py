@@ -146,7 +146,7 @@ def get_num_bins(
     return num_bins
 
 
-def infer_categorical(X: NDArray, threshold: float = 0.5) -> NDArray:
+def infer_categorical(X: NDArray, threshold: float = 0.2) -> NDArray:
     """
     Compute fraction of feature values that are unique --- intended to be used
     for inferring whether variables are categorical.
