@@ -1,4 +1,6 @@
-from typing import Dict, Optional, Tuple
+from __future__ import annotations  # py39: support Type | None
+
+from typing import Dict, Tuple
 from unittest.mock import MagicMock, NonCallableMagicMock, patch
 
 import numpy as np
@@ -49,7 +51,7 @@ def eval_100(model: nn.Module, dl: DataLoader) -> Dict[str, float]:
     return {"eval": 1.0}
 
 
-def mock_ds(length: Optional[int]):
+def mock_ds(length: int | None):
     ds = MagicMock()
     if length is None:
         delattr(ds, "__len__")

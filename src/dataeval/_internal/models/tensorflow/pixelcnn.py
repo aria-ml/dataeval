@@ -8,9 +8,10 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
+from __future__ import annotations  # py39: support Type | None
+
 import functools
 import warnings
-from typing import Optional
 
 import keras
 import numpy as np
@@ -278,7 +279,7 @@ class PixelCNN(distribution.Distribution):
     def __init__(
         self,
         image_shape: tuple,
-        conditional_shape: Optional[tuple] = None,
+        conditional_shape: tuple | None = None,
         num_resnet: int = 5,
         num_hierarchies: int = 3,
         num_filters: int = 160,

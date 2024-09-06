@@ -6,9 +6,11 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
+from __future__ import annotations  # py39: support Type | None
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, List, Literal, NamedTuple, Optional, Tuple, cast
+from typing import Callable, List, Literal, NamedTuple, Tuple, cast
 
 import keras
 import numpy as np
@@ -30,13 +32,13 @@ class OODOutput(OutputMetadata):
         Array of images that are detected as out of distribution
     instance_score : NDArray[np.float32]
         Instance score of the evaluated dataset
-    feature_score : Optional[NDArray[np.float32]]
+    feature_score : NDArray[np.float32] | None
         Feature score, if available, of the evaluated dataset
     """
 
     is_ood: NDArray[np.bool_]
     instance_score: NDArray[np.float32]
-    feature_score: Optional[NDArray[np.float32]]
+    feature_score: NDArray[np.float32] | None
 
 
 class OODScore(NamedTuple):
@@ -47,12 +49,12 @@ class OODScore(NamedTuple):
     ----------
     instance_score : NDArray[np.float32]
         Instance score of the evaluated dataset.
-    feature_score : Optional[NDArray[np.float32]], default None
+    feature_score : NDArray[np.float32] | None, default None
         Feature score, if available, of the evaluated dataset.
     """
 
     instance_score: NDArray[np.float32]
-    feature_score: Optional[NDArray[np.float32]] = None
+    feature_score: NDArray[np.float32] | None = None
 
     def get(self, ood_type: Literal["instance", "feature"]) -> NDArray:
         return self.instance_score if ood_type == "instance" or self.feature_score is None else self.feature_score
@@ -64,7 +66,7 @@ class OODBase(ABC):
 
         self._ref_score: OODScore
         self._threshold_perc: float
-        self._data_info: Optional[Tuple[tuple, type]] = None
+        self._data_info: Tuple[tuple, type] | None = None
 
         if not isinstance(model, keras.Model):
             raise TypeError("Model should be of type 'keras.Model'.")
@@ -80,7 +82,7 @@ class OODBase(ABC):
             raise RuntimeError(f"Expect data of type: {self._data_info[1]} and shape: {self._data_info[0]}. \
                                Provided data is type: {check_data_info[1]} and shape: {check_data_info[0]}.")
 
-    def _validate_state(self, X: NDArray, additional_attrs: Optional[List[str]] = None) -> None:
+    def _validate_state(self, X: NDArray, additional_attrs: List[str] | None = None) -> None:
         attrs = ["_data_info", "_threshold_perc", "_ref_score"]
         attrs = attrs if additional_attrs is None else attrs + additional_attrs
         if not all(hasattr(self, attr) for attr in attrs) or any(getattr(self, attr) for attr in attrs) is None:
@@ -187,7 +189,7 @@ class OODGMMBase(OODBase):
         super().__init__(model)
         self.gmm_params: GaussianMixtureModelParams
 
-    def _validate_state(self, X: NDArray, additional_attrs: Optional[List[str]] = None) -> None:
+    def _validate_state(self, X: NDArray, additional_attrs: List[str] | None = None) -> None:
         if additional_attrs is None:
             additional_attrs = ["gmm_params"]
         super()._validate_state(X, additional_attrs)

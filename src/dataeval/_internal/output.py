@@ -1,7 +1,9 @@
+from __future__ import annotations  # py39: support Type | None
+
 import inspect
 from datetime import datetime, timezone
 from functools import wraps
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import numpy as np
 
@@ -23,7 +25,7 @@ class OutputMetadata:
         return {k.removeprefix("_"): v for k, v in self.__dict__.items() if k.startswith("_")}
 
 
-def set_metadata(module_name: str = "", state_attr: Optional[List[str]] = None):
+def set_metadata(module_name: str = "", state_attr: List[str] | None = None):
     def decorator(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):

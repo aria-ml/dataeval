@@ -6,8 +6,10 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
+from __future__ import annotations  # py39: support Type | None
+
 from dataclasses import dataclass
-from typing import Callable, Optional, Tuple
+from typing import Callable, Tuple
 
 import torch
 from numpy.typing import ArrayLike
@@ -62,17 +64,17 @@ class DriftMMD(BaseDrift):
         Whether to preprocess the reference data when the detector is instantiated.
         Otherwise, the reference data will be preprocessed at prediction time. Only
         applies if `x_ref_preprocessed=False`.
-    update_x_ref : Optional[UpdateStrategy], default None
+    update_x_ref : UpdateStrategy | None, default None
         Reference data can optionally be updated using an UpdateStrategy class. Update
         using the last n instances seen by the detector with
         :py:class:`dataeval.detectors.LastSeenUpdateStrategy`
         or via reservoir sampling with
         :py:class:`dataeval.detectors.ReservoirSamplingUpdateStrategy`.
-    preprocess_fn : Optional[Callable], default None
+    preprocess_fn : Callable[[ArrayLike], ArrayLike] | None, default None
         Function to preprocess the data before computing the data drift metrics.
     kernel : Callable, default :py:class:`dataeval.detectors.GaussianRBF`
         Kernel used for the MMD computation, defaults to Gaussian RBF kernel.
-    sigma : Optional[ArrayLike], default None
+    sigma : ArrayLike | None, default None
         Optionally set the GaussianRBF kernel bandwidth. Can also pass multiple
         bandwidth values as an array. The kernel evaluation is then averaged over
         those bandwidths.
@@ -80,7 +82,7 @@ class DriftMMD(BaseDrift):
         Whether to already configure the kernel bandwidth from the reference data.
     n_permutations : int, default 100
         Number of permutations used in the permutation test.
-    device : Optional[str], default None
+    device : str | None, default None
         Device type used. The default None uses the GPU and falls back on CPU.
         Can be specified by passing either 'cuda', 'gpu' or 'cpu'.
     """
@@ -90,13 +92,13 @@ class DriftMMD(BaseDrift):
         x_ref: ArrayLike,
         p_val: float = 0.05,
         x_ref_preprocessed: bool = False,
-        update_x_ref: Optional[UpdateStrategy] = None,
-        preprocess_fn: Optional[Callable[[ArrayLike], ArrayLike]] = None,
+        update_x_ref: UpdateStrategy | None = None,
+        preprocess_fn: Callable[[ArrayLike], ArrayLike] | None = None,
         kernel: Callable = GaussianRBF,
-        sigma: Optional[ArrayLike] = None,
+        sigma: ArrayLike | None = None,
         configure_kernel_from_x_ref: bool = True,
         n_permutations: int = 100,
-        device: Optional[str] = None,
+        device: str | None = None,
     ) -> None:
         super().__init__(x_ref, p_val, x_ref_preprocessed, update_x_ref, preprocess_fn)
 

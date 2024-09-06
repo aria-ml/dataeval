@@ -1,6 +1,8 @@
+from __future__ import annotations  # py39: support Type | None
+
 import warnings
 from dataclasses import dataclass
-from typing import Dict, Generic, Mapping, Optional, Tuple, TypeVar
+from typing import Dict, Generic, Mapping, Tuple, TypeVar
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -162,7 +164,7 @@ def validate_dist(label_dist: NDArray, label_name: str):
 def parity(
     expected_labels: ArrayLike,
     observed_labels: ArrayLike,
-    num_classes: Optional[int] = None,
+    num_classes: int | None = None,
 ) -> ParityOutput[np.float64]:
     """
     Perform a one-way chi-squared test between observation frequencies and expected frequencies that
@@ -177,7 +179,7 @@ def parity(
         List of class labels in the expected dataset
     observed_labels : ArrayLike
         List of class labels in the observed dataset
-    num_classes : Optional[int]
+    num_classes : int | None
         The number of unique classes in the datasets. If this is not specified, it will
         be inferred from the set of unique labels in expected_labels and observed_labels
 
@@ -225,7 +227,7 @@ def parity(
 @set_metadata("dataeval.metrics")
 def parity_metadata(
     data_factors: Mapping[str, ArrayLike],
-    continuous_factor_bincounts: Optional[Dict[str, int]] = None,
+    continuous_factor_bincounts: Dict[str, int] | None = None,
 ) -> ParityOutput[NDArray[np.float64]]:
     """
     Evaluates the statistical independence of metadata factors from class labels.
@@ -239,7 +241,7 @@ def parity_metadata(
     data_factors: Mapping[str, ArrayLike]
         The dataset factors, which are per-image attributes including class label and metadata.
         Each key of dataset_factors is a factor, whose value is the per-image factor values.
-    continuous_factor_bincounts : Optional[Dict[str, int]], default None
+    continuous_factor_bincounts : Dict[str, int] | None, default None
         The factors in data_factors that have continuous values and the array of bin counts to
         discretize values into. All factors are treated as having discrete values unless they
         are specified as keys in this dictionary. Each element of this array must occur as a key

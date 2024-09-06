@@ -37,7 +37,7 @@ If there are scenarios that you want us to explain, contact us!
 ```
 
 ```{eval-rst}
-.. autoclass:: dataeval.models.tensorflow.PixelCNN(image_shape: tuple, conditional_shape: Optional[tuple] = None, num_resnet: int = 5, num_hierarchies: int = 3, num_filters: int = 160, num_logistic_mix: int = 10, receptive_field_dims: tuple = (3, 3), dropout_p: float = 0.5, resnet_activation: str = "concat_elu", l2_weight: float = 0.0, use_weight_norm: bool = True, use_data_init: bool = True, high: int = 255, low: int = 0, dtype=tf.float32, name: str = "PixelCNN")
+.. autoclass:: dataeval.models.tensorflow.PixelCNN(image_shape: tuple, conditional_shape: tuple | None = None, num_resnet: int = 5, num_hierarchies: int = 3, num_filters: int = 160, num_logistic_mix: int = 10, receptive_field_dims: tuple = (3, 3), dropout_p: float = 0.5, resnet_activation: str = "concat_elu", l2_weight: float = 0.0, use_weight_norm: bool = True, use_data_init: bool = True, high: int = 255, low: int = 0, dtype=tf.float32, name: str = "PixelCNN")
 ```
 
 ```{eval-rst}

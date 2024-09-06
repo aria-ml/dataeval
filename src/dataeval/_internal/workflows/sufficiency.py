@@ -1,6 +1,8 @@
+from __future__ import annotations  # py39: support Type | None
+
 import warnings
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union, cast
+from typing import Any, Callable, Dict, List, Sequence, Union, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -278,8 +280,8 @@ class Sufficiency:
         eval_fn: Callable[[nn.Module, Dataset], Union[Dict[str, float], Dict[str, NDArray]]],
         runs: int = 1,
         substeps: int = 5,
-        train_kwargs: Optional[Dict[str, Any]] = None,
-        eval_kwargs: Optional[Dict[str, Any]] = None,
+        train_kwargs: Dict[str, Any] | None = None,
+        eval_kwargs: Dict[str, Any] | None = None,
     ):
         self.model = model
         self.train_ds = train_ds
@@ -339,7 +341,7 @@ class Sufficiency:
         return self._train_kwargs
 
     @train_kwargs.setter
-    def train_kwargs(self, value: Optional[Dict[str, Any]]):
+    def train_kwargs(self, value: Dict[str, Any] | None):
         self._train_kwargs = {} if value is None else value
 
     @property
@@ -347,17 +349,17 @@ class Sufficiency:
         return self._eval_kwargs
 
     @eval_kwargs.setter
-    def eval_kwargs(self, value: Optional[Dict[str, Any]]):
+    def eval_kwargs(self, value: Dict[str, Any] | None):
         self._eval_kwargs = {} if value is None else value
 
     @set_metadata("dataeval.workflows", ["runs", "substeps"])
-    def evaluate(self, eval_at: Optional[NDArray] = None, niter: int = 1000) -> SufficiencyOutput:
+    def evaluate(self, eval_at: NDArray | None = None, niter: int = 1000) -> SufficiencyOutput:
         """
         Creates data indices, trains models, and returns plotting data
 
         Parameters
         ----------
-        eval_at : Optional[NDArray]
+        eval_at : NDArray | None
             Specify this to collect accuracies over a specific set of dataset lengths, rather
             than letting Sufficiency internally create the lengths to evaluate at.
         niter : int, default 1000
@@ -456,7 +458,7 @@ class Sufficiency:
         return SufficiencyOutput(projection, data.params, output)
 
     @classmethod
-    def plot(cls, data: SufficiencyOutput, class_names: Optional[Sequence[str]] = None) -> List[Figure]:
+    def plot(cls, data: SufficiencyOutput, class_names: Sequence[str] | None = None) -> List[Figure]:
         """Plotting function for data sufficiency tasks
 
         Parameters
