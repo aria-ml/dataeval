@@ -1,4 +1,6 @@
-from typing import Any, Callable, Dict, List, Literal, NamedTuple, Optional, Sequence, Tuple, Union
+from __future__ import annotations
+
+from typing import Any, Callable, Literal, NamedTuple, Sequence
 
 import numpy as np
 import xxhash as xxh
@@ -19,22 +21,22 @@ HASH_SIZE = 8
 MAX_FACTOR = 4
 
 
-def get_method(method_map: Dict[str, Callable], method: str) -> Callable:
+def get_method(method_map: dict[str, Callable], method: str) -> Callable:
     if method not in method_map:
         raise ValueError(f"Specified method {method} is not a valid method: {method_map}.")
     return method_map[method]
 
 
 def get_counts(
-    data: NDArray, names: List[str], is_categorical: List[bool], subset_mask: Optional[NDArray[np.bool_]] = None
-) -> tuple[Dict, Dict]:
+    data: NDArray, names: list[str], is_categorical: list[bool], subset_mask: NDArray[np.bool_] | None = None
+) -> tuple[dict, dict]:
     """
     Initialize dictionary of histogram counts --- treat categorical values
     as histogram bins.
 
     Parameters
     ----------
-    subset_mask: Optional[NDArray[np.bool_]]
+    subset_mask: NDArray[np.bool_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
     Returns
@@ -68,10 +70,10 @@ def get_counts(
 
 def entropy(
     data: NDArray,
-    names: List[str],
-    is_categorical: List[bool],
+    names: list[str],
+    is_categorical: list[bool],
     normalized: bool = False,
-    subset_mask: Optional[NDArray[np.bool_]] = None,
+    subset_mask: NDArray[np.bool_] | None = None,
 ) -> NDArray[np.float64]:
     """
     Meant for use with Bias metrics, Balance, Diversity, ClasswiseBalance,
@@ -84,7 +86,7 @@ def entropy(
     ----------
     normalized: bool
         Flag that determines whether or not to normalize entropy by log(num_bins)
-    subset_mask: Optional[NDArray[np.bool_]]
+    subset_mask: NDArray[np.bool_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
     Notes
@@ -120,7 +122,7 @@ def entropy(
 
 
 def get_num_bins(
-    data: NDArray, names: List[str], is_categorical: List[bool], subset_mask: Optional[NDArray[np.bool_]] = None
+    data: NDArray, names: list[str], is_categorical: list[bool], subset_mask: NDArray[np.bool_] | None = None
 ) -> NDArray[np.float64]:
     """
     Number of bins or unique values for each metadata factor, used to
@@ -128,7 +130,7 @@ def get_num_bins(
 
     Parameters
     ----------
-    subset_mask: Optional[NDArray[np.bool_]]
+    subset_mask: NDArray[np.bool_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
     Returns
@@ -160,10 +162,10 @@ def infer_categorical(X: NDArray, threshold: float = 0.5) -> NDArray:
 
 
 def preprocess_metadata(
-    class_labels: Sequence[int], metadata: List[Dict], cat_thresh: float = 0.2
-) -> Tuple[NDArray, List[str], List[bool]]:
+    class_labels: Sequence[int], metadata: list[dict], cat_thresh: float = 0.2
+) -> tuple[NDArray, list[str], list[bool]]:
     # convert class_labels and list of metadata dicts to dict of ndarrays
-    metadata_dict: Dict[str, NDArray] = {
+    metadata_dict: dict[str, NDArray] = {
         "class_label": np.asarray(class_labels, dtype=int),
         **{k: np.array([d[k] for d in metadata]) for k in metadata[0]},
     }
@@ -223,7 +225,7 @@ def minimum_spanning_tree(X: NDArray) -> Any:
     return mst(eudist_csr)
 
 
-def get_classes_counts(labels: NDArray) -> Tuple[int, int]:
+def get_classes_counts(labels: NDArray) -> tuple[int, int]:
     """
     Returns the classes and counts of from an array of labels
 
@@ -303,8 +305,8 @@ def compute_neighbors(
 
 class BitDepth(NamedTuple):
     depth: int
-    pmin: Union[float, int]
-    pmax: Union[float, int]
+    pmin: float | int
+    pmax: float | int
 
 
 def get_bitdepth(image: NDArray) -> BitDepth:

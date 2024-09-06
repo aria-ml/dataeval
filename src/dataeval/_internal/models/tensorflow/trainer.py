@@ -6,7 +6,9 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
-from typing import Callable, Iterable, Optional, Tuple, cast
+from __future__ import annotations
+
+from typing import Callable, Iterable, cast
 
 import keras
 import numpy as np
@@ -17,10 +19,10 @@ from numpy.typing import NDArray
 def trainer(
     model: keras.Model,
     x_train: NDArray,
-    y_train: Optional[NDArray] = None,
-    loss_fn: Optional[Callable[..., tf.Tensor]] = None,
+    y_train: NDArray | None = None,
+    loss_fn: Callable[..., tf.Tensor] | None = None,
     optimizer: keras.optimizers.Optimizer = keras.optimizers.Adam,
-    preprocess_fn: Optional[Callable[[tf.Tensor], tf.Tensor]] = None,
+    preprocess_fn: Callable[[tf.Tensor], tf.Tensor] | None = None,
     epochs: int = 20,
     reg_loss_fn: Callable[[keras.Model], tf.Tensor] = (lambda _: cast(tf.Tensor, tf.Variable(0, dtype=tf.float32))),
     batch_size: int = 64,
@@ -70,14 +72,14 @@ def trainer(
             dataset.on_epoch_end()  # type: ignore py39
         loss_val_ma = 0.0
         for step, data in enumerate(dataset):
-            x, y = cast(Tuple[tf.Tensor, Optional[tf.Tensor]], data if isinstance(data, tuple) else (data, None))
+            x, y = data if isinstance(data, tuple) else (data, None)
             if isinstance(preprocess_fn, Callable):
                 x = preprocess_fn(x)
             with tf.GradientTape() as tape:
                 y_hat = model(x)
                 y = x if y is None else y
                 if isinstance(loss_fn, Callable):
-                    args = [y] + list(y_hat) if isinstance(y_hat, Tuple) else [y, y_hat]
+                    args = [y] + list(y_hat) if isinstance(y_hat, tuple) else [y, y_hat]
                     loss = loss_fn(*args)
                 else:
                     loss = cast(tf.Tensor, tf.constant(0.0, dtype=tf.float32))

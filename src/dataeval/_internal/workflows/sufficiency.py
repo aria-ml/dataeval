@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import warnings
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union, cast
+from typing import Any, Callable, Sequence, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -28,8 +30,8 @@ class SufficiencyOutput(OutputMetadata):
     """
 
     steps: NDArray[np.uint32]
-    params: Dict[str, NDArray[np.float64]]
-    measures: Dict[str, NDArray[np.float64]]
+    params: dict[str, NDArray[np.float64]]
+    measures: dict[str, NDArray[np.float64]]
 
     def __post_init__(self):
         c = len(self.steps)
@@ -191,7 +193,7 @@ def inv_project_steps(params: NDArray, targets: NDArray) -> NDArray[np.uint64]:
     return np.ceil(steps)
 
 
-def get_curve_params(measures: Dict[str, NDArray], ranges: NDArray, niter: int) -> Dict[str, NDArray]:
+def get_curve_params(measures: dict[str, NDArray], ranges: NDArray, niter: int) -> dict[str, NDArray]:
     """Calculates and aggregates parameters for both single and multi-class metrics"""
     output = {}
     for name, measure in measures.items():
@@ -275,11 +277,11 @@ class Sufficiency:
         train_ds: Dataset,
         test_ds: Dataset,
         train_fn: Callable[[nn.Module, Dataset, Sequence[int]], None],
-        eval_fn: Callable[[nn.Module, Dataset], Union[Dict[str, float], Dict[str, NDArray]]],
+        eval_fn: Callable[[nn.Module, Dataset], dict[str, float] | dict[str, NDArray]],
         runs: int = 1,
         substeps: int = 5,
-        train_kwargs: Optional[Dict[str, Any]] = None,
-        eval_kwargs: Optional[Dict[str, Any]] = None,
+        train_kwargs: dict[str, Any] | None = None,
+        eval_kwargs: dict[str, Any] | None = None,
     ):
         self.model = model
         self.train_ds = train_ds
@@ -322,42 +324,42 @@ class Sufficiency:
     @property
     def eval_fn(
         self,
-    ) -> Callable[[nn.Module, Dataset], Union[Dict[str, float], Dict[str, NDArray]]]:
+    ) -> Callable[[nn.Module, Dataset], dict[str, float] | dict[str, NDArray]]:
         return self._eval_fn
 
     @eval_fn.setter
     def eval_fn(
         self,
-        value: Callable[[nn.Module, Dataset], Union[Dict[str, float], Dict[str, NDArray]]],
+        value: Callable[[nn.Module, Dataset], dict[str, float] | dict[str, NDArray]],
     ):
         if not callable(value):
             raise TypeError("Must provide a callable for eval_fn.")
         self._eval_fn = value
 
     @property
-    def train_kwargs(self) -> Dict[str, Any]:
+    def train_kwargs(self) -> dict[str, Any]:
         return self._train_kwargs
 
     @train_kwargs.setter
-    def train_kwargs(self, value: Optional[Dict[str, Any]]):
+    def train_kwargs(self, value: dict[str, Any] | None):
         self._train_kwargs = {} if value is None else value
 
     @property
-    def eval_kwargs(self) -> Dict[str, Any]:
+    def eval_kwargs(self) -> dict[str, Any]:
         return self._eval_kwargs
 
     @eval_kwargs.setter
-    def eval_kwargs(self, value: Optional[Dict[str, Any]]):
+    def eval_kwargs(self, value: dict[str, Any] | None):
         self._eval_kwargs = {} if value is None else value
 
     @set_metadata("dataeval.workflows", ["runs", "substeps"])
-    def evaluate(self, eval_at: Optional[NDArray] = None, niter: int = 1000) -> SufficiencyOutput:
+    def evaluate(self, eval_at: NDArray | None = None, niter: int = 1000) -> SufficiencyOutput:
         """
         Creates data indices, trains models, and returns plotting data
 
         Parameters
         ----------
-        eval_at : Optional[NDArray]
+        eval_at : NDArray | None
             Specify this to collect accuracies over a specific set of dataset lengths, rather
             than letting Sufficiency internally create the lengths to evaluate at.
         niter : int, default 1000
@@ -416,7 +418,7 @@ class Sufficiency:
     def project(
         cls,
         data: SufficiencyOutput,
-        projection: Union[int, Sequence[int], NDArray[np.uint]],
+        projection: int | Sequence[int] | NDArray[np.uint],
     ) -> SufficiencyOutput:
         """Projects the measures for each value of X
 
@@ -456,7 +458,7 @@ class Sufficiency:
         return SufficiencyOutput(projection, data.params, output)
 
     @classmethod
-    def plot(cls, data: SufficiencyOutput, class_names: Optional[Sequence[str]] = None) -> List[Figure]:
+    def plot(cls, data: SufficiencyOutput, class_names: Sequence[str] | None = None) -> list[Figure]:
         """Plotting function for data sufficiency tasks
 
         Parameters
@@ -505,7 +507,7 @@ class Sufficiency:
         return plots
 
     @classmethod
-    def inv_project(cls, targets: Dict[str, NDArray], data: SufficiencyOutput) -> Dict[str, NDArray]:
+    def inv_project(cls, targets: dict[str, NDArray], data: SufficiencyOutput) -> dict[str, NDArray]:
         """
         Calculate training samples needed to achieve target model metric values.
 

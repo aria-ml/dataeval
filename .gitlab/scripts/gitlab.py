@@ -1,6 +1,6 @@
 from os import remove
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal
 from uuid import uuid4
 from zipfile import ZipFile
 
@@ -32,7 +32,7 @@ class Gitlab(RestWrapper):
 
     def __init__(
         self,
-        token: Optional[str] = None,
+        token: str | None = None,
         timeout: int = 10,
         verbose: bool = False,
     ):
@@ -55,7 +55,7 @@ class Gitlab(RestWrapper):
         r = self._request(get, TAGS)
         return r
 
-    def add_tag(self, tag_name: str, ref: str = "main", message: Optional[str] = None) -> Dict[str, Any]:
+    def add_tag(self, tag_name: str, ref: str = "main", message: str | None = None) -> Dict[str, Any]:
         """
         Create a new tag
 
@@ -65,7 +65,7 @@ class Gitlab(RestWrapper):
             The name of the tag (e.g. "v0.1.0")
         ref : str
             The tag, branch name or SHA to create the tag at
-        message : Optional[str], default None
+        message : str | None, default None
             Create an annotated tag with provided message
 
         Returns
@@ -153,11 +153,11 @@ class Gitlab(RestWrapper):
 
     def list_merge_requests(
         self,
-        state: Optional[Literal["opened", "closed", "locked", "merged"]] = None,
-        target_branch: Optional[str] = None,
-        source_branch: Optional[str] = None,
-        search_title: Optional[str] = None,
-        order_by: Optional[Literal["created_at", "title", "merged_at", "updated_at"]] = None,
+        state: Literal["opened", "closed", "locked", "merged"] | None = None,
+        target_branch: str | None = None,
+        source_branch: str | None = None,
+        search_title: str | None = None,
+        order_by: Literal["created_at", "title", "merged_at", "updated_at"] | None = None,
     ) -> List[Dict[str, Any]]:
         """
         List merge requests

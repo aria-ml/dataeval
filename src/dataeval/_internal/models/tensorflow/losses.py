@@ -6,7 +6,9 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
-from typing import Literal, Optional, Union, cast
+from __future__ import annotations
+
+from typing import Literal, cast
 
 import tensorflow as tf
 from keras.layers import Flatten
@@ -34,8 +36,8 @@ class Elbo:
 
     def __init__(
         self,
-        cov_type: Union[Literal["cov_full", "cov_diag"], float] = 1.0,
-        x: Optional[Union[tf.Tensor, NDArray]] = None,
+        cov_type: Literal["cov_full", "cov_diag"] | float = 1.0,
+        x: tf.Tensor | NDArray | None = None,
     ):
         if isinstance(cov_type, float):
             self.cov = ("sim", cov_type)
@@ -82,7 +84,7 @@ class LossGMM:
         w_recon: float = 1e-7,
         w_energy: float = 0.1,
         w_cov_diag: float = 0.005,
-        elbo: Optional[Elbo] = None,
+        elbo: Elbo | None = None,
     ):
         self.w_recon = w_recon
         self.w_energy = w_energy

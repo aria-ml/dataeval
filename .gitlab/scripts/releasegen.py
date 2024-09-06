@@ -5,7 +5,7 @@ from enum import IntEnum
 from os import path, remove, walk
 from re import MULTILINE, compile
 from shutil import move, rmtree
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Literal, Tuple
 
 from gitlab import Gitlab
 from rest import verbose
@@ -45,7 +45,7 @@ release_notes_pattern = compile(
 )
 
 
-def _get_version_tuple(version: str) -> Optional[Tuple[int, int, int]]:
+def _get_version_tuple(version: str) -> Tuple[int, int, int] | None:
     result = version_pattern.match(version)
     groups = None if result is None else result.groups()
     if groups is None or len(groups) != 3:
@@ -103,7 +103,7 @@ class _Category(IntEnum):
 
 
 class _Tag:
-    def __init__(self, response: Optional[Dict[str, Any]] = None, pending: Optional[bool] = None):
+    def __init__(self, response: Dict[str, Any] | None = None, pending: bool | None = None):
         if response is not None:
             time = response["commit"]["committed_date"]
             self.time: datetime = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S.%f%z")

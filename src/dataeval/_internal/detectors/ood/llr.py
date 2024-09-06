@@ -6,8 +6,10 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
+from __future__ import annotations
+
 from functools import partial
-from typing import Callable, Optional, Tuple
+from typing import Callable
 
 import keras
 import numpy as np
@@ -24,8 +26,8 @@ from dataeval._internal.models.tensorflow.utils import predict_batch
 
 
 def build_model(
-    dist: PixelCNN, input_shape: Optional[tuple] = None, filepath: Optional[str] = None
-) -> Tuple[keras.Model, PixelCNN]:
+    dist: PixelCNN, input_shape: tuple | None = None, filepath: str | None = None
+) -> tuple[keras.Model, PixelCNN]:
     """
     Create keras.Model from TF distribution.
 
@@ -90,8 +92,8 @@ class OOD_LLR(OODBase):
     def __init__(
         self,
         model: PixelCNN,
-        model_background: Optional[PixelCNN] = None,
-        log_prob: Optional[Callable] = None,
+        model_background: PixelCNN | None = None,
+        log_prob: Callable | None = None,
         sequential: bool = False,
     ) -> None:
         """
@@ -101,9 +103,9 @@ class OOD_LLR(OODBase):
         ----------
         model : PixelCNN
             Generative distribution model.
-        model_background : Optional[PixelCNN], default None
+        model_background : PixelCNN | None, default None
             Optional model for the background. Only needed if it is different from `model`.
-        log_prob : Optional[Callable], default None
+        log_prob : Callable | None, default None
             Function used to evaluate log probabilities under the model
             if the model does not have a `log_prob` function.
         sequential : bool, default False
@@ -123,13 +125,13 @@ class OOD_LLR(OODBase):
 
         self._ref_score: OODScore
         self._threshold_perc: float
-        self._data_info: Optional[Tuple[tuple, type]] = None
+        self._data_info: tuple[tuple, type] | None = None
 
     def fit(
         self,
         x_ref: ArrayLike,
         threshold_perc: float = 100.0,
-        loss_fn: Optional[Callable] = None,
+        loss_fn: Callable | None = None,
         optimizer: keras.optimizers.Optimizer = keras.optimizers.Adam,
         epochs: int = 20,
         batch_size: int = 64,
@@ -147,7 +149,7 @@ class OOD_LLR(OODBase):
             Training batch.
         threshold_perc : float, default 100.0
             Percentage of reference data that is normal.
-        loss_fn : Optional[Callable], default None
+        loss_fn : Callable | None, default None
             Loss function used for training.
         optimizer : keras.optimizers.Optimizer, default keras.optimizers.Adam
             Optimizer used for training.

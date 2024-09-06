@@ -1,5 +1,5 @@
 from os import environ, path
-from typing import Any, Callable, Dict, Optional, Sequence, Union, cast
+from typing import Any, Callable, Dict, Sequence, Union, cast
 
 from requests import JSONDecodeError, Response
 
@@ -31,7 +31,7 @@ class RestWrapper:
         self,
         project_url: str,
         env_token: str,
-        override_token: Optional[str] = None,
+        override_token: str | None = None,
         timeout: int = 10,
         verbose: bool = False,
     ):
@@ -43,7 +43,7 @@ class RestWrapper:
         self.timeout = timeout
         set_verbose(verbose)
 
-    def _get_param_str(self, params: Optional[Dict[str, Any]]) -> str:
+    def _get_param_str(self, params: Dict[str, Any] | None) -> str:
         if params is None:
             return ""
         return "&".join({f"{k}={v}" for k, v in params.items()})
@@ -52,8 +52,8 @@ class RestWrapper:
         self,
         fncall: Callable,
         resource: Union[str, Sequence[str]],
-        params: Optional[Dict[str, Any]] = None,
-        data: Optional[Dict[str, Any]] = None,
+        params: Dict[str, Any] | None = None,
+        data: Dict[str, Any] | None = None,
         raw_data: bool = False,
     ) -> Any:
         """
@@ -71,9 +71,9 @@ class RestWrapper:
             The requests function to call (get, post, put)
         resource : Union[str, Sequence[str]]
             The path(s) of the API to call
-        params : Optional[Dict[str, Any]], default None
+        params : Dict[str, Any] | None, default None
             Optional parameters for the resource
-        data : Optional[Dict[str, Any]], default None
+        data : Dict[str, Any] | None, default None
             Optional data provided for the request (used in post or put)
 
         Raises

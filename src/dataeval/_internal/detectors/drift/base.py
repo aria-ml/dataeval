@@ -6,10 +6,12 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import wraps
-from typing import Callable, Literal, Optional, Tuple
+from typing import Callable, Literal
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -145,8 +147,8 @@ class BaseDrift:
         x_ref: ArrayLike,
         p_val: float = 0.05,
         x_ref_preprocessed: bool = False,
-        update_x_ref: Optional[UpdateStrategy] = None,
-        preprocess_fn: Optional[Callable[[ArrayLike], ArrayLike]] = None,
+        update_x_ref: UpdateStrategy | None = None,
+        preprocess_fn: Callable[[ArrayLike], ArrayLike] | None = None,
         correction: Literal["bonferroni", "fdr"] = "bonferroni",
     ) -> None:
         # Type checking
@@ -200,10 +202,10 @@ class BaseDriftUnivariate(BaseDrift):
         x_ref: ArrayLike,
         p_val: float = 0.05,
         x_ref_preprocessed: bool = False,
-        update_x_ref: Optional[UpdateStrategy] = None,
-        preprocess_fn: Optional[Callable[[ArrayLike], ArrayLike]] = None,
+        update_x_ref: UpdateStrategy | None = None,
+        preprocess_fn: Callable[[ArrayLike], ArrayLike] | None = None,
         correction: Literal["bonferroni", "fdr"] = "bonferroni",
-        n_features: Optional[int] = None,
+        n_features: int | None = None,
     ) -> None:
         super().__init__(
             x_ref,
@@ -233,10 +235,10 @@ class BaseDriftUnivariate(BaseDrift):
 
     @preprocess_x
     @abstractmethod
-    def score(self, x: ArrayLike) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
+    def score(self, x: ArrayLike) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         """Abstract method to calculate feature score after preprocessing"""
 
-    def _apply_correction(self, p_vals: NDArray) -> Tuple[bool, float]:
+    def _apply_correction(self, p_vals: NDArray) -> tuple[bool, float]:
         if self.correction == "bonferroni":
             threshold = self.p_val / self.n_features
             drift_pred = bool((p_vals < threshold).any())

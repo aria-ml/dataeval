@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Dict, Iterable, List
+from typing import Iterable
 
 from numpy.typing import ArrayLike
 
@@ -20,8 +22,8 @@ class DuplicatesOutput(OutputMetadata):
         Indices of images that are near matches
     """
 
-    exact: List[List[int]]
-    near: List[List[int]]
+    exact: list[list[int]]
+    near: list[list[int]]
 
 
 class Duplicates:
@@ -46,7 +48,7 @@ class Duplicates:
         self.find_exact = find_exact
         self.find_near = find_near
 
-    def _get_duplicates(self) -> Dict[str, List[List[int]]]:
+    def _get_duplicates(self) -> dict[str, list[list[int]]]:
         stats_dict = self.stats.dict()
         if "xxhash" in stats_dict:
             exact = {}

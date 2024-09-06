@@ -6,8 +6,9 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
+from __future__ import annotations
+
 from itertools import product
-from typing import Tuple, Union
 
 import numpy as np
 import pytest
@@ -39,7 +40,7 @@ class TestPredictBatch:
             self.dense = nn.Linear(self.n_features, self.n_classes)
             self.multi_out = multi_out
 
-        def forward(self, x: torch.Tensor) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        def forward(self, x: torch.Tensor) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
             out = self.dense(x)
             if not self.multi_out:
                 return out
