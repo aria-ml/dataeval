@@ -16,20 +16,26 @@ def get_images_from_batch(batch: Any) -> Any:
 
 
 class AETrainer:
+    """
+    A class to train and evaluate an autoencoder model.
+
+    Parameters
+    ----------
+    model : nn.Module
+        The model to be trained.
+    device : str or torch.device, default "auto"
+        The hardware device to use for training.
+        If "auto", the device will be set to "cuda" if available, otherwise "cpu".
+    batch_size : int, default 8
+        The number of images to process in a batch.
+    """
+
     def __init__(
         self,
         model: nn.Module,
         device: str | torch.device = "auto",
         batch_size: int = 8,
     ):
-        """
-        model : nn.Module
-            Model to be trained
-        device : str | torch.device, default "cpu"
-            Hardware device for model, optimizer, and data to run on
-        batch_size : int, default 8
-            Number of images to group together in `torch.utils.data.DataLoader`
-        """
         if device == "auto":
             device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = device
@@ -38,18 +44,24 @@ class AETrainer:
 
     def train(self, dataset: Dataset, epochs: int = 25) -> list[float]:
         """
-        Basic training function for Autoencoder models for reconstruction tasks
+        Basic image reconstruction training function for Autoencoder models
 
         Uses `torch.optim.Adam` and `torch.nn.MSELoss` as default hyperparameters
 
         Parameters
         ----------
         dataset : Dataset
-            Torch Dataset containing images in the first return position
+            The dataset to train on.
+            Torch Dataset containing images in the first return position.
         epochs : int, default 25
             Number of full training loops
 
-        Note
+        Returns
+        -------
+        List[float]
+            A list of average loss values for each epoch.
+
+        Notes
         ----
         To replace this function with a custom function, do
             AETrainer.train = custom_function
@@ -91,19 +103,20 @@ class AETrainer:
     @torch.no_grad
     def eval(self, dataset: Dataset) -> float:
         """
-        Basic evaluation function for Autoencoder models for reconstruction tasks
+        Basic image reconstruction evaluation function for Autoencoder models
 
-        Uses `torch.optim.Adam` and `torch.nn.MSELoss` as default hyperparameters
+        Uses `torch.nn.MSELoss` as default loss function.
 
         Parameters
         ----------
         dataset : Dataset
-            Torch Dataset containing images in the first return position
+            The dataset to evaluate on.
+            Torch Dataset containing images in the first return position.
 
         Returns
         -------
         float
-            Total reconstruction loss over all data
+            Total reconstruction loss over the entire dataset
 
         Note
         ----
@@ -126,18 +139,25 @@ class AETrainer:
     @torch.no_grad
     def encode(self, dataset: Dataset) -> torch.Tensor:
         """
-        Encode data through model if it has an encode attribute,
-        otherwise passes data through model.forward
+        Create image embeddings for the dataset using the model's encoder.
+
+        If the model has an `encode` method, it will be used; otherwise,
+        `model.forward` will be used.
 
         Parameters
         ----------
         dataset: Dataset
-            Dataset containing images to be encoded by the model
+            The dataset to encode.
+            Torch Dataset containing images in the first return position.
 
         Returns
         -------
         torch.Tensor
             Data encoded by the model
+
+        Notes
+        -----
+        This function should be run after the model has been trained and evaluated.
         """
         self.model.eval()
         dl = DataLoader(dataset, batch_size=self.batch_size)
@@ -157,21 +177,67 @@ class AETrainer:
 
 
 class AriaAutoencoder(nn.Module):
+    """
+    An autoencoder model with a separate encoder and decoder.
+
+    Parameters
+    ----------
+    channels : int, default 3
+        Number of input channels
+    """
+
     def __init__(self, channels=3):
         super().__init__()
         self.encoder = Encoder(channels)
         self.decoder = Decoder(channels)
 
     def forward(self, x):
+        """
+        Perform a forward pass through the encoder and decoder.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor
+
+        Returns
+        -------
+        torch.Tensor
+            The reconstructed output tensor.
+        """
         x = self.encoder(x)
         x = self.decoder(x)
         return x
 
     def encode(self, x):
+        """
+        Encode the input tensor using the encoder.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor
+
+        Returns
+        -------
+        torch.Tensor
+            The encoded representation of the input tensor.
+        """
         return self.encoder(x)
 
 
 class Encoder(nn.Module):
+    """
+    A simple encoder to be used in an autoencoder model.
+
+    This is the encoder used by the AriaAutoencoder model.
+
+    Parameters
+    ----------
+    channels : int, default 3
+        Number of input channels
+    """
+
     def __init__(self, channels=3):
         super().__init__()
         self.encoder = nn.Sequential(
@@ -185,10 +251,34 @@ class Encoder(nn.Module):
         )
 
     def forward(self, x):
+        """
+        Perform a forward pass through the encoder.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor
+
+        Returns
+        -------
+        torch.Tensor
+            The encoded representation of the input tensor.
+        """
         return self.encoder(x)
 
 
 class Decoder(nn.Module):
+    """
+    A simple decoder to be used in an autoencoder model.
+
+    This is the decoder used by the AriaAutoencoder model.
+
+    Parameters
+    ----------
+    channels : int
+        Number of output channels
+    """
+
     def __init__(self, channels):
         super().__init__()
         self.decoder = nn.Sequential(
@@ -201,4 +291,17 @@ class Decoder(nn.Module):
         )
 
     def forward(self, x):
+        """
+        Perform a forward pass through the decoder.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            The encoded tensor.
+
+        Returns
+        -------
+        torch.Tensor
+            The reconstructed output tensor.
+        """
         return self.decoder(x)
