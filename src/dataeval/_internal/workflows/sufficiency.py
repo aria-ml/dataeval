@@ -21,11 +21,11 @@ class SufficiencyOutput(OutputMetadata):
     """
     Attributes
     ----------
-    steps : NDArray[np.uint32]
+    steps : NDArray
         Array of sample sizes
-    params : Dict[str, NDArray[np.float64]]
+    params : Dict[str, NDArray]
         Inverse power curve coefficients for the line of best fit for each measure
-    measures : Dict[str, NDArray[np.float64]]
+    measures : Dict[str, NDArray]
         Average of values observed for each sample size step for each measure
     """
 
@@ -75,7 +75,7 @@ def f_inv_out(y_i: NDArray, x: NDArray) -> NDArray[np.uint64]:
 
     Returns
     -------
-    NDArray[np.uint64]
+    NDArray
         Array of sample sizes
     """
     n_i = ((y_i - x[2]) / x[0]) ** (-1 / x[1])
@@ -185,7 +185,7 @@ def inv_project_steps(params: NDArray, targets: NDArray) -> NDArray[np.uint64]:
 
     Returns
     -------
-    NDArray[np.uint64]
+    NDArray
         Array of sample sizes, or 0 if overflow
     """
     steps = f_inv_out(1 - np.array(targets), params)
@@ -248,15 +248,15 @@ class Sufficiency:
     ----------
     model : nn.Module
         Model that will be trained for each subset of data
-    train_ds : Dataset
+    train_ds : torch.Dataset
         Full training data that will be split for each run
-    test_ds : Dataset
+    test_ds : torch.Dataset
         Data that will be used for every run's evaluation
     train_fn : Callable[[nn.Module, Dataset, Sequence[int]], None]
         Function which takes a model (torch.nn.Module), a dataset
         (torch.utils.data.Dataset), indices to train on and executes model
         training against the data.
-    eval_fn : Callable[[nn.Module, Dataset], Dict[str, float]]
+    eval_fn : Callable[[nn.Module, Dataset], Dict[str, float | NDArray]]
         Function which takes a model (torch.nn.Module), a dataset
         (torch.utils.data.Dataset) and returns a dictionary of metric
         values (Dict[str, float]) which is used to assess model performance
@@ -265,9 +265,9 @@ class Sufficiency:
         Number of models to run over all subsets
     substeps : int, default 5
         Total number of dataset partitions that each model will train on
-    train_kwargs : Dict[str, Any] | None, default None
+    train_kwargs : Dict | None, default None
         Additional arguments required for custom training function
-    eval_kwargs : Dict[str, Any] | None, default None
+    eval_kwargs : Dict | None, default None
         Additional arguments required for custom evaluation function
     """
 
@@ -359,7 +359,7 @@ class Sufficiency:
 
         Parameters
         ----------
-        eval_at : NDArray | None
+        eval_at : NDArray | None, default None
             Specify this to collect accuracies over a specific set of dataset lengths, rather
             than letting Sufficiency internally create the lengths to evaluate at.
         niter : int, default 1000
@@ -369,7 +369,15 @@ class Sufficiency:
         -------
         SufficiencyOutput
             Dataclass containing the average of each measure per substep
-        """
+
+        Examples
+        --------
+        >>> suff = Sufficiency(
+        ...     model=model, train_ds=train_ds, test_ds=test_ds, train_fn=train_fn, eval_fn=eval_fn, runs=5, substeps=10
+        ... )
+        >>> suff.evaluate()
+        SufficiencyOutput(steps=array([0, 0, 0, 0, 0, 0, 0, 0, 1, 2], dtype=uint32), params={'test': array([3.08792896, 3.08792896, 2.68792896])}, measures={'test': array([1., 1., 1., 1., 1., 1., 1., 1., 1., 1.])})
+        """  # noqa: E501
         if eval_at is not None:
             ranges = eval_at
         else:
@@ -426,7 +434,7 @@ class Sufficiency:
         ----------
         data : SufficiencyOutput
             Dataclass containing the average of each measure per substep
-        projection : Union[int, Sequence[int], NDArray[np.uint]]
+        projection : int | Sequence[int] | NDArray[np.uint]
             Step or steps to project
 
         Returns
@@ -465,6 +473,8 @@ class Sufficiency:
         ----------
         data : SufficiencyOutput
             Dataclass containing the average of each measure per substep
+        class_names : Sequence[str] | None, default None
+            List of class names
 
         Returns
         -------
