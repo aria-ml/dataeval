@@ -1,21 +1,13 @@
 (parity-ref)=
 # Parity
 
-% Create small blurb here that answers:
+```{testsetup}
+import numpy as np
+from dataeval.metrics import parity
 
-% 1. What it is
-
-% 2. What does it solve
-
-## How-To Guides
-
-Check out this **how to** to begin using the `parity` metric.
-
-{doc}`Class Label Analysis Tutorial<../../how_to/notebooks/ClassLabelAnalysisTutorial>`
-
-## DataEval API
+np_random_gen = np.random.default_rng(175)
+```
 
 ```{eval-rst}
 .. autofunction:: dataeval.metrics.parity
-.. autofunction:: dataeval.metrics.parity_metadata
 ```

@@ -46,8 +46,8 @@ def digitize_factor_bins(continuous_values: NDArray, bins: int, factor_name: str
     -------
     NDArray
         The digitized values
-
     """
+
     if not np.all([np.issubdtype(type(n), np.number) for n in continuous_values]):
         raise TypeError(
             f"Encountered a non-numeric value for factor {factor_name}, but the factor"
@@ -85,6 +85,7 @@ def format_discretize_factors(
           Each key is a metadata factor, whose value is the discrete per-image factor values.
         - Per-image labels, whose ith element is the label for the ith element of the dataset.
     """
+
     invalid_keys = set(continuous_factor_bincounts.keys()) - set(data_factors.keys())
     if invalid_keys:
         raise KeyError(
@@ -116,6 +117,35 @@ def format_discretize_factors(
 
 
 def normalize_expected_dist(expected_dist: NDArray, observed_dist: NDArray) -> NDArray:
+    """
+    Normalize the expected label distribution to match the total number of labels in the observed distribution.
+
+    This function adjusts the expected distribution so that its sum equals the sum of the observed distribution.
+    If the expected distribution is all zeros, an error is raised.
+
+    Parameters
+    ----------
+    expected_dist : np.ndarray
+        The expected label distribution. This array represents the anticipated distribution of labels.
+    observed_dist : np.ndarray
+        The observed label distribution. This array represents the actual distribution of labels in the dataset.
+
+    Returns
+    -------
+    np.ndarray
+        The normalized expected distribution, scaled to have the same sum as the observed distribution.
+
+    Raises
+    ------
+    ValueError
+        If the expected distribution is all zeros.
+
+    Notes
+    -----
+    The function ensures that the total number of labels in the expected distribution matches the total
+    number of labels in the observed distribution by scaling the expected distribution.
+    """
+
     exp_sum = np.sum(expected_dist)
     obs_sum = np.sum(observed_dist)
 
@@ -150,6 +180,7 @@ def validate_dist(label_dist: NDArray, label_name: str):
     Warning
         If any elements of label_dist are less than 5
     """
+
     if not len(label_dist):
         raise ValueError(f"No labels found in the {label_name} dataset")
     if np.any(label_dist < 5):
@@ -167,11 +198,11 @@ def parity(
     num_classes: int | None = None,
 ) -> ParityOutput[np.float64]:
     """
-    Perform a one-way chi-squared test between observation frequencies and expected frequencies that
-    tests the null hypothesis that the observed data has the expected frequencies.
+    Calculate the chi-square statistic to assess the parity between expected and observed label distributions.
 
-    This function acts as an interface to the scipy.stats.chisquare method, which is documented at
-    https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.chisquare.html
+    This function computes the frequency distribution of classes in both expected and observed labels, normalizes
+    the expected distribution to match the total number of observed labels, and then calculates the chi-square
+    statistic to determine if there is a significant difference between the two distributions.
 
     Parameters
     ----------
@@ -179,9 +210,9 @@ def parity(
         List of class labels in the expected dataset
     observed_labels : ArrayLike
         List of class labels in the observed dataset
-    num_classes : int | None
-        The number of unique classes in the datasets. If this is not specified, it will
-        be inferred from the set of unique labels in expected_labels and observed_labels
+    num_classes : int | None, default None
+        The number of unique classes in the datasets. If not provided, the function will infer it
+        from the set of unique labels in expected_labels and observed_labels
 
     Returns
     -------
@@ -191,8 +222,31 @@ def parity(
     Raises
     ------
     ValueError
-        If x is empty
+        If expected label distribution is empty, is all zeros, or if there is a mismatch in the number
+        of unique classes between the observed and expected distributions.
+
+
+    Notes
+    -----
+    - Providing ``num_classes`` can be helpful if there are classes with zero instances in one of the distributions.
+    - The function first validates the observed distribution and normalizes the expected distribution so that it
+      has the same total number of labels as the observed distribution.
+    - It then performs a chi-square test to determine if there is a statistically significant difference between
+      the observed and expected label distributions.
+    - This function acts as an interface to the scipy.stats.chisquare method, which is documented at
+      https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.chisquare.html
+
+
+    Examples
+    --------
+    Randomly creating some label distributions using ``np.random.default_rng``
+
+    >>> expected_labels = np_random_gen.choice([0, 1, 2, 3, 4], (100))
+    >>> observed_labels = np_random_gen.choice([2, 3, 0, 4, 1], (100))
+    >>> parity(expected_labels, observed_labels)
+    ParityOutput(score=14.007374204742625, p_value=0.0072715574616218)
     """
+
     # Calculate
     if not num_classes:
         num_classes = 0
@@ -230,11 +284,11 @@ def parity_metadata(
     continuous_factor_bincounts: dict[str, int] | None = None,
 ) -> ParityOutput[NDArray[np.float64]]:
     """
-    Evaluates the statistical independence of metadata factors from class labels.
-    This performs a chi-square test, which provides a score and a p-value for
-    statistical independence between each pair of a metadata factor and a class label.
-    A high score with a low p-value suggests that a metadata factor is strongly
-    correlated with a class label.
+    Calculate chi-square statistics to assess the relationship between multiple factors and class labels.
+
+    This function computes the chi-square statistic for each metadata factor to determine if there is
+    a significant relationship between the factor values and class labels. The function handles both categorical
+    and discretized continuous factors.
 
     Parameters
     ----------
@@ -242,10 +296,10 @@ def parity_metadata(
         The dataset factors, which are per-image attributes including class label and metadata.
         Each key of dataset_factors is a factor, whose value is the per-image factor values.
     continuous_factor_bincounts : Dict[str, int] | None, default None
-        The factors in data_factors that have continuous values and the array of bin counts to
-        discretize values into. All factors are treated as having discrete values unless they
-        are specified as keys in this dictionary. Each element of this array must occur as a key
-        in data_factors.
+        A dictionary specifying the number of bins for discretizing the continuous factors.
+        The keys should correspond to the names of continuous factors in `data_factors`,
+        and the values should be the number of bins to use for discretization.
+        If not provided, no discretization is applied.
 
     Returns
     -------
@@ -253,7 +307,39 @@ def parity_metadata(
         Arrays of length (num_factors) whose (i)th element corresponds to the
         chi-square score and p-value for the relationship between factor i and
         the class labels in the dataset.
+
+    Raises
+    ------
+    Warning
+        If any cell in the contingency matrix has a value between 0 and 5, a warning is issued because this can
+        lead to inaccurate chi-square calculations. It is recommended to ensure that each label co-occurs with
+        factor values either 0 times or at least 5 times. Alternatively, continuous-valued factors can be digitized
+        into fewer bins.
+
+    Notes
+    -----
+    - Each key of the ``continuous_factor_bincounts`` dictionary must occur as a key in data_factors.
+    - A high score with a low p-value suggests that a metadata factor is strongly correlated with a class label.
+    - The function creates a contingency matrix for each factor, where each entry represents the frequency of a
+      specific factor value co-occurring with a particular class label.
+    - Rows containing only zeros in the contingency matrix are removed before performing the chi-square test
+      to prevent errors in the calculation.
+
+    Examples
+    --------
+    Randomly creating some "continuous" and categorical variables using ``np.random.default_rng``
+
+    >>> data_factors = {
+    ...     "age": np_random_gen.choice([25, 30, 35, 45], (100)),
+    ...     "income": np_random_gen.choice([50000, 65000, 80000], (100)),
+    ...     "gender": np_random_gen.choice(["M", "F"], (100)),
+    ...     "class": np_random_gen.choice([0, 1, 2], (100)),
+    ... }
+    >>> continuous_factor_bincounts = {"age": 4, "income": 3}
+    >>> parity_metadata(data_factors, continuous_factor_bincounts)
+    ParityOutput(score=array([2.82329785, 1.60625584, 1.38377236]), p_value=array([0.83067563, 0.80766733, 0.5006309 ]))
     """
+
     data_factors_np = {k: to_numpy(v) for k, v in data_factors.items()}
     continuous_factor_bincounts = continuous_factor_bincounts if continuous_factor_bincounts else {}
 
