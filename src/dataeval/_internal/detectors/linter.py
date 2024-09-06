@@ -1,7 +1,7 @@
-from __future__ import annotations  # py39: support Type | None
+from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Iterable, Literal
+from typing import Iterable, Literal
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -22,7 +22,7 @@ class LinterOutput(OutputMetadata):
         the issues and calculated values for the given index.
     """
 
-    issues: Dict[int, Dict[str, float]]
+    issues: dict[int, dict[str, float]]
 
 
 def _get_outlier_mask(

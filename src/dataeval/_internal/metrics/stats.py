@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterable, List
+from typing import Any, Callable, Iterable
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -62,8 +64,8 @@ class StatsOutput(OutputMetadata):
         Per-channel mapping of indices for each metric
     """
 
-    xxhash: List[str]
-    pchash: List[str]
+    xxhash: list[str]
+    pchash: list[str]
     width: NDArray[np.uint16]
     height: NDArray[np.uint16]
     channels: NDArray[np.uint8]
@@ -82,7 +84,7 @@ class StatsOutput(OutputMetadata):
     percentiles: NDArray[np.float16]
     histogram: NDArray[np.uint32]
     entropy: NDArray[np.float16]
-    ch_idx_map: Dict[int, List[int]]
+    ch_idx_map: dict[int, list[int]]
 
     def dict(self):
         return {k: v for k, v in self.__dict__.items() if not k.startswith("_") and len(v) > 0}
@@ -90,7 +92,7 @@ class StatsOutput(OutputMetadata):
 
 QUARTILES = (0, 25, 50, 75, 100)
 
-IMAGESTATS_FN_MAP: Dict[ImageStat, Callable[[NDArray], Any]] = {
+IMAGESTATS_FN_MAP: dict[ImageStat, Callable[[NDArray], Any]] = {
     ImageStat.XXHASH: lambda x: xxhash(x),
     ImageStat.PCHASH: lambda x: pchash(x),
     ImageStat.WIDTH: lambda x: np.uint16(x.shape[-1]),
@@ -113,7 +115,7 @@ IMAGESTATS_FN_MAP: Dict[ImageStat, Callable[[NDArray], Any]] = {
     ImageStat.ENTROPY: lambda x: np.float16(entropy(x)),
 }
 
-CHANNELSTATS_FN_MAP: Dict[ImageStat, Callable[[NDArray], Any]] = {
+CHANNELSTATS_FN_MAP: dict[ImageStat, Callable[[NDArray], Any]] = {
     ImageStat.MEAN: lambda x: np.float16(np.mean(x, axis=1)),
     ImageStat.STD: lambda x: np.float16(np.std(x, axis=1)),
     ImageStat.VAR: lambda x: np.float16(np.var(x, axis=1)),
@@ -128,18 +130,18 @@ CHANNELSTATS_FN_MAP: Dict[ImageStat, Callable[[NDArray], Any]] = {
 def run_stats(
     images: Iterable[ArrayLike],
     flags: ImageStat,
-    fn_map: Dict[ImageStat, Callable[[NDArray], Any]],
+    fn_map: dict[ImageStat, Callable[[NDArray], Any]],
     flatten: bool,
 ):
     verify_supported(flags, fn_map)
     flag_dict = to_distinct(flags)
 
-    results_list: List[Dict[str, NDArray]] = []
+    results_list: list[dict[str, NDArray]] = []
     for image in to_numpy_iter(images):
         normalized = normalize_image_shape(image)
         scaled = None
         hist = None
-        output: Dict[str, NDArray] = {}
+        output: dict[str, NDArray] = {}
         for flag, stat in flag_dict.items():
             if flag & (ImageStat.ALL_PIXELSTATS | ImageStat.BRIGHTNESS):
                 if scaled is None:

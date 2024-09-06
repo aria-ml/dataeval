@@ -6,9 +6,9 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
-from __future__ import annotations  # py39: support Type | None
+from __future__ import annotations
 
-from typing import Callable, Iterable, Tuple, cast
+from typing import Callable, Iterable, cast
 
 import keras
 import numpy as np
@@ -79,7 +79,7 @@ def trainer(
                 y_hat = model(x)
                 y = x if y is None else y
                 if isinstance(loss_fn, Callable):
-                    args = [y] + list(y_hat) if isinstance(y_hat, Tuple) else [y, y_hat]
+                    args = [y] + list(y_hat) if isinstance(y_hat, tuple) else [y, y_hat]
                     loss = loss_fn(*args)
                 else:
                     loss = cast(tf.Tensor, tf.constant(0.0, dtype=tf.float32))

@@ -1,4 +1,4 @@
-from __future__ import annotations  # py39: support Type | None
+from __future__ import annotations
 
 from importlib import import_module
 from typing import Iterable

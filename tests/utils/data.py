@@ -1,4 +1,6 @@
-from typing import Any, Tuple, Union
+from __future__ import annotations
+
+from typing import Any
 
 import numpy as np
 from torch.utils.data import Dataset
@@ -22,7 +24,7 @@ class DataEvalDataset(Dataset):
     def __len__(self) -> int:
         return len(self._images)
 
-    def __getitem__(self, index) -> Union[Any, Tuple]:
+    def __getitem__(self, index) -> Any | tuple:
         image: Any = self._images[index]
 
         # Return image if no other attributes

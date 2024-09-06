@@ -6,7 +6,9 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
-from typing import NamedTuple, Tuple
+from __future__ import annotations
+
+from typing import NamedTuple
 
 import numpy as np
 import tensorflow as tf
@@ -75,7 +77,7 @@ def gmm_energy(
     z: tf.Tensor,
     params: GaussianMixtureModelParams,
     return_mean: bool = True,
-) -> Tuple[tf.Tensor, tf.Tensor]:
+) -> tuple[tf.Tensor, tf.Tensor]:
     """
     Compute sample energy from Gaussian Mixture Model.
 

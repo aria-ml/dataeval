@@ -8,7 +8,9 @@ Licensed under Apache Software License (Apache 2.0)
 
 # pyright: reportIncompatibleMethodOverride=false
 
-from typing import Callable, Tuple, cast
+from __future__ import annotations
+
+from typing import Callable, cast
 
 import keras
 import tensorflow as tf
@@ -80,7 +82,7 @@ def eucl_cosim_features(x: tf.Tensor, y: tf.Tensor, max_eucl: float = 1e2) -> tf
 class Sampling(Layer):
     """Reparametrization trick. Uses (z_mean, z_log_var) to sample the latent vector z."""
 
-    def call(self, inputs: Tuple[tf.Tensor, tf.Tensor]) -> tf.Tensor:
+    def call(self, inputs: tuple[tf.Tensor, tf.Tensor]) -> tf.Tensor:
         """
         Sample z.
 
@@ -138,7 +140,7 @@ class EncoderVAE(Layer):
         self.fc_log_var = Dense(latent_dim, activation=None)
         self.sampling = Sampling()
 
-    def call(self, x: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+    def call(self, x: tf.Tensor) -> tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
         x = cast(tf.Tensor, self.encoder_net(x))
         if len(x.shape) > 2:
             x = cast(tf.Tensor, Flatten()(x))
@@ -214,7 +216,7 @@ class VAE(keras.Model):
         self.latent_dim = latent_dim
 
     def call(self, x: tf.Tensor) -> tf.Tensor:
-        z_mean, z_log_var, z = cast(Tuple[tf.Tensor, tf.Tensor, tf.Tensor], self.encoder(x))
+        z_mean, z_log_var, z = cast(tuple[tf.Tensor, tf.Tensor, tf.Tensor], self.encoder(x))
         x_recon = self.decoder(z)
         # add KL divergence loss term
         kl_loss = -0.5 * tf.reduce_mean(z_log_var - tf.square(z_mean) - tf.exp(z_log_var) + 1)
@@ -255,7 +257,7 @@ class AEGMM(keras.Model):
         self.n_gmm = n_gmm
         self.recon_features = recon_features
 
-    def call(self, x: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+    def call(self, x: tf.Tensor) -> tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
         enc = self.encoder(x)
         x_recon = cast(tf.Tensor, self.decoder(enc))
         recon_features = self.recon_features(x, x_recon)
@@ -305,8 +307,8 @@ class VAEGMM(keras.Model):
         self.recon_features = recon_features
         self.beta = beta
 
-    def call(self, x: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
-        enc_mean, enc_log_var, enc = cast(Tuple[tf.Tensor, tf.Tensor, tf.Tensor], self.encoder(x))
+    def call(self, x: tf.Tensor) -> tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+        enc_mean, enc_log_var, enc = cast(tuple[tf.Tensor, tf.Tensor, tf.Tensor], self.encoder(x))
         x_recon = cast(tf.Tensor, self.decoder(enc))
         recon_features = self.recon_features(x, x_recon)
         z = cast(tf.Tensor, tf.concat([enc, recon_features], -1))

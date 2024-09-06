@@ -1,4 +1,4 @@
-from typing import Dict
+from __future__ import annotations
 
 import numpy as np
 
@@ -19,7 +19,7 @@ class MockImageClassificationDataset:
         self.images = images
         self.labels = labels
 
-    def __getitem__(self, idx: int) -> Dict[str, np.ndarray]:
+    def __getitem__(self, idx: int) -> dict[str, np.ndarray]:
         """Returns an image-label pair specified by idx
 
         :param idx: Index of requested image and label

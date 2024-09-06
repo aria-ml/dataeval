@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 from collections import defaultdict
-from typing import Any, Dict, List
+from typing import Any
 
 from torch.utils.data import Dataset
 
 
-def read_dataset(dataset: Dataset) -> List[List[Any]]:
+def read_dataset(dataset: Dataset) -> list[list[Any]]:
     """
     Extract information from a dataset at each index into a individual lists of each information position
 
@@ -51,7 +53,7 @@ def read_dataset(dataset: Dataset) -> List[List[Any]]:
     True
     """
 
-    ddict: Dict[int, List] = defaultdict(list)
+    ddict: dict[int, list] = defaultdict(list)
 
     for data in dataset:
         # Convert to tuple if single return (e.g. images only)

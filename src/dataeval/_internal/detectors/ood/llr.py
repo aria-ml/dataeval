@@ -6,10 +6,10 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
-from __future__ import annotations  # py39: support Type | None
+from __future__ import annotations
 
 from functools import partial
-from typing import Callable, Tuple
+from typing import Callable
 
 import keras
 import numpy as np
@@ -27,7 +27,7 @@ from dataeval._internal.models.tensorflow.utils import predict_batch
 
 def build_model(
     dist: PixelCNN, input_shape: tuple | None = None, filepath: str | None = None
-) -> Tuple[keras.Model, PixelCNN]:
+) -> tuple[keras.Model, PixelCNN]:
     """
     Create keras.Model from TF distribution.
 
@@ -125,7 +125,7 @@ class OOD_LLR(OODBase):
 
         self._ref_score: OODScore
         self._threshold_perc: float
-        self._data_info: Tuple[tuple, type] | None = None
+        self._data_info: tuple[tuple, type] | None = None
 
     def fit(
         self,

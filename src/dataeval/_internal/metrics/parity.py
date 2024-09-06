@@ -1,8 +1,8 @@
-from __future__ import annotations  # py39: support Type | None
+from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass
-from typing import Dict, Generic, Mapping, Tuple, TypeVar
+from typing import Generic, Mapping, TypeVar
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -62,8 +62,8 @@ def digitize_factor_bins(continuous_values: NDArray, bins: int, factor_name: str
 
 
 def format_discretize_factors(
-    data_factors: Dict[str, NDArray], continuous_factor_bincounts: Dict[str, int]
-) -> Tuple[Dict[str, NDArray], NDArray]:
+    data_factors: dict[str, NDArray], continuous_factor_bincounts: dict[str, int]
+) -> tuple[dict[str, NDArray], NDArray]:
     """
     Sets up the internal list of metadata factors.
 
@@ -227,7 +227,7 @@ def parity(
 @set_metadata("dataeval.metrics")
 def parity_metadata(
     data_factors: Mapping[str, ArrayLike],
-    continuous_factor_bincounts: Dict[str, int] | None = None,
+    continuous_factor_bincounts: dict[str, int] | None = None,
 ) -> ParityOutput[NDArray[np.float64]]:
     """
     Evaluates the statistical independence of metadata factors from class labels.

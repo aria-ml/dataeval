@@ -1,4 +1,6 @@
-from typing import Any, List, Union
+from __future__ import annotations
+
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -17,7 +19,7 @@ class AETrainer:
     def __init__(
         self,
         model: nn.Module,
-        device: Union[str, torch.device] = "auto",
+        device: str | torch.device = "auto",
         batch_size: int = 8,
     ):
         """
@@ -34,7 +36,7 @@ class AETrainer:
         self.model = model.to(device)
         self.batch_size = batch_size
 
-    def train(self, dataset: Dataset, epochs: int = 25) -> List[float]:
+    def train(self, dataset: Dataset, epochs: int = 25) -> list[float]:
         """
         Basic training function for Autoencoder models for reconstruction tasks
 
@@ -58,7 +60,7 @@ class AETrainer:
         opt = Adam(self.model.parameters(), lr=0.001)
         criterion = nn.MSELoss().to(self.device)
         # Record loss
-        loss_history: List[float] = []
+        loss_history: list[float] = []
 
         for _ in range(epochs):
             epoch_loss: float = 0
