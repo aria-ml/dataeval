@@ -6,8 +6,10 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
+from __future__ import annotations  # py39: support Type | None
+
 from functools import partial
-from typing import Callable, Optional, Type, Union
+from typing import Callable, Type, Union
 
 import numpy as np
 import torch
@@ -15,7 +17,7 @@ import torch.nn as nn
 from numpy.typing import NDArray
 
 
-def get_device(device: Optional[Union[str, torch.device]] = None) -> torch.device:
+def get_device(device: Union[str, torch.device] | None = None) -> torch.device:
     """
     Instantiates a PyTorch device object.
 
@@ -77,9 +79,9 @@ def mmd2_from_kernel_matrix(
 def predict_batch(
     x: Union[NDArray, torch.Tensor],
     model: Union[Callable, nn.Module, nn.Sequential],
-    device: Optional[torch.device] = None,
+    device: torch.device | None = None,
     batch_size: int = int(1e10),
-    preprocess_fn: Optional[Callable] = None,
+    preprocess_fn: Callable | None = None,
     dtype: Union[Type[np.generic], torch.dtype] = np.float32,
 ) -> Union[NDArray, torch.Tensor, tuple]:
     """
@@ -152,8 +154,8 @@ def predict_batch(
 def preprocess_drift(
     x: NDArray,
     model: nn.Module,
-    device: Optional[torch.device] = None,
-    preprocess_batch_fn: Optional[Callable] = None,
+    device: torch.device | None = None,
+    preprocess_batch_fn: Callable | None = None,
     batch_size: int = int(1e10),
     dtype: Union[Type[np.generic], torch.dtype] = np.float32,
 ) -> Union[NDArray, torch.Tensor, tuple]:
@@ -249,10 +251,10 @@ class GaussianRBF(nn.Module):
 
     Parameters
     ----------
-    sigma : Optional[torch.Tensor], default None
+    sigma : torch.Tensor | None, default None
         Bandwidth used for the kernel. Needn't be specified if being inferred or
         trained. Can pass multiple values to eval kernel with and then average.
-    init_sigma_fn : Optional[Callable], default None
+    init_sigma_fn : Callable | None, default None
         Function used to compute the bandwidth `sigma`. Used when `sigma` is to be
         inferred. The function's signature should take in the tensors `x`, `y` and
         `dist` and return `sigma`. If `None`, it is set to
@@ -263,8 +265,8 @@ class GaussianRBF(nn.Module):
 
     def __init__(
         self,
-        sigma: Optional[torch.Tensor] = None,
-        init_sigma_fn: Optional[Callable] = None,
+        sigma: torch.Tensor | None = None,
+        init_sigma_fn: Callable | None = None,
         trainable: bool = False,
     ) -> None:
         super().__init__()

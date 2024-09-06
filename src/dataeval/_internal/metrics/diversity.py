@@ -1,5 +1,7 @@
+from __future__ import annotations  # py39: support Type | None
+
 from dataclasses import dataclass
-from typing import Dict, List, Literal, Optional, Sequence
+from typing import Dict, List, Literal, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -24,7 +26,7 @@ def diversity_shannon(
     data: NDArray,
     names: List[str],
     is_categorical: List[bool],
-    subset_mask: Optional[NDArray[np.bool_]] = None,
+    subset_mask: NDArray[np.bool_] | None = None,
 ) -> NDArray:
     """
     Compute diversity for discrete/categorical variables and, through standard
@@ -37,7 +39,7 @@ def diversity_shannon(
 
     Parameters
     ----------
-    subset_mask: Optional[NDArray[np.bool_]]
+    subset_mask: NDArray[np.bool_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
     Notes
@@ -65,7 +67,7 @@ def diversity_simpson(
     data: NDArray,
     names: List[str],
     is_categorical: List[bool],
-    subset_mask: Optional[NDArray[np.bool_]] = None,
+    subset_mask: NDArray[np.bool_] | None = None,
 ) -> NDArray:
     """
     Compute diversity for discrete/categorical variables and, through standard
@@ -79,7 +81,7 @@ def diversity_simpson(
 
     Parameters
     ----------
-    subset_mask: Optional[NDArray[np.bool_]]
+    subset_mask: NDArray[np.bool_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
     Notes

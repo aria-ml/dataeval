@@ -1,6 +1,7 @@
+from __future__ import annotations  # py39: support Type | None
+
 import hashlib
 import os
-import typing
 import warnings
 from contextlib import contextmanager
 from os import makedirs
@@ -48,7 +49,7 @@ def _validate_file(fpath, file_hash, chunk_size=65535):
 def _get_file(
     fname: str,
     origin: str,
-    file_hash: typing.Optional[str] = None,
+    file_hash: str | None = None,
 ):
     cache_dir = os.path.join(os.path.expanduser("~"), ".keras")
     datadir_base = os.path.expanduser(cache_dir)

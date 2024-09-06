@@ -1,4 +1,6 @@
-from typing import Literal, Optional, Tuple
+from __future__ import annotations  # py39: support Type | None
+
+from typing import Literal, Tuple
 
 import numpy as np
 import pytest
@@ -12,7 +14,7 @@ def mnist():
     def _method(
         size: int = 1000,
         category: Literal["train", "test"] = "train",
-        dtype: Optional[type] = None,
+        dtype: type | None = None,
         add_channels: Literal["channels_first", "channels_last", "none"] = "none",
         unit_normalize: bool = False,
     ) -> Tuple[NDArray, NDArray]:

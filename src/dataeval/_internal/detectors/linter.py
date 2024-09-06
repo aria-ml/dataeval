@@ -1,5 +1,7 @@
+from __future__ import annotations  # py39: support Type | None
+
 from dataclasses import dataclass
-from typing import Dict, Iterable, Literal, Optional
+from typing import Dict, Iterable, Literal
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -24,7 +26,7 @@ class LinterOutput(OutputMetadata):
 
 
 def _get_outlier_mask(
-    values: NDArray, method: Literal["zscore", "modzscore", "iqr"], threshold: Optional[float]
+    values: NDArray, method: Literal["zscore", "modzscore", "iqr"], threshold: float | None
 ) -> NDArray:
     if method == "zscore":
         threshold = threshold if threshold else 3.0
@@ -113,7 +115,7 @@ class Linter:
         self,
         flags: ImageStat = ImageStat.ALL_PROPERTIES | ImageStat.ALL_VISUALS,
         outlier_method: Literal["zscore", "modzscore", "iqr"] = "modzscore",
-        outlier_threshold: Optional[float] = None,
+        outlier_threshold: float | None = None,
     ):
         verify_supported(flags, ImageStat.ALL_STATS)
         self.flags = flags

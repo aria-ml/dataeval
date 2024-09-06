@@ -1,4 +1,6 @@
-from typing import Dict, Optional, Sequence, cast
+from __future__ import annotations  # py39: support Type | None
+
+from typing import Dict, Sequence, cast
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -34,7 +36,7 @@ class Net(nn.Module):
         return x
 
 
-def mock_ds(length: Optional[int]):
+def mock_ds(length: int | None):
     ds = MagicMock()
     if length is None:
         delattr(ds, "__len__")

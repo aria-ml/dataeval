@@ -1,4 +1,4 @@
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Tuple, Union
 
 import numpy as np
 from torch.utils.data import Dataset
@@ -10,8 +10,8 @@ class DataEvalDataset(Dataset):
     def __init__(
         self,
         images: Any,
-        labels: Optional[Any] = None,
-        boxes: Optional[Any] = None,
+        labels: Any = None,
+        boxes: Any = None,
     ) -> None:
         self._images: Any = images
         self._labels = labels
