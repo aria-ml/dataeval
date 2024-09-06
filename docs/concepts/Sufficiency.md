@@ -14,7 +14,7 @@ The `Sufficiency` class should be used when you would like to extrapolate hypoth
 
 Use a small step size and around 50 epochs per step on the curve.
 
-```{python}
+```python
 def custom_train(model: nn.Module, dataset: Dataset, indices: Sequence[int]):
     # Defined only for this testing scenariov
     criterion = torch.nn.CrossEntropyLoss().to(device)
@@ -46,7 +46,7 @@ def custom_train(model: nn.Module, dataset: Dataset, indices: Sequence[int]):
 
 We recommend at least 5 bootstrap samples (runs) and 10 steps along the training curve per model (substeps). 
 
-```{python}
+```python
 # Create data indices for training
 suff = Sufficiency(
     model=model,
