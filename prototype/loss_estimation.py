@@ -15,9 +15,9 @@ from torch.utils.data import DataLoader, Dataset, Subset
 import nannyml as nml
 from IPython.display import display
 
-def outputs_to_nannyml(problem_type, outputs, class_names, truths=[]):
+def outputs_to_nannyml(problem_type, outputs, class_names, truths=None):
     classification = ("classification" in problem_type)
-    has_labels = len(truths) > 0
+    has_labels = truths is not None
     pred_type = int if classification else float
     dict_out = {"y_pred": np.zeros(0, dtype=pred_type)}
     if has_labels:
