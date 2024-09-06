@@ -65,3 +65,12 @@ class TestDuplicates:
         results = dupes.evaluate(stats)
         assert len(results.exact) == 20
         assert len(results.near) == 0
+
+    def test_get_duplicates_no_xxhash(self):
+        data = np.random.random((20, 3, 16, 16))
+        data = np.concatenate((data, data, data + 0.001))
+        dupes = Duplicates()
+        dupes.stats = imagestats(data, ImageStat.PCHASH)
+        results = dupes._get_duplicates()
+        assert len(results["exact"]) == 0
+        assert len(results["near"]) > 0

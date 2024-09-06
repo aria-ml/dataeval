@@ -397,7 +397,6 @@ class BaseDriftUnivariate(BaseDrift):
         tuple[NDArray, NDArray]
             A tuple containing p-values and distance statistics for each feature.
         """
-        pass
 
     def _apply_correction(self, p_vals: NDArray) -> tuple[bool, float]:
         """

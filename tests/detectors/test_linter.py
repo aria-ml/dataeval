@@ -31,6 +31,17 @@ class TestLinter:
         with pytest.raises(ValueError):
             _get_outlier_mask(np.zeros([0]), "error", None)  # type: ignore
 
+    def test_get_outliers_with_extra_stats(self):
+        linter = Linter()
+        dataset = np.random.random((100, 3, 16, 16)) / 5
+        dataset[0] = 1
+        linter.stats = imagestats(dataset, ImageStat.ALL_HASHES | ImageStat.MEAN)
+        assert len(linter.stats.dict()) == 3
+        results = linter._get_outliers()
+        assert len(results) == 1
+        assert len(results[0]) == 1
+        assert "mean" in results[0]
+
     def test_linter_with_stats(self):
         data = np.random.random((20, 3, 16, 16))
         stats = imagestats(data, ImageStat.MEAN)
