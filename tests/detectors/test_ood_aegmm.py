@@ -22,8 +22,10 @@ from tests.utils.datasets import wait_lock
 n_gmm = [1, 2]
 w_energy = [0.1, 0.5]
 threshold_perc = [90.0]
+loss_fn = [True]
 
-tests = list(product(n_gmm, w_energy, threshold_perc))
+tests = list(product(n_gmm, w_energy, threshold_perc, loss_fn))
+tests.append((n_gmm[0], w_energy[0], threshold_perc[0], False))
 n_tests = len(tests)
 
 # load and preprocess MNIST data
@@ -45,7 +47,7 @@ def aegmm_params(request):
 @pytest.mark.parametrize("aegmm_params", list(range(n_tests)), indirect=True)
 def test_aegmm(aegmm_params):
     # OutlierAEGMM parameters
-    n_gmm, w_energy, threshold_perc = aegmm_params
+    n_gmm, w_energy, threshold_perc, loss_fn = aegmm_params
 
     # define encoder, decoder and GMM density net
     encoder_net = keras.Sequential(
@@ -72,8 +74,11 @@ def test_aegmm(aegmm_params):
     aegmm = OOD_AEGMM(AEGMM(encoder_net, decoder_net, gmm_density_net, n_gmm))
 
     # fit OutlierAEGMM, infer threshold and compute scores
-    loss_fn = LossGMM(w_energy=w_energy)
-    aegmm.fit(X, threshold_perc=threshold_perc, loss_fn=loss_fn, epochs=5, batch_size=1000, verbose=False)
+    if loss_fn:
+        loss_fn = LossGMM(w_energy=w_energy)
+        aegmm.fit(X, threshold_perc=threshold_perc, loss_fn=loss_fn, epochs=5, batch_size=1000, verbose=False)
+    else:
+        aegmm.fit(X, threshold_perc=threshold_perc, epochs=5, batch_size=1000, verbose=False)
     energy = aegmm.score(X).instance_score
     perc_score = 100 * (energy < aegmm._threshold_score()).sum() / energy.shape[0]
     assert threshold_perc + 5 > perc_score > threshold_perc - 5

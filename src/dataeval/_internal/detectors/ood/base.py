@@ -28,11 +28,11 @@ class OODOutput(OutputMetadata):
     """
     Attributes
     ----------
-    is_ood : NDArray[np.bool_]
+    is_ood : NDArray
         Array of images that are detected as out of distribution
-    instance_score : NDArray[np.float32]
+    instance_score : NDArray
         Instance score of the evaluated dataset
-    feature_score : NDArray[np.float32] | None
+    feature_score : NDArray | None
         Feature score, if available, of the evaluated dataset
     """
 
@@ -47,9 +47,9 @@ class OODScore(NamedTuple):
 
     Parameters
     ----------
-    instance_score : NDArray[np.float32]
+    instance_score : NDArray
         Instance score of the evaluated dataset.
-    feature_score : NDArray[np.float32] | None, default None
+    feature_score : NDArray | None, default None
         Feature score, if available, of the evaluated dataset.
     """
 
@@ -57,6 +57,18 @@ class OODScore(NamedTuple):
     feature_score: NDArray[np.float32] | None = None
 
     def get(self, ood_type: Literal["instance", "feature"]) -> NDArray:
+        """
+        Returns either the instance or feature score
+
+        Parameters
+        ----------
+        ood_type : "instance" | "feature"
+
+        Returns
+        -------
+        NDArray
+            Either the instance or feature score based on input selection
+        """
         return self.instance_score if ood_type == "instance" or self.feature_score is None else self.feature_score
 
 
@@ -92,18 +104,20 @@ class OODBase(ABC):
     @abstractmethod
     def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScore:
         """
-        Compute instance and (optionally) feature level outlier scores.
+        Compute the out-of-distribution (OOD) scores for a given dataset.
 
         Parameters
         ----------
         X : ArrayLike
-            Batch of instances.
-        batch_size : int, default int(1e10)
-            Batch size used when making predictions with the autoencoder.
+            Input data to score.
+        batch_size : int, default 1e10
+            Number of instances to process in each batch.
+            Use a smaller batch size if your dataset is large or if you encounter memory issues.
 
         Returns
         -------
-        Instance and feature level outlier scores.
+        OODScore
+            An object containing the instance-level and feature-level OOD scores.
         """
 
     def _threshold_score(self, ood_type: Literal["feature", "instance"] = "instance") -> np.floating:
@@ -112,33 +126,34 @@ class OODBase(ABC):
     def fit(
         self,
         x_ref: ArrayLike,
-        threshold_perc: float,
-        loss_fn: Callable,
-        optimizer: keras.optimizers.Optimizer,
-        epochs: int,
-        batch_size: int,
-        verbose: bool,
+        threshold_perc: float = 100.0,
+        loss_fn: Callable[..., tf.Tensor] | None = None,
+        optimizer: keras.optimizers.Optimizer = keras.optimizers.Adam,
+        epochs: int = 20,
+        batch_size: int = 64,
+        verbose: bool = True,
     ) -> None:
         """
         Train the model and infer the threshold value.
 
         Parameters
         ----------
-        x_ref: : ArrayLike
-            Training batch.
-        threshold_perc : float
+        x_ref : ArrayLike
+            Training data.
+        threshold_perc : float, default 100.0
             Percentage of reference data that is normal.
-        loss_fn : Callable
+        loss_fn : Callable | None, default None
             Loss function used for training.
-        optimizer : keras.optimizers.Optimizer
+        optimizer : Optimizer, default keras.optimizers.Adam
             Optimizer used for training.
-        epochs : int
+        epochs : int, default 20
             Number of training epochs.
-        batch_size : int
+        batch_size : int, default 64
             Batch size used for training.
-        verbose : bool
+        verbose : bool, default True
             Whether to print training progress.
         """
+
         # Train the model
         trainer(
             model=self.model,
@@ -167,15 +182,16 @@ class OODBase(ABC):
         Parameters
         ----------
         X : ArrayLike
-            Batch of instances.
-        batch_size : int, default int(1e10)
-            Batch size used when making predictions with the autoencoder.
-        ood_type : Literal["feature", "instance"], default "instance"
+            Input data for out-of-distribution prediction.
+        batch_size : int, default 1e10
+            Number of instances to process in each batch.
+        ood_type : "feature" | "instance", default "instance"
             Predict out-of-distribution at the 'feature' or 'instance' level.
 
         Returns
         -------
-        Dictionary containing the outlier predictions and both feature and instance level outlier scores.
+        Dictionary containing the outlier predictions for the selected level,
+        and the OOD scores for the data including both 'instance' and 'feature' (if present) level scores.
         """
         self._validate_state(X := to_numpy(X))
         # compute outlier scores
@@ -197,12 +213,12 @@ class OODGMMBase(OODBase):
     def fit(
         self,
         x_ref: ArrayLike,
-        threshold_perc: float,
-        loss_fn: Callable[[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor], tf.Tensor],
-        optimizer: keras.optimizers.Optimizer,
-        epochs: int,
-        batch_size: int,
-        verbose: bool,
+        threshold_perc: float = 100.0,
+        loss_fn: Callable[..., tf.Tensor] | None = None,
+        optimizer: keras.optimizers.Optimizer = keras.optimizers.Adam,
+        epochs: int = 20,
+        batch_size: int = 64,
+        verbose: bool = True,
     ) -> None:
         # Train the model
         trainer(
