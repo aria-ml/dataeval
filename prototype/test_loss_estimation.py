@@ -226,6 +226,14 @@ class TestLEUnit():
         ds_outputs, ds_labels = custom_eval(model, ds, ds.class_names, True)
         ds_dict = outputs_to_nannyml("classification", ds_outputs, ds.class_names, ds_labels)
         assert sorted(ds_dict["y"]) == sorted(ds.labels)
+    
+    def test_fails_with_bad_truths_len(self):
+        problem_type = "classification"
+        outputs = [1,2,3]
+        class_names = [1,2,3]
+        truths = [1,2,3,1]
+        with pytest.raises(ValueError):
+            _ = outputs_to_nannyml(problem_type, outputs, class_names, truths)
 
 class TestLEFunc_class():
     def test_no_degradation_on_same_dataset_class(self):

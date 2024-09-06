@@ -23,6 +23,10 @@ def outputs_to_nannyml(problem_type, outputs, class_names, truths=None):
     if has_labels:
         dict_out["y"] = np.zeros(0, dtype=pred_type)
 
+        if len(truths) != len(outputs):
+            raise ValueError(f"Length of truths {len(truths)} is",
+                             f"not equal to length of outputs {len(outputs)}.")
+
     if classification:
         for class_name in class_names:
             dict_out[f"y_pred_proba_{class_name}"] = np.zeros(0)
