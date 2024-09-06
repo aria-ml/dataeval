@@ -88,6 +88,7 @@ metrics/coverage
 metrics/divergence
 metrics/diversity
 metrics/parity
+metrics/parity_metadata
 metrics/ber
 metrics/uap
 :::
