@@ -58,16 +58,17 @@ def eucl_cosim_features(x: tf.Tensor, y: tf.Tensor, max_eucl: float = 1e2) -> tf
 
     Parameters
     ----------
-    x
+    x : tf.Tensor
         Tensor used in feature computation.
-    y
+    y : tf.Tensor
         Tensor used in feature computation.
-    max_eucl
+    max_eucl : float, default 1e2
         Maximum value to clip relative Euclidean distance by.
 
     Returns
     -------
-    Tensor concatenating the relative Euclidean distance and cosine similarity features.
+    tf.Tensor
+        Tensor concatenating the relative Euclidean distance and cosine similarity features.
     """
     if len(x.shape) > 2 or len(y.shape) > 2:
         x = cast(tf.Tensor, Flatten()(x))
@@ -80,7 +81,7 @@ def eucl_cosim_features(x: tf.Tensor, y: tf.Tensor, max_eucl: float = 1e2) -> tf
 
 
 class Sampling(Layer):
-    """Reparametrization trick. Uses (z_mean, z_log_var) to sample the latent vector z."""
+    """Reparametrization trick - Uses (z_mean, z_log_var) to sample the latent vector z."""
 
     def call(self, inputs: tuple[tf.Tensor, tf.Tensor]) -> tf.Tensor:
         """
@@ -175,9 +176,9 @@ class AE(keras.Model):
 
     Parameters
     ----------
-    encoder_net
+    encoder_net : keras.Model
         Layers for the encoder wrapped in a keras.Sequential class.
-    decoder_net
+    decoder_net : keras.Model
         Layers for the decoder wrapped in a keras.Sequential class.
     """
 
@@ -198,13 +199,13 @@ class VAE(keras.Model):
 
     Parameters
     ----------
-    encoder_net
+    encoder_net : keras.Model
         Layers for the encoder wrapped in a keras.Sequential class.
-    decoder_net
+    decoder_net : keras.Model
         Layers for the decoder wrapped in a keras.Sequential class.
-    latent_dim
+    latent_dim : int
         Dimensionality of the latent space.
-    beta
+    beta : float, default 1.0
         Beta parameter for KL-divergence loss term.
     """
 
@@ -230,15 +231,15 @@ class AEGMM(keras.Model):
 
     Parameters
     ----------
-    encoder_net
+    encoder_net : keras.Model
         Layers for the encoder wrapped in a keras.Sequential class.
-    decoder_net
+    decoder_net : keras.Model
         Layers for the decoder wrapped in a keras.Sequential class.
-    gmm_density_net
+    gmm_density_net : keras.Model
         Layers for the GMM network wrapped in a keras.Sequential class.
-    n_gmm
+    n_gmm : int
         Number of components in GMM.
-    recon_features
+    recon_features : Callable, default eucl_cosim_features
         Function to extract features from the reconstructed instance by the decoder.
     """
 
@@ -272,19 +273,19 @@ class VAEGMM(keras.Model):
 
     Parameters
     ----------
-    encoder_net
+    encoder_net : keras.Model
         Layers for the encoder wrapped in a keras.Sequential class.
-    decoder_net
+    decoder_net : keras.Model
         Layers for the decoder wrapped in a keras.Sequential class.
-    gmm_density_net
+    gmm_density_net : keras.Model
         Layers for the GMM network wrapped in a keras.Sequential class.
-    n_gmm
+    n_gmm : int
         Number of components in GMM.
-    latent_dim
+    latent_dim : int
         Dimensionality of the latent space.
-    recon_features
+    recon_features : Callable, default eucl_cosim_features
         Function to extract features from the reconstructed instance by the decoder.
-    beta
+    beta : float, default 1.0
         Beta parameter for KL-divergence loss term.
     """
 
