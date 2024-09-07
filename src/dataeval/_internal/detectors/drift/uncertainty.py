@@ -31,18 +31,19 @@ def classifier_uncertainty(
 
     Parameters
     ----------
-    x
+    x : np.ndarray
         Batch of instances.
-    model_fn
+    model_fn : Callable
         Function that evaluates a classification model on x in a single call (contains
         batching logic if necessary).
-    preds_type
+    preds_type : "probs" | "logits", default "probs"
         Type of prediction output by the model. Options are 'probs' (in [0,1]) or
         'logits' (in [-inf,inf]).
 
     Returns
     -------
-    A scalar indication of uncertainty of the model on each instance in x.
+    NDArray
+        A scalar indication of uncertainty of the model on each instance in x.
     """
 
     preds = model_fn(x)
@@ -63,29 +64,27 @@ def classifier_uncertainty(
 class DriftUncertainty:
     """
     Test for a change in the number of instances falling into regions on which the
-    model is uncertain. Performs a K-S test on prediction entropies.
+    model is uncertain.
+
+    Performs a K-S test on prediction entropies.
 
     Parameters
     ----------
     x_ref : ArrayLike
-        Data used as reference distribution. Should be disjoint from the data the
-        model was trained on for accurate p-values.
+        Data used as reference distribution.
     model : Callable
         Classification model outputting class probabilities (or logits)
     p_val : float, default 0.05
         p-value used for the significance of the test.
     x_ref_preprocessed : bool, default False
-        Whether the given reference data `x_ref` has been preprocessed yet. If
-        `x_ref_preprocessed=True`, only the test data `x` will be preprocessed at
-        prediction time. If `x_ref_preprocessed=False`, the reference data will
-        also be preprocessed.
+        Whether the given reference data ``x_ref`` has been preprocessed yet.
+        If ``True``, only the test data ``x`` will be preprocessed at prediction time.
+        If ``False``, the reference data will also be preprocessed.
     update_x_ref : UpdateStrategy | None, default None
         Reference data can optionally be updated using an UpdateStrategy class. Update
-        using the last n instances seen by the detector with
-        :py:class:`dataeval.detectors.LastSeenUpdateStrategy`
-        or via reservoir sampling with
-        :py:class:`dataeval.detectors.ReservoirSamplingUpdateStrategy`.
-    preds_type : Literal["probs", "logits"], default "logits"
+        using the last n instances seen by the detector with LastSeenUpdateStrategy
+        or via reservoir sampling with ReservoirSamplingUpdateStrategy.
+    preds_type : "probs" | "logits", default "logits"
         Type of prediction output by the model. Options are 'probs' (in [0,1]) or
         'logits' (in [-inf,inf]).
     batch_size : int, default 32
@@ -97,8 +96,6 @@ class DriftUncertainty:
     device : str | None, default None
         Device type used. The default None tries to use the GPU and falls back on
         CPU if needed. Can be specified by passing either 'cuda', 'gpu' or 'cpu'.
-    input_shape : tuple | None, default None
-        Shape of input data.
     """
 
     def __init__(
@@ -147,6 +144,7 @@ class DriftUncertainty:
 
         Returns
         -------
-        Dictionary containing the drift prediction, p-value, and threshold statistics.
+        DriftUnvariateOutput
+            Dictionary containing the drift prediction, p-value, and threshold statistics.
         """
         return self._detector.predict(x)
