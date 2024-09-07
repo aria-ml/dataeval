@@ -21,37 +21,36 @@ from .base import BaseDriftUnivariate, UpdateStrategy, preprocess_x
 
 class DriftCVM(BaseDriftUnivariate):
     """
-    Cramér-von Mises (CVM) data drift detector, which tests for any change in the
-    distribution of continuous univariate data. For multivariate data, a separate
-    CVM test is applied to each feature, and the obtained p-values are aggregated
-    via the Bonferroni or False Discovery Rate (FDR) corrections.
+    Drift detector employing the Cramér-von Mises (CVM) distribution test.
+
+    The CVM test detects changes in the distribution of continuous
+    univariate data. For multivariate data, a separate CVM test is applied to each
+    feature, and the obtained p-values are aggregated via the Bonferroni or
+    False Discovery Rate (FDR) corrections.
 
     Parameters
     ----------
     x_ref : ArrayLike
         Data used as reference distribution.
-    p_val : float, default 0.05
+    p_val : float | None, default 0.05
         p-value used for significance of the statistical test for each feature.
         If the FDR correction method is used, this corresponds to the acceptable
         q-value.
     x_ref_preprocessed : bool, default False
-        Whether the given reference data `x_ref` has been preprocessed yet. If
-        `x_ref_preprocessed=True`, only the test data `x` will be preprocessed at
-        prediction time. If `x_ref_preprocessed=False`, the reference data will also
-        be preprocessed.
+        Whether the given reference data ``x_ref`` has been preprocessed yet.
+        If ``True``, only the test data ``x`` will be preprocessed at prediction time.
+        If ``False``, the reference data will also be preprocessed.
     update_x_ref : UpdateStrategy | None, default None
         Reference data can optionally be updated using an UpdateStrategy class. Update
-        using the last n instances seen by the detector with
-        :py:class:`dataeval.detectors.LastSeenUpdateStrategy`
-        or via reservoir sampling with
-        :py:class:`dataeval.detectors.ReservoirSamplingUpdateStrategy`.
-    preprocess_fn : Callable[[ArrayLike], ArrayLike] | None, default None
+        using the last n instances seen by the detector with LastSeenUpdateStrategy
+        or via reservoir sampling with ReservoirSamplingUpdateStrategy.
+    preprocess_fn : Callable | None, default None
         Function to preprocess the data before computing the data drift metrics.
         Typically a dimensionality reduction technique.
-    correction : Literal["bonferroni", "fdr"], default "bonferroni"
+    correction : "bonferroni" | "fdr", default "bonferroni"
         Correction type for multivariate data. Either 'bonferroni' or 'fdr' (False
         Discovery Rate).
-    n_features
+    n_features : int | None, default None
         Number of features used in the statistical test. No need to pass it if no
         preprocessing takes place. In case of a preprocessing step, this can also
         be inferred automatically but could be more expensive to compute.
@@ -90,7 +89,8 @@ class DriftCVM(BaseDriftUnivariate):
 
         Returns
         -------
-        Feature level p-values and CVM statistics.
+        tuple[NDArray, NDArray]
+            Feature level p-values and CVM statistic
         """
         x_np = to_numpy(x)
         x_np = x_np.reshape(x_np.shape[0], -1)

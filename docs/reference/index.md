@@ -10,27 +10,27 @@
 :titlesonly:
 
 detectors/clusterer
-detectors/duplicates
-detectors/linter
 detectors/drift_cvm
 detectors/drift_ks
 detectors/drift_mmd
 detectors/drift_uncertainty
+detectors/duplicates
 detectors/gaussianrbf
 detectors/lastseenupdate
-detectors/reservoirsamplingupdate
+detectors/linter
 detectors/ood_ae
 detectors/ood_aegmm
 detectors/ood_llr
 detectors/ood_vae
 detectors/ood_vaegmm
 detectors/oodscore
+detectors/reservoirsamplingupdate
 :::
 
 Detectors can determine if a dataset or individual images in a dataset are indicative of a specific issue
 
 :::
-### Data Exploration
+### _Data Exploration_
 :::
 
 ```{eval-rst}
@@ -42,9 +42,10 @@ Detectors can determine if a dataset or individual images in a dataset are indic
 ```
 
 :::
-### Data Monitoring
+### _Data Monitoring_
 #### Drift
 :::
+*Detectors*
 
 ```{eval-rst}
 .. autosummary::
@@ -53,10 +54,25 @@ Detectors can determine if a dataset or individual images in a dataset are indic
     detectors.DriftKS
     detectors.DriftUncertainty
     detectors.DriftMMD
+```
+
+*Kernels*
+
+```{eval-rst}
+.. autosummary::
+
     detectors.GaussianRBF
+```
+
+*Update Strategies*
+
+```{eval-rst}
+.. autosummary::
+
     detectors.LastSeenUpdate
     detectors.ReservoirSamplingUpdate
 ```
+
 :::
 #### Out of Distribution
 :::
@@ -78,15 +94,15 @@ Detectors can determine if a dataset or individual images in a dataset are indic
 :hidden:
 :titlesonly:
 
-metrics/channelstats
-metrics/imagestats
 metrics/balance
+metrics/ber
+metrics/channelstats
 metrics/coverage
 metrics/divergence
 metrics/diversity
+metrics/imagestats
 metrics/parity
 metrics/parity_metadata
-metrics/ber
 metrics/uap
 :::
 
@@ -94,7 +110,7 @@ Metrics are a way to measure the performance of your models or datasets that can
 then be analyzed in the context of a given problem
 
 :::
-### Data Exploration
+### _Data Exploration_
 :::
 
 ```{eval-rst}
@@ -104,7 +120,7 @@ then be analyzed in the context of a given problem
     metrics.imagestats
 ```
 :::
-### Metadata/Label Exploration
+### _Metadata/Label Exploration_
 :::
 
 ```{eval-rst}
@@ -121,7 +137,7 @@ then be analyzed in the context of a given problem
 ```
 
 :::
-### Data Performance
+### _Data Performance_
 :::
 
 ```{eval-rst}
