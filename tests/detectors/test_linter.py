@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from dataeval._internal.detectors.linter import Linter, _get_outlier_mask
+from dataeval._internal.metrics.stats import imagestats
 from dataeval.flags import ImageStat
 
 
@@ -29,3 +30,31 @@ class TestLinter:
     def test_get_outlier_mask_valueerror(self):
         with pytest.raises(ValueError):
             _get_outlier_mask(np.zeros([0]), "error", None)  # type: ignore
+
+    def test_linter_with_stats(self):
+        data = np.random.random((20, 3, 16, 16))
+        stats = imagestats(data, ImageStat.MEAN)
+        linter = Linter(ImageStat.MEAN)
+        results = linter.evaluate(stats)
+        assert results is not None
+
+    def test_linter_with_stats_no_mean(self):
+        data = np.random.random((20, 3, 16, 16))
+        stats = imagestats(data, ImageStat.VAR)
+        linter = Linter(ImageStat.MEAN)
+        with pytest.raises(ValueError):
+            linter.evaluate(stats)
+
+    def test_linter_with_stats_mean_plus(self):
+        data = np.random.random((20, 3, 16, 16))
+        stats = imagestats(data, ImageStat.MEAN | ImageStat.VAR)
+        linter = Linter(ImageStat.MEAN)
+        results = linter.evaluate(stats)
+        assert results is not None
+
+    def test_linter_with_stats_no_mean_plus(self):
+        data = np.random.random((20, 3, 16, 16))
+        stats = imagestats(data, ImageStat.MEAN)
+        linter = Linter(ImageStat.MEAN | ImageStat.VAR)
+        with pytest.raises(ValueError):
+            linter.evaluate(stats)
