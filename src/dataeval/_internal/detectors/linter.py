@@ -6,7 +6,8 @@ from typing import Iterable, Literal
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval._internal.flags import verify_supported
+from dataeval._internal.flags import to_distinct, verify_supported
+from dataeval._internal.metrics.stats import StatsOutput
 from dataeval._internal.output import OutputMetadata, set_metadata
 from dataeval.flags import ImageStat
 from dataeval.metrics import imagestats
@@ -125,11 +126,9 @@ class Linter:
     def _get_outliers(self) -> dict:
         flagged_images = {}
         stats_dict = self.stats.dict()
+        supported = to_distinct(ImageStat.ALL_STATS)
         for stat, values in stats_dict.items():
-            if not isinstance(values, np.ndarray):
-                continue
-
-            if values.ndim == 1 and np.std(values) != 0:
+            if stat in supported.values() and values.ndim == 1 and np.std(values) != 0:
                 mask = _get_outlier_mask(values, self.outlier_method, self.outlier_threshold)
                 indices = np.flatnonzero(mask)
                 for i, value in zip(indices, values[mask]):
@@ -138,15 +137,14 @@ class Linter:
         return dict(sorted(flagged_images.items()))
 
     @set_metadata("dataeval.detectors", ["flags", "outlier_method", "outlier_threshold"])
-    def evaluate(self, images: Iterable[ArrayLike]) -> LinterOutput:
+    def evaluate(self, data: Iterable[ArrayLike] | StatsOutput) -> LinterOutput:
         """
         Returns indices of outliers with the issues identified for each
 
         Parameters
         ----------
-        images : Iterable[ArrayLike], shape - (N, C, H, W)
-            A dataset in an ArrayLike format.
-            Function expects the data to have 3 dimensions, CxHxW.
+        data : Iterable[ArrayLike], shape - (N, C, H, W) | StatsOutput
+            A dataset of images in an ArrayLike format or the output from an imagestats metric analysis
 
         Returns
         -------
@@ -161,5 +159,13 @@ class Linter:
         >>> lint.evaluate(images)
         LinterOutput(issues={18: {'brightness': 0.78}, 25: {'brightness': 0.98}})
         """
-        self.stats = imagestats(images, self.flags)
+        if isinstance(data, StatsOutput):
+            flags = set(to_distinct(self.flags).values())
+            stats = set(data.dict())
+            missing = flags - stats
+            if missing:
+                raise ValueError(f"StatsOutput is missing {missing} from the required stats: {flags}.")
+            self.stats = data
+        else:
+            self.stats = imagestats(data, self.flags)
         return LinterOutput(self._get_outliers())
