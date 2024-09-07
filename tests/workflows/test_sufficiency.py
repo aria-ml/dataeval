@@ -211,6 +211,14 @@ class TestSufficiency:
                 eval_fn=NonCallableMagicMock(),
             )
 
+    def test_output_params_measures_mismatch(self):
+        with pytest.raises(ValueError):
+            SufficiencyOutput(
+                steps=np.array([1, 5, 10]),
+                params={"a": np.array([0.1, 0.5, 1.0])},
+                measures={"b": np.array([0.2, 0.4, 0.6])},
+            )
+
 
 class TestSufficiencyPlot:
     def test_plot(self):
@@ -370,6 +378,19 @@ class TestSufficiencyProject:
         assert len(result.keys()) == 2
         assert result["test1"].shape == (2, 4)
         assert result["test2"].shape == (4,)
+
+    def test_inv_project_ignore_unknown_measure(self):
+        output = SufficiencyOutput(
+            steps=np.array([10, 100, 1000]),
+            params={"test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 1.0]])},
+            measures={"test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]])},
+        )
+
+        targets = {"test1": np.array([0.6, 0.7, 0.8, 0.9]), "test2": np.array([0.6, 0.7, 0.8, 0.9])}
+
+        result = Sufficiency.inv_project(targets, output)
+        assert len(result.keys()) == 1
+        assert result["test1"].shape == (2, 4)
 
 
 class TestSufficiencyInverseProject:
