@@ -6,7 +6,19 @@
 
 The imagestats function is an aggregate metric that calculates various values for each individual image for the selected metrics.  
 
+The `imagestats` function assists with understanding the dataset.
+It can be used to get a big picture view of the dataset and it's underlying distribution.
+
+The stats delivered by the class is broken down into 3 main categories:
+* statistics covering image properties,
+* statistics covering the visual aspect of images,
+* and normal statistics about pixel values.
+
 The available metrics are defined in the [ImageStat](../reference/flags/imagestat.md) flag class.
+
+This function can be used in conjunction with the `Linter` class to determine if there are any issues with any of the images in the dataset.
+
+This function can be used in conjunction with the `Duplicates` class in order to identify duplicate images.
 
 ## channelstats
 
