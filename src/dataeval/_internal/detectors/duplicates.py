@@ -36,6 +36,11 @@ class Duplicates:
     stats : StatsOutput
         Output class of stats
 
+    Parameters
+    ----------
+    only_exact : bool, default False
+        Only inspect the dataset for exact image matches
+
     Example
     -------
     Initialize the Duplicates class:
@@ -43,10 +48,9 @@ class Duplicates:
     >>> dups = Duplicates()
     """
 
-    def __init__(self, find_exact: bool = True, find_near: bool = True):
+    def __init__(self, only_exact: bool = False):
         self.stats: StatsOutput
-        self.find_exact = find_exact
-        self.find_near = find_near
+        self.only_exact = only_exact
 
     def _get_duplicates(self) -> dict[str, list[list[int]]]:
         stats_dict = self.stats.dict()
@@ -58,7 +62,7 @@ class Duplicates:
         else:
             exact = []
 
-        if "pchash" in stats_dict:
+        if "pchash" in stats_dict and not self.only_exact:
             near = {}
             for i, value in enumerate(stats_dict["pchash"]):
                 near.setdefault(value, []).append(i)
@@ -71,15 +75,15 @@ class Duplicates:
             "near": sorted(near),
         }
 
-    @set_metadata("dataeval.detectors", ["find_exact", "find_near"])
-    def evaluate(self, images: Iterable[ArrayLike]) -> DuplicatesOutput:
+    @set_metadata("dataeval.detectors", ["only_exact"])
+    def evaluate(self, data: Iterable[ArrayLike] | StatsOutput) -> DuplicatesOutput:
         """
         Returns duplicate image indices for both exact matches and near matches
 
         Parameters
         ----------
-        images : Iterable[ArrayLike], shape - (N, C, H, W)
-            A set of images in an ArrayLike format
+        data : Iterable[ArrayLike], shape - (N, C, H, W) | StatsOutput
+            A dataset of images in an ArrayLike format or the output from an imagestats metric analysis
 
         Returns
         -------
@@ -95,7 +99,12 @@ class Duplicates:
         >>> dups.evaluate(images)
         DuplicatesOutput(exact=[[3, 20], [16, 37]], near=[[3, 20, 22], [12, 18], [13, 36], [14, 31], [17, 27], [19, 38, 47]])
         """  # noqa: E501
-        flag_exact = ImageStat.XXHASH if self.find_exact else ImageStat(0)
-        flag_near = ImageStat.PCHASH if self.find_near else ImageStat(0)
-        self.stats = imagestats(images, flag_exact | flag_near)
+        if isinstance(data, StatsOutput):
+            if not data.xxhash:
+                raise ValueError("StatsOutput must include xxhash information of the images.")
+            if not self.only_exact and not data.pchash:
+                raise ValueError("StatsOutput must include pchash information of the images for near matches.")
+            self.stats = data
+        else:
+            self.stats = imagestats(data, ImageStat.XXHASH | (ImageStat(0) if self.only_exact else ImageStat.PCHASH))
         return DuplicatesOutput(**self._get_duplicates())
