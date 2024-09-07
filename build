@@ -106,7 +106,7 @@ function build_image() {
     # create cache array
     cache=()
     for cache_image in ${cache_images[@]}; do
-        if [[ ${BRANCH_CACHE} ]]; then
+        if [[ ${BRANCH_CACHE} && $cache_image != data ]]; then
             cache+=("${BRANCH_CACHE}${cache_image}-${python_version}")
         fi
         # always cache from main
@@ -271,9 +271,9 @@ for python_version in ${!python_versions[@]}; do
         task_map[$python_version]+="$task "
     done
 
-    if [[ $CI && $build_only ]]; then
+    if [[ $CI && $build_only && $branch_name == $main_branch ]]; then
         # export pyenv in main branch pipeline runs if pyenv is not present
-        if [[ $branch_name == $main_branch && ! $(docker manifest inspect "$PYENV_IMAGE:$python_version" 2> /dev/null) ]]; then
+        if [[ ! $(docker manifest inspect "$PYENV_IMAGE:$python_version" 2> /dev/null) ]]; then
             task_map[$python_version]+="pyenv "
         fi
         # build data layer in build-only pipeline runs for 3.11
@@ -293,7 +293,7 @@ for python_version in ${!task_map[@]}; do
         # build each task image in parallel
         tasks=$(echo -n ${task_map[$python_version]} | xargs)
         echo "Building [${tasks}]-$python_version..."
-        python_version=$python_version parallel $keep_order --lb "build_image {} $python_version" ::: ${tasks}
+        python_version=$python_version parallel $keep_order --lb --tag "build_image {} $python_version" ::: ${tasks}
     fi
 done
 
