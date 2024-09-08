@@ -99,7 +99,7 @@ function build_image() {
     no_cache_layers=${@:3}
 
     cache_images=()
-    if [[ $target != base && $target != pyenv ]]; then cache_images+=("$target"); fi
+    if [[ $target != base ]]; then cache_images+=("$target"); fi
     if [[ $target == docs || $target == qdocs ]]; then cache_images+=("data"); fi
     if [[ $target != data ]]; then cache_images+=("base"); fi
 
@@ -115,7 +115,7 @@ function build_image() {
 
     # set cache_from and cache_to args
     cache_from_arg=$(echo ${cache[*]} | xargs -n1 sh -c 'echo --cache-from type=registry,ref=$0')
-    if [[ $target != pyenv && $push_to_repo ]]; then
+    if [[ $push_to_repo ]]; then
         # Writing to the cache means that you must be able to push to the registry, therefore
         # don't want to force users to login to the registry just to build.
         cache_to_arg="--cache-to type=registry,mode=max,image-manifest=true,ref=${cache[0]}"
@@ -128,14 +128,8 @@ function build_image() {
         no_cache_filter_arg="--no-cache-filter $(tr ' ' ',' <<< $no_cache_layers)"
     fi
 
-    # There are only 2 scenarios where we want to push an actual image up to the registry
-    # one is for the pyenv image if it does not exist, and the other is for task images to
-    # be loaded for playback of results.
-
-    # build image_tag for pyenv (if not exist) or for task images (not pyenv, not base)
-    if [[ $target == pyenv ]]; then
-        image_tag="${PYENV_IMAGE}:${python_version}"
-    elif [[ $target != pyenv && $target != base && $target != data ]]; then
+    # only push an image up to the registry for task images to be loaded for playback of results.
+    if [[ $target != base && $target != data ]]; then
         image_tag="${TASK_IMAGE}${target}-${python_version}"
         if [[ $CI_PIPELINE_ID ]]; then
             image_tag="${image_tag}-${CI_PIPELINE_ID}"
@@ -154,7 +148,7 @@ function build_image() {
         output_arg="--output type=cacheonly"
     fi
 
-    if [[ $target != pyenv && $target != base && $target != data && ($save_build_images || -z $push_to_repo) ]]; then
+    if [[ $target != base && $target != data && ($save_build_images || -z $push_to_repo) ]]; then
         # By default the docker-container driver doesn't load images to the
         # local docker images store, these args will cause it to do so.
         load_arg="--tag ${image_tag} --load"
@@ -250,7 +244,6 @@ else
 fi
 
 # construct image and cache names
-export PYENV_IMAGE="${namespace}/pyenv"
 export TASK_IMAGE="${namespace}/${repository}:${tag_prefix}"
 
 export MAIN_CACHE="${namespace}/cache"
@@ -271,15 +264,9 @@ for python_version in ${!python_versions[@]}; do
         task_map[$python_version]+="$task "
     done
 
-    if [[ $CI && $build_only && $branch_name == $main_branch ]]; then
-        # export pyenv in main branch pipeline runs if pyenv is not present
-        if [[ ! $(docker manifest inspect "$PYENV_IMAGE:$python_version" 2> /dev/null) ]]; then
-            task_map[$python_version]+="pyenv "
-        fi
+    if [[ $CI && $build_only && $branch_name == $main_branch && $python_version == 3.11 ]]; then
         # build data layer in build-only pipeline runs for 3.11
-        if [[ $python_version == 3.11 ]]; then
-            task_map[$python_version]+="data "
-        fi
+        task_map[$python_version]+="data "
     fi
 done
 for task in ${!docs_tasks[@]}; do

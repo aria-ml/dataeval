@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# Check for uv
+if ! $(which uv 1> /dev/null); then echo "Install uv to continue: https://docs.astral.sh/uv/"; exit 1; fi
+
+allowed=(3.9 3.10 3.11)
+default=(3.11)
+
+# Use arguments or prompt for python versions
+if [[ $@ ]]; then
+    input=$@
+else
+    read -p "Enter space delimited desired versions of python [supported: ${allowed[*]}] [default: ${default[*]}]: " input
+fi
+
+# Parse python version inputs
+versions=()
+if [[ $input ]]; then
+    for token in ${input}; do
+        token=$(echo $token | cut -d '.' -f 1,2)
+        if [[ ! " ${allowed[*]} " =~ [[:space:]]${token}[[:space:]] ]]; then
+            echo "Unrecognized input $token - skipping..."
+            continue
+        else
+            versions+=($token)
+        fi
+    done
+fi
+if [ ${#versions[@]} == 0 ]; then
+    echo "Unrecognized inputs, defaulting to ${default[*]}"
+    versions=(${default[@]})
+fi
+
+# Install dataeval environment for each version of python
+echo -n ${versions[*]} | xargs -n1 bash -c '\
+    echo "Creating python virtual environment for $0..." && \
+    uv venv --allow-existing --python $0 .venv-$0 && \
+    uv pip install --python .venv-$0 --index-strategy unsafe-best-match \
+        -e . \
+        -r environment/requirements.txt \
+        -r environment/requirements-dev.txt'
+echo -n ${versions[*]} | xargs -n1 bash -c '\
+    echo "Finished installing dataeval for python $0 to .venv-$0"'
+echo
