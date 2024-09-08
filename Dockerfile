@@ -3,7 +3,6 @@
 ARG USER="dataeval"
 ARG UID="1000"
 ARG HOME="/home/$USER"
-ARG PYENV_ROOT="$HOME/.pyenv"
 ARG python_version="3.11"
 ARG output_dir="/dataeval/output"
 
@@ -30,9 +29,8 @@ ARG UID
 ARG USER
 RUN useradd -m -u ${UID} -s /bin/bash ${USER}
 USER ${USER}
-WORKDIR /dataeval
-ARG PYENV_ROOT
-ENV PYENV_ROOT=${PYENV_ROOT}
+WORKDIR /${USER}
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
 ENV TF_GPU_ALLOCATOR=cuda_malloc_async
 ENV UV_INDEX_STRATEGY=unsafe-best-match
@@ -40,59 +38,15 @@ ENV LANGUAGE=en
 ENV LC_ALL=C.UTF-8
 ENV LANG=en_US.UTF-8
 
-
-######################## base task image ########################
-FROM ubuntu:22.04 as pyenv-build
-ENV DEBIAN_FRONTEND noninteractive
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        ca-certificates \
-        curl \
-        git \
-        libbz2-dev \
-        libffi-dev \
-        liblzma-dev \
-        libncursesw5-dev \
-        libreadline-dev \
-        libsqlite3-dev \
-        libssl-dev \
-        libxml2-dev \
-        libxmlsec1-dev \
-        llvm \
-        tk-dev \
-        wget \
-        xz-utils \
-        zlib1g-dev
-ARG USER
-RUN useradd -m ${USER}
-USER ${USER}
-RUN curl https://pyenv.run | bash
-ENV PYTHON_CONFIGURE_OPTS "--enable-optimizations --with-lto"
-ARG PYENV_ROOT
-ARG python_version
-RUN ${PYENV_ROOT}/bin/pyenv install ${python_version}
-
 FROM cuda as base
 ARG UID
-ARG PYENV_ROOT
-COPY --chown=${UID} --link --from=pyenv-build ${PYENV_ROOT} ${PYENV_ROOT}
-ENV PATH ${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:$PATH
 ARG python_version
-RUN pyenv global ${python_version}
-RUN pip install tox tox-uv uv --no-cache
-RUN uv venv
+RUN uv venv -p ${python_version}
 COPY --chown=${UID} environment/requirements.txt environment/
 RUN uv pip install -r environment/requirements.txt
 COPY --chown=${UID} environment/requirements-dev.txt environment/
 RUN uv pip install -r environment/requirements-dev.txt
-
-
-######################## pyenv image ########################
-FROM scratch as pyenv
-ARG PYENV_ROOT
-COPY --from=pyenv-build ${PYENV_ROOT} ${PYENV_ROOT}
+ENV PATH=/${USER}/.venv/bin:${PATH}
 
 
 ######################## task layers ########################
@@ -205,11 +159,3 @@ RUN addgroup --gid 1001 docker
 ARG USER
 RUN usermod -a -G docker ${USER}
 USER ${USER}
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ARG PYENV_ROOT
-ENV PATH=${HOME}/.cargo/bin:${PYENV_ROOT}/shims:${PYENV_ROOT}/bin:${PATH}
-RUN echo 'eval "$(pyenv init -)"' >> ~/.bashrc
-ARG UID
-COPY --chown=${UID} --link --from=harbor.jatic.net/dataeval/pyenv:3.9 ${PYENV_ROOT} ${PYENV_ROOT}
-COPY --chown=${UID} --link --from=harbor.jatic.net/dataeval/pyenv:3.10 ${PYENV_ROOT} ${PYENV_ROOT}
-COPY --chown=${UID} --link --from=harbor.jatic.net/dataeval/pyenv:3.11 ${PYENV_ROOT} ${PYENV_ROOT}
