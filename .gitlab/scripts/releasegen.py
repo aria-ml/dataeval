@@ -3,7 +3,7 @@ from collections import defaultdict
 from datetime import UTC, datetime
 from enum import IntEnum
 from os import path, remove, walk
-from re import MULTILINE, compile
+from re import MULTILINE, compile, search, sub
 from shutil import move, rmtree
 from typing import Any, Dict, List, Literal, Tuple
 
@@ -12,6 +12,11 @@ from rest import verbose
 from versiontag import VersionTag
 
 CHANGELOG_FILE = "CHANGELOG.md"
+# need to read this to update the doc links
+HOWTO_INDEX_FILE = "docs/how_to/index.md"
+TUTORIAL_INDEX_FILE = "docs/tutorials/index.md"
+NOTEBOOK_DIRECTORY = "docs/how_to/notebooks"
+TUTORIAL_DIRECTORY = "docs/tutorials"
 TAB = "    "
 
 version_pattern = compile(r"v([0-9]+)\.([0-9]+)\.([0-9]+)")
@@ -188,6 +193,22 @@ class ReleaseGen:
             remove(CHANGELOG_FILE)
         return lines
 
+    def _read_doc_file(self, file_name: str) -> None | List[str]:
+        temp = False
+        if not path.exists(file_name):
+            verbose(f"{file_name} not found, pulling from Gitlab")
+            temp = True
+            self.gl.get_file(file_name, file_name)
+        try:
+            with open(file_name) as file:
+                lines = file.readlines()
+            if temp:
+                verbose(f"Removing temp {file_name}")
+                remove(file_name)
+            return lines
+        except:
+            return None
+
     def _get_last_hash(self, line: str) -> str:
         start = line.find("(") + 1
         end = line.find(")")
@@ -336,6 +357,80 @@ class ReleaseGen:
                 file_paths.append(path.join(root, filename))
         return file_paths
 
+    def _generate_index_markdown_update_action(self, file_name: str) -> None | Dict[str, str]:
+        howto_index_file = self._read_doc_file(file_name)
+        if howto_index_file:
+            vt = VersionTag(self.gl)
+            new_ref = vt.current
+            new_sub_1 = "aria-ml/dataeval/blob/" + new_ref + "/docs"
+
+            verbose(f"substitution for new version  {new_sub_1}")
+            pattern_1 = "aria-ml/dataeval/blob/main/docs"
+            lines: List[str] = []
+            for line in howto_index_file:
+                new_line_1 = sub(pattern_1, new_sub_1, line)
+                if new_line_1 != line:
+                    lines.append(new_line_1)  # replace the old with the new line.
+                else:
+                    lines.append(line)
+            content = "".join(lines)
+            return {
+                "action": "update",
+                "file_path": file_name,
+                "encoding": "text",
+                "content": content,
+            }
+        else:
+            return None
+
+    def _generate_notebook_update_actions(self) -> List[Dict[str, str]]:
+        # get all the ipynb file from the notebook directory
+        # may need to read .jupytercache files and update them instead of the original files. TEST THIS
+        file_path = NOTEBOOK_DIRECTORY
+        files = self._get_files(file_path)
+        # get the notebooks in the docs/tutorials directory
+        more_file_path = TUTORIAL_DIRECTORY
+        more_files = self._get_files(more_file_path)
+        # add them to the list if they are notebook files.
+        for f in more_files:
+            if f.lower().endswith("ipynb"):
+                files.append(f)
+
+        vt = VersionTag(self.gl)
+        # file_lines: List[List[str]] = [[] for i in range(len(files))]
+        current_tag = vt.current
+        search_pattern = r"(%|\!)+(pip install -q dataeval){1}(\[\w+\])*"
+        # Second example search pattern !pip install -q dataeval[torch] torchmetrics torchvision
+        action_list: List[Dict[str, str]] = []
+        # index = 0
+        for file_name in files:
+            if path.isfile(file_name):
+                new_list: List[str] = []
+                lines = self._read_doc_file(file_name)  # return none if file is unreadable.
+                if lines:
+                    for line in lines:
+                        result = search(search_pattern, line)
+                        if result:
+                            new_string = (
+                                result.string[0 : result.regs[0][1]]
+                                + "=="
+                                + current_tag
+                                + result.string[result.regs[0][1] :]
+                            )
+                            new_list.append(new_string)
+                        else:
+                            new_list.append(line)
+                    content = "".join(new_list)
+                    new_action = {
+                        "action": "update",
+                        "file_path": file_name,
+                        "encoding": "text",
+                        "content": content,
+                    }
+                    action_list.append(new_action)
+
+        return action_list
+
     def _generate_jupyter_cache_actions(self) -> List[Dict[str, str]]:
         ref = "main"
         cache_path = "docs/.jupyter_cache"
@@ -356,7 +451,18 @@ class ReleaseGen:
         version, changelog_action = self._generate_version_and_changelog_action()
         if not changelog_action:
             return "", []
-
+        # creating actions for updating python notebook pip install statements
+        file_update_actions = self._generate_notebook_update_actions()
         actions = self._generate_jupyter_cache_actions()
+        # creating actions for updating colab references in markdown locations.
+        howto_index_action = self._generate_index_markdown_update_action(HOWTO_INDEX_FILE)
+        tutorital_index_action = self._generate_index_markdown_update_action(TUTORIAL_INDEX_FILE)
+        if howto_index_action:  # can return None
+            actions.append(howto_index_action)
+        if tutorital_index_action:  # can return None
+            actions.append(tutorital_index_action)
+        if file_update_actions:  # can return None
+            actions.extend(file_update_actions)
+
         actions.append(changelog_action)
         return version, actions

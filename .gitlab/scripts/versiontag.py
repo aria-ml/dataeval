@@ -21,7 +21,6 @@ class VersionTag:
         """
         if self._current is None:
             tags = self.gl.list_tags()
-            verbose(f"Pulled tags: {', '.join(d['name'] for d in tags)}")
             for tag in tags:
                 if len(tag["name"].split(".")) != 3:
                     continue
