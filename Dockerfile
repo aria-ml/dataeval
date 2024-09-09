@@ -135,7 +135,7 @@ RUN ./capture.sh lint ${python_version} tox -e lint
 
 FROM task-run-with-docs as doctest-run
 ARG python_version
-RUN ln -s /dataeval/.venv .tox/lint
+RUN ln -s /dataeval/.venv .tox/doctest
 RUN ./capture.sh doctest ${python_version} tox -e doctest
 
 # docs works differently than other tasks because it requires GPU access.
