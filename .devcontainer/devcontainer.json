@@ -38,5 +38,5 @@
     }
   },
 
-  "postCreateCommand": [ ".devcontainer/postcreate.sh" ]
+  "postCreateCommand": [ "./init" ]
 }
