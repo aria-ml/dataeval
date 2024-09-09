@@ -259,7 +259,8 @@ class TestLEFunc_class():
 
         #for method in ("regression", "classification_multiclass"):
         method = "classification_multiclass"
-        estimator = LossEstimator("CBPE", method)
+        metrics = ["accuracy"]
+        estimator = LossEstimator(method, metrics)
         #results = estimator.evaluate(model, ds, ds_c, ds.class_names, 2)
         ds_c_outputs, _ = custom_eval(model, ds_c, ds_c.class_names, False)
         ds_c_dict = outputs_to_nannyml("classification", ds_c_outputs, ds_c.class_names)
@@ -269,8 +270,8 @@ class TestLEFunc_class():
 
         results = estimator.evaluate(ds_dict, ds_c_dict, class_names, 2)
 
-        ds_acc = results["Reference_Metric"]
-        ds_c_acc = results["Op_Predicted_Metric"]
+        ds_acc = results["Reference_accuracy"]
+        ds_c_acc = results["Op_Predicted_accuracy"]
 
         assert np.isclose(ds_acc, ds_c_acc)
     
@@ -297,11 +298,12 @@ class TestLEFunc_class():
 
         #for method in ("regression", "classification_multiclass"):
         method = "regression"
-        estimator = LossEstimator("CBPE", method)
+        metrics = ["rmse"]
+        estimator = LossEstimator(method, metrics)
         results = estimator.evaluate(model, ds, ds_c, ds.class_names, 2)
 
-        ds_acc = results["Reference_Metric"]
-        ds_c_acc = results["Op_Predicted_Metric"]
+        ds_acc = results["Reference_accuracy"]
+        ds_c_acc = results["Op_Predicted_accuracy"]
 
         assert np.isclose(ds_acc, ds_c_acc)
 
@@ -344,7 +346,8 @@ class TestLEFunc_class():
         )
 
         method = "classification_multiclass"
-        estimator = LossEstimator("CBPE", method)
+        metrics = ["accuracy"]
+        estimator = LossEstimator(method, metrics)
         #results = estimator.evaluate(model, ds, ds_c, ds.class_names, 2)
         ds_c_outputs, _ = custom_eval(model, ds_c, ds_c.class_names, False)
         ds_c_dict = outputs_to_nannyml("classification", ds_c_outputs, ds_c.class_names)
@@ -354,8 +357,8 @@ class TestLEFunc_class():
 
         results = estimator.evaluate(ds_dict, ds_c_dict, class_names, 2)
 
-        ds_acc = results["Reference_Metric"]
-        ds_c_acc = results["Op_Predicted_Metric"]
+        ds_acc = results["Reference_accuracy"]
+        ds_c_acc = results["Op_Predicted_accuracy"]
 
         assert ds_c_acc < 0.95*ds_acc
     
@@ -390,7 +393,8 @@ class TestLEFunc_class():
         )
 
         method = "classification_multiclass"
-        estimator = LossEstimator("CBPE", method)
+        metrics = ["accuracy"]
+        estimator = LossEstimator(method, metrics)
         #results = estimator.evaluate(model, ds, ds_c, ds.class_names, 2)
         ds_c_outputs, _ = custom_eval(model, ds_c, ds_c.class_names, False)
         ds_c_dict = outputs_to_nannyml("classification", ds_c_outputs, ds_c.class_names)
@@ -401,7 +405,7 @@ class TestLEFunc_class():
         results = estimator.evaluate(ds_dict, ds_c_dict, class_names, 2)
 
         #ds_acc = results["Reference_Metric"]
-        pred_ds_c_acc = results["Op_Predicted_Metric"]
+        pred_ds_c_acc = results["Op_Predicted_accuracy"]
         true_ds_c_acc = get_accuracy(model, ds_c, ds_c.class_names)["Accuracy"].float()
 
         percent_diff = np.abs(pred_ds_c_acc - true_ds_c_acc)* 100
@@ -450,10 +454,10 @@ class TestLEFunc_class():
         )
 
         method = "regression"
-        estimator = LossEstimator("CBPE", method)
+        estimator = LossEstimator(method, ["rmse"])
         results = estimator.evaluate(model, ds, ds_c, ds.class_names, 2)
 
-        ds_err = results["Reference_Metric"]
-        ds_c_err = results["Op_Predicted_Metric"]
+        ds_err = results["Reference_rmse"]
+        ds_c_err = results["Op_Predicted_rmse"]
 
         assert ds_err < 0.95*ds_c_err

@@ -38,15 +38,6 @@ def outputs_to_nannyml(problem_type, outputs, class_names, truths=None):
     #dataloader = DataLoader(dataset, batch_size=16)
     # Tell PyTorch to not track gradients, greatly speeds up processing
     for batch_id, output_batch in enumerate(outputs):
-            #batch 
-            # Load data/images to device
-            #X = torch.Tensor(batch[0]).to(device)
-            # Load targets/labels to device
-            
-            #output = model(X).cpu()
-            
-            
-
             if classification:
                 preds = np.int64(torch.argmax(output_batch, dim=1))
                 for i, class_name in enumerate(class_names):
@@ -68,11 +59,11 @@ def outputs_to_nannyml(problem_type, outputs, class_names, truths=None):
 
 
 class LossEstimator():
-    def __init__(self, method="CBPE", problem_type="classification_multiclass"):
-        self.method = method
+    def __init__(self, problem_type="classification_multiclass", metrics=["accuracy"]):
+        self.metrics = metrics
         self.problem_type = problem_type
         self.classification = "classification" in problem_type
-        self.metric = 'accuracy' if self.classification else 'rmse'
+        #self.metric = 'accuracy' if self.classification else 'rmse'
     
     def _eval_model(self, model: nn.Module, dataset: Dataset, class_names, has_labels: bool = False, device="cuda" if torch.cuda.is_available() else "cpu") -> Dict[str, list]:
         #TODO: Let user set their own custom eval function
@@ -130,7 +121,7 @@ class LossEstimator():
             #'y_pred_proba': y_pred_keys,
             'y_pred': 'y_pred',
             'y_true': 'y',
-            'metrics': [self.metric],
+            'metrics': self.metrics,
             'chunk_size': chunk_size
         }
 
@@ -148,14 +139,24 @@ class LossEstimator():
 
         reference_df = results.filter(period="reference").to_df()
         results_df = results.filter(period="analysis").to_df()
-        ref_accuracy = np.mean(reference_df[self.metric]['value'])
-        pred_accuracy = np.mean(results_df[self.metric]['value'])
-        alert = np.any(results_df[self.metric]['alert'])
+        
+        has_drifted = False
+        output_dict = {}
+        for metric in self.metrics:
+            ref_value = np.mean(reference_df[metric]['value'])
+            pred_value = np.mean(results_df[metric]['value'])
+            curr_alert = np.any(results_df[metric]['alert'])
 
-        return {
-            "Reference_Metric": ref_accuracy,
-            "Op_Predicted_Metric": pred_accuracy,
-            "Has_Drifted": alert
-        }
+            if curr_alert:
+                has_drifted = True
+
+            output_dict[f"Reference_{metric}"] = ref_value
+            output_dict[f"Op_Predicted_{metric}"] = pred_value
+            output_dict[f"Alert_{metric}"] = curr_alert
+
+        output_dict["has_drifted"] = has_drifted
+
+
+        return output_dict
 
     
