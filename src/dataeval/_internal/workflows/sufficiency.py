@@ -376,7 +376,7 @@ class Sufficiency:
         ...     model=model, train_ds=train_ds, test_ds=test_ds, train_fn=train_fn, eval_fn=eval_fn, runs=3, substeps=5
         ... )
         >>> suff.evaluate()
-        SufficiencyOutput(steps=array([  1,   3,  10,  31, 100], dtype=uint32), params={'test': array([   0.       , 9094.4682464,    0.       ])}, measures={'test': array([1., 1., 1., 1., 1.])})
+        SufficiencyOutput(steps=array([  1,   3,  10,  31, 100], dtype=uint32), params={'test': array([ 0., 42.,  0.])}, measures={'test': array([1., 1., 1., 1., 1.])})
         """  # noqa: E501
         if eval_at is not None:
             ranges = eval_at

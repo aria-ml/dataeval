@@ -8,8 +8,6 @@ import numpy as np
 from unittest.mock import MagicMock, patch
 from dataeval.workflows import Sufficiency
 
-np.random.seed(0)
-
 model = MagicMock()
 train_ds = MagicMock()
 train_ds.__len__.return_value = 100
@@ -18,6 +16,9 @@ test_ds.__len__.return_value = 10
 train_fn = MagicMock()
 eval_fn = MagicMock()
 eval_fn.return_value = {"test": 1.0}
+
+mock_params = patch("dataeval._internal.workflows.sufficiency.calc_params").start()
+mock_params.return_value = np.array([0.0, 42.0, 0.0])
 ```
 
 
