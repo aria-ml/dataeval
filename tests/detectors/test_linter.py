@@ -33,7 +33,7 @@ class TestLinter:
 
     def test_get_outliers_with_extra_stats(self):
         linter = Linter()
-        dataset = np.random.random((100, 3, 16, 16)) / 5
+        dataset = np.zeros((100, 3, 16, 16))
         dataset[0] = 1
         linter.stats = imagestats(dataset, ImageStat.ALL_HASHES | ImageStat.MEAN)
         assert len(linter.stats.dict()) == 3
