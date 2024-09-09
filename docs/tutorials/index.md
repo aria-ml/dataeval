@@ -8,7 +8,7 @@ In addition to viewing them in our documentation, these notebooks can also be op
 
 Data Engineering Stage
 - [Data Cleaning Guide](EDA_Part1) [![Open In Colab][colab-badge]][eda-colab]
-% [Identify Outliers and Assess Data Coverage](EDA Part2)
+- [Assessing the Data Space Guide](EDA_Part2) [![Open In Colab][colab-badge]][dataspace-colab]
 % [Identifying Bias and Correlations Guide](EDA_Part3)
 
 Monitoring Stage
@@ -19,9 +19,11 @@ Monitoring Stage
 :maxdepth: 1
 
 EDA_Part1.ipynb
+EDA_Part2.ipynb
 Data_Monitoring.ipynb
 :::
 
 [colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
 [eda-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.65.0/docs/tutorials/EDA_Part1.ipynb
+[dataspace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.65.0/docs/tutorials/EDA_Part2.ipynb
 [monitoring-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.65.0/docs/tutorials/Data_Monitoring.ipynb
