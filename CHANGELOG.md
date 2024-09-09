@@ -4,12 +4,8 @@
 
 ## v0.65.0
 
-🌟 **Feature Release**
-- `bea0446c` - Torch Dataset Reader
-
 🛠️ **Improvements and Enhancements**
 - `5f730baa` - Refactor ImageStats and ChannelStats as metric functions
-- `eda88822` - Refactor metrics
 
 👾 **Fixes**
 - `3ebd278c` - handle float-type categorical variables in balance metric
@@ -18,20 +14,6 @@
 📝 **Miscellaneous**
 - `fe1e292d` - Use output dataclass with metadata
 - `b3f6a027` - Unify handling of image reshaping
-- `a4b8e919` - Created new documentation issue templates
-- `1028d082` - Remove is_arraylike function
-- `dbcecec6` - Refactored read_dataset to handle common dataset returns
-- `61b1f854` - Updated Workflow Landing Page
-- `cf96c7f2` - Run doctest in CI pipeline
-- `ecfcf89b` - Adjusted notebooks to work on google colab and added environment requirements
-- `5f863782` - Update remaining metric output to NamedTuple
-- `e58f4dba` - Add metadata parity documentation
-- `6319a1d4` - Adding Duplicates concept
-- `787545f5` - Adding ImageStats and ChannelStats concept document
-- `7826405c` - Update Data Cleaning concept
-- `50047116` - Change to Semantic Versioning
-- `9e43399c` - Bayes Error Rate - explanation documentation
-- `266ad738` - Updated BER docstrings with NDArray, shapes, and examples
 
 ## v0.64.0
 
