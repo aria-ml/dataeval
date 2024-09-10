@@ -12,7 +12,7 @@ Data Engineering Stage
 % [Identifying Bias and Correlations Guide](EDA_Part3)
 
 Monitoring Stage
-- [Data Monitoring Guide](Data_Monitoring.ipynb) [![Open In Colab][colab-badge]][monitoring_colab]
+- [Data Monitoring Guide](Data_Monitoring.ipynb) [![Open In Colab][colab-badge]][monitoring-colab]
 
 :::{toctree}
 :hidden:
