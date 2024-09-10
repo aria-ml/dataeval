@@ -33,7 +33,7 @@ There are 4 categories of metrics for data cleaning which are available in the [
 To select a custom set of metrics, load in the category:
 
 ```python
-from dataeval.metrics import ImageStat
+from dataeval.metrics.stats import ImageStat
 ```
 
 Then select the desired metrics and pass them to the desired function or class.
@@ -58,14 +58,14 @@ flags = ImageStat.MEAN | ImageStat.STD | ImageStat.ENTROPY
 result = channelstats(dataset, flags=flags)
 ```
 
-`Linter` class example:
+`Outliers` class example:
 
 ```python
 # Select the desired data cleaning metrics
 flags = ImageStat.ALL_VISUALS
 
 # Set the flags for the class
-lints = Linter(dataset, flags=flags)
+outliers = Outliers(dataset, flags=flags)
 # Evaluate the dataset
-results = lints.evaluate()
+results = outliers.evaluate()
 ```

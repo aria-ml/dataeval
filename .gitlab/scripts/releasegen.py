@@ -206,7 +206,7 @@ class ReleaseGen:
                 verbose(f"Removing temp {file_name}")
                 remove(file_name)
             return lines
-        except:
+        except Exception:
             return None
 
     def _get_last_hash(self, line: str) -> str:

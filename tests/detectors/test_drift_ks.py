@@ -15,7 +15,7 @@ from dataeval._internal.detectors.drift.base import (
     LastSeenUpdate,
     ReservoirSamplingUpdate,
 )
-from dataeval.detectors import DriftKS
+from dataeval._internal.detectors.drift.ks import DriftKS
 
 
 class TestKSDrift:

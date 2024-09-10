@@ -12,7 +12,7 @@ These explanations dive into the what, why and theory behind each of DataEval's 
 - [Detecting Drift in Datasets](Drift.md)
 - [Detecting Duplicates](Duplicates.md)
 - [Image Statistics Functions](Stats.md)
-- [Linter Class](Linter.md)
+- [Outliers Class](Outliers.md)
 - [Model Training Techniques](ModelTraining.md)
 - [Detecting Out of Distribution Data](OOD.md)
 - [Sufficiency of Datasets per Model](Sufficiency.md)
@@ -32,7 +32,7 @@ Divergence.md
 Drift.md
 Duplicates.md
 Stats.md
-Linter.md
+Outliers.md
 ModelTraining.md
 OOD.md
 Sufficiency.md

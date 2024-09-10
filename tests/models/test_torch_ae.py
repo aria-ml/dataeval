@@ -2,8 +2,13 @@ import pytest
 import torch
 from torch.utils.data import DataLoader
 
-from dataeval._internal.models.pytorch.autoencoder import get_images_from_batch
-from dataeval.models.torch import AETrainer, AriaAutoencoder, Decoder, Encoder
+from dataeval._internal.models.pytorch.autoencoder import (
+    AETrainer,
+    AriaAutoencoder,
+    Decoder,
+    Encoder,
+    get_images_from_batch,
+)
 from tests.utils.data import DataEvalDataset
 
 

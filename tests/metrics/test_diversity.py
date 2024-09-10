@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
+from dataeval._internal.metrics.diversity import diversity, diversity_classwise
 from dataeval._internal.metrics.utils import entropy
-from dataeval.metrics import diversity, diversity_classwise
 
 
 @pytest.fixture
