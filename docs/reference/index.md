@@ -5,24 +5,22 @@
 
 ## Detectors
 
-:::
+Detectors can determine if a dataset or individual images in a dataset are indicative of a specific issue.
+
 ### Drift
-:::
+
+[Drift](../concepts/glossary.md#drift) detectors identify if the statistical properties of the data has changed.
 
 :::{toctree}
 :hidden:
 :titlesonly:
+:maxdepth: 4
 
 detectors/drift/drift_cvm
 detectors/drift/drift_ks
 detectors/drift/drift_mmd
 detectors/drift/drift_uncertainty
-detectors/drift/kernels/guassianrbf
-detectors/drift/updates/lastseenupdate
-detectors/drift/updates/reservoirsamplingupdate
 :::
-
-Detectors can determine if a dataset or individual images in a dataset are indicative of a specific issue
 
 ```{eval-rst}
 .. autosummary::
@@ -33,9 +31,9 @@ Detectors can determine if a dataset or individual images in a dataset are indic
     detectors.drift.DriftMMD
 ```
 
-:::
 #### _Kernels_
-:::
+
+Kernels are used to map non-linear data to a higher dimensional space.
 
 :::{toctree}
 :hidden:
@@ -50,9 +48,9 @@ detectors/drift/kernels/guassianrbf
     detectors.drift.kernels.GaussianRBF
 ```
 
-:::
 #### _Updates_
-:::
+
+Update strategies inform how the drift detector classes update the reference data when monitoring for drift.
 
 :::{toctree}
 :hidden:
@@ -69,9 +67,9 @@ detectors/drift/updates/reservoirsamplingupdate
     detectors.drift.updates.ReservoirSamplingUpdate
 ```
 
-:::
 ### Linters
-:::
+
+[Linters](../concepts/glossary.md#linter) help identify potential issues in training and test data and are an important aspect of [data cleaning](../concepts/DataCleaning.md).
 
 :::{toctree}
 :hidden:
@@ -90,9 +88,9 @@ detectors/linters/outliers
     detectors.linters.Outliers
 ```
 
-:::
 ### Out-of-Distribution
-:::
+
+[Out-of-distribution](../concepts/glossary.md#out-of-distribution-ood) detectors identify data that is different from the data used to train a particular model.
 
 :::{toctree}
 :hidden:
@@ -119,7 +117,7 @@ detectors/ood/oodscore
 
 ## Flags
 
-Flags are used by the `imagestats` and `channelstats` functions, as well as the `Linter` and `Duplicates` classes
+Flags are used by the [`imagestats`](metrics/stats/imagestats.md) and [`channelstats`](metrics/stats/channelstats.md) functions, as well as the [`Outliers`](detectors/linters/outliers.md) and [`Duplicates`](detectors/linters/duplicates.md) classes.
 
 :::{toctree}
 :hidden:
@@ -136,12 +134,11 @@ flags/imagestat
 
 ## Metrics
 
-Metrics are a way to measure the performance of your models or datasets that can
-then be analyzed in the context of a given problem
+Metrics are a way to measure the performance of your models or datasets that can then be analyzed in the context of a given problem.
 
-:::
 ### Bias
-:::
+
+[Bias](../concepts/glossary.md#bias) metrics check for skewed or imbalanced datasets and incomplete feature representation which may impact model performance.
 
 :::{toctree}
 :hidden:
@@ -168,9 +165,9 @@ metrics/bias/parity
     metrics.bias.parity
 ```
 
-:::
 ### Estimators
-:::
+
+Estimators calculate performance bounds and the statistical distance between datasets.
 
 :::{toctree}
 :hidden:
@@ -189,9 +186,9 @@ metrics/estimators/uap
     metrics.estimators.uap
 ```
 
-:::
 ### Statistics
-:::
+
+Statistics metrics calculate a variety of image properties and pixel statistics against the image and individual channels of an image.
 
 :::{toctree}
 :hidden:
@@ -210,7 +207,7 @@ metrics/stats/imagestats
 
 ## Workflows
 
-Workflows perform a sequence of actions to analyze the dataset and make predictions
+Workflows perform a sequence of actions to analyze the dataset and make predictions.
 
 :::{toctree}
 :hidden:

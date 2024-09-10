@@ -645,7 +645,7 @@ See [**Machine Learning**](#machine-learning-ml) and [**Supervised Learning**](#
 
 ### **Upper-bound Average Precision (UAP)**
 
-Object detection equivalent of [**Bayes Error Rate (BER)**](#bayes-error-rate-ber). An estimate of an upper bound on performance for an object detection model on a dateset.
+Object detection equivalent of [**Bayes Error Rate (BER)**](#bayes-error-rate-ber). An estimate of an upper bound on performance for an object detection model on a dataset.
 
 See [**Bayes Error Rate (BER)**](#bayes-error-rate-ber).
 
