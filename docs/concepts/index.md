@@ -1,5 +1,5 @@
-Explanations
-============
+Concepts
+========
 
 These explanations dive into the what, why and theory behind each of DataEval's features.
 

@@ -1,4 +1,4 @@
-# Reference Guide
+# API Reference
 
 ```{currentmodule} dataeval
 ```

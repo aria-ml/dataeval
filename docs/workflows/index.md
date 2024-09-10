@@ -6,17 +6,16 @@ The Operational Machine Learning Lifecycle has multiple stages that are interwov
 The workflows described in this document give an overview to the role-specific stages that you might be tasked with. \
 It is important to note that these workflows are flexible, and many times multiple hats are needed in a professional setting.
 
-However, at DataEval, we have created a few entry-level guides for common roles found in Data Analytics and Machine Learning to develop the crucial knowledge ones must know to become an expert practiioner.
+However, at DataEval, we have created a few entry-level guides for common roles found in Data Analytics and Machine Learning to develop the crucial knowledge one must know to become an expert practitioner.
+
+## Roles
 
 :::{toctree}
 :maxdepth: 1
 
-TE_engineer_workflow.md
-AI_engineer_workflow.md
+Testing & Evaluation Engineer <TE_engineer_workflow.md>
+Artificial Intelligence Engineer <AI_engineer_workflow.md>
 :::
-
-[te-workflow]: TE_engineer_workflow.md
-[AI-workflow]: AI_engineer_workflow.md
 
 ## See Also
 
