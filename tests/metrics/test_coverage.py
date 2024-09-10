@@ -4,7 +4,7 @@ import warnings
 import numpy as np
 import pytest
 
-from dataeval.metrics import coverage
+from dataeval._internal.metrics.coverage import coverage
 
 
 class TestCoverageUnit:

@@ -137,7 +137,7 @@ def ber(images: ArrayLike, labels: ArrayLike, k: int = 1, method: Literal["KNN",
     Examples
     --------
     >>> import sklearn.datasets as dsets
-    >>> from dataeval.metrics import ber
+    >>> from dataeval.metrics.estimators import ber
 
     >>> images, labels = dsets.make_blobs(n_samples=50, centers=2, n_features=2, random_state=0)
 

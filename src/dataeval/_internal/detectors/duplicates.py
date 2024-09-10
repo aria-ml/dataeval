@@ -5,10 +5,9 @@ from typing import Iterable
 
 from numpy.typing import ArrayLike
 
-from dataeval._internal.metrics.stats import StatsOutput
+from dataeval._internal.flags import ImageStat
+from dataeval._internal.metrics.stats import StatsOutput, imagestats
 from dataeval._internal.output import OutputMetadata, set_metadata
-from dataeval.flags import ImageStat
-from dataeval.metrics import imagestats
 
 
 @dataclass(frozen=True)

@@ -1,8 +1,11 @@
 import numpy as np
 
 from dataeval._internal.interop import to_numpy
-from dataeval.detectors import DriftCVM, DriftKS, Duplicates, Linter
-from dataeval.metrics import ber, channelstats, divergence, imagestats, parity, uap
+from dataeval.detectors.drift import DriftCVM, DriftKS
+from dataeval.detectors.linters import Duplicates, Outliers
+from dataeval.metrics.bias import label_parity
+from dataeval.metrics.estimators import ber, divergence, uap
+from dataeval.metrics.stats import channelstats, imagestats
 
 
 class TestMinimalDependencies:
@@ -17,9 +20,9 @@ class TestMinimalDependencies:
         drift_ks = DriftKS(self.images)
         drift_ks.predict(self.images)
 
-    def testLinters(self):
-        linter = Linter()
-        linter.evaluate(self.images)
+    def testOutliers(self):
+        outliers = Outliers()
+        outliers.evaluate(self.images)
 
         duplicates = Duplicates()
         duplicates.evaluate(self.images)
@@ -36,7 +39,7 @@ class TestMinimalDependencies:
         channelstats(self.images)
 
     def testBias(self):
-        parity(self.labels, self.labels)
+        label_parity(self.labels, self.labels)
 
     def testToNumpy(self):
         actual = to_numpy([[1, 2], [3, 4]])  # type: ignore

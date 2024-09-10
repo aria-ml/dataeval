@@ -7,9 +7,9 @@ from test_stage import TestStage
 from torch.utils.data import DataLoader
 from torchmetrics.utilities.data import dim_zero_cat
 
-from dataeval.detectors import OOD_AE
-from dataeval.metrics import BER
-from dataeval.models.tensorflow import AE, create_model
+from dataeval.detectors.ood import OOD_AE
+from dataeval.metrics.estimators import ber
+from dataeval.tensorflow.models import AE, create_model
 
 BASE_OPTS = ["Base", "Both"]
 TARGET_OPTS = ["Target", "Both"]
@@ -119,7 +119,7 @@ class DataEvalStage(TestStage):
         images = dim_zero_cat(images).detach().cpu().numpy()
         labels = dim_zero_cat(labels).detach().cpu().numpy()
 
-        return BER(images, labels).evaluate()
+        return ber(images, labels).dict()
 
     def bias(self) -> dict:
         bias_output = defaultdict(dict)

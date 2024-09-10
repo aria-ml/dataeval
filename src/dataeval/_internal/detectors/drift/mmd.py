@@ -17,12 +17,12 @@ from numpy.typing import ArrayLike
 from dataeval._internal.interop import to_numpy
 from dataeval._internal.output import set_metadata
 
-from .base import BaseDrift, DriftOutput, UpdateStrategy, preprocess_x, update_x_ref
+from .base import BaseDrift, DriftBaseOutput, UpdateStrategy, preprocess_x, update_x_ref
 from .torch import GaussianRBF, get_device, mmd2_from_kernel_matrix
 
 
 @dataclass(frozen=True)
-class DriftMMDOutput(DriftOutput):
+class DriftMMDOutput(DriftBaseOutput):
     """
     Output class for DriftMMD
 

@@ -1,6 +1,6 @@
 import numpy as np
 
-from dataeval.metrics import uap
+from dataeval._internal.metrics.uap import uap
 
 
 class TestUAP:

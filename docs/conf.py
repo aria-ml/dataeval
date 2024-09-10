@@ -89,7 +89,7 @@ html_favicon = "_static/DataEval_Favicon.png"
 
 html_show_sourcelink = False
 html_theme_options = {
-    "navigation_depth": 3,
+    "navigation_depth": 4,
     "logo_only": True,
 }
 html_static_path = ["_static"]
@@ -122,11 +122,15 @@ def setup(app):
 
     normalize_module(
         [
-            "dataeval.detectors",
-            "dataeval.metrics",
+            "dataeval.detectors.drift",
+            "dataeval.detectors.linters",
+            "dataeval.detectors.ood",
+            "dataeval.metrics.bias",
+            "dataeval.metrics.estimators",
+            "dataeval.metrics.stats",
             "dataeval.workflows",
             "dataeval.flags",
-            "dataeval.models.tensorflow",
-            "dataeval.models.torch",
+            "dataeval.tensorflow",
+            "dataeval.torch",
         ]
     )

@@ -1,8 +1,6 @@
-from importlib.util import find_spec
+from dataeval import _IS_TORCH_AVAILABLE
 
-if find_spec("torch") is not None:  # pragma: no cover
+if _IS_TORCH_AVAILABLE:  # pragma: no cover
     from dataeval._internal.workflows.sufficiency import Sufficiency
 
     __all__ = ["Sufficiency"]
-
-del find_spec

@@ -4,8 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from dataeval._internal.metrics.ber import ber_knn, ber_mst, knn_lowerbound
-from dataeval.metrics import ber
+from dataeval._internal.metrics.ber import ber, ber_knn, ber_mst, knn_lowerbound
 
 
 class TestFunctionalBER:
