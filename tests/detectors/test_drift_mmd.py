@@ -21,7 +21,8 @@ from dataeval._internal.detectors.drift.base import (
     LastSeenUpdate,
     ReservoirSamplingUpdate,
 )
-from dataeval.detectors import DriftMMD, preprocess_drift
+from dataeval._internal.detectors.drift.mmd import DriftMMD
+from dataeval._internal.detectors.drift.torch import preprocess_drift
 
 n, n_hidden, n_classes = 500, 10, 5
 

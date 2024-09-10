@@ -366,7 +366,7 @@ See [**Manifold**](#manifold).
 
 ### **Linter**
 
-The data linter identifies potential issues (lints) in the ML training data. The term "linter" stems from the origins of a tool known as "lint," which was initially developed by Stephen C. Johnson in 1978 at Bell Labs. For [**DataEval**](#dataeval) and imagery, it identifies issues such as image quality (overly bright/dark, overly blurry, lacking information) or unusual image properties (shape,size, **channels*). 
+The data linter identifies potential issues (lints) in the ML training data. The term "linter" stems from the origins of a tool known as "lint," which was initially developed by Stephen C. Johnson in 1978 at Bell Labs. For [**DataEval**](#dataeval) and imagery, it identifies issues such as image quality (overly bright/dark, overly blurry, lacking information), unusual image properties (shape,size, **channels*), as well as duplicates and outliers. 
 
 See [**DataEval**](#dataeval).
 
@@ -645,7 +645,7 @@ See [**Machine Learning**](#machine-learning-ml) and [**Supervised Learning**](#
 
 ### **Upper-bound Average Precision (UAP)**
 
-Object detection equivalent of [**Bayes Error Rate (BER)**](#bayes-error-rate-ber). An estimate of an upper bound on performance for an object detection model on a dateset.
+Object detection equivalent of [**Bayes Error Rate (BER)**](#bayes-error-rate-ber). An estimate of an upper bound on performance for an object detection model on a dataset.
 
 See [**Bayes Error Rate (BER)**](#bayes-error-rate-ber).
 

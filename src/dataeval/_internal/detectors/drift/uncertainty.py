@@ -16,7 +16,7 @@ from numpy.typing import ArrayLike, NDArray
 from scipy.special import softmax
 from scipy.stats import entropy
 
-from .base import DriftUnivariateOutput, UpdateStrategy
+from .base import DriftOutput, UpdateStrategy
 from .ks import DriftKS
 from .torch import get_device, preprocess_drift
 
@@ -133,7 +133,7 @@ class DriftUncertainty:
             preprocess_fn=preprocess_fn,  # type: ignore
         )
 
-    def predict(self, x: ArrayLike) -> DriftUnivariateOutput:
+    def predict(self, x: ArrayLike) -> DriftOutput:
         """
         Predict whether a batch of data has drifted from the reference data.
 

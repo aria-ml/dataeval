@@ -3,7 +3,7 @@ from statistics import NormalDist
 import matplotlib.pyplot as plt
 import numpy as np
 
-from dataeval.metrics import BER
+from dataeval.metrics.estimators import BER
 
 
 def generate_toy_data(num_classes=2, num_feat=32, num_samples_per_class=1000):
