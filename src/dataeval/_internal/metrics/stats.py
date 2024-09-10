@@ -235,7 +235,7 @@ def imagestats(images: Iterable[ArrayLike], flags: ImageStat = ImageStat.ALL_STA
 
     Examples
     --------
-    Calculating the statistics on the images, whose shape is (N, C, H, W)
+    Calculating the statistics on the images, whose shape is (C, H, W)
 
     >>> results = imagestats(images, flags=ImageStat.MEAN | ImageStat.ALL_VISUALS)
     >>> print(results.mean)

@@ -2,17 +2,21 @@ __version__ = "0.0.0"
 
 from importlib.util import find_spec
 
-from . import detectors, flags, metrics
+_IS_TORCH_AVAILABLE = find_spec("torch") is not None
+_IS_TENSORFLOW_AVAILABLE = find_spec("tensorflow") is not None and find_spec("tensorflow_probability") is not None
+
+del find_spec
+
+from . import detectors, flags, metrics  # noqa: E402
 
 __all__ = ["detectors", "flags", "metrics"]
 
-if find_spec("torch") is not None:  # pragma: no cover
-    from . import models, utils, workflows
+if _IS_TORCH_AVAILABLE:  # pragma: no cover
+    from . import torch, utils, workflows
 
-    __all__ += ["models", "utils", "workflows"]
-elif find_spec("tensorflow") is not None:  # pragma: no cover
-    from . import models
+    __all__ += ["torch", "utils", "workflows"]
 
-    __all__ += ["models"]
+if _IS_TENSORFLOW_AVAILABLE:  # pragma: no cover
+    from . import tensorflow
 
-del find_spec
+    __all__ += ["tensorflow"]

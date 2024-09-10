@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from dataeval._internal.flags import ImageStat, to_distinct
-from dataeval.metrics import channelstats, imagestats
+from dataeval._internal.metrics.stats import channelstats, imagestats
 
 
 def get_dataset(count: int, channels: int):

@@ -1,5 +1,4 @@
 (sufficiency-ref)=
-
 # Sufficiency
 
 ```{testsetup}
@@ -21,10 +20,8 @@ mock_params = patch("dataeval._internal.workflows.sufficiency.calc_params").star
 mock_params.return_value = np.array([0.0, 42.0, 0.0])
 ```
 
-
 ```{eval-rst}
 .. autoclass:: dataeval.workflows.Sufficiency
    :members:
    :inherited-members:
 ```
-

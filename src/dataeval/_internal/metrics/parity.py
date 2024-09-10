@@ -192,7 +192,7 @@ def validate_dist(label_dist: NDArray, label_name: str):
 
 
 @set_metadata("dataeval.metrics")
-def parity(
+def label_parity(
     expected_labels: ArrayLike,
     observed_labels: ArrayLike,
     num_classes: int | None = None,
@@ -243,7 +243,7 @@ def parity(
 
     >>> expected_labels = np_random_gen.choice([0, 1, 2, 3, 4], (100))
     >>> observed_labels = np_random_gen.choice([2, 3, 0, 4, 1], (100))
-    >>> parity(expected_labels, observed_labels)
+    >>> label_parity(expected_labels, observed_labels)
     ParityOutput(score=14.007374204742625, p_value=0.0072715574616218)
     """
 
@@ -279,7 +279,7 @@ def parity(
 
 
 @set_metadata("dataeval.metrics")
-def parity_metadata(
+def parity(
     data_factors: Mapping[str, ArrayLike],
     continuous_factor_bincounts: dict[str, int] | None = None,
 ) -> ParityOutput[NDArray[np.float64]]:
@@ -336,7 +336,7 @@ def parity_metadata(
     ...     "class": np_random_gen.choice([0, 1, 2], (100)),
     ... }
     >>> continuous_factor_bincounts = {"age": 4, "income": 3}
-    >>> parity_metadata(data_factors, continuous_factor_bincounts)
+    >>> parity(data_factors, continuous_factor_bincounts)
     ParityOutput(score=array([2.82329785, 1.60625584, 1.38377236]), p_value=array([0.83067563, 0.80766733, 0.5006309 ]))
     """
 

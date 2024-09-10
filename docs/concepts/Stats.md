@@ -16,7 +16,7 @@ The stats delivered by the class is broken down into 3 main categories:
 
 The available metrics are defined in the [ImageStat](../reference/flags/imagestat.md) flag class.
 
-This function can be used in conjunction with the `Linter` class to determine if there are any issues with any of the images in the dataset.
+This function can be used in conjunction with the `Outliers` class to determine if there are any issues with any of the images in the dataset.
 
 This function can be used in conjunction with the `Duplicates` class in order to identify duplicate images.
 
@@ -25,9 +25,9 @@ This function can be used in conjunction with the `Duplicates` class in order to
 ### What is the channelstats function
 
 The channelstats function is an aggregate metric that calculates various values for each individual image on a per channel basis for the selected metrics.
-Unlike the imagestats function, this function only works with the Pixel Statistics subset of the [ImageStat](../reference/flags/imagestat.md) flag class.
+Unlike the imagestats function, this function only works with the Pixel Statistics subset of the [ImageStat](../reference/flags/imagestat) flag class.
 
 ### When to use the channelstats function
 
 This function is best used when you have multiple channels in a dataset and are looking for channelwise differences.
-The output from this function cannot currently be used with the Linter class and must be used on its own.
+The output from this function cannot currently be used with the Outliers class and must be used on its own.

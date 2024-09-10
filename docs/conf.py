@@ -122,11 +122,15 @@ def setup(app):
 
     normalize_module(
         [
-            "dataeval.detectors",
-            "dataeval.metrics",
+            "dataeval.detectors.drift",
+            "dataeval.detectors.linters",
+            "dataeval.detectors.ood",
+            "dataeval.metrics.bias",
+            "dataeval.metrics.estimators",
+            "dataeval.metrics.stats",
             "dataeval.workflows",
             "dataeval.flags",
-            "dataeval.models.tensorflow",
-            "dataeval.models.torch",
+            "dataeval.tensorflow",
+            "dataeval.torch",
         ]
     )

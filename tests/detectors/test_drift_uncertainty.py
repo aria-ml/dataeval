@@ -19,8 +19,7 @@ from dataeval._internal.detectors.drift.base import (
     LastSeenUpdate,
     ReservoirSamplingUpdate,
 )
-from dataeval._internal.detectors.drift.uncertainty import classifier_uncertainty
-from dataeval.detectors import DriftUncertainty
+from dataeval._internal.detectors.drift.uncertainty import DriftUncertainty, classifier_uncertainty
 
 
 class PtModel(nn.Module):
