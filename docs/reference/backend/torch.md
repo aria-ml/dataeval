@@ -1,28 +1,15 @@
+(torch-backend-ref)=
 # PyTorch Backend
 
-(torch-ariaae-ref)=
-## AriaAutoencoder
+## Models
 
 ```{eval-rst}
 .. autoclass:: dataeval.torch.models.AriaAutoencoder
-```
-
-(torch-decoder-ref)=
-## Decoder
-
-```{eval-rst}
 .. autoclass:: dataeval.torch.models.Decoder
-```
-
-(torch-encoder-ref)=
-## Encoder
-
-```{eval-rst}
 .. autoclass:: dataeval.torch.models.Encoder
 ```
 
-(torch-aetrainer-ref)=
-## Autoencoder Trainer
+## Trainer
 
 ```{eval-rst}
 .. autoclass:: dataeval.torch.trainer.AETrainer

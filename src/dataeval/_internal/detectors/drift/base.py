@@ -21,7 +21,7 @@ from dataeval._internal.output import OutputMetadata, set_metadata
 
 
 @dataclass(frozen=True)
-class DriftOutput(OutputMetadata):
+class DriftBaseOutput(OutputMetadata):
     """
     Output class for Drift
 
@@ -38,7 +38,7 @@ class DriftOutput(OutputMetadata):
 
 
 @dataclass(frozen=True)
-class DriftUnivariateOutput(DriftOutput):
+class DriftOutput(DriftBaseOutput):
     """
     Output class for DriftCVM and DriftKS
 
@@ -441,7 +441,7 @@ class BaseDriftUnivariate(BaseDrift):
     def predict(
         self,
         x: ArrayLike,
-    ) -> DriftUnivariateOutput:
+    ) -> DriftOutput:
         """
         Predict whether a batch of data has drifted from the reference data and update
         reference data using specified update strategy.
@@ -453,7 +453,7 @@ class BaseDriftUnivariate(BaseDrift):
 
         Returns
         -------
-        DriftUnivariateOutput
+        DriftOutput
             Dictionary containing the drift prediction and optionally the feature level
             p-values, threshold after multivariate correction if needed and test statistics.
         """
@@ -462,4 +462,4 @@ class BaseDriftUnivariate(BaseDrift):
 
         feature_drift = (p_vals < self.p_val).astype(np.bool_)
         drift_pred, threshold = self._apply_correction(p_vals)
-        return DriftUnivariateOutput(drift_pred, threshold, feature_drift, self.p_val, p_vals, dist)
+        return DriftOutput(drift_pred, threshold, feature_drift, self.p_val, p_vals, dist)

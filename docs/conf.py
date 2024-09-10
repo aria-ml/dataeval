@@ -89,7 +89,7 @@ html_favicon = "_static/DataEval_Favicon.png"
 
 html_show_sourcelink = False
 html_theme_options = {
-    "navigation_depth": 3,
+    "navigation_depth": 4,
     "logo_only": True,
 }
 html_static_path = ["_static"]
