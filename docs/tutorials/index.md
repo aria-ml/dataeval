@@ -23,5 +23,5 @@ Data_Monitoring.ipynb
 :::
 
 [colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
-[eda-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/tutorials/EDA_Part1.ipynb
-[monitoring-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/main/docs/tutorials/Data_Monitoring.ipynb
+[eda-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.65.0/docs/tutorials/EDA_Part1.ipynb
+[monitoring-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.65.0/docs/tutorials/Data_Monitoring.ipynb

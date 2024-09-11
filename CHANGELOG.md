@@ -1,6 +1,61 @@
-[//]: # (e233999d2367201d0c17f5463268878abcfd7bf2)
+[//]: # (dd0e80e36f02418da02bfdd6e12e6693a6ff2665)
 
 # DataEval Change Log
+
+## v0.66.0
+
+🌟 **Feature Release**
+- `a0b04800` - Refactor DataEval functions and classes and update documentation
+
+    - Changes DataEval functions and classes to be more hierarchical in modules:
+      - detectors
+        - drift (DriftCVS, DriftKS, DriftMMD, DriftUncertainty)
+        - linters (Clusterer, Duplicates, Outliers)
+        - ood (OOD_AE, OOD_AEGMM, OOD_LLR, OOD_VAE, OOD_VAEGMM)
+      - flags (ImageStat)
+      - metrics
+        - bias (balance, coverage, diversity, parity)
+        - estimators (ber, divergence, uap)
+        - stats (imagestats, channelstats)
+      - workflows (Sufficiency)
+    - Backends have been moved from `models` to `tensorflow` and `torch`
+    - Renamed following classes:
+      - `Linter` -> `Outliers`
+      - `parity` -> `label_parity`
+      - `parity_metadata` -> `parity`
+      - `DriftOutput` -> `DriftBaseOutput`
+      - `DriftUnivariateOutput` -> `DriftOutput`
+    - Miscellaneous fixes:
+      - Documentation updated
+      - Streamlined optional import checks in the `__init__.py` tree
+       - Fixed misspelling in glossary
+
+🛠️ **Improvements and Enhancements**
+- `5f730baa` - Refactor ImageStats and ChannelStats as metric functions
+
+👾 **Fixes**
+- `84aae760` - balance test cleanup
+- `3ebd278c` - handle float-type categorical variables in balance metric
+- `066b7153` - Fixes modzscore to account for division by 0
+
+📝 **Miscellaneous**
+- `d50d9cd1` - Update Landing Page
+- `2fd7fa59` - Author drift detection tutorial
+- `49b5af42` - Use uv instead of pyenv for python deployment
+- `0f6eb6b0` - Pin notebooks on release to specific version
+- `4f101a4e` - Adjust imagestats and channelstats reference guides to new format
+- `0ee82ede` - Only build data image in main pipeline
+- `7b84ceb5` - Improve test coverage
+- `d3c5258a` - Add StatsOutput as input type for linter and duplicates
+- `cf73393a` - Updates drift reference guides and concept page
+- `4ce5cdf7` - Adjust model reference guides to new format
+- `17195a2b` - Adjust parity reference guides to new format
+- `e9761b4d` - Adjust out of distribution reference guides to new format
+- `eaf707a7` - Adjust uap reference guide to new format
+- `335ac3be` - Adjust sufficiency reference guide to new format
+- `3a866f01` - Change Optional[Type] to Type | None per 3.10+ standards
+- `fe1e292d` - Use output dataclass with metadata
+- `b3f6a027` - Unify handling of image reshaping
 
 ## v0.65.0
 
