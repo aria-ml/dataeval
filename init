@@ -34,7 +34,7 @@ fi
 # Install dataeval environment for each version of python
 echo -n ${versions[*]} | xargs -n1 bash -c '\
     echo "Creating python virtual environment for $0..." && \
-    uv venv --allow-existing --python $0 .venv-$0 && \
+    uv venv --seed --allow-existing --python $0 .venv-$0 && \
     uv pip install --python .venv-$0 --index-strategy unsafe-best-match \
         -e . \
         -r environment/requirements.txt \
