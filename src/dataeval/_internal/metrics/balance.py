@@ -17,11 +17,17 @@ class BalanceOutput(OutputMetadata):
     """
     Attributes
     ----------
-    mutual_information : NDArray[np.float64]
+    balance : NDArray[np.float64]
         Estimate of mutual information between metadata factors and class label
+    factors : NDArray[np.float64]
+        Estimate of inter/intra-factor mutual information
+    classwise : NDArray[np.float64]
+        Estimate of mutual information between metadata factors and individual class labels
     """
 
-    mutual_information: NDArray[np.float64]
+    balance: NDArray[np.float64]
+    factors: NDArray[np.float64]
+    classwise: NDArray[np.float64]
 
 
 def validate_num_neighbors(num_neighbors: int) -> int:
@@ -77,17 +83,22 @@ def balance(class_labels: Sequence[int], metadata: list[dict], num_neighbors: in
     -------
     Return balance (mutual information) of factors with class_labels
 
-    >>> balance(class_labels, metadata).mutual_information[0]
+    >>> bal = balance(class_labels, metadata)
+    >>> bal.balance
     array([0.99999822, 0.13363788, 0.        , 0.02994455])
 
-    Return balance (mutual information) of metadata factors with class_labels
-    and each other
+    Return intra/interfactor balance (mutual information)
 
-    >>> balance(class_labels, metadata).mutual_information
-    array([[0.99999822, 0.13363788, 0.        , 0.02994455],
-           [0.13363788, 0.99999843, 0.01389763, 0.09725766],
-           [0.        , 0.01389763, 0.48549233, 0.15314612],
-           [0.02994455, 0.09725766, 0.15314612, 0.99999856]])
+    >>> bal.factors
+    array([[0.99999843, 0.01389763, 0.09725766],
+           [0.01389763, 0.48549233, 0.15314612],
+           [0.09725766, 0.15314612, 0.99999856]])
+
+    Return classwise balance (mutual information) of factors with individual class_labels
+
+    >>> bal.classwise
+    array([[0.13363788, 0.54085156, 0.        ],
+           [0.13363788, 0.54085156, 0.        ]])
 
     See Also
     --------
@@ -129,58 +140,9 @@ def balance(class_labels: Sequence[int], metadata: list[dict], num_neighbors: in
     norm_factor = 0.5 * np.add.outer(ent_all, ent_all) + 1e-6
     # in principle MI should be symmetric, but it is not in practice.
     nmi = 0.5 * (mi + mi.T) / norm_factor
+    balance = nmi[0]
+    factors = nmi[1:, 1:]
 
-    return BalanceOutput(nmi)
-
-
-@set_metadata("dataeval.metrics")
-def balance_classwise(class_labels: Sequence[int], metadata: list[dict], num_neighbors: int = 5) -> BalanceOutput:
-    """
-    Compute mutual information (analogous to correlation) between metadata factors
-    (class label, metadata, label/image properties) with individual class labels.
-
-    Parameters
-    ----------
-    class_labels: Sequence[int]
-        List of class labels for each image
-    metadata: List[Dict]
-        List of metadata factors for each image
-    num_neighbors: int, default 5
-        Number of nearest neighbors to use for computing MI between discrete
-        and continuous variables.
-
-    Notes
-    -----
-    We use `mutual_info_classif` from sklearn since class label is categorical.
-    `mutual_info_classif` outputs are consistent up to O(1e-4) and depend on a random
-    seed. MI is computed differently for categorical and continuous variables, so we
-    have to specify with is_categorical.
-
-    Returns
-    -------
-    BalanceOutput
-        (num_classes x num_factors) estimate of mutual information between
-        num_factors metadata factors and individual class labels.
-
-    Example
-    -------
-    Return classwise balance (mutual information) of factors with individual class_labels
-
-    >>> balance_classwise(class_labels, metadata).mutual_information
-    array([[0.13363788, 0.54085156, 0.        ],
-           [0.13363788, 0.54085156, 0.        ]])
-
-
-    See Also
-    --------
-    sklearn.feature_selection.mutual_info_classif
-    sklearn.feature_selection.mutual_info_regression
-    sklearn.metrics.mutual_info_score
-    compute_mutual_information
-    """
-    num_neighbors = validate_num_neighbors(num_neighbors)
-    data, names, is_categorical = preprocess_metadata(class_labels, metadata)
-    num_factors = len(names)
     # unique class labels
     class_idx = names.index("class_label")
     class_data = data[:, class_idx]
@@ -190,8 +152,8 @@ def balance_classwise(class_labels: Sequence[int], metadata: list[dict], num_nei
     data_no_class = np.concatenate((data[:, :class_idx], data[:, (class_idx + 1) :]), axis=1)
 
     # assume class is a factor
-    mi = np.empty((num_classes, num_factors - 1))
-    mi[:] = np.nan
+    classwise_mi = np.empty((num_classes, num_factors - 1))
+    classwise_mi[:] = np.nan
 
     # categorical variables, excluding class label
     cat_mask = np.concatenate((is_categorical[:class_idx], is_categorical[(class_idx + 1) :]), axis=0).astype(int)
@@ -200,7 +162,7 @@ def balance_classwise(class_labels: Sequence[int], metadata: list[dict], num_nei
     for idx, cls in enumerate(u_cls):
         tgt = class_data == cls
         # units: nat
-        mi[idx, :] = mutual_info_classif(
+        classwise_mi[idx, :] = mutual_info_classif(
             data_no_class,
             tgt,
             discrete_features=cat_mask,  # type: ignore
@@ -213,5 +175,6 @@ def balance_classwise(class_labels: Sequence[int], metadata: list[dict], num_nei
     ent_tgt = ent_all[class_idx]
     ent_all = np.concatenate((ent_all[:class_idx], ent_all[(class_idx + 1) :]), axis=0)
     norm_factor = 0.5 * np.add.outer(ent_tgt, ent_all) + 1e-6
-    nmi = mi / norm_factor
-    return BalanceOutput(nmi)
+    classwise = classwise_mi / norm_factor
+
+    return BalanceOutput(balance, factors, classwise)
