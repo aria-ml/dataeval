@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval._internal.metrics.diversity import diversity, diversity_classwise
+from dataeval._internal.metrics.diversity import diversity
 from dataeval._internal.metrics.utils import entropy
 
 
@@ -38,15 +38,15 @@ def test_entropy_normalization(norm, entropy_test_vars):
     assert ent[0] == 0
 
 
-@pytest.mark.parametrize("div_fn", [diversity, diversity_classwise])
 class TestDiversityUnit:
     @pytest.mark.parametrize("met", ["Simpson", "ShANnOn"])
-    def test_invalid_method(self, div_fn, met):
+    def test_invalid_method(self, met):
         with pytest.raises(ValueError):
-            div_fn([], [], method=met)  # type: ignore
+            diversity([], [], method=met)  # type: ignore
 
     @pytest.mark.parametrize("met", ["simpson", "shannon"])
-    def test_range_of_values(self, div_fn, met, metadata, class_labels):
-        div = div_fn(class_labels, metadata, method=met).diversity_index
-        assert div.dtype == float
-        assert np.logical_and(div >= 0, div <= 1).all()
+    def test_range_of_values(self, met, metadata, class_labels):
+        result = diversity(class_labels, metadata, method=met)
+        for div in result.dict().values():
+            assert div.dtype == float
+            assert np.logical_and(div >= 0, div <= 1).all()
