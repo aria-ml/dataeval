@@ -17,6 +17,8 @@ These explanations dive into the what, why and theory behind each of DataEval's 
 - [Detecting Out of Distribution Data](OOD.md)
 - [Sufficiency of Datasets per Model](Sufficiency.md)
 - [Upperbound on Average Precision Estimation](UAP.md)
+- [Balance Bias Metrics](Balance.md)
+- [Diversity Indices](Diversity.md)
 
 
 :::{toctree}
@@ -37,4 +39,6 @@ ModelTraining.md
 OOD.md
 Sufficiency.md
 UAP.md
+Balance.md
+Diversity.md
 :::
