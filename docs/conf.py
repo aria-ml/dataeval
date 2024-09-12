@@ -33,7 +33,6 @@ extensions = [
     "sphinx.ext.graphviz",
     "sphinx.ext.mathjax",
     # External extensions
-    "sphinx_rtd_size",
     "sphinx_design",
     "myst_nb",
     "enum_tools.autoenum",
@@ -62,7 +61,6 @@ exclude_patterns = [
 # -----------------------------------------------------------------------------
 
 autosummary_generate = False
-sphinx_rtd_size_width = "80%"
 
 # -----------------------------------------------------------------------------
 # MyST-NB settings
@@ -82,16 +80,13 @@ myst_heading_anchors = 4
 # HTML output
 # -----------------------------------------------------------------------------
 
-html_theme = "sphinx_rtd_theme"
+html_theme = "pydata_sphinx_theme"
 html_logo = "_static/DataEval_Logo.png"
 html_favicon = "_static/DataEval_Favicon.png"
 
 
 html_show_sourcelink = False
-html_theme_options = {
-    "navigation_depth": 4,
-    "logo_only": True,
-}
+html_theme_options = {"navigation_depth": 3, "logo": {"text": "DataEval"}}
 html_static_path = ["_static"]
 
 
