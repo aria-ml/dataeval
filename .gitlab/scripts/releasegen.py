@@ -307,8 +307,11 @@ class ReleaseGen:
         except Exception:
             return True
 
-    def _generate_actions(self, old_files: List[str], new_files: List[str]) -> List[Dict[str, str]]:
+    def _generate_actions(
+        self, old_files: List[str], new_files: List[str], pending_version: str
+    ) -> List[Dict[str, str]]:
         actions: List[Dict[str, str]] = []
+        current_tag = pending_version
 
         for old_file in old_files:
             if old_file not in new_files:
@@ -328,25 +331,28 @@ class ReleaseGen:
                 encoding = "text"
                 with open(new_file) as f:
                     content = f.read()
-
+                if new_file.endswith("ipynb"):
+                    content = self._update_cache_file_path(new_file, current_tag=current_tag)
             if new_file in old_files:
-                actions.append(
-                    {
-                        "action": "update",
-                        "file_path": new_file,
-                        "encoding": encoding,
-                        "content": content,
-                    }
-                )
+                if content:
+                    actions.append(
+                        {
+                            "action": "update",
+                            "file_path": new_file,
+                            "encoding": encoding,
+                            "content": content,
+                        }
+                    )
             else:
-                actions.append(
-                    {
-                        "action": "create",
-                        "file_path": new_file,
-                        "encoding": encoding,
-                        "content": content,
-                    }
-                )
+                if content:
+                    actions.append(
+                        {
+                            "action": "create",
+                            "file_path": new_file,
+                            "encoding": encoding,
+                            "content": content,
+                        }
+                    )
 
         return actions
 
@@ -357,11 +363,10 @@ class ReleaseGen:
                 file_paths.append(path.join(root, filename))
         return file_paths
 
-    def _generate_index_markdown_update_action(self, file_name: str) -> None | Dict[str, str]:
+    def _generate_index_markdown_update_action(self, file_name: str, pending_version: str) -> None | Dict[str, str]:
         howto_index_file = self._read_doc_file(file_name)
         if howto_index_file:
-            vt = VersionTag(self.gl)
-            new_ref = vt.current
+            new_ref = pending_version
             new_sub_1 = "aria-ml/dataeval/blob/" + new_ref + "/docs"
 
             verbose(f"substitution for new version  {new_sub_1}")
@@ -383,9 +388,38 @@ class ReleaseGen:
         else:
             return None
 
-    def _generate_notebook_update_actions(self) -> List[Dict[str, str]]:
+    def _update_cache_file_path(self, file_name: str, current_tag: str) -> None | str:
+        search_pattern = r"(%|\!)+(pip install -q dataeval){1}(\[\w+\])*"
+        if path.isfile(file_name):
+            new_list: List[str] = []
+            lines = self._read_doc_file(file_name)  # return none if file is unreadable.
+            if lines:
+                for line in lines:
+                    result = search(search_pattern, line)
+                    if result:
+                        pos = result.string.find("==v")
+                        if pos == -1:
+                            new_string = (
+                                result.string[0 : result.regs[0][1]]
+                                + "=="
+                                + current_tag
+                                + result.string[result.regs[0][1] :]
+                            )
+                        else:
+                            new_string = result.string[0:pos] + "==" + current_tag + '\n",\n'
+                        new_list.append(new_string)
+                    else:
+                        new_list.append(line)
+                content = "".join(new_list)
+            else:
+                content = None
+        else:
+            content = None
+        return content
+
+    def _generate_notebook_update_actions(self, pending_version: str) -> List[Dict[str, str]]:
         # get all the ipynb file from the notebook directory
-        # may need to read .jupytercache files and update them instead of the original files. TEST THIS
+        # may need to read .jupytercache files and update them instead of the original files.
         file_path = NOTEBOOK_DIRECTORY
         files = self._get_files(file_path)
         # get the notebooks in the docs/tutorials directory
@@ -395,43 +429,21 @@ class ReleaseGen:
         for f in more_files:
             if f.lower().endswith("ipynb"):
                 files.append(f)
-
-        vt = VersionTag(self.gl)
-        # file_lines: List[List[str]] = [[] for i in range(len(files))]
-        current_tag = vt.current
-        search_pattern = r"(%|\!)+(pip install -q dataeval){1}(\[\w+\])*"
-        # Second example search pattern !pip install -q dataeval[torch] torchmetrics torchvision
+        current_tag = pending_version
         action_list: List[Dict[str, str]] = []
-        # index = 0
         for file_name in files:
-            if path.isfile(file_name):
-                new_list: List[str] = []
-                lines = self._read_doc_file(file_name)  # return none if file is unreadable.
-                if lines:
-                    for line in lines:
-                        result = search(search_pattern, line)
-                        if result:
-                            new_string = (
-                                result.string[0 : result.regs[0][1]]
-                                + "=="
-                                + current_tag
-                                + result.string[result.regs[0][1] :]
-                            )
-                            new_list.append(new_string)
-                        else:
-                            new_list.append(line)
-                    content = "".join(new_list)
-                    new_action = {
-                        "action": "update",
-                        "file_path": file_name,
-                        "encoding": "text",
-                        "content": content,
-                    }
-                    action_list.append(new_action)
+            content = self._update_cache_file_path(file_name, current_tag=current_tag)
+            new_action = {
+                "action": "update",
+                "file_path": file_name,
+                "encoding": "text",
+                "content": content,
+            }
+            action_list.append(new_action)
 
         return action_list
 
-    def _generate_jupyter_cache_actions(self) -> List[Dict[str, str]]:
+    def _generate_jupyter_cache_actions(self, pending_version: str) -> List[Dict[str, str]]:
         ref = "main"
         cache_path = "docs/.jupyter_cache"
         output_path = path.join("output", cache_path)
@@ -444,7 +456,7 @@ class ReleaseGen:
         old_files = self._get_files(cache_path)
         rmtree(cache_path)
         move(output_path, cache_path)
-        actions = self._generate_actions(old_files, self._get_files(cache_path))
+        actions = self._generate_actions(old_files, self._get_files(cache_path), pending_version=pending_version)
         return actions
 
     def generate(self) -> Tuple[str, List[Dict[str, str]]]:
@@ -452,17 +464,21 @@ class ReleaseGen:
         if not changelog_action:
             return "", []
         # creating actions for updating python notebook pip install statements
-        file_update_actions = self._generate_notebook_update_actions()
-        actions = self._generate_jupyter_cache_actions()
+        actions = self._generate_notebook_update_actions(pending_version=version)
+        # changing pip install statement in cache so code does not try to rebuild everything.
+        cache_actions = self._generate_jupyter_cache_actions(pending_version=version)
         # creating actions for updating colab references in markdown locations.
-        howto_index_action = self._generate_index_markdown_update_action(HOWTO_INDEX_FILE)
-        tutorital_index_action = self._generate_index_markdown_update_action(TUTORIAL_INDEX_FILE)
+        howto_index_action = self._generate_index_markdown_update_action(HOWTO_INDEX_FILE, pending_version=version)
+        tutorital_index_action = self._generate_index_markdown_update_action(
+            TUTORIAL_INDEX_FILE, pending_version=version
+        )
         if howto_index_action:  # can return None
             actions.append(howto_index_action)
         if tutorital_index_action:  # can return None
             actions.append(tutorital_index_action)
-        if file_update_actions:  # can return None
-            actions.extend(file_update_actions)
+        # make sure the cache actions are done last so timestamps don't trigger a rebuild.
+        if cache_actions:  # can return None
+            actions.extend(cache_actions)
 
         actions.append(changelog_action)
         return version, actions
