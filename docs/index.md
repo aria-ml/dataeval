@@ -26,6 +26,7 @@ sd_hide_title: true
 
 ```{rubric} **Welcome to DataEval's Documentation!**
 ```
+
 Where experts come to build _robust_, _reliable_, and _responsible_ models.
 
 :::
@@ -34,8 +35,6 @@ Where experts come to build _robust_, _reliable_, and _responsible_ models.
 
 ----------------
 
-
-
 ## Key Features
 
 - Novel algorithms that characterize image data and its impact on model performance
@@ -43,13 +42,14 @@ Where experts come to build _robust_, _reliable_, and _responsible_ models.
 - Full integration with the JATIC Toolbox by CDAO
 - Open source
 
------
+----------------
 
 ### **_We do the all the research, you get all the benefits_**
 
 <!-- SECTION START | Quick, beginner friendly guides as eye catchers. Not a part of Diataxis -->
 
 ## Before You Begin
+
 ::::{grid}
 
 :::{grid-item-card}
@@ -253,12 +253,11 @@ Find the word in the glosssary.
 
 <!-- SECTION END -->
 
-## Contributing
+## [Contributing](reference/contributing)
 
-### [Changelog](reference/changelog)
-    
+## [Changelog](reference/changelog)
+
 DataEval's development changelog
-
 
 <!-- BELOW IS SIDEBAR TOC TREE -->
 
@@ -302,6 +301,7 @@ reference/index.md
 :hidden:
 :titlesonly:
 
+reference/contributing
 reference/changelog
 reference/about
 :::
