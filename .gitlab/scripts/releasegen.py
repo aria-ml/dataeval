@@ -406,7 +406,7 @@ class ReleaseGen:
                                 + result.string[result.regs[0][1] :]
                             )
                         else:
-                            new_string = result.string[0:pos] + "==" + current_tag + '\n",\n'
+                            new_string = result.string[0:pos] + "==" + current_tag + '\\n",\n'
                         new_list.append(new_string)
                     else:
                         new_list.append(line)
