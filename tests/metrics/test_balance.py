@@ -3,7 +3,7 @@ from contextlib import nullcontext as does_not_raise
 import numpy as np
 import pytest
 
-from dataeval._internal.metrics.balance import balance, balance_classwise
+from dataeval._internal.metrics.balance import balance
 from dataeval._internal.metrics.utils import infer_categorical, preprocess_metadata
 
 
@@ -54,10 +54,9 @@ class TestBalanceUnit:
             (4.0, pytest.warns(UserWarning)),
         ],
     )
-    @pytest.mark.parametrize("balance_fn", [balance, balance_classwise])
-    def test_validates_balance_inputs(self, test_param, expected_exception, balance_fn, class_labels, metadata):
+    def test_validates_balance_inputs(self, test_param, expected_exception, class_labels, metadata):
         with expected_exception:
-            balance_fn(class_labels, metadata, test_param)
+            balance(class_labels, metadata, test_param)
 
     def test_preprocess(self, metadata, class_labels):
         data, names, is_categorical = preprocess_metadata(class_labels, metadata)
@@ -67,19 +66,14 @@ class TestBalanceUnit:
         assert all(is_categorical[:idx] + is_categorical[idx + 1 :])
         assert data.dtype == float
 
-    def test_preprocess_no_float(self, class_labels, metadata):
-        # test case with no float data
-        md = [{"var_cat": md["var_cat"]} for md in metadata]
-        balance(class_labels=class_labels, metadata=md)
-
     def test_infer_categorical_2D_data(self):
         x = np.ones((10, 2))
         _ = infer_categorical(x)
 
-    @pytest.mark.parametrize("balance_fcn", [balance, balance_classwise])
-    def test_correct_mi_shape_and_dtype(self, balance_fcn, class_labels, metadata):
+    def test_correct_mi_shape_and_dtype(self, class_labels, metadata):
         num_vars = len(metadata[0].keys())
-        expected_shape = (2, num_vars) if "classwise" in balance_fcn.__name__ else (num_vars + 1, num_vars + 1)
-        mi = balance_fcn(class_labels, metadata).mutual_information
-        assert mi.shape == expected_shape
-        assert mi.dtype == float
+        expected_shape = {"balance": (num_vars + 1,), "factors": (num_vars, num_vars), "classwise": (2, num_vars + 1)}
+        mi = balance(class_labels, metadata)
+        for k, v in mi.dict().items():
+            assert v.shape == expected_shape[k]
+            assert v.dtype == float

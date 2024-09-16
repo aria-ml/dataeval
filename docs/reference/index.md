@@ -145,10 +145,8 @@ Metrics are a way to measure the performance of your models or datasets that can
 :titlesonly:
 
 metrics/bias/balance
-metrics/bias/balance_classwise
 metrics/bias/coverage
 metrics/bias/diversity
-metrics/bias/diversity_classwise
 metrics/bias/label_parity
 metrics/bias/parity
 :::
@@ -157,10 +155,8 @@ metrics/bias/parity
 .. autosummary::
 
     metrics.bias.balance
-    metrics.bias.balance_classwise
     metrics.bias.coverage
     metrics.bias.diversity
-    metrics.bias.diversity_classwise
     metrics.bias.label_parity
     metrics.bias.parity
 ```
