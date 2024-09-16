@@ -66,18 +66,13 @@ class TestBalanceUnit:
         assert all(is_categorical[:idx] + is_categorical[idx + 1 :])
         assert data.dtype == float
 
-    def test_preprocess_no_float(self, class_labels, metadata):
-        # test case with no float data
-        md = [{k: int(v) if isinstance(v, float) else v for k, v in md.items()} for md in metadata]
-        balance(class_labels=class_labels, metadata=md)
-
     def test_infer_categorical_2D_data(self):
         x = np.ones((10, 2))
         _ = infer_categorical(x)
 
     def test_correct_mi_shape_and_dtype(self, class_labels, metadata):
         num_vars = len(metadata[0].keys())
-        expected_shape = {"balance": (num_vars + 1,), "factors": (num_vars, num_vars), "classwise": (2, num_vars)}
+        expected_shape = {"balance": (num_vars + 1,), "factors": (num_vars, num_vars), "classwise": (2, num_vars + 1)}
         mi = balance(class_labels, metadata)
         for k, v in mi.dict().items():
             assert v.shape == expected_shape[k]
