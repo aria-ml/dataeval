@@ -11,7 +11,7 @@ from dataeval import __version__
 
 class OutputMetadata:
     _name: str
-    _execution_time: str
+    _execution_time: datetime
     _execution_duration: float
     _arguments: dict[str, str]
     _state: dict[str, str]

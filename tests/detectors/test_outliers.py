@@ -53,7 +53,7 @@ class TestOutliers:
         data = np.random.random((20, 3, 16, 16))
         stats = imagestats(data, ImageStat.VAR)
         outliers = Outliers(ImageStat.MEAN)
-        with pytest.raises(ValueError):
+        with pytest.warns():
             outliers.evaluate(stats)
 
     def test_outliers_with_stats_mean_plus(self):
@@ -67,5 +67,15 @@ class TestOutliers:
         data = np.random.random((20, 3, 16, 16))
         stats = imagestats(data, ImageStat.MEAN)
         outliers = Outliers(ImageStat.MEAN | ImageStat.VAR)
-        with pytest.raises(ValueError):
+        with pytest.warns():
             outliers.evaluate(stats)
+
+    def test_outliers_with_multiple_stats(self):
+        dataset1 = np.zeros((50, 3, 16, 16))
+        dataset2 = np.zeros((50, 3, 16, 16))
+        dataset2[0] = 1
+        stats1 = imagestats(dataset1, ImageStat.MEAN)
+        stats2 = imagestats(dataset2, ImageStat.MEAN)
+        outliers = Outliers()
+        results = outliers.evaluate((stats1, stats2))
+        assert results is not None
