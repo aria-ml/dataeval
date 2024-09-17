@@ -280,7 +280,7 @@ for python_version in ${!task_map[@]}; do
         # build each task image in parallel
         tasks=$(echo -n ${task_map[$python_version]} | xargs)
         echo "Building [${tasks}]-$python_version..."
-        python_version=$python_version parallel $keep_order --lb --tag "build_image {} $python_version" ::: ${tasks}
+        python_version=$python_version parallel $keep_order --lb --tag "build_image {} $python_version task-run" ::: ${tasks}
     fi
 done
 
