@@ -1,14 +1,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Literal
+from typing import Iterable, Literal, Sequence, cast
+from warnings import warn
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
+from dataeval._internal.detectors.merged_stats import combine_stats, get_dataset_step_from_idx
 from dataeval._internal.flags import ImageStat, to_distinct, verify_supported
 from dataeval._internal.metrics.stats import StatsOutput, imagestats
 from dataeval._internal.output import OutputMetadata, set_metadata
+
+IndexIssueMap = dict[int, dict[str, float]]
+DatasetIndexIssueMap = dict[int, IndexIssueMap]
+"""
+Mapping of image indices to a dictionary of issue types and calculated values
+"""
 
 
 @dataclass(frozen=True)
@@ -16,12 +24,16 @@ class OutliersOutput(OutputMetadata):
     """
     Attributes
     ----------
-    issues : Dict[int, Dict[str, float]]
-        Dictionary containing the indices of outliers and a dictionary showing
-        the issues and calculated values for the given index.
+    issues : dict[int, dict[str, float]] | dict[int, dict[int, dict[str, float]]]
+        Indices of image outliers with their associated issue type and calculated values.
+
+    - For a single dataset, a dictionary containing the indices of outliers and
+      a dictionary showing the issues and calculated values for the given index.
+    - For multiple datasets, a map of dataset indices to the indices of outliers
+      and their associated issues and calculated values.
     """
 
-    issues: dict[int, dict[str, float]]
+    issues: IndexIssueMap | DatasetIndexIssueMap
 
 
 def _get_outlier_mask(
@@ -64,7 +76,7 @@ class Outliers:
 
     Attributes
     ----------
-    stats : Dict[str, Any]
+    stats : dict[str, Any]
         Dictionary to hold the value of each metric for each image
 
     See Also
@@ -135,14 +147,14 @@ class Outliers:
         return dict(sorted(flagged_images.items()))
 
     @set_metadata("dataeval.detectors", ["flags", "outlier_method", "outlier_threshold"])
-    def evaluate(self, data: Iterable[ArrayLike] | StatsOutput) -> OutliersOutput:
+    def evaluate(self, data: Iterable[ArrayLike] | StatsOutput | Sequence[StatsOutput]) -> OutliersOutput:
         """
         Returns indices of outliers with the issues identified for each
 
         Parameters
         ----------
-        data : Iterable[ArrayLike], shape - (C, H, W) | StatsOutput
-            A dataset of images in an ArrayLike format or the output from an imagestats metric analysis
+        data : Iterable[ArrayLike], shape - (C, H, W) | StatsOutput | Sequence[StatsOutput]
+            A dataset of images in an ArrayLike format or the output(s) from an imagestats metric analysis
 
         Returns
         -------
@@ -157,13 +169,29 @@ class Outliers:
         >>> outliers.evaluate(images)
         OutliersOutput(issues={18: {'brightness': 0.78}, 25: {'brightness': 0.98}})
         """
-        if isinstance(data, StatsOutput):
-            flags = set(to_distinct(self.flags).values())
-            stats = set(data.dict())
-            missing = flags - stats
+        stats, dataset_steps = combine_stats(data)
+
+        if isinstance(stats, StatsOutput):
+            selected_flags = set(to_distinct(self.flags).values())
+            provided = set(stats.dict())
+            missing = selected_flags - provided
             if missing:
-                raise ValueError(f"StatsOutput is missing {missing} from the required stats: {flags}.")
-            self.stats = data
+                warn(
+                    f"StatsOutput provided {provided} and is missing {missing} \
+                        from the selected stat flags: {selected_flags}."
+                )
+            self.stats = stats
         else:
-            self.stats = imagestats(data, self.flags)
-        return OutliersOutput(self._get_outliers())
+            self.stats = imagestats(cast(Iterable[ArrayLike], data), self.flags)
+
+        outliers = self._get_outliers()
+
+        # split up results from combined dataset into individual dataset buckets
+        if dataset_steps:
+            out_dict = {}
+            for idx, issue in outliers.items():
+                k, v = get_dataset_step_from_idx(idx, dataset_steps)
+                out_dict.setdefault(k, {})[v] = issue
+            outliers = out_dict
+
+        return OutliersOutput(outliers)
