@@ -89,6 +89,16 @@ class StatsOutput(OutputMetadata):
     def dict(self):
         return {k: v for k, v in self.__dict__.items() if not k.startswith("_") and len(v) > 0}
 
+    def __len__(self) -> int:
+        if self.ch_idx_map:
+            return sum([len(idxs) for idxs in self.ch_idx_map.values()])
+        else:
+            for a in self.__annotations__:
+                attr = getattr(self, a, None)
+                if attr is not None and hasattr(a, "__len__") and len(attr) > 0:
+                    return len(attr)
+        return 0
+
 
 QUARTILES = (0, 25, 50, 75, 100)
 

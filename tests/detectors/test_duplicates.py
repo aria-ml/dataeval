@@ -74,3 +74,20 @@ class TestDuplicates:
         results = dupes._get_duplicates()
         assert len(results["exact"]) == 0
         assert len(results["near"]) > 0
+
+    def test_get_duplicates_multiple_stats(self):
+        ones = np.ones((1, 16, 16))
+        zeros = np.zeros((1, 16, 16))
+        data1 = np.concatenate((ones, zeros, ones, zeros, ones))
+        data2 = np.concatenate((zeros, ones, zeros))
+        data3 = np.concatenate((zeros + 0.001, ones - 0.001))
+        dupes1 = imagestats(data1, ImageStat.ALL_HASHES)
+        dupes2 = imagestats(data2, ImageStat.ALL_HASHES)
+        dupes3 = imagestats(data3, ImageStat.ALL_HASHES)
+
+        dupes = Duplicates()
+        results = dupes.evaluate((dupes1, dupes2, dupes3))
+        assert len(results.exact) == 2
+        assert results.exact[0] == {0: [0, 2, 4], 1: [1]}
+        assert len(results.near) == 2
+        assert results.near[0] == {0: [0, 2, 4], 1: [1], 2: [1]}

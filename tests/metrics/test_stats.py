@@ -2,7 +2,8 @@ import numpy as np
 import pytest
 
 from dataeval._internal.flags import ImageStat, to_distinct
-from dataeval._internal.metrics.stats import channelstats, imagestats
+from dataeval._internal.metrics.stats import StatsOutput, channelstats, imagestats
+from dataeval._internal.output import populate_defaults
 
 
 def get_dataset(count: int, channels: int):
@@ -79,3 +80,15 @@ class TestChannelStats:
     def test_channel_stats_value_error(self):
         with pytest.raises(ValueError):
             channelstats(get_dataset(1, 1), ImageStat.XXHASH)
+
+    def test_len_empty_stats(self):
+        empty = StatsOutput(**populate_defaults({}, StatsOutput))
+        assert len(empty) == 0
+
+    def test_len_image_stats(self):
+        img_stats = imagestats(get_dataset(100, 3), ImageStat.ENTROPY)
+        assert len(img_stats) == 100
+
+    def test_len_channel_stats(self):
+        ch_stats = channelstats(get_dataset(100, 3), ImageStat.ENTROPY)
+        assert len(ch_stats) == 100
