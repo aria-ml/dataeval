@@ -339,22 +339,14 @@ class ReleaseGen:
                 file_paths.append(path.join(root, filename))
         return file_paths
 
-    def _generate_index_markdown_update_action(self, file_name: str, pending_version: str) -> None | Dict[str, str]:
+    def _generate_index_markdown_update_action(self, file_name: str, pending_version: str) -> Dict[str, str]:
         howto_index_file = self._read_doc_file(file_name)
         if howto_index_file:
-            new_ref = pending_version
-            new_sub_1 = "aria-ml/dataeval/blob/" + new_ref + "/docs"
+            pattern = compile(r"aria-ml/dataeval/blob/v([0-9]+)\.([0-9]+)\.([0-9]+)/docs")
+            new_path = f"aria-ml/dataeval/blob/{pending_version}/docs"
 
-            verbose(f"substitution for new version  {new_sub_1}")
-            pattern_1 = "aria-ml/dataeval/blob/main/docs"
-            lines: List[str] = []
-            for line in howto_index_file:
-                new_line_1 = sub(pattern_1, new_sub_1, line)
-                if new_line_1 != line:
-                    lines.append(new_line_1)  # replace the old with the new line.
-                else:
-                    lines.append(line)
-            content = "".join(lines)
+            verbose(f"Substituting markdown links for new version {pending_version}")
+            content = "".join([sub(pattern, new_path, line) for line in howto_index_file])
             return {
                 "action": "update",
                 "file_path": file_name,
@@ -362,7 +354,7 @@ class ReleaseGen:
                 "content": content,
             }
         else:
-            return None
+            return {}
 
     def _update_cache_file_path(self, file_name: str, current_tag: str) -> None | str:
         search_pattern = r"(%|\!)+(pip install -q dataeval){1}(\[\w+\])*"
@@ -446,24 +438,17 @@ class ReleaseGen:
         version, changelog_action = self._generate_version_and_changelog_action()
         if not changelog_action:
             return "", []
-        # creating actions for updating python notebook pip install statements
 
-        # actions = self._generate_notebook_update_actions(pending_version=version)
-        # creating actions for updating colab references in markdown locations.
-        howto_index_action = self._generate_index_markdown_update_action(HOWTO_INDEX_FILE, pending_version=version)
-        tutorial_index_action = self._generate_index_markdown_update_action(
-            TUTORIAL_INDEX_FILE, pending_version=version
+        # creating actions for updating notebook cache, documentation links, and changelog content
+        actions = self._generate_jupyter_cache_actions()
+        actions.extend(
+            [self._generate_index_markdown_update_action(f, version) for f in [HOWTO_INDEX_FILE, TUTORIAL_INDEX_FILE]]
         )
-        actions: List[Dict[str, str]] = []
-        if howto_index_action:  # can return None
-            actions.append(howto_index_action)
-        if tutorial_index_action:  # can return None
-            actions.append(tutorial_index_action)
-        # make sure the cache actions are done last so timestamps don't trigger a rebuild.
-        # comment out for now. Will need for permanent solution.
-        cache_actions = self._generate_jupyter_cache_actions()
-        if cache_actions:  # can return None
-            actions.extend(cache_actions)
+
+        # comment out for now - will need for permanent solution
+        # creating actions for updating python notebook pip install statements
+        # actions.extend(self._generate_notebook_update_actions(pending_version=version))
 
         actions.append(changelog_action)
-        return version, actions
+
+        return version, [action for action in actions if action]
