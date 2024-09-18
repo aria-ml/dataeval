@@ -214,79 +214,55 @@ class ReleaseGen:
         end = line.find(")")
         return line[start:end]
 
-    def _get_entries(self, last_hash: str) -> Dict[_Tag, Dict[_Category, List[_Merge]]]:
+    def _get_entries(self, last_hash: str) -> tuple[_Merge, Dict[_Category, List[_Merge]]]:
         # get merges in to develop and main and sort
         merges: List[_Merge] = [_Merge(m) for m in self.gl.list_merge_requests(state="merged", target_branch="main")]
         merges.sort(reverse=True)
-
-        # get version buckets and sort
-        tags: List[_Tag] = [_Tag(t) for t in self.gl.list_tags() if _get_version_tuple(t["name"]) is not None]
-        tags.sort(reverse=True)
+        latest = merges[0]
 
         # populate the categorized merge issues
-        categorized: Dict[_Tag, Dict[_Category, List[_Merge]]] = defaultdict(lambda: defaultdict(lambda: []))
+        categorized: Dict[_Category, List[_Merge]] = defaultdict(lambda: [])
 
-        tag_it = iter(tags)
-        tag = next(tag_it)
-        next_tag = next(tag_it, None)
         for merge in merges:
-            # check if we need to move to next tag
-            while next_tag is not None and (merge.hash == next_tag.hash or merge.time <= next_tag.time):
-                # return early if hash is already present
-                if next_tag.hash == last_hash:
-                    return categorized
-
-                # move to next tag
-                tag = next_tag
-                next_tag = next(tag_it, None)
-
             # return early if hash is already present
             if merge.hash == last_hash:
-                return categorized
+                return latest, categorized
 
             merge_log = f"COMMITGEN: {merge.description} @ {merge.hash}"
             verbose(merge_log + f" - ADDED as {_Category(merge.category).name}")
-            categorized[tag][merge.category].append(merge)
+            categorized[merge.category].append(merge)
 
-        return categorized
+        return latest, categorized
 
     def _generate_version_and_changelog_action(self) -> Tuple[str, Dict[str, str]]:
         current = self._read_changelog()
         last_hash = self._get_last_hash(current[0]) if current else ""
 
         # Return empty dict if nothing to update
-        entries = self._get_entries(last_hash)
-        tags = list(entries)
+        latest, entries = self._get_entries(last_hash)
+        if not entries:
+            return "", {}
+
         lines: List[str] = []
         next_category = _Category.UNKNOWN
 
-        for tag in tags:
-            if tag.hash == last_hash:
-                break
+        categories = sorted(entries)
+        for category in categories:
+            merges = entries[category]
+            lines.append("")
+            lines.append(_Category.to_markdown(category))
+            for merge in merges:
+                if merge.hash == last_hash:
+                    break
 
-            if not entries[tag]:
-                continue
-
-            categories = sorted(entries[tag])
-            for category in categories:
-                merges = entries[tag][category]
-                lines.append("")
-                lines.append(_Category.to_markdown(category))
-                for merge in merges:
-                    if merge.hash == last_hash:
-                        break
-
-                    lines.append(merge.to_markdown())
-                    verbose(f"Adding - {merge.to_markdown()}")
-                    next_category = min(next_category, category)
-
-        if not lines:
-            return "", {}
+                lines.append(merge.to_markdown())
+                verbose(f"Adding - {merge.to_markdown()}")
+                next_category = min(next_category, category)
 
         vt = VersionTag(self.gl)
         next_version = vt.next(_Category.version_type(next_category))
 
-        header = [f"[//]: # ({tags[0].hash})", "", "# DataEval Change Log", "", f"## {next_version}"]
+        header = [f"[//]: # ({latest.hash})", "", "# DataEval Change Log", "", f"## {next_version}"]
         content = "\n".join(header + lines) + "\n"
 
         for oldline in current[3:]:
@@ -474,14 +450,14 @@ class ReleaseGen:
         # actions = self._generate_notebook_update_actions(pending_version=version)
         # creating actions for updating colab references in markdown locations.
         howto_index_action = self._generate_index_markdown_update_action(HOWTO_INDEX_FILE, pending_version=version)
-        tutorital_index_action = self._generate_index_markdown_update_action(
+        tutorial_index_action = self._generate_index_markdown_update_action(
             TUTORIAL_INDEX_FILE, pending_version=version
         )
         actions: List[Dict[str, str]] = []
         if howto_index_action:  # can return None
             actions.append(howto_index_action)
-        if tutorital_index_action:  # can return None
-            actions.append(tutorital_index_action)
+        if tutorial_index_action:  # can return None
+            actions.append(tutorial_index_action)
         # make sure the cache actions are done last so timestamps don't trigger a rebuild.
         # comment out for now. Will need for permanent solution.
         cache_actions = self._generate_jupyter_cache_actions()
