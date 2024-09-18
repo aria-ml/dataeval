@@ -1,6 +1,11 @@
-[//]: # (63ab70d703e4c4103645247a7be36bd3ea724884)
+[//]: # (d9068a2c2ccbc7f12852a9ef4bd517e2ee35716e)
 
 # DataEval Change Log
+
+## v0.69.1
+
+📝 **Miscellaneous**
+- `d9068a2c` - Fix release and changelog script
 
 ## v0.69.0
 
