@@ -1,6 +1,20 @@
-[//]: # (e792ad425518867cdba9dd7371193113e6a80142)
+[//]: # (e14d3e690cc110ed10be34bd704507a1f093a71b)
 
 # DataEval Change Log
+
+## v0.68.0
+
+🌟 **Feature Release**
+- `47b48e14` - Allow Duplicates and Outliers detectors to take in multiple StatsOutput objects
+
+📝 **Miscellaneous**
+- `65d8f3de` - Combine classwise bias metric outputs with non-classwise
+- `ccfd72ef` - Adding clustering/coverage tutorial
+- `6d09d710` - Add CONTRIBUTING.md
+- `72387d9c` - Updated version replacement script to include cache files
+- `5285f01b` - Prototype Performance  Estimation
+- `3ae16116` - concept pages for balance and diversity, rescale Simpson diversity
+- `3e16a905` - Switching documentation themes to the pydata theme
 
 ## v0.67.0
 
