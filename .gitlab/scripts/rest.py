@@ -22,6 +22,17 @@ def set_verbose(value: bool):
     _VerboseSingleton().verbose = value
 
 
+def replace_long_strings(d, max_length, replacement=None):
+    if isinstance(d, dict):
+        return {k: replace_long_strings(v, max_length, replacement) for k, v in d.items()}
+    elif isinstance(d, list):
+        return [replace_long_strings(i, max_length, replacement) for i in d]
+    elif isinstance(d, str) and len(d) > max_length:
+        return replacement or f"{d[:max_length-3]}..."
+    else:
+        return d
+
+
 class RestWrapper:
     """
     Helper class wrapping generic REST API calls
@@ -111,7 +122,7 @@ class RestWrapper:
 
             response = cast(Response, fncall(**args))
 
-            args_to_print = {x: args[x] for x in args if x != "headers"}
+            args_to_print = replace_long_strings({x: args[x] for x in args if x != "headers"}, 50)
             verbose(f"Request '{fncall.__name__}' issued: {args_to_print}")
             verbose(f"Response received: {response}")
             if response.status_code not in range(200, 299):
