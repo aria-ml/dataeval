@@ -7,7 +7,7 @@ from re import MULTILINE, compile, search, sub
 from shutil import move, rmtree
 from typing import Any, Dict, List, Literal, Tuple
 
-from gitlab import Gitlab
+from gitlab import LATEST_KNOWN_GOOD, Gitlab
 from rest import verbose
 from versiontag import VersionTag
 
@@ -285,7 +285,7 @@ class ReleaseGen:
 
     def _generate_actions(self, old_files: List[str], new_files: List[str]) -> List[Dict[str, str]]:
         actions: List[Dict[str, str]] = []
-        # will need this as an input for permandent solution
+        # will need this as an input for permanent solution
         # current_tag = pending_version
 
         for old_file in old_files:
@@ -423,9 +423,9 @@ class ReleaseGen:
 
         return action_list
 
-    # removed pending version. Will need to add back for permananet solution.
+    # removed pending version. Will need to add back for permanant solution.
     def _generate_jupyter_cache_actions(self) -> List[Dict[str, str]]:
-        ref = "main"
+        ref = LATEST_KNOWN_GOOD
         cache_path = "docs/.jupyter_cache"
         output_path = path.join("output", cache_path)
         self.gl.get_artifacts(job="docs", dest="./", ref=ref)
