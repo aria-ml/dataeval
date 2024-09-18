@@ -7,7 +7,7 @@ from re import MULTILINE, compile, search, sub
 from shutil import move, rmtree
 from typing import Any, Dict, List, Literal, Tuple
 
-from gitlab import LATEST_KNOWN_GOOD, Gitlab
+from gitlab import Gitlab
 from rest import verbose
 from versiontag import VersionTag
 
@@ -425,7 +425,8 @@ class ReleaseGen:
 
     # removed pending version. Will need to add back for permanant solution.
     def _generate_jupyter_cache_actions(self) -> List[Dict[str, str]]:
-        ref = LATEST_KNOWN_GOOD
+        # cannot use 'latest-known-good' because 404 on download - investigate
+        ref = "main"
         cache_path = "docs/.jupyter_cache"
         output_path = path.join("output", cache_path)
         self.gl.get_artifacts(job="docs", dest="./", ref=ref)
