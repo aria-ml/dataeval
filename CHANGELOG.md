@@ -1,6 +1,16 @@
-[//]: # (e14d3e690cc110ed10be34bd704507a1f093a71b)
+[//]: # (cc7a064daac558cd2261219dae7aa60d7b2edbff)
 
 # DataEval Change Log
+
+## v0.69.0
+
+🌟 **Feature Release**
+- `47b48e14` - Allow Duplicates and Outliers detectors to take in multiple StatsOutput objects
+
+📝 **Miscellaneous**
+- `63ab70d7` - Remove automatic update of documentation notebooks
+- `65d8f3de` - Combine classwise bias metric outputs with non-classwise
+- `ccfd72ef` - Adding clustering/coverage tutorial
 
 ## v0.68.0
 
