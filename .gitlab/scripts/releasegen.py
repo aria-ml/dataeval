@@ -307,11 +307,10 @@ class ReleaseGen:
         except Exception:
             return True
 
-    def _generate_actions(
-        self, old_files: List[str], new_files: List[str], pending_version: str
-    ) -> List[Dict[str, str]]:
+    def _generate_actions(self, old_files: List[str], new_files: List[str]) -> List[Dict[str, str]]:
         actions: List[Dict[str, str]] = []
-        current_tag = pending_version
+        # will need this as an input for permandent solution
+        # current_tag = pending_version
 
         for old_file in old_files:
             if old_file not in new_files:
@@ -331,8 +330,9 @@ class ReleaseGen:
                 encoding = "text"
                 with open(new_file) as f:
                     content = f.read()
-                if new_file.endswith("ipynb"):
-                    content = self._update_cache_file_path(new_file, current_tag=current_tag)
+                # comment out this code for now. Will need for permanent solution.
+                # if new_file.endswith("ipynb"):
+                #    content = self._update_cache_file_path(new_file, current_tag=current_tag)
             if new_file in old_files:
                 if content:
                     actions.append(
@@ -421,7 +421,11 @@ class ReleaseGen:
         # get all the ipynb file from the notebook directory
         # may need to read .jupytercache files and update them instead of the original files.
         file_path = NOTEBOOK_DIRECTORY
-        files = self._get_files(file_path)
+        files: List[str] = []
+        notebook_files = self._get_files(file_path)
+        for f in notebook_files:
+            if f.lower().endswith("ipynb"):
+                files.append(f)
         # get the notebooks in the docs/tutorials directory
         more_file_path = TUTORIAL_DIRECTORY
         more_files = self._get_files(more_file_path)
@@ -443,7 +447,8 @@ class ReleaseGen:
 
         return action_list
 
-    def _generate_jupyter_cache_actions(self, pending_version: str) -> List[Dict[str, str]]:
+    # removed pending version. Will need to add back for permananet solution.
+    def _generate_jupyter_cache_actions(self) -> List[Dict[str, str]]:
         ref = "main"
         cache_path = "docs/.jupyter_cache"
         output_path = path.join("output", cache_path)
@@ -456,7 +461,8 @@ class ReleaseGen:
         old_files = self._get_files(cache_path)
         rmtree(cache_path)
         move(output_path, cache_path)
-        actions = self._generate_actions(old_files, self._get_files(cache_path), pending_version=pending_version)
+        # removed pending version for now. will need for permanent solution.
+        actions = self._generate_actions(old_files, self._get_files(cache_path))
         return actions
 
     def generate(self) -> Tuple[str, List[Dict[str, str]]]:
@@ -464,19 +470,21 @@ class ReleaseGen:
         if not changelog_action:
             return "", []
         # creating actions for updating python notebook pip install statements
-        actions = self._generate_notebook_update_actions(pending_version=version)
-        # changing pip install statement in cache so code does not try to rebuild everything.
-        cache_actions = self._generate_jupyter_cache_actions(pending_version=version)
+
+        # actions = self._generate_notebook_update_actions(pending_version=version)
         # creating actions for updating colab references in markdown locations.
         howto_index_action = self._generate_index_markdown_update_action(HOWTO_INDEX_FILE, pending_version=version)
         tutorital_index_action = self._generate_index_markdown_update_action(
             TUTORIAL_INDEX_FILE, pending_version=version
         )
+        actions: List[Dict[str, str]] = []
         if howto_index_action:  # can return None
             actions.append(howto_index_action)
         if tutorital_index_action:  # can return None
             actions.append(tutorital_index_action)
         # make sure the cache actions are done last so timestamps don't trigger a rebuild.
+        # comment out for now. Will need for permanent solution.
+        cache_actions = self._generate_jupyter_cache_actions()
         if cache_actions:  # can return None
             actions.extend(cache_actions)
 
