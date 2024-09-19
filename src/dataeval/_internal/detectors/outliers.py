@@ -119,7 +119,7 @@ class Outliers:
 
     Specifying an outlier method and threshold:
 
-    >>> outliers = Outliers(outlier_method="zscore", outlier_threshold=2.5)
+    >>> outliers = Outliers(outlier_method="zscore", outlier_threshold=2.75)
     """
 
     def __init__(
@@ -167,8 +167,8 @@ class Outliers:
         Evaluate the dataset:
 
         >>> outliers.evaluate(images)
-        OutliersOutput(issues={18: {'brightness': 0.78}, 25: {'brightness': 0.98}})
-        """
+        OutliersOutput(issues={10: {'blurriness': 1.26, 'contrast': 1.06, 'zeros': 0.05}, 12: {'blurriness': 1.51, 'contrast': 1.06, 'zeros': 0.05}})
+        """  # noqa: E501
         stats, dataset_steps = combine_stats(data)
 
         if isinstance(stats, StatsOutput):
