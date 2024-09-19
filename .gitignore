@@ -17,3 +17,5 @@ output/
 
 # Used to store user customizable settings
 .settings
+# debug profiles
+.vscode/launch.json
