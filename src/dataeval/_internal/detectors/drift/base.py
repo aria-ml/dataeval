@@ -35,6 +35,8 @@ class DriftBaseOutput(OutputMetadata):
 
     is_drift: bool
     threshold: float
+    p_val: float
+    distance: float
 
 
 @dataclass(frozen=True)
@@ -60,6 +62,8 @@ class DriftOutput(DriftBaseOutput):
 
     # is_drift: bool
     # threshold: float
+    # p_val: float
+    # distance: float
     feature_drift: NDArray[np.bool_]
     feature_threshold: float
     p_vals: NDArray[np.float32]
@@ -462,4 +466,6 @@ class BaseDriftUnivariate(BaseDrift):
 
         feature_drift = (p_vals < self.p_val).astype(np.bool_)
         drift_pred, threshold = self._apply_correction(p_vals)
-        return DriftOutput(drift_pred, threshold, feature_drift, self.p_val, p_vals, dist)
+        return DriftOutput(
+            drift_pred, threshold, float(np.mean(p_vals)), float(np.mean(dist)), feature_drift, self.p_val, p_vals, dist
+        )
