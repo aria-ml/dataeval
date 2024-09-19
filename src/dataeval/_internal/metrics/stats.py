@@ -24,43 +24,47 @@ class StatsOutput(OutputMetadata):
         xxHash hash of the images as a hex string
     pchash : List[str]
         Perception hash of the images as a hex string
-    width: NDArray[np.uint16]
+    width : NDArray[np.uint16]
         Width of the images in pixels
-    height: NDArray[np.uint16]
+    height : NDArray[np.uint16]
         Height of the images in pixels
-    channels: NDArray[np.uint8]
+    channels : NDArray[np.uint8]
         Channel count of the images in pixels
-    size: NDArray[np.uint32]
+    size : NDArray[np.uint32]
         Size of the images in pixels
-    aspect_ratio: NDArray[np.float16]
+    aspect_ratio : NDArray[np.float16]
         Aspect ratio of the images (width/height)
-    depth: NDArray[np.uint8]
+    depth : NDArray[np.uint8]
         Color depth of the images in bits
-    brightness: NDArray[np.float16]
+    brightness : NDArray[np.float16]
         Brightness of the images
-    blurriness: NDArray[np.float16]
+    blurriness : NDArray[np.float16]
         Blurriness of the images
-    missing: NDArray[np.float16]
+    contrast : NDArray[np.float16]
+        Image contrast ratio
+    darkness : NDArray[np.float16]
+        Darkness of the images
+    missing : NDArray[np.float16]
         Percentage of the images with missing pixels
-    zero: NDArray[np.float16]
+    zeros : NDArray[np.float16]
         Percentage of the images with zero value pixels
-    mean: NDArray[np.float16]
+    mean : NDArray[np.float16]
         Mean of the pixel values of the images
-    std: NDArray[np.float16]
+    std : NDArray[np.float16]
         Standard deviation of the pixel values of the images
-    var: NDArray[np.float16]
+    var : NDArray[np.float16]
         Variance of the pixel values of the images
-    skew: NDArray[np.float16]
+    skew : NDArray[np.float16]
         Skew of the pixel values of the images
-    kurtosis: NDArray[np.float16]
+    kurtosis : NDArray[np.float16]
         Kurtosis of the pixel values of the images
-    percentiles: NDArray[np.float16]
+    percentiles : NDArray[np.float16]
         Percentiles of the pixel values of the images with quartiles of (0, 25, 50, 75, 100)
-    histogram: NDArray[np.uint32]
+    histogram : NDArray[np.uint32]
         Histogram of the pixel values of the images across 256 bins scaled between 0 and 1
-    entropy: NDArray[np.float16]
+    entropy : NDArray[np.float16]
         Entropy of the pixel values of the images
-    ch_idx_map: Dict[int, List[int]]
+    ch_idx_map : Dict[int, List[int]]
         Per-channel mapping of indices for each metric
     """
 
@@ -74,8 +78,10 @@ class StatsOutput(OutputMetadata):
     depth: NDArray[np.uint8]
     brightness: NDArray[np.float16]
     blurriness: NDArray[np.float16]
+    contrast: NDArray[np.float16]
+    darkness: NDArray[np.float16]
     missing: NDArray[np.float16]
-    zero: NDArray[np.float16]
+    zeros: NDArray[np.float16]
     mean: NDArray[np.float16]
     std: NDArray[np.float16]
     var: NDArray[np.float16]
@@ -111,27 +117,33 @@ IMAGESTATS_FN_MAP: dict[ImageStat, Callable[[NDArray], Any]] = {
     ImageStat.SIZE: lambda x: np.uint32(np.prod(x.shape[-2:])),
     ImageStat.ASPECT_RATIO: lambda x: np.float16(x.shape[-1] / x.shape[-2]),
     ImageStat.DEPTH: lambda x: np.uint8(get_bitdepth(x).depth),
-    ImageStat.BRIGHTNESS: lambda x: np.float16(np.mean(x)),
+    ImageStat.BRIGHTNESS: lambda x: x[-2],
     ImageStat.BLURRINESS: lambda x: np.float16(np.std(edge_filter(np.mean(x, axis=0)))),
+    ImageStat.CONTRAST: lambda x: np.float16((np.max(x) - np.min(x)) / np.mean(x)),
+    ImageStat.DARKNESS: lambda x: x[1],
     ImageStat.MISSING: lambda x: np.float16(np.sum(np.isnan(x)) / np.prod(x.shape[-2:])),
-    ImageStat.ZERO: lambda x: np.float16(np.count_nonzero(x == 0) / np.prod(x.shape[-2:])),
+    ImageStat.ZEROS: lambda x: np.float16(np.count_nonzero(x == 0) / np.prod(x.shape[-2:])),
     ImageStat.MEAN: lambda x: np.float16(np.mean(x)),
     ImageStat.STD: lambda x: np.float16(np.std(x)),
     ImageStat.VAR: lambda x: np.float16(np.var(x)),
     ImageStat.SKEW: lambda x: np.float16(skew(x.ravel())),
     ImageStat.KURTOSIS: lambda x: np.float16(kurtosis(x.ravel())),
-    ImageStat.PERCENTILES: lambda x: np.float16(np.percentile(x, q=QUARTILES)),
+    ImageStat.PERCENTILES: lambda x: np.float16(np.nanpercentile(x, q=QUARTILES)),
     ImageStat.HISTOGRAM: lambda x: np.uint32(np.histogram(x, 256, (0, 1))[0]),
     ImageStat.ENTROPY: lambda x: np.float16(entropy(x)),
 }
 
 CHANNELSTATS_FN_MAP: dict[ImageStat, Callable[[NDArray], Any]] = {
+    ImageStat.BRIGHTNESS: lambda x: np.float16((np.max(x, axis=1) - np.mean(x, axis=1)) / np.var(x, axis=1)),
+    ImageStat.CONTRAST: lambda x: np.float16((np.max(x, axis=1) - np.min(x, axis=1)) / np.mean(x, axis=1)),
+    ImageStat.DARKNESS: lambda x: np.float16((np.mean(x, axis=1) - np.min(x, axis=1)) / np.var(x, axis=1)),
+    ImageStat.ZEROS: lambda x: np.float16(np.count_nonzero(x == 0, axis=(1, 2)) / np.prod(x.shape[-2:])),
     ImageStat.MEAN: lambda x: np.float16(np.mean(x, axis=1)),
     ImageStat.STD: lambda x: np.float16(np.std(x, axis=1)),
     ImageStat.VAR: lambda x: np.float16(np.var(x, axis=1)),
     ImageStat.SKEW: lambda x: np.float16(skew(x, axis=1)),
     ImageStat.KURTOSIS: lambda x: np.float16(kurtosis(x, axis=1)),
-    ImageStat.PERCENTILES: lambda x: np.float16(np.percentile(x, q=QUARTILES, axis=1).T),
+    ImageStat.PERCENTILES: lambda x: np.float16(np.nanpercentile(x, q=QUARTILES, axis=1).T),
     ImageStat.HISTOGRAM: lambda x: np.uint32(np.apply_along_axis(lambda y: np.histogram(y, 256, (0, 1))[0], 1, x)),
     ImageStat.ENTROPY: lambda x: np.float16(entropy(x, axis=1)),
 }
@@ -195,15 +207,20 @@ def run_stats(
         normalized = normalize_image_shape(image)
         scaled = None
         hist = None
+        percentiles = None
         output: dict[str, NDArray] = {}
         for flag, stat in flag_dict.items():
-            if flag & (ImageStat.ALL_PIXELSTATS | ImageStat.BRIGHTNESS):
+            if flag & (ImageStat.ALL_PIXELSTATS | ImageStat.BRIGHTNESS | ImageStat.CONTRAST | ImageStat.DARKNESS):
                 if scaled is None:
                     scaled = rescale(normalized).reshape(image.shape[0], -1) if flatten else rescale(normalized)
                 if flag & (ImageStat.HISTOGRAM | ImageStat.ENTROPY):
                     if hist is None:
                         hist = fn_map[ImageStat.HISTOGRAM](scaled)
                     output[stat] = hist if flag & ImageStat.HISTOGRAM else fn_map[flag](hist)
+                elif flag & (ImageStat.BRIGHTNESS | ImageStat.DARKNESS | ImageStat.PERCENTILES):
+                    if percentiles is None:
+                        percentiles = fn_map[ImageStat.PERCENTILES](scaled)
+                    output[stat] = percentiles if flag & ImageStat.PERCENTILES else fn_map[flag](percentiles)
                 else:
                     output[stat] = fn_map[flag](scaled)
             else:
@@ -236,6 +253,10 @@ def imagestats(images: Iterable[ArrayLike], flags: ImageStat = ImageStat.ALL_STA
         to the names of the statistics (e.g., 'mean', 'std'), and the values are lists of results for
         each image or numpy arrays when the results are multi-dimensional.
 
+    See Also
+    --------
+    ImageStat, channelstats, Outliers, Duplicates
+
     Notes
     -----
     - All metrics in the ImageStat.ALL_PIXELSTATS flag are scaled based on the perceived bit depth
@@ -256,7 +277,7 @@ def imagestats(images: Iterable[ArrayLike], flags: ImageStat = ImageStat.ALL_STA
      0.56152344 0.58837891 0.61230469 0.63671875 0.65771484 0.68505859
      0.70947266 0.73388672 0.75488281 0.78271484 0.80712891 0.83203125
      0.85302734 0.88134766 0.90625    0.93115234]
-    >>> print(results.zero)
+    >>> print(results.zeros)
     [0.12561035 0.         0.         0.         0.11730957 0.
      0.         0.         0.10986328 0.         0.         0.
      0.10266113 0.         0.         0.         0.09570312 0.
@@ -279,7 +300,7 @@ def imagestats(images: Iterable[ArrayLike], flags: ImageStat = ImageStat.ALL_STA
 
 
 @set_metadata("dataeval.metrics")
-def channelstats(images: Iterable[ArrayLike], flags=ImageStat.ALL_PIXELSTATS) -> StatsOutput:
+def channelstats(images: Iterable[ArrayLike], flags=ImageStat.ALL_CHANNEL_STATS) -> StatsOutput:
     """
     Calculates pixel statistics for each image per channel
 
@@ -291,9 +312,9 @@ def channelstats(images: Iterable[ArrayLike], flags=ImageStat.ALL_PIXELSTATS) ->
     ----------
     images : ArrayLike
         Images to run statistical tests on
-    flags: ImageStat, default ImageStat.ALL_PIXELSTATS
+    flags: ImageStat, default ImageStat.ALL_CHANNEL_STATS
         Metric(s) to calculate for each image per channel.
-        Only flags within the ``ImageStat.ALL_PIXELSTATS`` category are supported.
+        Only flags within the ``ImageStat.ALL_CHANNEL_STATS`` category are supported.
 
     Returns
     -------
@@ -302,9 +323,14 @@ def channelstats(images: Iterable[ArrayLike], flags=ImageStat.ALL_PIXELSTATS) ->
         correspond to the names of the statistics (e.g., 'mean', 'variance'), and the values are numpy arrays
         with results for each channel of each image.
 
+    See Also
+    --------
+    ImageStat, imagestats, Outliers, Duplicates
+
     Notes
     -----
-    - All metrics in the ImageStat.ALL_PIXELSTATS flag are scaled based on the perceived bit depth
+    - All metrics in the ImageStat.ALL_PIXELSTATS flag along with ImageStat.Brightness,
+      ImageStat.Contrast and ImageStat.Darkness are scaled based on the perceived bit depth
       (which is derived from the largest pixel value) to allow for better comparison
       between images stored in different formats and different resolutions.
 
@@ -351,7 +377,6 @@ def channelstats(images: Iterable[ArrayLike], flags=ImageStat.ALL_PIXELSTATS) ->
           dtype=float16)}
     """
     stats = run_stats(images, flags, CHANNELSTATS_FN_MAP, True)
-
     output = {}
     for i, results in enumerate(stats):
         for stat, result in results.items():

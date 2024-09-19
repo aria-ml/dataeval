@@ -25,7 +25,8 @@ This function can be used in conjunction with the `Duplicates` class in order to
 ### What is the channelstats function
 
 The channelstats function is an aggregate metric that calculates various values for each individual image on a per channel basis for the selected metrics.
-Unlike the imagestats function, this function only works with the Pixel Statistics subset of the [ImageStat](../reference/flags/imagestat.md) flag class.
+Unlike the imagestats function, this function only works with the Pixel Statistics subset and a subset of the Visual Statistics subset 
+(Brightness, Contrast, Darkness, Zeros) of the [ImageStat](../reference/flags/imagestat.md) flag class.
 
 ### When to use the channelstats function
 

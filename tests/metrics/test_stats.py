@@ -49,17 +49,21 @@ class TestImageStats:
         assert len(results.mean) == 100
         assert len(results.entropy) == 100
 
+    def test_len_image_stats(self):
+        img_stats = imagestats(get_dataset(100, 3), ImageStat.ENTROPY)
+        assert len(img_stats) == 100
+
 
 class TestChannelStats:
     def test_channel_stats_single_channel(self):
         results = channelstats(get_dataset(100, 1))
-        assert len(results.dict()) == len(to_distinct(ImageStat.ALL_PIXELSTATS)) + 1
+        assert len(results.dict()) == len(to_distinct(ImageStat.ALL_CHANNEL_STATS)) + 1
         assert len(results.mean) == 1
         assert results.mean[1].shape == (1, 100)
 
     def test_channel_stats_triple_channel(self):
         results = channelstats(get_dataset(100, 3))
-        assert len(results.dict()) == len(to_distinct(ImageStat.ALL_PIXELSTATS)) + 1
+        assert len(results.dict()) == len(to_distinct(ImageStat.ALL_CHANNEL_STATS)) + 1
         assert len(results.mean) == 1
         assert results.mean[3].shape == (3, 100)
 
@@ -72,7 +76,7 @@ class TestChannelStats:
         data_triple = get_dataset(50, 3)
         data_single = get_dataset(50, 1)
         results = channelstats(data_triple + data_single)
-        assert len(results.dict()) == len(to_distinct(ImageStat.ALL_PIXELSTATS)) + 1
+        assert len(results.dict()) == len(to_distinct(ImageStat.ALL_CHANNEL_STATS)) + 1
         assert len(results.mean) == 2
         assert results.mean[3].shape == (3, 50)
         assert results.mean[1].shape == (1, 50)
@@ -84,10 +88,6 @@ class TestChannelStats:
     def test_len_empty_stats(self):
         empty = StatsOutput(**populate_defaults({}, StatsOutput))
         assert len(empty) == 0
-
-    def test_len_image_stats(self):
-        img_stats = imagestats(get_dataset(100, 3), ImageStat.ENTROPY)
-        assert len(img_stats) == 100
 
     def test_len_channel_stats(self):
         ch_stats = channelstats(get_dataset(100, 3), ImageStat.ENTROPY)
