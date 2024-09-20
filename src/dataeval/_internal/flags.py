@@ -15,6 +15,7 @@ class ImageStat(IntFlag):
     # HASHES
     XXHASH = auto()
     PCHASH = auto()
+
     # PROPERTIES
     WIDTH = auto()
     HEIGHT = auto()
@@ -22,11 +23,15 @@ class ImageStat(IntFlag):
     ASPECT_RATIO = auto()
     CHANNELS = auto()
     DEPTH = auto()
+
     # VISUALS
     BRIGHTNESS = auto()
     BLURRINESS = auto()
+    CONTRAST = auto()
+    DARKNESS = auto()
     MISSING = auto()
-    ZERO = auto()
+    ZEROS = auto()
+
     # PIXEL STATS
     MEAN = auto()
     STD = auto()
@@ -36,11 +41,13 @@ class ImageStat(IntFlag):
     ENTROPY = auto()
     PERCENTILES = auto()
     HISTOGRAM = auto()
+
     # JOINT FLAGS
     ALL_HASHES = XXHASH | PCHASH
     ALL_PROPERTIES = WIDTH | HEIGHT | SIZE | ASPECT_RATIO | CHANNELS | DEPTH
-    ALL_VISUALS = BRIGHTNESS | BLURRINESS | MISSING | ZERO
+    ALL_VISUALS = BRIGHTNESS | BLURRINESS | CONTRAST | DARKNESS | MISSING | ZEROS
     ALL_PIXELSTATS = MEAN | STD | VAR | SKEW | KURTOSIS | ENTROPY | PERCENTILES | HISTOGRAM
+    ALL_CHANNEL_STATS = BRIGHTNESS | CONTRAST | DARKNESS | ZEROS | ALL_PIXELSTATS
     ALL_STATS = ALL_PROPERTIES | ALL_VISUALS | ALL_PIXELSTATS
     ALL = ALL_HASHES | ALL_STATS
 
