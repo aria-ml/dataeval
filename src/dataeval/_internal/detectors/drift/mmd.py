@@ -42,8 +42,8 @@ class DriftMMDOutput(DriftBaseOutput):
 
     # is_drift: bool
     # threshold: float
-    p_val: float
-    distance: float
+    # p_val: float
+    # distance: float
     distance_threshold: float
 
 
