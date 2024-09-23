@@ -1,25 +1,42 @@
 import numpy as np
 import pytest
 
-from dataeval._internal.detectors.outliers import Outliers, _get_outlier_mask
-from dataeval._internal.metrics.stats import imagestats
-from dataeval.flags import ImageStat
+from dataeval._internal.detectors.outliers import Outliers, StatsOutputs, _get_outlier_mask
+from dataeval._internal.metrics.stats import dimensionstats, pixelstats, visualstats
 
 
 class TestOutliers:
     def test_outliers(self):
         outliers = Outliers()
-        results = outliers.evaluate(np.random.random((1000, 3, 16, 16)))
+        results = outliers.evaluate(np.random.random((100, 3, 16, 16)))
+        assert outliers.stats.dimensionstats is not None
+        assert outliers.stats.pixelstats is not None
+        assert outliers.stats.visualstats is not None
         assert results is not None
 
-    def test_outliers_custom(self):
-        outliers = Outliers(ImageStat.ENTROPY)
-        results = outliers.evaluate(np.random.random((1000, 3, 16, 16)))
+    def test_outliers_with_dimension_only(self):
+        outliers = Outliers(use_dimension=True, use_pixel=False, use_visual=False)
+        results = outliers.evaluate(np.random.random((100, 3, 16, 16)))
+        assert outliers.stats.dimensionstats is not None
+        assert outliers.stats.pixelstats is None
+        assert outliers.stats.visualstats is None
         assert results is not None
 
-    def test_outliers_value_error(self):
-        with pytest.raises(ValueError):
-            Outliers(ImageStat.XXHASH)
+    def test_outliers_with_pixel_only(self):
+        outliers = Outliers(use_dimension=False, use_pixel=True, use_visual=False)
+        results = outliers.evaluate(np.random.random((100, 3, 16, 16)))
+        assert outliers.stats.dimensionstats is None
+        assert outliers.stats.pixelstats is not None
+        assert outliers.stats.visualstats is None
+        assert results is not None
+
+    def test_outliers_with_visual_only(self):
+        outliers = Outliers(use_dimension=False, use_pixel=False, use_visual=True)
+        results = outliers.evaluate(np.random.random((100, 3, 16, 16)))
+        assert outliers.stats.dimensionstats is None
+        assert outliers.stats.pixelstats is None
+        assert outliers.stats.visualstats is not None
+        assert results is not None
 
     @pytest.mark.parametrize("method", ["zscore", "modzscore", "iqr"])
     def test_get_outlier_mask(self, method):
@@ -31,51 +48,39 @@ class TestOutliers:
         with pytest.raises(ValueError):
             _get_outlier_mask(np.zeros([0]), "error", None)  # type: ignore
 
-    def test_get_outliers_with_extra_stats(self):
-        outliers = Outliers()
-        dataset = np.zeros((100, 3, 16, 16))
-        dataset[0] = 1
-        outliers.stats = imagestats(dataset, ImageStat.ALL_HASHES | ImageStat.MEAN)
-        assert len(outliers.stats.dict()) == 3
-        results = outliers._get_outliers()
-        assert len(results) == 1
-        assert len(results[0]) == 1
-        assert "mean" in results[0]
-
     def test_outliers_with_stats(self):
         data = np.random.random((20, 3, 16, 16))
-        stats = imagestats(data, ImageStat.MEAN)
-        outliers = Outliers(ImageStat.MEAN)
-        results = outliers.evaluate(stats)
+        stats = pixelstats(data)
+        outliers = Outliers()
+        results = outliers.from_stats(stats)
         assert results is not None
-
-    def test_outliers_with_stats_no_mean(self):
-        data = np.random.random((20, 3, 16, 16))
-        stats = imagestats(data, ImageStat.VAR)
-        outliers = Outliers(ImageStat.MEAN)
-        with pytest.warns():
-            outliers.evaluate(stats)
-
-    def test_outliers_with_stats_mean_plus(self):
-        data = np.random.random((20, 3, 16, 16))
-        stats = imagestats(data, ImageStat.MEAN | ImageStat.VAR)
-        outliers = Outliers(ImageStat.MEAN)
-        results = outliers.evaluate(stats)
-        assert results is not None
-
-    def test_outliers_with_stats_no_mean_plus(self):
-        data = np.random.random((20, 3, 16, 16))
-        stats = imagestats(data, ImageStat.MEAN)
-        outliers = Outliers(ImageStat.MEAN | ImageStat.VAR)
-        with pytest.warns():
-            outliers.evaluate(stats)
 
     def test_outliers_with_multiple_stats(self):
         dataset1 = np.zeros((50, 3, 16, 16))
         dataset2 = np.zeros((50, 3, 16, 16))
         dataset2[0] = 1
-        stats1 = imagestats(dataset1, ImageStat.MEAN)
-        stats2 = imagestats(dataset2, ImageStat.MEAN)
+        stats1 = pixelstats(dataset1)
+        stats2 = pixelstats(dataset2)
+        stats3 = dimensionstats(dataset1)
         outliers = Outliers()
-        results = outliers.evaluate((stats1, stats2))
+        results = outliers.from_stats((stats1, stats2, stats3))
         assert results is not None
+
+    def test_outliers_with_merged_stats(self):
+        dataset1 = np.zeros((50, 3, 16, 16))
+        dataset2 = np.zeros((50, 3, 16, 16))
+        dataset2[0] = 1
+        stats3 = visualstats(dataset1)
+        stats2 = pixelstats(dataset2)
+        stats1 = dimensionstats(dataset1)
+        outliers = Outliers()
+        stats = StatsOutputs(stats1, stats2, stats3)
+        results = outliers.from_stats(stats)
+        assert results is not None
+
+    def test_outliers_with_invalid_stats_type(self):
+        outliers = Outliers()
+        with pytest.raises(TypeError):
+            outliers.from_stats(1234)  # type: ignore
+        with pytest.raises(TypeError):
+            outliers.from_stats([1234])  # type: ignore

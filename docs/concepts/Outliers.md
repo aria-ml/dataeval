@@ -46,4 +46,3 @@ The Outliers class outputs a results dictionary with the keys being the images w
 The value for each image in the results dictionary is a dictionary with the metric and the image's value in the given metric as the key-value pair.
 
 For more information on the flags and metrics used, see the [list](DataCleaning.md#data-cleaning-metrics).
-If you are having trouble changing the flags/metrics, check out our how-to [How to customize the metrics for data cleaning](../how_to/linting_flags.md).

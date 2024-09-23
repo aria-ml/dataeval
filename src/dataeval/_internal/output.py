@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 from datetime import datetime, timezone
 from functools import wraps
+from typing import Any
 
 import numpy as np
 
@@ -17,10 +18,10 @@ class OutputMetadata:
     _state: dict[str, str]
     _version: str
 
-    def dict(self) -> dict:
+    def dict(self) -> dict[str, Any]:
         return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
 
-    def meta(self) -> dict:
+    def meta(self) -> dict[str, Any]:
         return {k.removeprefix("_"): v for k, v in self.__dict__.items() if k.startswith("_")}
 
 
@@ -67,19 +68,3 @@ def set_metadata(module_name: str = "", state_attr: list[str] | None = None):
         return wrapper
 
     return decorator
-
-
-def populate_defaults(d: dict, c: type) -> dict:
-    def default(t):
-        t = (
-            t if isinstance(t, str) else t._name if hasattr(t, "_name") else t.__name__
-        ).lower()  # py3.9 : _name, py3.10 : __name__
-        if t.startswith("dict"):
-            return {}
-        if t.startswith("list"):
-            return []
-        if t.startswith("ndarray"):
-            return np.array([])
-        raise TypeError("Unrecognized annotation type")
-
-    return {k: d[k] if k in d else default(t) for k, t in c.__annotations__.items()}

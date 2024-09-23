@@ -1,34 +1,56 @@
 # Image Statistics Functions
 
-## imagestats
-
-### What is the imagestats function
-
-The imagestats function is an aggregate metric that calculates various values for each individual image for the selected metrics.  
-
-The `imagestats` function assists with understanding the dataset.
+The image statistics functions assist with understanding the dataset.
 It can be used to get a big picture view of the dataset and it's underlying distribution.
 
-The stats delivered by the class is broken down into 3 main categories:
-* statistics covering image properties,
-* statistics covering the visual aspect of images,
-* and normal statistics about pixel values.
+## dimensionstats
 
-The available metrics are defined in the [ImageStat](../reference/flags/imagestat.md) flag class.
+### What is the dimensionstats function
+
+The dimensionstats function is an aggregate metric that calculates various dimension based statistics for each individual image:
+- width
+- height
+- channels
+- size
+- aspect_ratio
+- depth
 
 This function can be used in conjunction with the `Outliers` class to determine if there are any issues with any of the images in the dataset.
 
+## hashstats
+
+### What is the hashstats function
+
+The hashstats function is an aggregate metric that calculates various hash values for each individual image:
+- [xxhash](https://github.com/Cyan4973/xxHash) - exact image matching
+- [pchash](https://en.wikipedia.org/wiki/Perceptual_hashing) - perceptual hash based near image matching
+
 This function can be used in conjunction with the `Duplicates` class in order to identify duplicate images.
 
-## channelstats
+## pixelstats
 
-### What is the channelstats function
+### What is the pixelstats function
 
-The channelstats function is an aggregate metric that calculates various values for each individual image on a per channel basis for the selected metrics.
-Unlike the imagestats function, this function only works with the Pixel Statistics subset and a subset of the Visual Statistics subset 
-(Brightness, Contrast, Darkness, Zeros) of the [ImageStat](../reference/flags/imagestat.md) flag class.
+The pixelstats function is an aggregate metric that calculates normal statistics about pixel values for each individual image:
+- mean
+- std
+- var
+- skew
+- kurtosis
+- entropy
+- percentiles
+- histogram
 
-### When to use the channelstats function
+This function can be used in conjunction with the `Outliers` class to determine if there are any issues with any of the images in the dataset.
 
-This function is best used when you have multiple channels in a dataset and are looking for channelwise differences.
-The output from this function cannot currently be used with the Outliers class and must be used on its own.
+## visualstats
+
+### What is the visualstats function
+
+The visualstats function is an aggregate metric that calculates visual quality statistics for each individual image:
+- brightness
+- blurriness
+- contrast
+- darkness
+- missing (as a percentage of total pixels)
+- zeros (as a percentage of total pixels)

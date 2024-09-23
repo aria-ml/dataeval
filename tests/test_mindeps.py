@@ -5,7 +5,7 @@ from dataeval.detectors.drift import DriftCVM, DriftKS
 from dataeval.detectors.linters import Duplicates, Outliers
 from dataeval.metrics.bias import label_parity
 from dataeval.metrics.estimators import ber, divergence, uap
-from dataeval.metrics.stats import channelstats, imagestats
+from dataeval.metrics.stats import dimensionstats, hashstats, pixelstats, visualstats
 
 
 class TestMinimalDependencies:
@@ -35,8 +35,10 @@ class TestMinimalDependencies:
         divergence(self.images, self.images, "MST")
 
     def testStats(self):
-        imagestats(self.images)
-        channelstats(self.images)
+        dimensionstats(self.images)
+        hashstats(self.images)
+        pixelstats(self.images)
+        visualstats(self.images)
 
     def testBias(self):
         label_parity(self.labels, self.labels)

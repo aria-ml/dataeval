@@ -95,15 +95,19 @@ regardless of the sophistication of the analysis.
 DataEval is a data analysis and monitoring library with some dedicated functions and classes for data cleaning.
 
 DataEval's data cleaning functions and classes are:
-* [imagestats](Stats.md#imagestats) function,
-* [channelstats](Stats.md#channelstats) function,
+* [dimensionstats](Stats.md#dimensionstats) function,
+* [hashstats](Stats.md#hashstats) function,
+* [pixelstats](Stats.md#pixelstats) function,
+* [visualstats](Stats.md#visualstats) function,
 * [Clusterer](Clusterer.md) class,
 * [Duplicates](Duplicates.md) class, and
 * [Outliers](Outliers.md) class.
 
 These functions and classes facilitate the creation of dataset statistics and
 the identification of abnormal data points and duplicates. 
-The **imagestats** and **channelstats** functions create dataset statistics on a per image and a per image per channel basis, respectively.
+The **hashstats** function creates image hashes on a per image basis.
+The **dimensionstats** function creates dataset statistics on a per image basis.
+The **pixelstats** and **visualstats** functions create dataset statistics on a per image per channel basis.
 The **Clusterer** class clusters the data and identifies data points which do not fit into a cluster.
 The **Duplicates** class identifies duplicate images.
 The **Outliers** class analyzes the dataset statistics for outliers based on the chosen statistical method.
@@ -113,33 +117,34 @@ To see data cleaning in action using DataEval, check out our [Data Cleaning Guid
 (data-clean-metrics)=
 ### Data Cleaning Metrics
 
-Below is a list of all of the metrics available for analysis and the overarching flag category the metric belongs to.
-Each category has an _ALL_ method which selects all metrics in that category.
+Below is a list of all of the metrics available for analysis and the category the stats metric belongs to.
 
-* Image Hash (ALL_HASHES)
-    * XXHASH
-    * PCHASH
+* hashstats
+    * xxhash
+    * pchash
 
-* Image Properties (ALL_PROPERTIES)
-    * WIDTH
-    * HEIGHT
-    * SIZE
-    * ASPECT_RATIO
-    * CHANNELS
-    * DEPTH
+* dimensionstats
+    * width
+    * height
+    * size
+    * aspect_ratio
+    * channels
+    * depth
 
-* Image Visuals (ALL_VISUALS)
-    * BRIGHTNESS
-    * BLURRINESS
-    * MISSING
-    * ZERO
+* visualstats
+    * brightness
+    * darkness
+    * contrast
+    * blurriness
+    * missing
+    * zero
 
-* Pixel Statistics (ALL_PIXELSTATS)
-    * MEAN
-    * STD
-    * VAR
-    * SKEW
-    * KURTOSIS
-    * ENTROPY
-    * PERCENTILES
-    * HISTOGRAM
+* pixelstats
+    * mean
+    * std
+    * var
+    * skew
+    * kurtosis
+    * entropy
+    * percentiles
+    * histogram

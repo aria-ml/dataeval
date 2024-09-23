@@ -1,10 +1,9 @@
-(channelstats_ref)=
-# channelstats
+(visualstats_ref)=
+# visualstats
 
 ```{testsetup}
 import numpy as np
-from dataeval.flags import ImageStat
-from dataeval.metrics.stats import channelstats
+from dataeval.metrics.stats import visualstats
 
 images = np.repeat(np.arange(65536, dtype=np.int32), 4*30).reshape(30,-1,128,128)[:,:3,:,:]
 for i in range(30):
@@ -13,5 +12,5 @@ for i in range(30):
 ```
 
 ```{eval-rst}
-.. autofunction:: dataeval.metrics.stats.channelstats
+.. autofunction:: dataeval.metrics.stats.visualstats
 ```

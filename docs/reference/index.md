@@ -115,23 +115,6 @@ detectors/ood/oodscore
     detectors.ood.OODScore
 ```
 
-## Flags
-
-Flags are used by the [`imagestats`](metrics/stats/imagestats.md) and [`channelstats`](metrics/stats/channelstats.md) functions, as well as the [`Outliers`](detectors/linters/outliers.md) and [`Duplicates`](detectors/linters/duplicates.md) classes.
-
-:::{toctree}
-:hidden:
-:titlesonly:
-
-flags/imagestat
-:::
-
-```{eval-rst}
-.. autosummary::
-
-    flags.ImageStat
-```
-
 ## Metrics
 
 Metrics are a way to measure the performance of your models or datasets that can then be analyzed in the context of a given problem.
@@ -190,15 +173,19 @@ Statistics metrics calculate a variety of image properties and pixel statistics 
 :hidden:
 :titlesonly:
 
-metrics/stats/channelstats
-metrics/stats/imagestats
+metrics/stats/dimensionstats
+metrics/stats/hashstats
+metrics/stats/pixelstats
+metrics/stats/visualstats
 :::
 
 ```{eval-rst}
 .. autosummary::
 
-    metrics.stats.channelstats
-    metrics.stats.imagestats
+    metrics.stats.dimensionstats
+    metrics.stats.hashstats
+    metrics.stats.pixelstats
+    metrics.stats.visualstats
 ```
 
 ## Workflows
