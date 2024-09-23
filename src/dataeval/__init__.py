@@ -7,9 +7,9 @@ _IS_TENSORFLOW_AVAILABLE = find_spec("tensorflow") is not None and find_spec("te
 
 del find_spec
 
-from . import detectors, flags, metrics  # noqa: E402
+from . import detectors, metrics  # noqa: E402
 
-__all__ = ["detectors", "flags", "metrics"]
+__all__ = ["detectors", "metrics"]
 
 if _IS_TORCH_AVAILABLE:  # pragma: no cover
     from . import torch, utils, workflows

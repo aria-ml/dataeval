@@ -128,7 +128,6 @@ def setup(app):
             "dataeval.metrics.estimators",
             "dataeval.metrics.stats",
             "dataeval.workflows",
-            "dataeval.flags",
             "dataeval.tensorflow",
             "dataeval.torch",
         ]

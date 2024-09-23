@@ -2,9 +2,8 @@ from dataclasses import dataclass
 from typing import Iterable
 
 import numpy as np
-import pytest
 
-from dataeval._internal.output import OutputMetadata, populate_defaults, set_metadata
+from dataeval._internal.output import OutputMetadata, set_metadata
 
 
 @dataclass
@@ -80,10 +79,3 @@ class TestOutputMetadata:
             "z": b"bytes",
             "n": "MockMetric",
         }
-
-    def test_populate_defaults(self):
-        class MockDefault:
-            unsupported: set
-
-        with pytest.raises(TypeError):
-            populate_defaults({}, MockDefault)

@@ -2,8 +2,7 @@ import numpy as np
 import pytest
 
 from dataeval._internal.detectors.duplicates import Duplicates
-from dataeval._internal.flags import ImageStat
-from dataeval._internal.metrics.stats import imagestats
+from dataeval._internal.metrics.stats import hashstats
 
 
 def get_dataset(count: int, channels: int):
@@ -35,45 +34,11 @@ class TestDuplicates:
     def test_duplicates_with_stats(self):
         data = np.random.random((20, 3, 16, 16))
         data = np.concatenate((data, data, data + 0.001))
-        stats = imagestats(data, ImageStat.ALL_HASHES)
+        stats = hashstats(data)
         dupes = Duplicates(only_exact=True)
-        results = dupes.evaluate(stats)
+        results = dupes.from_stats(stats)
         assert len(results.exact) == 20
         assert len(results.near) == 0
-
-    def test_duplicates_with_stats_no_xxhash(self):
-        data = np.random.random((20, 3, 16, 16))
-        data = np.concatenate((data, data, data + 0.001))
-        stats = imagestats(data, ImageStat.PCHASH)
-        dupes = Duplicates()
-        with pytest.raises(ValueError):
-            dupes.evaluate(stats)
-
-    def test_duplicates_with_stats_no_pchash(self):
-        data = np.random.random((20, 3, 16, 16))
-        data = np.concatenate((data, data, data + 0.001))
-        stats = imagestats(data, ImageStat.XXHASH)
-        dupes = Duplicates()
-        with pytest.raises(ValueError):
-            dupes.evaluate(stats)
-
-    def test_duplicates_with_stats_no_pchash_only_exact(self):
-        data = np.random.random((20, 3, 16, 16))
-        data = np.concatenate((data, data, data + 0.001))
-        stats = imagestats(data, ImageStat.XXHASH)
-        dupes = Duplicates(only_exact=True)
-        results = dupes.evaluate(stats)
-        assert len(results.exact) == 20
-        assert len(results.near) == 0
-
-    def test_get_duplicates_no_xxhash(self):
-        data = np.random.random((20, 3, 16, 16))
-        data = np.concatenate((data, data, data + 0.001))
-        dupes = Duplicates()
-        dupes.stats = imagestats(data, ImageStat.PCHASH)
-        results = dupes._get_duplicates()
-        assert len(results["exact"]) == 0
-        assert len(results["near"]) > 0
 
     def test_get_duplicates_multiple_stats(self):
         ones = np.ones((1, 16, 16))
@@ -81,13 +46,20 @@ class TestDuplicates:
         data1 = np.concatenate((ones, zeros, ones, zeros, ones))
         data2 = np.concatenate((zeros, ones, zeros))
         data3 = np.concatenate((zeros + 0.001, ones - 0.001))
-        dupes1 = imagestats(data1, ImageStat.ALL_HASHES)
-        dupes2 = imagestats(data2, ImageStat.ALL_HASHES)
-        dupes3 = imagestats(data3, ImageStat.ALL_HASHES)
+        dupes1 = hashstats(data1)
+        dupes2 = hashstats(data2)
+        dupes3 = hashstats(data3)
 
         dupes = Duplicates()
-        results = dupes.evaluate((dupes1, dupes2, dupes3))
+        results = dupes.from_stats((dupes1, dupes2, dupes3))
         assert len(results.exact) == 2
         assert results.exact[0] == {0: [0, 2, 4], 1: [1]}
         assert len(results.near) == 2
         assert results.near[0] == {0: [0, 2, 4], 1: [1], 2: [1]}
+
+    def test_duplicates_invalid_stats(self):
+        dupes = Duplicates()
+        with pytest.raises(TypeError):
+            dupes.from_stats(1234)  # type: ignore
+        with pytest.raises(TypeError):
+            dupes.from_stats([1234])  # type: ignore

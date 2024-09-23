@@ -350,6 +350,19 @@ def normalize_image_shape(image: NDArray) -> NDArray:
         raise ValueError("Images must have 2 or more dimensions.")
 
 
+def normalize_box_shape(bounding_box: NDArray) -> NDArray:
+    """
+    Normalizes the bounding box shape into (N,4).
+    """
+    ndim = bounding_box.ndim
+    if ndim == 1:
+        return np.expand_dims(bounding_box, axis=0)
+    elif ndim > 2:
+        raise ValueError("Bounding boxes must have 2 dimensions: (# of boxes in an image, [X,Y,W,H]) -> (N,4)")
+    else:
+        return bounding_box
+
+
 def edge_filter(image: NDArray, offset: float = 0.5) -> NDArray:
     """
     Returns the image filtered using a 3x3 edge detection kernel:

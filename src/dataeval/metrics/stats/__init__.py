@@ -1,6 +1,8 @@
-from dataeval._internal.metrics.stats import channelstats, imagestats
+from dataeval._internal.metrics.stats import dimensionstats, hashstats, pixelstats, visualstats
 
 __all__ = [
-    "channelstats",
-    "imagestats",
+    "dimensionstats",
+    "hashstats",
+    "pixelstats",
+    "visualstats",
 ]
