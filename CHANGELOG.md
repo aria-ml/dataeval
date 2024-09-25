@@ -1,6 +1,18 @@
-[//]: # (d9068a2c2ccbc7f12852a9ef4bd517e2ee35716e)
+[//]: # (f7d5bac3847fc42b0505baa17a2862da1df6d121)
 
 # DataEval Change Log
+
+## v0.69.2
+
+📝 **Miscellaneous**
+- `f7d5bac3` - Adds stats for bounding boxes
+- `18be58a3` - Adding label stats
+- `809d1d7a` - Always produce p-val and distance metrics for drift
+- `5cd7c205` - Improving imagestats and channelstats functions
+- `b379d44c` - Add dataset splitting features
+- `80b68a73` - Use regex to replace markdown links
+- `1d99455a` - Tag LKG at the correct commit SHA
+- `ad0e368b` - Always run tasks
 
 ## v0.69.1
 
