@@ -14,7 +14,7 @@ The stats delivered by the class is broken down into 3 main categories:
 * statistics covering the visual aspect of images,
 * and normal statistics about pixel values.
 
-The available metrics are defined in the [ImageStat](../reference/flags/imagestat.md) flag class.
+The available metrics are defined in the [ImageStat](../reference/flags/dataeval.flags.ImageStat.rst) flag class.
 
 This function can be used in conjunction with the `Outliers` class to determine if there are any issues with any of the images in the dataset.
 
@@ -26,7 +26,7 @@ This function can be used in conjunction with the `Duplicates` class in order to
 
 The channelstats function is an aggregate metric that calculates various values for each individual image on a per channel basis for the selected metrics.
 Unlike the imagestats function, this function only works with the Pixel Statistics subset and a subset of the Visual Statistics subset 
-(Brightness, Contrast, Darkness, Zeros) of the [ImageStat](../reference/flags/imagestat.md) flag class.
+(Brightness, Contrast, Darkness, Zeros) of the [ImageStat](../reference/flags/dataeval.flags.ImageStat.rst) flag class.
 
 ### When to use the channelstats function
 

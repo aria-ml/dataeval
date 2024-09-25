@@ -1,8 +1,5 @@
 # API Reference
 
-```{currentmodule} dataeval
-```
-
 ## Detectors
 
 Detectors can determine if a dataset or individual images in a dataset are indicative of a specific issue.
@@ -11,125 +8,77 @@ Detectors can determine if a dataset or individual images in a dataset are indic
 
 [Drift](../concepts/glossary.md#drift) detectors identify if the statistical properties of the data has changed.
 
-:::{toctree}
-:hidden:
-:titlesonly:
-:maxdepth: 4
-
-detectors/drift/drift_cvm
-detectors/drift/drift_ks
-detectors/drift/drift_mmd
-detectors/drift/drift_uncertainty
-:::
-
 ```{eval-rst}
 .. autosummary::
+   :toctree: drift
 
-    detectors.drift.DriftCVM
-    detectors.drift.DriftKS
-    detectors.drift.DriftUncertainty
-    detectors.drift.DriftMMD
+   dataeval.detectors.drift.DriftCVM
+   dataeval.detectors.drift.DriftKS
+   dataeval.detectors.drift.DriftUncertainty
+   dataeval.detectors.drift.DriftMMD
 ```
 
 #### _Kernels_
 
 Kernels are used to map non-linear data to a higher dimensional space.
 
-:::{toctree}
-:hidden:
-:titlesonly:
-
-detectors/drift/kernels/guassianrbf
-:::
-
 ```{eval-rst}
 .. autosummary::
+   :toctree: drift
 
-    detectors.drift.kernels.GaussianRBF
+   dataeval.detectors.drift.kernels.GaussianRBF
 ```
 
 #### _Updates_
 
 Update strategies inform how the drift detector classes update the reference data when monitoring for drift.
 
-:::{toctree}
-:hidden:
-:titlesonly:
-
-detectors/drift/updates/lastseenupdate
-detectors/drift/updates/reservoirsamplingupdate
-:::
-
 ```{eval-rst}
 .. autosummary::
+   :toctree: drift
 
-    detectors.drift.updates.LastSeenUpdate
-    detectors.drift.updates.ReservoirSamplingUpdate
+   dataeval.detectors.drift.updates.LastSeenUpdate
+   dataeval.detectors.drift.updates.ReservoirSamplingUpdate
 ```
 
 ### Linters
 
 [Linters](../concepts/glossary.md#linter) help identify potential issues in training and test data and are an important aspect of [data cleaning](../concepts/DataCleaning.md).
 
-:::{toctree}
-:hidden:
-:titlesonly:
-
-detectors/linters/clusterer
-detectors/linters/duplicates
-detectors/linters/outliers
-:::
-
 ```{eval-rst}
 .. autosummary::
+   :toctree: linters
 
-    detectors.linters.Clusterer
-    detectors.linters.Duplicates
-    detectors.linters.Outliers
+   dataeval.detectors.linters.Clusterer
+   dataeval.detectors.linters.Duplicates
+   dataeval.detectors.linters.Outliers
 ```
 
 ### Out-of-Distribution
 
 [Out-of-distribution](../concepts/glossary.md#out-of-distribution-ood) detectors identify data that is different from the data used to train a particular model.
 
-:::{toctree}
-:hidden:
-:titlesonly:
-
-detectors/ood/ood_ae
-detectors/ood/ood_aegmm
-detectors/ood/ood_llr
-detectors/ood/ood_vae
-detectors/ood/ood_vaegmm
-detectors/ood/oodscore
-:::
-
 ```{eval-rst}
 .. autosummary::
+   :toctree: ood
 
-    detectors.ood.OOD_AE
-    detectors.ood.OOD_AEGMM
-    detectors.ood.OOD_LLR
-    detectors.ood.OOD_VAE
-    detectors.ood.OOD_VAEGMM
-    detectors.ood.OODScore
+   dataeval.detectors.ood.OOD_AE
+   dataeval.detectors.ood.OOD_AEGMM
+   dataeval.detectors.ood.OOD_LLR
+   dataeval.detectors.ood.OOD_VAE
+   dataeval.detectors.ood.OOD_VAEGMM
+   dataeval.detectors.ood.OODScore
 ```
 
 ## Flags
 
-Flags are used by the [`imagestats`](metrics/stats/imagestats.md) and [`channelstats`](metrics/stats/channelstats.md) functions, as well as the [`Outliers`](detectors/linters/outliers.md) and [`Duplicates`](detectors/linters/duplicates.md) classes.
-
-:::{toctree}
-:hidden:
-:titlesonly:
-
-flags/imagestat
-:::
+Flags are used by the [`imagestats`](metrics/dataeval.metrics.stats.imagestats.rst) and [`channelstats`](metrics/dataeval.metrics.stats.channelstats.rst) functions, as well as the [`Outliers`](linters/dataeval.detectors.linters.Outliers.rst) and [`Duplicates`](linters/dataeval.detectors.linters.Duplicates.rst) classes.
 
 ```{eval-rst}
 .. autosummary::
+   :toctree: flags
 
-    flags.ImageStat
+   dataeval.flags.ImageStat
 ```
 
 ## Metrics
@@ -140,82 +89,51 @@ Metrics are a way to measure the performance of your models or datasets that can
 
 [Bias](../concepts/glossary.md#bias) metrics check for skewed or imbalanced datasets and incomplete feature representation which may impact model performance.
 
-:::{toctree}
-:hidden:
-:titlesonly:
-
-metrics/bias/balance
-metrics/bias/coverage
-metrics/bias/diversity
-metrics/bias/label_parity
-metrics/bias/parity
-:::
-
 ```{eval-rst}
 .. autosummary::
+   :toctree: bias
 
-    metrics.bias.balance
-    metrics.bias.coverage
-    metrics.bias.diversity
-    metrics.bias.label_parity
-    metrics.bias.parity
+   dataeval.metrics.bias.balance
+   dataeval.metrics.bias.coverage
+   dataeval.metrics.bias.diversity
+   dataeval.metrics.bias.label_parity
+   dataeval.metrics.bias.parity
 ```
 
 ### Estimators
 
 Estimators calculate performance bounds and the statistical distance between datasets.
 
-:::{toctree}
-:hidden:
-:titlesonly:
-
-metrics/estimators/ber
-metrics/estimators/divergence
-metrics/estimators/uap
-:::
-
 ```{eval-rst}
 .. autosummary::
+   :toctree: metrics
 
-    metrics.estimators.ber
-    metrics.estimators.divergence
-    metrics.estimators.uap
+   dataeval.metrics.estimators.ber
+   dataeval.metrics.estimators.divergence
+   dataeval.metrics.estimators.uap
 ```
 
 ### Statistics
 
 Statistics metrics calculate a variety of image properties and pixel statistics against the image and individual channels of an image.
 
-:::{toctree}
-:hidden:
-:titlesonly:
-
-metrics/stats/channelstats
-metrics/stats/imagestats
-:::
-
 ```{eval-rst}
 .. autosummary::
+   :toctree: metrics
 
-    metrics.stats.channelstats
-    metrics.stats.imagestats
+   dataeval.metrics.stats.channelstats
+   dataeval.metrics.stats.imagestats
 ```
 
 ## Workflows
 
 Workflows perform a sequence of actions to analyze the dataset and make predictions.
 
-:::{toctree}
-:hidden:
-:titlesonly:
-
-workflows/sufficiency
-:::
-
 ```{eval-rst}
 .. autosummary::
+   :toctree: workflows
 
-    workflows.Sufficiency
+   dataeval.workflows.Sufficiency
 ```
 
 ## Supported Backends
@@ -238,10 +156,11 @@ to create a seamless integration between custom models and DataEval's metrics.
 
 ```{eval-rst}
 .. autosummary::
+   :toctree: torch
 
-    torch.models.AriaAutoencoder
-    torch.models.Decoder
-    torch.models.Encoder
+   dataeval.torch.models.AriaAutoencoder
+   dataeval.torch.models.Decoder
+   dataeval.torch.models.Encoder
 ```
 
 :::
@@ -250,8 +169,9 @@ to create a seamless integration between custom models and DataEval's metrics.
 
 ```{eval-rst}
 .. autosummary::
+   :toctree: torch
 
-    torch.trainer.AETrainer
+   dataeval.torch.trainer.AETrainer
 ```
 
 :::
@@ -269,13 +189,14 @@ used by the model.
 
 ```{eval-rst}
 .. autosummary::
+   :toctree: tensorflow
 
-    tensorflow.models.AE
-    tensorflow.models.AEGMM
-    tensorflow.models.PixelCNN
-    tensorflow.models.VAE
-    tensorflow.models.VAEGMM
-    tensorflow.models.create_model
+   dataeval.tensorflow.models.AE
+   dataeval.tensorflow.models.AEGMM
+   dataeval.tensorflow.models.PixelCNN
+   dataeval.tensorflow.models.VAE
+   dataeval.tensorflow.models.VAEGMM
+   dataeval.tensorflow.models.create_model
 ```
 
 :::
@@ -284,8 +205,9 @@ used by the model.
 
 ```{eval-rst}
 .. autosummary::
+   :toctree: tensorflow
 
-    tensorflow.recon.eucl_cosim_features
+   dataeval.tensorflow.recon.eucl_cosim_features
 ```
 
 :::
@@ -294,9 +216,10 @@ used by the model.
 
 ```{eval-rst}
 .. autosummary::
-
-    tensorflow.loss.Elbo
-    tensorflow.loss.LossGMM
+   :toctree: tensorflow
+   
+   dataeval.tensorflow.loss.Elbo
+   dataeval.tensorflow.loss.LossGMM
 ```
 
 :::{toctree}
