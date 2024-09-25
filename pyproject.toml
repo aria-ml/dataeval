@@ -80,7 +80,7 @@ pytest-xdist = {version = "*"}
 coverage = {version = "*", extras = ["toml"]}
 torchmetrics = {version = ">=1.0.0", source = "pytorch"}
 # type
-pyright = {version = "*, !=1.1.340"}
+pyright = {version = "*", extras = ["nodejs"]}
 # prototype
 maite = {version = "*"}
 pandas = {version = "*"}

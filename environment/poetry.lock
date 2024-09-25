@@ -2439,9 +2439,9 @@ files = [
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.23.3", markers = "python_version >= \"3.11\""},
     {version = ">=1.21.2", markers = "python_version >= \"3.10\" and python_version < \"3.11\""},
     {version = ">1.20", markers = "python_version < \"3.10\""},
+    {version = ">=1.23.3", markers = "python_version >= \"3.11\""},
 ]
 
 [package.extras]
@@ -2871,8 +2871,8 @@ files = [
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.23.2", markers = "python_version == \"3.11\""},
     {version = ">=1.22.4", markers = "python_version < \"3.11\""},
+    {version = ">=1.23.2", markers = "python_version == \"3.11\""},
 ]
 python-dateutil = ">=2.8.2"
 pytz = ">=2020.1"
@@ -5766,4 +5766,4 @@ torch = ["matplotlib", "nvidia-cudnn-cu11", "torch"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.12"
-content-hash = "9167149e6cb71543579d8efbdf2fb788aff0cff5ed95ac2923cd2710bd680ac2"
+content-hash = "d0eb30feaea71a245bcfe58176ba8d6c1a39795dce3f0541b44f65f7b73093dc"
