@@ -158,8 +158,8 @@ class TestSufficiencyFunctional:
     def test_classification(self, mnist) -> None:
         model = Net()
         length = 1000
-        train_ds = DataEvalDataset(*mnist(length, "train", np.float32, "channels_first"))
-        test_ds = DataEvalDataset(*mnist(100, "test", np.float32, "channels_first"))
+        train_ds = DataEvalDataset(*mnist(train="train", size=length, dtype=np.float32, channels="channels_first"))
+        test_ds = DataEvalDataset(*mnist(train="test", size=100, dtype=np.float32, channels="channels_first"))
         m_count = 1
         steps = 3
 
@@ -204,8 +204,12 @@ class TestSufficiencyInverseProjectFunc:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         torch._dynamo.config.suppress_errors = True  # type: ignore
 
-        train_ds = DataEvalDataset(*mnist(1000, "train", np.float32, "channels_first", True))
-        test_ds = DataEvalDataset(*mnist(200, "test", np.float32, "channels_first", True))
+        train_ds = DataEvalDataset(
+            *mnist(train="train", size=1000, unit_normalize=True, dtype=np.float32, channels="channels_first")
+        )
+        test_ds = DataEvalDataset(
+            *mnist(train="test", size=200, unit_normalize=True, dtype=np.float32, channels="channels_first")
+        )
         model = cast(Net, torch.compile(Net().to(device)))
 
         # Instantiate sufficiency metric
