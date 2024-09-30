@@ -348,6 +348,7 @@ def parity(
     chi_scores = np.zeros(len(factors))
     p_values = np.zeros(len(factors))
     n_cls = len(np.unique(labels))
+    not_enough_data = {}
     for i, (current_factor_name, factor_values) in enumerate(factors.items()):
         unique_factor_values = np.unique(factor_values)
         contingency_matrix = np.zeros((len(unique_factor_values), n_cls))
@@ -361,13 +362,12 @@ def parity(
                 with_both = np.bitwise_and((labels == label), factor_values == factor_value)
                 contingency_matrix[fi, label] = np.sum(with_both)
                 if 0 < contingency_matrix[fi, label] < 5:
-                    warnings.warn(
-                        f"Factor {current_factor_name} value {factor_value} co-occurs "
-                        f"only {contingency_matrix[fi, label]} times with label {label}. "
-                        "This can cause inaccurate chi_square calculation. Recommend"
-                        "ensuring each label occurs either 0 times or at least 5 times. "
-                        "Alternatively, digitize any continuous-valued factors "
-                        "into fewer bins."
+                    if current_factor_name not in not_enough_data:
+                        not_enough_data[current_factor_name] = {}
+                    if factor_value not in not_enough_data[current_factor_name]:
+                        not_enough_data[current_factor_name][factor_value] = []
+                    not_enough_data[current_factor_name][factor_value].append(
+                        (label, int(contingency_matrix[fi, label]))
                     )
 
         # This deletes rows containing only zeros,
@@ -380,5 +380,24 @@ def parity(
 
         chi_scores[i] = chi2
         p_values[i] = p
+
+    if not_enough_data:
+        factor_msg = []
+        for factor, fact_dict in not_enough_data.items():
+            stacked_msg = []
+            for key, value in fact_dict.items():
+                msg = []
+                for item in value:
+                    msg.append(f"label {item[0]}: {item[1]} occurrences")
+                flat_msg = "\n\t\t".join(msg)
+                stacked_msg.append(f"value {key} - {flat_msg}\n\t")
+            factor_msg.append(factor + " - " + "".join(stacked_msg))
+
+        message = "\n".join(factor_msg)
+
+        warnings.warn(
+            f"The following factors did not meet the recommended 5 occurrences for each value-label combination. \nRecommend rerunning parity after adjusting the following factor-value-label combinations: \n{message}",  # noqa: E501
+            UserWarning,
+        )
 
     return ParityOutput(chi_scores, p_values)
