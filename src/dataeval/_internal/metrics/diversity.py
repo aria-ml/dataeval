@@ -130,7 +130,10 @@ def diversity_simpson(
         p_i = cnts / cnts.sum()
         # inverse Simpson index normalized by (number of bins)
         s_0 = 1 / np.sum(p_i**2) / num_bins[col]
-        ev_index[col] = (s_0 * num_bins[col] - 1) / (num_bins[col] - 1)
+        if num_bins[col] == 1:
+            ev_index[col] = 0
+        else:
+            ev_index[col] = (s_0 * num_bins[col] - 1) / (num_bins[col] - 1)
     return ev_index
 
 
