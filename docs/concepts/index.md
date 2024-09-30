@@ -7,7 +7,7 @@ These explanations dive into the what, why and theory behind each of DataEval's 
 - [Cluster Assignment](Clusterer.md)
 - [Detecting Bias in Datasets](Bias.md)
 - [Cleaning Datasets](DataCleaning.md)
-- [Evaluating Metadata Parity](MetadataParity.md)
+- [Evaluating Parity](Parity.md)
 - [Dataset Divergence](Divergence.md)
 - [Detecting Drift in Datasets](Drift.md)
 - [Detecting Duplicates](Duplicates.md)
@@ -29,7 +29,7 @@ BER.md
 Bias.md
 Clusterer.md
 DataCleaning.md
-MetadataParity.md
+Parity.md
 Divergence.md
 Drift.md
 Duplicates.md
