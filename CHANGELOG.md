@@ -1,6 +1,12 @@
-[//]: # (f7d5bac3847fc42b0505baa17a2862da1df6d121)
+[//]: # (6745e39daea127ba1bd600dd991f128c14a45e5c)
 
 # DataEval Change Log
+
+## v0.69.3
+
+📝 **Miscellaneous**
+- `6745e39d` - Document: Class Label Statistical Independence and Coverage Documentation
+- `1f7689ac` - Adding bias tutorial (parity-balance-diversity)
 
 ## v0.69.2
 
