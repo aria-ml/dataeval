@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from dataeval._internal.detectors.duplicates import Duplicates
-from dataeval._internal.metrics.stats import hashstats
+from dataeval._internal.metrics.stats.hashstats import hashstats
 
 
 def get_dataset(count: int, channels: int):
