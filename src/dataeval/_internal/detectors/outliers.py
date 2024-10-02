@@ -7,43 +7,16 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from dataeval._internal.detectors.merged_stats import combine_stats, get_dataset_step_from_idx
-from dataeval._internal.metrics.stats.base import INDEX_MAP
-from dataeval._internal.metrics.stats.dimensionstats import DimensionStatsOutput, dimensionstats
-from dataeval._internal.metrics.stats.pixelstats import PixelStatsOutput, pixelstats
-from dataeval._internal.metrics.stats.visualstats import VisualStatsOutput, visualstats
+from dataeval._internal.metrics.stats.base import BOX_COUNT, SOURCE_INDEX
+from dataeval._internal.metrics.stats.datasetstats import DatasetStatsOutput, datasetstats
+from dataeval._internal.metrics.stats.dimensionstats import DimensionStatsOutput
+from dataeval._internal.metrics.stats.pixelstats import PixelStatsOutput
+from dataeval._internal.metrics.stats.visualstats import VisualStatsOutput
 from dataeval._internal.output import OutputMetadata, set_metadata
 
 IndexIssueMap = dict[int, dict[str, float]]
 OutlierStatsOutput = Union[DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput]
 TIndexIssueMap = TypeVar("TIndexIssueMap", IndexIssueMap, list[IndexIssueMap])
-
-
-@dataclass
-class OutlierStatsOutputs:
-    """
-    This class represents the outputs of various stats functions against a single
-    dataset, such that each index across all stat outputs are representative of
-    the same source image.  Modifying or mixing outputs will result in inaccurate
-    outlier calculations if not created correctly.
-
-    Attributes
-    ----------
-    dimensionstats : DimensionStatsOutput or None
-    pixelstats: PixelStatsOutput or None
-    visualstats: VisualStatsOutput or None
-    """
-
-    dimensionstats: DimensionStatsOutput | None
-    pixelstats: PixelStatsOutput | None
-    visualstats: VisualStatsOutput | None
-
-    def outputs(self) -> list[OutlierStatsOutput]:
-        return [s for s in (self.dimensionstats, self.pixelstats, self.visualstats) if s is not None]
-
-    def __post_init__(self):
-        lengths = [len(s) for s in self.outputs()]
-        if not all(length == lengths[0] for length in lengths):
-            raise ValueError("All StatsOutput classes must contain the same number of image sources.")
 
 
 @dataclass(frozen=True)
@@ -72,12 +45,11 @@ class OutliersOutput(Generic[TIndexIssueMap], OutputMetadata):
 def _get_outlier_mask(
     values: NDArray, method: Literal["zscore", "modzscore", "iqr"], threshold: float | None
 ) -> NDArray:
-    values = values.astype(np.float64)
     if method == "zscore":
         threshold = threshold if threshold else 3.0
         std = np.std(values)
         abs_diff = np.abs(values - np.mean(values))
-        return (abs_diff / std) > threshold
+        return std != 0 and (abs_diff / std) > threshold
     elif method == "modzscore":
         threshold = threshold if threshold else 3.5
         abs_diff = np.abs(values - np.median(values))
@@ -146,7 +118,7 @@ class Outliers:
 
     Specifying an outlier method and threshold:
 
-    >>> outliers = Outliers(outlier_method="zscore", outlier_threshold=2.75)
+    >>> outliers = Outliers(outlier_method="zscore", outlier_threshold=3.5)
     """
 
     def __init__(
@@ -157,7 +129,7 @@ class Outliers:
         outlier_method: Literal["zscore", "modzscore", "iqr"] = "modzscore",
         outlier_threshold: float | None = None,
     ):
-        self.stats: OutlierStatsOutputs
+        self.stats: DatasetStatsOutput
         self.use_dimension = use_dimension
         self.use_pixel = use_pixel
         self.use_visual = use_visual
@@ -167,33 +139,34 @@ class Outliers:
     def _get_outliers(self, stats: dict) -> dict[int, dict[str, float]]:
         flagged_images: dict[int, dict[str, float]] = {}
         for stat, values in stats.items():
-            if stat == INDEX_MAP:
+            if stat in (SOURCE_INDEX, BOX_COUNT):
                 continue
-            if values.ndim == 1 and np.std(values) != 0:
-                mask = _get_outlier_mask(values, self.outlier_method, self.outlier_threshold)
+            if values.ndim == 1:
+                mask = _get_outlier_mask(values.astype(np.float64), self.outlier_method, self.outlier_threshold)
                 indices = np.flatnonzero(mask)
                 for i, value in zip(indices, values[mask]):
-                    flagged_images.setdefault(i, {}).update({stat: np.round(value, 2)})
+                    flagged_images.setdefault(i, {}).update({stat: value})
 
         return dict(sorted(flagged_images.items()))
 
     @overload
-    def from_stats(self, stats: OutlierStatsOutputs | OutlierStatsOutput) -> OutliersOutput[IndexIssueMap]: ...
+    def from_stats(self, stats: OutlierStatsOutput | DatasetStatsOutput) -> OutliersOutput[IndexIssueMap]: ...
 
     @overload
     def from_stats(self, stats: Sequence[OutlierStatsOutput]) -> OutliersOutput[list[IndexIssueMap]]: ...
 
     @set_metadata("dataeval.detectors", ["outlier_method", "outlier_threshold"])
     def from_stats(
-        self, stats: OutlierStatsOutputs | OutlierStatsOutput | Sequence[OutlierStatsOutput]
+        self, stats: OutlierStatsOutput | DatasetStatsOutput | Sequence[OutlierStatsOutput]
     ) -> OutliersOutput:
         """
         Returns indices of outliers with the issues identified for each
 
         Parameters
         ----------
-        stats : StatsOutputs | OutlierStatsOutput | Sequence[OutlierStatsOutput]
-            The output(s) from an dimensionstats, pixelstats, or visualstats metric analysis
+        stats : OutlierStatsOutput | DatasetStatsOutput | Sequence[OutlierStatsOutput]
+            The output(s) from a dimensionstats, pixelstats, or visualstats metric
+            analysis or an aggregate DatasetStatsOutput
 
         Returns
         -------
@@ -211,10 +184,15 @@ class Outliers:
         -------
         Evaluate the dataset:
 
-        >>> outliers.from_stats([stats1, stats2])
-        OutliersOutput(issues=[{10: {'std': 0.0, 'entropy': 0.21}, 12: {'std': 0.01, 'entropy': 0.21}}, {}])
-        """
-        if isinstance(stats, OutlierStatsOutputs):
+        >>> results = outliers.from_stats([stats1, stats2])
+        >>> len(results)
+        2
+        >>> results.issues[0]
+        {10: {'skew': -3.906, 'kurtosis': 13.266, 'entropy': 0.2128}, 12: {'std': 0.00536, 'var': 2.87e-05, 'skew': -3.906, 'kurtosis': 13.266, 'entropy': 0.2128}}
+        >>> results.issues[1]
+        {}
+        """  # noqa: E501
+        if isinstance(stats, DatasetStatsOutput):
             outliers = self._get_outliers({k: v for o in stats.outputs() for k, v in o.dict().items()})
             return OutliersOutput(outliers)
 
@@ -228,7 +206,9 @@ class Outliers:
 
         stats_map: dict[type, list[int]] = {}
         for i, stats_output in enumerate(stats):
-            if not isinstance(stats_output, (DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput)):
+            if not isinstance(
+                stats_output, (DatasetStatsOutput, DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput)
+            ):
                 raise TypeError(
                     "Invalid stats output type; only use output from dimensionstats, pixelstats or visualstats."
                 )
@@ -273,13 +253,12 @@ class Outliers:
         -------
         Evaluate the dataset:
 
-        >>> outliers.evaluate(images)
-        OutliersOutput(issues={10: {'std': 0.0, 'entropy': 0.21, 'blurriness': 1.26, 'contrast': 1.25, 'zeros': 0.05}, 12: {'std': 0.01, 'entropy': 0.21, 'blurriness': 1.51, 'contrast': 1.25, 'zeros': 0.05}})
-        """  # noqa: E501
-        self.stats = OutlierStatsOutputs(
-            dimensionstats(data) if self.use_dimension else None,
-            pixelstats(data) if self.use_pixel else None,
-            visualstats(data) if self.use_visual else None,
-        )
+        >>> results = outliers.evaluate(images)
+        >>> list(results.issues)
+        [10, 12]
+        >>> results.issues[10]
+        {'skew': -3.906, 'kurtosis': 13.266, 'entropy': 0.2128, 'contrast': 1.25, 'zeros': 0.05493}
+        """
+        self.stats = datasetstats(data, None, self.use_dimension, self.use_pixel, self.use_visual)
         outliers = self._get_outliers({k: v for o in self.stats.outputs() for k, v in o.dict().items()})
         return OutliersOutput(outliers)

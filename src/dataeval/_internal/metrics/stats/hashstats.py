@@ -5,13 +5,13 @@ from typing import Iterable
 
 from numpy.typing import ArrayLike
 
-from dataeval._internal.metrics.stats.base import BaseStatsOutput, StatsFunctionMap, run_stats
+from dataeval._internal.metrics.stats.base import BaseStatsOutput, StatsProcessor, run_stats
 from dataeval._internal.metrics.utils import pchash, xxhash
 from dataeval._internal.output import set_metadata
 
 
-class HashStatsFunctionMap(StatsFunctionMap):
-    image = {
+class HashStatsProcessor(StatsProcessor):
+    image_function_map = {
         "xxhash": lambda x: xxhash(x.image),
         "pchash": lambda x: pchash(x.image),
     }
@@ -33,7 +33,10 @@ class HashStatsOutput(BaseStatsOutput):
 
 
 @set_metadata("dataeval.metrics")
-def hashstats(images: Iterable[ArrayLike]) -> HashStatsOutput:
+def hashstats(
+    images: Iterable[ArrayLike],
+    bboxes: Iterable[ArrayLike] | None = None,
+) -> HashStatsOutput:
     """
     Calculates hashes for each image
 
@@ -43,7 +46,9 @@ def hashstats(images: Iterable[ArrayLike]) -> HashStatsOutput:
     Parameters
     ----------
     images : ArrayLike
-        Images to run statistical tests on
+        Images to hashing
+    bboxes : Iterable[ArrayLike] or None
+        Bounding boxes in `xyxy` format for each image
 
     Returns
     -------
@@ -64,5 +69,5 @@ def hashstats(images: Iterable[ArrayLike]) -> HashStatsOutput:
     >>> print(results.pchash)
     ['8f25506af46a7c6a', '8000808000008080', '8e71f18e0ef18e0e', 'a956d6a956d6a928']
     """
-    output = run_stats(images, None, False, HashStatsFunctionMap(), HashStatsOutput)
+    output = run_stats(images, bboxes, False, HashStatsProcessor, HashStatsOutput)
     return HashStatsOutput(**output)

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import re
+import warnings
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, NamedTuple
+from typing import Any, Callable, Iterable, NamedTuple, Optional, Union
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -12,12 +13,16 @@ from dataeval._internal.metrics.utils import normalize_box_shape, normalize_imag
 from dataeval._internal.output import OutputMetadata
 
 DTYPE_REGEX = re.compile(r"NDArray\[np\.(.*?)\]")
-INDEX_MAP = "index_map"
+SOURCE_INDEX = "source_index"
+BOX_COUNT = "box_count"
+
+OptionalRange = Optional[Union[int, Iterable[int]]]
 
 
-class StatsFunctionMap:
-    image: dict[str, Callable[[ImageProcessingCache], Any]] = {}
-    channel: dict[str, Callable[[ImageProcessingCache], Any]] = {}
+def matches(index: int | None, opt_range: OptionalRange) -> bool:
+    if index is None or opt_range is None:
+        return True
+    return index in opt_range if isinstance(opt_range, Iterable) else index == opt_range
 
 
 class SourceIndex(NamedTuple):
@@ -42,77 +47,86 @@ class BaseStatsOutput(OutputMetadata):
     """
     Attributes
     ----------
-    index_map : List[SourceIndex]
+    source_index : List[SourceIndex]
         Mapping from statistic to source image, box and channel index
+    box_count : NDArray[np.uint16]
     """
 
-    index_map: list[SourceIndex]
+    source_index: list[SourceIndex]
+    box_count: NDArray[np.uint16]
 
-    def get_channel_mask(self, channel_index: int | None, channel_count: int | None = None) -> list[bool]:
+    def get_channel_mask(
+        self,
+        channel_index: OptionalRange,
+        channel_count: OptionalRange = None,
+    ) -> list[bool]:
         """
         Boolean mask for results filtered to specified channel index and optionally the count
         of the channels per image.
 
         Parameters
         ----------
-        channel_index : int
-            Index of channel to filter for
-        channel_count : int or None
-            Optional count of channels to filter for
+        channel_index : int | Iterable[int] | None
+            Index or indices of channel(s) to filter for
+        channel_count : int | Iterable[int] | None
+            Optional count(s) of channels to filter for
         """
         mask: list[bool] = []
         cur_mask: list[bool] = []
         cur_image = 0
         cur_max_channel = 0
-        for source_index in list(self.index_map) + [None]:
+        for source_index in list(self.source_index) + [None]:
             if source_index is None or source_index.image > cur_image:
-                mask.extend(
-                    cur_mask
-                    if channel_count is None or cur_max_channel == channel_count - 1
-                    else [False for _ in cur_mask]
-                )
+                mask.extend(cur_mask if matches(cur_max_channel + 1, channel_count) else [False for _ in cur_mask])
                 if source_index is None:
                     break
                 cur_image = source_index.image
                 cur_max_channel = 0
                 cur_mask.clear()
-            cur_mask.append(channel_index is None or source_index.channel == channel_index)
+            cur_mask.append(matches(source_index.channel, channel_index))
             cur_max_channel = max(cur_max_channel, source_index.channel or 0)
         return mask
 
     def __len__(self) -> int:
-        for a in self.__annotations__:
-            attr = getattr(self, a, None)
-            if attr is not None and hasattr(a, "__len__") and len(attr) > 0:
-                return len(attr)
-        return 0
+        return len(self.source_index)
 
 
-class ImageProcessingCache:
-    def __init__(self, image: NDArray, box: NDArray | None, per_channel: bool, function_map: StatsFunctionMap):
+class StatsProcessor:
+    cache_keys: list[str] = []
+    image_function_map: dict[str, Callable[[StatsProcessor], Any]] = {}
+    channel_function_map: dict[str, Callable[[StatsProcessor], Any]] = {}
+
+    def __init__(self, image: NDArray, box: NDArray | None, per_channel: bool):
         self.raw = image
-        self.box = np.array([0, 0, image.shape[-1], image.shape[-2]]) if box is None else box
+        self.width = image.shape[-1]
+        self.height = image.shape[-2]
+        self.box = np.array([0, 0, self.width, self.height]) if box is None else box
         self.per_channel = per_channel
         self._image = None
         self._shape = None
         self._scaled = None
-        self._histogram = None
-        self._percentiles = None
-        self.fn_map = function_map.channel if per_channel else function_map.image
+        self.cache = {}
+        self.fn_map = self.channel_function_map if per_channel else self.image_function_map
+        self.is_valid_slice = box is None or bool(
+            box[0] >= 0 and box[1] >= 0 and box[2] <= image.shape[-1] and box[3] <= image.shape[-2]
+        )
 
-    def calculate(self, fn_key: str) -> NDArray:
-        if fn_key == "percentiles":
-            return self.percentiles
-        elif fn_key == "histogram":
-            return self.histogram
+    def get(self, fn_key: str) -> NDArray:
+        if fn_key in self.cache_keys:
+            if fn_key not in self.cache:
+                self.cache[fn_key] = self.fn_map[fn_key](self)
+            return self.cache[fn_key]
         else:
             return self.fn_map[fn_key](self)
 
     @property
     def image(self) -> NDArray:
         if self._image is None:
-            norm = normalize_image_shape(self.raw)
-            self._image = norm[:, self.box[1] : self.box[1] + self.box[3], self.box[0] : self.box[0] + self.box[2]]
+            if self.is_valid_slice:
+                norm = normalize_image_shape(self.raw)
+                self._image = norm[:, self.box[1] : self.box[3], self.box[0] : self.box[2]]
+            else:
+                self._image = np.zeros((self.raw.shape[0], self.box[3] - self.box[1], self.box[2] - self.box[0]))
         return self._image
 
     @property
@@ -129,24 +143,12 @@ class ImageProcessingCache:
                 self._scaled = self._scaled.reshape(self.image.shape[0], -1)
         return self._scaled
 
-    @property
-    def histogram(self) -> NDArray:
-        if self._histogram is None:
-            self._histogram = self.fn_map["histogram"](self)
-        return self._histogram
-
-    @property
-    def percentiles(self) -> NDArray:
-        if self._percentiles is None:
-            self._percentiles = self.fn_map["percentiles"](self)
-        return self._percentiles
-
 
 def run_stats(
     images: Iterable[ArrayLike],
     bboxes: Iterable[ArrayLike] | None,
     per_channel: bool,
-    function_map: StatsFunctionMap,
+    stats_processor_cls: type,
     output_cls: type,
 ) -> dict:
     """
@@ -163,7 +165,7 @@ def run_stats(
         array-like structure (e.g., NumPy arrays).
     bboxes : Iterable[ArrayLike]
         An iterable of bounding boxes (e.g. list of arrays) where each bounding box is represented
-        as an array-like structure in the format of (X, Y, W, H). The length of the bounding boxes
+        as an array-like structure in the format of (X0, Y0, X1, Y1). The length of the bounding boxes
         iterable should match the length of the input images.
     per_channel : bool
         A flag which determines if the states should be evaluated on a per-channel basis or not.
@@ -188,26 +190,32 @@ def run_stats(
     """
     results_list: list[dict[str, NDArray]] = []
     output_list = list(output_cls.__annotations__)
-    index_map = []
+    source_index = []
+    box_count = []
     if bboxes is None:
         for i, image in enumerate(to_numpy_iter(images)):
-            cache = ImageProcessingCache(image, None, per_channel, function_map)
-            results_list.append({stat: cache.calculate(stat) for stat in output_list})
+            processor: StatsProcessor = stats_processor_cls(image, None, per_channel)
+            results_list.append({stat: processor.get(stat) for stat in output_list})
             if per_channel:
-                index_map.extend([SourceIndex(i, None, c) for c in range(image.shape[-3] if per_channel else 1)])
+                channels = image.shape[-3]
+                source_index.extend([SourceIndex(i, None, c) for c in range(channels)])
             else:
-                index_map.append(SourceIndex(i, None, None))
+                source_index.append(SourceIndex(i, None, None))
+            box_count.append(0)
     else:
         for i, (boxes, image) in enumerate(zip(to_numpy_iter(bboxes), to_numpy_iter(images))):
             nboxes = normalize_box_shape(boxes)
             for i_b, box in enumerate(nboxes):
-                cache = ImageProcessingCache(image, box, per_channel, function_map)
-                results_list.append({stat: cache.calculate(stat) for stat in output_list})
+                processor: StatsProcessor = stats_processor_cls(image, box, per_channel)
+                if not processor.is_valid_slice:
+                    warnings.warn(f"Bounding box {i_b}: {box} is out of bounds of image {i}: {image.shape}.")
+                results_list.append({stat: processor.get(stat) for stat in output_list})
                 if per_channel:
-                    index_map.extend([SourceIndex(i, i_b, c) for c in range(image.shape[-3] if per_channel else 1)])
+                    channels = image.shape[-3]
+                    source_index.extend([SourceIndex(i, i_b, c) for c in range(image.shape[-3])])
                 else:
-                    index_map.append(SourceIndex(i, i_b, None))
-
+                    source_index.append(SourceIndex(i, i_b, None))
+            box_count.append(len(boxes))
     output = {}
     if per_channel:
         for i, results in enumerate(results_list):
@@ -225,6 +233,7 @@ def run_stats(
         if dtype_match is not None:
             output[stat] = np.asarray(output[stat], dtype=np.dtype(dtype_match.group(1)))
 
-    output[INDEX_MAP] = index_map
+    output[SOURCE_INDEX] = source_index
+    output[BOX_COUNT] = np.asarray(box_count, dtype=np.uint16)
 
     return output

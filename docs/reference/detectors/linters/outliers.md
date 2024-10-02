@@ -3,7 +3,7 @@
 
 ```{testsetup}
 import numpy as np
-from dataeval._internal.detectors.outliers import Outliers
+from dataeval.detectors.linters import Outliers
 from dataeval.metrics.stats import pixelstats
 
 images = np.ones((30,1,128,128), dtype=np.int32)*2 + np.repeat(np.arange(10), 3*128*128).reshape(30,-1,128,128)

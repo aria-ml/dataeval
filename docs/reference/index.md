@@ -173,6 +173,8 @@ Statistics metrics calculate a variety of image properties and pixel statistics 
 :hidden:
 :titlesonly:
 
+metrics/stats/boxratiostats
+metrics/stats/datasetstats
 metrics/stats/dimensionstats
 metrics/stats/hashstats
 metrics/stats/pixelstats
@@ -182,6 +184,8 @@ metrics/stats/visualstats
 ```{eval-rst}
 .. autosummary::
 
+    metrics.stats.boxratiostats
+    metrics.stats.datasetstats
     metrics.stats.dimensionstats
     metrics.stats.hashstats
     metrics.stats.pixelstats
