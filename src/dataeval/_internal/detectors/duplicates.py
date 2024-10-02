@@ -6,7 +6,7 @@ from typing import Generic, Iterable, Sequence, TypeVar
 from numpy.typing import ArrayLike
 
 from dataeval._internal.detectors.merged_stats import combine_stats, get_dataset_step_from_idx
-from dataeval._internal.metrics.stats import HashStatsOutput, hashstats
+from dataeval._internal.metrics.stats.hashstats import HashStatsOutput, hashstats
 from dataeval._internal.output import OutputMetadata, set_metadata
 
 DuplicateGroup = list[int]

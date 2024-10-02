@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from dataeval._internal.detectors.merged_stats import add_stats, combine_stats, get_dataset_step_from_idx
-from dataeval._internal.metrics.stats import hashstats, pixelstats
+from dataeval.metrics.stats import hashstats, pixelstats
 
 
 def get_dataset(count: int, channels: int):

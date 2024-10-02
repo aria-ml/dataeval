@@ -9,7 +9,7 @@ from scipy.stats import entropy, kurtosis, skew
 
 from dataeval._internal.flags import ImageStat, to_distinct, verify_supported
 from dataeval._internal.interop import to_numpy_iter
-from dataeval._internal.metrics.stats import StatsOutput
+from dataeval._internal.metrics.stats.stats import StatsOutput
 from dataeval._internal.metrics.utils import edge_filter, normalize_image_shape, rescale
 from dataeval._internal.output import OutputMetadata, populate_defaults, set_metadata
 

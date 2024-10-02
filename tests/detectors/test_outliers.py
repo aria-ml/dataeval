@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from dataeval._internal.detectors.outliers import Outliers, StatsOutputs, _get_outlier_mask
-from dataeval._internal.metrics.stats import dimensionstats, pixelstats, visualstats
+from dataeval._internal.detectors.outliers import Outliers, OutlierStatsOutputs, _get_outlier_mask
+from dataeval.metrics.stats import dimensionstats, pixelstats, visualstats
 
 
 class TestOutliers:
@@ -74,7 +74,7 @@ class TestOutliers:
         stats2 = pixelstats(dataset2)
         stats1 = dimensionstats(dataset1)
         outliers = Outliers()
-        stats = StatsOutputs(stats1, stats2, stats3)
+        stats = OutlierStatsOutputs(stats1, stats2, stats3)
         results = outliers.from_stats(stats)
         assert results is not None
 

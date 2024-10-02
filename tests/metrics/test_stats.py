@@ -2,13 +2,8 @@ import numpy as np
 import pytest
 from numpy.random import randint
 
-from dataeval._internal.metrics.stats import (
-    BaseStatsOutput,
-    dimensionstats,
-    hashstats,
-    pixelstats,
-    visualstats,
-)
+from dataeval._internal.metrics.stats.base import BaseStatsOutput
+from dataeval.metrics.stats import dimensionstats, hashstats, pixelstats, visualstats
 
 
 def get_dataset(count: int, channels: int):

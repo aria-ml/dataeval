@@ -5,7 +5,7 @@ from typing import Sequence, TypeVar
 
 import numpy as np
 
-from dataeval._internal.metrics.stats import BaseStatsOutput
+from dataeval._internal.metrics.stats.base import BaseStatsOutput
 
 TStatsOutput = TypeVar("TStatsOutput", bound=BaseStatsOutput)
 
@@ -14,32 +14,27 @@ def add_stats(a: TStatsOutput, b: TStatsOutput) -> TStatsOutput:
     if type(a) is not type(b):
         raise TypeError(f"Types {type(a)} and {type(b)} cannot be added.")
 
-    stats_cls = type(a)
-    a_dict = deepcopy(a.dict())
-    b_dict = b.dict()
+    sum_dict = deepcopy(a.dict())
 
-    for k in a_dict:
-        if isinstance(a_dict[k], list):
-            a_dict[k].extend(b_dict[k])
+    for k in sum_dict:
+        if isinstance(sum_dict[k], list):
+            sum_dict[k].extend(b.dict()[k])
         else:
-            a_dict[k] = np.concatenate((a_dict[k], b_dict[k]))
+            sum_dict[k] = np.concatenate((sum_dict[k], b.dict()[k]))
 
-    return stats_cls(**a_dict)
+    return type(a)(**sum_dict)
 
 
 def combine_stats(stats: Sequence[TStatsOutput]) -> tuple[TStatsOutput, list[int]]:
     output = None
     dataset_steps = []
     cur_len = 0
-    stat_type = type(stats[0]) if stats else None
     for s in stats:
-        if stat_type is None or not isinstance(s, BaseStatsOutput) or not isinstance(s, stat_type):
-            raise TypeError("Cannot combine outputs.")
         output = s if output is None else add_stats(output, s)
         cur_len += len(s)
         dataset_steps.append(cur_len)
     if output is None:
-        raise TypeError("Cannot combine outputs.")
+        raise TypeError("Cannot combine empty sequence of stats.")
     return output, dataset_steps
 
 
