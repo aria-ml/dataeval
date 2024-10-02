@@ -7,32 +7,29 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy.stats import entropy, kurtosis, skew
 
-from dataeval._internal.metrics.stats.base import BaseStatsOutput, StatsFunctionMap, run_stats
+from dataeval._internal.metrics.stats.base import BaseStatsOutput, StatsProcessor, run_stats
 from dataeval._internal.output import set_metadata
 
-QUARTILES = (0, 25, 50, 75, 100)
 
-
-class PixelStatsFunctionMap(StatsFunctionMap):
-    image = {
-        "mean": lambda x: np.float16(np.mean(x.scaled)),
-        "std": lambda x: np.float16(np.std(x.scaled)),
-        "var": lambda x: np.float16(np.var(x.scaled)),
-        "skew": lambda x: np.float16(skew(x.scaled.ravel())),
-        "kurtosis": lambda x: np.float16(kurtosis(x.scaled.ravel())),
-        "percentiles": lambda x: np.float16(np.nanpercentile(x.scaled, q=QUARTILES)),
-        "histogram": lambda x: np.uint32(np.histogram(x.scaled, 256, (0, 1))[0]),
-        "entropy": lambda x: np.float16(entropy(x.histogram)),
+class PixelStatsProcessor(StatsProcessor):
+    cache_keys = ["histogram"]
+    image_function_map = {
+        "mean": lambda self: np.mean(self.scaled),
+        "std": lambda x: np.std(x.scaled),
+        "var": lambda x: np.var(x.scaled),
+        "skew": lambda x: np.nan_to_num(skew(x.scaled.ravel())),
+        "kurtosis": lambda x: np.nan_to_num(kurtosis(x.scaled.ravel())),
+        "histogram": lambda x: np.histogram(x.scaled, 256, (0, 1))[0],
+        "entropy": lambda x: entropy(x.get("histogram")),
     }
-    channel = {
-        "mean": lambda x: np.float16(np.mean(x.scaled, axis=1)),
-        "std": lambda x: np.float16(np.std(x.scaled, axis=1)),
-        "var": lambda x: np.float16(np.var(x.scaled, axis=1)),
-        "skew": lambda x: np.float16(skew(x.scaled, axis=1)),
-        "kurtosis": lambda x: np.float16(kurtosis(x.scaled, axis=1)),
-        "percentiles": lambda x: np.float16(np.nanpercentile(x.scaled, q=QUARTILES, axis=1).T),
-        "histogram": lambda x: np.uint32(np.apply_along_axis(lambda y: np.histogram(y, 256, (0, 1))[0], 1, x.scaled)),
-        "entropy": lambda x: np.float16(entropy(x.histogram, axis=1)),
+    channel_function_map = {
+        "mean": lambda x: np.mean(x.scaled, axis=1),
+        "std": lambda x: np.std(x.scaled, axis=1),
+        "var": lambda x: np.var(x.scaled, axis=1),
+        "skew": lambda x: np.nan_to_num(skew(x.scaled, axis=1)),
+        "kurtosis": lambda x: np.nan_to_num(kurtosis(x.scaled, axis=1)),
+        "histogram": lambda x: np.apply_along_axis(lambda y: np.histogram(y, 256, (0, 1))[0], 1, x.scaled),
+        "entropy": lambda x: entropy(x.get("histogram"), axis=1),
     }
 
 
@@ -51,8 +48,6 @@ class PixelStatsOutput(BaseStatsOutput):
         Skew of the pixel values of the images
     kurtosis : NDArray[np.float16]
         Kurtosis of the pixel values of the images
-    percentiles : NDArray[np.float16]
-        Percentiles of the pixel values of the images with quartiles of (0, 25, 50, 75, 100)
     histogram : NDArray[np.uint32]
         Histogram of the pixel values of the images across 256 bins scaled between 0 and 1
     entropy : NDArray[np.float16]
@@ -64,7 +59,6 @@ class PixelStatsOutput(BaseStatsOutput):
     var: NDArray[np.float16]
     skew: NDArray[np.float16]
     kurtosis: NDArray[np.float16]
-    percentiles: NDArray[np.float16]
     histogram: NDArray[np.uint32]
     entropy: NDArray[np.float16]
 
@@ -86,7 +80,7 @@ def pixelstats(
     images : Iterable[ArrayLike]
         Images to perform calculations on
     bboxes : Iterable[ArrayLike] or None
-        Bounding boxes for each image to perform calculations on
+        Bounding boxes in `xyxy` format for each image to perform calculations
 
     Returns
     -------
@@ -119,5 +113,5 @@ def pixelstats(
      0.812  0.9883 0.795  0.9243 0.9243 0.795  0.9907 0.8125 1.028  0.8223
      1.046  0.8247 1.041  0.8203 1.012  0.812  0.9883 0.795  0.9243 0.9243]
     """
-    output = run_stats(images, bboxes, per_channel, PixelStatsFunctionMap(), PixelStatsOutput)
+    output = run_stats(images, bboxes, per_channel, PixelStatsProcessor, PixelStatsOutput)
     return PixelStatsOutput(**output)

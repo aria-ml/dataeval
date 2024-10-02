@@ -6,31 +6,37 @@ from typing import Iterable
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval._internal.metrics.stats.base import BaseStatsOutput, StatsFunctionMap, run_stats
+from dataeval._internal.metrics.stats.base import BaseStatsOutput, StatsProcessor, run_stats
 from dataeval._internal.metrics.utils import edge_filter
 from dataeval._internal.output import set_metadata
 
+QUARTILES = (0, 25, 50, 75, 100)
 
-class VisualStatsFunctionMap(StatsFunctionMap):
-    image = {
-        "brightness": lambda x: x.percentiles[-2],
-        "blurriness": lambda x: np.float16(np.std(edge_filter(np.mean(x.image, axis=0)))),
-        "contrast": lambda x: np.float16((np.max(x.percentiles) - np.min(x.percentiles)) / np.mean(x.percentiles)),
-        "darkness": lambda x: x.percentiles[1],
-        "missing": lambda x: np.float16(np.sum(np.isnan(x.image)) / np.prod(x.shape[-2:])),
-        "zeros": lambda x: np.float16(np.count_nonzero(x.image == 0) / np.prod(x.shape[-2:])),
+
+class VisualStatsProcessor(StatsProcessor):
+    cache_keys = ["percentiles"]
+    image_function_map = {
+        "brightness": lambda x: x.get("percentiles")[-2],
+        "blurriness": lambda x: np.std(edge_filter(np.mean(x.image, axis=0))),
+        "contrast": lambda x: np.nan_to_num(
+            (np.max(x.get("percentiles")) - np.min(x.get("percentiles"))) / np.mean(x.get("percentiles"))
+        ),
+        "darkness": lambda x: x.get("percentiles")[1],
+        "missing": lambda x: np.sum(np.isnan(x.image)) / np.prod(x.shape[-2:]),
+        "zeros": lambda x: np.count_nonzero(x.image == 0) / np.prod(x.shape[-2:]),
+        "percentiles": lambda x: np.nanpercentile(x.scaled, q=QUARTILES),
     }
-    channel = {
-        "brightness": lambda x: x.percentiles[:, -2],
-        "blurriness": lambda x: np.float16(
-            np.std(np.vectorize(edge_filter, signature="(m,n)->(m,n)")(x.image), axis=(1, 2))
+    channel_function_map = {
+        "brightness": lambda x: x.get("percentiles")[:, -2],
+        "blurriness": lambda x: np.std(np.vectorize(edge_filter, signature="(m,n)->(m,n)")(x.image), axis=(1, 2)),
+        "contrast": lambda x: np.nan_to_num(
+            (np.max(x.get("percentiles"), axis=1) - np.min(x.get("percentiles"), axis=1))
+            / np.mean(x.get("percentiles"), axis=1)
         ),
-        "contrast": lambda x: np.float16(
-            (np.max(x.percentiles, axis=1) - np.min(x.percentiles, axis=1)) / np.mean(x.percentiles, axis=1)
-        ),
-        "darkness": lambda x: x.percentiles[:, 1],
-        "missing": lambda x: np.float16(np.sum(np.isnan(x.image), axis=(1, 2)) / np.prod(x.shape[-2:])),
-        "zeros": lambda x: np.float16(np.count_nonzero(x.image == 0, axis=(1, 2)) / np.prod(x.shape[-2:])),
+        "darkness": lambda x: x.get("percentiles")[:, 1],
+        "missing": lambda x: np.sum(np.isnan(x.image), axis=(1, 2)) / np.prod(x.shape[-2:]),
+        "zeros": lambda x: np.count_nonzero(x.image == 0, axis=(1, 2)) / np.prod(x.shape[-2:]),
+        "percentiles": lambda x: np.nanpercentile(x.scaled, q=QUARTILES, axis=1).T,
     }
 
 
@@ -51,6 +57,8 @@ class VisualStatsOutput(BaseStatsOutput):
         Percentage of the images with missing pixels
     zeros : NDArray[np.float16]
         Percentage of the images with zero value pixels
+    percentiles : NDArray[np.float16]
+        Percentiles of the pixel values of the images with quartiles of (0, 25, 50, 75, 100)
     """
 
     brightness: NDArray[np.float16]
@@ -59,6 +67,7 @@ class VisualStatsOutput(BaseStatsOutput):
     darkness: NDArray[np.float16]
     missing: NDArray[np.float16]
     zeros: NDArray[np.float16]
+    percentiles: NDArray[np.float16]
 
 
 @set_metadata("dataeval.metrics")
@@ -78,7 +87,7 @@ def visualstats(
     images : Iterable[ArrayLike]
         Images to perform calculations on
     bboxes : Iterable[ArrayLike] or None
-        Bounding boxes for each image to perform calculations on
+        Bounding boxes in `xyxy` format for each image to perform calculations on
 
     Returns
     -------
@@ -105,9 +114,9 @@ def visualstats(
      0.338  0.3713 0.4045 0.438  0.4712 0.5044 0.538  0.5713 0.6045 0.638
      0.6714 0.7046 0.738  0.7715 0.8047 0.838  0.871  0.905  0.938  0.971 ]
     >>> print(results.contrast)
-    [2.041 1.332 1.293 1.279 1.271 1.269 1.265 1.264 1.261 1.26  1.259 1.258
-     1.258 1.257 1.256 1.256 1.256 1.255 1.255 1.255 1.254 1.254 1.254 1.254
-     1.254 1.253 1.254 1.253 1.254 1.254]
+    [2.041 1.332 1.293 1.279 1.272 1.268 1.265 1.263 1.261 1.26  1.259 1.258
+     1.258 1.257 1.257 1.256 1.256 1.255 1.255 1.255 1.255 1.254 1.254 1.254
+     1.254 1.254 1.254 1.253 1.253 1.253]
     """
-    output = run_stats(images, bboxes, per_channel, VisualStatsFunctionMap(), VisualStatsOutput)
+    output = run_stats(images, bboxes, per_channel, VisualStatsProcessor, VisualStatsOutput)
     return VisualStatsOutput(**output)
