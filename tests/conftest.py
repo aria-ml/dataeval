@@ -5,7 +5,10 @@ from typing import Literal
 import pytest
 from numpy.typing import NDArray
 
-from dataeval._internal.datasets import MNIST
+try:
+    from dataeval._internal.datasets import MNIST
+except ImportError:
+    MNIST = None
 
 
 @pytest.fixture
@@ -18,6 +21,8 @@ def mnist():
         channels: Literal["channels_first", "channels_last"] | None = None,
         flatten: bool = False,
     ) -> tuple[NDArray, NDArray]:
+        if MNIST is None:
+            raise ImportError("MNIST dataset requires torch and torchvision.")
         dataset = MNIST(
             root="./data/",
             train=train,
