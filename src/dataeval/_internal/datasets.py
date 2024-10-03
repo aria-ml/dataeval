@@ -18,7 +18,7 @@ from torchvision.datasets import CIFAR10, VOCDetection  # noqa: F401
 
 
 @contextmanager
-def wait_lock(name: str, timeout: int = 60):
+def wait_lock(name: str, timeout: int = 120):
     try:
         from filelock import FileLock
     except ImportError:
@@ -40,6 +40,9 @@ def wait_lock(name: str, timeout: int = 60):
     lock = FileLock(lock_file, timeout=timeout)
     with lock:
         yield
+
+    # Remove lockfile on completion
+    os.remove(lock_file)
 
 
 def _validate_file(fpath, file_md5, chunk_size=65535):
@@ -99,19 +102,13 @@ def download_dataset(url: str, root: str | Path, fname: str, md5: str) -> str:
     folder = os.path.join(root, name)
     os.makedirs(folder, exist_ok=True)
 
-    with wait_lock(folder):
-        path = _get_file(
-            root,
-            fname,
-            origin=url + fname,
-            file_md5=md5,
-        )
-
-    # Remove wait_lock file
-    os.remove(folder + ".lock")
-
+    path = _get_file(
+        root,
+        fname,
+        origin=url + fname,
+        file_md5=md5,
+    )
     extract_archive(path, remove_finished=True)
-
     return path
 
 
@@ -250,13 +247,13 @@ class MNIST(Dataset):
             print("Identity is not a corrupted dataset but the original MNIST dataset")
         self.corruption = corruption
 
-        if not os.path.exists(self.mnist_folder):
-            if download:
+        with wait_lock(self.mnist_folder):
+            if os.path.exists(self.mnist_folder):
+                print("Files already downloaded and verified")
+            elif download:
                 download_dataset(self.mirror, self.root, self.resources[0], self.resources[1])
-            elif not _validate_file(os.path.join(self.root, self.resources[0]), self.resources[1]):
+            else:
                 raise RuntimeError("Dataset not found. You can use download=True to download it")
-        else:
-            print("Files already downloaded and verified")
 
         self.data, self.targets = self._load_data()
 
