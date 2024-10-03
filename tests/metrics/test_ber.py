@@ -13,14 +13,14 @@ class TestFunctionalBER:
     @pytest.mark.parametrize(
         "method, k, expected",
         [
-            (ber_mst, None, (0.137, 0.07132636098401203)),
-            (ber_knn, 1, (0.118, 0.061072112753426215)),
-            (ber_knn, 10, (0.143, 0.0745910104681437)),
+            (ber_mst, None, (0.143, 0.0745910104681437)),
+            (ber_knn, 1, (0.12, 0.06214559737386353)),
+            (ber_knn, 10, (0.137, 0.07132636098401203)),
         ],
     )
     def test_ber_on_mnist(self, method, k, expected, mnist):
         """Methods correctly calculate BER with given params"""
-        data, labels = mnist()
+        data, labels = mnist(flatten=True)
         result = method(data, labels, k) if k else method(data, labels)
         assert result == expected
 
@@ -70,15 +70,15 @@ class TestAPIBER:
     @pytest.mark.parametrize(
         "method, k, expected",
         [
-            ("MST", 1, {"ber": 0.137, "ber_lower": 0.07132636098401203}),
-            ("KNN", 1, {"ber": 0.118, "ber_lower": 0.061072112753426215}),
+            ("MST", 1, {"ber": 0.143, "ber_lower": 0.0745910104681437}),
+            ("KNN", 1, {"ber": 0.12, "ber_lower": 0.06214559737386353}),
         ],
     )
     def test_ber_output_format(self, method, k, expected, mnist):
         """Confirms BER class transforms functional results into correct format"""
 
         # TODO: Mock patch _ber methods, just check output tuple -> dict
-        images, labels = mnist()
+        images, labels = mnist(flatten=True)
         result = ber(images=images, labels=labels, k=k, method=method)
         assert result.dict() == expected
 

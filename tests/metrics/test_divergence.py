@@ -10,14 +10,14 @@ class TestDivergence:
     @pytest.mark.parametrize(
         "method, output",
         [
-            ("MST", {"divergence": 0.8377897755491117, "errors": 81}),
-            ("FNN", {"divergence": 0.8618209199122062, "errors": 69}),
+            ("MST", {"divergence": 0.838, "errors": 81}),
+            ("FNN", {"divergence": 0.864, "errors": 68}),
         ],
     )
     def test_divergence(self, mnist, method, output):
         """Unit testing of Divergence"""
 
-        covariates, labels = mnist(add_channels="channels_last")
+        covariates, labels = mnist(channels="channels_last")
 
         inds = np.array([x % 2 == 0 for x in labels])
         rev_inds = np.invert(inds)

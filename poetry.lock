@@ -1337,22 +1337,22 @@ xmp = ["defusedxml"]
 
 [[package]]
 name = "protobuf"
-version = "4.25.5"
+version = "4.25.3"
 description = ""
 optional = true
 python-versions = ">=3.8"
 files = [
-    {file = "protobuf-4.25.5-cp310-abi3-win32.whl", hash = "sha256:5e61fd921603f58d2f5acb2806a929b4675f8874ff5f330b7d6f7e2e784bbcd8"},
-    {file = "protobuf-4.25.5-cp310-abi3-win_amd64.whl", hash = "sha256:4be0571adcbe712b282a330c6e89eae24281344429ae95c6d85e79e84780f5ea"},
-    {file = "protobuf-4.25.5-cp37-abi3-macosx_10_9_universal2.whl", hash = "sha256:b2fde3d805354df675ea4c7c6338c1aecd254dfc9925e88c6d31a2bcb97eb173"},
-    {file = "protobuf-4.25.5-cp37-abi3-manylinux2014_aarch64.whl", hash = "sha256:919ad92d9b0310070f8356c24b855c98df2b8bd207ebc1c0c6fcc9ab1e007f3d"},
-    {file = "protobuf-4.25.5-cp37-abi3-manylinux2014_x86_64.whl", hash = "sha256:fe14e16c22be926d3abfcb500e60cab068baf10b542b8c858fa27e098123e331"},
-    {file = "protobuf-4.25.5-cp38-cp38-win32.whl", hash = "sha256:98d8d8aa50de6a2747efd9cceba361c9034050ecce3e09136f90de37ddba66e1"},
-    {file = "protobuf-4.25.5-cp38-cp38-win_amd64.whl", hash = "sha256:b0234dd5a03049e4ddd94b93400b67803c823cfc405689688f59b34e0742381a"},
-    {file = "protobuf-4.25.5-cp39-cp39-win32.whl", hash = "sha256:abe32aad8561aa7cc94fc7ba4fdef646e576983edb94a73381b03c53728a626f"},
-    {file = "protobuf-4.25.5-cp39-cp39-win_amd64.whl", hash = "sha256:7a183f592dc80aa7c8da7ad9e55091c4ffc9497b3054452d629bb85fa27c2a45"},
-    {file = "protobuf-4.25.5-py3-none-any.whl", hash = "sha256:0aebecb809cae990f8129ada5ca273d9d670b76d9bfc9b1809f0a9c02b7dbf41"},
-    {file = "protobuf-4.25.5.tar.gz", hash = "sha256:7f8249476b4a9473645db7f8ab42b02fe1488cbe5fb72fddd445e0665afd8584"},
+    {file = "protobuf-4.25.3-cp310-abi3-win32.whl", hash = "sha256:d4198877797a83cbfe9bffa3803602bbe1625dc30d8a097365dbc762e5790faa"},
+    {file = "protobuf-4.25.3-cp310-abi3-win_amd64.whl", hash = "sha256:209ba4cc916bab46f64e56b85b090607a676f66b473e6b762e6f1d9d591eb2e8"},
+    {file = "protobuf-4.25.3-cp37-abi3-macosx_10_9_universal2.whl", hash = "sha256:f1279ab38ecbfae7e456a108c5c0681e4956d5b1090027c1de0f934dfdb4b35c"},
+    {file = "protobuf-4.25.3-cp37-abi3-manylinux2014_aarch64.whl", hash = "sha256:e7cb0ae90dd83727f0c0718634ed56837bfeeee29a5f82a7514c03ee1364c019"},
+    {file = "protobuf-4.25.3-cp37-abi3-manylinux2014_x86_64.whl", hash = "sha256:7c8daa26095f82482307bc717364e7c13f4f1c99659be82890dcfc215194554d"},
+    {file = "protobuf-4.25.3-cp38-cp38-win32.whl", hash = "sha256:f4f118245c4a087776e0a8408be33cf09f6c547442c00395fbfb116fac2f8ac2"},
+    {file = "protobuf-4.25.3-cp38-cp38-win_amd64.whl", hash = "sha256:c053062984e61144385022e53678fbded7aea14ebb3e0305ae3592fb219ccfa4"},
+    {file = "protobuf-4.25.3-cp39-cp39-win32.whl", hash = "sha256:19b270aeaa0099f16d3ca02628546b8baefe2955bbe23224aaf856134eccf1e4"},
+    {file = "protobuf-4.25.3-cp39-cp39-win_amd64.whl", hash = "sha256:e3c97a1555fd6388f857770ff8b9703083de6bf1f9274a002a332d65fbb56c8c"},
+    {file = "protobuf-4.25.3-py3-none-any.whl", hash = "sha256:f0700d54bcf45424477e46a9f0944155b46fb0639d69728739c0e47bab83f2b9"},
+    {file = "protobuf-4.25.3.tar.gz", hash = "sha256:25b5d0b42fd000320bd7830b349e3b696435f3b329810427a6bcce6a5492cc5c"},
 ]
 
 [[package]]
@@ -1886,6 +1886,37 @@ url = "https://download.pytorch.org/whl/cu118"
 reference = "pytorch"
 
 [[package]]
+name = "torchvision"
+version = "0.16.2+cu118"
+description = "image and video datasets and models for torch deep learning"
+optional = true
+python-versions = ">=3.8"
+files = [
+    {file = "torchvision-0.16.2+cu118-cp310-cp310-linux_x86_64.whl", hash = "sha256:18470aef0bbde73f5a6a96135cd457f4d8be31f60be7ceae4ef5174f02f73add"},
+    {file = "torchvision-0.16.2+cu118-cp310-cp310-win_amd64.whl", hash = "sha256:689f2458e8924c47b7ba9f50dca353423b75214184b905d540f69d9b962b2fdf"},
+    {file = "torchvision-0.16.2+cu118-cp311-cp311-linux_x86_64.whl", hash = "sha256:9a784073e801c04066a5e4453306010b67bacfbff12bd57e5d65c1a638584a89"},
+    {file = "torchvision-0.16.2+cu118-cp311-cp311-win_amd64.whl", hash = "sha256:036391a65f3c2ac6dbe4b73ea0acc303dd1c0a667e2a3592a194b2d2db377da1"},
+    {file = "torchvision-0.16.2+cu118-cp38-cp38-linux_x86_64.whl", hash = "sha256:5e4c9f43f3b379c8ce9bc75da0378606fd5ca01c8a82493cc25639bffbd66c74"},
+    {file = "torchvision-0.16.2+cu118-cp38-cp38-win_amd64.whl", hash = "sha256:d3c207437b8be6f451218aa0bcc50ed949b072813bc7f36aa1debdb17f71768e"},
+    {file = "torchvision-0.16.2+cu118-cp39-cp39-linux_x86_64.whl", hash = "sha256:88999dceabb6652b6ede49509722a29753c9206df09ccaa69754f21b58fbdb63"},
+    {file = "torchvision-0.16.2+cu118-cp39-cp39-win_amd64.whl", hash = "sha256:63c70ba3b83915bc165e539103e2e03a69dc63e9660de9adb12bd460428fbffa"},
+]
+
+[package.dependencies]
+numpy = "*"
+pillow = ">=5.3.0,<8.3.dev0 || >=8.4.dev0"
+requests = "*"
+torch = "2.1.2"
+
+[package.extras]
+scipy = ["scipy"]
+
+[package.source]
+type = "legacy"
+url = "https://download.pytorch.org/whl/cu118"
+reference = "pytorch"
+
+[[package]]
 name = "triton"
 version = "2.1.0"
 description = "A language and compiler for custom Deep Learning operations"
@@ -2204,11 +2235,11 @@ test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", 
 type = ["pytest-mypy"]
 
 [extras]
-all = ["matplotlib", "nvidia-cudnn-cu11", "tensorflow", "tensorflow-io-gcs-filesystem", "tensorflow_probability", "torch"]
+all = ["matplotlib", "nvidia-cudnn-cu11", "tensorflow", "tensorflow-io-gcs-filesystem", "tensorflow_probability", "torch", "torchvision"]
 tensorflow = ["nvidia-cudnn-cu11", "tensorflow", "tensorflow-io-gcs-filesystem", "tensorflow_probability"]
-torch = ["matplotlib", "nvidia-cudnn-cu11", "torch"]
+torch = ["matplotlib", "nvidia-cudnn-cu11", "torch", "torchvision"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.12"
-content-hash = "d0eb30feaea71a245bcfe58176ba8d6c1a39795dce3f0541b44f65f7b73093dc"
+content-hash = "92368a8629a5bf4b156d7cbc910bbd6b532c24b063d852ff57e7cc1c4da650cc"
