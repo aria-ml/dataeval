@@ -55,7 +55,14 @@ def read_dataset(dataset: Dataset) -> list[list[Any]]:
 
     ddict: dict[int, list] = defaultdict(list)
 
-    for data in dataset:
+    # BUG: When passing test_parity.FactorDataset,
+    # iter loop goes out of bounds, but
+    # for i in range(len(dataset)) doesn't. Unsure why.
+    # It doesn't crash in the debug console either, only
+    # when fully running the program in debug mode.
+    # for data in dataset:
+    for i in range(len(dataset)):
+        data = dataset[i]
         # Convert to tuple if single return (e.g. images only)
         if not isinstance(data, tuple):
             data = (data,)

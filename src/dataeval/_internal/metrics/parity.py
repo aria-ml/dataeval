@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import warnings
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import Generic, Mapping, TypeVar
+from typing import Generic, TypeVar
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -10,6 +11,7 @@ from scipy.stats import chi2_contingency, chisquare
 
 from dataeval._internal.interop import to_numpy
 from dataeval._internal.output import OutputMetadata, set_metadata
+from dataeval._internal.utils import read_dataset
 
 TData = TypeVar("TData", np.float64, NDArray[np.float64])
 
@@ -278,9 +280,44 @@ def label_parity(
     return ParityOutput(cs, p)
 
 
+def preprocess_dataset(dataset):
+    dataset_elements = read_dataset(dataset)
+    # images = dataset_elements[0]
+    targets = dataset_elements[1]
+    metadata = dataset_elements[2]
+
+    metadata_extended = []
+
+    # Aggregate each metadata factor into lists:
+    # dict[factor] = List[factor_values]
+    factor_lists = defaultdict(list)
+    labels: list = []
+
+    # Flattens all targets into one array and
+    # copies metadata for an image into all of its targets
+    for idx, (target, factors) in enumerate(zip(targets, metadata)):
+        # Generates flat list of all labels
+        tlabels = np.array(target.labels)
+        labels.extend(tlabels.tolist())
+        metadata_extended.extend([metadata[idx]] * len(tlabels))
+
+        # Aggregates list for each metadata factor -> Dict[List]
+        for factor, value in factors.items():
+            vlist = [value] * len(tlabels)
+            factor_lists[factor].extend(vlist)
+
+    labels_arr: NDArray = np.array(labels)
+
+    # Convert all lists into ArrayLike
+    # metadata_arr: dict[str, NDArray] = {k: np.array(v) for k, v in factor_lists.items()}
+
+    return labels_arr, factor_lists
+
+
 @set_metadata("dataeval.metrics")
 def parity(
-    data_factors: Mapping[str, ArrayLike],
+    # data_factors: Mapping[str, ArrayLike],
+    dataset,
     continuous_factor_bincounts: dict[str, int] | None = None,
 ) -> ParityOutput[NDArray[np.float64]]:
     """
@@ -339,7 +376,7 @@ def parity(
     >>> parity(data_factors, continuous_factor_bincounts)
     ParityOutput(score=array([2.82329785, 1.60625584, 1.38377236]), p_value=array([0.83067563, 0.80766733, 0.5006309 ]))
     """
-
+    labels, data_factors = preprocess_dataset(dataset)
     data_factors_np = {k: to_numpy(v) for k, v in data_factors.items()}
     continuous_factor_bincounts = continuous_factor_bincounts if continuous_factor_bincounts else {}
 

@@ -2,6 +2,8 @@ import warnings
 
 import numpy as np
 import pytest
+import torch
+from torch.utils.data import Dataset
 
 from dataeval._internal.metrics.parity import label_parity, parity
 
@@ -175,6 +177,32 @@ class TestLabelIndependenceFunctional:
         assert np.isclose(result.p_value, 1)
 
 
+class DummyObjectDetectionTarget:
+    def __init__(self, boxes, labels, scores):
+        self.boxes = boxes
+        self.labels = labels
+        self.scores = scores
+
+
+class FactorDataset(Dataset):
+    def __init__(self, factors):
+        self.data = factors
+
+    def __len__(self):
+        return len(self.data["class"])
+
+    def __getitem__(self, idx):
+        label = torch.tensor([self.data["class"][idx]])
+        metadata = {}
+        for key in self.data:
+            # if key != "class":
+            metadata[key] = self.data[key][idx]
+        image = np.array([0])
+
+        target = DummyObjectDetectionTarget(None, label, None)
+        return image, target, metadata
+
+
 class TestMDParityUnit:
     def test_warns_with_not_enough_frequency(self):
         factors = {
@@ -188,7 +216,7 @@ class TestMDParityUnit:
         }
 
         with pytest.warns():
-            parity(factors)
+            parity(FactorDataset(factors))
 
     def test_passes_with_enough_frequency(self):
         factors = {
