@@ -10,14 +10,19 @@ ARG output_dir="/dataeval/output"
 ######################## data image ########################
 FROM python:3.11 as data
 RUN pip install --no-cache \
-    tensorflow-cpu==2.15.1 \
-    tensorflow-datasets==4.9.3 \
     --extra-index-url https://download.pytorch.org/whl/cpu \
     torch==2.1.2+cpu \
     torchvision==0.16.2+cpu
 WORKDIR /docs
 COPY docs/data.py data.py
-RUN python -c "import data; data.download();"
+COPY src/dataeval/_internal/datasets.py dataeval/_internal/datasets.py
+RUN python -c "\
+from os import getcwd; \
+from sys import path; \
+path.append(getcwd()); \
+import data; \
+data.download(); \
+"
 
 
 ######################## shared cuda image ########################
@@ -98,8 +103,6 @@ RUN ./capture.sh doctest ${python_version} tox -e doctest
 FROM base as task-docs
 ARG UID
 ARG HOME
-COPY --chown=${UID} --link --from=data /root/tensorflow_datasets ${HOME}/tensorflow_datasets
-COPY --chown=${UID} --link --from=data /root/.keras ${HOME}/.keras
 COPY --chown=${UID} --link --from=data /docs docs
 COPY --chown=${UID} pyproject.toml poetry.lock ./
 COPY --chown=${UID} src/ src/
