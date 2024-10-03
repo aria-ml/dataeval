@@ -17,8 +17,7 @@ def cwd(rel_path):
 
 
 def download():
-    import tensorflow_datasets as tfds
-    from torchvision.datasets import CIFAR10, MNIST, VOCDetection
+    from dataeval._internal.datasets import CIFAR10, MNIST, VOCDetection
 
     # Assume we are running in the docs directory with notebooks in tutorials/notebooks
     with cwd("how_to/notebooks"):
@@ -26,20 +25,18 @@ def download():
         # BayesErrorRateEstimationTutorial.ipynb
         # ClassLearningCurvesTutorial.ipynb
         # ClassLabelAnalysisTutorial.ipynb
+        # DriftDetectionTutorial.ipynb
         # DuplicatesTutorial.ipynb
-        MNIST.mirrors = ["https://ossci-datasets.s3.amazonaws.com/mnist/"]
+        # HPDivergenceTutorial.ipynb
+        # OODDetectionTutorial.ipynb
         MNIST(root="./data", train=True, download=True)
-        MNIST(root="./data", train=False, download=True)
 
         # LintingTutorial.ipynb
         CIFAR10(root="./data", train=False, download=True)
 
-        # DriftDetectionTutorial.ipynb
-        # HPDivergenceTutorial.ipynb
-        # OODDetectionTutorial.ipynb
-        tfds.load("mnist", split="train")
-        tfds.load("mnist_corrupted/translate", split="train")
-
     with cwd("tutorials"):
         # EDA_Part1.ipynb
+        # EDA_Part2.ipynb
+        # EDA_Part3.ipynb
+        # Data_Monitoring.ipynb
         VOCDetection("./data", year="2011", image_set="train", download=True)

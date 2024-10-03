@@ -55,11 +55,12 @@ tensorflow = {version = ">=2.14.1, <2.16", optional = true}
 tensorflow-io-gcs-filesystem = {version = ">=0.35.0, <0.37", optional = true}
 tensorflow_probability = {version = ">=0.22.1, <0.24", optional = true}
 torch = {version = ">=2.0.1, !=2.2.0", source = "pytorch", optional = true}
+torchvision = {version = ">=0.16.0", source = "pytorch", optional = true}
 
 [tool.poetry.extras]
 tensorflow = ["tensorflow", "tensorflow-io-gcs-filesystem", "tensorflow_probability", "nvidia-cudnn-cu11"]
-torch = ["torch", "matplotlib", "nvidia-cudnn-cu11"]
-all = ["matplotlib", "nvidia-cudnn-cu11", "tensorflow", "tensorflow-io-gcs-filesystem", "tensorflow_probability", "torch"]
+torch = ["torch", "torchvision", "matplotlib", "nvidia-cudnn-cu11"]
+all = ["matplotlib", "nvidia-cudnn-cu11", "tensorflow", "tensorflow-io-gcs-filesystem", "tensorflow_probability", "torch", "torchvision"]
 
 [tool.poetry.group.dev]
 optional = true
@@ -98,8 +99,6 @@ pydata-sphinx-theme = "^0.15.4"
 sphinx-design = {version = "*", python = "~3.11"}
 sphinx-tabs = {version = "*", python = "~3.11"}
 Sphinx = {version = "7.2.6", python = "~3.11"}
-tensorflow-datasets = {version = "4.9.3", python = "~3.11"}
-torchvision = {version = ">=0.16.0", source = "pytorch", python = "~3.11"}
 
 [[tool.poetry.source]]
 name = "pytorch"
