@@ -87,18 +87,17 @@ maite = {version = "*"}
 pandas = {version = "*"}
 seaborn = {version = "*"}
 # docs
-certifi = {version = ">=2024.07.04", python = "~3.11"}
-enum_tools = {version = "0.12.0", extras = ["sphinx"], python = "~3.11"}
-ipykernel = {version = "6.26.0", python = "~3.11"}
-ipywidgets = {version = "8.1.1", python = "~3.11"}
-jupyter-client = {version = "8.6.0", python = "~3.11"}
-jupyter-cache = {version = "*", python = "~3.11"}
-myst-nb = {version = "1.0.0", python = "~3.11"}
-protobuf = {version = "4.25.3", python = "~3.11"}
-pydata-sphinx-theme = "^0.15.4"
-sphinx-design = {version = "*", python = "~3.11"}
-sphinx-tabs = {version = "*", python = "~3.11"}
-Sphinx = {version = "7.2.6", python = "~3.11"}
+certifi = {version = ">=2024.07.04"}
+enum_tools = {version = ">=0.12.0", extras = ["sphinx"]}
+ipykernel = {version = ">=6.26.0"}
+ipywidgets = {version = ">=8.1.1"}
+jupyter-client = {version = ">=8.6.0"}
+jupyter-cache = {version = "*"}
+myst-nb = {version = ">=1.0.0"}
+pydata-sphinx-theme = {version = ">=0.15.4"}
+sphinx-design = {version = "*"}
+sphinx-tabs = {version = "*"}
+Sphinx = {version = ">=7.2.6"}
 
 [[tool.poetry.source]]
 name = "pytorch"
