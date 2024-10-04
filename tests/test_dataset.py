@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from dataeval._internal.datasets import MNIST
+from tests.conftest import wait_lock
 
 corrupt = [
     "shot_noise",
@@ -59,7 +60,8 @@ class TestMNIST:
         self, root, train, download, size, unit_interval, dtype, channels, flatten, normalize, corruption, output
     ):
         """Unit testing of MNIST class"""
-        dataset = MNIST(root, train, download, size, unit_interval, dtype, channels, flatten, normalize, corruption)
+        with wait_lock("./data/mnist"):
+            dataset = MNIST(root, train, download, size, unit_interval, dtype, channels, flatten, normalize, corruption)
         assert dataset.data.shape == output
 
     @pytest.mark.parametrize("mnist_params", list(range(n_tests)), indirect=True)
@@ -68,5 +70,6 @@ class TestMNIST:
         root, train, download, size, unit_interval, dtype, channels, flatten, normalize, corruption, output = (
             mnist_params
         )
-        dataset = MNIST(root, train, download, size, unit_interval, dtype, channels, flatten, normalize, corruption)
+        with wait_lock("./data/mnist"):
+            dataset = MNIST(root, train, download, size, unit_interval, dtype, channels, flatten, normalize, corruption)
         assert dataset.data.shape == output
