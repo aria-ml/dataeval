@@ -226,7 +226,7 @@ class TestMDParityUnit:
 
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            parity(factors)
+            parity(FactorDataset(factors))
 
     def test_cant_quantize_strings(self):
         factors = {
@@ -236,7 +236,7 @@ class TestMDParityUnit:
         continuous_bincounts = {"factor1": 2}
 
         with pytest.raises(TypeError):
-            parity(factors, continuous_bincounts)
+            parity(FactorDataset(factors), continuous_bincounts)
 
     def test_bad_factor_ref(self):
         factors = {
@@ -246,17 +246,17 @@ class TestMDParityUnit:
         continuous_bincounts = {"something_else": 2}
 
         with pytest.raises(Exception):
-            parity(factors, continuous_bincounts)
+            parity(FactorDataset(factors), continuous_bincounts)
 
     def test_uneven_factor_lengths(self):
         factors = {
             "class": np.concatenate(([0] * 5, [1] * 5)),
             "factor1": np.array(["a"] * 10),
-            "factor2": np.array(["a"] * 11),
+            "factor2": np.array(["a"] * 9),
         }
 
-        with pytest.raises(ValueError):
-            parity(factors)
+        with pytest.raises(IndexError):
+            parity(FactorDataset(factors))
 
 
 class TestMDParityFunctional:
@@ -271,7 +271,7 @@ class TestMDParityFunctional:
             "factor1": np.concatenate(([10] * 5, [20] * 5)),
         }
 
-        result = parity(factors)
+        result = parity(FactorDataset(factors))
 
         # Checks that factor1 is highly correlated with class
         assert result.p_value[0] < 0.05
@@ -286,7 +286,7 @@ class TestMDParityFunctional:
             "factor1": np.array(["foo"] * 10),
         }
 
-        result = parity(factors)
+        result = parity(FactorDataset(factors))
 
         # Checks that factor1 is uncorrelated with class
         assert np.isclose(result.score[0], 0)
@@ -303,14 +303,14 @@ class TestMDParityFunctional:
         }
         continuous_bincounts = {"factor1": 2}
 
-        result1 = parity(continuous_dataset, continuous_bincounts)
+        result1 = parity(FactorDataset(continuous_dataset), continuous_bincounts)
 
         discrete_dataset = {
             "class": np.concatenate(([0] * 5, [1] * 5)),
             "factor2": np.concatenate(([10] * 5, [20] * 5)),
         }
 
-        result2 = parity(discrete_dataset)
+        result2 = parity(FactorDataset(discrete_dataset))
 
         # Checks that the test on the quantization continuous_dataset is
         # equivalent to the test on the discrete dataset discrete_dataset
@@ -328,7 +328,7 @@ class TestMDParityFunctional:
         }
         continuous_bincounts = {"factor1": 1}
 
-        result = parity(factors, continuous_bincounts)
+        result = parity(FactorDataset(factors), continuous_bincounts)
 
         # Checks if factor1 and class are perfectly uncorrelated
         assert np.isclose(result.score[0], 0)
@@ -347,4 +347,4 @@ class TestMDParityFunctional:
 
         # Looks for a warning that there are (class,factor1) pairs with too low frequency
         with pytest.warns():
-            parity(factors, continuous_bincounts)
+            parity(FactorDataset(factors), continuous_bincounts)
