@@ -17,6 +17,7 @@ from keras.layers import Dense, InputLayer
 from dataeval._internal.detectors.ood.aegmm import OOD_AEGMM
 from dataeval._internal.models.tensorflow.autoencoder import AEGMM
 from dataeval._internal.models.tensorflow.losses import LossGMM
+from tests.conftest import mnist
 
 n_gmm = [1, 2]
 w_energy = [0.1, 0.5]
@@ -34,7 +35,7 @@ def aegmm_params(request):
 
 
 @pytest.mark.parametrize("aegmm_params", list(range(n_tests)), indirect=True)
-def test_aegmm(aegmm_params, mnist):
+def test_aegmm(aegmm_params):
     # OutlierAEGMM parameters
     n_gmm, w_energy, threshold_perc, loss_fn = aegmm_params
 

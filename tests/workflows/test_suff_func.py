@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader, Dataset, Subset
 
 from dataeval._internal.workflows.sufficiency import SufficiencyOutput
 from dataeval.workflows import Sufficiency
+from tests.conftest import mnist
 from tests.utils.data import DataEvalDataset
 
 
@@ -155,11 +156,11 @@ def custom_eval(model, dataset) -> dict[str, float]:
 
 
 class TestSufficiencyFunctional:
-    def test_classification(self, mnist) -> None:
+    def test_classification(self) -> None:
         model = Net()
         length = 1000
-        train_ds = DataEvalDataset(*mnist(train="train", size=length, dtype=np.float32, channels="channels_first"))
-        test_ds = DataEvalDataset(*mnist(train="test", size=100, dtype=np.float32, channels="channels_first"))
+        train_ds = DataEvalDataset(*mnist(train=True, size=length, dtype=np.float32, channels="channels_first"))
+        test_ds = DataEvalDataset(*mnist(train=False, size=100, dtype=np.float32, channels="channels_first"))
         m_count = 1
         steps = 3
 
@@ -190,7 +191,7 @@ class TestSufficiencyFunctional:
 
 
 class TestSufficiencyInverseProjectFunc:
-    def test_predicts_on_real_data(self, mnist):
+    def test_predicts_on_real_data(self):
         """
         End-to-end functional test of sufficiency. This loads the MNIST dataset,
         fits a sufficiency curve to it, and then predicts how many steps are required
@@ -205,10 +206,10 @@ class TestSufficiencyInverseProjectFunc:
         torch._dynamo.config.suppress_errors = True  # type: ignore
 
         train_ds = DataEvalDataset(
-            *mnist(train="train", size=1000, unit_normalize=True, dtype=np.float32, channels="channels_first")
+            *mnist(train=True, size=1000, unit_normalize=True, dtype=np.float32, channels="channels_first")
         )
         test_ds = DataEvalDataset(
-            *mnist(train="test", size=200, unit_normalize=True, dtype=np.float32, channels="channels_first")
+            *mnist(train=False, size=200, unit_normalize=True, dtype=np.float32, channels="channels_first")
         )
         model = cast(Net, torch.compile(Net().to(device)))
 

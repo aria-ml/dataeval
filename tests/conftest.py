@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import tempfile
 import warnings
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal
 
-import pytest
 from numpy.typing import NDArray
 
 try:
@@ -15,7 +15,7 @@ except ImportError:
 
 
 @contextmanager
-def wait_lock(name: str, timeout: int = 120):
+def wait_lock(path: Path, timeout: int = 30):
     try:
         from filelock import FileLock
     except ImportError:
@@ -23,52 +23,63 @@ def wait_lock(name: str, timeout: int = 120):
         yield
         return
 
-    path = Path(name)
+    lock = FileLock(str(path), timeout=timeout)
+    with lock:
+        yield
 
+
+def mnist(
+    root: str | Path = "./data",
+    train: bool = True,
+    download: bool = True,
+    size: int = 1000,
+    unit_normalize: bool = False,
+    dtype: type | None = None,
+    channels: Literal["channels_first", "channels_last"] | None = None,
+    flatten: bool = False,
+    normalize: tuple[float, float] | None = None,
+    corruption: Literal[
+        "identity",
+        "shot_noise",
+        "impulse_noise",
+        "glass_blur",
+        "motion_blur",
+        "shear",
+        "scale",
+        "rotate",
+        "brightness",
+        "translate",
+        "stripe",
+        "fog",
+        "spatter",
+        "dotted_line",
+        "zigzag",
+        "canny_edges",
+    ]
+    | None = None,
+) -> tuple[NDArray, NDArray]:
+    if MNIST is None:
+        raise ImportError("MNIST dataset requires torch and torchvision.")
+
+    path = Path(root)
     if not path.is_absolute():
         path = path.resolve()
 
-    # If we are writing to a new temp folder, create any parent paths
-    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_dir = tempfile.gettempdir()
+    lock_file = Path(temp_dir, "mnist.lock")
 
-    # https://stackoverflow.com/a/60281933/315168
-    lock_file = path.parent / (path.name + ".lock")
+    with wait_lock(lock_file, timeout=60):
+        dataset = MNIST(
+            root=root,
+            train=train,
+            download=download,
+            size=size,
+            unit_interval=unit_normalize,
+            dtype=dtype,
+            channels=channels,
+            flatten=flatten,
+            normalize=normalize,
+            corruption=corruption,
+        )
 
-    lock = FileLock(lock_file, timeout=timeout)
-    try:
-        with lock:
-            yield
-    except TimeoutError:
-        warnings.warn(f"Timed out after {timeout} seconds. Releasing lock on {lock_file}")
-    finally:
-        lock.release()
-
-
-@pytest.fixture(scope="session")
-def mnist():
-    def _method(
-        train: bool = True,
-        size: int = 1000,
-        unit_normalize: bool = False,
-        dtype: type | None = None,
-        channels: Literal["channels_first", "channels_last"] | None = None,
-        flatten: bool = False,
-    ) -> tuple[NDArray, NDArray]:
-        if MNIST is None:
-            raise ImportError("MNIST dataset requires torch and torchvision.")
-
-        with wait_lock("./data/mnist"):
-            dataset = MNIST(
-                root="./data/",
-                train=train,
-                download=True,
-                size=size,
-                unit_interval=unit_normalize,
-                dtype=dtype,
-                channels=channels,
-                flatten=flatten,
-            )
-
-        return dataset.data, dataset.targets
-
-    return _method
+    return dataset.data, dataset.targets

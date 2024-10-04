@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from dataeval._internal.metrics.divergence import divergence, divergence_fnn, divergence_mst
+from tests.conftest import mnist
 
 np.random.seed(0)
 
@@ -14,7 +15,7 @@ class TestDivergence:
             ("FNN", {"divergence": 0.864, "errors": 68}),
         ],
     )
-    def test_divergence(self, mnist, method, output):
+    def test_divergence(self, method, output):
         """Unit testing of Divergence"""
 
         covariates, labels = mnist(channels="channels_last")

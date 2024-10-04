@@ -4,8 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from dataeval._internal.datasets import MNIST
-from tests.conftest import wait_lock
+from tests.conftest import mnist
 
 corrupt = [
     "shot_noise",
@@ -60,9 +59,8 @@ class TestMNIST:
         self, root, train, download, size, unit_interval, dtype, channels, flatten, normalize, corruption, output
     ):
         """Unit testing of MNIST class"""
-        with wait_lock("./data/mnist"):
-            dataset = MNIST(root, train, download, size, unit_interval, dtype, channels, flatten, normalize, corruption)
-        assert dataset.data.shape == output
+        data, _ = mnist(root, train, download, size, unit_interval, dtype, channels, flatten, normalize, corruption)
+        assert data.shape == output
 
     @pytest.mark.parametrize("mnist_params", list(range(n_tests)), indirect=True)
     def test_MNIST_corrupt(self, mnist_params):
@@ -70,6 +68,5 @@ class TestMNIST:
         root, train, download, size, unit_interval, dtype, channels, flatten, normalize, corruption, output = (
             mnist_params
         )
-        with wait_lock("./data/mnist"):
-            dataset = MNIST(root, train, download, size, unit_interval, dtype, channels, flatten, normalize, corruption)
-        assert dataset.data.shape == output
+        data, _ = mnist(root, train, download, size, unit_interval, dtype, channels, flatten, normalize, corruption)
+        assert data.shape == output
