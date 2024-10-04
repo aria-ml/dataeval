@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
-import warnings
 import zipfile
-from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal
 from urllib.error import HTTPError, URLError
@@ -14,34 +12,6 @@ import numpy as np
 from numpy.typing import NDArray
 from torch.utils.data import Dataset
 from torchvision.datasets import CIFAR10, VOCDetection  # noqa: F401
-
-
-@contextmanager
-def wait_lock(name: str, timeout: int = 120):
-    try:
-        from filelock import FileLock
-    except ImportError:
-        warnings.warn("FileLock dependency not found, read/write collisions possible when running in parallel.")
-        yield
-        return
-
-    path = Path(name)
-
-    if not path.is_absolute():
-        path = path.resolve()
-
-    # If we are writing to a new temp folder, create any parent paths
-    os.makedirs(path.parent, exist_ok=True)
-
-    # https://stackoverflow.com/a/60281933/315168
-    lock_file = path.parent / (path.name + ".lock")
-
-    lock = FileLock(lock_file, timeout=timeout)
-    try:
-        with lock:
-            yield
-    finally:
-        lock.release()
 
 
 def _validate_file(fpath, file_md5, chunk_size=65535):
@@ -246,13 +216,12 @@ class MNIST(Dataset):
             print("Identity is not a corrupted dataset but the original MNIST dataset")
         self.corruption = corruption
 
-        with wait_lock(self.mnist_folder):
-            if os.path.exists(self.mnist_folder):
-                print("Files already downloaded and verified")
-            elif download:
-                download_dataset(self.mirror, self.root, self.resources[0], self.resources[1])
-            else:
-                raise RuntimeError("Dataset not found. You can use download=True to download it")
+        if os.path.exists(self.mnist_folder):
+            print("Files already downloaded and verified")
+        elif download:
+            download_dataset(self.mirror, self.root, self.resources[0], self.resources[1])
+        else:
+            raise RuntimeError("Dataset not found. You can use download=True to download it")
 
         self.data, self.targets = self._load_data()
 
