@@ -5,7 +5,6 @@ import os
 import warnings
 import zipfile
 from contextlib import contextmanager
-from os import makedirs
 from pathlib import Path
 from typing import Literal
 from urllib.error import HTTPError, URLError
@@ -32,17 +31,17 @@ def wait_lock(name: str, timeout: int = 120):
         path = path.resolve()
 
     # If we are writing to a new temp folder, create any parent paths
-    makedirs(path.parent, exist_ok=True)
+    os.makedirs(path.parent, exist_ok=True)
 
     # https://stackoverflow.com/a/60281933/315168
     lock_file = path.parent / (path.name + ".lock")
 
     lock = FileLock(lock_file, timeout=timeout)
-    with lock:
-        yield
-
-    # Remove lockfile on completion
-    os.remove(lock_file)
+    try:
+        with lock:
+            yield
+    finally:
+        lock.release()
 
 
 def _validate_file(fpath, file_md5, chunk_size=65535):
