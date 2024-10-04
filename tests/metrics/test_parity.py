@@ -195,8 +195,8 @@ class FactorDataset(Dataset):
         label = torch.tensor([self.data["class"][idx]])
         metadata = {}
         for key in self.data:
-            # if key != "class":
-            metadata[key] = self.data[key][idx]
+            if key != "class":
+                metadata[key] = self.data[key][idx]
         image = np.array([0])
 
         target = DummyObjectDetectionTarget(None, label, None)
