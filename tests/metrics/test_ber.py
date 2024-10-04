@@ -5,6 +5,7 @@ import pytest
 import torch
 
 from dataeval._internal.metrics.ber import ber, ber_knn, ber_mst, knn_lowerbound
+from tests.conftest import mnist
 
 
 class TestFunctionalBER:
@@ -18,7 +19,7 @@ class TestFunctionalBER:
             (ber_knn, 10, (0.137, 0.07132636098401203)),
         ],
     )
-    def test_ber_on_mnist(self, method, k, expected, mnist):
+    def test_ber_on_mnist(self, method, k, expected):
         """Methods correctly calculate BER with given params"""
         data, labels = mnist(flatten=True)
         result = method(data, labels, k) if k else method(data, labels)
@@ -74,7 +75,7 @@ class TestAPIBER:
             ("KNN", 1, {"ber": 0.12, "ber_lower": 0.06214559737386353}),
         ],
     )
-    def test_ber_output_format(self, method, k, expected, mnist):
+    def test_ber_output_format(self, method, k, expected):
         """Confirms BER class transforms functional results into correct format"""
 
         # TODO: Mock patch _ber methods, just check output tuple -> dict

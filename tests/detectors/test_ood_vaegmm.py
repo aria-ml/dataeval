@@ -17,6 +17,7 @@ from keras.layers import Dense, InputLayer
 from dataeval._internal.detectors.ood.vaegmm import OOD_VAEGMM
 from dataeval._internal.models.tensorflow.autoencoder import VAEGMM
 from dataeval._internal.models.tensorflow.losses import LossGMM
+from tests.conftest import mnist
 
 n_gmm = [1, 2]
 w_energy = [0.1, 0.5]
@@ -36,7 +37,7 @@ def vaegmm_params(request):
 
 
 @pytest.mark.parametrize("vaegmm_params", list(range(n_tests)), indirect=True)
-def test_vaegmm(vaegmm_params, mnist):
+def test_vaegmm(vaegmm_params):
     # OutlierVAEGMM parameters
     n_gmm, w_energy, w_recon, samples, threshold_perc, loss_fn = vaegmm_params
 
