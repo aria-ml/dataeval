@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import warnings
 from contextlib import contextmanager
-from os import makedirs
 from pathlib import Path
 from typing import Literal
 
@@ -30,7 +29,7 @@ def wait_lock(name: str, timeout: int = 120):
         path = path.resolve()
 
     # If we are writing to a new temp folder, create any parent paths
-    makedirs(path.parent, exist_ok=True)
+    path.parent.mkdir(parents=True, exist_ok=True)
 
     # https://stackoverflow.com/a/60281933/315168
     lock_file = path.parent / (path.name + ".lock")
@@ -39,6 +38,8 @@ def wait_lock(name: str, timeout: int = 120):
     try:
         with lock:
             yield
+    except TimeoutError:
+        warnings.warn(f"Timed out after {timeout} seconds. Releasing lock on {lock_file}")
     finally:
         lock.release()
 
