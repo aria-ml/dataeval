@@ -52,6 +52,8 @@ RUN uv pip install -r environment/requirements.txt
 COPY --chown=${UID} environment/requirements-dev.txt environment/
 RUN uv pip install -r environment/requirements-dev.txt
 ENV PATH=/${USER}/.venv/bin:${PATH}
+# Corrupted MNIST dataset
+ADD https://zenodo.org/record/3239543/files/mnist_c.zip data/mnist_c.zip
 
 
 ######################## task layers ########################
