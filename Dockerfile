@@ -45,6 +45,8 @@ ENV LANG=en_US.UTF-8
 
 FROM cuda as base
 ARG UID
+# Corrupted MNIST dataset
+ADD --chown=${UID} https://zenodo.org/record/3239543/files/mnist_c.zip data/mnist_c.zip
 ARG python_version
 RUN uv venv -p ${python_version}
 COPY --chown=${UID} environment/requirements.txt environment/
@@ -52,8 +54,6 @@ RUN uv pip install -r environment/requirements.txt
 COPY --chown=${UID} environment/requirements-dev.txt environment/
 RUN uv pip install -r environment/requirements-dev.txt
 ENV PATH=/${USER}/.venv/bin:${PATH}
-# Corrupted MNIST dataset
-ADD https://zenodo.org/record/3239543/files/mnist_c.zip data/mnist_c.zip
 
 
 ######################## task layers ########################
