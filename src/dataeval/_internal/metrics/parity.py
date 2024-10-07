@@ -3,12 +3,11 @@ from __future__ import annotations
 import warnings
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import Generic, Mapping, TypeVar
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy.stats import chi2_contingency, chisquare
-from torch.utils.data import Dataset
 
 from dataeval._internal.interop import to_numpy
 from dataeval._internal.output import OutputMetadata, set_metadata
@@ -281,9 +280,9 @@ def label_parity(
     return ParityOutput(cs, p)
 
 
-def preprocess_dataset(dataset):
+def maite_to_dict_of_lists(dataset):
     """
-    Converts a dataset from torch.utils.data.Dataset to a list of dicts
+    Converts a MAITE dataset from torch.utils.data.Dataset to a list of dicts
 
     Parameters
     ----------
@@ -326,7 +325,7 @@ def preprocess_dataset(dataset):
 
 @set_metadata("dataeval.metrics")
 def parity(
-    dataset: Dataset,
+    data_factors: Mapping[str, ArrayLike],
     continuous_factor_bincounts: dict[str, int] | None = None,
 ) -> ParityOutput[NDArray[np.float64]]:
     """
@@ -338,9 +337,10 @@ def parity(
 
     Parameters
     ----------
-    dataset: torch.utils.data.Dataset
-        Dataset with metadata information to be studied. The dataset
-        must be MAITE-compliant.
+    data_factors: Mapping[str, ArrayLike]
+        The dataset factors, which are per-image attributes including class label and metadata.
+        Each key of dataset_factors is a factor, whose value is the per-image factor values.
+
     continuous_factor_bincounts : Dict[str, int] | None, default None
         A dictionary specifying the number of bins for discretizing the continuous factors.
         The keys should correspond to the names of continuous factors in `data_factors`,
@@ -374,7 +374,6 @@ def parity(
     Examples
     --------
     Randomly creating some "continuous" and categorical variables using ``np.random.default_rng``
-    #TODO: What's the best way to redo this example? Create a whole dataset object on the fly? Run on MNIST?
     >>> data_factors = {
     ...     "age": np_random_gen.choice([25, 30, 35, 45], (100)),
     ...     "income": np_random_gen.choice([50000, 65000, 80000], (100)),
@@ -385,7 +384,7 @@ def parity(
     >>> parity(data_factors, continuous_factor_bincounts)
     ParityOutput(score=array([2.82329785, 1.60625584, 1.38377236]), p_value=array([0.83067563, 0.80766733, 0.5006309 ]))
     """
-    data_factors = preprocess_dataset(dataset)
+    # data_factors = preprocess_dataset(dataset)
     data_factors_np = {k: to_numpy(v) for k, v in data_factors.items()}
     continuous_factor_bincounts = continuous_factor_bincounts if continuous_factor_bincounts else {}
 
