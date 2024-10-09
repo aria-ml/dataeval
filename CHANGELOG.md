@@ -1,6 +1,12 @@
-[//]: # (6745e39daea127ba1bd600dd991f128c14a45e5c)
+[//]: # (7bca6ed436d27e99d6b3b7c105c9ed0ab418f4d0)
 
 # DataEval Change Log
+
+## v0.69.4
+
+📝 **Miscellaneous**
+- `7bca6ed4` - Unified all MNIST and MNIST corrupt datasets to a single internal MNIST class
+- `66ad1c92` - new drift detector: multivariate domain classifier
 
 ## v0.69.3
 
