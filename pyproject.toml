@@ -173,6 +173,7 @@ docstring-code-line-length = "dynamic"
 
 [tool.codespell]
 skip = './*env*,./prototype,./output,./docs/_build,./docs/.jupyter_cache,CHANGELOG.md,poetry.lock,*.html'
+ignore-words-list = ["Hart"]
 
 [build-system]
 requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning"]
