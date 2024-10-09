@@ -73,7 +73,7 @@ nb_execution_mode = "cache" if EXECUTION_MODE is None else EXECUTION_MODE
 nb_execution_raise_on_error = True
 nb_execution_timeout = -1
 
-myst_enable_extensions = ["colon_fence", "dollarmath", "html_image"]
+myst_enable_extensions = ["attrs_inline", "colon_fence", "dollarmath", "html_image"]
 myst_heading_anchors = 4
 
 # -----------------------------------------------------------------------------
@@ -86,8 +86,12 @@ html_favicon = "_static/DataEval_Favicon.png"
 
 
 html_show_sourcelink = False
-html_theme_options = {"navigation_depth": 3, "logo": {"text": "DataEval"}}
 html_static_path = ["_static"]
+html_css_files = ["ARiA.css"]
+html_theme_options = {
+    "navigation_depth": 3,
+    "logo": {"text": "DataEval"},
+}
 
 
 # because we expose private modules in public namespaces

@@ -1,5 +1,4 @@
-Concepts
-========
+# Concepts
 
 These explanations dive into the what, why and theory behind each of DataEval's features.
 
@@ -45,4 +44,15 @@ Sufficiency.md
 UAP.md
 Balance.md
 Diversity.md
+:::
+
+For a quick reference of each algorithm's functionality and requirements, see the Algorithm Overview page.
+
+[Algorithm Overview](metric_table.md)
+
+:::{toctree}
+:hidden:
+:maxdepth: 1
+
+metric_table.md
 :::
