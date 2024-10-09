@@ -1,5 +1,5 @@
 # Detecting Bias in Datasets
-% Includes Parity, Coverage, Mutual Information, iEAT
+% Includes Parity, Coverage, Balance
 
 ## What is it
 
