@@ -1,6 +1,6 @@
 from dataeval import _IS_TORCH_AVAILABLE
 
 if _IS_TORCH_AVAILABLE:  # pragma: no cover
-    from dataeval._internal.workflows.sufficiency import Sufficiency
+    from dataeval._internal.workflows.sufficiency import Sufficiency, SufficiencyOutput
 
-    __all__ = ["Sufficiency"]
+    __all__ = ["Sufficiency", "SufficiencyOutput"]
