@@ -1,0 +1,23 @@
+.font-title {
+    font-size: x-large;
+}
+
+.red-text {
+    color: red;
+}
+
+.bd-sidebar-primary {
+    width: 16rem;
+}
+
+html {
+    --pst-sidebar-secondary: 14rem;
+}
+
+.bd-main .bd-content .bd-article-container {
+    max-width: 70em;
+}
+
+.bd-page-width {
+    max-width: 90rem;
+}

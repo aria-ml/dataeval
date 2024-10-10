@@ -17,10 +17,19 @@ To keep DataEval lightweight but powerful, only the following metrics come with 
 :::{list-table}
 :header-rows: 1
 
-* - Packages
-* - Bayes Error Rate
-* - Divergence
-* - Upper bound Average Precision
+* - Modules
+* - [Balance](concepts/Balance.md)
+* - [Bayes Error Rate](concepts/BER.md)
+* - [Clusterer](concepts/Clusterer.md)
+* - [Coverage](concepts/Coverage.md)
+* - [Divergence](concepts/Divergence.md)
+* - [Diversity](concepts/Diversity.md)
+* - [Duplicates](concepts/Duplicates.md)
+* - [Label Parity](concepts/LabelParity.md)
+* - [Outliers](concepts/Outliers.md)
+* - [Parity](concepts/Parity.md)
+* - [Stats](concepts/Stats.md)
+* - [Upper bound Average Precision](concepts/UAP.md)
 :::
 
 ## Extras
@@ -32,14 +41,15 @@ These extras are **torch**, **tensorflow** and **all**. Any extra can be install
 :header-rows: 1
 
 * - Extras
-  - Additional Packages
+  - Additional Modules
 * - torch
-  - Sufficiency
+  - [Drift](concepts/Drift.md)  
+    [Sufficiency](concepts/Sufficiency.md)
 * - tensorflow
-  - OOD Detection
-* - all
-  - Sufficiency, OOD Detection
+  - [Out-of-Distribution Detection](concepts/OOD.md)
 :::
+
+**all** installs everything in **torch** and **tensorflow**.
 
 ## Installation
 
