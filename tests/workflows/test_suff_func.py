@@ -240,7 +240,7 @@ class TestSufficiencyInverseProjectFunc:
 
         # Evaluate the learning curve to infer the needed amount of training data
         # to train a model to (desired_accuracies) accuracy
-        pred_nsamples = Sufficiency.inv_project(desired_accuracies, output_to_fit)["Accuracy"]
+        pred_nsamples = output_to_fit.inv_project(desired_accuracies)["Accuracy"]
 
         # Train model and see if we get the accuracy we expect on these predicted
         # amounts of training data

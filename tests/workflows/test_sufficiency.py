@@ -229,7 +229,7 @@ class TestSufficiencyPlot:
             params={"test": np.array([-0.1, -1.0, 1.0])},
             measures={"test": np.array([0.2, 0.6, 0.9])},
         )
-        result = Sufficiency.plot(output)
+        result = output.plot()
         assert len(result) == 1
         assert isinstance(result[0], Figure)
 
@@ -249,7 +249,7 @@ class TestSufficiencyPlot:
             },
         )
 
-        result = Sufficiency.plot(output)
+        result = output.plot()
         assert len(result) == 3
         assert isinstance(result[0], Figure)
 
@@ -260,7 +260,7 @@ class TestSufficiencyPlot:
             measures={"test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]])},
         )
 
-        result = Sufficiency.plot(output)
+        result = output.plot()
         assert len(result) == 2
         assert isinstance(result[0], Figure)
 
@@ -272,7 +272,7 @@ class TestSufficiencyPlot:
         )
 
         with pytest.raises(IndexError):
-            Sufficiency.plot(output, ["A", "B", "C"])
+            output.plot(["A", "B", "C"])
 
     def test_multiplot_classwise_with_names(self):
         output = SufficiencyOutput(
@@ -281,7 +281,7 @@ class TestSufficiencyPlot:
             measures={"test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]])},
         )
 
-        result = Sufficiency.plot(output, ["A", "B"])
+        result = output.plot(["A", "B"])
         assert result[0].axes[0].get_title().startswith("test1_A")
 
     def test_multiplot_classwise_without_names(self):
@@ -291,7 +291,7 @@ class TestSufficiencyPlot:
             measures={"test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]])},
         )
 
-        result = Sufficiency.plot(output)
+        result = output.plot()
         assert result[0].axes[0].get_title().startswith("test1_0")
 
     def test_multiplot_mixed(self):
@@ -301,7 +301,7 @@ class TestSufficiencyPlot:
             measures={"test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]]), "test2": np.array([0.2, 0.6, 0.9])},
         )
 
-        result = Sufficiency.plot(output)
+        result = output.plot()
         assert len(result) == 3
         assert result[0].axes[0].get_title().startswith("test1_0")
         assert result[1].axes[0].get_title().startswith("test1_1")
@@ -324,7 +324,7 @@ class TestSufficiencyProject:
             params={"test1": np.array([-0.1, -1.0, 1.0])},
             measures={"test1": np.array([0.2, 0.6, 0.9])},
         )
-        result = Sufficiency.project(output, steps)
+        result = output.project(steps)
         npt.assert_almost_equal(result.measures["test1"], [10.0], decimal=4)
 
     def test_project_invalid_steps(self):
@@ -334,7 +334,7 @@ class TestSufficiencyProject:
             measures={"test1": np.array([0.2, 0.6, 0.9])},
         )
         with pytest.raises(ValueError):
-            Sufficiency.project(output, 1.0)  # type: ignore
+            output.project(1.0)  # type: ignore
 
     def test_project_classwise(self):
         output = SufficiencyOutput(
@@ -344,7 +344,7 @@ class TestSufficiencyProject:
         )
 
         assert output.measures["test1"].shape == (2, 3)
-        result = Sufficiency.project(output, [1000, 2000, 4000, 8000])
+        result = output.project([1000, 2000, 4000, 8000])
         assert len(result.measures) == 1
         assert result.measures["test1"].shape == (2, 4)
 
@@ -357,7 +357,7 @@ class TestSufficiencyProject:
 
         assert output.measures["test1"].shape == (2, 3)
         assert output.measures["test2"].shape == (3,)
-        result = Sufficiency.project(output, [1000, 2000, 4000, 8000])
+        result = output.project([1000, 2000, 4000, 8000])
         assert len(result.measures) == 2
         assert result.measures["test1"].shape == (2, 4)
         assert result.measures["test2"].shape == (4,)
@@ -374,7 +374,7 @@ class TestSufficiencyProject:
 
         targets = {"test1": np.array([0.6, 0.7, 0.8, 0.9]), "test2": np.array([0.6, 0.7, 0.8, 0.9])}
 
-        result = Sufficiency.inv_project(targets, output)
+        result = output.inv_project(targets)
         assert len(result.keys()) == 2
         assert result["test1"].shape == (2, 4)
         assert result["test2"].shape == (4,)
@@ -388,7 +388,7 @@ class TestSufficiencyProject:
 
         targets = {"test1": np.array([0.6, 0.7, 0.8, 0.9]), "test2": np.array([0.6, 0.7, 0.8, 0.9])}
 
-        result = Sufficiency.inv_project(targets, output)
+        result = output.inv_project(targets)
         assert len(result.keys()) == 1
         assert result["test1"].shape == (2, 4)
 
@@ -400,7 +400,7 @@ class TestSufficiencyInverseProject:
         """
         data = SufficiencyOutput(np.array([]), params={}, measures={})
         desired_accuracies = {}
-        assert len(Sufficiency.inv_project(desired_accuracies, data)) == 0
+        assert len(data.inv_project(desired_accuracies)) == 0
 
     def test_can_invert_sufficiency(self):
         """
@@ -414,7 +414,7 @@ class TestSufficiencyInverseProject:
         data = SufficiencyOutput(steps=num_samples, params={"Accuracy": params}, measures={"Accuracy": accuracies})
 
         desired_accuracies = {"Accuracy": np.array([0.4, 0.6])}
-        needed_data = Sufficiency.inv_project(desired_accuracies, data)["Accuracy"]
+        needed_data = data.inv_project(desired_accuracies)["Accuracy"]
 
         target_needed_data = np.array([40, 60])
         npt.assert_array_equal(needed_data, target_needed_data)

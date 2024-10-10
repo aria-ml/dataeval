@@ -42,6 +42,129 @@ class SufficiencyOutput(OutputMetadata):
             if c != c_v:
                 raise ValueError(f"{m} does not contain the expected number ({c}) of data points.")
 
+    @set_metadata("dataeval.workflows.SufficiencyOutput")
+    def project(
+        self,
+        projection: int | Sequence[int] | NDArray[np.uint],
+    ) -> SufficiencyOutput:
+        """Projects the measures for each value of X
+
+        Parameters
+        ----------
+        projection : int | Sequence[int] | NDArray[np.uint]
+            Step or steps to project
+
+        Returns
+        -------
+        SufficiencyOutput
+            Dataclass containing the projected measures per projection
+
+        Raises
+        ------
+        ValueError
+            If the length of data points in the measures do not match
+            If the steps are not int, Sequence[int] or an ndarray
+        """
+        projection = [projection] if isinstance(projection, int) else projection
+        projection = np.array(projection) if isinstance(projection, Sequence) else projection
+        if not isinstance(projection, np.ndarray):
+            raise ValueError("'steps' must be an int, Sequence[int] or ndarray")
+
+        output = {}
+        for name, measures in self.measures.items():
+            if measures.ndim > 1:
+                result = []
+                for i in range(len(measures)):
+                    projected = project_steps(self.params[name][i], projection)
+                    result.append(projected)
+                output[name] = np.array(result)
+            else:
+                output[name] = project_steps(self.params[name], projection)
+        return SufficiencyOutput(projection, self.params, output)
+
+    def plot(self, class_names: Sequence[str] | None = None) -> list[Figure]:
+        """Plotting function for data sufficiency tasks
+
+        Parameters
+        ----------
+        class_names : Sequence[str] | None, default None
+            List of class names
+
+        Returns
+        -------
+        List[plt.Figure]
+            List of Figures for each measure
+
+        Raises
+        ------
+        ValueError
+            If the length of data points in the measures do not match
+        """
+        # Extrapolation parameters
+        last_X = self.steps[-1]
+        geomshape = (0.01 * last_X, last_X * 4, len(self.steps))
+        extrapolated = np.geomspace(*geomshape).astype(np.int64)
+
+        # Stores all plots
+        plots = []
+
+        # Create a plot for each measure on one figure
+        for name, measures in self.measures.items():
+            if measures.ndim > 1:
+                if class_names is not None and len(measures) != len(class_names):
+                    raise IndexError("Class name count does not align with measures")
+                for i, measure in enumerate(measures):
+                    class_name = str(i) if class_names is None else class_names[i]
+                    fig = plot_measure(
+                        f"{name}_{class_name}",
+                        self.steps,
+                        measure,
+                        self.params[name][i],
+                        extrapolated,
+                    )
+                    plots.append(fig)
+
+            else:
+                fig = plot_measure(name, self.steps, measures, self.params[name], extrapolated)
+                plots.append(fig)
+
+        return plots
+
+    def inv_project(self, targets: dict[str, NDArray]) -> dict[str, NDArray]:
+        """
+        Calculate training samples needed to achieve target model metric values.
+
+        Parameters
+        ----------
+        targets : Dict[str, NDArray]
+            Dictionary of target metric scores (from 0.0 to 1.0) that we want
+            to achieve, where the key is the name of the metric.
+
+        Returns
+        -------
+        Dict[str, NDArray]
+            List of the number of training samples needed to achieve each
+            corresponding entry in targets
+        """
+
+        projection = {}
+
+        for name, target in targets.items():
+            if name not in self.measures:
+                continue
+
+            measure = self.measures[name]
+            if measure.ndim > 1:
+                projection[name] = np.zeros((len(measure), len(target)))
+                for i in range(len(measure)):
+                    projection[name][i] = inv_project_steps(
+                        self.params[name][i], target[i] if target.ndim == measure.ndim else target
+                    )
+            else:
+                projection[name] = inv_project_steps(self.params[name], target)
+
+        return projection
+
 
 def f_out(n_i: NDArray, x: NDArray) -> NDArray:
     """
@@ -421,136 +544,3 @@ class Sufficiency:
         measures = {k: (v / self.runs).T for k, v in measures.items()}
         params_output = get_curve_params(measures, ranges, niter)
         return SufficiencyOutput(ranges, params_output, measures)
-
-    @classmethod
-    def project(
-        cls,
-        data: SufficiencyOutput,
-        projection: int | Sequence[int] | NDArray[np.uint],
-    ) -> SufficiencyOutput:
-        """Projects the measures for each value of X
-
-        Parameters
-        ----------
-        data : SufficiencyOutput
-            Dataclass containing the average of each measure per substep
-        projection : int | Sequence[int] | NDArray[np.uint]
-            Step or steps to project
-
-        Returns
-        -------
-        SufficiencyOutput
-            Dataclass containing the projected measures per projection
-
-        Raises
-        ------
-        ValueError
-            If the length of data points in the measures do not match
-            If the steps are not int, Sequence[int] or an ndarray
-        """
-        projection = [projection] if isinstance(projection, int) else projection
-        projection = np.array(projection) if isinstance(projection, Sequence) else projection
-        if not isinstance(projection, np.ndarray):
-            raise ValueError("'steps' must be an int, Sequence[int] or ndarray")
-
-        output = {}
-        for name, measures in data.measures.items():
-            if measures.ndim > 1:
-                result = []
-                for i in range(len(measures)):
-                    projected = project_steps(data.params[name][i], projection)
-                    result.append(projected)
-                output[name] = np.array(result)
-            else:
-                output[name] = project_steps(data.params[name], projection)
-        return SufficiencyOutput(projection, data.params, output)
-
-    @classmethod
-    def plot(cls, data: SufficiencyOutput, class_names: Sequence[str] | None = None) -> list[Figure]:
-        """Plotting function for data sufficiency tasks
-
-        Parameters
-        ----------
-        data : SufficiencyOutput
-            Dataclass containing the average of each measure per substep
-        class_names : Sequence[str] | None, default None
-            List of class names
-
-        Returns
-        -------
-        List[plt.Figure]
-            List of Figures for each measure
-
-        Raises
-        ------
-        ValueError
-            If the length of data points in the measures do not match
-        """
-        # Extrapolation parameters
-        last_X = data.steps[-1]
-        geomshape = (0.01 * last_X, last_X * 4, len(data.steps))
-        extrapolated = np.geomspace(*geomshape).astype(np.int64)
-
-        # Stores all plots
-        plots = []
-
-        # Create a plot for each measure on one figure
-        for name, measures in data.measures.items():
-            if measures.ndim > 1:
-                if class_names is not None and len(measures) != len(class_names):
-                    raise IndexError("Class name count does not align with measures")
-                for i, measure in enumerate(measures):
-                    class_name = str(i) if class_names is None else class_names[i]
-                    fig = plot_measure(
-                        f"{name}_{class_name}",
-                        data.steps,
-                        measure,
-                        data.params[name][i],
-                        extrapolated,
-                    )
-                    plots.append(fig)
-
-            else:
-                fig = plot_measure(name, data.steps, measures, data.params[name], extrapolated)
-                plots.append(fig)
-
-        return plots
-
-    @classmethod
-    def inv_project(cls, targets: dict[str, NDArray], data: SufficiencyOutput) -> dict[str, NDArray]:
-        """
-        Calculate training samples needed to achieve target model metric values.
-
-        Parameters
-        ----------
-        targets : Dict[str, NDArray]
-            Dictionary of target metric scores (from 0.0 to 1.0) that we want
-            to achieve, where the key is the name of the metric.
-
-        data : SufficiencyOutput
-            Dataclass containing the average of each measure per substep
-
-        Returns
-        -------
-        Dict[str, NDArray]
-            List of the number of training samples needed to achieve each
-            corresponding entry in targets
-        """
-
-        projection = {}
-
-        for name, target in targets.items():
-            if name not in data.measures:
-                continue
-
-            measure = data.measures[name]
-            if measure.ndim > 1:
-                projection[name] = np.zeros((len(measure), len(target)))
-                for i in range(len(measure)):
-                    projection[name][i] = inv_project_steps(
-                        data.params[name][i], target[i] if target.ndim == measure.ndim else target
-                    )
-            else:
-                projection[name] = inv_project_steps(data.params[name], target)
-
-        return projection
