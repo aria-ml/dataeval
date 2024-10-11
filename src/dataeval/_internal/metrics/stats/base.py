@@ -192,30 +192,22 @@ def run_stats(
     output_list = list(output_cls.__annotations__)
     source_index = []
     box_count = []
-    if bboxes is None:
-        for i, image in enumerate(to_numpy_iter(images)):
-            processor: StatsProcessor = stats_processor_cls(image, None, per_channel)
+    bbox_iter = (None for _ in images) if bboxes is None else to_numpy_iter(bboxes)
+
+    for i, (boxes, image) in enumerate(zip(bbox_iter, to_numpy_iter(images))):
+        nboxes = [None] if boxes is None else normalize_box_shape(boxes)
+        for i_b, box in enumerate(nboxes):
+            i_b = None if box is None else i_b
+            processor: StatsProcessor = stats_processor_cls(image, box, per_channel)
+            if not processor.is_valid_slice:
+                warnings.warn(f"Bounding box {i_b}: {box} is out of bounds of image {i}: {image.shape}.")
             results_list.append({stat: processor.get(stat) for stat in output_list})
             if per_channel:
-                channels = image.shape[-3]
-                source_index.extend([SourceIndex(i, None, c) for c in range(channels)])
+                source_index.extend([SourceIndex(i, i_b, c) for c in range(image.shape[-3])])
             else:
-                source_index.append(SourceIndex(i, None, None))
-            box_count.append(0)
-    else:
-        for i, (boxes, image) in enumerate(zip(to_numpy_iter(bboxes), to_numpy_iter(images))):
-            nboxes = normalize_box_shape(boxes)
-            for i_b, box in enumerate(nboxes):
-                processor: StatsProcessor = stats_processor_cls(image, box, per_channel)
-                if not processor.is_valid_slice:
-                    warnings.warn(f"Bounding box {i_b}: {box} is out of bounds of image {i}: {image.shape}.")
-                results_list.append({stat: processor.get(stat) for stat in output_list})
-                if per_channel:
-                    channels = image.shape[-3]
-                    source_index.extend([SourceIndex(i, i_b, c) for c in range(image.shape[-3])])
-                else:
-                    source_index.append(SourceIndex(i, i_b, None))
-            box_count.append(len(boxes))
+                source_index.append(SourceIndex(i, i_b, None))
+        box_count.append(0 if boxes is None else len(boxes))
+
     output = {}
     if per_channel:
         for i, results in enumerate(results_list):

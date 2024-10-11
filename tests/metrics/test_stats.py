@@ -198,3 +198,25 @@ class TestStats:
             if isinstance(v, np.ndarray):
                 assert not np.isnan(np.sum(v))
                 assert not np.isinf(np.sum(v))
+
+    def test_stats_source_index_no_boxes_no_channels(self):
+        stats = pixelstats(DATA_3)
+        assert all(si.box is None for si in stats.source_index)
+        assert all(si.channel is None for si in stats.source_index)
+
+    def test_stats_source_index_with_boxes_no_channels(self):
+        boxes = get_bboxes(10, 2)
+        stats = pixelstats(DATA_3, boxes)
+        assert all(si.box is not None for si in stats.source_index)
+        assert all(si.channel is None for si in stats.source_index)
+
+    def test_stats_source_index_no_boxes_with_channels(self):
+        stats = pixelstats(DATA_3, per_channel=True)
+        assert all(si.box is None for si in stats.source_index)
+        assert all(si.channel is not None for si in stats.source_index)
+
+    def test_stats_source_index_with_boxes_with_channels(self):
+        boxes = get_bboxes(10, 2)
+        stats = pixelstats(DATA_3, boxes, per_channel=True)
+        assert all(si.box is not None for si in stats.source_index)
+        assert all(si.channel is not None for si in stats.source_index)

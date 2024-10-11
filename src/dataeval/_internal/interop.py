@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Iterable
+from typing import Any, Iterable, Iterator
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -22,7 +22,7 @@ def try_import(module_name):
     return module
 
 
-def to_numpy(array: ArrayLike | None) -> NDArray:
+def to_numpy(array: ArrayLike | None) -> NDArray[Any]:
     if array is None:
         return np.ndarray([])
 
@@ -40,6 +40,6 @@ def to_numpy(array: ArrayLike | None) -> NDArray:
     return np.asarray(array)
 
 
-def to_numpy_iter(iterable: Iterable[ArrayLike]):
+def to_numpy_iter(iterable: Iterable[ArrayLike]) -> Iterator[NDArray[Any]]:
     for array in iterable:
         yield to_numpy(array)
