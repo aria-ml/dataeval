@@ -13,6 +13,8 @@ from numpy.typing import NDArray
 skip_mnist = pytest.mark.skip(reason="Skip MNIST tests for unit testing")
 
 try:
+    from torch.utils.data import Dataset
+
     from dataeval._internal.datasets import MNIST
 except ImportError:
     MNIST = None
@@ -66,7 +68,41 @@ def mnist(
         "canny_edges",
     ]
     | None = None,
-) -> tuple[NDArray, NDArray]:
+    classes: Literal[
+        "zero",
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine",
+    ]
+    | int
+    | list[int]
+    | list[
+        Literal[
+            "zero",
+            "one",
+            "two",
+            "three",
+            "four",
+            "five",
+            "six",
+            "seven",
+            "eight",
+            "nine",
+        ]
+    ]
+    | None = None,
+    balance: bool = True,
+    randomize: bool = False,
+    slice_back: bool = False,
+    verbose: bool = True,
+    return_dataset: bool = False,
+) -> tuple[NDArray, NDArray] | Dataset:
     if MNIST is None:
         raise ImportError("MNIST dataset requires torch and torchvision.")
 
@@ -89,8 +125,15 @@ def mnist(
             flatten=flatten,
             normalize=normalize,
             corruption=corruption,
+            classes=classes,
+            balance=balance,
+            randomize=randomize,
+            slice_back=slice_back,
+            verbose=verbose,
         )
 
     assert False
 
+    if return_dataset:
+        return dataset
     return dataset.data, dataset.targets
