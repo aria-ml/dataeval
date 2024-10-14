@@ -2,12 +2,13 @@ import numpy as np
 import pytest
 
 from dataeval._internal.metrics.divergence import divergence, divergence_fnn, divergence_mst
-from tests.conftest import mnist
+from tests.conftest import mnist, skip_mnist
 
 np.random.seed(0)
 
 
 class TestDivergence:
+    @skip_mnist
     @pytest.mark.parametrize(
         "method, output",
         [

@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from tests.conftest import mnist
+from tests.conftest import mnist, skip_mnist
 
 corrupt = [
     "shot_noise",
@@ -34,6 +34,7 @@ def mnist_params(request):
     return tests[request.param]
 
 
+@skip_mnist
 class TestMNIST:
     @pytest.mark.parametrize(
         "root, train, download, size, unit_interval, dtype, channels, flatten, normalize, corruption, output",
