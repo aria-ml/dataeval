@@ -4,7 +4,7 @@ import hashlib
 import os
 import zipfile
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypeVar
 from urllib.error import HTTPError, URLError
 from urllib.request import urlretrieve
 from warnings import warn
@@ -14,9 +14,30 @@ from numpy.typing import NDArray
 from torch.utils.data import Dataset
 from torchvision.datasets import CIFAR10, VOCDetection  # noqa: F401
 
+ClassStringMap = Literal["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
+TClassMap = TypeVar("TClassMap", ClassStringMap, int, list[ClassStringMap], list[int])
+CorruptionStringMap = Literal[
+    "identity",
+    "shot_noise",
+    "impulse_noise",
+    "glass_blur",
+    "motion_blur",
+    "shear",
+    "scale",
+    "rotate",
+    "brightness",
+    "translate",
+    "stripe",
+    "fog",
+    "spatter",
+    "dotted_line",
+    "zigzag",
+    "canny_edges",
+]
 
-def _validate_file(fpath, file_md5, chunk_size=65535):
-    hasher = hashlib.md5()
+
+def _validate_file(fpath, file_md5, md5=False, chunk_size=65535):
+    hasher = hashlib.md5() if md5 else hashlib.sha256()
     with open(fpath, "rb") as fpath_file:
         while chunk := fpath_file.read(chunk_size):
             hasher.update(chunk)
@@ -27,22 +48,18 @@ def _get_file(
     root: str | Path,
     fname: str,
     origin: str,
-    file_md5: str | None = None,
+    file_hash: str | None = None,
     verbose: bool = True,
+    md5: bool = False,
 ):
-    fname = os.fspath(fname) if isinstance(fname, os.PathLike) else fname
     fpath = os.path.join(root, fname)
-
-    download = False
-    if os.path.exists(fpath):
-        if file_md5 is not None and not _validate_file(fpath, file_md5):
-            download = True
-        else:
-            if verbose:
-                print("Zip already downloaded and verified.")
-                print("Extracting...")
-    else:
-        download = True
+    download = True
+    if os.path.exists(fpath) and file_hash is not None and _validate_file(fpath, file_hash, md5):
+        download = False
+        if verbose:
+            print("File already downloaded and verified.")
+            if md5:
+                print("Extracting zip file...")
 
     if download:
         try:
@@ -58,29 +75,42 @@ def _get_file(
                 os.remove(fpath)
             raise
 
-        if os.path.exists(fpath) and file_md5 is not None and not _validate_file(fpath, file_md5):
+        if os.path.exists(fpath) and file_hash is not None and not _validate_file(fpath, file_hash, md5):
             raise ValueError(
                 "Incomplete or corrupted file detected. "
-                f"The md5 file hash does not match the provided value "
-                f"of {file_md5}.",
+                f"The file hash does not match the provided value "
+                f"of {file_hash}.",
             )
+
     return fpath
 
 
 def check_exists(
-    folder: str | Path, url: str, root: str | Path, fname: str, md5: str, download: bool = True, verbose: bool = True
+    folder: str | Path,
+    url: str,
+    root: str | Path,
+    fname: str,
+    file_hash: str,
+    download: bool = True,
+    verbose: bool = True,
+    md5: bool = False,
 ):
+    """Determine if the dataset has already been downloaded."""
+    location = str(folder)
     if not os.path.exists(folder):
         if download:
-            download_dataset(url, root, fname, md5, verbose)
+            location = download_dataset(url, root, fname, file_hash, verbose, md5)
         else:
             raise RuntimeError("Dataset not found. You can use download=True to download it")
     else:
         if verbose:
             print("Files already downloaded and verified")
+    return location
 
 
-def download_dataset(url: str, root: str | Path, fname: str, md5: str, verbose: bool = True) -> str:
+def download_dataset(
+    url: str, root: str | Path, fname: str, file_hash: str, verbose: bool = True, md5: bool = False
+) -> str:
     """Code to download mnist and corruptions, originates from tensorflow_datasets (tfds):
     https://github.com/tensorflow/datasets/blob/master/tensorflow_datasets/image_classification/mnist_corrupted.py
     """
@@ -88,22 +118,24 @@ def download_dataset(url: str, root: str | Path, fname: str, md5: str, verbose: 
     folder = os.path.join(root, name)
     os.makedirs(folder, exist_ok=True)
 
-    path = _get_file(
-        root,
+    fpath = _get_file(
+        folder,
         fname,
         origin=url + fname,
-        file_md5=md5,
+        file_hash=file_hash,
         verbose=verbose,
+        md5=md5,
     )
-    extract_archive(path, remove_finished=True)
-    return path
+    if md5:
+        folder = extract_archive(fpath, root, remove_finished=True)
+    return folder
 
 
 def extract_archive(
     from_path: str | Path,
     to_path: str | Path | None = None,
     remove_finished: bool = False,
-):
+) -> str:
     """Extract an archive.
 
     The archive type and a possible compression is automatically detected from the file name.
@@ -112,8 +144,11 @@ def extract_archive(
     if not from_path.is_absolute():
         from_path = from_path.resolve()
 
-    if to_path is None:
+    if to_path is None or not os.path.exists(to_path):
         to_path = os.path.dirname(from_path)
+    to_path = Path(to_path)
+    if not to_path.is_absolute():
+        to_path = to_path.resolve()
 
     # Extracting zip
     with zipfile.ZipFile(from_path, "r", compression=zipfile.ZIP_STORED) as zzip:
@@ -121,6 +156,7 @@ def extract_archive(
 
     if remove_finished:
         os.remove(from_path)
+    return str(to_path)
 
 
 def subselect(arr: NDArray, count: int, from_back: bool = False):
@@ -171,9 +207,15 @@ class MNIST(Dataset):
             If True, outputs print statements.
     """
 
-    mirror = "https://zenodo.org/record/3239543/files/"
+    mirror = [
+        "https://storage.googleapis.com/tensorflow/tf-keras-datasets/",
+        "https://zenodo.org/record/3239543/files/",
+    ]
 
-    resources = ("mnist_c.zip", "4b34b33045869ee6d424616cd3a65da3")
+    resources = [
+        ("mnist.npz", "731c5ac602752760c8e48fbffcf8c3b850d9dc2a2aedcf2cc48468fc17b673d1"),
+        ("mnist_c.zip", "4b34b33045869ee6d424616cd3a65da3"),
+    ]
 
     class_dict = {
         "zero": 0,
@@ -199,54 +241,8 @@ class MNIST(Dataset):
         channels: Literal["channels_first", "channels_last"] | None = None,
         flatten: bool = False,
         normalize: tuple[float, float] | None = None,
-        corruption: Literal[
-            "identity",
-            "shot_noise",
-            "impulse_noise",
-            "glass_blur",
-            "motion_blur",
-            "shear",
-            "scale",
-            "rotate",
-            "brightness",
-            "translate",
-            "stripe",
-            "fog",
-            "spatter",
-            "dotted_line",
-            "zigzag",
-            "canny_edges",
-        ]
-        | None = None,
-        classes: Literal[
-            "zero",
-            "one",
-            "two",
-            "three",
-            "four",
-            "five",
-            "six",
-            "seven",
-            "eight",
-            "nine",
-        ]
-        | int
-        | list[int]
-        | list[
-            Literal[
-                "zero",
-                "one",
-                "two",
-                "three",
-                "four",
-                "five",
-                "six",
-                "seven",
-                "eight",
-                "nine",
-            ]
-        ]
-        | None = None,
+        corruption: CorruptionStringMap | None = None,
+        classes: TClassMap | None = None,
         balance: bool = True,
         randomize: bool = False,
         slice_back: bool = False,
@@ -262,15 +258,11 @@ class MNIST(Dataset):
         self.channels = channels
         self.flatten = flatten
         self.normalize = normalize
+        self.corruption = corruption
         self.balance = balance
         self.randomize = randomize
         self.from_back = slice_back
-
-        if corruption is None:
-            corruption = "identity"
-        elif corruption == "identity" and verbose:
-            print("Identity is not a corrupted dataset but the original MNIST dataset")
-        self.corruption = corruption
+        self.verbose = verbose
 
         self.class_set = []
         if classes is not None:
@@ -289,23 +281,38 @@ class MNIST(Dataset):
 
         self.num_classes = len(self.class_set)
 
-        check_exists(self.mnist_folder, self.mirror, self.root, self.resources[0], self.resources[1], download, verbose)
+        if self.corruption is None:
+            file_resource = self.resources[0]
+            mirror = self.mirror[0]
+            md5 = False
+        else:
+            if self.corruption == "identity" and verbose:
+                print("Identity is not a corrupted dataset but the original MNIST dataset")
+            file_resource = self.resources[1]
+            mirror = self.mirror[1]
+            md5 = True
+        check_exists(self.mnist_folder, mirror, self.root, file_resource[0], file_resource[1], download, verbose, md5)
 
         self.data, self.targets = self._load_data()
 
         self._augmentations()
 
     def _load_data(self):
-        image_file = f"{'train' if self.train else 'test'}_images.npy"
-        data = self._read_file(os.path.join(self.mnist_folder, image_file))
+        if self.corruption is None:
+            image_file = self.resources[0][0]
+            data, targets = self._read_normal_file(os.path.join(self.mnist_folder, image_file))
+        else:
+            image_file = f"{'train' if self.train else 'test'}_images.npy"
+            data = self._read_corrupt_file(os.path.join(self.mnist_folder, image_file))
+            data = data.squeeze()
 
-        label_file = f"{'train' if self.train else 'test'}_labels.npy"
-        targets = self._read_file(os.path.join(self.mnist_folder, label_file))
+            label_file = f"{'train' if self.train else 'test'}_labels.npy"
+            targets = self._read_corrupt_file(os.path.join(self.mnist_folder, label_file))
 
         return data, targets
 
     def _augmentations(self):
-        if self.size > self.targets.shape[0]:
+        if self.size > self.targets.shape[0] and self.verbose:
             warn(
                 f"Asked for more samples, {self.size}, than the raw dataset contains, {self.targets.shape[0]}. "
                 "Adjusting down to raw dataset size."
@@ -330,7 +337,7 @@ class MNIST(Dataset):
 
             if self.per_class_count > min_label_count:
                 self.per_class_count = min_label_count
-                if not self.balance:
+                if not self.balance and self.verbose:
                     warn(
                         f"Because of dataset limitations, only {min_label_count*self.num_classes} samples "
                         f"will be returned, instead of the desired {self.size}."
@@ -352,9 +359,9 @@ class MNIST(Dataset):
             self.data = self.data.astype(self.dtype)
 
         if self.channels == "channels_first":
-            self.data = np.moveaxis(self.data, -1, 1)
-        elif self.channels is None:
-            self.data = self.data[:, :, :, 0]
+            self.data = self.data[:, np.newaxis, :, :]
+        elif self.channels == "channels_last":
+            self.data = self.data[:, :, :, np.newaxis]
 
         if self.flatten and self.channels is None:
             self.data = self.data.reshape(self.data.shape[0], -1)
@@ -376,8 +383,18 @@ class MNIST(Dataset):
 
     @property
     def mnist_folder(self) -> str:
+        if self.corruption is None:
+            return os.path.join(self.root, "mnist")
         return os.path.join(self.root, "mnist_c", self.corruption)
 
-    def _read_file(self, path: str) -> NDArray:
+    def _read_normal_file(self, path: str) -> tuple[NDArray, NDArray]:
+        with np.load(path, allow_pickle=True) as f:
+            if self.train:
+                x, y = f["x_train"], f["y_train"]
+            else:
+                x, y = f["x_test"], f["y_test"]
+        return x, y
+
+    def _read_corrupt_file(self, path: str) -> NDArray:
         x = np.load(path, allow_pickle=False)
         return x
