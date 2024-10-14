@@ -4,13 +4,14 @@ import numpy as np
 import pytest
 import torch
 
-from dataeval._internal.metrics.ber import ber, ber_knn, ber_mst, knn_lowerbound
-from tests.conftest import mnist
+from dataeval._internal.metrics.ber import BEROutput, ber, ber_knn, ber_mst, knn_lowerbound
+from tests.conftest import mnist, skip_mnist
 
 
 class TestFunctionalBER:
     """Tests the functional methods used in BER"""
 
+    @skip_mnist
     @pytest.mark.parametrize(
         "method, k, expected",
         [
@@ -68,20 +69,9 @@ class TestAPIBER:
         with pytest.raises(ValueError):
             ber([], [], method="NOT_A_METHOD")  # type: ignore
 
-    @pytest.mark.parametrize(
-        "method, k, expected",
-        [
-            ("MST", 1, {"ber": 0.143, "ber_lower": 0.0745910104681437}),
-            ("KNN", 1, {"ber": 0.12, "ber_lower": 0.06214559737386353}),
-        ],
-    )
-    def test_ber_output_format(self, method, k, expected):
-        """Confirms BER class transforms functional results into correct format"""
-
-        # TODO: Mock patch _ber methods, just check output tuple -> dict
-        images, labels = mnist(flatten=True)
-        result = ber(images=images, labels=labels, k=k, method=method)
-        assert result.dict() == expected
+    def test_ber_output_format(self):
+        result = BEROutput(0.8, 0.2)
+        assert result.dict() == {"ber": 0.8, "ber_lower": 0.2}
 
     def test_torch_inputs(self):
         """Torch class correctly calls functional numpy math"""

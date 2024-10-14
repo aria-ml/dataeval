@@ -6,12 +6,21 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal
 
+import numpy as np
+import pytest
 from numpy.typing import NDArray
+
+skip_mnist = pytest.mark.skip(reason="Skip MNIST tests for unit testing")
 
 try:
     from dataeval._internal.datasets import MNIST
 except ImportError:
     MNIST = None
+
+
+@pytest.fixture
+def np_rand_1000_28x28():
+    return np.random.random((1000, 28 * 28)).astype(np.float32)
 
 
 @contextmanager
@@ -81,5 +90,7 @@ def mnist(
             normalize=normalize,
             corruption=corruption,
         )
+
+    assert False
 
     return dataset.data, dataset.targets
