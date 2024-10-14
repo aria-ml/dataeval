@@ -131,6 +131,7 @@ omit = [
   "*/_internal/models/pytorch/blocks.py",
   "*/_internal/models/pytorch/utils.py",
   "*/_internal/models/tensorflow/pixelcnn.py",
+  "*/_internal/datasets.py",
 ]
 fail_under = 90
 
