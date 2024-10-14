@@ -135,18 +135,9 @@ build:
 verify lock:
   stage: build
   before_script:
-    - pip install poetry
+    - pip install tox
   script:
-    - poetry config warnings.export false
-    - poetry check
-    - cp -f environment/poetry.lock poetry.lock
-    - poetry check
-    - poetry export --all-extras --without-hashes -o environment/requirements.check
-    - diff environment/requirements.txt environment/requirements.check
-    - cmp -s environment/requirements.txt environment/requirements.check
-    - poetry export --only=dev --without-hashes -o environment/requirements-dev.check
-    - diff environment/requirements-dev.txt environment/requirements-dev.check
-    - cmp -s environment/requirements-dev.txt environment/requirements-dev.check
+    - tox -e check
   rules: *on_run
 
 docker info:
