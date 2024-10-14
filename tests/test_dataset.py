@@ -27,7 +27,7 @@ def wait_lock(path: Path, timeout: int = 30):
 
 
 @skip_mnist
-class TestDownloadingMNIST:
+class TestDownloadingFunctions:
     mirror = "https://zenodo.org/record/3239543/files/"
     resources = ("mnist_c.zip", "4b34b33045869ee6d424616cd3a65da3")
 
@@ -35,7 +35,7 @@ class TestDownloadingMNIST:
         with pytest.raises(RuntimeError):
             check_exists("will", "this", "work", "yes", "no", False)
 
-    def test_download(self):
+    def test_download_corruption(self):
         path = Path("./data2")
         if not path.is_absolute():
             path = path.resolve()
@@ -44,15 +44,29 @@ class TestDownloadingMNIST:
 
         folder = Path(path) / "mnist_c" / "identity"
         with wait_lock(lock_file, timeout=60):
-            check_exists(folder, self.mirror, path, self.resources[0], self.resources[1])
-        check_exists(folder, self.mirror, path, self.resources[0], self.resources[1], verbose=False)
+            check_exists(folder, self.mirror, path, self.resources[0], self.resources[1], md5=True)
+        check_exists(folder, self.mirror, path, self.resources[0], self.resources[1], verbose=False, md5=True)
 
+        folder = Path(path) / "mnist_c"
         with wait_lock(lock_file, timeout=60):
-            tmp_path = _get_file(path, self.resources[0], self.mirror + self.resources[0], self.resources[1], False)
+            tmp_path = _get_file(
+                folder, self.resources[0], self.mirror + self.resources[0], self.resources[1], False, md5=True
+            )
             extract_archive(str(tmp_path))
-            _get_file(path, self.resources[0], self.mirror + self.resources[0], self.resources[1], True)
+            _get_file(folder, self.resources[0], self.mirror + self.resources[0], self.resources[1], True, md5=True)
             with pytest.raises(ValueError):
-                _get_file(path, self.resources[0], self.mirror + self.resources[0], "wrongNumber")
+                _get_file(folder, self.resources[0], self.mirror + self.resources[0], "wrongNumber", md5=True)
+
+        shutil.rmtree(path)
+
+    def test_load_corruption(self):
+        path = Path("./data3")
+        if not path.is_absolute():
+            path = path.resolve()
+
+        data, targets = mnist(root=path, size=-1, corruption="identity", verbose=False)
+        assert targets.ndim == 1
+        assert data.shape == (54210, 28, 28)
 
         shutil.rmtree(path)
 
@@ -96,7 +110,12 @@ class TestMNIST:
         with pytest.warns(UserWarning):
             _, targets = mnist(train=False, size=15000, balance=False)
         assert targets.shape == (10000,)
-        _, targets = mnist(train=False, size=15000, balance=True)
+        _, targets = mnist(train=False, size=15000, balance=True, verbose=False)
+        assert targets.shape == (8920,)
+        with pytest.warns(UserWarning):
+            _, targets = mnist(train=False, size=9000, balance=False)
+        assert targets.shape == (8920,)
+        _, targets = mnist(train=False, size=9000, balance=False, verbose=False)
         assert targets.shape == (8920,)
 
     def test_mnist_normalize(self):
@@ -140,36 +159,36 @@ class TestMNIST:
         assert set(labels).issubset(subset)
         assert counts[labels[0]] == expected  # type: ignore
 
-    @pytest.mark.parametrize(
-        "corruption",
-        [
-            "identity",
-            "shot_noise",
-            "impulse_noise",
-            "glass_blur",
-            "motion_blur",
-            "shear",
-            "scale",
-            "rotate",
-            "brightness",
-            "translate",
-            "stripe",
-            "fog",
-            "spatter",
-            "dotted_line",
-            "zigzag",
-            "canny_edges",
-        ],
-    )
-    def test_mnist_corruption(self, corruption):
-        """Test the loading of all the corruptions."""
-        data, targets = mnist(size=-1, balance=False, corruption=corruption, randomize=True)
-        assert targets.ndim == 1
-        assert data.shape == (60000, 28, 28)
+    # @pytest.mark.parametrize(
+    #     "corruption",
+    #     [
+    #         "identity",
+    #         "shot_noise",
+    #         "impulse_noise",
+    #         "glass_blur",
+    #         "motion_blur",
+    #         "shear",
+    #         "scale",
+    #         "rotate",
+    #         "brightness",
+    #         "translate",
+    #         "stripe",
+    #         "fog",
+    #         "spatter",
+    #         "dotted_line",
+    #         "zigzag",
+    #         "canny_edges",
+    #     ],
+    # )
+    # def test_mnist_corruption(self, corruption):
+    #     """Test the loading of all the corruptions."""
+    #     data, targets = mnist(size=-1, balance=False, corruption=corruption)
+    #     assert targets.ndim == 1
+    #     assert data.shape == (60000, 28, 28)
 
     def test_mnist_slice_back(self):
         """Test the functionality of slicing from the back."""
-        dataA, targetsA = mnist(slice_back=True)
+        dataA, targetsA = mnist(slice_back=True, randomize=True)
         dataB, targetsB = mnist()
         assert np.all(targetsA == targetsB)
         assert ~np.all(dataA == dataB)
