@@ -16,7 +16,7 @@ import tensorflow as tf
 from numpy.typing import ArrayLike
 
 from dataeval._internal.detectors.ood.base import OODBase, OODScore
-from dataeval._internal.interop import to_numpy
+from dataeval._internal.interop import as_numpy
 from dataeval._internal.models.tensorflow.autoencoder import AE
 from dataeval._internal.models.tensorflow.utils import predict_batch
 
@@ -46,10 +46,10 @@ class OOD_AE(OODBase):
     ) -> None:
         if loss_fn is None:
             loss_fn = keras.losses.MeanSquaredError()
-        super().fit(to_numpy(x_ref), threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
+        super().fit(as_numpy(x_ref), threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
 
     def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScore:
-        self._validate(X := to_numpy(X))
+        self._validate(X := as_numpy(X))
 
         # reconstruct instances
         X_recon = predict_batch(X, self.model, batch_size=batch_size)

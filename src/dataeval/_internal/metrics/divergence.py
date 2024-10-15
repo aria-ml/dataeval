@@ -9,7 +9,7 @@ from typing import Literal
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval._internal.interop import to_numpy
+from dataeval._internal.interop import as_numpy
 from dataeval._internal.metrics.utils import compute_neighbors, get_method, minimum_spanning_tree
 from dataeval._internal.output import OutputMetadata, set_metadata
 
@@ -123,8 +123,8 @@ def divergence(data_a: ArrayLike, data_b: ArrayLike, method: Literal["FNN", "MST
     DivergenceOutput(divergence=0.28, errors=36.0)
     """
     div_fn = get_method(DIVERGENCE_FN_MAP, method)
-    a = to_numpy(data_a)
-    b = to_numpy(data_b)
+    a = as_numpy(data_a)
+    b = as_numpy(data_b)
     N = a.shape[0]
     M = b.shape[0]
 
