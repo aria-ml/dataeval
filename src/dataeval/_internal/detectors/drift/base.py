@@ -16,7 +16,7 @@ from typing import Callable, Literal
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval._internal.interop import to_numpy
+from dataeval._internal.interop import as_numpy, to_numpy
 from dataeval._internal.output import OutputMetadata, set_metadata
 
 
@@ -234,7 +234,7 @@ class BaseDrift:
         if correction not in ["bonferroni", "fdr"]:
             raise ValueError("`correction` must be `bonferroni` or `fdr`.")
 
-        self._x_ref = x_ref
+        self._x_ref = to_numpy(x_ref)
         self.x_ref_preprocessed = x_ref_preprocessed
 
         # Other attributes
@@ -242,7 +242,7 @@ class BaseDrift:
         self.update_x_ref = update_x_ref
         self.preprocess_fn = preprocess_fn
         self.correction = correction
-        self.n = len(self._x_ref)  # type: ignore
+        self.n = len(self._x_ref)
 
         # Ref counter for preprocessed x
         self._x_refcount = 0
@@ -260,9 +260,8 @@ class BaseDrift:
         if not self.x_ref_preprocessed:
             self.x_ref_preprocessed = True
             if self.preprocess_fn is not None:
-                self._x_ref = self.preprocess_fn(self._x_ref)
+                self._x_ref = as_numpy(self.preprocess_fn(self._x_ref))
 
-        self._x_ref = to_numpy(self._x_ref)
         return self._x_ref
 
     def _preprocess(self, x: ArrayLike) -> ArrayLike:
@@ -380,7 +379,7 @@ class BaseDriftUnivariate(BaseDrift):
                 self._n_features = self.x_ref.reshape(self.x_ref.shape[0], -1).shape[-1]
             else:
                 # infer number of features after applying preprocessing step
-                x = to_numpy(self.preprocess_fn(self._x_ref[0:1]))  # type: ignore
+                x = as_numpy(self.preprocess_fn(self._x_ref[0:1]))  # type: ignore
                 self._n_features = x.reshape(x.shape[0], -1).shape[-1]
 
         return self._n_features
