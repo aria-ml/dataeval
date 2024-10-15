@@ -4,7 +4,7 @@ from numpy.random import randint
 
 from dataeval._internal.metrics.stats.base import SOURCE_INDEX, BaseStatsOutput
 from dataeval._internal.metrics.stats.boxratiostats import boxratiostats
-from dataeval.metrics.stats import dimensionstats, hashstats, pixelstats, visualstats
+from dataeval.metrics.stats import dimensionstats, hashstats, labelstats, pixelstats, visualstats
 
 
 def get_dataset(count: int, channels: int):
@@ -220,3 +220,26 @@ class TestStats:
         stats = pixelstats(DATA_3, boxes, per_channel=True)
         assert all(si.box is not None for si in stats.source_index)
         assert all(si.channel is not None for si in stats.source_index)
+
+    def test_labelstats_str_keys(self):
+        label_array = np.random.choice(["horse", "cow", "sheep", "pig", "chicken"], 50)
+        labels = []
+        for i in range(10):
+            num_labels = np.random.choice(5) + 1
+            selected_labels = list(label_array[5 * i : 5 * i + num_labels])
+            labels.append(selected_labels)
+
+        stats = labelstats(labels)
+        assert stats is not None
+
+    def test_labelstats_int_keys(self):
+        labels = [[0, 0, 0, 0, 0], [0, 1], [0, 1, 2], [0, 1, 2, 3]]
+        stats = labelstats(labels)
+
+        assert stats.label_counts_per_class == {0: 8, 1: 3, 2: 2, 3: 1}
+        assert stats.image_indices_per_label == {0: [0, 1, 2, 3], 1: [1, 2, 3], 2: [2, 3], 3: [3]}
+        assert stats.image_counts_per_label == {0: 4, 1: 3, 2: 2, 3: 1}
+        assert stats.label_counts_per_image == [5, 2, 3, 4]
+        assert stats.image_count == 4
+        assert stats.class_count == 4
+        assert stats.label_count == 14
