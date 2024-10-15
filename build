@@ -41,7 +41,7 @@ while true; do
         -h|--help)       showHelp;;
         -q|--quiet)      export quiet="--quiet";;
         --gpu)           export gpuflag="--gpus all";;
-        --build-only)    build_only=1;;
+        --build-only)    export build_only=1;;
         --push)          if [[ ! $CI ]]; then echo "Only CI pipelines should be pushing."; exit 1; else export push_to_repo=1; fi;;
         --)              shift; break;;
     esac
@@ -148,7 +148,7 @@ function build_image() {
         output_arg="--output type=cacheonly"
     fi
 
-    if [[ $target != base && $target != data && ($save_build_images || -z $push_to_repo) ]]; then
+    if [[ $target != base && $target != data && ($save_build_images || -z $build_only) ]]; then
         # By default the docker-container driver doesn't load images to the
         # local docker images store, these args will cause it to do so.
         load_arg="--tag ${image_tag} --load"

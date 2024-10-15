@@ -127,6 +127,7 @@ stages:
 build:
   stage: build
   extends: [.harbor, .python_version_matrix]
+  needs: [verify lock]
   script:
     - apk add --no-cache parallel
     - ./build --build-only --push ${PYTHON_VERSION}
@@ -216,7 +217,7 @@ doctest:
 docs:
   stage: docs
   extends: .harbor
-  needs: [build]
+  needs: [verify lock]
   tags:
     - $DOCS_RUNNER_TAG
   script:
