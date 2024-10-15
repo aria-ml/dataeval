@@ -27,6 +27,19 @@ The hashstats function is an aggregate metric that calculates various hash value
 
 This function can be used in conjunction with the `Duplicates` class in order to identify duplicate images.
 
+## labelstats
+
+### What is the labelstats function
+
+The labelstats function provides summary statistics across classes and labels:
+- label_counts_per_class
+- label_counts_per_image
+- image_counts_per_label
+- image_indices_per_label
+- image_count
+- label_count
+- class_count
+
 ## pixelstats
 
 ### What is the pixelstats function

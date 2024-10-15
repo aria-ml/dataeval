@@ -177,6 +177,7 @@ metrics/stats/boxratiostats
 metrics/stats/datasetstats
 metrics/stats/dimensionstats
 metrics/stats/hashstats
+metrics/stats/labelstats
 metrics/stats/pixelstats
 metrics/stats/visualstats
 :::
@@ -188,6 +189,7 @@ metrics/stats/visualstats
     metrics.stats.datasetstats
     metrics.stats.dimensionstats
     metrics.stats.hashstats
+    metrics.stats.labelstats
     metrics.stats.pixelstats
     metrics.stats.visualstats
 ```
