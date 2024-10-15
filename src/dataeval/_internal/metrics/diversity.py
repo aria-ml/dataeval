@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Sequence
+from typing import Literal, Mapping
 
 import numpy as np
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 
 from dataeval._internal.metrics.utils import entropy, get_counts, get_method, get_num_bins, preprocess_metadata
 from dataeval._internal.output import OutputMetadata, set_metadata
@@ -142,7 +142,7 @@ DIVERSITY_FN_MAP = {"simpson": diversity_simpson, "shannon": diversity_shannon}
 
 @set_metadata("dataeval.metrics")
 def diversity(
-    class_labels: Sequence[int], metadata: list[dict], method: Literal["shannon", "simpson"] = "simpson"
+    class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], method: Literal["shannon", "simpson"] = "simpson"
 ) -> DiversityOutput:
     """
     Compute diversity and classwise diversity for discrete/categorical variables and, through standard
@@ -155,10 +155,10 @@ def diversity(
 
     Parameters
     ----------
-    class_labels: Sequence[int]
+    class_labels: ArrayLike
         List of class labels for each image
-    metadata: List[Dict]
-        List of metadata factors for each image
+    metadata: Mapping[str, ArrayLike]
+        Dict of list of metadata factors for each image
     method: Literal["shannon", "simpson"], default "simpson"
         Indicates which diversity index should be computed
 

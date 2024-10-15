@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Literal, NamedTuple, Sequence
+from typing import Any, Callable, Literal, Mapping, NamedTuple
 
 import numpy as np
 import xxhash as xxh
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 from PIL import Image
 from scipy.fftpack import dct
 from scipy.signal import convolve2d
@@ -13,6 +13,8 @@ from scipy.sparse.csgraph import minimum_spanning_tree as mst
 from scipy.spatial.distance import pdist, squareform
 from scipy.stats import entropy as sp_entropy
 from sklearn.neighbors import NearestNeighbors
+
+from dataeval._internal.interop import to_numpy
 
 EPSILON = 1e-5
 EDGE_KERNEL = np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]], dtype=np.int8)
@@ -162,26 +164,26 @@ def infer_categorical(X: NDArray, threshold: float = 0.2) -> NDArray:
 
 
 def preprocess_metadata(
-    class_labels: Sequence[int], metadata: list[dict], cat_thresh: float = 0.2
+    class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], cat_thresh: float = 0.2
 ) -> tuple[NDArray, list[str], list[bool]]:
-    # convert class_labels and list of metadata dicts to dict of ndarrays
-    metadata_dict: dict[str, NDArray] = {
-        "class_label": np.asarray(class_labels, dtype=int),
-        **{k: np.array([d[k] for d in metadata]) for k in metadata[0]},
-    }
+    # convert class_labels and dict of lists to matrix of metadata values
+    preprocessed_metadata = {"class_label": np.asarray(class_labels, dtype=int)}
 
     # map columns of dict that are not numeric (e.g. string) to numeric values
     # that mutual information and diversity functions can accommodate.  Each
     # unique string receives a unique integer value.
-    for k, v in metadata_dict.items():
+    for k, v in metadata.items():
         # if not numeric
+        v = to_numpy(v)
         if not np.issubdtype(v.dtype, np.number):
             _, mapped_vals = np.unique(v, return_inverse=True)
-            metadata_dict[k] = mapped_vals
+            preprocessed_metadata[k] = mapped_vals
+        else:
+            preprocessed_metadata[k] = v
 
-    data = np.stack(list(metadata_dict.values()), axis=-1)
-    names = list(metadata_dict.keys())
-    is_categorical = [infer_categorical(metadata_dict[var], cat_thresh)[0] for var in names]
+    data = np.stack(list(preprocessed_metadata.values()), axis=-1)
+    names = list(preprocessed_metadata.keys())
+    is_categorical = [infer_categorical(preprocessed_metadata[var], cat_thresh)[0] for var in names]
 
     return data, names, is_categorical
 

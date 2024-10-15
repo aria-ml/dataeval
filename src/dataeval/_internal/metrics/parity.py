@@ -62,8 +62,8 @@ def digitize_factor_bins(continuous_values: NDArray, bins: int, factor_name: str
 
 
 def format_discretize_factors(
-    data_factors: dict[str, NDArray], continuous_factor_bincounts: dict[str, int]
-) -> tuple[dict[str, NDArray], NDArray]:
+    data_factors: Mapping[str, NDArray], continuous_factor_bincounts: Mapping[str, int]
+) -> dict[str, NDArray]:
     """
     Sets up the internal list of metadata factors.
 
@@ -80,10 +80,9 @@ def format_discretize_factors(
 
     Returns
     -------
-    Tuple[Dict[str, NDArray], NDArray]
+    Dict[str, NDArray]
         - Intrinsic per-image metadata information with the formatting that input data_factors uses.
           Each key is a metadata factor, whose value is the discrete per-image factor values.
-        - Per-image labels, whose ith element is the label for the ith element of the dataset.
     """
 
     invalid_keys = set(continuous_factor_bincounts.keys()) - set(data_factors.keys())
@@ -103,8 +102,6 @@ def format_discretize_factors(
     if lengths[1:] != lengths[:-1]:
         raise ValueError("The lengths of each entry in the dictionary are not equal." f" Found lengths {lengths}")
 
-    labels = data_factors["class"]
-
     metadata_factors = {
         name: val
         if name not in continuous_factor_bincounts
@@ -113,7 +110,7 @@ def format_discretize_factors(
         if name != "class"
     }
 
-    return metadata_factors, labels
+    return metadata_factors
 
 
 def normalize_expected_dist(expected_dist: NDArray, observed_dist: NDArray) -> NDArray:
@@ -187,7 +184,8 @@ def validate_dist(label_dist: NDArray, label_name: str):
         warnings.warn(
             f"Labels {np.where(label_dist<5)[0]} in {label_name}"
             " dataset have frequencies less than 5. This may lead"
-            " to invalid chi-squared evaluation."
+            " to invalid chi-squared evaluation.",
+            UserWarning,
         )
 
 
@@ -280,8 +278,9 @@ def label_parity(
 
 @set_metadata("dataeval.metrics")
 def parity(
+    class_labels: ArrayLike,
     data_factors: Mapping[str, ArrayLike],
-    continuous_factor_bincounts: dict[str, int] | None = None,
+    continuous_factor_bincounts: Mapping[str, int] | None = None,
 ) -> ParityOutput[NDArray[np.float64]]:
     """
     Calculate chi-square statistics to assess the relationship between multiple factors and class labels.
@@ -292,10 +291,12 @@ def parity(
 
     Parameters
     ----------
+    class_labels: ArrayLike
+        List of class labels for each image
     data_factors: Mapping[str, ArrayLike]
-        The dataset factors, which are per-image attributes including class label and metadata.
+        The dataset factors, which are per-image metadata attributes.
         Each key of dataset_factors is a factor, whose value is the per-image factor values.
-    continuous_factor_bincounts : Dict[str, int] | None, default None
+    continuous_factor_bincounts : Mapping[str, int] | None, default None
         A dictionary specifying the number of bins for discretizing the continuous factors.
         The keys should correspond to the names of continuous factors in `data_factors`,
         and the values should be the number of bins to use for discretization.
@@ -329,21 +330,27 @@ def parity(
     --------
     Randomly creating some "continuous" and categorical variables using ``np.random.default_rng``
 
+    >>> labels = np_random_gen.choice([0, 1, 2], (100))
     >>> data_factors = {
     ...     "age": np_random_gen.choice([25, 30, 35, 45], (100)),
     ...     "income": np_random_gen.choice([50000, 65000, 80000], (100)),
     ...     "gender": np_random_gen.choice(["M", "F"], (100)),
-    ...     "class": np_random_gen.choice([0, 1, 2], (100)),
     ... }
     >>> continuous_factor_bincounts = {"age": 4, "income": 3}
-    >>> parity(data_factors, continuous_factor_bincounts)
-    ParityOutput(score=array([2.82329785, 1.60625584, 1.38377236]), p_value=array([0.83067563, 0.80766733, 0.5006309 ]))
+    >>> parity(labels, data_factors, continuous_factor_bincounts)
+    ParityOutput(score=array([7.35731943, 5.46711299, 0.51506212]), p_value=array([0.28906231, 0.24263543, 0.77295762]))
     """
+    if len(np.shape(class_labels)) > 1:
+        raise ValueError(
+            f"Got class labels with {len(np.shape(class_labels))}-dimensional",
+            f" shape {np.shape(class_labels)}, but expected a 1-dimensional array.",
+        )
 
     data_factors_np = {k: to_numpy(v) for k, v in data_factors.items()}
     continuous_factor_bincounts = continuous_factor_bincounts if continuous_factor_bincounts else {}
 
-    factors, labels = format_discretize_factors(data_factors_np, continuous_factor_bincounts)
+    labels = to_numpy(class_labels)
+    factors = format_discretize_factors(data_factors_np, continuous_factor_bincounts)
 
     chi_scores = np.zeros(len(factors))
     p_values = np.zeros(len(factors))
@@ -396,7 +403,8 @@ def parity(
         message = "\n".join(factor_msg)
 
         warnings.warn(
-            f"The following factors did not meet the recommended 5 occurrences for each value-label combination. \nRecommend rerunning parity after adjusting the following factor-value-label combinations: \n{message}",  # noqa: E501
+            f"The following factors did not meet the recommended 5 occurrences for each value-label combination. \n\
+            Recommend rerunning parity after adjusting the following factor-value-label combinations: \n{message}",
             UserWarning,
         )
 
