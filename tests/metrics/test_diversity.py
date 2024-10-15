@@ -57,3 +57,15 @@ class TestDiversityUnit:
         assert result.class_list.dtype is np.dtype(np.int64)
         assert type(result.metadata_names[0]) is str
         assert type(result.method) is str
+
+
+class TestDiversityFunctional:
+    # @pytest.mark.parametrize("met", ["simpson", "shannon"])
+    def test_simple_input_simpson(self):
+        metadata = {"factor1": [5, 5, 6, 6]}
+        class_labels = [0, 0, 1, 1]
+        result = diversity(class_labels, metadata, method="simpson")
+        expected_index = [0.5, 0.5]
+        expected_classwise = [[0], [0]]
+        np.testing.assert_array_almost_equal(result.diversity_index, expected_index)
+        np.testing.assert_array_almost_equal(result.classwise, expected_classwise)
