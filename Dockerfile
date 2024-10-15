@@ -45,8 +45,6 @@ ENV LANG=en_US.UTF-8
 
 FROM cuda as base
 ARG UID
-# Corrupted MNIST dataset
-ADD --chown=${UID} https://zenodo.org/record/3239543/files/mnist_c.zip data/mnist_c.zip
 ARG python_version
 RUN uv venv -p ${python_version}
 COPY --chown=${UID} environment/requirements.txt environment/
