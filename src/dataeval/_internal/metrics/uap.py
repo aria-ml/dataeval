@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from numpy.typing import ArrayLike
 from sklearn.metrics import average_precision_score
 
-from dataeval._internal.interop import to_numpy
+from dataeval._internal.interop import as_numpy
 from dataeval._internal.output import OutputMetadata, set_metadata
 
 
@@ -75,5 +75,5 @@ def uap(labels: ArrayLike, scores: ArrayLike) -> UAPOutput:
     UAPOutput(uap=0.7777777777777777)
     """
 
-    precision = float(average_precision_score(to_numpy(labels), to_numpy(scores), average="weighted"))
+    precision = float(average_precision_score(as_numpy(labels), as_numpy(scores), average="weighted"))
     return UAPOutput(precision)

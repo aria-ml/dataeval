@@ -22,22 +22,26 @@ def try_import(module_name):
     return module
 
 
-def to_numpy(array: ArrayLike | None) -> NDArray[Any]:
+def as_numpy(array: ArrayLike | None) -> NDArray[Any]:
+    return to_numpy(array, copy=False)
+
+
+def to_numpy(array: ArrayLike | None, copy: bool = True) -> NDArray[Any]:
     if array is None:
         return np.ndarray([])
 
     if isinstance(array, np.ndarray):
-        return array
+        return array.copy() if copy else array
 
     tf = try_import("tensorflow")
     if tf and tf.is_tensor(array):
-        return array.numpy()  # type: ignore
+        return array.numpy().copy() if copy else array.numpy()  # type: ignore
 
     torch = try_import("torch")
     if torch and isinstance(array, torch.Tensor):
-        return array.detach().cpu().numpy()  # type: ignore
+        return array.detach().cpu().numpy().copy() if copy else array.detach().cpu().numpy()  # type: ignore
 
-    return np.asarray(array)
+    return np.array(array, copy=copy)
 
 
 def to_numpy_iter(iterable: Iterable[ArrayLike]) -> Iterator[NDArray[Any]]:

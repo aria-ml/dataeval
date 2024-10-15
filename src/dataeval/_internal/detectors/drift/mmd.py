@@ -14,7 +14,7 @@ from typing import Callable
 import torch
 from numpy.typing import ArrayLike
 
-from dataeval._internal.interop import to_numpy
+from dataeval._internal.interop import as_numpy
 from dataeval._internal.output import set_metadata
 
 from .base import BaseDrift, DriftBaseOutput, UpdateStrategy, preprocess_x, update_x_ref
@@ -110,7 +110,7 @@ class DriftMMD(BaseDrift):
         self.device = get_device(device)
 
         # initialize kernel
-        sigma_tensor = torch.from_numpy(to_numpy(sigma)).to(self.device) if sigma is not None else None
+        sigma_tensor = torch.from_numpy(as_numpy(sigma)).to(self.device) if sigma is not None else None
         self.kernel = kernel(sigma_tensor).to(self.device) if kernel == GaussianRBF else kernel
 
         # compute kernel matrix for the reference data
@@ -147,7 +147,7 @@ class DriftMMD(BaseDrift):
             p-value obtained from the permutation test, MMD^2 between the reference and test set,
             and MMD^2 threshold above which drift is flagged
         """
-        x = to_numpy(x)
+        x = as_numpy(x)
         x_ref = torch.from_numpy(self.x_ref).to(self.device)
         n = x.shape[0]
         kernel_mat = self._kernel_matrix(x_ref, torch.from_numpy(x).to(self.device))
