@@ -7,6 +7,7 @@ from numpy.typing import ArrayLike
 
 from dataeval._internal.metrics.stats.base import BaseStatsOutput
 from dataeval._internal.metrics.stats.dimensionstats import DimensionStatsOutput, dimensionstats
+from dataeval._internal.metrics.stats.labelstats import LabelStatsOutput, labelstats
 from dataeval._internal.metrics.stats.pixelstats import PixelStatsOutput, pixelstats
 from dataeval._internal.metrics.stats.visualstats import VisualStatsOutput, visualstats
 from dataeval._internal.output import OutputMetadata, set_metadata
@@ -25,11 +26,13 @@ class DatasetStatsOutput(OutputMetadata):
     dimensionstats : DimensionStatsOutput or None
     pixelstats: PixelStatsOutput or None
     visualstats: VisualStatsOutput or None
+    labelstats: LabelStatsOutput or None, default None
     """
 
     dimensionstats: DimensionStatsOutput | None
     pixelstats: PixelStatsOutput | None
     visualstats: VisualStatsOutput | None
+    labelstats: LabelStatsOutput | None = None
 
     def outputs(self) -> list[BaseStatsOutput]:
         return [s for s in (self.dimensionstats, self.pixelstats, self.visualstats) if s is not None]
@@ -44,6 +47,7 @@ class DatasetStatsOutput(OutputMetadata):
 def datasetstats(
     images: Iterable[ArrayLike],
     bboxes: Iterable[ArrayLike] | None = None,
+    labels: Iterable[ArrayLike] | None = None,
     use_dimension: bool = True,
     use_pixel: bool = True,
     use_visual: bool = True,
@@ -52,7 +56,8 @@ def datasetstats(
     Calculates various statistics for each image
 
     This function computes dimension, pixel and visual metrics
-    on the images or individual bounding boxes for each image.
+    on the images or individual bounding boxes for each image as
+    well as label statistics if provided.
 
     Parameters
     ----------
@@ -60,15 +65,17 @@ def datasetstats(
         Images to perform calculations on
     bboxes : Iterable[ArrayLike] or None
         Bounding boxes in `xyxy` format for each image to perform calculations on
+    labels : Iterable[ArrayLike] or None
+        Labels of images or boxes to perform calculations on
 
     Returns
     -------
     DatasetStatsOutput
-        Output class containing the outputs of dimensionstats, pixelstats and visualstats
+        Output class containing the outputs of various stats functions
 
     See Also
     --------
-    dimensionstats, pixelstats, visualstats, Outliers
+    dimensionstats, labelstats, pixelstats, visualstats, Outliers
 
     Examples
     --------
@@ -86,4 +93,5 @@ def datasetstats(
         dimensionstats(images, bboxes) if use_dimension else None,
         pixelstats(images, bboxes) if use_pixel else None,
         visualstats(images, bboxes) if use_visual else None,
+        labelstats(labels) if labels else None,
     )
