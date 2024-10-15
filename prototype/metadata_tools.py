@@ -62,7 +62,7 @@ def predict_ood_mi(refdl, newdl, ood_detector, **kwargs):
 
     return MI_dict
 
-def get_metadata_ood_mi(metadata: Mapping[str, Union[List, NDArray]], is_ood: NDArray[np.bool_], discrete_features=None) -> Dict:
+def get_metadata_ood_mi(metadata: Dict[str, Union[List, NDArray]], is_ood: NDArray[np.bool_], discrete_features=None) -> Dict:
     r"""Computes mutual information between a set of metadata features and an out-of-distribution flag.
     
     Given a metadata dictionary `metadata`, where each key maps to one scalar metadata feature, and a corresponding boolean flag `is_ood` 
