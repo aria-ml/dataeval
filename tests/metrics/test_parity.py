@@ -12,8 +12,6 @@ class MockDistributionDataset:
     """
 
     # TODO: move defs to init
-
-    # TODO: move defs to init
     def __init__(self, label_dist):
         for label_curr in label_dist:
             if not isinstance(label_curr, (int, np.integer)):
@@ -176,59 +174,68 @@ class TestLabelIndependenceFunctional:
 
 
 class TestMDParityUnit:
-    def test_warns_with_not_enough_frequency(self):
+    def test_wrong_shape(self):
+        labels = np.array([[0], [1]])
         factors = {
-            "class": np.array(
-                [
-                    0,
-                    1,
-                ]
-            ),
+            "factor1": np.array([10, 20]),
+        }
+
+        with pytest.raises(ValueError):
+            parity(labels, factors)
+
+    def test_warns_with_not_enough_frequency(self):
+        labels = np.array(
+            [
+                0,
+                1,
+            ]
+        )
+        factors = {
             "factor1": np.array([10, 20]),
         }
 
         with pytest.warns():
-            parity(factors)
+            parity(labels, factors)
 
     def test_passes_with_enough_frequency(self):
+        labels = np.concatenate(([0] * 5, [1] * 5))
         factors = {
-            "class": np.concatenate(([0] * 5, [1] * 5)),
             "factor1": np.array(["foo"] * 10),
         }
 
         with warnings.catch_warnings():
-            warnings.simplefilter("error")
-            parity(factors)
+            warnings.simplefilter("error", category=UserWarning)
+            parity(labels, factors)
 
     def test_cant_quantize_strings(self):
+        labels = np.concatenate(([0] * 5, [1] * 5))
         factors = {
-            "class": np.concatenate(([0] * 5, [1] * 5)),
             "factor1": np.concatenate((["a"] * 5, ["b"] * 5)),
         }
         continuous_bincounts = {"factor1": 2}
 
         with pytest.raises(TypeError):
-            parity(factors, continuous_bincounts)
+            parity(labels, factors, continuous_bincounts)
 
     def test_bad_factor_ref(self):
+        labels = np.concatenate(([0] * 5, [1] * 5))
         factors = {
-            "class": np.concatenate(([0] * 5, [1] * 5)),
             "factor1": np.concatenate((["a"] * 5, ["b"] * 5)),
         }
         continuous_bincounts = {"something_else": 2}
 
         with pytest.raises(Exception):
-            parity(factors, continuous_bincounts)
+            parity(labels, factors, continuous_bincounts)
 
     def test_uneven_factor_lengths(self):
+        labels = np.concatenate(([0] * 5, [1] * 5))
         factors = {
-            "class": np.concatenate(([0] * 5, [1] * 5)),
             "factor1": np.array(["a"] * 10),
             "factor2": np.array(["a"] * 11),
         }
 
         with pytest.raises(ValueError):
-            parity(factors)
+            parity(labels, factors)
 
 
 class TestMDParityFunctional:
@@ -243,7 +250,7 @@ class TestMDParityFunctional:
             "factor1": np.concatenate(([10] * 5, [20] * 5)),
         }
 
-        result = parity(factors)
+        result = parity(factors["class"], factors)
 
         # Checks that factor1 is highly correlated with class
         assert result.p_value[0] < 0.05
@@ -253,12 +260,12 @@ class TestMDParityFunctional:
         This verifies that if the factor is homogeneous for the whole dataset,
         that chi2 and p correspond to factor1 being uncorrelated with class.
         """
+        labels = np.concatenate(([0] * 5, [1] * 5))
         factors = {
-            "class": np.concatenate(([0] * 5, [1] * 5)),
             "factor1": np.array(["foo"] * 10),
         }
 
-        result = parity(factors)
+        result = parity(labels, factors)
 
         # Checks that factor1 is uncorrelated with class
         assert np.isclose(result.score[0], 0)
@@ -269,20 +276,19 @@ class TestMDParityFunctional:
         This discretizes 'factor1' into having two values.
         This verifies that the '11' and '10' values get grouped together.
         """
+        labels = np.concatenate(([0] * 5, [1] * 5))
         continuous_dataset = {
-            "class": np.concatenate(([0] * 5, [1] * 5)),
             "factor1": np.concatenate(([10] * 2, [11] * 3, [20] * 5)),
         }
         continuous_bincounts = {"factor1": 2}
 
-        result1 = parity(continuous_dataset, continuous_bincounts)
+        result1 = parity(labels, continuous_dataset, continuous_bincounts)
 
         discrete_dataset = {
-            "class": np.concatenate(([0] * 5, [1] * 5)),
             "factor2": np.concatenate(([10] * 5, [20] * 5)),
         }
 
-        result2 = parity(discrete_dataset)
+        result2 = parity(labels, discrete_dataset)
 
         # Checks that the test on the quantization continuous_dataset is
         # equivalent to the test on the discrete dataset discrete_dataset
@@ -294,13 +300,13 @@ class TestMDParityFunctional:
         This quantizes factor1 to have only one value, so that the discretized
         factor1 is the same over the entire dataset.
         """
+        labels = np.concatenate(([0] * 5, [1] * 5))
         factors = {
-            "class": np.concatenate(([0] * 5, [1] * 5)),
             "factor1": np.concatenate(([10] * 5, [20] * 5)),
         }
         continuous_bincounts = {"factor1": 1}
 
-        result = parity(factors, continuous_bincounts)
+        result = parity(labels, factors, continuous_bincounts)
 
         # Checks if factor1 and class are perfectly uncorrelated
         assert np.isclose(result.score[0], 0)
@@ -311,12 +317,12 @@ class TestMDParityFunctional:
         This quantizes factor1 such that there are large regions with bins
         that contain a small number of points.
         """
+        labels = np.concatenate(([0] * 5, [1] * 5))
         factors = {
-            "class": np.concatenate(([0] * 5, [1] * 5)),
             "factor1": np.concatenate(([10] * 4, [15], [20] * 5)),
         }
         continuous_bincounts = {"factor1": 100}
 
         # Looks for a warning that there are (class,factor1) pairs with too low frequency
         with pytest.warns():
-            parity(factors, continuous_bincounts)
+            parity(labels, factors, continuous_bincounts)

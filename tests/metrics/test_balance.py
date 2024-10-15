@@ -14,7 +14,7 @@ def class_labels():
 
 @pytest.fixture
 def metadata():
-    str_vals = ["b", "b", "b", "b", "b", "a", "a", "b", "a", "b", "b", "a"]
+    str_vals = np.array(["b", "b", "b", "b", "b", "a", "a", "b", "a", "b", "b", "a"])
     cnt_vals = np.array(
         [
             -0.54425898,
@@ -33,14 +33,7 @@ def metadata():
     )
     cat_vals = np.array([1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0])
     # for unit testing
-    md = [
-        {
-            "var_cat": strv,
-            "var_cnt": cntv,
-            "var_float_cat": catv + 0.1,
-        }
-        for strv, cntv, catv in zip(str_vals, cnt_vals, cat_vals)
-    ]
+    md = {"var_cat": str_vals, "var_cnt": cnt_vals, "var_float_cat": cat_vals + 0.1}
     return md
 
 
@@ -60,7 +53,7 @@ class TestBalanceUnit:
 
     def test_preprocess(self, metadata, class_labels):
         data, names, is_categorical = preprocess_metadata(class_labels, metadata)
-        assert len(names) == len(metadata[0].keys()) + 1  # 3 variables, class_label
+        assert len(names) == len(metadata.keys()) + 1  # 3 variables, class_label
         idx = names.index("var_cnt")
         assert not is_categorical[idx]
         assert all(is_categorical[:idx] + is_categorical[idx + 1 :])
@@ -71,7 +64,7 @@ class TestBalanceUnit:
         _ = infer_categorical(x)
 
     def test_correct_mi_shape_and_dtype(self, class_labels, metadata):
-        num_vars = len(metadata[0].keys())
+        num_vars = len(metadata.keys())
         expected_shape = {"balance": (num_vars + 1,), "factors": (num_vars, num_vars), "classwise": (2, num_vars + 1)}
         mi = balance(class_labels, metadata)
         for k, v in mi.dict().items():

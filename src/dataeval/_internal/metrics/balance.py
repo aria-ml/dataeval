@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Mapping
 
 import numpy as np
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 
 from dataeval._internal.metrics.utils import entropy, preprocess_metadata
@@ -51,16 +51,16 @@ def validate_num_neighbors(num_neighbors: int) -> int:
 
 
 @set_metadata("dataeval.metrics")
-def balance(class_labels: Sequence[int], metadata: list[dict], num_neighbors: int = 5) -> BalanceOutput:
+def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neighbors: int = 5) -> BalanceOutput:
     """
     Mutual information (MI) between factors (class label, metadata, label/image properties)
 
     Parameters
     ----------
-    class_labels: Sequence[int]
+    class_labels: ArrayLike
         List of class labels for each image
-    metadata: List[Dict]
-        List of metadata factors for each image
+    metadata: Mapping[str, ArrayLike]
+        Dict of lists of metadata factors for each image
     num_neighbors: int, default 5
         Number of nearest neighbors to use for computing MI between discrete
         and continuous variables.
@@ -90,9 +90,9 @@ def balance(class_labels: Sequence[int], metadata: list[dict], num_neighbors: in
     Return intra/interfactor balance (mutual information)
 
     >>> bal.factors
-    array([[0.99999843, 0.03510422, 0.09725766],
-           [0.03510422, 0.08433558, 0.15621459],
-           [0.09725766, 0.15621459, 0.99999856]])
+    array([[0.99999843, 0.04133555, 0.09725766],
+           [0.04133555, 0.08433558, 0.1301489 ],
+           [0.09725766, 0.1301489 , 0.99999856]])
 
     Return classwise balance (mutual information) of factors with individual class_labels
 
