@@ -17,7 +17,7 @@ from numpy.typing import ArrayLike, NDArray
 from scipy.sparse import coo_matrix
 from scipy.stats import mode
 
-from dataeval._internal.interop import to_numpy
+from dataeval._internal.interop import as_numpy
 from dataeval._internal.metrics.utils import compute_neighbors, get_classes_counts, get_method, minimum_spanning_tree
 from dataeval._internal.output import OutputMetadata, set_metadata
 
@@ -145,7 +145,7 @@ def ber(images: ArrayLike, labels: ArrayLike, k: int = 1, method: Literal["KNN",
     BEROutput(ber=0.04, ber_lower=0.020416847668728033)
     """
     ber_fn = get_method(BER_FN_MAP, method)
-    X = to_numpy(images)
-    y = to_numpy(labels)
+    X = as_numpy(images)
+    y = as_numpy(labels)
     upper, lower = ber_fn(X, y, k) if method == "KNN" else ber_fn(X, y)
     return BEROutput(upper, lower)
