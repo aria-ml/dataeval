@@ -287,7 +287,7 @@ class MNIST(Dataset):
             md5 = False
         else:
             if self.corruption == "identity" and verbose:
-                print("Identity is not a corrupted dataset but the original MNIST dataset")
+                print("Identity is not a corrupted dataset but the original MNIST dataset.")
             file_resource = self.resources[1]
             mirror = self.mirror[1]
             md5 = True
