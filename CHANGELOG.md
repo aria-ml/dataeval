@@ -1,6 +1,27 @@
-[//]: # (7bca6ed436d27e99d6b3b7c105c9ed0ab418f4d0)
+[//]: # (71e7ff06614323a8dabb6de565cc1436530a84f3)
 
 # DataEval Change Log
+
+## v0.70.0
+
+🌟 **Feature Release**
+- `71e7ff06` - Integrate labelstats function
+- `f40bf0e4` - Redesign stats functions for expansion to per-box, per-channel, and boxratiostats
+
+🛠️ **Improvements and Enhancements**
+- `72390edc` - Change input format of balance and diversity to be the same as parity
+
+👾 **Fixes**
+- `f598c46a` - Update pytorch to 2.2.0+
+
+📝 **Miscellaneous**
+- `b8f0d502` - Create copy on `to_numpy` by default
+- `04a71337` - Fix CI docs job to load on build
+- `9286f5e8` - Skip or rework MNIST based unit tests
+- `704f44e3` - Investigate the use of metadata to help explain observed dataset drifts and OOD examples
+- `e25f84f3` - Expose SufficiencyOutput and move class methods to output class
+- `742a084c` - Adding algorithm compatability/requirements table
+- `7ce85be7` - Misc concept documentation
 
 ## v0.69.4
 
