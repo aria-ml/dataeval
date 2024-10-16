@@ -117,6 +117,15 @@ files = ["src/dataeval/__init__.py"]
 [tool.poetry2conda]
 name = "dataeval"
 
+[tool.poetry2conda.dependencies]
+nvidia-cudnn-cu11 = { name = "cudnn" }
+pillow = { channel = "pip" }
+tensorflow = { channel = "pip" }
+tensorflow_probability = { channel = "pip" }
+torch = { name = "pytorch", channel = "pytorch" }
+torchvision = { channel = "pytorch" }
+xxhash = { name = "python-xxhash" }
+
 [tool.pyright]
 reportMissingImports = false
 
