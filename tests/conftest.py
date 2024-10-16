@@ -1,139 +1,59 @@
 from __future__ import annotations
 
-import tempfile
-import warnings
-from contextlib import contextmanager
-from pathlib import Path
-from typing import Literal
+from zipfile import ZipFile
 
 import numpy as np
 import pytest
-from numpy.typing import NDArray
 
-skip_mnist = pytest.mark.skip(reason="Skip MNIST tests for unit testing")
-
-try:
-    from torch.utils.data import Dataset
-
-    from dataeval._internal.datasets import MNIST
-except ImportError:
-    MNIST = None
+TEMP_CONTENTS = "ABCDEF1234567890"
 
 
-@pytest.fixture
-def np_rand_1000_28x28():
-    return np.random.random((1000, 28 * 28)).astype(np.float32)
+@pytest.fixture(scope="session")
+def mnist_file(tmp_path_factory):
+    temp = tmp_path_factory.mktemp("data")
+    mnist_file = temp / "mnist.txt"
+
+    with mnist_file.open(mode="w") as f:
+        f.write(TEMP_CONTENTS)
+    yield mnist_file
 
 
-@contextmanager
-def wait_lock(path: Path, timeout: int = 30):
-    try:
-        from filelock import FileLock
-    except ImportError:
-        warnings.warn("FileLock dependency not found, read/write collisions possible when running in parallel.")
-        yield
-        return
-
-    lock = FileLock(str(path), timeout=timeout)
-    with lock:
-        yield
+@pytest.fixture(scope="session")
+def mnist_download(tmp_path_factory):
+    temp = tmp_path_factory.mktemp("data")
+    mnist_temp = temp / "mnist" / "mnist.txt"
+    mnist_temp.parent.mkdir(exist_ok=True)
+    with mnist_temp.open(mode="w") as f:
+        f.write(TEMP_CONTENTS)
+    yield mnist_temp.parents[1], mnist_temp.name
 
 
-def mnist(
-    root: str | Path = "./data",
-    train: bool = True,
-    download: bool = True,
-    size: int = 1000,
-    unit_normalize: bool = False,
-    dtype: type | None = None,
-    channels: Literal["channels_first", "channels_last"] | None = None,
-    flatten: bool = False,
-    normalize: tuple[float, float] | None = None,
-    corruption: Literal[
-        "identity",
-        "shot_noise",
-        "impulse_noise",
-        "glass_blur",
-        "motion_blur",
-        "shear",
-        "scale",
-        "rotate",
-        "brightness",
-        "translate",
-        "stripe",
-        "fog",
-        "spatter",
-        "dotted_line",
-        "zigzag",
-        "canny_edges",
-    ]
-    | None = None,
-    classes: Literal[
-        "zero",
-        "one",
-        "two",
-        "three",
-        "four",
-        "five",
-        "six",
-        "seven",
-        "eight",
-        "nine",
-    ]
-    | int
-    | list[int]
-    | list[
-        Literal[
-            "zero",
-            "one",
-            "two",
-            "three",
-            "four",
-            "five",
-            "six",
-            "seven",
-            "eight",
-            "nine",
-        ]
-    ]
-    | None = None,
-    balance: bool = True,
-    randomize: bool = False,
-    slice_back: bool = False,
-    verbose: bool = True,
-    return_dataset: bool = False,
-) -> tuple[NDArray, NDArray] | Dataset:
-    if MNIST is None:
-        raise ImportError("MNIST dataset requires torch and torchvision.")
+@pytest.fixture(scope="session")
+def zip_file(tmp_path_factory):
+    temp = tmp_path_factory.mktemp("data")
+    zip_temp = temp / "mnist.zip"
+    file_temp = temp / "mnist_stuff.txt"
+    with file_temp.open(mode="w") as f:
+        f.write(TEMP_CONTENTS)
+    with ZipFile(zip_temp, "w") as myzip:
+        myzip.write(file_temp)
+    yield zip_temp
 
-    path = Path(root)
-    if not path.is_absolute():
-        path = path.resolve()
 
-    temp_dir = tempfile.gettempdir()
-    lock_file = Path(temp_dir, "mnist.lock")
+@pytest.fixture(scope="session")
+def mnist_npy(tmp_path_factory):
+    temp = tmp_path_factory.mktemp("data")
+    mnist_temp = temp / "mnist"
+    mnist_temp.mkdir(exist_ok=True)
+    mnistc_temp = temp / "mnist_c" / "identity"
+    mnistc_temp.mkdir(parents=True, exist_ok=True)
+    rng = np.random.default_rng(3)
+    labels = np.concatenate([rng.choice(10, 10000), np.arange(10).repeat(5000)])
+    train = np.ones((60000, 28, 28)) * labels[:, np.newaxis, np.newaxis]
+    train[:, 13:16, 13:16] += 1
+    train[-5000:, 13:16, 13:16] += 1
 
-    with wait_lock(lock_file, timeout=60):
-        dataset = MNIST(
-            root=root,
-            train=train,
-            download=download,
-            size=size,
-            unit_interval=unit_normalize,
-            dtype=dtype,
-            channels=channels,
-            flatten=flatten,
-            normalize=normalize,
-            corruption=corruption,
-            classes=classes,
-            balance=balance,
-            randomize=randomize,
-            slice_back=slice_back,
-            verbose=verbose,
-        )
-
-    assert False
-
-    if return_dataset:
-        return dataset
-    return dataset.data, dataset.targets
+    np.savez(mnist_temp / "mnist.npz", x_train=train, x_test=train[:10000], y_train=labels, y_test=labels[:10000])
+    np.save(mnistc_temp / "train_images.npy", train, allow_pickle=False)
+    np.save(mnistc_temp / "train_labels.npy", labels, allow_pickle=False)
+    yield temp
