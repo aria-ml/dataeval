@@ -34,6 +34,15 @@ You can install DataEval directly from pypi.org using the following command.  Th
 pip install dataeval[all]
 ```
 
+### Installing DataEval in Conda/Mamba
+
+DataEval can be installed in a Conda/Mamba environment using the provided `environment.yaml` file.  As some dependencies
+are installed from the `pytorch` channel, the channel is specified in the below example.
+
+```
+micromamba create -f environment\environment.yaml -c pytorch
+```
+
 ### Installing DataEval from GitHub
 
 To install DataEval from source locally on Ubuntu, you will need `git-lfs` to download larger, binary source files and `poetry` for project dependency management.
