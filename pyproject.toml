@@ -71,6 +71,7 @@ tox-uv = {version = "*"}
 uv = {version = "*"}
 poetry = {version = "*"}
 poetry-lock-groups-plugin = {version = "*"}
+poetry2conda = {version = "*"}
 # lint
 ruff = {version = "*"}
 codespell = {version = "*", extras = ["toml"]}
@@ -112,6 +113,9 @@ pattern = "v(?P<base>\\d+\\.\\d+\\.\\d+)$"
 
 [tool.poetry-dynamic-versioning.substitution]
 files = ["src/dataeval/__init__.py"]
+
+[tool.poetry2conda]
+name = "dataeval"
 
 [tool.pyright]
 reportMissingImports = false
