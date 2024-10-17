@@ -148,19 +148,37 @@ def get_num_bins(
     return num_bins
 
 
-def infer_categorical(X: NDArray, threshold: float = 0.2) -> NDArray:
+# def infer_categorical(X: NDArray, threshold: float = 0.2) -> NDArray:
+def infer_categorical(X: NDArray, threshold: float = 0.05) -> NDArray:
     """
     Compute fraction of feature values that are unique --- intended to be used
     for inferring whether variables are categorical.
     """
+    from scipy.stats import ks_1samp
+
     if X.ndim == 1:
         X = np.expand_dims(X, axis=1)
-    num_samples = X.shape[0]
-    pct_unique = np.empty(X.shape[1])
-    for col in range(X.shape[1]):  # type: ignore
-        uvals = np.unique(X[:, col], axis=0)
-        pct_unique[col] = len(uvals) / num_samples
-    return pct_unique < threshold
+    # num_samples = X.shape[0]
+    # pct_unique = np.empty(X.shape[1])
+    # for col in range(X.shape[1]):  # type: ignore
+    #     uvals = np.unique(X[:, col], axis=0)
+    #     pct_unique[col] = len(uvals) / num_samples
+    # return pct_unique < threshold
+    Xu = np.unique(X)  # remove duplicates to avoid dividing by zero below
+    X0, X1 = Xu[0:-2, :], Xu[2:, :]
+    Xs = np.sort(X)[1:-1]
+    dx = (Xs - X0) / (X1 - X0)
+
+    n_features = dx.shape[1]
+    pval = np.zeros(n_features)
+    for i in range(n_features):
+        pval[i] = ks_1samp(dx[:, i], _unicdf, method="asymp").pvalue
+
+    return pval
+
+
+def _unicdf(x):
+    return x  # cdf for uniform between 0 and 1
 
 
 def preprocess_metadata(
