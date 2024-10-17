@@ -20,6 +20,8 @@ from dataeval._internal.output import OutputMetadata, set_metadata
 @dataclass(frozen=True)
 class SufficiencyOutput(OutputMetadata):
     """
+    Output class for :class:`Sufficiency` workflow
+
     Attributes
     ----------
     steps : NDArray

@@ -9,7 +9,7 @@ from torchmetrics.utilities.data import dim_zero_cat
 
 from dataeval.detectors.ood import OOD_AE
 from dataeval.metrics.estimators import ber
-from dataeval.tensorflow.models import AE, create_model
+from dataeval.utils.tensorflow.models import AE, create_model
 
 BASE_OPTS = ["Base", "Both"]
 TARGET_OPTS = ["Target", "Both"]

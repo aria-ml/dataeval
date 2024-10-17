@@ -17,6 +17,8 @@ TData = TypeVar("TData", np.float64, NDArray[np.float64])
 @dataclass(frozen=True)
 class ParityOutput(Generic[TData], OutputMetadata):
     """
+    Output class for :func:`parity` and :func:`label_parity` bias metrics
+
     Attributes
     ----------
     score : np.float64 | NDArray[np.float64]
@@ -137,8 +139,8 @@ def normalize_expected_dist(expected_dist: NDArray, observed_dist: NDArray) -> N
     ValueError
         If the expected distribution is all zeros.
 
-    Notes
-    -----
+    Note
+    ----
     The function ensures that the total number of labels in the expected distribution matches the total
     number of labels in the observed distribution by scaling the expected distribution.
     """
@@ -224,8 +226,8 @@ def label_parity(
         of unique classes between the observed and expected distributions.
 
 
-    Notes
-    -----
+    Note
+    ----
     - Providing ``num_classes`` can be helpful if there are classes with zero instances in one of the distributions.
     - The function first validates the observed distribution and normalizes the expected distribution so that it
       has the same total number of labels as the observed distribution.
@@ -317,8 +319,8 @@ def parity(
         factor values either 0 times or at least 5 times. Alternatively, continuous-valued factors can be digitized
         into fewer bins.
 
-    Notes
-    -----
+    Note
+    ----
     - Each key of the ``continuous_factor_bincounts`` dictionary must occur as a key in data_factors.
     - A high score with a low p-value suggests that a metadata factor is strongly correlated with a class label.
     - The function creates a contingency matrix for each factor, where each entry represents the frequency of a

@@ -1,4 +1,3 @@
-(boxratiostats_ref)=
 # boxratiostats
 
 ```{testsetup}

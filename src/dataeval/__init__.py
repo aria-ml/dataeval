@@ -12,11 +12,11 @@ from . import detectors, metrics  # noqa: E402
 __all__ = ["detectors", "metrics"]
 
 if _IS_TORCH_AVAILABLE:  # pragma: no cover
-    from . import torch, utils, workflows
+    from . import workflows
 
-    __all__ += ["torch", "utils", "workflows"]
+    __all__ += ["workflows"]
 
-if _IS_TENSORFLOW_AVAILABLE:  # pragma: no cover
-    from . import tensorflow
+if _IS_TENSORFLOW_AVAILABLE or _IS_TORCH_AVAILABLE:  # pragma: no cover
+    from . import utils
 
-    __all__ += ["tensorflow"]
+    __all__ += ["utils"]

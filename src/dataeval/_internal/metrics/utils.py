@@ -91,8 +91,8 @@ def entropy(
     subset_mask: NDArray[np.bool_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
-    Notes
-    -----
+    Note
+    ----
     For continuous variables, histogram bins are chosen automatically.  See
     numpy.histogram for details.
 

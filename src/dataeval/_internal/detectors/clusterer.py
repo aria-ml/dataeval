@@ -16,6 +16,8 @@ from dataeval._internal.output import OutputMetadata, set_metadata
 @dataclass(frozen=True)
 class ClustererOutput(OutputMetadata):
     """
+    Output class for :class:`Clusterer` lint detector
+
     Attributes
     ----------
     outliers : List[int]

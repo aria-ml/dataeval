@@ -1,4 +1,3 @@
-(uap-ref)=
 # uap
 
 ```{testsetup}

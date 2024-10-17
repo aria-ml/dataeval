@@ -1,4 +1,3 @@
-(coverage-ref)=
 # coverage
 
 ```{testsetup}

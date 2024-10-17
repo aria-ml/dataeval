@@ -52,7 +52,7 @@ Where experts come to build _robust_, _reliable_, and _responsible_ models.
 ::::{grid} 1 1 2 2
 :gutter: 4
 
-:::{grid-item-card} [Installation Guide](installation){.font-title}
+:::{grid-item-card} [Installation Guide](installation.md){.font-title}
 :text-align: center
 :link: installation
 :link-type: doc
@@ -62,9 +62,9 @@ Jump in and try out DataEval for yourself.
 
 :::
 
-:::{grid-item-card} [About DataEval](reference/about.md){.font-title}
+:::{grid-item-card} [About DataEval](about.md){.font-title}
 :text-align: center
-:link: reference/about
+:link: about
 :link-type: doc
 :link-alt: "About DataEval Page Link"
 
@@ -130,7 +130,7 @@ These handcrafted guides created by experts here at ARIA will get you up and run
 ::::{grid} 1 1 2 2
 :gutter: 4
 
-:::{grid-item-card} [Tutorials](tutorials/index){.font-title}
+:::{grid-item-card} [Tutorials](tutorials/index.md){.font-title}
 :text-align: center
 :link: tutorials/index
 :link-type: doc
@@ -142,7 +142,7 @@ Try out these guides to learn the ins and outs of AI T&E using DataEval.
 
 :::
 
-:::{grid-item-card} [How-To's](how_to/index){.font-title}
+:::{grid-item-card} [How-To's](how_to/index.md){.font-title}
 :text-align: center
 :link: how_to/index
 :link-type: doc
@@ -203,7 +203,7 @@ Everything you need to become an expert with DataEval.
 ::::{grid} 1 1 2 2
 :gutter: 4
 
-:::{grid-item-card} [API Reference](reference/index){.font-title}
+:::{grid-item-card} [API Reference](reference/index.md){.font-title}
 :text-align: center
 :link: reference/index
 :link-type: doc
@@ -231,9 +231,9 @@ Find the word in the glosssary.
 
 <!-- SECTION END -->
 
-## [Contributing](reference/contributing)
+## [Contributing](contributing.md)
 
-## [Changelog](reference/changelog)
+## [Changelog](changelog.md)
 
 DataEval's development changelog
 
@@ -251,8 +251,8 @@ self
 :hidden:
 :maxdepth: 2
 
-installation.md
-tutorials/index.md
+installation
+tutorials/index
 how_to/index
 
 :::
@@ -262,9 +262,9 @@ how_to/index
 :hidden:
 :maxdepth: 2
 
-concepts/index.md
-workflows/index.md
-concepts/glossary.md
+concepts/index
+workflows/index
+concepts/glossary
 :::
 
 :::{toctree}
@@ -272,14 +272,14 @@ concepts/glossary.md
 :hidden:
 :maxdepth: 1
 
-reference/index.md
+reference/index
 :::
 
 :::{toctree}
 :hidden:
 :titlesonly:
 
-reference/contributing
-reference/changelog
-reference/about
+contributing
+changelog
+about
 :::

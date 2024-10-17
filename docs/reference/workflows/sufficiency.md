@@ -1,4 +1,3 @@
-(sufficiency-ref)=
 # Sufficiency
 
 ```{testsetup}
@@ -22,10 +21,6 @@ mock_params.return_value = np.array([0.0, 42.0, 0.0])
 
 ```{eval-rst}
 .. autoclass:: dataeval.workflows.Sufficiency
-   :members:
-   :inherited-members:
-
-.. autoclass:: dataeval.workflows.SufficiencyOutput
    :members:
    :inherited-members:
 ```

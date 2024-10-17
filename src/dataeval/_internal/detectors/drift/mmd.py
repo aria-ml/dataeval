@@ -24,7 +24,7 @@ from .torch import GaussianRBF, get_device, mmd2_from_kernel_matrix
 @dataclass(frozen=True)
 class DriftMMDOutput(DriftBaseOutput):
     """
-    Output class for DriftMMD
+    Output class for :class:`DriftMMD` drift detector
 
     Attributes
     ----------
