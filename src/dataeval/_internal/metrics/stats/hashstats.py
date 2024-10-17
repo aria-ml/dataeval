@@ -20,6 +20,8 @@ class HashStatsProcessor(StatsProcessor):
 @dataclass(frozen=True)
 class HashStatsOutput(BaseStatsOutput):
     """
+    Output class for :func:`hashstats` stats metric
+
     Attributes
     ----------
     xxhash : List[str]

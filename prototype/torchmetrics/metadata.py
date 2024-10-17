@@ -158,8 +158,8 @@ class Balance(BaseBalanceMetric):
     num_samples: int
         Number of samples in the dataset
 
-    Notes
-    -----
+    Note
+    ----
     We use mutual_info_classif from sklearn since class label is categorical
     mutual_info_classif outputs are consistent up to O(1e-4) and depend on
         a random seed.
@@ -275,8 +275,8 @@ class BalanceClasswise(BaseBalanceMetric):
             Number of nearest neighbors to use for computing MI between discrete
             and continuous variables.
 
-        Notes
-        -----
+        Note
+        ----
         We use mutual_info_classif from sklearn since class label is categorical
         mutual_info_classif outputs are consistent up to O(1e-4) and depend on
             a random seed
@@ -386,8 +386,8 @@ class BaseDiversityMetric(BaseBiasMetric):
         subset_mask: Optional[np.ndarray[bool]]
             Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
-        Notes
-        -----
+        Note
+        ----
         For continuous variables, histogram bins are chosen automatically.  See
             numpy.histogram for details.
         The expression is undefined for q=1, but it approaches the Shannon entropy
@@ -435,8 +435,8 @@ class BaseDiversityMetric(BaseBiasMetric):
         subset_mask: Optional[np.ndarray[bool]]
             Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
-        Notes
-        -----
+        Note
+        ----
         - For continuous variables, histogram bins are chosen automatically.  See
         numpy.histogram for details.
 
@@ -503,8 +503,8 @@ class DiversityClasswise(BaseDiversityMetric):
         diversity = 1 implies that samples are evenly distributed across a particular factor
         diversity = 1/num_categories implies that all samples belong to one category/bin
 
-        Notes
-        -----
+        Note
+        ----
         For continuous variables, histogram bins are chosen automatically.  See
             numpy.histogram for details.
         The expression is undefined for q=1, but it approaches the Shannon entropy
@@ -588,8 +588,8 @@ class Diversity(BaseDiversityMetric):
             The type of diversity index to return,  currently ["simpson",
             "shannon"]
 
-        Notes
-        -----
+        Note
+        ----
         - For continuous variables, histogram bins are chosen automatically.  See
         numpy.histogram for details.
 

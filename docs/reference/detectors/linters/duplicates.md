@@ -1,4 +1,3 @@
-(duplicates-ref)=
 # Duplicates
 
 ```{testsetup}

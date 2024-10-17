@@ -1,4 +1,3 @@
-(labelstats_ref)=
 # labelstats
 
 ```{testsetup}

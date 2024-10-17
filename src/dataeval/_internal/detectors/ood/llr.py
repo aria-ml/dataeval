@@ -18,11 +18,12 @@ from keras.layers import Input
 from keras.models import Model
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval._internal.detectors.ood.base import OODBase, OODScore
+from dataeval._internal.detectors.ood.base import OODBase, OODScoreOutput
 from dataeval._internal.interop import to_numpy
 from dataeval._internal.models.tensorflow.pixelcnn import PixelCNN
 from dataeval._internal.models.tensorflow.trainer import trainer
 from dataeval._internal.models.tensorflow.utils import predict_batch
+from dataeval._internal.output import set_metadata
 
 
 def build_model(
@@ -124,7 +125,7 @@ class OOD_LLR(OODBase):
         self.sequential = sequential
         self.log_prob = log_prob
 
-        self._ref_score: OODScore
+        self._ref_score: OODScoreOutput
         self._threshold_perc: float
         self._data_info: tuple[tuple, type] | None = None
 
@@ -279,12 +280,13 @@ class OOD_LLR(OODBase):
         logp_b = logp_fn(self.dist_b, X, return_per_feature=return_per_feature, batch_size=batch_size)
         return logp_s - logp_b
 
+    @set_metadata("dataeval.detectors")
     def score(
         self,
         X: ArrayLike,
         batch_size: int = int(1e10),
-    ) -> OODScore:
+    ) -> OODScoreOutput:
         self._validate(X := to_numpy(X))
         fscore = -self._llr(X, True, batch_size=batch_size)
         iscore = -self._llr(X, False, batch_size=batch_size)
-        return OODScore(iscore, fscore)
+        return OODScoreOutput(iscore, fscore)

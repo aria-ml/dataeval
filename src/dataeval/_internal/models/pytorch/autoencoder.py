@@ -61,9 +61,9 @@ class AETrainer:
         List[float]
             A list of average loss values for each epoch.
 
-        Notes
+        Note
         ----
-        To replace this function with a custom function, do
+        To replace this function with a custom function, do:
             AETrainer.train = custom_function
         """
         # Setup training
@@ -120,7 +120,7 @@ class AETrainer:
 
         Note
         ----
-        To replace this function with a custom function, do
+        To replace this function with a custom function, do:
             AETrainer.eval = custom_function
         """
         self.model.eval()
@@ -155,8 +155,8 @@ class AETrainer:
         torch.Tensor
             Data encoded by the model
 
-        Notes
-        -----
+        Note
+        ----
         This function should be run after the model has been trained and evaluated.
         """
         self.model.eval()

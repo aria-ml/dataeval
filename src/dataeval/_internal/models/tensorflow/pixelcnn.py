@@ -272,8 +272,6 @@ class PixelCNN(distribution.Distribution):
         The minimum value of the input data.
     dtype : tensorflow dtype, default tf.float32
         Data type of the `Distribution`.
-    name : str, default "PixelCNN"
-        The name of the `Distribution`.
     """
 
     def __init__(
@@ -293,10 +291,9 @@ class PixelCNN(distribution.Distribution):
         high: int = 255,
         low: int = 0,
         dtype=tf.float32,
-        name: str = "PixelCNN",
     ) -> None:
         parameters = dict(locals())
-        with tf.name_scope(name) as name:
+        with tf.name_scope("PixelCNN") as name:
             super().__init__(
                 dtype=dtype,
                 reparameterization_type=reparameterization.NOT_REPARAMETERIZED,

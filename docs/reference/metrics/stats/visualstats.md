@@ -1,4 +1,3 @@
-(visualstats_ref)=
 # visualstats
 
 ```{testsetup}

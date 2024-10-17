@@ -1,4 +1,3 @@
-(driftks-ref)=
 # DriftKS
 
 ```{eval-rst}

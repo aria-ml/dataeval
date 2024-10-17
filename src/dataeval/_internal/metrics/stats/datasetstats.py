@@ -16,6 +16,8 @@ from dataeval._internal.output import OutputMetadata, set_metadata
 @dataclass(frozen=True)
 class DatasetStatsOutput(OutputMetadata):
     """
+    Output class for :func:`datasetstats` stats metric
+
     This class represents the outputs of various stats functions against a single
     dataset, such that each index across all stat outputs are representative of
     the same source image.  Modifying or mixing outputs will result in inaccurate

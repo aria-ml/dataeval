@@ -1,4 +1,3 @@
-(driftmmd-ref)=
 # DriftMMD
 
 ```{eval-rst}

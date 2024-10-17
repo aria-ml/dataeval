@@ -1,9 +1,9 @@
-from dataeval._internal.metrics.ber import ber
-from dataeval._internal.metrics.divergence import divergence
-from dataeval._internal.metrics.uap import uap
+"""
+Estimators calculate performance bounds and the statistical distance between datasets.
+"""
 
-__all__ = [
-    "ber",
-    "divergence",
-    "uap",
-]
+from dataeval._internal.metrics.ber import BEROutput, ber
+from dataeval._internal.metrics.divergence import DivergenceOutput, divergence
+from dataeval._internal.metrics.uap import UAPOutput, uap
+
+__all__ = ["ber", "divergence", "uap", "BEROutput", "DivergenceOutput", "UAPOutput"]

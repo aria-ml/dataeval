@@ -60,6 +60,7 @@ exclude_patterns = [
 # Extension configurations
 # -----------------------------------------------------------------------------
 
+autodoc_type_aliases = {"ArrayLike": "ArrayLike"}
 autosummary_generate = False
 
 # -----------------------------------------------------------------------------
@@ -85,11 +86,11 @@ html_logo = "_static/DataEval_Logo.png"
 html_favicon = "_static/DataEval_Favicon.png"
 
 
-html_show_sourcelink = False
+html_show_sourcelink = True
 html_static_path = ["_static"]
 html_css_files = ["ARiA.css"]
 html_theme_options = {
-    "navigation_depth": 3,
+    "navigation_depth": 2,
     "logo": {"text": "DataEval"},
 }
 
@@ -128,7 +129,7 @@ def setup(app):
             "dataeval.metrics.estimators",
             "dataeval.metrics.stats",
             "dataeval.workflows",
-            "dataeval.tensorflow",
-            "dataeval.torch",
+            "dataeval.utils.tensorflow",
+            "dataeval.utils.torch",
         ]
     )
