@@ -2,25 +2,25 @@ import numpy as np
 import pytest
 
 from dataeval._internal.metrics.divergence import divergence, divergence_fnn, divergence_mst
-from tests.conftest import mnist, skip_mnist
 
 np.random.seed(0)
 
 
 class TestDivergence:
-    @skip_mnist
     @pytest.mark.parametrize(
         "method, output",
         [
-            ("MST", {"divergence": 0.838, "errors": 81}),
-            ("FNN", {"divergence": 0.864, "errors": 68}),
+            ("MST", {"divergence": 0.9819993519766712, "errors": 9}),
+            ("FNN", {"divergence": 1.0, "errors": 0.0}),
         ],
     )
-    def test_divergence(self, method, output):
+    def test_divergence_mock_data(self, method, output):
         """Unit testing of Divergence"""
-
-        covariates, labels = mnist(channels="channels_last")
-
+        rng = np.random.default_rng(3)
+        labels = np.concatenate([rng.choice(10, 500), np.arange(10).repeat(50)])
+        covariates = np.ones((1000, 28, 28)) * labels[:, np.newaxis, np.newaxis]
+        covariates[:, 13:16, 13:16] += 1
+        covariates[-200:, 13:16, 13:16] += rng.choice(5)
         inds = np.array([x % 2 == 0 for x in labels])
         rev_inds = np.invert(inds)
         even = covariates[inds, :, :]
