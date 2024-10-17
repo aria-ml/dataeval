@@ -5,11 +5,10 @@ import os
 import zipfile
 from pathlib import Path
 from typing import Literal, TypeVar
-from urllib.error import HTTPError, URLError
-from urllib.request import urlretrieve
 from warnings import warn
 
 import numpy as np
+import requests
 from numpy.typing import NDArray
 from torch.utils.data import Dataset
 from torchvision.datasets import CIFAR10, VOCDetection  # noqa: F401
@@ -65,11 +64,16 @@ def _get_file(
         try:
             error_msg = "URL fetch failure on {}: {} -- {}"
             try:
-                urlretrieve(origin, fpath)
-            except HTTPError as e:
-                raise Exception(error_msg.format(origin, e.code, e.msg)) from e
-            except URLError as e:
-                raise Exception(error_msg.format(origin, e.errno, e.reason)) from e
+                with requests.get(origin, stream=True, timeout=60) as r:
+                    r.raise_for_status()
+                    with open(fpath, "wb") as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            if chunk:
+                                f.write(chunk)
+            except requests.exceptions.HTTPError as e:
+                raise Exception(f"{error_msg.format(origin, e.response.status_code)} -- {e.response.reason}") from e
+            except requests.exceptions.RequestException as e:
+                raise Exception(f"{error_msg.format(origin, 'Unknown error')} -- {str(e)}") from e
         except (Exception, KeyboardInterrupt):
             if os.path.exists(fpath):
                 os.remove(fpath)
