@@ -48,8 +48,8 @@ class Gitlab(RestWrapper):
         List[Dict[str, Any]]
             List of project tags
 
-        Notes
-        --------
+        Note
+        ----
         https://docs.gitlab.com/ee/api/tags.html#list-project-repository-tags
         """
         r = self._request(get, TAGS)
@@ -73,8 +73,8 @@ class Gitlab(RestWrapper):
         Dict[str, Any]:
             The response received after issuing the request
 
-        Notes
-        --------
+        Note
+        ----
         https://docs.gitlab.com/ee/api/tags.html#create-a-new-tag
         """
         tag_content = {"tag_name": tag_name, "ref": ref}
@@ -96,8 +96,8 @@ class Gitlab(RestWrapper):
         -------
         None
 
-        Notes
-        --------
+        Note
+        ----
         https://docs.gitlab.com/ee/api/tags.html#delete-a-tag
         """
 
@@ -123,8 +123,8 @@ class Gitlab(RestWrapper):
         Dict[str, Any]:
             The response received after issuing the request
 
-        Notes
-        --------
+        Note
+        ----
         https://docs.gitlab.com/ee/api/branches.html#get-single-repository-branch
         """
         r = self._request(get, f"{BRANCHES}/{branch}")
@@ -144,8 +144,8 @@ class Gitlab(RestWrapper):
         Dict[str, Any]:
             The response received after issuing the request
 
-        Notes
-        --------
+        Note
+        ----
         https://docs.gitlab.com/ee/api/branches.html#create-repository-branch
         """
         r = self._request(post, BRANCHES, {"branch": branch, "ref": ref})
@@ -167,8 +167,8 @@ class Gitlab(RestWrapper):
         List[Dict[str, Any]]
             List of merge requests found using criteria
 
-        Notes
-        --------
+        Note
+        ----
         https://docs.gitlab.com/ee/api/merge_requests.html#list-merge-requests
         """
         params = {"per_page": "100"}
@@ -211,8 +211,8 @@ class Gitlab(RestWrapper):
         Dict[str, Any]:
             The response received after issuing the request
 
-        Notes
-        --------
+        Note
+        ----
         https://docs.gitlab.com/ee/api/merge_requests.html#create-mr
         """
         r = self._request(
@@ -246,8 +246,8 @@ class Gitlab(RestWrapper):
         Dict[str, Any]:
             The response received after issuing the request
 
-        Notes
-        --------
+        Note
+        ----
         https://docs.gitlab.com/ee/api/merge_requests.html#update-mr
         """
         r = self._request(
@@ -271,8 +271,8 @@ class Gitlab(RestWrapper):
         ref : str, default "main"
             The tag, branch name or SHA to retrieve the file from
 
-        Notes
-        -----
+        Note
+        ----
         https://docs.gitlab.com/ee/api/repository_files.html#get-raw-file-from-repository
         """
         r = self._request(get, [FILES, filepath, "raw"], {"ref": ref})
@@ -295,8 +295,8 @@ class Gitlab(RestWrapper):
         Dict[str, Any]
             The file information from the specified repository file
 
-        Notes
-        -----
+        Note
+        ----
         https://docs.gitlab.com/ee/api/repository_files.html#get-file-from-repository
         """
         r = self._request(get, [FILES, filepath], {"ref": ref})
@@ -322,8 +322,8 @@ class Gitlab(RestWrapper):
         Dict[str, Any]:
             The response received after issuing the request
 
-        Notes
-        -----
+        Note
+        ----
         https://docs.gitlab.com/ee/api/repository_files.html#update-existing-file-in-repository
         """
         r = self._request(
@@ -354,8 +354,8 @@ class Gitlab(RestWrapper):
         Dict[str, Any]:
             The response received after issuing the request
 
-        Notes
-        -----
+        Note
+        ----
         https://docs.gitlab.com/ee/api/commits.html#cherry-pick-a-commit
         """
         r = self._request(post, [COMMITS, sha, "cherry_pick"], None, {"branch": branch})
@@ -374,8 +374,8 @@ class Gitlab(RestWrapper):
         ref : str, default "main"
             The tag, branch name or SHA to retrieve the file from
 
-        Notes
-        -----
+        Note
+        ----
         https://docs.gitlab.com/ee/api/job_artifacts.html#download-the-artifacts-archive
         """
         r = self._request(get, [JOBS, ARTIFACTS, ref, DOWNLOAD], {"job": job})
@@ -400,8 +400,8 @@ class Gitlab(RestWrapper):
         actions : List[Dict[str, str]]
             A list of actions to commit to the repository
 
-        Notes
-        -----
+        Note
+        ----
         https://docs.gitlab.com/ee/api/commits.html#create-a-commit-with-multiple-files-and-actions
         """
         r = self._request(

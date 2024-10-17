@@ -13,7 +13,7 @@ from dataeval._internal.output import OutputMetadata, set_metadata
 @dataclass(frozen=True)
 class LabelStatsOutput(OutputMetadata):
     """
-    Output class for `labelstats` metrics function
+    Output class for :func:`labelstats` stats metric
 
     Attributes
     ----------

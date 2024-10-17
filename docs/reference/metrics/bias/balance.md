@@ -1,4 +1,3 @@
-(balance-ref)=
 # balance
 
 Balance and classwise balance are metrics that measure distributional

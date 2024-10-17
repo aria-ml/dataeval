@@ -1,4 +1,3 @@
-(pixelstats_ref)=
 # pixelstats
 
 ```{testsetup}

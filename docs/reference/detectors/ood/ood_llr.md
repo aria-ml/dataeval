@@ -1,4 +1,3 @@
-(oodllr-ref)=
 # OOD_LLR
 
 ```{eval-rst}

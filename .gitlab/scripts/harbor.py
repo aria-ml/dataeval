@@ -34,8 +34,8 @@ class Harbor(RestWrapper):
         List[Dict[str, Any]]
             List of artifacts
 
-        Notes
-        --------
+        Note
+        ----
         https://harbor.jatic.net/#/artifact/listArtifacts
         """
         params = {"with_tag": "true", "page_size": "100"}
@@ -60,8 +60,8 @@ class Harbor(RestWrapper):
         -------
         None
 
-        Notes
-        --------
+        Note
+        ----
         https://harbor.jatic.net/#/artifact/deleteTag
         """
 

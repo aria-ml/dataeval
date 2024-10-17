@@ -14,12 +14,13 @@ import keras
 import tensorflow as tf
 from numpy.typing import ArrayLike
 
-from dataeval._internal.detectors.ood.base import OODGMMBase, OODScore
+from dataeval._internal.detectors.ood.base import OODGMMBase, OODScoreOutput
 from dataeval._internal.interop import to_numpy
 from dataeval._internal.models.tensorflow.autoencoder import AEGMM
 from dataeval._internal.models.tensorflow.gmm import gmm_energy
 from dataeval._internal.models.tensorflow.losses import LossGMM
 from dataeval._internal.models.tensorflow.utils import predict_batch
+from dataeval._internal.output import set_metadata
 
 
 class OOD_AEGMM(OODGMMBase):
@@ -49,7 +50,8 @@ class OOD_AEGMM(OODGMMBase):
             loss_fn = LossGMM()
         super().fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
 
-    def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScore:
+    @set_metadata("dataeval.detectors")
+    def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
         """
         Compute the out-of-distribution (OOD) score for a given dataset.
 
@@ -63,7 +65,7 @@ class OOD_AEGMM(OODGMMBase):
 
         Returns
         -------
-        OODScore
+        OODScoreOutput
             An object containing the instance-level OOD score.
 
         Note
@@ -73,4 +75,4 @@ class OOD_AEGMM(OODGMMBase):
         self._validate(X := to_numpy(X))
         _, z, _ = predict_batch(X, self.model, batch_size=batch_size)
         energy, _ = gmm_energy(z, self.gmm_params, return_mean=False)
-        return OODScore(energy.numpy())  # type: ignore
+        return OODScoreOutput(energy.numpy())  # type: ignore

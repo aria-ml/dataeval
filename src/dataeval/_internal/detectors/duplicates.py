@@ -17,6 +17,8 @@ TIndexCollection = TypeVar("TIndexCollection", DuplicateGroup, DatasetDuplicateG
 @dataclass(frozen=True)
 class DuplicatesOutput(Generic[TIndexCollection], OutputMetadata):
     """
+    Output class for :class:`Duplicates` lint detector
+
     Attributes
     ----------
     exact : list[list[int] | dict[int, list[int]]]

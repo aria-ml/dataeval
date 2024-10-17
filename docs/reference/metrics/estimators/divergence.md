@@ -1,4 +1,3 @@
-(divergence-ref)=
 # divergence
 
 ```{testsetup}

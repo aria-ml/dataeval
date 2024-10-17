@@ -179,8 +179,8 @@ def run_stats(
         The dictionary keys correspond to the names of the statistics, and the values are NumPy arrays
         with the results of the computations.
 
-    Notes
-    -----
+    Note
+    ----
     - The function performs image normalization (rescaling the image values)
       before applying some of the statistics.
     - Pixel-level statistics (e.g., brightness, entropy) are computed after

@@ -1,4 +1,3 @@
-(clusterer-ref)=
 # Clusterer
 
 ```{testsetup}

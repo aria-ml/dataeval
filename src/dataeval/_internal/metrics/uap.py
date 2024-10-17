@@ -4,6 +4,8 @@ FR Test Statistic based estimate for the upperbound
 average precision using empirical mean precision
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from numpy.typing import ArrayLike
@@ -16,6 +18,8 @@ from dataeval._internal.output import OutputMetadata, set_metadata
 @dataclass(frozen=True)
 class UAPOutput(OutputMetadata):
     """
+    Output class for :func:`uap` estimator metric
+
     Attributes
     ----------
     uap : float
@@ -48,8 +52,8 @@ def uap(labels: ArrayLike, scores: ArrayLike) -> UAPOutput:
     ValueError
         If unique classes M < 2
 
-    Notes
-    -----
+    Note
+    ----
     This function calculates the empirical mean precision using the
     ``average_precision_score`` from scikit-learn, weighted by the class distribution.
 

@@ -1,3 +1,7 @@
+"""
+Detectors can determine if a dataset or individual images in a dataset are indicative of a specific issue.
+"""
+
 from dataeval import _IS_TENSORFLOW_AVAILABLE
 
 from . import drift, linters

@@ -15,11 +15,12 @@ import numpy as np
 import tensorflow as tf
 from numpy.typing import ArrayLike
 
-from dataeval._internal.detectors.ood.base import OODBase, OODScore
+from dataeval._internal.detectors.ood.base import OODBase, OODScoreOutput
 from dataeval._internal.interop import to_numpy
 from dataeval._internal.models.tensorflow.autoencoder import VAE
 from dataeval._internal.models.tensorflow.losses import Elbo
 from dataeval._internal.models.tensorflow.utils import predict_batch
+from dataeval._internal.output import set_metadata
 
 
 class OOD_VAE(OODBase):
@@ -67,7 +68,8 @@ class OOD_VAE(OODBase):
             loss_fn = Elbo(0.05)
         super().fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
 
-    def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScore:
+    @set_metadata("dataeval.detectors")
+    def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
         self._validate(X := to_numpy(X))
 
         # sample reconstructed instances
@@ -86,4 +88,4 @@ class OOD_VAE(OODBase):
         sorted_fscore_perc = sorted_fscore[:, -n_score_features:]
         iscore = np.mean(sorted_fscore_perc, axis=1)
 
-        return OODScore(iscore, fscore)
+        return OODScoreOutput(iscore, fscore)

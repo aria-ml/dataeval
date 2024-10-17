@@ -13,6 +13,8 @@ from dataeval._internal.output import OutputMetadata, set_metadata
 @dataclass(frozen=True)
 class DiversityOutput(OutputMetadata):
     """
+    Output class for :func:`diversity` bias metric
+
     Attributes
     ----------
     diversity_index : NDArray[np.float64]
@@ -52,8 +54,8 @@ def diversity_shannon(
     subset_mask: NDArray[np.bool_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
-    Notes
-    -----
+    Note
+    ----
     For continuous variables, histogram bins are chosen automatically.  See `numpy.histogram` for details.
 
     Returns
@@ -103,8 +105,8 @@ def diversity_simpson(
     subset_mask: NDArray[np.bool_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
-    Notes
-    -----
+    Note
+    ----
     For continuous variables, histogram bins are chosen automatically.  See
         numpy.histogram for details.
     If there is only one category, the diversity index takes a value of 0.
@@ -162,8 +164,8 @@ def diversity(
     method: Literal["shannon", "simpson"], default "simpson"
         Indicates which diversity index should be computed
 
-    Notes
-    -----
+    Note
+    ----
     - For continuous variables, histogram bins are chosen automatically. See numpy.histogram for details.
     - The expression is undefined for q=1, but it approaches the Shannon entropy in the limit.
     - If there is only one category, the diversity index takes a value of 1 = 1/N = 1/1. Entropy will take a value of 0.

@@ -22,6 +22,8 @@ TIndexIssueMap = TypeVar("TIndexIssueMap", IndexIssueMap, list[IndexIssueMap])
 @dataclass(frozen=True)
 class OutliersOutput(Generic[TIndexIssueMap], OutputMetadata):
     """
+    Output class for :class:`Outliers` lint detector
+
     Attributes
     ----------
     issues : dict[int, dict[str, float]] | list[dict[int, dict[str, float]]]
@@ -86,8 +88,8 @@ class Outliers:
     --------
     Duplicates
 
-    Notes
-    ------
+    Note
+    ----
     There are 3 different statistical methods:
 
     - zscore

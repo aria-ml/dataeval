@@ -43,6 +43,8 @@ class VisualStatsProcessor(StatsProcessor):
 @dataclass(frozen=True)
 class VisualStatsOutput(BaseStatsOutput):
     """
+    Output class for :func:`visualstats` stats metric
+
     Attributes
     ----------
     brightness : NDArray[np.float16]
@@ -100,8 +102,8 @@ def visualstats(
     --------
     dimensionstats, pixelstats, Outliers
 
-    Notes
-    -----
+    Note
+    ----
     - `zeros` and `missing` are presented as a percentage of total pixel counts
 
     Examples

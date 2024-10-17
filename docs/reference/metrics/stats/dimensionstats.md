@@ -1,4 +1,3 @@
-(dimensionstats_ref)=
 # dimensionstats
 
 ```{testsetup}

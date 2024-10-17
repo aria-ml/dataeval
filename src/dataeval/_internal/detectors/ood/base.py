@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, Literal, NamedTuple, cast
+from typing import Callable, Literal, cast
 
 import keras
 import numpy as np
@@ -26,6 +26,9 @@ from dataeval._internal.output import OutputMetadata, set_metadata
 @dataclass(frozen=True)
 class OODOutput(OutputMetadata):
     """
+    Output class for predictions from :class:`OOD_AE`, :class:`OOD_AEGMM`, :class:`OOD_LLR`,
+    :class:`OOD_VAE`, and :class:`OOD_VAEGMM` out-of-distribution detectors
+
     Attributes
     ----------
     is_ood : NDArray
@@ -41,9 +44,11 @@ class OODOutput(OutputMetadata):
     feature_score: NDArray[np.float32] | None
 
 
-class OODScore(NamedTuple):
+@dataclass(frozen=True)
+class OODScoreOutput(OutputMetadata):
     """
-    NamedTuple containing the instance and (optionally) feature score.
+    Output class for instance and feature scores from :class:`OOD_AE`, :class:`OOD_AEGMM`,
+    :class:`OOD_LLR`, :class:`OOD_VAE`, and :class:`OOD_VAEGMM` out-of-distribution detectors
 
     Parameters
     ----------
@@ -76,7 +81,7 @@ class OODBase(ABC):
     def __init__(self, model: keras.Model) -> None:
         self.model = model
 
-        self._ref_score: OODScore
+        self._ref_score: OODScoreOutput
         self._threshold_perc: float
         self._data_info: tuple[tuple, type] | None = None
 
@@ -102,7 +107,7 @@ class OODBase(ABC):
         self._validate(X)
 
     @abstractmethod
-    def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScore:
+    def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
         """
         Compute the out-of-distribution (OOD) scores for a given dataset.
 
@@ -116,7 +121,7 @@ class OODBase(ABC):
 
         Returns
         -------
-        OODScore
+        OODScoreOutput
             An object containing the instance-level and feature-level OOD scores.
         """
 
@@ -197,7 +202,7 @@ class OODBase(ABC):
         # compute outlier scores
         score = self.score(X, batch_size=batch_size)
         ood_pred = score.get(ood_type) > self._threshold_score(ood_type)
-        return OODOutput(is_ood=ood_pred, **score._asdict())
+        return OODOutput(is_ood=ood_pred, **score.dict())
 
 
 class OODGMMBase(OODBase):

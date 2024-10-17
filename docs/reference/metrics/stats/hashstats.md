@@ -1,4 +1,3 @@
-(hashstats_ref)=
 # hashstats
 
 ```{testsetup}

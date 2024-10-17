@@ -1,4 +1,3 @@
-(parity-ref)=
 # parity
 
 ```{testsetup}

@@ -1,4 +1,3 @@
-(ber-ref)=
 # ber
 
 ```{eval-rst}
