@@ -1,4 +1,3 @@
-(labelparity-ref)=
 # label_parity
 
 ```{testsetup}

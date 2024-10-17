@@ -1,4 +1,3 @@
-(driftuncertainty-ref)=
 # DriftUncertainty
 
 ```{eval-rst}

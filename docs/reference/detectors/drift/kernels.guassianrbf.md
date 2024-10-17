@@ -1,5 +1,4 @@
-(gaussianrbf-ref)=
-# GaussianRBF
+# kernels.GaussianRBF
 
 ```{eval-rst}
 .. autoclass:: dataeval.detectors.drift.kernels.GaussianRBF

@@ -1,4 +1,3 @@
-(outliers-ref)=
 # Outliers
 
 ```{testsetup}

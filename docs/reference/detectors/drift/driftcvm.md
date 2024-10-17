@@ -1,4 +1,3 @@
-(driftcvm-ref)=
 # DriftCVM
 
 ```{eval-rst}

@@ -23,7 +23,7 @@ from dataeval._internal.output import OutputMetadata, set_metadata
 @dataclass(frozen=True)
 class DriftBaseOutput(OutputMetadata):
     """
-    Output class for Drift
+    Base output class for Drift detector classes
 
     Attributes
     ----------
@@ -42,7 +42,7 @@ class DriftBaseOutput(OutputMetadata):
 @dataclass(frozen=True)
 class DriftOutput(DriftBaseOutput):
     """
-    Output class for DriftCVM and DriftKS
+    Output class for :class:`DriftCVM`, :class:`DriftKS`, and :class:`DriftUncertainty` drift detectors
 
     Attributes
     ----------

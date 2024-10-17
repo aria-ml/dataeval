@@ -1,5 +1,4 @@
-(lsupdate-ref)=
-# LastSeenUpdate
+# updates.LastSeenUpdate
 
 ```{eval-rst}
 .. autoclass:: dataeval.detectors.drift.updates.LastSeenUpdate

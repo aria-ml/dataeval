@@ -1,4 +1,3 @@
-(oodae-ref)=
 # OOD_AE
 
 ```{eval-rst}

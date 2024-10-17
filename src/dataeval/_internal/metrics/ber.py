@@ -25,6 +25,8 @@ from dataeval._internal.output import OutputMetadata, set_metadata
 @dataclass(frozen=True)
 class BEROutput(OutputMetadata):
     """
+    Output class for :func:`ber` estimator metric
+
     Attributes
     ----------
     ber : float

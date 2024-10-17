@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import math
 from dataclasses import dataclass
 from typing import Literal
@@ -14,6 +16,8 @@ from dataeval._internal.output import OutputMetadata, set_metadata
 @dataclass(frozen=True)
 class CoverageOutput(OutputMetadata):
     """
+    Output class for :func:`coverage` bias metric
+
     Attributes
     ----------
     indices : NDArray

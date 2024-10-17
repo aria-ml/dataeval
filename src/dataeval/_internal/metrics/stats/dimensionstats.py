@@ -32,6 +32,8 @@ class DimensionStatsProcessor(StatsProcessor):
 @dataclass(frozen=True)
 class DimensionStatsOutput(BaseStatsOutput):
     """
+    Output class for :func:`dimensionstats` stats metric
+
     Attributes
     ----------
     left : NDArray[np.int32]

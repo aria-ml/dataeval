@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.utils import read_dataset
+from dataeval.utils.torch import read_dataset
 
 
 class TestDatasetReader:

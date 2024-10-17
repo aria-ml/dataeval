@@ -3,6 +3,8 @@ This module contains the implementation of HP Divergence
 using the Fast Nearest Neighbor and Minimum Spanning Tree algorithms
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Literal
 
@@ -17,6 +19,8 @@ from dataeval._internal.output import OutputMetadata, set_metadata
 @dataclass(frozen=True)
 class DivergenceOutput(OutputMetadata):
     """
+    Output class for :func:`divergence` estimator metric
+
     Attributes
     ----------
     divergence : float
@@ -96,8 +100,8 @@ def divergence(data_a: ArrayLike, data_b: ArrayLike, method: Literal["FNN", "MST
     DivergenceOutput
         The divergence value (0.0..1.0) and the number of differing edges between the datasets
 
-    Notes
-    -----
+    Note
+    ----
     The divergence value indicates how similar the 2 datasets are
     with 0 indicating approximately identical data distributions.
 

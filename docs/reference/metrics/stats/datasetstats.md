@@ -1,4 +1,3 @@
-(datasetstats_ref)=
 # datasetstats
 
 ```{testsetup}

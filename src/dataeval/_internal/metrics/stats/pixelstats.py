@@ -36,6 +36,8 @@ class PixelStatsProcessor(StatsProcessor):
 @dataclass(frozen=True)
 class PixelStatsOutput(BaseStatsOutput):
     """
+    Output class for :func:`pixelstats` stats metric
+
     Attributes
     ----------
     mean : NDArray[np.float16]
@@ -93,8 +95,8 @@ def pixelstats(
     --------
     dimensionstats, visualstats, Outliers
 
-    Notes
-    -----
+    Note
+    ----
     - All metrics are scaled based on the perceived bit depth (which is derived from the largest pixel value)
       to allow for better comparison between images stored in different formats and different resolutions.
 

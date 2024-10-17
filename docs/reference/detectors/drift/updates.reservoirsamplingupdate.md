@@ -1,5 +1,4 @@
-(rsupdate-ref)=
-# ReservoirSamplingUpdate
+# updates.ReservoirSamplingUpdate
 
 ```{eval-rst}
 .. autoclass:: dataeval.detectors.drift.updates.ReservoirSamplingUpdate

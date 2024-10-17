@@ -1,4 +1,3 @@
-(diversity-ref)=
 # diversity
 
 Diversity and classwise diversity measure the evenness or uniformity of metadata

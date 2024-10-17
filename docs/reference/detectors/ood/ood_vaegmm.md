@@ -1,4 +1,3 @@
-(oodvaegmm-ref)=
 # OOD_VAEGMM
 
 ```{eval-rst}

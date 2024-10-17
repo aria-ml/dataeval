@@ -15,6 +15,8 @@ from dataeval._internal.output import OutputMetadata, set_metadata
 @dataclass(frozen=True)
 class BalanceOutput(OutputMetadata):
     """
+    Output class for :func:`balance` bias metric
+
     Attributes
     ----------
     balance : NDArray[np.float64]
@@ -71,8 +73,8 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
         (num_factors+1) x (num_factors+1) estimate of mutual information
         between num_factors metadata factors and class label. Symmetry is enforced.
 
-    Notes
-    -----
+    Note
+    ----
     We use `mutual_info_classif` from sklearn since class label is categorical.
     `mutual_info_classif` outputs are consistent up to O(1e-4) and depend on a random
     seed. MI is computed differently for categorical and continuous variables, and
