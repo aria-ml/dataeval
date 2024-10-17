@@ -30,6 +30,7 @@ def download():
         # HPDivergenceTutorial.ipynb
         # OODDetectionTutorial.ipynb
         MNIST(root="./data", train=True, download=True)
+        MNIST(root="./data", train=True, download=True, corruption="translate")
 
         # LintingTutorial.ipynb
         CIFAR10(root="./data", train=False, download=True)
