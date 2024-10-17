@@ -1,13 +1,14 @@
 # Image Statistics Functions
 
-The image statistics functions assist with understanding the dataset.
+```{currentmodule} dataeval.metrics.stats
+```
+
+The dataset statistics functions assist with understanding the dataset by examining the images, labels and metadata.
 It can be used to get a big picture view of the dataset and it's underlying distribution.
 
-## dimensionstats
+We categorize the image metrics into the following 4 buckets:
 
-### What is the dimensionstats function
-
-The dimensionstats function is an aggregate metric that calculates various dimension based statistics for each individual image:
+## dimension stats
 - width
 - height
 - channels

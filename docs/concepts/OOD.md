@@ -2,10 +2,13 @@
 
 ## What is it
 
-`OOD_AE` is a method for detecting out-of-distribution images via autoencoder reconstruction error. Images which are poorly reconstructed by an autoencoder, trained on the reference dataset, are likely to be qualitatively different from those on which the model was trained. Much of the functionality comes from [Alibi Detect](https://github.com/SeldonIO/alibi-detect).
+```{currentmodule} dataeval.detectors.ood
+```
+
+{class}`OOD_AE` is a class for detecting out-of-distribution images via autoencoder reconstruction error. Images which are poorly reconstructed by an autoencoder, trained on the reference dataset, are likely to be qualitatively different from those on which the model was trained. Much of the functionality comes from [Alibi Detect](https://github.com/SeldonIO/alibi-detect).
 ## When to use it
 
-The `OOD_AE` class and similar should be used when you would like to find individual images in a dataset which are qualitatively different from those in a reference (training) dataset. Typically, the main use-case is when you have a new set of (operational) images, and would like to determine if there are any qualitatively different images amongst them. These could be a novel, operationally relevant class or sub-class which was not present in the training data. This type of detection is critical because models are likely to degrade rapidly if novel images represent a significant portion of operational data.
+The {class}`OOD_AE` class and similar should be used when you would like to find individual images in a dataset which are qualitatively different from those in a reference (training) dataset. Typically, the main use-case is when you have a new set of (operational) images, and would like to determine if there are any qualitatively different images amongst them. These could be a novel, operationally relevant class or sub-class which was not present in the training data. This type of detection is critical because models are likely to degrade rapidly if novel images represent a significant portion of operational data.
 
 ## Theory behind it
 

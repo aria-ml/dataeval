@@ -2,8 +2,11 @@
 
 ## What is it
 
+```{currentmodule} dataeval.metrics.estimators
+```
+
 Bayes error rate refers to the irreducible error in a particular classification problem.
-The `ber` function assesses the feasibility of a machine learning classification task by estimating this error rate.
+The {func}`ber` function assesses the feasibility of a machine learning classification task by estimating this error rate.
 Bayes error rate has a formal definition given by the following:
 
 $$\text{BER}= E_X[P(Y\neq y \mid \argmax_i P(Y=i \mid X=x)=y)]$$
@@ -33,4 +36,4 @@ Here the colors represent the different labels (digits). While most are separate
 
 The two methods we use to estimate BER are [K-nearest-neighbors](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm) and a [minimum spanning tree](https://en.wikipedia.org/wiki/Minimum_spanning_tree). The technical details behind these estimators are drawn from [Learning to Bound the Multi-class Bayes Error](https://arxiv.org/abs/1811.06419). You can read this paper for more technical details and justification pertaining to its estimation.
 
-The [ber](../reference/metrics/estimators/ber.md) API will give more information on how to use the functionality. The only parameter which is up to the user to select is $k$, the number of neighbors to use for the BER estimator. We recommend $k=5$ as a default. There are other options, such as $k=\sqrt{n}$ or $k = c_0 n^{4/(4+d)}$, where $d$ is the number of features/dimension of the embedding, n is the sample size, and $c_0$ is some constant. Both of these have empirical and theoretical merits, but for most users, a relatively small, fixed $k$ is best.
+The {func}`ber` function will give more information on how to use the functionality. The only parameter which is up to the user to select is $k$, the number of neighbors to use for the BER estimator. We recommend $k=5$ as a default. There are other options, such as $k=\sqrt{n}$ or $k = c_0 n^{4/(4+d)}$, where $d$ is the number of features/dimension of the embedding, n is the sample size, and $c_0$ is some constant. Both of these have empirical and theoretical merits, but for most users, a relatively small, fixed $k$ is best.

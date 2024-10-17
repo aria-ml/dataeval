@@ -4,7 +4,10 @@
 
 ## When to use it
 
-The `AETrainer` class should be used when you have lots of images, have very large images, or your given speed requirements are strict.
+```{currentmodule} dataeval.torch.trainer
+```
+
+The {class}`AETrainer` class should be used when you have lots of images, have very large images, or your given speed requirements are strict.
 Images can be hundreds of pixels tall and wide, and can have multiple channels, which makes them very large.
 Encoding these images using an autoencoder can shrink the images significantly.
 
