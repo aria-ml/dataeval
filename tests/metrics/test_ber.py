@@ -5,24 +5,26 @@ import pytest
 import torch
 
 from dataeval._internal.metrics.ber import BEROutput, ber, ber_knn, ber_mst, knn_lowerbound
-from tests.conftest import mnist, skip_mnist
 
 
 class TestFunctionalBER:
     """Tests the functional methods used in BER"""
 
-    @skip_mnist
     @pytest.mark.parametrize(
         "method, k, expected",
         [
-            (ber_mst, None, (0.143, 0.0745910104681437)),
-            (ber_knn, 1, (0.12, 0.06214559737386353)),
-            (ber_knn, 10, (0.137, 0.07132636098401203)),
+            (ber_mst, None, (0.009, 0.004511306604042031)),
+            (ber_knn, 1, (0.0, 0.0)),
+            (ber_knn, 10, (0.0, 0.0)),
         ],
     )
-    def test_ber_on_mnist(self, method, k, expected):
+    def test_ber_on_mock_data(self, method, k, expected):
         """Methods correctly calculate BER with given params"""
-        data, labels = mnist(flatten=True)
+        rng = np.random.default_rng(3)
+        labels = np.concatenate([rng.choice(10, 500), np.arange(10).repeat(50)])
+        data = np.ones((1000, 28, 28)) * labels[:, np.newaxis, np.newaxis]
+        data[:, 13:16, 13:16] += 1
+        data[-200:, 13:16, 13:16] += rng.choice(5)
         result = method(data, labels, k) if k else method(data, labels)
         assert result == expected
 
