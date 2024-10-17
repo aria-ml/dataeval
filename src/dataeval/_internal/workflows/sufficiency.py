@@ -2,17 +2,18 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass
-from typing import Any, Callable, Sequence, cast
+from typing import Any, Callable, Iterable, Mapping, Sequence, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
 from matplotlib.figure import Figure
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 from scipy.optimize import basinhopping
 from torch.utils.data import Dataset
 
+from dataeval._internal.interop import as_numpy
 from dataeval._internal.output import OutputMetadata, set_metadata
 
 
@@ -45,13 +46,13 @@ class SufficiencyOutput(OutputMetadata):
     @set_metadata("dataeval.workflows.SufficiencyOutput")
     def project(
         self,
-        projection: int | Sequence[int] | NDArray[np.uint],
+        projection: int | Iterable[int],
     ) -> SufficiencyOutput:
         """Projects the measures for each value of X
 
         Parameters
         ----------
-        projection : int | Sequence[int] | NDArray[np.uint]
+        projection : int | Iterable[int]
             Step or steps to project
 
         Returns
@@ -63,12 +64,12 @@ class SufficiencyOutput(OutputMetadata):
         ------
         ValueError
             If the length of data points in the measures do not match
-            If the steps are not int, Sequence[int] or an ndarray
+            If `projection` is not numerical
         """
-        projection = [projection] if isinstance(projection, int) else projection
-        projection = np.array(projection) if isinstance(projection, Sequence) else projection
-        if not isinstance(projection, np.ndarray):
-            raise ValueError("'steps' must be an int, Sequence[int] or ndarray")
+        projection = np.asarray(list(projection) if isinstance(projection, Iterable) else [projection])
+
+        if not np.issubdtype(projection.dtype, np.number):
+            raise ValueError("'projection' must consist of numerical values")
 
         output = {}
         for name, measures in self.measures.items():
@@ -92,7 +93,7 @@ class SufficiencyOutput(OutputMetadata):
 
         Returns
         -------
-        List[plt.Figure]
+        list[plt.Figure]
             List of Figures for each measure
 
         Raises
@@ -130,19 +131,19 @@ class SufficiencyOutput(OutputMetadata):
 
         return plots
 
-    def inv_project(self, targets: dict[str, NDArray]) -> dict[str, NDArray]:
+    def inv_project(self, targets: Mapping[str, ArrayLike]) -> dict[str, NDArray[np.float64]]:
         """
         Calculate training samples needed to achieve target model metric values.
 
         Parameters
         ----------
-        targets : Dict[str, NDArray]
-            Dictionary of target metric scores (from 0.0 to 1.0) that we want
+        targets : Mapping[str, ArrayLike]
+            Mapping of target metric scores (from 0.0 to 1.0) that we want
             to achieve, where the key is the name of the metric.
 
         Returns
         -------
-        Dict[str, NDArray]
+        dict[str, NDArray]
             List of the number of training samples needed to achieve each
             corresponding entry in targets
         """
@@ -150,18 +151,19 @@ class SufficiencyOutput(OutputMetadata):
         projection = {}
 
         for name, target in targets.items():
+            tarray = as_numpy(target)
             if name not in self.measures:
                 continue
 
             measure = self.measures[name]
             if measure.ndim > 1:
-                projection[name] = np.zeros((len(measure), len(target)))
+                projection[name] = np.zeros((len(measure), len(tarray)))
                 for i in range(len(measure)):
                     projection[name][i] = inv_project_steps(
-                        self.params[name][i], target[i] if target.ndim == measure.ndim else target
+                        self.params[name][i], tarray[i] if tarray.ndim == measure.ndim else tarray
                     )
             else:
-                projection[name] = inv_project_steps(self.params[name], target)
+                projection[name] = inv_project_steps(self.params[name], tarray)
 
         return projection
 
@@ -379,18 +381,18 @@ class Sufficiency:
         Function which takes a model (torch.nn.Module), a dataset
         (torch.utils.data.Dataset), indices to train on and executes model
         training against the data.
-    eval_fn : Callable[[nn.Module, Dataset], Dict[str, float | NDArray]]
+    eval_fn : Callable[[nn.Module, Dataset], Mapping[str, float | ArrayLike]]
         Function which takes a model (torch.nn.Module), a dataset
         (torch.utils.data.Dataset) and returns a dictionary of metric
-        values (Dict[str, float]) which is used to assess model performance
+        values (Mapping[str, float]) which is used to assess model performance
         given the model and data.
     runs : int, default 1
         Number of models to run over all subsets
     substeps : int, default 5
         Total number of dataset partitions that each model will train on
-    train_kwargs : Dict | None, default None
+    train_kwargs : Mapping | None, default None
         Additional arguments required for custom training function
-    eval_kwargs : Dict | None, default None
+    eval_kwargs : Mapping | None, default None
         Additional arguments required for custom evaluation function
     """
 
@@ -400,11 +402,11 @@ class Sufficiency:
         train_ds: Dataset,
         test_ds: Dataset,
         train_fn: Callable[[nn.Module, Dataset, Sequence[int]], None],
-        eval_fn: Callable[[nn.Module, Dataset], dict[str, float] | dict[str, NDArray]],
+        eval_fn: Callable[[nn.Module, Dataset], Mapping[str, float] | Mapping[str, ArrayLike]],
         runs: int = 1,
         substeps: int = 5,
-        train_kwargs: dict[str, Any] | None = None,
-        eval_kwargs: dict[str, Any] | None = None,
+        train_kwargs: Mapping[str, Any] | None = None,
+        eval_kwargs: Mapping[str, Any] | None = None,
     ):
         self.model = model
         self.train_ds = train_ds
@@ -447,42 +449,42 @@ class Sufficiency:
     @property
     def eval_fn(
         self,
-    ) -> Callable[[nn.Module, Dataset], dict[str, float] | dict[str, NDArray]]:
+    ) -> Callable[[nn.Module, Dataset], dict[str, float] | Mapping[str, ArrayLike]]:
         return self._eval_fn
 
     @eval_fn.setter
     def eval_fn(
         self,
-        value: Callable[[nn.Module, Dataset], dict[str, float] | dict[str, NDArray]],
+        value: Callable[[nn.Module, Dataset], dict[str, float] | Mapping[str, ArrayLike]],
     ):
         if not callable(value):
             raise TypeError("Must provide a callable for eval_fn.")
         self._eval_fn = value
 
     @property
-    def train_kwargs(self) -> dict[str, Any]:
+    def train_kwargs(self) -> Mapping[str, Any]:
         return self._train_kwargs
 
     @train_kwargs.setter
-    def train_kwargs(self, value: dict[str, Any] | None):
+    def train_kwargs(self, value: Mapping[str, Any] | None):
         self._train_kwargs = {} if value is None else value
 
     @property
-    def eval_kwargs(self) -> dict[str, Any]:
+    def eval_kwargs(self) -> Mapping[str, Any]:
         return self._eval_kwargs
 
     @eval_kwargs.setter
-    def eval_kwargs(self, value: dict[str, Any] | None):
+    def eval_kwargs(self, value: Mapping[str, Any] | None):
         self._eval_kwargs = {} if value is None else value
 
     @set_metadata("dataeval.workflows", ["runs", "substeps"])
-    def evaluate(self, eval_at: NDArray | None = None, niter: int = 1000) -> SufficiencyOutput:
+    def evaluate(self, eval_at: int | Iterable[int] | None = None, niter: int = 1000) -> SufficiencyOutput:
         """
         Creates data indices, trains models, and returns plotting data
 
         Parameters
         ----------
-        eval_at : NDArray | None, default None
+        eval_at : int | Iterable[int] | None, default None
             Specify this to collect accuracies over a specific set of dataset lengths, rather
             than letting Sufficiency internally create the lengths to evaluate at.
         niter : int, default 1000
@@ -493,6 +495,11 @@ class Sufficiency:
         SufficiencyOutput
             Dataclass containing the average of each measure per substep
 
+        Raises
+        ------
+        ValueError
+            If `eval_at` is not numerical
+
         Examples
         --------
         >>> suff = Sufficiency(
@@ -502,7 +509,9 @@ class Sufficiency:
         SufficiencyOutput(steps=array([  1,   3,  10,  31, 100], dtype=uint32), params={'test': array([ 0., 42.,  0.])}, measures={'test': array([1., 1., 1., 1., 1.])})
         """  # noqa: E501
         if eval_at is not None:
-            ranges = eval_at
+            ranges = np.asarray(list(eval_at) if isinstance(eval_at, Iterable) else [eval_at])
+            if not np.issubdtype(ranges.dtype, np.number):
+                raise ValueError("'eval_at' must consist of numerical values")
         else:
             geomshape = (
                 0.01 * self._length,
