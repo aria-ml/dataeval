@@ -126,6 +126,20 @@ class TestSufficiency:
 
         assert isinstance(results, SufficiencyOutput)
 
+    def test_run_with_invalid_eval_at(self) -> None:
+        suff = Sufficiency(
+            model=MagicMock(),
+            train_ds=mock_ds(2),
+            test_ds=mock_ds(2),
+            train_fn=MagicMock(),
+            eval_fn=MagicMock(),
+            runs=1,
+            substeps=2,
+        )
+
+        with pytest.raises(ValueError):
+            suff.evaluate("hello world")  # type: ignore
+
     def test_run_multiple_metrics(self) -> None:
         eval_fn = MagicMock()
         eval_fn.return_value = {"Accuracy": 1.0, "Precision": 1.0}
@@ -317,7 +331,7 @@ class TestSufficiencyProject:
                 measures={"test1": np.array([0.2, 0.6, 0.9])},
             )
 
-    @pytest.mark.parametrize("steps", [100, [100], np.array([100])])
+    @pytest.mark.parametrize("steps", [100.0, 100, [100], np.array([100])])
     def test_project(self, steps):
         output = SufficiencyOutput(
             steps=np.array([10, 100, 1000]),
@@ -334,7 +348,7 @@ class TestSufficiencyProject:
             measures={"test1": np.array([0.2, 0.6, 0.9])},
         )
         with pytest.raises(ValueError):
-            output.project(1.0)  # type: ignore
+            output.project("not a number")  # type: ignore
 
     def test_project_classwise(self):
         output = SufficiencyOutput(
