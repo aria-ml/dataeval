@@ -192,11 +192,14 @@ DataEval is a comprehensive data analysis and monitoring library that provides s
 classes specifically designed for drift detection.
 These classes implement the theoretical concepts discussed above to help detect drift in datasets efficiently.
 
+```{currentmodule} dataeval.detectors.drift
+```
+
 DataEval's drift detection classes are:
-- **[DriftCVM](../reference/detectors/drift/drift_cvm.md)**: Implements the Cramér-von Mises (CVM) test for feature-wise drift detection.
-- **[DriftKS](../reference/detectors/drift/drift_ks.md)**: Implements the Kolmogorov-Smirnov (KS) test for detecting feature-wise distributional shifts.
-- **[DriftMMD](../reference/detectors/drift/drift_mmd.md)**: Utilizes the Maximum Mean Discrepancy (MMD) test to detect drift in multivariate data using kernel methods.
-- **[DriftUncertainty](../reference/detectors/drift/drift_uncertainty.md)**: Detects drift by analyzing changes in the model's uncertainty across datasets.
+- {class}`DriftCVM`: Implements the Cramér-von Mises (CVM) test for feature-wise drift detection.
+- {class}`DriftKS`: Implements the Kolmogorov-Smirnov (KS) test for detecting feature-wise distributional shifts.
+- {class}`DriftMMD`: Utilizes the Maximum Mean Discrepancy (MMD) test to detect drift in multivariate data using kernel methods.
+- {class}`DriftUncertainty`: Detects drift by analyzing changes in the model's uncertainty across datasets.
 
 To see how these detectors work in practice, refer to our Monitoring Guide, where you can explore real-world examples of drift detection using DataEval.
 <!-- [Monitoring Guide](../tutorials/Monitoring.ipynb) -->
