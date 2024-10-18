@@ -43,7 +43,7 @@ def predict_ood_mi(refdl, newdl, ood_detector, **kwargs):
     for k in mdict:
         mdict[k] = np.array(mdict[k])
 
-    df = pd.DataFrame.from_dict(mdict)
+    # df = pd.DataFrame.from_dict(mdict)
 
     is_ood = ood_detector.predict(allimages).is_ood
     
@@ -97,6 +97,8 @@ def get_metadata_ood_mi(metadata: Dict[str, Union[List, NDArray]], is_ood: NDArr
     >>> is_ood = rng.choice(a=[False, True], size=(len(images)))
     >>> print(get_metadata_ood_mi(metadata, is_ood, discrete_features=False))
     """
+    from dataeval._internal.metrics.utils import infer_categorical
+
     nats2bits = 1.442695
     discrete_features = False if discrete_features is None else discrete_features
     mdict = metadata
@@ -105,6 +107,7 @@ def get_metadata_ood_mi(metadata: Dict[str, Union[List, NDArray]], is_ood: NDArr
     
     X0, dX = np.mean(X, axis=0), np.std(X, axis=0, ddof=1)
     Xscl = (X - X0)/dX
+    # discrete_features = infer_categorical(Xscl)
 
     MI = mutual_info_classif(Xscl, is_ood, discrete_features=discrete_features)*nats2bits
 
@@ -113,6 +116,7 @@ def get_metadata_ood_mi(metadata: Dict[str, Union[List, NDArray]], is_ood: NDArr
         MI_dict.update({k: MI[i]})
 
     return MI_dict
+    
 
 # <a name="ks_compare"></a>
 def ks_compare(dl0, dl1, k_stop=None, debug=None):
@@ -232,6 +236,12 @@ def meta_distribution_compare(md0: Mapping[str, Union[List, NDArray]], md1: Mapp
 
     return mdc_dict
 
+def test_metadata_comparison():
+    md0 = {'time': [1.2, 3.4, 5.6], 'altitude': [235, 6789, 101112]}
+    md1 = {'time': [7.8, 9.10, 11.12], 'altitude': [532, 9876, 211101]}
+    meta_distribution_compare(md0, md1)
+
+    assert True
 
 # <a name="least_likely_features"></a>
 def least_likely_features(refds, testds, ood_detector):
