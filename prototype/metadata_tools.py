@@ -62,15 +62,15 @@ def predict_ood_mi(refdl, newdl, ood_detector, **kwargs):
 
     return MI_dict
 
-def get_metadata_ood_mi(metadata: Dict[str, Union[List, NDArray]], is_ood: NDArray[np.bool_], discrete_features=None) -> Dict:
-    r"""Computes :term:Mutual Information (MI)` between a set of metadata features and an :term:`out of distribution<Out-of-Distribution (OOD)>` flag.
+def get_metadata_ood_mi(metadata: Mapping[str, Union[List, NDArray]], is_ood: NDArray[np.bool_], discrete_features=None) -> Dict:
+    r"""Computes mutual information between a set of metadata features and an out-of-distribution flag.
     
-    Given a metadata dictionary `metadata` (where each key maps to one scalar metadata feature per example), and a corresponding 
-    boolean flag `is_ood` indicating whether each example falls :term:`out of distribution<Out-of-distribution (OOD)>` relative to a reference dataset, this 
-    function finds the strength of association between each metadata feature and `is_ood` by computing their mutual information. 
-    Metadata features may be either discrete or continuous; set the `discrete_features` keyword to a bool array set to True for
-    each feature that is discrete, or pass one bool to apply to all features.  Returns a dict indicating the strength of association
-    between each individual feature and the OOD flag, measured in bits. 
+    Given a metadata dictionary `metadata`, where each key maps to one scalar metadata feature, and a corresponding boolean flag `is_ood` 
+    indicating whether each example falls out-of-distribution (OOD) relative to a reference dataset, this function finds the strength of 
+    association between each metadata feature and `is_ood` by computing their mutual information. Metadata features may be either 
+    discrete or continuous; set the `discrete_features` keyword to a bool array set to True for each feature that is discrete, or pass one
+    bool to apply to all features.  Returns a dict indicating the strength of association between each individual feature and the OOD flag, 
+    measured in bits. 
 
     Parameters
     ----------
