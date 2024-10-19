@@ -1,24 +1,52 @@
 import torch
 from torchvision.datasets.vision import VisionDataset
 import numpy as np
-import tensorflow as tf
-import tensorflow_datasets as tfds
+# import tensorflow as tf
+# import tensorflow_datasets as tfds
 from scipy.spatial import ConvexHull
+from dataeval._internal.datasets import MNIST
 
 
 
 class InstanceMNIST(VisionDataset):
-    def __init__(self, corruption=None, split=None, **kwargs):
+    def __init__(self, corruption=None, size=None, **kwargs):
         super().__init__(root='./data', **kwargs)
         
         self.rng = np.random.default_rng(1234)
 
-        self.images, self.labels, self.info = self.get_MNIST_data(corruption=corruption, split=split, with_info=True)
-        self.images = (self.images/255.0).astype(np.float32)
+        mnist = MNIST(root='./data', corruption=corruption, size=size, randomize=True, balance=False, verbose=False)
 
+        self.images, self.labels  = mnist._load_data()
+        if size is not None:
+            self.images = self.images[0:size]
+            self.labels = self.labels[0:size]
+        else:
+            size = len(self.images)
+
+        self.images = (np.reshape(self.images, (size, 1, *self.images.shape[1:]))/255.0).astype(np.float32)
         nsamp, nchan, ny, nx = self.images.shape
+
         self.x, self.y = np.meshgrid(np.linspace(0, nx - 1, nx), np.linspace(0, ny - 1, ny))
         self.metadata = self.make_metadata()
+        self.corruptions = [
+            "identity",
+            "shot_noise",
+            "impulse_noise",
+            "glass_blur",
+            "motion_blur",
+            "shear",
+            "scale",
+            "rotate",
+            "brightness",
+            "translate",
+            "stripe",
+            "fog",
+            "spatter",
+            "dotted_line",
+            "zigzag",
+            "canny_edges"
+        ]
+
 
     def __getitem__(self, idx):
         img = torch.tensor(self.images[idx:idx+1, 0, :, :]) # idx:idx+1 yields a leading dimension of 1

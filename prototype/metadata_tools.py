@@ -43,8 +43,6 @@ def predict_ood_mi(refdl, newdl, ood_detector, **kwargs):
     for k in mdict:
         mdict[k] = np.array(mdict[k])
 
-    # df = pd.DataFrame.from_dict(mdict)
-
     is_ood = ood_detector.predict(allimages).is_ood
     
     MI_dict = get_metadata_ood_mi(mdict, is_ood, discrete_features=kwargs.get('discrete_features'))
