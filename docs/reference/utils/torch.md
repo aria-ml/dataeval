@@ -15,6 +15,14 @@ from dataeval.utils.torch import read_dataset
 .. autofunction:: dataeval.utils.torch.read_dataset
 ```
 
+## Datasets
+
+```{eval-rst}
+.. autoclass:: dataeval.utils.torch.datasets.CIFAR10
+.. autoclass:: dataeval.utils.torch.datasets.MNIST
+.. autoclass:: dataeval.utils.torch.datasets.VOCDetection
+```
+
 ## Models
 
 ```{eval-rst}
