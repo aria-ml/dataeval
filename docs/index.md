@@ -43,8 +43,6 @@ Where experts come to build _robust_, _reliable_, and _responsible_ models.
 
 ----------------
 
-### **_We do the all the research, you get all the benefits_**
-
 <!-- SECTION START | Quick, beginner friendly guides as eye catchers. Not a part of Diataxis -->
 
 ## Before You Begin
