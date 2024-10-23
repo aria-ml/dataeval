@@ -1,20 +1,37 @@
 import torch
 from torchvision.datasets.vision import VisionDataset
+from torch.utils.data import Dataset
 import numpy as np
 import tensorflow as tf
 # import tensorflow_datasets as tfds
 from scipy.spatial import ConvexHull
 from dataeval._internal.datasets import MNIST
 from types import SimpleNamespace as blank_object
+from typing import NamedTuple
+from functools import partial
 
-# class InstanceMNIST(VisionDataset):
-class InstanceMNIST():
+class MakeDataset(Dataset):
+    def __init__(self, namespace):
+        self.namespace = namespace
+        for d in dir(namespace):
+            if d[0:2] == '__' and d[-2:] == '__':
+                continue
+            setattr(self, d, getattr(namespace, d))
+    
+    def __getitem__(self, idx):
+        return self.namespace.__getitem__(idx)
+
+    def __len__(self):
+        return self.namespace.__len__()
+
+class InstanceMNIST(blank_object):
     """
     Interface to corrupted MNIST, along with self-generated intrinsic metadata. The latter comes from a catalog of
-    simple functions that compute something about each image. A use can easily add new function to compute other 
-    quantities of interest. 
+    simple functions that compute something about each image. A user can easily add new functions to compute other 
+    quantities of interest if desired. 
     """
     def __init__(self, corruptions=None, size=None, **kwargs):
+
         self.rng = np.random.default_rng(1234)
 
         self.corruptions = [
@@ -40,11 +57,12 @@ class InstanceMNIST():
             corruptions = ['identity']
         if not isinstance(corruptions, list):
             corruptions = [corruptions]
+ 
+        super().__init__()
 
         if size is None:
             size = int(MNIST_NUM_IMAGES/len(corruptions))
 
-        mnist_dict = {}
         for ic, c in enumerate(corruptions):
             if not c in self.corruptions:
                 print(f'Unknown corruption type {c}.')
@@ -56,23 +74,20 @@ class InstanceMNIST():
             images = (np.reshape(images, (size, 1, *images.shape[1:]))/255.0).astype(np.float32)
             nsamp, nchan, ny, nx = images.shape
 
-            mnist_dict.update({c: blank_object()})
-            mnist_dict[c].images, mnist_dict[c].labels  = images, labels
-
-            mnist_dict[c].x, mnist_dict[c].y = np.meshgrid(np.linspace(0, nx - 1, nx), np.linspace(0, ny - 1, ny))
-            self.x, self.y = mnist_dict[c].x, mnist_dict[c].y
+            self.x, self.y = np.meshgrid(np.linspace(0, nx - 1, nx), np.linspace(0, ny - 1, ny))
 
             self.images, self.labels = images, labels # for use in self.make_metadata
-            mnist_dict[c].metadata = self.make_metadata()
+            
+            this_getitem = partial(self.__getitem__, c)
 
-            mnist_dict[c].__getitem__ = self.__getitem__
-            mnist_dict[c].__len__ = self.__len__
+            setattr(self, c, MakeDataset(blank_object(corruption=c, images=images, labels=labels, metadata=self.make_metadata(), __getitem__=this_getitem, __len__=self.__len__)))
 
 
-    def __getitem__(self, idx):
-        img = torch.tensor(self.images[idx:idx+1, 0, :, :]) # idx:idx+1 yields a leading dimension of 1
-        label = self.labels[idx]
-        metadata = self.metadata[idx]
+    def __getitem__(self, corruption, idx):
+        myself = getattr(self, corruption)
+        img = torch.tensor(myself.images[idx:idx+1, 0, :, :]) # idx:idx+1 yields a leading dimension of 1
+        label = myself.labels[idx]
+        metadata = myself.metadata[idx]
 
         return img, label, metadata
 
