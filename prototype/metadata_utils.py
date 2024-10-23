@@ -14,7 +14,7 @@ class MakeDataset(Dataset):
     def __init__(self, namespace):
         self.namespace = namespace
         for d in dir(namespace):
-            if d[0:2] == '__' and d[-2:] == '__':
+            if d[0:2] == '__' and d[-2:] == '__': 
                 continue
             setattr(self, d, getattr(namespace, d))
     
@@ -31,8 +31,10 @@ class InstanceMNIST(blank_object):
     quantities of interest if desired. 
     """
     def __init__(self, corruptions=None, size=None, **kwargs):
+        MNIST_NUM_IMAGES = 60000
 
         self.rng = np.random.default_rng(1234)
+        ishuff = self.rng.permutation(MNIST_NUM_IMAGES)
 
         self.corruptions = [
             "identity",
@@ -70,8 +72,12 @@ class InstanceMNIST(blank_object):
 
             mnist = MNIST(root='./data', corruption=c, size=size, randomize=False, balance=False, verbose=False)
             images, labels = mnist._load_data()
+            images, labels = images[ishuff], labels[ishuff]
+
             images, labels = images[ic*size:ic*size+size], labels[ic*size:ic*size+size]
             images = (np.reshape(images, (size, 1, *images.shape[1:]))/255.0).astype(np.float32)
+
+
             nsamp, nchan, ny, nx = images.shape
 
             self.x, self.y = np.meshgrid(np.linspace(0, nx - 1, nx), np.linspace(0, ny - 1, ny))
@@ -81,7 +87,6 @@ class InstanceMNIST(blank_object):
             this_getitem = partial(self.__getitem__, c)
 
             setattr(self, c, MakeDataset(blank_object(corruption=c, images=images, labels=labels, metadata=self.make_metadata(), __getitem__=this_getitem, __len__=self.__len__)))
-
 
     def __getitem__(self, corruption, idx):
         myself = getattr(self, corruption)
@@ -186,64 +191,7 @@ class InstanceMNIST(blank_object):
     def random_normal(self):  # valid metadata tests need to find this uninformative. 
         return self.rng.normal(size=len(self.images))
     
-    # # wrap the TensorFlow MNIST and corrupted MNIST functions. 
-    # def visualize(self):
-    #     tfds.visualization.show_examples(self.dataset, self.info)
 
-    # def get_MNIST_data(self, corruption=None, split=None, with_info=None, visualize=None):
-    #     corruptions = [
-    #         "identity",
-    #         "shot_noise",
-    #         "impulse_noise",
-    #         "glass_blur",
-    #         "motion_blur",
-    #         "shear",
-    #         "scale",
-    #         "rotate",
-    #         "brightness",
-    #         "translate",
-    #         "stripe",
-    #         "fog",
-    #         "spatter",
-    #         "dotted_line",
-    #         "zigzag",
-    #         "canny_edges"
-    #     ]
-
-    #     self.corruptions = corruptions
-        
-    #     dataset_name = "mnist"
-    #     self.corruption = None
-    #     if corruption is not None:
-    #         if corruption == 'random':
-    #             corruption = self.rng.choice(corruptions)
-
-    #         if not (corruption in corruptions):
-    #             print('Unknown corruption type:', corruption)
-    #             raise ValueError
-        
-    #         self.corruption = corruption
-    #         dataset_name += "_corrupted/" + corruption
-
-    #     with_info = False if with_info is None else with_info
-    #     visualize = False if visualize is None else visualize
-
-    #     if split is None:
-    #         split = 'train'
-            
-    #     dataset, ds_info = tfds.load(dataset_name, split=split, with_info=with_info)
-    #     self.dataset = dataset # handy for visualization method
- 
-    #     images = [i["image"] for i in dataset]
-    #     labels = [i["label"].numpy() for i in dataset]
-    #     images = np.array(images, dtype=np.float32).transpose(0, 3, 1, 2)
-
-    #    # shuffle to avoid pairing between dataset instances
-    #     shuffle = self.rng.permutation(len(images))
-    #     images = images[shuffle]
-    #     labels = [labels[shuf] for shuf in shuffle]
-
-    #     return images, labels, ds_info
     
 def collate_fn_2(batch):
     # The batch comes in the format ((x1, y1), (x2, y2), ..., (xn, yn)).
