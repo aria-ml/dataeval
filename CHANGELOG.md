@@ -1,6 +1,18 @@
-[//]: # (71e7ff06614323a8dabb6de565cc1436530a84f3)
+[//]: # (5ecd4d3ada39ffa98e0838a9820a3e4b80d31aa4)
 
 # DataEval Change Log
+
+## v0.70.1
+
+🛠️ **Improvements and Enhancements**
+- `d1cdcda5` - API changes with supporting documentation updates
+
+📝 **Miscellaneous**
+- `5ecd4d3a` - expose datasets API
+- `6c19bba7` - Make sufficiency args more permissive
+- `1bc2d067` - Improving MNIST class
+- `d23b3461` - Extract small-scope reusable functions from tools made for prototype Associate[Drift|OOD]withMetadataTutorial notebooks.
+- `5bea9512` - remove tf-iogcs-fs
 
 ## v0.70.0
 
