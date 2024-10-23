@@ -46,6 +46,7 @@ numpy = {version = ">1.24.3"}
 pillow = {version = ">=10.3.0"}
 scipy = {version = ">=1.10"}
 scikit-learn = {version = ">=1.5.0"}
+tqdm = {version = "*"}
 xxhash = {version = ">=3.3"}
 
 # optional
@@ -135,6 +136,8 @@ addopts = ["--pythonwarnings=ignore::DeprecationWarning", "--verbose", "--durati
 [tool.coverage.run]
 source = ["src/dataeval", "src/dataeval/_internal"]
 branch = true
+concurrency = ["multiprocessing"]
+parallel = true
 
 [tool.coverage.report]
 exclude_also = ["raise NotImplementedError"]

@@ -4,6 +4,7 @@ from numpy.random import randint
 
 from dataeval._internal.metrics.stats.base import SOURCE_INDEX, BaseStatsOutput
 from dataeval._internal.metrics.stats.boxratiostats import boxratiostats
+from dataeval._internal.metrics.stats.datasetstats import channelstats, datasetstats
 from dataeval.metrics.stats import dimensionstats, hashstats, labelstats, pixelstats, visualstats
 
 
@@ -177,11 +178,9 @@ class TestStats:
             boxratiostats(boxstats, imagestats)
 
     def test_stats_box_out_of_range(self):
-        boxes = [np.array([-1, -1, 100, 100])]
-        with pytest.warns() as warning:
+        boxes = [np.array([0, 0, 1, 1]), np.array([-1, -1, 100, 100])]
+        with pytest.warns(UserWarning, match=r"Bounding box \[1\]\[0\]"):
             boxstats = dimensionstats(DATA_1, boxes)
-            message = warning[0].message.args[0]  # type: ignore
-        assert message == "Bounding box 0: [ -1  -1 100 100] is out of bounds of image 0: (1, 64, 64)."
         assert boxstats is not None
 
     def test_stats_div_by_zero(self):
@@ -243,3 +242,11 @@ class TestStats:
         assert stats.image_count == 4
         assert stats.class_count == 4
         assert stats.label_count == 14
+
+    def test_datasetstats(self):
+        ds_stats = datasetstats(DATA_3)
+        assert ds_stats is not None
+
+    def test_channelstats(self):
+        ch_stats = channelstats(DATA_3)
+        assert ch_stats is not None

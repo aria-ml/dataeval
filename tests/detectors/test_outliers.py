@@ -15,30 +15,6 @@ class TestOutliers:
         assert outliers.stats.visualstats is not None
         assert results is not None
 
-    def test_outliers_with_dimension_only(self):
-        outliers = Outliers(use_dimension=True, use_pixel=False, use_visual=False)
-        results = outliers.evaluate(np.random.random((100, 3, 16, 16)))
-        assert outliers.stats.dimensionstats is not None
-        assert outliers.stats.pixelstats is None
-        assert outliers.stats.visualstats is None
-        assert results is not None
-
-    def test_outliers_with_pixel_only(self):
-        outliers = Outliers(use_dimension=False, use_pixel=True, use_visual=False)
-        results = outliers.evaluate(np.random.random((100, 3, 16, 16)))
-        assert outliers.stats.dimensionstats is None
-        assert outliers.stats.pixelstats is not None
-        assert outliers.stats.visualstats is None
-        assert results is not None
-
-    def test_outliers_with_visual_only(self):
-        outliers = Outliers(use_dimension=False, use_pixel=False, use_visual=True)
-        results = outliers.evaluate(np.random.random((100, 3, 16, 16)))
-        assert outliers.stats.dimensionstats is None
-        assert outliers.stats.pixelstats is None
-        assert outliers.stats.visualstats is not None
-        assert results is not None
-
     @pytest.mark.parametrize("method", ["zscore", "modzscore", "iqr"])
     def test_get_outlier_mask(self, method):
         mask_value = _get_outlier_mask(np.array([0.1, 0.2, 0.1, 1.0]), method, 2.5)

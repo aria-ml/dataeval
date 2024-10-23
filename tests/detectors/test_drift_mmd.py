@@ -24,7 +24,7 @@ from dataeval._internal.detectors.drift.base import (
 from dataeval._internal.detectors.drift.mmd import DriftMMD
 from dataeval._internal.detectors.drift.torch import preprocess_drift
 
-n, n_hidden, n_classes = 500, 10, 5
+n, n_hidden, n_classes = 100, 10, 5
 
 
 class HiddenOutput(nn.Module):

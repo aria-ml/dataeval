@@ -10,13 +10,6 @@ from dataeval._internal.metrics.utils import pchash, xxhash
 from dataeval._internal.output import set_metadata
 
 
-class HashStatsProcessor(StatsProcessor):
-    image_function_map = {
-        "xxhash": lambda x: xxhash(x.image),
-        "pchash": lambda x: pchash(x.image),
-    }
-
-
 @dataclass(frozen=True)
 class HashStatsOutput(BaseStatsOutput):
     """
@@ -32,6 +25,14 @@ class HashStatsOutput(BaseStatsOutput):
 
     xxhash: list[str]
     pchash: list[str]
+
+
+class HashStatsProcessor(StatsProcessor[HashStatsOutput]):
+    output_class = HashStatsOutput
+    image_function_map = {
+        "xxhash": lambda x: xxhash(x.image),
+        "pchash": lambda x: pchash(x.image),
+    }
 
 
 @set_metadata("dataeval.metrics")
@@ -71,5 +72,4 @@ def hashstats(
     >>> print(results.pchash)
     ['8f25506af46a7c6a', '8000808000008080', '8e71f18e0ef18e0e', 'a956d6a956d6a928']
     """
-    output = run_stats(images, bboxes, False, HashStatsProcessor, HashStatsOutput)
-    return HashStatsOutput(**output)
+    return run_stats(images, bboxes, False, [HashStatsProcessor])[0]
