@@ -14,6 +14,7 @@
 .. autosummary::
 
    boxratiostats
+   channelstats
    datasetstats
    dimensionstats
    hashstats
@@ -27,6 +28,7 @@
 ```{eval-rst}
 .. autosummary::
 
+   ChannelStatsOutput
    DatasetStatsOutput
    DimensionStatsOutput
    HashStatsOutput
@@ -41,12 +43,14 @@
 :maxdepth: 1
 
 stats/boxratiostats
+stats/channelstats
 stats/datasetstats
 stats/dimensionstats
 stats/hashstats
 stats/labelstats
 stats/pixelstats
 stats/visualstats
+stats/channelstatsoutput
 stats/datasetstatsoutput
 stats/dimensionstatsoutput
 stats/hashstatsoutput

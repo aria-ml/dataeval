@@ -3,9 +3,12 @@ from __future__ import annotations
 import re
 import warnings
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, NamedTuple, Optional, Union
+from functools import partial
+from multiprocessing import Pool
+from typing import Any, Callable, Generic, Iterable, NamedTuple, Optional, TypeVar, Union
 
 import numpy as np
+import tqdm
 from numpy.typing import ArrayLike, NDArray
 
 from dataeval._internal.interop import to_numpy_iter
@@ -91,7 +94,11 @@ class BaseStatsOutput(OutputMetadata):
         return len(self.source_index)
 
 
-class StatsProcessor:
+TStatsOutput = TypeVar("TStatsOutput", bound=BaseStatsOutput, covariant=True)
+
+
+class StatsProcessor(Generic[TStatsOutput]):
+    output_class: type[TStatsOutput]
     cache_keys: list[str] = []
     image_function_map: dict[str, Callable[[StatsProcessor], Any]] = {}
     channel_function_map: dict[str, Callable[[StatsProcessor], Any]] = {}
@@ -119,6 +126,9 @@ class StatsProcessor:
         else:
             return self.fn_map[fn_key](self)
 
+    def process(self) -> dict:
+        return {k: self.fn_map[k](self) for k in self.fn_map}
+
     @property
     def image(self) -> NDArray:
         if self._image is None:
@@ -143,14 +153,66 @@ class StatsProcessor:
                 self._scaled = self._scaled.reshape(self.image.shape[0], -1)
         return self._scaled
 
+    @classmethod
+    def convert_output(
+        cls, source: dict[str, Any], source_index: list[SourceIndex], box_count: list[int]
+    ) -> TStatsOutput:
+        output = {}
+        for key in source:
+            if key not in cls.output_class.__annotations__:
+                continue
+            stat_type: str = cls.output_class.__annotations__[key]
+            dtype_match = re.match(DTYPE_REGEX, stat_type)
+            if dtype_match is not None:
+                output[key] = np.asarray(source[key], dtype=np.dtype(dtype_match.group(1)))
+            else:
+                output[key] = source[key]
+        return cls.output_class(**output, source_index=source_index, box_count=np.asarray(box_count, dtype=np.uint16))
+
+
+class StatsProcessorOutput(NamedTuple):
+    results: list[dict[str, Any]]
+    source_indices: list[SourceIndex]
+    box_counts: list[int]
+    warnings_list: list[tuple[int, int, NDArray, tuple[int, ...]]]
+
+
+def process_stats(
+    i: int,
+    image_boxes: tuple[NDArray, NDArray | None],
+    per_channel: bool,
+    stats_processor_cls: Iterable[type[StatsProcessor]],
+) -> StatsProcessorOutput:
+    image, boxes = image_boxes
+    results_list: list[dict[str, Any]] = []
+    source_indices: list[SourceIndex] = []
+    box_counts: list[int] = []
+    warnings_list: list[tuple[int, int, NDArray, tuple[int, ...]]] = []
+    nboxes = [None] if boxes is None else normalize_box_shape(boxes)
+    for i_b, box in enumerate(nboxes):
+        i_b = None if box is None else i_b
+        processor_list = [p(image, box, per_channel) for p in stats_processor_cls]
+        if any(not p.is_valid_slice for p in processor_list) and i_b is not None and box is not None:
+            warnings_list.append((i, i_b, box, image.shape))
+        results_list.append({k: v for p in processor_list for k, v in p.process().items()})
+        if per_channel:
+            source_indices.extend([SourceIndex(i, i_b, c) for c in range(image_boxes[0].shape[-3])])
+        else:
+            source_indices.append(SourceIndex(i, i_b, None))
+    box_counts.append(0 if boxes is None else len(boxes))
+    return StatsProcessorOutput(results_list, source_indices, box_counts, warnings_list)
+
+
+def process_stats_unpack(args, per_channel: bool, stats_processor_cls: Iterable[type[StatsProcessor]]):
+    return process_stats(*args, per_channel=per_channel, stats_processor_cls=stats_processor_cls)
+
 
 def run_stats(
     images: Iterable[ArrayLike],
     bboxes: Iterable[ArrayLike] | None,
     per_channel: bool,
-    stats_processor_cls: type,
-    output_cls: type,
-) -> dict:
+    stats_processor_cls: Iterable[type[StatsProcessor[TStatsOutput]]],
+) -> list[TStatsOutput]:
     """
     Compute specified statistics on a set of images.
 
@@ -169,15 +231,13 @@ def run_stats(
         iterable should match the length of the input images.
     per_channel : bool
         A flag which determines if the states should be evaluated on a per-channel basis or not.
-    output_cls : type
-        The output class for which stats values will be calculated.
+    stats_processor_cls : Iterable[type[StatsProcessor]]
+        An iterable of stats processor classes that calculate stats and return output classes.
 
     Returns
     -------
-    dict[str, NDArray]]
-        A dictionary containing the computed statistics for each image.
-        The dictionary keys correspond to the names of the statistics, and the values are NumPy arrays
-        with the results of the computations.
+    list[TStatsOutput]
+        A list of output classes corresponding to the input processor types.
 
     Note
     ----
@@ -189,43 +249,41 @@ def run_stats(
       be reused to avoid redundant computation.
     """
     results_list: list[dict[str, NDArray]] = []
-    output_list = list(output_cls.__annotations__)
     source_index = []
     box_count = []
     bbox_iter = (None for _ in images) if bboxes is None else to_numpy_iter(bboxes)
 
-    for i, (boxes, image) in enumerate(zip(bbox_iter, to_numpy_iter(images))):
-        nboxes = [None] if boxes is None else normalize_box_shape(boxes)
-        for i_b, box in enumerate(nboxes):
-            i_b = None if box is None else i_b
-            processor: StatsProcessor = stats_processor_cls(image, box, per_channel)
-            if not processor.is_valid_slice:
-                warnings.warn(f"Bounding box {i_b}: {box} is out of bounds of image {i}: {image.shape}.")
-            results_list.append({stat: processor.get(stat) for stat in output_list})
-            if per_channel:
-                source_index.extend([SourceIndex(i, i_b, c) for c in range(image.shape[-3])])
-            else:
-                source_index.append(SourceIndex(i, i_b, None))
-        box_count.append(0 if boxes is None else len(boxes))
+    warning_list = []
+    total_for_status = getattr(images, "__len__")() if hasattr(images, "__len__") else None
+    stats_processor_cls = stats_processor_cls if isinstance(stats_processor_cls, Iterable) else [stats_processor_cls]
+
+    # TODO: Introduce global controls for CPU job parallelism and GPU configurations
+    with Pool(16) as p:
+        for r in tqdm.tqdm(
+            p.imap(
+                partial(process_stats_unpack, per_channel=per_channel, stats_processor_cls=stats_processor_cls),
+                enumerate(zip(to_numpy_iter(images), bbox_iter)),
+            ),
+            total=total_for_status,
+        ):
+            results_list.extend(r.results)
+            source_index.extend(r.source_indices)
+            box_count.extend(r.box_counts)
+            warning_list.extend(r.warnings_list)
+    p.close()
+    p.join()
+
+    # warnings are not emitted while in multiprocessing pools so we emit after gathering all warnings
+    for w in warning_list:
+        warnings.warn(f"Bounding box [{w[0]}][{w[1]}]: {w[2]} is out of bounds of {w[3]}.", UserWarning)
 
     output = {}
-    if per_channel:
-        for i, results in enumerate(results_list):
-            for stat, result in results.items():
+    for results in results_list:
+        for stat, result in results.items():
+            if per_channel:
                 output.setdefault(stat, []).extend(result.tolist())
-    else:
-        for results in results_list:
-            for stat, result in results.items():
+            else:
                 output.setdefault(stat, []).append(result.tolist() if isinstance(result, np.ndarray) else result)
 
-    for stat in output:
-        stat_type: str = output_cls.__annotations__[stat]
-
-        dtype_match = re.match(DTYPE_REGEX, stat_type)
-        if dtype_match is not None:
-            output[stat] = np.asarray(output[stat], dtype=np.dtype(dtype_match.group(1)))
-
-    output[SOURCE_INDEX] = source_index
-    output[BOX_COUNT] = np.asarray(box_count, dtype=np.uint16)
-
-    return output
+    outputs = [s.convert_output(output, source_index, box_count) for s in stats_processor_cls]
+    return outputs
