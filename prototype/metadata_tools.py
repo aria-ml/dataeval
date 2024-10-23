@@ -14,6 +14,8 @@ from numpy.typing import NDArray, ArrayLike
 
 from metadata_utils import collate_fn_2 as collate_fn
 
+import pytest
+
 
 #<a name="predict_ood_mi"></a>
 def predict_ood_mi(refdl, newdl, ood_detector, **kwargs):
@@ -114,7 +116,31 @@ def get_metadata_ood_mi(metadata: Dict[str, Union[List, NDArray]], is_ood: NDArr
         MI_dict.update({k: MI[i]})
 
     return MI_dict
+
+@pytest.fixture
+def mock_md_ood():
+    rng = np.random.default_rng(20241022)
+    nsamp, nfeatures = 100, 5
+    x = rng.normal(size=(nsamp, nfeatures))
+    is_ood = np.abs(x[:, 0]) > np.abs(x[:,1]) + np.abs(x[:,2])
+
+    md = {}
+    for i in range(nfeatures):
+        md.update({'feature_'+str(i): x[:,i]})
+
+    discrete_features = False
+
+    mi_dict = get_metadata_ood_mi(md, is_ood, discrete_features=discrete_features)
+
+    return mi_dict
+
+class TestGetMetadataOodMi():
+    def test_type(self, mock_md_ood):
+        assert isinstance(mock_md_ood, dict)
+
     
+        
+
 
 # <a name="ks_compare"></a>
 def ks_compare(dl0, dl1, k_stop=None, debug=None):
@@ -234,12 +260,27 @@ def meta_distribution_compare(md0: Mapping[str, Union[List, NDArray]], md1: Mapp
 
     return mdc_dict
 
-def test_metadata_comparison():
+@pytest.fixture
+def mock_mdc():
     md0 = {'time': [1.2, 3.4, 5.6], 'altitude': [235, 6789, 101112]}
     md1 = {'time': [7.8, 9.10, 11.12], 'altitude': [532, 9876, 211101]}
-    meta_distribution_compare(md0, md1)
+    mdc = meta_distribution_compare(md0, md1)
+    return mdc
 
-    assert True
+class TestMetadataCompare():
+    # test conditions, as many as you can think of
+    def test_type(self, mock_mdc):
+        mdc = mock_mdc
+        assert isinstance(mdc, dict) 
+    
+    def test_shifts(self, mock_mdc):
+        mdc = mock_mdc
+        assert mdc['time'].shift_magnitude == 2.7 and  np.isclose(mdc['altitude'].shift_magnitude,  0.7492490855199898)
+
+    def test_pvalue(self, mock_mdc):
+        mdc = mock_mdc
+        assert np.isclose(mdc['time'].pvalue, 0.0) and np.isclose(mdc['altitude'].pvalue, 0.9444444444444444)
+
 
 # <a name="least_likely_features"></a>
 def least_likely_features(refds, testds, ood_detector):
@@ -370,6 +411,33 @@ def _lod2dol(lod, to_numpy=None):
             v = np.array(v)
 
     return dol
+
+@pytest.fixture
+def mock_llf():
+    md0 = {'time': [1.2, 3.4, 5.6], 'altitude': [235, 6789, 101112]}
+    md1 = {'time': [7.8, 9.10, 11.12], 'altitude': [532, 9876, 211101]}
+
+    is_ood = np.array([False, False, True])
+
+    llf = get_least_likely_features(md0, md1, is_ood)
+    # print('ARGHARGHARGHARGHARGHARGHARGHARGHARGHARGHARGHARGHARGH', flush=True)
+    return llf
+
+class TestGetLeastLikelyFeatures():
+    def test_nothing(self, mock_llf):
+        features = mock_llf
+        print('gonna pass for sure', flush=True)
+        # print(features, flush=True)
+        # print(type(features), flush=True)
+        assert True
+
+    def test_llf(self, mock_llf):
+        llf = mock_llf
+        assert llf[0] == 'time'
+
+    def test_llf_type(self, mock_llf):
+        crap = mock_llf
+        assert isinstance(crap, np.ndarray)
 
 # if __name__ == "__main__":
 #     import doctest
