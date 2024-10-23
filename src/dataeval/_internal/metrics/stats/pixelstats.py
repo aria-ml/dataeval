@@ -11,28 +11,6 @@ from dataeval._internal.metrics.stats.base import BaseStatsOutput, StatsProcesso
 from dataeval._internal.output import set_metadata
 
 
-class PixelStatsProcessor(StatsProcessor):
-    cache_keys = ["histogram"]
-    image_function_map = {
-        "mean": lambda self: np.mean(self.scaled),
-        "std": lambda x: np.std(x.scaled),
-        "var": lambda x: np.var(x.scaled),
-        "skew": lambda x: np.nan_to_num(skew(x.scaled.ravel())),
-        "kurtosis": lambda x: np.nan_to_num(kurtosis(x.scaled.ravel())),
-        "histogram": lambda x: np.histogram(x.scaled, 256, (0, 1))[0],
-        "entropy": lambda x: entropy(x.get("histogram")),
-    }
-    channel_function_map = {
-        "mean": lambda x: np.mean(x.scaled, axis=1),
-        "std": lambda x: np.std(x.scaled, axis=1),
-        "var": lambda x: np.var(x.scaled, axis=1),
-        "skew": lambda x: np.nan_to_num(skew(x.scaled, axis=1)),
-        "kurtosis": lambda x: np.nan_to_num(kurtosis(x.scaled, axis=1)),
-        "histogram": lambda x: np.apply_along_axis(lambda y: np.histogram(y, 256, (0, 1))[0], 1, x.scaled),
-        "entropy": lambda x: entropy(x.get("histogram"), axis=1),
-    }
-
-
 @dataclass(frozen=True)
 class PixelStatsOutput(BaseStatsOutput):
     """
@@ -63,6 +41,29 @@ class PixelStatsOutput(BaseStatsOutput):
     kurtosis: NDArray[np.float16]
     histogram: NDArray[np.uint32]
     entropy: NDArray[np.float16]
+
+
+class PixelStatsProcessor(StatsProcessor[PixelStatsOutput]):
+    output_class = PixelStatsOutput
+    cache_keys = ["histogram"]
+    image_function_map = {
+        "mean": lambda self: np.mean(self.scaled),
+        "std": lambda x: np.std(x.scaled),
+        "var": lambda x: np.var(x.scaled),
+        "skew": lambda x: np.nan_to_num(skew(x.scaled.ravel())),
+        "kurtosis": lambda x: np.nan_to_num(kurtosis(x.scaled.ravel())),
+        "histogram": lambda x: np.histogram(x.scaled, 256, (0, 1))[0],
+        "entropy": lambda x: entropy(x.get("histogram")),
+    }
+    channel_function_map = {
+        "mean": lambda x: np.mean(x.scaled, axis=1),
+        "std": lambda x: np.std(x.scaled, axis=1),
+        "var": lambda x: np.var(x.scaled, axis=1),
+        "skew": lambda x: np.nan_to_num(skew(x.scaled, axis=1)),
+        "kurtosis": lambda x: np.nan_to_num(kurtosis(x.scaled, axis=1)),
+        "histogram": lambda x: np.apply_along_axis(lambda y: np.histogram(y, 256, (0, 1))[0], 1, x.scaled),
+        "entropy": lambda x: entropy(x.get("histogram"), axis=1),
+    }
 
 
 @set_metadata("dataeval.metrics")
@@ -115,5 +116,4 @@ def pixelstats(
      0.812  0.9883 0.795  0.9243 0.9243 0.795  0.9907 0.8125 1.028  0.8223
      1.046  0.8247 1.041  0.8203 1.012  0.812  0.9883 0.795  0.9243 0.9243]
     """
-    output = run_stats(images, bboxes, per_channel, PixelStatsProcessor, PixelStatsOutput)
-    return PixelStatsOutput(**output)
+    return run_stats(images, bboxes, per_channel, [PixelStatsProcessor])[0]

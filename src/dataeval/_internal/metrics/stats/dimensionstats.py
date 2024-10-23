@@ -11,24 +11,6 @@ from dataeval._internal.metrics.utils import get_bitdepth
 from dataeval._internal.output import set_metadata
 
 
-class DimensionStatsProcessor(StatsProcessor):
-    image_function_map = {
-        "left": lambda x: x.box[0],
-        "top": lambda x: x.box[1],
-        "width": lambda x: x.shape[-1],
-        "height": lambda x: x.shape[-2],
-        "channels": lambda x: x.shape[-3],
-        "size": lambda x: np.prod(x.shape[-2:]),
-        "aspect_ratio": lambda x: x.shape[-1] / x.shape[-2],
-        "depth": lambda x: get_bitdepth(x.image).depth,
-        "center": lambda x: np.asarray([(x.box[0] + x.box[2]) / 2, (x.box[1] + x.box[3]) / 2]),
-        "distance": lambda x: np.sqrt(
-            np.square(((x.box[0] + x.box[2]) / 2) - (x.width / 2))
-            + np.square(((x.box[1] + x.box[3]) / 2) - (x.height / 2))
-        ),
-    }
-
-
 @dataclass(frozen=True)
 class DimensionStatsOutput(BaseStatsOutput):
     """
@@ -70,6 +52,25 @@ class DimensionStatsOutput(BaseStatsOutput):
     distance: NDArray[np.float16]
 
 
+class DimensionStatsProcessor(StatsProcessor[DimensionStatsOutput]):
+    output_class = DimensionStatsOutput
+    image_function_map = {
+        "left": lambda x: x.box[0],
+        "top": lambda x: x.box[1],
+        "width": lambda x: x.shape[-1],
+        "height": lambda x: x.shape[-2],
+        "channels": lambda x: x.shape[-3],
+        "size": lambda x: np.prod(x.shape[-2:]),
+        "aspect_ratio": lambda x: x.shape[-1] / x.shape[-2],
+        "depth": lambda x: get_bitdepth(x.image).depth,
+        "center": lambda x: np.asarray([(x.box[0] + x.box[2]) / 2, (x.box[1] + x.box[3]) / 2]),
+        "distance": lambda x: np.sqrt(
+            np.square(((x.box[0] + x.box[2]) / 2) - (x.width / 2))
+            + np.square(((x.box[1] + x.box[3]) / 2) - (x.height / 2))
+        ),
+    }
+
+
 @set_metadata("dataeval.metrics")
 def dimensionstats(
     images: Iterable[ArrayLike],
@@ -109,5 +110,4 @@ def dimensionstats(
     >>> print(results.channels)
     [1 1 1 1 1 1 3 1 1 3]
     """
-    output = run_stats(images, bboxes, False, DimensionStatsProcessor, DimensionStatsOutput)
-    return DimensionStatsOutput(**output)
+    return run_stats(images, bboxes, False, [DimensionStatsProcessor])[0]
