@@ -261,11 +261,6 @@ class Outliers:
         >>> results.issues[10]
         {'skew': -3.906, 'kurtosis': 13.266, 'entropy': 0.2128, 'contrast': 1.25, 'zeros': 0.05493}
         """
-        self.stats = datasetstats(
-            images=data,
-            use_dimension=self.use_dimension,
-            use_pixel=self.use_pixel,
-            use_visual=self.use_visual,
-        )
-        outliers = self._get_outliers({k: v for o in self.stats.outputs() for k, v in o.dict().items()})
+        self.stats = datasetstats(images=data)
+        outliers = self._get_outliers(self.stats.dict())
         return OutliersOutput(outliers)
