@@ -22,7 +22,7 @@ class VisualStatsOutput(BaseStatsOutput):
     ----------
     brightness : NDArray[np.float16]
         Brightness of the images
-    blurriness : NDArray[np.float16]
+    sharpness : NDArray[np.float16]
         Blurriness of the images
     contrast : NDArray[np.float16]
         Image contrast ratio
@@ -37,7 +37,7 @@ class VisualStatsOutput(BaseStatsOutput):
     """
 
     brightness: NDArray[np.float16]
-    blurriness: NDArray[np.float16]
+    sharpness: NDArray[np.float16]
     contrast: NDArray[np.float16]
     darkness: NDArray[np.float16]
     missing: NDArray[np.float16]
@@ -50,7 +50,7 @@ class VisualStatsProcessor(StatsProcessor[VisualStatsOutput]):
     cache_keys = ["percentiles"]
     image_function_map = {
         "brightness": lambda x: x.get("percentiles")[-2],
-        "blurriness": lambda x: np.std(edge_filter(np.mean(x.image, axis=0))),
+        "sharpness": lambda x: np.std(edge_filter(np.mean(x.image, axis=0))),
         "contrast": lambda x: np.nan_to_num(
             (np.max(x.get("percentiles")) - np.min(x.get("percentiles"))) / np.mean(x.get("percentiles"))
         ),
@@ -61,7 +61,7 @@ class VisualStatsProcessor(StatsProcessor[VisualStatsOutput]):
     }
     channel_function_map = {
         "brightness": lambda x: x.get("percentiles")[:, -2],
-        "blurriness": lambda x: np.std(np.vectorize(edge_filter, signature="(m,n)->(m,n)")(x.image), axis=(1, 2)),
+        "sharpness": lambda x: np.std(np.vectorize(edge_filter, signature="(m,n)->(m,n)")(x.image), axis=(1, 2)),
         "contrast": lambda x: np.nan_to_num(
             (np.max(x.get("percentiles"), axis=1) - np.min(x.get("percentiles"), axis=1))
             / np.mean(x.get("percentiles"), axis=1)
@@ -82,7 +82,7 @@ def visualstats(
     """
     Calculates visual statistics for each image
 
-    This function computes various visual metrics (e.g., brightness, darkness, contrast, blurriness)
+    This function computes various visual metrics (e.g., brightness, darkness, contrast, sharpness)
     on the images as a whole.
 
     Parameters
@@ -96,7 +96,7 @@ def visualstats(
     -------
     VisualStatsOutput
         A dictionary-like object containing the computed visual statistics for each image. The keys correspond
-        to the names of the statistics (e.g., 'brightness', 'blurriness'), and the values are lists of results for
+        to the names of the statistics (e.g., 'brightness', 'sharpness'), and the values are lists of results for
         each image or numpy arrays when the results are multi-dimensional.
 
     See Also
