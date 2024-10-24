@@ -91,12 +91,13 @@ def get_metadata_ood_mi(metadata: Dict[str, Union[List, NDArray]], is_ood: NDArr
     --------
     Imagine we have 3 data examples, and that the corresponding metadata contains 2 features called time and altitude.
 
-    >>> import tensorflow_datasets  # This has GOT to go! Ryan's new MNIST should allow me to eliminate it. 
-    >>> rng = numpy.random.default_rng(123)
-    >>> metadata = {'time': [1.2, 3.4, 5.6], 'altitude': [235, 6789, 101112]}
-    >>> is_ood = rng.choice(a=[False, True], size=(len(images)))
-    >>> print(get_metadata_ood_mi(metadata, is_ood, discrete_features=False))
+	>>> import numpy
+	>>> metadata = {'time': numpy.linspace(0,10,100), 'altitude': numpy.linspace(0,16,100)**2}
+	>>> is_ood = metadata['altitude'] > 100
+	>>> print(get_metadata_ood_mi(metadata, is_ood, discrete_features=False))
+    {'time': 0.9407686591507002, 'altitude': 0.9407686591507002}
     """
+
     from dataeval._internal.metrics.utils import infer_categorical
 
     nats2bits = 1.442695
@@ -122,6 +123,7 @@ def mock_md_ood():
     rng = np.random.default_rng(20241022)
     nsamp, nfeatures = 100, 5
     x = rng.normal(size=(nsamp, nfeatures))
+    # features 0, 1, and 2 should have some MI, but 3 and 4 will not
     is_ood = np.abs(x[:, 0]) > np.abs(x[:,1]) + np.abs(x[:,2])
 
     md = {}
@@ -138,8 +140,9 @@ class TestGetMetadataOodMi():
     def test_type(self, mock_md_ood):
         assert isinstance(mock_md_ood, dict)
 
-    
-        
+    def test_mi_values(self, mock_md_ood):
+        mi_dict = mock_md_ood
+        assert np.allclose([v for v in mi_dict.values()], [0.17562533, 0.18743624, 0.15217528, 0.        , 0.        ])
 
 
 # <a name="ks_compare"></a>
@@ -228,9 +231,21 @@ def meta_distribution_compare(md0: Mapping[str, Union[List, NDArray]], md1: Mapp
     --------
     Imagine we have 3 data examples, and that the corresponding metadata contains 2 features called time and altitude.
 
+    >>> from metadata_tools import meta_distribution_compare
+    >>> import numpy
     >>> md0 = {'time': [1.2, 3.4, 5.6], 'altitude': [235, 6789, 101112]}
     >>> md1 = {'time': [7.8, 9.10, 11.12], 'altitude': [532, 9876, 211101]}
-    >>> meta_distribution_compare(md0, md1)
+    >>> md_out = meta_distribution_compare(md0, md1)
+    >>> for k, v in md_out.items():
+    >>>     print(k)
+    >>>     for f in v._fields:
+    >>>         print('\t',f, getattr(v, f)) 
+    time
+         statistic 1.0
+         pvalue 0.0
+    altitude
+         statistic 0.33333333333333337
+         pvalue 0.9444444444444444
     """
 
     mdc_dict = {}
@@ -238,7 +253,7 @@ def meta_distribution_compare(md0: Mapping[str, Union[List, NDArray]], md1: Mapp
     results = {}
     for k in md0:
         x0, x1 = md0[k], md1[k]
-        allx = x0 + x1 # x0 and x1 are lists, so + concatenates them. 
+        allx = list(x0) + list(x1) # "+" sign concatenates lists. 
         xmin = min(allx) 
         xmax = max(allx)
 
@@ -348,11 +363,16 @@ def get_least_likely_features(metadata, corrmetadata, is_ood)-> NDArray[str]:
     --------
     Imagine we have 3 data examples, and that the corresponding metadata contains 2 features called time and altitude.
 
-    >>> rng = numpy.random.default_rng(123)
-    >>> metadata = {'time': [1.2, 3.4, 5.6], 'altitude': [235, 6789, 101112]}
-    >>> is_ood = rng.choice(a=[False, True], size=len(metadata['time']))
-    >>> get_least_likely_features(metadata, is_ood, discrete_features=False)
-    """   
+>>> from metadata_tools import get_least_likely_features
+>>> import numpy
+>>> rng = numpy.random.default_rng(123)
+>>> metadata = {'time': [1.2, 3.4, 5.6], 'altitude': [235, 6789, 101112]}
+>>> corrmetadata = {'time': [7.8, 9.10, 11.12], 'altitude': [532, 9876, 211101]}
+>>> is_ood = rng.choice(a=[False, True], size=len(metadata['time']))
+>>> get_least_likely_features(metadata, corrmetadata, is_ood)
+array(['time', 'time'], dtype='<U4')
+
+"""   
     norm_dict = {}
     for k,v in metadata.items():
         loc = np.median(v)
@@ -420,15 +440,11 @@ def mock_llf():
     is_ood = np.array([False, False, True])
 
     llf = get_least_likely_features(md0, md1, is_ood)
-    # print('ARGHARGHARGHARGHARGHARGHARGHARGHARGHARGHARGHARGHARGH', flush=True)
     return llf
 
 class TestGetLeastLikelyFeatures():
     def test_nothing(self, mock_llf):
         features = mock_llf
-        print('gonna pass for sure', flush=True)
-        # print(features, flush=True)
-        # print(type(features), flush=True)
         assert True
 
     def test_llf(self, mock_llf):
