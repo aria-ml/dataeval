@@ -29,9 +29,9 @@ def predict_ood_mi(refdl, newdl, ood_detector, **kwargs):
           break
 
     allimages = np.concatenate((images, corrimages), axis=0)
-    input_shape = (*allimages[0].shape, 1)
-    bbshape = (*allimages.shape,1)
-    allimages = allimages.reshape(bbshape) 
+    # input_shape = (*allimages[0].shape, 1)
+    # bbshape = (*allimages.shape,1)
+    # allimages = allimages.reshape(bbshape) 
 
     metadata.extend(corrmetadata)
 
