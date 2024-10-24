@@ -46,7 +46,7 @@ class TestStats:
             [pixelstats, DATA_1 + DATA_3, False, "entropy", 10 + 10],
             [pixelstats, DATA_1 + DATA_3, True, "histogram", 10 * 3 + 10],
             [visualstats, DATA_1, False, "brightness", 10],
-            [visualstats, DATA_1, True, "blurriness", 10],
+            [visualstats, DATA_1, True, "sharpness", 10],
             [visualstats, DATA_3, False, "contrast", 10],
             [visualstats, DATA_3, True, "darkness", 10 * 3],
             [visualstats, DATA_1 + DATA_3, False, "missing", 10 + 10],

@@ -50,7 +50,7 @@ avoid issues like duplicate entries or conflicting formats.
 Always clean your data before performing any statistical analysis or model building.
 Consider having a subject matter expert verify sample statistics with known population dynamics to ensure that the data is representative.
 For images, the data cleaning process should include verifying image properties (like size and metadata)
-as well as the visual aspects of the image (like brightness and blurriness). 
+as well as the visual aspects of the image (like brightness and sharpness). 
 This ensures that your results are based on accurate and relevant information.
 
 ## Inaccurate, Incomplete and/or Irrelevant Data
@@ -135,7 +135,7 @@ Below is a list of all of the metrics available for analysis and the category th
     * brightness
     * darkness
     * contrast
-    * blurriness
+    * sharpness
     * missing
     * zero
 

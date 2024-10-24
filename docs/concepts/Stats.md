@@ -62,7 +62,7 @@ This function can be used in conjunction with the `Outliers` class to determine 
 
 The visualstats function is an aggregate metric that calculates visual quality statistics for each individual image:
 - brightness
-- blurriness
+- sharpness
 - contrast
 - darkness
 - missing (as a percentage of total pixels)
