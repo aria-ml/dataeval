@@ -55,8 +55,8 @@ class VisualStatsProcessor(StatsProcessor[VisualStatsOutput]):
             (np.max(x.get("percentiles")) - np.min(x.get("percentiles"))) / np.mean(x.get("percentiles"))
         ),
         "darkness": lambda x: x.get("percentiles")[1],
-        "missing": lambda x: np.count_nonzero(np.isnan(x.image)) / np.prod(x.shape),
-        "zeros": lambda x: np.count_nonzero(x.image == 0) / np.prod(x.shape),
+        "missing": lambda x: np.count_nonzero(np.isnan(np.sum(x.image, axis=0))) / np.prod(x.shape[-2:]),
+        "zeros": lambda x: np.count_nonzero(np.sum(x.image, axis=0) == 0) / np.prod(x.shape[-2:]),
         "percentiles": lambda x: np.nanpercentile(x.scaled, q=QUARTILES),
     }
     channel_function_map = {
