@@ -62,8 +62,12 @@ class InstanceMNIST(blank_object):
  
         super().__init__()
 
+        max_size = int(MNIST_NUM_IMAGES/len(corruptions))
         if size is None:
-            size = int(MNIST_NUM_IMAGES/len(corruptions))
+            size = max_size
+
+        if size > max_size:
+            raise ValueError(f'size {size} is too big, must bve less than {max_size} for {len(corruptions)} corruptions.')
 
         for ic, c in enumerate(corruptions):
             if not c in self.corruptions:
