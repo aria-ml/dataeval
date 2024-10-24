@@ -4,6 +4,7 @@ import re
 import warnings
 from dataclasses import dataclass
 from functools import partial
+from itertools import repeat
 from multiprocessing import Pool
 from typing import Any, Callable, Generic, Iterable, NamedTuple, Optional, TypeVar, Union
 
@@ -251,7 +252,7 @@ def run_stats(
     results_list: list[dict[str, NDArray]] = []
     source_index = []
     box_count = []
-    bbox_iter = (None for _ in images) if bboxes is None else to_numpy_iter(bboxes)
+    bbox_iter = repeat(None) if bboxes is None else to_numpy_iter(bboxes)
 
     warning_list = []
     total_for_status = getattr(images, "__len__")() if hasattr(images, "__len__") else None
