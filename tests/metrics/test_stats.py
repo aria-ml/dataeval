@@ -250,3 +250,8 @@ class TestStats:
     def test_channelstats(self):
         ch_stats = channelstats(DATA_3)
         assert ch_stats is not None
+
+    def test_generator_with_stats(self):
+        generator = (np.ones((3, 16, 16)) for _ in range(10))
+        stats = datasetstats(generator)
+        assert len(stats.dimensionstats) == 10
