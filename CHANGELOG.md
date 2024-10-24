@@ -1,6 +1,26 @@
-[//]: # (5ecd4d3ada39ffa98e0838a9820a3e4b80d31aa4)
+[//]: # (552668a00f67c648298636a8e0ffac9699ed1454)
 
 # DataEval Change Log
+
+## v0.71.0
+
+🌟 **Feature Release**
+- `cdae8a17` - Parallelize existing stats metric functions and introduce dedicated channelstats function
+
+    Running statistical analysis functions take significant time against large datasets.  Due to the natural parallelism of analyzing individual images, we introduced parallel processing leveraging the `multiprocessing` library to accelerate processing times.
+    
+    Affected functions:
+    
+    * `datasetstats`
+    * `dimensionstats`
+    * `hashstats`
+    * `pixelstats`
+    * `visualstats`
+    
+    Additionally, `channelstats` was added which performs the functionality of `datasetstats` but only for the functions that support per-channel stat calculation, `pixelstats` and `visualstats`.
+
+📝 **Miscellaneous**
+- `552668a0` - Update EDA part 1 tutorial with miscellaneous changes
 
 ## v0.70.1
 
