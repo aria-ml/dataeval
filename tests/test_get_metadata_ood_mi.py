@@ -3,9 +3,8 @@ import pytest
 
 from dataeval._internal.metrics.metadata_ood_mi import get_metadata_ood_mi
 
-pytest.fixture
 
-
+@pytest.fixture
 def mock_md_ood():
     rng = np.random.default_rng(20241022)
     nsamp, nfeatures = 100, 5
