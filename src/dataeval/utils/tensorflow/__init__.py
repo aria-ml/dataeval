@@ -6,6 +6,12 @@ as well as constructors which allow for customization of the encoder, decoder an
 layers used by the model.
 """
 
+from dataeval import _IS_TENSORFLOW_AVAILABLE
+
 from . import loss, models, recon
 
-__all__ = ["loss", "models", "recon"]
+__all__ = []
+
+
+if _IS_TENSORFLOW_AVAILABLE:
+    __all__ = ["loss", "models", "recon"]
