@@ -59,7 +59,7 @@ def meta_distribution_compare(md0: Mapping[str, Union[List, NDArray]], md1: Mapp
         res = ks_2samp(x0, x1, method="asymp")
         mdc_dict.update({k: res})
         if xmax > xmin:
-            mdc_dict[k].statistic_location = (res.statistic_location - xmin) / (xmax - xmin)
+            mdc_dict[k].statistic_location = (res.statistic_location - xmin) / (xmax - xmin)  #  pyright: ignore
 
     for k in md0:
         x0, x1 = md0[k], md1[k]
