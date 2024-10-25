@@ -4,7 +4,7 @@ import pytest
 from dataeval._internal.metrics.metadata_ks_compare import meta_distribution_compare
 
 
-@pytest.fixture
+@pytest.fixture(scope="class")
 def mock_mdc():
     md0 = {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112]}
     md1 = {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, 211101]}
