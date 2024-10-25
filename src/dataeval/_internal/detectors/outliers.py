@@ -147,7 +147,7 @@ class Outliers:
                 mask = _get_outlier_mask(values.astype(np.float64), self.outlier_method, self.outlier_threshold)
                 indices = np.flatnonzero(mask)
                 for i, value in zip(indices, values[mask]):
-                    flagged_images.setdefault(i, {}).update({stat: value})
+                    flagged_images.setdefault(int(i), {}).update({stat: value})
 
         return dict(sorted(flagged_images.items()))
 
