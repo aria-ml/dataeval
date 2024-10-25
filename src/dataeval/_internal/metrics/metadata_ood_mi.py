@@ -25,13 +25,13 @@ def get_metadata_ood_mi(
     is_ood:
         A boolean array, with one value per example, that indicates which examples are OOD.
     discrete_features:
-        Either a boolean array or a single boolean value, indicate which features take on disrete values.
+        Either a boolean array or a single boolean value, indicate which features take on discrete values.
 
     Returns
     -------
     Dict[str, float]
-        A dictionary with keys corresponding to metadata feature names, and values indicating the strength of assocation
-        between each named feature and the OOD flag, as mutual information measured in bits.
+        A dictionary with keys corresponding to metadata feature names, and values indicating the strength of
+        association between each named feature and the OOD flag, as mutual information measured in bits.
 
     Examples
     --------
