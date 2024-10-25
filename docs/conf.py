@@ -111,8 +111,11 @@ def normalize_module(mod_names):
 
 def setup(app):
     # pre-download data used in notebooks
+    import warnings
     from os import getcwd
     from sys import path
+
+    warnings.filterwarnings("ignore")
 
     path.append(getcwd())
     import data
