@@ -1,12 +1,12 @@
-from typing import Dict, List, Union
+from typing import Union
 
 import numpy as np
 from numpy.typing import NDArray
 
 
 def get_least_likely_features(
-    metadata: Dict[str, Union[List, NDArray]], corrmetadata: Dict[str, Union[List, NDArray]], is_ood: NDArray[np.bool_]
-) -> NDArray[str]:
+    metadata: dict[str, NDArray], corrmetadata: dict[str, Union[list, NDArray]], is_ood: NDArray[np.bool_]
+) -> NDArray[np.str_]:
     """Computes which metadata feature is most out-of-distribution (OOD) relative to a reference metadata set.
 
         Given a reference metadata dictionary `metadata` (where each key maps to one scalar metadata feature), a second

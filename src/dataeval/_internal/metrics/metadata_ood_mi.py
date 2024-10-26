@@ -6,7 +6,9 @@ from sklearn.feature_selection import mutual_info_classif
 
 
 def get_metadata_ood_mi(
-    metadata: Dict[str, Union[List, NDArray]], is_ood: NDArray[np.bool_], discrete_features=None
+    metadata: Dict[str, Union[List, NDArray]],
+    is_ood: NDArray[np.bool_],
+    discrete_features: Union[str, bool, NDArray[np.bool_]] = False,
 ) -> Dict:
     """Computes mutual information between a set of metadata features and an out-of-distribution flag.
 
@@ -47,16 +49,22 @@ def get_metadata_ood_mi(
     # from dataeval._internal.metrics.utils import infer_categorical
 
     nats2bits = 1.442695
-    discrete_features = False if discrete_features is None else discrete_features
+    # discrete_features = False if discrete_features is None else discrete_features
     mdict = metadata
 
     X = np.array([np.array(v) for v in mdict.values()]).T
 
     X0, dX = np.mean(X, axis=0), np.std(X, axis=0, ddof=1)
     Xscl = (X - X0) / dX
-    # discrete_features = infer_categorical(Xscl)
 
-    MI = mutual_info_classif(Xscl, is_ood, discrete_features=discrete_features) * nats2bits
+    MI = (
+        mutual_info_classif(
+            Xscl,
+            is_ood,
+            discrete_features=discrete_features,  # type: ignore
+        )
+        * nats2bits
+    )
 
     MI_dict = {}
     for i, k in enumerate(mdict):
