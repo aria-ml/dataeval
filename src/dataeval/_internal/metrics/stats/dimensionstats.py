@@ -57,16 +57,16 @@ class DimensionStatsProcessor(StatsProcessor[DimensionStatsOutput]):
     image_function_map = {
         "left": lambda x: x.box[0],
         "top": lambda x: x.box[1],
-        "width": lambda x: x.shape[-1],
-        "height": lambda x: x.shape[-2],
+        "width": lambda x: x.box[2] - x.box[0],
+        "height": lambda x: x.box[3] - x.box[1],
         "channels": lambda x: x.shape[-3],
-        "size": lambda x: np.prod(x.shape[-2:]),
-        "aspect_ratio": lambda x: x.shape[-1] / x.shape[-2],
+        "size": lambda x: (x.box[2] - x.box[0]) * (x.box[3] - x.box[1]),
+        "aspect_ratio": lambda x: (x.box[2] - x.box[0]) / (x.box[3] - x.box[1]),
         "depth": lambda x: get_bitdepth(x.image).depth,
         "center": lambda x: np.asarray([(x.box[0] + x.box[2]) / 2, (x.box[1] + x.box[3]) / 2]),
         "distance": lambda x: np.sqrt(
-            np.square(((x.box[0] + x.box[2]) / 2) - (x.width / 2))
-            + np.square(((x.box[1] + x.box[3]) / 2) - (x.height / 2))
+            np.square(((x.box[0] + x.box[2]) / 2) - (x.shape[-1] / 2))
+            + np.square(((x.box[1] + x.box[3]) / 2) - (x.shape[-2] / 2))
         ),
     }
 
