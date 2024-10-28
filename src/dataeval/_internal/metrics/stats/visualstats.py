@@ -22,14 +22,14 @@ class VisualStatsOutput(BaseStatsOutput):
     ----------
     brightness : NDArray[np.float16]
         Brightness of the images
-    sharpness : NDArray[np.float16]
-        Blurriness of the images
     contrast : NDArray[np.float16]
         Image contrast ratio
     darkness : NDArray[np.float16]
         Darkness of the images
     missing : NDArray[np.float16]
         Percentage of the images with missing pixels
+    sharpness : NDArray[np.float16]
+        Sharpness of the images
     zeros : NDArray[np.float16]
         Percentage of the images with zero value pixels
     percentiles : NDArray[np.float16]
@@ -37,10 +37,10 @@ class VisualStatsOutput(BaseStatsOutput):
     """
 
     brightness: NDArray[np.float16]
-    sharpness: NDArray[np.float16]
     contrast: NDArray[np.float16]
     darkness: NDArray[np.float16]
     missing: NDArray[np.float16]
+    sharpness: NDArray[np.float16]
     zeros: NDArray[np.float16]
     percentiles: NDArray[np.float16]
 
@@ -49,25 +49,25 @@ class VisualStatsProcessor(StatsProcessor[VisualStatsOutput]):
     output_class = VisualStatsOutput
     cache_keys = ["percentiles"]
     image_function_map = {
-        "brightness": lambda x: x.get("percentiles")[-2],
-        "sharpness": lambda x: np.std(edge_filter(np.mean(x.image, axis=0))),
+        "brightness": lambda x: x.get("percentiles")[1],
         "contrast": lambda x: np.nan_to_num(
             (np.max(x.get("percentiles")) - np.min(x.get("percentiles"))) / np.mean(x.get("percentiles"))
         ),
-        "darkness": lambda x: x.get("percentiles")[1],
+        "darkness": lambda x: x.get("percentiles")[-2],
         "missing": lambda x: np.count_nonzero(np.isnan(np.sum(x.image, axis=0))) / np.prod(x.shape[-2:]),
+        "sharpness": lambda x: np.std(edge_filter(np.mean(x.image, axis=0))),
         "zeros": lambda x: np.count_nonzero(np.sum(x.image, axis=0) == 0) / np.prod(x.shape[-2:]),
         "percentiles": lambda x: np.nanpercentile(x.scaled, q=QUARTILES),
     }
     channel_function_map = {
-        "brightness": lambda x: x.get("percentiles")[:, -2],
-        "sharpness": lambda x: np.std(np.vectorize(edge_filter, signature="(m,n)->(m,n)")(x.image), axis=(1, 2)),
+        "brightness": lambda x: x.get("percentiles")[:, 1],
         "contrast": lambda x: np.nan_to_num(
             (np.max(x.get("percentiles"), axis=1) - np.min(x.get("percentiles"), axis=1))
             / np.mean(x.get("percentiles"), axis=1)
         ),
-        "darkness": lambda x: x.get("percentiles")[:, 1],
+        "darkness": lambda x: x.get("percentiles")[:, -2],
         "missing": lambda x: np.count_nonzero(np.isnan(x.image), axis=(1, 2)) / np.prod(x.shape[-2:]),
+        "sharpness": lambda x: np.std(np.vectorize(edge_filter, signature="(m,n)->(m,n)")(x.image), axis=(1, 2)),
         "zeros": lambda x: np.count_nonzero(x.image == 0, axis=(1, 2)) / np.prod(x.shape[-2:]),
         "percentiles": lambda x: np.nanpercentile(x.scaled, q=QUARTILES, axis=1).T,
     }
@@ -113,9 +113,10 @@ def visualstats(
 
     >>> results = visualstats(images)
     >>> print(results.brightness)
-    [0.0737 0.607  0.0713 0.1046 0.138  0.1713 0.2046 0.2379 0.2712 0.3047
-     0.338  0.3713 0.4045 0.438  0.4712 0.5044 0.538  0.5713 0.6045 0.638
-     0.6714 0.7046 0.738  0.7715 0.8047 0.838  0.871  0.905  0.938  0.971 ]
+    [0.02246 0.5557  0.06805 0.1014  0.1348  0.1681  0.2014  0.2347  0.268
+     0.3015  0.3347  0.3682  0.4014  0.4348  0.468   0.5015  0.5347  0.568
+     0.6016  0.635   0.668   0.701   0.735   0.768   0.8013  0.835   0.868
+     0.9014  0.9346  0.9683 ]
     >>> print(results.contrast)
     [2.041 1.332 1.293 1.279 1.272 1.268 1.265 1.263 1.261 1.26  1.259 1.258
      1.258 1.257 1.257 1.256 1.256 1.255 1.255 1.255 1.255 1.254 1.254 1.254
