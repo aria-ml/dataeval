@@ -162,10 +162,10 @@ def channelstats(
 
     >>> stats = channelstats(images)
     >>> print(stats.visualstats.darkness)
-    [0.02124 0.1213  0.2212  0.1013  0.1076  0.11383 0.2013  0.2076  0.2139
-     0.3013  0.3076  0.3137  0.4014  0.4075  0.4138  0.5015  0.508   0.5137
-     0.6016  0.6074  0.614   0.701   0.7075  0.714   0.8013  0.8076  0.814
-     0.9014  0.9077  0.914  ]
+    [0.07495 0.1748  0.275   0.1047  0.11096 0.1172  0.2047  0.2109  0.2172
+     0.3047  0.311   0.3171  0.4048  0.411   0.4172  0.505   0.5107  0.517
+     0.6045  0.611   0.617   0.7046  0.711   0.7173  0.8047  0.811   0.8174
+     0.905   0.911   0.917  ]
     """
     outputs = run_stats(images, bboxes, True, [PixelStatsProcessor, VisualStatsProcessor])
     return ChannelStatsOutput(*outputs)  # type: ignore
