@@ -80,7 +80,6 @@ def get_least_likely_features(
         maxpdev[update_mpdev], maxndev[update_mndev] = X[update_mpdev], X[update_mndev]
 
         update_k = np.logical_or(update_mpdev, update_mndev)
-        # ikmax[update_k] = ik
         kmax[update_k] = k
         deviation[update_k] = np.abs(X[update_k])
 

@@ -5,7 +5,7 @@ from numpy.typing import NDArray
 from sklearn.feature_selection import mutual_info_classif
 
 # NATS2BITS is the reciprocal of natural log of 2. If you have an information/entropy-type quantity measured in nats,
-#   which is what many library functions return, mutliply it by NATS2BITS to get it in bits.
+#   which is what many library functions return, multiply it by NATS2BITS to get it in bits.
 NATS2BITS = 1.442695
 
 
