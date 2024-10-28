@@ -18,15 +18,10 @@ def mock_md_ood():
 
     discrete_features = False
 
-    mi_dict = get_metadata_ood_mi(md, is_ood, discrete_features=discrete_features)
-
-    return mi_dict
+    return md, is_ood, discrete_features
 
 
 class TestGetMetadataOodMi:
-    def test_type(self, mock_md_ood):
-        assert isinstance(mock_md_ood, dict)
-
     def test_mi_values(self, mock_md_ood):
-        mi_dict = mock_md_ood
+        mi_dict = get_metadata_ood_mi(*mock_md_ood)
         assert np.allclose(list(mi_dict.values()), [0.17562533, 0.18743624, 0.15217528, 0.0, 0.0])

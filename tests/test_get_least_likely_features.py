@@ -11,19 +11,18 @@ def mock_llf():
 
     is_ood = np.array([False, False, True])
 
-    llf = get_least_likely_features(md0, md1, is_ood)
-    return llf
+    return md0, md1, is_ood
 
 
 class TestGetLeastLikelyFeatures:
-    def test_nothing(self, mock_llf):
-        _ = mock_llf
-        assert True
-
     def test_llf(self, mock_llf):
-        llf = mock_llf
+        llf = get_least_likely_features(*mock_llf)
         assert llf[0] == "time"
 
     def test_llf_type(self, mock_llf):
-        ml = mock_llf
-        assert isinstance(ml, np.ndarray)
+        llf = get_least_likely_features(*mock_llf)
+        assert isinstance(llf, np.ndarray)
+
+    def test_llf_types(self, mock_llf):
+        llf = get_least_likely_features(*mock_llf)
+        assert isinstance(llf, np.ndarray)

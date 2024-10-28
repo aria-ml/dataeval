@@ -54,14 +54,13 @@ def get_least_likely_features(
 
         norm_dict.update({k: {"loc": loc, "pos_scale": pos_scale, "neg_scale": neg_scale}})
 
-    mkeys = list(norm_dict)
-
-    maxpdev = np.array([-1e30 for _ in is_ood])
+    maxpdev = np.repeat(-1e30, len(is_ood))
     maxndev = -1.0 * maxpdev
 
     deviation = np.zeros(is_ood.shape)
-    ikmax = np.zeros(is_ood.shape, dtype=np.int32)
-    for ik, k in enumerate(mkeys):
+    # ikmax = np.zeros(is_ood.shape, dtype=np.int32)
+    kmax = np.empty(len(is_ood), dtype=object)
+    for k in norm_dict:
         if k == "random":  # exclude cases where random happens to be out on tails, not interesting.
             continue
         ndk = norm_dict[k]
@@ -81,8 +80,9 @@ def get_least_likely_features(
         maxpdev[update_mpdev], maxndev[update_mndev] = X[update_mpdev], X[update_mndev]
 
         update_k = np.logical_or(update_mpdev, update_mndev)
-        ikmax[update_k] = ik
+        # ikmax[update_k] = ik
+        kmax[update_k] = k
         deviation[update_k] = np.abs(X[update_k])
 
-    unlikely_features = np.array([mkeys[ik] for ik in ikmax])[is_ood]
+    unlikely_features = kmax[is_ood]
     return unlikely_features

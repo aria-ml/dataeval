@@ -4,6 +4,10 @@ import numpy as np
 from numpy.typing import NDArray
 from sklearn.feature_selection import mutual_info_classif
 
+# NATS2BITS is the reciprocal of natural log of 2. If you have an information/entropy-type quantity measured in nats,
+#   which is what many library functions return, mutliply it by NATS2BITS to get it in bits.
+NATS2BITS = 1.442695
+
 
 def get_metadata_ood_mi(
     metadata: Dict[str, Union[List, NDArray]],
@@ -45,29 +49,21 @@ def get_metadata_ood_mi(
         >>> print(get_metadata_ood_mi(metadata, is_ood, discrete_features=False))
     {'time': 0.9407686591507002, 'altitude': 0.9407686591507002}
     """
-
-    # from dataeval._internal.metrics.utils import infer_categorical
-
-    nats2bits = 1.442695
-    # discrete_features = False if discrete_features is None else discrete_features
     mdict = metadata
 
-    X = np.array([np.array(v) for v in mdict.values()]).T
+    X = np.array(list(mdict.values())).T
 
     X0, dX = np.mean(X, axis=0), np.std(X, axis=0, ddof=1)
     Xscl = (X - X0) / dX
 
-    MI = (
+    mutual_info_values = (
         mutual_info_classif(
             Xscl,
             is_ood,
             discrete_features=discrete_features,  # type: ignore
         )
-        * nats2bits
+        * NATS2BITS
     )
 
-    MI_dict = {}
-    for i, k in enumerate(mdict):
-        MI_dict.update({k: MI[i]})
-
-    return MI_dict
+    mi_dict = {k: mutual_info_values[i] for i, k in enumerate(mdict)}
+    return mi_dict
