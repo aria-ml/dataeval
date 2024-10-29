@@ -11,12 +11,12 @@ from __future__ import annotations
 from functools import partial
 from typing import Callable
 
-import keras
 import numpy as np
 import tensorflow as tf
-from keras.layers import Input
-from keras.models import Model
+import tf_keras as keras
 from numpy.typing import ArrayLike, NDArray
+from tf_keras.layers import Input
+from tf_keras.models import Model
 
 from dataeval._internal.detectors.ood.base import OODBase, OODScoreOutput
 from dataeval._internal.interop import to_numpy

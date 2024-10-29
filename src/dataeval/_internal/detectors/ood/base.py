@@ -12,9 +12,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Callable, Literal, cast
 
-import keras
 import numpy as np
 import tensorflow as tf
+import tf_keras as keras
 from numpy.typing import ArrayLike, NDArray
 
 from dataeval._internal.interop import to_numpy

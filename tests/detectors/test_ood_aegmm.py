@@ -8,11 +8,11 @@ Licensed under Apache Software License (Apache 2.0)
 
 from itertools import product
 
-import keras as keras
 import numpy as np
 import pytest
 import tensorflow as tf
-from keras.layers import Dense, InputLayer
+import tf_keras as keras
+from tf_keras.layers import Dense, InputLayer
 
 from dataeval._internal.detectors.ood.aegmm import OOD_AEGMM
 from dataeval._internal.models.tensorflow.autoencoder import AEGMM
