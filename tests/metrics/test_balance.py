@@ -8,6 +8,54 @@ from dataeval.metrics.bias.metadata import infer_categorical, preprocess_metadat
 
 
 @pytest.fixture
+def simple_class_labels():
+    return [1] * 100 + [2] * 100
+
+
+@pytest.fixture
+def homog_class_labels():
+    return [1] * 10
+
+
+@pytest.fixture
+def inhomog_metadata():
+    return {
+        "factor1": list(range(10)),
+        "factor2": list(range(10)),
+        "factor3": list(range(10)),
+    }
+
+
+@pytest.fixture
+def simple_metadata():
+    return {"factor1": [1] * 100 + [2] * 100, "factor2": [1] * 100 + [2] * 100}
+
+
+@pytest.fixture
+def simple_class_labels():
+    return [1] * 100 + [2] * 100
+
+
+@pytest.fixture
+def homog_class_labels():
+    return [1] * 10
+
+
+@pytest.fixture
+def inhomog_metadata():
+    return {
+        "factor1": list(range(10)),
+        "factor2": list(range(10)),
+        "factor3": list(range(10)),
+    }
+
+
+@pytest.fixture
+def simple_metadata():
+    return {"factor1": [1] * 100 + [2] * 100, "factor2": [1] * 100 + [2] * 100}
+
+
+@pytest.fixture
 def class_labels():
     return np.array([1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0], dtype=int)
 
@@ -86,3 +134,14 @@ class TestBalanceUnit:
                 assert v.shape == expected_shape[k]
                 if k in expected_type:
                     assert v.dtype == expected_type[k]
+
+
+class TestBalanceFunctional:
+    def test_unity_balance(self, simple_class_labels, simple_metadata):
+        output = balance(simple_class_labels, simple_metadata)
+        assert np.all(output.balance > 0.999)
+        assert np.all(output.factors > 0.999)
+
+    def test_zero_balance(self, homog_class_labels, inhomog_metadata):
+        output = balance(homog_class_labels, inhomog_metadata)
+        assert np.all(np.isclose(output.balance, 0))
