@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from typing import Callable, cast
 
-import keras
 import tensorflow as tf
-from keras.layers import (
+import tf_keras as keras
+from tf_keras.layers import (
     Dense,
     Flatten,
     Layer,

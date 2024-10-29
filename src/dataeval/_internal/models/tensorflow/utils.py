@@ -11,11 +11,13 @@ from __future__ import annotations
 import math
 from typing import Callable, Union, cast
 
-import keras as keras
 import numpy as np
 import tensorflow as tf
-from keras import Sequential
-from keras.layers import (
+import tf_keras as keras
+from numpy.typing import NDArray
+from tensorflow._api.v2.nn import relu, softmax, tanh
+from tf_keras import Sequential
+from tf_keras.layers import (
     Conv2D,
     Conv2DTranspose,
     Dense,
@@ -23,8 +25,6 @@ from keras.layers import (
     InputLayer,
     Reshape,
 )
-from numpy.typing import NDArray
-from tensorflow._api.v2.nn import relu, softmax, tanh
 
 from dataeval._internal.models.tensorflow.autoencoder import AE, AEGMM, VAE, VAEGMM
 from dataeval._internal.models.tensorflow.pixelcnn import PixelCNN

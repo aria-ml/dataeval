@@ -11,11 +11,11 @@ from __future__ import annotations
 from typing import Literal, cast
 
 import tensorflow as tf
-from keras.layers import Flatten
 from numpy.typing import NDArray
 from tensorflow_probability.python.distributions.mvn_diag import MultivariateNormalDiag
 from tensorflow_probability.python.distributions.mvn_tril import MultivariateNormalTriL
 from tensorflow_probability.python.stats import covariance
+from tf_keras.layers import Flatten
 
 from dataeval._internal.models.tensorflow.gmm import gmm_energy, gmm_params
 
