@@ -11,8 +11,8 @@ from itertools import product
 import numpy as np
 import pytest
 import tensorflow as tf
-from keras import Model
-from keras.layers import LSTM, Dense, Input
+from tf_keras import Model
+from tf_keras.layers import LSTM, Dense, Input
 
 from dataeval._internal.detectors.ood.llr import OOD_LLR
 

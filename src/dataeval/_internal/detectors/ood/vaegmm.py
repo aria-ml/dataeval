@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from typing import Callable
 
-import keras
 import numpy as np
 import tensorflow as tf
+import tf_keras as keras
 from numpy.typing import ArrayLike
 
 from dataeval._internal.detectors.ood.base import OODGMMBase, OODScoreOutput
