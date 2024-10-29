@@ -131,6 +131,7 @@ reportMissingImports = false
 
 [tool.pytest.ini_options]
 norecursedirs = ["prototype"]
+testpaths = ["tests"]
 addopts = ["--pythonwarnings=ignore::DeprecationWarning", "--verbose", "--durations=20", "--durations-min=1.0"]
 
 [tool.coverage.run]
