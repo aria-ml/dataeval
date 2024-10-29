@@ -65,8 +65,8 @@ class TestDiversityFunctional:
         metadata = {"factor1": [5, 5, 6, 6]}
         class_labels = [0, 0, 1, 1]
         result = diversity(class_labels, metadata, method="simpson")
-        expected_index = [0.5, 0.5]
-        expected_classwise = [[0], [0]]
+        expected_index = np.array([0.5, 0.5])
+        expected_classwise = np.array([[0], [0]])
         np.testing.assert_array_almost_equal(result.diversity_index, expected_index)
         np.testing.assert_array_almost_equal(result.classwise, expected_classwise)
 
@@ -74,8 +74,8 @@ class TestDiversityFunctional:
         metadata = {"factor1": [5, 5, 5, 5]}
         class_labels = [0, 0, 1, 1]
         result = diversity(class_labels, metadata, method="simpson")
-        expected_index = [0.5, 0]
-        expected_classwise = [[0], [0]]
+        expected_index = np.array([0.5, 0])
+        expected_classwise = np.array([[0], [0]])
         np.testing.assert_array_almost_equal(result.diversity_index, expected_index)
         np.testing.assert_array_almost_equal(result.classwise, expected_classwise)
 
@@ -83,8 +83,8 @@ class TestDiversityFunctional:
         metadata = {"factor1": [5, 5, 6, 6]}
         class_labels = [0, 0, 0, 0]
         result = diversity(class_labels, metadata, method="simpson")
-        expected_index = [0, 0.5]
-        expected_classwise = [[0.5]]
+        expected_index = np.array([0, 0.5])
+        expected_classwise = np.array([[0.5]])
         np.testing.assert_array_almost_equal(result.diversity_index, expected_index)
         np.testing.assert_array_almost_equal(result.classwise, expected_classwise)
 
@@ -92,8 +92,8 @@ class TestDiversityFunctional:
         metadata = {"factor1": [5, 6, 5, 6, 5, 6], "factor2": [0, 0, 5, 0, 5, 5]}
         labels = [1, 1, 1, 2, 2, 2]
         result = diversity(labels, metadata, method="simpson")
-        expected_index = [1 / 3, 1 / 3, 1 / 3]
-        expected_classwise = [[4 / 15, 4 / 15], [4 / 15, 4 / 15]]
+        expected_index = np.array([1 / 3, 1 / 3, 1 / 3])
+        expected_classwise = np.array([[4 / 15, 4 / 15], [4 / 15, 4 / 15]])
         np.testing.assert_array_almost_equal(result.diversity_index, expected_index)
         np.testing.assert_array_almost_equal(result.classwise, expected_classwise)
 
@@ -101,8 +101,8 @@ class TestDiversityFunctional:
         metadata = {"factor1": [5, 5, 5, 6, 6, 6]}
         class_labels = [0, 0, 0, 1, 1, 1]
         result = diversity(class_labels, metadata, method="shannon")
-        expected_index = [0.5, 0.5]
-        expected_classwise = [[0], [0]]
+        expected_index = np.array([0.5, 0.5])
+        expected_classwise = np.array([[0], [0]])
         np.testing.assert_array_almost_equal(result.diversity_index, expected_index)
         np.testing.assert_array_almost_equal(result.classwise, expected_classwise)
 
@@ -110,8 +110,8 @@ class TestDiversityFunctional:
         metadata = {"factor1": [5, 5, 5, 5, 5, 5]}
         class_labels = [0, 0, 0, 1, 1, 1]
         result = diversity(class_labels, metadata, method="shannon")
-        expected_index = [0.5, 0]
-        expected_classwise = [[0], [0]]
+        expected_index = np.array([0.5, 0])
+        expected_classwise = np.array([[0], [0]])
         np.testing.assert_array_almost_equal(result.diversity_index, expected_index)
         np.testing.assert_array_almost_equal(result.classwise, expected_classwise)
 
@@ -119,8 +119,8 @@ class TestDiversityFunctional:
         metadata = {"factor1": [5, 5, 5, 6, 6, 6]}
         class_labels = [0, 0, 0, 0, 0, 0]
         result = diversity(class_labels, metadata, method="shannon")
-        expected_index = [0, 0.5]
-        expected_classwise = [[0.5]]
+        expected_index = np.array([0, 0.5])
+        expected_classwise = np.array([[0.5]])
         np.testing.assert_array_almost_equal(result.diversity_index, expected_index)
         np.testing.assert_array_almost_equal(result.classwise, expected_classwise)
 
@@ -128,7 +128,7 @@ class TestDiversityFunctional:
         metadata = {"factor1": [5, 6, 5, 6, 5, 6], "factor2": [0, 0, 5, 0, 5, 5]}
         labels = [1, 1, 1, 2, 2, 2]
         result = diversity(labels, metadata, method="shannon")
-        expected_index = [0.5, 0.5, 0.5]
-        expected_classwise = [[0.5, 0.5], [0.5, 0.5]]
+        expected_index = np.array([0.5, 0.5, 0.5])
+        expected_classwise = np.array([[0.5, 0.5], [0.5, 0.5]])
         np.testing.assert_array_almost_equal(result.diversity_index, expected_index)
         np.testing.assert_array_less(expected_classwise, result.classwise)
