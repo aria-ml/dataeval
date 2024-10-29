@@ -13,9 +13,9 @@ from __future__ import annotations
 import functools
 import warnings
 
-import keras
 import numpy as np
 import tensorflow as tf
+import tf_keras as keras
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.distributions import (
     categorical,
