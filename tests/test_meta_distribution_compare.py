@@ -19,8 +19,10 @@ class TestMetadataCompare:
 
     def test_shifts(self, mock_mdc):
         mdc = meta_distribution_compare(*mock_mdc)
-        assert mdc["time"].shift_magnitude == 2.7 and np.isclose(mdc["altitude"].shift_magnitude, 0.7492490855199898)
+        assert mdc["time"].shift_magnitude == 2.7
+        assert np.isclose(mdc["altitude"].shift_magnitude, 0.7492490855199898)
 
     def test_pvalue(self, mock_mdc):
         mdc = meta_distribution_compare(*mock_mdc)
-        assert np.isclose(mdc["time"].pvalue, 0.0) and np.isclose(mdc["altitude"].pvalue, 0.9444444444444444)
+        assert np.isclose(mdc["time"].pvalue, 0.0)
+        assert np.isclose(mdc["altitude"].pvalue, 0.9444444444444444)
