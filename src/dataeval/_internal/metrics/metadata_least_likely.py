@@ -65,10 +65,10 @@ def get_least_likely_features(
         dxn = dxn if dxn > 0 else 1.0
 
         xdev = x - x0
-        pos, neg = xdev >= 0, xdev < 0
+        pos = xdev >= 0
 
         X = np.zeros_like(x)
-        X[pos], X[neg] = xdev[pos] / dxp, xdev[neg] / dxn  # keeping track of possible asymmetry of x
+        X[pos], X[~pos] = xdev[pos] / dxp, xdev[~pos] / dxn  # keeping track of possible asymmetry of x
         # Below here, only need to think about absolute deviation.
         abig = np.abs(X) > deviation
         kmax[abig] = k
