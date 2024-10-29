@@ -5,7 +5,7 @@ from numpy.typing import NDArray
 
 
 def get_least_likely_features(
-    metadata: dict[str, NDArray], corrmetadata: dict[str, Union[list, NDArray]], is_ood: NDArray[np.bool_]
+    metadata: dict[str, NDArray], newmetadata: dict[str, Union[list, NDArray]], is_ood: NDArray[np.bool_]
 ) -> NDArray[np.str_]:
     """Computes which metadata feature is most out-of-distribution (OOD) relative to a reference metadata set.
 
@@ -39,49 +39,40 @@ def get_least_likely_features(
     >>> import numpy
     >>> rng = numpy.random.default_rng(123)
     >>> metadata = {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112]}
-    >>> corrmetadata = {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, 211101]}
+    >>> newmetadata = {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, 211101]}
     >>> is_ood = rng.choice(a=[False, True], size=len(metadata["time"]))
-    >>> get_least_likely_features(metadata, corrmetadata, is_ood)
+    >>> get_least_likely_features(metadata, newmetadata, is_ood)
     array(['time', 'time'], dtype='<U4')
     """
-    norm_dict = {}
+    # largest standardized absolute deviation from the median observed so far for each example
+    deviation = np.zeros_like(is_ood, dtype=np.float32)
+
+    # name of feature that corresponds to `deviation` (see above) for each example
+    kmax = np.empty(len(is_ood), dtype=object)
+
     for k, v in metadata.items():
+        if k == "random":  # exclude cases where random happens to be out on tails, not interesting.
+            continue
+
         loc = np.median(v)
         dev = v - loc
         posdev, negdev = dev[dev > 0], dev[dev < 0]
         pos_scale = np.median(posdev)
         neg_scale = np.abs(np.median(negdev))
 
-        norm_dict.update({k: {"loc": loc, "pos_scale": pos_scale, "neg_scale": neg_scale}})
-
-    maxpdev = np.repeat(-1e30, len(is_ood))
-    maxndev = -1.0 * maxpdev
-
-    deviation = np.zeros(is_ood.shape)
-    # ikmax = np.zeros(is_ood.shape, dtype=np.int32)
-    kmax = np.empty(len(is_ood), dtype=object)
-    for k in norm_dict:
-        if k == "random":  # exclude cases where random happens to be out on tails, not interesting.
-            continue
-        ndk = norm_dict[k]
-        x, x0, dxp, dxn = corrmetadata[k], ndk["loc"], ndk["pos_scale"], ndk["neg_scale"]
-        dxp = dxp if dxp > 0 else 1.0
+        x, x0, dxp, dxn = np.array(newmetadata[k]), loc, pos_scale, neg_scale  # just abbreviations
+        dxp = dxp if dxp > 0 else 1.0  # avoids dividing by zero below
         dxn = dxn if dxn > 0 else 1.0
 
         xdev = x - x0
         pos, neg = xdev >= 0, xdev < 0
 
         X = np.zeros_like(x)
-        X[pos], X[neg] = xdev[pos] / dxp, xdev[neg] / dxn
-
-        pbig, nbig, abig = maxpdev < X, maxndev > X, np.abs(X) > deviation
-
-        update_mpdev, update_mndev = np.logical_and(pbig, abig), np.logical_and(nbig, abig)
-        maxpdev[update_mpdev], maxndev[update_mndev] = X[update_mpdev], X[update_mndev]
-
-        update_k = np.logical_or(update_mpdev, update_mndev)
-        kmax[update_k] = k
-        deviation[update_k] = np.abs(X[update_k])
+        X[pos], X[neg] = xdev[pos] / dxp, xdev[neg] / dxn  # keeping track of possible asymmetry of x
+        # Below here, only need to think about absolute deviation.
+        abig = np.abs(X) > deviation
+        kmax[abig] = k
+        deviation[abig] = np.abs(X[abig])
 
     unlikely_features = kmax[is_ood]
     return unlikely_features
