@@ -5719,11 +5719,11 @@ test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", 
 type = ["pytest-mypy"]
 
 [extras]
-all = ["matplotlib", "nvidia-cudnn-cu11", "tensorflow", "tensorflow_probability", "torch", "torchvision"]
+all = ["matplotlib", "nvidia-cudnn-cu11", "tensorflow", "tensorflow_probability", "tf-keras", "torch", "torchvision"]
 tensorflow = ["nvidia-cudnn-cu11", "tensorflow", "tensorflow_probability", "tf-keras"]
 torch = ["matplotlib", "nvidia-cudnn-cu11", "torch", "torchvision"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.12"
-content-hash = "4accf5401e876577aae6ddfd68f7140b037a749bb26c6bf564fea143d0179bf0"
+content-hash = "76c62188a16efae23a5b6ac599bd6a6b7938021d7d702f4cc2de870c853761c3"

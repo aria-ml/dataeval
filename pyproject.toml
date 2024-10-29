@@ -61,7 +61,7 @@ torchvision = {version = ">=0.17.0", source = "pytorch", optional = true}
 [tool.poetry.extras]
 tensorflow = ["tensorflow", "tensorflow_probability", "tf-keras", "nvidia-cudnn-cu11"]
 torch = ["torch", "torchvision", "matplotlib", "nvidia-cudnn-cu11"]
-all = ["matplotlib", "nvidia-cudnn-cu11", "tensorflow", "tensorflow_probability", "torch", "torchvision"]
+all = ["matplotlib", "nvidia-cudnn-cu11", "tensorflow", "tensorflow_probability", "tf-keras", "torch", "torchvision"]
 
 [tool.poetry.group.dev]
 optional = true
