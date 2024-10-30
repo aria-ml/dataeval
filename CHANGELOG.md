@@ -1,6 +1,11 @@
-[//]: # (97849b0120adbe017daed4c151bebb5af655bf78)
+[//]: # (14ef382c7d3216d8571d366ae24eaf118b5f7682)
 
 # DataEval Change Log
+
+## v0.72.0
+
+🌟 **Feature Release**
+- `14ef382c` - Update dependencies for conda compatibility
 
 ## v0.71.1
 
