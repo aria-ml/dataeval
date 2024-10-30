@@ -54,7 +54,7 @@ matplotlib = {version = "*", optional = true}
 nvidia-cudnn-cu11 = {version = ">=8.6.0.163", optional = true}
 tensorflow = {version = ">=2.16", optional = true}
 tensorflow_probability = {version = ">=0.24", optional = true}
-tf-keras = {version = ">2.16", optional = true}
+tf-keras = {version = ">=2.16", optional = true}
 torch = {version = ">=2.2.0", source = "pytorch", optional = true}
 torchvision = {version = ">=0.17.0", source = "pytorch", optional = true}
 
@@ -120,11 +120,8 @@ name = "dataeval"
 
 [tool.poetry2conda.dependencies]
 nvidia-cudnn-cu11 = { name = "cudnn" }
-pillow = { channel = "pip" }
-tensorflow = { channel = "pip" }
-tensorflow_probability = { channel = "pip" }
-torch = { name = "pytorch", channel = "pytorch" }
-torchvision = { channel = "pytorch" }
+tensorflow_probability = { name = "tensorflow-probability" }
+torch = { name = "pytorch" }
 xxhash = { name = "python-xxhash" }
 
 [tool.pyright]
