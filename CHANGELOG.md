@@ -1,6 +1,17 @@
-[//]: # (552668a00f67c648298636a8e0ffac9699ed1454)
+[//]: # (97849b0120adbe017daed4c151bebb5af655bf78)
 
 # DataEval Change Log
+
+## v0.71.1
+
+🛠️ **Improvements and Enhancements**
+- `97849b01` - Update support for tensorflow >=2.16 with explicit keras v2
+
+📝 **Miscellaneous**
+- `85bafa30` - Swap brightness and darkness
+- `96a30ad0` - Make optional checks more granular
+- `55ca81d6` - Use native int for dict keys for Outliers
+- `639e140b` - silence warnings for docs and doctest
 
 ## v0.71.0
 
