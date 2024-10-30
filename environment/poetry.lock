@@ -5726,4 +5726,4 @@ torch = ["matplotlib", "nvidia-cudnn-cu11", "torch", "torchvision"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.12"
-content-hash = "76c62188a16efae23a5b6ac599bd6a6b7938021d7d702f4cc2de870c853761c3"
+content-hash = "2a9519eff73f9e8c8a064f185a6370214210adfbc77208cd87cb4b2ebdddc2e4"
