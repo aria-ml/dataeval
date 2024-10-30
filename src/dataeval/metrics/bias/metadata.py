@@ -12,8 +12,8 @@ from dataeval.interop import to_numpy
 
 
 def get_counts(
-    data: NDArray[np.int_], names: list[str], is_categorical: list[bool], subset_mask: NDArray[np.bool_] | None = None
-) -> tuple[dict[str, NDArray[np.int_]], dict[str, NDArray[np.int_]]]:
+    data: NDArray, names: list[str], continuous_factor_bincounts, subset_mask: NDArray[np.bool_] | None = None
+) -> tuple[dict, dict]:
     """
     Initialize dictionary of histogram counts --- treat categorical values
     as histogram bins.
@@ -34,17 +34,25 @@ def get_counts(
 
     hist_counts, hist_bins = {}, {}
     # np.where needed to satisfy linter
+    # TODO: The commented line results in discretization according to nonglobal standards,
+    # need to figure out an elegant solution to this problem
     mask = np.where(subset_mask if subset_mask is not None else np.ones(data.shape[0], dtype=bool))
+    # mask = np.where(np.ones(data.shape[0], dtype=bool))
 
     for cdx, fn in enumerate(names):
         # linter doesn't like double indexing
         col_data = data[mask, cdx].squeeze()
-        if is_categorical[cdx]:
+        if continuous_factor_bincounts and fn in continuous_factor_bincounts:
+            # bins = hist_bins.get(fn, "auto")
+            bins = continuous_factor_bincounts[fn]
+            cnts, bins = np.histogram(data[:, cdx].squeeze(), bins=bins, density=True)
+            bins[-1] = np.inf
+            bins[0] = -np.inf
+            disc_col_data = np.digitize(col_data, bins)
+            bins, cnts = np.unique(disc_col_data, return_counts=True)
+        else:
             # if discrete, use unique values as bins
             bins, cnts = np.unique(col_data, return_counts=True)
-        else:
-            bins = hist_bins.get(fn, "auto")
-            cnts, bins = np.histogram(col_data, bins=bins, density=True)
 
         hist_counts[fn] = cnts
         hist_bins[fn] = bins
@@ -53,15 +61,15 @@ def get_counts(
 
 
 def entropy(
-    data: NDArray[Any],
+    data: NDArray,
     names: list[str],
-    is_categorical: list[bool],
+    continuous_factor_bincounts,
     normalized: bool = False,
     subset_mask: NDArray[np.bool_] | None = None,
 ) -> NDArray[np.float64]:
     """
-    Meant for use with :term:`bias<Bias>` metrics, :term:`balance<Balance>`, :term:`diversity<Diversity>`,
-    ClasswiseBalance, and Classwise Diversity.
+    Meant for use with Bias metrics, Balance, Diversity, ClasswiseBalance,
+    and Classwise Diversity.
 
     Compute entropy for discrete/categorical variables and for continuous variables through standard
     histogram binning.
@@ -73,8 +81,8 @@ def entropy(
     subset_mask: NDArray[np.bool_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
-    Note
-    ----
+    Notes
+    -----
     For continuous variables, histogram bins are chosen automatically.  See
     numpy.histogram for details.
 
@@ -90,7 +98,7 @@ def entropy(
     """
 
     num_factors = len(names)
-    hist_counts, _ = get_counts(data, names, is_categorical, subset_mask)
+    hist_counts, _ = get_counts(data, names, continuous_factor_bincounts, subset_mask)
 
     ev_index = np.empty(num_factors)
     for col, cnts in enumerate(hist_counts.values()):
@@ -106,11 +114,11 @@ def entropy(
 
 
 def get_num_bins(
-    data: NDArray[Any], names: list[str], is_categorical: list[bool], subset_mask: NDArray[np.bool_] | None = None
+    data: NDArray, names: list[str], continuous_factor_bincounts, subset_mask: NDArray[np.bool_] | None = None
 ) -> NDArray[np.float64]:
     """
     Number of bins or unique values for each metadata factor, used to
-    normalize entropy/:term:`diversity<Diversity>`.
+    normalize entropy/diversity.
 
     Parameters
     ----------
@@ -122,7 +130,7 @@ def get_num_bins(
     NDArray[np.float64]
     """
     # likely cached
-    hist_counts, _ = get_counts(data, names, is_categorical, subset_mask)
+    hist_counts, _ = get_counts(data, names, continuous_factor_bincounts, subset_mask)
     num_bins = np.empty(len(hist_counts))
     for idx, cnts in enumerate(hist_counts.values()):
         num_bins[idx] = len(cnts)
@@ -130,24 +138,24 @@ def get_num_bins(
     return num_bins
 
 
-def infer_categorical(arr: NDArray[Any], threshold: float = 0.2) -> NDArray[Any]:
+def infer_categorical(X: NDArray, threshold: float = 0.2) -> NDArray:
     """
     Compute fraction of feature values that are unique --- intended to be used
     for inferring whether variables are categorical.
     """
-    if arr.ndim == 1:
-        arr = np.expand_dims(arr, axis=1)
-    num_samples = arr.shape[0]
-    pct_unique = np.empty(arr.shape[1])
-    for col in range(arr.shape[1]):  # type: ignore
-        uvals = np.unique(arr[:, col], axis=0)
+    if X.ndim == 1:
+        X = np.expand_dims(X, axis=1)
+    num_samples = X.shape[0]
+    pct_unique = np.empty(X.shape[1])
+    for col in range(X.shape[1]):  # type: ignore
+        uvals = np.unique(X[:, col], axis=0)
         pct_unique[col] = len(uvals) / num_samples
     return pct_unique < threshold
 
 
 def preprocess_metadata(
     class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], cat_thresh: float = 0.2
-) -> tuple[NDArray[Any], list[str], list[bool]]:
+) -> tuple[NDArray, list[str], list[bool]]:
     # convert class_labels and dict of lists to matrix of metadata values
     preprocessed_metadata = {"class_label": np.asarray(class_labels, dtype=int)}
 

@@ -143,5 +143,6 @@ class TestBalanceFunctional:
         assert np.all(output.factors > 0.999)
 
     def test_zero_balance(self, homog_class_labels, inhomog_metadata):
-        output = balance(homog_class_labels, inhomog_metadata)
+        continuous_factor_bincounts = {"factor1": 5, "factor2": 5, "factor3": 5}
+        output = balance(homog_class_labels, inhomog_metadata, continuous_factor_bincounts=continuous_factor_bincounts)
         assert np.all(np.isclose(output.balance, 0))

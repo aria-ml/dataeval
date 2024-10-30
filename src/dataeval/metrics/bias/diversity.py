@@ -67,7 +67,7 @@ class DiversityOutput(OutputMetadata):
 def diversity_shannon(
     data: NDArray[Any],
     names: list[str],
-    is_categorical: list[bool],
+    continuous_factor_bincounts,
     subset_mask: NDArray[np.bool_] | None = None,
 ) -> NDArray[np.float64]:
     """
@@ -106,9 +106,11 @@ def diversity_shannon(
     """
 
     # entropy computed using global auto bins so that we can properly normalize
-    ent_unnormalized = entropy(data, names, is_categorical, normalized=False, subset_mask=subset_mask)
+    ent_unnormalized = entropy(data, names, continuous_factor_bincounts, normalized=False, subset_mask=subset_mask)
     # normalize by global counts rather than classwise counts
-    num_bins = get_num_bins(data, names, is_categorical=is_categorical, subset_mask=subset_mask)
+    num_bins = get_num_bins(
+        data, names, continuous_factor_bincounts=continuous_factor_bincounts, subset_mask=subset_mask
+    )
     ent_norm = np.empty(ent_unnormalized.shape)
     ent_norm[num_bins != 1] = ent_unnormalized[num_bins != 1] / np.log(num_bins[num_bins != 1])
     ent_norm[num_bins == 1] = 0
@@ -118,7 +120,8 @@ def diversity_shannon(
 def diversity_simpson(
     data: NDArray[Any],
     names: list[str],
-    is_categorical: list[bool],
+    # is_categorical: list[bool],
+    continuous_factor_bincounts: Mapping[str, int] | None = None,
     subset_mask: NDArray[np.bool_] | None = None,
 ) -> NDArray[np.float64]:
     """
@@ -158,9 +161,9 @@ def diversity_simpson(
     numpy.histogram
     """
 
-    hist_counts, _ = get_counts(data, names, is_categorical, subset_mask)
+    hist_counts, _ = get_counts(data, names, continuous_factor_bincounts, subset_mask)
     # normalize by global counts, not classwise counts
-    num_bins = get_num_bins(data, names, is_categorical)
+    num_bins = get_num_bins(data, names, continuous_factor_bincounts)
 
     ev_index = np.empty(len(names))
     # loop over columns for convenience
@@ -178,7 +181,10 @@ def diversity_simpson(
 
 @set_metadata()
 def diversity(
-    class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], method: Literal["shannon", "simpson"] = "simpson"
+    class_labels: ArrayLike,
+    metadata: Mapping[str, ArrayLike],
+    continuous_factor_bincounts: Mapping[str, int] | None = None,
+    method: Literal["shannon", "simpson"] = "simpson",
 ) -> DiversityOutput:
     """
     Compute :term:`diversity<Diversity>` and classwise diversity for discrete/categorical variables and,
@@ -249,7 +255,7 @@ def diversity(
     diversity[:] = np.nan
     for idx, cls in enumerate(u_classes):
         subset_mask = class_lbl == cls
-        diversity[idx, :] = diversity_fn(data, names, is_categorical, subset_mask)
+        diversity[idx, :] = diversity_fn(data, names, continuous_factor_bincounts, subset_mask)
     div_no_class = np.concatenate((diversity[:, :class_idx], diversity[:, (class_idx + 1) :]), axis=1)
 
     return DiversityOutput(diversity_index, div_no_class, class_lbl, list(metadata.keys()), method)

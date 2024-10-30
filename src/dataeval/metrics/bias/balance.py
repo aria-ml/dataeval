@@ -116,7 +116,9 @@ def validate_num_neighbors(num_neighbors: int) -> int:
 
 
 @set_metadata("dataeval.metrics")
-def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neighbors: int = 5) -> BalanceOutput:
+def balance(
+    class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neighbors: int = 5, continuous_factor_bincounts={}
+) -> BalanceOutput:
     """
     Mutual information (MI) between factors (class label, metadata, label/image properties)
 
@@ -172,7 +174,8 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
     sklearn.metrics.mutual_info_score
     """
     num_neighbors = validate_num_neighbors(num_neighbors)
-    data, names, is_categorical = preprocess_metadata(class_labels, metadata)
+    data, names, _ = preprocess_metadata(class_labels, metadata)
+    is_categorical = [factor_name not in continuous_factor_bincounts for factor_name in names]
     num_factors = len(names)
     mi = np.empty((num_factors, num_factors))
     mi[:] = np.nan
@@ -183,7 +186,7 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
     for idx in range(num_factors):
         tgt = data[:, idx].astype(int)
 
-        if is_categorical[idx]:
+        if names[idx] not in continuous_factor_bincounts:
             mi[idx, :] = mutual_info_classif(
                 data,
                 tgt,
@@ -222,7 +225,7 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
 
     tgt_bin = np.stack([class_data == cls for cls in u_cls]).T.astype(int)
     ent_tgt_bin = entropy(
-        tgt_bin, names=[str(idx) for idx in range(num_classes)], is_categorical=[True for idx in range(num_classes)]
+        tgt_bin, names=[str(idx) for idx in range(num_classes)], continuous_factor_bincounts=continuous_factor_bincounts
     )
 
     # classification MI for discrete/categorical features

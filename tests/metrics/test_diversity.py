@@ -64,8 +64,19 @@ class TestDiversityFunctional:
     def test_simple_input_simpson(self):
         metadata = {"factor1": [5, 5, 6, 6]}
         class_labels = [0, 0, 1, 1]
-        result = diversity(class_labels, metadata, method="simpson")
-        expected_index = np.array([0.5, 0.5])
+        continuous_factor_bincounts = {}
+        result = diversity(class_labels, metadata, continuous_factor_bincounts, method="simpson")
+        expected_index = np.array([1, 1])
+        expected_classwise = np.array([[0], [0]])
+        np.testing.assert_array_almost_equal(result.diversity_index, expected_index)
+        np.testing.assert_array_almost_equal(result.classwise, expected_classwise)
+
+    def test_binned_input_simpson(self):
+        metadata = {"factor1": [5.1, 4.9, 6.1, 6.2]}
+        class_labels = [0, 0, 1, 1]
+        continuous_factor_bincounts = {"factor1": 2}
+        result = diversity(class_labels, metadata, continuous_factor_bincounts, method="simpson")
+        expected_index = np.array([1, 1])
         expected_classwise = np.array([[0], [0]])
         np.testing.assert_array_almost_equal(result.diversity_index, expected_index)
         np.testing.assert_array_almost_equal(result.classwise, expected_classwise)
@@ -73,8 +84,9 @@ class TestDiversityFunctional:
     def test_homog_md_input_simpson(self):
         metadata = {"factor1": [5, 5, 5, 5]}
         class_labels = [0, 0, 1, 1]
-        result = diversity(class_labels, metadata, method="simpson")
-        expected_index = np.array([0.5, 0])
+        continuous_factor_bincounts = {}
+        result = diversity(class_labels, metadata, continuous_factor_bincounts, method="simpson")
+        expected_index = np.array([1, 0])
         expected_classwise = np.array([[0], [0]])
         np.testing.assert_array_almost_equal(result.diversity_index, expected_index)
         np.testing.assert_array_almost_equal(result.classwise, expected_classwise)
@@ -82,26 +94,29 @@ class TestDiversityFunctional:
     def test_homog_cls_input_simpson(self):
         metadata = {"factor1": [5, 5, 6, 6]}
         class_labels = [0, 0, 0, 0]
-        result = diversity(class_labels, metadata, method="simpson")
-        expected_index = np.array([0, 0.5])
-        expected_classwise = np.array([[0.5]])
+        continuous_factor_bincounts = {}
+        result = diversity(class_labels, metadata, continuous_factor_bincounts, method="simpson")
+        expected_index = np.array([0, 1])
+        expected_classwise = np.array([[1]])
         np.testing.assert_array_almost_equal(result.diversity_index, expected_index)
         np.testing.assert_array_almost_equal(result.classwise, expected_classwise)
 
     def test_diverse_input_simpson(self):
         metadata = {"factor1": [5, 6, 5, 6, 5, 6], "factor2": [0, 0, 5, 0, 5, 5]}
-        labels = [1, 1, 1, 2, 2, 2]
-        result = diversity(labels, metadata, method="simpson")
-        expected_index = np.array([1 / 3, 1 / 3, 1 / 3])
-        expected_classwise = np.array([[4 / 15, 4 / 15], [4 / 15, 4 / 15]])
+        class_labels = [1, 1, 1, 2, 2, 2]
+        continuous_factor_bincounts = {}
+        result = diversity(class_labels, metadata, continuous_factor_bincounts, method="simpson")
+        expected_index = np.array([1, 1, 1])
+        expected_classwise = np.array([[0.8, 0.8], [0.8, 0.8]])
         np.testing.assert_array_almost_equal(result.diversity_index, expected_index)
         np.testing.assert_array_almost_equal(result.classwise, expected_classwise)
 
     def test_simple_input_shannon(self):
         metadata = {"factor1": [5, 5, 5, 6, 6, 6]}
         class_labels = [0, 0, 0, 1, 1, 1]
-        result = diversity(class_labels, metadata, method="shannon")
-        expected_index = np.array([0.5, 0.5])
+        continuous_factor_bincounts = {}
+        result = diversity(class_labels, metadata, continuous_factor_bincounts, method="shannon")
+        expected_index = np.array([1, 1])
         expected_classwise = np.array([[0], [0]])
         np.testing.assert_array_almost_equal(result.diversity_index, expected_index)
         np.testing.assert_array_almost_equal(result.classwise, expected_classwise)
@@ -109,8 +124,9 @@ class TestDiversityFunctional:
     def test_homog_md_input_shannon(self):
         metadata = {"factor1": [5, 5, 5, 5, 5, 5]}
         class_labels = [0, 0, 0, 1, 1, 1]
-        result = diversity(class_labels, metadata, method="shannon")
-        expected_index = np.array([0.5, 0])
+        continuous_factor_bincounts = {}
+        result = diversity(class_labels, metadata, continuous_factor_bincounts, method="shannon")
+        expected_index = np.array([1, 0])
         expected_classwise = np.array([[0], [0]])
         np.testing.assert_array_almost_equal(result.diversity_index, expected_index)
         np.testing.assert_array_almost_equal(result.classwise, expected_classwise)
@@ -118,17 +134,19 @@ class TestDiversityFunctional:
     def test_homog_cls_input_shannon(self):
         metadata = {"factor1": [5, 5, 5, 6, 6, 6]}
         class_labels = [0, 0, 0, 0, 0, 0]
-        result = diversity(class_labels, metadata, method="shannon")
-        expected_index = np.array([0, 0.5])
-        expected_classwise = np.array([[0.5]])
+        continuous_factor_bincounts = {}
+        result = diversity(class_labels, metadata, continuous_factor_bincounts, method="shannon")
+        expected_index = np.array([0, 1])
+        expected_classwise = np.array([[1]])
         np.testing.assert_array_almost_equal(result.diversity_index, expected_index)
         np.testing.assert_array_almost_equal(result.classwise, expected_classwise)
 
     def test_diverse_input_shannon(self):
         metadata = {"factor1": [5, 6, 5, 6, 5, 6], "factor2": [0, 0, 5, 0, 5, 5]}
-        labels = [1, 1, 1, 2, 2, 2]
-        result = diversity(labels, metadata, method="shannon")
-        expected_index = np.array([0.5, 0.5, 0.5])
-        expected_classwise = np.array([[0.5, 0.5], [0.5, 0.5]])
+        class_labels = [1, 1, 1, 2, 2, 2]
+        continuous_factor_bincounts = {}
+        result = diversity(class_labels, metadata, continuous_factor_bincounts, method="shannon")
+        expected_index = np.array([1, 1, 1])
+        expected_classwise = np.array([[0.8, 0.8], [0.8, 0.8]])
         np.testing.assert_array_almost_equal(result.diversity_index, expected_index)
         np.testing.assert_array_less(expected_classwise, result.classwise)
