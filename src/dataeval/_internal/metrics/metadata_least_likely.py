@@ -35,14 +35,13 @@ def get_least_likely_features(
         Imagine we have 3 data examples, and that the corresponding metadata contains 2 features called time and
         altitude, as shown below.
 
-    >>> from metadata_tools import get_least_likely_features
+    from dataeval._internal.metrics.metadata_least_likely import get_least_likely_features
     >>> import numpy
-    >>> rng = numpy.random.default_rng(123)
     >>> metadata = {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112]}
-    >>> newmetadata = {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, 211101]}
-    >>> is_ood = rng.choice(a=[False, True], size=len(metadata["time"]))
+    >>> newmetadata = {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -211101]}
+    >>> is_ood = numpy.array([True, True, True])
     >>> get_least_likely_features(metadata, newmetadata, is_ood)
-    array(['time', 'time'], dtype='<U4')
+    array(['time', 'time', 'altitude'], dtype=object)
     """
     # largest standardized absolute deviation from the median observed so far for each example
     deviation = np.zeros_like(is_ood, dtype=np.float32)
@@ -64,10 +63,10 @@ def get_least_likely_features(
         dxp = dxp if dxp > 0 else 1.0  # avoids dividing by zero below
         dxn = dxn if dxn > 0 else 1.0
 
-        xdev = x - x0
+        xdev = (x - x0).astype(np.float64)  # floating-point needed for division below to avoid getting zero.
         pos = xdev >= 0
 
-        X = np.zeros_like(x)
+        X = np.zeros_like(xdev)
         X[pos], X[~pos] = xdev[pos] / dxp, xdev[~pos] / dxn  # keeping track of possible asymmetry of x
         # Below here, only need to think about absolute deviation.
         abig = np.abs(X) > deviation
