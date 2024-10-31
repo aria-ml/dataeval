@@ -31,6 +31,7 @@ classifiers = [
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering",
 ]
 
@@ -40,7 +41,7 @@ packages = [
 
 [tool.poetry.dependencies]
 # required
-python = ">=3.9,<3.12"
+python = ">=3.9,<3.13"
 hdbscan = {version = ">=0.8.36"}
 numpy = {version = ">1.24.3"}
 pillow = {version = ">=10.3.0"}
@@ -51,7 +52,6 @@ xxhash = {version = ">=3.3"}
 
 # optional
 matplotlib = {version = "*", optional = true}
-nvidia-cudnn-cu11 = {version = ">=8.6.0.163", optional = true}
 tensorflow = {version = ">=2.16", optional = true}
 tensorflow_probability = {version = ">=0.24", optional = true}
 tf-keras = {version = ">=2.16", optional = true}
@@ -59,9 +59,9 @@ torch = {version = ">=2.2.0", source = "pytorch", optional = true}
 torchvision = {version = ">=0.17.0", source = "pytorch", optional = true}
 
 [tool.poetry.extras]
-tensorflow = ["tensorflow", "tensorflow_probability", "tf-keras", "nvidia-cudnn-cu11"]
-torch = ["torch", "torchvision", "matplotlib", "nvidia-cudnn-cu11"]
-all = ["matplotlib", "nvidia-cudnn-cu11", "tensorflow", "tensorflow_probability", "tf-keras", "torch", "torchvision"]
+tensorflow = ["tensorflow", "tensorflow_probability", "tf-keras"]
+torch = ["torch", "torchvision", "matplotlib"]
+all = ["matplotlib", "tensorflow", "tensorflow_probability", "tf-keras", "torch", "torchvision"]
 
 [tool.poetry.group.dev]
 optional = true
@@ -103,7 +103,7 @@ Sphinx = {version = ">=7.2.6"}
 
 [[tool.poetry.source]]
 name = "pytorch"
-url = "https://download.pytorch.org/whl/cu118"
+url = "https://download.pytorch.org/whl/cu124"
 priority = "explicit"
 
 [tool.poetry-dynamic-versioning]

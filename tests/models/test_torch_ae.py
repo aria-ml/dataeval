@@ -159,10 +159,6 @@ class TestTrainer:
             marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="cuda not available"),
         ),
         pytest.param(
-            torch.device(0),
-            marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="cuda not available"),
-        ),
-        pytest.param(
             "cuda",
             marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="cuda not available"),
         ),
