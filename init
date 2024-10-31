@@ -3,7 +3,7 @@
 # Check for uv
 if ! $(which uv 1> /dev/null); then echo "Install uv to continue: https://docs.astral.sh/uv/"; exit 1; fi
 
-allowed=(3.9 3.10 3.11)
+allowed=(3.9 3.10 3.11 3.12)
 default=(3.11)
 
 # Use arguments or prompt for python versions
