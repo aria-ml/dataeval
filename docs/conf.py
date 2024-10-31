@@ -5,6 +5,8 @@
 
 from os import getenv
 
+import numpy as np
+
 # -----------------------------------------------------------------------------
 # Project configuration
 # -----------------------------------------------------------------------------
@@ -93,6 +95,19 @@ html_theme_options = {
     "navigation_depth": 2,
     "logo": {"text": "DataEval"},
 }
+
+# Set numpy print option to legacy 1.25 so native numpy types
+# are not printed with dtype information.
+
+# WITHOUT LEGACY=1.25
+# >>> np.int32(16)
+# np.int32(16)
+
+# WITH LEGACY=1.25
+# >>> np.int32(16)
+# 16
+
+np.set_printoptions(legacy="1.25")
 
 
 # because we expose private modules in public namespaces

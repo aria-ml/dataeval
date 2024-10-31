@@ -1,6 +1,6 @@
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  PYTHON_LATEST_SUPPORTED_VERSION: "3.11"
+  PYTHON_LATEST_SUPPORTED_VERSION: "3.12"
   DOCKER_DRIVER: overlay2
   PIP_ROOT_USER_ACTION: ignore
   PIP_DISABLE_PIP_VERSION_CHECK: 1
@@ -95,7 +95,7 @@ stages:
 .python_version_matrix:
   parallel:
     matrix:
-      - PYTHON_VERSION: ["3.9", "3.10", "3.11"]
+      - PYTHON_VERSION: ["3.9", "3.10", "3.11", "3.12"]
 
 ### DOCKER TEMPLATES ###
 
