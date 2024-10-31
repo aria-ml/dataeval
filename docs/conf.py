@@ -107,7 +107,8 @@ html_theme_options = {
 # >>> np.int32(16)
 # 16
 
-np.set_printoptions(legacy="1.25")
+# Commenting out until numpy 2.0
+# np.set_printoptions(legacy="1.25")
 
 
 # because we expose private modules in public namespaces
