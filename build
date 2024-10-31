@@ -14,10 +14,10 @@ Options:
       --push        push all built images to repository
 
 Default:
-  run unit tests and type check for 3.9-3.11 as well as lint and docs
+  run unit tests and type check for 3.9-3.12 as well as lint and docs
 
 Python Versions:
-  3.9-3.11 are supported
+  3.9-3.12 are supported
 
 Tasks:
   unit    run unit tests
@@ -55,7 +55,7 @@ if [[ -f .settings ]]; then
 fi
 
 # declare lookup maps
-declare -A PYTHON_VERSIONS=([3.9]=1 [3.10]=1 [3.11]=1)
+declare -A PYTHON_VERSIONS=([3.9]=1 [3.10]=1 [3.11]=1 [3.12]=1)
 declare -A TEST_TASKS=([unit]=1 [type]=1 [lint]=1 [deps]=1)
 declare -A DOCS_TASKS=([docs]=1 [qdocs]=1 [doctest]=1)
 
