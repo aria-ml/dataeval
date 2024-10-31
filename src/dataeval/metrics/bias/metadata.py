@@ -12,8 +12,12 @@ from dataeval.interop import to_numpy
 
 
 def get_counts(
-    data: NDArray, names: list[str], continuous_factor_bincounts, subset_mask: NDArray[np.bool_] | None = None
-) -> tuple[dict, dict]:
+    data: NDArray,
+    names: list[str],
+    continuous_factor_bincounts,
+    subset_mask: NDArray[np.bool_] | None = None,
+    cached_hist=None,
+) -> tuple[dict, dict, dict]:
     """
     Initialize dictionary of histogram counts --- treat categorical values
     as histogram bins.
@@ -45,19 +49,27 @@ def get_counts(
         if continuous_factor_bincounts and fn in continuous_factor_bincounts:
             # bins = hist_bins.get(fn, "auto")
             bins = continuous_factor_bincounts[fn]
-            cnts, bins = np.histogram(data[:, cdx].squeeze(), bins=bins, density=True)
+            if cached_hist:
+                cnts, bins = cached_hist["cnts"], cached_hist["bins"]
+            else:
+                cnts, bins = np.histogram(data[:, cdx].squeeze(), bins=bins, density=True)
+                cached_hist = {"cnts": cnts, "bins": bins}
             bins[-1] = np.inf
             bins[0] = -np.inf
             disc_col_data = np.digitize(col_data, bins)
             bins, cnts = np.unique(disc_col_data, return_counts=True)
         else:
             # if discrete, use unique values as bins
-            bins, cnts = np.unique(col_data, return_counts=True)
+            if cached_hist:
+                cnts, bins = cached_hist["cnts"], cached_hist["bins"]
+            else:
+                bins, cnts = np.unique(col_data, return_counts=True)
+                cached_hist = {"cnts": cnts, "bins": bins}
 
         hist_counts[fn] = cnts
         hist_bins[fn] = bins
 
-    return hist_counts, hist_bins
+    return hist_counts, hist_bins, cached_hist
 
 
 def entropy(
@@ -66,7 +78,8 @@ def entropy(
     continuous_factor_bincounts,
     normalized: bool = False,
     subset_mask: NDArray[np.bool_] | None = None,
-) -> NDArray[np.float64]:
+    cached_hist=None,
+) -> tuple[NDArray[np.float64], dict]:
     """
     Meant for use with Bias metrics, Balance, Diversity, ClasswiseBalance,
     and Classwise Diversity.
@@ -98,7 +111,7 @@ def entropy(
     """
 
     num_factors = len(names)
-    hist_counts, _ = get_counts(data, names, continuous_factor_bincounts, subset_mask)
+    hist_counts, _, cached_hist = get_counts(data, names, continuous_factor_bincounts, subset_mask, cached_hist)
 
     ev_index = np.empty(num_factors)
     for col, cnts in enumerate(hist_counts.values()):
@@ -110,12 +123,16 @@ def entropy(
                 ev_index[col] = 0
             else:
                 ev_index[col] /= np.log(len(cnts))
-    return ev_index
+    return ev_index, cached_hist
 
 
 def get_num_bins(
-    data: NDArray, names: list[str], continuous_factor_bincounts, subset_mask: NDArray[np.bool_] | None = None
-) -> NDArray[np.float64]:
+    data: NDArray,
+    names: list[str],
+    continuous_factor_bincounts,
+    subset_mask: NDArray[np.bool_] | None = None,
+    cached_hist=None,
+) -> tuple[NDArray[np.float64], dict]:
     """
     Number of bins or unique values for each metadata factor, used to
     normalize entropy/diversity.
@@ -130,12 +147,12 @@ def get_num_bins(
     NDArray[np.float64]
     """
     # likely cached
-    hist_counts, _ = get_counts(data, names, continuous_factor_bincounts, subset_mask)
+    hist_counts, _, cached_hist = get_counts(data, names, continuous_factor_bincounts, subset_mask, cached_hist)
     num_bins = np.empty(len(hist_counts))
     for idx, cnts in enumerate(hist_counts.values()):
         num_bins[idx] = len(cnts)
 
-    return num_bins
+    return num_bins, cached_hist
 
 
 def infer_categorical(X: NDArray, threshold: float = 0.2) -> NDArray:

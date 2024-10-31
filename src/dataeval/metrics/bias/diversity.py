@@ -69,7 +69,8 @@ def diversity_shannon(
     names: list[str],
     continuous_factor_bincounts,
     subset_mask: NDArray[np.bool_] | None = None,
-) -> NDArray[np.float64]:
+    cached_hist=None,
+) -> tuple(NDArray, tuple(NDArray, NDArray)):
     """
     Compute :term:`diversity<Diversity>` for discrete/categorical variables and, through standard
     histogram binning, for continuous variables.
@@ -106,15 +107,21 @@ def diversity_shannon(
     """
 
     # entropy computed using global auto bins so that we can properly normalize
-    ent_unnormalized = entropy(data, names, continuous_factor_bincounts, normalized=False, subset_mask=subset_mask)
+    ent_unnormalized, cached_hist = entropy(
+        data, names, continuous_factor_bincounts, normalized=False, subset_mask=subset_mask
+    )
     # normalize by global counts rather than classwise counts
-    num_bins = get_num_bins(
-        data, names, continuous_factor_bincounts=continuous_factor_bincounts, subset_mask=subset_mask
+    num_bins, _ = get_num_bins(
+        data,
+        names,
+        continuous_factor_bincounts=continuous_factor_bincounts,
+        subset_mask=subset_mask,
+        cached_hist=cached_hist,
     )
     ent_norm = np.empty(ent_unnormalized.shape)
     ent_norm[num_bins != 1] = ent_unnormalized[num_bins != 1] / np.log(num_bins[num_bins != 1])
     ent_norm[num_bins == 1] = 0
-    return ent_norm
+    return ent_norm, cached_hist
 
 
 def diversity_simpson(
@@ -123,7 +130,8 @@ def diversity_simpson(
     # is_categorical: list[bool],
     continuous_factor_bincounts: Mapping[str, int] | None = None,
     subset_mask: NDArray[np.bool_] | None = None,
-) -> NDArray[np.float64]:
+    cached_hist=None,
+) -> tuple[NDArray, dict]:
     """
     Compute :term:`diversity<Diversity>` for discrete/categorical variables and, through standard
     histogram binning, for continuous variables.
@@ -161,9 +169,9 @@ def diversity_simpson(
     numpy.histogram
     """
 
-    hist_counts, _ = get_counts(data, names, continuous_factor_bincounts, subset_mask)
+    hist_counts, _, cached_hist = get_counts(data, names, continuous_factor_bincounts, subset_mask)
     # normalize by global counts, not classwise counts
-    num_bins = get_num_bins(data, names, continuous_factor_bincounts)
+    num_bins, _ = get_num_bins(data, names, continuous_factor_bincounts, cached_hist=cached_hist)
 
     ev_index = np.empty(len(names))
     # loop over columns for convenience
@@ -176,7 +184,7 @@ def diversity_simpson(
             ev_index[col] = 0
         else:
             ev_index[col] = (s_0 * num_bins[col] - 1) / (num_bins[col] - 1)
-    return ev_index
+    return ev_index, cached_hist
 
 
 @set_metadata()
@@ -243,8 +251,8 @@ def diversity(
     numpy.histogram
     """
     diversity_fn = get_method({"simpson": diversity_simpson, "shannon": diversity_shannon}, method)
-    data, names, is_categorical = preprocess_metadata(class_labels, metadata)
-    diversity_index = diversity_fn(data, names, is_categorical, None).astype(np.float64)
+    data, names, _ = preprocess_metadata(class_labels, metadata)
+    diversity_index, cached_hist = diversity_fn(data, names, continuous_factor_bincounts, None).astype(np.float64)
 
     class_idx = names.index("class_label")
     class_lbl = np.array(data[:, class_idx], dtype=int)
@@ -255,7 +263,7 @@ def diversity(
     diversity[:] = np.nan
     for idx, cls in enumerate(u_classes):
         subset_mask = class_lbl == cls
-        diversity[idx, :] = diversity_fn(data, names, continuous_factor_bincounts, subset_mask)
+        diversity[idx, :], _ = diversity_fn(data, names, continuous_factor_bincounts, subset_mask, cached_hist)
     div_no_class = np.concatenate((diversity[:, :class_idx], diversity[:, (class_idx + 1) :]), axis=1)
 
     return DiversityOutput(diversity_index, div_no_class, class_lbl, list(metadata.keys()), method)
