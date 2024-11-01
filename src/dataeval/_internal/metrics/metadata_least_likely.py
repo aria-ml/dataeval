@@ -50,24 +50,21 @@ def get_least_likely_features(
     # Raise errors for bad inputs...
     if any(md_lengths < 3):
         raise ValueError(
-            "We need at least 3 reference metadata examples "
-            + "to determine which features are least likely, but only got "
-            + str(min(md_lengths))
+            "We need at least 3 reference metadata examples to determine which"
+            f"features are least likely, but only got {min(md_lengths)}"
         )
 
     if not all(md_lengths == md_lengths[0]) or not all(newmd_lengths == newmd_lengths[0]):
-        raise ValueError("All features must have same length, got lengths " + str(md_lengths) + str(newmd_lengths))
+        raise ValueError(f"All features must have same length, got lengths {md_lengths}, {newmd_lengths}")
 
     if newmd_lengths[0] != len(is_ood):
         raise ValueError(
-            "is_ood flag must have same length as new metadata"
-            + str(newmd_lengths)
-            + "but has length"
-            + str(len(is_ood))
+            f"is_ood flag must have same length as new metadata {newmd_lengths[0]} but has length {len(is_ood)}."
         )
 
-    if np.sum(is_ood) == 0:
+    if not any(is_ood):
         return []
+
     # ...inputs are good, look for most deviant standardized features.
 
     # largest standardized absolute deviation from the median observed so far for each example
