@@ -10,31 +10,31 @@ def get_least_likely_features(
 ) -> list[tuple[str, float]]:
     """Computes which metadata feature is most out-of-distribution (OOD) relative to a reference metadata set.
 
-        Given a reference metadata dictionary `metadata` (where each key maps to one scalar metadata feature), a second
-        metadata dictionary, and a corresponding boolean flag `is_ood` indicating whether each example falls
-        out-of-distribution (OOD) relative to the reference, this function finds which metadata feature is the most OOD,
-        for each OOD example.
+    Given a reference metadata dictionary `metadata` (where each key maps to one scalar metadata feature), a second
+    metadata dictionary, and a corresponding boolean flag `is_ood` indicating whether each example falls
+    out-of-distribution (OOD) relative to the reference, this function finds which metadata feature is the most OOD,
+    for each OOD example.
 
-        Parameters
-        ----------
-        metadata:
-            A reference set of arrays of values, indexed by metadata feature names, with one value per data example per
-            feature.
-        corrmetadata:
-            A second metedata set, to be tested against the reference metadata. It is ok if the two meta data objects
-            hold different numbers of examples.
-        is_ood:
-            A boolean array, with one value per corrmetadata example, that indicates which examples are OOD.
+    Parameters
+    ----------
+    metadata: dict[str, NDArray]
+        A reference set of arrays of values, indexed by metadata feature names, with one value per data example per
+        feature.
+    corrmetadata: dict[str, Union[list, NDArray]]
+        A second metedata set, to be tested against the reference metadata. It is ok if the two meta data objects
+        hold different numbers of examples.
+    is_ood: NDArray[np.bool_]
+        A boolean array, with one value per corrmetadata example, that indicates which examples are OOD.
 
-        Returns
-        -------
-        NDArray[str]
-            An array of names of the features of each OOD corrmetadata example that were the most OOD.
+    Returns
+    -------
+    list[tuple[str, float]]
+        An array of names of the features of each OOD corrmetadata example that were the most OOD.
 
-        Examples
-        --------
-        Imagine we have 3 data examples, and that the corresponding metadata contains 2 features called time and
-        altitude, as shown below.
+    Examples
+    --------
+    Imagine we have 3 data examples, and that the corresponding metadata contains 2 features called time and
+    altitude, as shown below.
 
     from dataeval._internal.metrics.metadata_least_likely import get_least_likely_features
     >>> import numpy
@@ -47,30 +47,33 @@ def get_least_likely_features(
     md_lengths = np.asarray([len(np.atleast_1d(np.asarray(v))) for v in metadata.values()])
     newmd_lengths = np.asarray([len(np.atleast_1d(np.asarray(v))) for v in newmetadata.values()])
 
-    # Early returns for bad inputs...
+    # Raise errors for bad inputs...
     if any(md_lengths < 3):
-        return [("not enough reference metadata", np.nan)]
+        raise ValueError("Not enough reference metadata")
+        # return [("not enough reference metadata", np.nan)]
 
     if not all(md_lengths == md_lengths[0]) or not all(newmd_lengths == newmd_lengths[0]):
-        return [("all features must have same length", np.nan)]
+        raise ValueError("All features must have same length")
 
     if newmd_lengths[0] != len(is_ood):
-        return [("is_ood flag must have same length as metadata.", np.nan)]
+        raise ValueError("is_ood flag must have same length as metadata.")
 
     if np.sum(is_ood) == 0:
-        return [("all examples are in-distribution", np.nan)]
+        raise ValueError("All examples are in-distribution")
     # ...inputs are good, look for most deviant standardized features.
 
     # largest standardized absolute deviation from the median observed so far for each example
     deviation = np.zeros_like(is_ood, dtype=np.float32)
 
-    # name of feature that corresponds to `deviation` (see above) for each example
+    # name of feature that corresponds to `deviation` for each example
     kmax = np.empty(len(is_ood), dtype=object)
 
     for k, v in metadata.items():
-        if k == "random":  # exclude cases where random happens to be out on tails, not interesting.
+        # exclude cases where random happens to be out on tails, not interesting.
+        if k == "random":
             continue
 
+        # Skip non-numerical features
         if not all(isinstance(vi, numbers.Number) for vi in v):  # NB: np.nan *is* a number in this context.
             continue
 

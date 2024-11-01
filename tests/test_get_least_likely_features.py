@@ -35,19 +35,19 @@ from dataeval._internal.metrics.metadata_least_likely import get_least_likely_fe
             {"time": 42, "altitude": 0},
             {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
             np.array([True, False, True]),
-            [("not enough reference metadata", np.nan)],
+            ValueError,
         ),
         (  # Valid inputs: no OOD examples.
             {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
             {"time": np.array([1.2, 3.4, 5.6]), "altitude": [235, 6789, 101112]},
             np.array([False, False, False]),
-            [("all examples are in-distribution", np.nan)],
+            ValueError,
         ),
         (  # is_ood does not match metadata.
             {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
             {"time": np.array([42, 47]), "altitude": [235, 6789]},
             np.array([False, True, False]),
-            [("is_ood flag must have same length as metadata.", np.nan)],
+            ValueError,
         ),
     ),
 )
@@ -56,26 +56,30 @@ from dataeval._internal.metrics.metadata_least_likely import get_least_likely_fe
 # X numerical values in md0 and md1, not str etc
 # X scalar md1
 # X at least one ood
-# md1 and is_ood same size
+# X md1 and is_ood same size
 
 
-def test_output_values(md0, md1, is_ood, expected):
-    output = get_least_likely_features(md0, md1, is_ood)
-    print(f"################## {output}", flush=True)
-    assert all((ke == k and np.isclose(ve, v, equal_nan=True)) for (ke, ve), (k, v) in zip(expected, output))
+def test_output_values(md0, md1, is_ood, expected: list[tuple[str, float]]):
+    if type(expected) is type and issubclass(expected, Exception):
+        with pytest.raises(expected):
+            get_least_likely_features(md0, md1, is_ood)
+    else:
+        output = get_least_likely_features(md0, md1, is_ood)
+        assert all((ke == k and np.isclose(ve, v, equal_nan=True)) for (ke, ve), (k, v) in zip(expected, output))
 
 
+# With a more realistic number of samples, make sure that
 def test_bigdata_unlikely_features():
     nbig = 1000
     feature_names = ["temperature", "DJIA", "uptime"]
     bigdata_size = (nbig, len(feature_names))
-    rng = np.random.default_rng(123)
+    rng = np.random.default_rng(123)  # same pseudorandom sets each time.
     X0 = rng.normal(size=bigdata_size)
     X1 = rng.normal(size=bigdata_size)
 
     half = int(nbig / 2)
-    X1[:half, 1] -= 5000  # first half will have weird DJIA
-    X1[half:, 0] += 30  # second half will have weird temperature
+    X1[:half, 1] -= rng.normal(loc=5000, scale=200, size=half)  # first half will have weird DJIA
+    X1[half:, 0] += rng.normal(loc=100, scale=10, size=half)  # second half will have weird temperature
 
     bigrefmetadata = {}
     bignewmetadata = {}
@@ -86,13 +90,4 @@ def test_bigdata_unlikely_features():
     is_ood = np.array([True] * nbig)
     output = get_least_likely_features(bigrefmetadata, bignewmetadata, is_ood)
 
-    print("@@@@@@@@@@@@@@@@@@@", output[0], output[-1])
-
     assert all(out[0] == "DJIA" for out in output[0:half]) and all(out[0] == "temperature" for out in output[half:])
-
-    # (  # big data find weird feature test...
-    #     bigrefmetadata,
-    #     bignewmetadata,
-    #     np.array([True]*nbig),
-    #     [("is_ood flag must have same length as metadata.", np.nan)],
-    # ),
