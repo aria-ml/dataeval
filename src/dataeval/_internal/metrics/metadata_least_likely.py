@@ -44,8 +44,18 @@ def get_least_likely_features(
     >>> get_least_likely_features(metadata, newmetadata, is_ood)
     array(['time', 'time', 'altitude'], dtype=object)
     """
-    if any(len(np.atleast_1d(np.asarray(v))) < 3 for v in metadata.values()):
+    md_lengths = np.asarray([len(np.atleast_1d(np.asarray(v))) for v in metadata.values()])
+    if any(md_lengths < 3):
         return [("not enough reference metadata", np.nan)]
+
+    if not all(md_lengths == md_lengths[0]):
+        return [("all features must have same length", np.nan)]
+
+    if md_lengths[0] != len(is_ood):
+        return [("is_ood flag must have same length as metadata.", np.nan)]
+
+    if np.sum(is_ood) == 0:
+        return [("all examples are in-distribution", np.nan)]
 
     # largest standardized absolute deviation from the median observed so far for each example
     deviation = np.zeros_like(is_ood, dtype=np.float32)

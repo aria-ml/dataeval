@@ -37,13 +37,18 @@ from dataeval._internal.metrics.metadata_least_likely import get_least_likely_fe
             np.array([True, False, True]),
             [("not enough reference metadata", np.nan)],
         ),
+        (  # Valid inputs: no OOD examples.
+            {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
+            {"time": 42, "altitude": 0},
+            np.array([False, False, False]),
+            [("all examples are in-distribution", np.nan)],
+        ),
     ),
 )
-
 # INPUT CHECKS:
-# large enough md0
-# numerical values in md0 and md1, not str etc
-# scalar md1
+# X large enough md0
+# X numerical values in md0 and md1, not str etc
+# X scalar md1
 # at least one ood
 # md1 and is_ood same size
 
