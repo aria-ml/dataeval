@@ -60,7 +60,7 @@ def get_least_likely_features(
         pos_scale = np.median(posdev) if posdev.any() else 1.0
         neg_scale = np.abs(np.median(negdev)) if negdev.any() else 1.0
 
-        x, x0, dxp, dxn = np.array(newmetadata[k]), loc, pos_scale, neg_scale  # just abbreviations
+        x, x0, dxp, dxn = np.atleast_1d(newmetadata[k]), loc, pos_scale, neg_scale  # just abbreviations
         dxp = dxp if dxp > 0 else 1.0  # avoids dividing by zero below
         dxn = dxn if dxn > 0 else 1.0
 
