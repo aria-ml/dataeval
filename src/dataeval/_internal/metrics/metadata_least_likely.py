@@ -6,7 +6,7 @@ from numpy.typing import NDArray
 
 
 def get_least_likely_features(
-    metadata: dict[str, NDArray], newmetadata: dict[str, Union[list, NDArray]], is_ood: NDArray[np.bool_]
+    metadata: dict[str, Union[list, NDArray]], newmetadata: dict[str, Union[list, NDArray]], is_ood: NDArray[np.bool_]
 ) -> list[tuple[str, float]]:
     """Computes which metadata feature is most out-of-distribution (OOD) relative to a reference metadata set.
 
@@ -50,7 +50,7 @@ def get_least_likely_features(
     # Raise errors for bad inputs...
     if any(md_lengths < 3):
         raise ValueError(
-            "We need at least 3 reference metadata examples to determine which"
+            "We need at least 3 reference metadata examples to determine which "
             f"features are least likely, but only got {min(md_lengths)}"
         )
 

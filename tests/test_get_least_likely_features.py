@@ -47,25 +47,25 @@ def test_output_values(md0, md1, is_ood, expected: list[tuple[str, float]]):
 
 # Inputs that raise Exceptions
 @pytest.mark.parametrize(
-    "md0, md1, is_ood, expected",
+    "md0, md1, is_ood, error_msg",
     (
         (  # Invalid inputs: md0 not enough examples.
             {"time": 42, "altitude": 0},
             {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
             np.array([True, False, True]),
-            ValueError,
+            "We need at least 3 reference metadata examples to determine which features are least likely, but only got 1",  # noqa: E501
         ),
         (  # is_ood does not match metadata.
             {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
             {"time": np.array([42, 47]), "altitude": [235, 6789]},
             np.array([False, True, False]),
-            ValueError,
+            "is_ood flag must have same length as new metadata 2 but has length 3.",
         ),
     ),
 )
-def test_invalid_inputs(md0, md1, is_ood, expected: type):
-    with pytest.raises(expected):
-        _ = get_least_likely_features(md0, md1, is_ood)
+def test_invalid_inputs(md0, md1, is_ood, error_msg):
+    with pytest.raises(ValueError, match=error_msg):
+        get_least_likely_features(md0, md1, is_ood)
 
 
 # With a more realistic number of samples, make sure that
