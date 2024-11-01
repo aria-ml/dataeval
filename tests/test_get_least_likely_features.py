@@ -41,7 +41,7 @@ from dataeval._internal.metrics.metadata_least_likely import get_least_likely_fe
             {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
             {"time": np.array([1.2, 3.4, 5.6]), "altitude": [235, 6789, 101112]},
             np.array([False, False, False]),
-            ValueError,
+            [],
         ),
         (  # is_ood does not match metadata.
             {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},

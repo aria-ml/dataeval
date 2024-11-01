@@ -59,7 +59,7 @@ def get_least_likely_features(
         raise ValueError("is_ood flag must have same length as metadata.")
 
     if np.sum(is_ood) == 0:
-        raise ValueError("All examples are in-distribution")
+        return []
     # ...inputs are good, look for most deviant standardized features.
 
     # largest standardized absolute deviation from the median observed so far for each example
