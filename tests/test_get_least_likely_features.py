@@ -4,6 +4,7 @@ import pytest
 from dataeval._internal.metrics.metadata_least_likely import get_least_likely_features
 
 
+# Inputs with expected valid results:
 @pytest.mark.parametrize(
     "md0, md1, is_ood, expected",
     (
@@ -31,17 +32,28 @@ from dataeval._internal.metrics.metadata_least_likely import get_least_likely_fe
             np.array([True]),
             [("time", 16.287128)],
         ),
-        (  # Invalid inputs: md0 not enough examples.
-            {"time": 42, "altitude": 0},
-            {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
-            np.array([True, False, True]),
-            ValueError,
-        ),
         (  # Valid inputs: no OOD examples.
             {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
             {"time": np.array([1.2, 3.4, 5.6]), "altitude": [235, 6789, 101112]},
             np.array([False, False, False]),
             [],
+        ),
+    ),
+)
+def test_output_values(md0, md1, is_ood, expected: list[tuple[str, float]]):
+    output = get_least_likely_features(md0, md1, is_ood)
+    assert all((ke == k and np.isclose(ve, v, equal_nan=True)) for (ke, ve), (k, v) in zip(expected, output))
+
+
+# Inputs that raise Exceptions
+@pytest.mark.parametrize(
+    "md0, md1, is_ood, expected",
+    (
+        (  # Invalid inputs: md0 not enough examples.
+            {"time": 42, "altitude": 0},
+            {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
+            np.array([True, False, True]),
+            ValueError,
         ),
         (  # is_ood does not match metadata.
             {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
@@ -51,21 +63,9 @@ from dataeval._internal.metrics.metadata_least_likely import get_least_likely_fe
         ),
     ),
 )
-# INPUT CHECKS:
-# X large enough md0
-# X numerical values in md0 and md1, not str etc
-# X scalar md1
-# X at least one ood
-# X md1 and is_ood same size
-
-
-def test_output_values(md0, md1, is_ood, expected: list[tuple[str, float]]):
-    if type(expected) is type and issubclass(expected, Exception):
-        with pytest.raises(expected):
-            get_least_likely_features(md0, md1, is_ood)
-    else:
-        output = get_least_likely_features(md0, md1, is_ood)
-        assert all((ke == k and np.isclose(ve, v, equal_nan=True)) for (ke, ve), (k, v) in zip(expected, output))
+def test_invalid_inputs(md0, md1, is_ood, expected: type):
+    with pytest.raises(expected):
+        _ = get_least_likely_features(md0, md1, is_ood)
 
 
 # With a more realistic number of samples, make sure that

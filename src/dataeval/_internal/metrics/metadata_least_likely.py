@@ -49,14 +49,22 @@ def get_least_likely_features(
 
     # Raise errors for bad inputs...
     if any(md_lengths < 3):
-        raise ValueError("Not enough reference metadata")
-        # return [("not enough reference metadata", np.nan)]
+        raise ValueError(
+            "We need at least 3 reference metadata examples "
+            + "to determine which features are least likely, but only got "
+            + str(min(md_lengths))
+        )
 
     if not all(md_lengths == md_lengths[0]) or not all(newmd_lengths == newmd_lengths[0]):
-        raise ValueError("All features must have same length")
+        raise ValueError("All features must have same length, got lengths " + str(md_lengths) + str(newmd_lengths))
 
     if newmd_lengths[0] != len(is_ood):
-        raise ValueError("is_ood flag must have same length as metadata.")
+        raise ValueError(
+            "is_ood flag must have same length as new metadata"
+            + str(newmd_lengths)
+            + "but has length"
+            + str(len(is_ood))
+        )
 
     if np.sum(is_ood) == 0:
         return []
