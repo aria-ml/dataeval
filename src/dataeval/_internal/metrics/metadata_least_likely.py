@@ -45,17 +45,21 @@ def get_least_likely_features(
     array(['time', 'time', 'altitude'], dtype=object)
     """
     md_lengths = np.asarray([len(np.atleast_1d(np.asarray(v))) for v in metadata.values()])
+    newmd_lengths = np.asarray([len(np.atleast_1d(np.asarray(v))) for v in newmetadata.values()])
+
+    # Early returns for bad inputs...
     if any(md_lengths < 3):
         return [("not enough reference metadata", np.nan)]
 
-    if not all(md_lengths == md_lengths[0]):
+    if not all(md_lengths == md_lengths[0]) or not all(newmd_lengths == newmd_lengths[0]):
         return [("all features must have same length", np.nan)]
 
-    if md_lengths[0] != len(is_ood):
+    if newmd_lengths[0] != len(is_ood):
         return [("is_ood flag must have same length as metadata.", np.nan)]
 
     if np.sum(is_ood) == 0:
         return [("all examples are in-distribution", np.nan)]
+    # ...inputs are good, look for most deviant standardized features.
 
     # largest standardized absolute deviation from the median observed so far for each example
     deviation = np.zeros_like(is_ood, dtype=np.float32)
@@ -88,6 +92,7 @@ def get_least_likely_features(
         X = np.zeros_like(xdev)
         X[pos], X[~pos] = xdev[pos] / dxp, xdev[~pos] / dxn  # keeping track of possible asymmetry of x, but...
         # ...below here, only need to think about absolute deviation.
+
         abig = np.abs(X) > deviation
         kmax[abig] = k
         deviation[abig] = np.abs(X[abig])
