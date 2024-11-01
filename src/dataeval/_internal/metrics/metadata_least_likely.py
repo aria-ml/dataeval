@@ -6,7 +6,7 @@ from numpy.typing import NDArray
 
 def get_least_likely_features(
     metadata: dict[str, NDArray], newmetadata: dict[str, Union[list, NDArray]], is_ood: NDArray[np.bool_]
-) -> NDArray[np.str_]:
+) -> list[tuple[str, float]]:  # NDArray[np.str_]:
     """Computes which metadata feature is most out-of-distribution (OOD) relative to a reference metadata set.
 
         Given a reference metadata dictionary `metadata` (where each key maps to one scalar metadata feature), a second
@@ -53,25 +53,27 @@ def get_least_likely_features(
         if k == "random":  # exclude cases where random happens to be out on tails, not interesting.
             continue
 
+        # Get standardization parameters from metadata
         loc = np.median(v)
         dev = v - loc
         posdev, negdev = dev[dev > 0], dev[dev < 0]
-        pos_scale = np.median(posdev)
-        neg_scale = np.abs(np.median(negdev))
+        pos_scale = np.median(posdev) if posdev.any() else 1.0
+        neg_scale = np.abs(np.median(negdev)) if negdev.any() else 1.0
 
         x, x0, dxp, dxn = np.array(newmetadata[k]), loc, pos_scale, neg_scale  # just abbreviations
         dxp = dxp if dxp > 0 else 1.0  # avoids dividing by zero below
         dxn = dxn if dxn > 0 else 1.0
 
-        xdev = (x - x0).astype(np.float64)  # floating-point needed for division below to avoid getting zero.
+        # xdev must be floating-point to avoid getting zero in an integer division.
+        xdev = (x - x0).astype(np.float64)
         pos = xdev >= 0
 
         X = np.zeros_like(xdev)
-        X[pos], X[~pos] = xdev[pos] / dxp, xdev[~pos] / dxn  # keeping track of possible asymmetry of x
-        # Below here, only need to think about absolute deviation.
+        X[pos], X[~pos] = xdev[pos] / dxp, xdev[~pos] / dxn  # keeping track of possible asymmetry of x, but...
+        # ...below here, only need to think about absolute deviation.
         abig = np.abs(X) > deviation
         kmax[abig] = k
         deviation[abig] = np.abs(X[abig])
 
-    unlikely_features = kmax[is_ood]
+    unlikely_features = list(zip(kmax[is_ood], deviation[is_ood]))
     return unlikely_features
