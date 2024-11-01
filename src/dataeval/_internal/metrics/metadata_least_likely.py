@@ -1,3 +1,4 @@
+import numbers
 from typing import Union
 
 import numpy as np
@@ -6,7 +7,7 @@ from numpy.typing import NDArray
 
 def get_least_likely_features(
     metadata: dict[str, NDArray], newmetadata: dict[str, Union[list, NDArray]], is_ood: NDArray[np.bool_]
-) -> list[tuple[str, float]]:  # NDArray[np.str_]:
+) -> list[tuple[str, float]]:
     """Computes which metadata feature is most out-of-distribution (OOD) relative to a reference metadata set.
 
         Given a reference metadata dictionary `metadata` (where each key maps to one scalar metadata feature), a second
@@ -43,6 +44,9 @@ def get_least_likely_features(
     >>> get_least_likely_features(metadata, newmetadata, is_ood)
     array(['time', 'time', 'altitude'], dtype=object)
     """
+    if any(len(np.atleast_1d(np.asarray(v))) < 3 for v in metadata.values()):
+        return [("not enough reference metadata", np.nan)]
+
     # largest standardized absolute deviation from the median observed so far for each example
     deviation = np.zeros_like(is_ood, dtype=np.float32)
 
@@ -51,6 +55,9 @@ def get_least_likely_features(
 
     for k, v in metadata.items():
         if k == "random":  # exclude cases where random happens to be out on tails, not interesting.
+            continue
+
+        if not all(isinstance(vi, numbers.Number) for vi in v):  # NB: np.nan *is* a number in this context.
             continue
 
         # Get standardization parameters from metadata
