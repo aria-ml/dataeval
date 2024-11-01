@@ -52,16 +52,17 @@ xxhash = {version = ">=3.3"}
 
 # optional
 matplotlib = {version = "*", optional = true}
-tensorflow = {version = ">=2.16", optional = true}
+markupsafe = {version = "<3.0.2", optional = true}
+tensorflow = {version = ">=2.16,<2.18", optional = true}
 tensorflow_probability = {version = ">=0.24", optional = true}
 tf-keras = {version = ">=2.16", optional = true}
 torch = {version = ">=2.2.0", source = "pytorch", optional = true}
 torchvision = {version = ">=0.17.0", source = "pytorch", optional = true}
 
 [tool.poetry.extras]
-tensorflow = ["tensorflow", "tensorflow_probability", "tf-keras"]
+tensorflow = ["markupsafe", "tensorflow", "tensorflow_probability", "tf-keras"]
 torch = ["torch", "torchvision", "matplotlib"]
-all = ["matplotlib", "tensorflow", "tensorflow_probability", "tf-keras", "torch", "torchvision"]
+all = ["matplotlib", "markupsafe", "tensorflow", "tensorflow_probability", "tf-keras", "torch", "torchvision"]
 
 [tool.poetry.group.dev]
 optional = true
@@ -100,6 +101,7 @@ pydata-sphinx-theme = {version = ">=0.15.4"}
 sphinx-design = {version = "*"}
 sphinx-tabs = {version = "*"}
 Sphinx = {version = ">=7.2.6"}
+markupsafe = {version = "<3.0.2", optional = true}
 
 [[tool.poetry.source]]
 name = "pytorch"
