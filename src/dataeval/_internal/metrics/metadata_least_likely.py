@@ -42,7 +42,7 @@ def get_least_likely_features(
     >>> newmetadata = {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -211101]}
     >>> is_ood = numpy.array([True, True, True])
     >>> get_least_likely_features(metadata, newmetadata, is_ood)
-    array(['time', 'time', 'altitude'], dtype=object)
+    [('time', 2.0), ('time', 2.590909), ('altitude', 33.245346)]
     """
     md_lengths = np.asarray([len(np.atleast_1d(np.asarray(v))) for v in metadata.values()])
     newmd_lengths = np.asarray([len(np.atleast_1d(np.asarray(v))) for v in newmetadata.values()])
