@@ -36,7 +36,7 @@ def get_least_likely_features(
     Imagine we have 3 data examples, and that the corresponding metadata contains 2 features called time and
     altitude, as shown below.
 
-    from dataeval._internal.metrics.metadata_least_likely import get_least_likely_features
+    >>> from dataeval._internal.metrics.metadata_least_likely import get_least_likely_features
     >>> import numpy
     >>> metadata = {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112]}
     >>> newmetadata = {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -211101]}
@@ -84,7 +84,7 @@ def get_least_likely_features(
 
         # Get standardization parameters from metadata
         loc = np.median(v)
-        dev = v - loc
+        dev = np.asarray(v) - loc
         posdev, negdev = dev[dev > 0], dev[dev < 0]
         pos_scale = np.median(posdev) if posdev.any() else 1.0
         neg_scale = np.abs(np.median(negdev)) if negdev.any() else 1.0
