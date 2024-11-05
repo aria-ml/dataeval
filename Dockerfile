@@ -15,7 +15,7 @@ RUN pip install --no-cache \
     torchvision==0.16.2+cpu
 WORKDIR /docs
 COPY docs/data.py data.py
-COPY src/dataeval/_internal/datasets.py dataeval/_internal/datasets.py
+COPY src/dataeval/utils/torch/datasets.py dataeval/utils/torch/datasets.py
 RUN python -c "\
 from os import getcwd; \
 from sys import path; \

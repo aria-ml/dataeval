@@ -48,6 +48,7 @@ pillow = {version = ">=10.3.0"}
 scipy = {version = ">=1.10"}
 scikit-learn = {version = ">=1.5.0"}
 tqdm = {version = "*"}
+typing-extensions = {version = ">=4.12", python = ">=3.9,<3.10"}  # ParamSpec
 xxhash = {version = ">=3.3"}
 
 # optional
@@ -135,7 +136,7 @@ testpaths = ["tests"]
 addopts = ["--pythonwarnings=ignore::DeprecationWarning", "--verbose", "--durations=20", "--durations-min=1.0"]
 
 [tool.coverage.run]
-source = ["src/dataeval", "src/dataeval/_internal"]
+source = ["src/dataeval"]
 branch = true
 concurrency = ["multiprocessing"]
 parallel = true
@@ -144,9 +145,9 @@ parallel = true
 exclude_also = ["raise NotImplementedError"]
 include = ["*/src/dataeval/*"]
 omit = [
-  "*/_internal/models/pytorch/blocks.py",
-  "*/_internal/models/pytorch/utils.py",
-  "*/_internal/models/tensorflow/pixelcnn.py",
+  "*/torch/blocks.py",
+  "*/torch/utils.py",
+  "*/tensorflow/_internal/pixelcnn.py",
 ]
 fail_under = 90
 

@@ -3,7 +3,7 @@ import warnings
 import numpy as np
 import pytest
 
-from dataeval._internal.metrics.parity import label_parity, parity
+from dataeval.metrics.bias.parity import label_parity, parity
 
 
 class MockDistributionDataset:

@@ -2,10 +2,10 @@ import numpy as np
 import pytest
 from numpy.random import randint
 
-from dataeval._internal.metrics.stats.base import SOURCE_INDEX, BaseStatsOutput
-from dataeval._internal.metrics.stats.boxratiostats import boxratiostats
-from dataeval._internal.metrics.stats.datasetstats import channelstats, datasetstats
 from dataeval.metrics.stats import dimensionstats, hashstats, labelstats, pixelstats, visualstats
+from dataeval.metrics.stats.base import SOURCE_INDEX, BaseStatsOutput
+from dataeval.metrics.stats.boxratiostats import boxratiostats
+from dataeval.metrics.stats.datasetstats import channelstats, datasetstats
 
 
 def get_dataset(count: int, channels: int):

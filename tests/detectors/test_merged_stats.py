@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval._internal.detectors.merged_stats import add_stats, combine_stats, get_dataset_step_from_idx
+from dataeval.detectors.linters.merged_stats import add_stats, combine_stats, get_dataset_step_from_idx
 from dataeval.metrics.stats import hashstats, pixelstats
 
 

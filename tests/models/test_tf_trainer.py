@@ -17,7 +17,7 @@ import pytest
 import tensorflow as tf
 import tf_keras as keras
 
-from dataeval._internal.models.tensorflow.trainer import trainer
+from dataeval.utils.tensorflow._internal.trainer import trainer
 
 Indexable = Union[np.ndarray, tf.Tensor, list]
 

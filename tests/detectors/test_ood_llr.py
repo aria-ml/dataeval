@@ -14,7 +14,7 @@ import tensorflow as tf
 from tf_keras import Model
 from tf_keras.layers import LSTM, Dense, Input
 
-from dataeval._internal.detectors.ood.llr import OOD_LLR
+from dataeval.detectors.ood.llr import OOD_LLR
 
 input_dim = 5
 hidden_dim = 20

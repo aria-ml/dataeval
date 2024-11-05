@@ -3,7 +3,7 @@ from typing import Iterable
 
 import numpy as np
 
-from dataeval._internal.output import OutputMetadata, set_metadata
+from dataeval.output import OutputMetadata, set_metadata
 
 
 @dataclass
@@ -13,7 +13,7 @@ class MockOutput(OutputMetadata):
     test3: str
 
 
-@set_metadata("mock_module")
+@set_metadata()
 def mock_metric(arg1: int, arg2: bool, arg3: str) -> MockOutput:
     return MockOutput(arg1, arg2, arg3)
 
@@ -23,7 +23,7 @@ class MockMetric:
     state2: float = 1.5
     state3: list = ["a", "very", "long", "input", "list"]
 
-    @set_metadata("mock_class_module", ["state1", "state2", "state3"])
+    @set_metadata(["state1", "state2", "state3"])
     def evaluate(self, arg1: int, arg2: bool, arg3: str = "mock_default") -> MockOutput:
         return MockOutput(arg1, arg2, arg3)
 
@@ -41,7 +41,7 @@ class TestOutputMetadata:
 
     def test_output_metadata_meta(self):
         output_meta = mock_metric(1, True, "value").meta()
-        assert output_meta["name"] == "mock_module.mock_metric"
+        assert output_meta["name"] == "tests.test_output_metadata.mock_metric"
         assert output_meta["execution_time"]
         assert output_meta["execution_duration"] > 0
         assert set(output_meta["arguments"]) == {"arg1", "arg2", "arg3"}
@@ -53,7 +53,7 @@ class TestOutputMetadata:
         output_dict = output.dict()
         assert output_dict == {"test1": 1, "test2": True, "test3": "mock_default"}
         output_meta = output.meta()
-        assert output_meta["name"] == "mock_class_module.MockMetric"
+        assert output_meta["name"] == "tests.test_output_metadata.MockMetric.evaluate"
         assert output_meta["execution_time"]
         assert output_meta["execution_duration"] > 0
         assert output_meta["arguments"] == {"arg1": 1, "arg2": True, "arg3": "mock_default"}
