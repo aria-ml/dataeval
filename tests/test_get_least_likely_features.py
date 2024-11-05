@@ -1,3 +1,5 @@
+import re
+
 import numpy as np
 import pytest
 
@@ -38,6 +40,18 @@ from dataeval._internal.metrics.metadata_least_likely import get_least_likely_fe
             np.array([False, False, False]),
             [],
         ),
+        (  # Valid inputs: include non-numerical features.
+            {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112], "weather": ["raining", "calm", "tornado"]},
+            {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111], "weather": ["snow", "hail", "hot"]},
+            np.array([True, True, False]),
+            [("time", 2.0), ("time", 2.590909)],
+        ),
+        (  # Valid inputs: include random feature.
+            {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112], "random": [3.14, 159, 265]},
+            {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111], "random": [1.12, 3.5, 8.13]},
+            np.array([True, True, False]),
+            [("time", 2.0), ("time", 2.590909)],
+        ),
     ),
 )
 def test_output_values(md0, md1, is_ood, expected: list[tuple[str, float]]):
@@ -60,6 +74,20 @@ def test_output_values(md0, md1, is_ood, expected: list[tuple[str, float]]):
             {"time": np.array([42, 47]), "altitude": [235, 6789]},
             np.array([False, True, False]),
             "is_ood flag must have same length as new metadata 2 but has length 3.",
+        ),
+        (  # key mismatch.
+            {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
+            {"time": np.array([42, 47]), "schmaltitude": [235, 6789]},
+            np.array([False, True]),
+            re.escape(
+                "Reference and test metadata keys must be identical: ['time', 'altitude'], ['time', 'schmaltitude']"
+            ),
+        ),
+        (  # wrong number of examples in a feature
+            {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112]},
+            {"time": [7.8, 9.10], "altitude": [532, 9876, -2111]},
+            np.array([False, False, True]),
+            re.escape("All features must have same length, got lengths [3 3], [2 3]"),
         ),
     ),
 )
