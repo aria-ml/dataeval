@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from itertools import product
 from zipfile import ZipFile
 
 import numpy as np
 import pytest
+from numpy.typing import NDArray
 
 TEMP_CONTENTS = "ABCDEF1234567890"
 
@@ -57,3 +59,33 @@ def mnist_npy(tmp_path_factory):
     np.save(mnistc_temp / "train_images.npy", train, allow_pickle=False)
     np.save(mnistc_temp / "train_labels.npy", labels, allow_pickle=False)
     yield temp
+
+
+@pytest.fixture
+def labels_with_metadata() -> tuple[NDArray, dict[str, NDArray]]:
+    """Test fixture that returns multiclass labels, as well as a metadata dictionary containing
+    columns with various testable properties.
+
+    Specifically, the metadata columns contain all possible combinations of:
+    discrete vs. continuous vs. angles,
+    correlated vs. uncorrelated with labels,
+
+
+    Each metadata dictionary key reflects the properties of its corresponding feature vector.
+    For example, the key 'CorrelatedAngle' indexes into a column of angle data correlated with
+    labels
+    """
+    rng = np.random.default_rng(9251990)
+    n_labels = 5000
+    labels = rng.integers(low=0, high=5, size=(n_labels,))
+    metadata = {}
+    metadata_attrs = [["Discrete", "Continuous", "Angle"], ["Correlated", "Uncorrelated"]]
+    md_keys = ["".join(prod) for prod in product(*metadata_attrs)]
+    for key in md_keys:
+        md = rng.uniform(-10, 10, size=(n_labels,)) if "Uncorrelated" in key else rng.uniform(-10, 10, size=(n_labels,))
+        if "Angle" in key:
+            md = ((md + 10) / 20) * 2 * np.pi
+        elif "Discrete" in key:
+            md = np.round(md).astype(int)
+        metadata[key] = md
+    return labels, metadata
