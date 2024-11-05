@@ -25,7 +25,7 @@ class ClustererOutput(OutputMetadata):
     potential_outliers : List[int]
         Indices which are near the border between belonging in the cluster and being an outlier
     duplicates : List[List[int]]
-        Groups of indices that are exact duplicates
+        Groups of indices that are exact :term:`duplicates<Duplicates>`
     potential_duplicates : List[List[int]]
         Groups of indices which are not exact but closely related data points
     """
@@ -129,7 +129,7 @@ class ClusterMergeEntry:
 
 class Clusterer:
     """
-    Uses hierarchical clustering to flag dataset properties of interest like outliers and duplicates
+    Uses hierarchical clustering to flag dataset properties of interest like Outliers and :term:`duplicates<Duplicates>`
 
     Parameters
     ----------
@@ -401,7 +401,7 @@ class Clusterer:
 
     def find_outliers(self, last_merge_levels: dict[int, int]) -> tuple[list[int], list[int]]:
         """
-        Retrieves outliers based on when the sample was added to the cluster
+        Retrieves Outliers based on when the sample was added to the cluster
         and how far it was from the cluster when it was added
 
         Parameters
@@ -470,7 +470,7 @@ class Clusterer:
         Returns
         -------
         Tuple[List[List[int]], List[List[int]]]
-            The exact duplicates and near duplicates as lists of related indices
+            The exact :term:`duplicates<Duplicates>` and near duplicates as lists of related indices
         """
 
         duplicates_std = []
@@ -495,12 +495,12 @@ class Clusterer:
     # TODO: Move data input to evaluate from class
     @set_metadata("dataeval.detectors", ["data"])
     def evaluate(self) -> ClustererOutput:
-        """Finds and flags indices of the data for outliers and duplicates
+        """Finds and flags indices of the data for Outliers and :term:`duplicates<Duplicates>`
 
         Returns
         -------
         ClustererOutput
-            The outliers and duplicate indices found in the data
+            The Outliers and duplicate indices found in the data
 
         Example
         -------

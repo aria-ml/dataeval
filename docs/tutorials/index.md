@@ -1,7 +1,7 @@
 # Tutorials
 
 
-These tutorials demonstrate how to use DataEval to perform data analysis tasks using
+These tutorials demonstrate how to use {term}`DataEval` to perform data analysis tasks using
 various detectors, metrics and workflows to assess the suitability of a dataset and/or model.
 
 In addition to viewing them in our documentation, these notebooks can also be opened in Google Colab to be used interactively!

@@ -161,7 +161,7 @@ Check out these curated guides to see how DataEval can improve your workflows.
 <!-- SUBSECTION START | Explanations -->
 ## Be Theoretical
 
-Dive deep into the concepts that DataEval is built upon to enhance your skillset.
+Dive deep into the concepts that DataEval is built upon to enhance your skill set.
 
 ::::{grid} 1 1 2 2
 :gutter: 4
@@ -221,7 +221,7 @@ Find all the technical details needed to understand the DataEval Ecosystem.
 
 Looking for a definition?
 
-Find the word in the glosssary.
+Find the word in the glossary.
 
 :::
 ::::

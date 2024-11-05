@@ -2,13 +2,13 @@
 
 ## What is it
 
-Balance and classwise balance are metrics that measure correlational
+{term}`Balance` and classwise balance are metrics that measure correlational
 relationships between metadata factors and class labels.  Balance and classwise
 balance can indicate opportunities for shortcut learning and disproportionate
 dataset sampling, with respect to individual classes or between metadata factors, that
 leads to poor generalization or overestimation of model performance.
 
-Balance metrics compute the mutual information between class labels and metadata
+Balance metrics compute the {term}`mutual information<Mutual Information (MI)>` between class labels and metadata
 factors which may include intrinsic metadata, such as image statistics or
 bounding box statistics; or extrinsic metadata factors such as environmental
 information, sensor information, and operational information.  Mutual
@@ -17,7 +17,7 @@ label, by observing another variable, e.g. location.  Balance metrics provide a
 T&E engineer or model developer insight into dataset relationships which should
 be investigated or accounted for during model training or model evaluation.
 
-The `balance` metric returns mutual information computed between metadata factors
+The {term}`balance<Balance>` metric returns mutual information computed between metadata factors
 and class labels but also mutual information between all pairs of metadata
 factors to characterize inter-factor relationships.  The `balance_classwise`
 metric returns mutual information between individual class labels and metadata
@@ -29,10 +29,10 @@ factors to identify relationships between only one class and secondary factors.
 For both model and dataset development it is important to understand
 correlational relationships that underlie the dataset.  Often, opportunities for
 data collection are sparse, available only in non-operational locations and
-conditions, with limited target diversity, etc.  A model trained on these
+conditions, with limited target {term}`diversity<Diversity>`, etc.  A model trained on these
 realistic datasets could learn to use secondary information to perform the
 primary learning task, reducing the model's ability to generalize to new domains
-or to perform unexpectedly when presented with new data.  Balance metrics
+or to perform unexpectedly when presented with new data.  {term}`balance<Balance>` metrics
 provide a method for identifying relationships between dataset factors and class
 labels _a priori_.  A T&E engineer or model developer should then use that information to
 design tests for model generalization or data augmentation to mitigate the
@@ -47,11 +47,11 @@ grassy field but internally cues on the grassy field (background) rather than th
 properties of the cow.  When presented with an image of a cow at a sandy beach,
 the model fails to identify the cow because it was able to previously use
 secondary information about location or visual context to reliably identify
-cows.  Balance metrics are one way to identify the *potential* for learning such
+cows.  {term}`Balance` metrics are one way to identify the *potential* for learning such
 shortcuts.
 
 ### Identifying disproportionate dataset sampling
-In addition to identifying possible shortcuts, balance metrics may identify
+In addition to identifying possible shortcuts, {term}`balance<Balance>` metrics may identify
 issues where data are sampled disproportionately with respect to a particular
 factor.  For instance, in the example above where the model is trained on images
 where cows nearly always appear in a grassy field, classwise balance, would show
@@ -61,7 +61,7 @@ Given the apparent correlation between the `cow` class label and grassy field
 background, a model developer or T&E engineer should first assess whether the
 correlation is problematic and whether the dataset should be resampled, further
 data collected in other environments, or augmentation techniques used to
-mitigate the apparent bias.
+mitigate the apparent {term}`bias<Bias>`.
 
 Not all dataset correlation and sampling biases are problematic, however.  For
 instance, it may be expected that elevation of the sun correlates with day of
@@ -74,24 +74,24 @@ whether data need to be augmented for training and evaluation.
 
 It is important to note that correlational relationships within a dataset
 measured by balance metrics only indicate *opportunity* for shortcut learning;
-balance and other metrics within DataEval do not measure whether shortcut
+balance and other metrics within {term}`DataEval` do not measure whether shortcut
 learning has occurred.  It is important to interrogate potential biases
 exhibited by the trained model and to assess the need for further data
 augmentation to mitigate or compensate observed biases.
 
 ## Theory behind it
 
-Mutual information is a metric that is often used for measuring the quality of
+{term}`Mutual information<Mutual Information (MI)>` is a metric that is often used for measuring the quality of
 dataset clustering or for feature selection, and there are several formulations
-to measure relationships between two categorical variables, between categorical
+to measure relationships between two Categorical Variables, between categorical
 and continuous variables, and between two continuous variables.  We consider
 class label a categorical variable, as there is typically no presumed ordering
 between classes; however, other metadata factors, such as latitude and longitude
 or time stamps may take continuous (ordered) values.
 
-The implementation of mutual information within DataEval draws on multiple
+The implementation of mutual information within {term}`DataEval` draws on multiple
 implementations within the scikit-learn package including
-[`mutual_info_classif`](https://scikit-learn.org/stable/modules/generated/sklearn.feature_selection.mutual_info_classif.html)
+[`mutual_info_classification`](https://scikit-learn.org/stable/modules/generated/sklearn.feature_selection.mutual_info_classif.html)
 and
 [`mutual_info_regression`](https://scikit-learn.org/stable/modules/generated/sklearn.feature_selection.mutual_info_regression.html).
 For categorical or discrete target variables, `mutual_info_classif` computes the
@@ -100,15 +100,15 @@ factors.  DataEval attempts to infer whether a variable is continuous or
 discrete by the fraction of unique values present&mdash;i.e. whether the data
 may be binned uniquely with a relatively small number of bins.
 
-Mutual information between categorical/discrete variables is computed from
+{term}`Mutual information<Mutual Information (MI)>` between categorical/discrete variables is computed from
 contingency tables which measure co-occurence of each variable, while mutual
 information involving continuous (ordered) data is computed using the k-nearest
 neighbor (KNN) graph as in Refs. [1] and [2].
 
 ### Normalization
 
-Raw mutual information scores are difficult for a human to contextualize, so
-balance metrics normalize the mutual information by the arithmetic mean of
+Raw {term}`mutual information<Mutual Information (MI)>` scores are difficult for a human to contextualize, so
+{term}`balance<Balance>` metrics normalize the mutual information by the arithmetic mean of
 marginal entropies of each variable.  Given that some variables could have a
 marginal entropy of zero (all values the same), the arithmetic mean is somewhat
 preferable over the geometric mean in those cases.

@@ -17,7 +17,7 @@ TData = TypeVar("TData", np.float64, NDArray[np.float64])
 @dataclass(frozen=True)
 class ParityOutput(Generic[TData], OutputMetadata):
     """
-    Output class for :func:`parity` and :func:`label_parity` bias metrics
+    Output class for :func:`parity` and :func:`label_parity` :term:`bias<Bias>` metrics
 
     Attributes
     ----------
@@ -198,7 +198,8 @@ def label_parity(
     num_classes: int | None = None,
 ) -> ParityOutput[np.float64]:
     """
-    Calculate the chi-square statistic to assess the parity between expected and observed label distributions.
+    Calculate the chi-square statistic to assess the :term:`parity<Parity>` between expected and
+    observed label distributions.
 
     This function computes the frequency distribution of classes in both expected and observed labels, normalizes
     the expected distribution to match the total number of observed labels, and then calculates the chi-square
@@ -217,7 +218,7 @@ def label_parity(
     Returns
     -------
     ParityOutput[np.float64]
-        chi-squared score and p-value of the test
+        chi-squared score and :term`P-Value` of the test
 
     Raises
     ------
@@ -231,8 +232,8 @@ def label_parity(
     - Providing ``num_classes`` can be helpful if there are classes with zero instances in one of the distributions.
     - The function first validates the observed distribution and normalizes the expected distribution so that it
       has the same total number of labels as the observed distribution.
-    - It then performs a chi-square test to determine if there is a statistically significant difference between
-      the observed and expected label distributions.
+    - It then performs a :term:`Chi-Square Test of Independence` to determine if there is a statistically significant
+      difference between the observed and expected label distributions.
     - This function acts as an interface to the scipy.stats.chisquare method, which is documented at
       https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.chisquare.html
 
@@ -285,7 +286,8 @@ def parity(
     continuous_factor_bincounts: Mapping[str, int] | None = None,
 ) -> ParityOutput[NDArray[np.float64]]:
     """
-    Calculate chi-square statistics to assess the relationship between multiple factors and class labels.
+    Calculate chi-square statistics to assess the relationship between multiple factors
+    and class labels.
 
     This function computes the chi-square statistic for each metadata factor to determine if there is
     a significant relationship between the factor values and class labels. The function handles both categorical
@@ -308,7 +310,7 @@ def parity(
     -------
     ParityOutput[NDArray[np.float64]]
         Arrays of length (num_factors) whose (i)th element corresponds to the
-        chi-square score and p-value for the relationship between factor i and
+        chi-square score and :term:`p-value<P-Value>` for the relationship between factor i and
         the class labels in the dataset.
 
     Raises

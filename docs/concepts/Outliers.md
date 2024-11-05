@@ -11,7 +11,7 @@ The Outliers class should be used anytime someone is working with a new dataset.
 Whether you are tasked with trying to find the right dataset to train a model or with verifying someone else's stuff,
 the Outliers class helps you gain an understanding of the data.
 
-The [Data Cleaning Guide](../tutorials/EDA_Part1.ipynb) shows how the Outliers class can be used in conjunction with other DataEval classes to explore and clean a dataset. 
+The [Data Cleaning Guide](../tutorials/EDA_Part1.ipynb) shows how the Outliers class can be used in conjunction with other {term}`DataEval` classes to explore and clean a dataset. 
 
 ## Theory behind it
 

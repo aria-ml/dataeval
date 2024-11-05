@@ -78,8 +78,8 @@ def entropy(
     subset_mask: NDArray[np.bool_] | None = None,
 ) -> NDArray[np.float64]:
     """
-    Meant for use with Bias metrics, Balance, Diversity, ClasswiseBalance,
-    and Classwise Diversity.
+    Meant for use with :term:`bias<Bias>` metrics, :term:`balance<Balance>`, :term:`diversity<Diversity>`,
+    ClasswiseBalance, and Classwise Diversity.
 
     Compute entropy for discrete/categorical variables and for continuous variables through standard
     histogram binning.
@@ -128,7 +128,7 @@ def get_num_bins(
 ) -> NDArray[np.float64]:
     """
     Number of bins or unique values for each metadata factor, used to
-    normalize entropy/diversity.
+    normalize entropy/:term:`diversity<Diversity>`.
 
     Parameters
     ----------
@@ -207,12 +207,12 @@ def flatten(X: NDArray):
 
 def minimum_spanning_tree(X: NDArray) -> Any:
     """
-    Returns the minimum spanning tree from a NumPy image array.
+    Returns the minimum spanning tree from a :term:`NumPy` image array.
 
     Parameters
     ----------
     X : NDArray
-        Numpy image array
+        NumPy image array
 
     Returns
     -------
@@ -234,7 +234,7 @@ def get_classes_counts(labels: NDArray) -> tuple[int, int]:
     Parameters
     ----------
     label : NDArray
-        Numpy labels array
+        :term:`NumPy` labels array
 
     Returns
     -------
@@ -389,7 +389,7 @@ def pchash(image: NDArray) -> str:
     Parameters
     ----------
     image : NDArray
-        An image as a numpy array in CxHxW format
+        An image as a :term:`NumPy` array in CxHxW format
 
     Returns
     -------
@@ -437,7 +437,7 @@ def xxhash(image: NDArray) -> str:
     Parameters
     ----------
     image : NDArray
-        An image as a numpy array
+        An image as a :term:NumPy` array
 
     Returns
     -------

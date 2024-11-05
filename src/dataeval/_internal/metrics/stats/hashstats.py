@@ -20,7 +20,7 @@ class HashStatsOutput(BaseStatsOutput):
     xxhash : List[str]
         xxHash hash of the images as a hex string
     pchash : List[str]
-        Perception hash of the images as a hex string
+        :term:`Perception-based Hash` of the images as a hex string
     """
 
     xxhash: list[str]
@@ -60,11 +60,11 @@ def hashstats(
 
     See Also
     --------
-    Duplicates
+    :term:`Duplicates`
 
     Examples
     --------
-    Calculating the statistics on the images, whose shape is (C, H, W)
+    Calculating the :term:`statistics<Statistics>` on the images, whose shape is (C, H, W)
 
     >>> results = hashstats(images)
     >>> print(results.xxhash)

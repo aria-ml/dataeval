@@ -34,7 +34,7 @@ def classifier_uncertainty(
     x : np.ndarray
         Batch of instances.
     model_fn : Callable
-        Function that evaluates a classification model on x in a single call (contains
+        Function that evaluates a :term:`classification<Classification>` model on x in a single call (contains
         batching logic if necessary).
     preds_type : "probs" | "logits", default "probs"
         Type of prediction output by the model. Options are 'probs' (in [0,1]) or
@@ -73,9 +73,9 @@ class DriftUncertainty:
     x_ref : ArrayLike
         Data used as reference distribution.
     model : Callable
-        Classification model outputting class probabilities (or logits)
+        :term:`Classification` model outputting class probabilities (or logits)
     p_val : float, default 0.05
-        p-value used for the significance of the test.
+        :term:`P-Value` used for the significance of the test.
     x_ref_preprocessed : bool, default False
         Whether the given reference data ``x_ref`` has been preprocessed yet.
         If ``True``, only the test data ``x`` will be preprocessed at prediction time.
@@ -145,6 +145,7 @@ class DriftUncertainty:
         Returns
         -------
         DriftUnvariateOutput
-            Dictionary containing the drift prediction, p-value, and threshold statistics.
+            Dictionary containing the drift prediction, :term:`p-value<P-Value>`, and threshold
+            statistics.
         """
         return self._detector.predict(x)

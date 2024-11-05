@@ -102,7 +102,7 @@ def predict_batch(
     preprocess_fn : Callable | None, default None
         Optional preprocessing function for each batch.
     dtype : np.dtype | torch.dtype, default np.float32
-        Model output type, either a numpy or torch dtype, e.g. np.float32 or torch.float32.
+        Model output type, either a :term:`NumPy` or torch dtype, e.g. np.float32 or torch.float32.
 
     Returns
     -------
@@ -179,7 +179,7 @@ def preprocess_drift(
     batch_size : int, default 1e10
         Batch size used during prediction.
     dtype : np.dtype | torch.dtype, default np.float32
-        Model output type, either a numpy or torch dtype, e.g. np.float32 or torch.float32.
+        Model output type, either a :term:`NumPy` or torch dtype, e.g. np.float32 or torch.float32.
 
     Returns
     -------

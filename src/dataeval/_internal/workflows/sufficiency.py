@@ -86,7 +86,7 @@ class SufficiencyOutput(OutputMetadata):
         return SufficiencyOutput(projection, self.params, output)
 
     def plot(self, class_names: Sequence[str] | None = None) -> list[Figure]:
-        """Plotting function for data sufficiency tasks
+        """Plotting function for data :term:`sufficience<Sufficiency>` tasks
 
         Parameters
         ----------
@@ -369,7 +369,7 @@ def plot_measure(
 
 class Sufficiency:
     """
-    Project dataset sufficiency using given a model and evaluation criteria
+    Project dataset :term:`sufficiency<Sufficiency>` using given a model and evaluation criteria
 
     Parameters
     ----------
@@ -488,7 +488,7 @@ class Sufficiency:
         ----------
         eval_at : int | Iterable[int] | None, default None
             Specify this to collect accuracies over a specific set of dataset lengths, rather
-            than letting Sufficiency internally create the lengths to evaluate at.
+            than letting :term:`sufficiency<Sufficiency>` internally create the lengths to evaluate at.
         niter : int, default 1000
             Iterations to perform when using the basin-hopping method to curve-fit measure(s).
 

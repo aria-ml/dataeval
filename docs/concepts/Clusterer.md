@@ -7,9 +7,9 @@ The Clusterer class uses hierarchal clustering to group the data and flags dupli
 
 The Clusterer identifies both exact duplicate and near duplicate images based on their distance.
 Near duplicate images are defined as images whose distance is within the standard deviation of the cluster to which they belong.
-By being based on their respective cluster, near duplicates accounts for differences in the density of the cluster.
+By being based on their respective cluster, near {term}`duplicates<Duplicates>` accounts for differences in the density of the cluster.
 
-The Clusterer identifies outliers based on their distance.
+The Clusterer identifies Outliers based on their distance.
 After defining where the splits are in the data for the different groups,
 outliers are defined as samples that lie outside of 2 standard deviations of the average intra-cluster distance.
 

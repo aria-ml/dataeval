@@ -15,12 +15,12 @@ from dataeval._internal.output import OutputMetadata, set_metadata
 @dataclass(frozen=True)
 class BalanceOutput(OutputMetadata):
     """
-    Output class for :func:`balance` bias metric
+    Output class for :func:`balance` :term:`Bias` metric
 
     Attributes
     ----------
     balance : NDArray[np.float64]
-        Estimate of mutual information between metadata factors and class label
+        Estimate of :term:`mutual information<Mutual Information (MI)>` between metadata factors and class label
     factors : NDArray[np.float64]
         Estimate of inter/intra-factor mutual information
     classwise : NDArray[np.float64]
@@ -55,7 +55,7 @@ def validate_num_neighbors(num_neighbors: int) -> int:
 @set_metadata("dataeval.metrics")
 def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neighbors: int = 5) -> BalanceOutput:
     """
-    Mutual information (MI) between factors (class label, metadata, label/image properties)
+    :term:`Mutual information (MI)` between factors (class label, metadata, label/image properties)
 
     Parameters
     ----------
@@ -70,7 +70,7 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
     Returns
     -------
     BalanceOutput
-        (num_factors+1) x (num_factors+1) estimate of mutual information
+        (num_factors+1) x (num_factors+1) estimate of :term:`mutual information<Mutual Information (MI)>`
         between num_factors metadata factors and class label. Symmetry is enforced.
 
     Note
@@ -83,7 +83,7 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
 
     Example
     -------
-    Return balance (mutual information) of factors with class_labels
+    Return :term:`balance<Balance>` (:term:`mutual information<Mutual Information (MI)>`) of factors with class_labels
 
     >>> bal = balance(class_labels, metadata)
     >>> bal.balance
