@@ -1,5 +1,5 @@
 """
-Out-of-distribution detectors identify data that is different from the data used to train a particular model.
+Out-of-distribution (OOD)` detectors identify data that is different from the data used to train a particular model.
 """
 
 from dataeval import _IS_TENSORFLOW_AVAILABLE
@@ -12,12 +12,4 @@ if _IS_TENSORFLOW_AVAILABLE:  # pragma: no cover
     from dataeval._internal.detectors.ood.vae import OOD_VAE
     from dataeval._internal.detectors.ood.vaegmm import OOD_VAEGMM
 
-    __all__ = [
-        "OOD_AE",
-        "OOD_AEGMM",
-        "OOD_LLR",
-        "OOD_VAE",
-        "OOD_VAEGMM",
-        "OODOutput",
-        "OODScoreOutput",
-    ]
+    __all__ = ["OOD_AE", "OOD_AEGMM", "OOD_LLR", "OOD_VAE", "OOD_VAEGMM", "OODOutput", "OODScoreOutput"]

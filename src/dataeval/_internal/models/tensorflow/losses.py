@@ -31,7 +31,7 @@ class Elbo:
     Parameters
     ----------
     cov_type : Union[Literal["cov_full", "cov_diag"], float], default 1.0
-        Full covariance matrix, diagonal variance matrix, or scale identity multiplier.
+        Full covariance matrix, diagonal :term:`variance<Variance>` matrix, or scale identity multiplier.
     x : ArrayLike, optional - default None
         Dataset used to calculate the covariance matrix.  Required for full and diagonal covariance matrix types.
     """

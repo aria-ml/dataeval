@@ -47,7 +47,7 @@ class DriftOutput(DriftBaseOutput):
     Attributes
     ----------
     is_drift : bool
-        Drift prediction for the images
+        :term:`Drift` prediction for the images
     threshold : float
         Threshold after multivariate correction if needed
     feature_drift : NDArray
@@ -103,7 +103,7 @@ def preprocess_x(fn):
 
 class UpdateStrategy(ABC):
     """
-    Updates reference dataset for drift detector
+    Updates reference dataset for :term:`drift<Drift>` detector
 
     Parameters
     ----------
@@ -121,7 +121,7 @@ class UpdateStrategy(ABC):
 
 class LastSeenUpdate(UpdateStrategy):
     """
-    Updates reference dataset for drift detector using last seen method.
+    Updates reference dataset for :term:`drift<Drift>` detector using last seen method.
 
     Parameters
     ----------
@@ -136,7 +136,7 @@ class LastSeenUpdate(UpdateStrategy):
 
 class ReservoirSamplingUpdate(UpdateStrategy):
     """
-    Updates reference dataset for drift detector using reservoir sampling method.
+    Updates reference dataset for :term:`drift<Drift>` detector using reservoir sampling method.
 
     Parameters
     ----------
@@ -167,7 +167,7 @@ class ReservoirSamplingUpdate(UpdateStrategy):
 
 class BaseDrift:
     """
-    A generic drift detection component for preprocessing data and applying statistical correction.
+    A generic :term:`drift<Drift>` detection component for preprocessing data and applying statistical correction.
 
     This class handles common tasks related to drift detection, such as preprocessing
     the reference data (`x_ref`), performing statistical correction (e.g., Bonferroni, FDR),
@@ -266,7 +266,7 @@ class BaseDrift:
 
     def _preprocess(self, x: ArrayLike) -> ArrayLike:
         """
-        Preprocess the given data before computing the drift scores.
+        Preprocess the given data before computing the :term:`drift<Drift>` scores.
 
         Parameters
         ----------
@@ -285,12 +285,13 @@ class BaseDrift:
 
 class BaseDriftUnivariate(BaseDrift):
     """
-    Base class for drift detection methods using univariate statistical tests.
+    Base class for :term:`drift<Drift>` detection methods using univariate statistical tests.
 
     This class inherits from `BaseDrift` and serves as a generic component for detecting
     distribution drift in univariate features. If the number of features `n_features` is greater
     than 1, a multivariate correction method (e.g., Bonferroni or FDR) is applied to control
-    the false positive rate, ensuring it does not exceed the specified p-value.
+    the :term:`false positive rate<False Positive Rate (FP)>`, ensuring it does not exceed the specified
+    :term:`p-value<P-Value>`.
 
     Parameters
     ----------
@@ -318,7 +319,7 @@ class BaseDriftUnivariate(BaseDrift):
     p_val : float
         The significance level for drift detection.
     correction : str
-        The method for controlling the false discovery rate or applying a Bonferroni correction.
+        The method for controlling the :term:`False Discovery Rate (FDR)` or applying a Bonferroni correction.
     update_x_ref : UpdateStrategy | None
         Strategy for updating the reference data if applicable.
     preprocess_fn : Callable | None
@@ -393,19 +394,19 @@ class BaseDriftUnivariate(BaseDrift):
         Parameters
         ----------
         x : ArrayLike
-            The batch of data to calculate univariate drift scores for each feature.
+            The batch of data to calculate univariate :term:`drift<Drift>` scores for each feature.
 
         Returns
         -------
         tuple[NDArray, NDArray]
-            A tuple containing p-values and distance statistics for each feature.
+            A tuple containing p-values and distance :term:`statistics<Statistics>` for each feature.
         """
 
     def _apply_correction(self, p_vals: NDArray) -> tuple[bool, float]:
         """
         Apply the specified correction method (Bonferroni or FDR) to the p-values.
 
-        If the correction method is Bonferroni, the threshold for detecting drift
+        If the correction method is Bonferroni, the threshold for detecting :term:`drift<Drift>`
         is divided by the number of features. For FDR, the correction is applied
         using the Benjamini-Hochberg procedure.
 
@@ -457,8 +458,8 @@ class BaseDriftUnivariate(BaseDrift):
         Returns
         -------
         DriftOutput
-            Dictionary containing the drift prediction and optionally the feature level
-            p-values, threshold after multivariate correction if needed and test statistics.
+            Dictionary containing the :term:`drift<Drift>` prediction and optionally the feature level
+            p-values, threshold after multivariate correction if needed and test :term:`statistics<Statistics>`.
         """
         # compute drift scores
         p_vals, dist = self.score(x)

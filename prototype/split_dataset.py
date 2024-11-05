@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 def check_labels(labels: Union[list, np.ndarray], total_partitions: int):
     """Check to make sure there are more input data than the total number of partitions requested
-    Also converts labels to a numpy array, if it isn't already
+    Also converts labels to a :term:`NumPy` array, if it isn't already
 
     Args:
         labels (Union[list, np.ndarray]): all class labels from the input dataset
@@ -138,7 +138,7 @@ def make_splits(
         n_folds (int): number or train/val folds 
         groups (Optional[np.ndarray]): group_ids for grouped partitions. Grouped partitions are
             split such that no group id is present in both a training and validation split.
-        stratified (Optional[bool]): If True, maintain dataset class balance within each train/val
+        stratified (Optional[bool]): If True, maintain dataset class :term:`balance<Balance>` within each train/val
             split
 
     Returns:
@@ -212,7 +212,7 @@ def split_dataset(
     train and validation indices. Indices for a test holdout may also be optionally included 
 
     Args:
-        labels (Union[list, np.ndarray]): Classification Labels used to generate splits. 
+        labels (Union[list, np.ndarray]): classification labels used to generate splits. 
             Determines the size of the dataset 
 
         num_folds (Optional[int], optional): Number of train/val folds. If None, returns a 
@@ -227,7 +227,7 @@ def split_dataset(
         split_on (Optional[list], optional): Keys of the metadata dictionary which map to columns upon
             which to group the dataset. A grouped partition is divided such that no group is present
             within both the training and validation set. Split_on groups should be selected to
-            mitigate validation bias. Defaults to None, in which groups will not be considered when
+            mitigate validation :term:`bian<Bias>`. Defaults to None, in which groups will not be considered when
             partitioning the data.
 
         metadata (Optional[dict], optional): metadict containing data for potential dataset grouping.

@@ -1,7 +1,7 @@
 """
 This module contains the implementation of the
 FR Test Statistic based estimate and the
-KNN based estimate for the Bayes Error Rate
+KNN based estimate for the :term:`Bayes error rate<Bayes Error Rate (BER)>`
 
 Learning to Bound the Multi-class Bayes Error (Th. 3 and Th. 4)
 https://arxiv.org/abs/1811.06419
@@ -30,7 +30,7 @@ class BEROutput(OutputMetadata):
     Attributes
     ----------
     ber : float
-        The upper bounds of the Bayes Error Rate
+        The upper bounds of the :term:`Bayes error rate<Bayes Error Rate (BER)>`
     ber_lower : float
         The lower bounds of the Bayes Error Rate
     """
@@ -40,7 +40,7 @@ class BEROutput(OutputMetadata):
 
 
 def ber_mst(X: NDArray, y: NDArray) -> tuple[float, float]:
-    """Calculates the Bayes Error Rate using a minimum spanning tree
+    """Calculates the :term:`Bayes error rate<Bayes Error Rate (BER)>` using a minimum spanning tree
 
     Parameters
     ----------
@@ -65,7 +65,7 @@ def ber_mst(X: NDArray, y: NDArray) -> tuple[float, float]:
 
 
 def ber_knn(X: NDArray, y: NDArray, k: int) -> tuple[float, float]:
-    """Calculates the Bayes Error Rate using K-nearest neighbors
+    """Calculates the :term:`Bayes error rate<Bayes Error Rate (BER)>` using K-nearest neighbors
 
     Parameters
     ----------
@@ -114,12 +114,12 @@ BER_FN_MAP = {"KNN": ber_knn, "MST": ber_mst}
 @set_metadata("dataeval.metrics")
 def ber(images: ArrayLike, labels: ArrayLike, k: int = 1, method: Literal["KNN", "MST"] = "KNN") -> BEROutput:
     """
-    An estimator for Multi-class Bayes Error Rate using FR or KNN test statistic basis
+    An estimator for Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` using FR or KNN test statistic basis
 
     Parameters
     ----------
     images : ArrayLike (N, ... )
-        Array of images or image embeddings
+        Array of images or image :term:`embeddings<Embeddings>`
     labels : ArrayLike (N, 1)
         Array of labels for each image or image embedding
     k : int, default 1

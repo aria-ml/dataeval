@@ -30,7 +30,7 @@ class OOD_AEGMM(OODGMMBase):
     Parameters
     ----------
     model : AEGMM
-        An AEGMM model.
+       An AEGMM model.
     """
 
     def __init__(self, model: AEGMM) -> None:
@@ -53,7 +53,7 @@ class OOD_AEGMM(OODGMMBase):
     @set_metadata("dataeval.detectors")
     def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
         """
-        Compute the out-of-distribution (OOD) score for a given dataset.
+        Compute the :term:`out of distribution<Out-of-distribution (OOD)>` score for a given dataset.
 
         Parameters
         ----------

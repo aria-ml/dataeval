@@ -76,7 +76,7 @@ class TestAPIBER:
         assert result.dict() == {"ber": 0.8, "ber_lower": 0.2}
 
     def test_torch_inputs(self):
-        """Torch class correctly calls functional numpy math"""
+        """Torch class correctly calls functional :term:`NumPy` math"""
         mock_knn = MagicMock()
         mock_knn.return_value = (0, 0)
         from dataeval._internal.metrics.ber import BER_FN_MAP

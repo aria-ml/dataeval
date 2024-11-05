@@ -157,7 +157,7 @@ class TestLabelIndependenceFunctional:
 
     def test_5050_data(self):
         """
-        Test that a 50/50 distribution of labels gives the expected chi-squared and p-value
+        Test that a 50/50 distribution of labels gives the expected chi-squared and :term:`p-value<P-Value>`
         """
         f_exp = np.array([100, 100])
         f_obs = np.array([100, 100])
@@ -242,7 +242,7 @@ class TestMDParityFunctional:
     def test_correlated_factors(self):
         """
         In this dataset, class and factor1 are perfectly correlated.
-        This tests that the p-value is less than 0.05, which
+        This tests that the p-value<P-Value>` is less than 0.05, which
         corresponds to class and factor1 being highly correlated.
         """
         factors = {

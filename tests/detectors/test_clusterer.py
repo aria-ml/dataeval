@@ -394,7 +394,7 @@ class TestClusterOutliers:
         ],
     )
     def test_find_outliers(self, cluster: Cluster, outs, pouts):
-        """Specified outliers are added to lists"""
+        """Specified Outliers are added to lists"""
 
         x = Clusters({1: {0: cluster}})
         last_merge_levels = {0: 0}
@@ -418,7 +418,7 @@ class TestClusterOutliers:
         ],
     )
     def test_no_outliers(self, mid, cid, merge_lvl, cluster):
-        """No outliers are found"""
+        """No Outliers are found"""
         x = Clusters({1: {cid: cluster}})
 
         last_merge_levels = {mid: merge_lvl}
@@ -485,7 +485,7 @@ class TestClusterDuplicates:
         assert potential_duplicates == []
 
     def test_no_duplicates(self):
-        """`Clusterer` finds no duplicates during evaluate"""
+        """`Clusterer` finds no :term:`duplicates<Duplicates>` during evaluate"""
         data = np.array([[0, 0], [1, 1], [2, 2]])
         c = Clusterer(data)
         results = c.evaluate()

@@ -27,7 +27,7 @@ class OutliersOutput(Generic[TIndexIssueMap], OutputMetadata):
     Attributes
     ----------
     issues : dict[int, dict[str, float]] | list[dict[int, dict[str, float]]]
-        Indices of image outliers with their associated issue type and calculated values.
+        Indices of image Outliers with their associated issue type and calculated values.
 
     - For a single dataset, a dictionary containing the indices of outliers and
       a dictionary showing the issues and calculated values for the given index.
@@ -69,7 +69,7 @@ def _get_outlier_mask(
 
 class Outliers:
     r"""
-    Calculates statistical outliers of a dataset using various statistical tests applied to each image
+    Calculates statistical Outliers of a dataset using various statistical tests applied to each image
 
     Parameters
     ----------
@@ -86,7 +86,7 @@ class Outliers:
 
     See Also
     --------
-    Duplicates
+    :term:`Duplicates`
 
     Note
     ----
@@ -162,7 +162,7 @@ class Outliers:
         self, stats: OutlierStatsOutput | DatasetStatsOutput | Sequence[OutlierStatsOutput]
     ) -> OutliersOutput:
         """
-        Returns indices of outliers with the issues identified for each
+        Returns indices of Outliers with the issues identified for each
 
         Parameters
         ----------
@@ -238,7 +238,7 @@ class Outliers:
     )
     def evaluate(self, data: Iterable[ArrayLike]) -> OutliersOutput[IndexIssueMap]:
         """
-        Returns indices of outliers with the issues identified for each
+        Returns indices of Outliers with the issues identified for each
 
         Parameters
         ----------

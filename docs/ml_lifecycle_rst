@@ -144,7 +144,7 @@ Data Engineering
 * formulate sampling protocols
 
   * coverage assessment
-  * ensure relevance, completeness, balance, and accuracy
+  * ensure relevance, completeness, {term}`balance<Balance>`, and {term}`accuracy<Accuracy.`
 
 * curate static training and test datasets
 

@@ -1,16 +1,16 @@
-# Detecting Duplicates
+# Detecting {term}`duplicates<Duplicates>`
 
 ## What is it
 
-The Duplicates class identifies exact and near duplicate data.
+The {term}`Duplicates` class identifies exact and near duplicate data.
 
 ## When to use it
 
-The Duplicates class should be used if you need to check for duplicates in your dataset.
+The {term}`Duplicates` class should be used if you need to check for duplicates in your dataset.
 
 ## Theory behind it
 
-With the Duplicates class, exact matches are found using a byte hash of the data information,
+With the {term}`Duplicates` class, exact matches are found using a byte hash of the data information,
 while near matches (such as a crop of another image or a distoration of another image) use a perception based hash.
 
 The byte hash is achieved through the use of the [python-xxHash](https://github.com/ifduyue/python-xxhash) Python module,

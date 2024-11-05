@@ -35,7 +35,7 @@ def build_model(
     Parameters
     ----------
     dist
-        TensorFlow distribution.
+        :term:`TensorFlow` distribution.
     input_shape
         Input shape of the model.
     filepath
@@ -230,7 +230,7 @@ class OOD_LLR(OODBase):
         batch_size: int = int(1e10),
     ) -> NDArray:
         """
-        Compute log probability of a batch of instances under the generative model.
+        Compute log probability of a batch of instances under the :term:`generative model<Generative Model>`.
         """
         logp_fn = partial(dist.log_prob, return_per_feature=return_per_feature)
         # TODO: TBD: can this be any of the other types from predict_batch? i.e. tf.Tensor or tuple
@@ -269,7 +269,7 @@ class OOD_LLR(OODBase):
         return_per_feature
             Return likelihood ratio per feature.
         batch_size
-            Batch size for the generative model evaluations.
+            Batch size for the :term:`generative model<Generative Model>` evaluations.
 
         Returns
         -------

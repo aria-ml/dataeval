@@ -89,7 +89,7 @@ def datasetstats(
     labels: Iterable[ArrayLike] | None = None,
 ) -> DatasetStatsOutput:
     """
-    Calculates various statistics for each image
+    Calculates various :term:`statistics<Statistics>` for each image
 
     This function computes dimension, pixel and visual metrics
     on the images or individual bounding boxes for each image as

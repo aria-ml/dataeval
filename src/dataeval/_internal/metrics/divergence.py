@@ -1,5 +1,5 @@
 """
-This module contains the implementation of HP Divergence
+This module contains the implementation of HP :term:`divergence<Divergence>`
 using the Fast Nearest Neighbor and Minimum Spanning Tree algorithms
 """
 
@@ -24,7 +24,7 @@ class DivergenceOutput(OutputMetadata):
     Attributes
     ----------
     divergence : float
-        Divergence value calculated between 2 datasets ranging between 0.0 and 1.0
+        :term:`Divergence` value calculated between 2 datasets ranging between 0.0 and 1.0
     errors : int
         The number of differing edges between the datasets
     """
@@ -82,7 +82,7 @@ DIVERGENCE_FN_MAP = {"FNN": divergence_fnn, "MST": divergence_mst}
 @set_metadata("dataeval.metrics")
 def divergence(data_a: ArrayLike, data_b: ArrayLike, method: Literal["FNN", "MST"] = "FNN") -> DivergenceOutput:
     """
-    Calculates the divergence and any errors between the datasets
+    Calculates the :term`divergence` and any errors between the datasets
 
     Parameters
     ----------
@@ -93,7 +93,7 @@ def divergence(data_a: ArrayLike, data_b: ArrayLike, method: Literal["FNN", "MST
         A dataset in an ArrayLike format to compare.
         Function expects the data to have 2 dimensions, N number of observations in a P-dimensionial space.
     method : Literal["MST, "FNN"], default "FNN"
-        Method used to estimate dataset divergence
+        Method used to estimate dataset :term:`divergence<Divergence>`
 
     Returns
     -------

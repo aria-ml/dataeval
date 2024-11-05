@@ -1,4 +1,4 @@
-# Detecting Bias in Datasets
+# Detecting {term}`Bias<Bias>` in Datasets
 % Includes Parity, Coverage, Balance
 
 ## What is it
