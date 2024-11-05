@@ -86,8 +86,8 @@ def get_least_likely_features(
             continue
 
         # Get standardization parameters from metadata
-        loc = np.median(v)
-        dev = np.asarray(v) - loc
+        loc = np.median(v)  # ok, because we checked all were numeric
+        dev = np.asarray(v) - loc  # need to make array from v since it could be a list here.
         posdev, negdev = dev[dev > 0], dev[dev < 0]
         pos_scale = np.median(posdev) if posdev.any() else 1.0
         neg_scale = np.abs(np.median(negdev)) if negdev.any() else 1.0
