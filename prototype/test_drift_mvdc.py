@@ -7,13 +7,15 @@ import os
 @pytest.fixture
 def tst_data():
     """Zeros as test data, just needs to be really different from the Gaussian training data"""
+    
     n_samples, n_features = 100, 4
     tstData = np.zeros((n_samples, n_features))
     return tstData
 
 @pytest.fixture
 def trn_data():
-    """Gaussian distribution, 0 mean, unit variance training data"""
+    """Gaussian distribution, 0 mean, unit :term:`variance<Variance>` training data"""
+    
     n_samples, n_features, mean, std_dev = 100, 4, 0, 1
     size = n_samples*n_features
     x = np.linspace(-3, 3, size)
@@ -89,7 +91,7 @@ if __name__ == "__main__":
     dc.predict()
     dc.plot(showme=True, savedir=os.getcwd())  # fig: DomainClassification.png will be to cwd
     
-    # Test domain dataframe and classification
+    # Test domain data frame and classification
     tstdf = dc.resdf[dc.resdf['chunk']['period']=='analysis']
     isdrift = tstdf['domain_classifier_auroc']['alert'].values
     

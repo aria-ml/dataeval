@@ -1,5 +1,5 @@
 """
-This module contains the implementation of drift detection
+This module contains the implementation of :term:`drift<Drift>` detection
 
 """
 
@@ -155,11 +155,11 @@ class DriftDetector:
         unlabeled_test_datasets: List[Dataset],
     ):
         """
-        Predicts the effects of unlabeled test dataset drift on model accuracy.
+        Predicts the effects of unlabeled test dataset :term:`drift<Drift>` on model :term:`accuracy<Accuracy>`.
 
         Use case: Given a model trained on some dataset, where we know its performance
         on a variety of labeled test datasets, how will model accuracy change on a new,
-        possibly out-of-distribution test dataset that we don't have labels for?
+        possibly :term:Out-of-distribution (OOD)` test dataset that we don't have labels for?
 
         This implements the method introduced in https://arxiv.org/abs/2202.05834.
 
@@ -356,7 +356,7 @@ class DriftDetector:
         Parameters
         ----------
         model : nn.Module
-            The model that the effects of dataset drift will be characterized on.
+            The model that the effects of dataset :term:`drift<Drift>` will be characterized on.
         train_ds : Dataset
             Training dataset for the model.
         test_ds : Dataset
@@ -368,7 +368,7 @@ class DriftDetector:
             The projection norm associated with fine-tuning model on predicted labels
             on test_ds
         accuracy_ref : float
-            If test_ds is labeled, this is the accuracy of the reference model
+            If test_ds is labeled, this is the :term:`accuracy<Accuracy>` of the reference model
             on test_ds
         """
 

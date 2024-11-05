@@ -1,7 +1,7 @@
 """
 The utility classes and functions are provided by DataEval to assist users
 in setting up architectures that are guaranteed to work with applicable DataEval
-metrics. Currently DataEval supports both Tensorflow and PyTorch backends.
+metrics. Currently DataEval supports both :term:`TensorFlow` and PyTorch backends.
 """
 
 from dataeval import _IS_TENSORFLOW_AVAILABLE, _IS_TORCH_AVAILABLE

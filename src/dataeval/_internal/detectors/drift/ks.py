@@ -21,10 +21,10 @@ from .base import BaseDriftUnivariate, UpdateStrategy, preprocess_x
 
 class DriftKS(BaseDriftUnivariate):
     """
-    Drift detector employing the Kolmogorov-Smirnov (KS) distribution test.
+    :term:`Drift` detector employing the Kolmogorov-Smirnov (KS) distribution test.
 
     The KS test detects changes in the maximum distance between two data
-    distributions with Bonferroni or False Discovery Rate (FDR) correction
+    distributions with Bonferroni or :term:`False Discovery Rate (FDR)` correction
     for multivariate data.
 
     Parameters
@@ -32,7 +32,7 @@ class DriftKS(BaseDriftUnivariate):
     x_ref : ArrayLike
         Data used as reference distribution.
     p_val : float | None, default 0.05
-        p-value used for significance of the statistical test for each feature.
+        :term:`p-value<P-Value>` used for significance of the statistical test for each feature.
         If the FDR correction method is used, this corresponds to the acceptable
         q-value.
     x_ref_preprocessed : bool, default False
@@ -44,8 +44,8 @@ class DriftKS(BaseDriftUnivariate):
         using the last n instances seen by the detector with LastSeenUpdateStrategy
         or via reservoir sampling with ReservoirSamplingUpdateStrategy.
     preprocess_fn : Callable | None, default None
-        Function to preprocess the data before computing the data drift metrics.
-        Typically a dimensionality reduction technique.
+        Function to preprocess the data before computing the data :term:`drift<Drift>` metrics.
+        Typically a :term:`dimensionality reduction<Dimensionality Reduction>` technique.
     correction : "bonferroni" | "fdr", default "bonferroni"
         Correction type for multivariate data. Either 'bonferroni' or 'fdr' (False
         Discovery Rate).
@@ -85,7 +85,7 @@ class DriftKS(BaseDriftUnivariate):
     @preprocess_x
     def score(self, x: ArrayLike) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         """
-        Compute KS scores and statistics per feature.
+        Compute KS scores and :term:Statistics` per feature.
 
         Parameters
         ----------
@@ -95,7 +95,7 @@ class DriftKS(BaseDriftUnivariate):
         Returns
         -------
         tuple[NDArray, NDArray]
-            Feature level p-values and KS statistic
+            Feature level :term:p-values and KS statistic
         """
         x = to_numpy(x)
         x = x.reshape(x.shape[0], -1)

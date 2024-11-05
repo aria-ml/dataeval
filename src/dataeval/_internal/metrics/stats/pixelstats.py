@@ -23,7 +23,7 @@ class PixelStatsOutput(BaseStatsOutput):
     std : NDArray[np.float16]
         Standard deviation of the pixel values of the images
     var : NDArray[np.float16]
-        Variance of the pixel values of the images
+        :term:`Variance` of the pixel values of the images
     skew : NDArray[np.float16]
         Skew of the pixel values of the images
     kurtosis : NDArray[np.float16]
@@ -73,7 +73,7 @@ def pixelstats(
     per_channel: bool = False,
 ) -> PixelStatsOutput:
     """
-    Calculates pixel statistics for each image
+    Calculates pixel :term:`statistics<Statistics>` for each image
 
     This function computes various statistical metrics (e.g., mean, standard deviation, entropy)
     on the images as a whole.
@@ -90,7 +90,7 @@ def pixelstats(
     PixelStatsOutput
         A dictionary-like object containing the computed statistics for each image. The keys correspond
         to the names of the statistics (e.g., 'mean', 'std'), and the values are lists of results for
-        each image or numpy arrays when the results are multi-dimensional.
+        each image or :term:`NumPy` arrays when the results are multi-dimensional.
 
     See Also
     --------

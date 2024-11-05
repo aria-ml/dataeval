@@ -1,9 +1,9 @@
-# Bayes Error Rate Estimation
+# {term}`Bayes Error Rate (BER)` Estimation
 
 ## What is it
 
-Bayes error rate refers to the irreducible error in a particular classification problem.
-The `ber` function assesses the feasibility of a machine learning classification task by estimating this error rate.
+Bayes error rate refers to the {term}`irreducible error<Irreducible Error>` in a particular {term}`classification<Classification>` problem.
+The `ber` function assesses the {term}`feasibility<Feasibility>` of a machine learning classification task by estimating this error rate.
 Bayes error rate has a formal definition given by the following:
 
 $$\text{BER}= E_X[P(Y\neq y \mid \argmax_i P(Y=i \mid X=x)=y)]$$
@@ -12,18 +12,18 @@ Put into words, it is the misclassification rate of the best possible classifier
 
 ## When to use it
 
-The `ber` metric should be used when you would like to measure the feasibility of a machine learning classification task.
-For example, you would like to know if the operational accuracy requirement of 80% is achievable given the imagery.
+The `ber` metric should be used when you would like to measure the {term}`feasibility<Feasibility>` of a {term}`machine learning<Machine Learning (ML)>` {term}`classification<Classification>` task.
+For example, you would like to know if the operational {term}`accuracy<Accuracy>` requirement of 80% is achievable given the imagery.
 
 This quantity is of interest because it informs an engineer about the inherent difficulty of a problem. If this difficulty surpasses operational performance requirements, then the problem must be changed in order to become feasible.
 
 ## Theory behind it
 
-While the expectation described above is easy to write down, it is nontrivial to obtain it for difficult computer vision tasks. Many works have proposed estimators of this quantity and analyzed their properties. At their core, these estimators try to quantify uncertainty along the decision boundary. For high dimensional datasets, typically only a fraction of samples are inherently problematic when it comes to classification. For example, take the following problematic images from the [MNIST](https://en.wikipedia.org/wiki/MNIST_database) dataset (taken from [here](https://www.kaggle.com/code/cdeotte/25-million-images-0-99757-mnist)):
+While the expectation described above is easy to write down, it is nontrivial to obtain it for difficult computer vision tasks. Many works have proposed estimators of this quantity and analyzed their properties. At their core, these estimators try to quantify uncertainty along the decision boundary. For high dimensional datasets, typically only a fraction of samples are inherently problematic when it comes to {term}`classification<Classification>`. For example, take the following problematic images from the [MNIST](https://en.wikipedia.org/wiki/MNIST_database) dataset (taken from [here](https://www.kaggle.com/code/cdeotte/25-million-images-0-99757-mnist)):
 
 ![problem](images/difficult.png)
 
-It is very difficult for even a human to classify these images, and the conditional distributions of labels for them are certainly non-deterministic. This is an intuitive example of the irreducible error that the `ber` function estimates.
+It is very difficult for even a human to classify these images, and the conditional distributions of labels for them are certainly non-deterministic. This is an intuitive example of the {term}`irreducible error<Irreducible Error>` that the `ber` function estimates.
 
 One way of understanding how we try to estimate BER is to look at *dimension reductions* of the images. In this case, we use [UMAP](https://arxiv.org/abs/1802.03426) (a simple dimension reduction technique) to embed the MNIST images in 2-dimensional space.
 

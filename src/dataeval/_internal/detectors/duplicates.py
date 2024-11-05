@@ -37,7 +37,7 @@ class DuplicatesOutput(Generic[TIndexCollection], OutputMetadata):
 
 class Duplicates:
     """
-    Finds the duplicate images in a dataset using xxhash for exact duplicates
+    Finds the duplicate images in a dataset using xxhash for exact :term:`duplicates<Duplicates>`
     and pchash for near duplicates
 
     Attributes

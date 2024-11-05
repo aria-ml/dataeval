@@ -2,7 +2,7 @@
 
 ## About DataEval
 
-DataEval focuses on characterizing image data and its impact on model performance across classification and object-detection tasks.
+DataEval focuses on characterizing image data and its impact on model performance across Classification and object-detection tasks.
 
 <!-- start about -->
 

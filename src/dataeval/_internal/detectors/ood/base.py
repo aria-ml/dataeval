@@ -32,7 +32,7 @@ class OODOutput(OutputMetadata):
     Attributes
     ----------
     is_ood : NDArray
-        Array of images that are detected as out of distribution
+        Array of images that are detected as :term:Out-of-Distribution (OOD)`
     instance_score : NDArray
         Instance score of the evaluated dataset
     feature_score : NDArray | None
@@ -109,7 +109,7 @@ class OODBase(ABC):
     @abstractmethod
     def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
         """
-        Compute the out-of-distribution (OOD) scores for a given dataset.
+        Compute the :term:`out of distribution<Out-of-distribution (OOD)>` scores for a given dataset.
 
         Parameters
         ----------
@@ -182,7 +182,7 @@ class OODBase(ABC):
         ood_type: Literal["feature", "instance"] = "instance",
     ) -> OODOutput:
         """
-        Predict whether instances are out-of-distribution or not.
+        Predict whether instances are :term:`out of distribution<Out-of-distribution (OOD)>` or not.
 
         Parameters
         ----------

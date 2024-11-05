@@ -5,7 +5,7 @@ import numpy as np
 
 class MockImageClassificationDataset:
     """
-    A class representing a mock image classification dataset
+    A class representing a mock image :term:`classification<Classification>` dataset
 
     :param images: An array of multi-dimensional arrays mocking an image
      format of Height, Width, Channels

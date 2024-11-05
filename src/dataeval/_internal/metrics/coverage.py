@@ -16,7 +16,7 @@ from dataeval._internal.output import OutputMetadata, set_metadata
 @dataclass(frozen=True)
 class CoverageOutput(OutputMetadata):
     """
-    Output class for :func:`coverage` bias metric
+    Output class for :func:`coverage` :term:`bias<Bias>` metric
 
     Attributes
     ----------
@@ -25,7 +25,7 @@ class CoverageOutput(OutputMetadata):
     radii : NDArray
         Array of critical value radii
     critical_value : float
-        Radius for coverage
+        Radius for :term:`coverage<Coverage>`
     """
 
     indices: NDArray[np.intp]
@@ -41,7 +41,7 @@ def coverage(
     percent: np.float64 = np.float64(0.01),
 ) -> CoverageOutput:
     """
-    Class for evaluating coverage and identifying images/samples that are in undercovered regions.
+    Class for evaluating :term:`coverage<Coverage>` and identifying images/samples that are in undercovered regions.
 
     Parameters
     ----------
@@ -64,7 +64,7 @@ def coverage(
     Raises
     ------
     ValueError
-        If length of embeddings is less than or equal to k
+        If length of :term:`embeddings<Embeddings>` is less than or equal to k
     ValueError
         If radius_type is unknown
 

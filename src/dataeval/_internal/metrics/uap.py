@@ -1,7 +1,7 @@
 """
 This module contains the implementation of the
-FR Test Statistic based estimate for the upperbound
-average precision using empirical mean precision
+FR Test Statistic based estimate for the :term:`upper-bound
+average precision<Upper-Bound Average Precision (UAP)>` using empirical mean precision
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ def uap(labels: ArrayLike, scores: ArrayLike) -> UAPOutput:
     Parameters
     ----------
     labels : ArrayLike
-        A numpy array of n_samples of class labels with M unique classes.
+        A term:`NumPy` array of n_samples of class labels with M unique classes.
     scores : ArrayLike
         A 2D array of class probabilities per image
 

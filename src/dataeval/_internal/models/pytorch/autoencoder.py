@@ -17,7 +17,7 @@ def get_images_from_batch(batch: Any) -> Any:
 
 class AETrainer:
     """
-    A class to train and evaluate an autoencoder model.
+    A class to train and evaluate an autoencoder<Autoencoder>` model.
 
     Parameters
     ----------
@@ -44,7 +44,7 @@ class AETrainer:
 
     def train(self, dataset: Dataset, epochs: int = 25) -> list[float]:
         """
-        Basic image reconstruction training function for Autoencoder models
+        Basic image reconstruction training function for :term:`Autoencoder` models
 
         Uses `torch.optim.Adam` and `torch.nn.MSELoss` as default hyperparameters
 
@@ -59,7 +59,7 @@ class AETrainer:
         Returns
         -------
         List[float]
-            A list of average loss values for each epoch.
+            A list of average loss values for each :term:`epoch<Epoch>`.
 
         Note
         ----
@@ -103,7 +103,7 @@ class AETrainer:
     @torch.no_grad
     def eval(self, dataset: Dataset) -> float:
         """
-        Basic image reconstruction evaluation function for Autoencoder models
+        Basic image reconstruction evaluation function for :term:`autoencoder<Autoencoder>` models
 
         Uses `torch.nn.MSELoss` as default loss function.
 
@@ -139,7 +139,7 @@ class AETrainer:
     @torch.no_grad
     def encode(self, dataset: Dataset) -> torch.Tensor:
         """
-        Create image embeddings for the dataset using the model's encoder.
+        Create image :term:`embeddings<Embeddings>` for the dataset using the model's encoder.
 
         If the model has an `encode` method, it will be used; otherwise,
         `model.forward` will be used.
@@ -178,7 +178,7 @@ class AETrainer:
 
 class AriaAutoencoder(nn.Module):
     """
-    An autoencoder model with a separate encoder and decoder.
+    An :term:`autoencoder<Autoencoder>` model with a separate encoder and decoder.
 
     Parameters
     ----------
@@ -228,7 +228,7 @@ class AriaAutoencoder(nn.Module):
 
 class Encoder(nn.Module):
     """
-    A simple encoder to be used in an autoencoder model.
+    A simple encoder to be used in an :term:`autoencoder<Autoencoder>` model.
 
     This is the encoder used by the AriaAutoencoder model.
 
@@ -269,7 +269,7 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
     """
-    A simple decoder to be used in an autoencoder model.
+    A simple decoder to be used in an :term:`autoencoder<Autoencoder>` model.
 
     This is the decoder used by the AriaAutoencoder model.
 

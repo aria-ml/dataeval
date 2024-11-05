@@ -82,7 +82,7 @@ def visualstats(
     """
     Calculates visual statistics for each image
 
-    This function computes various visual metrics (e.g., brightness, darkness, contrast, sharpness)
+    This function computes various visual metrics (e.g., :term:`brightness<Brightness>`, darkness, contrast, blurriness)
     on the images as a whole.
 
     Parameters
@@ -96,8 +96,8 @@ def visualstats(
     -------
     VisualStatsOutput
         A dictionary-like object containing the computed visual statistics for each image. The keys correspond
-        to the names of the statistics (e.g., 'brightness', 'sharpness'), and the values are lists of results for
-        each image or numpy arrays when the results are multi-dimensional.
+        to the names of the statistics (e.g., 'brightness', 'blurriness'), and the values are lists of results for
+        each image or :term:`NumPy` arrays when the results are multi-dimensional.
 
     See Also
     --------
@@ -109,7 +109,7 @@ def visualstats(
 
     Examples
     --------
-    Calculating the statistics on the images, whose shape is (C, H, W)
+    Calculating the :term:`statistics<Statistics>` on the images, whose shape is (C, H, W)
 
     >>> results = visualstats(images)
     >>> print(results.brightness)

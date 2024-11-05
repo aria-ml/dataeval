@@ -3,17 +3,17 @@
 ## What is Data Cleaning?
 
 Data cleaning is the process of detecting and correcting inaccurate, incomplete, or irrelevant data from a dataset.
-This process involves identifying and fixing errors, handling missing values, standardizing data formats, and removing duplicates.
+This process involves identifying and fixing errors, handling missing values, standardizing data formats, and removing {term}`duplicate<Duplicates>`.
 The goal is to ensure that the data is accurate, consistent, and ready for analysis.
 
 ## Why Should You Clean Your Data?
 
 When training models, the quality of the dataset can greatly impact the usefulness of the model.
-The goal of machine learning and AI is to create robust, reliable, and generalizable models.
+The goal of {term}`machine learning<Machine Learning (ML)>` and AI is to create robust, reliable, and generalizable models.
 A dataset contributes to the usefulness of a model in the following ways:
 
 1. **Accuracy**:
-Data cleaning improves the accuracy or representation of your dataset.
+Data cleaning improves the {term}`accuracy<Accuracy>` or representation of your dataset.
 Dirty data, which may include incorrect or inconsistent entries, can result in misleading analyses and incorrect conclusions.
 
 2. **Reliability**:
@@ -50,7 +50,7 @@ avoid issues like duplicate entries or conflicting formats.
 Always clean your data before performing any statistical analysis or model building.
 Consider having a subject matter expert verify sample statistics with known population dynamics to ensure that the data is representative.
 For images, the data cleaning process should include verifying image properties (like size and metadata)
-as well as the visual aspects of the image (like brightness and sharpness). 
+as well as the visual aspects of the image (like {term}`brigtness<Brightness>` and {term}`blurriness<Blur>`). 
 This ensures that your results are based on accurate and relevant information.
 
 ## Inaccurate, Incomplete and/or Irrelevant Data
@@ -90,7 +90,7 @@ If the input data is flawed, the output will be unreliable,
 regardless of the sophistication of the analysis.
 
 
-## Data Cleaning with DataEval
+## Data Cleaning with {term}`DataEval`
 
 DataEval is a data analysis and monitoring library with some dedicated functions and classes for data cleaning.
 
@@ -104,13 +104,13 @@ DataEval's data cleaning functions and classes are:
 * [Outliers](Outliers.md) class.
 
 These functions and classes facilitate the creation of dataset statistics and
-the identification of abnormal data points and duplicates. 
+the identification of abnormal data points and {term}`duplicates<Duplicates>`. 
 The **hashstats** function creates image hashes on a per image basis.
 The **dimensionstats** function creates dataset statistics on a per image basis.
 The **pixelstats** and **visualstats** functions create dataset statistics on a per image per channel basis.
 The **Clusterer** class clusters the data and identifies data points which do not fit into a cluster.
 The **Duplicates** class identifies duplicate images.
-The **Outliers** class analyzes the dataset statistics for outliers based on the chosen statistical method.
+The **Outliers** class analyzes the dataset statistics for Outliers based on the chosen statistical method.
 
 To see data cleaning in action using DataEval, check out our [Data Cleaning Guide](../tutorials/EDA_Part1.ipynb).
 

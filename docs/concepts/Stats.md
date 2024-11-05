@@ -15,7 +15,7 @@ The dimensionstats function is an aggregate metric that calculates various dimen
 - aspect_ratio
 - depth
 
-This function can be used in conjunction with the `Outliers` class to determine if there are any issues with any of the images in the dataset.
+This function can be used in conjunction with the Outliers class to determine if there are any issues with any of the images in the dataset.
 
 ## hashstats
 
@@ -25,7 +25,7 @@ The hashstats function is an aggregate metric that calculates various hash value
 - [xxhash](https://github.com/Cyan4973/xxHash) - exact image matching
 - [pchash](https://en.wikipedia.org/wiki/Perceptual_hashing) - perceptual hash based near image matching
 
-This function can be used in conjunction with the `Duplicates` class in order to identify duplicate images.
+This function can be used in conjunction with the {term}`duplicates<Duplicates>` class in order to identify duplicate images.
 
 ## labelstats
 
@@ -54,7 +54,7 @@ The pixelstats function is an aggregate metric that calculates normal statistics
 - percentiles
 - histogram
 
-This function can be used in conjunction with the `Outliers` class to determine if there are any issues with any of the images in the dataset.
+This function can be used in conjunction with the Outliers class to determine if there are any issues with any of the images in the dataset.
 
 ## visualstats
 

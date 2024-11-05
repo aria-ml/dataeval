@@ -5,7 +5,7 @@ import numpy as np
 
 def compute_hwa_xyxy(xyxy: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
-    Compute width, height, size/area, and aspect ratio for bounding boxes.
+    Compute width, height, size/area, and :term:`aspect ratio<Aspect Ratio>` for bounding boxes.
     Compute in one function to reuse quantities.
     Catch divide by zero error in aspect ratio calculation with epsilon
     Computed together for reuse.
@@ -150,7 +150,7 @@ def intrinsic_factors_xywh(xywh: np.ndarray, img_sizes: np.ndarray) -> Tuple[Dic
     Returns
     -------
     prop: Dict[np.ndarray]
-        Dictionary where keys are intrinsic metadata factors, values are numpy
+        Dictionary where keys are intrinsic metadata factors, values are :term:`NumPy`
         arrays of values.
     is_categorical: Dict[np.ndarray]
         Dictionary specifying whether each key in prop is a categorical variable
