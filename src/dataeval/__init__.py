@@ -8,16 +8,16 @@ _IS_TENSORFLOW_AVAILABLE = find_spec("tensorflow") is not None and find_spec("te
 
 del find_spec
 
-from . import detectors, metrics  # noqa: E402
+from dataeval import detectors, metrics  # noqa: E402
 
 __all__ = ["detectors", "metrics"]
 
 if _IS_TORCH_AVAILABLE:  # pragma: no cover
-    from . import workflows
+    from dataeval import workflows
 
     __all__ += ["workflows"]
 
 if _IS_TENSORFLOW_AVAILABLE or _IS_TORCH_AVAILABLE:  # pragma: no cover
-    from . import utils
+    from dataeval import utils
 
     __all__ += ["utils"]

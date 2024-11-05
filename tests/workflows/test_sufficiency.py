@@ -10,14 +10,14 @@ import torch.nn as nn
 from matplotlib.figure import Figure
 from torch.utils.data import DataLoader
 
-from dataeval._internal.workflows.sufficiency import (
+from dataeval.workflows import Sufficiency
+from dataeval.workflows.sufficiency import (
     SufficiencyOutput,
     f_inv_out,
     f_out,
     inv_project_steps,
     project_steps,
 )
-from dataeval.workflows import Sufficiency
 from tests.utils.data import DataEvalDataset
 
 np.random.seed(0)

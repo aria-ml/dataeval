@@ -5,13 +5,13 @@ import numpy.testing as npt
 import pytest
 import sklearn.datasets as dsets
 
-from dataeval._internal.detectors.clusterer import (
-    Cluster,
+from dataeval.detectors.linters.clusterer import (
     Clusterer,
-    ClusterMergeEntry,
-    ClusterPosition,
-    Clusters,
-    extend_linkage,
+    _Cluster,
+    _ClusterMergeEntry,
+    _ClusterPosition,
+    _Clusters,
+    _extend_linkage,
 )
 
 
@@ -83,7 +83,7 @@ class TestMatrixOps:
 
             # Extend function
             arr = np.ones(shape=(rows, cols))
-            ext_matrix = extend_linkage(arr)
+            ext_matrix = _extend_linkage(arr)
             assert ext_matrix.shape == (rows, cols + 1)  # Adds a column to the right
             # New column contains new max_row number of ids starting from max row + 1
             # i.e. [1, 2, 3] -> [[1, 2, 3], [4, 5, 6]]
@@ -96,7 +96,7 @@ class TestMatrixOps:
 class TestCluster:
     def test_init_not_copy(self):
         """Variables are calculated correctly when not copying"""
-        c1 = Cluster(merged=False, samples=[0, 1], sample_dist=[1, 4], is_copy=False)  # type: ignore
+        c1 = _Cluster(merged=False, samples=[0, 1], sample_dist=[1, 4], is_copy=False)  # type: ignore
 
         assert isinstance(c1.samples, np.ndarray)
         assert c1.samples.dtype == np.int32
@@ -111,7 +111,7 @@ class TestCluster:
 
     def test_init_dist_is_scalar(self):
         """Special case where there is only one sample"""
-        c1 = Cluster(merged=False, samples=[0], sample_dist=0, is_copy=False)  # type: ignore
+        c1 = _Cluster(merged=False, samples=[0], sample_dist=0, is_copy=False)  # type: ignore
 
         assert isinstance(c1.samples, np.ndarray)
         assert c1.samples.dtype == np.int32
@@ -127,7 +127,7 @@ class TestCluster:
     def test_init_is_copy(self):
         """Default values are set for copied clusters"""
         # A copy ignores scalar sample_dist, and sets dist_std to 0 instead of 1e-5
-        c1 = Cluster(merged=False, samples=[0], sample_dist=0, is_copy=True)  # type: ignore
+        c1 = _Cluster(merged=False, samples=[0], sample_dist=0, is_copy=True)  # type: ignore
 
         assert isinstance(c1.samples, np.ndarray)
         assert c1.samples.dtype == np.int32
@@ -142,7 +142,7 @@ class TestCluster:
 
     def test_cluster_copy(self):
         """A copied cluster retains parent's samples, but not other status"""
-        c1 = Cluster(merged=True, samples=[0, 1], sample_dist=[1, 4], is_copy=False)  # type: ignore
+        c1 = _Cluster(merged=True, samples=[0, 1], sample_dist=[1, 4], is_copy=False)  # type: ignore
 
         c2 = c1.copy()
 
@@ -159,17 +159,17 @@ class TestCluster:
         assert not c2.out2
 
     def test_cluster_repr(self):
-        c1 = Cluster(merged=False, samples=[0, 1], sample_dist=[1, 4], is_copy=False)  # type: ignore
+        c1 = _Cluster(merged=False, samples=[0, 1], sample_dist=[1, 4], is_copy=False)  # type: ignore
 
         assert (
             c1.__repr__()
-            == "Cluster(**{'merged': False, 'samples': array([0, 1], dtype=int32), 'sample_dist': array([1, 4]), 'is_copy': False})"  # noqa: E501
+            == "_Cluster(**{'merged': False, 'samples': array([0, 1], dtype=int32), 'sample_dist': array([1, 4]), 'is_copy': False})"  # noqa: E501
         )
 
         # Numpy repr assumes direct numpy namespace imports
         from numpy import array, int32
 
-        assert Cluster(
+        assert _Cluster(
             **{"merged": False, "samples": array([0, 1], dtype=int32), "sample_dist": array([1, 4]), "is_copy": False}
         )
 
@@ -178,17 +178,17 @@ class TestCluster:
 
 class TestClusterPosition:
     def test_get_by_name(self):
-        cp = ClusterPosition(1, 1)
+        cp = _ClusterPosition(1, 1)
         assert cp.level
         assert cp.cid
 
 
 class TestClusterMergeEntry:
     def test_arithmetic_ops(self):
-        cme = ClusterMergeEntry(1, 1, 1, True)
+        cme = _ClusterMergeEntry(1, 1, 1, True)
 
-        cme_less = ClusterMergeEntry(0, 10, 10, False)
-        cme_more = ClusterMergeEntry(10, 0, 0, False)
+        cme_less = _ClusterMergeEntry(0, 10, 10, False)
+        cme_more = _ClusterMergeEntry(10, 0, 0, False)
 
         assert cme_less < cme < cme_more
         assert cme_more > cme > cme_less
@@ -283,8 +283,8 @@ class TestCreateClusters:
 
     def test_fill_level(self):
         """Merged clusters fill levels with missing cluster data"""
-        dummy_data = Cluster(False, np.ndarray([0]), 0.0, True)
-        x = Clusters(
+        dummy_data = _Cluster(False, np.ndarray([0]), 0.0, True)
+        x = _Clusters(
             {
                 0: {
                     0: dummy_data,
@@ -303,7 +303,7 @@ class TestCreateClusters:
         )
 
         # Fill 0,1 up to 2,1
-        filled_clusters = self.clusterer._fill_levels(x, ClusterPosition(0, 1), ClusterPosition(2, 1))
+        filled_clusters = self.clusterer._fill_levels(x, _ClusterPosition(0, 1), _ClusterPosition(2, 1))
 
         # Confirm cluster info has been placed into levels up to merge level (3)
         # assert cluster_1 in [0, 1, 2, 3)
@@ -373,7 +373,7 @@ class TestCreateClusters:
 
     def test_skip_create_clusters(self, functional_data):
         c = Clusterer(functional_data)
-        x = {0: {0: Cluster(0, np.array([0]), np.array([0]))}}
+        x = {0: {0: _Cluster(0, np.array([0]), np.array([0]))}}
         c._clusters = x  # type: ignore
 
         assert c.clusters == x
@@ -386,17 +386,17 @@ class TestClusterOutliers:
         "cluster, outs, pouts",
         [
             # out2 is True; add last sample to outliers
-            (Cluster(0, np.arange(10), np.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 11])), [9], []),
+            (_Cluster(0, np.arange(10), np.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 11])), [9], []),
             # out1 is True and len(cluster.samples) >= min_num; add last sample to possible_outliers
-            (Cluster(0, np.arange(5), np.array([1, 1, 1, 1, 6])), [], [4]),
+            (_Cluster(0, np.arange(5), np.array([1, 1, 1, 1, 6])), [], [4]),
             # len(cluster.samples) < self.min_num; add all samples to outliers
-            (Cluster(0, np.arange(3), np.zeros((3, 1))), [0, 1, 2], []),
+            (_Cluster(0, np.arange(3), np.zeros((3, 1))), [0, 1, 2], []),
         ],
     )
-    def test_find_outliers(self, cluster: Cluster, outs, pouts):
-        """Specified Outliers are added to lists"""
+    def test_find_outliers(self, cluster: _Cluster, outs, pouts):
+        """Specified outliers are added to lists"""
 
-        x = Clusters({1: {0: cluster}})
+        x = _Clusters({1: {0: cluster}})
         last_merge_levels = {0: 0}
 
         c = Clusterer(np.zeros((3, 1)))
@@ -411,15 +411,15 @@ class TestClusterOutliers:
     @pytest.mark.parametrize(
         "mid, cid, merge_lvl, cluster",
         [
-            (0, 0, 0, Cluster(1, np.array([0]), 0.0)),  # merged
-            (0, 1, 0, Cluster(0, np.array([0]), 0.0)),  # cluster_id not in last_merge_levels
-            (0, 0, 2, Cluster(0, np.array([0]), 0.0)),  # merge_level > level (1)
-            (0, 0, 0, Cluster(0, np.arange(3), np.zeros((3, 1)))),  # No outliers
+            (0, 0, 0, _Cluster(1, np.array([0]), 0.0)),  # merged
+            (0, 1, 0, _Cluster(0, np.array([0]), 0.0)),  # cluster_id not in last_merge_levels
+            (0, 0, 2, _Cluster(0, np.array([0]), 0.0)),  # merge_level > level (1)
+            (0, 0, 0, _Cluster(0, np.arange(3), np.zeros((3, 1)))),  # No outliers
         ],
     )
     def test_no_outliers(self, mid, cid, merge_lvl, cluster):
-        """No Outliers are found"""
-        x = Clusters({1: {cid: cluster}})
+        """No outliers are found"""
+        x = _Clusters({1: {cid: cluster}})
 
         last_merge_levels = {mid: merge_lvl}
 
@@ -531,8 +531,8 @@ class TestClustererGetLastMergeLevels:
         c._max_clusters = 2
 
         merge_list = [
-            ClusterMergeEntry(-1, 0, 1, 0),  # level=-1, forces entry.level-1
-            ClusterMergeEntry(1, 0, 2, 1),  # Changes level back to 1
+            _ClusterMergeEntry(-1, 0, 1, 0),  # level=-1, forces entry.level-1
+            _ClusterMergeEntry(1, 0, 2, 1),  # Changes level back to 1
         ]
 
         c._get_cluster_distances = MagicMock()

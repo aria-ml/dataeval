@@ -2,13 +2,8 @@ import pytest
 import torch
 from torch.utils.data import DataLoader
 
-from dataeval._internal.models.pytorch.autoencoder import (
-    AETrainer,
-    AriaAutoencoder,
-    Decoder,
-    Encoder,
-    get_images_from_batch,
-)
+from dataeval.utils.torch.models import AriaAutoencoder, Decoder, Encoder
+from dataeval.utils.torch.trainer import AETrainer, get_images_from_batch
 from tests.utils.data import DataEvalDataset
 
 
@@ -173,7 +168,7 @@ class TestGPU:
         model = AriaAutoencoder()
         trainer = AETrainer(model, device=device)
         # Check trainer device set properly
-        assert trainer.device == device
+        assert trainer.device == torch.device(device)
 
         # Check if all params moved to device
         m = trainer.model

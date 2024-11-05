@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
-from dataeval._internal.models.tensorflow.losses import Elbo, LossGMM
+from dataeval.utils.tensorflow._internal.loss import Elbo, LossGMM
 
 N, K, D, F = 10, 5, 1, 3
 x = tf.convert_to_tensor(np.random.rand(N, F), dtype=tf.float32)
@@ -27,8 +27,8 @@ def test_elbo():
 
     assert elbo_cov_full(x, y) != elbo_cov_diag(x, y) != elbo_cov_sim(x, y)
 
-    elbo_cov_full.cov = ("cov_full", cov_full)
-    elbo_cov_diag.cov = ("cov_diag", cov_diag)
+    elbo_cov_full._cov = ("cov_full", cov_full)
+    elbo_cov_diag._cov = ("cov_diag", cov_diag)
 
     assert elbo_cov_full(x, y) == elbo_cov_diag(x, y) == elbo_cov_sim(x, y)
 
