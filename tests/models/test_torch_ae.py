@@ -63,7 +63,7 @@ class TestTrainer:
     """Tests the AETrainer class"""
 
     def test_train_aria_ae(self):
-        """Aria provided autoencoder can be trained"""
+        """Aria provided :term:`autoencoder<Autoencoder>` can be trained"""
         images = torch.ones(size=(5, 3, 32, 32))
         dataset = DataEvalDataset(images)
         ae = AriaAutoencoder(channels=3)

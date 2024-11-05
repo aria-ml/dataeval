@@ -63,10 +63,10 @@ def predict_ood_mi(refdl, newdl, ood_detector, **kwargs):
     return MI_dict
 
 def get_metadata_ood_mi(metadata: Dict[str, Union[List, NDArray]], is_ood: NDArray[np.bool_], discrete_features=None) -> Dict:
-    r"""Computes mutual information between a set of metadata features and an out-of-distribution flag.
+    r"""Computes :term:Mutual Information (MI)` between a set of metadata features and an :term:`out of distribution<Out-of-Distribution (OOD)>` flag.
     
     Given a metadata dictionary `metadata` (where each key maps to one scalar metadata feature per example), and a corresponding 
-    boolean flag `is_ood` indicating whether each example falls out-of-distribution (OOD) relative to a reference dataset, this 
+    boolean flag `is_ood` indicating whether each example falls :term:`out of distribution<Out-of-distribution (OOD)>` relative to a reference dataset, this 
     function finds the strength of association between each metadata feature and `is_ood` by computing their mutual information. 
     Metadata features may be either discrete or continuous; set the `discrete_features` keyword to a bool array set to True for
     each feature that is discrete, or pass one bool to apply to all features.  Returns a dict indicating the strength of association
@@ -176,7 +176,7 @@ def ks_compare(dl0, dl1, k_stop=None, debug=None):
     return results
 
 def meta_distribution_compare(md0: Mapping[str, Union[List, NDArray]], md1: Mapping[str, Union[List, NDArray]]) -> Dict:
-    r"""Measures the featurewise distance between two metadata distributions, and computes a p-value to evaluate its significance. 
+    r"""Measures the featurewise distance between two metadata distributions, and computes a :term:`p-value<P-Value>` to evaluate its significance. 
     
     Uses the Earth Mover's Distance and the Kolmogorov-Smirnov two-sample test, feature-wise.  
 
@@ -273,7 +273,7 @@ def least_likely_features(refds, testds, ood_detector):
     return unlikely_features
     
 def get_least_likely_features(metadata, corrmetadata, is_ood)-> NDArray[str]:
-    r"""Computes which metadata feature is most out-of-distribution (OOD) relative to a reference metadata set. 
+    r"""Computes which metadata feature is most :term:`out of distribution<Out-of-distribution (OOD)>` relative to a reference metadata set. 
     
     Given a reference metadata dictionary `metadata` (where each key maps to one scalar metadata feature), a second 
     metadata dictionary, and a corresponding boolean flag `is_ood` indicating whether each example falls 

@@ -1,5 +1,5 @@
 """
-Drift detectors identify if the statistical properties of the data has changed.
+:term:`Drift` detectors identify if the statistical properties of the data has changed.
 """
 
 from dataeval import _IS_TORCH_AVAILABLE

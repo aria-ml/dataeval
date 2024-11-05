@@ -31,7 +31,7 @@ class DimensionStatsOutput(BaseStatsOutput):
     size : NDArray[np.uint32]
         Size of the images in pixels
     aspect_ratio : NDArray[np.float16]
-        Aspect ratio of the images (width/height)
+        :term:`ASspect Ratio<Aspect Ratio>` of the images (width/height)
     depth : NDArray[np.uint8]
         Color depth of the images in bits
     center : NDArray[np.uint16]
@@ -77,7 +77,7 @@ def dimensionstats(
     bboxes: Iterable[ArrayLike] | None = None,
 ) -> DimensionStatsOutput:
     """
-    Calculates dimension statistics for each image
+    Calculates dimension :term:`statistics<Statistics>` for each image
 
     This function computes various dimensional metrics (e.g., width, height, channels)
     on the images or individual bounding boxes for each image.
@@ -94,7 +94,7 @@ def dimensionstats(
     DimensionStatsOutput
         A dictionary-like object containing the computed dimension statistics for each image or bounding
         box. The keys correspond to the names of the statistics (e.g., 'width', 'height'), and the values
-        are lists of results for each image or numpy arrays when the results are multi-dimensional.
+        are lists of results for each image or :term:NumPy` arrays when the results are multi-dimensional.
 
     See Also
     --------

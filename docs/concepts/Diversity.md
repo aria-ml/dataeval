@@ -2,16 +2,16 @@
 
 ## What is it
 
-Diversity indices and classwise diversity indices measure the evenness or
+{term}`Diversity` indices and classwise diversity indices measure the evenness or
 uniformity of the sampling of metadata factors over a dataset.  Diversity
 indices identify whether intrinsic or extrinsic metadata factors are sampled
-disproportionately to others, which may indicate sources of sampling bias.
+disproportionately to others, which may indicate sources of sampling {term}`bias<Bias>`.
 Even, or uniform, sampling with respect to class labels is often referred to as
 stratification, but it may also be important to understand whether a dataset is
 sampled uniformly with respect to metadata and contextual variables.
 
 Diversity indices are normalized measures of uniformity taking values on the
-interval [0, 1].  DataEval offers two diversity indices&mdash;the
+interval [0, 1].  {term}`DataEval` offers two diversity indices&mdash;the
 inverse Simpson diversity index and the normalized Shannon entropy.  Values near
 1 indicate uniform sampling, while values near 0 indicate imbalanced sampling,
 e.g. all values taking a single value.
@@ -22,7 +22,7 @@ sampling bias in a dataset.
 
 ## When to use it
 
-Diversity indices can be used as a diagnostic metric during dataset development
+{term}`Diversity` indices can be used as a diagnostic metric during dataset development
 and during model development and evaluation.  Much like class
 imbalance, sampling imbalance with respect to environment, context, or other
 factors could lead to poor generalization or otherwise poor model performance
@@ -30,8 +30,8 @@ and are important to understand for both model developers and test and
 evaluation (T&E) engineers.
 
 For dataset development and test and evaluation, diversity indices may inform
-dataset splits or measure the quality of the splits by identifying sources of
-sampling bias across training, validation, and test splits.  Diversity indices
+{term}`dataset splits<Dataset Splits>` or measure the quality of the splits by identifying sources of
+sampling {term}`bias<Bias>` across training, validation, and test splits.  Diversity indices
 may also be used during T&E in order to contextualize model performance
 results by identifying sources of sampling biases encoded in the model through
 training and validation datasets.  Similarly, model developers may use
@@ -53,7 +53,7 @@ where $p_i$ are discrete probabilities for bin $i$ where $p_i \neq 0$.  When the
 data take $N$ unique values and are uniformly sampled, $p_i = 1/N$ for $ i =
 1\ldots N$, which makes $d = 1 / \left( \sum_i^N 1/N\right) = 1$.  The minimum
 value of the Simpson diversity index is $d = 1/N$ when $p_i = 1, p_j = 0 \,
-\forall j \neq i$.  The metric reported by DataEval, $d'$, is rescaled linearly to the interval
+\forall j \neq i$.  The metric reported by {term}`DataEval`, $d'$, is rescaled linearly to the interval
 $[0, 1]$ using
 
 $$
@@ -98,7 +98,7 @@ The Shannon entropy approaches 0 as the PDF approaches a single bin, i.e. $1
 \log(1)= 0$.  Variables have a single value with probability 1 indicating no
 uncertainty.  Normalizing the entropy by its maximum value of $\log N$
 could lead to ambiguity in this case due to an indeterminate form; however, in
-DataEval the ambiguity is resolved by assigning the limit of the unnormalized
+{term}`DataEval` the ambiguity is resolved by assigning the limit of the unnormalized
 entropy&mdash;i.e. not reversing the interpretation of the
 single-bin entropy through a normalization artifact.
 

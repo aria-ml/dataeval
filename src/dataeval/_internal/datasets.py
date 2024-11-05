@@ -185,7 +185,7 @@ class MNIST(Dataset):
         unit_interval : bool, default False
             Shift the data values to the unit interval [0-1].
         dtype : type | None, default None
-            Change the numpy dtype - data is loaded as np.uint8
+            Change the :term:`NumPy` dtype - data is loaded as np.uint8
         channels : Literal['channels_first' | 'channels_last'] | None, default None
             Location of channel axis if desired, default has no channels (N, 28, 28)
         flatten : bool, default False

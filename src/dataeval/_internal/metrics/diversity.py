@@ -13,12 +13,12 @@ from dataeval._internal.output import OutputMetadata, set_metadata
 @dataclass(frozen=True)
 class DiversityOutput(OutputMetadata):
     """
-    Output class for :func:`diversity` bias metric
+    Output class for :func:`diversity` :term:`bias<Bias>` metric
 
     Attributes
     ----------
     diversity_index : NDArray[np.float64]
-        Diversity index for classes and factors
+        :term:`Diversity` index for classes and factors
     classwise : NDArray[np.float64]
         Classwise diversity index [n_class x n_factor]
     """
@@ -34,7 +34,7 @@ def diversity_shannon(
     subset_mask: NDArray[np.bool_] | None = None,
 ) -> NDArray:
     """
-    Compute diversity for discrete/categorical variables and, through standard
+    Compute :term:`diversity<Diversity>` for discrete/categorical variables and, through standard
     histogram binning, for continuous variables.
 
     We define diversity as a normalized form of the Shannon entropy.
@@ -85,7 +85,7 @@ def diversity_simpson(
     subset_mask: NDArray[np.bool_] | None = None,
 ) -> NDArray:
     """
-    Compute diversity for discrete/categorical variables and, through standard
+    Compute :term:`diversity<Diversity>` for discrete/categorical variables and, through standard
     histogram binning, for continuous variables.
 
     We define diversity as the inverse Simpson diversity index linearly rescaled to the unit interval.
@@ -147,8 +147,8 @@ def diversity(
     class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], method: Literal["shannon", "simpson"] = "simpson"
 ) -> DiversityOutput:
     """
-    Compute diversity and classwise diversity for discrete/categorical variables and, through standard
-    histogram binning, for continuous variables.
+    Compute :term:`diversity<Diversity>` and classwise diversity for discrete/categorical variables and,
+    through standard histogram binning, for continuous variables.
 
     We define diversity as a normalized form of the inverse Simpson diversity index.
 

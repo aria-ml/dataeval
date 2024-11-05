@@ -57,7 +57,7 @@ class OOD_VAEGMM(OODGMMBase):
     @set_metadata("dataeval.detectors")
     def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
         """
-        Compute the out-of-distribution (OOD) score for a given dataset.
+        Compute the out of distributuion<Out-of-distribution (OOD)>` score for a given dataset.
 
         Parameters
         ----------

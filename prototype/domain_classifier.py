@@ -29,7 +29,7 @@ class MVDC():
             Number of samples in a chunk/batch used in CV, will get one metric & prediction per chunk/batch. 
             The default is None.
         threshold : Tuple[float,float], optional
-            Upper, Lower metric bounds on roc_auc for identifying drift. 
+            Upper, Lower metric bounds on roc_auc for identifying :term:`drift<Drift>`. 
             The default is (0.45, 0.65).
     """
     def __init__(
@@ -89,7 +89,7 @@ class MVDC():
     
     def _convert_to_df(self, mysplit: str) -> pd.DataFrame:
         """
-        Convert numpy array into NML preferred dataframe
+        Convert :term:`NumPy` array into NML preferred dataframe
 
         Parameters
         ----------
@@ -137,7 +137,7 @@ class MVDC():
         
     def predict(self) -> pd.DataFrame:
         """
-        Perform inference on the test dataframe
+        Perform :term:`inference<Inference>` on the test dataframe
 
         Returns
         -------

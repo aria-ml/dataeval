@@ -1,6 +1,6 @@
 # diversity
 
-Diversity and classwise diversity measure the evenness or uniformity of metadata
+{term}`Diversity` and classwise diversity measure the evenness or uniformity of metadata
 factors either over the entire dataset or by class. Diversity indices may
 indicate which intrinsic or extrinsic metadata factors are sampled
 disproportionately to others.

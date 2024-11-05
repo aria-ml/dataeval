@@ -45,7 +45,7 @@ class OOD_VAE(OODBase):
 
     >>> metric.fit(dataset, threshold_perc=85, batch_size=128, verbose=False)
 
-    Detect out of distribution samples at the 'feature' level
+    Detect :term:`out of distribution<Out-of-Distribution (OOD)>` samples at the 'feature' level
 
     >>> result = metric.predict(dataset, ood_type="feature")
     """

@@ -1,6 +1,6 @@
 # balance
 
-Balance and classwise balance are metrics that measure distributional
+{term}`Balance` and classwise balance are metrics that measure distributional
 correlation between metadata factors and class label.  Balance and classwise
 balance can indicate opportunities for shortcut learning and disproportionate
 dataset sampling with respect to class labels or between metadata factors.

@@ -215,7 +215,7 @@ def run_stats(
     stats_processor_cls: Iterable[type[StatsProcessor[TStatsOutput]]],
 ) -> list[TStatsOutput]:
     """
-    Compute specified statistics on a set of images.
+    Compute specified :term:`statistics<Statistics>` on a set of images.
 
     This function applies a set of statistical operations to each image in the input iterable,
     based on the specified output class. The function determines which statistics to apply
@@ -225,7 +225,7 @@ def run_stats(
     ----------
     images : Iterable[ArrayLike]
         An iterable of images (e.g., list of arrays), where each image is represented as an
-        array-like structure (e.g., NumPy arrays).
+        array-like structure (e.g., :term:`NumPy` arrays).
     bboxes : Iterable[ArrayLike]
         An iterable of bounding boxes (e.g. list of arrays) where each bounding box is represented
         as an array-like structure in the format of (X0, Y0, X1, Y1). The length of the bounding boxes
@@ -237,14 +237,16 @@ def run_stats(
 
     Returns
     -------
-    list[TStatsOutput]
-        A list of output classes corresponding to the input processor types.
+    dict[str, NDArray]]
+        A dictionary containing the computed statistics for each image.
+        The dictionary keys correspond to the names of the statistics, and the values are :term:`NumPy` arrays
+        with the results of the computations.
 
     Note
     ----
     - The function performs image normalization (rescaling the image values)
       before applying some of the statistics.
-    - Pixel-level statistics (e.g., brightness, entropy) are computed after
+    - Pixel-level statistics (e.g., :term:`brightness<Brightness>`, entropy) are computed after
       rescaling and, optionally, flattening the images.
     - For statistics like histograms and entropy, intermediate results may
       be reused to avoid redundant computation.

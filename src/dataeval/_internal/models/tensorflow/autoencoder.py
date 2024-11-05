@@ -90,7 +90,7 @@ class Sampling(Layer):
         Parameters
         ----------
         inputs
-            Tuple with mean and log variance.
+            Tuple with mean and log :term:`variance<Variance>`.
 
         Returns
         -------
@@ -131,7 +131,7 @@ class EncoderVAE(Layer):
         encoder_net
             Layers for the encoder wrapped in a keras.Sequential class.
         latent_dim
-            Dimensionality of the latent space.
+            Dimensionality of the :term:`latent space<Latent Space>`.
         name
             Name of encoder.
         """
@@ -204,7 +204,7 @@ class VAE(keras.Model):
     decoder_net : keras.Model
         Layers for the decoder wrapped in a keras.Sequential class.
     latent_dim : int
-        Dimensionality of the latent space.
+        Dimensionality of the :term:`latent space<Latent Space>`.
     beta : float, default 1.0
         Beta parameter for KL-divergence loss term.
     """
@@ -282,7 +282,7 @@ class VAEGMM(keras.Model):
     n_gmm : int
         Number of components in GMM.
     latent_dim : int
-        Dimensionality of the latent space.
+        Dimensionality of the :term:`latent space<Latent Space>`.
     recon_features : Callable, default eucl_cosim_features
         Function to extract features from the reconstructed instance by the decoder.
     beta : float, default 1.0

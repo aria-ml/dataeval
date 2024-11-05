@@ -400,7 +400,7 @@ class PixelCNN(distribution.Distribution):
         Parameters
         ----------
         value
-            `Tensor` or Numpy array of image data. May have leading batch
+            `Tensor` or :term:`NumPy` array of image data. May have leading batch
             dimension(s), which must broadcast to the leading batch dimensions of
             `conditional_input`.
         conditional_input
@@ -706,7 +706,7 @@ class _PixelCNNNetwork(keras.layers.Layer):
         use_data_init: bool = True,
         dtype=tf.float32,
     ) -> None:
-        """Initialize the neural network for the Pixel CNN++ distribution.
+        """Initialize the :term:`neural network<Neural Network>` for the Pixel CNN++ distribution.
 
         Parameters
         ----------

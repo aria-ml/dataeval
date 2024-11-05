@@ -24,12 +24,12 @@ from dataeval._internal.output import set_metadata
 
 class OOD_AE(OODBase):
     """
-    Autoencoder based out-of-distribution detector.
+    Autoencoder-based :term:`out of distribution<Out-of-distribution (OOD)>` detector.
 
     Parameters
     ----------
     model : AE
-        An Autoencoder model.
+       An :term:`autoencoder<Autoencoder>` model.
     """
 
     def __init__(self, model: AE) -> None:

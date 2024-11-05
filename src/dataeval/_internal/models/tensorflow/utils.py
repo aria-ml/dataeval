@@ -55,7 +55,7 @@ def predict_batch(
 
     Returns
     -------
-    Numpy array, tensorflow tensor or tuples of those with model outputs.
+    :term:`NumPy` array, tensorflow tensor or tuples of those with model outputs.
     """
     n = len(x)
     n_minibatch = int(np.ceil(n / batch_size))

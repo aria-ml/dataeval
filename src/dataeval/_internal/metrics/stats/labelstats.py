@@ -60,7 +60,7 @@ def labelstats(
     labels: Iterable[ArrayLike],
 ) -> LabelStatsOutput:
     """
-    Calculates statistics for data labels
+    Calculates :term:`statistics<Statistics>` for data labels
 
     This function computes counting metrics (e.g., total per class, total per image)
     on the labels.
@@ -68,7 +68,7 @@ def labelstats(
     Parameters
     ----------
     labels : ArrayLike, shape - [label] | [[label]] or (N,M) | (N,)
-        Lists or numpy array of labels.
+        Lists or :term:`NumPy` array of labels.
         A set of lists where each list contains all labels per image -
         (e.g. [[label1, label2], [label2], [label1, label3]] or [label1, label2, label1, label3]).
         If a numpy array, N is the number of images, M is the number of labels per image.
@@ -80,7 +80,7 @@ def labelstats(
 
     Examples
     --------
-    Calculating the statistics on labels for a set of data
+    Calculating the :term:`statistics<Statistics>` on labels for a set of data
 
     >>> stats = labelstats(labels)
     >>> stats.label_counts_per_class

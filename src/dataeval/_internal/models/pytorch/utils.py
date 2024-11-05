@@ -17,7 +17,7 @@ def torch_to_numpy(tensor: Tensor) -> ndarray:
 
 def numpy_to_torch(array: ndarray) -> Tensor:
     """
-    Converts a NumPy array to a PyTorch tensor
+    Converts a :term:`NumPy` array to a PyTorch tensor
     """
     if isinstance(array, Tensor):  # Already tensor, return
         return array
@@ -29,7 +29,7 @@ def numpy_to_torch(array: ndarray) -> Tensor:
 
 def permute_to_torch(array: ndarray) -> Tensor:
     """
-    Converts and permutes a NumPy image array into a PyTorch image tensor.
+    Converts and permutes a :term:`NumPy` image array into a PyTorch image tensor.
 
     Parameters
     ----------
@@ -48,7 +48,7 @@ def permute_to_torch(array: ndarray) -> Tensor:
 
 def permute_to_numpy(tensor: Tensor) -> ndarray:
     """
-    Converts and permutes a PyTorch image tensor into a NumPy image array.
+    Converts and permutes a PyTorch image tensor into a :term:`NumPy` image array.
 
     Does not permute if given ndarray
 

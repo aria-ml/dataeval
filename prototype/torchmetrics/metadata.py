@@ -13,7 +13,7 @@ from dataeval._internal.metrics.functional import entropy, get_counts, get_num_b
 def str_to_int(d: Dict) -> Dict:
     """
     Map columns of dict that are not numeric (e.g. string) to numeric values
-    that mutual information and diversity functions can accommodate.  Each
+    that :term:`mutual informaion<Mutual Information (MI)>` and :tern:`Diversity` functions can accommodate.  Each
     unique string receives a unique integer value.
 
     Parameters
@@ -55,7 +55,7 @@ def list_to_dict(list_of_dicts: List[Dict]) -> Dict:
 
 class BaseBiasMetric(Metric):
     """
-    Base class for bias metrics with common functionality for consuming
+    Base class for :term:`bias<Bias>` metrics with common functionality for consuming
     metadata---subclasses torchmetrics.Metric
 
     Attributes
@@ -65,7 +65,7 @@ class BaseBiasMetric(Metric):
     names: List[str]
         List of the names of metadata factor variables
     is_categorical: List
-        List of boolean flags for categorical features.  Mutual information is
+        List of boolean flags for categorical features.  :term:`mutual information<Mutual Information (MI)>` is
         computed differently for categorical/discrete and continuous variables
     num_factors: int
         Number of metadata factors in the dataset
@@ -108,7 +108,7 @@ class BaseBiasMetric(Metric):
 
 class BaseBalanceMetric(BaseBiasMetric):
     """
-    Base class for balance (mutual information) metrics.  Contains input
+    Base class for :term:`balance<Balance>` (:term:`mutual information<Mutual Information (MI)>`) metrics.  Contains input
     validation for balance metrics.
     """
 
@@ -135,9 +135,9 @@ class BaseBalanceMetric(BaseBiasMetric):
 
 class Balance(BaseBalanceMetric):
     """
-    Metadata balance measures distributional correlation between metadata
+    Metadata :term:Balance` measures distributional correlation between metadata
     factors and class label to identify opportunities for shortcut learning or
-    sampling bias in the dataset.
+    sampling :term:`bias<Bias>` in the dataset.
 
     Parameters
     ----------
@@ -151,7 +151,7 @@ class Balance(BaseBalanceMetric):
     names: List[str]
         List of the names of metadata factor variables
     is_categorical: List
-        List of boolean flags for categorical features.  Mutual information is
+        List of boolean flags for categorical features.  :term:`mutual information<Mutual Information (MI)>` is
         computed differently for categorical/discrete and continuous variables
     num_factors: int
         Number of metadata factors in the dataset
@@ -179,7 +179,7 @@ class Balance(BaseBalanceMetric):
 
     def compute(self) -> NDArray:
         """
-        Mutual information (MI) between factors (class label, metadata, label/image properties)
+        :term:`Mutual information<Mutual information (MI)>` between factors (class label, metadata, label/image properties)
 
         Parameters
         ----------
@@ -190,7 +190,7 @@ class Balance(BaseBalanceMetric):
         Returns
         -------
         NDArray
-            (num_factors+1) x (num_factors+1) estimate of mutual information
+            (num_factors+1) x (num_factors+1) estimate of :term:`mutual information<Mutual Information (MI)>`
             between num_factors metadata factors and class label. Symmetry is enforced.
 
         See Also
@@ -233,7 +233,7 @@ class Balance(BaseBalanceMetric):
 
 class BalanceClasswise(BaseBalanceMetric):
     """
-    Computes mutual information (analogous to correlation) between metadata
+    Computes :term:`mutual information<Mutual Information (MI)>` (analogous to correlation) between metadata
         factors (class label, metadata, label/image properties) with individual
         class labels.
 
@@ -266,7 +266,7 @@ class BalanceClasswise(BaseBalanceMetric):
 
     def compute(self) -> NDArray:
         """
-        Compute mutual information between metadata factors (class label, metadata,
+        Compute :term:`mutual information<Mutual Information>` between metadata factors (class label, metadata,
         label/image properties) with individual class labels.
 
         Parameters
@@ -337,7 +337,7 @@ class BalanceClasswise(BaseBalanceMetric):
 
 class BaseDiversityMetric(BaseBiasMetric):
     """
-    Base class for Diversity and ClasswiseDiversity metrics.
+    Base class for :term:`diversity<Diversity>` and ClasswiseDiversity metrics.
 
     Parameters
     ----------
@@ -355,7 +355,7 @@ class BaseDiversityMetric(BaseBiasMetric):
     names: List[str]
         List of the names of metadata factor variables
     is_categorical: List
-        List of boolean flags for categorical features.  Mutual information is
+        List of boolean flags for categorical features.  :term:`mutual information<Mutual Information (MI)>` is
         computed differently for categorical/discrete and continuous variables
     num_factors: int
         Number of metadata factors in the dataset
@@ -372,7 +372,7 @@ class BaseDiversityMetric(BaseBiasMetric):
 
     def _diversity_simpson(self, subset_mask: np.ndarray = np.empty(shape=0)) -> np.ndarray:
         """
-        Compute diversity for discrete/categorical variables and, through standard
+        Compute :term:`diversity<Diversity>` for discrete/categorical variables and, through standard
         histogram binning, for continuous variables.
 
         We define diversity as a normalized form of the inverse Simpson diversity
@@ -422,7 +422,7 @@ class BaseDiversityMetric(BaseBiasMetric):
 
     def _diversity_shannon(self, subset_mask: np.ndarray = np.empty(shape=0)) -> np.ndarray:
         """
-        Compute diversity for discrete/categorical variables and, through standard
+        Compute :term:`diversity<Diversity>` for discrete/categorical variables and, through standard
         histogram binning, for continuous variables.
 
         We define diversity as a normalized form of the Shannon entropy.
@@ -461,7 +461,7 @@ class BaseDiversityMetric(BaseBiasMetric):
 
 class DiversityClasswise(BaseDiversityMetric):
     """
-    Classwise diversity index: evenness of the distribution of metadata factors
+    Classwise :term:`diversity<Diversity>` index: evenness of the distribution of metadata factors
     per class.
 
     Parameters
@@ -480,7 +480,7 @@ class DiversityClasswise(BaseDiversityMetric):
     names: List[str]
         List of the names of metadata factor variables
     is_categorical: List
-        List of boolean flags for categorical features.  Mutual information is
+        List of boolean flags for categorical features.  mutual information<Mutual Information (MI)>` is
         computed differently for categorical/discrete and continuous variables
     num_factors: int
         Number of metadata factors in the dataset
@@ -494,7 +494,7 @@ class DiversityClasswise(BaseDiversityMetric):
 
     def compute(self):
         """
-        Compute diversity for discrete/categorical variables and, through standard
+        Compute :term:`diversity<Diversity>` for discrete/categorical variables and, through standard
         histogram binning, for continuous variables.
 
         We define diversity as a normalized form of the inverse Simpson diversity
@@ -544,7 +544,7 @@ class DiversityClasswise(BaseDiversityMetric):
 
 class Diversity(BaseDiversityMetric):
     """
-    Diversity index: evenness of the distribution of metadata factors to
+    :term:`diversity<Diversity>` index: evenness of the distribution of metadata factors to
     identify imbalance or undersampled data categories.
 
     Parameters
@@ -563,7 +563,7 @@ class Diversity(BaseDiversityMetric):
     names: List[str]
         List of the names of metadata factor variables
     is_categorical: List
-        List of boolean flags for categorical features.  Mutual information is
+        List of boolean flags for categorical features.  :term:`mutual information<Mutual Information (MI)>` is
         computed differently for categorical/discrete and continuous variables
     num_factors: int
         Number of metadata factors in the dataset
@@ -576,7 +576,7 @@ class Diversity(BaseDiversityMetric):
 
     def compute(self):
         """
-        Compute diversity for discrete/categorical variables and, through standard
+        Compute :term:`diversity<Diversity>` for discrete/categorical variables and, through standard
         histogram binning, for continuous variables.
 
         diversity = 1 implies that samples are evenly distributed across a particular factor

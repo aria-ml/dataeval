@@ -1,15 +1,15 @@
-# Detecting Drift in Datasets
+# Detecting {term}`drift<Drift>` in Datasets
 
-## What is Drift?
+## What is {term}`drift<Drift>`?
 
 Drift refers to the phenomenon where the statistical properties of data change over time, 
 leading to discrepancies between the data a model was trained on and the data it encounters 
-during deployment. This can significantly degrading the performance of machine learning models, 
+during deployment. This can significantly degrading the performance of {term}`machine learning<Machine Learning (ML)>` models, 
 as the assumptions made during training may no longer hold in real-world scenarios.
 
 ### _Formal Definition and Types of Drift_
 
-In the context of supervised learning, where a model is trained to predict the conditional 
+In the context of {term}`supervised learning<Supervised Learning>`, where a model is trained to predict the conditional 
 probability $P(Y|X)$—with $X$ representing input features and $Y$ representing the target 
 variable—drift occurs when the joint distribution $P(X, Y)$ changes between the training and 
 deployment phases. 
@@ -45,7 +45,7 @@ regions of the input space during training (i.e., "blind spots").
 
 ### _Label Shift_
 
-Label Shift (also known as prior-probability shift or target shift) occurs when the 
+{term}`Label shift<Label Shift>` (also known as prior-probability shift or target shift) occurs when the 
 conditional probability of the input given the output, $P(X|Y)$, remains the same, 
 but the prior distribution of the target variable, $P(Y)$, shifts between training and deployment:
 
@@ -60,7 +60,7 @@ in the distribution of the target variable.
 
 ### _Concept Drift_
 
-Concept Drift (also known as posterior-probability shift or real drift) occurs when the 
+{term}`Concept drift<Concept Drift>` (also known as posterior-probability shift or real drift) occurs when the 
 input distribution, $P(X)$, remains stable, but the conditional probability of the target 
 given the input, $P(Y|X)$, changes:
 
@@ -71,7 +71,7 @@ $$
 Concept drift causes the same input features to correspond to different outputs over time.
 This can happen due to changes in the underlying process that generates the data, such as 
 evolving disease patterns in medical diagnosis or changes in the characteristics of targets 
-in machine classification tasks.
+in machine {term}`classification<Classification>` tasks.
 Concept drift can be driven by changes in the likelihood $P(X|Y)$, the prior $P(Y)$, or both.
 
 <!--
@@ -88,9 +88,9 @@ continuous learning.
 
 ### _Interrelations Between Drift Types_
 
-It's important to note that these forms of drift are not mutually exclusive.
-For instance, covariate shift can lead to label shift, and both covariate and label shifts 
-can contribute to concept drift.
+It's important to note that these forms of {term}`drift<Drift>` are not mutually exclusive.
+For instance, covariate shift can lead to {term}`Label shift<Label Shift>`, and both covariate and label shifts 
+can contribute to {term}`concept drift<Concept Drift>`.
 As observed in the [literature](#references), it is common for covariate shift and concept 
 drift to occur simultaneously.
 However, it is challenging, if not impossible, to study dataset shifts that result from 
@@ -98,18 +98,18 @@ isolated changes in the likelihood $P(X|Y)$ alone.
 
 ### _Practical Implications_
 
-Understanding these different forms of drift is crucial for maintaining robust, reliable and 
-generalizable machine learning models over time.
-Techniques such as Untrained AutoEncoders (UAE) and [Black-Box Shift Estimation] (BBSE) can be 
+Understanding these different forms of {term}`drift<Drift>` is crucial for maintaining robust, reliable and 
+generalizable {term}`machine learning<Machine Learning (ML)>` models over time.
+Techniques such as Untrained AutoEncoders (UAE) and {term}`black box shift estimation<Black-Box Shift Estimation (BBSE)>` can be 
 applied as preprocessing methods to detect these shifts.
-Dimensionality reduction techniques, like [Principal Component Analysis] (PCA), are also often 
+{term}`Dimensionality reduction<Dimensionality Reduction>` techniques, like {term}`principal component analysis<Principal Component Analysis (PCA)>`, are also often 
 used to simplify the problem in high-dimensional datasets.
 By carefully monitoring for drift and applying appropriate corrective measures, 
 we can ensure that our models continue to perform well in dynamic, real-world environments.
 
 ## When to monitor for drift
 
-Once a model has been approved for operation/deployment, monitoring for drift should begin. 
+Once a model has been approved for operation/deployment, monitoring for {term}`drift<Drift>` should begin. 
 Regardless of whether the model has been deployed in a contiunous or discrete manner, 
 all new data that the model digests should be analyzed for drift.
 
@@ -117,7 +117,7 @@ all new data that the model digests should be analyzed for drift.
 
 ### _Cramér-von Mises_
 
-The [Cramér-von Mises] (CVM) test is a non-parametric method used for detecting drift by 
+The {term}`Cramér-von Mises<Cramér-von Mises (CVM) Drift Detection>` test is a non-parametric method used for detecting {term}`Drift` by 
 comparing two empirical distributions.
 For two distributions $F(z)$ and $F_{ref}(z)$, the CVM test statistic is calculated as:
 
@@ -125,20 +125,20 @@ $$
 W = \sum_{z\in k} \left| F(z) - F_{ref}(z) \right|^2
 $$
 
-where $k$ represents the joint sample.
+where $k$ represents the {term}`joint sample<Joint Sample>`.
 The CVM test is particularly effective in detecting shifts in higher-order moments, 
-such as changes in variance, by leveraging the full joint sample.
+such as changes in {term}`variance<Variance>`, by leveraging the full joint sample.
 
 When applied to multivariate data, the CVM test is conducted separately for each feature, 
-and the resulting p-values are aggregated using either the [Bonferroni] or [False Discovery Rate] 
-(FDR) correction. 
-The Bonferroni correction controls the probability of at least one false positive, 
+and the resulting p-values are aggregated using either the [Bonferroni] or {term}`False Discovery Rate 
+(FDR)` correction. 
+The {term}`Bonferroni correction<Bonferroni Correction>` controls the probability of at least one false positive, 
 making it more conservative, while the FDR correction allows for a controlled proportion 
 of false positives.
 
 ### _Kolmogorov-Smirnov_
 
-The [Kolmogorov-Smirnov] (KS) test is another widely used non-parametric test for detecting drift.
+The {term}`Kolmogorov-Smirnov test<Kolmogorov-Smirnov (K-S) test>` is another widely used non-parametric test for detecting {term}`drift<Drift>`.
 It measures the maximum distance between two empirical distributions, $F(z)$ and $F_{ref}(z)$:
 
 $$
@@ -157,8 +157,8 @@ number of them.
 
 ### _Maximum Mean Discrepancy_
 
-[Maximum Mean Discrepancy] (MMD) is a kernel-based method for comparing two distributions 
-by calculating the distance between their mean embeddings in a reproducing kernel Hilbert 
+{term}`Maximum mean discrepancy drift detection<Maximum Mean Discrepancy (MMD) Drift Detection>` is a kernel-based method for comparing two distributions 
+by calculating the distance between their mean {term}`embeddings<Embeddings>` in a reproducing kernel Hilbert 
 space (RKHS). The MMD test statistic is defined as:
 
 $$
@@ -168,14 +168,14 @@ $$
 where $\mu_{p}$ and $\mu_{q}$ are the mean embeddings of distributions *p* and *q* in the RKHS.
 The MMD test is particularly useful for detecting complex, multivariate distributional differences.
 Unbiased estimates of $MMD^2$ can be obtained using the [kernel trick], and a permutation test is 
-used to obtain the p-value.
+used to obtain the {term}`p-value<P-Value>`.
 
 A common choice for the kernel is the [radial basis function] (RBF) kernel, though other kernels can 
 be used depending on the application.
 
 ### _Classifier Uncertainty_
 
-Classifier Uncertainty as a drift detection method focuses on changes in the model's uncertainty 
+Classifier Uncertainty as a {term}`drift<Drift>` detection method focuses on changes in the model's uncertainty 
 across different datasets.
 This approach is particularly relevant when the goal is to detect drift that could impact the 
 performance of a model in production.
@@ -186,7 +186,7 @@ Significant differences, typically detected via a KS test, indicate potential dr
 This method is especially useful when the reference set is distinct from the training set, 
 as it helps detect shifts in regions where the model's predictions are less confident.
 
-## Detecting Drift with DataEval
+## Detecting {term}`drift<Drift>` with {term}`DataEval`
 
 DataEval is a comprehensive data analysis and monitoring library that provides several 
 classes specifically designed for drift detection.
@@ -194,7 +194,7 @@ These classes implement the theoretical concepts discussed above to help detect 
 
 DataEval's drift detection classes are:
 - **[DriftCVM](../reference/detectors/drift/driftcvm.md)**: Implements the Cramér-von Mises (CVM) test for feature-wise drift detection.
-- **[DriftKS](../reference/detectors/drift/driftks.md)**: Implements the Kolmogorov-Smirnov (KS) test for detecting feature-wise distributional shifts.
+- **[DriftKS](../reference/detectors/drift/driftks.md)**: Implements the {term}`Kolmogorov-Smirnov test<Kolmogorov-Smirnov (K-S) test>` for detecting feature-wise distributional shifts.
 - **[DriftMMD](../reference/detectors/drift/driftmmd.md)**: Utilizes the Maximum Mean Discrepancy (MMD) test to detect drift in multivariate data using kernel methods.
 - **[DriftUncertainty](../reference/detectors/drift/driftuncertainty.md)**: Detects drift by analyzing changes in the model's uncertainty across datasets.
 

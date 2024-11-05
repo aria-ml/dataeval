@@ -1,5 +1,6 @@
 """
-Tensorflow models are used in out-of-distribution detectors in the :mod:`dataeval.detectors.ood` module.
+TensorFlow models are used in :term:`out of distribution<Out-of-distribution (OOD)>` detectors in the
+:mod:`dataeval.detectors.ood` module.
 
 DataEval provides both basic default models through the utility :func:`dataeval.utils.tensorflow.models.create_model`
 as well as constructors which allow for customization of the encoder, decoder and any other applicable

@@ -21,19 +21,19 @@ from .base import BaseDriftUnivariate, UpdateStrategy, preprocess_x
 
 class DriftCVM(BaseDriftUnivariate):
     """
-    Drift detector employing the Cramér-von Mises (CVM) distribution test.
+    :term:`Drift` detector employing the :term:`Cramér-von Mises (CVM) Drift Detection` test.
 
     The CVM test detects changes in the distribution of continuous
     univariate data. For multivariate data, a separate CVM test is applied to each
     feature, and the obtained p-values are aggregated via the Bonferroni or
-    False Discovery Rate (FDR) corrections.
+    :term:`False Discovery Rate (FDR)` corrections.
 
     Parameters
     ----------
     x_ref : ArrayLike
         Data used as reference distribution.
     p_val : float | None, default 0.05
-        p-value used for significance of the statistical test for each feature.
+        :term:`p-value<P-Value>` used for significance of the statistical test for each feature.
         If the FDR correction method is used, this corresponds to the acceptable
         q-value.
     x_ref_preprocessed : bool, default False
@@ -46,7 +46,7 @@ class DriftCVM(BaseDriftUnivariate):
         or via reservoir sampling with ReservoirSamplingUpdateStrategy.
     preprocess_fn : Callable | None, default None
         Function to preprocess the data before computing the data drift metrics.
-        Typically a dimensionality reduction technique.
+        Typically a :term:`dimensionality reduction<Dimensionality Reduction>` technique.
     correction : "bonferroni" | "fdr", default "bonferroni"
         Correction type for multivariate data. Either 'bonferroni' or 'fdr' (False
         Discovery Rate).
@@ -79,7 +79,7 @@ class DriftCVM(BaseDriftUnivariate):
     @preprocess_x
     def score(self, x: ArrayLike) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         """
-        Performs the two-sample Cramér-von Mises test(s), computing the p-value and
+        Performs the two-sample Cramér-von Mises test(s), computing the :term:`p-value<P-value>` and
         test statistic per feature.
 
         Parameters

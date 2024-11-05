@@ -24,14 +24,14 @@ from .torch import GaussianRBF, get_device, mmd2_from_kernel_matrix
 @dataclass(frozen=True)
 class DriftMMDOutput(DriftBaseOutput):
     """
-    Output class for :class:`DriftMMD` drift detector
+    Output class for :class:`DriftMMD` :term:`drift<Drift>` detector
 
     Attributes
     ----------
     is_drift : bool
         Drift prediction for the images
     threshold : float
-        P-value used for significance of the permutation test
+        :term:`P-Value` used for significance of the permutation test
     p_val : float
         P-value obtained from the permutation test
     distance : float
@@ -49,14 +49,14 @@ class DriftMMDOutput(DriftBaseOutput):
 
 class DriftMMD(BaseDrift):
     """
-    Maximum Mean Discrepancy (MMD) data drift detector using a permutation test.
+    :term:`Maximum Mean Discrepancy (MMD) Drift Detection` algorithm using a permutation test.
 
     Parameters
     ----------
     x_ref : ArrayLike
         Data used as reference distribution.
     p_val : float | None, default 0.05
-        p-value used for significance of the statistical test for each feature.
+        :term:`P-value` used for significance of the statistical test for each feature.
         If the FDR correction method is used, this corresponds to the acceptable
         q-value.
     x_ref_preprocessed : bool, default False
@@ -69,7 +69,7 @@ class DriftMMD(BaseDrift):
         or via reservoir sampling with ReservoirSamplingUpdateStrategy.
     preprocess_fn : Callable | None, default None
         Function to preprocess the data before computing the data drift metrics.
-        Typically a dimensionality reduction technique.
+        Typically a :term:`dimensionality reduction<Dimensionality Reduction>` technique.
     kernel : Callable, default GaussianRBF
         Kernel used for the MMD computation, defaults to Gaussian RBF kernel.
     sigma : ArrayLike | None, default None
@@ -132,7 +132,7 @@ class DriftMMD(BaseDrift):
     @preprocess_x
     def score(self, x: ArrayLike) -> tuple[float, float, float]:
         """
-        Compute the p-value resulting from a permutation test using the maximum mean
+        Compute the :term:`p-value<P-Value>` resulting from a permutation test using the maximum mean
         discrepancy as a distance measure between the reference data and the data to
         be tested.
 
@@ -145,7 +145,7 @@ class DriftMMD(BaseDrift):
         -------
         tuple(float, float, float)
             p-value obtained from the permutation test, MMD^2 between the reference and test set,
-            and MMD^2 threshold above which drift is flagged
+            and MMD^2 threshold above which :term:`drift<Drift>` is flagged
         """
         x = as_numpy(x)
         x_ref = torch.from_numpy(self.x_ref).to(self.device)
@@ -179,7 +179,8 @@ class DriftMMD(BaseDrift):
         Returns
         -------
         DriftMMDOutput
-            Output class containing the drift prediction, p-value, threshold and MMD metric.
+            Output class containing the :term:`drift<Drift>` prediction, :term:`p-value<P-Value>`,
+            threshold and MMD metric.
         """
         # compute drift scores
         p_val, dist, distance_threshold = self.score(x)
