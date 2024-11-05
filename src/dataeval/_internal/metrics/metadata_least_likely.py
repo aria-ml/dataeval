@@ -62,6 +62,9 @@ def get_least_likely_features(
             f"is_ood flag must have same length as new metadata {newmd_lengths[0]} but has length {len(is_ood)}."
         )
 
+    if not metadata.keys() == newmetadata.keys():
+        raise ValueError(f"Reference and test metadata keys must be identical: {list(metadata)}, {list(newmetadata)}")
+
     if not any(is_ood):
         return []
 
