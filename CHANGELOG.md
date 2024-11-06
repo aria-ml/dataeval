@@ -1,6 +1,13 @@
-[//]: # (14ef382c7d3216d8571d366ae24eaf118b5f7682)
+[//]: # (32ba1f29f3c9e57c4ad5cab44f632258e5f4e893)
 
 # DataEval Change Log
+
+## v0.72.1
+
+📝 **Miscellaneous**
+- `32ba1f29` - Data split tests
+- `76f73770` - Updated glossary and other files to use new style of links
+- `20efd27e` - Add support for Python 3.12
 
 ## v0.72.0
 
