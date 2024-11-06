@@ -2123,7 +2123,7 @@ tutorials = ["matplotlib", "pandas", "tabulate"]
 name = "typing-extensions"
 version = "4.12.2"
 description = "Backported and Experimental Type Hints for Python 3.8+"
-optional = true
+optional = false
 python-versions = ">=3.8"
 files = [
     {file = "typing_extensions-4.12.2-py3-none-any.whl", hash = "sha256:04e5ca0351e0f3f85c6853954072df659d0d13fac324d0072316b67d7794700d"},
@@ -2416,4 +2416,4 @@ torch = ["matplotlib", "torch", "torchvision"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "2a640dc7615cb2bfea0db94c72cc2ecca2b6d55e469ca9676c34daa00753a400"
+content-hash = "5eefd5f15d2915b48634a1855b93ac1ac0dc021072ff7270e71fc7062cf43b93"

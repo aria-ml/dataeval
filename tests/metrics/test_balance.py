@@ -3,8 +3,8 @@ from contextlib import nullcontext as does_not_raise
 import numpy as np
 import pytest
 
-from dataeval._internal.metrics.balance import balance
-from dataeval._internal.metrics.utils import infer_categorical, preprocess_metadata
+from dataeval.metrics.bias import balance
+from dataeval.metrics.bias.metadata import infer_categorical, preprocess_metadata
 
 
 @pytest.fixture

@@ -15,7 +15,7 @@ train_fn = MagicMock()
 eval_fn = MagicMock()
 eval_fn.return_value = {"test": 1.0}
 
-mock_params = patch("dataeval._internal.workflows.sufficiency.calc_params").start()
+mock_params = patch("dataeval.workflows.sufficiency.calc_params").start()
 mock_params.return_value = np.array([0.0, 42.0, 0.0])
 ```
 

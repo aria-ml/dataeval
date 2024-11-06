@@ -11,11 +11,8 @@ from itertools import product
 import numpy as np
 import pytest
 
-from dataeval._internal.detectors.drift.base import (
-    LastSeenUpdate,
-    ReservoirSamplingUpdate,
-)
-from dataeval._internal.detectors.drift.ks import DriftKS
+from dataeval.detectors.drift.ks import DriftKS
+from dataeval.detectors.drift.updates import LastSeenUpdate, ReservoirSamplingUpdate
 
 
 class TestKSDrift:

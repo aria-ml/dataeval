@@ -17,12 +17,9 @@ import pytest
 import torch
 import torch.nn as nn
 
-from dataeval._internal.detectors.drift.base import (
-    LastSeenUpdate,
-    ReservoirSamplingUpdate,
-)
-from dataeval._internal.detectors.drift.mmd import DriftMMD
-from dataeval._internal.detectors.drift.torch import preprocess_drift
+from dataeval.detectors.drift.mmd import DriftMMD
+from dataeval.detectors.drift.torch import preprocess_drift
+from dataeval.detectors.drift.updates import LastSeenUpdate, ReservoirSamplingUpdate
 
 n, n_hidden, n_classes = 100, 10, 5
 

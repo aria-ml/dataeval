@@ -1,10 +1,7 @@
-from unittest.mock import MagicMock
-
 import numpy as np
 import pytest
-import torch
 
-from dataeval._internal.metrics.ber import BEROutput, ber, ber_knn, ber_mst, knn_lowerbound
+from dataeval.metrics.estimators.ber import BEROutput, ber, ber_knn, ber_mst, knn_lowerbound
 
 
 class TestFunctionalBER:
@@ -74,17 +71,3 @@ class TestAPIBER:
     def test_ber_output_format(self):
         result = BEROutput(0.8, 0.2)
         assert result.dict() == {"ber": 0.8, "ber_lower": 0.2}
-
-    def test_torch_inputs(self):
-        """Torch class correctly calls functional :term:`NumPy` math"""
-        mock_knn = MagicMock()
-        mock_knn.return_value = (0, 0)
-        from dataeval._internal.metrics.ber import BER_FN_MAP
-
-        BER_FN_MAP["KNN"] = mock_knn
-
-        images = torch.ones((5, 10, 10))
-        labels = torch.ones(5)
-        ber(images, labels)
-
-        mock_knn.assert_called_once()

@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from requests import HTTPError, RequestException, Response
 
-from dataeval._internal.datasets import MNIST, _get_file, _validate_file, check_exists, extract_archive
+from dataeval.utils.torch.datasets import MNIST, _check_exists, _extract_archive, _get_file, _validate_file
 
 TEMP_MD5 = "d149274109b50d5147c09d6fc7e80c71"
 TEMP_SHA256 = "2b749913055289cb3a5c602a17196b5437dc59bba50e986ea449012a303f7201"
@@ -13,25 +13,25 @@ TEMP_SHA256 = "2b749913055289cb3a5c602a17196b5437dc59bba50e986ea449012a303f7201"
 
 @pytest.mark.xdist_group(name="mnist_file")
 def test_check_exists_path_exists(capsys, mnist_file):
-    check_exists(mnist_file, "fakeurl", "root", mnist_file.name, "file_hash", False, True)
+    _check_exists(mnist_file, "fakeurl", "root", mnist_file.name, "file_hash", False, True)
     captured = capsys.readouterr()
     assert captured.out == "Files already downloaded and verified\n"
-    location = check_exists(mnist_file, "fakeurl", "root", mnist_file.name, "file_hash", False, False)
+    location = _check_exists(mnist_file, "fakeurl", "root", mnist_file.name, "file_hash", False, False)
     assert str(mnist_file) == location
 
 
 def test_check_exists_no_path():
     with pytest.raises(RuntimeError):
-        check_exists("folder_path", "fakeurl", "root", "name", "file_hash", False)
+        _check_exists("folder_path", "fakeurl", "root", "name", "file_hash", False)
 
 
 @pytest.mark.xdist_group(name="mnist_download")
 def test_check_exists_download(capsys, mnist_download):
     parent, name = mnist_download
-    check_exists(folder="folder_path", url="http://mock", root=parent, fname=name, file_hash=TEMP_SHA256)
+    _check_exists(folder="folder_path", url="http://mock", root=parent, fname=name, file_hash=TEMP_SHA256)
     captured = capsys.readouterr()
     assert captured.out == "File already downloaded and verified.\n"
-    location = check_exists(
+    location = _check_exists(
         folder="folder_path", url="http://mock", root=parent, fname=name, file_hash=TEMP_SHA256, verbose=False
     )
     assert str(parent / "mnist") == location
@@ -57,7 +57,7 @@ class MockHTTPError(HTTPError):
         self.response.status_code = 404
 
 
-@patch("dataeval._internal.datasets.requests.get", side_effect=MockHTTPError())
+@patch("dataeval.utils.torch.datasets.requests.get", side_effect=MockHTTPError())
 @pytest.mark.xdist_group(name="mnist_download")
 def test_get_file_http_error(mock_get, mnist_download):
     parent, name = mnist_download
@@ -65,7 +65,7 @@ def test_get_file_http_error(mock_get, mnist_download):
         _get_file(root=parent, fname=name, origin="http://mock", file_hash=TEMP_SHA256, md5=True)
 
 
-@patch("dataeval._internal.datasets.requests.get", side_effect=RequestException())
+@patch("dataeval.utils.torch.datasets.requests.get", side_effect=RequestException())
 @pytest.mark.xdist_group(name="mnist_download")
 def test_get_file_request_error(mock_get, mnist_download):
     _, name = mnist_download
@@ -75,9 +75,9 @@ def test_get_file_request_error(mock_get, mnist_download):
 
 @pytest.mark.xdist_group(name="mnist_zip")
 def test_extract_archive(zip_file):
-    location = extract_archive(zip_file)
+    location = _extract_archive(zip_file)
     assert str(zip_file.parent) == location
-    location = extract_archive(zip_file, zip_file.parent, remove_finished=True)
+    location = _extract_archive(zip_file, zip_file.parent, remove_finished=True)
     assert str(zip_file.parent) == location
 
 

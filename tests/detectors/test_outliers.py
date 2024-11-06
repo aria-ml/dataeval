@@ -1,9 +1,8 @@
 import numpy as np
 import pytest
 
-from dataeval._internal.detectors.outliers import Outliers, _get_outlier_mask
-from dataeval._internal.metrics.stats.datasetstats import DatasetStatsOutput
-from dataeval.metrics.stats import dimensionstats, pixelstats, visualstats
+from dataeval.detectors.linters.outliers import Outliers, _get_outlier_mask
+from dataeval.metrics.stats import DatasetStatsOutput, dimensionstats, pixelstats, visualstats
 
 
 class TestOutliers:
