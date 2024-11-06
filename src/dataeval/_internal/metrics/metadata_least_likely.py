@@ -12,7 +12,7 @@ def get_least_likely_features(
     metadata: dict[str, list[Any] | NDArray[Any]],
     new_metadata: dict[str, list[Any] | NDArray[Any]],
     is_ood: NDArray[np.bool_],
-) -> list[tuple[str | None, float]]:
+) -> list[tuple[str, float]]:
     """Computes which metadata feature is most out-of-distribution (OOD) relative to a reference metadata set.
 
     Given a reference metadata dictionary `metadata` (where each key maps to one scalar metadata feature), a second
@@ -33,7 +33,7 @@ def get_least_likely_features(
 
     Returns
     -------
-    list[tuple[str | None, float]]
+    list[tuple[str, float]]
         An array of names of the features of each OOD new_metadata example that were the most OOD.
 
     Examples
@@ -70,7 +70,7 @@ def get_least_likely_features(
             f"features are least likely, but only got {n_reference}",
             UserWarning,
         )
-        return [(None, np.nan)]
+        return []
 
     if not any(is_ood):
         return []

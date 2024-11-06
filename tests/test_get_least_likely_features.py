@@ -1,5 +1,4 @@
 import re
-import warnings
 
 import numpy as np
 import pytest
@@ -99,16 +98,13 @@ def test_invalid_inputs(md0, md1, is_ood, error_msg):
             {"time": 42, "altitude": 0},
             {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
             np.array([True, False, True]),
-            [(None, np.nan)],
+            "We need at least 3 reference metadata examples to determine which features are least likely, but only got 1",  # noqa: E501
         ),
     ),
 )
 def test_nonsense_inputs(md0, md1, is_ood, warning):
-    with pytest.warns(UserWarning):
-        warnings.warn(
-            "We need at least 3 reference metadata examples to determine which features are least likely, but only got 1",  # noqa: E501
-            UserWarning,
-        )
+    with pytest.warns(UserWarning, match=warning):
+        get_least_likely_features(md0, md1, is_ood)
 
 
 # With a more realistic number of samples, make sure that
