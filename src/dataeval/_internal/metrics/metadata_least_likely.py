@@ -16,7 +16,7 @@ def get_least_likely_features(
     """Computes which metadata feature is most out-of-distribution (OOD) relative to a reference metadata set.
 
     Given a reference metadata dictionary `metadata` (where each key maps to one scalar metadata feature), a second
-    metadata dictionary, and a corresponding boolean flag `is_ood` indicating whether each example falls
+    metadata dictionary, and a corresponding boolean flag `is_ood` indicating whether each new example falls
     out-of-distribution (OOD) relative to the reference, this function finds which metadata feature is the most OOD,
     for each OOD example.
 
@@ -26,15 +26,15 @@ def get_least_likely_features(
         A reference set of arrays of values, indexed by metadata feature names, with one value per data example per
         feature.
     new_metadata: dict[str, list[Any] | NDArray[Any]]
-        A second metedata set, to be tested against the reference metadata. It is ok if the two meta data objects
+        A second metadata set, to be tested against the reference metadata. It is ok if the two meta data objects
         hold different numbers of examples.
     is_ood: NDArray[np.bool_]
-        A boolean array, with one value per corrmetadata example, that indicates which examples are OOD.
+        A boolean array, with one value per new_metadata example, that indicates which examples are OOD.
 
     Returns
     -------
     list[tuple[str | None, float]]
-        An array of names of the features of each OOD corrmetadata example that were the most OOD.
+        An array of names of the features of each OOD new_metadata example that were the most OOD.
 
     Examples
     --------
@@ -44,10 +44,10 @@ def get_least_likely_features(
     >>> from dataeval._internal.metrics.metadata_least_likely import get_least_likely_features
     >>> import numpy
     >>> metadata = {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112]}
-    >>> new_metadata = {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -211101]}
-    >>> is_ood = numpy.array([True, True, True])
+    >>> new_metadata = {"time": [7.8, 11.12], "altitude": [532, -211101]}
+    >>> is_ood = numpy.array([True, True])
     >>> get_least_likely_features(metadata, new_metadata, is_ood)
-    [('time', 2.0), ('time', 2.590909), ('altitude', 33.245346)]
+    [('time', 2.0), ('altitude', 33.245346)]
     """
     # Raise errors for bad inputs...
 
@@ -56,16 +56,13 @@ def get_least_likely_features(
 
     md_lengths = {len(np.atleast_1d(v)) for v in metadata.values()}
     new_md_lengths = {len(np.atleast_1d(v)) for v in new_metadata.values()}
-
     if len(md_lengths) > 1 or len(new_md_lengths) > 1:
         raise ValueError(f"All features must have same length, got lengths {md_lengths}, {new_md_lengths}")
 
-    n_reference, n_examples = md_lengths.pop(), new_md_lengths.pop()
+    n_reference, n_new = md_lengths.pop(), new_md_lengths.pop()  # possibly different numbers of metadata examples
 
-    if n_examples != len(is_ood):
-        raise ValueError(
-            f"is_ood flag must have same length as new metadata {n_examples} but has length {len(is_ood)}."
-        )
+    if n_new != len(is_ood):
+        raise ValueError(f"is_ood flag must have same length as new metadata {n_new} but has length {len(is_ood)}.")
 
     if n_reference < 3:
         warnings.warn(
