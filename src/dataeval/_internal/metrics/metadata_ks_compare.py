@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, TypeVar
+from typing import Any, Mapping
 
 from numpy.typing import NDArray
 from scipy.stats import iqr, ks_2samp
 from scipy.stats import wasserstein_distance as emd
 
-KstestResult = TypeVar("KstestResult")  # this is what ks_2samp returns.
-
 
 def meta_distribution_compare(
     md0: Mapping[str, list[Any] | NDArray[Any]], md1: Mapping[str, list[Any] | NDArray[Any]]
-) -> dict[str, KstestResult]:  # type: ignore
+) -> dict[str, dict[str, float]]:
     """Measures the featurewise distance between two metadata distributions, and computes a p-value to evaluate its
     significance.
 
@@ -53,7 +51,10 @@ def meta_distribution_compare(
          pvalue 0.9444444444444444
     """
 
+    metadata_keys = md0.keys()
     mdc_dict = {}
+    for k in metadata_keys:
+        mdc_dict.update({k: {}})
 
     for k in md0:
         x0, x1 = md0[k], md1[k]
@@ -62,19 +63,15 @@ def meta_distribution_compare(
         xmax = max(allx)
 
         res = ks_2samp(x0, x1, method="asymp")
-        mdc_dict.update({k: res})
-        if xmax > xmin:
-            mdc_dict[k].statistic_location = (res.statistic_location - xmin) / (xmax - xmin)  #  pyright: ignore
+        dev = res.statistic_location - xmin  #  pyright: ignore
+        loc = dev / (xmax - xmin) if xmax > xmin else dev
 
-    for k in md0:
-        x0, x1 = md0[k], md1[k]
-        dX = iqr(x0)
-        if dX == 0:
-            dX = (max(x0) - min(x0)) / 2.0
-            dX = 1.0 if dX == 0 else dX
+        dX = iqr(x0)  # preferred value of dX
+        dX = (max(x0) - min(x0)) / 2.0 if dX == 0 else dX  # reasonable alternative value
+        dX = 1.0 if dX == 0 else dX  # if alternative is still zero, just avoid division by zero this way
 
-        dX = 1.0 if dX == 0 else dX
         drift = emd(x0, x1) / dX
-        mdc_dict[k].shift_magnitude = drift
+
+        mdc_dict[k].update({"statistic_location": loc, "shift_magnitude": drift, "pvalue": res.pvalue})  #  pyright: ignore
 
     return mdc_dict
