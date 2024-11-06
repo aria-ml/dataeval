@@ -15,7 +15,7 @@ def get_metadata_ood_mi(
     metadata: dict[str, list[Any] | NDArray[Any]],
     is_ood: NDArray[np.bool_],
     discrete_features: str | bool | NDArray[np.bool_] = False,
-) -> dict:
+) -> dict[str, float]:
     """Computes mutual information between a set of metadata features and an out-of-distribution flag.
 
     Given a metadata dictionary `metadata` (where each key maps to one scalar metadata feature per example), and a
