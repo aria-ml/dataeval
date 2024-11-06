@@ -71,9 +71,9 @@ def _get_file(
                             if chunk:
                                 f.write(chunk)
             except requests.exceptions.HTTPError as e:
-                raise Exception(f"{error_msg.format(origin, e.response.status_code)} -- {e.response.reason}") from e
+                raise RuntimeError(f"{error_msg.format(origin, e.response.status_code, e.response.reason)}") from e
             except requests.exceptions.RequestException as e:
-                raise Exception(f"{error_msg.format(origin, 'Unknown error')} -- {str(e)}") from e
+                raise ValueError(f"{error_msg.format(origin, 'Unknown error', str(e))}") from e
         except (Exception, KeyboardInterrupt):
             if os.path.exists(fpath):
                 os.remove(fpath)

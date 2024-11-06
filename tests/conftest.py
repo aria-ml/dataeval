@@ -61,7 +61,7 @@ def mnist_npy(tmp_path_factory):
     yield temp
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def labels_with_metadata() -> tuple[NDArray, dict[str, NDArray]]:
     """Test fixture that returns multiclass labels, as well as a metadata dictionary containing
     columns with various testable properties.

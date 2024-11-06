@@ -1,7 +1,9 @@
 from collections import Counter
+from unittest.mock import patch
 
 import numpy as np
 import pytest
+from requests import HTTPError, RequestException, Response
 
 from dataeval._internal.datasets import MNIST, _get_file, _validate_file, check_exists, extract_archive
 
@@ -47,12 +49,27 @@ def test_get_file_exists_md5(mnist_file, use_md5, hash_value):
     _get_file(root=mnist_file.parent, fname=mnist_file.name, origin="http://mock", file_hash=hash_value, md5=use_md5)
 
 
+class MockHTTPError(HTTPError):
+    def __init__(self, *args, **kwargs):
+        super().__init__(self, *args, **kwargs)
+        self.response = Response()
+        self.response.reason = "MockError"
+        self.response.status_code = 404
+
+
+@patch("dataeval._internal.datasets.requests.get", side_effect=MockHTTPError())
 @pytest.mark.xdist_group(name="mnist_download")
-def test_get_file_error(mnist_download):
+def test_get_file_http_error(mock_get, mnist_download):
     parent, name = mnist_download
-    with pytest.raises(Exception):
+    with pytest.raises(RuntimeError):
         _get_file(root=parent, fname=name, origin="http://mock", file_hash=TEMP_SHA256, md5=True)
-    with pytest.raises(Exception):
+
+
+@patch("dataeval._internal.datasets.requests.get", side_effect=RequestException())
+@pytest.mark.xdist_group(name="mnist_download")
+def test_get_file_request_error(mock_get, mnist_download):
+    _, name = mnist_download
+    with pytest.raises(ValueError):
         _get_file(root="wrong_path", fname=name, origin="http://mock", file_hash=TEMP_SHA256, md5=True)
 
 
