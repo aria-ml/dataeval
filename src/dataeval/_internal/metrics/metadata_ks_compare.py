@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Mapping, TypeVar
 
 from numpy.typing import NDArray
 from scipy.stats import iqr, ks_2samp
 from scipy.stats import wasserstein_distance as emd
 
+KstestResult = TypeVar("KstestResult")  # this is what ks_2samp returns.
+
 
 def meta_distribution_compare(
     md0: Mapping[str, list[Any] | NDArray[Any]], md1: Mapping[str, list[Any] | NDArray[Any]]
-) -> dict[str, object]:
+) -> dict[str, KstestResult]:  # type: ignore
     """Measures the featurewise distance between two metadata distributions, and computes a p-value to evaluate its
     significance.
 
