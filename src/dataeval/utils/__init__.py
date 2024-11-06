@@ -5,15 +5,19 @@ metrics. Currently DataEval supports both :term:`TensorFlow` and PyTorch backend
 """
 
 from dataeval import _IS_TENSORFLOW_AVAILABLE, _IS_TORCH_AVAILABLE
+from dataeval.utils.split_dataset import split_dataset
 
-__all__ = []
+__all__ = ["split_dataset"]
 
 if _IS_TORCH_AVAILABLE:  # pragma: no cover
-    from . import torch
+    from dataeval.utils import torch
 
     __all__ += ["torch"]
 
 if _IS_TENSORFLOW_AVAILABLE:  # pragma: no cover
-    from . import tensorflow
+    from dataeval.utils import tensorflow
 
     __all__ += ["tensorflow"]
+
+del _IS_TENSORFLOW_AVAILABLE
+del _IS_TORCH_AVAILABLE

@@ -19,19 +19,7 @@
     DriftUncertainty
 ```
 
-## Supporting Classes
-
-### Kernels
-
-Kernels are used to map non-linear data to a higher dimensional space.
-
-```{eval-rst}
-.. autosummary::
-
-    kernels.GaussianRBF
-```
-
-### Update Strategies
+## Update Strategies
 
 Update strategies inform how the drift detector classes update the reference data when monitoring for drift.
 
@@ -60,7 +48,6 @@ drift/driftcvm
 drift/driftks
 drift/driftmmd
 drift/driftuncertainty
-drift/kernels.guassianrbf
 drift/updates.lastseenupdate
 drift/updates.reservoirsamplingupdate
 drift/driftoutput

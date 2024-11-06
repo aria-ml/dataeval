@@ -138,17 +138,3 @@ def setup(app):
 
     if nb_execution_mode != "off":
         data.download()
-
-    normalize_module(
-        [
-            "dataeval.detectors.drift",
-            "dataeval.detectors.linters",
-            "dataeval.detectors.ood",
-            "dataeval.metrics.bias",
-            "dataeval.metrics.estimators",
-            "dataeval.metrics.stats",
-            "dataeval.workflows",
-            "dataeval.utils.tensorflow",
-            "dataeval.utils.torch",
-        ]
-    )

@@ -3,7 +3,7 @@ import pytest
 import tensorflow as tf
 import torch
 
-from dataeval._internal.interop import to_numpy
+from dataeval.interop import to_numpy
 
 array_native = [[0, 1], [2, 3]]
 array_expected = np.asarray(array_native)
