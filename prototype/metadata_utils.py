@@ -1,29 +1,102 @@
 import torch
 from torchvision.datasets.vision import VisionDataset
+from torch.utils.data import Dataset
 import numpy as np
 import tensorflow as tf
-import tensorflow_datasets as tfds
+# import tensorflow_datasets as tfds
 from scipy.spatial import ConvexHull
+from dataeval._internal.datasets import MNIST
+from types import SimpleNamespace as blank_object
+from typing import NamedTuple
+from functools import partial
 
-
-
-class InstanceMNIST(VisionDataset):
-    def __init__(self, corruption=None, split=None, **kwargs):
-        super().__init__(root='./data', **kwargs)
-        
-        self.rng = np.random.default_rng(1234)
-
-        self.images, self.labels, self.info = self.get_MNIST_data(corruption=corruption, split=split, with_info=True)
-        self.images = (self.images/255.0).astype(np.float32)
-
-        nsamp, nchan, ny, nx = self.images.shape
-        self.x, self.y = np.meshgrid(np.linspace(0, nx - 1, nx), np.linspace(0, ny - 1, ny))
-        self.metadata = self.make_metadata()
-
+class MakeDataset(Dataset):
+    def __init__(self, namespace):
+        self.namespace = namespace
+        for d in dir(namespace):
+            if d[0:2] == '__' and d[-2:] == '__': 
+                continue
+            setattr(self, d, getattr(namespace, d))
+    
     def __getitem__(self, idx):
-        img = torch.tensor(self.images[idx:idx+1, 0, :, :]) # idx:idx+1 yields a leading dimension of 1
-        label = self.labels[idx]
-        metadata = self.metadata[idx]
+        return self.namespace.__getitem__(idx)
+
+    def __len__(self):
+        return self.namespace.__len__()
+
+class InstanceMNIST(blank_object):
+    """
+    Interface to corrupted MNIST, along with self-generated intrinsic metadata. The latter comes from a catalog of
+    simple functions that compute something about each image. A user can easily add new functions to compute other 
+    quantities of interest if desired. 
+    """
+    def __init__(self, corruptions=None, size=None, **kwargs):
+        MNIST_NUM_IMAGES = 60000
+
+        self.rng = np.random.default_rng(1234)
+        ishuff = self.rng.permutation(MNIST_NUM_IMAGES)
+
+        self.corruptions = [
+            "identity",
+            "shot_noise",
+            "impulse_noise",
+            "glass_blur",
+            "motion_blur",
+            "shear",
+            "scale",
+            "rotate",
+            "brightness",
+            "translate",
+            "stripe",
+            "fog",
+            "spatter",
+            "dotted_line",
+            "zigzag",
+            "canny_edges"
+        ]
+        
+        if corruptions is None:
+            corruptions = ['identity']
+        if not isinstance(corruptions, list):
+            corruptions = [corruptions]
+ 
+        super().__init__()
+
+        max_size = int(MNIST_NUM_IMAGES/len(corruptions))
+        if size is None:
+            size = max_size
+
+        if size > max_size:
+            raise ValueError(f'size {size} is too big, must bve less than {max_size} for {len(corruptions)} corruptions.')
+
+        for ic, c in enumerate(corruptions):
+            if not c in self.corruptions:
+                print(f'Unknown corruption type {c}.')
+                raise ValueError
+
+            mnist = MNIST(root='./data', corruption=c, size=size, randomize=False, balance=False, verbose=False)
+            images, labels = mnist._load_data()
+            images, labels = images[ishuff], labels[ishuff]
+
+            images, labels = images[ic*size:ic*size+size], labels[ic*size:ic*size+size]
+            images = (np.reshape(images, (size, 1, *images.shape[1:]))/255.0).astype(np.float32)
+
+
+            nsamp, nchan, ny, nx = images.shape
+
+            self.x, self.y = np.meshgrid(np.linspace(0, nx - 1, nx), np.linspace(0, ny - 1, ny))
+
+            self.images, self.labels = images, labels # for use in self.make_metadata
+            
+            this_getitem = partial(self.__getitem__, c)
+
+            setattr(self, c, MakeDataset(blank_object(corruption=c, images=images, labels=labels, metadata=self.make_metadata(), __getitem__=this_getitem, __len__=self.__len__)))
+
+    def __getitem__(self, corruption, idx):
+        myself = getattr(self, corruption)
+        img = torch.tensor(myself.images[idx:idx+1, 0, :, :]) # idx:idx+1 yields a leading dimension of 1
+        label = myself.labels[idx]
+        metadata = myself.metadata[idx]
 
         return img, label, metadata
 
@@ -105,7 +178,6 @@ class InstanceMNIST(VisionDataset):
         sumnzn = np.sum(ndiff, axis=(2,3))
         return sumnzn.reshape(-1)
         
-
     def fill_frac(self):
         nz = self.images > 0
         nz_area = np.sum(nz, axis=(2,3))
@@ -123,68 +195,8 @@ class InstanceMNIST(VisionDataset):
     def random_normal(self):  # valid metadata tests need to find this uninformative. 
         return self.rng.normal(size=len(self.images))
     
-    # wrap the TensorFlow MNIST and corrupted MNIST functions. 
-    def visualize(self):
-        tfds.visualization.show_examples(self.dataset, self.info)
-
-    def get_MNIST_data(self, corruption=None, split=None, with_info=None, visualize=None):
-        corruptions = [
-            "identity",
-            "shot_noise",
-            "impulse_noise",
-            "glass_blur",
-            "motion_blur",
-            "shear",
-            "scale",
-            "rotate",
-            "brightness",
-            "translate",
-            "stripe",
-            "fog",
-            "spatter",
-            "dotted_line",
-            "zigzag",
-            "canny_edges"
-        ]
-
-        self.corruptions = corruptions
-        
-        dataset_name = "mnist"
-        self.corruption = None
-        if corruption is not None:
-            if corruption == 'random':
-                corruption = self.rng.choice(corruptions)
-
-            if not (corruption in corruptions):
-                print('Unknown corruption type:', corruption)
-                raise ValueError
-        
-            self.corruption = corruption
-            dataset_name += "_corrupted/" + corruption
-
-        with_info = False if with_info is None else with_info
-        visualize = False if visualize is None else visualize
-
-        if split is None:
-            split = 'train'
-            
-        dataset, ds_info = tfds.load(dataset_name, split=split, with_info=with_info)
-        self.dataset = dataset # handy for visualization method
- 
-        images = [i["image"] for i in dataset]
-        labels = [i["label"].numpy() for i in dataset]
-        images = np.array(images, dtype=np.float32).transpose(0, 3, 1, 2)
-
-       # shuffle to avoid pairing between dataset instances
-        shuffle = self.rng.permutation(len(images))
-        images = images[shuffle]
-        labels = [labels[shuf] for shuf in shuffle]
-
-        return images, labels, ds_info
-    
 
     
-
 def collate_fn_2(batch):
     # The batch comes in the format ((x1, y1), (x2, y2), ..., (xn, yn)).
     # Let's split this up into your xs and your ys.
