@@ -9,7 +9,7 @@ from scipy.stats import wasserstein_distance as emd
 
 def meta_distribution_compare(
     md0: Mapping[str, list[Any] | NDArray[Any]], md1: Mapping[str, list[Any] | NDArray[Any]]
-) -> dict:
+) -> dict[str, float]:
     """Measures the featurewise distance between two metadata distributions, and computes a p-value to evaluate its
     significance.
 
