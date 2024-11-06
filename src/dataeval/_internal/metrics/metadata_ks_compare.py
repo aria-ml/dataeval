@@ -1,11 +1,15 @@
-from typing import Dict, List, Mapping, Union
+from __future__ import annotations
+
+from typing import Any, Mapping
 
 from numpy.typing import NDArray
 from scipy.stats import iqr, ks_2samp
 from scipy.stats import wasserstein_distance as emd
 
 
-def meta_distribution_compare(md0: Mapping[str, Union[List, NDArray]], md1: Mapping[str, Union[List, NDArray]]) -> Dict:
+def meta_distribution_compare(
+    md0: Mapping[str, list[Any] | NDArray[Any]], md1: Mapping[str, list[Any] | NDArray[Any]]
+) -> dict:
     """Measures the featurewise distance between two metadata distributions, and computes a p-value to evaluate its
     significance.
 
@@ -13,14 +17,14 @@ def meta_distribution_compare(md0: Mapping[str, Union[List, NDArray]], md1: Mapp
 
     Parameters
     ----------
-    md0:
+    md0 : Mapping[str, list[Any] | NDArray[Any]]
         A set of arrays of values, indexed by metadata feature names, with one value per data example per feature.
-    md1:
+    md1 : Mapping[str, list[Any] | NDArray[Any]]
         Another set of arrays of values, indexed by metadata feature names, with one value per data example per feature.
 
     Returns
     -------
-    Dict[str, float]
+    dict[str, float]
         A dictionary with keys corresponding to metadata feature names, and values that are KstestResult objects, as
         defined by scipy.stats.ks_2samp. These values also have two additional attributes: shift_magnitude and
         statistic_location. The first is the Earth Mover's Distance normalized by the interquartile range (IQR) of the

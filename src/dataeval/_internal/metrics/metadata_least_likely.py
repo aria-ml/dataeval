@@ -1,12 +1,16 @@
+from __future__ import annotations
+
 import numbers
-from typing import Union
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 
 
 def get_least_likely_features(
-    metadata: dict[str, Union[list, NDArray]], newmetadata: dict[str, Union[list, NDArray]], is_ood: NDArray[np.bool_]
+    metadata: dict[str, list[Any] | NDArray[Any]],
+    new_metadata: dict[str, list[Any] | NDArray[Any]],
+    is_ood: NDArray[np.bool_],
 ) -> list[tuple[str, float]]:
     """Computes which metadata feature is most out-of-distribution (OOD) relative to a reference metadata set.
 
@@ -17,10 +21,10 @@ def get_least_likely_features(
 
     Parameters
     ----------
-    metadata: dict[str, NDArray]
+    metadata: dict[str, list[Any] | NDArray[Any]]
         A reference set of arrays of values, indexed by metadata feature names, with one value per data example per
         feature.
-    corrmetadata: dict[str, Union[list, NDArray]]
+    new_metadata: dict[str, list[Any] | NDArray[Any]]
         A second metedata set, to be tested against the reference metadata. It is ok if the two meta data objects
         hold different numbers of examples.
     is_ood: NDArray[np.bool_]
@@ -39,13 +43,13 @@ def get_least_likely_features(
     >>> from dataeval._internal.metrics.metadata_least_likely import get_least_likely_features
     >>> import numpy
     >>> metadata = {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112]}
-    >>> newmetadata = {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -211101]}
+    >>> new_metadata = {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -211101]}
     >>> is_ood = numpy.array([True, True, True])
-    >>> get_least_likely_features(metadata, newmetadata, is_ood)
+    >>> get_least_likely_features(metadata, new_metadata, is_ood)
     [('time', 2.0), ('time', 2.590909), ('altitude', 33.245346)]
     """
     md_lengths = np.asarray([len(np.atleast_1d(np.asarray(v))) for v in metadata.values()])
-    newmd_lengths = np.asarray([len(np.atleast_1d(np.asarray(v))) for v in newmetadata.values()])
+    newmd_lengths = np.asarray([len(np.atleast_1d(np.asarray(v))) for v in new_metadata.values()])
 
     # Raise errors for bad inputs...
     if any(md_lengths < 3):
@@ -62,8 +66,8 @@ def get_least_likely_features(
             f"is_ood flag must have same length as new metadata {newmd_lengths[0]} but has length {len(is_ood)}."
         )
 
-    if not metadata.keys() == newmetadata.keys():
-        raise ValueError(f"Reference and test metadata keys must be identical: {list(metadata)}, {list(newmetadata)}")
+    if not metadata.keys() == new_metadata.keys():
+        raise ValueError(f"Reference and test metadata keys must be identical: {list(metadata)}, {list(new_metadata)}")
 
     if not any(is_ood):
         return []
@@ -92,7 +96,7 @@ def get_least_likely_features(
         pos_scale = np.median(posdev) if posdev.any() else 1.0
         neg_scale = np.abs(np.median(negdev)) if negdev.any() else 1.0
 
-        x, x0, dxp, dxn = np.atleast_1d(newmetadata[k]), loc, pos_scale, neg_scale  # just abbreviations
+        x, x0, dxp, dxn = np.atleast_1d(new_metadata[k]), loc, pos_scale, neg_scale  # just abbreviations
         dxp = dxp if dxp > 0 else 1.0  # avoids dividing by zero below
         dxn = dxn if dxn > 0 else 1.0
 

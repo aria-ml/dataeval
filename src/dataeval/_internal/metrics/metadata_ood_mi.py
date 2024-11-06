@@ -1,4 +1,6 @@
-from typing import Dict, List, Union
+from __future__ import annotations
+
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -10,10 +12,10 @@ NATS2BITS = 1.442695
 
 
 def get_metadata_ood_mi(
-    metadata: Dict[str, Union[List, NDArray]],
+    metadata: dict[str, list[Any] | NDArray[Any]],
     is_ood: NDArray[np.bool_],
-    discrete_features: Union[str, bool, NDArray[np.bool_]] = False,
-) -> Dict:
+    discrete_features: str | bool | NDArray[np.bool_] = False,
+) -> dict:
     """Computes mutual information between a set of metadata features and an out-of-distribution flag.
 
     Given a metadata dictionary `metadata` (where each key maps to one scalar metadata feature per example), and a
@@ -26,16 +28,16 @@ def get_metadata_ood_mi(
 
     Parameters
     ----------
-    metadata:
+    metadata : dict[str, list[Any] | NDArray[Any]]
         A set of arrays of values, indexed by metadata feature names, with one value per data example per feature.
-    is_ood:
+    is_ood : NDArray[np.bool_]
         A boolean array, with one value per example, that indicates which examples are OOD.
-    discrete_features:
+    discrete_features : str | bool | NDArray[np.bool_]
         Either a boolean array or a single boolean value, indicate which features take on discrete values.
 
     Returns
     -------
-    Dict[str, float]
+    dict[str, float]
         A dictionary with keys corresponding to metadata feature names, and values indicating the strength of
         association between each named feature and the OOD flag, as mutual information measured in bits.
 
