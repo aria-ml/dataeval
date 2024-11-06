@@ -3,7 +3,7 @@ import re
 import numpy as np
 import pytest
 
-from dataeval._internal.metrics.metadata_least_likely import get_least_likely_features
+from dataeval.detectors.ood.metadata_least_likely import get_least_likely_features
 
 
 # Inputs with expected valid results:
