@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numbers
+import warnings
 from typing import Any
 
 import numpy as np
@@ -11,7 +12,7 @@ def get_least_likely_features(
     metadata: dict[str, list[Any] | NDArray[Any]],
     new_metadata: dict[str, list[Any] | NDArray[Any]],
     is_ood: NDArray[np.bool_],
-) -> list[tuple[str, float]]:
+) -> list[tuple[str | None, float]]:
     """Computes which metadata feature is most out-of-distribution (OOD) relative to a reference metadata set.
 
     Given a reference metadata dictionary `metadata` (where each key maps to one scalar metadata feature), a second
@@ -32,7 +33,7 @@ def get_least_likely_features(
 
     Returns
     -------
-    list[tuple[str, float]]
+    list[tuple[str | None, float]]
         An array of names of the features of each OOD corrmetadata example that were the most OOD.
 
     Examples
@@ -48,26 +49,31 @@ def get_least_likely_features(
     >>> get_least_likely_features(metadata, new_metadata, is_ood)
     [('time', 2.0), ('time', 2.590909), ('altitude', 33.245346)]
     """
-    md_lengths = np.asarray([len(np.atleast_1d(np.asarray(v))) for v in metadata.values()])
-    newmd_lengths = np.asarray([len(np.atleast_1d(np.asarray(v))) for v in new_metadata.values()])
-
     # Raise errors for bad inputs...
-    if any(md_lengths < 3):
-        raise ValueError(
-            "We need at least 3 reference metadata examples to determine which "
-            f"features are least likely, but only got {min(md_lengths)}"
-        )
 
-    if not all(md_lengths == md_lengths[0]) or not all(newmd_lengths == newmd_lengths[0]):
-        raise ValueError(f"All features must have same length, got lengths {md_lengths}, {newmd_lengths}")
-
-    if newmd_lengths[0] != len(is_ood):
-        raise ValueError(
-            f"is_ood flag must have same length as new metadata {newmd_lengths[0]} but has length {len(is_ood)}."
-        )
-
-    if not metadata.keys() == new_metadata.keys():
+    if metadata.keys() != new_metadata.keys():
         raise ValueError(f"Reference and test metadata keys must be identical: {list(metadata)}, {list(new_metadata)}")
+
+    md_lengths = {len(np.atleast_1d(v)) for v in metadata.values()}
+    new_md_lengths = {len(np.atleast_1d(v)) for v in new_metadata.values()}
+
+    if len(md_lengths) > 1 or len(new_md_lengths) > 1:
+        raise ValueError(f"All features must have same length, got lengths {md_lengths}, {new_md_lengths}")
+
+    n_reference, n_examples = md_lengths.pop(), new_md_lengths.pop()
+
+    if n_examples != len(is_ood):
+        raise ValueError(
+            f"is_ood flag must have same length as new metadata {n_examples} but has length {len(is_ood)}."
+        )
+
+    if n_reference < 3:
+        warnings.warn(
+            "We need at least 3 reference metadata examples to determine which "
+            f"features are least likely, but only got {n_reference}",
+            UserWarning,
+        )
+        return [(None, np.nan)]
 
     if not any(is_ood):
         return []
