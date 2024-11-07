@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numbers
 from typing import Any
 
 import numpy as np
@@ -49,11 +50,11 @@ def get_metadata_ood_mi(
         >>> metadata = {"time": numpy.linspace(0, 10, 100), "altitude": numpy.linspace(0, 16, 100) ** 2}
         >>> is_ood = metadata["altitude"] > 100
         >>> print(get_metadata_ood_mi(metadata, is_ood, discrete_features=False))
-    {'time': 0.9407686591507002, 'altitude': 0.9407686591507002}
+        {'time': 0.933074285817367, 'altitude': 0.9407686591507002}
     """
     mdict = metadata
-
-    X = np.array(list(mdict.values())).T
+    numerical_keys = [k for k, v in mdict.items() if all(isinstance(vi, numbers.Number) for vi in v)]
+    X = np.array([mdict[k] for k in numerical_keys]).T
 
     X0, dX = np.mean(X, axis=0), np.std(X, axis=0, ddof=1)
     Xscl = (X - X0) / dX
@@ -63,9 +64,10 @@ def get_metadata_ood_mi(
             Xscl,
             is_ood,
             discrete_features=discrete_features,  # type: ignore
+            random_state=42,
         )
         * NATS2BITS
     )
 
-    mi_dict = {k: mutual_info_values[i] for i, k in enumerate(mdict)}
+    mi_dict = {k: mutual_info_values[i] for i, k in enumerate(numerical_keys)}
     return mi_dict
