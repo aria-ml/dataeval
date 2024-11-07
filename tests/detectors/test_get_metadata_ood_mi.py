@@ -1,3 +1,5 @@
+import re
+
 import numpy as np
 import pytest
 
@@ -10,108 +12,12 @@ from dataeval.detectors.ood.metadata_ood_mi import get_metadata_ood_mi
     (
         (  # Basic valid inputs
             {"time": np.linspace(0, 10, 100), "altitude": np.linspace(0, 16, 100) ** 2},
-            [
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-                True,
-            ],
+            np.array([True] * 62 + [False] * 38),
+            {"time": 0.9359596758173668, "altitude": 0.9407686591507002},
+        ),
+        (  # Basic valid inputs, but one is non-numerical, which should just be skipped
+            {"time": np.linspace(0, 10, 100), "name": ["phil"] * 100, "altitude": np.linspace(0, 16, 100) ** 2},
+            np.array([True] * 62 + [False] * 38),
             {"time": 0.9359596758173668, "altitude": 0.9407686591507002},
         ),
         # (  # Basic valid inputs with different numbers of examples
@@ -172,90 +78,38 @@ def test_output_values(md0, is_ood, expected: dict[str, float]):
 
 
 # # Inputs that raise Exceptions
-# @pytest.mark.parametrize(
-#     "md0, md1, error_msg",
-#     (
-#         (  # key mismatch.
-#             {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
-#             {"time": np.array([42, 47]), "schmaltitude": [235, 6789]},
-#             re.escape("Both sets of metadata keys must be identical: ['time', 'altitude'], ['time', 'schmaltitude']"),
-#         ),
-#         # (  # wrong number of examples in a feature
-#     {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112]},
-#     {"time": [7.8, 9.10], "altitude": [532, 9876, -2111]},
-#     re.escape("All features must have same length, got lengths {3}, {2, 3}"),
-# ),
-#     ),
-# )
-# def test_invalid_inputs(md0, md1, error_msg):
-#     with pytest.raises(ValueError, match=error_msg):
-#         meta_distribution_compare(md0, md1)
+@pytest.mark.parametrize(
+    "md0, is_ood, error_msg",
+    (
+        (  # key mismatch.
+            {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
+            np.array([False, False, True, False]),
+            re.escape("OOD flag and metadata features need to be same size, but are different sizes: 4 and 3."),
+        ),
+        # wrong number of examples in a feature
+        (
+            {"time": [7.8, 9.10], "altitude": [532, 9876, -2111]},
+            np.array([True, False, False]),
+            re.escape("Metadata features have differing sizes: {2, 3}"),
+        ),
+    ),
+)
+def test_invalid_inputs(md0, is_ood, error_msg):
+    with pytest.raises(ValueError, match=error_msg):
+        get_metadata_ood_mi(md0, is_ood)
 
 
 # # inputs that raise a warning
-# @pytest.mark.parametrize(
-#     "md0, md1, warning",
-#     (
-#         (  # Invalid inputs: md0 not enough examples.
-#             {"time": [42], "altitude": [532, 9876, -2111, 42, 83, 314159, 16, 99]},
-#             {
-#                 "time": [7.8, 9.10, 11.12, 13.14, 15.16, 17.18, 19.20, 21.22],
-#                 "altitude": [532, 9876, -2111, 42, 83, 314159, 16, 99],
-#             },
-#             "Sample sizes of 1, 8 for feature time will yield unreliable p-values from the KS test.",
-#         ),
-#     ),
-# )
-# def test_nonsense_inputs(md0, md1, warning):
-#     with pytest.warns(UserWarning, match=warning):
-#         meta_distribution_compare(md0, md1)
-
-
-# # Use a more realistic number of samples; make sure no waring is emitted.
-# def test_bigdata_unlikely_features():
-#     with warnings.catch_warnings() as record:
-#         warnings.simplefilter("error")
-#         nbig = 1000
-#         feature_names = ["temperature", "DJIA", "uptime"]
-#         bigdata_size = (nbig, len(feature_names))
-#         rng = np.random.default_rng(4567)  # same pseudorandom sets each time.
-#         X0 = rng.normal(size=bigdata_size)
-#         X1 = rng.normal(size=bigdata_size)
-
-#         half = int(nbig / 2)
-#         X1[:half, 1] -= rng.normal(loc=5000, scale=200, size=half)  # first half will have weird DJIA
-#         X1[half:, 0] += rng.normal(loc=100, scale=10, size=half)  # second half will have weird temperature
-
-#         bigrefmetadata = {}
-#         bignewmetadata = {}
-#         for i, k in enumerate(feature_names):
-#             bigrefmetadata.update({k: X0[:, i]})
-#             bignewmetadata.update({k: X1[:, i]})
-
-#         output = meta_distribution_compare(bigrefmetadata, bignewmetadata)
-
-#         # assert all(out[0] == "DJIA" for out in output[0:half]) and all(out[0] == "temperature" for out in output[half:])
-#         expected = {
-#             "temperature": {
-#                 "statistic_location": 0.04942976244618348,
-#                 "shift_magnitude": 37.37728630019768,
-#                 "pvalue": 4.1132799581816557e-116,
-#             },
-#             "DJIA": {
-#                 "statistic_location": 0.9988396927777546,
-#                 "shift_magnitude": 1834.6649059091003,
-#                 "pvalue": 1.3128633809722045e-116,
-#             },
-#             "uptime": {
-#                 "statistic_location": 0.4362350597356996,
-#                 "shift_magnitude": 0.04229056583710559,
-#                 "pvalue": 0.8172815627702071,
-#             },
-#         }
-#         good = True
-#         for (ko, do), (ke, de) in zip(output.items(), expected.items()):
-#             good = good and all(
-#                 (ke == k and np.isclose(ve, v, equal_nan=True)) for (ke, ve), (k, v) in zip(de.items(), do.items())
-#             )
-#         print(record)
-#         assert good and record is None
+@pytest.mark.parametrize(
+    "md0, is_ood, warning",
+    (
+        (  # Basic valid inputs
+            {"time": np.linspace(0, 10, 100), "stuff": ["junk"] * 100, "altitude": np.linspace(0, 16, 100) ** 2},
+            np.array([True] * 62 + [False] * 38),
+            re.escape("Processing ['time', 'altitude'], others are non-numerical and will be skipped."),
+        ),
+    ),
+)
+def test_nonsense_inputs(md0, is_ood, warning):
+    with pytest.warns(UserWarning, match=warning):
+        get_metadata_ood_mi(md0, is_ood)

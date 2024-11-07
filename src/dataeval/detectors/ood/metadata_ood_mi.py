@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numbers
+import warnings
 from typing import Any
 
 import numpy as np
@@ -10,6 +11,9 @@ from sklearn.feature_selection import mutual_info_classif
 # NATS2BITS is the reciprocal of natural log of 2. If you have an information/entropy-type quantity measured in nats,
 #   which is what many library functions return, multiply it by NATS2BITS to get it in bits.
 NATS2BITS = 1.442695
+
+# RANDOM_STATE is set to 42 for reproducibility of mutual_info_classif during testing, since it otherwise has variations.
+RANDOM_STATE = 42
 
 
 def get_metadata_ood_mi(
@@ -52,9 +56,23 @@ def get_metadata_ood_mi(
         >>> print(get_metadata_ood_mi(metadata, is_ood, discrete_features=False))
         {'time': 0.933074285817367, 'altitude': 0.9407686591507002}
     """
-    mdict = metadata
-    numerical_keys = [k for k, v in mdict.items() if all(isinstance(vi, numbers.Number) for vi in v)]
-    X = np.array([mdict[k] for k in numerical_keys]).T
+    numerical_keys = [k for k, v in metadata.items() if all(isinstance(vi, numbers.Number) for vi in v)]
+    if len(numerical_keys) < len(metadata):
+        warnings.warn(
+            f"Processing {numerical_keys}, others are non-numerical and will be skipped.",
+            UserWarning,
+        )
+
+    md_lengths = {len(np.atleast_1d(v)) for v in metadata.values()}
+    if len(md_lengths) > 1:
+        raise ValueError(f"Metadata features have differing sizes: {md_lengths}")
+
+    if len(is_ood) != (mdl := md_lengths.pop()):
+        raise ValueError(
+            f"OOD flag and metadata features need to be same size, but are different sizes: {len(is_ood)} and {mdl}."
+        )
+
+    X = np.array([metadata[k] for k in numerical_keys]).T
 
     X0, dX = np.mean(X, axis=0), np.std(X, axis=0, ddof=1)
     Xscl = (X - X0) / dX
@@ -64,7 +82,7 @@ def get_metadata_ood_mi(
             Xscl,
             is_ood,
             discrete_features=discrete_features,  # type: ignore
-            random_state=42,
+            random_state=RANDOM_STATE,
         )
         * NATS2BITS
     )
