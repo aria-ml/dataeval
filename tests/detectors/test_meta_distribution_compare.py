@@ -1,3 +1,5 @@
+import re
+
 import numpy as np
 import pytest
 
@@ -8,7 +10,7 @@ from dataeval.detectors.ood.metadata_ks_compare import meta_distribution_compare
 @pytest.mark.parametrize(
     "md0, md1, expected",
     (
-        (  # Basic valid inputs with one OOD example
+        (  # Basic valid inputs
             {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112], "random": [3.14, 159, 265]},
             {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111], "random": [1.12, 3.5, 8.13]},
             {
@@ -25,9 +27,25 @@ from dataeval.detectors.ood.metadata_ks_compare import meta_distribution_compare
                 },
             },
         ),
-        (  # Basic valid inputs with more than one OOD example
+        (  # Basic valid inputs with different numbers of examples
             {"time": np.array([1.2, 3.4, 5.6]), "altitude": [235, 6789, 101112]},
-            {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
+            {"time": [7.8, 9.10, 11.12, 13.14], "altitude": [532, 9876, -2111, 4321]},
+            {
+                "time": {
+                    "statistic_location": 0.36850921273031817,
+                    "shift_magnitude": 3.131818181818182,
+                    "pvalue": 0.0,
+                },
+                "altitude": {
+                    "statistic_location": 0.06231169409918332,
+                    "shift_magnitude": 0.6530791624123108,
+                    "pvalue": 0.7777777777777777,
+                },
+            },
+        ),
+        (  # Valid inputs: include non-numerical features.
+            {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112], "weather": ["raining", "calm", "tornado"]},
+            {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111], "weather": ["snow", "hail", "hot"]},
             {
                 "time": {"statistic_location": 0.44354838709677413, "shift_magnitude": 2.7, "pvalue": 0.0},
                 "altitude": {
@@ -35,20 +53,26 @@ from dataeval.detectors.ood.metadata_ks_compare import meta_distribution_compare
                     "shift_magnitude": 0.6598068274565396,
                     "pvalue": 0.9444444444444444,
                 },
+                "weather": {},
             },
         ),
-        # (  # Valid inputs: include non-numerical features.
-        #     {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112], "weather": ["raining", "calm", "tornado"]},
-        #     {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111], "weather": ["snow", "hail", "hot"]},
-        #     np.array([True, True, False]),
-        #     [("time", 2.0), ("time", 2.590909)],
-        # ),
-        # (  # Valid inputs: include random feature.
-        #     {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112], "random": [3.14, 159, 265]},
-        #     {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111], "random": [1.12, 3.5, 8.13]},
-        #     np.array([True, True, False]),
-        #     [("time", 2.0), ("time", 2.590909)],
-        # ),
+        (  # Valid inputs: feature with only one value
+            {"time": [1.2, 1.2, 1.2], "altitude": [235, 6789, 101112], "random": [3.14, 159, 265]},
+            {"time": [1.2, 1.2, 1.2], "altitude": [532, 9876, -2111], "random": [1.12, 3.5, 8.13]},
+            {
+                "time": {"statistic_location": 0.0, "shift_magnitude": 0.0, "pvalue": 1.0},
+                "altitude": {
+                    "statistic_location": 0.11612721970878584,
+                    "shift_magnitude": 0.6598068274565396,
+                    "pvalue": 0.9444444444444444,
+                },
+                "random": {
+                    "statistic_location": 0.026565105350917086,
+                    "shift_magnitude": 1.0549912166806692,
+                    "pvalue": 0.22222222222222213,
+                },
+            },
+        ),
     ),
 )
 def test_output_values(md0, md1, expected: dict[str, dict[str, float]]):
@@ -62,31 +86,24 @@ def test_output_values(md0, md1, expected: dict[str, dict[str, float]]):
 
 
 # # Inputs that raise Exceptions
-# @pytest.mark.parametrize(
-#     "md0, md1, error_msg",
-#     (
-#         (  # is_ood does not match metadata.
-#             {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
-#             {"time": np.array([42, 47]), "altitude": [235, 6789]},
-#             "is_ood flag must have same length as new metadata 2 but has length 3.",
-#         ),
-#         (  # key mismatch.
-#             {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
-#             {"time": np.array([42, 47]), "schmaltitude": [235, 6789]},
-#             re.escape(
-#                 "Reference and test metadata keys must be identical: ['time', 'altitude'], ['time', 'schmaltitude']"
-#             ),
-#         ),
-#         (  # wrong number of examples in a feature
-#             {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112]},
-#             {"time": [7.8, 9.10], "altitude": [532, 9876, -2111]},
-#             re.escape("All features must have same length, got lengths {3}, {2, 3}"),
-#         ),
-#     ),
-# )
-# def test_invalid_inputs(md0, md1, error_msg):
-#     with pytest.raises(ValueError, match=error_msg):
-#         meta_distribution_compare(md0, md1)
+@pytest.mark.parametrize(
+    "md0, md1, error_msg",
+    (
+        (  # key mismatch.
+            {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
+            {"time": np.array([42, 47]), "schmaltitude": [235, 6789]},
+            re.escape("Both sets of metadata keys must be identical: ['time', 'altitude'], ['time', 'schmaltitude']"),
+        ),
+        # (  # wrong number of examples in a feature
+        #     {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112]},
+        #     {"time": [7.8, 9.10], "altitude": [532, 9876, -2111]},
+        #     re.escape("All features must have same length, got lengths {3}, {2, 3}"),
+        # ),
+    ),
+)
+def test_invalid_inputs(md0, md1, error_msg):
+    with pytest.raises(ValueError, match=error_msg):
+        meta_distribution_compare(md0, md1)
 
 
 # # inputs that raise a warning

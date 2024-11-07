@@ -64,7 +64,7 @@ def get_least_likely_features(
     if n_new != len(is_ood):
         raise ValueError(f"is_ood flag must have same length as new metadata {n_new} but has length {len(is_ood)}.")
 
-    if n_reference < 3:
+    if n_reference < 3:  # too hard to define "in-distribution" with this few reference samples.
         warnings.warn(
             "We need at least 3 reference metadata examples to determine which "
             f"features are least likely, but only got {n_reference}",
@@ -115,5 +115,5 @@ def get_least_likely_features(
         kmax[abig] = k
         deviation[abig] = np.abs(X[abig])
 
-    unlikely_features = list(zip(kmax[is_ood], deviation[is_ood]))
+    unlikely_features = list(zip(kmax[is_ood], deviation[is_ood]))  # feature names, along with how far out they are.
     return unlikely_features
