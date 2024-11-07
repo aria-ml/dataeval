@@ -70,7 +70,7 @@ def meta_distribution_compare(
         if not all(isinstance(allxi, numbers.Number) for allxi in allx):  # NB: np.nan *is* a number in this context.
             continue  # non-numeric features will return an empty dict for feature k
 
-        # from Numerical Recipes in C, 3rd ed. p. 737. If too few points, warn and go.
+        # from Numerical Recipes in C, 3rd ed. p. 737. If too few points, warn and keep going.
         if np.sqrt(((N := len(x0)) * (M := len(x1))) / (N + M)) < 4:
             warnings.warn(
                 f"Sample sizes of {N}, {M} for feature {k} will yield unreliable p-values from the KS test.",
@@ -82,16 +82,16 @@ def meta_distribution_compare(
             mdc_dict[k].update({"statistic_location": 0.0, "shift_magnitude": 0.0, "pvalue": 1.0})
             continue
 
-        res = ks_2samp(x0, x1, method="asymp")
-        dev = res.statistic_location - xmin  #  pyright: ignore  (KSresult type)
+        ks_result = ks_2samp(x0, x1, method="asymp")
+        dev = ks_result.statistic_location - xmin  #  pyright: ignore  (KSresult type)
         loc = dev / (xmax - xmin) if xmax > xmin else dev
 
-        dX = iqr(x0)  # preferred value of dX
+        dX = iqr(x0)  # preferred value of dX, which is the scale of the the md0 values for feature k
         dX = (max(x0) - min(x0)) / 2.0 if dX == 0 else dX  # reasonable alternative value of dX, when iqr is zero.
         dX = 1.0 if dX == 0 else dX  # if dX is *still* zero, just avoid division by zero this way
 
         drift = emd(x0, x1) / dX
 
-        mdc_dict[k].update({"statistic_location": loc, "shift_magnitude": drift, "pvalue": res.pvalue})  #  pyright: ignore
+        mdc_dict[k].update({"statistic_location": loc, "shift_magnitude": drift, "pvalue": ks_result.pvalue})  #  pyright: ignore
 
     return mdc_dict

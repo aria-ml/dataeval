@@ -1,4 +1,5 @@
 import re
+import warnings
 
 import numpy as np
 import pytest
@@ -125,25 +126,51 @@ def test_nonsense_inputs(md0, md1, warning):
         meta_distribution_compare(md0, md1)
 
 
-# # Use a more realistic number of samples
-# def test_bigdata_unlikely_features():
-#     nbig = 1000
-#     feature_names = ["temperature", "DJIA", "uptime"]
-#     bigdata_size = (nbig, len(feature_names))
-#     rng = np.random.default_rng(123)  # same pseudorandom sets each time.
-#     X0 = rng.normal(size=bigdata_size)
-#     X1 = rng.normal(size=bigdata_size)
+# # Use a more realistic number of samples; make sure no waring is emitted.
+def test_bigdata_unlikely_features():
+    with warnings.catch_warnings() as record:
+        warnings.simplefilter("error")
+        nbig = 1000
+        feature_names = ["temperature", "DJIA", "uptime"]
+        bigdata_size = (nbig, len(feature_names))
+        rng = np.random.default_rng(4567)  # same pseudorandom sets each time.
+        X0 = rng.normal(size=bigdata_size)
+        X1 = rng.normal(size=bigdata_size)
 
-#     half = int(nbig / 2)
-#     X1[:half, 1] -= rng.normal(loc=5000, scale=200, size=half)  # first half will have weird DJIA
-#     X1[half:, 0] += rng.normal(loc=100, scale=10, size=half)  # second half will have weird temperature
+        half = int(nbig / 2)
+        X1[:half, 1] -= rng.normal(loc=5000, scale=200, size=half)  # first half will have weird DJIA
+        X1[half:, 0] += rng.normal(loc=100, scale=10, size=half)  # second half will have weird temperature
 
-#     bigrefmetadata = {}
-#     bignewmetadata = {}
-#     for i, k in enumerate(feature_names):
-#         bigrefmetadata.update({k: X0[:, i]})
-#         bignewmetadata.update({k: X1[:, i]})
+        bigrefmetadata = {}
+        bignewmetadata = {}
+        for i, k in enumerate(feature_names):
+            bigrefmetadata.update({k: X0[:, i]})
+            bignewmetadata.update({k: X1[:, i]})
 
-#     output = meta_distribution_compare(bigrefmetadata, bignewmetadata)
+        output = meta_distribution_compare(bigrefmetadata, bignewmetadata)
 
-#     assert all(out[0] == "DJIA" for out in output[0:half]) and all(out[0] == "temperature" for out in output[half:])
+        # assert all(out[0] == "DJIA" for out in output[0:half]) and all(out[0] == "temperature" for out in output[half:])
+        expected = {
+            "temperature": {
+                "statistic_location": 0.04942976244618348,
+                "shift_magnitude": 37.37728630019768,
+                "pvalue": 4.1132799581816557e-116,
+            },
+            "DJIA": {
+                "statistic_location": 0.9988396927777546,
+                "shift_magnitude": 1834.6649059091003,
+                "pvalue": 1.3128633809722045e-116,
+            },
+            "uptime": {
+                "statistic_location": 0.4362350597356996,
+                "shift_magnitude": 0.04229056583710559,
+                "pvalue": 0.8172815627702071,
+            },
+        }
+        good = True
+        for (ko, do), (ke, de) in zip(output.items(), expected.items()):
+            good = good and all(
+                (ke == k and np.isclose(ve, v, equal_nan=True)) for (ke, ve), (k, v) in zip(de.items(), do.items())
+            )
+        print(record)
+        assert good and record is None
