@@ -1,5 +1,5 @@
 import pytest
-from loss_estimation import LossEstimator, outputs_to_nannyml
+from prototype.nannyml.loss_estimation import LossEstimator, outputs_to_nannyml
 import os
 import random
 from typing import Dict, cast

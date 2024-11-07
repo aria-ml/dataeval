@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict, Tuple, Union
 
-import drift_projnorm as dd
+import prototype.drift.drift_projnorm as dd
 import numpy as np
 import pytest
 import tensorflow_datasets as tfds
