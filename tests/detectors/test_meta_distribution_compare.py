@@ -107,19 +107,22 @@ def test_invalid_inputs(md0, md1, error_msg):
 
 
 # # inputs that raise a warning
-# @pytest.mark.parametrize(
-#     "md0, md1, warning",
-#     (
-#         (  # Invalid inputs: md0 not enough examples.
-#             {"time": 42, "altitude": 0},
-#             {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111]},
-#             "We need at least 3 reference metadata examples to determine which features are least likely, but only got 1",  # noqa: E501
-#         ),
-#     ),
-# )
-# def test_nonsense_inputs(md0, md1, warning):
-#     with pytest.warns(UserWarning, match=warning):
-#         meta_distribution_compare(md0, md1)
+@pytest.mark.parametrize(
+    "md0, md1, warning",
+    (
+        (  # Invalid inputs: md0 not enough examples.
+            {"time": [42], "altitude": [532, 9876, -2111, 42, 83, 314159, 16, 99]},
+            {
+                "time": [7.8, 9.10, 11.12, 13.14, 15.16, 17.18, 19.20, 21.22],
+                "altitude": [532, 9876, -2111, 42, 83, 314159, 16, 99],
+            },
+            "Sample sizes of 1, 8 for feature time will yield unreliable p-values from the KS test.",
+        ),
+    ),
+)
+def test_nonsense_inputs(md0, md1, warning):
+    with pytest.warns(UserWarning, match=warning):
+        meta_distribution_compare(md0, md1)
 
 
 # # Use a more realistic number of samples

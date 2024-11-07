@@ -63,9 +63,9 @@ def meta_distribution_compare(
     for k in metadata_keys:
         mdc_dict.update({k: {}})
 
-        x0, x1 = md0[k], md1[k]
+        x0, x1 = list(md0[k]), list(md1[k])
 
-        allx = list(x0) + list(x1)  # "+" sign concatenates lists.
+        allx = x0 + x1  # "+" sign concatenates lists.
 
         if not all(isinstance(allxi, numbers.Number) for allxi in allx):  # NB: np.nan *is* a number in this context.
             continue  # non-numeric features will return an empty dict for feature k
