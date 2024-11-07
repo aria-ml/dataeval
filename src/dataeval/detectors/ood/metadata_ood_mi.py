@@ -12,7 +12,7 @@ from sklearn.feature_selection import mutual_info_classif
 #   which is what many library functions return, multiply it by NATS2BITS to get it in bits.
 NATS2BITS = 1.442695
 
-# RANDOM_STATE is set to 42 for reproducibility of mutual_info_classif during testing, since it otherwise has variations.
+# RANDOM_STATE is set for reproducibility of mutual_info_classif during testing, since it otherwise has variations.
 RANDOM_STATE = 42
 
 

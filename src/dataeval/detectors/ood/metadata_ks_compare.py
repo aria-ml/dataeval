@@ -23,20 +23,22 @@ def meta_distribution_compare(
         md0 : Mapping[str, list[Any] | NDArray[Any]]
             A set of arrays of values, indexed by metadata feature names, with one value per data example per feature.
         md1 : Mapping[str, list[Any] | NDArray[Any]]
-            Another set of arrays of values, indexed by metadata feature names, with one value per data example per feature.
+            Another set of arrays of values, indexed by metadata feature names, with one value per data example per
+            feature.
 
         Returns
         -------
         dict[str, KstestResult]
             A dictionary with keys corresponding to metadata feature names, and values that are KstestResult objects, as
             defined by scipy.stats.ks_2samp. These values also have two additional attributes: shift_magnitude and
-            statistic_location. The first is the Earth Mover's Distance normalized by the interquartile range (IQR) of the
-            reference, while the second is the value at which the KS statistic has its maximum, measured in IQR-normalized
-            units relative to the median of the reference distribution.
+            statistic_location. The first is the Earth Mover's Distance normalized by the interquartile range (IQR) of
+            the reference, while the second is the value at which the KS statistic has its maximum, measured in
+            IQR-normalized units relative to the median of the reference distribution.
 
         Examples
         --------
-        Imagine we have 3 data examples, and that the corresponding metadata contains 2 features called time and altitude.
+        Imagine we have 3 data examples, and that the corresponding metadata contains 2 features called time and
+        altitude.
 
     >>> import numpy
     >>> md0 = {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112]}

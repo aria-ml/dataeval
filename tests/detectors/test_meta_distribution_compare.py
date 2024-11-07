@@ -126,7 +126,7 @@ def test_nonsense_inputs(md0, md1, warning):
         meta_distribution_compare(md0, md1)
 
 
-# # Use a more realistic number of samples; make sure no waring is emitted.
+# Use a more realistic number of samples; make sure no warning is emitted.
 def test_bigdata_unlikely_features():
     with warnings.catch_warnings() as record:
         warnings.simplefilter("error")
@@ -149,7 +149,6 @@ def test_bigdata_unlikely_features():
 
         output = meta_distribution_compare(bigrefmetadata, bignewmetadata)
 
-        # assert all(out[0] == "DJIA" for out in output[0:half]) and all(out[0] == "temperature" for out in output[half:])
         expected = {
             "temperature": {
                 "statistic_location": 0.04942976244618348,
