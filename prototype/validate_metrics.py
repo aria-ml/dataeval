@@ -271,13 +271,20 @@ def outlier(ld, mymetric):
         for d in ld.data:
             for t in ld.tasks:
                 embTRN, embTST, _, _ = ld.get(m,d,t)
+                
+                # Some elements may be empty, ex. pca only did task=ae
+                if embTRN is None:
+                    pbar.update(1)
+                    continue
 
                 # Outlier identification in the TRAIN set
                 if mymetric.lower() == 'clusterer':
                     # TODO - Ryan working on updated clusterer
-                    cluster = Clusterer(embTRN)
-                    outputs = cluster.evaluate()
-                    ld.outliers[m][d][t] = outputs.outliers
+                    # cluster = Clusterer(embTRN)
+                    # outputs = cluster.evaluate()
+                    # ld.outliers[m][d][t] = outputs.outliers
+                    pbar.update(1)
+                    continue
                 elif mymetric.lower() == 'coverage':
                     res = coverage(embTRN)
                     ld.metrics[m][d][t] = res.indices
@@ -302,6 +309,12 @@ def estimator(ld, mymetric):
         for d in ld.data:
             for t in ld.tasks:
                 embTRN, embTST, lblTRN, lblTST = ld.get(m,d,t)
+                
+                # Some elements may be empty, ex. pca only did task=ae
+                if embTRN is None or embTST is None:
+                    pbar.update(1)
+                    continue
+
 
                 if mymetric.lower() == 'ber':
                     # Estimate performance metrics on the TEST test
