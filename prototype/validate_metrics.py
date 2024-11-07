@@ -69,7 +69,7 @@ def get_input_args():
     parser.add_argument('--model',          type = str, 
                                             nargs="+",
                                             default = None,
-                                            choices = ['resnet18', 'resnet34', 'segformer'],
+                                            choices = ['resnet18', 'resnet34', 'segformer', 'pca'],
                                             help="model name of the run you want to retreive")
     
     parser.add_argument('--data',           type = str, 
@@ -145,9 +145,11 @@ class Loader:
         self.duplicates = self.clear_dict_values(runlegend)
         
         # TODO, TEMP limit on (n_samples, n_feats)
-        self.limit = (100,4)
+        # self.limit = (100,4)
+        self.limit = None
 
         self.load()
+        
         
     def clear_dict_values(self, origdict):
         newdict = copy.deepcopy(origdict) 
@@ -174,11 +176,13 @@ class Loader:
                     lblTRN, lblTST = get_embeddings_labels(runfp, suffix='label')
                     self.labels[m][d][t] = (lblTRN, lblTST)
                     
+                    
     def get(self, mymodel, mydata, mytask):
         # Pull a set of training/test embeddings from the dict
         try:
             embTRN, embTST = self.embeddings[mymodel][mydata][mytask]
-            lblTRN, lblTST = self.embeddings[mymodel][mydata][mytask]
+            lblTRN, lblTST = self.labels[mymodel][mydata][mytask]
+            # Truncate for speed up if specified
             if self.limit is not None:
                 nsamp, nfeats = self.limit[0], self.limit[1]
                 embTRN = embTRN[:nsamp, :nfeats] 
@@ -195,7 +199,7 @@ class Loader:
 
 
 def drift(ld, mymetric):
-    # Run MMD drift detection over embeddings from all models, datasets, tasks
+    # Run drift metric over embeddings from all models/data/tasks
     niter = len(ld.models)+len(ld.data)+len(ld.tasks)
     pbar = tqdm(total=niter, desc=f'DRIFT[{mymetric}]')
     savefp = os.path.join(ld.rootdir, f'{mymetric}_analysis.pkl')
@@ -212,8 +216,9 @@ def drift(ld, mymetric):
 
                 # Get the method-dependent 'score' - the meaning of which varies
                 if mymetric.lower() == 'mvdc':
-                    # dc = MVDC(embTRN, embTST, n_folds=5, chunk_sz=128, threshold=(0.4,0.6))
-                    dc = MVDC(embTRN, embTST, n_folds=3, chunk_sz=10, threshold=(0.4,0.6))
+                    dc = MVDC(embTRN, embTST, n_folds=5, chunk_sz=128, threshold=(0.4,0.6))
+                    # TEMP, for speed up
+                    # dc = MVDC(embTRN, embTST, n_folds=3, chunk_sz=10, threshold=(0.4,0.6))
                     dc.fit()
                     dc.predict()
                     # Store metrics, classification label (drift/no drift) over all chunks in the TEST set
@@ -243,7 +248,7 @@ def drift(ld, mymetric):
 
                 # Store metrics, classification label (drift/no drift)
                 # NOTE:
-                # - ths size of both may vary depending on the method, just needs to be consisten within the method
+                # - ths size of both may vary depending on the method, just needs to be consistent within the method
                 ld.metrics[m][d][t] = score
                 ld.labels[m][d][t]  = classification
                 
@@ -258,9 +263,10 @@ def drift(ld, mymetric):
     
 
 def outlier(ld, mymetric):
+    # Run outlier metric over all models/data/tasks
     niter = len(ld.models)+len(ld.data)+len(ld.tasks)
     pbar = tqdm(total=niter, desc=f'OUTLIER[{mymetric}]')
-    savefp = os.path.join(ld.rootdir, f'{mymetric}_analysis.pkl')
+    savefp = os.path.join(ld.rootdir, f'analysis_{mymetric}.pkl')
     for m in ld.models:
         for d in ld.data:
             for t in ld.tasks:
@@ -288,6 +294,7 @@ def outlier(ld, mymetric):
 
 
 def estimator(ld, mymetric):
+    # Run estimator metric over all models/data/tasks
     niter = len(ld.models)+len(ld.data)+len(ld.tasks)
     pbar = tqdm(total=niter, desc=f'ESTIMATOR[{mymetric}]')
     savefp = os.path.join(ld.rootdir, f'{mymetric}_analysis.pkl')
@@ -317,6 +324,35 @@ def estimator(ld, mymetric):
 
 
 
+def compute_metrics(ld, mymetric=None):
+    # Currently enabled metrics (matches argparse options)
+    drift_metrics = ['cvm', 'ks', 'mmd', 'mvdc']
+    outlier_metrics = ['clusterer','coverage']
+    estimator_metrics = ['ber', 'divergence']
+    
+    # All metrics are here, but for run time + parallelization, just do one at a time
+    if mymetric is not None:
+        if np.isin(mymetric, drift_metrics):
+            ld = drift(ld, mymetric)
+        elif np.isin(opt.metric, outlier_metrics):
+            ld = outlier(ld, mymetric)
+        elif np.isin(opt.metric, estimator_metrics):
+            ld = estimator(ld, mymetric)
+        else:
+            warnings.warn(f'Cannot find {opt.metric} within dataeval metrics.')
+    else:
+        all_metrics = drift_metrics + outlier_metrics + estimator_metrics
+        for mymetric in all_metrics:
+            if np.isin(mymetric, drift_metrics):
+                ld = drift(ld, mymetric)
+            elif np.isin(opt.metric, outlier_metrics):
+                ld = outlier(ld, mymetric)
+            elif np.isin(opt.metric, estimator_metrics):
+                ld = estimator(ld, mymetric)
+            else:
+                warnings.warn(f'Cannot find {opt.metric} within dataeval metrics.')
+
+
 
 if __name__ == "__main__":
     
@@ -326,23 +362,8 @@ if __name__ == "__main__":
     # Loader class is needed for each metric
     ld = Loader(opt.resdir, runlegend)
     
-    drift_metrics = ['cvm', 'ks', 'mmd', 'mvdc']
-    outlier_metrics = ['clusterer','coverage']
-    estimator_metrics = ['ber', 'divergence']
-    
- 
-    # All drift metrics are here, but for run time + parallelization, just do one at a time
-    if np.isin(opt.metric, drift_metrics):
-        ld = drift(ld, opt.metric)
-    elif np.isin(opt.metric, outlier_metrics):
-        ld = outlier(ld, opt.metric)
-    elif np.isin(opt.metric, estimator_metrics):
-        ld = estimator(ld, opt.metric)
-    else:
-        warnings.warn(f'Cannot find {opt.metric} within dataeval metrics.')
-
-
- 
+    # Run the metric and save the analysis results as a .pkl file
+    compute_metrics(ld, opt.metric)
                 
     
     print('--COMPLETE--')
