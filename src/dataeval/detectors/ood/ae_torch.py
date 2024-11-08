@@ -16,10 +16,11 @@ import numpy as np
 import torch
 from numpy.typing import ArrayLike
 
+# from dataeval.utils.tensorflow import predict_batch
+from dataeval.detectors.drift.torch import predict_batch
 from dataeval.detectors.ood.base_torch import OODBase, OODScoreOutput
 from dataeval.interop import as_numpy
 from dataeval.output import set_metadata
-from dataeval.utils.tensorflow import predict_batch
 from dataeval.utils.torch.models import AriaAutoencoder
 
 
