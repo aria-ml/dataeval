@@ -100,11 +100,11 @@ def gmm_energy(
     D = torch.shape(params.cov)[1]  # type: ignore
     z_mu = expand(z) - expand(params.mu, 0)  # N x K x D
     z_mu_T = torch.permute(z_mu, dims=[1, 2, 0])  # K x D x N
-    v = torch.linalg.triangular_solve(params.L, z_mu_T, lower=True)  # K x D x D
+    v = torch.triangular_solve(z_mu_T, params.L, upper=False)  # K x D x D
 
     # rewrite sample energy in logsumexp format for numerical stability
     logits = torch.log(expand(params.phi)) - 0.5 * (
-        torch.sum(torch.square(v), 1)
+        torch.sum(torch.square(v), 1)  # type: ignore
         + torch.cast(D, torch.float32) * torch.math.log(2.0 * np.pi)  # type: ignore py38
         + expand(params.log_det_cov)
     )  # K x N
