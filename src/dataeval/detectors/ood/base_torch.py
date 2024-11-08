@@ -23,7 +23,9 @@ from numpy.typing import ArrayLike, NDArray
 from dataeval.interop import to_numpy
 from dataeval.models.pytorch.gmm import GaussianMixtureModelParams, gmm_params
 from dataeval.output import OutputMetadata, set_metadata
-from dataeval.utils.torch.trainer import AETrainer as trainer  # may not be correct trainer function
+
+# from dataeval.utils.torch.trainer import AETrainer as trainer  # may not be correct trainer function
+from dataeval.torch.trainer import trainer
 
 
 @dataclass(frozen=True)
