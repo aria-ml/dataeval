@@ -20,10 +20,10 @@ import numpy as np
 import torch
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval._internal.interop import to_numpy
-from dataeval._internal.models.pytorch.gmm import GaussianMixtureModelParams, gmm_params
-from dataeval._internal.models.pytorch.trainer import trainer
-from dataeval._internal.output import OutputMetadata, set_metadata
+from dataeval.interop import to_numpy
+from dataeval.models.pytorch.gmm import GaussianMixtureModelParams, gmm_params
+from dataeval.output import OutputMetadata, set_metadata
+from dataeval.utils.torch.trainer import AETrainer as trainer  # may not be correct trainer function
 
 
 @dataclass(frozen=True)
@@ -225,7 +225,7 @@ class OODGMMBase(OODBase):
         x_ref: ArrayLike,
         threshold_perc: float = 100.0,
         loss_fn: Callable[..., torch.Tensor] | None = None,
-        optimizer: torch.optim.Optimizer = torch.optim.Adam,
+        optimizer: torch.optim.Optimizer | None = None,
         epochs: int = 20,
         batch_size: int = 64,
         verbose: bool = True,
