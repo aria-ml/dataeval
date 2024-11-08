@@ -92,6 +92,7 @@ class DriftCVM(BaseDriftUnivariate):
         tuple[NDArray, NDArray]
             Feature level p-values and CVM statistic
         """
+
         x_np = to_numpy(x)
         x_np = x_np.reshape(x_np.shape[0], -1)
         x_ref = self.x_ref.reshape(self.x_ref.shape[0], -1)

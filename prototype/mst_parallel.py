@@ -41,6 +41,7 @@ class Graph:
         """
         Returna all edges in the graph
         """
+        
         return self._adjacency
 
     @property
@@ -62,6 +63,7 @@ class Graph:
         Adds an edge to the graph
 
         """
+        
         head, tail, weight = self._format_edge(edge)
         vertices = frozenset([head, tail])
         self._adjacency[vertices] = min(self._adjacency.get(vertices, np.inf), weight)
@@ -229,6 +231,7 @@ def minimum_spanning_tree(graph: Graph, njobs=1):
     3 -> 2 == 3
     2 -> 3 == 3
     """
+    
     components: List[Graph] = [Graph(v) for v in graph.vertices]
     mst = {}
     if njobs in [0, 1]:

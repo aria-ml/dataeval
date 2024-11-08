@@ -74,6 +74,7 @@ class OOD_VAEGMM(OODGMMBase):
         ----
         This model does not produce a feature level score like the OOD_AE or OOD_VAE models.
         """
+
         self._validate(X := to_numpy(X))
 
         # draw samples from latent space

@@ -157,6 +157,7 @@ def intrinsic_factors_xywh(xywh: np.ndarray, img_sizes: np.ndarray) -> Tuple[Dic
         or not.
 
     """
+    
     prop = {}
     prop["box_width"] = xywh[:, 2]
     prop["box_height"] = xywh[:, 3]

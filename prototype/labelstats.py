@@ -110,5 +110,6 @@ def labelstats(
 
     >>> labelstats(labels)
     """
+    
     stats = run_labelstats(labels)
     return LabelStatsOutput(**populate_defaults(stats, LabelStatsOutput))

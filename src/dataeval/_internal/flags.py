@@ -64,6 +64,7 @@ def to_distinct(flag: TFlag) -> dict[TFlag, str]:
     to use a combination of list comprehension and bit fiddling to determine distinct
     flag values from joint aliases.
     """
+
     if isinstance(flag, Iterable):  # >= py311
         return {f: f.name.lower() for f in flag if f.name}
     else:  # < py311

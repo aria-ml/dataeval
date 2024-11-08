@@ -6,6 +6,7 @@ def torch_to_numpy(tensor: Tensor) -> ndarray:
     """
     Converts a PyTorch tensor to a NumPy array
     """
+
     if isinstance(tensor, ndarray):  # Already array, return
         return tensor
     if not isinstance(tensor, Tensor):
@@ -19,6 +20,7 @@ def numpy_to_torch(array: ndarray) -> Tensor:
     """
     Converts a NumPy array to a PyTorch tensor
     """
+
     if isinstance(array, Tensor):  # Already tensor, return
         return array
     if not isinstance(array, ndarray):
@@ -41,6 +43,7 @@ def permute_to_torch(array: ndarray) -> Tensor:
     Tensor
         Tensor containing image data in the format NCHW
     """
+
     x = numpy_to_torch(array)
     x = x.permute(0, 3, 1, 2)  # NHWC -> NCHW
     return x
@@ -62,6 +65,7 @@ def permute_to_numpy(tensor: Tensor) -> ndarray:
     ndarray
         Array containing image data in the format NHWC
     """
+
     x = tensor.permute(0, 2, 3, 1)
     x = torch_to_numpy(x)  # NCHW -> NHWC
     return x

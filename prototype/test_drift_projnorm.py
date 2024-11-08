@@ -52,6 +52,7 @@ class TestDrift:
 
         TBD - run takes too long
         """
+        
         model = Net()
 
         train_ds = DataEvalDataset(*mnist(1000, "train", np.float32, "channels_first"))
@@ -319,6 +320,7 @@ def custom_eval(model: nn.Module, dataloader) -> Dict[str, float]:
     float
         The calculated performance of the model
     """
+    
     metric = torchmetrics.Accuracy(task="multiclass", num_classes=10)
 
     # Set model layers into evaluation mode
@@ -349,6 +351,7 @@ def custom_train(model: nn.Module, dl: DataLoader):
     y : torch.Tensor
         The training labels corresponding to the data
     """
+    
     # Defined only for this testing scenario
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
@@ -431,6 +434,7 @@ def load_od_dataset() -> Tuple[DataEvalDataset, DataEvalDataset]:
 
 def eval_100(model: nn.Module, dl: DataLoader) -> Dict[str, float]:
     """Eval should always return a float, and error if not"""
+    
     return {"eval": 1.0}
 
 
@@ -447,6 +451,7 @@ def load_cifar10_image(
     Returns:
         pytorch dataset object
     """
+    
     assert datatype == "test" or datatype == "train"
     training_flag = datatype == "train"
 

@@ -59,6 +59,7 @@ def f_out(n_i: NDArray, x: NDArray) -> NDArray:
     NDArray
         Data points for the line of best fit
     """
+
     return x[0] * n_i ** (-x[1]) + x[2]
 
 
@@ -78,6 +79,7 @@ def f_inv_out(y_i: NDArray, x: NDArray) -> NDArray[np.uint64]:
     NDArray
         Array of sample sizes
     """
+
     n_i = ((y_i - x[2]) / x[0]) ** (-1 / x[1])
     return np.asarray(n_i, dtype=np.uint64)
 
@@ -170,6 +172,7 @@ def project_steps(params: NDArray, projection: NDArray) -> NDArray:
         Extrapolated measure values at each projection step
 
     """
+
     return 1 - f_out(projection, params)
 
 
@@ -188,6 +191,7 @@ def inv_project_steps(params: NDArray, targets: NDArray) -> NDArray[np.uint64]:
     NDArray
         Array of sample sizes, or 0 if overflow
     """
+
     steps = f_inv_out(1 - np.array(targets), params)
     steps[np.isnan(steps)] = 0
     return np.ceil(steps)
@@ -195,6 +199,7 @@ def inv_project_steps(params: NDArray, targets: NDArray) -> NDArray[np.uint64]:
 
 def get_curve_params(measures: dict[str, NDArray], ranges: NDArray, niter: int) -> dict[str, NDArray]:
     """Calculates and aggregates parameters for both single and multi-class metrics"""
+
     output = {}
     for name, measure in measures.items():
         measure = cast(np.ndarray, measure)
@@ -378,6 +383,7 @@ class Sufficiency:
         >>> suff.evaluate()
         SufficiencyOutput(steps=array([  1,   3,  10,  31, 100], dtype=uint32), params={'test': array([ 0., 42.,  0.])}, measures={'test': array([1., 1., 1., 1., 1.])})
         """  # noqa: E501
+
         if eval_at is not None:
             ranges = eval_at
         else:
@@ -448,6 +454,7 @@ class Sufficiency:
             If the length of data points in the measures do not match
             If the steps are not int, Sequence[int] or an ndarray
         """
+
         projection = [projection] if isinstance(projection, int) else projection
         projection = np.array(projection) if isinstance(projection, Sequence) else projection
         if not isinstance(projection, np.ndarray):
@@ -486,6 +493,7 @@ class Sufficiency:
         ValueError
             If the length of data points in the measures do not match
         """
+
         # Extrapolation parameters
         last_X = data.steps[-1]
         geomshape = (0.01 * last_X, last_X * 4, len(data.steps))

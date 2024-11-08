@@ -49,6 +49,7 @@ def extend_linkage(link_arr: NDArray) -> NDArray:
     NDArray
         linkage matrix with adjusted shape, new shape (link_arr.shape[0], link_arr.shape[1]+1)
     """
+
     # Adjusting linkage matrix to accommodate renumbering
     rows, cols = link_arr.shape
     arr = np.zeros((rows, cols + 1))
@@ -194,6 +195,7 @@ class Clusterer:
     @classmethod
     def _validate_data(cls, x: NDArray):
         """Checks that the data has the correct size, shape, and format"""
+
         if not isinstance(x, np.ndarray):
             raise TypeError(f"Data should be of type NDArray; got {type(x)}")
 
@@ -209,6 +211,7 @@ class Clusterer:
 
     def _create_clusters(self) -> Clusters:
         """Generates clusters based on linkage matrix"""
+
         next_cluster_id = 0
         cluster_map: dict[int, ClusterPosition] = {}  # Dictionary to associate new cluster ids with actual clusters
         clusters: Clusters = Clusters()
@@ -268,6 +271,7 @@ class Clusterer:
 
     def _get_cluster_distances(self) -> NDArray:
         """Calculates the minimum distances between clusters are each level"""
+
         # Cluster distance matrix
         max_level = self.clusters.max_level
         cluster_matrix = np.full((max_level, self._max_clusters, self._max_clusters), -1.0, dtype=np.float32)
@@ -291,6 +295,7 @@ class Clusterer:
         """
         Determine what clusters should be merged and return their indices
         """
+
         intra_max_uniques = np.unique(intra_max)
         intra_log_values = np.log(intra_max_uniques)
         two_std_all = intra_log_values.mean() + 2 * intra_log_values.std()
@@ -325,6 +330,7 @@ class Clusterer:
         List[ClusterMergeEntry]:
             A list with each cluster's merge history
         """
+
         intra_max = []
         merge_mean = []
         merge_list: list[ClusterMergeEntry] = []
@@ -374,6 +380,7 @@ class Clusterer:
         Dict[int, int]
             A mapping of a cluster id to its last good merge level
         """
+
         last_merge_levels: dict[int, int] = {}
 
         if self._max_clusters <= 1:
@@ -412,6 +419,7 @@ class Clusterer:
         Tuple[List[int], List[int]]
             The outliers and possible outliers as sorted lists of indices
         """
+
         outliers = set()
         possible_outliers = set()
         already_seen = set()
@@ -443,6 +451,7 @@ class Clusterer:
 
     def _sorted_union_find(self, index_groups: Iterable[Iterable[int]]) -> list[list[int]]:
         """Merges and sorts groups of indices that share any common index"""
+
         groups: list[list[int]] = []
         for indices in zip(*index_groups):
             indices = set(indices)

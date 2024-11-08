@@ -147,4 +147,5 @@ class DriftUncertainty:
         DriftUnvariateOutput
             Dictionary containing the drift prediction, p-value, and threshold statistics.
         """
+
         return self._detector.predict(x)

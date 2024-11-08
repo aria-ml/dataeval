@@ -106,6 +106,7 @@ def balance(class_labels: Sequence[int], metadata: list[dict], num_neighbors: in
     sklearn.feature_selection.mutual_info_regression
     sklearn.metrics.mutual_info_score
     """
+
     num_neighbors = validate_num_neighbors(num_neighbors)
     data, names, is_categorical = preprocess_metadata(class_labels, metadata)
     num_factors = len(names)

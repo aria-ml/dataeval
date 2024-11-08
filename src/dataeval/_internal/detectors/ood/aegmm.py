@@ -70,6 +70,7 @@ class OOD_AEGMM(OODGMMBase):
         ----
         This model does not produce a feature level score like the OOD_AE or OOD_VAE models.
         """
+
         self._validate(X := to_numpy(X))
         _, z, _ = predict_batch(X, self.model, batch_size=batch_size)
         energy, _ = gmm_energy(z, self.gmm_params, return_mean=False)

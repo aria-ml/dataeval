@@ -51,6 +51,7 @@ def gmm_params(z: tf.Tensor, gamma: tf.Tensor) -> GaussianMixtureModelParams:
     GaussianMixtureModelParams(phi, mu, cov, L, log_det_cov)
         The parameters used to calculate energy.
     """
+
     # compute gmm parameters phi, mu and cov
     N = gamma.shape[0]  # nb of samples in batch
     sum_gamma = tf.reduce_sum(gamma, 0)  # K
@@ -95,6 +96,7 @@ def gmm_energy(
     cov_diag
         The inverse sum of the diagonal components of the covariance matrix.
     """
+
     D = tf.shape(params.cov)[1]  # type: ignore
     z_mu = tf.expand_dims(z, 1) - tf.expand_dims(params.mu, 0)  # N x K x D
     z_mu_T = tf.transpose(z_mu, perm=[1, 2, 0])  # K x D x N

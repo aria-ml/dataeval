@@ -25,6 +25,7 @@ def check_labels(labels: Union[list, np.ndarray], total_partitions: int):
     Returns:
         np.ndarray: labels, possibly converted to an array if passed as a list. 
     """
+    
     if len(labels) < total_partitions:
         raise IndexError(f"""
             Total number of labels must greater than or equal to number of total partitions.
@@ -41,6 +42,7 @@ def check_groups(groups: np.ndarray, num_folds: int):
     num_folds folds. If this is the case, returns groups=None, which tells the partitioner not to
     group the input data. 
     """
+    
     num_unique_groups = len(np.unique(groups))
     min_unique_groups = num_folds + 1
     if num_unique_groups < min_unique_groups:
@@ -62,6 +64,7 @@ def bin_kmeans(array: np.ndarray):
     Returns:
         np.ndarray[int]: bin numbers assigned by the kmeans best clusterer.
     """
+    
     array = np.array(array)
     if array.ndim == 1:
         array = array.reshape([-1,1])
@@ -89,6 +92,7 @@ def angle2xy(angles: np.ndarray):
     Returns:
         np.ndarray: Nx2 array of xy coordinates for each angle in angles
     """
+    
     is_radians = ((angles>=-np.pi) & (angles<=2*np.pi)).all()
     radians = angles if is_radians else np.pi/180 * angles
     xy = np.stack([np.cos(radians), np.sin(radians)], axis=1)
@@ -107,6 +111,7 @@ def get_group_ids(metadata: dict, groupnames: list, num_samples:int):
     Returns:
         np.ndarray: group identifiers from metadata
     """
+    
     features2group = {k:np.array(v) for k,v in metadata.items() if k in groupnames}
     if not features2group:
         return np.zeros(num_samples,dtype=int)
@@ -145,6 +150,7 @@ def make_splits(
         split_defs (list[dict]): list of dictionaries, which specifying train index, validation index,
             and the ratio of validation to all data.  
     """
+    
     split_defs = []
     index = index.reshape([-1,1])
     if groups is not None:
@@ -187,6 +193,7 @@ def single_split(
         train_index: indices of data partitioned for training
         eval_index: indices of data partitioned for evaluation
     """
+    
     if eval_frac <= 2/3:
         n_folds = int(round(1/eval_frac))
         split_candidates = make_splits(index, labels, n_folds, groups, stratified)
@@ -247,6 +254,7 @@ def split_dataset(
         "test": [13, 14, 15, 16]
        } 
     """
+    
     if (not num_folds) or (num_folds==1):
         if val_frac is None:
             raise UnboundLocalError("If not specifying num_folds, must assign a value to val_frac")

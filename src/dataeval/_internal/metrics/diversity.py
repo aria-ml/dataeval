@@ -49,21 +49,21 @@ def diversity_shannon(
     is_categorical: list[bool]
         List of flags to identify whether variables are categorical (True) or
         continuous (False)
-    subset_mask: NDArray[np.bool_] | None
+    subset_mask: NDArray[np.bool\_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
     Notes
     -----
-    For continuous variables, histogram bins are chosen automatically.  See `numpy.histogram` for details.
+        For continuous variables, histogram bins are chosen automatically.  See `numpy.histogram` for details.
 
     Returns
     -------
-    diversity_index: NDArray
-        Diversity index per column of X
+        diversity_index: NDArray
+            Diversity index per column of X
 
     See Also
     --------
-    numpy.histogram
+        numpy.histogram
     """
 
     # entropy computed using global auto bins so that we can properly normalize
@@ -100,13 +100,14 @@ def diversity_simpson(
     is_categorical: list[bool]
         List of flags to identify whether variables are categorical (True) or
         continuous (False)
-    subset_mask: NDArray[np.bool_] | None
+    subset_mask: NDArray[np.bool\_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
     Notes
     -----
     For continuous variables, histogram bins are chosen automatically.  See
         numpy.histogram for details.
+
     If there is only one category, the diversity index takes a value of 0.
 
     Returns
@@ -197,6 +198,7 @@ def diversity(
     --------
     numpy.histogram
     """
+
     diversity_fn = get_method(DIVERSITY_FN_MAP, method)
     data, names, is_categorical = preprocess_metadata(class_labels, metadata)
     diversity_index = diversity_fn(data, names, is_categorical, None).astype(np.float64)

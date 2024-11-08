@@ -57,6 +57,7 @@ def predict_batch(
     -------
     Numpy array, tensorflow tensor or tuples of those with model outputs.
     """
+
     n = len(x)
     n_minibatch = int(np.ceil(n / batch_size))
     return_np = not isinstance(dtype, tf.DType)
@@ -146,6 +147,7 @@ def create_model(
     gmm_latent_dim : int, optional - default None
         Latent dimensionality of the GMM layer.
     """
+
     input_dim = math.prod(input_shape)
     encoding_dim = int(math.pow(2, int(input_dim.bit_length() * 0.8)) if encoding_dim is None else encoding_dim)
     if model_type == AE:

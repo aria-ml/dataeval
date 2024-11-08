@@ -69,6 +69,7 @@ class OODScore(NamedTuple):
         NDArray
             Either the instance or feature score based on input selection
         """
+
         return self.instance_score if ood_type == "instance" or self.feature_score is None else self.feature_score
 
 
@@ -193,6 +194,7 @@ class OODBase(ABC):
         Dictionary containing the outlier predictions for the selected level,
         and the OOD scores for the data including both 'instance' and 'feature' (if present) level scores.
         """
+
         self._validate_state(X := to_numpy(X))
         # compute outlier scores
         score = self.score(X, batch_size=batch_size)

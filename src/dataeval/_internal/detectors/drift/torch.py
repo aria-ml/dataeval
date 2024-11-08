@@ -32,6 +32,7 @@ def get_device(device: str | torch.device | None = None) -> torch.device:
     -------
     The instantiated device object.
     """
+
     if isinstance(device, torch.device):  # Already a torch device
         return device
     else:  # Instantiate device
@@ -65,6 +66,7 @@ def mmd2_from_kernel_matrix(
     torch.Tensor
         MMD^2 between the samples from the kernel matrix.
     """
+
     n = kernel_mat.shape[0] - m
     if zero_diag:
         kernel_mat = kernel_mat - torch.diag(kernel_mat.diag())
@@ -109,6 +111,7 @@ def predict_batch(
     NDArray | torch.Tensor | tuple
         Numpy array, torch tensor or tuples of those with model outputs.
     """
+
     device = get_device(device)
     if isinstance(x, np.ndarray):
         x = torch.from_numpy(x)
@@ -186,6 +189,7 @@ def preprocess_drift(
     NDArray | torch.Tensor | tuple
         Numpy array, torch tensor or tuples of those with model outputs.
     """
+
     return predict_batch(
         x,
         model,
@@ -217,6 +221,7 @@ def squared_pairwise_distance(
     torch.Tensor
         Pairwise squared Euclidean distance [Nx, Ny].
     """
+
     x2 = x.pow(2).sum(dim=-1, keepdim=True)
     y2 = y.pow(2).sum(dim=-1, keepdim=True)
     dist = torch.addmm(y2.transpose(-2, -1), x, y.transpose(-2, -1), alpha=-2).add_(x2)
@@ -242,6 +247,7 @@ def sigma_median(x: torch.Tensor, y: torch.Tensor, dist: torch.Tensor) -> torch.
     torch.Tensor
         The computed bandwidth, `sigma`.
     """
+
     n = min(x.shape[0], y.shape[0])
     n = n if (x[:n] == y[:n]).all() and x.shape == y.shape else 0
     n_median = n + (np.prod(dist.shape) - n) // 2 - 1

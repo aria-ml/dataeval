@@ -57,6 +57,7 @@ def trainer(
     verbose
         Whether to print training progress.
     """
+
     loss_fn = loss_fn() if isinstance(loss_fn, type) else loss_fn
     optimizer = optimizer() if isinstance(optimizer, type) else optimizer
 

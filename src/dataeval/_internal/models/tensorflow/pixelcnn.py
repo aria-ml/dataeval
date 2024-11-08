@@ -66,6 +66,7 @@ class WeightNorm(keras.layers.Wrapper):
         ValueError
             If `layer` is not a `keras.layers.Layer` instance.
         """
+
         if not isinstance(layer, keras.layers.Layer):
             raise ValueError(
                 "Please initialize `WeightNorm` layer with a `keras.layers.Layer` " f"instance. You passed: {layer}"
@@ -86,6 +87,7 @@ class WeightNorm(keras.layers.Wrapper):
 
     def _compute_weights(self):
         """Generate weights with normalization."""
+
         # Determine the axis along which to expand `g` so that `g` broadcasts to
         # the shape of `v`.
         new_axis = -self.filter_axis - 3
@@ -94,11 +96,13 @@ class WeightNorm(keras.layers.Wrapper):
 
     def _init_norm(self):
         """Set the norm of the weight vector."""
+
         kernel_norm = tf.sqrt(tf.reduce_sum(tf.square(self.v), axis=self.kernel_norm_axes))
         self.g.assign(kernel_norm)
 
     def _data_dep_init(self, inputs):
         """Data dependent initialization."""
+
         # Normalize kernel first so that calling the layer calculates
         # `tf.dot(v, x)/tf.norm(v)` as in (5) in ([Salimans and Kingma, 2016][1]).
         self._compute_weights()
@@ -138,6 +142,7 @@ class WeightNorm(keras.layers.Wrapper):
         ValueError
             If `Layer` does not contain a `kernel` of weights.
         """
+
         input_shape = tf.TensorShape(input_shape).as_list()
         input_shape[0] = None
         self.input_spec = keras.layers.InputSpec(shape=input_shape)
@@ -200,6 +205,7 @@ class Shift(bijector.Bijector):
         name
             Python `str` name given to ops managed by this object.
         """
+
         with tf.name_scope(name) as name:
             dtype = dtype_util.common_dtype([shift], dtype_hint=tf.float32)
             self._shift = tensor_util.convert_nonref_to_tensor(shift, dtype=dtype, name="shift")
@@ -214,6 +220,7 @@ class Shift(bijector.Bijector):
     @property
     def shift(self):
         """The `shift` `Tensor` in `Y = X + shift`."""
+
         return self._shift
 
     @classmethod
@@ -368,6 +375,7 @@ class PixelCNN(distribution.Distribution):
         dist
             A quantized logistic mixture `tfp.distribution` over the input data.
         """
+
         mixture_distribution = categorical.Categorical(logits=component_logits)
 
         # Convert distribution parameters for pixel values in
@@ -421,6 +429,7 @@ class PixelCNN(distribution.Distribution):
         -------
         log_prob_values: `Tensor`.
         """
+
         # Determine the batch shape of the input images
         image_batch_shape = prefer_static.shape(value)[:-3]
 
@@ -518,6 +527,7 @@ class PixelCNN(distribution.Distribution):
         samples
             a `Tensor` of shape `[n, height, width, num_channels]`.
         """
+
         if conditional_input is not None:
             conditional_input = tf.convert_to_tensor(conditional_input, dtype=self.dtype)
             conditional_event_rank = tensorshape_util.rank(self.conditional_shape)
@@ -581,6 +591,7 @@ class PixelCNN(distribution.Distribution):
                 and including pixel `[index]`, with dimensions `[batch_size, height, \
                 width, num_channels]`.
             """
+
             inputs = samples if conditional_input is None else [samples, h]
             params = self.network(inputs, training=training)
             samples_new = self._sample_channels(*params, seed=seed)
@@ -637,6 +648,7 @@ class PixelCNN(distribution.Distribution):
             4D `Tensor` of sampled image data with autoregression among \
             channels. Dimensions are `[batch_size, height, width, num_channels]`.
         """
+
         num_channels = self.event_shape[-1]
 
         # sample mixture components once for the entire pixel
@@ -746,6 +758,7 @@ class _PixelCNNNetwork(keras.layers.Layer):
         dtype
             Data type of the layer.
         """
+
         super().__init__(dtype=dtype)
         self._dropout_p = dropout_p
         self._num_resnet = num_resnet
@@ -1080,11 +1093,13 @@ class _PixelCNNNetwork(keras.layers.Layer):
             Dimensions are `[batch_size, height, width, num_logistic_mix, \
             num_coeffs]`, where `num_coeffs = num_channels * (num_channels - 1) // 2`.
         """
+
         return self._network(inputs, training=training)
 
 
 def _make_kernel_constraint(kernel_size, valid_rows, valid_columns):
     """Make the masking function for layer kernels."""
+
     mask = np.zeros(kernel_size)
     lower, upper = valid_rows
     left, right = valid_columns
@@ -1095,6 +1110,7 @@ def _make_kernel_constraint(kernel_size, valid_rows, valid_columns):
 
 def _build_and_apply_h_projection(h, num_filters, dtype):
     """Project the conditional input."""
+
     h = keras.layers.Flatten(dtype=dtype)(h)
     h_projection = keras.layers.Dense(2 * num_filters, kernel_initializer="random_normal", dtype=dtype)(h)
     return h_projection[..., tf.newaxis, tf.newaxis, :]
@@ -1102,6 +1118,7 @@ def _build_and_apply_h_projection(h, num_filters, dtype):
 
 def _apply_sigmoid_gating(x):
     """Apply the sigmoid gating in Figure 2 of [2]."""
+
     activation_tensor, gate_tensor = tf.split(x, 2, axis=-1)
     sigmoid_gate = tf.sigmoid(gate_tensor)
     return keras.layers.multiply([sigmoid_gate, activation_tensor], dtype=x.dtype)

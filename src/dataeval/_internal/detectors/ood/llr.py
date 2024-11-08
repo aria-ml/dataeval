@@ -44,6 +44,7 @@ def build_model(
     -------
     TensorFlow model.
     """
+
     x_in = Input(shape=input_shape)
     log_prob = dist.log_prob(x_in)
     model = Model(inputs=x_in, outputs=log_prob)
@@ -78,6 +79,7 @@ def mutate_categorical(
     -------
     Array with perturbed data.
     """
+
     frange = (feature_range[0] + 1, feature_range[1] + 1)
     shape = X.shape
     n_samples = np.prod(shape)
@@ -168,6 +170,7 @@ class OOD_LLR(OODBase):
         mutate_batch_size: int, default int(1e10)
             Batch size used to generate the mutations for the background dataset.
         """
+
         x_ref = to_numpy(x_ref)
         input_shape = x_ref.shape[1:]
         optimizer = optimizer() if isinstance(optimizer, type) else optimizer
@@ -231,6 +234,7 @@ class OOD_LLR(OODBase):
         """
         Compute log probability of a batch of instances under the generative model.
         """
+
         logp_fn = partial(dist.log_prob, return_per_feature=return_per_feature)
         # TODO: TBD: can this be any of the other types from predict_batch? i.e. tf.Tensor or tuple
         return predict_batch(X, logp_fn, batch_size=batch_size)  # type: ignore[return-value]
@@ -245,6 +249,7 @@ class OOD_LLR(OODBase):
         """
         Compute log probability of a batch of instances with the user defined log_prob function.
         """
+
         if self.sequential:
             y, X = X[:, 1:], X[:, :-1]
         else:
@@ -274,6 +279,7 @@ class OOD_LLR(OODBase):
         -------
         Likelihood ratios.
         """
+
         logp_fn = self._logp if not isinstance(self.log_prob, Callable) else self._logp_alt  # type: ignore
         logp_s = logp_fn(self.dist_s, X, return_per_feature=return_per_feature, batch_size=batch_size)
         logp_b = logp_fn(self.dist_b, X, return_per_feature=return_per_feature, batch_size=batch_size)

@@ -199,6 +199,7 @@ def run_stats(
     - For statistics like histograms and entropy, intermediate results may
       be reused to avoid redundant computation.
     """
+
     verify_supported(flags, fn_map)
     flag_dict = to_distinct(flags)
 
@@ -286,6 +287,7 @@ def imagestats(images: Iterable[ArrayLike], flags: ImageStat = ImageStat.ALL_STA
      0.         0.         0.0703125  0.         0.         0.
      0.0645752  0.         0.         0.        ]
     """
+
     stats = run_stats(images, flags, IMAGESTATS_FN_MAP, False)
     output = {}
     length = len(stats)
@@ -376,6 +378,7 @@ def channelstats(images: Iterable[ArrayLike], flags=ImageStat.ALL_CHANNEL_STATS)
             0.02477   , 0.02676   , 0.02885   , 0.03102   , 0.03326   ]],
           dtype=float16)}
     """
+
     stats = run_stats(images, flags, CHANNELSTATS_FN_MAP, True)
     output = {}
     for i, results in enumerate(stats):

@@ -40,6 +40,7 @@ def relative_euclidean_distance(x: tf.Tensor, y: tf.Tensor, eps: float = 1e-12, 
     -------
     Tensor with relative Euclidean distance across specified axis.
     """
+
     denom = tf.concat(
         [
             tf.reshape(tf.norm(x, ord=2, axis=axis), (-1, 1)),  # type: ignore
@@ -70,6 +71,7 @@ def eucl_cosim_features(x: tf.Tensor, y: tf.Tensor, max_eucl: float = 1e2) -> tf
     tf.Tensor
         Tensor concatenating the relative Euclidean distance and cosine similarity features.
     """
+
     if len(x.shape) > 2 or len(y.shape) > 2:
         x = cast(tf.Tensor, Flatten()(x))
         y = cast(tf.Tensor, Flatten()(y))
@@ -96,6 +98,7 @@ class Sampling(Layer):
         -------
         Sampled vector z.
         """
+
         z_mean, z_log_var = inputs
         batch, dim = tuple(tf.shape(z_mean).numpy().ravel()[:2])  # type: ignore
         epsilon = cast(tf.Tensor, keras.backend.random_normal(shape=(batch, dim)))
@@ -114,6 +117,7 @@ class EncoderAE(Layer):
         name
             Name of encoder.
         """
+
         super().__init__(name="encoder_ae")
         self.encoder_net = encoder_net
 
@@ -135,6 +139,7 @@ class EncoderVAE(Layer):
         name
             Name of encoder.
         """
+
         super().__init__(name="encoder_vae")
         self.encoder_net = encoder_net
         self.fc_mean = Dense(latent_dim, activation=None)
@@ -163,6 +168,7 @@ class Decoder(Layer):
         name
             Name of decoder.
         """
+
         super().__init__(name="decoder")
         self.decoder_net = decoder_net
 

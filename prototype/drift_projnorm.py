@@ -16,6 +16,7 @@ def get_weights(model: nn.Module):
     """
     Returns all of the model weights
     """
+    
     weights = []
     for i, p in enumerate(model.parameters()):
         p_np = p.data.numpy().astype(np.float64)
@@ -116,6 +117,7 @@ class DriftDetector:
             Function which takes a model (nn.Module) and a data loader (DataLoader)
             and executes model training against the data.
         """
+        
         self._training_func = self._set_func(func)
 
     def set_eval_func(self, func: Callable):
@@ -130,6 +132,7 @@ class DriftDetector:
             and returns a float which is used to assess model performance given
             the model and data.
         """
+        
         self._eval_func = self._set_func(func)
 
     def set_train_eval_params(
@@ -191,6 +194,7 @@ class DriftDetector:
             The ith entry in a_known corresponds to the ith entry in
             labeled_test_datasets.
         """
+        
         if len(labeled_test_datasets) < 2:
             raise Exception("Can't predict accuracy from fewer than two labeled test datasets")
 
@@ -299,6 +303,7 @@ class DriftDetector:
         Returns:
             the l2 norm difference the two networks
         """
+        
         params1 = list(net_0.parameters())
         params2 = list(net_baseline.parameters())
 
@@ -327,6 +332,7 @@ class DriftDetector:
         proj_norm : float
             The projection norm between weights_1 and weights_2
         """
+        
         if len(weights_1) != len(weights_2):
             raise Exception("Tried to find projnorm of two sets of model weights of different sizes")
         # Iterate through all weights. proj_norm is the L2 distance between weights_1
@@ -410,6 +416,7 @@ class DriftDetector:
         train_data: Dataset,
     ):
         """Trains and evaluates model using custom functions"""
+        
         train_loader = DataLoader(train_data, batch_size=self.batch_size)
         self._train(model, train_loader, self.train_kwargs)
         weights = get_weights(model)

@@ -82,6 +82,7 @@ def normalize_box_shape(bounding_box: NDArray) -> NDArray:
     """
     Normalizes the bounding box shape into (N,4).
     """
+    
     ndim = bounding_box.ndim
     if ndim == 1:
         return np.expand_dims(bounding_box, axis=0)
@@ -322,6 +323,7 @@ def run_boxstats(
     - For statistics like histograms and entropy, intermediate results may
       be reused to avoid redundant computation.
     """
+    
     verify_supported(flags, fn_map)
     flag_dict = to_distinct(flags)
 
@@ -407,6 +409,7 @@ def boxstats(
     >>> print(results.size)
     >>> print(results.darkness)
     """
+    
     stats, max_boxes = run_boxstats(bounding_boxes, images, flags, BOXSTATS_FN_MAP)
     output = {}
     length = len(stats)
@@ -471,6 +474,7 @@ def compare_stats(box_stats: dict, image_stats: dict):
     - For statistics like histograms and entropy, intermediate results may
       be reused to avoid redundant computation.
     """
+    
     flag_dict = to_distinct(BoxStat.ALL_BOXSTATS)
 
     output: dict[str, NDArray] = {}
@@ -559,6 +563,7 @@ def box_image_ratio_stats(
     >>> print(results.density)
     >>> print(results.density)
     """
+    
     box_output = bounding_boxes.dict()
     image_output = images.dict()
 

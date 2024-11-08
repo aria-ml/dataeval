@@ -97,6 +97,7 @@ class DriftKS(BaseDriftUnivariate):
         tuple[NDArray, NDArray]
             Feature level p-values and KS statistic
         """
+
         x = to_numpy(x)
         x = x.reshape(x.shape[0], -1)
         x_ref = self.x_ref.reshape(self.x_ref.shape[0], -1)

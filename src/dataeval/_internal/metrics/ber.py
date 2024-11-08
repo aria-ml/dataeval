@@ -52,6 +52,7 @@ def ber_mst(X: NDArray, y: NDArray) -> tuple[float, float]:
     Tuple[float, float]
         The upper and lower bounds of the bayes error rate
     """
+
     M, N = get_classes_counts(y)
 
     tree = coo_matrix(minimum_spanning_tree(X))
@@ -77,6 +78,7 @@ def ber_knn(X: NDArray, y: NDArray, k: int) -> tuple[float, float]:
     Tuple[float, float]
         The upper and lower bounds of the bayes error rate
     """
+
     M, N = get_classes_counts(y)
     nn_indices = compute_neighbors(X, X, k=k)
     nn_indices = np.expand_dims(nn_indices, axis=1) if nn_indices.ndim == 1 else nn_indices
@@ -88,6 +90,7 @@ def ber_knn(X: NDArray, y: NDArray, k: int) -> tuple[float, float]:
 
 def knn_lowerbound(value: float, classes: int, k: int) -> float:
     """Several cases for computing the BER lower bound"""
+
     if value <= 1e-10:
         return 0.0
 
@@ -144,6 +147,7 @@ def ber(images: ArrayLike, labels: ArrayLike, k: int = 1, method: Literal["KNN",
     >>> ber(images, labels)
     BEROutput(ber=0.04, ber_lower=0.020416847668728033)
     """
+
     ber_fn = get_method(BER_FN_MAP, method)
     X = to_numpy(images)
     y = to_numpy(labels)

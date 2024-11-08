@@ -26,6 +26,7 @@ def str_to_int(d: Dict) -> Dict:
     Dict
         Dictionary with same keys and non-numeric values mapped to numeric values.
     """
+    
     for key, val in d.items():
         val = val.numpy() if torch.is_tensor(val) else val
         val = np.array(val) if isinstance(val, list) else val
@@ -50,6 +51,7 @@ def list_to_dict(list_of_dicts: List[Dict]) -> Dict:
     Dict[np.ndarray]
         dictionary whose columns are np.ndarray
     """
+    
     return {k: np.array([dic[k] for dic in list_of_dicts]) for k in list_of_dicts[0]}
 
 
@@ -199,6 +201,7 @@ class Balance(BaseBalanceMetric):
         sklearn.feature_selection.mutual_info_regression
         sklearn.metrics.mutual_info_score
         """
+        
         self._collect_data()
         mi = np.empty((self.num_factors, self.num_factors))
         mi[:] = np.nan
@@ -523,6 +526,7 @@ class DiversityClasswise(BaseDiversityMetric):
         diversity_shannon
         numpy.histogram
         """
+        
         self._collect_data()
 
         class_idx = self.names.index("class_label")
@@ -603,6 +607,7 @@ class Diversity(BaseDiversityMetric):
         numpy.histogram
 
         """
+        
         self._collect_data()
         if self.metric.lower() == "simpson":
             return self._diversity_simpson()

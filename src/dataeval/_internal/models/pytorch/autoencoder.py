@@ -66,6 +66,7 @@ class AETrainer:
         To replace this function with a custom function, do
             AETrainer.train = custom_function
         """
+
         # Setup training
         self.model.train()
         dataloader = DataLoader(dataset, batch_size=self.batch_size)
@@ -123,6 +124,7 @@ class AETrainer:
         To replace this function with a custom function, do
             AETrainer.eval = custom_function
         """
+
         self.model.eval()
         dataloader = DataLoader(dataset, batch_size=self.batch_size)
         criterion = nn.MSELoss().to(self.device)
@@ -159,6 +161,7 @@ class AETrainer:
         -----
         This function should be run after the model has been trained and evaluated.
         """
+
         self.model.eval()
         dl = DataLoader(dataset, batch_size=self.batch_size)
         encodings = torch.Tensor([])
@@ -205,6 +208,7 @@ class AriaAutoencoder(nn.Module):
         torch.Tensor
             The reconstructed output tensor.
         """
+
         x = self.encoder(x)
         x = self.decoder(x)
         return x
@@ -223,6 +227,7 @@ class AriaAutoencoder(nn.Module):
         torch.Tensor
             The encoded representation of the input tensor.
         """
+
         return self.encoder(x)
 
 
@@ -264,6 +269,7 @@ class Encoder(nn.Module):
         torch.Tensor
             The encoded representation of the input tensor.
         """
+
         return self.encoder(x)
 
 
@@ -304,4 +310,5 @@ class Decoder(nn.Module):
         torch.Tensor
             The reconstructed output tensor.
         """
+
         return self.decoder(x)

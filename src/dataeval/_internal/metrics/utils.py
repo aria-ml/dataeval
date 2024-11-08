@@ -36,7 +36,7 @@ def get_counts(
 
     Parameters
     ----------
-    subset_mask: NDArray[np.bool_] | None
+    subset_mask: NDArray[np.bool\_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
     Returns
@@ -86,7 +86,7 @@ def entropy(
     ----------
     normalized: bool
         Flag that determines whether or not to normalize entropy by log(num_bins)
-    subset_mask: NDArray[np.bool_] | None
+    subset_mask: NDArray[np.bool\_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
     Notes
@@ -130,13 +130,14 @@ def get_num_bins(
 
     Parameters
     ----------
-    subset_mask: NDArray[np.bool_] | None
+    subset_mask: NDArray[np.bool\_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
     Returns
     -------
     NDArray[np.float64]
     """
+
     # likely cached
     hist_counts, _ = get_counts(data, names, is_categorical, subset_mask)
     num_bins = np.empty(len(hist_counts))
@@ -151,6 +152,7 @@ def infer_categorical(X: NDArray, threshold: float = 0.2) -> NDArray:
     Compute fraction of feature values that are unique --- intended to be used
     for inferring whether variables are categorical.
     """
+
     if X.ndim == 1:
         X = np.expand_dims(X, axis=1)
     num_samples = X.shape[0]
@@ -216,6 +218,7 @@ def minimum_spanning_tree(X: NDArray) -> Any:
     -------
         Data representing the minimum spanning tree
     """
+
     # All features belong on second dimension
     X = flatten(X)
     # We add a small constant to the distance matrix to ensure scipy interprets
@@ -243,6 +246,7 @@ def get_classes_counts(labels: NDArray) -> tuple[int, int]:
     ValueError
         If the number of unique classes is less than 2
     """
+
     classes, counts = np.unique(labels, return_counts=True)
     M = len(classes)
     if M < 2:
@@ -314,6 +318,7 @@ def get_bitdepth(image: NDArray) -> BitDepth:
     Approximates the bit depth of the image using the
     min and max pixel values.
     """
+
     pmin, pmax = np.min(image), np.max(image)
     if pmin < 0:
         return BitDepth(0, pmin, pmax)
@@ -326,6 +331,7 @@ def rescale(image: NDArray, depth: int = 1) -> NDArray:
     """
     Rescales the image using the bit depth provided.
     """
+
     bitdepth = get_bitdepth(image)
     if bitdepth.depth == depth:
         return image
@@ -338,6 +344,7 @@ def normalize_image_shape(image: NDArray) -> NDArray:
     """
     Normalizes the image shape into (C,H,W).
     """
+
     ndim = image.ndim
     if ndim == 2:
         return np.expand_dims(image, axis=0)
@@ -357,6 +364,7 @@ def edge_filter(image: NDArray, offset: float = 0.5) -> NDArray:
      [ -1,  8, -1 ],
      [ -1, -1, -1 ]]
     """
+
     edges = convolve2d(image, EDGE_KERNEL, mode="same", boundary="symm") + offset
     np.clip(edges, 0, 255, edges)
     return edges
@@ -381,6 +389,7 @@ def pchash(image: NDArray) -> str:
     str
         The hex string hash of the image using perceptual hashing
     """
+
     # Verify that the image is at least larger than an 8x8 image
     min_dim = min(image.shape[-2:])
     if min_dim < HASH_SIZE + 1:
@@ -429,4 +438,5 @@ def xxhash(image: NDArray) -> str:
     str
         The hex string hash of the image using the xxHash algorithm
     """
+
     return xxh.xxh3_64_hexdigest(image.ravel().tobytes())

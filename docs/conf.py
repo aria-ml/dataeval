@@ -32,11 +32,35 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.graphviz",
     "sphinx.ext.mathjax",
+    "sphinxcontrib.bibtex",
+    "autoapi.extension",
     # External extensions
     "sphinx_design",
     "myst_nb",
     "enum_tools.autoenum",
 ]
+
+# bittex config
+bibtex_bibfiles = ["refs.bib"]
+# Coverage show missing items
+coverage_show_missing_items = True
+
+# autoapi directories (where to look for files)
+autoapi_dirs = ["../src/dataeval"]
+autoapi_type = "python"
+autoapi_options = [
+    "members",
+    "undoc-members",
+    #'private-members',
+    "show-inheritance",
+    "show-module-summary",
+    "special-members",
+    "imported-members",
+]
+autoapi_keep_files = True
+napoleon_use_ivar = True  # to correctly handle Attributes header in various classes
+# Fixes duplicate documentation warning
+
 
 # The suffix of source filenames.
 source_suffix = [".rst", ".md"]
@@ -60,7 +84,7 @@ exclude_patterns = [
 # Extension configurations
 # -----------------------------------------------------------------------------
 
-autosummary_generate = False
+autosummary_generate = True
 
 # -----------------------------------------------------------------------------
 # MyST-NB settings
@@ -93,15 +117,15 @@ html_static_path = ["_static"]
 # because we expose private modules in public namespaces
 # and rename some classes, documentation recognizes these
 # public classes as aliases, which we don't want
-def normalize_module(mod_names):
-    import importlib
-
-    for mod_name in mod_names:
-        mod = importlib.import_module(mod_name)
-        for cls_name in mod.__all__:
-            cls = getattr(mod, cls_name)
-            cls.__name__ = cls_name
-            cls.__module__ = mod_name
+# def normalize_module(mod_names):
+#    import importlib
+#
+#    for mod_name in mod_names:
+#        mod = importlib.import_module(mod_name)
+#        for cls_name in mod.__all__:
+#            cls = getattr(mod, cls_name)
+#            cls.__name__ = cls_name
+#            cls.__module__ = mod_name
 
 
 def setup(app):
@@ -115,17 +139,17 @@ def setup(app):
     if nb_execution_mode != "off":
         data.download()
 
-    normalize_module(
-        [
-            "dataeval.detectors.drift",
-            "dataeval.detectors.linters",
-            "dataeval.detectors.ood",
-            "dataeval.metrics.bias",
-            "dataeval.metrics.estimators",
-            "dataeval.metrics.stats",
-            "dataeval.workflows",
-            "dataeval.flags",
-            "dataeval.tensorflow",
-            "dataeval.torch",
-        ]
-    )
+    # normalize_module(
+    #   [
+    #      "dataeval.detectors.drift",
+    #       "dataeval.detectors.linters",
+    #       "dataeval.detectors.ood",
+    #       "dataeval.metrics.bias",
+    #       "dataeval.metrics.estimators",
+    #       "dataeval.metrics.stats",
+    #       "dataeval.workflows",
+    #       "dataeval.flags",
+    #       "dataeval.tensorflow",
+    #       "dataeval.torch",
+    #   ]
+    # )

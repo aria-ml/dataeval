@@ -45,6 +45,7 @@ def divergence_mst(data: NDArray, labels: NDArray) -> int:
     int
         Number of label errors when creating the minimum spanning tree
     """
+
     mst = minimum_spanning_tree(data).toarray()
     edgelist = np.transpose(np.nonzero(mst))
     errors = np.sum(labels[edgelist[:, 0]] != labels[edgelist[:, 1]])
@@ -67,6 +68,7 @@ def divergence_fnn(data: NDArray, labels: NDArray) -> int:
     int
         Number of label errors when finding nearest neighbors
     """
+
     nn_indices = compute_neighbors(data, data)
     errors = np.sum(np.abs(labels[nn_indices] - labels))
     return errors
@@ -122,6 +124,7 @@ def divergence(data_a: ArrayLike, data_b: ArrayLike, method: Literal["FNN", "MST
     >>> divergence(datasetA, datasetB)
     DivergenceOutput(divergence=0.28, errors=36.0)
     """
+
     div_fn = get_method(DIVERGENCE_FN_MAP, method)
     a = to_numpy(data_a)
     b = to_numpy(data_b)
