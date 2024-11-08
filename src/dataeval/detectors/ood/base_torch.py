@@ -15,16 +15,12 @@ from dataclasses import dataclass
 from typing import Callable, Literal, cast
 
 import numpy as np
-
-# import tf_keras as keras
 import torch
 from numpy.typing import ArrayLike, NDArray
 
 from dataeval.interop import to_numpy
-from dataeval.models.pytorch.gmm import GaussianMixtureModelParams, gmm_params
 from dataeval.output import OutputMetadata, set_metadata
-
-# from dataeval.utils.torch.trainer import AETrainer as trainer  # may not be correct trainer function
+from dataeval.torch.models.gmm import GaussianMixtureModelParams, gmm_params
 from dataeval.torch.trainer import trainer
 
 
