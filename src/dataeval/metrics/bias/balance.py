@@ -4,34 +4,95 @@ __all__ = ["BalanceOutput", "balance"]
 
 import warnings
 from dataclasses import dataclass
-from typing import Mapping
+from typing import Any, Mapping
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 
-from dataeval.metrics.bias.metadata import entropy, preprocess_metadata
+from dataeval.metrics.bias.metadata import entropy, heatmap, preprocess_metadata
 from dataeval.output import OutputMetadata, set_metadata
 
 
 @dataclass(frozen=True)
 class BalanceOutput(OutputMetadata):
     """
-    Output class for :func:`balance` :term:`Bias` metric
+    Output class for :func:`balance` bias metric
 
     Attributes
     ----------
     balance : NDArray[np.float64]
-        Estimate of :term:`mutual information<Mutual Information (MI)>` between metadata factors and class label
+        Estimate of mutual information between metadata factors and class label
     factors : NDArray[np.float64]
         Estimate of inter/intra-factor mutual information
     classwise : NDArray[np.float64]
         Estimate of mutual information between metadata factors and individual class labels
+    class_list: NDArray[np.int64]
+        Class labels for each value in the dataset
+    metadata_names: list[str]
+        Names of each metadata factor
     """
 
     balance: NDArray[np.float64]
     factors: NDArray[np.float64]
     classwise: NDArray[np.float64]
+
+    class_list: NDArray[np.int64]
+    metadata_names: list[str]
+
+    def plot(
+        self,
+        row_labels: NDArray[Any] | None = None,
+        col_labels: NDArray[Any] | None = None,
+        plot_classwise: bool = False,
+    ) -> None:
+        """
+        Plot a heatmap of balance information
+
+        Parameters
+        ----------
+        row_labels: NDArray | None, default None
+            Array containing the labels for rows in the histogram
+        col_labels: NDArray | None, default None
+            Array containing the labels for columns in the histogram
+        plot_classwise: bool, default False
+            Whether to plot per-class balance instead of global balance
+
+        """
+        if plot_classwise:
+            if row_labels is None:
+                row_labels = np.unique(self.class_list)
+            if col_labels is None:
+                col_labels = np.concatenate((["class"], self.metadata_names))
+
+            heatmap(
+                self.classwise,
+                row_labels,
+                col_labels,
+                xlabel="Factors",
+                ylabel="Class",
+                cbarlabel="Normalized Mutual Information",
+            )
+        else:
+            data = np.concatenate([self.balance[np.newaxis, 1:], self.factors], axis=0)
+            # Create a mask for the upper triangle of the symmetrical array, ignoring the diagonal
+            mask = np.triu(data + 1, k=0) < 1
+            # Finalize the data for the plot, last row is last factor x last factor so it gets dropped
+            heat_data = np.where(mask, np.nan, data)[:-1]
+            # Creating label array for heat map axes
+            heat_labels = np.concatenate((["class"], self.metadata_names))
+
+            if row_labels is None:
+                row_labels = heat_labels[:-1]
+            if col_labels is None:
+                col_labels = heat_labels[1:]
+
+            heatmap(
+                heat_data,
+                row_labels,
+                col_labels,
+                cbarlabel="Normalized Mutual Information",
+            )
 
 
 def validate_num_neighbors(num_neighbors: int) -> int:
@@ -54,10 +115,10 @@ def validate_num_neighbors(num_neighbors: int) -> int:
     return num_neighbors
 
 
-@set_metadata()
+@set_metadata("dataeval.metrics")
 def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neighbors: int = 5) -> BalanceOutput:
     """
-    :term:`Mutual information (MI)` between factors (class label, metadata, label/image properties)
+    Mutual information (MI) between factors (class label, metadata, label/image properties)
 
     Parameters
     ----------
@@ -72,7 +133,7 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
     Returns
     -------
     BalanceOutput
-        (num_factors+1) x (num_factors+1) estimate of :term:`mutual information<Mutual Information (MI)>`
+        (num_factors+1) x (num_factors+1) estimate of mutual information
         between num_factors metadata factors and class label. Symmetry is enforced.
 
     Note
@@ -85,7 +146,7 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
 
     Example
     -------
-    Return :term:`balance<Balance>` (:term:`mutual information<Mutual Information (MI)>`) of factors with class_labels
+    Return balance (mutual information) of factors with class_labels
 
     >>> bal = balance(class_labels, metadata)
     >>> bal.balance
@@ -115,6 +176,9 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
     num_factors = len(names)
     mi = np.empty((num_factors, num_factors))
     mi[:] = np.nan
+
+    class_idx = names.index("class_label")
+    class_lbl = np.array(data[:, class_idx], dtype=int)
 
     for idx in range(num_factors):
         tgt = data[:, idx].astype(int)
@@ -176,4 +240,4 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
     norm_factor = 0.5 * np.add.outer(ent_tgt_bin, ent_all) + 1e-6
     classwise = classwise_mi / norm_factor
 
-    return BalanceOutput(balance, factors, classwise)
+    return BalanceOutput(balance, factors, classwise, class_lbl, list(metadata.keys()))
