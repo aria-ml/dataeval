@@ -8,7 +8,7 @@ from typing import Any, Literal, Mapping
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval.metrics.bias.metadata import entropy, get_counts, get_num_bins, preprocess_metadata
+from dataeval.metrics.bias.metadata import entropy, get_counts, get_num_bins, heatmap, preprocess_metadata
 from dataeval.output import OutputMetadata, set_metadata
 from dataeval.utils.shared import get_method
 
@@ -24,10 +24,44 @@ class DiversityOutput(OutputMetadata):
         :term:`Diversity` index for classes and factors
     classwise : NDArray[np.float64]
         Classwise diversity index [n_class x n_factor]
+    class_list: NDArray[np.int64]
+        Class labels for each value in the dataset
+    metadata_names: list[str]
+        Names of each metadata factor
     """
 
     diversity_index: NDArray[np.float64]
     classwise: NDArray[np.float64]
+
+    class_list: NDArray[np.int64]
+    metadata_names: list[str]
+
+    method: Literal["shannon", "simpson"]
+
+    def plot(self, row_labels: NDArray[Any] | None = None, col_labels: NDArray[Any] | None = None) -> None:
+        """
+        Plot a heatmap of diversity information
+
+        Parameters
+        ----------
+        row_labels: NDArray | None, default None
+            Array containing the labels for rows in the histogram
+        col_labels: NDArray | None, default None
+            Array containing the labels for columns in the histogram
+        """
+        if row_labels is None:
+            row_labels = np.unique(self.class_list)
+        if col_labels is None:
+            col_labels = np.array(self.metadata_names)
+
+        heatmap(
+            self.classwise,
+            row_labels,
+            col_labels,
+            xlabel="Factors",
+            ylabel="Class",
+            cbarlabel=f"Normalized {self.method.title()} Index",
+        )
 
 
 def diversity_shannon(
@@ -207,7 +241,7 @@ def diversity(
     diversity_index = diversity_fn(data, names, is_categorical, None).astype(np.float64)
 
     class_idx = names.index("class_label")
-    class_lbl = data[:, class_idx]
+    class_lbl = np.array(data[:, class_idx], dtype=int)
 
     u_classes = np.unique(class_lbl)
     num_factors = len(names)
@@ -218,4 +252,4 @@ def diversity(
         diversity[idx, :] = diversity_fn(data, names, is_categorical, subset_mask)
     div_no_class = np.concatenate((diversity[:, :class_idx], diversity[:, (class_idx + 1) :]), axis=1)
 
-    return DiversityOutput(diversity_index, div_no_class)
+    return DiversityOutput(diversity_index, div_no_class, class_lbl, list(metadata.keys()), method)
