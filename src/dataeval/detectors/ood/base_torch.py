@@ -177,7 +177,8 @@ class OODBase(ABC):
         self._ref_score = self.score(x_ref, batch_size)
         self._threshold_perc = threshold_perc
 
-    @set_metadata("dataeval.detectors")
+    # @set_metadata("dataeval.detectors") # this tries to iterate over string, barfs because OOD_AE has no attribute 'd'
+    @set_metadata(None)  # just bash through for now
     def predict(
         self,
         X: ArrayLike,
