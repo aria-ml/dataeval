@@ -63,8 +63,8 @@ def trainer(
     #
     # THIS WILL NEED MORE THAN JUST TYPO CHANGES!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     #
-    if optimizer is None:
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    # if optimizer is None:
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     loss_fn = loss_fn() if isinstance(loss_fn, type) else loss_fn
     # optimizer = optimizer() if isinstance(optimizer, type) else optimizer
@@ -84,6 +84,7 @@ def trainer(
     loader = DataLoader(dataset=dataset)
     # iterate over epochs
     for epoch in range(epochs):
+        print(f"Epoch {epoch}...")
         for step, data in enumerate(loader):
             x, y = [d.to(torch.float32) for d in data] if len(data) > 1 else (data[0].to(torch.float32), None)
 
@@ -104,6 +105,16 @@ def trainer(
             # loss = cast(torch.Tensor, torch.add(reg_loss_fn(model), loss))  # alternative way they might be specified
             loss.backward()
             optimizer.step()
+
+            if step == 2:
+                psave = list(model.parameters())[0].clone().detach().numpy()
+
+            if step == 3:
+                pnew = list(model.parameters())[0].clone().detach().numpy()
+                if (psave == pnew).all():  # type: ignore
+                    print("parameters not changing")
+                    pass
+
             if step % 500 == 0:
                 print(loss)
         pass
