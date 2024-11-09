@@ -9,7 +9,7 @@ from dataeval.metrics.bias.metadata import infer_categorical, preprocess_metadat
 
 @pytest.fixture
 def class_labels():
-    return [1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0]
+    return np.array([1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0], dtype=int)
 
 
 @pytest.fixture
@@ -31,7 +31,7 @@ def metadata():
             -0.92172538,
         ]
     )
-    cat_vals = np.array([1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0])
+    cat_vals = np.array([1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0], dtype=int)
     # for unit testing
     md = {"var_cat": str_vals, "var_cnt": cnt_vals, "var_float_cat": cat_vals + 0.1}
     return md
@@ -65,8 +65,24 @@ class TestBalanceUnit:
 
     def test_correct_mi_shape_and_dtype(self, class_labels, metadata):
         num_vars = len(metadata.keys())
-        expected_shape = {"balance": (num_vars + 1,), "factors": (num_vars, num_vars), "classwise": (2, num_vars + 1)}
+        expected_shape = {
+            "balance": (num_vars + 1,),
+            "factors": (num_vars, num_vars),
+            "classwise": (2, num_vars + 1),
+            "class_list": (len(class_labels),),
+            "metadata_names": (len(metadata.keys())),
+        }
+        expected_type = {
+            "balance": float,
+            "factors": float,
+            "classwise": float,
+            "class_list": int,
+        }
         mi = balance(class_labels, metadata)
         for k, v in mi.dict().items():
-            assert v.shape == expected_shape[k]
-            assert v.dtype == float
+            if type(v) is list:
+                assert len(v) == expected_shape[k]
+            else:
+                assert v.shape == expected_shape[k]
+                if k in expected_type:
+                    assert v.dtype == expected_type[k]

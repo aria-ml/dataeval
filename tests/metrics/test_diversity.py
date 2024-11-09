@@ -47,6 +47,13 @@ class TestDiversityUnit:
     @pytest.mark.parametrize("met", ["simpson", "shannon"])
     def test_range_of_values(self, met, metadata, class_labels):
         result = diversity(class_labels, metadata, method=met)
-        for div in result.dict().values():
+        for div in (result.diversity_index, result.classwise):
             assert div.dtype == float
             assert np.logical_and(div >= 0, div <= 1).all()
+
+    @pytest.mark.parametrize("met", ["simpson", "shannon"])
+    def test_output_dtypes(self, met, metadata, class_labels):
+        result = diversity(class_labels, metadata, method=met)
+        assert result.class_list.dtype is np.dtype(np.int64)
+        assert type(result.metadata_names[0]) is str
+        assert type(result.method) is str
