@@ -53,12 +53,13 @@ class OOD_AE(OODBase):
 
         super().fit(as_numpy(x_ref), threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
 
-    @set_metadata("dataeval.detectors")
+    # @set_metadata("dataeval.detectors") # this tries to iterate over string, barfs because OOD_AE has no attribute 'd'
+    @set_metadata(None)  # just bash through for now
     def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
         self._validate(X := as_numpy(X))
 
         # reconstruct instances
-        X_recon = predict_batch(X, self.model, batch_size=batch_size).to(torch.float32)
+        X_recon = predict_batch(X, self.model, batch_size=batch_size)
 
         # compute feature and instance level scores
         fscore = np.power(X - X_recon.detach().numpy(), 2)  # type: ignore

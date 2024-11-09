@@ -10,7 +10,6 @@ from __future__ import annotations
 
 __all__ = []
 
-from functools import partial
 from typing import Any, Callable
 
 import numpy as np
@@ -116,7 +115,7 @@ def predict_batch(
         x = torch.from_numpy(x)
     n = len(x)
     n_minibatch = int(np.ceil(n / batch_size))
-    return_np = not isinstance(dtype, torch.dtype)
+    # return_np = not isinstance(dtype, torch.dtype)
     preds = []
     with torch.no_grad():
         for i in range(n_minibatch):
@@ -124,37 +123,42 @@ def predict_batch(
             x_batch = x[istart:istop]
             if isinstance(preprocess_fn, Callable):
                 x_batch = preprocess_fn(x_batch)
-            # preds_tmp = model(x_batch.to(device))
-            # preds_tmp = model(x_batch.to(device).to(torch.float32))
-            preds_tmp = model(x_batch.to(torch.float32))
-            if isinstance(preds_tmp, (list, tuple)):
-                if len(preds) == 0:  # init tuple with lists to store predictions
-                    preds = tuple([] for _ in range(len(preds_tmp)))
-                for j, p in enumerate(preds_tmp):
-                    if isinstance(p, torch.Tensor):
-                        p = p.cpu()
-                    preds[j].append(p if not return_np or isinstance(p, np.ndarray) else p.numpy())
-            elif isinstance(preds_tmp, (np.ndarray, torch.Tensor)):
-                if isinstance(preds_tmp, torch.Tensor):
-                    preds_tmp = preds_tmp.cpu()
-                if isinstance(preds, tuple):
-                    preds = list(preds)
-                preds.append(
-                    preds_tmp
-                    if not return_np or isinstance(preds_tmp, np.ndarray)  # type: ignore
-                    else preds_tmp.numpy()
-                )
-            else:
-                raise TypeError(
-                    f"Model output type {type(preds_tmp)} not supported. The model \
-                    output type needs to be one of list, tuple, NDArray or \
-                    torch.Tensor."
-                )
-    concat = partial(np.concatenate, axis=0) if return_np else partial(torch.cat, dim=0)
-    out: tuple | np.ndarray | torch.Tensor = (
-        tuple(concat(p) for p in preds) if isinstance(preds, tuple) else concat(preds)  # type: ignore
-    )
-    return out
+
+            preds_tmp = model(torch.tensor(x_batch).to(torch.float32))
+            preds = preds_tmp.detach() if i == 0 else torch.cat((preds, preds_tmp.detach()), axis=0)  # type: ignore
+
+    #         # preds_tmp = model(x_batch.to(device))
+    #         # preds_tmp = model(x_batch.to(device).to(torch.float32))
+    #         preds_tmp = model(x_batch.to(torch.float32))
+    #         if isinstance(preds_tmp, (list, tuple)):
+    #             if len(preds) == 0:  # init tuple with lists to store predictions
+    #                 preds = tuple([] for _ in range(len(preds_tmp)))
+    #             for j, p in enumerate(preds_tmp):
+    #                 if isinstance(p, torch.Tensor):
+    #                     p = p.cpu()
+    #                 preds[j].append(p if not return_np or isinstance(p, np.ndarray) else p.numpy())
+    #         elif isinstance(preds_tmp, (np.ndarray, torch.Tensor)):
+    #             if isinstance(preds_tmp, torch.Tensor):
+    #                 preds_tmp = preds_tmp.cpu()
+    #             if isinstance(preds, tuple):
+    #                 preds = list(preds)
+    #             preds.append(
+    #                 preds_tmp
+    #                 if not return_np or isinstance(preds_tmp, np.ndarray)  # type: ignore
+    #                 else preds_tmp.numpy()
+    #             )
+    #         else:
+    #             raise TypeError(
+    #                 f"Model output type {type(preds_tmp)} not supported. The model \
+    #                 output type needs to be one of list, tuple, NDArray or \
+    #                 torch.Tensor."
+    #             )
+    # concat = partial(np.concatenate, axis=0) if return_np else partial(torch.cat, dim=0)
+    # out: tuple | np.ndarray | torch.Tensor = (
+    #     tuple(concat(p) for p in preds) if isinstance(preds, tuple) else concat(preds)  # type: ignore
+    # )
+    # return out
+    return preds  # type: ignore
 
 
 def preprocess_drift(
