@@ -124,7 +124,9 @@ def predict_batch(
             x_batch = x[istart:istop]
             if isinstance(preprocess_fn, Callable):
                 x_batch = preprocess_fn(x_batch)
-            preds_tmp = model(x_batch.to(device))
+            # preds_tmp = model(x_batch.to(device))
+            # preds_tmp = model(x_batch.to(device).to(torch.float32))
+            preds_tmp = model(x_batch.to(torch.float32))
             if isinstance(preds_tmp, (list, tuple)):
                 if len(preds) == 0:  # init tuple with lists to store predictions
                     preds = tuple([] for _ in range(len(preds_tmp)))
