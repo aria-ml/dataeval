@@ -72,9 +72,11 @@ def trainer(
     # train_data = x_train if y_train is None else (x_train, y_train)
     # torch.tensor(train_data)  # make a Dataset from this!
     if y_train is None:
-        dataset = TensorDataset(torch.from_numpy(x_train))
+        dataset = TensorDataset(torch.from_numpy(x_train).to(torch.float32))
     else:
-        dataset = TensorDataset(torch.from_numpy(x_train), torch.from_numpy(y_train))
+        dataset = TensorDataset(
+            torch.from_numpy(x_train).to(torch.float32), torch.from_numpy(y_train).to(torch.float32)
+        )
 
     # dataset = dataset.shuffle(buffer_size=buffer_size).batch(batch_size)
     # n_minibatch = len(dataset)

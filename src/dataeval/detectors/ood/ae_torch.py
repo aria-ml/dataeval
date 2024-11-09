@@ -58,7 +58,7 @@ class OOD_AE(OODBase):
         self._validate(X := as_numpy(X))
 
         # reconstruct instances
-        X_recon = predict_batch(X, self.model, batch_size=batch_size)
+        X_recon = predict_batch(X, self.model, batch_size=batch_size).to(torch.float32)
 
         # compute feature and instance level scores
         fscore = np.power(X - X_recon.detach().numpy(), 2)  # type: ignore
