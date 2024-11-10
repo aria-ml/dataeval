@@ -60,7 +60,9 @@ def trainer(
     loss_fn = loss_fn() if isinstance(loss_fn, type) else loss_fn
     optimizer = optimizer() if isinstance(optimizer, type) else optimizer
 
-    train_data = x_train if y_train is None else (x_train, y_train)
+    train_data = (
+        x_train.astype(np.float32) if y_train is None else (x_train.astype(np.float32), y_train.astype(np.float32))
+    )
     dataset = tf.data.Dataset.from_tensor_slices(train_data)
     dataset = dataset.shuffle(buffer_size=buffer_size).batch(batch_size)
     n_minibatch = len(dataset)
