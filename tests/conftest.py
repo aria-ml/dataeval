@@ -7,7 +7,12 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
+import dataeval.metrics.stats.base as base
+
 TEMP_CONTENTS = "ABCDEF1234567890"
+
+# Temporarily set DEFAULT_PROCESSES to 1
+base.DEFAULT_PROCESSES = 1
 
 
 @pytest.fixture(scope="session")
