@@ -71,14 +71,29 @@ class Encoder(nn.Module):
 
     def __init__(self, channels: int = 3) -> None:
         super().__init__()
+        # original
+        # self.encoder: nn.Sequential = nn.Sequential(
+        #     nn.Conv2d(channels, 256, 2, stride=1, padding=1),
+        #     nn.LeakyReLU(),
+        #     nn.MaxPool2d(2),
+        #     nn.Conv2d(256, 128, 2, stride=1, padding=1),
+        #     nn.LeakyReLU(),
+        #     nn.MaxPool2d(2),
+        #     nn.Conv2d(128, 64, 2, stride=1),
+        # )
+
+        # hacked
+        conv_in = nn.Conv2d(channels, 256, 2, stride=1, padding=1)
+        conv_mid = nn.Conv2d(256, 128, 2, stride=1, padding=1)
+        conv_done = nn.Conv2d(128, 64, 2, stride=1)
         self.encoder: nn.Sequential = nn.Sequential(
-            nn.Conv2d(channels, 256, 2, stride=1, padding=1),
-            nn.ReLU(),
+            conv_in,
+            nn.LeakyReLU(),
             nn.MaxPool2d(2),
-            nn.Conv2d(256, 128, 2, stride=1, padding=1),
-            nn.ReLU(),
+            conv_mid,
+            nn.LeakyReLU(),
             nn.MaxPool2d(2),
-            nn.Conv2d(128, 64, 2, stride=1),
+            conv_done,
         )
 
     def forward(self, x: Any) -> Any:
@@ -112,11 +127,21 @@ class Decoder(nn.Module):
 
     def __init__(self, channels: int) -> None:
         super().__init__()
+        # original
+        # self.decoder: nn.Sequential = nn.Sequential(
+        #     nn.ConvTranspose2d(64, 128, 2, stride=1),
+        #     nn.LeakyReLU(),
+        #     nn.ConvTranspose2d(128, 256, 2, stride=2),
+        #     nn.LeakyReLU(),
+        #     nn.ConvTranspose2d(256, channels, 2, stride=2),
+        #     nn.Sigmoid(),
+        # )
+        # hacked
         self.decoder: nn.Sequential = nn.Sequential(
             nn.ConvTranspose2d(64, 128, 2, stride=1),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.ConvTranspose2d(128, 256, 2, stride=2),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.ConvTranspose2d(256, channels, 2, stride=2),
             nn.Sigmoid(),
         )
