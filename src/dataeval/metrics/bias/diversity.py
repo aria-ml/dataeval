@@ -252,7 +252,7 @@ def diversity(
     """
     diversity_fn = get_method({"simpson": diversity_simpson, "shannon": diversity_shannon}, method)
     data, names, _ = preprocess_metadata(class_labels, metadata)
-    diversity_index, cached_hist = diversity_fn(data, names, continuous_factor_bincounts, None).astype(np.float64)
+    diversity_index, cached_hist = diversity_fn(data, names, continuous_factor_bincounts, None)
 
     class_idx = names.index("class_label")
     class_lbl = np.array(data[:, class_idx], dtype=int)

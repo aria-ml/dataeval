@@ -42,29 +42,31 @@ def get_counts(
     # need to figure out an elegant solution to this problem
     mask = np.where(subset_mask if subset_mask is not None else np.ones(data.shape[0], dtype=bool))
     # mask = np.where(np.ones(data.shape[0], dtype=bool))
+    if not cached_hist:
+        cached_hist = {}
 
     for cdx, fn in enumerate(names):
         # linter doesn't like double indexing
         col_data = data[mask, cdx].squeeze()
         if continuous_factor_bincounts and fn in continuous_factor_bincounts:
             # bins = hist_bins.get(fn, "auto")
-            bins = continuous_factor_bincounts[fn]
-            if cached_hist:
-                cnts, bins = cached_hist["cnts"], cached_hist["bins"]
+            num_bins = continuous_factor_bincounts[fn]
+            if fn in cached_hist:
+                cnts, bins = cached_hist[fn]["cnts"], cached_hist[fn]["bins"]
             else:
-                cnts, bins = np.histogram(data[:, cdx].squeeze(), bins=bins, density=True)
-                cached_hist = {"cnts": cnts, "bins": bins}
-            bins[-1] = np.inf
-            bins[0] = -np.inf
+                cnts, bins = np.histogram(data[:, cdx].squeeze(), bins=num_bins, density=True)
+                cached_hist[fn] = {"cnts": cnts, "bins": bins}
+                bins[-1] = np.inf
+                bins[0] = -np.inf
             disc_col_data = np.digitize(col_data, bins)
             bins, cnts = np.unique(disc_col_data, return_counts=True)
         else:
             # if discrete, use unique values as bins
-            if cached_hist:
-                cnts, bins = cached_hist["cnts"], cached_hist["bins"]
+            if fn in cached_hist:
+                cnts, bins = cached_hist[fn]["cnts"], cached_hist[fn]["bins"]
             else:
                 bins, cnts = np.unique(col_data, return_counts=True)
-                cached_hist = {"cnts": cnts, "bins": bins}
+                cached_hist[fn] = {"cnts": cnts, "bins": bins}
 
         hist_counts[fn] = cnts
         hist_bins[fn] = bins

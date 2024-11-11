@@ -24,7 +24,7 @@ def class_labels():
 @pytest.fixture
 def entropy_test_vars():
     ent = {}
-    ent["is_categorical"] = [True, False]
+    ent["continuous_factor_bincounts"] = [{"data": 5}]
     ent["data"] = np.stack([np.ones(10, dtype=int), np.array([1, 5, 3, 5, 8, 9, 0, 2, 4, 7])]).T
     ent["names"] = ["a", "b"]
     return ent
@@ -33,9 +33,12 @@ def entropy_test_vars():
 @pytest.mark.parametrize("norm", [True, False])
 def test_entropy_normalization(norm, entropy_test_vars):
     ent = entropy(
-        entropy_test_vars["data"], entropy_test_vars["names"], entropy_test_vars["is_categorical"], normalized=norm
+        entropy_test_vars["data"],
+        entropy_test_vars["names"],
+        entropy_test_vars["continuous_factor_bincounts"],
+        normalized=norm,
     )
-    assert ent[0] == 0
+    assert ent[0][0] == 0
 
 
 class TestDiversityUnit:
