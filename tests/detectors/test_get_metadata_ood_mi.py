@@ -5,6 +5,7 @@ import pytest
 
 from dataeval.detectors.ood.metadata_ood_mi import get_metadata_ood_mi
 
+RANDOM_STATE = 42
 
 # Inputs with expected valid results:
 @pytest.mark.parametrize(
@@ -20,56 +21,10 @@ from dataeval.detectors.ood.metadata_ood_mi import get_metadata_ood_mi
             np.array([True] * 62 + [False] * 38),
             {"time": 0.9359596758173668, "altitude": 0.9407686591507002},
         ),
-        # (  # Basic valid inputs with different numbers of examples
-        #     {"time": np.array([1.2, 3.4, 5.6]), "altitude": [235, 6789, 101112]},
-        #     {"time": [7.8, 9.10, 11.12, 13.14], "altitude": [532, 9876, -2111, 4321]},
-        #     {
-        #         "time": {
-        #             "statistic_location": 0.36850921273031817,
-        #             "shift_magnitude": 3.131818181818182,
-        #             "pvalue": 0.0,
-        #         },
-        #         "altitude": {
-        #             "statistic_location": 0.06231169409918332,
-        #             "shift_magnitude": 0.6530791624123108,
-        #             "pvalue": 0.7777777777777777,
-        #         },
-        #     },
-        # ),
-        # (  # Valid inputs: include non-numerical features.
-        #     {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112], "weather": ["raining", "calm", "tornado"]},
-        #     {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111], "weather": ["snow", "hail", "hot"]},
-        #     {
-        #         "time": {"statistic_location": 0.44354838709677413, "shift_magnitude": 2.7, "pvalue": 0.0},
-        #         "altitude": {
-        #             "statistic_location": 0.11612721970878584,
-        #             "shift_magnitude": 0.6598068274565396,
-        #             "pvalue": 0.9444444444444444,
-        #         },
-        #         "weather": {},
-        #     },
-        # ),
-        # (  # Valid inputs: feature with only one value
-        #     {"time": [1.2, 1.2, 1.2], "altitude": [235, 6789, 101112], "random": [3.14, 159, 265]},
-        #     {"time": [1.2, 1.2, 1.2], "altitude": [532, 9876, -2111], "random": [1.12, 3.5, 8.13]},
-        #     {
-        #         "time": {"statistic_location": 0.0, "shift_magnitude": 0.0, "pvalue": 1.0},
-        #         "altitude": {
-        #             "statistic_location": 0.11612721970878584,
-        #             "shift_magnitude": 0.6598068274565396,
-        #             "pvalue": 0.9444444444444444,
-        #         },
-        #         "random": {
-        #             "statistic_location": 0.026565105350917086,
-        #             "shift_magnitude": 1.0549912166806692,
-        #             "pvalue": 0.22222222222222213,
-        #         },
-        #     },
-        # ),
     ),
 )
 def test_output_values(md0, is_ood, expected: dict[str, float]):
-    output = get_metadata_ood_mi(md0, is_ood)
+    output = get_metadata_ood_mi(md0, is_ood, random_state=RANDOM_STATE))
     print("\n", flush=True)
     for k in output:
         print(f"{k}: {output[k]}, {expected[k]}", flush=True)
@@ -96,7 +51,7 @@ def test_output_values(md0, is_ood, expected: dict[str, float]):
 )
 def test_invalid_inputs(md0, is_ood, error_msg):
     with pytest.raises(ValueError, match=error_msg):
-        get_metadata_ood_mi(md0, is_ood)
+        get_metadata_ood_mi(md0, is_ood, random_state=RANDOM_STATE)
 
 
 # # inputs that raise a warning
@@ -112,4 +67,4 @@ def test_invalid_inputs(md0, is_ood, error_msg):
 )
 def test_nonsense_inputs(md0, is_ood, warning):
     with pytest.warns(UserWarning, match=warning):
-        get_metadata_ood_mi(md0, is_ood)
+        get_metadata_ood_mi(md0, is_ood, random_state=RANDOM_STATE))

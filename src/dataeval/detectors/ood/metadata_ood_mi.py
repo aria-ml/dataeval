@@ -20,6 +20,7 @@ def get_metadata_ood_mi(
     metadata: dict[str, list[Any] | NDArray[Any]],
     is_ood: NDArray[np.bool_],
     discrete_features: str | bool | NDArray[np.bool_] = False,
+    random_state: int | None = None,
 ) -> dict[str, float]:
     """Computes mutual information between a set of metadata features and an out-of-distribution flag.
 
@@ -82,7 +83,7 @@ def get_metadata_ood_mi(
             Xscl,
             is_ood,
             discrete_features=discrete_features,  # type: ignore
-            random_state=RANDOM_STATE,
+            random_state=random_state,
         )
         * NATS2BITS
     )
