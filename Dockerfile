@@ -70,13 +70,13 @@ RUN mkdir -p .tox
 
 FROM task-run as unit-run
 ARG python_version
-RUN ln -s /dataeval/.venv .tox/py$(echo ${python_version} | sed "s/\.//g")
-RUN ./capture.sh unit ${python_version} tox -e py$(echo ${python_version} | sed "s/\.//g")
+RUN ln -s /dataeval/.venv .tox/${python_version}
+RUN ./capture.sh unit ${python_version} tox -e ${python_version}
 
 FROM task-run as type-run
 ARG python_version
-RUN ln -s /dataeval/.venv .tox/type-py$(echo ${python_version} | sed "s/\.//g")
-RUN ./capture.sh type ${python_version} tox -e type-py$(echo ${python_version} | sed "s/\.//g")
+RUN ln -s /dataeval/.venv .tox/type-${python_version}
+RUN ./capture.sh type ${python_version} tox -e type-${python_version}
 
 FROM task-run as deps-run
 ARG python_version
