@@ -1,9 +1,12 @@
+from functools import partial
+
 import numpy as np
 import pytest
 from numpy.random import randint
+from numpy.typing import NDArray
 
 from dataeval.metrics.stats import dimensionstats, hashstats, labelstats, pixelstats, visualstats
-from dataeval.metrics.stats.base import SOURCE_INDEX, BaseStatsOutput
+from dataeval.metrics.stats.base import SOURCE_INDEX, BaseStatsOutput, StatsProcessor, process_stats_unpack
 from dataeval.metrics.stats.boxratiostats import boxratiostats
 from dataeval.metrics.stats.datasetstats import channelstats, datasetstats
 
@@ -28,6 +31,40 @@ def get_bboxes(count: int, boxes_per_image: int):
 
 DATA_1 = get_dataset(10, 1)
 DATA_3 = get_dataset(10, 3)
+
+
+class LengthStatsOutput(BaseStatsOutput):
+    length: int
+
+
+class LengthProcessor(StatsProcessor[LengthStatsOutput]):
+    output_class = LengthStatsOutput
+    cache_keys = ["length"]
+    image_function_map = {
+        "neg_length": lambda x: -(x.get("length")),
+        "length": lambda x: len(x.image),
+        "shape": lambda x: len(x.shape),
+        "scaled": lambda x: len(x.scaled),
+        "neg_length2": lambda x: x.get("neg_length"),
+        "length2": lambda x: x.get("length"),
+        "shape2": lambda x: len(x.shape),
+        "scaled2": lambda x: len(x.scaled),
+    }
+
+
+class TestBaseStats:
+    @pytest.mark.parametrize("box", [np.array([0, 0, 16, 16]), None])
+    @pytest.mark.parametrize("per_channel", [False, True])
+    def test_process_stats_unpack(self, box, per_channel):
+        results_list: list[dict[str, NDArray[np.int_]]] = []
+        images = DATA_3
+        bboxes = [box] * len(DATA_3)
+        bboxes[0] = np.array([-1, -1, 1, 1])
+        partial_fn = partial(process_stats_unpack, per_channel=per_channel, stats_processor_cls=[LengthProcessor])
+        for args in enumerate(zip(images, bboxes)):
+            r = partial_fn(args)
+            results_list.extend(r.results)
+        assert len(results_list) == len(DATA_3)
 
 
 class TestStats:

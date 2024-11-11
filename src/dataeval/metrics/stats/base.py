@@ -22,6 +22,9 @@ DTYPE_REGEX = re.compile(r"NDArray\[np\.(.*?)\]")
 SOURCE_INDEX = "source_index"
 BOX_COUNT = "box_count"
 
+# TODO: Replace with global config
+DEFAULT_PROCESSES: int | None = None
+
 OptionalRange = Optional[Union[int, Iterable[int]]]
 
 
@@ -253,6 +256,8 @@ def run_stats(
         A flag which determines if the states should be evaluated on a per-channel basis or not.
     stats_processor_cls : Iterable[type[StatsProcessor]]
         An iterable of stats processor classes that calculate stats and return output classes.
+    processes : int | None, default None
+        Number of processes to use, defaults to None which uses all available CPU cores.
 
     Returns
     -------
@@ -280,7 +285,7 @@ def run_stats(
     stats_processor_cls = stats_processor_cls if isinstance(stats_processor_cls, Iterable) else [stats_processor_cls]
 
     # TODO: Introduce global controls for CPU job parallelism and GPU configurations
-    with Pool(16) as p:
+    with Pool(processes=DEFAULT_PROCESSES) as p:
         for r in tqdm.tqdm(
             p.imap(
                 partial(process_stats_unpack, per_channel=per_channel, stats_processor_cls=stats_processor_cls),
