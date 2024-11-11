@@ -14,6 +14,7 @@ import numpy as np
 import tqdm
 from numpy.typing import ArrayLike, NDArray
 
+from dataeval import max_processes
 from dataeval.interop import to_numpy_iter
 from dataeval.output import OutputMetadata
 from dataeval.utils.image import normalize_image_shape, rescale
@@ -285,7 +286,7 @@ def run_stats(
     stats_processor_cls = stats_processor_cls if isinstance(stats_processor_cls, Iterable) else [stats_processor_cls]
 
     # TODO: Introduce global controls for CPU job parallelism and GPU configurations
-    with Pool(processes=DEFAULT_PROCESSES) as p:
+    with Pool(processes=max_processes()) as p:
         for r in tqdm.tqdm(
             p.imap(
                 partial(process_stats_unpack, per_channel=per_channel, stats_processor_cls=stats_processor_cls),
