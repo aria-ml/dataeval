@@ -13,12 +13,14 @@ from sklearn.model_selection import GroupKFold, KFold, StratifiedGroupKFold, Str
 from sklearn.utils.multiclass import type_of_target
 
 
-def check_args(num_folds: int = 1, test_frac: float | None = None, val_frac: float | None = None) -> None:
-    """Check input arguments to ensure unambiguous splitting arguments are passed.
+def validate_test_val(num_folds: int, test_frac: float | None, val_frac: float | None) -> tuple[float, float]:
+    """Check input fractions to ensure unambiguous splitting arguments are passed return calculated
+    test and validation fractions.
+
 
     Parameters
     ----------
-    num_folds : int, default 1
+    num_folds : int
         number of [train, val] cross-validation folds to generate
     test_frac : float, optional
         If specified, also generate a test set containing (test_frac*100)% of the data
@@ -40,16 +42,18 @@ def check_args(num_folds: int = 1, test_frac: float | None = None, val_frac: flo
 
     Returns
     -------
-    None
+    tuple[float, float]
+        Tuple of the validated and calculated values as appropriate for test and validation fractions
     """
     if (num_folds > 1) and (val_frac is not None):
         raise ValueError("If specifying val_frac, num_folds must be None or 1")
     if (num_folds == 1) and (val_frac is None):
-        raise UnboundLocalError("If num_folds is None or 1, must assign a value to val_frac")
+        raise ValueError("If num_folds is None or 1, must assign a value to val_frac")
     t_frac = 0.0 if test_frac is None else test_frac
     v_frac = 1.0 / num_folds * (1.0 - t_frac) if val_frac is None else val_frac * (1.0 - t_frac)
     if (t_frac + v_frac) >= 1.0:
         raise ValueError(f"val_frac + test_frac must be less that 1.0, currently {v_frac+t_frac}")
+    return t_frac, v_frac
 
 
 def check_labels(
@@ -300,6 +304,52 @@ def make_splits(
     return split_defs
 
 
+def find_best_split(
+    labels: NDArray[np.int_], split_defs: list[dict[str, NDArray[np.int_]]], stratified: bool, eval_frac: float
+) -> tuple[NDArray[np.int_], NDArray[np.int_]]:
+    """Finds the split that most closely satisfies a criterion determined by the arguments passed.
+    If stratified is True, returns the split whose class balance most closely resembles the overall
+    class balance. If false, returns the split with the size closest to the desired eval_frac
+
+    Parameters
+    ----------
+    labels : np.ndarray
+        Labels upon which splits are (optionally) stratified
+    split_defs : list[dict]
+        List of dictionaries, which specifying train index, validation index, and the ratio of
+        validation to all data.
+    stratified: bool
+        If True, maintain dataset class balance within each train/val split
+    eval_frac: float
+        Desired fraction of the dataset sequestered for evaluation
+
+    Returns
+    -------
+    train_index : np.ndarray
+        indices of data partitioned for training
+    eval_index : np.ndarray
+        indices of data partitioned for evaluation
+    """
+
+    def class_freq_diff(split):
+        train_labels = labels[split["train"]]
+        _, train_counts = np.unique(train_labels, return_counts=True)
+        train_freq = train_counts / train_counts.sum()
+        return np.square(train_freq - class_freq).sum()
+
+    if stratified:
+        _, class_counts = np.unique(labels, return_counts=True)
+        class_freq = class_counts / class_counts.sum()
+        best_split = min(split_defs, key=class_freq_diff)
+        return best_split["train"], best_split["eval"]
+    elif eval_frac <= 2 / 3:
+        best_split = min(split_defs, key=lambda x: abs(eval_frac - x["eval_frac"]))  # type: ignore
+        return best_split["train"], best_split["eval"]
+    else:
+        best_split = min(split_defs, key=lambda x: abs(eval_frac - (1 - x["eval_frac"])))  # type: ignore
+        return best_split["eval"], best_split["train"]
+
+
 def single_split(
     index: NDArray[np.int_],
     labels: NDArray[np.int_],
@@ -331,16 +381,17 @@ def single_split(
     eval_index : np.ndarray
         indices of data partitioned for evaluation
     """
-    if eval_frac <= 2 / 3:
+    if groups is not None:
+        n_unique_groups = np.unique(groups).shape[0]
+        _, label_counts = np.unique(labels, return_counts=True)
+        n_folds = min(n_unique_groups, label_counts.min())
+    elif eval_frac <= 2 / 3:
         n_folds = max(2, int(round(1 / (eval_frac + 1e-6))))
-        split_candidates = make_splits(index, labels, n_folds, groups, stratified)
-        best_split = min(split_candidates, key=lambda x: abs(eval_frac - x["eval_frac"]))  # type: ignore
-        return best_split["train"], best_split["eval"]
     else:
-        n_folds = max(2, int(round(1 / (1 - eval_frac + 1e-6))))
-        split_candidates = make_splits(index, labels, n_folds, groups, stratified)
-        best_split = min(split_candidates, key=lambda x: abs(eval_frac - (1 - x["eval_frac"])))  # type: ignore
-        return best_split["eval"], best_split["train"]
+        n_folds = max(2, int(round(1 / (1 - eval_frac - 1e-6))))
+    split_candidates = make_splits(index, labels, n_folds, groups, stratified)
+    best_train, best_eval = find_best_split(labels, split_candidates, stratified, eval_frac)
+    return best_train, best_eval
 
 
 def split_dataset(
@@ -400,7 +451,7 @@ def split_dataset(
         }
     """
 
-    check_args(num_folds, test_frac, val_frac)
+    test_frac, val_frac = validate_test_val(num_folds, test_frac, val_frac)
     total_partitions = num_folds + 1 if test_frac else num_folds
     index, labels = check_labels(labels, total_partitions)
     stratify &= check_stratifiable(labels, total_partitions)
@@ -424,7 +475,7 @@ def split_dataset(
         tv_labels = labels
         tv_groups = groups
     if num_folds == 1:
-        train_idx, val_idx = single_split(tv_idx, tv_labels, val_frac, tv_groups, stratify)  # type: ignore
+        train_idx, val_idx = single_split(tv_idx, tv_labels, val_frac, tv_groups, stratify)
         split_defs["fold_0"] = {"train": tv_idx[train_idx].squeeze(), "val": tv_idx[val_idx].squeeze()}
     else:
         tv_splits = make_splits(tv_idx, tv_labels, num_folds, tv_groups, stratify)
