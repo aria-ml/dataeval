@@ -47,6 +47,9 @@ from tqdm import tqdm
 import copy
 import pickle
 import warnings
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
 
 from domain_classifier import MVDC
 from dataeval.detectors.drift import DriftCVM, DriftKS, DriftMMD
@@ -61,7 +64,8 @@ def get_input_args():
     
     # PATHS
     parser.add_argument('--resdir',         type=str, 
-                                            default = '/mnt/nas_device_1/embeddings',
+                                            # default = '/mnt/nas_device_1/embeddings',
+                                            default = '/home/jchristian/2033/metric_analysis',
                                             help="root directory where the timestamped results folders are")
     
 
@@ -202,7 +206,7 @@ def drift(ld, mymetric):
     # Run drift metric over embeddings from all models/data/tasks
     niter = len(ld.models)+len(ld.data)+len(ld.tasks)
     pbar = tqdm(total=niter, desc=f'DRIFT[{mymetric}]')
-    savefp = os.path.join(ld.rootdir, f'{mymetric}_analysis.pkl')
+    savefp = os.path.join(ld.rootdir, f'analysis_{mymetric}.pkl')
     for m in ld.models:
         for d in ld.data:
             for t in ld.tasks:
@@ -304,7 +308,7 @@ def estimator(ld, mymetric):
     # Run estimator metric over all models/data/tasks
     niter = len(ld.models)+len(ld.data)+len(ld.tasks)
     pbar = tqdm(total=niter, desc=f'ESTIMATOR[{mymetric}]')
-    savefp = os.path.join(ld.rootdir, f'{mymetric}_analysis.pkl')
+    savefp = os.path.join(ld.rootdir, f'analysis_{mymetric}.pkl')
     for m in ld.models:
         for d in ld.data:
             for t in ld.tasks:
@@ -314,7 +318,6 @@ def estimator(ld, mymetric):
                 if embTRN is None or embTST is None:
                     pbar.update(1)
                     continue
-
 
                 if mymetric.lower() == 'ber':
                     # Estimate performance metrics on the TEST test
@@ -332,9 +335,6 @@ def estimator(ld, mymetric):
                     pickle.dump(ld, f)
     pbar.close()
     return ld 
-
-
-
 
 
 def compute_metrics(ld, mymetric=None):
@@ -366,17 +366,80 @@ def compute_metrics(ld, mymetric=None):
                 warnings.warn(f'Cannot find {opt.metric} within dataeval metrics.')
 
 
+def read_results(fp):
+    results = {}
+    for fn in os.listdir(fp):
+        ffn = os.path.join(fp, fn)
+        mymetric = ffn.split('analysis_')[-1].split('.pkl')[0]
+        with open(ffn, 'rb') as myfile:
+            results[mymetric] = pickle.load(myfile)
+    return results
+
+
+def compile_df(ld):
+    rows = []
+    doswarm = False
+    for m in ld.models:
+        for d in ld.data:
+            for t in ld.tasks:
+                vals = ld.metrics[m][d][t]
+                if vals is not None: 
+                    if type(vals)!=np.ndarray or len(vals)==1:
+                        vals = np.atleast_1d(np.array(vals))
+                        doswarm = True
+                    for v in vals:
+                        rows.append({
+                            'Model': m,
+                            'Data': d,
+                            'Task': t,
+                            'Value': v
+                        })
+
+    df = pd.DataFrame(rows)
+    
+    # Create a catplot 
+    if doswarm:
+        g = sns.catplot(x="Task", y="Value", 
+                        hue="Data", col="Model", 
+                        data=df, 
+                        kind='swarm',
+                        size=8,
+                        dodge=True,
+                        height=4, aspect=0.7) 
+    else:
+        g = sns.catplot(x="Task", y="Value", 
+                        hue="Data", col="Model", 
+                        data=df, 
+                        kind="box", 
+                        height=4, aspect=0.7) 
+            
+    g.set_titles("{col_name}") 
+    g.set_axis_labels("Task", "Values")
+    plt.suptitle(metric)
+    plt.show()
+
+    return df
+
 
 if __name__ == "__main__":
     
     opt = get_input_args()
-    runlegend = load_legend(opt.resdir)
     
-    # Loader class is needed for each metric
-    ld = Loader(opt.resdir, runlegend)
+    # Read prior results
+    if len(os.listdir(opt.resdir)) != 0:
+        results = read_results(opt.resdir)       
+        for metric in list(results.keys()):
+            df = compile_df(results[metric])
     
-    # Run the metric and save the analysis results as a .pkl file
-    compute_metrics(ld, opt.metric)
+    # Compute metrics
+    else:
+        runlegend = load_legend(opt.resdir)
+        
+        # Loader class is needed for each metric
+        ld = Loader(opt.resdir, runlegend)
+        
+        # Run the metric and save the analysis results as a .pkl file
+        compute_metrics(ld, opt.metric)
                 
     
     print('--COMPLETE--')
