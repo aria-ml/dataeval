@@ -12,9 +12,6 @@ from sklearn.feature_selection import mutual_info_classif
 #   which is what many library functions return, multiply it by NATS2BITS to get it in bits.
 NATS2BITS = 1.442695
 
-# RANDOM_STATE is set for reproducibility of mutual_info_classif during testing, since it otherwise has variations.
-RANDOM_STATE = 42
-
 
 def get_metadata_ood_mi(
     metadata: dict[str, list[Any] | NDArray[Any]],
@@ -40,6 +37,9 @@ def get_metadata_ood_mi(
         A boolean array, with one value per example, that indicates which examples are OOD.
     discrete_features : str | bool | NDArray[np.bool_]
         Either a boolean array or a single boolean value, indicate which features take on discrete values.
+    random_state : int, optional - default None
+        Determines random number generation for small noise added to continuous variables. Set to a value for
+        reproducible results.
 
     Returns
     -------
