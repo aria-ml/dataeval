@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import numbers
+import warnings
 from typing import Any
 
 import numpy as np
@@ -15,6 +17,7 @@ def get_metadata_ood_mi(
     metadata: dict[str, list[Any] | NDArray[Any]],
     is_ood: NDArray[np.bool_],
     discrete_features: str | bool | NDArray[np.bool_] = False,
+    random_state: int | None = None,
 ) -> dict[str, float]:
     """Computes mutual information between a set of metadata features and an out-of-distribution flag.
 
@@ -34,6 +37,9 @@ def get_metadata_ood_mi(
         A boolean array, with one value per example, that indicates which examples are OOD.
     discrete_features : str | bool | NDArray[np.bool_]
         Either a boolean array or a single boolean value, indicate which features take on discrete values.
+    random_state : int, optional - default None
+        Determines random number generation for small noise added to continuous variables. Set to a value for
+        reproducible results.
 
     Returns
     -------
@@ -49,11 +55,25 @@ def get_metadata_ood_mi(
         >>> metadata = {"time": numpy.linspace(0, 10, 100), "altitude": numpy.linspace(0, 16, 100) ** 2}
         >>> is_ood = metadata["altitude"] > 100
         >>> print(get_metadata_ood_mi(metadata, is_ood, discrete_features=False))
-    {'time': 0.9407686591507002, 'altitude': 0.9407686591507002}
+        {'time': 0.933074285817367, 'altitude': 0.9407686591507002}
     """
-    mdict = metadata
+    numerical_keys = [k for k, v in metadata.items() if all(isinstance(vi, numbers.Number) for vi in v)]
+    if len(numerical_keys) < len(metadata):
+        warnings.warn(
+            f"Processing {numerical_keys}, others are non-numerical and will be skipped.",
+            UserWarning,
+        )
 
-    X = np.array(list(mdict.values())).T
+    md_lengths = {len(np.atleast_1d(v)) for v in metadata.values()}
+    if len(md_lengths) > 1:
+        raise ValueError(f"Metadata features have differing sizes: {md_lengths}")
+
+    if len(is_ood) != (mdl := md_lengths.pop()):
+        raise ValueError(
+            f"OOD flag and metadata features need to be same size, but are different sizes: {len(is_ood)} and {mdl}."
+        )
+
+    X = np.array([metadata[k] for k in numerical_keys]).T
 
     X0, dX = np.mean(X, axis=0), np.std(X, axis=0, ddof=1)
     Xscl = (X - X0) / dX
@@ -63,9 +83,10 @@ def get_metadata_ood_mi(
             Xscl,
             is_ood,
             discrete_features=discrete_features,  # type: ignore
+            random_state=random_state,
         )
         * NATS2BITS
     )
 
-    mi_dict = {k: mutual_info_values[i] for i, k in enumerate(mdict)}
+    mi_dict = {k: mutual_info_values[i] for i, k in enumerate(numerical_keys)}
     return mi_dict
