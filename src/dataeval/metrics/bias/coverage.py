@@ -2,17 +2,22 @@ from __future__ import annotations
 
 __all__ = ["CoverageOutput", "coverage"]
 
+import contextlib
 import math
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy.spatial.distance import pdist, squareform
 
 from dataeval.interop import to_numpy
+from dataeval.metrics.bias.metadata import coverage_plot
 from dataeval.output import OutputMetadata, set_metadata
 from dataeval.utils.shared import flatten
+
+with contextlib.suppress(ImportError):
+    from matplotlib.figure import Figure
 
 
 @dataclass(frozen=True)
@@ -34,13 +39,45 @@ class CoverageOutput(OutputMetadata):
     radii: NDArray[np.float64]
     critical_value: float
 
+    def plot(
+        self,
+        images: NDArray[Any],
+        top_k: int = 6,
+        show: bool = True,
+    ) -> Figure | None:
+        """
+        Plot the top k images together for visualization
+
+        Parameters
+        ----------
+        images : ArrayLike
+            Original images (not embeddings) in (N, C, H, W) or (N, H, W) format
+        top_k : int, default 6
+            Number of images to plot (plotting assumes groups of 3)
+        show : bool, default True
+            Whether to show the plot or return the matplotlib Figure
+        """
+        # Determine which images to plot
+        highest_uncovered_indices = self.indices[:top_k]
+
+        # Grab the images
+        images = to_numpy(images)
+        selected_images = images[highest_uncovered_indices]
+
+        # Plot the images
+        fig = coverage_plot(selected_images, top_k, show=show)
+
+        if not show:
+            return fig
+        return None
+
 
 @set_metadata()
 def coverage(
     embeddings: ArrayLike,
     radius_type: Literal["adaptive", "naive"] = "adaptive",
     k: int = 20,
-    percent: np.float64 = np.float64(0.01),
+    percent: float = 0.01,
 ) -> CoverageOutput:
     """
     Class for evaluating :term:`coverage<Coverage>` and identifying images/samples that are in undercovered regions.
@@ -55,7 +92,7 @@ def coverage(
     k: int, default 20
         Number of observations required in order to be covered.
         [1] suggests that a minimum of 20-50 samples is necessary.
-    percent: np.float64, default np.float(0.01)
+    percent: float, default 0.01
         Percent of observations to be considered uncovered. Only applies to adaptive radius.
 
     Returns
