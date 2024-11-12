@@ -3,8 +3,10 @@ import warnings
 
 import numpy as np
 import pytest
+from matplotlib.figure import Figure
 
 from dataeval.metrics.bias.coverage import coverage
+from dataeval.metrics.bias.metadata import coverage_plot
 
 
 class TestCoverageUnit:
@@ -39,6 +41,25 @@ class TestCoverageUnit:
         assert x.critical_value == x_flat.critical_value
         np.testing.assert_array_equal(x.indices, x_flat.indices)
         np.testing.assert_array_equal(x.radii, x_flat.radii)
+
+    def test_base_plotting(self):
+        images = np.zeros((20, 3, 28, 28), dtype=int)
+        images[1] += 80
+        images[5] += 240
+        images[7] += 160
+        result = coverage(images, k=10, percent=0.15)
+        output = result.plot(images, 3)
+        assert output is None
+        return_output = result.plot(images, 3, False)
+        assert isinstance(return_output, Figure)
+
+    def test_coverage_plot(self):
+        images = np.ones((6, 28, 28), dtype=int)
+        result = coverage_plot(images, 6, False)
+        assert isinstance(result, Figure)
+        images = np.ones((6, 28), dtype=int)
+        with pytest.raises(ValueError):
+            result = coverage_plot(images, 6, False)
 
 
 class TestCoverageFunctional:

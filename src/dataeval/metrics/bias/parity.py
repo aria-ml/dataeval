@@ -11,6 +11,7 @@ from numpy.typing import ArrayLike, NDArray
 from scipy.stats import chi2_contingency, chisquare
 
 from dataeval.interop import to_numpy
+from dataeval.metrics.bias.metadata import preprocess_metadata
 from dataeval.output import OutputMetadata, set_metadata
 
 TData = TypeVar("TData", np.float64, NDArray[np.float64])
@@ -27,10 +28,14 @@ class ParityOutput(Generic[TData], OutputMetadata):
         chi-squared score(s) of the test
     p_value : np.float64 | NDArray[np.float64]
         p-value(s) of the test
+    metadata_names: list[str] | None
+        Names of each metadata factor
     """
 
     score: TData
     p_value: TData
+
+    metadata_names: list[str] | None
 
 
 def digitize_factor_bins(continuous_values: NDArray[Any], bins: int, factor_name: str) -> NDArray[np.intp]:
@@ -66,7 +71,7 @@ def digitize_factor_bins(continuous_values: NDArray[Any], bins: int, factor_name
 
 
 def format_discretize_factors(
-    data_factors: Mapping[str, NDArray[Any]], continuous_factor_bincounts: Mapping[str, int]
+    data: NDArray[Any], names: list[str], is_categorical: list[bool], continuous_factor_bincounts: Mapping[str, int]
 ) -> dict[str, NDArray[Any]]:
     """
     Sets up the internal list of metadata factors.
@@ -89,30 +94,31 @@ def format_discretize_factors(
           Each key is a metadata factor, whose value is the discrete per-image factor values.
     """
 
-    invalid_keys = set(continuous_factor_bincounts.keys()) - set(data_factors.keys())
+    invalid_keys = set(continuous_factor_bincounts.keys()) - set(names)
     if invalid_keys:
         raise KeyError(
             f"The continuous factor(s) {invalid_keys} do not exist in data_factors. Delete these "
             "keys from `continuous_factor_names` or add corresponding entries to `data_factors`."
         )
 
+    warn = []
     metadata_factors = {}
+    for i, name in enumerate(names):
+        if name != "class_label":
+            if name in continuous_factor_bincounts:
+                metadata_factors[name] = digitize_factor_bins(data[:, i], continuous_factor_bincounts[name], name)
+            elif not is_categorical[i]:
+                warn.append(name)
+                metadata_factors[name] = data[:, i]
+            else:
+                metadata_factors[name] = data[:, i]
 
-    # make sure each factor has the same number of entries
-    lengths = []
-    for arr in data_factors.values():
-        lengths.append(arr.shape)
-
-    if lengths[1:] != lengths[:-1]:
-        raise ValueError("The lengths of each entry in the dictionary are not equal." f" Found lengths {lengths}")
-
-    metadata_factors = {
-        name: val
-        if name not in continuous_factor_bincounts
-        else digitize_factor_bins(val, continuous_factor_bincounts[name], name)
-        for name, val in data_factors.items()
-        if name != "class"
-    }
+    if warn:
+        warnings.warn(
+            f"The following factors appear to be continuous but did not have the desired number of bins specified: \n\
+            {warn}",
+            UserWarning,
+        )
 
     return metadata_factors
 
@@ -247,7 +253,7 @@ def label_parity(
     >>> expected_labels = np_random_gen.choice([0, 1, 2, 3, 4], (100))
     >>> observed_labels = np_random_gen.choice([2, 3, 0, 4, 1], (100))
     >>> label_parity(expected_labels, observed_labels)
-    ParityOutput(score=14.007374204742625, p_value=0.0072715574616218)
+    ParityOutput(score=14.007374204742625, p_value=0.0072715574616218, metadata_names=None)
     """
 
     # Calculate
@@ -278,13 +284,13 @@ def label_parity(
         )
 
     cs, p = chisquare(f_obs=observed_dist, f_exp=expected_dist)
-    return ParityOutput(cs, p)
+    return ParityOutput(cs, p, None)
 
 
 @set_metadata()
 def parity(
     class_labels: ArrayLike,
-    data_factors: Mapping[str, ArrayLike],
+    metadata: Mapping[str, ArrayLike],
     continuous_factor_bincounts: Mapping[str, int] | None = None,
 ) -> ParityOutput[NDArray[np.float64]]:
     """
@@ -299,12 +305,12 @@ def parity(
     ----------
     class_labels: ArrayLike
         List of class labels for each image
-    data_factors: Mapping[str, ArrayLike]
+    metadata: Mapping[str, ArrayLike]
         The dataset factors, which are per-image metadata attributes.
         Each key of dataset_factors is a factor, whose value is the per-image factor values.
     continuous_factor_bincounts : Mapping[str, int] | None, default None
         A dictionary specifying the number of bins for discretizing the continuous factors.
-        The keys should correspond to the names of continuous factors in `data_factors`,
+        The keys should correspond to the names of continuous factors in `metadata`,
         and the values should be the number of bins to use for discretization.
         If not provided, no discretization is applied.
 
@@ -337,42 +343,44 @@ def parity(
     Randomly creating some "continuous" and categorical variables using ``np.random.default_rng``
 
     >>> labels = np_random_gen.choice([0, 1, 2], (100))
-    >>> data_factors = {
+    >>> metadata = {
     ...     "age": np_random_gen.choice([25, 30, 35, 45], (100)),
     ...     "income": np_random_gen.choice([50000, 65000, 80000], (100)),
     ...     "gender": np_random_gen.choice(["M", "F"], (100)),
     ... }
     >>> continuous_factor_bincounts = {"age": 4, "income": 3}
-    >>> parity(labels, data_factors, continuous_factor_bincounts)
-    ParityOutput(score=array([7.35731943, 5.46711299, 0.51506212]), p_value=array([0.28906231, 0.24263543, 0.77295762]))
-    """
+    >>> parity(labels, metadata, continuous_factor_bincounts)
+    ParityOutput(score=array([7.35731943, 5.46711299, 0.51506212]), p_value=array([0.28906231, 0.24263543, 0.77295762]), metadata_names=['age', 'income', 'gender'])
+    """  # noqa: E501
     if len(np.shape(class_labels)) > 1:
         raise ValueError(
             f"Got class labels with {len(np.shape(class_labels))}-dimensional",
             f" shape {np.shape(class_labels)}, but expected a 1-dimensional array.",
         )
 
-    data_factors_np = {k: to_numpy(v) for k, v in data_factors.items()}
+    data, names, is_categorical, _ = preprocess_metadata(class_labels, metadata)
     continuous_factor_bincounts = continuous_factor_bincounts if continuous_factor_bincounts else {}
 
-    labels = to_numpy(class_labels)
-    factors = format_discretize_factors(data_factors_np, continuous_factor_bincounts)
+    factors = format_discretize_factors(data, names, is_categorical, continuous_factor_bincounts)
+
+    # unique class labels
+    class_idx = names.index("class_label")
+    u_cls = np.unique(data[:, class_idx])
 
     chi_scores = np.zeros(len(factors))
     p_values = np.zeros(len(factors))
-    n_cls = len(np.unique(labels))
     not_enough_data = {}
     for i, (current_factor_name, factor_values) in enumerate(factors.items()):
         unique_factor_values = np.unique(factor_values)
-        contingency_matrix = np.zeros((len(unique_factor_values), n_cls))
+        contingency_matrix = np.zeros((len(unique_factor_values), u_cls.size))
         # Builds a contingency matrix where entry at index (r,c) represents
         # the frequency of current_factor_name achieving value unique_factor_values[r]
         # at a data point with class c.
 
         # TODO: Vectorize this nested for loop
         for fi, factor_value in enumerate(unique_factor_values):
-            for label in range(n_cls):
-                with_both = np.bitwise_and((labels == label), factor_values == factor_value)
+            for label in u_cls:
+                with_both = np.bitwise_and((data[:, class_idx] == label), factor_values == factor_value)
                 contingency_matrix[fi, label] = np.sum(with_both)
                 if 0 < contingency_matrix[fi, label] < 5:
                     if current_factor_name not in not_enough_data:
@@ -414,4 +422,4 @@ def parity(
             UserWarning,
         )
 
-    return ParityOutput(chi_scores, p_values)
+    return ParityOutput(chi_scores, p_values, list(metadata.keys()))

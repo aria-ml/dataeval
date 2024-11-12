@@ -2,15 +2,26 @@ from __future__ import annotations
 
 __all__ = ["DiversityOutput", "diversity"]
 
+import contextlib
 from dataclasses import dataclass
 from typing import Any, Literal, Mapping
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval.metrics.bias.metadata import entropy, get_counts, get_num_bins, heatmap, preprocess_metadata
+from dataeval.metrics.bias.metadata import (
+    diversity_bar_plot,
+    entropy,
+    get_counts,
+    get_num_bins,
+    heatmap,
+    preprocess_metadata,
+)
 from dataeval.output import OutputMetadata, set_metadata
 from dataeval.utils.shared import get_method
+
+with contextlib.suppress(ImportError):
+    from matplotlib.figure import Figure
 
 
 @dataclass(frozen=True)
@@ -33,35 +44,56 @@ class DiversityOutput(OutputMetadata):
     diversity_index: NDArray[np.float64]
     classwise: NDArray[np.float64]
 
-    class_list: NDArray[np.int64]
+    class_list: NDArray[Any]
     metadata_names: list[str]
 
     method: Literal["shannon", "simpson"]
 
-    def plot(self, row_labels: NDArray[Any] | None = None, col_labels: NDArray[Any] | None = None) -> None:
+    def plot(
+        self,
+        row_labels: list[Any] | NDArray[Any] | None = None,
+        col_labels: list[Any] | NDArray[Any] | None = None,
+        plot_classwise: bool = False,
+        show: bool = True,
+    ) -> Figure | None:
         """
         Plot a heatmap of diversity information
 
         Parameters
         ----------
-        row_labels: NDArray | None, default None
-            Array containing the labels for rows in the histogram
-        col_labels: NDArray | None, default None
-            Array containing the labels for columns in the histogram
+        row_labels : ArrayLike | None, default None
+            List/Array containing the labels for rows in the histogram
+        col_labels : ArrayLike | None, default None
+            List/Array containing the labels for columns in the histogram
+        plot_classwise : bool, default False
+            Whether to plot per-class balance instead of global balance
+        show : bool, default True
+            Whether to show the plot or return the matplotlib Figure
         """
-        if row_labels is None:
-            row_labels = np.unique(self.class_list)
-        if col_labels is None:
-            col_labels = np.array(self.metadata_names)
+        if plot_classwise:
+            if row_labels is None:
+                row_labels = self.class_list
+            if col_labels is None:
+                col_labels = self.metadata_names
 
-        heatmap(
-            self.classwise,
-            row_labels,
-            col_labels,
-            xlabel="Factors",
-            ylabel="Class",
-            cbarlabel=f"Normalized {self.method.title()} Index",
-        )
+            fig = heatmap(
+                self.classwise,
+                row_labels,
+                col_labels,
+                xlabel="Factors",
+                ylabel="Class",
+                cbarlabel=f"Normalized {self.method.title()} Index",
+            )
+
+        else:
+            # Creating label array for heat map axes
+            heat_labels = np.concatenate((["class"], self.metadata_names))
+
+            fig = diversity_bar_plot(heat_labels, self.diversity_index, show=show)
+
+        if not show:
+            return fig
+        return None
 
 
 def diversity_shannon(
@@ -237,19 +269,17 @@ def diversity(
     numpy.histogram
     """
     diversity_fn = get_method({"simpson": diversity_simpson, "shannon": diversity_shannon}, method)
-    data, names, is_categorical = preprocess_metadata(class_labels, metadata)
+    data, names, is_categorical, unique_labels = preprocess_metadata(class_labels, metadata)
     diversity_index = diversity_fn(data, names, is_categorical, None).astype(np.float64)
 
     class_idx = names.index("class_label")
-    class_lbl = np.array(data[:, class_idx], dtype=int)
-
-    u_classes = np.unique(class_lbl)
+    u_classes = np.unique(data[:, class_idx])
     num_factors = len(names)
     diversity = np.empty((len(u_classes), num_factors))
     diversity[:] = np.nan
     for idx, cls in enumerate(u_classes):
-        subset_mask = class_lbl == cls
+        subset_mask = data[:, class_idx] == cls
         diversity[idx, :] = diversity_fn(data, names, is_categorical, subset_mask)
     div_no_class = np.concatenate((diversity[:, :class_idx], diversity[:, (class_idx + 1) :]), axis=1)
 
-    return DiversityOutput(diversity_index, div_no_class, class_lbl, list(metadata.keys()), method)
+    return DiversityOutput(diversity_index, div_no_class, unique_labels, list(metadata.keys()), method)
