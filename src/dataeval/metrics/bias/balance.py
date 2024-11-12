@@ -8,9 +8,11 @@ from typing import Any, Mapping
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
-from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
+from sklearn.feature_selection import (mutual_info_classif,
+                                       mutual_info_regression)
 
-from dataeval.metrics.bias.metadata import entropy, heatmap, preprocess_metadata
+from dataeval.metrics.bias.metadata import (entropy, heatmap,
+                                            preprocess_metadata)
 from dataeval.output import OutputMetadata, set_metadata
 
 
@@ -117,7 +119,10 @@ def validate_num_neighbors(num_neighbors: int) -> int:
 
 @set_metadata("dataeval.metrics")
 def balance(
-    class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neighbors: int = 5, continuous_factor_bincounts={}
+    class_labels: ArrayLike,
+    metadata: Mapping[str, ArrayLike],
+    num_neighbors: int = 5,
+    continuous_factor_bincounts: Mapping[str, int] | None = None,
 ) -> BalanceOutput:
     """
     Mutual information (MI) between factors (class label, metadata, label/image properties)
@@ -131,6 +136,11 @@ def balance(
     num_neighbors: int, default 5
         Number of nearest neighbors to use for computing MI between discrete
         and continuous variables.
+    continuous_factor_bincounts: Dict[str, int] | None, default None
+        The factors in metadata that have continuous values and the array of bin counts to
+        discretize values into. All factors are treated as having discrete values unless they
+        are specified as keys in this dictionary. Each element of this array must occur as a key
+        in metadata.
 
     Returns
     -------
@@ -173,6 +183,9 @@ def balance(
     sklearn.feature_selection.mutual_info_regression
     sklearn.metrics.mutual_info_score
     """
+    if not continuous_factor_bincounts:
+        continuous_factor_bincounts = {}
+
     num_neighbors = validate_num_neighbors(num_neighbors)
     data, names, _ = preprocess_metadata(class_labels, metadata)
     is_categorical = [factor_name not in continuous_factor_bincounts for factor_name in names]

@@ -86,11 +86,16 @@ def diversity_shannon(
         Array containing numerical values for metadata factors
     names: list[str]
         Names of metadata factors -- keys of the metadata dictionary
-    is_categorical: list[bool]
-        List of flags to identify whether variables are categorical (True) or
-        continuous (False)
+    continuous_factor_bincounts: Dict[str, int] | None, default None
+        The factors in names that have continuous values and the array of bin counts to
+        discretize values into. All factors are treated as having discrete values unless they
+        are specified as keys in this dictionary. Each element of this array must occur as a key
+        in names.
     subset_mask: NDArray[np.bool_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
+    cached_hist: Dict[str, Dict[str, ArrayLike]] | None, default None
+        If specified, provides the bin information that will be used to discretize continuous factors.
+        Keys are metadata factors, values are {"cnts": counts, "bins": bins}
 
     Note
     ----
@@ -100,6 +105,9 @@ def diversity_shannon(
     -------
     diversity_index: NDArray
         Diversity index per column of X
+    cached_hist: Dict[str, Dict[str, ArrayLike]]
+        Cached bin information for discretizing continuous factors.
+        Keys are metadata factors, values are {"cnts": counts, "bins": bins}
 
     See Also
     --------
@@ -127,10 +135,9 @@ def diversity_shannon(
 def diversity_simpson(
     data: NDArray[Any],
     names: list[str],
-    # is_categorical: list[bool],
     continuous_factor_bincounts: Mapping[str, int] | None = None,
     subset_mask: NDArray[np.bool_] | None = None,
-    cached_hist=None,
+    cached_hist: Mapping[str, Mapping[str, ArrayLike]] | None = None,
 ) -> tuple[NDArray, dict]:
     """
     Compute :term:`diversity<Diversity>` for discrete/categorical variables and, through standard
@@ -147,11 +154,16 @@ def diversity_simpson(
         Array containing numerical values for metadata factors
     names: list[str]
         Names of metadata factors -- keys of the metadata dictionary
-    is_categorical: list[bool]
-        List of flags to identify whether variables are categorical (True) or
-        continuous (False)
+    continuous_factor_bincounts: Dict[str, int] | None, default None
+        The factors in names that have continuous values and the array of bin counts to
+        discretize values into. All factors are treated as having discrete values unless they
+        are specified as keys in this dictionary. Each element of this array must occur as a key
+        in names.
     subset_mask: NDArray[np.bool_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
+    cached_hist: Dict[str, Dict[str, ArrayLike]] | None, default None
+        If specified, provides the bin information that will be used to discretize continuous factors.
+        Keys are metadata factors, values are {"cnts": counts, "bins": bins}
 
     Note
     ----
@@ -163,6 +175,9 @@ def diversity_simpson(
     -------
     NDArray
         Diversity index per column of X
+    cached_hist: Dict[str, Dict[str, ArrayLike]] | None, default None
+        Cached bin information for discretizing continuous factors.
+        Keys are metadata factors, values are {"cnts": counts, "bins": bins}
 
     See Also
     --------
@@ -209,6 +224,11 @@ def diversity(
         List of class labels for each image
     metadata: Mapping[str, ArrayLike]
         Dict of list of metadata factors for each image
+    continuous_factor_bincounts: Dict[str, int] | None, default None
+        The factors in metadata that have continuous values and the array of bin counts to
+        discretize values into. All factors are treated as having discrete values unless they
+        are specified as keys in this dictionary. Each element of this array must occur as a key
+        in metadata.
     method: Literal["shannon", "simpson"], default "simpson"
         Indicates which diversity index should be computed
 

@@ -16,7 +16,7 @@ def get_counts(
     names: list[str],
     continuous_factor_bincounts,
     subset_mask: NDArray[np.bool_] | None = None,
-    cached_hist=None,
+    cached_hist: Mapping[str, Mapping[str, ArrayLike]] | None = None,
 ) -> tuple[dict, dict, dict]:
     """
     Initialize dictionary of histogram counts --- treat categorical values
@@ -24,16 +24,29 @@ def get_counts(
 
     Parameters
     ----------
+    data: NDArray
+        Array containing numerical values for metadata factors
+    names: list[str]
+        Names of metadata factors -- keys of the metadata dictionary
     subset_mask: NDArray[np.bool_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
+    cached_hist: Dict[str, Dict[str, ArrayLike]] | None, default None
+        If specified, provides the bin information that will be used to discretize continuous factors.
+        Keys are metadata factors, values are {"cnts": counts, "bins": bins}
+
 
     Returns
     -------
-    counts: Dict
+    hist_counts: Dict
         histogram counts per metadata factor in `factors`.  Each
         factor will have a different number of bins.  Counts get reused
         across metrics, so hist_counts are cached but only if computed
         globally, i.e. without masked samples.
+    hist_bins: NDArray
+        Bin boundaries used for discretization
+    cached_hist: Dict[str, Dict[str, ArrayLike]]
+        Cached bin information for discretizing continuous factors.
+        Keys are metadata factors, values are {"cnts": counts, "bins": bins}
     """
 
     hist_counts, hist_bins = {}, {}
@@ -77,10 +90,10 @@ def get_counts(
 def entropy(
     data: NDArray,
     names: list[str],
-    continuous_factor_bincounts,
+    continuous_factor_bincounts: Mapping[str, int],
     normalized: bool = False,
     subset_mask: NDArray[np.bool_] | None = None,
-    cached_hist=None,
+    cached_hist: Mapping[str, Mapping[str, ArrayLike]] | None = None,
 ) -> tuple[NDArray[np.float64], dict]:
     """
     Meant for use with Bias metrics, Balance, Diversity, ClasswiseBalance,
@@ -91,10 +104,22 @@ def entropy(
 
     Parameters
     ----------
+    data: NDArray
+        Array containing numerical values for metadata factors
+    names: list[str]
+        Names of metadata factors -- keys of the metadata dictionary
+    continuous_factor_bincounts: Dict[str, int], default None
+        The factors in names that have continuous values and the array of bin counts to
+        discretize values into. All factors are treated as having discrete values unless they
+        are specified as keys in this dictionary. Each element of this array must occur as a key
+        in names.
     normalized: bool
         Flag that determines whether or not to normalize entropy by log(num_bins)
     subset_mask: NDArray[np.bool_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
+    cached_hist: Dict[str, Dict[str, ArrayLike]] | None, default None
+        If specified, provides the bin information that will be used to discretize continuous factors.
+        Keys are metadata factors, values are {"cnts": counts, "bins": bins}
 
     Notes
     -----
@@ -105,6 +130,9 @@ def entropy(
     -------
     ent: NDArray[np.float64]
         Entropy estimate per column of X
+    cached_hist: Dict[str, Dict[str, ArrayLike]]
+        Cached bin information for discretizing continuous factors.
+        Keys are metadata factors, values are {"cnts": counts, "bins": bins}
 
     See Also
     --------
@@ -141,12 +169,28 @@ def get_num_bins(
 
     Parameters
     ----------
+    data: NDArray
+        Array containing numerical values for metadata factors
+    names: list[str]
+        Names of metadata factors -- keys of the metadata dictionary
+    continuous_factor_bincounts: Dict[str, int], default None
+        The factors in names that have continuous values and the array of bin counts to
+        discretize values into. All factors are treated as having discrete values unless they
+        are specified as keys in this dictionary. Each element of this array must occur as a key
+        in names.
     subset_mask: NDArray[np.bool_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
+    cached_hist: Dict[str, Dict[str, ArrayLike]] | None, default None
+        If specified, provides the bin information that will be used to discretize continuous factors.
+        Keys are metadata factors, values are {"cnts": counts, "bins": bins}
 
     Returns
     -------
-    NDArray[np.float64]
+    num_bins: NDArray[np.float64]
+        Number of bins used in the discretization for each value in names.
+    cached_hist: Dict[str, Dict[str, ArrayLike]]
+        Cached bin information for discretizing continuous factors.
+        Keys are metadata factors, values are {"cnts": counts, "bins": bins}
     """
     # likely cached
     hist_counts, _, cached_hist = get_counts(data, names, continuous_factor_bincounts, subset_mask, cached_hist)
