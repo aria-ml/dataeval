@@ -8,17 +8,26 @@ Licensed under Apache Software License (Apache 2.0)
 
 from __future__ import annotations
 
-from typing import Literal, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 import numpy as np
-import tensorflow as tf
 from numpy.typing import NDArray
-from tensorflow_probability.python.distributions.mvn_diag import MultivariateNormalDiag
-from tensorflow_probability.python.distributions.mvn_tril import MultivariateNormalTriL
-from tensorflow_probability.python.stats import covariance
-from tf_keras.layers import Flatten
 
+from dataeval.utils.lazy import lazyload
 from dataeval.utils.tensorflow._internal.gmm import gmm_energy, gmm_params
+
+if TYPE_CHECKING:
+    import tensorflow as tf
+    import tensorflow_probability.python.distributions.mvn_diag as mvn_diag
+    import tensorflow_probability.python.distributions.mvn_tril as mvn_tril
+    import tensorflow_probability.python.stats as tfp_stats
+    import tf_keras as keras
+else:
+    tf = lazyload("tensorflow")
+    keras = lazyload("tf_keras")
+    mvn_diag = lazyload("tensorflow_probability.python.distributions.mvn_diag")
+    mvn_tril = lazyload("tensorflow_probability.python.distributions.mvn_tril")
+    tfp_stats = lazyload("tensorflow_probability.python.stats")
 
 
 class Elbo:
@@ -46,7 +55,7 @@ class Elbo:
             self._cov = ("sim", cov_type)
         elif cov_type in ["cov_full", "cov_diag"]:
             x_np: NDArray[np.float32] = x.numpy().astype(np.float32) if tf.is_tensor(x) else x  # type: ignore
-            cov = covariance(x_np.reshape(x_np.shape[0], -1))  # type: ignore py38
+            cov = tfp_stats.covariance(x_np.reshape(x_np.shape[0], -1))  # type: ignore py38
             if cov_type == "cov_diag":  # infer standard deviation from covariance matrix
                 cov = tf.math.sqrt(tf.linalg.diag_part(cov))
             self._cov = (cov_type, cov)
@@ -54,15 +63,15 @@ class Elbo:
             raise ValueError("Only cov_full, cov_diag or sim value should be specified.")
 
     def __call__(self, y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
-        y_pred_flat = cast(tf.Tensor, Flatten()(y_pred))
+        y_pred_flat = cast(tf.Tensor, keras.layers.Flatten()(y_pred))
 
         if self._cov[0] == "cov_full":
-            y_mn = MultivariateNormalTriL(y_pred_flat, scale_tril=tf.linalg.cholesky(self._cov[1]))
+            y_mn = mvn_tril.MultivariateNormalTriL(y_pred_flat, scale_tril=tf.linalg.cholesky(self._cov[1]))
         else:  # cov_diag and sim
             cov_diag = self._cov[1] if self._cov[0] == "cov_diag" else self._cov[1] * tf.ones(y_pred_flat.shape[-1])
-            y_mn = MultivariateNormalDiag(y_pred_flat, scale_diag=cov_diag)
+            y_mn = mvn_diag.MultivariateNormalDiag(y_pred_flat, scale_diag=cov_diag)
 
-        loss = -tf.reduce_mean(y_mn.log_prob(Flatten()(y_true)))
+        loss = -tf.reduce_mean(y_mn.log_prob(keras.layers.Flatten()(y_true)))
         return loss
 
 

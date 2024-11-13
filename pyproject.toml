@@ -142,12 +142,15 @@ concurrency = ["multiprocessing"]
 parallel = true
 
 [tool.coverage.report]
-exclude_also = ["raise NotImplementedError"]
+exclude_also = [
+  "raise NotImplementedError",
+  "if TYPE_CHECKING:",
+]
 include = ["*/src/dataeval/*"]
 omit = [
   "*/torch/blocks.py",
   "*/torch/utils.py",
-  "*/tensorflow/_internal/pixelcnn.py",
+  "*/tensorflow/_internal/models.py",
 ]
 fail_under = 90
 

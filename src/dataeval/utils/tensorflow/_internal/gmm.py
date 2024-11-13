@@ -8,10 +8,16 @@ Licensed under Apache Software License (Apache 2.0)
 
 from __future__ import annotations
 
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
-import tensorflow as tf
+
+from dataeval.utils.lazy import lazyload
+
+if TYPE_CHECKING:
+    import tensorflow as tf
+else:
+    tf = lazyload("tensorflow")
 
 
 class GaussianMixtureModelParams(NamedTuple):
