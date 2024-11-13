@@ -144,7 +144,8 @@ class Decoder(nn.Module):
 
 class AE_torch(nn.Module):
     """
-    An autoencoder model with a separate encoder and decoder.
+    An autoencoder model with a separate encoder and decoder. Meant to replace the TensorFlow model called AE, which we
+      used as the core of an autoencoder-based OOD detector.
 
     Parameters
     ----------
@@ -159,7 +160,9 @@ class AE_torch(nn.Module):
         encoding_dim = int(math.pow(2, int(input_dim.bit_length() * 0.8)))
 
         self.encoder: Encoder_AE = Encoder_AE(channels, input_shape, encoding_dim=encoding_dim)
-        self.decoder: Decoder_AE = Decoder_AE(channels, encoding_dim)
+        self.decoder: Decoder_AE = Decoder_AE(
+            channels, encoding_dim, self.encoder.post_op_shape, self.encoder.input_shape
+        )
 
     def forward(self, x: Any) -> Any:
         """
@@ -209,9 +212,14 @@ class Encoder_AE(nn.Module):
     """
 
     def __init__(
-        self, channels: int = 3, input_shape: tuple[int, int, int, int] = (1, 3, 1, 1), encoding_dim: int | None = None
+        self,
+        channels: int = 3,
+        input_shape: tuple[int, int, int, int] = (1, 3, 1, 1),
+        encoding_dim: int | None = None,
     ) -> None:
         super().__init__()
+
+        self.input_shape = input_shape
 
         nc_in, nc_mid, nc_done = 256, 128, 64
         conv_in = nn.Conv2d(channels, nc_in, 2, stride=1, padding=1)
@@ -229,11 +237,13 @@ class Encoder_AE(nn.Module):
         ]
 
         nbatch, channels, ny, nx = input_shape
-        post_op_shape = (nbatch, nc_done, ny // 4 - 1, nx // 4 - 1)
+        self.input_shape = input_shape
+        self.post_op_shape = (nbatch, nc_done, ny // 4 - 1, nx // 4 - 1)
+        self.flatcon = math.prod(self.post_op_shape[1:])
         self.crush = nn.Sequential(
             nn.Flatten(1, -1),
             nn.Linear(
-                math.prod(post_op_shape[1:]),
+                self.flatcon,
                 encoding_dim,
             ),
         )
@@ -274,19 +284,20 @@ class Decoder_AE(nn.Module):
         Number of output channels
     """
 
-    def __init__(self, channels: int, encoding_dim: int) -> None:
+    def __init__(
+        self,
+        channels: int,
+        encoding_dim: int,
+        post_op_shape: tuple[int, int, int, int],
+        input_shape: tuple[int, int, int, int],
+    ) -> None:
         super().__init__()
-        # original
-        # self.decoder: nn.Sequential = nn.Sequential(
-        #     nn.ConvTranspose2d(64, 128, 2, stride=1),
-        #     nn.LeakyReLU(),
-        #     nn.ConvTranspose2d(128, 256, 2, stride=2),
-        #     nn.LeakyReLU(),
-        #     nn.ConvTranspose2d(256, channels, 2, stride=2),
-        #     nn.Sigmoid(),
-        # )
-        # hacked
-        self.input: nn.Sequential = nn.Sequential(nn.Linear(encoding_dim, 4 * 4 * 128))
+
+        self.post_op_shape = post_op_shape
+        self.input_shape = input_shape
+
+        self.input: nn.Sequential = nn.Sequential(nn.Linear(encoding_dim, math.prod(post_op_shape[1:])))
+        # self.input: nn.Sequential = nn.Sequential(nn.Linear(encoding_dim, ndc))
         self.decoder: nn.Sequential = nn.Sequential(
             nn.ConvTranspose2d(64, 128, 2, stride=1),
             nn.LeakyReLU(),
@@ -294,8 +305,6 @@ class Decoder_AE(nn.Module):
             nn.LeakyReLU(),
             nn.ConvTranspose2d(256, channels, 2, stride=2),
         )
-
-        self.crush = nn.Sequential(nn.Flatten(), nn.Linear(2, 2))
 
     def forward(self, x: Any) -> Any:
         """
@@ -311,6 +320,8 @@ class Decoder_AE(nn.Module):
         torch.Tensor
             The reconstructed output tensor.
         """
+        x = self.input(x)
+        x = x.reshape(self.post_op_shape)
         x = self.decoder(x)
-        x = self.crush(x)
+        x = x.reshape(self.input_shape)
         return x
