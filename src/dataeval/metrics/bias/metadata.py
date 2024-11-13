@@ -12,12 +12,12 @@ from dataeval.interop import to_numpy
 
 
 def get_counts(
-    data: NDArray,
+    data: NDArray[Any],
     names: list[str],
-    continuous_factor_bincounts,
+    continuous_factor_bincounts: Mapping[str, int],
     subset_mask: NDArray[np.bool_] | None = None,
     cached_hist: Mapping[str, Mapping[str, ArrayLike]] | None = None,
-) -> tuple[dict, dict, dict]:
+) -> tuple[Mapping[str, ArrayLike], Mapping[str, ArrayLike], Mapping[str, Mapping[str, ArrayLike]]]:
     """
     Initialize dictionary of histogram counts --- treat categorical values
     as histogram bins.
@@ -27,6 +27,12 @@ def get_counts(
     data: NDArray
         Array containing numerical values for metadata factors
     names: list[str]
+        Names of metadata factors -- keys of the metadata dictionary
+    continuous_factor_bincounts: Dict[str, int], default None
+        The factors in names that have continuous values and the array of bin counts to
+        discretize values into. All factors are treated as having discrete values unless they
+        are specified as keys in this dictionary. Each element of this array must occur as a key
+        in names.
         Names of metadata factors -- keys of the metadata dictionary
     subset_mask: NDArray[np.bool_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
@@ -88,13 +94,13 @@ def get_counts(
 
 
 def entropy(
-    data: NDArray,
+    data: NDArray[Any],
     names: list[str],
     continuous_factor_bincounts: Mapping[str, int],
     normalized: bool = False,
     subset_mask: NDArray[np.bool_] | None = None,
     cached_hist: Mapping[str, Mapping[str, ArrayLike]] | None = None,
-) -> tuple[NDArray[np.float64], dict]:
+) -> Mapping[str, Mapping[str, ArrayLike]]:
     """
     Meant for use with Bias metrics, Balance, Diversity, ClasswiseBalance,
     and Classwise Diversity.
@@ -157,12 +163,12 @@ def entropy(
 
 
 def get_num_bins(
-    data: NDArray,
+    data: NDArray[Any],
     names: list[str],
-    continuous_factor_bincounts,
+    continuous_factor_bincounts: Mapping[str, int],
     subset_mask: NDArray[np.bool_] | None = None,
-    cached_hist=None,
-) -> tuple[NDArray[np.float64], dict]:
+    cached_hist: Mapping[str, Mapping[str, ArrayLike]] | None = None,
+) -> tuple[NDArray[np.float64], Mapping[str, Mapping[str, ArrayLike]]]:
     """
     Number of bins or unique values for each metadata factor, used to
     normalize entropy/diversity.
@@ -201,7 +207,7 @@ def get_num_bins(
     return num_bins, cached_hist
 
 
-def infer_categorical(X: NDArray, threshold: float = 0.2) -> NDArray:
+def infer_categorical(X: NDArray[np.float64], threshold: float = 0.2) -> NDArray[np.bool_]:
     """
     Compute fraction of feature values that are unique --- intended to be used
     for inferring whether variables are categorical.
@@ -218,7 +224,7 @@ def infer_categorical(X: NDArray, threshold: float = 0.2) -> NDArray:
 
 def preprocess_metadata(
     class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], cat_thresh: float = 0.2
-) -> tuple[NDArray, list[str], list[bool]]:
+) -> tuple[NDArray[Any], list[str], list[bool]]:
     # convert class_labels and dict of lists to matrix of metadata values
     preprocessed_metadata = {"class_label": np.asarray(class_labels, dtype=int)}
 

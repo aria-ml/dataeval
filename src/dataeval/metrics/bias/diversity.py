@@ -67,10 +67,10 @@ class DiversityOutput(OutputMetadata):
 def diversity_shannon(
     data: NDArray[Any],
     names: list[str],
-    continuous_factor_bincounts,
+    continuous_factor_bincounts: Mapping[str, int],
     subset_mask: NDArray[np.bool_] | None = None,
-    cached_hist=None,
-) -> tuple(NDArray, tuple(NDArray, NDArray)):
+    cached_hist: Mapping[str, Mapping[str, ArrayLike]] | None = None,
+) -> tuple[NDArray[np.float64], Mapping[str, Mapping[str, ArrayLike]]]:
     """
     Compute :term:`diversity<Diversity>` for discrete/categorical variables and, through standard
     histogram binning, for continuous variables.
@@ -138,7 +138,7 @@ def diversity_simpson(
     continuous_factor_bincounts: Mapping[str, int] | None = None,
     subset_mask: NDArray[np.bool_] | None = None,
     cached_hist: Mapping[str, Mapping[str, ArrayLike]] | None = None,
-) -> tuple[NDArray, dict]:
+) -> tuple[NDArray[np.float64], Mapping[str, Mapping[str, ArrayLike]]]:
     """
     Compute :term:`diversity<Diversity>` for discrete/categorical variables and, through standard
     histogram binning, for continuous variables.
