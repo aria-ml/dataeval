@@ -40,7 +40,6 @@ class BalanceOutput(OutputMetadata):
     balance: NDArray[np.float64]
     factors: NDArray[np.float64]
     classwise: NDArray[np.float64]
-
     class_list: NDArray[Any]
     metadata_names: list[str]
 
@@ -49,8 +48,7 @@ class BalanceOutput(OutputMetadata):
         row_labels: list[Any] | NDArray[Any] | None = None,
         col_labels: list[Any] | NDArray[Any] | None = None,
         plot_classwise: bool = False,
-        show: bool = True,
-    ) -> Figure | None:
+    ) -> Figure:
         """
         Plot a heatmap of balance information
 
@@ -62,8 +60,6 @@ class BalanceOutput(OutputMetadata):
             List/Array containing the labels for columns in the histogram
         plot_classwise : bool, default False
             Whether to plot per-class balance instead of global balance
-        show : bool, default True
-            Whether to show the plot or return the matplotlib Figure
         """
         if plot_classwise:
             if row_labels is None:
@@ -78,7 +74,6 @@ class BalanceOutput(OutputMetadata):
                 xlabel="Factors",
                 ylabel="Class",
                 cbarlabel="Normalized Mutual Information",
-                show=show,
             )
         else:
             # Combine balance and factors results
@@ -95,11 +90,9 @@ class BalanceOutput(OutputMetadata):
             if col_labels is None:
                 col_labels = heat_labels[1:]
 
-            fig = heatmap(heat_data, row_labels, col_labels, cbarlabel="Normalized Mutual Information", show=show)
+            fig = heatmap(heat_data, row_labels, col_labels, cbarlabel="Normalized Mutual Information")
 
-        if not show:
-            return fig
-        return None
+        return fig
 
 
 def validate_num_neighbors(num_neighbors: int) -> int:

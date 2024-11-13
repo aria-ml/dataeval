@@ -11,7 +11,7 @@ from numpy.typing import ArrayLike, NDArray
 from scipy.stats import chi2_contingency, chisquare
 
 from dataeval.interop import to_numpy
-from dataeval.metrics.bias.metadata import preprocess_metadata
+from dataeval.metrics.bias.metadata import CLASS_LABEL, preprocess_metadata
 from dataeval.output import OutputMetadata, set_metadata
 
 TData = TypeVar("TData", np.float64, NDArray[np.float64])
@@ -34,7 +34,6 @@ class ParityOutput(Generic[TData], OutputMetadata):
 
     score: TData
     p_value: TData
-
     metadata_names: list[str] | None
 
 
@@ -104,14 +103,15 @@ def format_discretize_factors(
     warn = []
     metadata_factors = {}
     for i, name in enumerate(names):
-        if name != "class_label":
-            if name in continuous_factor_bincounts:
-                metadata_factors[name] = digitize_factor_bins(data[:, i], continuous_factor_bincounts[name], name)
-            elif not is_categorical[i]:
-                warn.append(name)
-                metadata_factors[name] = data[:, i]
-            else:
-                metadata_factors[name] = data[:, i]
+        if name == CLASS_LABEL:
+            continue
+        if name in continuous_factor_bincounts:
+            metadata_factors[name] = digitize_factor_bins(data[:, i], continuous_factor_bincounts[name], name)
+        elif not is_categorical[i]:
+            warn.append(name)
+            metadata_factors[name] = data[:, i]
+        else:
+            metadata_factors[name] = data[:, i]
 
     if warn:
         warnings.warn(
@@ -364,7 +364,7 @@ def parity(
     factors = format_discretize_factors(data, names, is_categorical, continuous_factor_bincounts)
 
     # unique class labels
-    class_idx = names.index("class_label")
+    class_idx = names.index(CLASS_LABEL)
     u_cls = np.unique(data[:, class_idx])
 
     chi_scores = np.zeros(len(factors))

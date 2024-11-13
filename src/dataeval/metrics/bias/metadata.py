@@ -14,6 +14,8 @@ from dataeval.interop import to_numpy
 with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure
 
+CLASS_LABEL = "class_label"
+
 
 def get_counts(
     data: NDArray[np.int_], names: list[str], is_categorical: list[bool], subset_mask: NDArray[np.bool_] | None = None
@@ -161,12 +163,14 @@ def preprocess_metadata(
         unique_classes = np.unique(class_array)
 
     # convert class_labels and dict of lists to matrix of metadata values
-    preprocessed_metadata = {"class_label": numerical_labels}
+    preprocessed_metadata = {CLASS_LABEL: numerical_labels}
 
     # map columns of dict that are not numeric (e.g. string) to numeric values
     # that mutual information and diversity functions can accommodate.  Each
     # unique string receives a unique integer value.
     for k, v in metadata.items():
+        if k == CLASS_LABEL:
+            k = "label_class"
         # if not numeric
         v = to_numpy(v)
         if not np.issubdtype(v.dtype, np.number):
@@ -189,8 +193,7 @@ def heatmap(
     xlabel: str = "",
     ylabel: str = "",
     cbarlabel: str = "",
-    show: bool = True,
-) -> Figure | None:
+) -> Figure:
     """
     Plots a formatted heatmap
 
@@ -208,14 +211,9 @@ def heatmap(
         Y-axis label
     cbarlabel : str, default ""
         Label for the colorbar
-    show : bool, default True
-        Whether to show the plot or not
     """
-    try:
-        import matplotlib
-        import matplotlib.pyplot as plt
-    except ImportError:
-        return None
+    import matplotlib
+    import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(figsize=(10, 10))
 
@@ -269,8 +267,6 @@ def heatmap(
             texts.append(text)
 
     fig.tight_layout()
-    if show:
-        plt.show()
     return fig
 
 
@@ -294,7 +290,7 @@ def format_text(*args: str) -> str:
     return f"{x:.2f}".replace("0.00", "0").replace("0.", ".").replace("nan", "")
 
 
-def diversity_bar_plot(labels: NDArray[Any], bar_heights: NDArray[Any], show: bool = True) -> Figure | None:
+def diversity_bar_plot(labels: NDArray[Any], bar_heights: NDArray[Any]) -> Figure:
     """
     Plots a formatted bar plot
 
@@ -304,13 +300,8 @@ def diversity_bar_plot(labels: NDArray[Any], bar_heights: NDArray[Any], show: bo
         Array containing the labels for each bar
     bar_heights : NDArray
         Array containing the values for each bar
-    show : bool, default True
-        Whether to show the plot or not
     """
-    try:
-        import matplotlib.pyplot as plt
-    except ImportError:
-        return None
+    import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(figsize=(10, 10))
 
@@ -320,12 +311,10 @@ def diversity_bar_plot(labels: NDArray[Any], bar_heights: NDArray[Any], show: bo
     plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
 
     fig.tight_layout()
-    if show:
-        plt.show()
     return fig
 
 
-def coverage_plot(images: NDArray[Any], num_images: int, show: bool = True) -> Figure | None:
+def coverage_plot(images: NDArray[Any], num_images: int) -> Figure:
     """
     Creates a single plot of all of the provided images
 
@@ -333,13 +322,8 @@ def coverage_plot(images: NDArray[Any], num_images: int, show: bool = True) -> F
     ----------
     images : NDArray
         Array containing only the desired images to plot
-    show : bool, default True
-        Whether to show the plot or not
     """
-    try:
-        import matplotlib.pyplot as plt
-    except ImportError:
-        return None
+    import matplotlib.pyplot as plt
 
     if images.ndim == 4:
         images = np.moveaxis(images, 1, -1)
@@ -364,6 +348,4 @@ def coverage_plot(images: NDArray[Any], num_images: int, show: bool = True) -> F
                 axs[i, j].axis("off")
 
     fig.tight_layout()
-    if show:
-        plt.show()
     return fig

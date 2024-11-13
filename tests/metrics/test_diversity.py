@@ -67,15 +67,13 @@ class TestDiversityUnit:
     def test_base_plotting(self, class_labels_int, metadata):
         result = diversity(class_labels_int, metadata, "simpson")
         output = result.plot()
-        assert output is None
+        assert isinstance(output, Figure)
         classwise_output = result.plot(plot_classwise=True)
-        assert classwise_output is None
+        assert isinstance(classwise_output, Figure)
 
     def test_plotting_vars(self, class_labels, metadata):
         result = diversity(class_labels, metadata, "shannon")
-        output = result.plot(None, None, False, False)
-        assert isinstance(output, Figure)
         row_labels = np.arange(result.class_list.size)
         col_labels = np.arange(len(result.metadata_names))
-        classwise_output = result.plot(row_labels, col_labels, True, False)
+        classwise_output = result.plot(row_labels, col_labels, True)
         assert isinstance(classwise_output, Figure)

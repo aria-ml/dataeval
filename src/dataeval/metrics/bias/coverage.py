@@ -43,8 +43,7 @@ class CoverageOutput(OutputMetadata):
         self,
         images: NDArray[Any],
         top_k: int = 6,
-        show: bool = True,
-    ) -> Figure | None:
+    ) -> Figure:
         """
         Plot the top k images together for visualization
 
@@ -54,8 +53,6 @@ class CoverageOutput(OutputMetadata):
             Original images (not embeddings) in (N, C, H, W) or (N, H, W) format
         top_k : int, default 6
             Number of images to plot (plotting assumes groups of 3)
-        show : bool, default True
-            Whether to show the plot or return the matplotlib Figure
         """
         # Determine which images to plot
         highest_uncovered_indices = self.indices[:top_k]
@@ -65,11 +62,9 @@ class CoverageOutput(OutputMetadata):
         selected_images = images[highest_uncovered_indices]
 
         # Plot the images
-        fig = coverage_plot(selected_images, top_k, show=show)
+        fig = coverage_plot(selected_images, top_k)
 
-        if not show:
-            return fig
-        return None
+        return fig
 
 
 @set_metadata()
