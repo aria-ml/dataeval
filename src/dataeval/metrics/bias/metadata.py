@@ -61,10 +61,15 @@ def get_counts(
     # need to figure out an elegant solution to this problem
     mask = np.where(subset_mask if subset_mask is not None else np.ones(data.shape[0], dtype=bool))
     # mask = np.where(np.ones(data.shape[0], dtype=bool))
-    if not cached_hist:
+
+    create_new_hist = False
+    if cached_hist is None:
         cached_hist = {}
+        create_new_hist = True
 
     for cdx, fn in enumerate(names):
+        bins = [-np.inf, np.inf]
+        cnts = [len(data[:, cdx].squeeze())]
         # linter doesn't like double indexing
         col_data = data[mask, cdx].squeeze()
         if continuous_factor_bincounts and fn in continuous_factor_bincounts:
@@ -72,7 +77,7 @@ def get_counts(
             num_bins = continuous_factor_bincounts[fn]
             if fn in cached_hist:
                 cnts, bins = cached_hist[fn]["cnts"], cached_hist[fn]["bins"]
-            else:
+            elif create_new_hist:
                 cnts, bins = np.histogram(data[:, cdx].squeeze(), bins=num_bins, density=True)
                 cached_hist[fn] = {"cnts": cnts, "bins": bins}
                 bins[-1] = np.inf
@@ -83,7 +88,7 @@ def get_counts(
             # if discrete, use unique values as bins
             if fn in cached_hist:
                 cnts, bins = cached_hist[fn]["cnts"], cached_hist[fn]["bins"]
-            else:
+            elif create_new_hist:
                 bins, cnts = np.unique(col_data, return_counts=True)
                 cached_hist[fn] = {"cnts": cnts, "bins": bins}
 
@@ -100,7 +105,7 @@ def entropy(
     normalized: bool = False,
     subset_mask: NDArray[np.bool_] | None = None,
     cached_hist: Mapping[str, Mapping[str, ArrayLike]] | None = None,
-) -> Mapping[str, Mapping[str, ArrayLike]]:
+) -> tuple[NDArray[np.float64], Mapping[str, Mapping[str, ArrayLike]]]:
     """
     Meant for use with Bias metrics, Balance, Diversity, ClasswiseBalance,
     and Classwise Diversity.

@@ -70,7 +70,7 @@ def diversity_shannon(
     continuous_factor_bincounts: Mapping[str, int],
     subset_mask: NDArray[np.bool_] | None = None,
     cached_hist: Mapping[str, Mapping[str, ArrayLike]] | None = None,
-) -> tuple[NDArray[np.float64], Mapping[str, Mapping[str, ArrayLike]]]:
+) -> tuple[NDArray[np.float64], Mapping[str, Mapping[str, ArrayLike]] | None]:
     """
     Compute :term:`diversity<Diversity>` for discrete/categorical variables and, through standard
     histogram binning, for continuous variables.
@@ -184,6 +184,9 @@ def diversity_simpson(
     numpy.histogram
     """
 
+    if continuous_factor_bincounts is None:
+        continuous_factor_bincounts = {}
+
     hist_counts, _, cached_hist = get_counts(data, names, continuous_factor_bincounts, subset_mask)
     # normalize by global counts, not classwise counts
     num_bins, _ = get_num_bins(data, names, continuous_factor_bincounts, cached_hist=cached_hist)
@@ -192,7 +195,7 @@ def diversity_simpson(
     # loop over columns for convenience
     for col, cnts in enumerate(hist_counts.values()):
         # relative frequencies
-        p_i = cnts / cnts.sum()
+        p_i = cnts / np.sum(cnts)
         # inverse Simpson index normalized by (number of bins)
         s_0 = 1 / np.sum(p_i**2) / num_bins[col]
         if num_bins[col] == 1:
