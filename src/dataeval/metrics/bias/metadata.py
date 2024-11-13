@@ -66,20 +66,24 @@ def get_counts(
 
     for cdx, fn in enumerate(names):
         bins = np.array([-np.inf, np.inf])
+        hist_edges = np.array([-np.inf, np.inf])
         cnts = np.array([len(data[:, cdx].squeeze())])
         # linter doesn't like double indexing
         col_data = np.array(data[mask, cdx].squeeze(), dtype=np.float64)
         if continuous_factor_bincounts and fn in continuous_factor_bincounts:
             # bins = hist_bins.get(fn, "auto")
             num_bins = continuous_factor_bincounts[fn]
+
+            # new fn here
+
             if cached_hist and fn in cached_hist:
-                cnts, bins = cached_hist[fn]["cnts"], cached_hist[fn]["bins"]
+                raw_cnts, hist_edges = cached_hist[fn]["cnts"], cached_hist[fn]["bins"]
             elif not cached_hist:
-                cnts, bins = np.histogram(data[:, cdx].squeeze(), bins=num_bins, density=True)
-                new_cached_hist[fn] = {"cnts": cnts, "bins": bins}
-                bins[-1] = np.inf
-                bins[0] = -np.inf
-            disc_col_data = np.digitize(col_data, bins)
+                raw_cnts, hist_edges = np.histogram(data[:, cdx].squeeze(), bins=num_bins, density=True)
+                new_cached_hist[fn] = {"cnts": raw_cnts, "bins": hist_edges}
+                hist_edges[-1] = np.inf
+                hist_edges[0] = -np.inf
+            disc_col_data = np.digitize(col_data, np.array(hist_edges))
             bins, cnts = np.unique(disc_col_data, return_counts=True)
         else:
             # if discrete, use unique values as bins
@@ -159,11 +163,12 @@ def entropy(
         # entropy in nats, normalizes counts
         ev_index[col] = sp_entropy(cnts)
         if normalized:
-            if len(cnts) == 1:
+            cnt_len = np.size(cnts, 0)
+            if cnt_len == 1:
                 # log(0)
                 ev_index[col] = 0
             else:
-                ev_index[col] /= np.log(len(cnts))
+                ev_index[col] /= np.log(cnt_len)
     return ev_index, cached_hist
 
 
@@ -207,7 +212,7 @@ def get_num_bins(
     hist_counts, _, cached_hist = get_counts(data, names, continuous_factor_bincounts, subset_mask, cached_hist)
     num_bins = np.empty(len(hist_counts))
     for idx, cnts in enumerate(hist_counts.values()):
-        num_bins[idx] = len(cnts)
+        num_bins[idx] = np.size(cnts, 0)
 
     return num_bins, cached_hist
 
