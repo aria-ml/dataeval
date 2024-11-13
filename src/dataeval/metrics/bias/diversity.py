@@ -67,7 +67,7 @@ class DiversityOutput(OutputMetadata):
 def diversity_shannon(
     data: NDArray[Any],
     names: list[str],
-    continuous_factor_bincounts: Mapping[str, int],
+    continuous_factor_bincounts: Mapping[str, int] | None = None,
     subset_mask: NDArray[np.bool_] | None = None,
     cached_hist: Mapping[str, Mapping[str, ArrayLike]] | None = None,
 ) -> tuple[NDArray[np.float64], Mapping[str, Mapping[str, ArrayLike]] | None]:

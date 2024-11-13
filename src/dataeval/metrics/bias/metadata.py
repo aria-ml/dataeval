@@ -14,7 +14,7 @@ from dataeval.interop import to_numpy
 def get_counts(
     data: NDArray[Any],
     names: list[str],
-    continuous_factor_bincounts: Mapping[str, int],
+    continuous_factor_bincounts: Mapping[str, int] | None = None,
     subset_mask: NDArray[np.bool_] | None = None,
     cached_hist: Mapping[str, Mapping[str, ArrayLike]] | None = None,
 ) -> tuple[Mapping[str, ArrayLike], Mapping[str, ArrayLike], Mapping[str, Mapping[str, ArrayLike]]]:
@@ -62,46 +62,46 @@ def get_counts(
     mask = np.where(subset_mask if subset_mask is not None else np.ones(data.shape[0], dtype=bool))
     # mask = np.where(np.ones(data.shape[0], dtype=bool))
 
-    create_new_hist = False
-    if cached_hist is None:
-        cached_hist = {}
-        create_new_hist = True
+    new_cached_hist = {}
 
     for cdx, fn in enumerate(names):
-        bins = [-np.inf, np.inf]
-        cnts = [len(data[:, cdx].squeeze())]
+        bins = np.array([-np.inf, np.inf])
+        cnts = np.array([len(data[:, cdx].squeeze())])
         # linter doesn't like double indexing
-        col_data = data[mask, cdx].squeeze()
+        col_data = np.array(data[mask, cdx].squeeze(), dtype=np.float64)
         if continuous_factor_bincounts and fn in continuous_factor_bincounts:
             # bins = hist_bins.get(fn, "auto")
             num_bins = continuous_factor_bincounts[fn]
-            if fn in cached_hist:
+            if cached_hist and fn in cached_hist:
                 cnts, bins = cached_hist[fn]["cnts"], cached_hist[fn]["bins"]
-            elif create_new_hist:
+            elif not cached_hist:
                 cnts, bins = np.histogram(data[:, cdx].squeeze(), bins=num_bins, density=True)
-                cached_hist[fn] = {"cnts": cnts, "bins": bins}
+                new_cached_hist[fn] = {"cnts": cnts, "bins": bins}
                 bins[-1] = np.inf
                 bins[0] = -np.inf
             disc_col_data = np.digitize(col_data, bins)
             bins, cnts = np.unique(disc_col_data, return_counts=True)
         else:
             # if discrete, use unique values as bins
-            if fn in cached_hist:
+            if cached_hist and fn in cached_hist:
                 cnts, bins = cached_hist[fn]["cnts"], cached_hist[fn]["bins"]
-            elif create_new_hist:
+            elif not cached_hist:
                 bins, cnts = np.unique(col_data, return_counts=True)
-                cached_hist[fn] = {"cnts": cnts, "bins": bins}
+                new_cached_hist[fn] = {"cnts": cnts, "bins": bins}
 
         hist_counts[fn] = cnts
         hist_bins[fn] = bins
 
-    return hist_counts, hist_bins, cached_hist
+        if cached_hist:
+            new_cached_hist = cached_hist
+
+    return hist_counts, hist_bins, new_cached_hist
 
 
 def entropy(
     data: NDArray[Any],
     names: list[str],
-    continuous_factor_bincounts: Mapping[str, int],
+    continuous_factor_bincounts: Mapping[str, int] | None = None,
     normalized: bool = False,
     subset_mask: NDArray[np.bool_] | None = None,
     cached_hist: Mapping[str, Mapping[str, ArrayLike]] | None = None,
@@ -170,7 +170,7 @@ def entropy(
 def get_num_bins(
     data: NDArray[Any],
     names: list[str],
-    continuous_factor_bincounts: Mapping[str, int],
+    continuous_factor_bincounts: Mapping[str, int] | None = None,
     subset_mask: NDArray[np.bool_] | None = None,
     cached_hist: Mapping[str, Mapping[str, ArrayLike]] | None = None,
 ) -> tuple[NDArray[np.float64], Mapping[str, Mapping[str, ArrayLike]]]:
