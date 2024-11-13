@@ -2,6 +2,7 @@ from __future__ import annotations
 
 __all__ = ["BalanceOutput", "balance"]
 
+import contextlib
 import warnings
 from dataclasses import dataclass
 from typing import Any, Mapping
@@ -12,6 +13,9 @@ from sklearn.feature_selection import mutual_info_classif, mutual_info_regressio
 
 from dataeval.metrics.bias.metadata import entropy, heatmap, preprocess_metadata
 from dataeval.output import OutputMetadata, set_metadata
+
+with contextlib.suppress(ImportError):
+    from matplotlib.figure import Figure
 
 
 @dataclass(frozen=True)
@@ -27,8 +31,8 @@ class BalanceOutput(OutputMetadata):
         Estimate of inter/intra-factor mutual information
     classwise : NDArray[np.float64]
         Estimate of mutual information between metadata factors and individual class labels
-    class_list: NDArray[np.int64]
-        Class labels for each value in the dataset
+    class_list: NDArray
+        Array of the class labels present in the dataset
     metadata_names: list[str]
         Names of each metadata factor
     """
@@ -36,36 +40,34 @@ class BalanceOutput(OutputMetadata):
     balance: NDArray[np.float64]
     factors: NDArray[np.float64]
     classwise: NDArray[np.float64]
-
-    class_list: NDArray[np.int64]
+    class_list: NDArray[Any]
     metadata_names: list[str]
 
     def plot(
         self,
-        row_labels: NDArray[Any] | None = None,
-        col_labels: NDArray[Any] | None = None,
+        row_labels: list[Any] | NDArray[Any] | None = None,
+        col_labels: list[Any] | NDArray[Any] | None = None,
         plot_classwise: bool = False,
-    ) -> None:
+    ) -> Figure:
         """
         Plot a heatmap of balance information
 
         Parameters
         ----------
-        row_labels: NDArray | None, default None
-            Array containing the labels for rows in the histogram
-        col_labels: NDArray | None, default None
-            Array containing the labels for columns in the histogram
-        plot_classwise: bool, default False
+        row_labels : ArrayLike | None, default None
+            List/Array containing the labels for rows in the histogram
+        col_labels : ArrayLike | None, default None
+            List/Array containing the labels for columns in the histogram
+        plot_classwise : bool, default False
             Whether to plot per-class balance instead of global balance
-
         """
         if plot_classwise:
             if row_labels is None:
-                row_labels = np.unique(self.class_list)
+                row_labels = self.class_list
             if col_labels is None:
                 col_labels = np.concatenate((["class"], self.metadata_names))
 
-            heatmap(
+            fig = heatmap(
                 self.classwise,
                 row_labels,
                 col_labels,
@@ -74,6 +76,7 @@ class BalanceOutput(OutputMetadata):
                 cbarlabel="Normalized Mutual Information",
             )
         else:
+            # Combine balance and factors results
             data = np.concatenate([self.balance[np.newaxis, 1:], self.factors], axis=0)
             # Create a mask for the upper triangle of the symmetrical array, ignoring the diagonal
             mask = np.triu(data + 1, k=0) < 1
@@ -87,12 +90,9 @@ class BalanceOutput(OutputMetadata):
             if col_labels is None:
                 col_labels = heat_labels[1:]
 
-            heatmap(
-                heat_data,
-                row_labels,
-                col_labels,
-                cbarlabel="Normalized Mutual Information",
-            )
+            fig = heatmap(heat_data, row_labels, col_labels, cbarlabel="Normalized Mutual Information")
+
+        return fig
 
 
 def validate_num_neighbors(num_neighbors: int) -> int:
@@ -172,13 +172,10 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
     sklearn.metrics.mutual_info_score
     """
     num_neighbors = validate_num_neighbors(num_neighbors)
-    data, names, is_categorical = preprocess_metadata(class_labels, metadata)
+    data, names, is_categorical, unique_labels = preprocess_metadata(class_labels, metadata)
     num_factors = len(names)
     mi = np.empty((num_factors, num_factors))
     mi[:] = np.nan
-
-    class_idx = names.index("class_label")
-    class_lbl = np.array(data[:, class_idx], dtype=int)
 
     for idx in range(num_factors):
         tgt = data[:, idx].astype(int)
@@ -209,8 +206,7 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
 
     # unique class labels
     class_idx = names.index("class_label")
-    class_data = data[:, class_idx].astype(int)
-    u_cls = np.unique(class_data)
+    u_cls = np.unique(data[:, class_idx])
     num_classes = len(u_cls)
 
     # assume class is a factor
@@ -220,7 +216,7 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
     # categorical variables, excluding class label
     cat_mask = np.concatenate((is_categorical[:class_idx], is_categorical[(class_idx + 1) :]), axis=0).astype(int)
 
-    tgt_bin = np.stack([class_data == cls for cls in u_cls]).T.astype(int)
+    tgt_bin = np.stack([data[:, class_idx] == cls for cls in u_cls]).T.astype(int)
     ent_tgt_bin = entropy(
         tgt_bin, names=[str(idx) for idx in range(num_classes)], is_categorical=[True for idx in range(num_classes)]
     )
@@ -240,4 +236,4 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
     norm_factor = 0.5 * np.add.outer(ent_tgt_bin, ent_all) + 1e-6
     classwise = classwise_mi / norm_factor
 
-    return BalanceOutput(balance, factors, classwise, class_lbl, list(metadata.keys()))
+    return BalanceOutput(balance, factors, classwise, unique_labels, list(metadata.keys()))

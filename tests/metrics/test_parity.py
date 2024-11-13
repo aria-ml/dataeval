@@ -3,7 +3,7 @@ import warnings
 import numpy as np
 import pytest
 
-from dataeval.metrics.bias.parity import label_parity, parity
+from dataeval.metrics.bias.parity import digitize_factor_bins, label_parity, parity
 
 
 class MockDistributionDataset:
@@ -208,14 +208,12 @@ class TestMDParityUnit:
             parity(labels, factors)
 
     def test_cant_quantize_strings(self):
-        labels = np.concatenate(([0] * 5, [1] * 5))
-        factors = {
-            "factor1": np.concatenate((["a"] * 5, ["b"] * 5)),
-        }
-        continuous_bincounts = {"factor1": 2}
+        continuous_values = np.concatenate((["a"] * 5, ["b"] * 5))
+        factor_name = "factor1"
+        bins = 2
 
         with pytest.raises(TypeError):
-            parity(labels, factors, continuous_bincounts)
+            digitize_factor_bins(continuous_values, bins, factor_name)
 
     def test_bad_factor_ref(self):
         labels = np.concatenate(([0] * 5, [1] * 5))
