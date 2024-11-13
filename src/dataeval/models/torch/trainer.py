@@ -64,8 +64,8 @@ def trainer(
     # THIS WILL NEED MORE THAN JUST TYPO CHANGES!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     #
     # if optimizer is None:
-    # optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    optimizer = torch.optim.SGD(model.parameters(), lr=1e-2)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    # optimizer = torch.optim.SGD(model.parameters(), lr=1e-2)
 
     # loss_fn = loss_fn() if isinstance(loss_fn, type) else loss_fn
     # optimizer = optimizer() if isinstance(optimizer, type) else optimizer

@@ -21,7 +21,6 @@ from dataeval.detectors.drift.torch import predict_batch
 from dataeval.detectors.ood.base_torch import OODBase, OODScoreOutput
 from dataeval.interop import as_numpy
 from dataeval.output import set_metadata
-from dataeval.utils.torch.models import AriaAutoencoder
 
 
 class OOD_AE(OODBase):
@@ -34,7 +33,7 @@ class OOD_AE(OODBase):
         An Autoencoder model.
     """
 
-    def __init__(self, model: AriaAutoencoder) -> None:
+    def __init__(self, model: torch.nn.Module) -> None:
         super().__init__(model)
         self.model = model
 
