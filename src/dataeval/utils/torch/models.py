@@ -297,7 +297,7 @@ class Decoder_AE(nn.Module):
         self.post_op_shape = post_op_shape
         self.input_shape = input_shape
 
-        self.input: nn.Sequential = nn.Sequential(nn.Linear(encoding_dim, math.prod(post_op_shape)))
+        self.input = nn.Linear(encoding_dim, math.prod(post_op_shape))
         # self.input: nn.Sequential = nn.Sequential(nn.Linear(encoding_dim, ndc))
         self.decoder: nn.Sequential = nn.Sequential(
             nn.ConvTranspose2d(64, 128, 2, stride=1),

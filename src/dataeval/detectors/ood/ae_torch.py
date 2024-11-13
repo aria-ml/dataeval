@@ -61,7 +61,7 @@ class OOD_AE(OODBase):
         X_recon = predict_batch(X, self.model, batch_size=batch_size)
 
         # compute feature and instance level scores
-        fscore = np.power(X - X_recon.detach().numpy(), 2)  # type: ignore
+        fscore = np.power(X - X_recon, 2)  # type: ignore
         fscore_flat = fscore.reshape(fscore.shape[0], -1).copy()
         n_score_features = int(np.ceil(fscore_flat.shape[1]))
         sorted_fscore = np.sort(fscore_flat, axis=1)
