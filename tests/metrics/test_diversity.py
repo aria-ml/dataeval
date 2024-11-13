@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from matplotlib.figure import Figure
 
 from dataeval.metrics.bias import diversity
 from dataeval.metrics.bias.metadata import entropy
@@ -17,8 +18,13 @@ def metadata():
 
 
 @pytest.fixture
-def class_labels():
+def class_labels_int():
     return np.array([0, 0, 0, 1, 0, 1, 0, 0, 0, 1])
+
+
+@pytest.fixture
+def class_labels():
+    return np.array(["dog", "dog", "dog", "cat", "dog", "cat", "dog", "dog", "dog", "cat"])
 
 
 @pytest.fixture
@@ -52,8 +58,22 @@ class TestDiversityUnit:
             assert np.logical_and(div >= 0, div <= 1).all()
 
     @pytest.mark.parametrize("met", ["simpson", "shannon"])
-    def test_output_dtypes(self, met, metadata, class_labels):
-        result = diversity(class_labels, metadata, method=met)
+    def test_output_dtypes(self, met, metadata, class_labels_int):
+        result = diversity(class_labels_int, metadata, method=met)
         assert result.class_list.dtype is np.dtype(np.int64)
         assert type(result.metadata_names[0]) is str
         assert type(result.method) is str
+
+    def test_base_plotting(self, class_labels_int, metadata):
+        result = diversity(class_labels_int, metadata, "simpson")
+        output = result.plot()
+        assert isinstance(output, Figure)
+        classwise_output = result.plot(plot_classwise=True)
+        assert isinstance(classwise_output, Figure)
+
+    def test_plotting_vars(self, class_labels, metadata):
+        result = diversity(class_labels, metadata, "shannon")
+        row_labels = np.arange(result.class_list.size)
+        col_labels = np.arange(len(result.metadata_names))
+        classwise_output = result.plot(row_labels, col_labels, True)
+        assert isinstance(classwise_output, Figure)

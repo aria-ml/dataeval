@@ -2,6 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
+import contextlib
 from typing import Any, Mapping
 
 import numpy as np
@@ -9,6 +10,11 @@ from numpy.typing import ArrayLike, NDArray
 from scipy.stats import entropy as sp_entropy
 
 from dataeval.interop import to_numpy
+
+with contextlib.suppress(ImportError):
+    from matplotlib.figure import Figure
+
+CLASS_LABEL = "class_label"
 
 
 def get_counts(
@@ -147,14 +153,24 @@ def infer_categorical(arr: NDArray[Any], threshold: float = 0.2) -> NDArray[Any]
 
 def preprocess_metadata(
     class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], cat_thresh: float = 0.2
-) -> tuple[NDArray[Any], list[str], list[bool]]:
+) -> tuple[NDArray[Any], list[str], list[bool], NDArray[np.str_]]:
+    # if class_labels is not numeric
+    class_array = to_numpy(class_labels)
+    if not np.issubdtype(class_array.dtype, np.number):
+        unique_classes, numerical_labels = np.unique(class_array, return_inverse=True)
+    else:
+        numerical_labels = np.asarray(class_array, dtype=int)
+        unique_classes = np.unique(class_array)
+
     # convert class_labels and dict of lists to matrix of metadata values
-    preprocessed_metadata = {"class_label": np.asarray(class_labels, dtype=int)}
+    preprocessed_metadata = {CLASS_LABEL: numerical_labels}
 
     # map columns of dict that are not numeric (e.g. string) to numeric values
     # that mutual information and diversity functions can accommodate.  Each
     # unique string receives a unique integer value.
     for k, v in metadata.items():
+        if k == CLASS_LABEL:
+            k = "label_class"
         # if not numeric
         v = to_numpy(v)
         if not np.issubdtype(v.dtype, np.number):
@@ -167,35 +183,34 @@ def preprocess_metadata(
     names = list(preprocessed_metadata.keys())
     is_categorical = [infer_categorical(preprocessed_metadata[var], cat_thresh)[0] for var in names]
 
-    return data, names, is_categorical
+    return data, names, is_categorical, unique_classes
 
 
 def heatmap(
     data: NDArray[Any],
-    row_labels: NDArray[Any],
-    col_labels: NDArray[Any],
+    row_labels: list[str] | NDArray[Any],
+    col_labels: list[str] | NDArray[Any],
     xlabel: str = "",
     ylabel: str = "",
     cbarlabel: str = "",
-) -> None:
+) -> Figure:
     """
     Plots a formatted heatmap
 
     Parameters
     ----------
-    data: NDArray
+    data : NDArray
         Array containing numerical values for factors to plot
-    row_labels: NDArray
-        Array containing the labels for rows in the histogram
-    col_labels: NDArray
-        Array containing the labels for columns in the histogram
-    xlabel: str, default ""
+    row_labels : ArrayLike
+        List/Array containing the labels for rows in the histogram
+    col_labels : ArrayLike
+        List/Array containing the labels for columns in the histogram
+    xlabel : str, default ""
         X-axis label
-    ylabel: str, default ""
+    ylabel : str, default ""
         Y-axis label
-    cbarlabel: str, default ""
+    cbarlabel : str, default ""
         Label for the colorbar
-
     """
     import matplotlib
     import matplotlib.pyplot as plt
@@ -252,7 +267,7 @@ def heatmap(
             texts.append(text)
 
     fig.tight_layout()
-    plt.show()
+    return fig
 
 
 # Function to define how the text is displayed in the heatmap
@@ -273,3 +288,64 @@ def format_text(*args: str) -> str:
     """
     x = args[0]
     return f"{x:.2f}".replace("0.00", "0").replace("0.", ".").replace("nan", "")
+
+
+def diversity_bar_plot(labels: NDArray[Any], bar_heights: NDArray[Any]) -> Figure:
+    """
+    Plots a formatted bar plot
+
+    Parameters
+    ----------
+    labels : NDArray
+        Array containing the labels for each bar
+    bar_heights : NDArray
+        Array containing the values for each bar
+    """
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    ax.bar(labels, bar_heights)
+    ax.set_xlabel("Factors")
+
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+
+    fig.tight_layout()
+    return fig
+
+
+def coverage_plot(images: NDArray[Any], num_images: int) -> Figure:
+    """
+    Creates a single plot of all of the provided images
+
+    Parameters
+    ----------
+    images : NDArray
+        Array containing only the desired images to plot
+    """
+    import matplotlib.pyplot as plt
+
+    if images.ndim == 4:
+        images = np.moveaxis(images, 1, -1)
+    elif images.ndim == 3:
+        images = np.repeat(images[:, :, :, np.newaxis], 3, axis=-1)
+    else:
+        raise ValueError(
+            f"Expected a (N,C,H,W) or a (N, H, W) set of images, but got a {images.ndim}-dimensional set of images."
+        )
+
+    rows = np.ceil(num_images / 3).astype(int)
+    fig, axs = plt.subplots(rows, 3, figsize=(9, 3 * rows))
+
+    if rows == 1:
+        for j in range(3):
+            axs[j].imshow(images[j])
+            axs[j].axis("off")
+    else:
+        for i in range(rows):
+            for j in range(3):
+                axs[i, j].imshow(images[i * 3 + j])
+                axs[i, j].axis("off")
+
+    fig.tight_layout()
+    return fig
