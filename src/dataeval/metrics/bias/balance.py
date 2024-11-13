@@ -8,11 +8,9 @@ from typing import Any, Mapping
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
-from sklearn.feature_selection import (mutual_info_classif,
-                                       mutual_info_regression)
+from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 
-from dataeval.metrics.bias.metadata import (entropy, heatmap,
-                                            preprocess_metadata)
+from dataeval.metrics.bias.metadata import entropy, heatmap, preprocess_metadata
 from dataeval.output import OutputMetadata, set_metadata
 
 

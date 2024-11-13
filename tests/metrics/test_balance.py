@@ -32,30 +32,6 @@ def simple_metadata():
 
 
 @pytest.fixture
-def simple_class_labels():
-    return [1] * 100 + [2] * 100
-
-
-@pytest.fixture
-def homog_class_labels():
-    return [1] * 10
-
-
-@pytest.fixture
-def inhomog_metadata():
-    return {
-        "factor1": list(range(10)),
-        "factor2": list(range(10)),
-        "factor3": list(range(10)),
-    }
-
-
-@pytest.fixture
-def simple_metadata():
-    return {"factor1": [1] * 100 + [2] * 100, "factor2": [1] * 100 + [2] * 100}
-
-
-@pytest.fixture
 def class_labels():
     return np.array([1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0], dtype=int)
 
