@@ -11,25 +11,31 @@ from __future__ import annotations
 __all__ = ["OOD_LLR"]
 
 from functools import partial
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 import numpy as np
-import tensorflow as tf
-import tf_keras as keras
 from numpy.typing import ArrayLike, NDArray
-from tf_keras.layers import Input
-from tf_keras.models import Model
 
 from dataeval.detectors.ood.base import OODBase, OODScoreOutput
 from dataeval.interop import to_numpy
-from dataeval.utils.tensorflow._internal.pixelcnn import PixelCNN
+from dataeval.utils.lazy import lazyload
 from dataeval.utils.tensorflow._internal.trainer import trainer
 from dataeval.utils.tensorflow._internal.utils import predict_batch
 
+if TYPE_CHECKING:
+    import tensorflow as tf
+    import tf_keras as keras
+
+    import dataeval.utils.tensorflow._internal.models as tf_models
+else:
+    tf = lazyload("tensorflow")
+    keras = lazyload("tf_keras")
+    tf_models = lazyload("dataeval.utils.tensorflow._internal.models")
+
 
 def _build_model(
-    dist: PixelCNN, input_shape: tuple | None = None, filepath: str | None = None
-) -> tuple[keras.Model, PixelCNN]:
+    dist: tf_models.PixelCNN, input_shape: tuple | None = None, filepath: str | None = None
+) -> tuple[keras.Model, tf_models.PixelCNN]:
     """
     Create keras.Model from TF distribution.
 
@@ -46,9 +52,9 @@ def _build_model(
     -------
     TensorFlow model.
     """
-    x_in = Input(shape=input_shape)
+    x_in = keras.layers.Input(shape=input_shape)
     log_prob = dist.log_prob(x_in)
-    model = Model(inputs=x_in, outputs=log_prob)
+    model = keras.models.Model(inputs=x_in, outputs=log_prob)
     model.add_loss(-tf.reduce_mean(log_prob))
     if isinstance(filepath, str):
         model.load_weights(filepath)
@@ -109,13 +115,13 @@ class OOD_LLR(OODBase):
 
     def __init__(
         self,
-        model: PixelCNN,
-        model_background: PixelCNN | None = None,
+        model: tf_models.PixelCNN,
+        model_background: tf_models.PixelCNN | None = None,
         log_prob: Callable | None = None,
         sequential: bool = False,
     ) -> None:
-        self.dist_s: PixelCNN = model
-        self.dist_b: PixelCNN = (
+        self.dist_s: tf_models.PixelCNN = model
+        self.dist_b: tf_models.PixelCNN = (
             model.copy()
             if hasattr(model, "copy")
             else keras.models.clone_model(model)
@@ -135,7 +141,7 @@ class OOD_LLR(OODBase):
         x_ref: ArrayLike,
         threshold_perc: float = 100.0,
         loss_fn: Callable | None = None,
-        optimizer: keras.optimizers.Optimizer = keras.optimizers.Adam,
+        optimizer: keras.optimizers.Optimizer | None = None,
         epochs: int = 20,
         batch_size: int = 64,
         verbose: bool = True,
@@ -176,7 +182,7 @@ class OOD_LLR(OODBase):
         """
         x_ref = to_numpy(x_ref)
         input_shape = x_ref.shape[1:]
-        optimizer = optimizer() if isinstance(optimizer, type) else optimizer
+        optimizer = keras.optimizers.Adam() if optimizer is None else optimizer
         # Separate into two separate optimizers, one for semantic model and one for background model
         optimizer_s = optimizer
         optimizer_b = optimizer.__class__.from_config(optimizer.get_config())

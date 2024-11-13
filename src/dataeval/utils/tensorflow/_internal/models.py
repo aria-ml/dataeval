@@ -12,27 +12,321 @@ from __future__ import annotations
 
 import functools
 import warnings
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
-import tensorflow as tf
-import tf_keras as keras
-from tensorflow_probability.python.bijectors import bijector
-from tensorflow_probability.python.distributions import (
-    categorical,
-    distribution,
-    independent,
-    logistic,
-    mixture_same_family,
-    quantized_distribution,
-    transformed_distribution,
-)
-from tensorflow_probability.python.internal import (
-    dtype_util,
-    prefer_static,
-    reparameterization,
-    tensor_util,
-    tensorshape_util,
-)
+
+from dataeval.utils.lazy import lazyload
+
+if TYPE_CHECKING:
+    import tensorflow as tf
+    import tensorflow_probability.python.bijectors as bijectors
+    import tensorflow_probability.python.distributions as distributions
+    import tensorflow_probability.python.internal as tfp_internal
+    import tf_keras as keras
+else:
+    tf = lazyload("tensorflow")
+    bijectors = lazyload("tensorflow_probability.python.bijectors")
+    distributions = lazyload("tensorflow_probability.python.distributions")
+    tfp_internal = lazyload("tensorflow_probability.python.internal")
+    keras = lazyload("tf_keras")
+
+
+def relative_euclidean_distance(x: tf.Tensor, y: tf.Tensor, eps: float = 1e-12, axis: int = -1) -> tf.Tensor:
+    """
+    Relative Euclidean distance.
+
+    Parameters
+    ----------
+    x
+        Tensor used in distance computation.
+    y
+        Tensor used in distance computation.
+    eps
+        Epsilon added to denominator for numerical stability.
+    axis
+        Axis used to compute distance.
+
+    Returns
+    -------
+    Tensor with relative Euclidean distance across specified axis.
+    """
+    denom = tf.concat(
+        [
+            tf.reshape(tf.norm(x, ord=2, axis=axis), (-1, 1)),  # type: ignore
+            tf.reshape(tf.norm(y, ord=2, axis=axis), (-1, 1)),  # type: ignore
+        ],
+        axis=1,
+    )
+    dist = tf.norm(tf.math.subtract(x, y), ord=2, axis=axis) / (tf.reduce_min(denom, axis=axis) + eps)  # type: ignore
+    return dist
+
+
+def eucl_cosim_features(x: tf.Tensor, y: tf.Tensor, max_eucl: float = 1e2) -> tf.Tensor:
+    """
+    Compute features extracted from the reconstructed instance using the
+    relative Euclidean distance and cosine similarity between 2 tensors.
+
+    Parameters
+    ----------
+    x : tf.Tensor
+        Tensor used in feature computation.
+    y : tf.Tensor
+        Tensor used in feature computation.
+    max_eucl : float, default 1e2
+        Maximum value to clip relative Euclidean distance by.
+
+    Returns
+    -------
+    tf.Tensor
+        Tensor concatenating the relative Euclidean distance and cosine similarity features.
+    """
+    if len(x.shape) > 2 or len(y.shape) > 2:
+        x = cast(tf.Tensor, keras.layers.Flatten()(x))
+        y = cast(tf.Tensor, keras.layers.Flatten()(y))
+    rec_cos = tf.reshape(keras.losses.cosine_similarity(y, x, -1), (-1, 1))
+    rec_euc = tf.reshape(relative_euclidean_distance(y, x, -1), (-1, 1))
+    # rec_euc could become very large so should be clipped
+    rec_euc = tf.clip_by_value(rec_euc, 0, max_eucl)
+    return cast(tf.Tensor, tf.concat([rec_cos, rec_euc], -1))
+
+
+class Sampling(keras.layers.Layer):
+    """Reparametrization trick - Uses (z_mean, z_log_var) to sample the latent vector z."""
+
+    def call(self, inputs: tuple[tf.Tensor, tf.Tensor]) -> tf.Tensor:
+        """
+        Sample z.
+
+        Parameters
+        ----------
+        inputs
+            Tuple with mean and log :term:`variance<Variance>`.
+
+        Returns
+        -------
+        Sampled vector z.
+        """
+        z_mean, z_log_var = inputs
+        batch, dim = tuple(tf.shape(z_mean).numpy().ravel()[:2])  # type: ignore
+        epsilon = cast(tf.Tensor, keras.backend.random_normal(shape=(batch, dim)))
+        return z_mean + tf.exp(tf.math.multiply(0.5, z_log_var)) * epsilon
+
+
+class EncoderAE(keras.layers.Layer):
+    def __init__(self, encoder_net: keras.Sequential) -> None:
+        """
+        Encoder of AE.
+
+        Parameters
+        ----------
+        encoder_net
+            Layers for the encoder wrapped in a keras.keras.Sequential class.
+        name
+            Name of encoder.
+        """
+        super().__init__(name="encoder_ae")
+        self.encoder_net: keras.Sequential = encoder_net
+
+    def call(self, x: tf.Tensor) -> tf.Tensor:
+        return cast(tf.Tensor, self.encoder_net(x))
+
+
+class EncoderVAE(keras.layers.Layer):
+    def __init__(self, encoder_net: keras.Sequential, latent_dim: int) -> None:
+        """
+        Encoder of VAE.
+
+        Parameters
+        ----------
+        encoder_net
+            Layers for the encoder wrapped in a keras.keras.Sequential class.
+        latent_dim
+            Dimensionality of the :term:`latent space<Latent Space>`.
+        name
+            Name of encoder.
+        """
+        super().__init__(name="encoder_vae")
+        self.encoder_net: keras.Sequential = encoder_net
+        self._fc_mean = keras.layers.Dense(latent_dim, activation=None)
+        self._fc_log_var = keras.layers.Dense(latent_dim, activation=None)
+        self._sampling = Sampling()
+
+    def call(self, x: tf.Tensor) -> tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+        x = cast(tf.Tensor, self.encoder_net(x))
+        if len(x.shape) > 2:
+            x = cast(tf.Tensor, keras.layers.Flatten()(x))
+        z_mean = cast(tf.Tensor, self._fc_mean(x))
+        z_log_var = cast(tf.Tensor, self._fc_log_var(x))
+        z = cast(tf.Tensor, self._sampling((z_mean, z_log_var)))
+        return z_mean, z_log_var, z
+
+
+class Decoder(keras.layers.Layer):
+    def __init__(self, decoder_net: keras.Sequential) -> None:
+        """
+        Decoder of AE and VAE.
+
+        Parameters
+        ----------
+        decoder_net
+            Layers for the decoder wrapped in a keras.keras.Sequential class.
+        name
+            Name of decoder.
+        """
+        super().__init__(name="decoder")
+        self.decoder_net: keras.Sequential = decoder_net
+
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        return cast(tf.Tensor, self.decoder_net(inputs))
+
+
+class AE(keras.Model):
+    """
+    Combine encoder and decoder in AE.
+
+    Parameters
+    ----------
+    encoder_net : keras.Sequential
+        Layers for the encoder wrapped in a keras.keras.Sequential class.
+    decoder_net : keras.Sequential
+        Layers for the decoder wrapped in a keras.keras.Sequential class.
+    """
+
+    def __init__(self, encoder_net: keras.Sequential, decoder_net: keras.Sequential) -> None:
+        super().__init__(name="ae")
+        self.encoder: keras.layers.Layer = EncoderAE(encoder_net)
+        self.decoder: keras.layers.Layer = Decoder(decoder_net)
+
+    def call(self, inputs: tf.Tensor, training: bool | None = None, mask: tf.Tensor | None = None) -> tf.Tensor:
+        z = cast(tf.Tensor, self.encoder(inputs))
+        x_recon = cast(tf.Tensor, self.decoder(z))
+        return x_recon
+
+
+class VAE(keras.Model):
+    """
+    Combine encoder and decoder in VAE.
+
+    Parameters
+    ----------
+    encoder_net : keras.Sequential
+        Layers for the encoder wrapped in a keras.keras.Sequential class.
+    decoder_net : keras.Sequential
+        Layers for the decoder wrapped in a keras.keras.Sequential class.
+    latent_dim : int
+        Dimensionality of the :term:`latent space<Latent Space>`.
+    beta : float, default 1.0
+        Beta parameter for KL-divergence loss term.
+    """
+
+    def __init__(
+        self, encoder_net: keras.Sequential, decoder_net: keras.Sequential, latent_dim: int, beta: float = 1.0
+    ) -> None:
+        super().__init__(name="vae_model")
+        self.encoder: keras.layers.Layer = EncoderVAE(encoder_net, latent_dim)
+        self.decoder: keras.layers.Layer = Decoder(decoder_net)
+        self.beta: float = beta
+        self.latent_dim: int = latent_dim
+
+    def call(self, inputs: tf.Tensor, training: bool | None = None, mask: tf.Tensor | None = None) -> tf.Tensor:
+        z_mean, z_log_var, z = cast(tuple[tf.Tensor, tf.Tensor, tf.Tensor], self.encoder(inputs))
+        x_recon = self.decoder(z)
+        # add KL divergence loss term
+        kl_loss = -0.5 * tf.reduce_mean(z_log_var - tf.square(z_mean) - tf.exp(z_log_var) + 1)
+        self.add_loss(self.beta * kl_loss)
+        return cast(tf.Tensor, x_recon)
+
+
+class AEGMM(keras.Model):
+    """
+    Deep Autoencoding Gaussian Mixture Model.
+
+    Parameters
+    ----------
+    encoder_net : keras.Sequential
+        Layers for the encoder wrapped in a keras.keras.Sequential class.
+    decoder_net : keras.Sequential
+        Layers for the decoder wrapped in a keras.keras.Sequential class.
+    gmm_density_net : keras.Sequential
+        Layers for the GMM network wrapped in a keras.keras.Sequential class.
+    n_gmm : int
+        Number of components in GMM.
+    """
+
+    def __init__(
+        self,
+        encoder_net: keras.Sequential,
+        decoder_net: keras.Sequential,
+        gmm_density_net: keras.Sequential,
+        n_gmm: int,
+    ) -> None:
+        super().__init__("aegmm")
+        self.encoder = encoder_net
+        self.decoder = decoder_net
+        self.gmm_density = gmm_density_net
+        self.n_gmm = n_gmm
+
+    def call(
+        self, inputs: tf.Tensor, training: bool | None = None, mask: tf.Tensor | None = None
+    ) -> tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+        enc = self.encoder(inputs)
+        x_recon = cast(tf.Tensor, self.decoder(enc))
+        recon_features = eucl_cosim_features(inputs, x_recon)
+        z = cast(tf.Tensor, tf.concat([enc, recon_features], -1))
+        gamma = cast(tf.Tensor, self.gmm_density(z))
+        return x_recon, z, gamma
+
+
+class VAEGMM(keras.Model):
+    """
+    Variational Autoencoding Gaussian Mixture Model.
+
+    Parameters
+    ----------
+    encoder_net : keras.Sequential
+        Layers for the encoder wrapped in a keras.keras.Sequential class.
+    decoder_net : keras.Sequential
+        Layers for the decoder wrapped in a keras.keras.Sequential class.
+    gmm_density_net : keras.Sequential
+        Layers for the GMM network wrapped in a keras.keras.Sequential class.
+    n_gmm : int
+        Number of components in GMM.
+    latent_dim : int
+        Dimensionality of the :term:`latent space<Latent Space>`.
+    beta : float, default 1.0
+        Beta parameter for KL-divergence loss term.
+    """
+
+    def __init__(
+        self,
+        encoder_net: keras.Sequential,
+        decoder_net: keras.Sequential,
+        gmm_density_net: keras.Sequential,
+        n_gmm: int,
+        latent_dim: int,
+        beta: float = 1.0,
+    ) -> None:
+        super().__init__(name="vaegmm")
+        self.encoder: keras.Sequential = EncoderVAE(encoder_net, latent_dim)
+        self.decoder: keras.Sequential = decoder_net
+        self.gmm_density: keras.Sequential = gmm_density_net
+        self.n_gmm: int = n_gmm
+        self.latent_dim: int = latent_dim
+        self.beta = beta
+
+    def call(
+        self, inputs: tf.Tensor, training: bool | None = None, mask: tf.Tensor | None = None
+    ) -> tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+        enc_mean, enc_log_var, enc = cast(tuple[tf.Tensor, tf.Tensor, tf.Tensor], self.encoder(inputs))
+        x_recon = cast(tf.Tensor, self.decoder(enc))
+        recon_features = eucl_cosim_features(inputs, x_recon)
+        z = cast(tf.Tensor, tf.concat([enc, recon_features], -1))
+        gamma = cast(tf.Tensor, self.gmm_density(z))
+        # add KL divergence loss term
+        kl_loss = -0.5 * tf.reduce_mean(enc_log_var - tf.square(enc_mean) - tf.exp(enc_log_var) + 1)
+        self.add_loss(self.beta * kl_loss)
+        return x_recon, z, gamma
 
 
 class WeightNorm(keras.layers.Wrapper):
@@ -182,7 +476,7 @@ class WeightNorm(keras.layers.Wrapper):
         return tf.TensorShape(self.layer.compute_output_shape(input_shape).as_list())
 
 
-class Shift(bijector.Bijector):
+class Shift(bijectors.Bijector):
     def __init__(self, shift, validate_args=False, name="shift") -> None:
         """Instantiates the `Shift` bijector which computes `Y = g(X; shift) = X + shift`
         where `shift` is a numeric `Tensor`.
@@ -197,8 +491,8 @@ class Shift(bijector.Bijector):
             Python `str` name given to ops managed by this object.
         """
         with tf.name_scope(name) as name:
-            dtype = dtype_util.common_dtype([shift], dtype_hint=tf.float32)
-            self._shift = tensor_util.convert_nonref_to_tensor(shift, dtype=dtype, name="shift")
+            dtype = tfp_internal.dtype_util.common_dtype([shift], dtype_hint=tf.float32)
+            self._shift = tfp_internal.tensor_util.convert_nonref_to_tensor(shift, dtype=dtype, name="shift")
             super().__init__(
                 forward_min_event_ndims=0,
                 is_constant_jacobian=True,
@@ -226,12 +520,12 @@ class Shift(bijector.Bijector):
         # is_constant_jacobian = True for this bijector, hence the
         # `log_det_jacobian` need only be specified for a single input, as this will
         # be tiled to match `event_ndims`.
-        return tf.zeros([], dtype=dtype_util.base_dtype(x.dtype))
+        return tf.zeros([], dtype=tfp_internal.dtype_util.base_dtype(x.dtype))
 
 
-class PixelCNN(distribution.Distribution):
+class PixelCNN(distributions.distribution.Distribution):
     """
-    Construct Pixel CNN++ distribution.
+    Construct Pixel CNN++ distributions.distribution.
 
     Parameters
     ----------
@@ -246,7 +540,7 @@ class PixelCNN(distribution.Distribution):
     num_filters : int, default 160
         The number of convolutional filters.
     num_logistic_mix : int, default 10
-        Number of components in the logistic mixture distribution.
+        Number of components in the distributions.logistic mixture distributions.distribution.
     receptive_field_dims tuple, default (3, 3)
         Height and width in pixels of the receptive field of the convolutional layers above and to the left
         of a given pixel. The width (second element of the tuple) should be odd. Figure 1 (middle) of [2]
@@ -292,20 +586,20 @@ class PixelCNN(distribution.Distribution):
         with tf.name_scope("PixelCNN") as name:
             super().__init__(
                 dtype=dtype,
-                reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
+                reparameterization_type=tfp_internal.reparameterization.NOT_REPARAMETERIZED,
                 validate_args=False,
                 allow_nan_stats=True,
                 parameters=parameters,
                 name=name,
             )
 
-            if not tensorshape_util.is_fully_defined(image_shape):
+            if not tfp_internal.tensorshape_util.is_fully_defined(image_shape):
                 raise ValueError("`image_shape` must be fully defined.")
 
-            if conditional_shape is not None and not tensorshape_util.is_fully_defined(conditional_shape):
+            if conditional_shape is not None and not tfp_internal.tensorshape_util.is_fully_defined(conditional_shape):
                 raise ValueError("`conditional_shape` must be fully defined.")
 
-            if tensorshape_util.rank(image_shape) != 3:
+            if tfp_internal.tensorshape_util.rank(image_shape) != 3:
                 raise ValueError("`image_shape` must have length 3, representing [height, width, channels] dimensions.")
 
             self._high = tf.cast(high, self.dtype)
@@ -325,11 +619,11 @@ class PixelCNN(distribution.Distribution):
                 dtype=dtype,
             )
 
-            image_input_shape = tensorshape_util.concatenate([None], image_shape)
+            image_input_shape = tfp_internal.tensorshape_util.concatenate([None], image_shape)
             if conditional_shape is None:
                 input_shape = image_input_shape
             else:
-                conditional_input_shape = tensorshape_util.concatenate([None], conditional_shape)
+                conditional_input_shape = tfp_internal.tensorshape_util.concatenate([None], conditional_shape)
                 input_shape = [image_input_shape, conditional_input_shape]
 
             self.image_shape = image_shape
@@ -337,12 +631,12 @@ class PixelCNN(distribution.Distribution):
             self._network.build(input_shape)
 
     def _make_mixture_dist(self, component_logits, locs, scales, return_per_feature: bool = False):
-        """Builds a mixture of quantized logistic distributions.
+        """Builds a mixture of quantized distributions.logistic distributions.
 
         Parameters
         ----------
         component_logits
-            4D `Tensor` of logits for the Categorical distribution
+            4D `Tensor` of logits for the Categorical distributions.distribution
             over Quantized Logistic mixture components. Dimensions are `[batch_size,
             height, width, num_logistic_mix]`.
         locs
@@ -359,17 +653,17 @@ class PixelCNN(distribution.Distribution):
         Returns
         -------
         dist
-            A quantized logistic mixture `tfp.distribution` over the input data.
+            A quantized distributions.logistic mixture `tfp.distributions.distribution` over the input data.
         """
-        mixture_distribution = categorical.Categorical(logits=component_logits)
+        mixture_distribution = distributions.categorical.Categorical(logits=component_logits)
 
-        # Convert distribution parameters for pixel values in
+        # Convert distributions.distribution parameters for pixel values in
         # `[self._low, self._high]` for use with `QuantizedDistribution`
         locs = self._low + 0.5 * (self._high - self._low) * (locs + 1.0)
         scales *= 0.5 * (self._high - self._low)
-        logistic_dist = quantized_distribution.QuantizedDistribution(
-            distribution=transformed_distribution.TransformedDistribution(
-                distribution=logistic.Logistic(loc=locs, scale=scales),
+        logistic_dist = distributions.quantized_distribution.QuantizedDistribution(
+            distribution=distributions.transformed_distribution.TransformedDistribution(
+                distribution=distributions.logistic.Logistic(loc=locs, scale=scales),
                 bijector=Shift(shift=tf.cast(-0.5, self.dtype)),
             ),
             low=self._low,
@@ -377,20 +671,20 @@ class PixelCNN(distribution.Distribution):
         )
 
         # mixture with logistics for the loc and scale on each pixel for each component
-        dist = mixture_same_family.MixtureSameFamily(
+        dist = distributions.mixture_same_family.MixtureSameFamily(
             mixture_distribution=mixture_distribution,
-            components_distribution=independent.Independent(logistic_dist, reinterpreted_batch_ndims=1),
+            components_distribution=distributions.independent.Independent(logistic_dist, reinterpreted_batch_ndims=1),
         )
         if return_per_feature:
             return dist
         else:
-            return independent.Independent(dist, reinterpreted_batch_ndims=2)
+            return distributions.independent.Independent(dist, reinterpreted_batch_ndims=2)
 
     def _log_prob(self, value, conditional_input=None, training=None, return_per_feature=False):
         """Log probability function with optional conditional input.
 
         Calculates the log probability of a batch of data under the modeled
-        distribution (or conditional distribution, if conditional input is
+        distributions.distribution (or conditional distributions.distribution, if conditional input is
         provided).
 
         Parameters
@@ -400,7 +694,7 @@ class PixelCNN(distribution.Distribution):
             dimension(s), which must broadcast to the leading batch dimensions of
             `conditional_input`.
         conditional_input
-            `Tensor` on which to condition the distribution (e.g.
+            `Tensor` on which to condition the distributions.distribution (e.g.
             class labels), or `None`. May have leading batch dimension(s), which
             must broadcast to the leading batch dimensions of `value`.
         training
@@ -415,38 +709,38 @@ class PixelCNN(distribution.Distribution):
         log_prob_values: `Tensor`.
         """
         # Determine the batch shape of the input images
-        image_batch_shape = prefer_static.shape(value)[:-3]
+        image_batch_shape = tfp_internal.prefer_static.shape(value)[:-3]
 
         # Broadcast `value` and `conditional_input` to the same batch_shape
         if conditional_input is None:
             image_batch_and_conditional_shape = image_batch_shape
         else:
             conditional_input = tf.convert_to_tensor(conditional_input)
-            conditional_input_shape = prefer_static.shape(conditional_input)
-            conditional_batch_rank = prefer_static.rank(conditional_input) - tensorshape_util.rank(
-                self.conditional_shape
-            )
+            conditional_input_shape = tfp_internal.prefer_static.shape(conditional_input)
+            conditional_batch_rank = tfp_internal.prefer_static.rank(
+                conditional_input
+            ) - tfp_internal.tensorshape_util.rank(self.conditional_shape)
             conditional_batch_shape = conditional_input_shape[:conditional_batch_rank]
 
-            image_batch_and_conditional_shape = prefer_static.broadcast_shape(
+            image_batch_and_conditional_shape = tfp_internal.prefer_static.broadcast_shape(
                 image_batch_shape, conditional_batch_shape
             )
             conditional_input = tf.broadcast_to(
                 conditional_input,
-                prefer_static.concat([image_batch_and_conditional_shape, self.conditional_shape], axis=0),
+                tfp_internal.prefer_static.concat([image_batch_and_conditional_shape, self.conditional_shape], axis=0),
             )
             value = tf.broadcast_to(
                 value,
-                prefer_static.concat([image_batch_and_conditional_shape, self.event_shape], axis=0),
+                tfp_internal.prefer_static.concat([image_batch_and_conditional_shape, self.event_shape], axis=0),
             )
 
             # Flatten batch dimension for input to Keras model
             conditional_input = tf.reshape(
                 conditional_input,
-                prefer_static.concat([(-1,), self.conditional_shape], axis=0),
+                tfp_internal.prefer_static.concat([(-1,), self.conditional_shape], axis=0),
             )
 
-        value = tf.reshape(value, prefer_static.concat([(-1,), self.event_shape], axis=0))
+        value = tf.reshape(value, tfp_internal.prefer_static.concat([(-1,), self.event_shape], axis=0))
 
         transformed_value = (2.0 * (value - self._low) / (self._high - self._low)) - 1.0
         inputs = transformed_value if conditional_input is None else [transformed_value, conditional_input]
@@ -459,7 +753,7 @@ class PixelCNN(distribution.Distribution):
         else:
             # If there is more than one channel, we create a linear autoregressive
             # dependency among the location parameters of the channels of a single
-            # pixel (the scale parameters within a pixel are independent). For a pixel
+            # pixel (the scale parameters within a pixel are distributions.independent). For a pixel
             # with R/G/B channels, the `r`, `g`, and `b` saturation values are
             # distributed as:
             #
@@ -489,7 +783,7 @@ class PixelCNN(distribution.Distribution):
             return tf.reshape(log_px, image_batch_and_conditional_shape)
 
     def _sample_n(self, n, seed=None, conditional_input=None, training=False):
-        """Samples from the distribution, with optional conditional input.
+        """Samples from the distributions.distribution, with optional conditional input.
 
         Parameters
         ----------
@@ -499,7 +793,7 @@ class PixelCNN(distribution.Distribution):
             `int`, seed for RNG. Setting a random seed enforces reproducibility
             of the samples between sessions (not within a single session).
         conditional_input
-            `Tensor` on which to condition the distribution (e.g.
+            `Tensor` on which to condition the distributions.distribution (e.g.
             class labels), or `None`.
         training
             `bool` or `None`. If `bool`, it controls the dropout layer,
@@ -513,9 +807,9 @@ class PixelCNN(distribution.Distribution):
         """
         if conditional_input is not None:
             conditional_input = tf.convert_to_tensor(conditional_input, dtype=self.dtype)
-            conditional_event_rank = tensorshape_util.rank(self.conditional_shape)
-            conditional_input_shape = prefer_static.shape(conditional_input)
-            conditional_sample_rank = prefer_static.rank(conditional_input) - conditional_event_rank
+            conditional_event_rank = tfp_internal.tensorshape_util.rank(self.conditional_shape)
+            conditional_input_shape = tfp_internal.prefer_static.shape(conditional_input)
+            conditional_sample_rank = tfp_internal.prefer_static.rank(conditional_input) - conditional_event_rank
 
             # If `conditional_input` has no sample dimensions, prepend a sample
             # dimension
@@ -528,14 +822,14 @@ class PixelCNN(distribution.Distribution):
             conditional_event_shape = conditional_input_shape[conditional_sample_rank:]
             with tf.control_dependencies([tf.assert_equal(self.conditional_shape, conditional_event_shape)]):
                 conditional_sample_shape = conditional_input_shape[:conditional_sample_rank]
-                repeat = n // prefer_static.reduce_prod(conditional_sample_shape)
+                repeat = n // tfp_internal.prefer_static.reduce_prod(conditional_sample_shape)
                 h = tf.reshape(
                     conditional_input,
-                    prefer_static.concat([(-1,), self.conditional_shape], axis=0),
+                    tfp_internal.prefer_static.concat([(-1,), self.conditional_shape], axis=0),
                 )
                 h = tf.tile(
                     h,
-                    prefer_static.pad(
+                    tfp_internal.prefer_static.pad(
                         [repeat],
                         paddings=[[0, conditional_event_rank]],
                         constant_values=1,
@@ -543,7 +837,7 @@ class PixelCNN(distribution.Distribution):
                 )
 
         samples_0 = tf.random.uniform(
-            prefer_static.concat([(n,), self.event_shape], axis=0),
+            tfp_internal.prefer_static.concat([(n,), self.event_shape], axis=0),
             minval=-1.0,
             maxval=1.0,
             dtype=self.dtype,
@@ -553,7 +847,7 @@ class PixelCNN(distribution.Distribution):
         params_0 = self._network(inputs, training=training)
         samples_0 = self._sample_channels(*params_0, seed=seed)
 
-        image_height, image_width, _ = tensorshape_util.as_list(self.event_shape)
+        image_height, image_width, _ = tfp_internal.tensorshape_util.as_list(self.event_shape)
 
         def loop_body(index, samples):
             """Loop for iterative pixel sampling.
@@ -605,7 +899,7 @@ class PixelCNN(distribution.Distribution):
         Parameters
         ----------
         component_logits
-            4D `Tensor` of logits for the Categorical distribution
+            4D `Tensor` of logits for the Categorical distributions.distribution
             over Quantized Logistic mixture components. Dimensions are `[batch_size,
             height, width, num_logistic_mix]`.
         locs
@@ -633,7 +927,7 @@ class PixelCNN(distribution.Distribution):
         num_channels = self.event_shape[-1]
 
         # sample mixture components once for the entire pixel
-        component_dist = categorical.Categorical(logits=component_logits)
+        component_dist = distributions.categorical.Categorical(logits=component_logits)
         mask = tf.one_hot(indices=component_dist.sample(seed=seed), depth=self._num_logistic_mix)
         mask = tf.cast(mask[..., tf.newaxis], self.dtype)
 
@@ -656,7 +950,7 @@ class PixelCNN(distribution.Distribution):
                 loc += c * coef_tensors[coef_count]
                 coef_count += 1
 
-            logistic_samp = logistic.Logistic(loc=loc, scale=scale_tensors[i]).sample(seed=seed)
+            logistic_samp = distributions.logistic.Logistic(loc=loc, scale=scale_tensors[i]).sample(seed=seed)
             logistic_samp = tf.clip_by_value(logistic_samp, -1.0, 1.0)
             channel_samples.append(logistic_samp)
 
@@ -670,7 +964,7 @@ class PixelCNN(distribution.Distribution):
 
 
 class PixelCNNNetwork(keras.layers.Layer):
-    """Keras `Layer` to parameterize a Pixel CNN++ distribution.
+    """Keras `Layer` to parameterize a Pixel CNN++ distributions.distribution.
     This is a Keras implementation of the Pixel CNN++ network, as described in
     Salimans et al. (2017)[1] and van den Oord et al. (2016)[2].
     (https://github.com/openai/pixel-cnn).
@@ -702,7 +996,7 @@ class PixelCNNNetwork(keras.layers.Layer):
         use_data_init: bool = True,
         dtype: tf.DType = tf.float32,
     ) -> None:
-        """Initialize the :term:`neural network<Neural Network>` for the Pixel CNN++ distribution.
+        """Initialize the :term:`neural network<Neural Network>` for the Pixel CNN++ distributions.distribution.
 
         Parameters
         ----------
@@ -717,8 +1011,8 @@ class PixelCNNNetwork(keras.layers.Layer):
         num_filters
             `int`, the number of convolutional filters.
         num_logistic_mix
-            `int`, number of components in the logistic mixture
-            distribution.
+            `int`, number of components in the distributions.logistic mixture
+            distributions.distribution.
         receptive_field_dims
             `tuple`, height and width in pixels of the receptive
             field of the convolutional layers above and to the left of a given
@@ -1004,21 +1298,21 @@ class PixelCNNNetwork(keras.layers.Layer):
 
         # Build final Dense/Reshape layers to output the correct number of
         # parameters per pixel.
-        num_channels = tensorshape_util.as_list(image_shape)[-1]
+        num_channels = tfp_internal.tensorshape_util.as_list(image_shape)[-1]
         num_coeffs = num_channels * (num_channels - 1) // 2  # alpha, beta, gamma in eq.3 of paper
         num_out = num_channels * 2 + num_coeffs + 1  # mu, s + alpha, beta, gamma + 1 (mixture weight)
         num_out_total = num_out * self._num_logistic_mix
         params = Dense(num_out_total)(x_out)
         params = tf.reshape(
             params,
-            prefer_static.concat(  # [-1,H,W,nb mixtures, params per mixture]
+            tfp_internal.prefer_static.concat(  # [-1,H,W,nb mixtures, params per mixture]
                 [[-1], image_shape[:-1], [self._num_logistic_mix, num_out]], axis=0
             ),
         )
 
         # If there is one color channel, split the parameters into a list of three
         # output `Tensor`s: (1) component logits for the Quantized Logistic mixture
-        # distribution, (2) location parameters for each component, and (3) scale
+        # distributions.distribution, (2) location parameters for each component, and (3) scale
         # parameters for each component. If there is more than one color channel,
         # return a fourth `Tensor` for the coefficients for the linear dependence
         # among color channels (e.g. alpha, beta, gamma).
@@ -1056,7 +1350,7 @@ class PixelCNNNetwork(keras.layers.Layer):
         -------
         outputs
             a 3- or 4-element `list` of `Tensor`s in the following order: \
-            component_logits: 4D `Tensor` of logits for the Categorical distribution \
+            component_logits: 4D `Tensor` of logits for the Categorical distributions.distribution \
             over Quantized Logistic mixture components. Dimensions are \
             `[batch_size, height, width, num_logistic_mix]`.
         locs

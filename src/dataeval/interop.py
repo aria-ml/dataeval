@@ -37,13 +37,15 @@ def to_numpy(array: ArrayLike | None, copy: bool = True) -> NDArray[Any]:
     if isinstance(array, np.ndarray):
         return array.copy() if copy else array
 
-    tf = _try_import("tensorflow")
-    if tf and tf.is_tensor(array):
-        return array.numpy().copy() if copy else array.numpy()  # type: ignore
+    if array.__class__.__module__.startswith("tensorflow"):
+        tf = _try_import("tensorflow")
+        if tf and tf.is_tensor(array):
+            return array.numpy().copy() if copy else array.numpy()  # type: ignore
 
-    torch = _try_import("torch")
-    if torch and isinstance(array, torch.Tensor):
-        return array.detach().cpu().numpy().copy() if copy else array.detach().cpu().numpy()  # type: ignore
+    if array.__class__.__module__.startswith("torch"):
+        torch = _try_import("torch")
+        if torch and isinstance(array, torch.Tensor):
+            return array.detach().cpu().numpy().copy() if copy else array.detach().cpu().numpy()  # type: ignore
 
     return np.array(array, copy=copy)
 
