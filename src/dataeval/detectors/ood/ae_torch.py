@@ -10,8 +10,6 @@ Licensed under Apache Software License (Apache 2.0)
 
 from __future__ import annotations
 
-from typing import Callable
-
 import numpy as np
 import torch
 from numpy.typing import ArrayLike
@@ -41,7 +39,7 @@ class OOD_AE(OODBase):
         self,
         x_ref: ArrayLike,
         threshold_perc: float = 100.0,
-        loss_fn: Callable[..., torch.Tensor] | None = None,
+        loss_fn: torch.nn.Module | None = None,
         optimizer: torch.optim.Optimizer | None = None,
         epochs: int = 20,
         batch_size: int = 64,
