@@ -12,17 +12,23 @@ __all__ = ["OODOutput", "OODScoreOutput"]
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, Literal, cast
+from typing import TYPE_CHECKING, Callable, Literal, cast
 
 import numpy as np
-import tensorflow as tf
-import tf_keras as keras
 from numpy.typing import ArrayLike, NDArray
 
 from dataeval.interop import to_numpy
 from dataeval.output import OutputMetadata, set_metadata
+from dataeval.utils.lazy import lazyload
 from dataeval.utils.tensorflow._internal.gmm import GaussianMixtureModelParams, gmm_params
 from dataeval.utils.tensorflow._internal.trainer import trainer
+
+if TYPE_CHECKING:
+    import tensorflow as tf
+    import tf_keras as keras
+else:
+    tf = lazyload("tensorflow")
+    keras = lazyload("tf_keras")
 
 
 @dataclass(frozen=True)

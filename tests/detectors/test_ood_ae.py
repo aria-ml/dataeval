@@ -17,7 +17,7 @@ from sklearn.datasets import load_iris
 from tf_keras.layers import Dense, InputLayer
 
 from dataeval.detectors.ood.ae import OOD_AE
-from dataeval.utils.tensorflow._internal.autoencoder import AE
+from dataeval.utils.tensorflow._internal.models import AE
 
 threshold_perc = [90.0]
 loss_fn = [keras.losses.MeanSquaredError(), None]

@@ -15,8 +15,8 @@ import tf_keras as keras
 from tf_keras.layers import Dense, InputLayer
 
 from dataeval.detectors.ood.aegmm import OOD_AEGMM
-from dataeval.utils.tensorflow._internal.autoencoder import AEGMM
 from dataeval.utils.tensorflow._internal.loss import LossGMM
+from dataeval.utils.tensorflow._internal.models import AEGMM
 
 n_gmm = [1, 2]
 w_energy = [0.1, 0.5]
