@@ -325,6 +325,8 @@ def coverage_plot(images: NDArray[Any], num_images: int) -> Figure:
     """
     import matplotlib.pyplot as plt
 
+    num_images = min(num_images, len(images))
+
     if images.ndim == 4:
         images = np.moveaxis(images, 1, -1)
     elif images.ndim == 3:
@@ -339,12 +341,17 @@ def coverage_plot(images: NDArray[Any], num_images: int) -> Figure:
 
     if rows == 1:
         for j in range(3):
+            if j >= len(images):
+                continue
             axs[j].imshow(images[j])
             axs[j].axis("off")
     else:
         for i in range(rows):
             for j in range(3):
-                axs[i, j].imshow(images[i * 3 + j])
+                i_j = i * 3 + j
+                if i_j >= len(images):
+                    continue
+                axs[i, j].imshow(images[i_j])
                 axs[i, j].axis("off")
 
     fig.tight_layout()
