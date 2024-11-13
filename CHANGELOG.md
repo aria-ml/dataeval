@@ -1,6 +1,18 @@
-[//]: # (32ba1f29f3c9e57c4ad5cab44f632258e5f4e893)
+[//]: # (6e55451c4cdd0d484a0ee76550b1b4026b50cee6)
 
 # DataEval Change Log
+
+## v0.72.2
+
+🛠️ **Improvements and Enhancements**
+- `ba52ef2e` - Refactor away _internal module
+
+📝 **Miscellaneous**
+- `6e55451c` - Integration of distribution compare and OOD MI metadata tools (continued)
+- `e4f82173` - Streamlined tests
+- `ac8fe3ee` - Fix type mismatch on training AEGMM
+- `6289c7d0` - Add plotting helper functions to diversity and balance
+- `14d0cfd4` - Integration of low-level metadata drift/OOD exploration functions
 
 ## v0.72.1
 
