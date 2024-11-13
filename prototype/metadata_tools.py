@@ -12,9 +12,9 @@ from sklearn.feature_selection import mutual_info_classif
 
 from typing import Dict, List, Union, Mapping
 
-from metadata_ood_mi import get_metadata_ood_mi
-from metadata_ks_compare import meta_distribution_compare
-from dataeval.detectors.ood.metadata_least_likely import get_least_likely_features
+from dataeval._internal.metrics.metadata_ood_mi import get_metadata_ood_mi
+from dataeval._internal.metrics.metadata_ks_compare import meta_distribution_compare
+from dataeval._internal.metrics.metadata_least_likely import get_least_likely_features
 
 import pytest
 
@@ -122,25 +122,25 @@ def ks_compare(dl0, dl1, k_stop=None, debug=None):
             xmax = max(allx)
 
             if xmax > xmin:
-                results[k]['statistic_location'] = (results[k]['statistic_location'] - xmin)/(xmax - xmin)
+                results[k].statistic_location = (results[k].statistic_location - xmin)/(xmax - xmin)
                   
-            del_ks[k] = np.abs(results[k]['statistic'] - ks_prev[k])
+            del_ks[k] = np.abs(results[k].statistic - ks_prev[k])
             stable = stable and (del_ks[k] < k_stop)  # *all* quantities must be stable before we quit.  
             # ks_prev[k] = res.statistic
-            ks_prev[k] = results[k]['statistic']
+            ks_prev[k] = results[k].statistic
 
         arg_max, maxdk = max(list(enumerate([del_ks[k] for k in dol0])), key=lambda x: x[1])
         maxkey = [k for k in dol0.keys()][arg_max]
         if debug:
-             print(f"{len(dol0[k])}: {maxkey} {maxdk:.3f}: {results[maxkey]['statistic_location']:.3f}")       
+             print(f'{len(dol0[k])}: {maxkey} {maxdk:.3f}: {results[maxkey].statistic_location:.3f}')       
 
         if stable:
             break
     else:
         pass
 
-    pvals = [v['pvalue'] for v in results.values()]
-    shifts = [v['shift_magnitude'] for v in results.values()]
+    pvals = [v.pvalue for v in results.values()]
+    shifts = [v.shift_magnitude for v in results.values()]
     iord = np.argsort(pvals)
     names = [k for k in results]
     maxlen = max([len(name) for name in names])
@@ -201,8 +201,7 @@ def least_likely_features(refds, testds, ood_detector):
         break
     corrmetadata  = _lod2dol(corrmetadata)
 
-    unlikely_feature_tuples = get_least_likely_features(metadata, corrmetadata, is_ood)
-    unlikely_features = [uft[0] for uft in unlikely_feature_tuples]
+    unlikely_features = get_least_likely_features(metadata, corrmetadata, is_ood)
     uvals, freq = np.unique(unlikely_features, return_counts=True)
 
     iord = np.argsort(freq,)[::-1] # decreasing order
