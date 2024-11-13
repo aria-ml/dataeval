@@ -49,17 +49,15 @@ class TestCoverageUnit:
         images[7] += 160
         result = coverage(images, k=10, percent=0.15)
         output = result.plot(images, 3)
-        assert output is None
-        return_output = result.plot(images, 3, False)
-        assert isinstance(return_output, Figure)
+        assert isinstance(output, Figure)
 
     def test_coverage_plot(self):
         images = np.ones((6, 28, 28), dtype=int)
-        result = coverage_plot(images, 6, False)
+        result = coverage_plot(images, 6)
         assert isinstance(result, Figure)
         images = np.ones((6, 28), dtype=int)
         with pytest.raises(ValueError):
-            result = coverage_plot(images, 6, False)
+            result = coverage_plot(images, 6)
 
 
 class TestCoverageFunctional:

@@ -98,16 +98,16 @@ class TestBalanceUnit:
     def test_base_plotting(self, class_labels_int, metadata):
         mi = balance(class_labels_int, metadata)
         output = mi.plot()
-        assert output is None
+        assert isinstance(output, Figure)
         classwise_output = mi.plot(plot_classwise=True)
-        assert classwise_output is None
+        assert isinstance(classwise_output, Figure)
 
     def test_plotting_vars(self, class_labels, metadata):
         mi = balance(class_labels, metadata)
         heat_labels = np.concatenate((["class"], mi.metadata_names))
-        output = mi.plot(heat_labels[:-1], heat_labels[1:], False, False)
+        output = mi.plot(heat_labels[:-1], heat_labels[1:], False)
         assert isinstance(output, Figure)
-        row_labels = np.unique(mi.class_list)
+        _, row_labels = np.unique(mi.class_list, return_inverse=True)
         col_labels = np.arange(len(mi.metadata_names) + 1)
-        classwise_output = mi.plot(row_labels, col_labels, True, False)
+        classwise_output = mi.plot(row_labels, col_labels, True)
         assert isinstance(classwise_output, Figure)

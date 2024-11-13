@@ -43,10 +43,8 @@ class DiversityOutput(OutputMetadata):
 
     diversity_index: NDArray[np.float64]
     classwise: NDArray[np.float64]
-
     class_list: NDArray[Any]
     metadata_names: list[str]
-
     method: Literal["shannon", "simpson"]
 
     def plot(
@@ -54,8 +52,7 @@ class DiversityOutput(OutputMetadata):
         row_labels: list[Any] | NDArray[Any] | None = None,
         col_labels: list[Any] | NDArray[Any] | None = None,
         plot_classwise: bool = False,
-        show: bool = True,
-    ) -> Figure | None:
+    ) -> Figure:
         """
         Plot a heatmap of diversity information
 
@@ -67,8 +64,6 @@ class DiversityOutput(OutputMetadata):
             List/Array containing the labels for columns in the histogram
         plot_classwise : bool, default False
             Whether to plot per-class balance instead of global balance
-        show : bool, default True
-            Whether to show the plot or return the matplotlib Figure
         """
         if plot_classwise:
             if row_labels is None:
@@ -89,11 +84,9 @@ class DiversityOutput(OutputMetadata):
             # Creating label array for heat map axes
             heat_labels = np.concatenate((["class"], self.metadata_names))
 
-            fig = diversity_bar_plot(heat_labels, self.diversity_index, show=show)
+            fig = diversity_bar_plot(heat_labels, self.diversity_index)
 
-        if not show:
-            return fig
-        return None
+        return fig
 
 
 def diversity_shannon(
