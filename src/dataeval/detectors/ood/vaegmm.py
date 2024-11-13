@@ -10,19 +10,27 @@ from __future__ import annotations
 
 __all__ = ["OOD_VAEGMM"]
 
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 import numpy as np
-import tensorflow as tf
-import tf_keras as keras
 from numpy.typing import ArrayLike
 
 from dataeval.detectors.ood.base import OODGMMBase, OODScoreOutput
 from dataeval.interop import to_numpy
-from dataeval.utils.tensorflow._internal.autoencoder import VAEGMM
+from dataeval.utils.lazy import lazyload
 from dataeval.utils.tensorflow._internal.gmm import gmm_energy
 from dataeval.utils.tensorflow._internal.loss import Elbo, LossGMM
 from dataeval.utils.tensorflow._internal.utils import predict_batch
+
+if TYPE_CHECKING:
+    import tensorflow as tf
+    import tf_keras as keras
+
+    import dataeval.utils.tensorflow._internal.models as tf_models
+else:
+    tf = lazyload("tensorflow")
+    keras = lazyload("tf_keras")
+    tf_models = lazyload("dataeval.utils.tensorflow._internal.models")
 
 
 class OOD_VAEGMM(OODGMMBase):
@@ -37,7 +45,7 @@ class OOD_VAEGMM(OODGMMBase):
         Number of samples sampled to evaluate each instance.
     """
 
-    def __init__(self, model: VAEGMM, samples: int = 10) -> None:
+    def __init__(self, model: tf_models.VAEGMM, samples: int = 10) -> None:
         super().__init__(model)
         self.samples = samples
 
@@ -46,7 +54,7 @@ class OOD_VAEGMM(OODGMMBase):
         x_ref: ArrayLike,
         threshold_perc: float = 100.0,
         loss_fn: Callable[..., tf.Tensor] = LossGMM(elbo=Elbo(0.05)),
-        optimizer: keras.optimizers.Optimizer = keras.optimizers.Adam,
+        optimizer: keras.optimizers.Optimizer | None = None,
         epochs: int = 20,
         batch_size: int = 64,
         verbose: bool = True,

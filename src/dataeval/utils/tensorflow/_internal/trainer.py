@@ -8,12 +8,19 @@ Licensed under Apache Software License (Apache 2.0)
 
 from __future__ import annotations
 
-from typing import Callable, Iterable, cast
+from typing import TYPE_CHECKING, Callable, Iterable, cast
 
 import numpy as np
-import tensorflow as tf
-import tf_keras as keras
 from numpy.typing import NDArray
+
+from dataeval.utils.lazy import lazyload
+
+if TYPE_CHECKING:
+    import tensorflow as tf
+    import tf_keras as keras
+else:
+    tf = lazyload("tensorflow")
+    keras = lazyload("tf_keras")
 
 
 def trainer(
@@ -21,7 +28,7 @@ def trainer(
     x_train: NDArray,
     y_train: NDArray | None = None,
     loss_fn: Callable[..., tf.Tensor] | None = None,
-    optimizer: keras.optimizers.Optimizer = keras.optimizers.Adam,
+    optimizer: keras.optimizers.Optimizer | None = None,
     preprocess_fn: Callable[[tf.Tensor], tf.Tensor] | None = None,
     epochs: int = 20,
     reg_loss_fn: Callable[[keras.Model], tf.Tensor] = (lambda _: cast(tf.Tensor, tf.Variable(0, dtype=tf.float32))),
@@ -58,7 +65,7 @@ def trainer(
         Whether to print training progress.
     """
     loss_fn = loss_fn() if isinstance(loss_fn, type) else loss_fn
-    optimizer = optimizer() if isinstance(optimizer, type) else optimizer
+    optimizer = keras.optimizers.Adam() if optimizer is None else optimizer
 
     train_data = (
         x_train.astype(np.float32) if y_train is None else (x_train.astype(np.float32), y_train.astype(np.float32))
