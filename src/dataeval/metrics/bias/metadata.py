@@ -2,7 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Any, Mapping
+from typing import Any, Mapping, MutableMapping
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -16,8 +16,8 @@ def get_counts(
     names: list[str],
     continuous_factor_bincounts: Mapping[str, int] | None = None,
     subset_mask: NDArray[np.bool_] | None = None,
-    cached_hist: Mapping[str, Mapping[str, ArrayLike]] | None = None,
-) -> tuple[Mapping[str, ArrayLike], Mapping[str, ArrayLike], Mapping[str, Mapping[str, ArrayLike]]]:
+    cached_hist: MutableMapping[str, Mapping[str, ArrayLike]] | None = None,
+) -> tuple[Mapping[str, ArrayLike], Mapping[str, ArrayLike], MutableMapping[str, Mapping[str, ArrayLike]]]:
     """
     Initialize dictionary of histogram counts --- treat categorical values
     as histogram bins.
@@ -104,8 +104,8 @@ def entropy(
     continuous_factor_bincounts: Mapping[str, int] | None = None,
     normalized: bool = False,
     subset_mask: NDArray[np.bool_] | None = None,
-    cached_hist: Mapping[str, Mapping[str, ArrayLike]] | None = None,
-) -> tuple[NDArray[np.float64], Mapping[str, Mapping[str, ArrayLike]]]:
+    cached_hist: MutableMapping[str, Mapping[str, ArrayLike]] | None = None,
+) -> tuple[NDArray[np.float64], MutableMapping[str, Mapping[str, ArrayLike]]]:
     """
     Meant for use with Bias metrics, Balance, Diversity, ClasswiseBalance,
     and Classwise Diversity.
@@ -172,8 +172,8 @@ def get_num_bins(
     names: list[str],
     continuous_factor_bincounts: Mapping[str, int] | None = None,
     subset_mask: NDArray[np.bool_] | None = None,
-    cached_hist: Mapping[str, Mapping[str, ArrayLike]] | None = None,
-) -> tuple[NDArray[np.float64], Mapping[str, Mapping[str, ArrayLike]]]:
+    cached_hist: MutableMapping[str, Mapping[str, ArrayLike]] | None = None,
+) -> tuple[NDArray[np.float64], MutableMapping[str, Mapping[str, ArrayLike]]]:
     """
     Number of bins or unique values for each metadata factor, used to
     normalize entropy/diversity.

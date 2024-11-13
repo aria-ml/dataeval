@@ -3,7 +3,7 @@ from __future__ import annotations
 __all__ = ["DiversityOutput", "diversity"]
 
 from dataclasses import dataclass
-from typing import Any, Literal, Mapping
+from typing import Any, Literal, Mapping, MutableMapping
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -69,8 +69,8 @@ def diversity_shannon(
     names: list[str],
     continuous_factor_bincounts: Mapping[str, int] | None = None,
     subset_mask: NDArray[np.bool_] | None = None,
-    cached_hist: Mapping[str, Mapping[str, ArrayLike]] | None = None,
-) -> tuple[NDArray[np.float64], Mapping[str, Mapping[str, ArrayLike]] | None]:
+    cached_hist: MutableMapping[str, Mapping[str, ArrayLike]] | None = None,
+) -> tuple[NDArray[np.float64], MutableMapping[str, Mapping[str, ArrayLike]] | None]:
     """
     Compute :term:`diversity<Diversity>` for discrete/categorical variables and, through standard
     histogram binning, for continuous variables.
@@ -137,8 +137,8 @@ def diversity_simpson(
     names: list[str],
     continuous_factor_bincounts: Mapping[str, int] | None = None,
     subset_mask: NDArray[np.bool_] | None = None,
-    cached_hist: Mapping[str, Mapping[str, ArrayLike]] | None = None,
-) -> tuple[NDArray[np.float64], Mapping[str, Mapping[str, ArrayLike]]]:
+    cached_hist: MutableMapping[str, Mapping[str, ArrayLike]] | None = None,
+) -> tuple[NDArray[np.float64], MutableMapping[str, Mapping[str, ArrayLike]]]:
     """
     Compute :term:`diversity<Diversity>` for discrete/categorical variables and, through standard
     histogram binning, for continuous variables.
