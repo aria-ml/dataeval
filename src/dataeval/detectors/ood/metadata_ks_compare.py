@@ -81,7 +81,7 @@ def meta_distribution_compare(
 
         xmin, xmax = min(allx), max(allx)
         if xmin == xmax:  # only one value in this feature, so fill in the obvious results for feature k
-            mdc_dict[k].update({"statistic_location": 0.0, "shift_magnitude": 0.0, "pvalue": 1.0})
+            mdc_dict[k].update({"statistic": 0.0, "statistic_location": 0.0, "shift_magnitude": 0.0, "pvalue": 1.0})
             continue
 
         ks_result = ks_2samp(x0, x1, method="asymp")
@@ -94,6 +94,13 @@ def meta_distribution_compare(
 
         drift = emd(x0, x1) / dX
 
-        mdc_dict[k].update({"statistic_location": loc, "shift_magnitude": drift, "pvalue": ks_result.pvalue})  #  pyright: ignore
+        mdc_dict[k].update(
+            {
+                "statistic": ks_result.statistic,  # type: ignore
+                "statistic_location": loc,
+                "shift_magnitude": drift,
+                "pvalue": ks_result.pvalue,  # type: ignore
+            }
+        )
 
     return mdc_dict
