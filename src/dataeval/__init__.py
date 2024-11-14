@@ -12,12 +12,12 @@ from dataeval import detectors, metrics  # noqa: E402
 
 __all__ = ["detectors", "metrics"]
 
-if _IS_TORCH_AVAILABLE:  # pragma: no cover
+if _IS_TORCH_AVAILABLE:
     from dataeval import workflows
 
     __all__ += ["workflows"]
 
-if _IS_TENSORFLOW_AVAILABLE or _IS_TORCH_AVAILABLE:  # pragma: no cover
+if _IS_TENSORFLOW_AVAILABLE or _IS_TORCH_AVAILABLE:
     from dataeval import utils
 
     __all__ += ["utils"]

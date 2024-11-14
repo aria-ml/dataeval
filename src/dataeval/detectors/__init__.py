@@ -7,7 +7,7 @@ from dataeval.detectors import drift, linters
 
 __all__ = ["drift", "linters"]
 
-if _IS_TENSORFLOW_AVAILABLE:  # pragma: no cover
+if _IS_TENSORFLOW_AVAILABLE:
     from dataeval.detectors import ood
 
     __all__ += ["ood"]

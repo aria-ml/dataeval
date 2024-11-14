@@ -10,7 +10,7 @@ from dataeval.detectors.drift.ks import DriftKS
 
 __all__ = ["DriftCVM", "DriftKS", "DriftOutput", "updates"]
 
-if _IS_TORCH_AVAILABLE:  # pragma: no cover
+if _IS_TORCH_AVAILABLE:
     from dataeval.detectors.drift.mmd import DriftMMD, DriftMMDOutput
     from dataeval.detectors.drift.torch import preprocess_drift
     from dataeval.detectors.drift.uncertainty import DriftUncertainty
