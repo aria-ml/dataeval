@@ -225,7 +225,7 @@ class Encoder_AE(nn.Module):
         conv_mid = nn.Conv2d(nc_in, nc_mid, 2, stride=1, padding=1)
         conv_done = nn.Conv2d(nc_mid, nc_done, 2, stride=1)
 
-        self.encoding_ops = nn.Sequential(
+        self.encoding_ops: nn.Sequential = nn.Sequential(
             conv_in,
             nn.LeakyReLU(),
             nn.MaxPool2d(2),
@@ -237,9 +237,9 @@ class Encoder_AE(nn.Module):
 
         self.input_shape = input_shape
         ny, nx = input_shape[1:]
-        self.post_op_shape = (nc_done, ny // 4 - 1, nx // 4 - 1)
-        self.flatcon = math.prod(self.post_op_shape)
-        self.crush = nn.Sequential(
+        self.post_op_shape: tuple[int, int, int] = (nc_done, ny // 4 - 1, nx // 4 - 1)
+        self.flatcon: int = math.prod(self.post_op_shape)
+        self.crush: nn.Sequential = nn.Sequential(
             nn.Flatten(1, -1),
             nn.Linear(
                 self.flatcon,
@@ -292,7 +292,7 @@ class Decoder_AE(nn.Module):
         self.post_op_shape = post_op_shape
         self.input_shape = input_shape
 
-        self.input = nn.Linear(encoding_dim, math.prod(post_op_shape))
+        self.input: nn.Linear = nn.Linear(encoding_dim, math.prod(post_op_shape))
         # self.input: nn.Sequential = nn.Sequential(nn.Linear(encoding_dim, ndc))
         self.decoder: nn.Sequential = nn.Sequential(
             nn.ConvTranspose2d(64, 128, 2, stride=1),
