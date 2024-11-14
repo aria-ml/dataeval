@@ -1,6 +1,17 @@
-[//]: # (6e55451c4cdd0d484a0ee76550b1b4026b50cee6)
+[//]: # (e055acf0d819dd7473e62cf3e8663fefd763ca5a)
 
 # DataEval Change Log
+
+## v0.73.0
+
+🌟 **Feature Release**
+- `e055acf0` - Metadata utility function to merge, extend and flatten metadata
+- `95b28ae1` - Adjust bias plotting functions to return figure
+
+📝 **Miscellaneous**
+- `532f92a2` - Minimum spanning tree and Clusterer are rewritten using numba for large code speed up
+- `7377e012` - Switch jobs to use uv and tox natively
+- `7af75016` - Add lazyloading for tensorflow modules
 
 ## v0.72.2
 
