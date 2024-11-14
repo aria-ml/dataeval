@@ -2,7 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Any, Mapping, MutableMapping
+from typing import Any, Mapping
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -16,8 +16,8 @@ def get_counts(
     names: list[str],
     continuous_factor_bincounts: Mapping[str, int] | None = None,
     subset_mask: NDArray[np.bool_] | None = None,
-    cached_hist: MutableMapping[str, Mapping[str, ArrayLike]] | None = None,
-) -> tuple[Mapping[str, ArrayLike], Mapping[str, ArrayLike], MutableMapping[str, Mapping[str, ArrayLike]]]:
+    hist_cache: dict[str, NDArray[np.intp]] | None = None,
+) -> dict[str, NDArray[np.intp]]:
     """
     Initialize dictionary of histogram counts --- treat categorical values
     as histogram bins.
@@ -36,70 +36,48 @@ def get_counts(
         Names of metadata factors -- keys of the metadata dictionary
     subset_mask: NDArray[np.bool_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
-    cached_hist: Dict[str, Dict[str, ArrayLike]] | None, default None
-        If specified, provides the bin information that will be used to discretize continuous factors.
-        Keys are metadata factors, values are {"cnts": counts, "bins": bins}
-
+    hist_cache: dict[str, NDArray[np.intp]] | None, default None
+        Optional cache to store histogram counts
 
     Returns
     -------
-    hist_counts: Dict
+    hist_counts: dict[str, NDArray[np.intp]]
         histogram counts per metadata factor in `factors`.  Each
         factor will have a different number of bins.  Counts get reused
         across metrics, so hist_counts are cached but only if computed
         globally, i.e. without masked samples.
-    hist_bins: NDArray
-        Bin boundaries used for discretization
-    cached_hist: Dict[str, Dict[str, ArrayLike]]
-        Cached bin information for discretizing continuous factors.
-        Keys are metadata factors, values are {"cnts": counts, "bins": bins}
     """
 
-    hist_counts, hist_bins = {}, {}
+    hist_counts = {}
+
     # np.where needed to satisfy linter
     # TODO: The commented line results in discretization according to nonglobal standards,
     # need to figure out an elegant solution to this problem
     mask = np.where(subset_mask if subset_mask is not None else np.ones(data.shape[0], dtype=bool))
     # mask = np.where(np.ones(data.shape[0], dtype=bool))
 
-    new_cached_hist = {}
-
     for cdx, fn in enumerate(names):
-        bins = np.array([-np.inf, np.inf])
         hist_edges = np.array([-np.inf, np.inf])
         cnts = np.array([len(data[:, cdx].squeeze())])
         # linter doesn't like double indexing
         col_data = np.array(data[mask, cdx].squeeze(), dtype=np.float64)
-        if continuous_factor_bincounts and fn in continuous_factor_bincounts:
-            # bins = hist_bins.get(fn, "auto")
-            num_bins = continuous_factor_bincounts[fn]
 
-            # new fn here
-
-            if cached_hist and fn in cached_hist:
-                raw_cnts, hist_edges = cached_hist[fn]["cnts"], cached_hist[fn]["bins"]
-            elif not cached_hist:
-                raw_cnts, hist_edges = np.histogram(data[:, cdx].squeeze(), bins=num_bins, density=True)
-                new_cached_hist[fn] = {"cnts": raw_cnts, "bins": hist_edges}
+        if hist_cache and fn in hist_cache:
+            cnts = hist_cache[fn]
+        else:
+            if continuous_factor_bincounts and fn in continuous_factor_bincounts:
+                num_bins = continuous_factor_bincounts[fn]
+                _, hist_edges = np.histogram(data[:, cdx].squeeze(), bins=num_bins, density=True)
                 hist_edges[-1] = np.inf
                 hist_edges[0] = -np.inf
-            disc_col_data = np.digitize(col_data, np.array(hist_edges))
-            bins, cnts = np.unique(disc_col_data, return_counts=True)
-        else:
-            # if discrete, use unique values as bins
-            if cached_hist and fn in cached_hist:
-                cnts, bins = cached_hist[fn]["cnts"], cached_hist[fn]["bins"]
-            elif not cached_hist:
-                bins, cnts = np.unique(col_data, return_counts=True)
-                new_cached_hist[fn] = {"cnts": cnts, "bins": bins}
+                disc_col_data = np.digitize(col_data, np.array(hist_edges))
+                _, cnts = np.unique(disc_col_data, return_counts=True)
+            else:
+                _, cnts = np.unique(col_data, return_counts=True)
 
         hist_counts[fn] = cnts
-        hist_bins[fn] = bins
 
-        if cached_hist:
-            new_cached_hist = cached_hist
-
-    return hist_counts, hist_bins, new_cached_hist
+    return hist_counts
 
 
 def entropy(
@@ -108,8 +86,8 @@ def entropy(
     continuous_factor_bincounts: Mapping[str, int] | None = None,
     normalized: bool = False,
     subset_mask: NDArray[np.bool_] | None = None,
-    cached_hist: MutableMapping[str, Mapping[str, ArrayLike]] | None = None,
-) -> tuple[NDArray[np.float64], MutableMapping[str, Mapping[str, ArrayLike]]]:
+    hist_cache: dict[str, NDArray[np.intp]] | None = None,
+) -> NDArray[np.float64]:
     """
     Meant for use with Bias metrics, Balance, Diversity, ClasswiseBalance,
     and Classwise Diversity.
@@ -132,9 +110,8 @@ def entropy(
         Flag that determines whether or not to normalize entropy by log(num_bins)
     subset_mask: NDArray[np.bool_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
-    cached_hist: Dict[str, Dict[str, ArrayLike]] | None, default None
-        If specified, provides the bin information that will be used to discretize continuous factors.
-        Keys are metadata factors, values are {"cnts": counts, "bins": bins}
+    hist_cache: dict[str, NDArray[np.intp]] | None, default None
+        Optional cache to store histogram counts
 
     Notes
     -----
@@ -145,9 +122,6 @@ def entropy(
     -------
     ent: NDArray[np.float64]
         Entropy estimate per column of X
-    cached_hist: Dict[str, Dict[str, ArrayLike]]
-        Cached bin information for discretizing continuous factors.
-        Keys are metadata factors, values are {"cnts": counts, "bins": bins}
 
     See Also
     --------
@@ -156,7 +130,7 @@ def entropy(
     """
 
     num_factors = len(names)
-    hist_counts, _, cached_hist = get_counts(data, names, continuous_factor_bincounts, subset_mask, cached_hist)
+    hist_counts = get_counts(data, names, continuous_factor_bincounts, subset_mask, hist_cache)
 
     ev_index = np.empty(num_factors)
     for col, cnts in enumerate(hist_counts.values()):
@@ -169,7 +143,7 @@ def entropy(
                 ev_index[col] = 0
             else:
                 ev_index[col] /= np.log(cnt_len)
-    return ev_index, cached_hist
+    return ev_index
 
 
 def get_num_bins(
@@ -177,8 +151,8 @@ def get_num_bins(
     names: list[str],
     continuous_factor_bincounts: Mapping[str, int] | None = None,
     subset_mask: NDArray[np.bool_] | None = None,
-    cached_hist: MutableMapping[str, Mapping[str, ArrayLike]] | None = None,
-) -> tuple[NDArray[np.float64], MutableMapping[str, Mapping[str, ArrayLike]]]:
+    hist_cache: dict[str, NDArray[np.intp]] | None = None,
+) -> NDArray[np.float64]:
     """
     Number of bins or unique values for each metadata factor, used to
     normalize entropy/diversity.
@@ -196,25 +170,21 @@ def get_num_bins(
         in names.
     subset_mask: NDArray[np.bool_] | None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
-    cached_hist: Dict[str, Dict[str, ArrayLike]] | None, default None
-        If specified, provides the bin information that will be used to discretize continuous factors.
-        Keys are metadata factors, values are {"cnts": counts, "bins": bins}
+    hist_cache: dict[str, NDArray[np.intp]] | None, default None
+        Optional cache to store histogram counts
 
     Returns
     -------
     num_bins: NDArray[np.float64]
         Number of bins used in the discretization for each value in names.
-    cached_hist: Dict[str, Dict[str, ArrayLike]]
-        Cached bin information for discretizing continuous factors.
-        Keys are metadata factors, values are {"cnts": counts, "bins": bins}
     """
     # likely cached
-    hist_counts, _, cached_hist = get_counts(data, names, continuous_factor_bincounts, subset_mask, cached_hist)
+    hist_counts = get_counts(data, names, continuous_factor_bincounts, subset_mask, hist_cache)
     num_bins = np.empty(len(hist_counts))
     for idx, cnts in enumerate(hist_counts.values()):
         num_bins[idx] = np.size(cnts, 0)
 
-    return num_bins, cached_hist
+    return num_bins
 
 
 def infer_categorical(X: NDArray[np.float64], threshold: float = 0.2) -> NDArray[np.bool_]:
