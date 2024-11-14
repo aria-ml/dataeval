@@ -10,10 +10,11 @@ Licensed under Apache Software License (Apache 2.0)
 
 from __future__ import annotations
 
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import numpy as np
 import torch
+from numpy.typing import NDArray
 
 
 class GaussianMixtureModelParams(NamedTuple):
@@ -120,6 +121,6 @@ def gmm_energy(
 
 
 # replace tf.expand with this....
-def expand(x, dim=None):
+def expand(x: NDArray[Any] | torch.Tensor, dim=None) -> NDArray[Any] | torch.Tensor:
     newshape = (*x.shape, 1) if dim is None else (*x.shape[0:dim], 1, *x.shape[dim:])
     return x.reshape(newshape)

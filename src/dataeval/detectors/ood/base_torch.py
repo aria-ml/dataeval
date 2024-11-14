@@ -62,7 +62,7 @@ class OODScoreOutput(OutputMetadata):
     instance_score: NDArray[np.float32]
     feature_score: NDArray[np.float32] | None = None
 
-    def get(self, ood_type: Literal["instance", "feature"]) -> NDArray:
+    def get(self, ood_type: Literal["instance", "feature"]) -> NDArray[np.float32]:
         """
         Returns either the instance or feature score
 

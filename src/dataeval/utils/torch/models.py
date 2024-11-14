@@ -214,20 +214,18 @@ class Encoder_AE(nn.Module):
 
     def __init__(
         self,
-        channels,
+        channels: int,
         input_shape: tuple[int, int, int],
         encoding_dim: int,
     ) -> None:
         super().__init__()
-
-        self.input_shape = input_shape
 
         nc_in, nc_mid, nc_done = 256, 128, 64
         conv_in = nn.Conv2d(channels, nc_in, 2, stride=1, padding=1)
         conv_mid = nn.Conv2d(nc_in, nc_mid, 2, stride=1, padding=1)
         conv_done = nn.Conv2d(nc_mid, nc_done, 2, stride=1)
 
-        self.op_list = [
+        self.encoding_ops = nn.Sequential(
             conv_in,
             nn.LeakyReLU(),
             nn.MaxPool2d(2),
@@ -235,10 +233,10 @@ class Encoder_AE(nn.Module):
             nn.LeakyReLU(),
             nn.MaxPool2d(2),
             conv_done,
-        ]
+        )
 
-        ny, nx = input_shape[1:]
         self.input_shape = input_shape
+        ny, nx = input_shape[1:]
         self.post_op_shape = (nc_done, ny // 4 - 1, nx // 4 - 1)
         self.flatcon = math.prod(self.post_op_shape)
         self.crush = nn.Sequential(
@@ -263,10 +261,7 @@ class Encoder_AE(nn.Module):
         torch.Tensor
             The encoded representation of the input tensor.
         """
-        for op in self.op_list:
-            x = op(x)
-            # print(op, x.shape)
-            pass
+        x = self.encoding_ops(x)
 
         x = self.crush(x)
 
