@@ -10,12 +10,12 @@ from dataeval.utils.split_dataset import split_dataset
 
 __all__ = ["split_dataset", "merge_metadata"]
 
-if _IS_TORCH_AVAILABLE:  # pragma: no cover
+if _IS_TORCH_AVAILABLE:
     from dataeval.utils import torch
 
     __all__ += ["torch"]
 
-if _IS_TENSORFLOW_AVAILABLE:  # pragma: no cover
+if _IS_TENSORFLOW_AVAILABLE:
     from dataeval.utils import tensorflow
 
     __all__ += ["tensorflow"]

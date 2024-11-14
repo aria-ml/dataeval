@@ -145,6 +145,9 @@ parallel = true
 exclude_also = [
   "raise NotImplementedError",
   "if TYPE_CHECKING:",
+  "if _IS_TENSORFLOW_AVAILABLE",
+  "if _IS_TORCH_AVAILABLE",
+  "if _IS_TORCHVISION_AVAILABLE",
 ]
 include = ["*/src/dataeval/*"]
 omit = [

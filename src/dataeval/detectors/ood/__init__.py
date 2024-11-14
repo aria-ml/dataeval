@@ -4,7 +4,7 @@ Out-of-distribution (OOD)` detectors identify data that is different from the da
 
 from dataeval import _IS_TENSORFLOW_AVAILABLE
 
-if _IS_TENSORFLOW_AVAILABLE:  # pragma: no cover
+if _IS_TENSORFLOW_AVAILABLE:
     from dataeval.detectors.ood.ae import OOD_AE
     from dataeval.detectors.ood.aegmm import OOD_AEGMM
     from dataeval.detectors.ood.base import OODOutput, OODScoreOutput
