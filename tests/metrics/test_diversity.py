@@ -38,7 +38,7 @@ def test_entropy_normalization(norm, entropy_test_vars):
         entropy_test_vars["continuous_factor_bincounts"],
         normalized=norm,
     )
-    assert ent[0][0] == 0
+    assert ent[0] == 0
 
 
 class TestDiversityUnit:

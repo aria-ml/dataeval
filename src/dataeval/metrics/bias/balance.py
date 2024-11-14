@@ -172,8 +172,9 @@ def balance(
     Return classwise balance (mutual information) of factors with individual class_labels
 
     >>> bal.classwise
-    array([[1.99999289, 0.25170131, 0.        , 0.        ],
-           [1.99999289, 0.25170131, 0.        , 0.        ]])
+    array([[0.99999822, 0.13363788, 0.        , 0.        ],
+           [0.99999822, 0.13363788, 0.        , 0.        ]])
+
 
     See Also
     --------
@@ -214,7 +215,8 @@ def balance(
                 random_state=0,
             )
 
-    ent_all, cached_hist = entropy(data, names, continuous_factor_bincounts, normalized=False)
+    hist_cache = {}
+    ent_all = entropy(data, names, continuous_factor_bincounts, normalized=False, hist_cache=hist_cache)
     norm_factor = 0.5 * np.add.outer(ent_all, ent_all) + 1e-6
     # in principle MI should be symmetric, but it is not in practice.
     nmi = 0.5 * (mi + mi.T) / norm_factor
@@ -235,12 +237,8 @@ def balance(
     cat_mask = np.concatenate((is_categorical[:class_idx], is_categorical[(class_idx + 1) :]), axis=0).astype(int)
 
     tgt_bin = np.stack([class_data == cls for cls in u_cls]).T.astype(int)
-    ent_tgt_bin, cached_hist = entropy(
-        tgt_bin,
-        names=[str(idx) for idx in range(num_classes)],
-        continuous_factor_bincounts=continuous_factor_bincounts,
-        cached_hist=cached_hist,
-    )
+    names = [str(idx) for idx in range(num_classes)]
+    ent_tgt_bin = entropy(tgt_bin, names, continuous_factor_bincounts, hist_cache=hist_cache)
 
     # classification MI for discrete/categorical features
     for idx in range(num_classes):
