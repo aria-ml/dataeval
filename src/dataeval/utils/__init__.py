@@ -5,9 +5,10 @@ metrics. Currently DataEval supports both :term:`TensorFlow` and PyTorch backend
 """
 
 from dataeval import _IS_TENSORFLOW_AVAILABLE, _IS_TORCH_AVAILABLE
+from dataeval.utils.metadata import merge_metadata
 from dataeval.utils.split_dataset import split_dataset
 
-__all__ = ["split_dataset"]
+__all__ = ["split_dataset", "merge_metadata"]
 
 if _IS_TORCH_AVAILABLE:  # pragma: no cover
     from dataeval.utils import torch
