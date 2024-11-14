@@ -113,7 +113,8 @@ def predict_batch(
     """
     device = get_device(device)
     if isinstance(x, np.ndarray):
-        x = torch.from_numpy(x)
+        x = torch.from_numpy(x).to(device)
+        model.to(device)
     n = len(x)
     n_minibatch = int(np.ceil(n / batch_size))
     return_np = not isinstance(dtype, torch.dtype)

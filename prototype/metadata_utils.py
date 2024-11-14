@@ -2,7 +2,6 @@ import torch
 from torchvision.datasets.vision import VisionDataset
 from torch.utils.data import Dataset
 import numpy as np
-import tensorflow as tf
 from scipy.spatial import ConvexHull
 from dataeval.utils.torch.datasets import MNIST
 from types import SimpleNamespace as blank_object
@@ -30,7 +29,8 @@ class InstanceMNIST(blank_object):
     quantities of interest if desired. 
     """
     def __init__(self, corruptions=None, size=None, **kwargs):
-        MNIST_NUM_IMAGES = 60000
+        train = True if (train:=kwargs.get('train')) is None else train
+        MNIST_NUM_IMAGES = 60000 if train else 10000
 
         self.rng = np.random.default_rng(1234)
         ishuff = self.rng.permutation(MNIST_NUM_IMAGES)
@@ -66,14 +66,14 @@ class InstanceMNIST(blank_object):
             size = max_size
 
         if size > max_size:
-            raise ValueError(f'size {size} is too big, must bve less than {max_size} for {len(corruptions)} corruptions.')
+            raise ValueError(f'size {size} is too big, must be less than {max_size} for {len(corruptions)} corruptions.')
 
         for ic, c in enumerate(corruptions):
             if not c in self.corruptions:
                 print(f'Unknown corruption type {c}.')
                 raise ValueError
-
-            mnist = MNIST(root='./data', corruption=c, size=size, randomize=False, balance=False, verbose=False)
+            
+            mnist = MNIST(root='./data', corruption=c, size=size, randomize=False, balance=False, verbose=False, train=train)
             images, labels = mnist._load_data()
             images, labels = images[ishuff], labels[ishuff]
 
