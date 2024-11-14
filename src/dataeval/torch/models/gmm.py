@@ -121,6 +121,6 @@ def gmm_energy(
 
 
 # replace tf.expand with this....
-def expand(x: NDArray[Any] | torch.Tensor, dim=None) -> NDArray[Any] | torch.Tensor:
+def expand(x: NDArray[Any] | torch.Tensor, dim=None) -> torch.Tensor:
     newshape = (*x.shape, 1) if dim is None else (*x.shape[0:dim], 1, *x.shape[dim:])
-    return x.reshape(newshape)
+    return torch.tensor(x).reshape(newshape)
