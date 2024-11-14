@@ -50,6 +50,9 @@ def get_counts(
 
     hist_counts = {}
 
+    if continuous_factor_bincounts is None:
+        continuous_factor_bincounts = {}
+
     # np.where needed to satisfy linter
     # TODO: The commented line results in discretization according to nonglobal standards,
     # need to figure out an elegant solution to this problem
@@ -57,15 +60,15 @@ def get_counts(
     # mask = np.where(np.ones(data.shape[0], dtype=bool))
 
     for cdx, fn in enumerate(names):
-        hist_edges = np.array([-np.inf, np.inf])
-        cnts = np.array([len(data[:, cdx].squeeze())])
-        # linter doesn't like double indexing
-        col_data = np.array(data[mask, cdx].squeeze(), dtype=np.float64)
-
         if hist_cache and fn in hist_cache:
             cnts = hist_cache[fn]
         else:
-            if continuous_factor_bincounts and fn in continuous_factor_bincounts:
+            hist_edges = np.array([-np.inf, np.inf])
+            cnts = np.array([len(data[:, cdx].squeeze())])
+            # linter doesn't like double indexing
+            col_data = np.array(data[mask, cdx].squeeze(), dtype=np.float64)
+
+            if fn in continuous_factor_bincounts:
                 num_bins = continuous_factor_bincounts[fn]
                 _, hist_edges = np.histogram(data[:, cdx].squeeze(), bins=num_bins, density=True)
                 hist_edges[-1] = np.inf
