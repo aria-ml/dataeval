@@ -8,6 +8,16 @@
 ```{currentmodule} dataeval.utils
 ```
 
+## Functions
+
+```{testsetup}
+from dataeval.utils import merge_metadata
+```
+
+```{eval-rst}
+.. autofunction:: merge_metadata
+```
+
 ## Submodules
 
 ```{eval-rst}
