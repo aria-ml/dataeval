@@ -30,7 +30,7 @@ def trainer(
     ),
     batch_size: int = 64,
     buffer_size: int = 1024,
-    verbose: bool = True,
+    verbose: bool = False,
 ) -> None:
     """
     Train Pytorch model.
@@ -60,18 +60,8 @@ def trainer(
     verbose
         Whether to print training progress.
     """
-    #
-    # THIS WILL NEED MORE THAN JUST TYPO CHANGES!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    #
-    # if optimizer is None:
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    # optimizer = torch.optim.SGD(model.parameters(), lr=1e-2)
 
-    # loss_fn = loss_fn() if isinstance(loss_fn, type) else loss_fn
-    # optimizer = optimizer() if isinstance(optimizer, type) else optimizer
-
-    # train_data = x_train if y_train is None else (x_train, y_train)
-    # torch.tensor(train_data)  # make a Dataset from this!
     if y_train is None:
         dataset = TensorDataset(torch.from_numpy(x_train).to(torch.float32))
     else:
@@ -79,18 +69,11 @@ def trainer(
             torch.from_numpy(x_train).to(torch.float32), torch.from_numpy(y_train).to(torch.float32)
         )
 
-    # dataset = dataset.shuffle(buffer_size=buffer_size).batch(batch_size)
-    # n_minibatch = len(dataset)
-
-    # def crapnorm(xraw):
-    #     return (xraw - torch.tensor(0.5)) * torch.tensor(2.0)
-
-    # preprocess_fn = crapnorm
-
     loader = DataLoader(dataset=dataset)
     # iterate over epochs
     for epoch in range(epochs):
-        print(f"Epoch {epoch}...")
+        if verbose:
+            print(f"Epoch {epoch}...")
         first_time_in_epoch = True
 
         for step, data in enumerate(loader):
@@ -99,19 +82,10 @@ def trainer(
             if isinstance(preprocess_fn, Callable):
                 x = preprocess_fn(x)
 
-            y_hat = model(x)  # .clone().detach().requires_grad_(True)
+            y_hat = model(x)
             y = x if y is None else y
-            # y = y.clone().detach().requires_grad_(True)
 
             loss = loss_fn(y, y_hat)  # type: ignore
-
-            # if isinstance(loss_fn, Callable):
-            #     args = [y] + list(y_hat) if isinstance(y_hat, tuple) else [y, y_hat]
-            #     loss = loss_fn(*args)
-            # else:
-            #     loss = cast(torch.Tensor, torch.tensor(0.0, dtype=torch.float32))
-            # if model.losses:  # additional model losses
-            #     loss = cast(torch.Tensor, torch.add(sum(model.losses), loss))
 
             optimizer.zero_grad()
             loss.backward()
@@ -132,9 +106,8 @@ def trainer(
                 print(f"epoch: {epoch}, step: {step}, parameters not changing")
                 pass
             else:
-                # print(total_norm)
                 pass
 
-            if step % 500 == 0:
-                print(f"loss: {loss}, |grad|: {total_norm}")
+            if step % 500 == 0 and verbose:
+                print(f"loss: {loss:.3f}, |grad|: {total_norm:.3f}")
         pass

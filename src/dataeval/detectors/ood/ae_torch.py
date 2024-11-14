@@ -43,7 +43,7 @@ class OOD_AE(OODBase):
         optimizer: torch.optim.Optimizer | None = None,
         epochs: int = 20,
         batch_size: int = 64,
-        verbose: bool = True,
+        verbose: bool = False,
     ) -> None:
         if loss_fn is None:
             loss_fn = torch.nn.MSELoss()
