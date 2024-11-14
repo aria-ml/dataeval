@@ -8,7 +8,7 @@ Licensed under Apache Software License (Apache 2.0)
 
 from __future__ import annotations
 
-from typing import Callable, cast
+from typing import Any, Callable, cast
 
 import torch
 from numpy.typing import NDArray
@@ -19,8 +19,8 @@ from torch.utils.data import DataLoader, TensorDataset
 
 def trainer(
     model: torch.nn.Module,
-    x_train: NDArray,
-    y_train: NDArray | None = None,
+    x_train: NDArray[Any],
+    y_train: NDArray[Any] | None = None,
     loss_fn: Callable[..., torch.Tensor] | None = None,
     optimizer: torch.optim.Optimizer | None = None,
     preprocess_fn: Callable[[torch.Tensor], torch.Tensor] | None = None,
