@@ -158,7 +158,7 @@ def balance(
     -------
     Return balance (mutual information) of factors with class_labels
 
-    >>> bal = balance(class_labels, metadata)
+    >>> bal = balance(class_labels, metadata, continuous_factor_bincounts=continuous_factor_bincounts)
     >>> bal.balance
     array([0.99999822, 0.13363788, 0.04505382, 0.02994455])
 
@@ -172,8 +172,8 @@ def balance(
     Return classwise balance (mutual information) of factors with individual class_labels
 
     >>> bal.classwise
-    array([[0.99999822, 0.13363788, 0.        , 0.        ],
-           [0.99999822, 0.13363788, 0.        , 0.        ]])
+    array([[1.99999289, 0.25170131, 0.        , 0.        ],
+           [1.99999289, 0.25170131, 0.        , 0.        ]])
 
     See Also
     --------

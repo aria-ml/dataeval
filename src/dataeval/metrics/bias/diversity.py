@@ -197,11 +197,11 @@ def diversity_simpson(
         # relative frequencies
         p_i = cnts / np.sum(cnts)
         # inverse Simpson index normalized by (number of bins)
-        s_0 = 1 / np.sum(p_i**2) / num_bins[col]
+        s_0 = 1 / np.sum(p_i**2)  # / num_bins[col]
         if num_bins[col] == 1:
             ev_index[col] = 0
         else:
-            ev_index[col] = (s_0 * num_bins[col] - 1) / (num_bins[col] - 1)
+            ev_index[col] = (s_0 - 1) / (num_bins[col] - 1)
     return ev_index, cached_hist
 
 
@@ -251,23 +251,23 @@ def diversity(
     -------
     Compute Simpson diversity index of metadata and class labels
 
-    >>> div_simp = diversity(class_labels, metadata, method="simpson")
+    >>> div_simp = diversity(class_labels, metadata, continuous_factor_bincounts, method="simpson")
     >>> div_simp.diversity_index
-    array([0.18103448, 0.18103448, 0.88636364])
+    array([0.72413793, 0.72413793, 0.88636364])
 
     >>> div_simp.classwise
-    array([[0.17241379, 0.39473684],
-           [0.2       , 0.2       ]])
+    array([[0.68965517, 0.69230769],
+           [0.8       , 0.5       ]])
 
     Compute Shannon diversity index of metadata and class labels
 
-    >>> div_shan = diversity(class_labels, metadata, method="shannon")
+    >>> div_shan = diversity(class_labels, metadata, continuous_factor_bincounts, method="shannon")
     >>> div_shan.diversity_index
-    array([0.37955133, 0.37955133, 0.96748876])
+    array([0.8812909 , 0.8812909 , 0.96748876])
 
     >>> div_shan.classwise
-    array([[0.43156028, 0.83224889],
-           [0.57938016, 0.57938016]])
+    array([[0.86312057, 0.91651644],
+           [0.91829583, 1.        ]])
 
     See Also
     --------
