@@ -11,8 +11,9 @@ ARG output_dir="/dataeval/output"
 FROM python:3.11 as data
 RUN pip install --no-cache \
     --extra-index-url https://download.pytorch.org/whl/cpu \
-    torch==2.1.2+cpu \
-    torchvision==0.16.2+cpu
+    torch==2.5.1+cpu \
+    torchvision==0.20.1+cpu \
+    requests
 WORKDIR /docs
 COPY docs/data.py data.py
 COPY src/dataeval/utils/torch/datasets.py dataeval/utils/torch/datasets.py
