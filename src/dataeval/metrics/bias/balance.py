@@ -182,7 +182,7 @@ def balance(
     sklearn.feature_selection.mutual_info_regression
     sklearn.metrics.mutual_info_score
     """
-    if not continuous_factor_bincounts:
+    if continuous_factor_bincounts is None:
         continuous_factor_bincounts = {}
 
     num_neighbors = validate_num_neighbors(num_neighbors)

@@ -89,8 +89,8 @@ def entropy(
     hist_cache: dict[str, NDArray[np.intp]] | None = None,
 ) -> NDArray[np.float64]:
     """
-    Meant for use with Bias metrics, Balance, Diversity, ClasswiseBalance,
-    and Classwise Diversity.
+    Meant for use with :term:`bias<Bias>` metrics, :term:`balance<Balance>`, :term:`diversity<Diversity>`,
+    ClasswiseBalance, and Classwise Diversity.
 
     Compute entropy for discrete/categorical variables and for continuous variables through standard
     histogram binning.
@@ -187,17 +187,17 @@ def get_num_bins(
     return num_bins
 
 
-def infer_categorical(X: NDArray[np.float64], threshold: float = 0.2) -> NDArray[np.bool_]:
+def infer_categorical(arr: NDArray[np.float64], threshold: float = 0.2) -> NDArray[np.bool_]:
     """
     Compute fraction of feature values that are unique --- intended to be used
     for inferring whether variables are categorical.
     """
-    if X.ndim == 1:
-        X = np.expand_dims(X, axis=1)
-    num_samples = X.shape[0]
-    pct_unique = np.empty(X.shape[1])
-    for col in range(X.shape[1]):  # type: ignore
-        uvals = np.unique(X[:, col], axis=0)
+    if arr.ndim == 1:
+        arr = np.expand_dims(arr, axis=1)
+    num_samples = arr.shape[0]
+    pct_unique = np.empty(arr.shape[1])
+    for col in range(arr.shape[1]):  # type: ignore
+        uvals = np.unique(arr[:, col], axis=0)
         pct_unique[col] = len(uvals) / num_samples
     return pct_unique < threshold
 
