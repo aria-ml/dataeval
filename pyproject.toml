@@ -55,8 +55,8 @@ xxhash = {version = ">=3.3"}
 matplotlib = {version = "*", optional = true}
 markupsafe = {version = "<3.0.2", optional = true}
 tensorflow = {version = ">=2.16,<2.18", optional = true}
-tensorflow_probability = {version = ">=0.24", optional = true}
-tf-keras = {version = ">=2.16", optional = true}
+tensorflow_probability = {version = ">=0.24,<0.25", optional = true}
+tf-keras = {version = ">=2.16,<2.18", optional = true}
 torch = {version = ">=2.2.0", source = "pytorch", optional = true}
 torchvision = {version = ">=0.17.0", source = "pytorch", optional = true}
 
