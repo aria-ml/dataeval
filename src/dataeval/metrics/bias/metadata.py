@@ -52,15 +52,14 @@ def get_counts(
 
     if continuous_factor_bincounts is None:
         continuous_factor_bincounts = {}
+    if hist_cache is None:
+        hist_cache = {}
 
     # np.where needed to satisfy linter
-    # TODO: The commented line results in discretization according to nonglobal standards,
-    # need to figure out an elegant solution to this problem
     mask = np.where(subset_mask if subset_mask is not None else np.ones(data.shape[0], dtype=bool))
-    # mask = np.where(np.ones(data.shape[0], dtype=bool))
 
     for cdx, fn in enumerate(names):
-        if hist_cache and fn in hist_cache:
+        if fn in hist_cache:
             cnts = hist_cache[fn]
         else:
             hist_edges = np.array([-np.inf, np.inf])
