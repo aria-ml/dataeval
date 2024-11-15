@@ -1,7 +1,7 @@
 variables:
   PYTHON_LATEST_SUPPORTED_VERSION: '3.12'
   DOCKER_DRIVER: overlay2
-  SAST_EXCLUDED_PATHS: spec,test,tests,tmp,.tox,output,prototype
+  SAST_EXCLUDED_PATHS: spec,test,tests,tmp,.nox,output,prototype
   DOCS_RUNNER_TAG: single-gpu
   UV_CACHE_DIR: .uv-cache
   UV_LINK_MODE: copy
@@ -71,10 +71,10 @@ stages:
         - environment/*
         - README.md
     variables:
-      TASK: qdocs
+      DOCS_POSARGS: ""
   - if: $CI_COMMIT_BRANCH == 'main'
     variables:
-      TASK: docs
+      DOCS_POSARGS: clean
 
 .on_merge_request_only: &on_merge_request_only
   - if: $CREATE_NEW_RELEASE
@@ -88,10 +88,10 @@ stages:
 
 ### TEMPLATES ###
 
-.tox:
+.nox:
   needs: []
   before_script:
-    - uv pip install uv tox tox-uv --system
+    - uv pip install nox[uv] --system
   cache:
     - key:
         files:
@@ -103,8 +103,8 @@ stages:
   after_script:
     - uv cache prune --ci
 
-.tox_all:
-  extends: .tox
+.nox_all:
+  extends: .nox
   image: $UV_IMAGE:python$PYTHON_VERSION-$BASE_LAYER
   parallel:
     matrix:
@@ -113,27 +113,27 @@ stages:
 ### TEST ###
 
 lint:
-  extends: .tox
+  extends: .nox
   script:
-    - tox -e lint
+    - nox -e lint
   rules: *on_run
 
 minimum install:
-  extends: .tox
+  extends: .nox
   script:
-    - tox -e deps
+    - nox -e deps
   rules: *on_run
 
 typecheck:
-  extends: .tox_all
+  extends: .nox_all
   script:
-    - tox -e type-${PYTHON_VERSION}
+    - nox -e type-${PYTHON_VERSION}
   rules: *on_run
 
 test:
-  extends: .tox_all
+  extends: .nox_all
   script:
-    - tox -e ${PYTHON_VERSION}
+    - nox -e test-${PYTHON_VERSION}
   artifacts:
     reports:
       junit: output/junit.*.xml
@@ -164,32 +164,32 @@ coverage:
   rules: *on_run
 
 verify lock:
-  extends: .tox
+  extends: .nox
   script:
-    - tox -e check
+    - nox -e check
   rules: *on_run
 
 ### DOCS ###
 
 doctest:
   stage: docs
-  extends: .tox
+  extends: .nox
   script:
-    - tox -e doctest
+    - nox -e doctest
   rules: *on_run
 
 docs:
   stage: docs
-  extends: .tox
+  extends: .nox
   image: nvidia/cuda:12.6.2-cudnn-devel-ubuntu22.04
   tags:
     - $DOCS_RUNNER_TAG
   before_script:
     - apt-get -y update; apt-get -y install curl
     - curl -LsSf https://astral.sh/uv/install.sh | env UV_UNMANAGED_INSTALL="/usr/bin" sh
-    - uv venv --python 3.11; uv pip install uv tox tox-uv; source .venv/bin/activate
+    - uv venv --python 3.11; uv pip install nox[uv]; source .venv/bin/activate
   script:
-    - tox -e $TASK
+    - nox -e docs -- $DOCS_POSARGS
   artifacts:
     paths:
       - output/docs/.jupyter_cache/

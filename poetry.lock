@@ -2416,4 +2416,4 @@ torch = ["matplotlib", "torch", "torchvision"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "bcdc70097c3f7b3686cd047519f7820ef98fc2e574721df70abf42ccfac4997a"
+content-hash = "ff4a4acb3186162b334a5ce30ce8a7245be0b54fe3d6de868aaa97215895516b"

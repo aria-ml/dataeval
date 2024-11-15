@@ -38,5 +38,5 @@
     }
   },
 
-  "postCreateCommand": [ "./init" ]
+  "postCreateCommand": [ ".devcontainer/init" ]
 }

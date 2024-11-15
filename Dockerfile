@@ -63,25 +63,25 @@ RUN touch README.md
 COPY --chown=${UID} pyproject.toml poetry.lock ./
 COPY --chown=${UID} src/ src/
 COPY --chown=${UID} tests/ tests/
-COPY --chown=${UID} tox.ini ./
+COPY --chown=${UID} noxfile.py ./
 COPY --chown=${UID} capture.sh ./
 ARG output_dir
 RUN mkdir -p $output_dir
-RUN mkdir -p .tox
+RUN mkdir -p .nox
 
 FROM task-run as unit-run
 ARG python_version
-RUN ln -s /dataeval/.venv .tox/${python_version}
-RUN ./capture.sh unit ${python_version} tox -e ${python_version}
+RUN ln -s /dataeval/.venv .nox/test-$(echo $python_version | tr . -)
+RUN ./capture.sh unit ${python_version} nox -r -e test-${python_version}
 
 FROM task-run as type-run
 ARG python_version
-RUN ln -s /dataeval/.venv .tox/type-${python_version}
-RUN ./capture.sh type ${python_version} tox -e type-${python_version}
+RUN ln -s /dataeval/.venv .nox/type-$(echo $python_version | tr . -)
+RUN ./capture.sh type ${python_version} nox -r -e type-${python_version}
 
 FROM task-run as deps-run
 ARG python_version
-RUN ./capture.sh deps ${python_version} tox -e deps
+RUN ./capture.sh deps ${python_version} nox -e deps
 
 FROM task-run as task-run-with-docs
 ARG UID
@@ -90,13 +90,13 @@ COPY --chown=${UID} *.md ./
 
 FROM task-run-with-docs as lint-run
 ARG python_version
-RUN ln -s /dataeval/.venv .tox/lint
-RUN ./capture.sh lint ${python_version} tox -e lint
+RUN ln -s /dataeval/.venv .nox/lint
+RUN ./capture.sh lint ${python_version} nox -r -e lint
 
 FROM task-run-with-docs as doctest-run
 ARG python_version
-RUN ln -s /dataeval/.venv .tox/doctest
-RUN ./capture.sh doctest ${python_version} tox -e doctest
+RUN ln -s /dataeval/.venv .nox/doctest
+RUN ./capture.sh doctest ${python_version} nox -r -e doctest
 
 # docs works differently than other tasks because it requires GPU access.
 # The GPU requirement means that the docs image must be run as a container
@@ -109,19 +109,18 @@ COPY --chown=${UID} pyproject.toml poetry.lock ./
 COPY --chown=${UID} src/ src/
 COPY --chown=${UID} docs/ docs/
 COPY --chown=${UID} *.md ./
-COPY --chown=${UID} tox.ini ./
+COPY --chown=${UID} noxfile.py ./
 COPY --chown=${UID} capture.sh ./
 ARG output_dir
 RUN mkdir -p $output_dir
-RUN mkdir -p .tox
+RUN mkdir -p .nox
+RUN ln -s /dataeval/.venv .nox/docs
 
 FROM task-docs as docs
-RUN ln -s /dataeval/.venv .tox/docs
-CMD tox -e docs
+CMD nox -r -e docs -- clean
 
 FROM task-docs as qdocs
-RUN ln -s /dataeval/.venv .tox/qdocs
-CMD tox -e qdocs
+CMD nox -r -e docs
 
 
 ######################## results layers ########################

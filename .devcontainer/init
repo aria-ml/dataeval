@@ -1,5 +1,8 @@
 #!/bin/bash
 
+echo -e "\033[1;31mPlease wait for this script to complete before allowing vscode to Reload Window!\033[0m"
+echo
+
 # Check for uv
 if ! $(which uv 1> /dev/null); then echo "Install uv to continue: https://docs.astral.sh/uv/"; exit 1; fi
 
@@ -32,13 +35,18 @@ if [ ${#versions[@]} == 0 ]; then
 fi
 
 # Install dataeval environment for each version of python
+uv pip install 
 echo -n ${versions[*]} | xargs -n1 bash -c '\
     echo "Creating python virtual environment for $0..." && \
-    uv venv --seed --allow-existing --python $0 .venv-$0 && \
-    uv pip install --python .venv-$0 --index-strategy unsafe-best-match \
+    uv venv --seed --allow-existing --python $0 .venv-$0 --link-mode copy && \
+    uv pip install --python .venv-$0 --index-strategy unsafe-best-match --link-mode copy \
         -e . \
         -r environment/requirements.txt \
         -r environment/requirements-dev.txt'
 echo -n ${versions[*]} | xargs -n1 bash -c '\
     echo "Finished installing dataeval for python $0 to .venv-$0"'
+echo
+
+echo
+echo -e '\033[1;37mIt is now safe to reload the window (\033[1;32mDeveloper: Reload Window\033[1;37m) and select a Python interpretor (\033[1;32mPython: Select Interpreter\033[1;37m) from the Command Palette.'
 echo
