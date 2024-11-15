@@ -11,7 +11,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 
-from dataeval.metrics.bias.metadata import entropy, heatmap, preprocess_metadata
+from dataeval.metrics.bias.metadata import CLASS_LABEL, entropy, heatmap, preprocess_metadata
 from dataeval.output import OutputMetadata, set_metadata
 
 with contextlib.suppress(ImportError):
@@ -31,9 +31,9 @@ class BalanceOutput(OutputMetadata):
         Estimate of inter/intra-factor mutual information
     classwise : NDArray[np.float64]
         Estimate of mutual information between metadata factors and individual class labels
-    class_list: NDArray
+    class_list : NDArray
         Array of the class labels present in the dataset
-    metadata_names: list[str]
+    metadata_names : list[str]
         Names of each metadata factor
     """
 
@@ -54,9 +54,9 @@ class BalanceOutput(OutputMetadata):
 
         Parameters
         ----------
-        row_labels : ArrayLike | None, default None
+        row_labels : ArrayLike or None, default None
             List/Array containing the labels for rows in the histogram
-        col_labels : ArrayLike | None, default None
+        col_labels : ArrayLike or None, default None
             List/Array containing the labels for columns in the histogram
         plot_classwise : bool, default False
             Whether to plot per-class balance instead of global balance
@@ -116,19 +116,29 @@ def validate_num_neighbors(num_neighbors: int) -> int:
 
 
 @set_metadata("dataeval.metrics")
-def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neighbors: int = 5) -> BalanceOutput:
+def balance(
+    class_labels: ArrayLike,
+    metadata: Mapping[str, ArrayLike],
+    num_neighbors: int = 5,
+    continuous_factor_bincounts: Mapping[str, int] | None = None,
+) -> BalanceOutput:
     """
     Mutual information (MI) between factors (class label, metadata, label/image properties)
 
     Parameters
     ----------
-    class_labels: ArrayLike
+    class_labels : ArrayLike
         List of class labels for each image
-    metadata: Mapping[str, ArrayLike]
+    metadata : Mapping[str, ArrayLike]
         Dict of lists of metadata factors for each image
-    num_neighbors: int, default 5
+    num_neighbors : int, default 5
         Number of nearest neighbors to use for computing MI between discrete
         and continuous variables.
+    continuous_factor_bincounts : Mapping[str, int] or None, default None
+        The factors in metadata that have continuous values and the array of bin counts to
+        discretize values into. All factors are treated as having discrete values unless they
+        are specified as keys in this dictionary. Each element of this array must occur as a key
+        in metadata.
 
     Returns
     -------
@@ -148,7 +158,7 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
     -------
     Return balance (mutual information) of factors with class_labels
 
-    >>> bal = balance(class_labels, metadata)
+    >>> bal = balance(class_labels, metadata, continuous_factor_bincounts=continuous_factor_bincounts)
     >>> bal.balance
     array([0.99999822, 0.13363788, 0.04505382, 0.02994455])
 
@@ -165,6 +175,7 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
     array([[0.99999822, 0.13363788, 0.        , 0.        ],
            [0.99999822, 0.13363788, 0.        , 0.        ]])
 
+
     See Also
     --------
     sklearn.feature_selection.mutual_info_classif
@@ -178,9 +189,9 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
     mi[:] = np.nan
 
     for idx in range(num_factors):
-        tgt = data[:, idx].astype(int)
+        tgt = data[:, idx].astype(np.intp)
 
-        if is_categorical[idx]:
+        if continuous_factor_bincounts and names[idx] not in continuous_factor_bincounts:
             mi[idx, :] = mutual_info_classif(
                 data,
                 tgt,
@@ -197,7 +208,7 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
                 random_state=0,
             )
 
-    ent_all = entropy(data, names, is_categorical, normalized=False)
+    ent_all = entropy(data, names, continuous_factor_bincounts, normalized=False)
     norm_factor = 0.5 * np.add.outer(ent_all, ent_all) + 1e-6
     # in principle MI should be symmetric, but it is not in practice.
     nmi = 0.5 * (mi + mi.T) / norm_factor
@@ -205,7 +216,7 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
     factors = nmi[1:, 1:]
 
     # unique class labels
-    class_idx = names.index("class_label")
+    class_idx = names.index(CLASS_LABEL)
     u_cls = np.unique(data[:, class_idx])
     num_classes = len(u_cls)
 
@@ -214,12 +225,11 @@ def balance(class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], num_neig
     classwise_mi[:] = np.nan
 
     # categorical variables, excluding class label
-    cat_mask = np.concatenate((is_categorical[:class_idx], is_categorical[(class_idx + 1) :]), axis=0).astype(int)
+    cat_mask = np.concatenate((is_categorical[:class_idx], is_categorical[(class_idx + 1) :]), axis=0).astype(np.intp)
 
-    tgt_bin = np.stack([data[:, class_idx] == cls for cls in u_cls]).T.astype(int)
-    ent_tgt_bin = entropy(
-        tgt_bin, names=[str(idx) for idx in range(num_classes)], is_categorical=[True for idx in range(num_classes)]
-    )
+    tgt_bin = np.stack([data[:, class_idx] == cls for cls in u_cls]).T.astype(np.intp)
+    names = [str(idx) for idx in range(num_classes)]
+    ent_tgt_bin = entropy(tgt_bin, names, continuous_factor_bincounts)
 
     # classification MI for discrete/categorical features
     for idx in range(num_classes):

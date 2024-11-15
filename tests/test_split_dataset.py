@@ -13,7 +13,7 @@ rng = np.random.default_rng(9251990)
 @pytest.fixture(scope="module")
 def labels():
     lbls = [np.full(50, 0), np.full(100, 1), np.full(125, 2), np.full(150, 3), np.full(75, 4)]
-    return np.concatenate(lbls).astype(int)
+    return np.concatenate(lbls).astype(np.intp)
 
 
 def make_groups(n_labels, num_folds, discrete, as_angle):
@@ -23,7 +23,7 @@ def make_groups(n_labels, num_folds, discrete, as_angle):
     group_dict = {}
     for angle in as_angle:
         for dis in discrete:
-            group_enum = np.linspace(0, 360, n_groups).astype(int)
+            group_enum = np.linspace(0, 360, n_groups).astype(np.intp)
             groups = rng.choice(group_enum, size=n_labels, replace=True)
             groups = groups if dis else rng.normal(loc=groups)
             group_key = ("Discrete" if dis else "Continuous") + ("_Angle" if angle else "_Int")
@@ -126,10 +126,10 @@ def test_stratification_warning(labels):
 
 
 def test_continuous_labels(labels):
-    labels = labels.astype(float) + np.random.uniform(-1, 1, size=labels.shape)
+    cont_labels = labels.astype(np.float64) + np.random.uniform(-1, 1, size=labels.shape)
     error_statement = "Detected continuous labels, labels must be discrete for proper stratification"
     with pytest.raises(ValueError, match=error_statement):
-        split_dataset(labels, num_folds=2)
+        split_dataset(cont_labels, num_folds=2)
 
 
 def test_too_many_partitions(labels):

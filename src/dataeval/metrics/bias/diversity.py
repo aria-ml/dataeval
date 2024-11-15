@@ -10,6 +10,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from dataeval.metrics.bias.metadata import (
+    CLASS_LABEL,
     diversity_bar_plot,
     entropy,
     get_counts,
@@ -35,9 +36,9 @@ class DiversityOutput(OutputMetadata):
         :term:`Diversity` index for classes and factors
     classwise : NDArray[np.float64]
         Classwise diversity index [n_class x n_factor]
-    class_list: NDArray[np.int64]
+    class_list : NDArray[np.int64]
         Class labels for each value in the dataset
-    metadata_names: list[str]
+    metadata_names : list[str]
         Names of each metadata factor
     """
 
@@ -45,12 +46,11 @@ class DiversityOutput(OutputMetadata):
     classwise: NDArray[np.float64]
     class_list: NDArray[Any]
     metadata_names: list[str]
-    method: Literal["shannon", "simpson"]
 
     def plot(
         self,
-        row_labels: list[Any] | NDArray[Any] | None = None,
-        col_labels: list[Any] | NDArray[Any] | None = None,
+        row_labels: ArrayLike | list[Any] | None = None,
+        col_labels: ArrayLike | list[Any] | None = None,
         plot_classwise: bool = False,
     ) -> Figure:
         """
@@ -58,9 +58,9 @@ class DiversityOutput(OutputMetadata):
 
         Parameters
         ----------
-        row_labels : ArrayLike | None, default None
+        row_labels : ArrayLike or None, default None
             List/Array containing the labels for rows in the histogram
-        col_labels : ArrayLike | None, default None
+        col_labels : ArrayLike or None, default None
             List/Array containing the labels for columns in the histogram
         plot_classwise : bool, default False
             Whether to plot per-class balance instead of global balance
@@ -77,7 +77,7 @@ class DiversityOutput(OutputMetadata):
                 col_labels,
                 xlabel="Factors",
                 ylabel="Class",
-                cbarlabel=f"Normalized {self.method.title()} Index",
+                cbarlabel=f"Normalized {self.meta()['arguments']['method'].title()} Index",
             )
 
         else:
@@ -92,7 +92,7 @@ class DiversityOutput(OutputMetadata):
 def diversity_shannon(
     data: NDArray[Any],
     names: list[str],
-    is_categorical: list[bool],
+    continuous_factor_bincounts: Mapping[str, int] | None = None,
     subset_mask: NDArray[np.bool_] | None = None,
 ) -> NDArray[np.float64]:
     """
@@ -106,14 +106,16 @@ def diversity_shannon(
 
     Parameters
     ----------
-    data: NDArray
+    data : NDArray
         Array containing numerical values for metadata factors
-    names: list[str]
+    names : list[str]
         Names of metadata factors -- keys of the metadata dictionary
-    is_categorical: list[bool]
-        List of flags to identify whether variables are categorical (True) or
-        continuous (False)
-    subset_mask: NDArray[np.bool_] | None
+    continuous_factor_bincounts : Mapping[str, int] or None, default None
+        The factors in names that have continuous values and the array of bin counts to
+        discretize values into. All factors are treated as having discrete values unless they
+        are specified as keys in this dictionary. Each element of this array must occur as a key
+        in names.
+    subset_mask : NDArray[np.bool_] or None, default None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
     Note
@@ -122,18 +124,32 @@ def diversity_shannon(
 
     Returns
     -------
-    diversity_index: NDArray
+    diversity_index : NDArray[np.float64]
         Diversity index per column of X
 
     See Also
     --------
     numpy.histogram
     """
+    hist_cache = {}
 
     # entropy computed using global auto bins so that we can properly normalize
-    ent_unnormalized = entropy(data, names, is_categorical, normalized=False, subset_mask=subset_mask)
+    ent_unnormalized = entropy(
+        data,
+        names,
+        continuous_factor_bincounts,
+        normalized=False,
+        subset_mask=subset_mask,
+        hist_cache=hist_cache,
+    )
     # normalize by global counts rather than classwise counts
-    num_bins = get_num_bins(data, names, is_categorical=is_categorical, subset_mask=subset_mask)
+    num_bins = get_num_bins(
+        data,
+        names,
+        continuous_factor_bincounts=continuous_factor_bincounts,
+        subset_mask=subset_mask,
+        hist_cache=hist_cache,
+    )
     ent_norm = np.empty(ent_unnormalized.shape)
     ent_norm[num_bins != 1] = ent_unnormalized[num_bins != 1] / np.log(num_bins[num_bins != 1])
     ent_norm[num_bins == 1] = 0
@@ -143,7 +159,7 @@ def diversity_shannon(
 def diversity_simpson(
     data: NDArray[Any],
     names: list[str],
-    is_categorical: list[bool],
+    continuous_factor_bincounts: Mapping[str, int] | None = None,
     subset_mask: NDArray[np.bool_] | None = None,
 ) -> NDArray[np.float64]:
     """
@@ -157,14 +173,16 @@ def diversity_simpson(
 
     Parameters
     ----------
-    data: NDArray
+    data : NDArray
         Array containing numerical values for metadata factors
-    names: list[str]
+    names : list[str]
         Names of metadata factors -- keys of the metadata dictionary
-    is_categorical: list[bool]
-        List of flags to identify whether variables are categorical (True) or
-        continuous (False)
-    subset_mask: NDArray[np.bool_] | None
+    continuous_factor_bincounts : Mapping[str, int] or None, default None
+        The factors in names that have continuous values and the array of bin counts to
+        discretize values into. All factors are treated as having discrete values unless they
+        are specified as keys in this dictionary. Each element of this array must occur as a key
+        in names.
+    subset_mask : NDArray[np.bool_] or None, default None
         Boolean mask of samples to bin (e.g. when computing per class).  True -> include in histogram counts
 
     Note
@@ -175,35 +193,39 @@ def diversity_simpson(
 
     Returns
     -------
-    NDArray
+    diversity_index : NDArray[np.float64]
         Diversity index per column of X
 
     See Also
     --------
     numpy.histogram
     """
+    hist_cache = {}
 
-    hist_counts, _ = get_counts(data, names, is_categorical, subset_mask)
+    hist_counts = get_counts(data, names, continuous_factor_bincounts, subset_mask, hist_cache=hist_cache)
     # normalize by global counts, not classwise counts
-    num_bins = get_num_bins(data, names, is_categorical)
+    num_bins = get_num_bins(data, names, continuous_factor_bincounts, hist_cache=hist_cache)
 
     ev_index = np.empty(len(names))
     # loop over columns for convenience
     for col, cnts in enumerate(hist_counts.values()):
         # relative frequencies
-        p_i = cnts / cnts.sum()
+        p_i = cnts / np.sum(cnts)
         # inverse Simpson index normalized by (number of bins)
-        s_0 = 1 / np.sum(p_i**2) / num_bins[col]
+        s_0 = 1 / np.sum(p_i**2)  # / num_bins[col]
         if num_bins[col] == 1:
             ev_index[col] = 0
         else:
-            ev_index[col] = (s_0 * num_bins[col] - 1) / (num_bins[col] - 1)
+            ev_index[col] = (s_0 - 1) / (num_bins[col] - 1)
     return ev_index
 
 
 @set_metadata()
 def diversity(
-    class_labels: ArrayLike, metadata: Mapping[str, ArrayLike], method: Literal["shannon", "simpson"] = "simpson"
+    class_labels: ArrayLike,
+    metadata: Mapping[str, ArrayLike],
+    continuous_factor_bincounts: Mapping[str, int] | None = None,
+    method: Literal["simpson", "shannon"] = "simpson",
 ) -> DiversityOutput:
     """
     Compute :term:`diversity<Diversity>` and classwise diversity for discrete/categorical variables and,
@@ -216,11 +238,16 @@ def diversity(
 
     Parameters
     ----------
-    class_labels: ArrayLike
+    class_labels : ArrayLike
         List of class labels for each image
-    metadata: Mapping[str, ArrayLike]
+    metadata : Mapping[str, ArrayLike]
         Dict of list of metadata factors for each image
-    method: Literal["shannon", "simpson"], default "simpson"
+    continuous_factor_bincounts : Mapping[str, int] or None, default None
+        The factors in metadata that have continuous values and the array of bin counts to
+        discretize values into. All factors are treated as having discrete values unless they
+        are specified as keys in this dictionary. Each element of this array must occur as a key
+        in metadata.
+    method : {"simpson", "shannon"}, default "simpson"
         Indicates which diversity index should be computed
 
     Note
@@ -239,40 +266,42 @@ def diversity(
     -------
     Compute Simpson diversity index of metadata and class labels
 
-    >>> div_simp = diversity(class_labels, metadata, method="simpson")
+    >>> div_simp = diversity(class_labels, metadata, continuous_factor_bincounts, method="simpson")
     >>> div_simp.diversity_index
-    array([0.18103448, 0.18103448, 0.88636364])
+    array([0.72413793, 0.72413793, 0.88636364])
 
     >>> div_simp.classwise
-    array([[0.17241379, 0.39473684],
-           [0.2       , 0.2       ]])
+    array([[0.68965517, 0.69230769],
+           [0.8       , 1.        ]])
 
     Compute Shannon diversity index of metadata and class labels
 
-    >>> div_shan = diversity(class_labels, metadata, method="shannon")
+    >>> div_shan = diversity(class_labels, metadata, continuous_factor_bincounts, method="shannon")
     >>> div_shan.diversity_index
-    array([0.37955133, 0.37955133, 0.96748876])
+    array([0.8812909 , 0.8812909 , 0.96748876])
 
     >>> div_shan.classwise
-    array([[0.43156028, 0.83224889],
-           [0.57938016, 0.57938016]])
+    array([[0.86312057, 0.91651644],
+           [0.91829583, 1.        ]])
 
     See Also
     --------
     numpy.histogram
     """
     diversity_fn = get_method({"simpson": diversity_simpson, "shannon": diversity_shannon}, method)
-    data, names, is_categorical, unique_labels = preprocess_metadata(class_labels, metadata)
-    diversity_index = diversity_fn(data, names, is_categorical, None).astype(np.float64)
+    data, names, _, unique_labels = preprocess_metadata(class_labels, metadata)
+    diversity_index = diversity_fn(data, names, continuous_factor_bincounts)
 
-    class_idx = names.index("class_label")
-    u_classes = np.unique(data[:, class_idx])
+    class_idx = names.index(CLASS_LABEL)
+    class_lbl = data[:, class_idx]
+
+    u_classes = np.unique(class_lbl)
     num_factors = len(names)
     diversity = np.empty((len(u_classes), num_factors))
     diversity[:] = np.nan
     for idx, cls in enumerate(u_classes):
-        subset_mask = data[:, class_idx] == cls
-        diversity[idx, :] = diversity_fn(data, names, is_categorical, subset_mask)
+        subset_mask = class_lbl == cls
+        diversity[idx, :] = diversity_fn(data, names, continuous_factor_bincounts, subset_mask)
     div_no_class = np.concatenate((diversity[:, :class_idx], diversity[:, (class_idx + 1) :]), axis=1)
 
-    return DiversityOutput(diversity_index, div_no_class, unique_labels, list(metadata.keys()), method)
+    return DiversityOutput(diversity_index, div_no_class, unique_labels, list(metadata.keys()))

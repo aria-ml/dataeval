@@ -43,7 +43,7 @@ class TestCoverageUnit:
         np.testing.assert_array_equal(x.radii, x_flat.radii)
 
     def test_base_plotting(self):
-        images = np.zeros((20, 3, 28, 28), dtype=int)
+        images = np.zeros((20, 3, 28, 28), dtype=np.intp)
         images[1] += 80
         images[5] += 240
         images[7] += 160
@@ -52,10 +52,10 @@ class TestCoverageUnit:
         assert isinstance(output, Figure)
 
     def test_coverage_plot(self):
-        images = np.ones((6, 28, 28), dtype=int)
+        images = np.ones((6, 28, 28), dtype=np.intp)
         result = coverage_plot(images, 6)
         assert isinstance(result, Figure)
-        images = np.ones((6, 28), dtype=int)
+        images = np.ones((6, 28), dtype=np.intp)
         with pytest.raises(ValueError):
             result = coverage_plot(images, 6)
 

@@ -28,7 +28,7 @@ class ParityOutput(Generic[TData], OutputMetadata):
         chi-squared score(s) of the test
     p_value : np.float64 | NDArray[np.float64]
         p-value(s) of the test
-    metadata_names: list[str] | None
+    metadata_names : list[str] | None
         Names of each metadata factor
     """
 
@@ -43,16 +43,16 @@ def digitize_factor_bins(continuous_values: NDArray[Any], bins: int, factor_name
 
     Parameters
     ----------
-    continuous_values: NDArray
+    continuous_values : NDArray
         The values to be digitized.
-    bins: int
+    bins : int
         The number of bins for the discrete values that continuous_values will be digitized into.
-    factor_name: str
+    factor_name : str
         The name of the factor to be digitized.
 
     Returns
     -------
-    NDArray
+    NDArray[np.intp]
         The digitized values
     """
 
@@ -70,17 +70,21 @@ def digitize_factor_bins(continuous_values: NDArray[Any], bins: int, factor_name
 
 
 def format_discretize_factors(
-    data: NDArray[Any], names: list[str], is_categorical: list[bool], continuous_factor_bincounts: Mapping[str, int]
+    data: NDArray[Any],
+    names: list[str],
+    is_categorical: list[bool],
+    continuous_factor_bincounts: Mapping[str, int] | None,
 ) -> dict[str, NDArray[Any]]:
     """
     Sets up the internal list of metadata factors.
 
     Parameters
     ----------
-    data_factors: Dict[str, NDArray]
+    data : NDArray
         The dataset factors, which are per-image attributes including class label and metadata.
-        Each key of dataset_factors is a factor, whose value is the per-image factor values.
-    continuous_factor_bincounts : Dict[str, int]
+    names : list[str]
+        The class label
+    continuous_factor_bincounts : Mapping[str, int] or None
         The factors in data_factors that have continuous values and the array of bin counts to
         discretize values into. All factors are treated as having discrete values unless they
         are specified as keys in this dictionary. Each element of this array must occur as a key
@@ -93,19 +97,20 @@ def format_discretize_factors(
           Each key is a metadata factor, whose value is the discrete per-image factor values.
     """
 
-    invalid_keys = set(continuous_factor_bincounts.keys()) - set(names)
-    if invalid_keys:
-        raise KeyError(
-            f"The continuous factor(s) {invalid_keys} do not exist in data_factors. Delete these "
-            "keys from `continuous_factor_names` or add corresponding entries to `data_factors`."
-        )
+    if continuous_factor_bincounts:
+        invalid_keys = set(continuous_factor_bincounts.keys()) - set(names)
+        if invalid_keys:
+            raise KeyError(
+                f"The continuous factor(s) {invalid_keys} do not exist in data_factors. Delete these "
+                "keys from `continuous_factor_names` or add corresponding entries to `data_factors`."
+            )
 
     warn = []
     metadata_factors = {}
     for i, name in enumerate(names):
         if name == CLASS_LABEL:
             continue
-        if name in continuous_factor_bincounts:
+        if continuous_factor_bincounts and name in continuous_factor_bincounts:
             metadata_factors[name] = digitize_factor_bins(data[:, i], continuous_factor_bincounts[name], name)
         elif not is_categorical[i]:
             warn.append(name)
@@ -132,14 +137,14 @@ def normalize_expected_dist(expected_dist: NDArray[Any], observed_dist: NDArray[
 
     Parameters
     ----------
-    expected_dist : np.ndarray
+    expected_dist : NDArray
         The expected label distribution. This array represents the anticipated distribution of labels.
-    observed_dist : np.ndarray
+    observed_dist : NDArray
         The observed label distribution. This array represents the actual distribution of labels in the dataset.
 
     Returns
     -------
-    np.ndarray
+    NDArray
         The normalized expected distribution, scaled to have the same sum as the observed distribution.
 
     Raises
@@ -179,6 +184,8 @@ def validate_dist(label_dist: NDArray[Any], label_name: str) -> None:
     ----------
     label_dist : NDArray
         Array representing label distributions
+    label_name : str
+        String representing label name
 
     Raises
     ------
@@ -219,7 +226,7 @@ def label_parity(
         List of class labels in the expected dataset
     observed_labels : ArrayLike
         List of class labels in the observed dataset
-    num_classes : int | None, default None
+    num_classes : int or None, default None
         The number of unique classes in the datasets. If not provided, the function will infer it
         from the set of unique labels in expected_labels and observed_labels
 
@@ -303,12 +310,12 @@ def parity(
 
     Parameters
     ----------
-    class_labels: ArrayLike
+    class_labels : ArrayLike
         List of class labels for each image
-    metadata: Mapping[str, ArrayLike]
+    metadata : Mapping[str, ArrayLike]
         The dataset factors, which are per-image metadata attributes.
         Each key of dataset_factors is a factor, whose value is the per-image factor values.
-    continuous_factor_bincounts : Mapping[str, int] | None, default None
+    continuous_factor_bincounts : Mapping[str, int] or None, default None
         A dictionary specifying the number of bins for discretizing the continuous factors.
         The keys should correspond to the names of continuous factors in `metadata`,
         and the values should be the number of bins to use for discretization.
@@ -359,7 +366,6 @@ def parity(
         )
 
     data, names, is_categorical, _ = preprocess_metadata(class_labels, metadata)
-    continuous_factor_bincounts = continuous_factor_bincounts if continuous_factor_bincounts else {}
 
     factors = format_discretize_factors(data, names, is_categorical, continuous_factor_bincounts)
 
