@@ -144,7 +144,7 @@ def check_groups(group_ids: NDArray[np.int_], num_partitions: int) -> bool:
     ----------
     group_ids : np.ndarray
         Identifies the group to which a sample at the same index belongs.
-    num_partitions: int
+    num_partitions : int
         How many total (train, val) folds will be generated (+1 if also specifying a test fold).
 
     Warns
@@ -242,12 +242,12 @@ def get_group_ids(metadata: dict[str, Any], group_names: list[str], num_samples:
 
     Returns
     -------
-    group_ids: np.ndarray
+    group_ids : np.ndarray
         group identifiers from metadata
     """
     features2group = {k: np.array(v) for k, v in metadata.items() if k in group_names}
     if not features2group:
-        return np.zeros(num_samples, dtype=int)
+        return np.zeros(num_samples, dtype=np.int_)
     for name, feature in features2group.items():
         if len(feature) != num_samples:
             raise IndexError(f"""Feature length does not match number of labels. 
@@ -300,7 +300,13 @@ def make_splits(
         splits = splitter.split(index, labels)
     for train_idx, eval_idx in splits:
         test_ratio = len(eval_idx) / index.shape[0]
-        split_defs.append({"train": train_idx.astype(int), "eval": eval_idx.astype(int), "eval_frac": test_ratio})
+        split_defs.append(
+            {
+                "train": train_idx.astype(np.int_),
+                "eval": eval_idx.astype(np.int_),
+                "eval_frac": test_ratio,
+            }
+        )
     return split_defs
 
 
@@ -318,9 +324,9 @@ def find_best_split(
     split_defs : list[dict]
         List of dictionaries, which specifying train index, validation index, and the ratio of
         validation to all data.
-    stratified: bool
+    stratified : bool
         If True, maintain dataset class balance within each train/val split
-    eval_frac: float
+    eval_frac : float
         Desired fraction of the dataset sequestered for evaluation
 
     Returns

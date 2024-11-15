@@ -33,7 +33,7 @@ class Net(nn.Module):
 
 class TestSufficiencyUtils:
     def test_f_out(self):
-        n_i = np.geomspace(30, 3000, 20).astype(int)
+        n_i = np.geomspace(30, 3000, 20).astype(np.intp)
         x = np.array([0.5, 0.5, 0.5])
         answer = [
             0.591287,
@@ -87,7 +87,7 @@ class TestSufficiencyUtils:
                 0.137333,
             ]
         )
-        n_i = np.geomspace(30, 3000, 20).astype(int)
+        n_i = np.geomspace(30, 3000, 20).astype(np.intp)
         answer = [3.2633, 0.4160, 0.0053]
 
         output = calc_params(p_i, n_i, 100)

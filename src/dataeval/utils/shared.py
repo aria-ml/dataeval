@@ -95,7 +95,7 @@ def get_classes_counts(labels: NDArray[np.int_]) -> tuple[int, int]:
     M = len(classes)
     if M < 2:
         raise ValueError("Label vector contains less than 2 classes!")
-    N = np.sum(counts).astype(int)
+    N = int(np.sum(counts))
     return M, N
 
 

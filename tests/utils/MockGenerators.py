@@ -36,7 +36,7 @@ class MockImageClassificationGenerator:
         self._limit = limit
         if isinstance(labels, int):
             labels = [labels]
-        self._labels = np.array(labels, dtype=int)
+        self._labels = np.array(labels, dtype=np.intp)
         self._num_labels = 1 if isinstance(labels, int) else len(self._labels)
 
         if isinstance(img_dims, int):
@@ -61,7 +61,7 @@ class MockImageClassificationGenerator:
     def _create_data(self) -> tuple[np.ndarray, np.ndarray]:
         # Create an index for each label
         mock_data = np.ones(shape=(self._limit, *self._img_dims))
-        mock_labels = np.ones(shape=(self._limit), dtype=int)
+        mock_labels = np.ones(shape=(self._limit), dtype=np.intp)
 
         # If only 1 label, split is not needed, replace "1" with label value
         # and return

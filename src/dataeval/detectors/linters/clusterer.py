@@ -480,7 +480,7 @@ class Clusterer:
             samples = self.clusters[level][cluster_id].samples
             if len(samples) >= self._min_num_samples_per_cluster:
                 duplicates_std.append(self.clusters[level][cluster_id].dist_std)
-        diag_mask = np.ones_like(self._sqdmat, dtype=bool)
+        diag_mask = np.ones_like(self._sqdmat, dtype=np.bool_)
         np.fill_diagonal(diag_mask, 0)
         diag_mask = np.triu(diag_mask)
 

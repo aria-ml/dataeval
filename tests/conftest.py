@@ -91,6 +91,6 @@ def labels_with_metadata() -> tuple[NDArray, dict[str, NDArray]]:
         if "Angle" in key:
             md = ((md + 10) / 20) * 2 * np.pi
         elif "Discrete" in key:
-            md = np.round(md).astype(int)
+            md = int(np.round(md))
         metadata[key] = md
     return labels, metadata
