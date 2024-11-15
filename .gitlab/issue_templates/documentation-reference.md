@@ -33,6 +33,6 @@ If you create a varaible in the code setup, then add a text explanation in the d
 
 - [ ] File in the docs/reference folder
 - [ ] Example(s) (at least 1 needed) included in docstring
-- [ ] Passes doctest - `tox -e doctest` <!-- has been run in terminal before pushing to gitlab -->
+- [ ] Passes doctest - `nox -e doctest` <!-- has been run in terminal before pushing to gitlab -->
 
 /label ~ARiA ~issue::docs
