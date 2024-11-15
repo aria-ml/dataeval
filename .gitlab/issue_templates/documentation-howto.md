@@ -18,6 +18,6 @@ All new features should have at least a tutorial, concept page, and reference pa
 - [ ] Has all steps listed for process
 - [ ] Code does not error
 - [ ] All links work properly
-- [ ] Run qdocs - `tox -e qdocs` <!-- has been run in terminal before pushing to gitlab -->
+- [ ] Run docs - `nox -e docs` <!-- has been run in terminal before pushing to gitlab -->
 
 /label ~ARiA ~issue::docs
