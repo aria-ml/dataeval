@@ -21,7 +21,7 @@ class MockDistributionDataset:
         self.image = np.array([0, 0, 0])
         self.image = np.array([0, 0, 0])
         self.length = np.sum(label_dist)
-        self.labels = np.zeros(self.length, dtype=int)
+        self.labels = np.zeros(self.length, dtype=np.intp)
 
         idx = 0
         for label, label_interval in enumerate(label_dist):
@@ -110,9 +110,9 @@ class TestLabelIndependenceUnit:
             label_parity(labels_expected, labels_observed, num_classes=2)
 
     def test_fails_with_empty_exp_dataset(self):
-        f_exp = np.array([], dtype=int)
+        f_exp = np.array([], dtype=np.intp)
         f_obs = [0, 1]
-        f_exp = np.array([], dtype=int)
+        f_exp = np.array([], dtype=np.intp)
         f_obs = [0, 1]
 
         labels_expected = MockDistributionDataset(f_exp).labels
@@ -124,9 +124,9 @@ class TestLabelIndependenceUnit:
 
     def test_fails_with_empty_obs_dataset(self):
         f_exp = [0, 1]
-        f_obs = np.array([], dtype=int)
+        f_obs = np.array([], dtype=np.intp)
         f_exp = [0, 1]
-        f_obs = np.array([], dtype=int)
+        f_obs = np.array([], dtype=np.intp)
 
         labels_expected = MockDistributionDataset(f_exp).labels
         labels_observed = MockDistributionDataset(f_obs).labels

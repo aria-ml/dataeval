@@ -5,7 +5,7 @@ __all__ = ["CoverageOutput", "coverage"]
 import contextlib
 import math
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Literal
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -27,9 +27,9 @@ class CoverageOutput(OutputMetadata):
 
     Attributes
     ----------
-    indices : NDArray
+    indices : NDArray[np.intp]
         Array of uncovered indices
-    radii : NDArray
+    radii : NDArray[np.float64]
         Array of critical value radii
     critical_value : float
         Radius for :term:`coverage<Coverage>`
@@ -39,11 +39,7 @@ class CoverageOutput(OutputMetadata):
     radii: NDArray[np.float64]
     critical_value: float
 
-    def plot(
-        self,
-        images: NDArray[Any],
-        top_k: int = 6,
-    ) -> Figure:
+    def plot(self, images: ArrayLike, top_k: int = 6) -> Figure:
         """
         Plot the top k images together for visualization
 
@@ -53,6 +49,10 @@ class CoverageOutput(OutputMetadata):
             Original images (not embeddings) in (N, C, H, W) or (N, H, W) format
         top_k : int, default 6
             Number of images to plot (plotting assumes groups of 3)
+
+        Returns
+        -------
+        matplotlib.figure.Figure
         """
         # Determine which images to plot
         highest_uncovered_indices = self.indices[:top_k]
@@ -82,12 +82,12 @@ def coverage(
     embeddings : ArrayLike, shape - (N, P)
         A dataset in an ArrayLike format.
         Function expects the data to have 2 dimensions, N number of observations in a P-dimesionial space.
-    radius_type : Literal["adaptive", "naive"], default "adaptive"
+    radius_type : {"adaptive", "naive"}, default "adaptive"
         The function used to determine radius.
-    k: int, default 20
+    k : int, default 20
         Number of observations required in order to be covered.
         [1] suggests that a minimum of 20-50 samples is necessary.
-    percent: float, default 0.01
+    percent : float, default 0.01
         Percent of observations to be considered uncovered. Only applies to adaptive radius.
 
     Returns
