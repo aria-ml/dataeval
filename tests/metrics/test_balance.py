@@ -9,8 +9,32 @@ from dataeval.metrics.bias.metadata import infer_categorical, preprocess_metadat
 
 
 @pytest.fixture
+def simple_class_labels():
+    return [1] * 100 + [2] * 100
+
+
+@pytest.fixture
+def homog_class_labels():
+    return [1] * 10
+
+
+@pytest.fixture
+def inhomog_metadata():
+    return {
+        "factor1": list(range(10)),
+        "factor2": list(range(10)),
+        "factor3": list(range(10)),
+    }
+
+
+@pytest.fixture
+def simple_metadata():
+    return {"factor1": [1] * 100 + [2] * 100, "factor2": [1] * 100 + [2] * 100}
+
+
+@pytest.fixture
 def class_labels_int():
-    return np.array([1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0], dtype=int)
+    return np.array([1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0], dtype=np.intp)
 
 
 @pytest.fixture
@@ -37,7 +61,7 @@ def metadata():
             -0.92172538,
         ]
     )
-    cat_vals = np.array([1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0], dtype=int)
+    cat_vals = np.array([1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0], dtype=np.intp)
     # for unit testing
     md = {"var_cat": str_vals, "var_cnt": cnt_vals, "var_float_cat": cat_vals + 0.1}
     return md
@@ -64,7 +88,7 @@ class TestBalanceUnit:
         assert not is_categorical[idx]
         assert all(is_categorical[:idx] + is_categorical[idx + 1 :])
         assert data.dtype == float
-        unique_check = np.array([0, 1], dtype=int)
+        unique_check = np.array([0, 1], dtype=np.intp)
         assert (unique_labels == unique_check).all()
 
     def test_infer_categorical_2D_data(self):
@@ -111,3 +135,15 @@ class TestBalanceUnit:
         col_labels = np.arange(len(mi.metadata_names) + 1)
         classwise_output = mi.plot(row_labels, col_labels, True)
         assert isinstance(classwise_output, Figure)
+
+
+class TestBalanceFunctional:
+    def test_unity_balance(self, simple_class_labels, simple_metadata):
+        output = balance(simple_class_labels, simple_metadata)
+        assert np.all(output.balance > 0.999)
+        assert np.all(output.factors > 0.999)
+
+    def test_zero_balance(self, homog_class_labels, inhomog_metadata):
+        continuous_factor_bincounts = {"factor1": 5, "factor2": 5, "factor3": 5}
+        output = balance(homog_class_labels, inhomog_metadata, continuous_factor_bincounts=continuous_factor_bincounts)
+        assert np.all(np.isclose(output.balance, 0))
