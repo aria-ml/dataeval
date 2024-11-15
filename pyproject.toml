@@ -69,8 +69,7 @@ all = ["matplotlib", "markupsafe", "tensorflow", "tensorflow_probability", "tf-k
 optional = true
 
 [tool.poetry.group.dev.dependencies]
-tox = {version = "*"}
-tox-uv = {version = "*"}
+nox = {version = "*", extras = ["uv"]}
 uv = {version = "*"}
 poetry = {version = "*"}
 poetry-lock-groups-plugin = {version = "*"}
@@ -167,6 +166,7 @@ exclude = [
   "*env*",
   "output",
   "_build",
+  ".nox",
   ".tox",
   "prototype",
 ]

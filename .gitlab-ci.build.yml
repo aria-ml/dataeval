@@ -4,7 +4,7 @@ variables:
   DOCKER_DRIVER: overlay2
   PIP_ROOT_USER_ACTION: ignore
   PIP_DISABLE_PIP_VERSION_CHECK: 1
-  SAST_EXCLUDED_PATHS: spec,test,tests,tmp,.tox,output,prototype
+  SAST_EXCLUDED_PATHS: spec,test,tests,tmp,.nox,output,prototype
   DOCS_RUNNER_TAG: single-gpu
 
 workflow:
@@ -136,9 +136,9 @@ build:
 verify lock:
   stage: build
   before_script:
-    - pip install tox
+    - pip install nox[uv]
   script:
-    - tox -e check
+    - nox -e check
   rules: *on_run
 
 docker info:

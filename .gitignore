@@ -13,6 +13,7 @@ output/
 .coverage*
 
 .tox/
+.nox/
 .python-version
 
 # Used to store user customizable settings
