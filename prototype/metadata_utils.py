@@ -33,7 +33,7 @@ class InstanceMNIST(blank_object):
         MNIST_NUM_IMAGES = 60000 if train else 10000
 
         self.rng = np.random.default_rng(1234)
-        ishuff = self.rng.permutation(MNIST_NUM_IMAGES)
+        # ishuff = self.rng.permutation(MNIST_NUM_IMAGES)
 
         self.corruptions = [
             "identity",
@@ -73,11 +73,12 @@ class InstanceMNIST(blank_object):
                 print(f'Unknown corruption type {c}.')
                 raise ValueError
             
-            mnist = MNIST(root='./data', corruption=c, size=size, randomize=False, balance=False, verbose=False, train=train)
-            images, labels = mnist._load_data()
-            images, labels = images[ishuff], labels[ishuff]
+            mnist = MNIST(root='./data', corruption=c, size=size, balance=False, verbose=False, train=train)
+            # images, labels = mnist._load_data()
+            images, labels = mnist.data, mnist.targets
+            # images, labels = images[ishuff], labels[ishuff]
 
-            images, labels = images[ic*size:ic*size+size], labels[ic*size:ic*size+size]
+            # images, labels = images[ic*size:ic*size+size], labels[ic*size:ic*size+size]
             images = (np.reshape(images, (size, 1, *images.shape[1:]))/255.0).astype(np.float32)
 
 
