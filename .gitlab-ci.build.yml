@@ -241,10 +241,10 @@ update cache:
     - git add docs/.jupyter_cache/*
     - git config --global user.email "${GITLAB_USER_EMAIL}"
     - git config --global user.name "${GITLAB_USER_NAME}"
-    - git commit --message "Update jupyter-cache"
+    - if [[ $CI_COMMIT_BRANCH == main ]]; then SKIP_PREFIX="[ci skip] "; else SKIP_PREFIX=""; fi
+    - git commit --message "${SKIP_PREFIX}Update jupyter-cache"
     - git push https://dataeval-bot:${DATAEVAL_BUILD_PAT}@gitlab.jatic.net/jatic/aria/dataeval.git
   rules:
-    - *exclude_main
     - *on_run_with_docs
 
 pages:
