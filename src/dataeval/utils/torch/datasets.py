@@ -206,7 +206,7 @@ class MNIST(Dataset[tuple[NDArray[np.float64], int]]):
             Option to select specific classes from dataset.
         balance : bool, default True
             If True, returns equal number of samples for each class.
-        randomize : bool, default False
+        randomize : bool, default True
             If True, shuffles the data prior to selection - uses a set seed for reproducibility.
         slice_back : bool, default False
             If True and size has a value greater than 0, then grabs selection starting at the last image.
@@ -251,7 +251,7 @@ class MNIST(Dataset[tuple[NDArray[np.float64], int]]):
         corruption: CorruptionStringMap | None = None,
         classes: TClassMap | None = None,
         balance: bool = True,
-        randomize: bool = False,
+        randomize: bool = True,
         slice_back: bool = False,
         verbose: bool = True,
     ) -> None:
