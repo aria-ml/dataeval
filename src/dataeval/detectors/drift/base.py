@@ -18,7 +18,7 @@ from typing import Any, Callable, Literal, TypeVar
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval.interop import as_numpy, to_numpy
+from dataeval.interop import as_numpy
 from dataeval.output import OutputMetadata, set_metadata
 
 R = TypeVar("R")
@@ -196,7 +196,7 @@ class BaseDrift:
         if correction not in ["bonferroni", "fdr"]:
             raise ValueError("`correction` must be `bonferroni` or `fdr`.")
 
-        self._x_ref = to_numpy(x_ref)
+        self._x_ref = as_numpy(x_ref)
         self.x_ref_preprocessed: bool = x_ref_preprocessed
 
         # Other attributes
