@@ -14,7 +14,6 @@ import numpy as np
 import torch
 from numpy.typing import ArrayLike
 
-# from dataeval.utils.tensorflow import predict_batch
 from dataeval.detectors.drift.torch import predict_batch
 from dataeval.detectors.ood.base_torch import OODBase, OODScoreOutput
 from dataeval.interop import as_numpy
@@ -50,8 +49,7 @@ class OOD_AE(OODBase):
 
         super().fit(as_numpy(x_ref), threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
 
-    # @set_metadata("dataeval.detectors") # this tries to iterate over string, barfs because OOD_AE has no attribute 'd'
-    @set_metadata(None)  # just bash through for now
+    @set_metadata("dataeval.detectors")
     def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
         self._validate(X := as_numpy(X))
 
@@ -59,7 +57,7 @@ class OOD_AE(OODBase):
         X_recon = predict_batch(X, self.model, batch_size=batch_size)
 
         # compute feature and instance level scores
-        fscore = np.power(X - X_recon, 2)  # type: ignore
+        fscore = np.power(X - X_recon, 2)
         fscore_flat = fscore.reshape(fscore.shape[0], -1).copy()
         n_score_features = int(np.ceil(fscore_flat.shape[1]))
         sorted_fscore = np.sort(fscore_flat, axis=1)

@@ -125,11 +125,6 @@ def predict_batch(
             if isinstance(preprocess_fn, Callable):
                 x_batch = preprocess_fn(x_batch)
 
-            # preds_tmp = model(torch.tensor(x_batch).to(torch.float32))
-            # preds = preds_tmp.detach() if i == 0 else torch.cat((preds, preds_tmp.detach()), axis=0)  # type: ignore
-
-            #         # preds_tmp = model(x_batch.to(device))
-            #         # preds_tmp = model(x_batch.to(device).to(torch.float32))
             preds_tmp = model(x_batch.to(torch.float32))
             if isinstance(preds_tmp, (list, tuple)):
                 if len(preds) == 0:  # init tuple with lists to store predictions
@@ -159,8 +154,6 @@ def predict_batch(
         tuple(concat(p) for p in preds) if isinstance(preds, tuple) else concat(preds)  # type: ignore
     )
     return out
-
-    # return preds
 
 
 def preprocess_drift(
