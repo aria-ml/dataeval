@@ -1,13 +1,11 @@
 variables:
-  PYTHON_LATEST_SUPPORTED_VERSION: '3.12'
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PYTHON_LATEST_SUPPORTED_VERSION: "3.12"
   DOCKER_DRIVER: overlay2
+  PIP_ROOT_USER_ACTION: ignore
+  PIP_DISABLE_PIP_VERSION_CHECK: 1
   SAST_EXCLUDED_PATHS: spec,test,tests,tmp,.nox,output,prototype
   DOCS_RUNNER_TAG: single-gpu
-  UV_CACHE_DIR: .uv-cache
-  UV_LINK_MODE: copy
-  UV_IMAGE: ghcr.io/astral-sh/uv
-  BASE_LAYER: bookworm
-  FORCE_COLOR: '1'
 
 workflow:
   # Allows jobs in this workflow to be interrupted:
@@ -38,9 +36,15 @@ default:
   tags:
     - autoscaler
 
-image: $UV_IMAGE:python$PYTHON_LATEST_SUPPORTED_VERSION-$BASE_LAYER
+image: python:$PYTHON_LATEST_SUPPORTED_VERSION
+
+cache:
+  paths:
+    - .cache/pip
+    - venv/
 
 stages:
+  - build
   - test
   - docs
   - release
@@ -71,10 +75,16 @@ stages:
         - environment/*
         - README.md
     variables:
-      DOCS_POSARGS: ""
+      TASK: qdocs
   - if: $CI_COMMIT_BRANCH == 'main'
+    changes:
+      paths:
+        - src/**/*
+        - docs/**/*
+        - environment/*
+        - README.md
     variables:
-      DOCS_POSARGS: clean
+      TASK: docs
 
 .on_merge_request_only: &on_merge_request_only
   - if: $CREATE_NEW_RELEASE
@@ -86,74 +96,102 @@ stages:
     when: never
   - if: $CI_COMMIT_BRANCH == 'main'
 
-.on_functional_change: &on_functional_change
-  - if: $CI_COMMIT_BRANCH == 'main'
-    changes:
-      paths:
-        - src/**/*
-        - docs/**/*
-        - environment/*
-        - README.md
+### PYTHON_VERSION PARALLEL MATRIX TEMPLATE ###
 
-### TEMPLATES ###
-
-.nox:
-  needs: []
-  before_script:
-    - uv pip install nox[uv] --system
-  cache:
-    - key:
-        files:
-          - environment/requirements.txt
-          - environment/requirements-dev.txt
-      paths:
-        - $UV_CACHE_DIR
-        - data
-  after_script:
-    - uv cache prune --ci
-
-.nox_all:
-  extends: .nox
-  image: $UV_IMAGE:python$PYTHON_VERSION-$BASE_LAYER
+.python_version_matrix:
   parallel:
     matrix:
       - PYTHON_VERSION: ["3.9", "3.10", "3.11", "3.12"]
 
-### TEST ###
+### DOCKER TEMPLATES ###
 
-lint:
-  extends: .nox
-  script:
-    - nox -e lint
-  rules: *on_run
+.docker:
+  image: docker:25.0.5-git
+  before_script:
+    - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
 
-minimum install:
-  extends: .nox
-  script:
-    - nox -e deps
-  rules: *on_run
+.harbor:
+  extends: .docker
+  before_script:
+    - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
+    - echo ${DATAEVAL_HARBOR_TOKEN} | docker login harbor.jatic.net -u 'robot$dataeval+dataeval-build' --password-stdin || echo "Failed to login to Harbor..."
+  after_script:
+    - docker logout harbor.jatic.net|| echo "Failed to logout from Harbor..."
 
-typecheck:
-  extends: .nox_all
+.build_task:
+  extends: [.harbor, .python_version_matrix]
+  needs: [build]
   script:
-    - nox -e type-${PYTHON_VERSION}
-  rules: *on_run
-
-test:
-  extends: .nox_all
-  script:
-    - nox -e test-${PYTHON_VERSION}
+    - ./build --push ${PYTHON_VERSION} ${TASK}
   artifacts:
-    reports:
-      junit: output/junit.*.xml
     paths:
       - output/*
   rules: *on_run
 
-coverage:
-  needs: [test]
+### BUILD ###
+
+build:
+  stage: build
+  extends: [.harbor, .python_version_matrix]
+  needs: [verify lock]
+  script:
+    - apk add --no-cache parallel
+    - ./build --build-only --push ${PYTHON_VERSION}
+  rules: *on_run
+
+verify lock:
+  stage: build
   before_script:
-    - uv pip install coverage --system
+    - pip install nox[uv]
+  script:
+    - nox -e check
+  rules: *on_run
+
+docker info:
+  stage: build
+  extends: .docker
+  script:
+    - echo ===========================================================
+    - |
+      docker info
+      echo ===========================================================
+    - |
+      docker version
+      echo ===========================================================
+    - |
+      docker buildx ls
+      echo ===========================================================
+  rules: *on_run
+
+### TEST ###
+
+linting:
+  extends: .build_task
+  variables:
+    TASK: lint
+
+dependency tests:
+  extends: .build_task
+  variables:
+    TASK: deps
+
+tests:
+  extends: .build_task
+  variables:
+    TASK: unit
+  artifacts:
+    reports:
+      junit: output/junit.*.xml
+
+type checks:
+  extends: .build_task
+  variables:
+    TASK: type
+
+coverage:
+  needs: [tests]
+  before_script:
+    - pip install coverage
   script:
     # TODO: Move coverage report generation in to build script (and/or resolve issue with using symlinks instead of a full recursive copy)
     - cp --recursive $(pwd) /dataeval
@@ -172,33 +210,24 @@ coverage:
       - htmlcov/
   rules: *on_run
 
-verify lock:
-  extends: .nox
-  script:
-    - nox -e check
-  rules: *on_run
-
 ### DOCS ###
 
 doctest:
   stage: docs
-  extends: .nox
+  extends: .harbor
+  needs: [build]
   script:
-    - nox -e doctest
+    - ./build --push doctest
   rules: *on_run
 
 docs:
   stage: docs
-  extends: .nox
-  image: nvidia/cuda:12.6.2-cudnn-devel-ubuntu22.04
+  extends: .harbor
+  needs: [verify lock]
   tags:
     - $DOCS_RUNNER_TAG
-  before_script:
-    - apt-get -y update; apt-get -y install curl
-    - curl -LsSf https://astral.sh/uv/install.sh | env UV_UNMANAGED_INSTALL="/usr/bin" sh
-    - uv venv --python 3.11; uv pip install nox[uv]; source .venv/bin/activate
   script:
-    - nox -e docs -- $DOCS_POSARGS
+    - ./build --push $TASK --gpu
   artifacts:
     paths:
       - output/docs/.jupyter_cache/
@@ -222,7 +251,6 @@ update cache:
     - git commit --message "${SKIP_PREFIX}Update jupyter-cache"
     - git push https://dataeval-bot:${DATAEVAL_BUILD_PAT}@gitlab.jatic.net/jatic/aria/dataeval.git
   rules:
-    - *on_functional_change
     - *on_run_with_docs
 
 pages:
@@ -238,17 +266,16 @@ pages:
   artifacts:
     paths:
       - public
-  rules: *on_commit_main_only
+  rules: *on_run_with_docs
 
 ### RELEASE ###
 
 update merge request:
   stage: release
   before_script:
-    - uv pip install requests --system
+    - pip install requests
   script:
     - .gitlab/scripts/update_merge_request.py $CI_MERGE_REQUEST_IID $CI_PIPELINE_ID
-  allow_failure: true
   rules: *on_merge_request_only
 
 # This job will only run if all previous stages have succeeded,
@@ -256,7 +283,7 @@ update merge request:
 tag release candidate:
   stage: release
   before_script:
-    - uv pip install requests --system
+    - pip install requests
   script:
     - .gitlab/scripts/update_latest_known_good.py
   rules: *on_commit_main_only
@@ -267,10 +294,9 @@ remove image tags:
   stage: release
   needs: []
   before_script:
-    - uv pip install requests --system
+    - pip install requests
   script:
     - .gitlab/scripts/remove_image_tags.py
-  allow_failure: true
   rules: *on_commit_main_only
 
 # This job updates the changelog and tags the commit hash with a
@@ -280,7 +306,7 @@ create release:
   stage: release
   needs: []
   before_script:
-    - uv pip install requests --system
+    - pip install requests
   script:
     - .gitlab/scripts/create_release.py
   rules: *on_release
