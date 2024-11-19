@@ -124,7 +124,7 @@ stages:
   extends: [.harbor, .python_version_matrix]
   needs: [build]
   script:
-    - ./build --push ${PYTHON_VERSION} ${TASK}
+    - ./build ${PYTHON_VERSION} ${TASK}
   artifacts:
     paths:
       - output/*
@@ -178,6 +178,11 @@ verify lock:
   script:
     - nox -e check
   rules: *on_run
+    changes:
+      paths:
+        - environment/*
+        - poetry.lock
+        - pyproject.toml
 
 docker info:
   stage: build
@@ -272,7 +277,7 @@ doctest:
   extends: .harbor
   needs: [build]
   script:
-    - ./build --push doctest
+    - ./build doctest
   rules: *on_run
 
 docs:
@@ -282,7 +287,7 @@ docs:
   tags:
     - $DOCS_RUNNER_TAG
   script:
-    - ./build --push $TASK --gpu
+    - ./build $TASK --gpu
   artifacts:
     paths:
       - output/docs/.jupyter_cache/

@@ -56,7 +56,6 @@ ENV PATH=/${USER}/.venv/bin:${PATH}
 
 
 ######################## task layers ########################
-# The *-run layers run individual tasks and capture the results
 FROM base as task-run
 ARG UID
 RUN touch README.md
@@ -69,81 +68,45 @@ ARG output_dir
 RUN mkdir -p $output_dir
 RUN mkdir -p .nox
 
-FROM task-run as unit-run
-ARG python_version
-RUN ln -s /dataeval/.venv .nox/test-$(echo $python_version | tr . -)
-RUN ./capture.sh unit ${python_version} nox -r -e test-${python_version}
-
-FROM task-run as type-run
-ARG python_version
-RUN ln -s /dataeval/.venv .nox/type-$(echo $python_version | tr . -)
-RUN ./capture.sh type ${python_version} nox -r -e type-${python_version}
-
-FROM task-run as deps-run
-ARG python_version
-RUN ./capture.sh deps ${python_version} nox -e deps
-
 FROM task-run as task-run-with-docs
 ARG UID
 COPY --chown=${UID} docs/ docs/
 COPY --chown=${UID} *.md ./
 
-FROM task-run-with-docs as lint-run
-ARG python_version
-RUN ln -s /dataeval/.venv .nox/lint
-RUN ./capture.sh lint ${python_version} nox -r -e lint
-
-FROM task-run-with-docs as doctest-run
-ARG python_version
-RUN ln -s /dataeval/.venv .nox/doctest
-RUN ./capture.sh doctest ${python_version} nox -r -e doctest
-
-# docs works differently than other tasks because it requires GPU access.
-# The GPU requirement means that the docs image must be run as a container
-# since there's no access to GPU during the build.
-FROM base as task-docs
+FROM task-run-with-docs as task-run-with-docs-data
 ARG UID
-ARG HOME
 COPY --chown=${UID} --link --from=data /docs docs
-COPY --chown=${UID} pyproject.toml poetry.lock ./
-COPY --chown=${UID} src/ src/
-COPY --chown=${UID} docs/ docs/
-COPY --chown=${UID} *.md ./
-COPY --chown=${UID} noxfile.py ./
-COPY --chown=${UID} capture.sh ./
-ARG output_dir
-RUN mkdir -p $output_dir
-RUN mkdir -p .nox
 RUN ln -s /dataeval/.venv .nox/docs
 
-FROM task-docs as docs
+FROM task-run as unit
+ARG python_version
+RUN ln -s /dataeval/.venv .nox/test-$(echo $python_version | tr . -)
+CMD nox -r -e test-${python_version}
+
+FROM task-run as type
+ARG python_version
+RUN ln -s /dataeval/.venv .nox/type-$(echo $python_version | tr . -)
+CMD nox -r -e type-${python_version}
+
+FROM task-run as deps
+ARG python_version
+CMD nox -e deps
+
+FROM task-run-with-docs as lint
+ARG python_version
+RUN ln -s /dataeval/.venv .nox/lint
+CMD nox -r -e lint
+
+FROM task-run-with-docs as doctest
+ARG python_version
+RUN ln -s /dataeval/.venv .nox/doctest
+CMD nox -r -e doctest
+
+FROM task-run-with-docs-data as docs
 CMD nox -r -e docs -- clean
 
-FROM task-docs as qdocs
+FROM task-run-with-docs-data as qdocs
 CMD nox -r -e docs
-
-
-######################## results layers ########################
-# These layers copy the results of the associated *-run layers into a scratch image in order to keep the created images as small as possible
-FROM busybox as results
-ARG output_dir
-ENV output_dir=${output_dir}
-CMD cat ${output_dir}/*.log && exit $(cat ${output_dir}/*-exitcode)
-
-FROM results as unit
-COPY --from=unit-run $output_dir $output_dir
-
-FROM results as type
-COPY --from=type-run $output_dir $output_dir
-
-FROM results as lint
-COPY --from=lint-run $output_dir $output_dir
-
-FROM results as deps
-COPY --from=deps-run $output_dir $output_dir
-
-FROM results as doctest
-COPY --from=doctest-run $output_dir $output_dir
 
 
 ######################## devcontainer image ########################
