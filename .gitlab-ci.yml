@@ -178,11 +178,6 @@ verify lock:
   script:
     - nox -e check
   rules: *on_run
-    changes:
-      paths:
-        - environment/*
-        - poetry.lock
-        - pyproject.toml
 
 docker info:
   stage: build
