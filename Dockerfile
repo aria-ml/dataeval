@@ -26,7 +26,30 @@ data.download(); \
 "
 
 
-######################## shared cuda image ########################
+######################## shared base images ########################
+FROM ubuntu:22.04 as ubuntu
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends clang
+ARG UID
+ARG USER
+RUN useradd -m -u ${UID} -s /bin/bash ${USER}
+USER ${USER}
+WORKDIR /${USER}
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
+ENV UV_INDEX_STRATEGY=unsafe-best-match
+
+FROM ubuntu as base
+ARG UID
+ARG python_version
+RUN uv venv -p ${python_version}
+COPY --chown=${UID} environment/requirements.txt environment/
+RUN uv pip install -r environment/requirements.txt
+COPY --chown=${UID} environment/requirements-dev.txt environment/
+RUN uv pip install -r environment/requirements-dev.txt
+ENV PATH=/${USER}/.venv/bin:${PATH}
+
 FROM nvidia/cuda:12.6.2-cudnn-devel-ubuntu22.04 as cuda
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -38,13 +61,13 @@ USER ${USER}
 WORKDIR /${USER}
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
-ENV TF_GPU_ALLOCATOR=cuda_malloc_async
 ENV UV_INDEX_STRATEGY=unsafe-best-match
+ENV TF_GPU_ALLOCATOR=cuda_malloc_async
 ENV LANGUAGE=en
 ENV LC_ALL=C.UTF-8
 ENV LANG=en_US.UTF-8
 
-FROM cuda as base
+FROM cuda as base-docs
 ARG UID
 ARG python_version
 RUN uv venv -p ${python_version}
@@ -53,9 +76,6 @@ RUN uv pip install -r environment/requirements.txt
 COPY --chown=${UID} environment/requirements-dev.txt environment/
 RUN uv pip install -r environment/requirements-dev.txt
 ENV PATH=/${USER}/.venv/bin:${PATH}
-
-FROM base as base-docs
-ARG UID
 COPY --chown=${UID} --link --from=data /docs docs
 
 

@@ -6,6 +6,7 @@ variables:
   DOCKER_DRIVER: overlay2
   SAST_EXCLUDED_PATHS: spec,test,tests,tmp,.nox,output,prototype
   DOCS_RUNNER_TAG: single-gpu
+  FORCE_COLOR: 1
   FF_SCRIPT_SECTIONS: true
 
 workflow:
