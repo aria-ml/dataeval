@@ -119,10 +119,11 @@ stages:
     - docker logout harbor.jatic.net|| echo "Failed to logout from Harbor..."
 
 .build_task:
-  extends: [.harbor, .python_version_matrix]
+  image: ${BASE_IMAGE}${PYTHON_VERSION}
+  extends: [.python_version_matrix]
   needs: [build]
   script:
-    - ./build --push ${PYTHON_VERSION} ${TASK}
+    - nox -e ${TASK} -- ${POSARGS}
   artifacts:
     paths:
       - output/*
@@ -184,13 +185,6 @@ linting:
   extends: .build_task
   variables:
     TASK: lint
-
-lint:
-  image: ${BASE_IMAGE}${PYTHON_VERSION}
-  extends: [.python_version_matrix]
-  script:
-    - nox -e lint
-  rules: *on_run
 
 dependency tests:
   extends: .build_task
