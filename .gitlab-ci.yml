@@ -238,6 +238,7 @@ update merge request:
     - uv pip install requests --system
   script:
     - .gitlab/scripts/update_merge_request.py $CI_MERGE_REQUEST_IID $CI_PIPELINE_ID
+  allow_failure: true
   rules: *on_merge_request_only
 
 # This job will only run if all previous stages have succeeded,
@@ -259,6 +260,7 @@ remove image tags:
     - uv pip install requests --system
   script:
     - .gitlab/scripts/remove_image_tags.py
+  allow_failure: true
   rules: *on_commit_main_only
 
 # This job updates the changelog and tags the commit hash with a
