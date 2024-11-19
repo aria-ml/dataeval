@@ -38,7 +38,7 @@ WORKDIR /${USER}
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
 ENV UV_INDEX_STRATEGY=unsafe-best-match
-ENV UV_CACHE_DIR=/home/${USER}/cache/uv
+ENV UV_CACHE_DIR=/home/${USER}/.cache/uv
 
 FROM ubuntu as base
 ARG UID
@@ -62,7 +62,7 @@ WORKDIR /${USER}
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
 ENV UV_INDEX_STRATEGY=unsafe-best-match
-ENV UV_CACHE_DIR=/home/${USER}/cache/uv
+ENV UV_CACHE_DIR=/home/${USER}/.cache/uv
 ENV TF_GPU_ALLOCATOR=cuda_malloc_async
 ENV LANGUAGE=en
 ENV LC_ALL=C.UTF-8
