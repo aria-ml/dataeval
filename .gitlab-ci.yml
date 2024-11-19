@@ -86,6 +86,15 @@ stages:
     when: never
   - if: $CI_COMMIT_BRANCH == 'main'
 
+.on_functional_change: &on_functional_change
+  - if: $CI_COMMIT_BRANCH == 'main'
+    changes:
+      paths:
+        - src/**/*
+        - docs/**/*
+        - environment/*
+        - README.md
+
 ### TEMPLATES ###
 
 .nox:
@@ -213,6 +222,7 @@ update cache:
     - git commit --message "${SKIP_PREFIX}Update jupyter-cache"
     - git push https://dataeval-bot:${DATAEVAL_BUILD_PAT}@gitlab.jatic.net/jatic/aria/dataeval.git
   rules:
+    - *on_functional_change
     - *on_run_with_docs
 
 pages:
