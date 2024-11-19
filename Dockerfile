@@ -67,7 +67,6 @@ COPY --chown=${UID} pyproject.toml poetry.lock ./
 COPY --chown=${UID} src/ src/
 COPY --chown=${UID} tests/ tests/
 COPY --chown=${UID} noxfile.py ./
-COPY --chown=${UID} capture.sh ./
 ARG output_dir
 RUN mkdir -p $output_dir
 RUN mkdir -p .nox
@@ -79,7 +78,6 @@ COPY --chown=${UID} pyproject.toml poetry.lock ./
 COPY --chown=${UID} src/ src/
 COPY --chown=${UID} tests/ tests/
 COPY --chown=${UID} noxfile.py ./
-COPY --chown=${UID} capture.sh ./
 COPY --chown=${UID} docs/ docs/
 COPY --chown=${UID} *.md ./
 ARG output_dir

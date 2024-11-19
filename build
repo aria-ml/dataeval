@@ -147,7 +147,7 @@ function build_image() {
         output_arg="--output type=cacheonly"
     fi
 
-    if [[ $target != base && $target != data && $target != base-docs && ($save_build_images || -z $build_only) ]]; then
+    if [[ $image_tag && ($save_build_images || -z $build_only) ]]; then
         # By default the docker-container driver doesn't load images to the
         # local docker images store, these args will cause it to do so.
         load_arg="--tag ${image_tag} --load"
@@ -191,7 +191,7 @@ function build_and_run() {
         image_tag="${image_tag}-${CI_PIPELINE_ID}"
     fi
 
-    build_image $task $python_version task-run
+    build_image $task $python_version
 
     colorize="-e TERM=xterm-256color -e FORCE_COLOR=1"
 
