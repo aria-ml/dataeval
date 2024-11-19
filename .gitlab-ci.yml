@@ -141,7 +141,7 @@ prepare:
     - main_branch=$CI_DEFAULT_BRANCH
     - namespace="harbor.jatic.net/dataeval"
     - if [[ $branch_name == $main_branch ]]; then repository="main"; fi
-    - if [[ $branch_name != $main_branch ]]; then repository="dev"; shopt -s extglob; tag_prefix="${branch_name//+([^a-zA-Z0-9])/-}-"; shopt -u extglob; fi
+    - if [[ $branch_name != $main_branch ]]; then repository="dev"; shopt -s extglob; tag_prefix="${branch_name//+([^a-zA-Z0-9])/-}"; shopt -u extglob; fi
     - echo BASE_IMAGE="${namespace}/${repository}:${tag_prefix}" > vars.env
   rules: *on_run
 
@@ -186,7 +186,7 @@ linting:
     TASK: lint
 
 lint:
-  image: $BASE_IMAGE-$VERSION
+  image: $BASE_IMAGE-${PYTHON_VERSION}
   extends: [.python_version_matrix]
   script:
     - nox -e lint
