@@ -166,7 +166,6 @@ prepare:
 build:
   stage: build
   extends: [.harbor, .python_version_matrix]
-  needs: [prepare]
   script:
     - apk add --no-cache parallel
     - ./build --build-only --push ${PYTHON_VERSION}
