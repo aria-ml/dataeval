@@ -100,8 +100,8 @@ function build_image() {
 
     cache_images=()
     if [[ $target != base ]]; then cache_images+=("$target"); fi
-    if [[ $target == docs || $target == qdocs ]]; then cache_images+=("data"); fi
     if [[ $target != data ]]; then cache_images+=("base"); fi
+    if [[ $target == docs || $target == qdocs || $target == base-docs ]]; then cache_images+=("data"); fi
 
     # create cache array
     cache=()
@@ -131,7 +131,7 @@ function build_image() {
     # only push base images up to the registry.
     if [[ $target != data ]]; then
         image_tag="${TASK_IMAGE}${target}-${python_version}"
-        if [[ $target != base && $CI_PIPELINE_ID ]]; then
+        if [[ $target != base && $target != base_docs && $CI_PIPELINE_ID ]]; then
             image_tag="${image_tag}-${CI_PIPELINE_ID}"
         fi
     else
@@ -148,7 +148,7 @@ function build_image() {
         output_arg="--output type=cacheonly"
     fi
 
-    if [[ $target != base && $target != data && ($save_build_images || -z $build_only) ]]; then
+    if [[ $target != base && $target != data && $target != base_docs && ($save_build_images || -z $build_only) ]]; then
         # By default the docker-container driver doesn't load images to the
         # local docker images store, these args will cause it to do so.
         load_arg="--tag ${image_tag} --load"
@@ -194,9 +194,11 @@ function build_and_run() {
 
     build_image $task $python_version task-run
 
+    colorize="-e TERM=xterm-256color -e FORCE_COLOR=1"
+
     echo "======================================================================"
     set +e
-    docker run --interactive $pull_arg --name $container_name $gpuflag $image_tag
+    docker run $colorize --interactive $pull_arg --name $container_name $gpuflag $image_tag
     exitcode=$?
     set -e
     echo "======================================================================"
@@ -253,11 +255,6 @@ for python_version in ${!python_versions[@]}; do
     for task in ${!test_tasks[@]}; do
         task_map[$python_version]+="$task "
     done
-
-    if [[ $CI && $build_only && $branch_name == $main_branch && $python_version == 3.11 ]]; then
-        # build data layer in build-only pipeline runs for 3.11
-        task_map[$python_version]+="data "
-    fi
 done
 for task in ${!docs_tasks[@]}; do
     task_map[3.11]+="$task "
@@ -266,6 +263,12 @@ done
 for python_version in ${!task_map[@]}; do
     if [[ ! $CI || $build_only ]]; then
         build_image base $python_version
+    fi
+    if [[ $CI && $build_only && $python_version == 3.11 ]]; then
+        if [[ $branch_name == $main_branch ]]; then
+            build_image data $python_version
+        fi
+        build_image base-docs $python_version
     fi
 done
 

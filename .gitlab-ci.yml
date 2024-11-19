@@ -76,8 +76,6 @@ stages:
         - docs/**/*
         - environment/*
         - README.md
-    variables:
-      TASK: qdocs
   - if: $CI_COMMIT_BRANCH == 'main'
     changes:
       paths:
@@ -86,7 +84,7 @@ stages:
         - environment/*
         - README.md
     variables:
-      TASK: docs
+      POSARGS: clean
 
 .on_merge_request_only: &on_merge_request_only
   - if: $CREATE_NEW_RELEASE
@@ -121,18 +119,7 @@ stages:
     - docker logout harbor.jatic.net || echo "Failed to logout from Harbor..."
 
 .build_task:
-  extends: [.harbor, .python_version_matrix]
-  needs: [build]
-  script:
-    - ./build ${PYTHON_VERSION} ${TASK}
-  artifacts:
-    paths:
-      - output/*
-  rules: *on_run
-
-.new_build_task:
-  stage: new test
-  image: ${BASE_IMAGE}${PYTHON_VERSION}
+  image: ${BASE_IMAGE}-${PYTHON_VERSION}
   extends: [.python_version_matrix]
   needs: [prepare, build]
   script:
@@ -141,6 +128,17 @@ stages:
     paths:
       - output/*
   rules: *on_run
+
+.build_docs_task:
+  image: ${BASE_IMAGE}-docs
+  needs: [prepare, build]
+  script:
+    - nox -e ${TASK} -- ${POSARGS}
+  artifacts:
+    paths:
+      - output/docs/.jupyter_cache/
+      - output/docs/html/
+  rules: *on_run_with_docs
 
 ### BUILD ###
 
@@ -157,10 +155,10 @@ prepare:
       else
           repository="dev"
           shopt -s extglob
-          tag_prefix="${branch_name//+([^a-zA-Z0-9])/-}-base-"
+          tag_prefix="${branch_name//+([^a-zA-Z0-9])/-}-"
           shopt -u extglob
       fi
-    - echo BASE_IMAGE="harbor.jatic.net/dataeval/${repository}:${tag_prefix}" > vars.env
+    - echo BASE_IMAGE="harbor.jatic.net/dataeval/${repository}:${tag_prefix}base" > vars.env
   rules: *on_run
 
 build:
@@ -210,7 +208,7 @@ dependency tests:
 tests:
   extends: .build_task
   variables:
-    TASK: unit
+    TASK: test-${PYTHON_VERSION}
   artifacts:
     reports:
       junit: output/junit.*.xml
@@ -218,30 +216,12 @@ tests:
 type checks:
   extends: .build_task
   variables:
-    TASK: type
-
-new linting:
-  extends: .new_build_task
-  variables:
-    TASK: lint
-
-new dependency tests:
-  extends: .new_build_task
-  variables:
-    TASK: deps
-
-new tests:
-  extends: .new_build_task
-  variables:
-    TASK: test-${PYTHON_VERSION}
-  artifacts:
-    reports:
-      junit: output/junit.*.xml
-
-new type checks:
-  extends: .new_build_task
-  variables:
     TASK: type-${PYTHON_VERSION}
+
+doc test:
+  extends: .build_task
+  variables:
+    TASK: doctest
 
 coverage:
   needs: [tests]
@@ -267,27 +247,14 @@ coverage:
 
 ### DOCS ###
 
-doctest:
-  stage: docs
-  extends: .harbor
-  needs: [build]
-  script:
-    - ./build doctest
-  rules: *on_run
-
 docs:
   stage: docs
-  extends: .harbor
-  needs: [verify lock]
+  extends: .build_docs_task
   tags:
     - $DOCS_RUNNER_TAG
-  script:
-    - ./build $TASK --gpu
-  artifacts:
-    paths:
-      - output/docs/.jupyter_cache/
-      - output/docs/html/
-  rules: *on_run_with_docs
+  variables:
+    TASK: docs
+  
 
 update cache:
   stage: docs

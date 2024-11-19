@@ -54,6 +54,9 @@ COPY --chown=${UID} environment/requirements-dev.txt environment/
 RUN uv pip install -r environment/requirements-dev.txt
 ENV PATH=/${USER}/.venv/bin:${PATH}
 
+FROM base as base-docs
+ARG UID
+COPY --chown=${UID} --link --from=data /docs docs
 
 ######################## task layers ########################
 FROM base as task-run
@@ -68,23 +71,34 @@ ARG output_dir
 RUN mkdir -p $output_dir
 RUN mkdir -p .nox
 
+FROM base-docs as task-run-for-docs
+ARG UID
+RUN touch README.md
+COPY --chown=${UID} pyproject.toml poetry.lock ./
+COPY --chown=${UID} src/ src/
+COPY --chown=${UID} tests/ tests/
+COPY --chown=${UID} noxfile.py ./
+COPY --chown=${UID} capture.sh ./
+COPY --chown=${UID} docs/ docs/
+COPY --chown=${UID} *.md ./
+ARG output_dir
+RUN mkdir -p $output_dir
+RUN mkdir -p .nox
+
 FROM task-run as task-run-with-docs
 ARG UID
 COPY --chown=${UID} docs/ docs/
 COPY --chown=${UID} *.md ./
 
-FROM task-run-with-docs as task-run-with-docs-data
-ARG UID
-COPY --chown=${UID} --link --from=data /docs docs
-RUN ln -s /dataeval/.venv .nox/docs
-
 FROM task-run as unit
 ARG python_version
+ENV python_version=${python_version}
 RUN ln -s /dataeval/.venv .nox/test-$(echo $python_version | tr . -)
 CMD nox -r -e test-${python_version}
 
 FROM task-run as type
 ARG python_version
+ENV python_version=${python_version}
 RUN ln -s /dataeval/.venv .nox/type-$(echo $python_version | tr . -)
 CMD nox -r -e type-${python_version}
 
@@ -102,10 +116,12 @@ ARG python_version
 RUN ln -s /dataeval/.venv .nox/doctest
 CMD nox -r -e doctest
 
-FROM task-run-with-docs-data as docs
+FROM task-run-for-docs as docs
+RUN ln -s /dataeval/.venv .nox/docs
 CMD nox -r -e docs -- clean
 
-FROM task-run-with-docs-data as qdocs
+FROM task-run-for-docs as qdocs
+RUN ln -s /dataeval/.venv .nox/docs
 CMD nox -r -e docs
 
 
