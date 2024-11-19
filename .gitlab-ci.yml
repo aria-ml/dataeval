@@ -130,10 +130,25 @@ stages:
 
 ### BUILD ###
 
+prepare:
+  stage: build
+  needs: []
+  artifacts:
+    reports:
+      dotenv: vars.env
+  script:
+    - branch_name=$CI_COMMIT_BRANCH$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME
+    - main_branch=$CI_DEFAULT_BRANCH
+    - namespace="harbor.jatic.net/dataeval"
+    - if [[ $branch_name == $main_branch ]]; then repository="main"; fi
+    - if [[ $branch_name != $main_branch ]]; then repository="dev"; shopt -s extglob; tag_prefix="${branch_name//+([^a-zA-Z0-9])/-}-"; shopt -u extglob; fi
+    - echo "BASE_IMAGE="${namespace}/${repository}:${tag_prefix}" > vars.env
+  rules: *on_run
+
 build:
   stage: build
   extends: [.harbor, .python_version_matrix]
-  needs: [verify lock]
+  needs: [prepare, verify lock]
   script:
     - apk add --no-cache parallel
     - ./build --build-only --push ${PYTHON_VERSION}
@@ -169,6 +184,13 @@ linting:
   extends: .build_task
   variables:
     TASK: lint
+
+lint:
+  image: $BASE_IMAGE-$VERSION
+  extends: [.python_version_matrix]
+  script:
+    - nox -e lint
+  rules: *on_run
 
 dependency tests:
   extends: .build_task

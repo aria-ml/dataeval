@@ -129,9 +129,9 @@ function build_image() {
     fi
 
     # only push an image up to the registry for task images to be loaded for playback of results.
-    if [[ $target != base && $target != data ]]; then
+    if [[ $target != data ]]; then
         image_tag="${TASK_IMAGE}${target}-${python_version}"
-        if [[ $CI_PIPELINE_ID ]]; then
+        if [[ $target != base && $CI_PIPELINE_ID ]]; then
             image_tag="${image_tag}-${CI_PIPELINE_ID}"
         fi
     else
