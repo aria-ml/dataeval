@@ -6,7 +6,11 @@ touch $log
 
 set +e
 set -o pipefail
-${@:3} 2>&1 | tee -a $log
+if [ $(which unbuffer) ]; then
+    unbuffer ${@:3} 2>&1 | tee -a $log
+else
+    ${@:3} 2>&1 | tee -a $log
+fi
 exitcode=$?
 set -e
 

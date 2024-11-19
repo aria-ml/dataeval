@@ -1,11 +1,13 @@
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  PYTHON_LATEST_SUPPORTED_VERSION: "3.12"
-  DOCKER_DRIVER: overlay2
   PIP_ROOT_USER_ACTION: ignore
   PIP_DISABLE_PIP_VERSION_CHECK: 1
+  PYTHON_LATEST_SUPPORTED_VERSION: "3.12"
+  DOCKER_DRIVER: overlay2
   SAST_EXCLUDED_PATHS: spec,test,tests,tmp,.nox,output,prototype
   DOCS_RUNNER_TAG: single-gpu
+  FORCE_COLOR: 1
+  TERM: xterm-256color
 
 workflow:
   # Allows jobs in this workflow to be interrupted:

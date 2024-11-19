@@ -72,12 +72,12 @@ RUN mkdir -p .nox
 FROM task-run as unit-run
 ARG python_version
 RUN ln -s /dataeval/.venv .nox/test-$(echo $python_version | tr . -)
-RUN ./capture.sh unit ${python_version} nox -r -e test-${python_version}
+RUN ./capture.sh unit ${python_version} nox -r -P {python_version} -e test
 
 FROM task-run as type-run
 ARG python_version
 RUN ln -s /dataeval/.venv .nox/type-$(echo $python_version | tr . -)
-RUN ./capture.sh type ${python_version} nox -r -e type-${python_version}
+RUN ./capture.sh type ${python_version} nox -r -P ${python_version} -e type
 
 FROM task-run as deps-run
 ARG python_version
