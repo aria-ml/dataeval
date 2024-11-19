@@ -9,7 +9,11 @@ nox.options.default_venv_backend = "uv"
 nox.options.sessions = [f"test-{python_version}", f"type-{python_version}", "deps", "lint", "doctest", "check"]
 
 INSTALL_ARGS = ["-e", ".", "-r", "environment/requirements.txt", "-r", "environment/requirements-dev.txt"]
-INSTALL_ENVS = {"UV_INDEX_STRATEGY": "unsafe-best-match", "POETRY_DYNAMIC_VERSIONING_BYPASS": "0.0.0"}
+INSTALL_ENVS = {
+    "UV_INDEX_STRATEGY": "unsafe-best-match",
+    "POETRY_DYNAMIC_VERSIONING_BYPASS": "0.0.0",
+    "RUST_LOG": "debug",
+}
 COMMON_ENVS = {"TQDM_DISABLE": "1", "TF_CPP_MIN_LOG_LEVEL": "3"}
 DOCS_ENVS = {"LANG": "C", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True", "PYDEVD_DISABLE_FILE_VALIDATION": "1"}
 DOCTEST_ENVS = {"NB_EXECUTION_MODE_OVERRIDE": "off"}
@@ -49,7 +53,7 @@ def test(session: nox.Session) -> None:
     cov_xml_args = ["--cov-report", f"xml:output/coverage.{session.name}.xml"]
     cov_html_args = ["--cov-report", f"html:output/htmlcov.{session.name}"]
 
-    session.install(*INSTALL_ARGS, env=INSTALL_ENVS)
+    session.install(*INSTALL_ARGS, env=INSTALL_ENVS, silent=False)
     session.run("pytest", *pytest_args, *cov_term_args, *cov_xml_args, *cov_html_args, env={**TEST_ENVS, **COMMON_ENVS})
     session.run("mv", ".coverage", f"output/.coverage.{session.name}", external=True)
 
@@ -57,7 +61,7 @@ def test(session: nox.Session) -> None:
 @nox.session(python=SUPPORTED_VERSIONS)
 def type(session: nox.Session) -> None:  # noqa: A001
     """Run type checks and verify external types."""
-    session.install(*INSTALL_ARGS, env=INSTALL_ENVS)
+    session.install(*INSTALL_ARGS, env=INSTALL_ENVS, silent=False)
     session.run("pyright", "--stats", "src/", "tests/")
     session.run("pyright", "--ignoreexternal", "--verifytypes", "dataeval")
 
