@@ -121,7 +121,7 @@ stages:
 .build_task:
   image: ${BASE_IMAGE}${PYTHON_VERSION}
   extends: [.python_version_matrix]
-  needs: [build]
+  needs: [prepare, build]
   script:
     - nox -e ${TASK} -- ${POSARGS}
   artifacts:
