@@ -9,11 +9,7 @@ nox.options.default_venv_backend = "uv"
 nox.options.sessions = [f"test-{python_version}", f"type-{python_version}", "deps", "lint", "doctest", "check"]
 
 INSTALL_ARGS = ["-e", ".", "-r", "environment/requirements.txt", "-r", "environment/requirements-dev.txt"]
-INSTALL_ENVS = {
-    "UV_INDEX_STRATEGY": "unsafe-best-match",
-    "POETRY_DYNAMIC_VERSIONING_BYPASS": "0.0.0",
-    "RUST_LOG": "debug",
-}
+INSTALL_ENVS = {"UV_INDEX_STRATEGY": "unsafe-best-match", "POETRY_DYNAMIC_VERSIONING_BYPASS": "0.0.0"}
 COMMON_ENVS = {"TQDM_DISABLE": "1", "TF_CPP_MIN_LOG_LEVEL": "3"}
 DOCS_ENVS = {"LANG": "C", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True", "PYDEVD_DISABLE_FILE_VALIDATION": "1"}
 DOCTEST_ENVS = {"NB_EXECUTION_MODE_OVERRIDE": "off"}
@@ -41,8 +37,8 @@ def dev(session: nox.Session) -> None:
         if version not in SUPPORTED_VERSIONS:
             print(f"Only python {SUPPORTED_VERSIONS} is supported. {version} provided. Skipping venv creation.")
             continue
-        session.run("uv", "venv", "--python", version, f".venv-{version}", "--seed", external=True)
-        session.run("uv", "pip", "install", "--python", f".venv-{version}", *INSTALL_ARGS, env=INSTALL_ENVS)
+        session.run("uv", "venv", "-p", version, f".venv-{version}", "--seed", external=True)
+        session.run("uv", "pip", "install", "-p", f".venv-{version}", *INSTALL_ARGS, env=INSTALL_ENVS, silent=False)
 
 
 @nox.session(python=SUPPORTED_VERSIONS)
@@ -69,14 +65,14 @@ def type(session: nox.Session) -> None:  # noqa: A001
 @nox.session(reuse_venv=False)
 def deps(session: nox.Session) -> None:
     """Run minimal unit tests against baseline installation."""
-    session.install(".", "pytest", env=INSTALL_ENVS)
+    session.install(".", "pytest", env=INSTALL_ENVS, silent=False)
     session.run("pytest", "tests/test_mindeps.py")
 
 
 @nox.session
 def lint(session: nox.Session) -> None:
     """Perform linting and spellcheck."""
-    session.install("ruff", "codespell[toml]")
+    session.install("ruff", "codespell[toml]", silent=False)
     session.run("ruff", "check", "--show-fixes", "--exit-non-zero-on-fix", "--fix")
     session.run("codespell")
 
@@ -84,7 +80,7 @@ def lint(session: nox.Session) -> None:
 @nox.session
 def doctest(session: nox.Session) -> None:
     """Run docstring tests."""
-    session.install(*INSTALL_ARGS, env=INSTALL_ENVS)
+    session.install(*INSTALL_ARGS, env=INSTALL_ENVS, silent=False)
     session.chdir("docs")
     session.run("rm", "-rf", "../output/docs", external=True)
     session.run("sphinx-build", "-M", "doctest", ".", "../output/docs", env={**DOCTEST_ENVS, **COMMON_ENVS})
@@ -93,7 +89,7 @@ def doctest(session: nox.Session) -> None:
 @nox.session
 def docs(session: nox.Session) -> None:
     """Generate documentation. Clear the cache using "clean" as a positional arg."""
-    session.install(*INSTALL_ARGS, env=INSTALL_ENVS)
+    session.install(*INSTALL_ARGS, env=INSTALL_ENVS, silent=False)
     session.chdir("docs")
     session.run("rm", "-rf", "../output/docs", external=True)
     if "clean" in session.posargs:
