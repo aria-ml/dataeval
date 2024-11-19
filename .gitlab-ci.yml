@@ -194,7 +194,7 @@ dependency tests:
 tests:
   extends: .build_task
   variables:
-    TASK: unit
+    TASK: test
   artifacts:
     reports:
       junit: output/junit.*.xml
