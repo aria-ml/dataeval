@@ -220,11 +220,6 @@ type checks:
   variables:
     TASK: type-${PYTHON_VERSION}
 
-doctest:
-  extends: .build_task
-  variables:
-    TASK: doctest
-
 coverage:
   needs: [tests]
   before_script:
@@ -248,6 +243,12 @@ coverage:
   rules: *on_run
 
 ### DOCS ###
+
+doctest:
+  stage: docs
+  extends: .build_task
+  variables:
+    TASK: doctest
 
 docs:
   stage: docs
