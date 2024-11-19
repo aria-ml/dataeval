@@ -129,10 +129,13 @@ function build_image() {
     fi
 
     # only push base images up to the registry.
-    if [[ $target == base ]]; then
-        image_tag="${TASK_IMAGE}${target}-${python_version}"
-    elif [[ $target == base-docs ]]; then
+    if [[ $target == base-docs ]]; then
         image_tag="${TASK_IMAGE}${target}"
+    elif [[ $target != data ]]; then
+        image_tag="${TASK_IMAGE}${target}-${python_version}"
+        if [[ $target != base && $CI_PIPELINE_ID ]]; then
+            image_tag="${image_tag}-${CI_PIPELINE_ID}"
+        fi
     else
         image_tag=""
     fi
