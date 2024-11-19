@@ -1,11 +1,12 @@
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  PYTHON_LATEST_SUPPORTED_VERSION: "3.12"
-  DOCKER_DRIVER: overlay2
   PIP_ROOT_USER_ACTION: ignore
   PIP_DISABLE_PIP_VERSION_CHECK: 1
+  PYTHON_LATEST_SUPPORTED_VERSION: "3.12"
+  DOCKER_DRIVER: overlay2
   SAST_EXCLUDED_PATHS: spec,test,tests,tmp,.nox,output,prototype
   DOCS_RUNNER_TAG: single-gpu
+  FF_SCRIPT_SECTIONS: true
 
 workflow:
   # Allows jobs in this workflow to be interrupted:
@@ -46,6 +47,7 @@ cache:
 stages:
   - build
   - test
+  - new test
   - docs
   - release
   - security
@@ -116,9 +118,20 @@ stages:
     - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
     - echo ${DATAEVAL_HARBOR_TOKEN} | docker login harbor.jatic.net -u 'robot$dataeval+dataeval-build' --password-stdin || echo "Failed to login to Harbor..."
   after_script:
-    - docker logout harbor.jatic.net|| echo "Failed to logout from Harbor..."
+    - docker logout harbor.jatic.net || echo "Failed to logout from Harbor..."
 
 .build_task:
+  extends: [.harbor, .python_version_matrix]
+  needs: [build]
+  script:
+    - ./build --push ${PYTHON_VERSION} ${TASK}
+  artifacts:
+    paths:
+      - output/*
+  rules: *on_run
+
+.new_build_task:
+  stage: new test
   image: ${BASE_IMAGE}${PYTHON_VERSION}
   extends: [.python_version_matrix]
   needs: [prepare, build]
@@ -133,23 +146,27 @@ stages:
 
 prepare:
   stage: build
-  needs: []
   artifacts:
     reports:
       dotenv: vars.env
   script:
     - branch_name=$CI_COMMIT_BRANCH$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME
-    - main_branch=$CI_DEFAULT_BRANCH
-    - namespace="harbor.jatic.net/dataeval"
-    - if [[ $branch_name == $main_branch ]]; then repository="main"; fi
-    - if [[ $branch_name != $main_branch ]]; then repository="dev"; shopt -s extglob; tag_prefix="${branch_name//+([^a-zA-Z0-9])/-}-base-"; shopt -u extglob; fi
-    - echo BASE_IMAGE="${namespace}/${repository}:${tag_prefix}" > vars.env
+    - |
+      if [[ $branch_name == $CI_DEFAULT_BRANCH ]]; then
+          repository="main"
+      else
+          repository="dev"
+          shopt -s extglob
+          tag_prefix="${branch_name//+([^a-zA-Z0-9])/-}-base-"
+          shopt -u extglob
+      fi
+    - echo BASE_IMAGE="harbor.jatic.net/dataeval/${repository}:${tag_prefix}" > vars.env
   rules: *on_run
 
 build:
   stage: build
   extends: [.harbor, .python_version_matrix]
-  needs: [prepare, verify lock]
+  needs: [prepare]
   script:
     - apk add --no-cache parallel
     - ./build --build-only --push ${PYTHON_VERSION}
@@ -194,13 +211,36 @@ dependency tests:
 tests:
   extends: .build_task
   variables:
-    TASK: test-${PYTHON_VERSION}
+    TASK: unit
   artifacts:
     reports:
       junit: output/junit.*.xml
 
 type checks:
   extends: .build_task
+  variables:
+    TASK: type
+
+new linting:
+  extends: .new_build_task
+  variables:
+    TASK: lint
+
+new dependency tests:
+  extends: .new_build_task
+  variables:
+    TASK: deps
+
+new tests:
+  extends: .new_build_task
+  variables:
+    TASK: test-${PYTHON_VERSION}
+  artifacts:
+    reports:
+      junit: output/junit.*.xml
+
+new type checks:
+  extends: .new_build_task
   variables:
     TASK: type-${PYTHON_VERSION}
 
