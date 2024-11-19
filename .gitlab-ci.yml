@@ -139,7 +139,8 @@ stages:
     paths:
       - output/docs/.jupyter_cache/
       - output/docs/html/
-  rules: *on_run_with_docs
+  rules: *on_run
+#  rules: *on_run_with_docs
 
 ### BUILD ###
 
