@@ -2,7 +2,7 @@ variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   PIP_ROOT_USER_ACTION: ignore
   PIP_DISABLE_PIP_VERSION_CHECK: 1
-  PYTHON_LATEST_SUPPORTED_VERSION: "3.12"
+  PYTHON_DEFAULT_VERSION: "3.11"
   DOCKER_DRIVER: overlay2
   SAST_EXCLUDED_PATHS: spec,test,tests,tmp,.nox,output,prototype
   DOCS_RUNNER_TAG: single-gpu
@@ -37,7 +37,7 @@ default:
   tags:
     - autoscaler
 
-image: python:$PYTHON_LATEST_SUPPORTED_VERSION
+image: python:$PYTHON_DEFAULT_VERSION
 
 cache:
   paths:
@@ -120,10 +120,11 @@ stages:
 
 .build_task:
   image: ${BASE_IMAGE}-${PYTHON_VERSION}
-  extends: [.python_version_matrix]
   needs: [prepare, build]
   script:
     - nox -e ${TASK} -- ${POSARGS}
+  variables:
+    PYTHON_VERSION: $PYTHON_DEFAULT_VERSION
   artifacts:
     paths:
       - output/*
@@ -201,12 +202,12 @@ linting:
     TASK: lint
 
 dependency tests:
-  extends: .build_task
+  extends: [.build_task, .python_version_matrix]
   variables:
     TASK: deps
 
 tests:
-  extends: .build_task
+  extends: [.build_task, .python_version_matrix]
   variables:
     TASK: test-${PYTHON_VERSION}
   artifacts:
@@ -214,11 +215,11 @@ tests:
       junit: output/junit.*.xml
 
 type checks:
-  extends: .build_task
+  extends: [.build_task, .python_version_matrix]
   variables:
     TASK: type-${PYTHON_VERSION}
 
-doc test:
+doctest:
   extends: .build_task
   variables:
     TASK: doctest
