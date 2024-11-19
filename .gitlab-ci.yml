@@ -194,7 +194,7 @@ dependency tests:
 tests:
   extends: .build_task
   variables:
-    TASK: test
+    TASK: test-${PYTHON_VERSION}
   artifacts:
     reports:
       junit: output/junit.*.xml
@@ -202,7 +202,7 @@ tests:
 type checks:
   extends: .build_task
   variables:
-    TASK: type
+    TASK: type-${PYTHON_VERSION}
 
 coverage:
   needs: [tests]
