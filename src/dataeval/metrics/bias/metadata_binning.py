@@ -93,8 +93,34 @@ def binning_function(metadata, bin_method):
     return
 
 
-def user_defined_bin(metadata, binning):
-    return
+# (continuous_values: NDArray[Any], bins: int, factor_name: str) -> NDArray[np.intp]:
+def user_defined_bin(metadata: NDArray[Any], binning: int) -> NDArray[np.intp]:
+    """
+    Digitizes a list of values into a given number of bins.
+
+    Parameters
+    ----------
+    metadata : NDArray
+        The values to be digitized.
+    binning : int
+        The number of bins for the discrete values that metadata will be digitized into.
+
+    Returns
+    -------
+    NDArray[np.intp]
+        The digitized values
+    """
+
+    if not np.all([np.issubdtype(type(n), np.number) for n in metadata]):
+        raise TypeError(
+            "Encountered a metadata value with non-numeric type when digitizing a factor.",
+            " Ensure all occurrences of continuous factors are numeric types.",
+        )
+
+    _, bin_edges = np.histogram(metadata, bins=binning)
+    bin_edges[-1] = np.inf
+    bin_edges[0] = -np.inf
+    return np.digitize(metadata, bin_edges)
 
 
 def is_continuous(metadata):
