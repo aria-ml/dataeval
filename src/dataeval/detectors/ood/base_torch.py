@@ -18,7 +18,7 @@ import numpy as np
 import torch
 from numpy.typing import ArrayLike, NDArray
 
-import dataeval.models.torch.trainer as trainer
+import dataeval.models.torch.trainer as torch_trainer
 from dataeval.interop import to_numpy
 from dataeval.output import OutputMetadata, set_metadata
 from dataeval.torch.models.gmm import GaussianMixtureModelParams, gmm_params
@@ -164,7 +164,7 @@ class OODBase(ABC):
             optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
 
         # Train the model
-        trainer.trainer(
+        torch_trainer.trainer(
             model=self.model,
             loss_fn=loss_fn,
             x_train=to_numpy(x_ref),
@@ -231,7 +231,7 @@ class OODGMMBase(OODBase):
         verbose: bool = True,
     ) -> None:
         # Train the model
-        trainer.trainer(
+        torch_trainer.trainer(
             model=self.model,
             loss_fn=loss_fn,
             x_train=to_numpy(x_ref),

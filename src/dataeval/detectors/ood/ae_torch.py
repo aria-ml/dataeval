@@ -49,7 +49,7 @@ class OOD_AE(OODBase):
 
         super().fit(as_numpy(x_ref), threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
 
-    @set_metadata("dataeval.detectors")
+    @set_metadata()
     def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
         self._validate(X := as_numpy(X))
 
