@@ -145,6 +145,7 @@ class DriftMMD(BaseDrift):
             p-value obtained from the permutation test, MMD^2 between the reference and test set,
             and MMD^2 threshold above which :term:`drift<Drift>` is flagged
         """
+
         x = as_numpy(x)
         x_ref = torch.from_numpy(self.x_ref).to(self.device)
         n = x.shape[0]
@@ -180,6 +181,7 @@ class DriftMMD(BaseDrift):
             Output class containing the :term:`drift<Drift>` prediction, :term:`p-value<P-Value>`,
             threshold and MMD metric.
         """
+
         # compute drift scores
         p_val, dist, distance_threshold = self.score(x)
         drift_pred = bool(p_val < self.p_val)

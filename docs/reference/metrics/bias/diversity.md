@@ -16,4 +16,5 @@ continuous_factor_bincounts = {"var_cnt": 5}
 
 ```{eval-rst}
 .. autofunction:: dataeval.metrics.bias.diversity
+   :no-index:
 ```

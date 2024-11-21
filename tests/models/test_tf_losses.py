@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 import tensorflow as tf
 
-from dataeval.utils.tensorflow._internal.loss import Elbo, LossGMM
+from dataeval.utils.tensorflow.internal.loss import Elbo, LossGMM
 
 N, K, D, F = 10, 5, 1, 3
 x = tf.convert_to_tensor(np.random.rand(N, F), dtype=tf.float32)

@@ -38,6 +38,7 @@ def normalize_box_shape(bounding_box: NDArray[Any]) -> NDArray[Any]:
     """
     Normalizes the bounding box shape into (N,4).
     """
+
     ndim = bounding_box.ndim
     if ndim == 1:
         return np.expand_dims(bounding_box, axis=0)
@@ -93,6 +94,7 @@ class BaseStatsOutput(OutputMetadata):
         channel_count : int | Iterable[int] | None
             Optional count(s) of channels to filter for
         """
+
         mask: list[bool] = []
         cur_mask: list[bool] = []
         cur_image = 0
@@ -275,6 +277,7 @@ def run_stats(
     - For statistics like histograms and entropy, intermediate results may
       be reused to avoid redundant computation.
     """
+
     results_list: list[dict[str, NDArray[np.float64]]] = []
     source_index: list[SourceIndex] = []
     box_count: list[int] = []

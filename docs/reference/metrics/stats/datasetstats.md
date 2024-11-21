@@ -25,4 +25,5 @@ bboxes = [
 
 ```{eval-rst}
 .. autofunction:: dataeval.metrics.stats.datasetstats
+   :no-index:
 ```

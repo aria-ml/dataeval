@@ -320,6 +320,7 @@ class BaseDriftUnivariate(BaseDrift):
         int
             Number of features in the reference data.
         """
+
         # lazy process n_features as needed
         if not isinstance(self._n_features, int):
             # compute number of features for the univariate tests
@@ -369,6 +370,7 @@ class BaseDriftUnivariate(BaseDrift):
             A tuple containing a boolean indicating if drift was detected and the
             threshold after correction.
         """
+
         if self.correction == "bonferroni":
             threshold = self.p_val / self.n_features
             drift_pred = bool((p_vals < threshold).any())
@@ -409,6 +411,7 @@ class BaseDriftUnivariate(BaseDrift):
             Dictionary containing the :term:`drift<Drift>` prediction and optionally the feature level
             p-values, threshold after multivariate correction if needed and test :term:`statistics<Statistics>`.
         """
+
         # compute drift scores
         p_vals, dist = self.score(x)
 

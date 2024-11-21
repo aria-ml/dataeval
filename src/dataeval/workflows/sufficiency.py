@@ -70,6 +70,7 @@ class SufficiencyOutput(OutputMetadata):
             If the length of data points in the measures do not match
             If `projection` is not numerical
         """
+
         projection = np.asarray(list(projection) if isinstance(projection, Iterable) else [projection])
 
         if not np.issubdtype(projection.dtype, np.number):
@@ -105,6 +106,7 @@ class SufficiencyOutput(OutputMetadata):
         ValueError
             If the length of data points in the measures do not match
         """
+
         # Extrapolation parameters
         last_X = self.steps[-1]
         geomshape = (0.01 * last_X, last_X * 4, len(self.steps))
@@ -188,6 +190,7 @@ def f_out(n_i: NDArray[Any], x: NDArray[Any]) -> NDArray[Any]:
     NDArray
         Data points for the line of best fit
     """
+
     return x[0] * n_i ** (-x[1]) + x[2]
 
 
@@ -207,6 +210,7 @@ def f_inv_out(y_i: NDArray[Any], x: NDArray[Any]) -> NDArray[np.uint64]:
     NDArray
         Array of sample sizes
     """
+
     n_i = ((y_i - x[2]) / x[0]) ** (-1 / x[1])
     return np.asarray(n_i, dtype=np.uint64)
 
@@ -297,8 +301,8 @@ def project_steps(params: NDArray[Any], projection: NDArray[Any]) -> NDArray[Any
     -------
     NDArray
         Extrapolated measure values at each projection step
-
     """
+
     return 1 - f_out(projection, params)
 
 
@@ -317,6 +321,7 @@ def inv_project_steps(params: NDArray[Any], targets: NDArray[Any]) -> NDArray[np
     NDArray
         Array of sample sizes, or 0 if overflow
     """
+
     steps = f_inv_out(1 - np.array(targets), params)
     steps[np.isnan(steps)] = 0
     return np.ceil(steps)
@@ -324,6 +329,7 @@ def inv_project_steps(params: NDArray[Any], targets: NDArray[Any]) -> NDArray[np
 
 def get_curve_params(measures: dict[str, NDArray[Any]], ranges: NDArray[Any], niter: int) -> dict[str, NDArray[Any]]:
     """Calculates and aggregates parameters for both single and multi-class metrics"""
+
     output = {}
     for name, measure in measures.items():
         measure = cast(np.ndarray, measure)
@@ -515,6 +521,7 @@ class Sufficiency(Generic[T]):
         >>> suff.evaluate()
         SufficiencyOutput(steps=array([  1,   3,  10,  31, 100], dtype=uint32), params={'test': array([ 0., 42.,  0.])}, measures={'test': array([1., 1., 1., 1., 1.])})
         """  # noqa: E501
+
         if eval_at is not None:
             ranges = np.asarray(list(eval_at) if isinstance(eval_at, Iterable) else [eval_at])
             if not np.issubdtype(ranges.dtype, np.number):

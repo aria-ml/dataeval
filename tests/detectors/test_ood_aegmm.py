@@ -15,8 +15,8 @@ import tf_keras as keras
 from tf_keras.layers import Dense, InputLayer
 
 from dataeval.detectors.ood.aegmm import OOD_AEGMM
-from dataeval.utils.tensorflow._internal.loss import LossGMM
-from dataeval.utils.tensorflow._internal.models import AEGMM
+from dataeval.utils.tensorflow.internal.autoencoder import AEGMM
+from dataeval.utils.tensorflow.internal.loss import LossGMM
 
 n_gmm = [1, 2]
 w_energy = [0.1, 0.5]
@@ -46,7 +46,11 @@ def test_aegmm(aegmm_params):
 
     # define encoder, decoder and GMM density net
     encoder_net = keras.Sequential(
-        [InputLayer(input_shape=(input_dim,)), Dense(128, activation=tf.nn.relu), Dense(latent_dim, activation=None)]
+        [
+            InputLayer(input_shape=(input_dim,)),
+            Dense(128, activation=tf.nn.relu),
+            Dense(latent_dim, activation=None),
+        ]
     )
 
     decoder_net = keras.Sequential(
@@ -71,9 +75,22 @@ def test_aegmm(aegmm_params):
     # fit OutlierAEGMM, infer threshold and compute scores
     if loss_fn:
         loss_fn = LossGMM(w_energy=w_energy)
-        aegmm.fit(X_train, threshold_perc=threshold_perc, loss_fn=loss_fn, epochs=5, batch_size=1000, verbose=False)
+        aegmm.fit(
+            X_train,
+            threshold_perc=threshold_perc,
+            loss_fn=loss_fn,
+            epochs=5,
+            batch_size=1000,
+            verbose=False,
+        )
     else:
-        aegmm.fit(X_train, threshold_perc=threshold_perc, epochs=5, batch_size=1000, verbose=False)
+        aegmm.fit(
+            X_train,
+            threshold_perc=threshold_perc,
+            epochs=5,
+            batch_size=1000,
+            verbose=False,
+        )
     energy = aegmm.score(X_train).instance_score
     perc_score = 100 * (energy < aegmm._threshold_score()).sum() / energy.shape[0]
     assert threshold_perc + 5 > perc_score > threshold_perc - 5
@@ -81,4 +98,7 @@ def test_aegmm(aegmm_params):
     # make and check predictions
     od_preds = aegmm.predict(X_train)
     assert od_preds.is_ood.shape == (X_train.shape[0],)
-    assert od_preds.is_ood.sum() == (od_preds.instance_score > aegmm._threshold_score()).sum()
+    assert (
+        od_preds.is_ood.sum()
+        == (od_preds.instance_score > aegmm._threshold_score()).sum()
+    )

@@ -28,6 +28,7 @@ class MockImageClassificationDataset:
         :return: An image, label pair
         :rtype: Tuple[np.ndarray, np.ndarray]
         """
+
         # return (self.images[idx], self.labels[idx])
         return {"image": self.images[idx], "label": self.labels[idx]}
 

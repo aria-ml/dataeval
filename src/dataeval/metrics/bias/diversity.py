@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["DiversityOutput", "diversity"]
+__all__ = ["DiversityOutput"]  # , "diversity"]
 
 import contextlib
 from dataclasses import dataclass
@@ -288,6 +288,7 @@ def diversity(
     --------
     numpy.histogram
     """
+
     diversity_fn = get_method({"simpson": diversity_simpson, "shannon": diversity_shannon}, method)
     data, names, _, unique_labels = preprocess_metadata(class_labels, metadata)
     diversity_index = diversity_fn(data, names, continuous_factor_bincounts)

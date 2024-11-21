@@ -489,6 +489,7 @@ class Shift(bijectors.Bijector):
             Python `bool` indicating whether arguments should be checked for correctness.
         name
             Python `str` name given to ops managed by this object.
+
         """
         with tf.name_scope(name) as name:
             dtype = tfp_internal.dtype_util.common_dtype([shift], dtype_hint=tf.float32)
@@ -503,7 +504,15 @@ class Shift(bijectors.Bijector):
 
     @property
     def shift(self):
+<<<<<<<< HEAD:src/dataeval/utils/tensorflow/internal/models.py
         """The `shift` `Tensor` in `Y = X + shift`."""
+========
+        #  """
+        #  The `shift` `Tensor` in `Y = X + shift`.
+        #
+        #  """
+
+>>>>>>>> 503a1c8d (Stashing some file so I can rebase):src/dataeval/utils/tensorflow/internal/pixelcnn.py
         return self._shift
 
     @classmethod
@@ -523,6 +532,7 @@ class Shift(bijectors.Bijector):
         return tf.zeros([], dtype=tfp_internal.dtype_util.base_dtype(x.dtype))
 
 
+<<<<<<<< HEAD:src/dataeval/utils/tensorflow/internal/models.py
 class PixelCNN(distributions.distribution.Distribution):
     """
     Construct Pixel CNN++ distributions.distribution.
@@ -563,6 +573,48 @@ class PixelCNN(distributions.distribution.Distribution):
     dtype : tensorflow dtype, default tf.float32
         Data type of the `Distribution`.
     """
+========
+class PixelCNN(distribution.Distribution):
+    #    """
+    #    Construct Pixel CNN++ distribution.
+    #
+    #    Parameters
+    #    ----------
+    #    image_shape : tuple
+    #        3D `TensorShape` or tuple for the `[height, width, channels]` dimensions of the image.
+    #        conditional_shape : tuple, optional - default None
+    #        `TensorShape` or tuple for the shape of the conditional input, or `None` if there is no conditional input.
+    #    num_resnet : int, default 5
+    #        The number of layers (shown in Figure 2 of [2]) within each highest-level block of Figure 2 of [1].
+    #    num_hierarchies : int, default 3
+    #        The number of highest-level blocks (separated by expansions/contractions of dimensions in Figure 2 of [1].)
+    #    num_filters : int, default 160
+    #    num_logistic_mix : int, default 10
+    #        Number of components in the logistic mixture distribution.
+    #    receptive_field_dims tuple, default (3, 3)
+    #        Height and width in pixels of the receptive field of the convolutional layers above and to the left
+    #        of a given pixel. The width (second element of the tuple) should be odd. Figure 1 (middle) of [2]
+    #        shows a receptive field of (3, 5) (the row containing the current pixel is included in the height).
+    #        The default of (3, 3) was used to produce the results in [1].
+    #    dropout_p : float, default 0.0
+    #        The dropout probability. Should be between 0 and 1.
+    #    resnet_activation : str, default "concat_elu"
+    #        The type of activation to use in the resnet blocks. May be 'concat_elu', 'elu', or 'relu'.
+    #    l2_weight : float, default 0.0
+    #        The L2 regularization weight.
+    #    use_weight_norm : bool, default True
+    #        If `True` then use weight normalization (works only in Eager mode).
+    #    use_data_init : bool, default True
+    #        If `True` then use data-dependent initialization (has no effect if `use_weight_norm` is `False`).
+    #    high : int, default 255
+    #        The maximum value of the input data (255 for an 8-bit image).
+    #    low : int, default 0
+    #        The minimum value of the input data.
+    #    dtype : tensorflow dtype, default tf.float32
+    #        Data type of the `Distribution`.
+    #
+    #    """
+>>>>>>>> 503a1c8d (Stashing some file so I can rebase):src/dataeval/utils/tensorflow/internal/pixelcnn.py
 
     def __init__(
         self,
@@ -631,6 +683,7 @@ class PixelCNN(distributions.distribution.Distribution):
             self._network.build(input_shape)
 
     def _make_mixture_dist(self, component_logits, locs, scales, return_per_feature: bool = False):
+<<<<<<<< HEAD:src/dataeval/utils/tensorflow/internal/models.py
         """Builds a mixture of quantized distributions.logistic distributions.
 
         Parameters
@@ -656,6 +709,34 @@ class PixelCNN(distributions.distribution.Distribution):
             A quantized distributions.logistic mixture `tfp.distributions.distribution` over the input data.
         """
         mixture_distribution = distributions.categorical.Categorical(logits=component_logits)
+========
+        #    """
+        #    Builds a mixture of quantized logistic distributions.
+        #
+        #    Parameters
+        #    ----------
+        #    component_logits
+        #        4D `Tensor` of logits for the Categorical distribution
+        #        over Quantized Logistic mixture components. Dimensions are `[batch_size,
+        #        height, width, num_logistic_mix]`.
+        #    locs
+        #        4D `Tensor` of location parameters for the Quantized Logistic
+        #        mixture components. Dimensions are `[batch_size, height, width,
+        #        num_logistic_mix, num_channels]`.
+        #    scales
+        #        4D `Tensor` of location parameters for the Quantized Logistic
+        #        mixture components. Dimensions are `[batch_size, height, width,
+        #        num_logistic_mix, num_channels]`.
+        #    return_per_feature
+        #        If True, return per pixel level log prob.
+        #
+        #    Returns
+        #    -------
+        #    dist
+        #        A quantized logistic mixture `tfp.distribution` over the input data.
+        #
+        #    """
+>>>>>>>> 503a1c8d (Stashing some file so I can rebase):src/dataeval/utils/tensorflow/internal/pixelcnn.py
 
         # Convert distributions.distribution parameters for pixel values in
         # `[self._low, self._high]` for use with `QuantizedDistribution`
@@ -681,6 +762,7 @@ class PixelCNN(distributions.distribution.Distribution):
             return distributions.independent.Independent(dist, reinterpreted_batch_ndims=2)
 
     def _log_prob(self, value, conditional_input=None, training=None, return_per_feature=False):
+<<<<<<<< HEAD:src/dataeval/utils/tensorflow/internal/models.py
         """Log probability function with optional conditional input.
 
         Calculates the log probability of a batch of data under the modeled
@@ -708,6 +790,38 @@ class PixelCNN(distributions.distribution.Distribution):
         -------
         log_prob_values: `Tensor`.
         """
+========
+        #   """
+        #   Log probability function with optional conditional input.
+        #
+        #    Calculates the log probability of a batch of data under the modeled
+        #    distribution (or conditional distribution, if conditional input is
+        #   provided).
+
+        #    Parameters
+        #    ----------
+        #    value
+        #        `Tensor` or :term:`NumPy` array of image data. May have leading batch
+        #        dimension(s), which must broadcast to the leading batch dimensions of
+        #        `conditional_input`.
+        #    conditional_input
+        #        `Tensor` on which to condition the distribution (e.g.
+        #        class labels), or `None`. May have leading batch dimension(s), which
+        #        must broadcast to the leading batch dimensions of `value`.
+        #    training
+        #        `bool` or `None`. If `bool`, it controls the dropout layer,
+        #        where `True` implies dropout is active. If `None`, it defaults to
+        #        `keras.backend.learning_phase()`.
+        #    return_per_feature
+        #        `bool`. If True, return per pixel level log prob.
+
+        #    Returns
+        #    -------
+        #    log_prob_values: `Tensor`.
+
+        #    """
+
+>>>>>>>> 503a1c8d (Stashing some file so I can rebase):src/dataeval/utils/tensorflow/internal/pixelcnn.py
         # Determine the batch shape of the input images
         image_batch_shape = tfp_internal.prefer_static.shape(value)[:-3]
 
@@ -783,6 +897,7 @@ class PixelCNN(distributions.distribution.Distribution):
             return tf.reshape(log_px, image_batch_and_conditional_shape)
 
     def _sample_n(self, n, seed=None, conditional_input=None, training=False):
+<<<<<<<< HEAD:src/dataeval/utils/tensorflow/internal/models.py
         """Samples from the distributions.distribution, with optional conditional input.
 
         Parameters
@@ -805,6 +920,33 @@ class PixelCNN(distributions.distribution.Distribution):
         samples
             a `Tensor` of shape `[n, height, width, num_channels]`.
         """
+========
+        #   """
+        #   Samples from the distribution, with optional conditional input.
+
+        #   Parameters
+        #   ----------
+        #   n
+        #       `int`, number of samples desired.
+        #   seed
+        #       `int`, seed for RNG. Setting a random seed enforces reproducibility
+        #       of the samples between sessions (not within a single session).
+        #   conditional_input
+        #       `Tensor` on which to condition the distribution (e.g.
+        #       class labels), or `None`.
+        #   training
+        #       `bool` or `None`. If `bool`, it controls the dropout layer,
+        #       where `True` implies dropout is active. If `None`, it defers to Keras'
+        #       handling of train/eval status.
+
+        #   Returns
+        #   -------
+        #   samples
+        #       a `Tensor` of shape `[n, height, width, num_channels]`.
+        #
+        #    """
+
+>>>>>>>> 503a1c8d (Stashing some file so I can rebase):src/dataeval/utils/tensorflow/internal/pixelcnn.py
         if conditional_input is not None:
             conditional_input = tf.convert_to_tensor(conditional_input, dtype=self.dtype)
             conditional_event_rank = tfp_internal.tensorshape_util.rank(self.conditional_shape)
@@ -850,6 +992,7 @@ class PixelCNN(distributions.distribution.Distribution):
         image_height, image_width, _ = tfp_internal.tensorshape_util.as_list(self.event_shape)
 
         def loop_body(index, samples):
+<<<<<<<< HEAD:src/dataeval/utils/tensorflow/internal/models.py
             """Loop for iterative pixel sampling.
 
             Parameters
@@ -868,6 +1011,29 @@ class PixelCNN(distributions.distribution.Distribution):
                 and including pixel `[index]`, with dimensions `[batch_size, height, \
                 width, num_channels]`.
             """
+========
+            #       """
+            #       Loop for iterative pixel sampling.
+
+            #       Parameters
+            #       ----------
+            #       index
+            #           0D `Tensor` of type `int32`. Index of the current pixel.
+            #       samples
+            #           4D `Tensor`. Images with pixels sampled in raster order, up to
+            #           pixel `[index]`, with dimensions `[batch_size, height, width,
+            #           num_channels]`.
+
+            #      Returns
+            #      -------
+            #      samples
+            #          4D `Tensor`. Images with pixels sampled in raster order, up to \
+            #          and including pixel `[index]`, with dimensions `[batch_size, height, \
+            #          width, num_channels]`.
+            #
+            #      """
+
+>>>>>>>> 503a1c8d (Stashing some file so I can rebase):src/dataeval/utils/tensorflow/internal/pixelcnn.py
             inputs = samples if conditional_input is None else [samples, h]
             params = self._network(inputs, training=training)
             samples_new = self._sample_channels(*params, seed=seed)
@@ -894,6 +1060,7 @@ class PixelCNN(distributions.distribution.Distribution):
         return tf.round(transformed_samples)
 
     def _sample_channels(self, component_logits, locs, scales, coeffs=None, seed=None):
+<<<<<<<< HEAD:src/dataeval/utils/tensorflow/internal/models.py
         """Sample a single pixel-iteration and apply channel conditioning.
 
         Parameters
@@ -924,6 +1091,41 @@ class PixelCNN(distributions.distribution.Distribution):
             4D `Tensor` of sampled image data with autoregression among \
             channels. Dimensions are `[batch_size, height, width, num_channels]`.
         """
+========
+        #    """
+        #    Sample a single pixel-iteration and apply channel conditioning.
+
+        #    Parameters
+        #    ----------
+        #    component_logits
+        #        4D `Tensor` of logits for the Categorical distribution
+        #        over Quantized Logistic mixture components. Dimensions are `[batch_size,
+        #        height, width, num_logistic_mix]`.
+        #    locs
+        #        4D `Tensor` of location parameters for the Quantized Logistic
+        #        mixture components. Dimensions are `[batch_size, height, width,
+        #        num_logistic_mix, num_channels]`.
+        #    scales
+        #        4D `Tensor` of location parameters for the Quantized Logistic
+        #        mixture components. Dimensions are `[batch_size, height, width,
+        #        num_logistic_mix, num_channels]`.
+        #    coeffs
+        #        4D `Tensor` of coefficients for the linear dependence among color
+        #        channels, or `None` if there is only one channel. Dimensions are
+        #        `[batch_size, height, width, num_logistic_mix, num_coeffs]`, where
+        #        `num_coeffs = num_channels * (num_channels - 1) // 2`.
+        #    seed
+        #        `int`, random seed.
+
+        #   Returns
+        #   -------
+        #   samples
+        #       4D `Tensor` of sampled image data with autoregression among \
+        #       channels. Dimensions are `[batch_size, height, width, num_channels]`.
+        #
+        #   """
+
+>>>>>>>> 503a1c8d (Stashing some file so I can rebase):src/dataeval/utils/tensorflow/internal/pixelcnn.py
         num_channels = self.event_shape[-1]
 
         # sample mixture components once for the entire pixel
@@ -968,6 +1170,7 @@ class PixelCNNNetwork(keras.layers.Layer):
     This is a Keras implementation of the Pixel CNN++ network, as described in
     Salimans et al. (2017)[1] and van den Oord et al. (2016)[2].
     (https://github.com/openai/pixel-cnn).
+<<<<<<<< HEAD:src/dataeval/utils/tensorflow/internal/models.py
     #### References
     [1]: Tim Salimans, Andrej Karpathy, Xi Chen, and Diederik P. Kingma.
        PixelCNN++: Improving the PixelCNN with Discretized Logistic Mixture
@@ -980,6 +1183,22 @@ class PixelCNNNetwork(keras.layers.Layer):
        PixelCNN Decoders. In _30th Conference on Neural Information Processing
        Systems_, 2016.
        https://papers.nips.cc/paper/6527-conditional-image-generation-with-pixelcnn-decoders.pdf.
+========
+
+    References
+    -----------
+    [1]: Tim Salimans, Andrej Karpathy, Xi Chen, and Diederik P. Kingma.
+    PixelCNN++: Improving the PixelCNN with Discretized Logistic Mixture
+    Likelihood and Other Modifications. In _International Conference on
+    Learning Representations\_, 2017.
+    https://pdfs.semanticscholar.org/9e90/6792f67cbdda7b7777b69284a81044857656.pdf
+    Additional details at https://github.com/openai/pixel-cnn
+    [2]: Aaron van den Oord, Nal Kalchbrenner, Oriol Vinyals, Lasse Espeholt,
+    Alex Graves, and Koray Kavukcuoglu. Conditional Image Generation with
+    PixelCNN Decoders. In _30th Conference on Neural Information Processing
+    Systems\_, 2016.
+    https://papers.nips.cc/paper/6527-conditional-image-generation-with-pixelcnn-decoders.pdf.
+>>>>>>>> 503a1c8d (Stashing some file so I can rebase):src/dataeval/utils/tensorflow/internal/pixelcnn.py
     """
 
     def __init__(
@@ -1032,6 +1251,7 @@ class PixelCNNNetwork(keras.layers.Layer):
             (has no effect if `use_weight_norm` is `False`).
         dtype
             Data type of the layer.
+
         """
         super().__init__(dtype=dtype)
         self._dropout_p = dropout_p
@@ -1366,6 +1586,7 @@ class PixelCNNNetwork(keras.layers.Layer):
             color channels, included only if the image has more than one channel. \
             Dimensions are `[batch_size, height, width, num_logistic_mix, \
             num_coeffs]`, where `num_coeffs = num_channels * (num_channels - 1) // 2`.
+            
         """
         return self._network(inputs, training=training)
 
@@ -1381,14 +1602,30 @@ def _make_kernel_constraint(kernel_size, valid_rows, valid_columns):
 
 
 def _build_and_apply_h_projection(h, num_filters, dtype):
+<<<<<<<< HEAD:src/dataeval/utils/tensorflow/internal/models.py
     """Project the conditional input."""
+========
+    """
+    Project the conditional input.
+
+    """
+
+>>>>>>>> 503a1c8d (Stashing some file so I can rebase):src/dataeval/utils/tensorflow/internal/pixelcnn.py
     h = keras.layers.Flatten(dtype=dtype)(h)
     h_projection = keras.layers.Dense(2 * num_filters, kernel_initializer="random_normal", dtype=dtype)(h)
     return h_projection[..., tf.newaxis, tf.newaxis, :]
 
 
 def _apply_sigmoid_gating(x):
+<<<<<<<< HEAD:src/dataeval/utils/tensorflow/internal/models.py
     """Apply the sigmoid gating in Figure 2 of [2]."""
+========
+    """
+    Apply the sigmoid gating in Figure 2 of [2].
+
+    """
+
+>>>>>>>> 503a1c8d (Stashing some file so I can rebase):src/dataeval/utils/tensorflow/internal/pixelcnn.py
     activation_tensor, gate_tensor = tf.split(x, 2, axis=-1)
     sigmoid_gate = tf.sigmoid(gate_tensor)
     return keras.layers.multiply([sigmoid_gate, activation_tensor], dtype=x.dtype)

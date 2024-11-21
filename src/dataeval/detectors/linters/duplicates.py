@@ -162,6 +162,7 @@ class Duplicates:
         >>> all_dupes.evaluate(images)
         DuplicatesOutput(exact=[[3, 20], [16, 37]], near=[[3, 20, 22], [12, 18], [13, 36], [14, 31], [17, 27], [19, 38, 47]])
         """  # noqa: E501
+
         self.stats = hashstats(data)
         duplicates = self._get_duplicates(self.stats.dict())
         return DuplicatesOutput(**duplicates)

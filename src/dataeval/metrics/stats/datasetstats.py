@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["DatasetStatsOutput", "ChannelStatsOutput", "datasetstats", "channelstats"]
+__all__ = ["ChannelStatsOutput", "channelstats"]
 
 from dataclasses import dataclass
 from typing import Any, Iterable

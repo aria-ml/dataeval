@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["DimensionStatsOutput", "dimensionstats"]
-
+# __all__ = ["DimensionStatsOutput", "dimensionstats"]
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable
 
@@ -93,7 +92,7 @@ def dimensionstats(
 
     Returns
     -------
-    DimensionStatsOutput
+    dimensionstats.DimensionStatsOutput
         A dictionary-like object containing the computed dimension statistics for each image or bounding
         box. The keys correspond to the names of the statistics (e.g., 'width', 'height'), and the values
         are lists of results for each image or :term:NumPy` arrays when the results are multi-dimensional.

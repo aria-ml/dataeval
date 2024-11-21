@@ -31,6 +31,8 @@ class OutliersOutput(Generic[TIndexIssueMap], OutputMetadata):
     issues : dict[int, dict[str, float]] | list[dict[int, dict[str, float]]]
         Indices of image Outliers with their associated issue type and calculated values.
 
+    Notes
+    -----
     - For a single dataset, a dictionary containing the indices of outliers and
       a dictionary showing the issues and calculated values for the given index.
     - For multiple stats outputs, a list of dictionaries containing the indices of
@@ -83,7 +85,7 @@ class Outliers:
 
     Attributes
     ----------
-    stats : tuple[DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput]
+    stats : tuple[dimensionstats.DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput]
         Various stats output classes that hold the value of each metric for each image
 
     See Also
@@ -196,6 +198,7 @@ class Outliers:
         >>> results.issues[1]
         {}
         """  # noqa: E501
+
         if isinstance(stats, DatasetStatsOutput):
             outliers = self._get_outliers({k: v for o in stats._outputs() for k, v in o.dict().items()})
             return OutliersOutput(outliers)
@@ -254,6 +257,7 @@ class Outliers:
         >>> results.issues[10]
         {'skew': -3.906, 'kurtosis': 13.266, 'entropy': 0.2128, 'contrast': 1.25, 'zeros': 0.05493}
         """
+
         self.stats = datasetstats(images=data)
         outliers = self._get_outliers(self.stats.dict())
         return OutliersOutput(outliers)

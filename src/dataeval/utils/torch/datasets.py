@@ -121,6 +121,7 @@ def _download_dataset(
     """Code to download mnist and corruptions, originates from tensorflow_datasets (tfds):
     https://github.com/tensorflow/datasets/blob/master/tensorflow_datasets/image_classification/mnist_corrupted.py
     """
+
     name, _ = os.path.splitext(fname)
     folder = os.path.join(root, name)
     os.makedirs(folder, exist_ok=True)
@@ -147,6 +148,7 @@ def _extract_archive(
 
     The archive type and a possible compression is automatically detected from the file name.
     """
+
     from_path = Path(from_path)
     if not from_path.is_absolute():
         from_path = from_path.resolve()
@@ -384,6 +386,7 @@ class MNIST(Dataset[tuple[NDArray[np.float64], int]]):
         Returns:
             tuple: (image, target) where target is index of the target class.
         """
+
         img, target = self.data[index], int(self.targets[index])
 
         return img, target

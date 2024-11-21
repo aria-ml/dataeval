@@ -3,6 +3,7 @@
 ```{eval-rst}
 .. automodule:: dataeval.detectors.ood
    :synopsis:
+   :no-index:
 ```
 
 ```{currentmodule} dataeval.detectors.ood

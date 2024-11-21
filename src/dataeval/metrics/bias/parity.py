@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["ParityOutput", "parity", "label_parity"]
+__all__ = ["ParityOutput", "label_parity"]  # , "parity", "label_parity"]
 
 import warnings
 from dataclasses import dataclass

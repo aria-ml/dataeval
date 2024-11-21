@@ -3,7 +3,7 @@ import pytest
 from numpy.typing import ArrayLike
 
 from dataeval.detectors.ood.base import OODGMMBase, OODScoreOutput
-from dataeval.utils.tensorflow._internal.utils import create_model
+from dataeval.utils.tensorflow.internal.utils import create_model
 
 image_shape = (32, 32, 1)
 model = create_model("AE", image_shape)

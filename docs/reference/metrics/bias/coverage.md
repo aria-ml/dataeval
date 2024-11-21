@@ -10,4 +10,5 @@ embeddings, _ = dsets.make_blobs(n_samples=500, centers=[(1,1), (3,3)], cluster_
 
 ```{eval-rst}
 .. autofunction:: dataeval.metrics.bias.coverage
+   :no-index:
 ```

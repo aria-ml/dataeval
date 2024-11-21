@@ -43,6 +43,7 @@ class MockCifar10:
         :return: A mock dataset with 50,000 images and labels
         :rtype: :class:`MockImageClassificationDataset`
         """
+
         return self._train_dataset
 
     @property
@@ -52,4 +53,5 @@ class MockCifar10:
         :return: A mock dataset with 10,000 images and labels
         :rtype: :class:`MockImageClassificationDataset`
         """
+
         return self._test_dataset

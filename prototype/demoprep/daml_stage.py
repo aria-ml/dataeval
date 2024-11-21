@@ -67,6 +67,7 @@ class DataEvalStage(TestStage):
     def load_cached_results(self, results: Path) -> None:
         """Load cached results from a previous run so that they may be accessed with the collect_metrics and the
         collect_report_consumables methods"""
+        
         if Path.is_file(results):
             print("Cache hit")
             with results.open() as f:

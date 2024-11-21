@@ -52,6 +52,7 @@ class MockImageClassificationGenerator:
         parameters
         :rtype: :class:`MockImageClassificationDataset`
         """
+
         return self._dataset
 
     def _create_dataset(self) -> None:

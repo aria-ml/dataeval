@@ -36,6 +36,7 @@ class AriaAutoencoder(nn.Module):
         torch.Tensor
             The reconstructed output tensor.
         """
+
         x = self.encoder(x)
         x = self.decoder(x)
         return x
@@ -54,6 +55,7 @@ class AriaAutoencoder(nn.Module):
         torch.Tensor
             The encoded representation of the input tensor.
         """
+
         return self.encoder(x)
 
 
@@ -95,6 +97,7 @@ class Encoder(nn.Module):
         torch.Tensor
             The encoded representation of the input tensor.
         """
+
         return self.encoder(x)
 
 
@@ -135,4 +138,5 @@ class Decoder(nn.Module):
         torch.Tensor
             The reconstructed output tensor.
         """
+
         return self.decoder(x)

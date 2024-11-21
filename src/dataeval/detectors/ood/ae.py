@@ -56,7 +56,15 @@ class OOD_AE(OODBase):
     ) -> None:
         if loss_fn is None:
             loss_fn = keras.losses.MeanSquaredError()
-        super().fit(as_numpy(x_ref), threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
+        super().fit(
+            as_numpy(x_ref),
+            threshold_perc,
+            loss_fn,
+            optimizer,
+            epochs,
+            batch_size,
+            verbose,
+        )
 
     def _score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
         self._validate(X := as_numpy(X))

@@ -10,7 +10,7 @@ import torch
 from matplotlib.patches import Rectangle
 from torchmetrics import MetricCollection
 
-from dataeval._internal.metrics.metadata import Balance, BalanceClasswise, Diversity, DiversityClasswise
+from dataeval.internal.metrics.metadata import Balance, BalanceClasswise, Diversity, DiversityClasswise
 
 def balance_classwise_fig(mi, metric, class_names):
     f, ax = plt.subplots(figsize=(12, 8))

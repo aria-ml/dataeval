@@ -19,8 +19,8 @@ from numpy.typing import ArrayLike, NDArray
 from dataeval.detectors.ood.base import OODBase, OODScoreOutput
 from dataeval.interop import to_numpy
 from dataeval.utils.lazy import lazyload
-from dataeval.utils.tensorflow._internal.trainer import trainer
-from dataeval.utils.tensorflow._internal.utils import predict_batch
+from dataeval.utils.tensorflow.internal.trainer import trainer
+from dataeval.utils.tensorflow.internal.utils import predict_batch
 
 if TYPE_CHECKING:
     import tensorflow as tf
@@ -34,7 +34,9 @@ else:
 
 
 def _build_model(
-    dist: tf_models.PixelCNN, input_shape: tuple | None = None, filepath: str | None = None
+    dist: tf_models.PixelCNN,
+    input_shape: tuple | None = None,
+    filepath: str | None = None,
 ) -> tuple[keras.Model, tf_models.PixelCNN]:
     """
     Create keras.Model from TF distribution.
@@ -52,7 +54,8 @@ def _build_model(
     -------
     TensorFlow model.
     """
-    x_in = keras.layers.Input(shape=input_shape)
+
+    x_in = Input(shape=input_shape)
     log_prob = dist.log_prob(x_in)
     model = keras.models.Model(inputs=x_in, outputs=log_prob)
     model.add_loss(-tf.reduce_mean(log_prob))
@@ -86,6 +89,7 @@ def _mutate_categorical(
     -------
     Array with perturbed data.
     """
+
     frange = (feature_range[0] + 1, feature_range[1] + 1)
     shape = X.shape
     n_samples = np.prod(shape)
@@ -180,6 +184,7 @@ class OOD_LLR(OODBase):
         mutate_batch_size: int, default int(1e10)
             Batch size used to generate the mutations for the background dataset.
         """
+
         x_ref = to_numpy(x_ref)
         input_shape = x_ref.shape[1:]
         optimizer = keras.optimizers.Adam() if optimizer is None else optimizer
@@ -243,6 +248,7 @@ class OOD_LLR(OODBase):
         """
         Compute log probability of a batch of instances under the :term:`generative model<Generative Model>`.
         """
+
         logp_fn = partial(dist.log_prob, return_per_feature=return_per_feature)
         # TODO: TBD: can this be any of the other types from predict_batch? i.e. tf.Tensor or tuple
         return predict_batch(X, logp_fn, batch_size=batch_size)  # type: ignore[return-value]
@@ -257,6 +263,7 @@ class OOD_LLR(OODBase):
         """
         Compute log probability of a batch of instances with the user defined log_prob function.
         """
+
         if self.sequential:
             y, X = X[:, 1:], X[:, :-1]
         else:
@@ -286,6 +293,7 @@ class OOD_LLR(OODBase):
         -------
         Likelihood ratios.
         """
+
         logp_fn = self._logp if not isinstance(self.log_prob, Callable) else self._logp_alt  # type: ignore
         logp_s = logp_fn(self.dist_s, X, return_per_feature=return_per_feature, batch_size=batch_size)
         logp_b = logp_fn(self.dist_b, X, return_per_feature=return_per_feature, batch_size=batch_size)

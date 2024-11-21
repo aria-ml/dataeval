@@ -152,7 +152,7 @@ include = ["*/src/dataeval/*"]
 omit = [
   "*/torch/blocks.py",
   "*/torch/utils.py",
-  "*/tensorflow/_internal/models.py",
+  "*/tensorflow/internal/pixelcnn.py",
 ]
 fail_under = 90
 

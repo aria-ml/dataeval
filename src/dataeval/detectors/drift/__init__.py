@@ -8,7 +8,9 @@ from dataeval.detectors.drift.base import DriftOutput
 from dataeval.detectors.drift.cvm import DriftCVM
 from dataeval.detectors.drift.ks import DriftKS
 
-__all__ = ["DriftCVM", "DriftKS", "DriftOutput", "updates"]
+__all__ = [
+    # "DriftCVM", "DriftKS", "DriftOutput", "updates"
+]
 
 if _IS_TORCH_AVAILABLE:
     from dataeval.detectors.drift.mmd import DriftMMD, DriftMMDOutput

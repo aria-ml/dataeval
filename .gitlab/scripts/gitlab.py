@@ -127,6 +127,7 @@ class Gitlab(RestWrapper):
         ----
         https://docs.gitlab.com/ee/api/branches.html#get-single-repository-branch
         """
+
         r = self._request(get, f"{BRANCHES}/{branch}")
         return r
 
@@ -148,6 +149,7 @@ class Gitlab(RestWrapper):
         ----
         https://docs.gitlab.com/ee/api/branches.html#create-repository-branch
         """
+
         r = self._request(post, BRANCHES, {"branch": branch, "ref": ref})
         return r
 

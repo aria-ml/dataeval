@@ -40,6 +40,52 @@ extensions = [
     "enum_tools.autoenum",
 ]
 
+# bittex config
+bibtex_bibfiles = ["refs.bib"]
+# Coverage show missing items
+coverage_show_missing_items = True
+
+# autoapi directories (where to look for files)
+autoapi_dirs = ["../src/dataeval"]
+autoapi_type = "python"
+autoapi_options = [
+    "members",
+    "undoc-members",
+    #'private-members',
+    "show-inheritance",
+    "show-module-summary",
+    "special-members",
+    "imported-members",
+]
+
+autoapi_ignore = [
+    "*/utils/tensorflow/internal/utils.py",
+    "*/utils/tensorflow/internal/autoencoder.py",
+    "*/utils/tensorflow/internal/loss.py",
+    "*/utils/tensorflow/internal/trainer.py",
+    "*/utils/tensorflow/internal/pixelcnn.py",
+]
+
+autodoc_mock_imports = [
+    "gmm",
+    "PixelCNN",
+    "trainer",
+    "predict_batch",
+    "tensorflow",
+    "tf-keras",
+    # "./src/dataeval/utils/tensorflow/_internal/gmm",
+    # "./src/dataeval/utils/tensorflow/internal/trainer",
+    # "./src/dataeval/utils/tensorflow/internal/utils",
+    # "./src/dataeval/utils/tensorflow/internal/autoencoder",
+    # "./src/dataeval/utils/tensorflow/internal/loss",
+    # "./src/dataeval/utils/tensorflow/internal/pixelcnn",
+    "./src/dataeval/utils/tensorflow/internal/trainer",
+]
+
+autoapi_keep_files = True
+napoleon_use_ivar = True  # to correctly handle Attributes header in various classes
+# Fixes duplicate documentation warning
+
 # The suffix of source filenames.
 source_suffix = [".rst", ".md"]
 
@@ -114,15 +160,24 @@ if np.__version__[0] == "2":
 # because we expose private modules in public namespaces
 # and rename some classes, documentation recognizes these
 # public classes as aliases, which we don't want
-def normalize_module(mod_names):
-    import importlib
+# def normalize_module(mod_names):
+#    import importlib
+#
+#    for mod_name in mod_names:
+#        mod = importlib.import_module(mod_name)
+#        for cls_name in mod.__all__:
+#            cls = getattr(mod, cls_name)
+#            cls.__name__ = cls_name
+#            cls.__module__ = mod_name
 
-    for mod_name in mod_names:
-        mod = importlib.import_module(mod_name)
-        for cls_name in mod.__all__:
-            cls = getattr(mod, cls_name)
-            cls.__name__ = cls_name
-            cls.__module__ = mod_name
+
+# did not work. Warning was not fixed
+# def maybe_skip_member(app, what, name, obj, skip, options):
+#    # print app, what, name, obj, skip, options
+#    skip = None
+#    if what == "function" and "gmm" in name or what == "class" and "GaussianMixtureModelParams" in name:
+#        skip = True
+#    return skip
 
 
 def setup(app):
@@ -138,3 +193,17 @@ def setup(app):
 
     if nb_execution_mode != "off":
         data.download()
+
+
+# did not work. Warning still issued.
+#   app.connect("autoapi-skip-member", maybe_skip_member)
+
+
+# did not work to skip documentation
+# def setup(sphinx):
+# didn't work. Member was not skipped
+#        sphinx.connect('autoapi-skip-member', maybe_skip_member)
+
+# ----------------------------------------------------------------------
+# Mock Import from StackOverflow
+# ---------------------------------------------------------------------

@@ -3,6 +3,7 @@
 ```{eval-rst}
 .. automodule:: dataeval.metrics
    :synopsis:
+   :no-index:
 ```
 
 ```{currentmodule} dataeval.metrics

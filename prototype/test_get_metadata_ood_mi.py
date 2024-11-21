@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval._internal.metrics.metadata_ood_mi import get_metadata_ood_mi
+from dataeval.internal.metrics.metadata_ood_mi import get_metadata_ood_mi
 
 
 @pytest.fixture(scope="class")

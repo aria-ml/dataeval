@@ -17,8 +17,8 @@ from sklearn.datasets import load_iris
 from tf_keras.layers import Dense, InputLayer
 
 from dataeval.detectors.ood.vae import OOD_VAE
-from dataeval.utils.tensorflow._internal.loss import Elbo
-from dataeval.utils.tensorflow._internal.models import VAE
+from dataeval.utils.tensorflow.internal.autoencoder import VAE
+from dataeval.utils.tensorflow.internal.loss import Elbo
 
 score_type = ["mse"]
 samples = [10]
@@ -56,7 +56,11 @@ def test_vae(vae_params):
 
     # define encoder and decoder
     encoder_net = keras.Sequential(
-        [InputLayer(input_shape=(input_dim,)), Dense(5, activation=tf.nn.relu), Dense(latent_dim, activation=None)]
+        [
+            InputLayer(input_shape=(input_dim,)),
+            Dense(5, activation=tf.nn.relu),
+            Dense(latent_dim, activation=None),
+        ]
     )
 
     decoder_net = keras.Sequential(

@@ -150,4 +150,5 @@ class DriftUncertainty:
             Dictionary containing the drift prediction, :term:`p-value<P-Value>`, and threshold
             statistics.
         """
+
         return self._detector.predict(x)

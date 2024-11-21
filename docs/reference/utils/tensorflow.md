@@ -14,6 +14,6 @@
 ## Loss Function Classes
 
 ```{eval-rst}
-.. autoclass:: dataeval.utils.tensorflow.loss.Elbo
-.. autoclass:: dataeval.utils.tensorflow.loss.LossGMM
+.. autoclass:: dataeval.utils.tensorflow.internal.loss.Elbo
+.. autoclass:: dataeval.utils.tensorflow.internal.loss.LossGMM
 ```

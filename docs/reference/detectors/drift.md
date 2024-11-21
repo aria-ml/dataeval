@@ -3,6 +3,7 @@
 ```{eval-rst}
 .. automodule:: dataeval.detectors.drift
    :synopsis:
+   :no-index:
 ```
 
 ```{currentmodule} dataeval.detectors.drift

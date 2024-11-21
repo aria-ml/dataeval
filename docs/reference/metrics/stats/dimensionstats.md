@@ -12,4 +12,5 @@ images[9] = np.zeros((3,64,64))
 
 ```{eval-rst}
 .. autofunction:: dataeval.metrics.stats.dimensionstats
+   :no-index:
 ```

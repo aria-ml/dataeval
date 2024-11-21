@@ -17,7 +17,7 @@ from sklearn.datasets import load_iris
 from tf_keras.layers import Dense, InputLayer
 
 from dataeval.detectors.ood.ae import OOD_AE
-from dataeval.utils.tensorflow._internal.models import AE
+from dataeval.utils.tensorflow.internal.autoencoder import AE
 
 threshold_perc = [90.0]
 loss_fn = [keras.losses.MeanSquaredError(), None]
@@ -46,7 +46,11 @@ def test_ae(ae_params):
 
     # define encoder and decoder
     encoder_net = keras.Sequential(
-        [InputLayer(input_shape=(input_dim,)), Dense(5, activation=tf.nn.relu), Dense(encoding_dim, activation=None)]
+        [
+            InputLayer(input_shape=(input_dim,)),
+            Dense(5, activation=tf.nn.relu),
+            Dense(encoding_dim, activation=None),
+        ]
     )
 
     decoder_net = keras.Sequential(

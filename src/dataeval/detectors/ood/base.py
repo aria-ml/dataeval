@@ -20,8 +20,11 @@ from numpy.typing import ArrayLike, NDArray
 from dataeval.interop import to_numpy
 from dataeval.output import OutputMetadata, set_metadata
 from dataeval.utils.lazy import lazyload
-from dataeval.utils.tensorflow._internal.gmm import GaussianMixtureModelParams, gmm_params
-from dataeval.utils.tensorflow._internal.trainer import trainer
+from dataeval.utils.tensorflow.internal.gmm import (
+    GaussianMixtureModelParams,
+    gmm_params,
+)
+from dataeval.utils.tensorflow.internal.trainer import trainer
 
 if TYPE_CHECKING:
     import tensorflow as tf
@@ -82,6 +85,7 @@ class OODScoreOutput(OutputMetadata):
         NDArray
             Either the instance or feature score based on input selection
         """
+
         return self.instance_score if ood_type == "instance" or self.feature_score is None else self.feature_score
 
 
@@ -135,6 +139,7 @@ class OODBase(ABC):
         OODScoreOutput
             An object containing the instance-level and feature-level OOD scores.
         """
+
         return self._score(X, batch_size)
 
     def _threshold_score(self, ood_type: Literal["feature", "instance"] = "instance") -> np.floating:
@@ -210,6 +215,7 @@ class OODBase(ABC):
         Dictionary containing the outlier predictions for the selected level,
         and the OOD scores for the data including both 'instance' and 'feature' (if present) level scores.
         """
+
         self._validate_state(X := to_numpy(X))
         # compute outlier scores
         score = self.score(X, batch_size=batch_size)

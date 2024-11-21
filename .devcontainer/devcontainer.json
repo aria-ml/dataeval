@@ -6,8 +6,8 @@
   },
 
   "runArgs": [
-    "--gpus",
-    "all"
+   // "--gpus",
+   // "all"
   ],
 
   "mounts": [

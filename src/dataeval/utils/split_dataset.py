@@ -9,11 +9,18 @@ import numpy as np
 from numpy.typing import NDArray
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
-from sklearn.model_selection import GroupKFold, KFold, StratifiedGroupKFold, StratifiedKFold
+from sklearn.model_selection import (
+    GroupKFold,
+    KFold,
+    StratifiedGroupKFold,
+    StratifiedKFold,
+)
 from sklearn.utils.multiclass import type_of_target
 
 
-def validate_test_val(num_folds: int, test_frac: float | None, val_frac: float | None) -> tuple[float, float]:
+def validate_test_val(
+    num_folds: int, test_frac: float | None, val_frac: float | None
+) -> tuple[float, float]:
     """Check input fractions to ensure unambiguous splitting arguments are passed return calculated
     test and validation fractions.
 
@@ -50,9 +57,15 @@ def validate_test_val(num_folds: int, test_frac: float | None, val_frac: float |
     if (num_folds == 1) and (val_frac is None):
         raise ValueError("If num_folds is None or 1, must assign a value to val_frac")
     t_frac = 0.0 if test_frac is None else test_frac
-    v_frac = 1.0 / num_folds * (1.0 - t_frac) if val_frac is None else val_frac * (1.0 - t_frac)
+    v_frac = (
+        1.0 / num_folds * (1.0 - t_frac)
+        if val_frac is None
+        else val_frac * (1.0 - t_frac)
+    )
     if (t_frac + v_frac) >= 1.0:
-        raise ValueError(f"val_frac + test_frac must be less that 1.0, currently {v_frac+t_frac}")
+        raise ValueError(
+            f"val_frac + test_frac must be less that 1.0, currently {v_frac+t_frac}"
+        )
     return t_frac, v_frac
 
 
@@ -93,7 +106,9 @@ def check_labels(
     if isinstance(labels, list):
         labels = np.array(labels)
     if type_of_target(labels) == "continuous":
-        raise ValueError("Detected continuous labels, labels must be discrete for proper stratification")
+        raise ValueError(
+            "Detected continuous labels, labels must be discrete for proper stratification"
+        )
     index = np.arange(len(labels))
     return index, labels
 
@@ -223,7 +238,9 @@ def angle2xy(angles: NDArray[Any]) -> NDArray[Any]:
     return xy
 
 
-def get_group_ids(metadata: dict[str, Any], group_names: list[str], num_samples: int) -> NDArray[np.int_]:
+def get_group_ids(
+    metadata: dict[str, Any], group_names: list[str], num_samples: int
+) -> NDArray[np.int_]:
     """Returns individual group numbers based on a subset of metadata defined by groupnames
 
     Parameters
@@ -311,7 +328,10 @@ def make_splits(
 
 
 def find_best_split(
-    labels: NDArray[np.int_], split_defs: list[dict[str, NDArray[np.int_]]], stratified: bool, eval_frac: float
+    labels: NDArray[np.int_],
+    split_defs: list[dict[str, NDArray[np.int_]]],
+    stratified: bool,
+    eval_frac: float,
 ) -> tuple[NDArray[np.int_], NDArray[np.int_]]:
     """Finds the split that most closely satisfies a criterion determined by the arguments passed.
     If stratified is True, returns the split whose class balance most closely resembles the overall
@@ -352,7 +372,9 @@ def find_best_split(
         best_split = min(split_defs, key=lambda x: abs(eval_frac - x["eval_frac"]))  # type: ignore
         return best_split["train"], best_split["eval"]
     else:
-        best_split = min(split_defs, key=lambda x: abs(eval_frac - (1 - x["eval_frac"])))  # type: ignore
+        best_split = min(
+            split_defs, key=lambda x: abs(eval_frac - (1 - x["eval_frac"]))
+        )  # type: ignore
         return best_split["eval"], best_split["train"]
 
 
@@ -396,7 +418,9 @@ def single_split(
     else:
         n_folds = max(2, int(round(1 / (1 - eval_frac - 1e-6))))
     split_candidates = make_splits(index, labels, n_folds, groups, stratified)
-    best_train, best_eval = find_best_split(labels, split_candidates, stratified, eval_frac)
+    best_train, best_eval = find_best_split(
+        labels, split_candidates, stratified, eval_frac
+    )
     return best_train, best_eval
 
 
@@ -449,11 +473,12 @@ def split_dataset(
         dictionary of folds, each containing indices of training and validation data.
         ex.
         {
-            "Fold_00":  {
-                            "train": [1,2,3,5,6,7,9,10,11],
-                            "val": [0, 4, 8, 12]
-                        },
-            "test": [13, 14, 15, 16]
+        "Fold_00":
+        {
+        "train": [1,2,3,5,6,7,9,10,11],
+        "val": [0, 4, 8, 12]
+        },
+        "test": [13, 14, 15, 16]
         }
     """
 
@@ -463,7 +488,9 @@ def split_dataset(
     stratify &= check_stratifiable(labels, total_partitions)
     if split_on:
         if metadata is None:
-            raise UnboundLocalError("If split_on is specified, metadata must also be provided")
+            raise UnboundLocalError(
+                "If split_on is specified, metadata must also be provided"
+            )
         groups = get_group_ids(metadata, split_on, len(labels))
         groupable = check_groups(groups, total_partitions)
         if not groupable:
@@ -481,12 +508,20 @@ def split_dataset(
         tv_labels = labels
         tv_groups = groups
     if num_folds == 1:
-        train_idx, val_idx = single_split(tv_idx, tv_labels, val_frac, tv_groups, stratify)
-        split_defs["fold_0"] = {"train": tv_idx[train_idx].squeeze(), "val": tv_idx[val_idx].squeeze()}
+        train_idx, val_idx = single_split(
+            tv_idx, tv_labels, val_frac, tv_groups, stratify
+        )
+        split_defs["fold_0"] = {
+            "train": tv_idx[train_idx].squeeze(),
+            "val": tv_idx[val_idx].squeeze(),
+        }
     else:
         tv_splits = make_splits(tv_idx, tv_labels, num_folds, tv_groups, stratify)
         for i, split in enumerate(tv_splits):
             train_split = tv_idx[split["train"]]
             val_split = tv_idx[split["eval"]]
-            split_defs[f"fold_{i}"] = {"train": train_split.squeeze(), "val": val_split.squeeze()}
+            split_defs[f"fold_{i}"] = {
+                "train": train_split.squeeze(),
+                "val": val_split.squeeze(),
+            }
     return split_defs

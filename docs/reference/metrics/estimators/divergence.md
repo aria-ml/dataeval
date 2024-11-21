@@ -11,4 +11,5 @@ datasetB, _ = dsets.make_blobs(n_samples=50, centers=[(-0.5,-0.5), (1,1)], clust
 
 ```{eval-rst}
 .. autofunction:: dataeval.metrics.estimators.divergence
+   :no-index:
 ```

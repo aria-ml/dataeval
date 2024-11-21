@@ -95,29 +95,29 @@ def predict_batch(
 
 
 def get_default_encoder_net(input_shape: tuple[int, int, int], encoding_dim: int):
-    return keras.Sequential(
+    return Sequential(
         [
-            keras.layers.InputLayer(input_shape=input_shape),
-            keras.layers.Conv2D(64, 4, strides=2, padding="same", activation=nn.relu),
-            keras.layers.Conv2D(128, 4, strides=2, padding="same", activation=nn.relu),
-            keras.layers.Conv2D(512, 4, strides=2, padding="same", activation=nn.relu),
-            keras.layers.Flatten(),
-            keras.layers.Dense(encoding_dim),
+            InputLayer(input_shape=input_shape),
+            Conv2D(64, 4, strides=2, padding="same", activation=relu),
+            Conv2D(128, 4, strides=2, padding="same", activation=relu),
+            Conv2D(512, 4, strides=2, padding="same", activation=relu),
+            Flatten(),
+            Dense(encoding_dim),
         ]
     )
 
 
 def get_default_decoder_net(input_shape: tuple[int, int, int], encoding_dim: int):
-    return keras.Sequential(
+    return Sequential(
         [
-            keras.layers.InputLayer(input_shape=(encoding_dim,)),
-            keras.layers.Dense(4 * 4 * 128),
-            keras.layers.Reshape(target_shape=(4, 4, 128)),
-            keras.layers.Conv2DTranspose(256, 4, strides=2, padding="same", activation=nn.relu),
-            keras.layers.Conv2DTranspose(64, 4, strides=2, padding="same", activation=nn.relu),
-            keras.layers.Flatten(),
-            keras.layers.Dense(math.prod(input_shape)),
-            keras.layers.Reshape(target_shape=input_shape),
+            InputLayer(input_shape=(encoding_dim,)),
+            Dense(4 * 4 * 128),
+            Reshape(target_shape=(4, 4, 128)),
+            Conv2DTranspose(256, 4, strides=2, padding="same", activation=relu),
+            Conv2DTranspose(64, 4, strides=2, padding="same", activation=relu),
+            Flatten(),
+            Dense(math.prod(input_shape)),
+            Reshape(target_shape=input_shape),
         ]
     )
 
@@ -148,13 +148,13 @@ def create_model(
     input_dim = math.prod(input_shape)
     encoding_dim = int(math.pow(2, int(input_dim.bit_length() * 0.8)) if encoding_dim is None else encoding_dim)
     if model_type == "AE":
-        return tf_models.AE(
+        return AE(
             get_default_encoder_net(input_shape, encoding_dim),
             get_default_decoder_net(input_shape, encoding_dim),
         )
 
     if model_type == "VAE":
-        return tf_models.VAE(
+        return VAE(
             get_default_encoder_net(input_shape, encoding_dim),
             get_default_decoder_net(input_shape, encoding_dim),
             encoding_dim,
@@ -164,36 +164,36 @@ def create_model(
         n_gmm = 2 if n_gmm is None else n_gmm
         gmm_latent_dim = 1 if gmm_latent_dim is None else gmm_latent_dim
         # The outlier detector is an encoder/decoder architecture
-        encoder_net = keras.Sequential(
+        encoder_net = Sequential(
             [
-                keras.layers.Flatten(),
-                keras.layers.InputLayer(input_shape=(input_dim,)),
-                keras.layers.Dense(60, activation=nn.tanh),
-                keras.layers.Dense(30, activation=nn.tanh),
-                keras.layers.Dense(10, activation=nn.tanh),
-                keras.layers.Dense(gmm_latent_dim, activation=None),
+                Flatten(),
+                InputLayer(input_shape=(input_dim,)),
+                Dense(60, activation=tanh),
+                Dense(30, activation=tanh),
+                Dense(10, activation=tanh),
+                Dense(gmm_latent_dim, activation=None),
             ]
         )
         # Here we define the decoder
-        decoder_net = keras.Sequential(
+        decoder_net = Sequential(
             [
-                keras.layers.InputLayer(input_shape=(gmm_latent_dim,)),
-                keras.layers.Dense(10, activation=nn.tanh),
-                keras.layers.Dense(30, activation=nn.tanh),
-                keras.layers.Dense(60, activation=nn.tanh),
-                keras.layers.Dense(input_dim, activation=None),
-                keras.layers.Reshape(target_shape=input_shape),
+                InputLayer(input_shape=(gmm_latent_dim,)),
+                Dense(10, activation=tanh),
+                Dense(30, activation=tanh),
+                Dense(60, activation=tanh),
+                Dense(input_dim, activation=None),
+                Reshape(target_shape=input_shape),
             ]
         )
         # GMM autoencoders have a density network too
-        gmm_density_net = keras.Sequential(
+        gmm_density_net = Sequential(
             [
-                keras.layers.InputLayer(input_shape=(gmm_latent_dim + 2,)),
-                keras.layers.Dense(10, activation=nn.tanh),
-                keras.layers.Dense(n_gmm, activation=nn.softmax),
+                InputLayer(input_shape=(gmm_latent_dim + 2,)),
+                Dense(10, activation=tanh),
+                Dense(n_gmm, activation=softmax),
             ]
         )
-        return tf_models.AEGMM(
+        return AEGMM(
             encoder_net=encoder_net,
             decoder_net=decoder_net,
             gmm_density_net=gmm_density_net,
@@ -205,35 +205,35 @@ def create_model(
         gmm_latent_dim = 2 if gmm_latent_dim is None else gmm_latent_dim
         # The outlier detector is an encoder/decoder architecture
         # Here we define the encoder
-        encoder_net = keras.Sequential(
+        encoder_net = Sequential(
             [
-                keras.layers.Flatten(),
-                keras.layers.InputLayer(input_shape=(input_dim,)),
-                keras.layers.Dense(20, activation=nn.relu),
-                keras.layers.Dense(15, activation=nn.relu),
-                keras.layers.Dense(7, activation=nn.relu),
+                Flatten(),
+                InputLayer(input_shape=(input_dim,)),
+                Dense(20, activation=relu),
+                Dense(15, activation=relu),
+                Dense(7, activation=relu),
             ]
         )
         # Here we define the decoder
-        decoder_net = keras.Sequential(
+        decoder_net = Sequential(
             [
-                keras.layers.InputLayer(input_shape=(gmm_latent_dim,)),
-                keras.layers.Dense(7, activation=nn.relu),
-                keras.layers.Dense(15, activation=nn.relu),
-                keras.layers.Dense(20, activation=nn.relu),
-                keras.layers.Dense(input_dim, activation=None),
-                keras.layers.Reshape(target_shape=input_shape),
+                InputLayer(input_shape=(gmm_latent_dim,)),
+                Dense(7, activation=relu),
+                Dense(15, activation=relu),
+                Dense(20, activation=relu),
+                Dense(input_dim, activation=None),
+                Reshape(target_shape=input_shape),
             ]
         )
         # GMM autoencoders have a density network too
-        gmm_density_net = keras.Sequential(
+        gmm_density_net = Sequential(
             [
-                keras.layers.InputLayer(input_shape=(gmm_latent_dim + 2,)),
-                keras.layers.Dense(10, activation=nn.relu),
-                keras.layers.Dense(n_gmm, activation=nn.softmax),
+                InputLayer(input_shape=(gmm_latent_dim + 2,)),
+                Dense(10, activation=relu),
+                Dense(n_gmm, activation=softmax),
             ]
         )
-        return tf_models.VAEGMM(
+        return VAEGMM(
             encoder_net=encoder_net,
             decoder_net=decoder_net,
             gmm_density_net=gmm_density_net,
@@ -242,7 +242,7 @@ def create_model(
         )
 
     if model_type == "PixelCNN":
-        return tf_models.PixelCNN(
+        return PixelCNN(
             image_shape=input_shape,
             num_resnet=5,
             num_hierarchies=2,

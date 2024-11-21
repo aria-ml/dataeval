@@ -7,7 +7,7 @@ from numpy.typing import ArrayLike, NDArray
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 from torchmetrics import Metric
 
-from dataeval._internal.metrics.functional import entropy, get_counts, get_num_bins, infer_categorical
+from dataeval.internal.metrics.functional import entropy, get_counts, get_num_bins, infer_categorical
 
 
 def str_to_int(d: Dict) -> Dict:
@@ -26,6 +26,7 @@ def str_to_int(d: Dict) -> Dict:
     Dict
         Dictionary with same keys and non-numeric values mapped to numeric values.
     """
+    
     for key, val in d.items():
         val = val.numpy() if torch.is_tensor(val) else val
         val = np.array(val) if isinstance(val, list) else val
@@ -50,6 +51,7 @@ def list_to_dict(list_of_dicts: List[Dict]) -> Dict:
     Dict[np.ndarray]
         dictionary whose columns are np.ndarray
     """
+    
     return {k: np.array([dic[k] for dic in list_of_dicts]) for k in list_of_dicts[0]}
 
 
@@ -262,18 +264,19 @@ class BalanceClasswise(BaseBalanceMetric):
     """
 
     def __init__(self, num_neighbors: int = 5):
+        '''
+        Parameters
+        ----------
+        num_neighbors: int
+            Number of nearest neighbors to use for computing MI between discrete
+            and continuous variables.
+        '''
         super().__init__(num_neighbors)
 
     def compute(self) -> NDArray:
         """
         Compute :term:`mutual information<Mutual Information>` between metadata factors (class label, metadata,
         label/image properties) with individual class labels.
-
-        Parameters
-        ----------
-        num_neighbors: int
-            Number of nearest neighbors to use for computing MI between discrete
-            and continuous variables.
 
         Note
         ----

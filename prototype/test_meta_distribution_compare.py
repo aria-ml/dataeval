@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval._internal.metrics.metadata_ks_compare import meta_distribution_compare
+from dataeval.internal.metrics.metadata_ks_compare import meta_distribution_compare
 
 
 @pytest.fixture(scope="class")

@@ -12,9 +12,9 @@ from sklearn.feature_selection import mutual_info_classif
 
 from typing import Dict, List, Union, Mapping
 
-from dataeval._internal.metrics.metadata_ood_mi import get_metadata_ood_mi
-from dataeval._internal.metrics.metadata_ks_compare import meta_distribution_compare
-from dataeval._internal.metrics.metadata_least_likely import get_least_likely_features
+from dataeval.internal.metrics.metadata_ood_mi import get_metadata_ood_mi
+from dataeval.internal.metrics.metadata_ks_compare import meta_distribution_compare
+from dataeval.internal.metrics.metadata_least_likely import get_least_likely_features
 
 import pytest
 

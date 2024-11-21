@@ -18,8 +18,8 @@ from numpy.typing import ArrayLike
 from dataeval.detectors.ood.base import OODBase, OODScoreOutput
 from dataeval.interop import to_numpy
 from dataeval.utils.lazy import lazyload
-from dataeval.utils.tensorflow._internal.loss import Elbo
-from dataeval.utils.tensorflow._internal.utils import predict_batch
+from dataeval.utils.tensorflow.internal.loss import Elbo
+from dataeval.utils.tensorflow.internal.utils import predict_batch
 
 if TYPE_CHECKING:
     import tensorflow as tf

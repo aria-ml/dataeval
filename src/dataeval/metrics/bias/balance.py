@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["BalanceOutput", "balance"]
+__all__ = ["BalanceOutput"]  # , "balance"]
 
 import contextlib
 import warnings
@@ -182,6 +182,7 @@ def balance(
     sklearn.feature_selection.mutual_info_regression
     sklearn.metrics.mutual_info_score
     """
+
     num_neighbors = validate_num_neighbors(num_neighbors)
     data, names, is_categorical, unique_labels = preprocess_metadata(class_labels, metadata)
     num_factors = len(names)

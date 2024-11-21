@@ -11,8 +11,8 @@ __all__ = []
 
 
 if _IS_TENSORFLOW_AVAILABLE:
-    import dataeval.utils.tensorflow.loss as loss
-    from dataeval.utils.tensorflow._internal.utils import create_model
+    import dataeval.utils.tensorflow.internal.loss as loss
+    from dataeval.utils.tensorflow.internal.utils import create_model
 
     __all__ = ["create_model", "loss"]
 

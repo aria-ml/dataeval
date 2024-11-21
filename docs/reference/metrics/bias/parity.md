@@ -9,4 +9,5 @@ np_random_gen = np.random.default_rng(175)
 
 ```{eval-rst}
 .. autofunction:: dataeval.metrics.bias.parity
+   :no-index:
 ```

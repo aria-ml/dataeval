@@ -106,14 +106,14 @@ def boxratiostats(
 
     Parameters
     ----------
-    boxstats : DimensionStatsOutput | PixelStatsOutput | VisualStatsOutput
+    boxstats : dimensionstats.DimensionStatsOutput | PixelStatsOutput | VisualStatsOutput
         Box statistics outputs to perform calculations on
-    imgstats : DimensionStatsOutput | PixelStatsOutput | VisualStatsOutput
+    imgstats : dimensionstats.DimensionStatsOutput | PixelStatsOutput | VisualStatsOutput
         Image statistics outputs to perform calculations on
 
     Returns
     -------
-    DimensionStatsOutput | PixelStatsOutput | VisualStatsOutput
+    dimensionstats.DimensionStatsOutput | PixelStatsOutput | VisualStatsOutput
         A dictionary-like object containing the computed ratio of the box statistics divided by the
         image statistics.
 
@@ -142,6 +142,7 @@ def boxratiostats(
      0.01220703 0.0168457  0.01057943 0.00976562 0.00130208 0.01098633
      0.02246094 0.0012207  0.01123047 0.00911458 0.02636719 0.06835938]
     """
+
     output_cls = type(boxstats)
     if type(boxstats) is not type(imgstats):
         raise TypeError("Must provide stats outputs of the same type.")

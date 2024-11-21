@@ -32,6 +32,7 @@ class GaussianMixtureModelParams(NamedTuple):
         Cholesky decomposition of `cov`.
     log_det_cov : tf.Tensor
         Log of the determinant of `cov`.
+
     """
 
     phi: tf.Tensor
@@ -56,6 +57,7 @@ def gmm_params(z: tf.Tensor, gamma: tf.Tensor) -> GaussianMixtureModelParams:
     -------
     GaussianMixtureModelParams(phi, mu, cov, L, log_det_cov)
         The parameters used to calculate energy.
+
     """
     # compute gmm parameters phi, mu and cov
     N = gamma.shape[0]  # nb of samples in batch
@@ -100,6 +102,7 @@ def gmm_energy(
         The sample energy of the GMM.
     cov_diag
         The inverse sum of the diagonal components of the covariance matrix.
+
     """
     D = tf.shape(params.cov)[1]  # type: ignore
     z_mu = tf.expand_dims(z, 1) - tf.expand_dims(params.mu, 0)  # N x K x D

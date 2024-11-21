@@ -14,6 +14,7 @@ torch.manual_seed(0)
 
 def get_images_from_batch(batch: Any) -> Any:
     """Extracts images from a batch of collated data by DataLoader"""
+
     return batch[0] if isinstance(batch, (list, tuple)) else batch
 
 
@@ -68,6 +69,7 @@ class AETrainer:
         To replace this function with a custom function, do:
             AETrainer.train = custom_function
         """
+
         # Setup training
         self.model.train()
         dataloader = DataLoader(dataset, batch_size=self.batch_size)
@@ -125,6 +127,7 @@ class AETrainer:
         To replace this function with a custom function, do:
             AETrainer.eval = custom_function
         """
+
         self.model.eval()
         dataloader = DataLoader(dataset, batch_size=self.batch_size)
         criterion = nn.MSELoss().to(self.device)
@@ -161,6 +164,7 @@ class AETrainer:
         ----
         This function should be run after the model has been trained and evaluated.
         """
+
         self.model.eval()
         dl = DataLoader(dataset, batch_size=self.batch_size)
         encodings = torch.Tensor([])

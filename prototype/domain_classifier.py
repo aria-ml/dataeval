@@ -32,6 +32,7 @@ class MVDC():
             Upper, Lower metric bounds on roc_auc for identifying :term:`drift<Drift>`. 
             The default is (0.45, 0.65).
     """
+    
     def __init__(
         self,
         x_trn: ArrayLike,
@@ -69,6 +70,7 @@ class MVDC():
             Returns the number of features.
 
         """
+        
         if self._x_trn.shape[-1] != self._x_tst.shape[-1]:
             raise ValueError('Reference and test embeddings have different number of features')
         else:
@@ -84,6 +86,7 @@ class MVDC():
             List of column numbers.
 
         """
+        
         self._col_lbl =  [str(n) for n in range(self.n_feats)]
         return self._col_lbl 
     
@@ -107,6 +110,7 @@ class MVDC():
             DESCRIPTION.
 
         """
+        
         if mysplit == 'trn':
             mydf = pd.DataFrame(data=self._x_trn , 
                                 index=np.arange(0, self._n_trn_samples),
@@ -129,6 +133,7 @@ class MVDC():
         None.
 
         """
+        
         self.calc = nml.DomainClassifierCalculator(feature_column_names = self._col_lbl,
                                                    cv_folds_num = self._n_folds,
                                                    chunk_size = self._chunk_sz,
@@ -144,6 +149,7 @@ class MVDC():
         None.
 
         """
+        
         results = self.calc.calculate(self.tstdf)
         self.resdf = results.to_df()
         
@@ -163,6 +169,7 @@ class MVDC():
         None.
 
         """
+        
         fig, ax = plt.subplots(dpi=300)
         resdf = self.resdf
         xticks = np.arange(resdf.shape[0])

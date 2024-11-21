@@ -3,6 +3,7 @@
 ```{eval-rst}
 .. automodule:: dataeval.detectors.linters
    :synopsis:
+   :no-index:
 ```
 
 ```{currentmodule} dataeval.detectors.linters
