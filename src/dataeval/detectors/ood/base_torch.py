@@ -10,8 +10,6 @@ Licensed under Apache Software License (Apache 2.0)
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import Callable, Literal, cast
 
 import numpy as np
@@ -19,66 +17,13 @@ import torch
 from numpy.typing import ArrayLike, NDArray
 
 import dataeval.models.torch.trainer as torch_trainer
+from dataeval.detectors.ood.base import OODBase, OODOutput, OODScoreOutput
 from dataeval.interop import to_numpy
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import set_metadata
 from dataeval.torch.models.gmm import GaussianMixtureModelParams, gmm_params
 
 
-@dataclass(frozen=True)
-class OODOutput(OutputMetadata):
-    """
-    Output class for predictions from :class:`OOD_AE`, :class:`OOD_AEGMM`, :class:`OOD_LLR`,
-    :class:`OOD_VAE`, and :class:`OOD_VAEGMM` out-of-distribution detectors
-
-    Attributes
-    ----------
-    is_ood : NDArray
-        Array of images that are detected as out of distribution
-    instance_score : NDArray
-        Instance score of the evaluated dataset
-    feature_score : NDArray | None
-        Feature score, if available, of the evaluated dataset
-    """
-
-    is_ood: NDArray[np.bool_]
-    instance_score: NDArray[np.float32]
-    feature_score: NDArray[np.float32] | None
-
-
-@dataclass(frozen=True)
-class OODScoreOutput(OutputMetadata):
-    """
-    Output class for instance and feature scores from :class:`OOD_AE`, :class:`OOD_AEGMM`,
-    :class:`OOD_LLR`, :class:`OOD_VAE`, and :class:`OOD_VAEGMM` out-of-distribution detectors
-
-    Parameters
-    ----------
-    instance_score : NDArray
-        Instance score of the evaluated dataset.
-    feature_score : NDArray | None, default None
-        Feature score, if available, of the evaluated dataset.
-    """
-
-    instance_score: NDArray[np.float32]
-    feature_score: NDArray[np.float32] | None = None
-
-    def get(self, ood_type: Literal["instance", "feature"]) -> NDArray[np.float32]:
-        """
-        Returns either the instance or feature score
-
-        Parameters
-        ----------
-        ood_type : "instance" | "feature"
-
-        Returns
-        -------
-        NDArray
-            Either the instance or feature score based on input selection
-        """
-        return self.instance_score if ood_type == "instance" or self.feature_score is None else self.feature_score
-
-
-class OODBase(ABC):
+class OODBaseTorch(OODBase):
     def __init__(self, model: torch.nn.Module) -> None:
         self.model = model
 
@@ -106,25 +51,6 @@ class OODBase(ABC):
         if not all(hasattr(self, attr) for attr in attrs) or any(getattr(self, attr) for attr in attrs) is None:
             raise RuntimeError("Metric needs to be `fit` before method call.")
         self._validate(X)
-
-    @abstractmethod
-    def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
-        """
-        Compute the out-of-distribution (OOD) scores for a given dataset.
-
-        Parameters
-        ----------
-        X : ArrayLike
-            Input data to score.
-        batch_size : int, default 1e10
-            Number of instances to process in each batch.
-            Use a smaller batch size if your dataset is large or if you encounter memory issues.
-
-        Returns
-        -------
-        OODScoreOutput
-            An object containing the instance-level and feature-level OOD scores.
-        """
 
     def _threshold_score(self, ood_type: Literal["feature", "instance"] = "instance") -> np.floating:
         return np.percentile(self._ref_score.get(ood_type), self._threshold_perc)
@@ -178,8 +104,7 @@ class OODBase(ABC):
         self._ref_score = self.score(x_ref, batch_size)
         self._threshold_perc = threshold_perc
 
-    # @set_metadata("dataeval.detectors") # this tries to iterate over string, barfs because OOD_AE has no attribute 'd'
-    @set_metadata(None)  # just bash through for now
+    @set_metadata()  # just bash through for now
     def predict(
         self,
         X: ArrayLike,
