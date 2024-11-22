@@ -13,6 +13,7 @@ __all__ = ["OOD_AE"]
 from typing import TYPE_CHECKING, Callable
 
 import numpy as np
+import torch
 from numpy.typing import ArrayLike
 
 from dataeval.detectors.ood.base import OODBase, OODScoreOutput
@@ -48,8 +49,8 @@ class OOD_AE(OODBase):
         self,
         x_ref: ArrayLike,
         threshold_perc: float = 100.0,
-        loss_fn: Callable[..., tf.Tensor] | None = None,
-        optimizer: keras.optimizers.Optimizer | None = None,
+        loss_fn: Callable[..., tf.Tensor | torch.nn.Module] | None = None,
+        optimizer: keras.optimizers.Optimizer | torch.optim.Optimizer | None = None,
         epochs: int = 20,
         batch_size: int = 64,
         verbose: bool = True,

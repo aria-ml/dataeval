@@ -10,6 +10,8 @@ Licensed under Apache Software License (Apache 2.0)
 
 from __future__ import annotations
 
+from typing import Callable
+
 import numpy as np
 import torch
 from numpy.typing import ArrayLike
@@ -37,8 +39,8 @@ class OOD_AE(OODBaseTorch):
     def fit(
         self,
         x_ref: ArrayLike,
-        threshold_perc: float = 100.0,
-        loss_fn: torch.nn.Module | None = None,
+        threshold_perc: float,
+        loss_fn: Callable[..., torch.nn.Module] | None = None,
         optimizer: torch.optim.Optimizer | None = None,
         epochs: int = 20,
         batch_size: int = 64,
@@ -46,6 +48,9 @@ class OOD_AE(OODBaseTorch):
     ) -> None:
         if loss_fn is None:
             loss_fn = torch.nn.MSELoss()
+
+        if optimizer is None:
+            optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
 
         super().fit(as_numpy(x_ref), threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
 
