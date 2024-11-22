@@ -8,6 +8,7 @@ from typing import Any, Iterable, Literal, Mapping, TypeVar
 
 import numpy as np
 from numpy.typing import NDArray
+from scipy.stats import wasserstein_distance as emd
 
 from dataeval.output import OutputMetadata, set_metadata
 from dataeval.utils.metadata import merge_metadata
@@ -89,13 +90,44 @@ def metadata_binning(
 # have option for user to specify type of binning like KBinsDiscretizer
 # density based binning using knn to get centers (potentially use MST to define centers)
 # need to determine difference between returning mean vs ordinal (might not be one)
-def binning_function(metadata, bin_method):
-    return
+def binning_function(
+    metadata: NDArray[Any] | list[Any], bin_method: str
+) -> Mapping[str, int | list[tuple[TNum, TNum]]]:
+    return {"ok": 1}
 
 
-def user_defined_bin(metadata, binning):
-    return
+def user_defined_bin(
+    metadata: NDArray[Any] | list[Any], binning: int | list[tuple[TNum, TNum]]
+) -> Mapping[str, int | list[tuple[TNum, TNum]]]:
+    return {"two": 3}
 
 
-def is_continuous(metadata):
-    return
+DISCRETE_MIN_EMD = 0.054
+CONTINUOUS_MIN_SAMPLE_SIZE = 20
+
+
+def is_continuous(X: NDArray[Any] | list[Any]) -> bool:
+    n_examples = len(X)
+
+    if n_examples < CONTINUOUS_MIN_SAMPLE_SIZE:
+        print(f"All samples look discrete with so few data points (< {CONTINUOUS_MIN_SAMPLE_SIZE})")
+        return False
+
+    # Require at least 3 unique values before bothering with NNN
+    xu = np.unique(X, axis=None)
+    if len(xu) < 3:
+        return False
+
+    Xs = np.sort(X)
+
+    X0, X1 = Xs[0:-2], Xs[2:]  # left and right neighbors
+
+    dx = np.zeros(len(Xs) - 2)  # no dx at end points
+    gtz = (X1 - X0) > 0  # check for dups; dx will be zero for them
+    dx[np.logical_not(gtz)] = 0.0
+
+    dx[gtz] = (Xs[1:-1] - X0)[gtz] / (X1 - X0)[gtz]  # the core idea: dx is NNN samples.
+
+    shift = emd(dx, np.linspace(0, 1, len(dx)))  # how far is dx from uniform, for this feature?
+
+    return shift < DISCRETE_MIN_EMD  # if NNN is close enough to uniform, consider the sample continuous.
