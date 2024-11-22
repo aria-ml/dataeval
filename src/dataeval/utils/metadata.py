@@ -217,7 +217,7 @@ def merge_metadata(
 
     Example
     -------
-    >>> list_metadata = [{"common": 1, "target": [{"a": 1, "b": 3}, {"a": 2, "b": 4}], "source": "example"}]
+    >>> list_metadata = [{"common": 1, "target": [{"a": 1, "b": 3, "c": 5}, {"a": 2, "b": 4}], "source": "example"}]
     >>> merge_metadata(list_metadata)
     {'common': [1, 1], 'a': [1, 2], 'b': [3, 4], 'source': ['example', 'example']}
     """
