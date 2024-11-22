@@ -247,7 +247,7 @@ class Encoder_AE(nn.Module):
         self.post_op_shape: tuple[int, int, int] = (nc_done, ny // 4 - 1, nx // 4 - 1)
         self.flatcon: int = math.prod(self.post_op_shape)
         self.flatten: nn.Sequential = nn.Sequential(
-            nn.Flatten(1, -1),
+            nn.Flatten(),
             nn.Linear(
                 self.flatcon,
                 encoding_dim,

@@ -14,8 +14,6 @@ import torch
 from numpy.typing import NDArray
 from torch.utils.data import DataLoader, TensorDataset
 
-# from dataeval._internal.detectors.ood.base_torch import GenericOptimizer
-
 
 def trainer(
     model: torch.nn.Module,
@@ -103,7 +101,7 @@ def trainer(
 
             if (psave == pnew).all() and first_time_in_epoch:  # type: ignore
                 first_time_in_epoch = False
-                print(f"epoch: {epoch}, step: {step}, parameters not changing")
+                # print(f"epoch: {epoch}, step: {step}, parameters not changing")
                 pass
             else:
                 pass

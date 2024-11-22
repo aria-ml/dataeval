@@ -148,10 +148,10 @@ def create_model(
     input_dim = math.prod(input_shape)
     encoding_dim = int(math.pow(2, int(input_dim.bit_length() * 0.8)) if encoding_dim is None else encoding_dim)
     if model_type == "AE":
-        enc = get_default_encoder_net(input_shape, encoding_dim)
-        dec = get_default_decoder_net(input_shape, encoding_dim)
-        ae_ret = tf_models.AE(enc, dec)
-        return ae_ret
+        return tf_models.AE(
+            get_default_encoder_net(input_shape, encoding_dim),
+            get_default_decoder_net(input_shape, encoding_dim),
+        )
 
     if model_type == "VAE":
         return tf_models.VAE(
