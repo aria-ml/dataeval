@@ -21,7 +21,7 @@ def trainer(
     model: torch.nn.Module,
     x_train: NDArray[Any],
     y_train: NDArray[Any] | None = None,
-    loss_fn: Callable[..., torch.Tensor] | None = None,
+    loss_fn: Callable[..., torch.Tensor | torch.nn.Module] | None = None,
     optimizer: torch.optim.Optimizer | None = None,
     preprocess_fn: Callable[[torch.Tensor], torch.Tensor] | None = None,
     epochs: int = 20,

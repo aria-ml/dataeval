@@ -58,10 +58,9 @@ class OODBaseTorch(OODBase):
     def fit(
         self,
         x_ref: ArrayLike,
-        threshold_perc: float = 100.0,
-        # loss_fn: Callable[..., torch.Tensor] | None = None,
-        loss_fn: torch.nn.Module | None = None,
-        optimizer: torch.optim.Optimizer | None = None,
+        threshold_perc: float,
+        loss_fn: Callable[..., torch.nn.Module],
+        optimizer: torch.optim.Optimizer,
         epochs: int = 20,
         batch_size: int = 64,
         verbose: bool = True,

@@ -12,9 +12,10 @@ __all__ = ["OODOutput", "OODScoreOutput"]
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Literal, cast
+from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 
 import numpy as np
+import torch
 from numpy.typing import ArrayLike, NDArray
 
 from dataeval.interop import to_numpy
@@ -86,7 +87,7 @@ class OODScoreOutput(OutputMetadata):
 
 
 class OODBase(ABC):
-    def __init__(self, model: keras.Model) -> None:
+    def __init__(self, model: keras.Model | torch.nn.Module) -> None:
         self.model = model
 
         self._ref_score: OODScoreOutput
@@ -144,8 +145,9 @@ class OODBase(ABC):
         self,
         x_ref: ArrayLike,
         threshold_perc: float,
-        loss_fn: Callable[..., tf.Tensor],
-        optimizer: keras.optimizers.Optimizer,
+        # loss_fn: Callable[..., tf.Tensor | torch.nn.Module],
+        loss_fn: Callable[..., Any],
+        optimizer: keras.optimizers.Optimizer | torch.optim.Optimizer,
         epochs: int,
         batch_size: int,
         verbose: bool,
