@@ -1,9 +1,9 @@
+import re
 from base64 import b64encode
 from collections import defaultdict
 from datetime import UTC, datetime
 from enum import IntEnum
 from os import path, remove, walk
-from re import MULTILINE, compile, search, sub
 from shutil import move, rmtree
 from typing import Any, Dict, List, Literal, Tuple
 
@@ -19,7 +19,7 @@ NOTEBOOK_DIRECTORY = "docs/how_to/notebooks"
 TUTORIAL_DIRECTORY = "docs/tutorials"
 TAB = "    "
 
-version_pattern = compile(r"v([0-9]+)\.([0-9]+)\.([0-9]+)")
+version_pattern = re.compile(r"v([0-9]+)\.([0-9]+)\.([0-9]+)")
 
 """
 Multiline pattern that matches for the following content in MR description:
@@ -44,9 +44,9 @@ Post capture end conditions:
     ^Closes #\\d+.*$ - Merge request shortcut to close related issue
     \\Z - End of string input
 """
-release_notes_pattern = compile(
+release_notes_pattern = re.compile(
     r"[\s\S]*^#+ Release Notes$(?P<content>[\s\S]+?)(?:^#+.+$|^Closes #\d+.*$|\Z)",
-    MULTILINE,
+    re.MULTILINE,
 )
 
 
@@ -342,11 +342,11 @@ class ReleaseGen:
     def _generate_index_markdown_update_action(self, file_name: str, pending_version: str) -> Dict[str, str]:
         howto_index_file = self._read_doc_file(file_name)
         if howto_index_file:
-            pattern = compile(r"aria-ml/dataeval/blob/v([0-9]+)\.([0-9]+)\.([0-9]+)/docs")
+            pattern = re.compile(r"aria-ml/dataeval/blob/v([0-9]+)\.([0-9]+)\.([0-9]+)/docs")
             new_path = f"aria-ml/dataeval/blob/{pending_version}/docs"
 
             verbose(f"Substituting markdown links for new version {pending_version}")
-            content = "".join([sub(pattern, new_path, line) for line in howto_index_file])
+            content = "".join([re.sub(pattern, new_path, line) for line in howto_index_file])
             return {
                 "action": "update",
                 "file_path": file_name,
@@ -363,7 +363,7 @@ class ReleaseGen:
             lines = self._read_doc_file(file_name)  # return none if file is unreadable.
             if lines:
                 for line in lines:
-                    result = search(search_pattern, line)
+                    result = re.search(search_pattern, line)
                     if result:
                         pos = result.string.find("==v")
                         if pos == -1:
