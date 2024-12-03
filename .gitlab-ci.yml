@@ -194,7 +194,7 @@ build:
   extends: .harbor
   needs: []
   script:
-    - ./build --push --build-only 3.11
+    - ./build --push --build-only docs
   rules: *on_run_with_docs
 
 docs:
