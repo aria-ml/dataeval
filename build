@@ -76,9 +76,6 @@ function build_image() {
     # build output_arg as appropriate if image needs to be pushed, otherwise just populate the registry cache
     if [[ $image_tag ]]; then
         output_arg="--output type=image,name=${image_tag}"
-        if [[ $push_to_repo ]]; then
-            output_arg+=",push=true"
-        fi
     else
         output_arg="--output type=cacheonly"
     fi
@@ -180,9 +177,3 @@ fi
 
 build_image docs
 run_image docs
-
-if [[ $push_to_repo ]]; then
-    rm -rf docs/.jupyter_cache
-    cp -rf output/docs/.jupyter_cache docs/
-    build_image docs
-fi
