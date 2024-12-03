@@ -121,7 +121,6 @@ files = ["src/dataeval/__init__.py"]
 name = "dataeval"
 
 [tool.poetry2conda.dependencies]
-nvidia-cudnn-cu11 = { name = "cudnn" }
 tensorflow_probability = { name = "tensorflow-probability" }
 torch = { name = "pytorch" }
 xxhash = { name = "python-xxhash" }

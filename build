@@ -3,45 +3,21 @@ set -o pipefail
 
 function showHelp() {
 cat << EOF
-Usage:
-  build [options] <tasks(s)> <python version(s)>
-
 Options:
-      --build-only  only build base dependency and task images
   -h, --help        display this help information
   -q, --quiet       do not print output to console during container execution
-      --gpu         enable gpu support on task execution
       --push        push all built images to repository
-
-Default:
-  run unit tests and type check for 3.9-3.12 as well as lint and docs
-
-Python Versions:
-  3.9-3.12 are supported
-
-Tasks:
-  unit    run unit tests
-  type    run typecheck
-  lint    run static code analysis
-  deps    run minimum dependency tests
-  docs    generate documentation
-  qdocs   generate documentation using cached notebooks
-  doctest run documentation tests
-
-Note:
-  docs, qdocs and doctest are always performed on python 3.11
 EOF
 exit $1
 }
 
-options=$(getopt -l "help,quiet,gpu,build-only,push" -o "hq" -n "build" -- "$@")
+options=$(getopt -l "help,quiet,gpu,push" -o "hq" -n "build" -- "$@")
 eval set -- "$options"
 while true; do
     case "$1" in
         -h|--help)       showHelp;;
         -q|--quiet)      export quiet="--quiet";;
         --gpu)           export gpuflag="--gpus all";;
-        --build-only)    export build_only=1;;
         --push)          if [[ ! $CI ]]; then echo "Only CI pipelines should be pushing."; exit 1; else export push_to_repo=1; fi;;
         --)              shift; break;;
     esac
@@ -52,36 +28,6 @@ if [[ -f .settings ]]; then
     if [[ $(cat .settings | grep save-build-images) ]]; then
         export save_build_images="true"
     fi
-fi
-
-# declare lookup maps
-declare -A PYTHON_VERSIONS=([3.9]=1 [3.10]=1 [3.11]=1 [3.12]=1)
-declare -A TEST_TASKS=([unit]=1 [type]=1 [lint]=1 [deps]=1)
-declare -A DOCS_TASKS=([docs]=1 [qdocs]=1 [doctest]=1)
-
-# generate python and task lists
-declare -A python_versions; declare -A test_tasks; declare -A docs_tasks;
-count=0; c_python_versions=0; c_test_tasks=0; c_docs_tasks=0;
-
-# validate args
-for arg do
-    if [[ $arg == -* ]]; then continue; fi
-    if [[ ${PYTHON_VERSIONS["$arg"]} ]]; then python_versions[$arg]=1; ((++c_python_versions)); fi
-    if [[ ${TEST_TASKS["$arg"]} ]]; then test_tasks[$arg]=1; ((++c_test_tasks)); fi
-    if [[ ${DOCS_TASKS["$arg"]} ]]; then docs_tasks[$arg]=1; ((++c_docs_tasks)); fi
-    ((++count))
-done
-
-# show help if arg count mismatch
-if [[ $((c_python_versions + c_test_tasks + c_docs_tasks)) != $count ]]; then showHelp 1; fi
-
-# set defaults if not specified
-if [[ $count == 0 || ($c_python_versions != 0 && $c_test_tasks == 0) ]]; then
-    test_tasks=([unit]=1 [type]=1 [deps]=1 [lint]=1)
-    if [[ $count == 0 || ${python_versions[3.11]} ]]; then docs_tasks=([doctest]=1); fi
-fi
-if [[ $count == 0 || ($c_python_versions == 0 && $c_test_tasks != 0) ]]; then
-    python_versions=([3.9]=1 [3.10]=1 [3.11]=1)
 fi
 
 export builder_name="dataeval"
@@ -95,22 +41,21 @@ fi
 
 function build_image() {
     target=$1
-    python_version=$2
-    no_cache_layers=${@:3}
 
-    cache_images=()
-    if [[ $target != base ]]; then cache_images+=("$target"); fi
-    if [[ $target == docs || $target == qdocs ]]; then cache_images+=("data"); fi
-    if [[ $target != data ]]; then cache_images+=("base"); fi
+    cache_images=("$target")
+    if [[ $target == docs ]]; then
+        cache_images+=("data")
+        cache_images+=("base")
+    fi
 
     # create cache array
     cache=()
     for cache_image in ${cache_images[@]}; do
         if [[ ${BRANCH_CACHE} && $cache_image != data ]]; then
-            cache+=("${BRANCH_CACHE}${cache_image}-${python_version}")
+            cache+=("${BRANCH_CACHE}${cache_image}")
         fi
         # always cache from main
-        cache+=("${MAIN_CACHE}:${cache_image}-${python_version}")
+        cache+=("${MAIN_CACHE}:${cache_image}")
     done
 
     # set cache_from and cache_to args
@@ -123,19 +68,9 @@ function build_image() {
         cache_to_arg=""
     fi
 
-    # set no_cache_filter_arg
-    if [[ $no_cache_layers ]]; then
-        no_cache_filter_arg="--no-cache-filter $(tr ' ' ',' <<< $no_cache_layers)"
-    fi
-
-    # only push an image up to the registry for task images to be loaded for playback of results.
-    if [[ $target != base && $target != data ]]; then
-        image_tag="${TASK_IMAGE}${target}-${python_version}"
-        if [[ $CI_PIPELINE_ID ]]; then
-            image_tag="${image_tag}-${CI_PIPELINE_ID}"
-        fi
-    else
-        image_tag=""
+    # only push an image up to the registry for docs images
+    if [[ $target == docs ]]; then
+        image_tag="${TASK_IMAGE}${target}"
     fi
 
     # build output_arg as appropriate if image needs to be pushed, otherwise just populate the registry cache
@@ -148,16 +83,15 @@ function build_image() {
         output_arg="--output type=cacheonly"
     fi
 
-    if [[ $target != base && $target != data && ($save_build_images || -z $build_only) ]]; then
+    if [[ $target == docs || $save_build_images ]]; then
         # By default the docker-container driver doesn't load images to the
         # local docker images store, these args will cause it to do so.
         load_arg="--tag ${image_tag} --load"
     fi
 
-    docker_build_cmd="docker buildx build $quiet \
+    docker_build_cmd="docker buildx build \
         $load_arg \
         --builder $builder_name \
-        --build-arg python_version=$python_version \
         $no_cache_filter_arg \
         $cache_from_arg \
         $cache_to_arg \
@@ -166,7 +100,7 @@ function build_image() {
         ."
     
     echo "======================================================================"
-    echo "Building $target-$python_version..."
+    echo "Building $target..."
     echo $docker_build_cmd
     if [[ ! $quiet ]]; then
         time $docker_build_cmd
@@ -176,10 +110,10 @@ function build_image() {
     echo "======================================================================"
 }
 
-function build_and_run() {
-    IFS=- read -r task python_version <<< $1
-
-    container_name="run-${task}-${python_version}"
+function run_image() {
+    task=$1
+    
+    container_name="run-${task}"
     if [[ $CI_PIPELINE_ID ]]; then
         container_name="${container_name}-${CI_PIPELINE_ID}"
     fi
@@ -187,29 +121,18 @@ function build_and_run() {
     # Clear any residual containers from previous runs
     docker rm -f $container_name 2> /dev/null || true
 
-    image_tag="${TASK_IMAGE}${task}-${python_version}"
-    if [[ $CI_PIPELINE_ID ]]; then
-        image_tag="${image_tag}-${CI_PIPELINE_ID}"
-    fi
+    image_tag="${TASK_IMAGE}${target}"
 
-    # NOTE: If we are pushing to the repo and the image is present,
-    # we should pull the latest image, otherwise build the image.
-    if [[ $push_to_repo && $(docker manifest inspect $image_tag 2> /dev/null) ]]; then
-        pull_arg="--pull always"
-    else
-        build_image $task $python_version
-    fi
-
-    echo "======================================================================"
-    echo "Output from ${container_name}"
-    echo "----------------"
+    echo "=================================================="
+    echo "Running ${task}..."
+    echo "--------------------------------------------------"
     set +e
-    docker run --interactive $pull_arg --name $container_name $gpuflag $image_tag
+    docker run --interactive $pull_arg --name $container_name $gpuflag $image_tag $@
     exitcode=$?
     set -e
-    echo "----------------"
+    echo "--------------------------------------------------"
     echo "${container_name} exit code: ${exitcode}"
-    echo "======================================================================"
+    echo "=================================================="
 
     mkdir -p output
     docker cp $container_name:/dataeval/output/ .
@@ -218,9 +141,6 @@ function build_and_run() {
         exit $exitcode
     fi
 }
-
-export -f build_image
-export -f build_and_run
 
 # In CI pipelines use commit branch name or merge request source branch name
 # These are mutually exclusive when set
@@ -233,7 +153,7 @@ else
     main_branch="main"
 fi
 
-namespace="harbor.jatic.net/dataeval"
+namespace="harbor.jatic.net/dataeval" 
 if [[ $branch_name == $main_branch ]]; then
     repository="main"
 else
@@ -251,60 +171,18 @@ if [[ $tag_prefix ]]; then
     export BRANCH_CACHE="${namespace}/cache:${tag_prefix}"
 fi
 
-if [[ ! $quiet ]]; then
-    keep_order="--keep-order"
-fi
-
-start=$(date +%s)
-
-# create a mapping of tasks to python_versions
-declare -A task_map;
-for python_version in ${!python_versions[@]}; do
-    for task in ${!test_tasks[@]}; do
-        task_map[$python_version]+="$task "
-    done
-
-    if [[ $CI && $build_only && $branch_name == $main_branch && $python_version == 3.11 ]]; then
-        # build data layer in build-only pipeline runs for 3.11
-        task_map[$python_version]+="data "
-fi
-done
-for task in ${!docs_tasks[@]}; do
-    task_map[3.11]+="$task "
-done
-
-for python_version in ${!task_map[@]}; do
-    if [[ ! $CI || $build_only ]]; then
-        build_image base $python_version
-
-        # build each task image in parallel
-        tasks=$(echo -n ${task_map[$python_version]} | xargs)
-        echo "Building [${tasks}]-$python_version..."
-            python_version=$python_version parallel $keep_order --lb --tag "build_image {} $python_version task-run" ::: ${tasks}
+if [[ $CI ]]; then
+    if [[ $branch_name == $main_branch ]]; then
+        build_image data
     fi
-done
-
-if [[ $build_only ]]; then
-    exit $?
+    build_image base
 fi
 
-end=$(date +%s)
-diff=$(( $end - $start ))
-echo "------"
-echo "Image build preparation completed in $diff seconds"
-echo "------"
+build_image docs
+run_image docs
 
-# execute jobs
-jobs=();
-for python_version in ${!task_map[@]}; do
-    for task in ${task_map[$python_version]}; do
-        jobs+=("$task-$python_version")
-    done
-done
-
-echo "Running ${jobs[@]}..."
-case ${#jobs[@]} in
-    0)  showHelp 1;;
-    1)  build_and_run ${jobs[@]};;
-    *)  parallel $keep_order --lb --tag 'set -o pipefail; build_and_run' ::: ${jobs[@]};;
-esac
+if [[ $push_to_repo ]]; then
+    rm -rf docs/.jupyter_cache
+    cp -rf output/docs/.jupyter_cache docs/
+    build_image docs
+fi
