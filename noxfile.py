@@ -6,7 +6,7 @@ import nox
 python_version = f"{version_info[0]}.{version_info[1]}"
 
 nox.options.default_venv_backend = "uv"
-nox.options.sessions = [f"test-{python_version}", f"type-{python_version}", "deps", "lint", "doctest", "check"]
+nox.options.sessions = ["test", "type", "deps", "lint", "doctest", "check"]
 
 INSTALL_ARGS = ["-e", ".", "-r", "environment/requirements.txt", "-r", "environment/requirements-dev.txt"]
 INSTALL_ENVS = {"UV_INDEX_STRATEGY": "unsafe-best-match", "POETRY_DYNAMIC_VERSIONING_BYPASS": "0.0.0"}
@@ -28,35 +28,47 @@ fi
 """
 
 
+def check_version(version: str) -> str:
+    pattern = re.compile(r".*(3.\d+)$")
+    matches = pattern.match(version)
+    version = matches.groups()[0] if matches is not None and len(matches.groups()) > 0 else python_version
+    if version not in SUPPORTED_VERSIONS:
+        raise ValueError(f"Specified python version {version} is not supported.")
+    return version
+
+
 @nox.session
 def dev(session: nox.Session) -> None:
-    """Set up a python development environment at ".venv-[python_version]". Specify version using positional args."""
-    pattern = re.compile(r"3.\d+$")
-    versions = [python_version] if not session.posargs else [s for s in session.posargs if pattern.match(s)]
-    for version in versions:
-        if version not in SUPPORTED_VERSIONS:
-            print(f"Only python {SUPPORTED_VERSIONS} is supported. {version} provided. Skipping venv creation.")
-            continue
-        session.run("uv", "venv", "--python", version, f".venv-{version}", "--seed", external=True)
-        session.run("uv", "pip", "install", "--python", f".venv-{version}", *INSTALL_ARGS, env=INSTALL_ENVS)
+    """Set up a python development environment at `.venv-{version}`. Specify version using `nox -P {version} -e dev`."""
+    version = check_version(session.name)
+    session.run("uv", "venv", "--python", version, f".venv-{version}", "--seed", external=True)
+    session.run("uv", "pip", "install", "--python", f".venv-{version}", *INSTALL_ARGS, env=INSTALL_ENVS)
 
 
-@nox.session(python=SUPPORTED_VERSIONS)
+@nox.session
 def test(session: nox.Session) -> None:
-    """Run unit tests with coverage reporting."""
-    pytest_args = ["--cov", "-n8", "--dist", "loadgroup", f"--junitxml=output/junit.{session.name}.xml"]
+    """Run unit tests with coverage reporting. Specify version using `nox -P {version} -e test`."""
+    check_version(session.name)
+    pytest_args = ["--cov", "-n8", "--dist", "loadgroup", f"--junitxml=output/junit.{python_version}.xml"]
     cov_term_args = ["--cov-report", "term"]
-    cov_xml_args = ["--cov-report", f"xml:output/coverage.{session.name}.xml"]
-    cov_html_args = ["--cov-report", f"html:output/htmlcov.{session.name}"]
+    cov_xml_args = ["--cov-report", f"xml:output/coverage.{python_version}.xml"]
+    cov_html_args = ["--cov-report", f"html:output/htmlcov.{python_version}"]
 
     session.install(*INSTALL_ARGS, env=INSTALL_ENVS)
     session.run("pytest", *pytest_args, *cov_term_args, *cov_xml_args, *cov_html_args, env={**TEST_ENVS, **COMMON_ENVS})
-    session.run("mv", ".coverage", f"output/.coverage.{session.name}", external=True)
+    session.run("mv", ".coverage", f"output/.coverage.{python_version}", external=True)
 
 
-@nox.session(python=SUPPORTED_VERSIONS)
+@nox.session
+def unit(session: nox.Session) -> None:
+    """Alias for `test` session."""
+    test(session)
+
+
+@nox.session
 def type(session: nox.Session) -> None:  # noqa: A001
-    """Run type checks and verify external types."""
+    """Run type checks and verify external types. Specify version using `nox -P {version} -e type`."""
+    check_version(session.name)
     session.install(*INSTALL_ARGS, env=INSTALL_ENVS)
     session.run("pyright", "--stats", "src/", "tests/")
     session.run("pyright", "--ignoreexternal", "--verifytypes", "dataeval")
@@ -65,6 +77,7 @@ def type(session: nox.Session) -> None:  # noqa: A001
 @nox.session(reuse_venv=False)
 def deps(session: nox.Session) -> None:
     """Run minimal unit tests against baseline installation."""
+    check_version(session.name)
     session.install(".", "pytest", env=INSTALL_ENVS)
     session.run("pytest", "tests/test_mindeps.py")
 
@@ -72,6 +85,7 @@ def deps(session: nox.Session) -> None:
 @nox.session
 def lint(session: nox.Session) -> None:
     """Perform linting and spellcheck."""
+    check_version(session.name)
     session.install("ruff", "codespell[toml]")
     session.run("ruff", "check", "--show-fixes", "--exit-non-zero-on-fix", "--fix")
     session.run("codespell")
@@ -80,6 +94,7 @@ def lint(session: nox.Session) -> None:
 @nox.session
 def doctest(session: nox.Session) -> None:
     """Run docstring tests."""
+    check_version(session.name)
     session.install(*INSTALL_ARGS, env=INSTALL_ENVS)
     session.chdir("docs")
     session.run("rm", "-rf", "../output/docs", external=True)
@@ -88,7 +103,8 @@ def doctest(session: nox.Session) -> None:
 
 @nox.session
 def docs(session: nox.Session) -> None:
-    """Generate documentation. Clear the cache using "clean" as a positional arg."""
+    """Generate documentation. Clear the jupyter cache by calling `nox -e docs -- clean`."""
+    check_version(session.name)
     session.install(*INSTALL_ARGS, env=INSTALL_ENVS)
     session.chdir("docs")
     session.run("rm", "-rf", "../output/docs", external=True)
@@ -118,7 +134,7 @@ def docs(session: nox.Session) -> None:
 
 @nox.session
 def lock(session: nox.Session) -> None:
-    """Lock dependencies in "poetry.lock" with --no-update. Can also use "update" as a positional arg."""
+    """Lock dependencies in "poetry.lock" with --no-update. Update dependencies by calling `nox -e lock -- update`."""
     update_args = "" if "update" in session.posargs else "--no-update"
     session.install("poetry", "poetry-lock-groups-plugin", "poetry2conda")
     session.run("cp", "-f", "environment/poetry.lock", "poetry.lock", external=True)

@@ -204,7 +204,7 @@ function build_and_run() {
     echo "Output from ${container_name}"
     echo "----------------"
     set +e
-    docker run --interactive $pull_arg --name $container_name $gpuflag $image_tag
+    docker run --tty --interactive $pull_arg --name $container_name $gpuflag $image_tag
     exitcode=$?
     set -e
     echo "----------------"
