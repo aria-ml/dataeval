@@ -165,15 +165,15 @@ function build_image() {
         --target $target \
         ."
     
+    echo "======================================================================"
+    echo "Building $target-$python_version..."
+    echo $docker_build_cmd
     if [[ ! $quiet ]]; then
-        echo "========================================"
-        echo "Building $target-$python_version..."
-        echo $docker_build_cmd
         time $docker_build_cmd
-        echo "========================================"
     else
         $docker_build_cmd &> /dev/null
     fi
+    echo "======================================================================"
 }
 
 function build_and_run() {
@@ -204,7 +204,7 @@ function build_and_run() {
     echo "Output from ${container_name}"
     echo "----------------"
     set +e
-    docker run --tty --interactive $pull_arg --name $container_name $gpuflag $image_tag
+    docker run --interactive $pull_arg --name $container_name $gpuflag $image_tag
     exitcode=$?
     set -e
     echo "----------------"
@@ -267,7 +267,7 @@ for python_version in ${!python_versions[@]}; do
     if [[ $CI && $build_only && $branch_name == $main_branch && $python_version == 3.11 ]]; then
         # build data layer in build-only pipeline runs for 3.11
         task_map[$python_version]+="data "
-    fi
+fi
 done
 for task in ${!docs_tasks[@]}; do
     task_map[3.11]+="$task "
@@ -280,7 +280,7 @@ for python_version in ${!task_map[@]}; do
         # build each task image in parallel
         tasks=$(echo -n ${task_map[$python_version]} | xargs)
         echo "Building [${tasks}]-$python_version..."
-        python_version=$python_version parallel $keep_order --lb --tag "build_image {} $python_version task-run" ::: ${tasks}
+            python_version=$python_version parallel $keep_order --lb --tag "build_image {} $python_version task-run" ::: ${tasks}
     fi
 done
 
