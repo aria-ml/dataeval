@@ -3,7 +3,6 @@ variables:
   DOCKER_DRIVER: overlay2
   SAST_EXCLUDED_PATHS: spec,test,tests,tmp,.nox,output,prototype
   DOCS_RUNNER_TAG: single-gpu
-  DOCS_TASK: qdocs
   UV_CACHE_DIR: .uv-cache
   UV_LINK_MODE: copy
   UV_IMAGE: ghcr.io/astral-sh/uv
@@ -62,6 +61,27 @@ stages:
     when: never
   - if: $CI_PIPELINE_SOURCE == 'merge_request_event' || $CI_COMMIT_BRANCH == 'main' || $CI_PIPELINE_SOURCE == 'web'
 
+.on_run_with_deps: &on_run_with_deps
+  - if: $CREATE_NEW_RELEASE
+    when: never
+  - if: $CI_PIPELINE_SOURCE == 'merge_request_event' || $CI_PIPELINE_SOURCE == 'web'
+    changes:
+      paths:
+        - pyproject.toml
+        - environment/*
+  - if: $CI_COMMIT_BRANCH == 'main'
+
+.on_run_with_code: &on_run_with_code
+  - if: $CREATE_NEW_RELEASE
+    when: never
+  - if: $CI_PIPELINE_SOURCE == 'merge_request_event' || $CI_PIPELINE_SOURCE == 'web'
+    changes:
+      paths:
+        - src/**/*
+        - tests/**/*
+        - environment/*
+  - if: $CI_COMMIT_BRANCH == 'main'
+
 .on_run_with_docs: &on_run_with_docs
   - if: $CREATE_NEW_RELEASE
     when: never
@@ -73,6 +93,8 @@ stages:
         - environment/*
         - README.md
   - if: $CI_COMMIT_BRANCH == 'main'
+    variables:
+      POSARGS: clean
 
 .on_merge_request_only: &on_merge_request_only
   - if: $CREATE_NEW_RELEASE
@@ -133,13 +155,13 @@ minimum install:
   extends: .nox
   script:
     - nox -e deps
-  rules: *on_run
+  rules: *on_run_with_code
 
 typecheck:
   extends: .nox_all
   script:
     - nox -e type
-  rules: *on_run
+  rules: *on_run_with_code
 
 test:
   extends: .nox_all
@@ -178,7 +200,7 @@ verify lock:
   extends: .nox
   script:
     - nox -e check
-  rules: *on_run
+  rules: *on_run_with_deps
 
 ### DOCS ###
   
@@ -187,7 +209,7 @@ doctest:
   extends: .nox
   script:
     - nox -e doctest
-  rules: *on_run
+  rules: *on_run_with_docs
 
 docs:
   stage: docs
@@ -196,7 +218,7 @@ docs:
   tags:
     - $DOCS_RUNNER_TAG
   script:
-    - ./build --push --gpu $DOCS_TASK
+    - ./build --push --gpu
   artifacts:
     paths:
       - output/docs/.jupyter_cache/
@@ -216,8 +238,7 @@ update cache:
     - git add docs/.jupyter_cache/*
     - git config --global user.email "${GITLAB_USER_EMAIL}"
     - git config --global user.name "${GITLAB_USER_NAME}"
-    - if [[ $CI_COMMIT_BRANCH == main ]]; then SKIP_PREFIX="[ci skip] "; else SKIP_PREFIX=""; fi
-    - git commit --message "${SKIP_PREFIX}Update jupyter-cache"
+    - git commit --message "Update documentation jupyter-cache"
     - git push https://dataeval-bot:${DATAEVAL_BUILD_PAT}@gitlab.jatic.net/jatic/aria/dataeval.git
   rules:
     - *on_run_with_docs
