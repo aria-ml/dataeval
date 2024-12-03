@@ -189,18 +189,10 @@ doctest:
     - nox -e doctest
   rules: *on_run
 
-build:
-  stage: docs
-  extends: .harbor
-  needs: []
-  script:
-    - ./build --push --build-only docs
-  rules: *on_run_with_docs
-
 docs:
   stage: docs
   extends: .harbor
-  needs: [build]
+  needs: []
   tags:
     - $DOCS_RUNNER_TAG
   script:
