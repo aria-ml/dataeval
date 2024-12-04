@@ -1,6 +1,19 @@
-[//]: # (e055acf0d819dd7473e62cf3e8663fefd763ca5a)
+[//]: # (bacbd0e761f60d6a53c2036f7e10f35ab7794e67)
 
 # DataEval Change Log
+
+## v0.73.1
+
+👾 **Fixes**
+- `cac3e2b8` - Fixes drift with pre-processing and shuffles MNIST by default
+
+📝 **Miscellaneous**
+- `bacbd0e7` - Use build script specifically for docs
+- `0a87e912` - docker build for docs only
+- `671b60a5` - Prototype function to infer whether a 1D sample is continuous or discrete
+- `d0b8004a` - Use explicit re namespace for compile, search, sub, and MULTILINE
+- `502ca2df` - Change to nox for automation test scripts
+- `5b46ebea` - Add new bias functional tests and set groundwork for rediscretization
 
 ## v0.73.0
 
