@@ -214,8 +214,6 @@ docs:
   tags:
     - $DOCS_RUNNER_TAG
   script:
-    - echo $CI_COMMIT_MESSAGE
-    - echo $CI_COMMIT_TITLE
     - ./build --push --gpu $DOCS_CLEAN
   artifacts:
     paths:
