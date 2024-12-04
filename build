@@ -3,20 +3,27 @@ set -o pipefail
 
 function showHelp() {
 cat << EOF
+Build documentation image and generate output
+
+Usage:  ./build [OPTIONS]
+
 Options:
   -h, --help        display this help information
   -q, --quiet       do not print output to console during container execution
-      --push        push all built images to repository
+      --clean       clean the jupyter-cache before building documentation
+      --gpu         run the container using GPUs if available
+      --push        push build caches to repository
 EOF
 exit $1
 }
 
-options=$(getopt -l "help,quiet,gpu,push" -o "hq" -n "build" -- "$@")
+options=$(getopt -l "help,quiet,clean,gpu,push" -o "hq" -n "build" -- "$@")
 eval set -- "$options"
 while true; do
     case "$1" in
         -h|--help)       showHelp;;
         -q|--quiet)      export quiet="--quiet";;
+        --clean)         export clean="clean";;
         --gpu)           export gpuflag="--gpus all";;
         --push)          if [[ ! $CI ]]; then echo "Only CI pipelines should be pushing."; exit 1; else export push_to_repo=1; fi;;
         --)              shift; break;;
@@ -124,14 +131,14 @@ function run_image() {
     echo "Running ${task}..."
     echo "--------------------------------------------------"
     set +e
-    docker run --interactive $pull_arg --name $container_name $gpuflag $image_tag $@
+    mkdir -p output
+    script -qec "docker run --tty --env TERM=xterm-256color --interactive --name $container_name $gpuflag $image_tag $@" output/build.log
     exitcode=$?
     set -e
     echo "--------------------------------------------------"
     echo "${container_name} exit code: ${exitcode}"
     echo "=================================================="
 
-    mkdir -p output
     docker cp $container_name:/dataeval/output/ .
 
     if [[ $exitcode != 0 ]]; then
@@ -176,4 +183,4 @@ if [[ $CI ]]; then
 fi
 
 build_image docs
-run_image docs
+run_image docs $clean

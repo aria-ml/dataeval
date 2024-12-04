@@ -29,7 +29,7 @@ workflow:
     - if: $CI_COMMIT_BRANCH == 'main'
       variables:
         DOCS_RUNNER_TAG: multi-gpu
-        DOCS_TASK: docs
+        DOCS_CLEAN: '--clean'
 
 default:
   # This should allow pipelines to auto-cancel when redundant:
@@ -93,8 +93,6 @@ stages:
         - environment/*
         - README.md
   - if: $CI_COMMIT_BRANCH == 'main'
-    variables:
-      POSARGS: clean
 
 .on_merge_request_only: &on_merge_request_only
   - if: $CREATE_NEW_RELEASE
@@ -218,7 +216,7 @@ docs:
   tags:
     - $DOCS_RUNNER_TAG
   script:
-    - ./build --push --gpu
+    - ./build --push --gpu $DOCS_CLEAN
   artifacts:
     paths:
       - output/docs/.jupyter_cache/
