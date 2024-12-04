@@ -126,7 +126,7 @@ function run_image() {
     docker rm -f $container_name 2> /dev/null || true
 
     image_tag="${TASK_IMAGE}${target}"
-    docker_run_cmd = "docker run --tty --env TERM=xterm-256color --interactive --name $container_name $gpuflag $image_tag $@"
+    docker_run_cmd="docker run --tty --env TERM=xterm-256color --interactive --name $container_name $gpuflag $image_tag $@"
 
     mkdir -p output
     echo "=================================================="
