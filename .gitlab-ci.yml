@@ -92,7 +92,7 @@ stages:
         - docs/**/*
         - environment/*
         - README.md
-  - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_MESSAGE != $UPDATE_CACHE_MESSAGE
+  - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_MESSAGE !~ $UPDATE_CACHE_MESSAGE
     variables:
       DOCS_CLEAN: '--clean'
   - if: $CI_COMMIT_BRANCH == 'main'
