@@ -109,8 +109,7 @@ stages:
 .harbor:
   image: docker:25.0.5-git
   before_script:
-    - if [[ ! $(which bash) ]]; then apk add --no-cache bash; fi
-    - if [[ ! $(which script) ]]; then apk add --no-cache util-linux-misc; fi
+    - apk add --no-cache bash util-linux
     - echo ${DATAEVAL_HARBOR_TOKEN} | docker login harbor.jatic.net -u 'robot$dataeval+dataeval-build' --password-stdin || echo "Failed to login to Harbor..."
   after_script:
     - docker logout harbor.jatic.net|| echo "Failed to logout from Harbor..."
