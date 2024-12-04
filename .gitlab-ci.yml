@@ -8,6 +8,7 @@ variables:
   UV_IMAGE: ghcr.io/astral-sh/uv
   BASE_LAYER: bookworm
   FORCE_COLOR: '1'
+  UPDATE_CACHE_MESSAGE: 'Update documentation jupyter-cache'
 
 workflow:
   # Allows jobs in this workflow to be interrupted:
@@ -91,7 +92,7 @@ stages:
         - docs/**/*
         - environment/*
         - README.md
-  - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_MESSAGE != 'Update documentation jupyter-cache'
+  - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_MESSAGE != $UPDATE_CACHE_MESSAGE
     variables:
       DOCS_CLEAN: '--clean'
   - if: $CI_COMMIT_BRANCH == 'main'
@@ -233,7 +234,7 @@ update cache:
     - git add docs/.jupyter_cache/*
     - git config --global user.email "${GITLAB_USER_EMAIL}"
     - git config --global user.name "${GITLAB_USER_NAME}"
-    - git commit --message "Update documentation jupyter-cache"
+    - git commit --message "${UPDATE_CACHE_MESSAGE}"
     - git push https://dataeval-bot:${DATAEVAL_BUILD_PAT}@gitlab.jatic.net/jatic/aria/dataeval.git
   rules:
     - *on_run_with_docs
