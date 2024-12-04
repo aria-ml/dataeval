@@ -23,7 +23,7 @@ while true; do
     case "$1" in
         -h|--help)       showHelp;;
         -q|--quiet)      export quiet="--quiet";;
-        --clean)         export clean="clean";;
+        --clean)         export clean="-- clean";;
         --gpu)           export gpuflag="--gpus all";;
         --push)          if [[ ! $CI ]]; then echo "Only CI pipelines should be pushing."; exit 1; else export push_to_repo=1; fi;;
         --)              shift; break;;
@@ -126,7 +126,7 @@ function run_image() {
     docker rm -f $container_name 2> /dev/null || true
 
     image_tag="${TASK_IMAGE}${target}"
-    docker_run_cmd="docker run --tty --env TERM=xterm-256color --interactive --name $container_name $gpuflag $image_tag $@"
+    docker_run_cmd="docker run --tty --env TERM=xterm-256color --interactive --name $container_name $gpuflag $image_tag $clean"
 
     mkdir -p output
     echo "=================================================="
@@ -185,4 +185,4 @@ if [[ $CI ]]; then
 fi
 
 build_image docs
-run_image docs $clean
+run_image docs
