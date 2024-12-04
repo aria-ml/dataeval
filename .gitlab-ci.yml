@@ -29,7 +29,6 @@ workflow:
     - if: $CI_COMMIT_BRANCH == 'main'
       variables:
         DOCS_RUNNER_TAG: multi-gpu
-        DOCS_CLEAN: '--clean'
 
 default:
   # This should allow pipelines to auto-cancel when redundant:
@@ -92,6 +91,9 @@ stages:
         - docs/**/*
         - environment/*
         - README.md
+  - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_MESSAGE != 'Update documentation jupyter-cache'
+    variables:
+      DOCS_CLEAN: '--clean'
   - if: $CI_COMMIT_BRANCH == 'main'
 
 .on_merge_request_only: &on_merge_request_only
