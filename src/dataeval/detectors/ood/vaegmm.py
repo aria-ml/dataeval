@@ -15,7 +15,8 @@ from typing import TYPE_CHECKING, Callable
 import numpy as np
 from numpy.typing import ArrayLike
 
-from dataeval.detectors.ood.base import OODGMMBase, OODScoreOutput
+from dataeval.detectors.ood.base import OODScoreOutput
+from dataeval.detectors.ood.base_tf import OODBaseGMM
 from dataeval.interop import to_numpy
 from dataeval.utils.lazy import lazyload
 from dataeval.utils.tensorflow._internal.gmm import gmm_energy
@@ -33,7 +34,7 @@ else:
     tf_models = lazyload("dataeval.utils.tensorflow._internal.models")
 
 
-class OOD_VAEGMM(OODGMMBase):
+class OOD_VAEGMM(OODBaseGMM):
     """
     VAE with Gaussian Mixture Model based outlier detector.
 
@@ -53,7 +54,7 @@ class OOD_VAEGMM(OODGMMBase):
         self,
         x_ref: ArrayLike,
         threshold_perc: float = 100.0,
-        loss_fn: Callable[..., tf.Tensor] = LossGMM(elbo=Elbo(0.05)),
+        loss_fn: Callable[..., tf.Tensor] | None = LossGMM(elbo=Elbo(0.05)),
         optimizer: keras.optimizers.Optimizer | None = None,
         epochs: int = 20,
         batch_size: int = 64,
@@ -69,7 +70,7 @@ class OOD_VAEGMM(OODGMMBase):
         _, z, _ = predict_batch(X_samples, self.model, batch_size=batch_size)
 
         # compute average energy for samples
-        energy, _ = gmm_energy(z, self.gmm_params, return_mean=False)
+        energy, _ = gmm_energy(z, self._gmm_params, return_mean=False)
         energy_samples = energy.numpy().reshape((-1, self.samples))  # type: ignore
         iscore = np.mean(energy_samples, axis=-1)
         return OODScoreOutput(iscore)
