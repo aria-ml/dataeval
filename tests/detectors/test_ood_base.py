@@ -1,22 +1,19 @@
+from typing import Callable
+
 import numpy as np
 import pytest
 from numpy.typing import ArrayLike
 
-from dataeval.detectors.ood.base import OODGMMBase, OODScoreOutput
+from dataeval.detectors.ood.base import OODBaseMixin, OODGMMMixin, OODScoreOutput
 from dataeval.utils.tensorflow._internal.utils import create_model
 
 image_shape = (32, 32, 1)
 model = create_model("AE", image_shape)
 
 
-class MockOutlier(OODGMMBase):
+class MockOutlier(OODGMMMixin, OODBaseMixin[Callable]):
     def _score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
         return OODScoreOutput(np.array([0.0]), np.array([0.0]))
-
-
-def test_invalid_model_raises_typeerror():
-    with pytest.raises(TypeError):
-        MockOutlier("invalid")  # type: ignore
 
 
 def test_invalid_data_raises_typeerror():
@@ -28,7 +25,7 @@ def test_invalid_data_raises_typeerror():
 def test_validate_state_raises_runtimeerror():
     outlier = MockOutlier(model)
     with pytest.raises(RuntimeError):
-        outlier._validate_state("invalid")  # type: ignore
+        outlier._validate_state(np.array([]))
 
 
 def test_validate_raises_runtimeerror():
@@ -43,9 +40,6 @@ def test_validate_state_additional_attrs():
     outlier._ref_score = "not none"  # type: ignore
     outlier._threshold_perc = 99.0
     outlier._data_info = (), np.float32
-    outlier.gmm_params = "not none"  # type: ignore
+    outlier._gmm_params = "not none"  # type: ignore
     # should pass
     outlier._validate_state(np.array([0.0], dtype=np.float32))
-    # should fail
-    with pytest.raises(RuntimeError):
-        outlier._validate_state(np.array([0.0], dtype=np.float32), ["other_param"])

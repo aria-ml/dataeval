@@ -1,4 +1,6 @@
 """
+Adapted for Pytorch from
+
 Source code derived from Alibi-Detect 0.11.4
 https://github.com/SeldonIO/alibi-detect/tree/v0.11.4
 
@@ -8,56 +10,48 @@ Licensed under Apache Software License (Apache 2.0)
 
 from __future__ import annotations
 
-__all__ = ["OOD_AE"]
-
-from typing import TYPE_CHECKING, Callable
+from typing import Callable
 
 import numpy as np
+import torch
 from numpy.typing import ArrayLike
 
 from dataeval.detectors.ood.base import OODScoreOutput
-from dataeval.detectors.ood.base_tf import OODBase
+from dataeval.detectors.ood.base_torch import OODBase
 from dataeval.interop import as_numpy
-from dataeval.utils.lazy import lazyload
-from dataeval.utils.tensorflow._internal.utils import predict_batch
-
-if TYPE_CHECKING:
-    import tensorflow as tf
-    import tf_keras as keras
-
-    import dataeval.utils.tensorflow._internal.models as tf_models
-else:
-    tf = lazyload("tensorflow")
-    keras = lazyload("tf_keras")
-    tf_models = lazyload("dataeval.utils.tensorflow._internal.models")
+from dataeval.utils.torch.utils import predict_batch
 
 
 class OOD_AE(OODBase):
     """
-    Autoencoder-based :term:`out of distribution<Out-of-distribution (OOD)>` detector.
+    Autoencoder based out-of-distribution detector.
 
     Parameters
     ----------
-    model : AE
-       An :term:`autoencoder<Autoencoder>` model.
+    model : AriaAutoencoder
+        An Autoencoder model.
     """
 
-    def __init__(self, model: tf_models.AE) -> None:
-        super().__init__(model)
+    def __init__(self, model: torch.nn.Module, device: str | torch.device | None = None) -> None:
+        super().__init__(model, device)
 
     def fit(
         self,
         x_ref: ArrayLike,
-        threshold_perc: float = 100.0,
-        loss_fn: Callable[..., tf.Tensor] | None = None,
-        optimizer: keras.optimizers.Optimizer | None = None,
+        threshold_perc: float,
+        loss_fn: Callable[..., torch.nn.Module] | None = None,
+        optimizer: torch.optim.Optimizer | None = None,
         epochs: int = 20,
         batch_size: int = 64,
-        verbose: bool = True,
+        verbose: bool = False,
     ) -> None:
         if loss_fn is None:
-            loss_fn = keras.losses.MeanSquaredError()
-        super().fit(as_numpy(x_ref), threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
+            loss_fn = torch.nn.MSELoss()
+
+        if optimizer is None:
+            optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
+
+        super().fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
 
     def _score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
         self._validate(X := as_numpy(X))

@@ -14,7 +14,8 @@ from typing import TYPE_CHECKING, Callable
 
 from numpy.typing import ArrayLike
 
-from dataeval.detectors.ood.base import OODGMMBase, OODScoreOutput
+from dataeval.detectors.ood.base import OODScoreOutput
+from dataeval.detectors.ood.base_tf import OODBaseGMM
 from dataeval.interop import to_numpy
 from dataeval.utils.lazy import lazyload
 from dataeval.utils.tensorflow._internal.gmm import gmm_energy
@@ -32,7 +33,7 @@ else:
     tf_models = lazyload("dataeval.utils.tensorflow._internal.models")
 
 
-class OOD_AEGMM(OODGMMBase):
+class OOD_AEGMM(OODBaseGMM):
     """
     AE with Gaussian Mixture Model based outlier detector.
 
@@ -62,5 +63,5 @@ class OOD_AEGMM(OODGMMBase):
     def _score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
         self._validate(X := to_numpy(X))
         _, z, _ = predict_batch(X, self.model, batch_size=batch_size)
-        energy, _ = gmm_energy(z, self.gmm_params, return_mean=False)
+        energy, _ = gmm_energy(z, self._gmm_params, return_mean=False)
         return OODScoreOutput(energy.numpy())  # type: ignore
