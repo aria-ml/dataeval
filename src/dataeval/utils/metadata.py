@@ -643,30 +643,25 @@ def _bin_data(data: NDArray[Any], bin_method: str) -> NDArray[np.int_]:
     Bins continuous data through either equal width bins, equal amounts in each bin, or by clusters.
     """
     if bin_method == "clusters":
-        # bin_edges = _binning_by_clusters(data)
-        warnings.warn(
-            "Binning by clusters is currently unavailable until changes to the clustering function go through.",
-            UserWarning,
-        )
-        bin_method = "uniform_width"
+        bin_edges = _binning_by_clusters(data)
 
-    # if bin_method != "clusters":  # restore this when clusters bin_method is available
-    counts, bin_edges = np.histogram(data, bins="auto")
-    n_bins = counts.size
-    if counts[counts > 0].min() < 10:
-        counter = 20
-        while counts[counts > 0].min() < 10 and n_bins >= 2 and counter > 0:
-            counter -= 1
-            n_bins -= 1
-            counts, bin_edges = np.histogram(data, bins=n_bins)
+    else:
+        counts, bin_edges = np.histogram(data, bins="auto")
+        n_bins = counts.size
+        if counts[counts > 0].min() < 10:
+            counter = 20
+            while counts[counts > 0].min() < 10 and n_bins >= 2 and counter > 0:
+                counter -= 1
+                n_bins -= 1
+                counts, bin_edges = np.histogram(data, bins=n_bins)
 
-    if bin_method == "uniform_count":
-        quantiles = np.linspace(0, 100, n_bins + 1)
-        bin_edges = np.asarray(np.percentile(data, quantiles))
+        if bin_method == "uniform_count":
+            quantiles = np.linspace(0, 100, n_bins + 1)
+            bin_edges = np.asarray(np.percentile(data, quantiles))
 
-    bin_edges[0] = -np.inf  # type: ignore # until the clusters speed up is merged
-    bin_edges[-1] = np.inf  # type: ignore # and the _binning_by_clusters can be uncommented
-    return np.digitize(data, bin_edges)  # type: ignore
+    bin_edges[0] = -np.inf
+    bin_edges[-1] = np.inf
+    return np.digitize(data, bin_edges)
 
 
 def _is_continuous(data: NDArray[np.number], image_indices: NDArray[np.number]) -> bool:
@@ -694,11 +689,6 @@ def _is_continuous(data: NDArray[np.number], image_indices: NDArray[np.number]) 
         if (data_indices == image_indices).all():
             data = data[data_indices]
 
-    # OLD METHOD
-    # uvals = np.unique(data)
-    # pct_unique = uvals.size / data.size
-    # return pct_unique < threshold
-
     n_examples = len(data)
 
     if n_examples < CONTINUOUS_MIN_SAMPLE_SIZE:
@@ -725,6 +715,58 @@ def _is_continuous(data: NDArray[np.number], image_indices: NDArray[np.number]) 
     shift = wd(dx, np.linspace(0, 1, dx.size))  # how far is dx from uniform, for this feature?
 
     return shift < DISCRETE_MIN_WD  # if NNN is close enough to uniform, consider the sample continuous.
+
+
+def _binning_by_clusters(data: NDArray[np.number]):
+    """
+    Bins continuous data by using the Clusterer to identify clusters
+    and incorporates outliers by adding them to the nearest bin.
+    """
+    from dataeval.detectors.linters import Clusterer
+
+    # Create initial clusters
+    groupings = Clusterer(data)
+    clusters = groupings.create_clusters()
+
+    # Create bins from clusters
+    bin_edges = np.zeros(clusters.max() + 2)
+    for group in range(clusters.max() + 1):
+        points = np.nonzero(clusters == group)[0]
+        bin_edges[group] = data[points].min()
+
+    # Get the outliers
+    outliers = np.nonzero(clusters == -1)[0]
+
+    # Identify non-outlier neighbors
+    nbrs = groupings._kneighbors[outliers]
+    nbrs = np.where(np.isin(nbrs, outliers), -1, nbrs)
+
+    # Find the nearest non-outlier neighbor for each outlier
+    nn = np.full(outliers.size, -1, dtype=np.int32)
+    for row in range(outliers.size):
+        non_outliers = nbrs[row, nbrs[row] != -1]
+        if non_outliers.size > 0:
+            nn[row] = non_outliers[0]
+
+    # Group outliers by their neighbors
+    unique_nnbrs, same_nbr, counts = np.unique(nn, return_inverse=True, return_counts=True)
+
+    # Adjust bin_edges based on each unique neighbor group
+    extend_bins = []
+    for i, nnbr in enumerate(unique_nnbrs):
+        outlier_indices = np.nonzero(same_nbr == i)[0]
+        min2add = data[outliers[outlier_indices]].min()
+        if counts[i] >= 4:
+            extend_bins.append(min2add)
+        else:
+            if min2add < data[nnbr]:
+                cluster = clusters[nnbr]
+                bin_edges[cluster] = min2add
+    if extend_bins:
+        bin_edges = np.concatenate([bin_edges, extend_bins])
+
+    bin_edges = np.sort(bin_edges)
+    return bin_edges
 
 
 def get_counts(data: NDArray[np.int_], min_num_bins: int | None = None) -> NDArray[np.int_]:
