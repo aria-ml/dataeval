@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Callable
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval.detectors.ood.base import OODBase, OODScoreOutput
+from dataeval.detectors.ood.base import OODBaseMixin, OODScoreOutput
 from dataeval.interop import to_numpy
 from dataeval.utils.lazy import lazyload
 from dataeval.utils.tensorflow._internal.trainer import trainer
@@ -96,7 +96,7 @@ def _mutate_categorical(
     return tf.cast(X, tf.float32)  # type: ignore
 
 
-class OOD_LLR(OODBase):
+class OOD_LLR(OODBaseMixin[tf_models.PixelCNN]):
     """
     Likelihood Ratios based outlier detector.
 

@@ -8,10 +8,11 @@ Licensed under Apache Software License (Apache 2.0)
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING
 
 import numpy as np
 
+from dataeval.utils.gmm import GaussianMixtureModelParams
 from dataeval.utils.lazy import lazyload
 
 if TYPE_CHECKING:
@@ -20,28 +21,7 @@ else:
     tf = lazyload("tensorflow")
 
 
-class GaussianMixtureModelParams(NamedTuple):
-    """
-    phi : tf.Tensor
-        Mixture component distribution weights.
-    mu : tf.Tensor
-        Mixture means.
-    cov : tf.Tensor
-        Mixture covariance.
-    L : tf.Tensor
-        Cholesky decomposition of `cov`.
-    log_det_cov : tf.Tensor
-        Log of the determinant of `cov`.
-    """
-
-    phi: tf.Tensor
-    mu: tf.Tensor
-    cov: tf.Tensor
-    L: tf.Tensor
-    log_det_cov: tf.Tensor
-
-
-def gmm_params(z: tf.Tensor, gamma: tf.Tensor) -> GaussianMixtureModelParams:
+def gmm_params(z: tf.Tensor, gamma: tf.Tensor) -> GaussianMixtureModelParams[tf.Tensor]:
     """
     Compute parameters of Gaussian Mixture Model.
 
@@ -81,7 +61,7 @@ def gmm_params(z: tf.Tensor, gamma: tf.Tensor) -> GaussianMixtureModelParams:
 
 def gmm_energy(
     z: tf.Tensor,
-    params: GaussianMixtureModelParams,
+    params: GaussianMixtureModelParams[tf.Tensor],
     return_mean: bool = True,
 ) -> tuple[tf.Tensor, tf.Tensor]:
     """

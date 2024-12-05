@@ -15,7 +15,8 @@ from typing import TYPE_CHECKING, Callable
 import numpy as np
 from numpy.typing import ArrayLike
 
-from dataeval.detectors.ood.base import OODBase, OODScoreOutput
+from dataeval.detectors.ood.base import OODScoreOutput
+from dataeval.detectors.ood.base_tf import OODBase
 from dataeval.interop import to_numpy
 from dataeval.utils.lazy import lazyload
 from dataeval.utils.tensorflow._internal.loss import Elbo
@@ -67,7 +68,7 @@ class OOD_VAE(OODBase):
         self,
         x_ref: ArrayLike,
         threshold_perc: float = 100.0,
-        loss_fn: Callable[..., tf.Tensor] = Elbo(0.05),
+        loss_fn: Callable[..., tf.Tensor] | None = Elbo(0.05),
         optimizer: keras.optimizers.Optimizer | None = None,
         epochs: int = 20,
         batch_size: int = 64,
