@@ -42,7 +42,6 @@ packages = [
 [tool.poetry.dependencies]
 # required
 python = ">=3.9,<3.13"
-hdbscan = {version = ">=0.8.36"}
 numpy = {version = ">1.24.3"}
 pillow = {version = ">=10.3.0"}
 scipy = {version = ">=1.10"}
