@@ -12,23 +12,14 @@ __all__ = ["OODOutput", "OODScoreOutput"]
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Literal, cast
+from typing import Callable, Generic, Literal, TypeVar
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from dataeval.interop import to_numpy
 from dataeval.output import OutputMetadata, set_metadata
-from dataeval.utils.lazy import lazyload
-from dataeval.utils.tensorflow._internal.gmm import GaussianMixtureModelParams, gmm_params
-from dataeval.utils.tensorflow._internal.trainer import trainer
-
-if TYPE_CHECKING:
-    import tensorflow as tf
-    import tf_keras as keras
-else:
-    tf = lazyload("tensorflow")
-    keras = lazyload("tf_keras")
+from dataeval.utils.gmm import GaussianMixtureModelParams
 
 
 @dataclass(frozen=True)
@@ -85,16 +76,62 @@ class OODScoreOutput(OutputMetadata):
         return self.instance_score if ood_type == "instance" or self.feature_score is None else self.feature_score
 
 
-class OODBase(ABC):
-    def __init__(self, model: keras.Model) -> None:
+TGMMData = TypeVar("TGMMData")
+
+
+class OODGMMMixin(Generic[TGMMData]):
+    _gmm_params: GaussianMixtureModelParams[TGMMData]
+
+
+TModel = TypeVar("TModel", bound=Callable)
+TLossFn = TypeVar("TLossFn", bound=Callable)
+TOptimizer = TypeVar("TOptimizer")
+
+
+class OODFitMixin(Generic[TLossFn, TOptimizer], ABC):
+    @abstractmethod
+    def fit(
+        self,
+        x_ref: ArrayLike,
+        threshold_perc: float,
+        loss_fn: TLossFn | None,
+        optimizer: TOptimizer | None,
+        epochs: int,
+        batch_size: int,
+        verbose: bool,
+    ) -> None:
+        """
+        Train the model and infer the threshold value.
+
+        Parameters
+        ----------
+        x_ref : ArrayLike
+            Training data.
+        threshold_perc : float, default 100.0
+            Percentage of reference data that is normal.
+        loss_fn : TLossFn
+            Loss function used for training.
+        optimizer : TOptimizer
+            Optimizer used for training.
+        epochs : int, default 20
+            Number of training epochs.
+        batch_size : int, default 64
+            Batch size used for training.
+        verbose : bool, default True
+            Whether to print training progress.
+        """
+
+
+class OODBaseMixin(Generic[TModel], ABC):
+    _ref_score: OODScoreOutput
+    _threshold_perc: float
+    _data_info: tuple[tuple, type] | None = None
+
+    def __init__(
+        self,
+        model: TModel,
+    ) -> None:
         self.model = model
-
-        self._ref_score: OODScoreOutput
-        self._threshold_perc: float
-        self._data_info: tuple[tuple, type] | None = None
-
-        if not isinstance(model, keras.Model):
-            raise TypeError("Model should be of type 'keras.Model'.")
 
     def _get_data_info(self, X: NDArray) -> tuple[tuple, type]:
         if not isinstance(X, np.ndarray):
@@ -107,9 +144,8 @@ class OODBase(ABC):
             raise RuntimeError(f"Expect data of type: {self._data_info[1]} and shape: {self._data_info[0]}. \
                                Provided data is type: {check_data_info[1]} and shape: {check_data_info[0]}.")
 
-    def _validate_state(self, X: NDArray, additional_attrs: list[str] | None = None) -> None:
-        attrs = ["_data_info", "_threshold_perc", "_ref_score"]
-        attrs = attrs if additional_attrs is None else attrs + additional_attrs
+    def _validate_state(self, X: NDArray) -> None:
+        attrs = [k for c in self.__class__.mro()[:-1][::-1] if hasattr(c, "__annotations__") for k in c.__annotations__]
         if not all(hasattr(self, attr) for attr in attrs) or any(getattr(self, attr) for attr in attrs) is None:
             raise RuntimeError("Metric needs to be `fit` before method call.")
         self._validate(X)
@@ -140,52 +176,6 @@ class OODBase(ABC):
     def _threshold_score(self, ood_type: Literal["feature", "instance"] = "instance") -> np.floating:
         return np.percentile(self._ref_score.get(ood_type), self._threshold_perc)
 
-    def fit(
-        self,
-        x_ref: ArrayLike,
-        threshold_perc: float,
-        loss_fn: Callable[..., tf.Tensor],
-        optimizer: keras.optimizers.Optimizer,
-        epochs: int,
-        batch_size: int,
-        verbose: bool,
-    ) -> None:
-        """
-        Train the model and infer the threshold value.
-
-        Parameters
-        ----------
-        x_ref : ArrayLike
-            Training data.
-        threshold_perc : float, default 100.0
-            Percentage of reference data that is normal.
-        loss_fn : Callable | None, default None
-            Loss function used for training.
-        optimizer : Optimizer, default keras.optimizers.Adam
-            Optimizer used for training.
-        epochs : int, default 20
-            Number of training epochs.
-        batch_size : int, default 64
-            Batch size used for training.
-        verbose : bool, default True
-            Whether to print training progress.
-        """
-
-        # Train the model
-        trainer(
-            model=self.model,
-            loss_fn=loss_fn,
-            x_train=to_numpy(x_ref),
-            optimizer=optimizer,
-            epochs=epochs,
-            batch_size=batch_size,
-            verbose=verbose,
-        )
-
-        # Infer the threshold values
-        self._ref_score = self.score(x_ref, batch_size)
-        self._threshold_perc = threshold_perc
-
     @set_metadata()
     def predict(
         self,
@@ -215,43 +205,3 @@ class OODBase(ABC):
         score = self.score(X, batch_size=batch_size)
         ood_pred = score.get(ood_type) > self._threshold_score(ood_type)
         return OODOutput(is_ood=ood_pred, **score.dict())
-
-
-class OODGMMBase(OODBase):
-    def __init__(self, model: keras.Model) -> None:
-        super().__init__(model)
-        self.gmm_params: GaussianMixtureModelParams
-
-    def _validate_state(self, X: NDArray, additional_attrs: list[str] | None = None) -> None:
-        if additional_attrs is None:
-            additional_attrs = ["gmm_params"]
-        super()._validate_state(X, additional_attrs)
-
-    def fit(
-        self,
-        x_ref: ArrayLike,
-        threshold_perc: float,
-        loss_fn: Callable[..., tf.Tensor],
-        optimizer: keras.optimizers.Optimizer,
-        epochs: int,
-        batch_size: int,
-        verbose: bool,
-    ) -> None:
-        # Train the model
-        trainer(
-            model=self.model,
-            loss_fn=loss_fn,
-            x_train=to_numpy(x_ref),
-            optimizer=optimizer,
-            epochs=epochs,
-            batch_size=batch_size,
-            verbose=verbose,
-        )
-
-        # Calculate the GMM parameters
-        _, z, gamma = cast(tuple[tf.Tensor, tf.Tensor, tf.Tensor], self.model(x_ref))
-        self.gmm_params = gmm_params(z, gamma)
-
-        # Infer the threshold values
-        self._ref_score = self.score(x_ref, batch_size)
-        self._threshold_perc = threshold_perc
