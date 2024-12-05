@@ -218,22 +218,20 @@ class TestBinningUnit:
     @pytest.mark.parametrize(
         "method, data, expected_result",
         [
-            ("uniform_width", np.array([0, 4, 3, 5, 6, 8] * 300), 6),
+            ("uniform_width", np.array([0, 4, 8, 5, 6, 15] * 300), 6),
             ("uniform_width", np.concatenate([np.arange(2), np.arange(140, 1500)]), 10),
             # ("uniform_count", np.array([0, 4, 3, 5, 6, 8] * 10 + [5] * 30), 6), # BROKEN IN NUMPY 2.1+
-            ("uniform_count", np.array([0, 4, 3, 5, 6, 9] * 10 + [5] * 30), 6),
+            ("uniform_count", np.array([0, 4, 8, 5, 6, 15] * 10 + [5] * 30), 6),
+            ("clusters", np.array([0, 4, 8, 5, 6, 15] * 300), 5),
         ],
     )
     def test_binning_method(self, method, data, expected_result):
         output = _bin_data(data, method)
+        unq, vals = np.unique(output, return_inverse=True)
+        print(unq)
+        print(data[:20])
+        print(vals[:20])
         assert np.unique(output).size == expected_result
-
-    def test_clusters_warn(self):
-        data = np.array([0, 4, 3, 5, 6, 8] * 15)
-        err_msg = "Binning by clusters is currently unavailable until changes to the clustering function go through."
-        with pytest.warns(UserWarning, match=err_msg):
-            output = _bin_data(data, "clusters")
-        assert np.unique(output).size == 6
 
 
 @pytest.mark.required
