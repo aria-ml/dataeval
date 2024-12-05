@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 from dataeval.utils.metadata import _convert_type, _try_cast, merge_metadata
@@ -228,7 +229,8 @@ class TestUtilsMetadata:
     }
 
     def test_ignore_lists(self):
-        a = merge_metadata([self.duplicate_keys], ignore_lists=True)
+        a, b = merge_metadata([self.duplicate_keys], ignore_lists=True)
+        assert b == np.array([0])
         assert {k: list(v) for k, v in a.items()} == {
             "a": [1],
             "b1": ["b1"],
@@ -240,7 +242,8 @@ class TestUtilsMetadata:
         }
 
     def test_fully_qualified_keys(self):
-        a = merge_metadata([self.duplicate_keys], fully_qualified=True)
+        a, b = merge_metadata([self.duplicate_keys], fully_qualified=True)
+        assert b == np.array([0])
         assert {k: list(v) for k, v in a.items()} == {
             "a": [1, 1, 1],
             "b_b1": ["b1", "b1", "b1"],
@@ -257,7 +260,8 @@ class TestUtilsMetadata:
 
     @pytest.mark.parametrize("as_numpy", [False, True])
     def test_duplicate_keys(self, as_numpy):
-        a = merge_metadata([self.duplicate_keys], as_numpy=as_numpy)
+        a, b = merge_metadata([self.duplicate_keys], as_numpy=as_numpy)
+        assert b == np.array([0])
         assert {k: list(v) for k, v in a.items()} == {
             "a": [1, 1, 1],
             "b1": ["b1", "b1", "b1"],
@@ -275,13 +279,17 @@ class TestUtilsMetadata:
     @pytest.mark.parametrize("as_numpy", [False, True])
     def test_inconsistent_keys(self, as_numpy):
         with pytest.warns(UserWarning, match="Inconsistent metadata keys found."):
-            a = merge_metadata(self.inconsistent_keys, as_numpy=as_numpy)
+            a, b = merge_metadata(self.inconsistent_keys, as_numpy=as_numpy)
+        assert b.size == 2
+        assert (b == [0, 1]).all()
         assert {k: list(v) for k, v in a.items()} == {"a": [1, 2]}
 
     @pytest.mark.parametrize("as_numpy", [False, True])
     def test_voc_test(self, as_numpy):
         with pytest.warns(UserWarning, match="Dropping nested list"):
-            a = merge_metadata(self.voc_test, as_numpy=as_numpy)
+            a, b = merge_metadata(self.voc_test, as_numpy=as_numpy)
+        assert b.size == 3
+        assert (b == [0, 3, 8]).all()
         assert {k: list(v) for k, v in a.items()} == {
             "folder": [
                 "VOC2011",
@@ -388,7 +396,7 @@ class TestUtilsMetadata:
         }
 
     def test_dict_of_dicts(self):
-        output = merge_metadata(self.dict_of_dicts)  # type: ignore
+        output, _ = merge_metadata(self.dict_of_dicts)  # type: ignore
         assert output == {
             "keys": ["sample1", "sample2", "sample3", "sample4"],
             "a_that": [37.0, 3.0, 3.7, 137.0],

@@ -5,13 +5,15 @@ __all__ = ["BalanceOutput", "balance"]
 import contextlib
 import warnings
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+import scipy as sp
+from numpy.typing import NDArray
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 
-from dataeval.metrics.bias.metadata import CLASS_LABEL, entropy, heatmap, preprocess_metadata
+from dataeval.metrics.bias.metadata_preprocessing import MetadataOutput
+from dataeval.metrics.bias.metadata_utils import get_counts, heatmap
 from dataeval.output import OutputMetadata, set_metadata
 
 with contextlib.suppress(ImportError):
@@ -31,17 +33,17 @@ class BalanceOutput(OutputMetadata):
         Estimate of inter/intra-factor mutual information
     classwise : NDArray[np.float64]
         Estimate of mutual information between metadata factors and individual class labels
+    factor_names : list[str]
+        Names of each metadata factor
     class_list : NDArray
         Array of the class labels present in the dataset
-    metadata_names : list[str]
-        Names of each metadata factor
     """
 
     balance: NDArray[np.float64]
     factors: NDArray[np.float64]
     classwise: NDArray[np.float64]
+    factor_names: list[str]
     class_list: NDArray[Any]
-    metadata_names: list[str]
 
     def plot(
         self,
@@ -65,7 +67,7 @@ class BalanceOutput(OutputMetadata):
             if row_labels is None:
                 row_labels = self.class_list
             if col_labels is None:
-                col_labels = np.concatenate((["class"], self.metadata_names))
+                col_labels = self.factor_names
 
             fig = heatmap(
                 self.classwise,
@@ -83,7 +85,7 @@ class BalanceOutput(OutputMetadata):
             # Finalize the data for the plot, last row is last factor x last factor so it gets dropped
             heat_data = np.where(mask, np.nan, data)[:-1]
             # Creating label array for heat map axes
-            heat_labels = np.concatenate((["class"], self.metadata_names))
+            heat_labels = self.factor_names
 
             if row_labels is None:
                 row_labels = heat_labels[:-1]
@@ -95,7 +97,7 @@ class BalanceOutput(OutputMetadata):
         return fig
 
 
-def validate_num_neighbors(num_neighbors: int) -> int:
+def _validate_num_neighbors(num_neighbors: int) -> int:
     if not isinstance(num_neighbors, (int, float)):
         raise TypeError(
             f"Variable {num_neighbors} is not real-valued numeric type."
@@ -117,28 +119,16 @@ def validate_num_neighbors(num_neighbors: int) -> int:
 
 @set_metadata("dataeval.metrics")
 def balance(
-    class_labels: ArrayLike,
-    metadata: Mapping[str, ArrayLike],
+    metadata: MetadataOutput,
     num_neighbors: int = 5,
-    continuous_factor_bincounts: Mapping[str, int] | None = None,
 ) -> BalanceOutput:
     """
     Mutual information (MI) between factors (class label, metadata, label/image properties)
 
     Parameters
     ----------
-    class_labels : ArrayLike
-        List of class labels for each image
-    metadata : Mapping[str, ArrayLike]
-        Dict of lists of metadata factors for each image
-    num_neighbors : int, default 5
-        Number of nearest neighbors to use for computing MI between discrete
-        and continuous variables.
-    continuous_factor_bincounts : Mapping[str, int] or None, default None
-        The factors in metadata that have continuous values and the array of bin counts to
-        discretize values into. All factors are treated as having discrete values unless they
-        are specified as keys in this dictionary. Each element of this array must occur as a key
-        in metadata.
+    metadata : MetadataOutput
+        Output after running `metadata_preprocessing`
 
     Returns
     -------
@@ -150,30 +140,33 @@ def balance(
     ----
     We use `mutual_info_classif` from sklearn since class label is categorical.
     `mutual_info_classif` outputs are consistent up to O(1e-4) and depend on a random
-    seed. MI is computed differently for categorical and continuous variables, and
-    we attempt to infer whether a variable is categorical by the fraction of unique
-    values in the dataset.
+    seed. MI is computed differently for categorical and continuous variables.
 
     Example
     -------
     Return balance (mutual information) of factors with class_labels
 
-    >>> bal = balance(class_labels, metadata, continuous_factor_bincounts=continuous_factor_bincounts)
+    >>> bal = balance(metadata)
     >>> bal.balance
-    array([0.99999822, 0.13363788, 0.04505382, 0.02994455])
+    array([0.9999982 , 0.2494567 , 0.02994455, 0.13363788, 0.        ,
+           0.        ])
 
     Return intra/interfactor balance (mutual information)
 
     >>> bal.factors
-    array([[0.99999843, 0.04133555, 0.09725766],
-           [0.04133555, 0.08433558, 0.1301489 ],
-           [0.09725766, 0.1301489 , 0.99999856]])
+    array([[0.99999935, 0.31360499, 0.26925848, 0.85201924, 0.36653548],
+           [0.31360499, 0.99999856, 0.09725766, 0.15836905, 1.98031993],
+           [0.26925848, 0.09725766, 0.99999846, 0.03713108, 0.01544656],
+           [0.85201924, 0.15836905, 0.03713108, 0.47450653, 0.25509664],
+           [0.36653548, 1.98031993, 0.01544656, 0.25509664, 1.06260686]])
 
     Return classwise balance (mutual information) of factors with individual class_labels
 
     >>> bal.classwise
-    array([[0.99999822, 0.13363788, 0.        , 0.        ],
-           [0.99999822, 0.13363788, 0.        , 0.        ]])
+    array([[0.9999982 , 0.2494567 , 0.02994455, 0.13363788, 0.        ,
+            0.        ],
+           [0.9999982 , 0.2494567 , 0.02994455, 0.13363788, 0.        ,
+            0.        ]])
 
 
     See Also
@@ -182,68 +175,78 @@ def balance(
     sklearn.feature_selection.mutual_info_regression
     sklearn.metrics.mutual_info_score
     """
-    num_neighbors = validate_num_neighbors(num_neighbors)
-    data, names, is_categorical, unique_labels = preprocess_metadata(class_labels, metadata)
-    num_factors = len(names)
-    mi = np.empty((num_factors, num_factors))
-    mi[:] = np.nan
+    num_neighbors = _validate_num_neighbors(num_neighbors)
+
+    num_factors = metadata.total_num_factors
+    is_discrete = [True] * (len(metadata.discrete_factor_names) + 1) + [False] * len(metadata.continuous_factor_names)
+    mi = np.full((num_factors, num_factors), np.nan, dtype=np.float32)
+    data = np.hstack((metadata.class_labels[:, np.newaxis], metadata.discrete_data))
+    discretized_data = data
+    if metadata.continuous_data is not None:
+        data = np.hstack((data, metadata.continuous_data))
+        discrete_idx = [metadata.discrete_factor_names.index(name) for name in metadata.continuous_factor_names]
+        discretized_data = np.hstack((discretized_data, metadata.discrete_data[:, discrete_idx]))
 
     for idx in range(num_factors):
-        tgt = data[:, idx].astype(np.intp)
-
-        if continuous_factor_bincounts and names[idx] not in continuous_factor_bincounts:
-            mi[idx, :] = mutual_info_classif(
+        if idx >= len(metadata.discrete_factor_names) + 1:
+            mi[idx, :] = mutual_info_regression(
                 data,
-                tgt,
-                discrete_features=is_categorical,  # type: ignore
+                data[:, idx],
+                discrete_features=is_discrete,  # type: ignore
                 n_neighbors=num_neighbors,
                 random_state=0,
             )
         else:
-            mi[idx, :] = mutual_info_regression(
+            mi[idx, :] = mutual_info_classif(
                 data,
-                tgt,
-                discrete_features=is_categorical,  # type: ignore
+                data[:, idx],
+                discrete_features=is_discrete,  # type: ignore
                 n_neighbors=num_neighbors,
                 random_state=0,
             )
 
-    ent_all = entropy(data, names, continuous_factor_bincounts, normalized=False)
-    norm_factor = 0.5 * np.add.outer(ent_all, ent_all) + 1e-6
+    # Normalization via entropy
+    bin_cnts = get_counts(discretized_data)
+    ent_factor = sp.stats.entropy(bin_cnts, axis=0)
+    norm_factor = 0.5 * np.add.outer(ent_factor, ent_factor) + 1e-6
+
     # in principle MI should be symmetric, but it is not in practice.
     nmi = 0.5 * (mi + mi.T) / norm_factor
     balance = nmi[0]
     factors = nmi[1:, 1:]
 
-    # unique class labels
-    class_idx = names.index(CLASS_LABEL)
-    u_cls = np.unique(data[:, class_idx])
-    num_classes = len(u_cls)
-
     # assume class is a factor
-    classwise_mi = np.empty((num_classes, num_factors))
-    classwise_mi[:] = np.nan
+    num_classes = metadata.class_names.size
+    classwise_mi = np.full((num_classes, num_factors), np.nan, dtype=np.float32)
 
-    # categorical variables, excluding class label
-    cat_mask = np.concatenate((is_categorical[:class_idx], is_categorical[(class_idx + 1) :]), axis=0).astype(np.intp)
-
-    tgt_bin = np.stack([data[:, class_idx] == cls for cls in u_cls]).T.astype(np.intp)
-    names = [str(idx) for idx in range(num_classes)]
-    ent_tgt_bin = entropy(tgt_bin, names, continuous_factor_bincounts)
+    # classwise targets
+    classes = np.unique(metadata.class_labels)
+    tgt_bin = data[:, 0][:, None] == classes
 
     # classification MI for discrete/categorical features
     for idx in range(num_classes):
-        # tgt = class_data == cls
         # units: nat
         classwise_mi[idx, :] = mutual_info_classif(
             data,
             tgt_bin[:, idx],
-            discrete_features=cat_mask,  # type: ignore
+            discrete_features=is_discrete,  # type: ignore
             n_neighbors=num_neighbors,
             random_state=0,
         )
 
-    norm_factor = 0.5 * np.add.outer(ent_tgt_bin, ent_all) + 1e-6
+    # Classwise normalization via entropy
+    classwise_bin_cnts = get_counts(tgt_bin)
+    ent_tgt_bin = sp.stats.entropy(classwise_bin_cnts, axis=0)
+    norm_factor = 0.5 * np.add.outer(ent_tgt_bin, ent_factor) + 1e-6
     classwise = classwise_mi / norm_factor
 
-    return BalanceOutput(balance, factors, classwise, unique_labels, list(metadata.keys()))
+    # Grabbing factor names for plotting function
+    factor_names = ["class"]
+    for name in metadata.discrete_factor_names:
+        if name in metadata.continuous_factor_names:
+            name = name + "-discrete"
+        factor_names.append(name)
+    for name in metadata.continuous_factor_names:
+        factor_names.append(name + "-continuous")
+
+    return BalanceOutput(balance, factors, classwise, factor_names, metadata.class_names)

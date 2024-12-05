@@ -4,113 +4,86 @@ import numpy as np
 import pytest
 from matplotlib.figure import Figure
 
-from dataeval.metrics.bias import balance
-from dataeval.metrics.bias.metadata import infer_categorical, preprocess_metadata
+from dataeval.metrics.bias.balance import _validate_num_neighbors, balance
+from dataeval.metrics.bias.metadata_preprocessing import metadata_preprocessing
 
 
 @pytest.fixture
-def simple_class_labels():
-    return [1] * 100 + [2] * 100
+def metadata_results():
+    str_vals = ["b", "b", "b", "b", "b", "a", "a", "b", "a", "b", "b", "a"]
+    cnt_vals = [
+        -0.54425898,
+        -0.31630016,
+        0.41163054,
+        1.04251337,
+        -0.12853466,
+        1.36646347,
+        -0.66519467,
+        0.35151007,
+        0.90347018,
+        0.0940123,
+        -0.74349925,
+        -0.92172538,
+    ]
+    cat_vals = [1.1, 1.1, 0.1, 0.1, 1.1, 0.1, 1.1, 0.1, 0.1, 1.1, 1.1, 0.1]
+    class_labels = ["dog", "dog", "dog", "cat", "dog", "cat", "dog", "dog", "dog", "cat", "cat", "cat"]
+    md = [{"var_cat": str_vals, "var_cnt": cnt_vals, "var_float_cat": cat_vals}]
+    return metadata_preprocessing(md, class_labels, {"var_cnt": 3, "var_float_cat": 2})
 
 
 @pytest.fixture
-def homog_class_labels():
-    return [1] * 10
-
-
-@pytest.fixture
-def inhomog_metadata():
-    return {
-        "factor1": list(range(10)),
-        "factor2": list(range(10)),
-        "factor3": list(range(10)),
-    }
+def mismatch_metadata():
+    raw_metadata = [{"factor1": list(range(10)), "factor2": list(range(10)), "factor3": list(range(10))}]
+    class_labels = [1] * 10
+    continuous_bins = {"factor1": 5, "factor2": 5, "factor3": 5}
+    return metadata_preprocessing(raw_metadata, class_labels, continuous_bins)
 
 
 @pytest.fixture
 def simple_metadata():
-    return {"factor1": [1] * 100 + [2] * 100, "factor2": [1] * 100 + [2] * 100}
-
-
-@pytest.fixture
-def class_labels_int():
-    return np.array([1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0], dtype=np.intp)
-
-
-@pytest.fixture
-def class_labels():
-    return np.array(["dog", "dog", "dog", "dog", "cat", "dog", "dog", "dog", "cat", "dog", "dog", "cat"])
-
-
-@pytest.fixture
-def metadata():
-    str_vals = np.array(["b", "b", "b", "b", "b", "a", "a", "b", "a", "b", "b", "a"])
-    cnt_vals = np.array(
-        [
-            -0.54425898,
-            -0.31630016,
-            0.41163054,
-            1.04251337,
-            -0.12853466,
-            1.36646347,
-            -0.66519467,
-            0.35151007,
-            0.90347018,
-            0.0940123,
-            -0.74349925,
-            -0.92172538,
-        ]
-    )
-    cat_vals = np.array([1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0], dtype=np.intp)
-    # for unit testing
-    md = {"var_cat": str_vals, "var_cnt": cnt_vals, "var_float_cat": cat_vals + 0.1}
-    return md
+    raw_metadata = [{"factor1": [1] * 100 + [2] * 100, "factor2": [1] * 100 + [2] * 100}]
+    class_labels = [1] * 100 + [2] * 100
+    return metadata_preprocessing(raw_metadata, class_labels)
 
 
 class TestBalanceUnit:
     @pytest.mark.parametrize(
-        "test_param,expected_exception",
+        "test_param, expected_exception, err_msg",
         [
-            ("7", pytest.raises(TypeError)),
-            (0, pytest.raises(ValueError)),
-            (10, does_not_raise()),
-            (4.0, pytest.warns(UserWarning)),
+            ("7", pytest.raises(TypeError), "Variable 7 is not real-valued numeric type."),
+            (0, pytest.raises(ValueError), "Invalid value for 0."),
         ],
     )
-    def test_validates_balance_inputs(self, test_param, expected_exception, class_labels, metadata):
-        with expected_exception:
-            balance(class_labels, metadata, test_param)
+    def test_validate_num_neighbors_type_errors(self, test_param, expected_exception, err_msg):
+        with expected_exception as e:
+            _validate_num_neighbors(test_param)
+        assert err_msg in str(e.value)
 
-    def test_preprocess(self, metadata, class_labels_int):
-        data, names, is_categorical, unique_labels = preprocess_metadata(class_labels_int, metadata)
-        assert len(names) == len(metadata.keys()) + 1  # 3 variables, class_label
-        idx = names.index("var_cnt")
-        assert not is_categorical[idx]
-        assert all(is_categorical[:idx] + is_categorical[idx + 1 :])
-        assert data.dtype == float
-        unique_check = np.array([0, 1], dtype=np.intp)
-        assert (unique_labels == unique_check).all()
+    def test_validate_num_neighbors_warning(self):
+        err_msg = "[ UserWarning('Variable 4 is currently type float and will be truncated to type int.')]"
+        with pytest.warns(UserWarning, match=err_msg):
+            _validate_num_neighbors(4.0)  # type: ignore
 
-    def test_infer_categorical_2D_data(self):
-        x = np.ones((10, 2))
-        _ = infer_categorical(x)
+    def test_validate_num_neighbors_pass(self):
+        with does_not_raise():
+            _validate_num_neighbors(10)
 
-    def test_correct_mi_shape_and_dtype(self, class_labels_int, metadata):
-        num_vars = len(metadata.keys())
+    def test_correct_mi_shape_and_dtype(self, metadata_results):
+        num_vars = len(metadata_results.discrete_factor_names + metadata_results.continuous_factor_names) + 1
         expected_shape = {
-            "balance": (num_vars + 1,),
-            "factors": (num_vars, num_vars),
-            "classwise": (2, num_vars + 1),
-            "class_list": (np.unique(class_labels_int).size,),
-            "metadata_names": (len(metadata.keys())),
+            "balance": (num_vars,),
+            "factors": (num_vars - 1, num_vars - 1),
+            "classwise": (2, num_vars),
+            "class_list": (np.unique(metadata_results.class_labels).size,),
+            "factor_names": (num_vars),
         }
         expected_type = {
             "balance": float,
             "factors": float,
             "classwise": float,
-            "class_list": int,
+            "factor_names": list,
         }
-        mi = balance(class_labels_int, metadata)
+        mi = balance(metadata_results)
         for k, v in mi.dict().items():
             if type(v) is list:
                 assert len(v) == expected_shape[k]
@@ -119,31 +92,30 @@ class TestBalanceUnit:
                 if k in expected_type:
                     assert v.dtype == expected_type[k]
 
-    def test_base_plotting(self, class_labels_int, metadata):
-        mi = balance(class_labels_int, metadata)
+    def test_base_plotting(self, metadata_results):
+        mi = balance(metadata_results)
         output = mi.plot()
         assert isinstance(output, Figure)
         classwise_output = mi.plot(plot_classwise=True)
         assert isinstance(classwise_output, Figure)
 
-    def test_plotting_vars(self, class_labels, metadata):
-        mi = balance(class_labels, metadata)
-        heat_labels = np.concatenate((["class"], mi.metadata_names))
+    def test_plotting_vars(self, metadata_results):
+        mi = balance(metadata_results)
+        heat_labels = np.arange(len(mi.factor_names))
         output = mi.plot(heat_labels[:-1], heat_labels[1:], False)
         assert isinstance(output, Figure)
         _, row_labels = np.unique(mi.class_list, return_inverse=True)
-        col_labels = np.arange(len(mi.metadata_names) + 1)
-        classwise_output = mi.plot(row_labels, col_labels, True)
+        col_labels = np.arange(len(mi.factor_names))
+        classwise_output = mi.plot(row_labels, col_labels, plot_classwise=True)
         assert isinstance(classwise_output, Figure)
 
 
 class TestBalanceFunctional:
-    def test_unity_balance(self, simple_class_labels, simple_metadata):
-        output = balance(simple_class_labels, simple_metadata)
+    def test_unity_balance(self, simple_metadata):
+        output = balance(simple_metadata)
         assert np.all(output.balance > 0.999)
         assert np.all(output.factors > 0.999)
 
-    def test_zero_balance(self, homog_class_labels, inhomog_metadata):
-        continuous_factor_bincounts = {"factor1": 5, "factor2": 5, "factor3": 5}
-        output = balance(homog_class_labels, inhomog_metadata, continuous_factor_bincounts=continuous_factor_bincounts)
+    def test_zero_balance(self, mismatch_metadata):
+        output = balance(mismatch_metadata)
         assert np.all(np.isclose(output.balance, 0))
