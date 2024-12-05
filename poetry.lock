@@ -482,6 +482,7 @@ description = "Python AST that abstracts the underlying Python version"
 optional = true
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7"
 files = [
+    {file = "gast-0.6.0-py3-none-any.whl", hash = "sha256:52b182313f7330389f72b069ba00f174cfe2a06411099547288839c6cbafbd54"},
     {file = "gast-0.6.0.tar.gz", hash = "sha256:88fc5300d32c7ac6ca7b515310862f71e6fdf2c029bbec7c66c0f5dd47b6b1fb"},
 ]
 
@@ -604,35 +605,6 @@ files = [
 
 [package.dependencies]
 numpy = ">=1.19.3"
-
-[[package]]
-name = "hdbscan"
-version = "0.8.39"
-description = "Clustering based on density with variable density clusters"
-optional = false
-python-versions = "*"
-files = [
-    {file = "hdbscan-0.8.39-cp310-cp310-macosx_12_0_x86_64.whl", hash = "sha256:9ea1f9867f54501f99f8323df1086881a13e5ad135216e23cf8cb170f3f159a9"},
-    {file = "hdbscan-0.8.39-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:17092f3dc50e4da19010b61b7ecf87aca2980e76d83a4826614bba2b5c45f89e"},
-    {file = "hdbscan-0.8.39-cp310-cp310-win_amd64.whl", hash = "sha256:f2e6bfb9e03b3689d93fd966d1037781339da5352653d8cf109ad2c9229be9f2"},
-    {file = "hdbscan-0.8.39-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:68880e33f8dc2a12b07f267dcb657932737e6863f9be8c13299c9ad7c50b9c41"},
-    {file = "hdbscan-0.8.39-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a1ce6cfe384b637b9451d003d0ddad75cfb4851ef743f29d794249721c2f1158"},
-    {file = "hdbscan-0.8.39-cp311-cp311-win_amd64.whl", hash = "sha256:d7809a21842f9524a5160176181079380ba47f54f438ec6c48101801e0a84712"},
-    {file = "hdbscan-0.8.39-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:36afdbdef30ad4cbccc730ca0f0d76837b533746db24c17cd661a8f01ff9c849"},
-    {file = "hdbscan-0.8.39-cp38-cp38-macosx_12_0_x86_64.whl", hash = "sha256:34595a7e77799dbc768f6e35691657d3c375a4f262d74515f46c7cc15294ea60"},
-    {file = "hdbscan-0.8.39-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7815a842008fcf224807f6cc79c48cda4f85f31a9a9918bb2cf5f8ecdb7bfe5b"},
-    {file = "hdbscan-0.8.39-cp38-cp38-win_amd64.whl", hash = "sha256:fdef592010599503d6197e8420e6ad4bccfdaaf49f46722da34a1b62026455db"},
-    {file = "hdbscan-0.8.39-cp39-cp39-macosx_12_0_x86_64.whl", hash = "sha256:127cd877bf0a816d3ea75478d9774f4205fdfe60d84bc7639be501f071d4c558"},
-    {file = "hdbscan-0.8.39-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5ec50875227d31995de80a2bdee98e541177856862897cb60357410c3f6a9ed9"},
-    {file = "hdbscan-0.8.39-cp39-cp39-win_amd64.whl", hash = "sha256:f782c749e1040f737e94c8c2f711135146b2d00753858acd13452dafb6add0b6"},
-    {file = "hdbscan-0.8.39.tar.gz", hash = "sha256:2aa1351f42fa79efdc47d53695381aa9a2efef6d1855b96c42d030646fee74f7"},
-]
-
-[package.dependencies]
-joblib = ">=1.0"
-numpy = ">=1.20,<3"
-scikit-learn = ">=0.20"
-scipy = ">=1.0"
 
 [[package]]
 name = "idna"
@@ -872,6 +844,7 @@ description = "Clang Python Bindings, mirrored from the official LLVM repo: http
 optional = true
 python-versions = "*"
 files = [
+    {file = "libclang-18.1.1-1-py2.py3-none-macosx_11_0_arm64.whl", hash = "sha256:0b2e143f0fac830156feb56f9231ff8338c20aecfe72b4ffe96f19e5a1dbb69a"},
     {file = "libclang-18.1.1-py2.py3-none-macosx_10_9_x86_64.whl", hash = "sha256:6f14c3f194704e5d09769108f03185fce7acaf1d1ae4bbb2f30a72c2400cb7c5"},
     {file = "libclang-18.1.1-py2.py3-none-macosx_11_0_arm64.whl", hash = "sha256:83ce5045d101b669ac38e6da8e58765f12da2d3aafb3b9b98d88b286a60964d8"},
     {file = "libclang-18.1.1-py2.py3-none-manylinux2010_x86_64.whl", hash = "sha256:c533091d8a3bbf7460a00cb6c1a71da93bffe148f172c7d03b1c31fbf8aa2a0b"},
@@ -2416,4 +2389,4 @@ torch = ["matplotlib", "torch", "torchvision"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "ff4a4acb3186162b334a5ce30ce8a7245be0b54fe3d6de868aaa97215895516b"
+content-hash = "2aa0e24d37f41a59ca603bbfcc6bf9574ed93ff02e7edeff4a944517be55d03b"
