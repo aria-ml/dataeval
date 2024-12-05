@@ -3,7 +3,7 @@ from sys import version_info
 
 import nox
 
-python_version = f"{version_info[0]}.{version_info[1]}"
+PYTHON_VERSION = f"{version_info[0]}.{version_info[1]}"
 
 nox.options.default_venv_backend = "uv"
 nox.options.sessions = ["test", "type", "deps", "lint", "doctest", "check"]
@@ -31,7 +31,7 @@ fi
 def check_version(version: str) -> str:
     pattern = re.compile(r".*(3.\d+)$")
     matches = pattern.match(version)
-    version = matches.groups()[0] if matches is not None and len(matches.groups()) > 0 else python_version
+    version = matches.groups()[0] if matches is not None and len(matches.groups()) > 0 else PYTHON_VERSION
     if version not in SUPPORTED_VERSIONS:
         raise ValueError(f"Specified python version {version} is not supported.")
     return version
@@ -40,15 +40,15 @@ def check_version(version: str) -> str:
 @nox.session
 def dev(session: nox.Session) -> None:
     """Set up a python development environment at `.venv-{version}`. Specify version using `nox -P {version} -e dev`."""
-    version = check_version(session.name)
-    session.run("uv", "venv", "--python", version, f".venv-{version}", "--seed", external=True)
-    session.run("uv", "pip", "install", "--python", f".venv-{version}", *INSTALL_ARGS, env=INSTALL_ENVS)
+    python_version = check_version(session.name)
+    session.run("uv", "venv", "--python", python_version, f".venv-{python_version}", "--seed", external=True)
+    session.run("uv", "pip", "install", "--python", f".venv-{python_version}", *INSTALL_ARGS, env=INSTALL_ENVS)
 
 
 @nox.session
 def test(session: nox.Session) -> None:
     """Run unit tests with coverage reporting. Specify version using `nox -P {version} -e test`."""
-    check_version(session.name)
+    python_version = check_version(session.name)
     pytest_args = ["--cov", "-n8", "--dist", "loadgroup", f"--junitxml=output/junit.{python_version}.xml"]
     cov_term_args = ["--cov-report", "term"]
     cov_xml_args = ["--cov-report", f"xml:output/coverage.{python_version}.xml"]
