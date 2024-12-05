@@ -131,7 +131,9 @@ def _flatten_dict_inner(
     return items, size
 
 
-def _flatten_dict(d: Mapping[str, Any], sep: str, ignore_lists: bool, fully_qualified: bool) -> dict[str, Any]:
+def _flatten_dict(
+    d: Mapping[str, Any], sep: str, ignore_lists: bool, fully_qualified: bool
+) -> tuple[dict[str, Any], int]:
     """
     Flattens a dictionary and converts values to numeric values when possible.
 
@@ -165,7 +167,7 @@ def _flatten_dict(d: Mapping[str, Any], sep: str, ignore_lists: bool, fully_qual
             output[k] = cv
         elif not isinstance(cv, list):
             output[k] = cv if not size else [cv] * size
-    return output
+    return output, size if size is not None else 1
 
 
 def _is_metadata_dict_of_dicts(metadata: Mapping) -> bool:
@@ -188,7 +190,7 @@ def merge_metadata(
     ignore_lists: bool = False,
     fully_qualified: bool = False,
     as_numpy: bool = False,
-) -> dict[str, list[Any]] | dict[str, NDArray[Any]]:
+) -> tuple[dict[str, list[Any]] | dict[str, NDArray[Any]], NDArray[np.int_]]:
     """
     Merges a collection of metadata dictionaries into a single flattened dictionary of keys and values.
 
@@ -208,8 +210,10 @@ def merge_metadata(
 
     Returns
     -------
-    dict[str, list[Any]] | dict[str, NDArray[Any]]
+    dict[str, list[Any]] or dict[str, NDArray[Any]]
         A single dictionary containing the flattened data as lists or NumPy arrays
+    NDArray[np.int_]
+        Array defining where individual images start, helpful when working with object detection metadata
 
     Note
     ----
@@ -217,9 +221,12 @@ def merge_metadata(
 
     Example
     -------
-    >>> list_metadata = [{"common": 1, "target": [{"a": 1, "b": 3}, {"a": 2, "b": 4}], "source": "example"}]
-    >>> merge_metadata(list_metadata)
+    >>> list_metadata = [{"common": 1, "target": [{"a": 1, "b": 3, "c": 5}, {"a": 2, "b": 4}], "source": "example"}]
+    >>> reorganized_metadata, image_indicies = merge_metadata(list_metadata)
+    >>> reorganized_metadata
     {'common': [1, 1], 'a': [1, 2], 'b': [3, 4], 'source': ['example', 'example']}
+    >>> image_indicies
+    array([0])
     """
     merged: dict[str, list[Any]] = {}
     isect: set[str] = set()
@@ -236,8 +243,11 @@ def merge_metadata(
     else:
         dicts = list(metadata)
 
-    for d in dicts:
-        flattened = _flatten_dict(d, sep="_", ignore_lists=ignore_lists, fully_qualified=fully_qualified)
+    image_repeats = np.zeros(len(dicts))
+    for i, d in enumerate(dicts):
+        flattened, image_repeats[i] = _flatten_dict(
+            d, sep="_", ignore_lists=ignore_lists, fully_qualified=fully_qualified
+        )
         isect = isect.intersection(flattened.keys()) if isect else set(flattened.keys())
         union = union.union(flattened.keys())
         for k, v in flattened.items():
@@ -248,6 +258,16 @@ def merge_metadata(
 
     output: dict[str, Any] = {}
 
+    if image_repeats.sum() == image_repeats.size:
+        image_indicies = np.arange(image_repeats.size)
+    else:
+        image_ids = np.arange(image_repeats.size)
+        image_data = np.concatenate(
+            [np.repeat(image_ids[i], image_repeats[i]) for i in range(image_ids.size)], dtype=np.int_
+        )
+        _, image_unsorted = np.unique(image_data, return_index=True)
+        image_indicies = np.sort(image_unsorted)
+
     if keys:
         output["keys"] = np.array(keys) if as_numpy else keys
 
@@ -255,4 +275,4 @@ def merge_metadata(
         cv = _convert_type(merged[k])
         output[k] = np.array(cv) if as_numpy else cv
 
-    return output
+    return output, image_indicies

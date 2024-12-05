@@ -6,7 +6,7 @@ import pytest
 from matplotlib.figure import Figure
 
 from dataeval.metrics.bias.coverage import coverage
-from dataeval.metrics.bias.metadata import coverage_plot
+from dataeval.metrics.bias.metadata_utils import coverage_plot
 
 
 class TestCoverageUnit:
