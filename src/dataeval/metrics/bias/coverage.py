@@ -12,7 +12,7 @@ from numpy.typing import ArrayLike, NDArray
 from scipy.spatial.distance import pdist, squareform
 
 from dataeval.interop import to_numpy
-from dataeval.metrics.bias.metadata import coverage_plot
+from dataeval.metrics.bias.metadata_utils import coverage_plot
 from dataeval.output import OutputMetadata, set_metadata
 from dataeval.utils.shared import flatten
 
