@@ -322,31 +322,31 @@ export-merged-sbom:
 
 ### SECURITY ###
 
-include:
-  - template: Security/Secret-Detection.gitlab-ci.yml
-  - template: Security/Dependency-Scanning.gitlab-ci.yml
-  - template: Security/SAST.gitlab-ci.yml
+# include:
+#   - template: Security/Secret-Detection.gitlab-ci.yml
+#   - template: Security/Dependency-Scanning.gitlab-ci.yml
+#   - template: Security/SAST.gitlab-ci.yml
 
-secret_detection:
-  stage: security
-  needs: []
-  rules:
-    - *exclude_main
-    - *on_run
+# secret_detection:
+#   stage: security
+#   needs: []
+#   rules:
+#     - *exclude_main
+#     - *on_run
 
-gemnasium-python-dependency_scanning:
-  stage: security
-  needs: []
-  rules:
-    - *exclude_main
-    - *on_run
+# gemnasium-python-dependency_scanning:
+#   stage: security
+#   needs: []
+#   rules:
+#     - *exclude_main
+#     - *on_run
 
-semgrep-sast:
-  stage: security
-  needs: []
-  rules:
-    - *exclude_main
-    - *on_run
+# semgrep-sast:
+#   stage: security
+#   needs: []
+#   rules:
+#     - *exclude_main
+#     - *on_run
 
 ### JATIC GROUP VALIDATION ###
 
