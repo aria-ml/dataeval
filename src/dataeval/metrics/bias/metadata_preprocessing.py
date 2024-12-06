@@ -57,6 +57,7 @@ def metadata_preprocessing(
     class_labels: ArrayLike | str,
     continuous_factor_bins: Mapping[str, int | list[tuple[TNum, TNum]]] | None = None,
     auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
+    exclude: Iterable[str] | None = None,
 ) -> MetadataOutput:
     """
     Restructures the metadata to be in the correct format for the bias functions.
@@ -78,6 +79,8 @@ def metadata_preprocessing(
     auto_bin_method : "uniform_width" or "uniform_count" or "clusters", default "uniform_width"
         Method by which the function will automatically bin continuous metadata factors. It is recommended
         that the user provide the bins through the `continuous_factor_bins`.
+    exclude : Iterable[str] or None, default None
+        User provided collection of metadata keys to exclude when processing metadata.
 
     Returns
     -------
@@ -86,6 +89,12 @@ def metadata_preprocessing(
     """
     # Transform metadata into single, flattened dictionary
     metadata, image_repeats = merge_metadata(raw_metadata)
+
+    # Drop any excluded metadata keys
+    if exclude:
+        for k in list(metadata):
+            if k in exclude:
+                metadata.pop(k)
 
     # Get the class label array in numeric form
     class_array = as_numpy(metadata.pop(class_labels)) if isinstance(class_labels, str) else as_numpy(class_labels)
