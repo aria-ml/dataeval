@@ -46,6 +46,7 @@ stages:
   - docs
   - release
   - security
+  - compliance
 
 ### RULE ANCHORS ###
 
@@ -347,3 +348,19 @@ semgrep-sast:
   rules:
     - *exclude_main
     - *on_run
+
+### JATIC GROUP VALIDATION ###
+
+include:
+  - component: $CI_SERVER_FQDN/jatic/devsecops/components/sr-compliance@0.2.0
+    inputs:
+      stage: compliance
+      package_directory: dataeval
+
+  - component: $CI_SERVER_FQDN/jatic/devsecops/components/unit-test@0.2.0
+    inputs:
+      stage: compliance
+      poetry_install_options: "--all-extras --with=dev"
+      package_directory: dataeval
+
+  - component: $CI_SERVER_FQDN/jatic/devsecops/components/validate-pipeline@0.2.0
