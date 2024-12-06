@@ -91,8 +91,12 @@ stages:
         - src/**/*
         - docs/**/*
         - environment/*
-        - README.md
   - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE != $UPDATE_CACHE_MESSAGE
+    changes:
+      paths:
+        - src/**/*
+        - docs/**/*
+        - environment/*
     variables:
       DOCS_CLEAN: '--clean'
   - if: $CI_COMMIT_BRANCH == 'main'
@@ -221,24 +225,6 @@ docs:
       - output/docs/html/
   rules: *on_run_with_docs
 
-update cache:
-  stage: docs
-  needs:
-    - job: docs
-      artifacts: true
-  script:
-    - git fetch --all --depth 1
-    - git switch --force ${CI_COMMIT_BRANCH}${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}
-    - cp -R output/docs/.jupyter_cache/* docs/.jupyter_cache
-    - if [[ ! $(git status --porcelain | tee /dev/stderr | grep docs/.jupyter_cache | grep --invert-match global.db) ]]; then echo "No cache changes"; exit 0; fi
-    - git add docs/.jupyter_cache/*
-    - git config --global user.email "${GITLAB_USER_EMAIL}"
-    - git config --global user.name "${GITLAB_USER_NAME}"
-    - git commit --message "${UPDATE_CACHE_MESSAGE}"
-    - git push https://dataeval-bot:${DATAEVAL_BUILD_PAT}@gitlab.jatic.net/jatic/aria/dataeval.git
-  rules:
-    - *on_run_with_docs
-
 pages:
   stage: docs
   needs:
@@ -255,6 +241,24 @@ pages:
   rules: *on_commit_main_only
 
 ### RELEASE ###
+
+update cache:
+  stage: release
+  needs:
+    - job: docs
+      artifacts: true
+  script:
+    - git fetch --all --depth 1
+    - git switch --force ${CI_COMMIT_BRANCH}${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}
+    - cp -R output/docs/.jupyter_cache/* docs/.jupyter_cache
+    - if [[ ! $(git status --porcelain | tee /dev/stderr | grep docs/.jupyter_cache | grep --invert-match global.db) ]]; then echo "No cache changes"; exit 0; fi
+    - git add docs/.jupyter_cache/*
+    - git config --global user.email "${GITLAB_USER_EMAIL}"
+    - git config --global user.name "${GITLAB_USER_NAME}"
+    - git commit --message "${UPDATE_CACHE_MESSAGE}"
+    - git push https://dataeval-bot:${DATAEVAL_BUILD_PAT}@gitlab.jatic.net/jatic/aria/dataeval.git
+  rules:
+    - *on_run_with_docs
 
 update merge request:
   stage: release
