@@ -363,3 +363,5 @@ include:
       package_directory: dataeval
 
   - component: $CI_SERVER_FQDN/jatic/devsecops/components/validate-pipeline@0.2.0
+    inputs:
+      stage: compliance
