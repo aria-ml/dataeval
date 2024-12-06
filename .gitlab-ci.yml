@@ -32,14 +32,13 @@ workflow:
         DOCS_RUNNER_TAG: multi-gpu
 
 default:
+  image: $UV_IMAGE:python$PYTHON_LATEST_SUPPORTED_VERSION-$BASE_LAYER
   # This should allow pipelines to auto-cancel when redundant:
   # https://gitlab.jatic.net/help/ci/pipelines/settings.md#auto-cancel-redundant-pipelines
   # https://gitlab.jatic.net/help/ci/yaml/index.md#interruptible
   interruptible: true
   tags:
     - autoscaler
-
-image: $UV_IMAGE:python$PYTHON_LATEST_SUPPORTED_VERSION-$BASE_LAYER
 
 stages:
   - test
