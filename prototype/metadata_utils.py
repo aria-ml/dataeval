@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 # import tensorflow_datasets as tfds
 from scipy.spatial import ConvexHull
-from dataeval._internal.datasets import MNIST
+from dataeval.utils.torch.datasets import MNIST
 from types import SimpleNamespace as blank_object
 from typing import NamedTuple
 from functools import partial
@@ -74,7 +74,7 @@ class InstanceMNIST(blank_object):
                 print(f'Unknown corruption type {c}.')
                 raise ValueError
 
-            mnist = MNIST(root='./data', corruption=c, size=size, randomize=False, balance=False, verbose=False)
+            mnist = MNIST(root='./data', corruption=c, size=size, randomize=False, balance=False, verbose=False) # type: ignore
             images, labels = mnist._load_data()
             images, labels = images[ishuff], labels[ishuff]
 
