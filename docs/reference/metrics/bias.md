@@ -17,6 +17,7 @@
    coverage
    diversity
    label_parity
+   metadata_preprocessing
    parity
 ```
 
@@ -28,6 +29,7 @@
    BalanceOutput
    CoverageOutput
    DiversityOutput
+   MetadataOutput
    ParityOutput
 ```
 
@@ -40,9 +42,11 @@ bias/balance
 bias/coverage
 bias/diversity
 bias/label_parity
+bias/metadata_preprocessing
 bias/parity
 bias/balanceoutput
 bias/coverageoutput
 bias/diversityoutput
+bias/metadataoutput
 bias/parityoutput
 :::
