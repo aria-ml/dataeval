@@ -7,6 +7,7 @@ import torch.nn as nn
 from numpy.typing import NDArray
 from torch.optim import Adam
 from torch.utils.data import DataLoader, Dataset, TensorDataset
+from tqdm import tqdm
 
 __all__ = ["AETrainer", "trainer"]
 
@@ -233,11 +234,14 @@ def trainer(
     model = model.to(device)
 
     # iterate over epochs
-    for epoch in range(epochs):
-        if verbose:
-            print(f"Epoch {epoch}...")
-
+    loss = torch.nan
+    disable_tqdm = not verbose
+    for epoch in (pbar := tqdm(range(epochs), disable=disable_tqdm)):
+        epoch_loss = loss
         for step, data in enumerate(loader):
+            if step % 250 == 0:
+                pbar.set_description(f"Epoch: {epoch} ({epoch_loss:.3f}), loss: {loss:.3f}")
+
             x, y = [d.to(device) for d in data] if len(data) > 1 else (data[0].to(device), None)
 
             if isinstance(preprocess_fn, Callable):
@@ -251,7 +255,3 @@ def trainer(
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-
-            if step % 500 == 0 and verbose:
-                print(f"loss: {loss:.3f}")
-        pass
