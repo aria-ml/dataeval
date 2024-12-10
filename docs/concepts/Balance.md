@@ -38,6 +38,11 @@ labels _a priori_.  A T&E engineer or model developer should then use that infor
 design tests for model generalization or data augmentation to mitigate the
 opportunity for shortcut learning or sampling imbalance.
 
+In order to use {term}`balance<Balance>`, the user must supply their metadata in a DataEval
+specific format. Because of this requirement, DataEval has a `metadata_preprocessing` function
+that will take in user [metadata](Metadata.md) and format it into DataEval's format. The balance function takes
+in the output of the {func}`.metadata_preprocessing` function for its analysis.
+
 ### Identifying opportunity for shortcut learning
 
 The literature contains many [examples](https://arxiv.org/pdf/2004.07780) of
