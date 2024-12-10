@@ -1,21 +1,29 @@
 # Parity
 
-## What is parity?
+## What is it
 
 {term}`Parity` is a means for assessing fairness in {term}`machine learning<Machine Learning (ML)>` by looking for statistical independence between metadata factors and class labels in a dataset.
 This assessment helps a user understand sources of potential {term}`bias<Bias>` before a model gets trained on it and inadvertently learns spurious correlations.
 In an ideal case with zero bias, the probability of observing a class label would be independent from observing a specific metadata factor.
 
-## Why is {term}`statistical independence<Statistical Independence>` important for metadata?
+## When to use it
 
-A model trained on a dataset must avoid learning unintended {term}`bias<Bias>`.
-A common way in which bias manifests is when class labels are not statistically independent from metadata attributes.
-For example, consider a scenario where a user wants to train a model to classify images as cats or as dogs.
-Suppose that, in this dataset, all dog pictures were taken in Washington, and all cat pictures were taken in Arizona.
-A model could learn this spurious correlation, and could classify an image as a cat or dog by inspecting the location information, 
-rather than by inspecting features of cats and dogs.
-Thus, a picture of a cat taken in Washington could be misclassified as a dog.
-Early detection and mitigation of metadata bias is critical for training unbiased and reliable models.
+For both model and dataset development it is important to understand
+correlational relationships that underlie the dataset.  Often, opportunities for
+data collection are sparse, available only in non-operational locations and
+conditions, with limited target diversity, etc.  A model trained on these
+realistic datasets could learn to use secondary information to perform the
+primary learning task, reducing the model's ability to generalize to new domains
+or to perform unexpectedly when presented with new data.  Parity metric
+provides a method for identifying *linear* relationships between dataset factors and class
+labels _a priori_.  A T&E engineer or model developer should then use that information to
+design tests for model generalization or data augmentation to mitigate the
+opportunity for shortcut learning or sampling imbalance.
+
+In order to use {term}`parity<Parity>`, the user must supply their metadata in a DataEval
+specific format. Because of this requirement, DataEval has a `metadata_preprocessing` function
+that will take in user [metadata](Metadata.md) and format it into DataEval's format. The parity function takes
+in the output of the {func}`.metadata_preprocessing` function for its analysis.
 
 ## Why use parity over other statistical methods?
 
