@@ -4,3 +4,4 @@
 *.{bat,[bB][aA][tT]} text eol=crlf
 *.npz filter=lfs diff=lfs merge=lfs -text
 docs/tutorials/notebooks/models/ae filter=lfs diff=lfs merge=lfs -text
+*.db binary
