@@ -15,13 +15,20 @@ from dataeval.detectors.ood.metadata_ks_compare import meta_distribution_compare
             {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112], "random": [3.14, 159, 265]},
             {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111], "random": [1.12, 3.5, 8.13]},
             {
-                "time": {"statistic_location": 0.44354838709677413, "shift_magnitude": 2.7, "pvalue": 0.0},
+                "time": {
+                    "statistic": 1.0,
+                    "statistic_location": 0.44354838709677413,
+                    "shift_magnitude": 2.7,
+                    "pvalue": 0.0,
+                },
                 "altitude": {
+                    "statistic": 0.33333333333333337,
                     "statistic_location": 0.11612721970878584,
                     "shift_magnitude": 0.6598068274565396,
                     "pvalue": 0.9444444444444444,
                 },
                 "random": {
+                    "statistic": 0.6666666666666667,
                     "statistic_location": 0.026565105350917086,
                     "shift_magnitude": 1.0549912166806692,
                     "pvalue": 0.22222222222222213,
@@ -33,11 +40,13 @@ from dataeval.detectors.ood.metadata_ks_compare import meta_distribution_compare
             {"time": [7.8, 9.10, 11.12, 13.14], "altitude": [532, 9876, -2111, 4321]},
             {
                 "time": {
+                    "statistic": 1.0,
                     "statistic_location": 0.36850921273031817,
                     "shift_magnitude": 3.131818181818182,
                     "pvalue": 0.0,
                 },
                 "altitude": {
+                    "statistic": 0.4166666666666667,
                     "statistic_location": 0.06231169409918332,
                     "shift_magnitude": 0.6530791624123108,
                     "pvalue": 0.7777777777777777,
@@ -48,8 +57,14 @@ from dataeval.detectors.ood.metadata_ks_compare import meta_distribution_compare
             {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112], "weather": ["raining", "calm", "tornado"]},
             {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, -2111], "weather": ["snow", "hail", "hot"]},
             {
-                "time": {"statistic_location": 0.44354838709677413, "shift_magnitude": 2.7, "pvalue": 0.0},
+                "time": {
+                    "statistic": 1.0,
+                    "statistic_location": 0.44354838709677413,
+                    "shift_magnitude": 2.7,
+                    "pvalue": 0.0,
+                },
                 "altitude": {
+                    "statistic": 0.33333333333333337,
                     "statistic_location": 0.11612721970878584,
                     "shift_magnitude": 0.6598068274565396,
                     "pvalue": 0.9444444444444444,
@@ -61,13 +76,15 @@ from dataeval.detectors.ood.metadata_ks_compare import meta_distribution_compare
             {"time": [1.2, 1.2, 1.2], "altitude": [235, 6789, 101112], "random": [3.14, 159, 265]},
             {"time": [1.2, 1.2, 1.2], "altitude": [532, 9876, -2111], "random": [1.12, 3.5, 8.13]},
             {
-                "time": {"statistic_location": 0.0, "shift_magnitude": 0.0, "pvalue": 1.0},
+                "time": {"statistic": 0.0, "statistic_location": 0.0, "shift_magnitude": 0.0, "pvalue": 1.0},
                 "altitude": {
+                    "statistic": 0.33333333333333337,
                     "statistic_location": 0.11612721970878584,
                     "shift_magnitude": 0.6598068274565396,
                     "pvalue": 0.9444444444444444,
                 },
                 "random": {
+                    "statistic": 0.6666666666666667,
                     "statistic_location": 0.026565105350917086,
                     "shift_magnitude": 1.0549912166806692,
                     "pvalue": 0.22222222222222213,
@@ -77,11 +94,13 @@ from dataeval.detectors.ood.metadata_ks_compare import meta_distribution_compare
     ),
 )
 def test_output_values(md0, md1, expected: dict[str, dict[str, float]]):
-    output = meta_distribution_compare(md0, md1)
+    output = meta_distribution_compare(md0, md1).mdc  # dict[str, MetadataKSResult]
     good = True
-    for (ko, do), (ke, de) in zip(output.items(), expected.items()):
-        good = good and all(
-            (ke == k and np.isclose(ve, v, equal_nan=True)) for (ke, ve), (k, v) in zip(de.items(), do.items())
+    for (kfo, ksout), (kfe, de) in zip(output.items(), expected.items()):
+        good = (
+            good
+            and (kfo == kfe)
+            and all(np.isclose(ve, ksq, equal_nan=True) for (ke, ve), ksq in zip(de.items(), ksout))
         )
     assert good
 
@@ -147,29 +166,33 @@ def test_bigdata_unlikely_features():
             bigrefmetadata.update({k: X0[:, i]})
             bignewmetadata.update({k: X1[:, i]})
 
-        output = meta_distribution_compare(bigrefmetadata, bignewmetadata)
+        output = meta_distribution_compare(bigrefmetadata, bignewmetadata).mdc
 
         expected = {
             "temperature": {
+                "statistic": 0.5,
                 "statistic_location": 0.04942976244618348,
                 "shift_magnitude": 37.37728630019768,
                 "pvalue": 4.1132799581816557e-116,
             },
             "DJIA": {
+                "statistic": 0.501,
                 "statistic_location": 0.9988396927777546,
                 "shift_magnitude": 1834.6649059091003,
                 "pvalue": 1.3128633809722045e-116,
             },
             "uptime": {
+                "statistic": 0.02799999999999997,
                 "statistic_location": 0.4362350597356996,
                 "shift_magnitude": 0.04229056583710559,
                 "pvalue": 0.8172815627702071,
             },
         }
         good = True
-        for (ko, do), (ke, de) in zip(output.items(), expected.items()):
-            good = good and all(
-                (ke == k and np.isclose(ve, v, equal_nan=True)) for (ke, ve), (k, v) in zip(de.items(), do.items())
+        for (kfo, ksout), (kfe, de) in zip(output.items(), expected.items()):
+            good = (
+                good
+                and (kfo == kfe)
+                and all(np.isclose(ve, ksq, equal_nan=True) for (ke, ve), ksq in zip(de.items(), ksout))
             )
-        print(record)
         assert good and record is None

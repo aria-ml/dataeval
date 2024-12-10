@@ -12,9 +12,9 @@ from sklearn.feature_selection import mutual_info_classif
 
 from typing import Dict, List, Union, Mapping
 
-from dataeval._internal.metrics.metadata_ood_mi import get_metadata_ood_mi
-from dataeval._internal.metrics.metadata_ks_compare import meta_distribution_compare
-from dataeval._internal.metrics.metadata_least_likely import get_least_likely_features
+from dataeval.detectors.ood.metadata_ood_mi import get_metadata_ood_mi
+from dataeval.detectors.ood.metadata_ks_compare import meta_distribution_compare
+from dataeval.detectors.ood.metadata_least_likely import get_least_likely_features
 
 import pytest
 
@@ -49,7 +49,7 @@ def predict_ood_mi(refdl, newdl, ood_detector, **kwargs):
 
     is_ood = ood_detector.predict(allimages).is_ood
     
-    MI_dict = get_metadata_ood_mi(mdict, is_ood, discrete_features=kwargs.get('discrete_features'))
+    MI_dict = get_metadata_ood_mi(mdict, is_ood, discrete_features=kwargs.get('discrete_features')) # type: ignore
     
     MI = np.array([MI_dict[k] for k in MI_dict])
     iord = np.argsort(MI)[::-1] # decreasing order
@@ -114,7 +114,7 @@ def ks_compare(dl0, dl1, k_stop=None, debug=None):
             dol1[k].extend([d[k] for d in md1])
 
         stable = True # start True, then do logical and with every KS stat change < k_stop
-        results = meta_distribution_compare(dol0, dol1)
+        results = meta_distribution_compare(dol0, dol1).mdc_dict
         for k in dol0:
             x0, x1 = dol0[k], dol1[k]
             allx = x0 + x1 # x0 and x1 are lists, so + concatenates them. 
@@ -122,25 +122,25 @@ def ks_compare(dl0, dl1, k_stop=None, debug=None):
             xmax = max(allx)
 
             if xmax > xmin:
-                results[k].statistic_location = (results[k].statistic_location - xmin)/(xmax - xmin)
+                results[k]['statistic_location'] = (results[k]['statistic_location'] - xmin)/(xmax - xmin)
                   
-            del_ks[k] = np.abs(results[k].statistic - ks_prev[k])
+            del_ks[k] = np.abs(results[k]['statistic'] - ks_prev[k])
             stable = stable and (del_ks[k] < k_stop)  # *all* quantities must be stable before we quit.  
             # ks_prev[k] = res.statistic
-            ks_prev[k] = results[k].statistic
+            ks_prev[k] = results[k]['statistic']
 
         arg_max, maxdk = max(list(enumerate([del_ks[k] for k in dol0])), key=lambda x: x[1])
         maxkey = [k for k in dol0.keys()][arg_max]
         if debug:
-             print(f'{len(dol0[k])}: {maxkey} {maxdk:.3f}: {results[maxkey].statistic_location:.3f}')       
+             print(f"{len(dol0[k])}: {maxkey} {maxdk:.3f}: {results[maxkey]['statistic_location']:.3f}")        # type: ignore
 
         if stable:
             break
     else:
         pass
 
-    pvals = [v.pvalue for v in results.values()]
-    shifts = [v.shift_magnitude for v in results.values()]
+    pvals = [v['pvalue'] for v in results.values()]
+    shifts = [v['shift_magnitude'] for v in results.values()]
     iord = np.argsort(pvals)
     names = [k for k in results]
     maxlen = max([len(name) for name in names])
@@ -181,28 +181,26 @@ class TestMetadataCompare():
 def least_likely_features(refds, testds, ood_detector):
 
     test_images = testds.images
-    bbshape = (*test_images.shape, 1)
 
-    is_ood = ood_detector.predict(test_images.reshape(bbshape)).is_ood # is_ood is bool
+    is_ood = ood_detector.predict(test_images).is_ood # is_ood is bool
     
-    test_images = test_images.reshape(bbshape)
-
     big_batch_size = len(refds)
 
     refbb = DataLoader(refds, collate_fn=collate_fn, batch_size=big_batch_size)
 
     for _, _, metadata in refbb:
         break
-    metadata = _lod2dol(metadata)
+    metadata = _lod2dol(metadata) # type: ignore
     
     testbb = DataLoader(testds, collate_fn=collate_fn, batch_size=big_batch_size)
 
     for _, _, corrmetadata in testbb:
         break
-    corrmetadata  = _lod2dol(corrmetadata)
+    corrmetadata  = _lod2dol(corrmetadata) # type: ignore
 
     unlikely_features = get_least_likely_features(metadata, corrmetadata, is_ood)
-    uvals, freq = np.unique(unlikely_features, return_counts=True)
+
+    uvals, freq = np.unique([uftp[0] for uftp in unlikely_features], return_counts=True)
 
     iord = np.argsort(freq,)[::-1] # decreasing order
     names = [k for k in uvals]
