@@ -2,17 +2,45 @@ from __future__ import annotations
 
 import numbers
 import warnings
-from typing import Any, Mapping
+from dataclasses import dataclass
+from typing import Any, Mapping, NamedTuple
 
 import numpy as np
 from numpy.typing import NDArray
 from scipy.stats import iqr, ks_2samp
 from scipy.stats import wasserstein_distance as emd
 
+from dataeval.output import OutputMetadata, set_metadata
 
+
+class MetadataKSResult(NamedTuple):
+    statistic: float
+    statistic_location: float
+    shift_magnitude: float
+    pvalue: float
+
+
+@dataclass(frozen=True)
+class KSOutput(OutputMetadata):
+    """
+    Output class for results of ks_2samp featurewise comparisons of new metadata to reference metadata.
+
+    Attributes
+    ----------
+    mdc : dict[str, dict[str, float]]
+        dict keyed by metadata feature names. Each value contains four floats, which are the KS statistic itself, its
+        location within the range of the reference metadata, the shift of new metadata relative to reference, the
+        p-value from the KS two-sample test.
+
+    """
+
+    mdc: dict[str, MetadataKSResult]
+
+
+@set_metadata()
 def meta_distribution_compare(
     md0: Mapping[str, list[Any] | NDArray[Any]], md1: Mapping[str, list[Any] | NDArray[Any]]
-) -> dict[str, dict[str, float]]:
+) -> KSOutput:
     """Measures the featurewise distance between two metadata distributions, and computes a p-value to evaluate its
         significance.
 
@@ -43,27 +71,29 @@ def meta_distribution_compare(
     >>> import numpy
     >>> md0 = {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112]}
     >>> md1 = {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, 211101]}
-    >>> md_out = meta_distribution_compare(md0, md1)
+    >>> md_out = meta_distribution_compare(md0, md1).mdc
     >>> for k, v in md_out.items():
     >>>     print(k)
     >>>     for kv in v:
     >>>         print("\t", f"{kv}: {v[kv]:.3f}")
     time
-             statistic_location: 0.444
-             shift_magnitude: 2.700
-             pvalue: 0.000
+            statistic: 1.000
+            statistic_location: 0.444
+            shift_magnitude: 2.700
+            pvalue: 0.000
     altitude
-             statistic_location: 0.478
-             shift_magnitude: 0.749
-             pvalue: 0.944
+            statistic: 0.333
+            statistic_location: 0.478
+            shift_magnitude: 0.749
+            pvalue: 0.944
     """
 
     if (metadata_keys := md0.keys()) != md1.keys():
         raise ValueError(f"Both sets of metadata keys must be identical: {list(md0)}, {list(md1)}")
 
-    mdc_dict = {}  # output dict
+    mdc = {}  # output dict
     for k in metadata_keys:
-        mdc_dict.update({k: {}})
+        mdc.update({k: {}})
 
         x0, x1 = list(md0[k]), list(md1[k])
 
@@ -81,7 +111,9 @@ def meta_distribution_compare(
 
         xmin, xmax = min(allx), max(allx)
         if xmin == xmax:  # only one value in this feature, so fill in the obvious results for feature k
-            mdc_dict[k].update({"statistic_location": 0.0, "shift_magnitude": 0.0, "pvalue": 1.0})
+            mdc[k] = MetadataKSResult(
+                **{"statistic": 0.0, "statistic_location": 0.0, "shift_magnitude": 0.0, "pvalue": 1.0}
+            )
             continue
 
         ks_result = ks_2samp(x0, x1, method="asymp")
@@ -94,6 +126,13 @@ def meta_distribution_compare(
 
         drift = emd(x0, x1) / dX
 
-        mdc_dict[k].update({"statistic_location": loc, "shift_magnitude": drift, "pvalue": ks_result.pvalue})  #  pyright: ignore
+        mdc[k] = MetadataKSResult(
+            **{
+                "statistic": ks_result.statistic,  #  pyright: ignore
+                "statistic_location": loc,
+                "shift_magnitude": drift,
+                "pvalue": ks_result.pvalue,  #  pyright: ignore
+            }
+        )
 
-    return mdc_dict
+    return KSOutput(mdc)
