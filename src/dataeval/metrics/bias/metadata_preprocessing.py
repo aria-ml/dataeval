@@ -28,13 +28,13 @@ class MetadataOutput(OutputMetadata):
     ----------
     discrete_factor_names : list[str]
         List containing factor names for the original data that was discrete and the binned continuous data
-    discrete_data : NDArray[np.intp]
+    discrete_data : NDArray[np.int]
         Array containing values for the original data that was discrete and the binned continuous data
     continuous_factor_names : list[str]
         List containing factor names for the original continuous data
-    continuous_data : NDArray[np.int_ or np.float_] | None
+    continuous_data : NDArray[np.int or np.double] | None
         Array containing values for the original continuous data or None if there was no continuous data
-    class_labels : NDArray[np.int_]
+    class_labels : NDArray[np.int]
         Numerical class labels for the images/objects
     class_names : NDArray[Any]
         Array of unique class names (for use with plotting)
