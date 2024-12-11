@@ -93,11 +93,9 @@ class TestGetMetadataOodMi():
 
 
 # <a name="ks_compare"></a>
-def ks_compare(dl0, dl1, k_stop=None, debug=None):
+def ks_compare(dl0, dl1, k_stop=None):
     # if every ks stat changes by less than k_stop, then stop adding data to the sample
     k_stop = 5e-3 if k_stop is None else k_stop
-
-    debug = False if debug is None else debug
     
     dol0, dol1, results, ks_prev, del_ks = {}, {}, {}, {}, {}
     first = True
@@ -114,33 +112,22 @@ def ks_compare(dl0, dl1, k_stop=None, debug=None):
             dol1[k].extend([d[k] for d in md1])
 
         stable = True # start True, then do logical and with every KS stat change < k_stop
-        results = meta_distribution_compare(dol0, dol1).mdc_dict
+        results = meta_distribution_compare(dol0, dol1).mdc
         for k in dol0:
-            x0, x1 = dol0[k], dol1[k]
-            allx = x0 + x1 # x0 and x1 are lists, so + concatenates them. 
-            xmin = min(allx) 
-            xmax = max(allx)
-
-            if xmax > xmin:
-                results[k]['statistic_location'] = (results[k]['statistic_location'] - xmin)/(xmax - xmin)
-                  
-            del_ks[k] = np.abs(results[k]['statistic'] - ks_prev[k])
+            del_ks[k] = np.abs(results[k].statistic - ks_prev[k])
             stable = stable and (del_ks[k] < k_stop)  # *all* quantities must be stable before we quit.  
-            # ks_prev[k] = res.statistic
-            ks_prev[k] = results[k]['statistic']
+            ks_prev[k] = results[k].statistic
 
         arg_max, maxdk = max(list(enumerate([del_ks[k] for k in dol0])), key=lambda x: x[1])
         maxkey = [k for k in dol0.keys()][arg_max]
-        if debug:
-             print(f"{len(dol0[k])}: {maxkey} {maxdk:.3f}: {results[maxkey]['statistic_location']:.3f}")        # type: ignore
 
         if stable:
             break
     else:
         pass
 
-    pvals = [v['pvalue'] for v in results.values()]
-    shifts = [v['shift_magnitude'] for v in results.values()]
+    pvals = [v.pvalue for v in results.values()]
+    shifts = [v.shift_magnitude for v in results.values()]
     iord = np.argsort(pvals)
     names = [k for k in results]
     maxlen = max([len(name) for name in names])
