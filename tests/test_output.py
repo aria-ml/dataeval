@@ -3,7 +3,7 @@ from typing import Iterable
 
 import numpy as np
 
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import MappingOutput, OutputMetadata, set_metadata
 
 
 @dataclass
@@ -28,6 +28,9 @@ class MockMetric:
         return MockOutput(arg1, arg2, arg3)
 
 
+class MockMappingOutput(MappingOutput[str, float]): ...
+
+
 class TestOutputMetadata:
     def test_output_metadata_data(self):
         output = mock_metric(1, True, "value")
@@ -41,7 +44,7 @@ class TestOutputMetadata:
 
     def test_output_metadata_meta(self):
         output_meta = mock_metric(1, True, "value").meta()
-        assert output_meta["name"] == "tests.test_output_metadata.mock_metric"
+        assert output_meta["name"] == "tests.test_output.mock_metric"
         assert output_meta["execution_time"]
         assert output_meta["execution_duration"] > 0
         assert set(output_meta["arguments"]) == {"arg1", "arg2", "arg3"}
@@ -53,7 +56,7 @@ class TestOutputMetadata:
         output_dict = output.dict()
         assert output_dict == {"test1": 1, "test2": True, "test3": "mock_default"}
         output_meta = output.meta()
-        assert output_meta["name"] == "tests.test_output_metadata.MockMetric.evaluate"
+        assert output_meta["name"] == "tests.test_output.MockMetric.evaluate"
         assert output_meta["execution_time"]
         assert output_meta["execution_duration"] > 0
         assert output_meta["arguments"] == {"arg1": 1, "arg2": True, "arg3": "mock_default"}
@@ -79,3 +82,24 @@ class TestOutputMetadata:
             "z": b"bytes",
             "n": "MockMetric",
         }
+
+
+class TestMappingOutput:
+    data = {"mock_key": 1.0}
+
+    def test_mapping_output(self):
+        t = MockMappingOutput(self.data)
+
+        assert t.meta() == {}
+        assert len(t) == 1
+        assert t.dict() == self.data
+
+    def test_mapping_output_meta(self):
+        @set_metadata()
+        def mock_output():
+            return MockMappingOutput(self.data)
+
+        t = mock_output()
+        assert t.meta() != {}
+        assert len(t) == 1
+        assert t.dict() == self.data

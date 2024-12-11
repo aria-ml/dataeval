@@ -94,7 +94,7 @@ from dataeval.detectors.ood.metadata_ks_compare import meta_distribution_compare
     ),
 )
 def test_output_values(md0, md1, expected: dict[str, dict[str, float]]):
-    output = meta_distribution_compare(md0, md1).mdc  # dict[str, MetadataKSResult]
+    output = meta_distribution_compare(md0, md1)  # dict[str, MetadataKSResult]
     good = True
     for (kfo, ksout), (kfe, de) in zip(output.items(), expected.items()):
         good = (
@@ -166,7 +166,7 @@ def test_bigdata_unlikely_features():
             bigrefmetadata.update({k: X0[:, i]})
             bignewmetadata.update({k: X1[:, i]})
 
-        output = meta_distribution_compare(bigrefmetadata, bignewmetadata).mdc
+        output = meta_distribution_compare(bigrefmetadata, bignewmetadata)
 
         expected = {
             "temperature": {
