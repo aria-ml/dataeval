@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import numbers
 import warnings
-from dataclasses import dataclass
 from typing import Any, Mapping, NamedTuple
 
 import numpy as np
@@ -10,7 +9,7 @@ from numpy.typing import NDArray
 from scipy.stats import iqr, ks_2samp
 from scipy.stats import wasserstein_distance as emd
 
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import MappingOutput, set_metadata
 
 
 class MetadataKSResult(NamedTuple):
@@ -20,21 +19,21 @@ class MetadataKSResult(NamedTuple):
     pvalue: float
 
 
-@dataclass(frozen=True)
-class KSOutput(OutputMetadata):
+class KSOutput(MappingOutput[str, MetadataKSResult]):
     """
-    Output class for results of ks_2samp featurewise comparisons of new metadata to reference metadata.
+    Output dictionary class for results of ks_2samp featurewise comparisons of new metadata to reference metadata.
 
     Attributes
     ----------
-    mdc : dict[str, dict[str, float]]
-        dict keyed by metadata feature names. Each value contains four floats, which are the KS statistic itself, its
-        location within the range of the reference metadata, the shift of new metadata relative to reference, the
-        p-value from the KS two-sample test.
-
+    key: str
+        Metadata feature names
+    value: NamedTuple[float, float, float, float]
+        Each value contains four floats, which are:
+        - statistic: the KS statistic itself
+        - statistic_location: its location within the range of the reference metadata
+        - shift_magnitude: the shift of new metadata relative to reference
+        - pvalue: the p-value from the KS two-sample test
     """
-
-    mdc: dict[str, MetadataKSResult]
 
 
 @set_metadata()
