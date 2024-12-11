@@ -47,7 +47,7 @@ def to_numpy(array: ArrayLike | None, copy: bool = True) -> NDArray[Any]:
         if torch and isinstance(array, torch.Tensor):
             return array.detach().cpu().numpy().copy() if copy else array.detach().cpu().numpy()  # type: ignore
 
-    return np.array(array, copy=copy)
+    return np.array(array) if copy else np.asarray(array)
 
 
 def to_numpy_iter(iterable: Iterable[ArrayLike]) -> Iterator[NDArray[Any]]:
