@@ -4,9 +4,10 @@ __all__ = []
 
 import inspect
 import sys
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from functools import wraps
-from typing import Any, Callable, Iterable, TypeVar
+from typing import Any, Callable, Iterable, Iterator, TypeVar
 
 import numpy as np
 
@@ -31,6 +32,29 @@ class OutputMetadata:
 
     def meta(self) -> dict[str, Any]:
         return {k.removeprefix("_"): v for k, v in self.__dict__.items() if k.startswith("_")}
+
+
+TKey = TypeVar("TKey", str, int, float, set)
+TValue = TypeVar("TValue")
+
+
+class MappingOutput(Mapping[TKey, TValue], OutputMetadata):
+    __slots__ = ["_data"]
+
+    def __init__(self, data: Mapping[TKey, TValue]):
+        self._data = data
+
+    def __getitem__(self, key: TKey) -> TValue:
+        return self._data.__getitem__(key)
+
+    def __iter__(self) -> Iterator[TKey]:
+        return self._data.__iter__()
+
+    def __len__(self) -> int:
+        return self._data.__len__()
+
+    def dict(self) -> dict[str, TValue]:
+        return {str(k): v for k, v in self._data.items()}
 
 
 P = ParamSpec("P")
