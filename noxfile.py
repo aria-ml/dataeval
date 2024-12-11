@@ -135,15 +135,15 @@ def docs(session: nox.Session) -> None:
 @nox.session
 def lock(session: nox.Session) -> None:
     """Lock dependencies in "poetry.lock" with --no-update. Update dependencies by calling `nox -e lock -- update`."""
-    update_args = "" if "update" in session.posargs else "--no-update"
+    update_args = [] if "update" in session.posargs else ["--no-update"]
     session.install("poetry", "poetry-lock-groups-plugin", "poetry2conda")
     session.run("cp", "-f", "environment/poetry.lock", "poetry.lock", external=True)
     session.run("poetry", "config", "warnings.export", "false")
-    session.run("poetry", "lock", "--with=dev", update_args)
+    session.run("poetry", "lock", "--with=dev", *update_args)
     for file, option in REQUIREMENTS_OPTION_MAP.items():
         session.run("poetry", "export", option, "--without-hashes", "-o", f"environment/{file}")
     session.run("cp", "-f", "poetry.lock", "environment/poetry.lock", external=True)
-    session.run("poetry", "lock", update_args)
+    session.run("poetry", "lock", *update_args)
     session.run("poetry2conda", "pyproject.toml", "environment/environment.yaml", "-E", "all")
 
 
