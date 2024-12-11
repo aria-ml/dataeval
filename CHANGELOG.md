@@ -1,6 +1,25 @@
-[//]: # (bacbd0e761f60d6a53c2036f7e10f35ab7794e67)
+[//]: # (4d94e6023d7f01b1730ad8a2f9863a2913789ba4)
 
 # DataEval Change Log
+
+## v0.74.0
+
+🌟 **Feature Release**
+- `73c1e1be` - Implement PyTorch AutoEncoder based OOD detector
+
+    Adds initial PyTorch based Autoencoder OOD detector available when installed with the `torch` extra.
+
+🛠️ **Improvements and Enhancements**
+- `70794b5f` - Moved discretization of metadata out of bias functions
+
+📝 **Miscellaneous**
+- `4d94e602` - Added test assertions for how_to notebooks
+- `7723e242` - Introduce Pytorch OOD detector, with its new training procedure, into OOD howto notebook.
+- `f5ac4bdd` - Added new KSOutput class and adapted tests and other functions accordingly
+- `3a01a81a` - Introduce new Pytorch OOD detection into prototype metadata demo notebooks.
+- `dc155554` - Fix torch gmm functions and enable tests
+- `a715c1ef` - Adjust docs to incorporate new metadata function
+- `0719bad0` - Update dependencies to remove hdbscan
 
 ## v0.73.1
 
