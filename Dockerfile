@@ -29,10 +29,13 @@ data.download(); \
 FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04 as cuda
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends libgl1 clang
+    apt-get update && apt-get install -y --no-install-recommends libgl1 clang sudo
 ARG UID
 ARG USER
-RUN useradd -m -u ${UID} -s /bin/bash ${USER}
+# Dev container tools expect non-root users to be able to sudo in a
+# non-interactive context, so allow the user to use passwordless sudo.
+RUN useradd -m -u ${UID} -s /bin/bash ${USER} -G sudo
+RUN echo "${USER} ALL=(ALL:ALL) NOPASSWD: ALL" > /etc/sudoers.d/user-nopasswd
 USER ${USER}
 WORKDIR /${USER}
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
