@@ -112,7 +112,7 @@ def ks_compare(dl0, dl1, k_stop=None):
             dol1[k].extend([d[k] for d in md1])
 
         stable = True # start True, then do logical and with every KS stat change < k_stop
-        results = meta_distribution_compare(dol0, dol1).mdc
+        results = meta_distribution_compare(dol0, dol1)
         for k in dol0:
             del_ks[k] = np.abs(results[k].statistic - ks_prev[k])
             stable = stable and (del_ks[k] < k_stop)  # *all* quantities must be stable before we quit.  
