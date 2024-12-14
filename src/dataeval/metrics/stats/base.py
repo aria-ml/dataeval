@@ -15,7 +15,7 @@ import tqdm
 from numpy.typing import ArrayLike, NDArray
 
 from dataeval.interop import to_numpy_iter
-from dataeval.output import OutputMetadata
+from dataeval.output import Output
 from dataeval.utils.image import normalize_image_shape, rescale
 
 DTYPE_REGEX = re.compile(r"NDArray\[np\.(.*?)\]")
@@ -65,7 +65,7 @@ class SourceIndex(NamedTuple):
 
 
 @dataclass(frozen=True)
-class BaseStatsOutput(OutputMetadata):
+class BaseStatsOutput(Output):
     """
     Attributes
     ----------

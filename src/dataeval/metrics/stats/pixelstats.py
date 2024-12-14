@@ -67,7 +67,7 @@ class PixelStatsProcessor(StatsProcessor[PixelStatsOutput]):
     }
 
 
-@set_metadata()
+@set_metadata
 def pixelstats(
     images: Iterable[ArrayLike],
     bboxes: Iterable[ArrayLike] | None = None,

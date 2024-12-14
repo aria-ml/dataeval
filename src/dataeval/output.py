@@ -6,8 +6,8 @@ import inspect
 import sys
 from collections.abc import Mapping
 from datetime import datetime, timezone
-from functools import wraps
-from typing import Any, Callable, Iterable, Iterator, TypeVar
+from functools import partial, wraps
+from typing import Any, Callable, Iterator, TypeVar
 
 import numpy as np
 
@@ -19,13 +19,16 @@ else:
 from dataeval import __version__
 
 
-class OutputMetadata:
+class Output:
     _name: str
     _execution_time: datetime
     _execution_duration: float
     _arguments: dict[str, str]
     _state: dict[str, str]
     _version: str
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}: {str(self.dict())}"
 
     def dict(self) -> dict[str, Any]:
         return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
@@ -38,7 +41,7 @@ TKey = TypeVar("TKey", str, int, float, set)
 TValue = TypeVar("TValue")
 
 
-class MappingOutput(Mapping[TKey, TValue], OutputMetadata):
+class MappingOutput(Mapping[TKey, TValue], Output):
     __slots__ = ["_data"]
 
     def __init__(self, data: Mapping[TKey, TValue]):
@@ -58,57 +61,54 @@ class MappingOutput(Mapping[TKey, TValue], OutputMetadata):
 
 
 P = ParamSpec("P")
-R = TypeVar("R", bound=OutputMetadata)
+R = TypeVar("R", bound=Output)
 
 
-def set_metadata(
-    state_attr: Iterable[str] | None = None,
-) -> Callable[[Callable[P, R]], Callable[P, R]]:
+def set_metadata(fn: Callable[P, R] | None = None, *, state: list[str] | None = None) -> Callable[P, R]:
     """Decorator to stamp OutputMetadata classes with runtime metadata"""
 
-    def decorator(fn: Callable[P, R]) -> Callable[P, R]:
-        @wraps(fn)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-            def fmt(v):
-                if np.isscalar(v):
-                    return v
-                if hasattr(v, "shape"):
-                    return f"{v.__class__.__name__}: shape={getattr(v, 'shape')}"
-                if hasattr(v, "__len__"):
-                    return f"{v.__class__.__name__}: len={len(v)}"
-                return f"{v.__class__.__name__}"
+    if fn is None:
+        return partial(set_metadata, state=state)  # type: ignore
 
-            time = datetime.now(timezone.utc)
-            result = fn(*args, **kwargs)
-            duration = (datetime.now(timezone.utc) - time).total_seconds()
-            fn_params = inspect.signature(fn).parameters
-            # set all params with defaults then update params with mapped arguments and explicit keyword args
-            arguments = {k: None if v.default is inspect.Parameter.empty else v.default for k, v in fn_params.items()}
-            arguments.update(zip(fn_params, args))
-            arguments.update(kwargs)
-            arguments = {k: fmt(v) for k, v in arguments.items()}
-            state = (
-                {k: fmt(getattr(args[0], k)) for k in state_attr if "self" in arguments}
-                if "self" in arguments and state_attr
-                else {}
-            )
-            name = (
-                f"{args[0].__class__.__module__}.{args[0].__class__.__name__}.{fn.__name__}"
-                if "self" in arguments
-                else f"{fn.__module__}.{fn.__qualname__}"
-            )
-            metadata = {
-                "_name": name,
-                "_execution_time": time,
-                "_execution_duration": duration,
-                "_arguments": {k: v for k, v in arguments.items() if k != "self"},
-                "_state": state,
-                "_version": __version__,
-            }
-            for k, v in metadata.items():
-                object.__setattr__(result, k, v)
-            return result
+    @wraps(fn)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        def fmt(v):
+            if np.isscalar(v):
+                return v
+            if hasattr(v, "shape"):
+                return f"{v.__class__.__name__}: shape={getattr(v, 'shape')}"
+            if hasattr(v, "__len__"):
+                return f"{v.__class__.__name__}: len={len(v)}"
+            return f"{v.__class__.__name__}"
 
-        return wrapper
+        time = datetime.now(timezone.utc)
+        result = fn(*args, **kwargs)
+        duration = (datetime.now(timezone.utc) - time).total_seconds()
+        fn_params = inspect.signature(fn).parameters
 
-    return decorator
+        # set all params with defaults then update params with mapped arguments and explicit keyword args
+        arguments = {k: None if v.default is inspect.Parameter.empty else v.default for k, v in fn_params.items()}
+        arguments.update(zip(fn_params, args))
+        arguments.update(kwargs)
+        arguments = {k: fmt(v) for k, v in arguments.items()}
+        state_attrs = (
+            {k: fmt(getattr(args[0], k)) for k in state if "self" in arguments} if "self" in arguments and state else {}
+        )
+        name = (
+            f"{args[0].__class__.__module__}.{args[0].__class__.__name__}.{fn.__name__}"
+            if "self" in arguments
+            else f"{fn.__module__}.{fn.__qualname__}"
+        )
+        metadata = {
+            "_name": name,
+            "_execution_time": time,
+            "_execution_duration": duration,
+            "_arguments": {k: v for k, v in arguments.items() if k != "self"},
+            "_state": state_attrs,
+            "_version": __version__,
+        }
+        for k, v in metadata.items():
+            object.__setattr__(result, k, v)
+        return result
+
+    return wrapper

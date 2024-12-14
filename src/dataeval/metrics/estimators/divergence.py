@@ -14,12 +14,12 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from dataeval.interop import as_numpy
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import Output, set_metadata
 from dataeval.utils.shared import compute_neighbors, get_method, minimum_spanning_tree
 
 
 @dataclass(frozen=True)
-class DivergenceOutput(OutputMetadata):
+class DivergenceOutput(Output):
     """
     Output class for :func:`divergence` estimator metric
 
@@ -78,7 +78,7 @@ def divergence_fnn(data: NDArray[np.float64], labels: NDArray[np.int_]) -> int:
     return errors
 
 
-@set_metadata()
+@set_metadata
 def divergence(data_a: ArrayLike, data_b: ArrayLike, method: Literal["FNN", "MST"] = "FNN") -> DivergenceOutput:
     """
     Calculates the :term`divergence` and any errors between the datasets
