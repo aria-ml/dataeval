@@ -36,7 +36,7 @@ class KSOutput(MappingOutput[str, MetadataKSResult]):
     """
 
 
-@set_metadata()
+@set_metadata
 def meta_distribution_compare(
     md0: Mapping[str, list[Any] | NDArray[Any]], md1: Mapping[str, list[Any] | NDArray[Any]]
 ) -> KSOutput:

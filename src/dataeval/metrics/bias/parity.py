@@ -13,13 +13,13 @@ from scipy.stats.contingency import chi2_contingency, crosstab
 
 from dataeval.interop import as_numpy, to_numpy
 from dataeval.metrics.bias.metadata_preprocessing import MetadataOutput
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import Output, set_metadata
 
 TData = TypeVar("TData", np.float64, NDArray[np.float64])
 
 
 @dataclass(frozen=True)
-class ParityOutput(Generic[TData], OutputMetadata):
+class ParityOutput(Generic[TData], Output):
     """
     Output class for :func:`parity` and :func:`label_parity` :term:`bias<Bias>` metrics
 
@@ -116,7 +116,7 @@ def validate_dist(label_dist: NDArray[Any], label_name: str) -> None:
         )
 
 
-@set_metadata()
+@set_metadata
 def label_parity(
     expected_labels: ArrayLike,
     observed_labels: ArrayLike,
@@ -204,7 +204,7 @@ def label_parity(
     return ParityOutput(cs, p, None)
 
 
-@set_metadata()
+@set_metadata
 def parity(metadata: MetadataOutput) -> ParityOutput[NDArray[np.float64]]:
     """
     Calculate chi-square statistics to assess the linear relationship between multiple factors

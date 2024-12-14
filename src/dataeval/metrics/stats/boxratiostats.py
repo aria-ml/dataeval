@@ -96,7 +96,7 @@ def calculate_ratios(key: str, box_stats: BaseStatsOutput, img_stats: BaseStatsO
     return out_stats
 
 
-@set_metadata()
+@set_metadata
 def boxratiostats(
     boxstats: TStatOutput,
     imgstats: TStatOutput,

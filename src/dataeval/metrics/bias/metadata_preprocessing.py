@@ -11,7 +11,7 @@ from numpy.typing import ArrayLike, NDArray
 from scipy.stats import wasserstein_distance as wd
 
 from dataeval.interop import as_numpy, to_numpy
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import Output, set_metadata
 from dataeval.utils.metadata import merge_metadata
 
 TNum = TypeVar("TNum", int, float)
@@ -20,7 +20,7 @@ CONTINUOUS_MIN_SAMPLE_SIZE = 20
 
 
 @dataclass(frozen=True)
-class MetadataOutput(OutputMetadata):
+class MetadataOutput(Output):
     """
     Output class for :func:`metadata_binning` function
 
@@ -51,7 +51,7 @@ class MetadataOutput(OutputMetadata):
     total_num_factors: int
 
 
-@set_metadata()
+@set_metadata
 def metadata_preprocessing(
     raw_metadata: Iterable[Mapping[str, Any]],
     class_labels: ArrayLike | str,

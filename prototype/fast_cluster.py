@@ -20,14 +20,14 @@ from fast_hdbscan.cluster_trees import (
 )
 
 from dataeval.interop import to_numpy
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import Output, set_metadata
 from dataeval.utils.shared import flatten
 from fast_mst import calculate_neighbor_distances, minimum_spanning_tree
 from fast_cluster_utils import _cluster_variance, _compare_links_to_std, _group_mst_by_clusters
 
 
 @dataclass(frozen=True)
-class ClustererOutput(OutputMetadata):
+class ClustererOutput(Output):
     """
     Output class for :class:`Clusterer` lint detector
 
@@ -176,7 +176,7 @@ class Clusterer:
 
         return exact_dupes, near_dupes
 
-    @set_metadata(["data"])
+    @set_metadata(state=["data"])
     def evaluate(self) -> ClustererOutput:
         """Finds and flags indices of the data for Outliers and :term:`duplicates<Duplicates>`
 
