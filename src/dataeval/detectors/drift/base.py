@@ -19,7 +19,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from dataeval.interop import as_numpy
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import Output, set_metadata
 
 R = TypeVar("R")
 
@@ -43,7 +43,7 @@ class UpdateStrategy(ABC):
 
 
 @dataclass(frozen=True)
-class DriftBaseOutput(OutputMetadata):
+class DriftBaseOutput(Output):
     """
     Base output class for Drift detector classes
 
@@ -387,7 +387,7 @@ class BaseDriftUnivariate(BaseDrift):
         else:
             raise ValueError("`correction` needs to be either `bonferroni` or `fdr`.")
 
-    @set_metadata()
+    @set_metadata
     @preprocess_x
     @update_x_ref
     def predict(

@@ -14,7 +14,7 @@ from dataeval.metrics.stats.datasetstats import DatasetStatsOutput, datasetstats
 from dataeval.metrics.stats.dimensionstats import DimensionStatsOutput
 from dataeval.metrics.stats.pixelstats import PixelStatsOutput
 from dataeval.metrics.stats.visualstats import VisualStatsOutput
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import Output, set_metadata
 
 IndexIssueMap = dict[int, dict[str, float]]
 OutlierStatsOutput = Union[DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput]
@@ -22,7 +22,7 @@ TIndexIssueMap = TypeVar("TIndexIssueMap", IndexIssueMap, list[IndexIssueMap])
 
 
 @dataclass(frozen=True)
-class OutliersOutput(Generic[TIndexIssueMap], OutputMetadata):
+class OutliersOutput(Generic[TIndexIssueMap], Output):
     """
     Output class for :class:`Outliers` lint detector
 
@@ -159,7 +159,7 @@ class Outliers:
     @overload
     def from_stats(self, stats: Sequence[OutlierStatsOutput]) -> OutliersOutput[list[IndexIssueMap]]: ...
 
-    @set_metadata(["outlier_method", "outlier_threshold"])
+    @set_metadata(state=["outlier_method", "outlier_threshold"])
     def from_stats(
         self, stats: OutlierStatsOutput | DatasetStatsOutput | Sequence[OutlierStatsOutput]
     ) -> OutliersOutput[IndexIssueMap] | OutliersOutput[list[IndexIssueMap]]:
@@ -228,7 +228,7 @@ class Outliers:
 
         return OutliersOutput(output_list)
 
-    @set_metadata(["use_dimension", "use_pixel", "use_visual", "outlier_method", "outlier_threshold"])
+    @set_metadata(state=["use_dimension", "use_pixel", "use_visual", "outlier_method", "outlier_threshold"])
     def evaluate(self, data: Iterable[ArrayLike]) -> OutliersOutput[IndexIssueMap]:
         """
         Returns indices of Outliers with the issues identified for each

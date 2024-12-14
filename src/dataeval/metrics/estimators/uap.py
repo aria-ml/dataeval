@@ -14,11 +14,11 @@ from numpy.typing import ArrayLike
 from sklearn.metrics import average_precision_score
 
 from dataeval.interop import as_numpy
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import Output, set_metadata
 
 
 @dataclass(frozen=True)
-class UAPOutput(OutputMetadata):
+class UAPOutput(Output):
     """
     Output class for :func:`uap` estimator metric
 
@@ -31,7 +31,7 @@ class UAPOutput(OutputMetadata):
     uap: float
 
 
-@set_metadata()
+@set_metadata
 def uap(labels: ArrayLike, scores: ArrayLike) -> UAPOutput:
     """
     FR Test Statistic based estimate of the empirical mean precision for

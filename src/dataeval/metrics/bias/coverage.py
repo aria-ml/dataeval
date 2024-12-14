@@ -13,7 +13,7 @@ from scipy.spatial.distance import pdist, squareform
 
 from dataeval.interop import to_numpy
 from dataeval.metrics.bias.metadata_utils import coverage_plot
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import Output, set_metadata
 from dataeval.utils.shared import flatten
 
 with contextlib.suppress(ImportError):
@@ -21,7 +21,7 @@ with contextlib.suppress(ImportError):
 
 
 @dataclass(frozen=True)
-class CoverageOutput(OutputMetadata):
+class CoverageOutput(Output):
     """
     Output class for :func:`coverage` :term:`bias<Bias>` metric
 
@@ -67,7 +67,7 @@ class CoverageOutput(OutputMetadata):
         return fig
 
 
-@set_metadata()
+@set_metadata
 def coverage(
     embeddings: ArrayLike,
     radius_type: Literal["adaptive", "naive"] = "adaptive",

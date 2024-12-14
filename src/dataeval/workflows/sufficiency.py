@@ -16,11 +16,11 @@ from scipy.optimize import basinhopping
 from torch.utils.data import Dataset
 
 from dataeval.interop import as_numpy
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import Output, set_metadata
 
 
 @dataclass(frozen=True)
-class SufficiencyOutput(OutputMetadata):
+class SufficiencyOutput(Output):
     """
     Output class for :class:`Sufficiency` workflow
 
@@ -47,7 +47,7 @@ class SufficiencyOutput(OutputMetadata):
             if c != c_v:
                 raise ValueError(f"{m} does not contain the expected number ({c}) of data points.")
 
-    @set_metadata()
+    @set_metadata
     def project(
         self,
         projection: int | Iterable[int],
@@ -484,7 +484,7 @@ class Sufficiency(Generic[T]):
     def eval_kwargs(self, value: Mapping[str, Any] | None) -> None:
         self._eval_kwargs = {} if value is None else value
 
-    @set_metadata(["runs", "substeps"])
+    @set_metadata(state=["runs", "substeps"])
     def evaluate(self, eval_at: int | Iterable[int] | None = None, niter: int = 1000) -> SufficiencyOutput:
         """
         Creates data indices, trains models, and returns plotting data

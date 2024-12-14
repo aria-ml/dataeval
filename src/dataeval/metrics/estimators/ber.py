@@ -20,12 +20,12 @@ from scipy.sparse import coo_matrix
 from scipy.stats import mode
 
 from dataeval.interop import as_numpy
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import Output, set_metadata
 from dataeval.utils.shared import compute_neighbors, get_classes_counts, get_method, minimum_spanning_tree
 
 
 @dataclass(frozen=True)
-class BEROutput(OutputMetadata):
+class BEROutput(Output):
     """
     Output class for :func:`ber` estimator metric
 
@@ -114,7 +114,7 @@ def knn_lowerbound(value: float, classes: int, k: int) -> float:
     return ((classes - 1) / classes) * (1 - np.sqrt(max(0, 1 - ((classes / (classes - 1)) * value))))
 
 
-@set_metadata()
+@set_metadata
 def ber(images: ArrayLike, labels: ArrayLike, k: int = 1, method: Literal["KNN", "MST"] = "KNN") -> BEROutput:
     """
     An estimator for Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` using FR or KNN test statistic basis

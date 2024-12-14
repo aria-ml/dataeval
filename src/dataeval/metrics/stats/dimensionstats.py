@@ -73,7 +73,7 @@ class DimensionStatsProcessor(StatsProcessor[DimensionStatsOutput]):
     }
 
 
-@set_metadata()
+@set_metadata
 def dimensionstats(
     images: Iterable[ArrayLike],
     bboxes: Iterable[ArrayLike] | None = None,

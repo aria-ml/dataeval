@@ -14,14 +14,14 @@ from sklearn.feature_selection import mutual_info_classif, mutual_info_regressio
 
 from dataeval.metrics.bias.metadata_preprocessing import MetadataOutput
 from dataeval.metrics.bias.metadata_utils import get_counts, heatmap
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import Output, set_metadata
 
 with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure
 
 
 @dataclass(frozen=True)
-class BalanceOutput(OutputMetadata):
+class BalanceOutput(Output):
     """
     Output class for :func:`balance` bias metric
 
@@ -117,7 +117,7 @@ def _validate_num_neighbors(num_neighbors: int) -> int:
     return num_neighbors
 
 
-@set_metadata("dataeval.metrics")
+@set_metadata
 def balance(
     metadata: MetadataOutput,
     num_neighbors: int = 5,
