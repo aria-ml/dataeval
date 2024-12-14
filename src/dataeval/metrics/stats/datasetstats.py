@@ -15,11 +15,11 @@ from dataeval.metrics.stats.dimensionstats import (
 from dataeval.metrics.stats.labelstats import LabelStatsOutput, labelstats
 from dataeval.metrics.stats.pixelstats import PixelStatsOutput, PixelStatsProcessor
 from dataeval.metrics.stats.visualstats import VisualStatsOutput, VisualStatsProcessor
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import Output, set_metadata
 
 
 @dataclass(frozen=True)
-class DatasetStatsOutput(OutputMetadata):
+class DatasetStatsOutput(Output):
     """
     Output class for :func:`datasetstats` stats metric
 
@@ -41,7 +41,7 @@ class DatasetStatsOutput(OutputMetadata):
     visualstats: VisualStatsOutput
     labelstats: LabelStatsOutput | None = None
 
-    def _outputs(self) -> list[OutputMetadata]:
+    def _outputs(self) -> list[Output]:
         return [s for s in (self.dimensionstats, self.pixelstats, self.visualstats, self.labelstats) if s is not None]
 
     def dict(self) -> dict[str, Any]:
@@ -54,7 +54,7 @@ class DatasetStatsOutput(OutputMetadata):
 
 
 @dataclass(frozen=True)
-class ChannelStatsOutput(OutputMetadata):
+class ChannelStatsOutput(Output):
     """
     Output class for :func:`channelstats` stats metric
 
@@ -84,7 +84,7 @@ class ChannelStatsOutput(OutputMetadata):
             raise ValueError("All StatsOutput classes must contain the same number of image sources.")
 
 
-@set_metadata()
+@set_metadata
 def datasetstats(
     images: Iterable[ArrayLike],
     bboxes: Iterable[ArrayLike] | None = None,
@@ -131,7 +131,7 @@ def datasetstats(
     return DatasetStatsOutput(*outputs, labelstats=labelstats(labels) if labels else None)  # type: ignore
 
 
-@set_metadata()
+@set_metadata
 def channelstats(
     images: Iterable[ArrayLike],
     bboxes: Iterable[ArrayLike] | None = None,

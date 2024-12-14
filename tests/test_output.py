@@ -3,17 +3,17 @@ from typing import Iterable
 
 import numpy as np
 
-from dataeval.output import MappingOutput, OutputMetadata, set_metadata
+from dataeval.output import MappingOutput, Output, set_metadata
 
 
 @dataclass
-class MockOutput(OutputMetadata):
+class MockOutput(Output):
     test1: int
     test2: bool
     test3: str
 
 
-@set_metadata()
+@set_metadata
 def mock_metric(arg1: int, arg2: bool, arg3: str) -> MockOutput:
     return MockOutput(arg1, arg2, arg3)
 
@@ -23,7 +23,7 @@ class MockMetric:
     state2: float = 1.5
     state3: list = ["a", "very", "long", "input", "list"]
 
-    @set_metadata(["state1", "state2", "state3"])
+    @set_metadata(state=["state1", "state2", "state3"])
     def evaluate(self, arg1: int, arg2: bool, arg3: str = "mock_default") -> MockOutput:
         return MockOutput(arg1, arg2, arg3)
 
@@ -32,6 +32,10 @@ class MockMappingOutput(MappingOutput[str, float]): ...
 
 
 class TestOutputMetadata:
+    def test_output_metadata_str(self):
+        output = mock_metric(1, True, "value")
+        assert str(output) == f"MockOutput: {str(output.dict())}"
+
     def test_output_metadata_data(self):
         output = mock_metric(1, True, "value")
         assert output.test1 == 1
@@ -64,7 +68,7 @@ class TestOutputMetadata:
         assert output_meta["version"]
 
     def test_output_metadata_text(self):
-        @set_metadata()
+        @set_metadata
         def mock_metric(a: np.ndarray, s: list, d: dict, i: Iterable, t: tuple, z: bytes, n: MockMetric) -> MockOutput:
             return MockOutput(1, True, "hello")
 
@@ -95,7 +99,7 @@ class TestMappingOutput:
         assert t.dict() == self.data
 
     def test_mapping_output_meta(self):
-        @set_metadata()
+        @set_metadata
         def mock_output():
             return MockMappingOutput(self.data)
 

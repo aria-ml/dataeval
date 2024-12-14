@@ -9,7 +9,7 @@ from numpy.typing import ArrayLike
 
 from dataeval.detectors.linters.merged_stats import combine_stats, get_dataset_step_from_idx
 from dataeval.metrics.stats.hashstats import HashStatsOutput, hashstats
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import Output, set_metadata
 
 DuplicateGroup = list[int]
 DatasetDuplicateGroupMap = dict[int, DuplicateGroup]
@@ -17,7 +17,7 @@ TIndexCollection = TypeVar("TIndexCollection", DuplicateGroup, DatasetDuplicateG
 
 
 @dataclass(frozen=True)
-class DuplicatesOutput(Generic[TIndexCollection], OutputMetadata):
+class DuplicatesOutput(Generic[TIndexCollection], Output):
     """
     Output class for :class:`Duplicates` lint detector
 
@@ -89,7 +89,7 @@ class Duplicates:
     @overload
     def from_stats(self, hashes: Sequence[HashStatsOutput]) -> DuplicatesOutput[DatasetDuplicateGroupMap]: ...
 
-    @set_metadata(["only_exact"])
+    @set_metadata(state=["only_exact"])
     def from_stats(
         self, hashes: HashStatsOutput | Sequence[HashStatsOutput]
     ) -> DuplicatesOutput[DuplicateGroup] | DuplicatesOutput[DatasetDuplicateGroupMap]:
@@ -138,7 +138,7 @@ class Duplicates:
 
         return DuplicatesOutput(**duplicates)
 
-    @set_metadata(["only_exact"])
+    @set_metadata(state=["only_exact"])
     def evaluate(self, data: Iterable[ArrayLike]) -> DuplicatesOutput[DuplicateGroup]:
         """
         Returns duplicate image indices for both exact matches and near matches

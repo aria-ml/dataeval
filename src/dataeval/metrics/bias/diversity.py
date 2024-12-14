@@ -12,7 +12,7 @@ from numpy.typing import ArrayLike, NDArray
 
 from dataeval.metrics.bias.metadata_preprocessing import MetadataOutput
 from dataeval.metrics.bias.metadata_utils import diversity_bar_plot, get_counts, heatmap
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import Output, set_metadata
 from dataeval.utils.shared import get_method
 
 with contextlib.suppress(ImportError):
@@ -20,7 +20,7 @@ with contextlib.suppress(ImportError):
 
 
 @dataclass(frozen=True)
-class DiversityOutput(OutputMetadata):
+class DiversityOutput(Output):
     """
     Output class for :func:`diversity` :term:`bias<Bias>` metric
 
@@ -163,7 +163,7 @@ def diversity_simpson(
     return ev_index
 
 
-@set_metadata()
+@set_metadata
 def diversity(
     metadata: MetadataOutput,
     method: Literal["simpson", "shannon"] = "simpson",

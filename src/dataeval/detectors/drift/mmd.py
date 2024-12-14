@@ -161,7 +161,7 @@ class DriftMMD(BaseDrift):
         distance_threshold = torch.sort(mmd2_permuted, descending=True).values[idx_threshold]
         return p_val.numpy().item(), mmd2.numpy().item(), distance_threshold.numpy().item()
 
-    @set_metadata()
+    @set_metadata
     @preprocess_x
     @update_x_ref
     def predict(self, x: ArrayLike) -> DriftMMDOutput:

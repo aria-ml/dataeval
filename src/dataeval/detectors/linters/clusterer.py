@@ -11,12 +11,12 @@ from scipy.cluster.hierarchy import linkage
 from scipy.spatial.distance import pdist, squareform
 
 from dataeval.interop import to_numpy
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import Output, set_metadata
 from dataeval.utils.shared import flatten
 
 
 @dataclass(frozen=True)
-class ClustererOutput(OutputMetadata):
+class ClustererOutput(Output):
     """
     Output class for :class:`Clusterer` lint detector
 
@@ -495,7 +495,7 @@ class Clusterer:
         return exact_dupes, near_dupes
 
     # TODO: Move data input to evaluate from class
-    @set_metadata(["data"])
+    @set_metadata(state=["data"])
     def evaluate(self) -> ClustererOutput:
         """Finds and flags indices of the data for Outliers and :term:`duplicates<Duplicates>`
 

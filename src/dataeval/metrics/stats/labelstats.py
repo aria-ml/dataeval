@@ -9,11 +9,11 @@ from typing import Any, Iterable, Mapping, TypeVar
 from numpy.typing import ArrayLike
 
 from dataeval.interop import to_numpy
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import Output, set_metadata
 
 
 @dataclass(frozen=True)
-class LabelStatsOutput(OutputMetadata):
+class LabelStatsOutput(Output):
     """
     Output class for :func:`labelstats` stats metric
 
@@ -57,7 +57,7 @@ def sort(d: Mapping[TKey, Any]) -> dict[TKey, Any]:
     return dict(sorted(d.items(), key=lambda x: x[0]))
 
 
-@set_metadata()
+@set_metadata
 def labelstats(
     labels: Iterable[ArrayLike],
 ) -> LabelStatsOutput:

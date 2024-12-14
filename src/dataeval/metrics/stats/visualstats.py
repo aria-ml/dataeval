@@ -74,7 +74,7 @@ class VisualStatsProcessor(StatsProcessor[VisualStatsOutput]):
     }
 
 
-@set_metadata()
+@set_metadata
 def visualstats(
     images: Iterable[ArrayLike],
     bboxes: Iterable[ArrayLike] | None = None,

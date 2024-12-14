@@ -18,12 +18,12 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from dataeval.interop import to_numpy
-from dataeval.output import OutputMetadata, set_metadata
+from dataeval.output import Output, set_metadata
 from dataeval.utils.gmm import GaussianMixtureModelParams
 
 
 @dataclass(frozen=True)
-class OODOutput(OutputMetadata):
+class OODOutput(Output):
     """
     Output class for predictions from :class:`OOD_AE`, :class:`OOD_AEGMM`, :class:`OOD_LLR`,
     :class:`OOD_VAE`, and :class:`OOD_VAEGMM` out-of-distribution detectors
@@ -44,7 +44,7 @@ class OODOutput(OutputMetadata):
 
 
 @dataclass(frozen=True)
-class OODScoreOutput(OutputMetadata):
+class OODScoreOutput(Output):
     """
     Output class for instance and feature scores from :class:`OOD_AE`, :class:`OOD_AEGMM`,
     :class:`OOD_LLR`, :class:`OOD_VAE`, and :class:`OOD_VAEGMM` out-of-distribution detectors
@@ -153,7 +153,7 @@ class OODBaseMixin(Generic[TModel], ABC):
     @abstractmethod
     def _score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput: ...
 
-    @set_metadata()
+    @set_metadata
     def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
         """
         Compute the :term:`out of distribution<Out-of-distribution (OOD)>` scores for a given dataset.
@@ -176,7 +176,7 @@ class OODBaseMixin(Generic[TModel], ABC):
     def _threshold_score(self, ood_type: Literal["feature", "instance"] = "instance") -> np.floating:
         return np.percentile(self._ref_score.get(ood_type), self._threshold_perc)
 
-    @set_metadata()
+    @set_metadata
     def predict(
         self,
         X: ArrayLike,

@@ -116,7 +116,7 @@ class HashStatsProcessor(StatsProcessor[HashStatsOutput]):
     }
 
 
-@set_metadata()
+@set_metadata
 def hashstats(
     images: Iterable[ArrayLike],
     bboxes: Iterable[ArrayLike] | None = None,
