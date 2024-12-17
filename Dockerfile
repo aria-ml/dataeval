@@ -40,7 +40,6 @@ USER ${USER}
 WORKDIR /${USER}
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
-ENV TF_GPU_ALLOCATOR=cuda_malloc_async
 ENV UV_INDEX_STRATEGY=unsafe-best-match
 ENV LANGUAGE=en
 ENV LC_ALL=C.UTF-8

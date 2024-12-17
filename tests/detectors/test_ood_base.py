@@ -1,14 +1,14 @@
 from typing import Callable
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
 from numpy.typing import ArrayLike
 
 from dataeval.detectors.ood.base import OODBaseMixin, OODGMMMixin, OODScoreOutput
-from dataeval.utils.tensorflow._internal.utils import create_model
 
 image_shape = (32, 32, 1)
-model = create_model("AE", image_shape)
+model = MagicMock()
 
 
 class MockOutlier(OODGMMMixin, OODBaseMixin[Callable]):

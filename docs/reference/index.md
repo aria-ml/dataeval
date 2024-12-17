@@ -17,7 +17,6 @@ is empty except for `__version__` by design.
     dataeval.metrics.estimators
     dataeval.metrics.stats
     dataeval.utils
-    dataeval.utils.tensorflow
     dataeval.utils.torch
     dataeval.workflows
 ```
