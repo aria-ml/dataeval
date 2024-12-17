@@ -14,10 +14,6 @@
 .. autosummary::
 
     OOD_AE
-    OOD_AEGMM
-    OOD_LLR
-    OOD_VAE
-    OOD_VAEGMM
 ```
 
 ## Output Classes
@@ -35,10 +31,6 @@
 :maxdepth: 1
 
 ood/ood_ae
-ood/ood_aegmm
-ood/ood_llr
-ood/ood_vae
-ood/ood_vaegmm
 ood/oodoutput
 ood/oodscoreoutput
 :::

@@ -10,7 +10,7 @@ nox.options.sessions = ["test", "type", "deps", "lint", "doctest", "check"]
 
 INSTALL_ARGS = ["-e", ".", "-r", "environment/requirements.txt", "-r", "environment/requirements-dev.txt"]
 INSTALL_ENVS = {"UV_INDEX_STRATEGY": "unsafe-best-match", "POETRY_DYNAMIC_VERSIONING_BYPASS": "0.0.0"}
-COMMON_ENVS = {"TQDM_DISABLE": "1", "TF_CPP_MIN_LOG_LEVEL": "3"}
+COMMON_ENVS = {"TQDM_DISABLE": "1"}
 DOCS_ENVS = {"LANG": "C", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True", "PYDEVD_DISABLE_FILE_VALIDATION": "1"}
 DOCTEST_ENVS = {"NB_EXECUTION_MODE_OVERRIDE": "off"}
 TEST_ENVS = {"CUDA_VISIBLE_DEVICES": "-1", **COMMON_ENVS}

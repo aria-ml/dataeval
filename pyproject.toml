@@ -42,7 +42,7 @@ packages = [
 [tool.poetry.dependencies]
 # required
 python = ">=3.9,<3.13"
-numpy = {version = ">1.24.3"}
+numpy = {version = ">=1.24.3"}
 pillow = {version = ">=10.3.0"}
 scipy = {version = ">=1.10"}
 scikit-learn = {version = ">=1.5.0"}
@@ -52,17 +52,12 @@ xxhash = {version = ">=3.3"}
 
 # optional
 matplotlib = {version = "*", optional = true}
-markupsafe = {version = "<3.0.2", optional = true}
-tensorflow = {version = ">=2.16,<2.18", optional = true}
-tensorflow_probability = {version = ">=0.24,<0.25", optional = true}
-tf-keras = {version = ">=2.16,<2.18", optional = true}
 torch = {version = ">=2.2.0", source = "pytorch", optional = true}
 torchvision = {version = ">=0.17.0", source = "pytorch", optional = true}
 
 [tool.poetry.extras]
-tensorflow = ["markupsafe", "tensorflow", "tensorflow_probability", "tf-keras"]
-torch = ["torch", "torchvision", "matplotlib"]
-all = ["matplotlib", "markupsafe", "tensorflow", "tensorflow_probability", "tf-keras", "torch", "torchvision"]
+torch = ["torch", "torchvision"]
+all = ["matplotlib", "torch", "torchvision"]
 
 [tool.poetry.group.dev]
 optional = true
@@ -88,6 +83,7 @@ pyright = {version = "*", extras = ["nodejs"]}
 maite = {version = "*"}
 pandas = {version = "*"}
 seaborn = {version = "*"}
+numpy = {version = ">=2.0.2"}
 # docs
 certifi = {version = ">=2024.07.04"}
 enum_tools = {version = ">=0.12.0", extras = ["sphinx"]}
@@ -104,7 +100,7 @@ markupsafe = {version = "<3.0.2", optional = true}
 
 [[tool.poetry.source]]
 name = "pytorch"
-url = "https://download.pytorch.org/whl/cu124"
+url = "https://download.pytorch.org/whl/cu118"
 priority = "explicit"
 
 [tool.poetry-dynamic-versioning]
@@ -120,7 +116,6 @@ files = ["src/dataeval/__init__.py"]
 name = "dataeval"
 
 [tool.poetry2conda.dependencies]
-tensorflow_probability = { name = "tensorflow-probability" }
 torch = { name = "pytorch" }
 xxhash = { name = "python-xxhash" }
 
@@ -141,8 +136,6 @@ parallel = true
 [tool.coverage.report]
 exclude_also = [
   "raise NotImplementedError",
-  "if TYPE_CHECKING:",
-  "if _IS_TENSORFLOW_AVAILABLE",
   "if _IS_TORCH_AVAILABLE",
   "if _IS_TORCHVISION_AVAILABLE",
 ]
@@ -150,7 +143,6 @@ include = ["*/src/dataeval/*"]
 omit = [
   "*/torch/blocks.py",
   "*/torch/utils.py",
-  "*/tensorflow/_internal/models.py",
 ]
 fail_under = 90
 
