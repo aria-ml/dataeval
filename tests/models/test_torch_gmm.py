@@ -8,10 +8,8 @@ Licensed under Apache Software License (Apache 2.0)
 
 import numpy as np
 import pytest
-import tensorflow as tf
 import torch
 
-import dataeval.utils.tensorflow._internal.gmm as tensorflow_gmm
 import dataeval.utils.torch.gmm as torch_gmm
 
 N, K, D = 10, 5, 1
@@ -22,7 +20,6 @@ gamma = np.random.rand(N, K).astype(np.float32)
 @pytest.mark.parametrize(
     "module, tz, tg",
     [
-        (tensorflow_gmm, tf.convert_to_tensor(z), tf.convert_to_tensor(gamma)),
         (torch_gmm, torch.from_numpy(z), torch.from_numpy(gamma)),
     ],
 )

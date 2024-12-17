@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-import tensorflow as tf
 import torch
 
 from dataeval.interop import to_numpy
@@ -15,7 +14,6 @@ class TestInteropArrayLike:
         (
             (array_native, array_expected),
             (np.array(array_native), array_expected),
-            (tf.constant(array_native), array_expected),
             (torch.Tensor(array_native), array_expected),
             (None, np.array([])),
         ),

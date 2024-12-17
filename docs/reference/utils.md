@@ -22,7 +22,6 @@ from dataeval.utils import merge_metadata
 
 ```{eval-rst}
 .. autosummary::
-    tensorflow
     torch
 ```
 
@@ -31,6 +30,5 @@ from dataeval.utils import merge_metadata
 :titlesonly:
 :maxdepth: 1
 
-utils/tensorflow
 utils/torch
 :::
