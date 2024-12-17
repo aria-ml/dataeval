@@ -10,7 +10,6 @@ from itertools import product
 
 import numpy as np
 import pytest
-import tensorflow as tf
 import torch
 import torch.nn as nn
 from sklearn.linear_model import LogisticRegression
@@ -75,7 +74,6 @@ class TestFunctionalClassifierUncertainty:
         ) = clfuncdrift_params
 
         np.random.seed(0)
-        tf.random.set_seed(0)
 
         model = gen_model(n_features, n_labels, preds_type == "probs")
         x_ref = np.random.randn(*(500, n_features)).astype(np.float32)

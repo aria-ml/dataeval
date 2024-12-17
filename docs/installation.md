@@ -12,7 +12,7 @@ We currently support python versions ``3.9 - 3.11``
 ## Base DataEval Packages
 
 
-To keep {term}`DataEval` lightweight but powerful, only the following metrics come with the base installation
+To keep {term}`DataEval` lightweight but powerful, the following metrics come with the base installation
 
 :::{list-table}
 :header-rows: 1
@@ -35,21 +35,22 @@ To keep {term}`DataEval` lightweight but powerful, only the following metrics co
 ## Extras
 
 However, {term}`DataEval` also has installable *extras* that provide a more expansive and powerful toolkit for any user.  \
-These extras are **torch**, **tensorflow** and **all**. Any extra can be installed using dataeval[*extra*]
+These extras are `torch`, and `all`. Any *extra* can be installed using `pip install dataeval[extra]`
 
 :::{list-table}
 :header-rows: 1
 
 * - Extras
-  - Additional Modules
+  - Additional Modules/Functionality
 * - torch
   - [Drift](concepts/Drift.md)  
     [Sufficiency](concepts/Sufficiency.md)
-* - tensorflow
-  - [Out-of-Distribution Detection](concepts/OOD.md)
+    [Out-of-Distribution Detection](concepts/OOD.md)
+* - all
+  - Plot functionality through `matplotlib`
 :::
 
-**all** installs everything in **torch** and **tensorflow**.
+**all** installs everything in **torch** as well as matplotlib for additional plotting capabilities.
 
 ## Installation
 
