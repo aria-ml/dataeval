@@ -1,6 +1,16 @@
-[//]: # (4d94e6023d7f01b1730ad8a2f9863a2913789ba4)
+[//]: # (102664ded7c9c6e77a27b7c9e180e69962dfa5de)
 
 # DataEval Change Log
+
+## v0.74.1
+
+📝 **Miscellaneous**
+- `102664de` - Remove tensorflow from project
+- `e782dad1` - Refactor OutputMetadata and clean up set_metadata decorator
+- `80aae3a6` - Just use KSOutput as a MappingOutput instance instead of extracting the dict attribute it no longer has.
+- `b738e01f` - Allow docker cmds within dev container
+- `16839b46` - Add MappingOutput class
+- `e2cfda94` - Made metadata_tools/ks_compare compatible with new KSOutput class.
 
 ## v0.74.0
 
