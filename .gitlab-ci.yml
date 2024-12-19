@@ -143,6 +143,25 @@ stages:
     matrix:
       - PYTHON_VERSION: ["3.9", "3.10", "3.11", "3.12"]
 
+.conda:
+  needs: []
+  image: mambaorg/micromamba:2-cuda11.8.0-ubuntu20.04
+  before_script:
+    - eval "$(micromamba shell hook --shell bash)"
+    - micromamba create -f environment/environment.yaml -n dataeval python=$PYTHON_VERSION
+    - micromamba activate dataeval
+    - micromamba install pytest pytest-xdist requests
+    - pip install -e . --no-deps
+    - micromamba list
+  variables:
+    POETRY_DYNAMIC_VERSIONING_BYPASS: "0.0.0"
+
+.conda_all:
+  extends: .conda
+  parallel:
+    matrix:
+      - PYTHON_VERSION: ["3.9", "3.10", "3.11", "3.12"]  
+
 ### TEST ###
 
 lint:
@@ -172,6 +191,12 @@ test:
       junit: output/junit.*.xml
     paths:
       - output/*
+  rules: *on_run
+
+conda:
+  extends: .conda_all
+  script:
+    - pytest -n8 --dist loadgroup
   rules: *on_run
 
 coverage:
