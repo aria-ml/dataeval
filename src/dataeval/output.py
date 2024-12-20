@@ -65,7 +65,7 @@ R = TypeVar("R", bound=Output)
 
 
 def set_metadata(fn: Callable[P, R] | None = None, *, state: list[str] | None = None) -> Callable[P, R]:
-    """Decorator to stamp OutputMetadata classes with runtime metadata"""
+    """Decorator to stamp Output classes with runtime metadata"""
 
     if fn is None:
         return partial(set_metadata, state=state)  # type: ignore

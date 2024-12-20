@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-__all__ = ["split_dataset"]
+from dataclasses import dataclass
+
+from dataeval.output import Output, set_metadata
+
+__all__ = ["split_dataset", "SplitDatasetOutput"]
 
 import warnings
-from typing import Any
+from typing import Any, Iterator, NamedTuple, Protocol
 
 import numpy as np
 from numpy.typing import NDArray
@@ -13,128 +17,156 @@ from sklearn.model_selection import GroupKFold, KFold, StratifiedGroupKFold, Str
 from sklearn.utils.multiclass import type_of_target
 
 
-def validate_test_val(num_folds: int, test_frac: float | None, val_frac: float | None) -> tuple[float, float]:
-    """Check input fractions to ensure unambiguous splitting arguments are passed return calculated
-    test and validation fractions.
+class TrainValSplit(NamedTuple):
+    """Tuple containing train and validation indices"""
 
+    train: NDArray[np.int_]
+    val: NDArray[np.int_]
+
+
+@dataclass(frozen=True)
+class SplitDatasetOutput(Output):
+    """Output class containing test indices and a list of TrainValSplits"""
+
+    test: NDArray[np.int_]
+    folds: list[TrainValSplit]
+
+
+class KFoldSplitter(Protocol):
+    """Protocol covering sklearn KFold variant splitters"""
+
+    def __init__(self, n_splits: int): ...
+    def split(self, X: Any, y: Any, groups: Any) -> Iterator[tuple[NDArray[Any], NDArray[Any]]]: ...
+
+
+KFOLD_GROUP_STRATIFIED_MAP: dict[tuple[bool, bool], type[KFoldSplitter]] = {
+    (False, False): KFold,
+    (False, True): StratifiedKFold,
+    (True, False): GroupKFold,
+    (True, True): StratifiedGroupKFold,
+}
+
+
+def calculate_validation_fraction(num_folds: int, test_frac: float, val_frac: float) -> float:
+    """
+    Calculate possible validation fraction based on the number of folds and test fraction.
 
     Parameters
     ----------
     num_folds : int
-        number of [train, val] cross-validation folds to generate
-    test_frac : float, optional
-        If specified, also generate a test set containing (test_frac*100)% of the data
-    val_frac  : float, optional
-        Only specify if requesting a single [train, val] split. The validation split will
-        contain (val_frac*100)% of any data not already allocated to the test set
+        number of train and validation cross-validation folds to generate
+    test_frac : float
+        The fraction of the data to extract for testing before folds are created
+    val_frac : float
+        The validation split will contain (val_frac * 100)% of any data not already allocated to the test set.
+        Only required if requesting a single [train, val] split.
 
     Raises
     ------
-    UnboundLocalError
-        Raised if more than one fold AND the fraction of data to be used for validation are
-        both requested. In this case, val_frac is ambiguous, since the validation fraction must be
-        by definition 1/num_folds
     ValueError
-        Raised if num_folds is 1 (or left blank) AND val_frac is unspecified. When only 1 fold is
-        requested, we need to know how much of the data should be allocated for validation.
+        When number of folds requested is less than 1
     ValueError
-        Raised if the total fraction of data used for evaluation (val + test) meets or exceeds 1.0
+        When the test fraction is not within 0.0 and 1.0 inclusively
+    ValueError
+        When more than one fold and the validation fraction are both requested
+    ValueError
+        When number of folds equals one but the validation fraction is 0.0
+    ValueError
+        When the validation fraction is not within 0.0 and 1.0 inclusively
 
     Returns
     -------
-    tuple[float, float]
-        Tuple of the validated and calculated values as appropriate for test and validation fractions
+    float
+        The updated validation fraction of the remaining data after the testing fraction is removed
     """
-    if (num_folds > 1) and (val_frac is not None):
-        raise ValueError("If specifying val_frac, num_folds must be None or 1")
-    if (num_folds == 1) and (val_frac is None):
-        raise ValueError("If num_folds is None or 1, must assign a value to val_frac")
-    t_frac = 0.0 if test_frac is None else test_frac
-    v_frac = 1.0 / num_folds * (1.0 - t_frac) if val_frac is None else val_frac * (1.0 - t_frac)
-    if (t_frac + v_frac) >= 1.0:
-        raise ValueError(f"val_frac + test_frac must be less that 1.0, currently {v_frac+t_frac}")
-    return t_frac, v_frac
+    if num_folds < 1:
+        raise ValueError(f"Number of folds must be greater than or equal to 1, got {num_folds}")
+    if test_frac < 0.0 or test_frac > 1.0:
+        raise ValueError(f"test_frac out of bounds. Must be between 0.0 and 1.0, got {test_frac}")
+
+    # val base is a variable placeholder so val_frac can be ignored if num_folds != 1
+    val_base: float = 1.0
+    if num_folds == 1:
+        if val_frac == 0.0:
+            raise ValueError("If num_folds equals 1, must assign a value to val_frac")
+        if val_frac < 0.0 or val_frac > 1.0:
+            raise ValueError(f"val_frac out of bounds. Must be between 0.0 and 1.0, got {val_frac}")
+        val_base = val_frac
+    # num folds must be >1 in this case
+    elif val_frac != 0.0:
+        raise ValueError("Can only specify val_frac when num_folds equals 1")
+
+    # This value is mathematically bound between 0-1 inclusive
+    return val_base * (1.0 / num_folds) * (1.0 - test_frac)
 
 
-def check_labels(
-    labels: list[int] | NDArray[np.int_], total_partitions: int
-) -> tuple[NDArray[np.int_], NDArray[np.int_]]:
-    """Check to make sure there are more input data than the total number of partitions requested
-    Also converts labels to a numpy array, if it isn't already
+def _validate_labels(labels: NDArray[np.int_], total_partitions: int) -> None:
+    """
+    Check to make sure there is more input data than the total number of partitions requested
 
     Parameters
     ----------
-    labels : list or np.ndarray
-        all class labels from the input dataset
+    labels : np.ndarray of ints
+        All class labels from the input dataset
     total_partitions : int
-        number of train-val splits requested (+1 if a test holdout is specified)
+        Number of [train, val, test] splits requested
 
     Raises
     ------
-    IndexError
-        Raised if more partitions are requested than number of labels. This is exceedingly rare and
-        usually means you've specified some argument incorrectly.
     ValueError
-        Raised if the labels are considered continuous by Scikit-Learn. This does not necessarily
-        mean that floats are not accepted as a label format. Rather, this exception implies that
-        there are too many unique values in the set relative to it's cardinality.
-
-    Returns
-    -------
-    index : np.ndarray
-        Integer index generated based on the total number of labels
-    labels : np.ndarray
-        labels, converted to an ndarray if passed as a list.
+        When more partitions are requested than number of labels.
+    ValueError
+        When the labels are considered continuous by Scikit-Learn. This does not necessarily
+        mean that floats are not accepted as a label format. Rather, this implies that
+        there are too many unique values in the set relative to its cardinality.
     """
+
     if len(labels) <= total_partitions:
-        raise IndexError(f"""
-            Total number of labels must greater than the number of total partitions.
-            Got {len(labels)} labels and {total_partitions} total train/val/test partitions.""")
-    if isinstance(labels, list):
-        labels = np.array(labels)
+        raise ValueError(
+            "Total number of labels must be greater than the total number of partitions. "
+            f"Got {len(labels)} labels and {total_partitions} total [train, val, test] partitions."
+        )
+
     if type_of_target(labels) == "continuous":
-        raise ValueError("Detected continuous labels, labels must be discrete for proper stratification")
-    index = np.arange(len(labels))
-    return index, labels
+        raise ValueError("Detected continuous labels. Labels must be discrete for proper stratification")
 
 
-def check_stratifiable(labels: NDArray[np.int_], total_partitions: int) -> bool:
+def is_stratifiable(labels: NDArray[np.int_], num_partitions: int) -> bool:
     """
-    Very basic check to see if dataset can be stratified by class label. This is not a
-    comprehensive test, as factors such as grouping also affect the ability to stratify by label
+    Check if the dataset can be stratified by class label over the given number of partitions
 
     Parameters
     ----------
-    labels : list or np.ndarray
-        all class labels from the input dataset
-    total_partitions : int
-        number of train-val splits requested (+1 if a test holdout is specified)
+    labels : NDArray of ints
+        All class labels of the input dataset
+    num_partitions : int
+        Total number of [train, val, test] splits requested
+
+    Returns
+    -------
+    bool
+        True if dataset can be stratified else False
 
     Warns
     -----
     UserWarning
-        Warns user if the dataset cannot be stratified due to the number of total (train, val, test)
+        Warns user if the dataset cannot be stratified due to the total number of [train, val, test]
         partitions exceeding the number of instances of the rarest class label.
-
-    Returns
-    -------
-    stratifiable : bool
-        True if dataset can be stratified according to the criteria above.
     """
 
-    stratifiable = True
-    _, label_counts = np.unique(labels, return_counts=True)
-    rarest_label_count = label_counts.min()
-    if rarest_label_count < total_partitions:
-        warnings.warn(f"""
-            Unable to stratify due to label frequency. The rarest label occurs {rarest_label_count},
-            which is fewer than the total number of partitions requested. Setting stratify flag to 
-            false.""")
-        stratifiable = False
-    return stratifiable
+    # Get the minimum count of all labels
+    lowest_label_count = np.unique(labels, return_counts=True)[1].min()
+    if lowest_label_count < num_partitions:
+        warnings.warn(
+            f"Unable to stratify due to label frequency. The lowest label count ({lowest_label_count}) is fewer "
+            f"than the total number of partitions ({num_partitions}) requested.",
+            UserWarning,
+        )
+        return False
+    return True
 
 
-def check_groups(group_ids: NDArray[np.int_], num_partitions: int) -> bool:
+def is_groupable(group_ids: NDArray[np.int_], num_partitions: int) -> bool:
     """
     Warns user if the number of unique group_ids is incompatible with a grouped partition containing
     num_folds folds. If this is the case, returns groups=None, which tells the partitioner not to
@@ -142,34 +174,35 @@ def check_groups(group_ids: NDArray[np.int_], num_partitions: int) -> bool:
 
     Parameters
     ----------
-    group_ids : np.ndarray
-        Identifies the group to which a sample at the same index belongs.
+    group_ids : NDArray of ints
+        The id of the group each sample at the corresponding index belongs to
     num_partitions : int
-        How many total (train, val) folds will be generated (+1 if also specifying a test fold).
+        Total number of train, val, and test splits requested
+
+    Returns
+    -------
+    bool
+        True if the dataset can be grouped by the given group ids else False
 
     Warns
     -----
     UserWarning
-        Warns if there are fewer groups than the minimum required to successfully partition the data
-        into num_partitions. The minimum is defined as the number of partitions requested plus one.
-
-    Returns
-    -------
-    groupable : bool
-        True if dataset can be grouped by the given group ids, given the criteria above.
+        Warns if there are fewer groups than the requested number of partitions plus one
     """
 
-    groupable = True
     num_unique_groups = len(np.unique(group_ids))
-    min_unique_groups = num_partitions + 1
-    if num_unique_groups < min_unique_groups:
-        warnings.warn(f"""
-            {min_unique_groups} unique groups required for {num_partitions} partitions. 
-            Found {num_unique_groups} instead. Reverting to ungrouped partitioning""")
-        groupable = False
-    else:
-        groupable = True
-    return groupable
+    # Cannot separate if only one group exists
+    if num_unique_groups == 1:
+        return False
+
+    if num_unique_groups < num_partitions:
+        warnings.warn(
+            f"Groups must be greater than num partitions. Got {num_unique_groups} and {num_partitions}. "
+            "Reverting to ungrouped partitioning",
+            UserWarning,
+        )
+        return False
+    return True
 
 
 def bin_kmeans(array: NDArray[Any]) -> NDArray[np.int_]:
@@ -179,14 +212,15 @@ def bin_kmeans(array: NDArray[Any]) -> NDArray[np.int_]:
 
     Parameters
     ----------
-    array : np.ndarray
+    array : NDArray
         continuous data to bin
 
     Returns
     -------
-        np.ndarray[int]: bin numbers assigned by the kmeans best clusterer.
+    NDArray[int]:
+        bin numbers assigned by the kmeans best clusterer.
     """
-    array = np.array(array)
+
     if array.ndim == 1:
         array = array.reshape([-1, 1])
         best_score = 0.60
@@ -203,28 +237,9 @@ def bin_kmeans(array: NDArray[Any]) -> NDArray[np.int_]:
     return bin_index
 
 
-def angle2xy(angles: NDArray[Any]) -> NDArray[Any]:
-    """
-    Converts angle measurements to xy coordinates on the unit circle. Needed for binning angle data.
-
-    Parameters
-    ----------
-    angles : np.ndarray
-        angle data in either radians or degrees
-
-    Returns
-    -------
-    xy : np.ndarray
-        Nx2 array of xy coordinates for each angle (can be radians or degrees)
-    """
-    is_radians = ((angles >= -np.pi) & (angles <= 2 * np.pi)).all()
-    radians = angles if is_radians else np.pi / 180 * angles
-    xy = np.stack([np.cos(radians), np.sin(radians)], axis=1)
-    return xy
-
-
 def get_group_ids(metadata: dict[str, Any], group_names: list[str], num_samples: int) -> NDArray[np.int_]:
-    """Returns individual group numbers based on a subset of metadata defined by groupnames
+    """
+    Returns individual group numbers based on a subset of metadata defined by groupnames
 
     Parameters
     ----------
@@ -242,7 +257,7 @@ def get_group_ids(metadata: dict[str, Any], group_names: list[str], num_samples:
 
     Returns
     -------
-    group_ids : np.ndarray
+    np.ndarray
         group identifiers from metadata
     """
     features2group = {k: np.array(v) for k, v in metadata.items() if k in group_names}
@@ -250,11 +265,12 @@ def get_group_ids(metadata: dict[str, Any], group_names: list[str], num_samples:
         return np.zeros(num_samples, dtype=np.int_)
     for name, feature in features2group.items():
         if len(feature) != num_samples:
-            raise IndexError(f"""Feature length does not match number of labels. 
-                             Got {len(feature)} features and {num_samples} samples""")
+            raise ValueError(
+                f"Feature length does not match number of labels. "
+                f"Got {len(feature)} features and {num_samples} samples"
+            )
+
         if type_of_target(feature) == "continuous":
-            if ("ANGLE" in name.upper()) or ("AZIMUTH" in name.upper()):
-                feature = angle2xy(feature)
             features2group[name] = bin_kmeans(feature)
     binned_features = np.stack(list(features2group.values()), axis=1)
     _, group_ids = np.unique(binned_features, axis=0, return_inverse=True)
@@ -265,228 +281,239 @@ def make_splits(
     index: NDArray[np.int_],
     labels: NDArray[np.int_],
     n_folds: int,
-    groups: NDArray[np.int_] | None = None,
-    stratified: bool = False,
-) -> list[dict[str, NDArray[np.int_]]]:
-    """Split data into n_folds partitions of training and validation data.
+    groups: NDArray[np.int_] | None,
+    stratified: bool,
+) -> list[TrainValSplit]:
+    """
+    Split data into n_folds partitions of training and validation data.
 
     Parameters
     ----------
-    index : np.ndarray
-        index corresponding to each label (see below)
-    labels : np.ndarray
+    index : NDArray of ints
+        index corresponding to each label
+    labels : NDArray of ints
         classification labels
     n_folds : int
-        number or train/val folds
-    groups : np.ndarray, Optional
+        number of [train, val] folds
+    groups : NDArray of ints or None
         group index for grouped partitions. Grouped partitions are split such that no group id is
         present in both a training and validation split.
-    stratified : bool, default=False
-        If True, maintain dataset class balance within each train/val split
+    stratified : bool
+        If True, maintain dataset class balance within each [train, val] split
 
     Returns
     -------
-    split_defs : list[dict]
-        list of dictionaries, which specifying train index, validation index, and the ratio of
+    split_defs : list[TrainValSplit]
+        List of TrainValSplits, which specify train index, validation index, and the ratio of
         validation to all data.
     """
-    split_defs = []
-    index = index.reshape([-1, 1])
-    if groups is not None:
-        splitter = StratifiedGroupKFold(n_folds) if stratified else GroupKFold(n_folds)
+    split_defs: list[TrainValSplit] = []
+    n_labels = len(np.unique(labels))
+    splitter = KFOLD_GROUP_STRATIFIED_MAP[(groups is not None, stratified)](n_folds)
+    good = False
+    attempts = 0
+    while not good and attempts < 3:
+        attempts += 1
         splits = splitter.split(index, labels, groups)
-    else:
-        splitter = StratifiedKFold(n_folds) if stratified else KFold(n_folds)
-        splits = splitter.split(index, labels)
-    for train_idx, eval_idx in splits:
-        test_ratio = len(eval_idx) / index.shape[0]
-        split_defs.append(
-            {
-                "train": train_idx.astype(np.int_),
-                "eval": eval_idx.astype(np.int_),
-                "eval_frac": test_ratio,
-            }
-        )
+        split_defs.clear()
+        for train_idx, eval_idx in splits:
+            # test_ratio = len(eval_idx) / len(index)
+            t = np.atleast_1d(train_idx).astype(np.int_)
+            v = np.atleast_1d(eval_idx).astype(np.int_)
+            good = good or (len(np.unique(labels[t])) == n_labels and len(np.unique(labels[v])) == n_labels)
+            split_defs.append(TrainValSplit(t, v))
+    if not good and attempts == 3:
+        warnings.warn("Unable to create a good split definition, not all classes are represented in each split.")
     return split_defs
 
 
 def find_best_split(
-    labels: NDArray[np.int_], split_defs: list[dict[str, NDArray[np.int_]]], stratified: bool, eval_frac: float
-) -> tuple[NDArray[np.int_], NDArray[np.int_]]:
-    """Finds the split that most closely satisfies a criterion determined by the arguments passed.
+    labels: NDArray[np.int_], split_defs: list[TrainValSplit], stratified: bool, split_frac: float
+) -> TrainValSplit:
+    """
+    Finds the split that most closely satisfies a criterion determined by the arguments passed.
     If stratified is True, returns the split whose class balance most closely resembles the overall
-    class balance. If false, returns the split with the size closest to the desired eval_frac
+    class balance. If false, returns the split with the size closest to the desired split_frac
 
     Parameters
     ----------
     labels : np.ndarray
         Labels upon which splits are (optionally) stratified
-    split_defs : list[dict]
-        List of dictionaries, which specifying train index, validation index, and the ratio of
-        validation to all data.
+    split_defs : list of TrainValSplits
+        Specifies the train index, validation index
     stratified : bool
-        If True, maintain dataset class balance within each train/val split
-    eval_frac : float
+        If True, maintain dataset class balance within each [train, val] split
+    split_frac : float
         Desired fraction of the dataset sequestered for evaluation
 
     Returns
     -------
-    train_index : np.ndarray
-        indices of data partitioned for training
-    eval_index : np.ndarray
-        indices of data partitioned for evaluation
+    TrainValSplit
+        Indices of data partitioned for training and evaluation
     """
 
-    def class_freq_diff(split):
-        train_labels = labels[split["train"]]
-        _, train_counts = np.unique(train_labels, return_counts=True)
-        train_freq = train_counts / train_counts.sum()
-        return np.square(train_freq - class_freq).sum()
+    # Minimization functions and helpers
+    def freq(arr: NDArray[Any], minlength: int = 0) -> NDArray[np.floating[Any]]:
+        counts = np.bincount(arr, minlength=minlength)
+        return counts / np.sum(counts)
 
+    def weight(arr: NDArray, class_freq: NDArray) -> np.float64:
+        return np.sum(np.abs(freq(arr, len(class_freq)) - class_freq))
+
+    def class_freq_diff(split: TrainValSplit) -> np.float64:
+        class_freq = freq(labels)
+        return weight(labels[split.train], class_freq) + weight(labels[split.val], class_freq)
+
+    def split_ratio(split: TrainValSplit) -> np.float64:
+        return np.float64(len(split.val) / (len(split.val) + len(split.train)))
+
+    def split_diff(split: TrainValSplit) -> np.float64:
+        return abs(split_frac - split_ratio(split))
+
+    def split_inv_diff(split: TrainValSplit) -> np.float64:
+        return abs(1 - split_frac - split_ratio(split))
+
+    # Selects minimization function based on inputs
     if stratified:
-        _, class_counts = np.unique(labels, return_counts=True)
-        class_freq = class_counts / class_counts.sum()
-        best_split = min(split_defs, key=class_freq_diff)
-        return best_split["train"], best_split["eval"]
-    elif eval_frac <= 2 / 3:
-        best_split = min(split_defs, key=lambda x: abs(eval_frac - x["eval_frac"]))  # type: ignore
-        return best_split["train"], best_split["eval"]
+        key_func = class_freq_diff
+    elif split_frac <= 2 / 3:
+        key_func = split_diff
     else:
-        best_split = min(split_defs, key=lambda x: abs(eval_frac - (1 - x["eval_frac"])))  # type: ignore
-        return best_split["eval"], best_split["train"]
+        key_func = split_inv_diff
+
+    return min(split_defs, key=key_func)
 
 
 def single_split(
     index: NDArray[np.int_],
     labels: NDArray[np.int_],
-    eval_frac: float,
+    split_frac: float,
     groups: NDArray[np.int_] | None = None,
     stratified: bool = False,
-) -> tuple[NDArray[np.int_], NDArray[np.int_]]:
-    """Handles the special case where only 1 partition of the data is desired (such as when
+) -> TrainValSplit:
+    """
+    Handles the special case where only 1 partition of the data is desired (such as when
     generating the test holdout split). In this case, the desired fraction of the data to be
-    partitioned into the test data must be specified, and a single [train, eval] pair are returned.
+    partitioned into the test data must be specified, and a single [train, val] pair is returned.
 
     Parameters
     ----------
-    index : np.ndarray
+    index : NDArray of ints
         Input Dataset index corresponding to each label
-    labels : np.ndarray
+    labels : NDArray of ints
         Labels upon which splits are (optionally) stratified
-    eval_frac : float
+    split_frac : float
         Fraction of incoming data to be set aside for evaluation
-    groups : np.ndarray, Optional
+    groups : NDArray of ints, Optional
         Group_ids (same shape as labels) for optional group partitioning
-    stratified : bool, default=False
+    stratified : bool, default False
         Generates stratified splits if true (recommended)
 
     Returns
     -------
-    train_index : np.ndarray
-        indices of data partitioned for training
-    eval_index : np.ndarray
-        indices of data partitioned for evaluation
+    TrainValSplit
+        Indices of data partitioned for training and evaluation
     """
-    if groups is not None:
-        n_unique_groups = np.unique(groups).shape[0]
-        _, label_counts = np.unique(labels, return_counts=True)
-        n_folds = min(n_unique_groups, label_counts.min())
-    elif eval_frac <= 2 / 3:
-        n_folds = max(2, int(round(1 / (eval_frac + 1e-6))))
-    else:
-        n_folds = max(2, int(round(1 / (1 - eval_frac - 1e-6))))
+
+    _, label_counts = np.unique(labels, return_counts=True)
+    max_folds = label_counts.min()
+    min_folds = np.unique(groups).shape[0] if groups is not None else 2
+    divisor = split_frac + 1e-06 if split_frac <= 2 / 3 else 1 - split_frac - 1e-06
+    n_folds = round(min(max(1 / divisor, min_folds), max_folds))  # Clips value between min_folds and max_folds
+
     split_candidates = make_splits(index, labels, n_folds, groups, stratified)
-    best_train, best_eval = find_best_split(labels, split_candidates, stratified, eval_frac)
-    return best_train, best_eval
+    return find_best_split(labels, split_candidates, stratified, split_frac)
 
 
+@set_metadata
 def split_dataset(
     labels: list[int] | NDArray[np.int_],
     num_folds: int = 1,
     stratify: bool = False,
     split_on: list[str] | None = None,
     metadata: dict[str, Any] | None = None,
-    test_frac: float | None = None,
-    val_frac: float | None = None,
-) -> dict[str, dict[str, NDArray[np.int_]] | NDArray[np.int_]]:
-    """Top level splitting function. Returns a dict with each key-value pair containing
-    train and validation indices. Indices for a test holdout may also be optionally included
+    test_frac: float = 0.0,
+    val_frac: float = 0.0,
+) -> SplitDatasetOutput:
+    """
+    Top level splitting function. Returns a dataclass containing a list of train and validation indices.
+    Indices for a test holdout may also be optionally included
 
     Parameters
     ----------
-    labels : Union[list, np.ndarray]
+    labels : list or NDArray of ints
         Classification Labels used to generate splits. Determines the size of the dataset
-    num_folds : int, optional
-        Number of train/val folds. If None, returns a single train/val split, and val_frac must be
-        specified. Defaults to None.
-    stratify : bool, default=False
+    num_folds : int, default 1
+        Number of [train, val] folds. If equal to 1, val_frac must be greater than 0.0
+    stratify : bool, default False
         If true, dataset is split such that the class distribution of the entire dataset is
-        preserved within each train/val partition, which is generally recommended.
-    split_on : list, optional
-        Keys of the metadata dictionary which map to columns upon which to group the dataset.
+        preserved within each [train, val] partition, which is generally recommended.
+    split_on : list or None, default None
+        Keys of the metadata dictionary upon which to group the dataset.
         A grouped partition is divided such that no group is present within both the training and
-        validation set. Split_on groups should be selected to mitigate validation bias. Defaults to
-        None, in which groups will not be considered when partitioning the data.
-    metadata : dict, optional
-        Dict containing data for potential dataset grouping. See split_on above. Defaults to None.
-    test_frac : float, optional
-        Fraction of data to be optionally held out for test set. Defaults to None, in which no test
-        set is created.
-    val_frac : float, optional
+        validation set. Split_on groups should be selected to mitigate validation bias
+    metadata : dict or None, default None
+        Dict containing data for potential dataset grouping. See split_on above
+    test_frac : float, default 0.0
+        Fraction of data to be optionally held out for test set
+    val_frac : float, default 0.0
         Fraction of training data to be set aside for validation in the case where a single
-        train/val split is desired. Defaults to None.
-
-    Raises
-    ------
-    UnboundLocalError
-        Raised if split_on is passed, but metadata is left as None. This is because split_on
-        defines the keys in which metadata dict must be indexed to determine the group index of the
-        data
+        [train, val] split is desired
 
     Returns
     -------
-    split_defs : dict
-        dictionary of folds, each containing indices of training and validation data.
-        ex.
-        {
-            "Fold_00":  {
-                            "train": [1,2,3,5,6,7,9,10,11],
-                            "val": [0, 4, 8, 12]
-                        },
-            "test": [13, 14, 15, 16]
-        }
+    split_defs : SplitDatasetOutput
+        Output class containing a list of indices of training
+        and validation data for each fold and optional test indices
+
+    Raises
+    ------
+    TypeError
+        Raised if split_on is passed, but metadata is None or empty
+
+    Note
+    ----
+    When specifying groups and/or stratification, ratios for test and validation splits can vary
+    as the stratification and grouping take higher priority than the percentages
     """
 
-    test_frac, val_frac = validate_test_val(num_folds, test_frac, val_frac)
+    val_frac = calculate_validation_fraction(num_folds, test_frac, val_frac)
     total_partitions = num_folds + 1 if test_frac else num_folds
-    index, labels = check_labels(labels, total_partitions)
-    stratify &= check_stratifiable(labels, total_partitions)
+
+    if isinstance(labels, list):
+        labels = np.array(labels, dtype=np.int_)
+
+    label_length: int = len(labels)
+
+    _validate_labels(labels, total_partitions)
+    stratify &= is_stratifiable(labels, total_partitions)
+    groups = None
     if split_on:
-        if metadata is None:
-            raise UnboundLocalError("If split_on is specified, metadata must also be provided")
-        groups = get_group_ids(metadata, split_on, len(labels))
-        groupable = check_groups(groups, total_partitions)
-        if not groupable:
-            groups = None
-    else:
-        groups = None
-    split_defs: dict[str, dict[str, NDArray[np.int_]] | NDArray[np.int_]] = {}
-    if test_frac:
-        tv_idx, test_idx = single_split(index, labels, test_frac, groups, stratify)
-        tv_labels = labels[tv_idx]
-        tv_groups = groups[tv_idx] if groups is not None else None
-        split_defs["test"] = test_idx
-    else:
-        tv_idx = np.arange(len(labels)).reshape((-1, 1))
-        tv_labels = labels
-        tv_groups = groups
+        if metadata is None or metadata == {}:
+            raise TypeError("If split_on is specified, metadata must also be provided, got None")
+        possible_groups = get_group_ids(metadata, split_on, label_length)
+        # Accounts for a test set that is 100 % of the data
+        group_partitions = total_partitions + 1 if val_frac else total_partitions
+        if is_groupable(possible_groups, group_partitions):
+            groups = possible_groups
+
+    test_indices: NDArray[np.int_]
+    index = np.arange(label_length)
+
+    tv_indices, test_indices = (
+        single_split(index=index, labels=labels, split_frac=test_frac, groups=groups, stratified=stratify)
+        if test_frac
+        else (index, np.array([], dtype=np.int_))
+    )
+
+    tv_labels = labels[tv_indices]
+    tv_groups = groups[tv_indices] if groups is not None else None
+
     if num_folds == 1:
-        train_idx, val_idx = single_split(tv_idx, tv_labels, val_frac, tv_groups, stratify)
-        split_defs["fold_0"] = {"train": tv_idx[train_idx].squeeze(), "val": tv_idx[val_idx].squeeze()}
+        tv_splits = [single_split(tv_indices, tv_labels, val_frac, tv_groups, stratify)]
     else:
-        tv_splits = make_splits(tv_idx, tv_labels, num_folds, tv_groups, stratify)
-        for i, split in enumerate(tv_splits):
-            train_split = tv_idx[split["train"]]
-            val_split = tv_idx[split["eval"]]
-            split_defs[f"fold_{i}"] = {"train": train_split.squeeze(), "val": val_split.squeeze()}
-    return split_defs
+        tv_splits = make_splits(tv_indices, tv_labels, num_folds, tv_groups, stratify)
+
+    folds: list[TrainValSplit] = [TrainValSplit(tv_indices[split.train], tv_indices[split.val]) for split in tv_splits]
+
+    return SplitDatasetOutput(test_indices, folds)
