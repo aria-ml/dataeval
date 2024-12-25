@@ -1,6 +1,15 @@
-[//]: # (102664ded7c9c6e77a27b7c9e180e69962dfa5de)
+[//]: # (e7a284de9d814f516b25b36712392311ada3039e)
 
 # DataEval Change Log
+
+## v0.74.2
+
+📝 **Miscellaneous**
+- `e7a284de` - Update dataset split unit tests
+- `f8731a44` - Add initial logging framework and unit test
+- `771dc1d1` - Add conda tests to pipeline
+- `2d9fd55a` - Update RTD yaml to use uv for installation
+- `0ab99a7f` - Initial prototyping of underspecification tests
 
 ## v0.74.1
 
