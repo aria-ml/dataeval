@@ -91,12 +91,14 @@ stages:
         - src/**/*
         - docs/**/*
         - environment/*
+        - *.md
   - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE != $UPDATE_CACHE_MESSAGE
     changes:
       paths:
         - src/**/*
         - docs/**/*
         - environment/*
+        - *.md
     variables:
       DOCS_CLEAN: '--clean'
   - if: $CI_COMMIT_BRANCH == 'main'
