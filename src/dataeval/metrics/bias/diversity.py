@@ -10,13 +10,42 @@ import numpy as np
 import scipy as sp
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval.metrics.bias.metadata_preprocessing import MetadataOutput
-from dataeval.metrics.bias.metadata_utils import diversity_bar_plot, get_counts, heatmap
 from dataeval.output import Output, set_metadata
+from dataeval.utils.metadata import Metadata, get_counts
+from dataeval.utils.plot import heatmap
 from dataeval.utils.shared import get_method
 
 with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure
+
+
+def _plot(labels: NDArray[Any], bar_heights: NDArray[Any]) -> Figure:
+    """
+    Plots a formatted bar plot
+
+    Parameters
+    ----------
+    labels : NDArray
+        Array containing the labels for each bar
+    bar_heights : NDArray
+        Array containing the values for each bar
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        Bar plot figure
+    """
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    ax.bar(labels, bar_heights)
+    ax.set_xlabel("Factors")
+
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+
+    fig.tight_layout()
+    return fig
 
 
 @dataclass(frozen=True)
@@ -77,8 +106,7 @@ class DiversityOutput(Output):
         else:
             # Creating label array for heat map axes
             heat_labels = np.concatenate((["class"], self.factor_names))
-
-            fig = diversity_bar_plot(heat_labels, self.diversity_index)
+            fig = _plot(heat_labels, self.diversity_index)
 
         return fig
 
@@ -165,7 +193,7 @@ def diversity_simpson(
 
 @set_metadata
 def diversity(
-    metadata: MetadataOutput,
+    metadata: Metadata,
     method: Literal["simpson", "shannon"] = "simpson",
 ) -> DiversityOutput:
     """
@@ -179,8 +207,8 @@ def diversity(
 
     Parameters
     ----------
-    metadata : MetadataOutput
-        Output after running `metadata_preprocessing`
+    metadata : Metadata
+        Preprocessed metadata from :func:`dataeval.utils.metadata.preprocess`
 
     Note
     ----

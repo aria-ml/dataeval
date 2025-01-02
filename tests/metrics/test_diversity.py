@@ -3,7 +3,7 @@ import pytest
 from matplotlib.figure import Figure
 
 from dataeval.metrics.bias import diversity
-from dataeval.metrics.bias.metadata_preprocessing import metadata_preprocessing
+from dataeval.utils.metadata import preprocess
 
 
 @pytest.fixture
@@ -12,7 +12,7 @@ def metadata_results():
     cnt_vals = [0.63784, -0.86422, -0.1017, -1.95131, -0.08494, -1.02940, 0.07908, -0.31724, -1.45562, 1.03368]
     class_labels = ["dog", "dog", "dog", "cat", "dog", "cat", "dog", "dog", "dog", "cat"]
     md = [{"var_cat": str_vals, "var_cnt": cnt_vals}]
-    return metadata_preprocessing(md, class_labels, {"var_cnt": 3})
+    return preprocess(md, class_labels, {"var_cnt": 3})
 
 
 class TestDiversityUnit:
@@ -56,27 +56,23 @@ class TestDiversityFunctional:
         "metadata, expected_result",
         [
             (
-                metadata_preprocessing([{"factor1": [5, 5, 5, 6, 6, 6]}], [0, 0, 0, 1, 1, 1], {}),
+                preprocess([{"factor1": [5, 5, 5, 6, 6, 6]}], [0, 0, 0, 1, 1, 1], {}),
                 (np.array([1, 1]), np.array([[0], [0]])),
             ),
             (
-                metadata_preprocessing(
-                    [{"factor1": [5.1, 4.9, 4.9, 6.1, 6.2, 6.1]}], [0, 0, 0, 1, 1, 1], {"factor1": 2}
-                ),
+                preprocess([{"factor1": [5.1, 4.9, 4.9, 6.1, 6.2, 6.1]}], [0, 0, 0, 1, 1, 1], {"factor1": 2}),
                 (np.array([1, 1]), np.array([[0], [0]])),
             ),
             (
-                metadata_preprocessing([{"factor1": [5, 5, 5, 5, 5, 5]}], [0, 0, 0, 1, 1, 1], {}),
+                preprocess([{"factor1": [5, 5, 5, 5, 5, 5]}], [0, 0, 0, 1, 1, 1], {}),
                 (np.array([1, 0]), np.array([[0], [0]])),
             ),
             (
-                metadata_preprocessing([{"factor1": [5, 5, 5, 6, 6, 6]}], [0, 0, 0, 0, 0, 0], {}),
+                preprocess([{"factor1": [5, 5, 5, 6, 6, 6]}], [0, 0, 0, 0, 0, 0], {}),
                 (np.array([0, 1]), np.array([[1]])),
             ),
             (
-                metadata_preprocessing(
-                    [{"factor1": [5, 6, 5, 6, 5, 6], "factor2": [0, 0, 5, 0, 5, 5]}], [1, 1, 1, 2, 2, 2], {}
-                ),
+                preprocess([{"factor1": [5, 6, 5, 6, 5, 6], "factor2": [0, 0, 5, 0, 5, 5]}], [1, 1, 1, 2, 2, 2], {}),
                 (np.array([1, 1, 1]), np.array([[0.8, 0.8], [0.8, 0.8]])),
             ),
         ],
@@ -90,27 +86,23 @@ class TestDiversityFunctional:
         "metadata, expected_result",
         [
             (
-                metadata_preprocessing([{"factor1": [5, 5, 5, 6, 6, 6]}], [0, 0, 0, 1, 1, 1], {}),
+                preprocess([{"factor1": [5, 5, 5, 6, 6, 6]}], [0, 0, 0, 1, 1, 1], {}),
                 (np.array([1, 1]), np.array([[0], [0]])),
             ),
             (
-                metadata_preprocessing(
-                    [{"factor1": [5.1, 4.9, 4.9, 6.1, 6.2, 6.1]}], [0, 0, 0, 1, 1, 1], {"factor1": 2}
-                ),
+                preprocess([{"factor1": [5.1, 4.9, 4.9, 6.1, 6.2, 6.1]}], [0, 0, 0, 1, 1, 1], {"factor1": 2}),
                 (np.array([1, 1]), np.array([[0], [0]])),
             ),
             (
-                metadata_preprocessing([{"factor1": [5, 5, 5, 5, 5, 5]}], [0, 0, 0, 1, 1, 1], {}),
+                preprocess([{"factor1": [5, 5, 5, 5, 5, 5]}], [0, 0, 0, 1, 1, 1], {}),
                 (np.array([1, 0]), np.array([[0], [0]])),
             ),
             (
-                metadata_preprocessing([{"factor1": [5, 5, 5, 6, 6, 6]}], [0, 0, 0, 0, 0, 0], {}),
+                preprocess([{"factor1": [5, 5, 5, 6, 6, 6]}], [0, 0, 0, 0, 0, 0], {}),
                 (np.array([0, 1]), np.array([[1]])),
             ),
             (
-                metadata_preprocessing(
-                    [{"factor1": [5, 6, 5, 6, 5, 6], "factor2": [0, 0, 5, 0, 5, 5]}], [1, 1, 1, 2, 2, 2], {}
-                ),
+                preprocess([{"factor1": [5, 6, 5, 6, 5, 6], "factor2": [0, 0, 5, 0, 5, 5]}], [1, 1, 1, 2, 2, 2], {}),
                 (np.array([1, 1, 1]), np.array([[0.91829583, 0.91829583], [0.91829583, 0.91829583]])),
             ),
         ],

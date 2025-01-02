@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader
 
 from dataeval.utils.torch.models import AriaAutoencoder, Decoder, Encoder
 from dataeval.utils.torch.trainer import AETrainer, get_images_from_batch
-from tests.utils.data import DataEvalDataset
+from tests.mock.data import DataEvalDataset
 
 
 @pytest.fixture

@@ -5,8 +5,7 @@ import numpy as np
 import pytest
 from matplotlib.figure import Figure
 
-from dataeval.metrics.bias.coverage import coverage
-from dataeval.metrics.bias.metadata_utils import coverage_plot
+from dataeval.metrics.bias.coverage import _plot, coverage
 
 
 class TestCoverageUnit:
@@ -53,11 +52,11 @@ class TestCoverageUnit:
 
     def test_coverage_plot(self):
         images = np.ones((6, 28, 28), dtype=np.intp)
-        result = coverage_plot(images, 6)
+        result = _plot(images, 6)
         assert isinstance(result, Figure)
         images = np.ones((6, 28), dtype=np.intp)
         with pytest.raises(ValueError):
-            result = coverage_plot(images, 6)
+            result = _plot(images, 6)
 
 
 class TestCoverageFunctional:

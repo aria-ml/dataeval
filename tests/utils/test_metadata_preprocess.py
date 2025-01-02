@@ -1,12 +1,12 @@
 import numpy as np
 import pytest
 
-from dataeval.metrics.bias.metadata_preprocessing import (
+from dataeval.utils.metadata import (
     CONTINUOUS_MIN_SAMPLE_SIZE,
     _binning_function,
     _is_continuous,
     _user_defined_bin,
-    metadata_preprocessing,
+    preprocess,
 )
 
 
@@ -16,7 +16,7 @@ class TestMDPreprocessingUnit:
         factors = [{"factor1": ["a"] * 10, "factor2": ["b"] * 11}]
         err_msg = """[UserWarning("Dropping nested list found in '('factor2',)'.")]"""
         with pytest.warns(UserWarning, match=err_msg):
-            metadata_preprocessing(factors, labels)
+            preprocess(factors, labels)
 
     def test_bad_factor_ref(self):
         labels = [0] * 5 + [1] * 5
@@ -24,7 +24,7 @@ class TestMDPreprocessingUnit:
         continuous_bincounts = {"something_else": 2}
         err_msg = "The keys - {'something_else'} - are present in the `continuous_factor_bins` dictionary "
         with pytest.raises(KeyError) as e:
-            metadata_preprocessing(factors, labels, continuous_bincounts)
+            preprocess(factors, labels, continuous_bincounts)
         assert err_msg in str(e.value)
 
     def test_wrong_shape(self):
@@ -32,14 +32,14 @@ class TestMDPreprocessingUnit:
         factors = [{"factor1": [10, 20]}]
         err_msg = "Got class labels with 2-dimensional shape (2, 1), but expected a 1-dimensional array."
         with pytest.raises(ValueError) as e:
-            metadata_preprocessing(factors, labels)
+            preprocess(factors, labels)
         assert err_msg in str(e.value)
 
     def test_doesnt_modify_input(self):
         factors = [{"data1": [0.1, 0.2, 0.3]}]
         labels = [0, 0, 0]
         bincounts = {"data1": 1}
-        output = metadata_preprocessing(factors, labels, bincounts)
+        output = preprocess(factors, labels, bincounts)
         if output.continuous_data is not None:
             cont_factors = output.continuous_data.T[0]
             assert np.all(cont_factors == [0.1, 0.2, 0.3])
@@ -57,7 +57,7 @@ class TestMDPreprocessingUnit:
         labels = list(np.random.randint(5, size=len(data_values)))
         err_msg = "A user defined binning was not provided for data."
         with pytest.warns(UserWarning, match=err_msg):
-            metadata_preprocessing(factors, labels)
+            preprocess(factors, labels)
 
 
 class TestMDPreprocessingFunctional:
@@ -65,7 +65,7 @@ class TestMDPreprocessingFunctional:
         factors = [{"data1": [0.1, 0.2, 0.3, 1.1, 1.2]}]
         labels = [0, 0, 0, 0, 0]
         bincounts = {"data1": 2}
-        output = metadata_preprocessing(factors, labels, bincounts)
+        output = preprocess(factors, labels, bincounts)
         disc_factors = output.discrete_data
         assert len(np.unique(disc_factors)) == 2
 
@@ -73,7 +73,7 @@ class TestMDPreprocessingFunctional:
         factors = [{"data1": [0.1, 0.2, 0.3, 1.1, 1.2]}]
         bin_edges = {"data1": [-np.inf, 1, np.inf]}
         labels = [0, 0, 0, 0, 0]
-        output = metadata_preprocessing(factors, labels, bin_edges)
+        output = preprocess(factors, labels, bin_edges)
         disc_factors = output.discrete_data
         assert len(np.unique(disc_factors)) == 2
 
@@ -81,7 +81,7 @@ class TestMDPreprocessingFunctional:
         factors = [{"data1": [-1.1, 0.2, 0.3, 1.1, 1.2], "data2": [-1.1, 0.2, 0.3, 1.1, 1.2]}]
         labels = [0, 0, 0, 0, 0]
         bincounts = {"data1": 3, "data2": [-np.inf, 1, np.inf]}
-        output = metadata_preprocessing(factors, labels, bincounts)
+        output = preprocess(factors, labels, bincounts)
         disc_factors = output.discrete_data.T
         assert len(np.unique(disc_factors[0])) == 3
         assert len(np.unique(disc_factors[1])) == 2
@@ -90,7 +90,7 @@ class TestMDPreprocessingFunctional:
         factors = [{"data1": [0.1, 0.2, 0.3, 1.1, 1.2]}]
         labels = [0, 0, 0, 0, 0]
         bincounts = {"data1": 1}
-        output = metadata_preprocessing(factors, labels, bincounts)
+        output = preprocess(factors, labels, bincounts)
         disc_factors = output.discrete_data
         assert len(np.unique(disc_factors)) == 1
 
@@ -98,7 +98,7 @@ class TestMDPreprocessingFunctional:
         factors = [{"data1": [0.1, 0.2, 0.3, 1.1, 1.2]}]
         labels = [0, 0, 0, 0, 0]
         bincounts = {"data1": 100}
-        output = metadata_preprocessing(factors, labels, bincounts)
+        output = preprocess(factors, labels, bincounts)
         disc_factors = output.discrete_data
         assert len(np.unique(disc_factors)) == 5
 
