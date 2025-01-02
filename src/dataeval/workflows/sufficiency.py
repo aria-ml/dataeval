@@ -2,21 +2,23 @@ from __future__ import annotations
 
 __all__ = ["SufficiencyOutput", "Sufficiency"]
 
+import contextlib
 import warnings
 from dataclasses import dataclass
 from typing import Any, Callable, Generic, Iterable, Mapping, Sequence, TypeVar, cast
 
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
-from matplotlib.figure import Figure
 from numpy.typing import ArrayLike, NDArray
 from scipy.optimize import basinhopping
 from torch.utils.data import Dataset
 
 from dataeval.interop import as_numpy
 from dataeval.output import Output, set_metadata
+
+with contextlib.suppress(ImportError):
+    from matplotlib.figure import Figure
 
 
 @dataclass(frozen=True)
@@ -97,7 +99,7 @@ class SufficiencyOutput(Output):
 
         Returns
         -------
-        list[plt.Figure]
+        list[Figure]
             List of Figures for each measure
 
         Raises
@@ -344,7 +346,9 @@ def plot_measure(
     params: NDArray[Any],
     projection: NDArray[Any],
 ) -> Figure:
-    fig = plt.figure()
+    import matplotlib.pyplot
+
+    fig = matplotlib.pyplot.figure()
     fig = cast(Figure, fig)
     fig.tight_layout()
 

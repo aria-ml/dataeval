@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-from dataeval.output import Output, set_metadata
-
 __all__ = ["split_dataset", "SplitDatasetOutput"]
 
 import warnings
+from dataclasses import dataclass
 from typing import Any, Iterator, NamedTuple, Protocol
 
 import numpy as np
@@ -15,6 +12,8 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.model_selection import GroupKFold, KFold, StratifiedGroupKFold, StratifiedKFold
 from sklearn.utils.multiclass import type_of_target
+
+from dataeval.output import Output, set_metadata
 
 
 class TrainValSplit(NamedTuple):
