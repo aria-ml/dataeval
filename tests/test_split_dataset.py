@@ -122,8 +122,8 @@ class TestInputValidation:
         """Tests that an error is raised if there are more partitions than number of labels"""
 
         error_statement = (
-            "Total number of labels must be greater than the total number of partitions. "
-            "Got 1 labels and 1 total \[train, val, test\] partitions."
+            r"Total number of labels must be greater than the total number of partitions. "
+            r"Got 1 labels and 1 total \[train, val, test\] partitions."
         )
 
         with pytest.raises(ValueError, match=error_statement):

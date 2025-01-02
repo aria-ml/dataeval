@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+__all__ = ["AETrainer", "trainer"]
+
 from typing import Any, Callable
 
 import torch
@@ -8,8 +10,6 @@ from numpy.typing import NDArray
 from torch.optim import Adam
 from torch.utils.data import DataLoader, Dataset, TensorDataset
 from tqdm import tqdm
-
-__all__ = ["AETrainer", "trainer"]
 
 
 def get_images_from_batch(batch: Any) -> Any:

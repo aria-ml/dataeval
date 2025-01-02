@@ -8,7 +8,7 @@ PYTHON_VERSION = f"{version_info[0]}.{version_info[1]}"
 nox.options.default_venv_backend = "uv"
 nox.options.sessions = ["test", "type", "deps", "lint", "doctest", "check"]
 
-INSTALL_ARGS = ["-e", ".", "-r", "environment/requirements.txt", "-r", "environment/requirements-dev.txt"]
+INSTALL_ARGS = ["--no-deps", "-e", ".", "-r", "environment/requirements.txt", "-r", "environment/requirements-dev.txt"]
 INSTALL_ENVS = {"UV_INDEX_STRATEGY": "unsafe-best-match", "POETRY_DYNAMIC_VERSIONING_BYPASS": "0.0.0"}
 COMMON_ENVS = {"TQDM_DISABLE": "1"}
 DOCS_ENVS = {"LANG": "C", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True", "PYDEVD_DISABLE_FILE_VALIDATION": "1"}
@@ -76,7 +76,7 @@ def type(session: nox.Session) -> None:  # noqa: A001
 
 @nox.session(reuse_venv=False)
 def deps(session: nox.Session) -> None:
-    """Run minimal unit tests against baseline installation."""
+    """Run unit tests against standard installation."""
     check_version(session.name)
     session.install(".", "pytest", env=INSTALL_ENVS)
     session.run("pytest", "tests/test_mindeps.py")
