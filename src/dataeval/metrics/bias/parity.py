@@ -12,8 +12,8 @@ from scipy.stats import chisquare
 from scipy.stats.contingency import chi2_contingency, crosstab
 
 from dataeval.interop import as_numpy, to_numpy
-from dataeval.metrics.bias.metadata_preprocessing import MetadataOutput
 from dataeval.output import Output, set_metadata
+from dataeval.utils.metadata import Metadata
 
 TData = TypeVar("TData", np.float64, NDArray[np.float64])
 
@@ -205,7 +205,7 @@ def label_parity(
 
 
 @set_metadata
-def parity(metadata: MetadataOutput) -> ParityOutput[NDArray[np.float64]]:
+def parity(metadata: Metadata) -> ParityOutput[NDArray[np.float64]]:
     """
     Calculate chi-square statistics to assess the linear relationship between multiple factors
     and class labels.
@@ -216,8 +216,8 @@ def parity(metadata: MetadataOutput) -> ParityOutput[NDArray[np.float64]]:
 
     Parameters
     ----------
-    metadata : MetadataOutput
-        Output after running `metadata_preprocessing`
+    metadata : Metadata
+        Preprocessed metadata from :func:`dataeval.utils.metadata.preprocess`
 
     Returns
     -------
@@ -258,7 +258,7 @@ def parity(metadata: MetadataOutput) -> ParityOutput[NDArray[np.float64]]:
     ...     }
     ... ]
     >>> continuous_factor_bincounts = {"age": 4, "income": 3}
-    >>> metadata = metadata_preprocessing(metadata_dict, labels, continuous_factor_bincounts)
+    >>> metadata = preprocess(metadata_dict, labels, continuous_factor_bincounts)
     >>> parity(metadata)
     ParityOutput(score=array([7.35731943, 5.46711299, 0.51506212]), p_value=array([0.28906231, 0.24263543, 0.77295762]), metadata_names=['age', 'income', 'gender'])
     """  # noqa: E501
