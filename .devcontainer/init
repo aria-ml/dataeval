@@ -39,7 +39,7 @@ uv pip install
 echo -n ${versions[*]} | xargs -n1 bash -c '\
     echo "Creating python virtual environment for $0..." && \
     uv venv --seed --allow-existing --python $0 .venv-$0 --link-mode copy && \
-    uv pip install --python .venv-$0 --index-strategy unsafe-best-match --link-mode copy \
+    uv pip install --python .venv-$0 --index-strategy unsafe-best-match --link-mode copy --no-deps \
         -e . \
         -r environment/requirements.txt \
         -r environment/requirements-dev.txt'
