@@ -44,20 +44,20 @@ packages = [
 python = ">=3.9,<3.13"
 numpy = {version = ">=1.24.3"}
 pillow = {version = ">=10.3.0"}
+requests = {version = "*"}
 scipy = {version = ">=1.10"}
 scikit-learn = {version = ">=1.5.0"}
+torch = {version = ">=2.2.0", source = "pytorch"}
+torchvision = {version = ">=0.17.0", source = "pytorch"}
 tqdm = {version = "*"}
-typing-extensions = {version = ">=4.12", python = ">=3.9,<3.10"}  # ParamSpec
+typing-extensions = {version = ">=4.12", python = "^3.9"}  # ParamSpec
 xxhash = {version = ">=3.3"}
 
 # optional
 matplotlib = {version = "*", optional = true}
-torch = {version = ">=2.2.0", source = "pytorch", optional = true}
-torchvision = {version = ">=0.17.0", source = "pytorch", optional = true}
 
 [tool.poetry.extras]
-torch = ["torch", "torchvision"]
-all = ["matplotlib", "torch", "torchvision"]
+all = ["matplotlib"]
 
 [tool.poetry.group.dev]
 optional = true
@@ -68,6 +68,7 @@ uv = {version = "*"}
 poetry = {version = "*"}
 poetry-lock-groups-plugin = {version = "*"}
 poetry2conda = {version = "*"}
+numpy = {version = ">=2.0.2"}
 # lint
 ruff = {version = "*"}
 codespell = {version = "*", extras = ["toml"]}
@@ -76,14 +77,12 @@ pytest = {version = "*"}
 pytest-cov = {version = "*"}
 pytest-xdist = {version = "*"}
 coverage = {version = "*", extras = ["toml"]}
-torchmetrics = {version = ">=1.0.0", source = "pytorch"}
 # type
 pyright = {version = "*", extras = ["nodejs"]}
 # prototype
 maite = {version = "*"}
 pandas = {version = "*"}
 seaborn = {version = "*"}
-numpy = {version = ">=2.0.2"}
 # docs
 certifi = {version = ">=2024.07.04"}
 enum_tools = {version = ">=0.12.0", extras = ["sphinx"]}
@@ -96,6 +95,7 @@ pydata-sphinx-theme = {version = ">=0.15.4"}
 sphinx-design = {version = "*"}
 sphinx-tabs = {version = "*"}
 Sphinx = {version = ">=7.2.6"}
+torchmetrics = {version = ">=1.0.0", source = "pytorch"}
 markupsafe = {version = "<3.0.2", optional = true}
 
 [[tool.poetry.source]]
@@ -136,8 +136,6 @@ parallel = true
 [tool.coverage.report]
 exclude_also = [
   "raise NotImplementedError",
-  "if _IS_TORCH_AVAILABLE",
-  "if _IS_TORCHVISION_AVAILABLE",
 ]
 include = ["*/src/dataeval/*"]
 omit = [

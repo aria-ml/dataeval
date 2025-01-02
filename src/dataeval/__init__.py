@@ -1,7 +1,10 @@
 __version__ = "0.0.0"
 
+__all__ = ["log_stderr", "detectors", "metrics", "utils", "workflows"]
+
 import logging
-from importlib.util import find_spec
+
+from dataeval import detectors, metrics, utils, workflows
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
@@ -19,18 +22,3 @@ def log_stderr(level: int = logging.DEBUG) -> None:
     logger.addHandler(handler)
     logger.setLevel(level)
     logger.debug("Added a stderr logging handler to logger: %s", __name__)
-
-
-_IS_TORCH_AVAILABLE = find_spec("torch") is not None
-_IS_TORCHVISION_AVAILABLE = find_spec("torchvision") is not None
-
-del find_spec
-
-from dataeval import detectors, metrics  # noqa: E402
-
-__all__ = ["log_stderr", "detectors", "metrics"]
-
-if _IS_TORCH_AVAILABLE:
-    from dataeval import utils, workflows
-
-    __all__ += ["utils", "workflows"]

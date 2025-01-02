@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-from types import ModuleType
-
-from dataeval.logging import LogMessage
-
 __all__ = ["as_numpy", "to_numpy", "to_numpy_iter"]
 
 import logging
 from importlib import import_module
+from types import ModuleType
 from typing import Any, Iterable, Iterator
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
+
+from dataeval.utils.logging import LogMessage
 
 _logger = logging.getLogger(__name__)
 
