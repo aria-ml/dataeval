@@ -18,7 +18,7 @@ from dataeval.workflows.sufficiency import (
     inv_project_steps,
     project_steps,
 )
-from tests.utils.data import DataEvalDataset
+from tests.mock.data import DataEvalDataset
 
 np.random.seed(0)
 torch.manual_seed(0)

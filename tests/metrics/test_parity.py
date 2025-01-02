@@ -3,8 +3,8 @@ import warnings
 import numpy as np
 import pytest
 
-from dataeval.metrics.bias.metadata_preprocessing import metadata_preprocessing
 from dataeval.metrics.bias.parity import label_parity, parity
+from dataeval.utils.metadata import preprocess
 
 
 class MockDistributionDataset:
@@ -16,8 +16,10 @@ class MockDistributionDataset:
     def __init__(self, label_dist):
         for label_curr in label_dist:
             if not isinstance(label_curr, (int, np.integer)):
-                raise Exception(f"Expected integer in the distribution of labels, got \
-                                {label_curr} with type {type(label_curr)}")
+                raise Exception(
+                    f"Expected integer in the distribution of labels, got \
+                                {label_curr} with type {type(label_curr)}"
+                )
 
         self.image = np.array([0, 0, 0])
         self.image = np.array([0, 0, 0])
@@ -178,14 +180,14 @@ class TestMDParityUnit:
     def test_warns_with_not_enough_frequency(self):
         labels = [0, 1]
         factors = [{"factor1": [10, 20]}]
-        metadata = metadata_preprocessing(factors, labels)
+        metadata = preprocess(factors, labels)
         with pytest.warns(UserWarning):
             parity(metadata)
 
     def test_passes_with_enough_frequency(self):
         labels = [0] * 5 + [1] * 5
         factors = [{"factor1": ["foo"] * 10}]
-        metadata = metadata_preprocessing(factors, labels)
+        metadata = preprocess(factors, labels)
         parity(metadata)
 
 
@@ -198,7 +200,7 @@ class TestMDParityFunctional:
         """
         labels = [0] * 5 + [1] * 5
         factors = [{"factor1": ["a"] * 5 + ["b"] * 5}]
-        metadata = metadata_preprocessing(factors, labels)
+        metadata = preprocess(factors, labels)
         result = parity(metadata)
 
         # Checks that factor1 is highly correlated with class
@@ -211,7 +213,7 @@ class TestMDParityFunctional:
         """
         labels = [0] * 5 + [1] * 5
         factors = [{"factor1": ["foo"] * 10}]
-        metadata = metadata_preprocessing(factors, labels)
+        metadata = preprocess(factors, labels)
         result = parity(metadata)
 
         # Checks that factor1 is uncorrelated with class
@@ -226,11 +228,11 @@ class TestMDParityFunctional:
         labels = [0] * 5 + [1] * 5
         factors = [{"factor1": [10] * 2 + [11] * 3 + [20] * 5}]
         continuous_bincounts = {"factor1": 2}
-        metadata = metadata_preprocessing(factors, labels, continuous_bincounts)
+        metadata = preprocess(factors, labels, continuous_bincounts)
         result1 = parity(metadata)
 
         discrete_dataset = [{"factor2": [10] * 5 + [20] * 5}]
-        metadata = metadata_preprocessing(discrete_dataset, labels)
+        metadata = preprocess(discrete_dataset, labels)
         result2 = parity(metadata)
 
         # Checks that the test on the quantization continuous_dataset is
@@ -246,7 +248,7 @@ class TestMDParityFunctional:
         labels = [0] * 5 + [1] * 5
         factors = [{"factor1": [10] * 2 + [11] * 3 + [20] * 5}]
         continuous_bincounts = {"factor1": 1}
-        metadata = metadata_preprocessing(factors, labels, continuous_bincounts)
+        metadata = preprocess(factors, labels, continuous_bincounts)
         result = parity(metadata)
 
         # Checks if factor1 and class are perfectly uncorrelated
@@ -261,7 +263,7 @@ class TestMDParityFunctional:
         labels = [0] * 5 + [1] * 5
         factors = [{"factor1": list(np.arange(10))}]
         continuous_bincounts = {"factor1": 10}
-        metadata = metadata_preprocessing(factors, labels, continuous_bincounts)
+        metadata = preprocess(factors, labels, continuous_bincounts)
 
         # Looks for a warning that there are (class,factor1) pairs with too low frequency
         with pytest.warns(UserWarning):

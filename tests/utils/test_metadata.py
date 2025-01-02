@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.utils.metadata import _convert_type, _try_cast, merge_metadata
+from dataeval.utils.metadata import _convert_type, _try_cast, merge
 
 
 class TestUtilsMetadata:
@@ -229,7 +229,7 @@ class TestUtilsMetadata:
     }
 
     def test_ignore_lists(self):
-        a, b = merge_metadata([self.duplicate_keys], ignore_lists=True)
+        a, b = merge([self.duplicate_keys], ignore_lists=True)
         assert b == np.array([0])
         assert {k: list(v) for k, v in a.items()} == {
             "a": [1],
@@ -242,7 +242,7 @@ class TestUtilsMetadata:
         }
 
     def test_fully_qualified_keys(self):
-        a, b = merge_metadata([self.duplicate_keys], fully_qualified=True)
+        a, b = merge([self.duplicate_keys], fully_qualified=True)
         assert b == np.array([0])
         assert {k: list(v) for k, v in a.items()} == {
             "a": [1, 1, 1],
@@ -260,7 +260,7 @@ class TestUtilsMetadata:
 
     @pytest.mark.parametrize("as_numpy", [False, True])
     def test_duplicate_keys(self, as_numpy):
-        a, b = merge_metadata([self.duplicate_keys], as_numpy=as_numpy)
+        a, b = merge([self.duplicate_keys], as_numpy=as_numpy)
         assert b == np.array([0])
         assert {k: list(v) for k, v in a.items()} == {
             "a": [1, 1, 1],
@@ -279,7 +279,7 @@ class TestUtilsMetadata:
     @pytest.mark.parametrize("as_numpy", [False, True])
     def test_inconsistent_keys(self, as_numpy):
         with pytest.warns(UserWarning, match="Inconsistent metadata keys found."):
-            a, b = merge_metadata(self.inconsistent_keys, as_numpy=as_numpy)
+            a, b = merge(self.inconsistent_keys, as_numpy=as_numpy)
         assert b.size == 2
         assert (b == [0, 1]).all()
         assert {k: list(v) for k, v in a.items()} == {"a": [1, 2]}
@@ -287,7 +287,7 @@ class TestUtilsMetadata:
     @pytest.mark.parametrize("as_numpy", [False, True])
     def test_voc_test(self, as_numpy):
         with pytest.warns(UserWarning, match="Dropping nested list"):
-            a, b = merge_metadata(self.voc_test, as_numpy=as_numpy)
+            a, b = merge(self.voc_test, as_numpy=as_numpy)
         assert b.size == 3
         assert (b == [0, 3, 8]).all()
         assert {k: list(v) for k, v in a.items()} == {
@@ -396,7 +396,7 @@ class TestUtilsMetadata:
         }
 
     def test_dict_of_dicts(self):
-        output, _ = merge_metadata(self.dict_of_dicts)  # type: ignore
+        output, _ = merge(self.dict_of_dicts)  # type: ignore
         assert output == {
             "keys": ["sample1", "sample2", "sample3", "sample4"],
             "a_that": [37.0, 3.0, 3.7, 137.0],

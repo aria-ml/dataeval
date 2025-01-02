@@ -21,9 +21,9 @@ design tests for model generalization or data augmentation to mitigate the
 opportunity for shortcut learning or sampling imbalance.
 
 In order to use {term}`parity<Parity>`, the user must supply their metadata in a DataEval
-specific format. Because of this requirement, DataEval has a `metadata_preprocessing` function
+specific format. Because of this requirement, DataEval has a `preprocess` function
 that will take in user [metadata](Metadata.md) and format it into DataEval's format. The parity function takes
-in the output of the {func}`.metadata_preprocessing` function for its analysis.
+in the output of the {func}`.preprocess` function for its analysis.
 
 ## Why use parity over other statistical methods?
 

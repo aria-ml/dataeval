@@ -12,9 +12,9 @@ import scipy as sp
 from numpy.typing import NDArray
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 
-from dataeval.metrics.bias.metadata_preprocessing import MetadataOutput
-from dataeval.metrics.bias.metadata_utils import get_counts, heatmap
 from dataeval.output import Output, set_metadata
+from dataeval.utils.metadata import Metadata, get_counts
+from dataeval.utils.plot import heatmap
 
 with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure
@@ -119,7 +119,7 @@ def _validate_num_neighbors(num_neighbors: int) -> int:
 
 @set_metadata
 def balance(
-    metadata: MetadataOutput,
+    metadata: Metadata,
     num_neighbors: int = 5,
 ) -> BalanceOutput:
     """
@@ -127,8 +127,8 @@ def balance(
 
     Parameters
     ----------
-    metadata : MetadataOutput
-        Output after running `metadata_preprocessing`
+    metadata : Metadata
+        Preprocessed metadata from :func:`dataeval.utils.metadata.preprocess`
 
     Returns
     -------

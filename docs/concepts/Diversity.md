@@ -39,9 +39,9 @@ diversity indices to develop and sample their training data or to contextualize
 results during iterative model development.
 
 In order to use {term}`diversity<Diversity>`, the user must supply their metadata in a DataEval
-specific format. Because of this requirement, DataEval has a `metadata_preprocessing` function
+specific format. Because of this requirement, DataEval has a `preprocess` function
 that will take in user [metadata](Metadata.md) and format it into DataEval's format. The diversity function takes
-in the output of the {func}`.metadata_preprocessing` function for its analysis.
+in the output of the {func}`.preprocess` function for its analysis.
 
 ## Theory behind it
 

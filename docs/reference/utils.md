@@ -11,11 +11,11 @@
 ## Functions
 
 ```{testsetup}
-from dataeval.utils import merge_metadata
+from dataeval.utils.metadata import merge
 ```
 
 ```{eval-rst}
-.. autofunction:: merge_metadata
+.. autofunction:: merge
 ```
 
 ## Submodules
