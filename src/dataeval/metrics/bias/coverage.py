@@ -5,19 +5,67 @@ __all__ = ["CoverageOutput", "coverage"]
 import contextlib
 import math
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy.spatial.distance import pdist, squareform
 
 from dataeval.interop import to_numpy
-from dataeval.metrics.bias.metadata_utils import coverage_plot
 from dataeval.output import Output, set_metadata
 from dataeval.utils.shared import flatten
 
 with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure
+
+
+def _plot(images: NDArray[Any], num_images: int) -> Figure:
+    """
+    Creates a single plot of all of the provided images
+
+    Parameters
+    ----------
+    images : NDArray
+        Array containing only the desired images to plot
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        Plot of all provided images
+    """
+    import matplotlib.pyplot as plt
+
+    num_images = min(num_images, len(images))
+
+    if images.ndim == 4:
+        images = np.moveaxis(images, 1, -1)
+    elif images.ndim == 3:
+        images = np.repeat(images[:, :, :, np.newaxis], 3, axis=-1)
+    else:
+        raise ValueError(
+            f"Expected a (N,C,H,W) or a (N, H, W) set of images, but got a {images.ndim}-dimensional set of images."
+        )
+
+    rows = int(np.ceil(num_images / 3))
+    fig, axs = plt.subplots(rows, 3, figsize=(9, 3 * rows))
+
+    if rows == 1:
+        for j in range(3):
+            if j >= len(images):
+                continue
+            axs[j].imshow(images[j])
+            axs[j].axis("off")
+    else:
+        for i in range(rows):
+            for j in range(3):
+                i_j = i * 3 + j
+                if i_j >= len(images):
+                    continue
+                axs[i, j].imshow(images[i_j])
+                axs[i, j].axis("off")
+
+    fig.tight_layout()
+    return fig
 
 
 @dataclass(frozen=True)
@@ -62,7 +110,7 @@ class CoverageOutput(Output):
         selected_images = images[highest_uncovered_indices]
 
         # Plot the images
-        fig = coverage_plot(selected_images, top_k)
+        fig = _plot(selected_images, top_k)
 
         return fig
 
