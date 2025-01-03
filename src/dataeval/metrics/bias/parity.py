@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["ParityOutput", "parity", "label_parity"]
+__all__ = []
 
 import warnings
 from dataclasses import dataclass
@@ -167,8 +167,9 @@ def label_parity(
     --------
     Randomly creating some label distributions using ``np.random.default_rng``
 
-    >>> expected_labels = np_random_gen.choice([0, 1, 2, 3, 4], (100))
-    >>> observed_labels = np_random_gen.choice([2, 3, 0, 4, 1], (100))
+    >>> rng = np.random.default_rng(175)
+    >>> expected_labels = rng.choice([0, 1, 2, 3, 4], (100))
+    >>> observed_labels = rng.choice([2, 3, 0, 4, 1], (100))
     >>> label_parity(expected_labels, observed_labels)
     ParityOutput(score=14.007374204742625, p_value=0.0072715574616218, metadata_names=None)
     """
@@ -249,12 +250,14 @@ def parity(metadata: Metadata) -> ParityOutput[NDArray[np.float64]]:
     --------
     Randomly creating some "continuous" and categorical variables using ``np.random.default_rng``
 
-    >>> labels = np_random_gen.choice([0, 1, 2], (100))
+    >>> from dataeval.utils.metadata import preprocess
+    >>> rng = np.random.default_rng(175)
+    >>> labels = rng.choice([0, 1, 2], (100))
     >>> metadata_dict = [
     ...     {
-    ...         "age": list(np_random_gen.choice([25, 30, 35, 45], (100))),
-    ...         "income": list(np_random_gen.choice([50000, 65000, 80000], (100))),
-    ...         "gender": list(np_random_gen.choice(["M", "F"], (100))),
+    ...         "age": list(rng.choice([25, 30, 35, 45], (100))),
+    ...         "income": list(rng.choice([50000, 65000, 80000], (100))),
+    ...         "gender": list(rng.choice(["M", "F"], (100))),
     ...     }
     ... ]
     >>> continuous_factor_bincounts = {"age": 4, "income": 3}

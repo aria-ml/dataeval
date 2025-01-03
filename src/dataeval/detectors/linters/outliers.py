@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["OutliersOutput", "Outliers"]
+__all__ = []
 
 from dataclasses import dataclass
 from typing import Generic, Iterable, Literal, Sequence, TypeVar, Union, overload
@@ -188,6 +188,7 @@ class Outliers:
         -------
         Evaluate the dataset:
 
+        >>> outliers = Outliers(outlier_method="zscore", outlier_threshold=3.5)
         >>> results = outliers.from_stats([stats1, stats2])
         >>> len(results)
         2
@@ -248,7 +249,8 @@ class Outliers:
         -------
         Evaluate the dataset:
 
-        >>> results = outliers.evaluate(images)
+        >>> outliers = Outliers(outlier_method="zscore", outlier_threshold=3.5)
+        >>> results = outliers.evaluate(outlier_images)
         >>> list(results.issues)
         [10, 12]
         >>> results.issues[10]

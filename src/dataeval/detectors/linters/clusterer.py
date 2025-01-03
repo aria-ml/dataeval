@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["ClustererOutput", "Clusterer"]
+__all__ = []
 
 from dataclasses import dataclass
 from typing import Any, Iterable, NamedTuple, cast
@@ -147,12 +147,6 @@ class Clusterer:
     ----
     The Clusterer works best when the length of the feature dimension, P, is less than 500.
     If flattening a CxHxW image results in a dimension larger than 500, then it is recommended to reduce the dimensions.
-
-    Example
-    -------
-    Initialize the Clusterer class:
-
-    >>> cluster = Clusterer(dataset)
     """
 
     def __init__(self, dataset: ArrayLike) -> None:
@@ -506,6 +500,7 @@ class Clusterer:
 
         Example
         -------
+        >>> cluster = Clusterer(clusterer_images)
         >>> cluster.evaluate()
         ClustererOutput(outliers=[18, 21, 34, 35, 45], potential_outliers=[13, 15, 42], duplicates=[[9, 24], [23, 48]], potential_duplicates=[[1, 11]])
         """  # noqa: E501

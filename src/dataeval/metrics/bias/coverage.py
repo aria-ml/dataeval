@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["CoverageOutput", "coverage"]
+__all__ = []
 
 import contextlib
 import math

@@ -8,7 +8,7 @@ Licensed under Apache Software License (Apache 2.0)
 
 from __future__ import annotations
 
-__all__ = ["DriftMMD", "DriftMMDOutput"]
+__all__ = []
 
 from dataclasses import dataclass
 from typing import Callable

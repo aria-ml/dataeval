@@ -19,15 +19,24 @@ from dataeval.output import Output, set_metadata
 class TrainValSplit(NamedTuple):
     """Tuple containing train and validation indices"""
 
-    train: NDArray[np.int_]
-    val: NDArray[np.int_]
+    train: NDArray[np.intp]
+    val: NDArray[np.intp]
 
 
 @dataclass(frozen=True)
 class SplitDatasetOutput(Output):
-    """Output class containing test indices and a list of TrainValSplits"""
+    """
+    Output class containing test indices and a list of TrainValSplits
 
-    test: NDArray[np.int_]
+    Attributes
+    ----------
+    test: NDArray[np.intp]
+        Indices for the test set
+    folds: list[TrainValSplit]
+        List where each index contains the indices for the train and validation splits
+    """
+
+    test: NDArray[np.intp]
     folds: list[TrainValSplit]
 
 
@@ -99,7 +108,7 @@ def calculate_validation_fraction(num_folds: int, test_frac: float, val_frac: fl
     return val_base * (1.0 / num_folds) * (1.0 - test_frac)
 
 
-def _validate_labels(labels: NDArray[np.int_], total_partitions: int) -> None:
+def _validate_labels(labels: NDArray[np.intp], total_partitions: int) -> None:
     """
     Check to make sure there is more input data than the total number of partitions requested
 
@@ -130,7 +139,7 @@ def _validate_labels(labels: NDArray[np.int_], total_partitions: int) -> None:
         raise ValueError("Detected continuous labels. Labels must be discrete for proper stratification")
 
 
-def is_stratifiable(labels: NDArray[np.int_], num_partitions: int) -> bool:
+def is_stratifiable(labels: NDArray[np.intp], num_partitions: int) -> bool:
     """
     Check if the dataset can be stratified by class label over the given number of partitions
 
@@ -165,7 +174,7 @@ def is_stratifiable(labels: NDArray[np.int_], num_partitions: int) -> bool:
     return True
 
 
-def is_groupable(group_ids: NDArray[np.int_], num_partitions: int) -> bool:
+def is_groupable(group_ids: NDArray[np.intp], num_partitions: int) -> bool:
     """
     Warns user if the number of unique group_ids is incompatible with a grouped partition containing
     num_folds folds. If this is the case, returns groups=None, which tells the partitioner not to
@@ -204,7 +213,7 @@ def is_groupable(group_ids: NDArray[np.int_], num_partitions: int) -> bool:
     return True
 
 
-def bin_kmeans(array: NDArray[Any]) -> NDArray[np.int_]:
+def bin_kmeans(array: NDArray[Any]) -> NDArray[np.intp]:
     """
     Find bins of continuous data by iteratively applying k-means clustering, and keeping the
     clustering with the highest silhouette score.
@@ -225,18 +234,18 @@ def bin_kmeans(array: NDArray[Any]) -> NDArray[np.int_]:
         best_score = 0.60
     else:
         best_score = 0.50
-    bin_index = np.zeros(len(array), dtype=np.int_)
+    bin_index = np.zeros(len(array), dtype=np.intp)
     for k in range(2, 20):
         clusterer = KMeans(n_clusters=k)
         cluster_labels = clusterer.fit_predict(array)
         score = silhouette_score(array, cluster_labels, sample_size=25_000)
         if score > best_score:
             best_score = score
-            bin_index = cluster_labels.astype(np.int_)
+            bin_index = cluster_labels.astype(np.intp)
     return bin_index
 
 
-def get_group_ids(metadata: dict[str, Any], group_names: list[str], num_samples: int) -> NDArray[np.int_]:
+def get_group_ids(metadata: dict[str, Any], group_names: list[str], num_samples: int) -> NDArray[np.intp]:
     """
     Returns individual group numbers based on a subset of metadata defined by groupnames
 
@@ -261,7 +270,7 @@ def get_group_ids(metadata: dict[str, Any], group_names: list[str], num_samples:
     """
     features2group = {k: np.array(v) for k, v in metadata.items() if k in group_names}
     if not features2group:
-        return np.zeros(num_samples, dtype=np.int_)
+        return np.zeros(num_samples, dtype=np.intp)
     for name, feature in features2group.items():
         if len(feature) != num_samples:
             raise ValueError(
@@ -277,10 +286,10 @@ def get_group_ids(metadata: dict[str, Any], group_names: list[str], num_samples:
 
 
 def make_splits(
-    index: NDArray[np.int_],
-    labels: NDArray[np.int_],
+    index: NDArray[np.intp],
+    labels: NDArray[np.intp],
     n_folds: int,
-    groups: NDArray[np.int_] | None,
+    groups: NDArray[np.intp] | None,
     stratified: bool,
 ) -> list[TrainValSplit]:
     """
@@ -317,8 +326,8 @@ def make_splits(
         split_defs.clear()
         for train_idx, eval_idx in splits:
             # test_ratio = len(eval_idx) / len(index)
-            t = np.atleast_1d(train_idx).astype(np.int_)
-            v = np.atleast_1d(eval_idx).astype(np.int_)
+            t = np.atleast_1d(train_idx).astype(np.intp)
+            v = np.atleast_1d(eval_idx).astype(np.intp)
             good = good or (len(np.unique(labels[t])) == n_labels and len(np.unique(labels[v])) == n_labels)
             split_defs.append(TrainValSplit(t, v))
     if not good and attempts == 3:
@@ -327,7 +336,7 @@ def make_splits(
 
 
 def find_best_split(
-    labels: NDArray[np.int_], split_defs: list[TrainValSplit], stratified: bool, split_frac: float
+    labels: NDArray[np.intp], split_defs: list[TrainValSplit], stratified: bool, split_frac: float
 ) -> TrainValSplit:
     """
     Finds the split that most closely satisfies a criterion determined by the arguments passed.
@@ -384,10 +393,10 @@ def find_best_split(
 
 
 def single_split(
-    index: NDArray[np.int_],
-    labels: NDArray[np.int_],
+    index: NDArray[np.intp],
+    labels: NDArray[np.intp],
     split_frac: float,
-    groups: NDArray[np.int_] | None = None,
+    groups: NDArray[np.intp] | None = None,
     stratified: bool = False,
 ) -> TrainValSplit:
     """
@@ -426,7 +435,7 @@ def single_split(
 
 @set_metadata
 def split_dataset(
-    labels: list[int] | NDArray[np.int_],
+    labels: list[int] | NDArray[np.intp],
     num_folds: int = 1,
     stratify: bool = False,
     split_on: list[str] | None = None,
@@ -480,7 +489,7 @@ def split_dataset(
     total_partitions = num_folds + 1 if test_frac else num_folds
 
     if isinstance(labels, list):
-        labels = np.array(labels, dtype=np.int_)
+        labels = np.array(labels, dtype=np.intp)
 
     label_length: int = len(labels)
 
@@ -496,13 +505,13 @@ def split_dataset(
         if is_groupable(possible_groups, group_partitions):
             groups = possible_groups
 
-    test_indices: NDArray[np.int_]
+    test_indices: NDArray[np.intp]
     index = np.arange(label_length)
 
     tv_indices, test_indices = (
         single_split(index=index, labels=labels, split_frac=test_frac, groups=groups, stratified=stratify)
         if test_frac
-        else (index, np.array([], dtype=np.int_))
+        else (index, np.array([], dtype=np.intp))
     )
 
     tv_labels = labels[tv_indices]

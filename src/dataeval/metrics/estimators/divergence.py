@@ -5,7 +5,7 @@ using the Fast Nearest Neighbor and Minimum Spanning Tree algorithms
 
 from __future__ import annotations
 
-__all__ = ["DivergenceOutput", "divergence"]
+__all__ = []
 
 from dataclasses import dataclass
 from typing import Literal

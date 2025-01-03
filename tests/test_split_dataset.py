@@ -12,8 +12,6 @@ from src.dataeval.utils.split_dataset import (
     split_dataset,
 )
 
-from .conftest import RNG
-
 
 @pytest.fixture(scope="module")
 def _base() -> NDArray[np.intp]:
@@ -28,7 +26,7 @@ def labels(_base):
 
 
 @pytest.fixture(scope="module")
-def groups(_base):
+def groups(_base, RNG):
     """Creates 100 labels and corresponding groups"""
 
     values = np.tile(_base, 20)  # ex. [0, 1, 0, 1, ...]

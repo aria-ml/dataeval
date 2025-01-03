@@ -193,10 +193,10 @@ classes specifically designed for drift detection.
 These classes implement the theoretical concepts discussed above to help detect drift in datasets efficiently.
 
 DataEval's drift detection classes are:
-- **[DriftCVM](../reference/detectors/drift/driftcvm.md)**: Implements the Cramér-von Mises (CVM) test for feature-wise drift detection.
-- **[DriftKS](../reference/detectors/drift/driftks.md)**: Implements the {term}`Kolmogorov-Smirnov test<Kolmogorov-Smirnov (K-S) test>` for detecting feature-wise distributional shifts.
-- **[DriftMMD](../reference/detectors/drift/driftmmd.md)**: Utilizes the Maximum Mean Discrepancy (MMD) test to detect drift in multivariate data using kernel methods.
-- **[DriftUncertainty](../reference/detectors/drift/driftuncertainty.md)**: Detects drift by analyzing changes in the model's uncertainty across datasets.
+- **{func}`.DriftCVM`**: Implements the Cramér-von Mises (CVM) test for feature-wise drift detection.
+- **{func}`.DriftKS`**: Implements the {term}`Kolmogorov-Smirnov test<Kolmogorov-Smirnov (K-S) test>` for detecting feature-wise distributional shifts.
+- **{func}`.DriftMMD`**: Utilizes the Maximum Mean Discrepancy (MMD) test to detect drift in multivariate data using kernel methods.
+- **{func}`.DriftUncertainty`**: Detects drift by analyzing changes in the model's uncertainty across datasets.
 
 To see how these detectors work in practice, refer to our Monitoring Guide, where you can explore real-world examples of drift detection using DataEval.
 <!-- [Monitoring Guide](../tutorials/Monitoring.ipynb) -->
