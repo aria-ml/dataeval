@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["DimensionStatsOutput", "dimensionstats"]
+__all__ = []
 
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable
@@ -106,10 +106,10 @@ def dimensionstats(
     --------
     Calculating the dimension statistics on the images, whose shape is (C, H, W)
 
-    >>> results = dimensionstats(images)
+    >>> results = dimensionstats(stats_images)
     >>> print(results.aspect_ratio)
-    [0.75  0.75  0.75  0.75  0.75  0.75  1.333 0.75  0.75  1.   ]
+    [1.     1.     1.333  1.     0.6665]
     >>> print(results.channels)
-    [1 1 1 1 1 1 3 1 1 3]
+    [3 3 1 3 1]
     """
     return run_stats(images, bboxes, False, [DimensionStatsProcessor])[0]

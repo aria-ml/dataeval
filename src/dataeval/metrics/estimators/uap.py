@@ -6,7 +6,7 @@ average precision<Upper-Bound Average Precision (UAP)>` using empirical mean pre
 
 from __future__ import annotations
 
-__all__ = ["UAPOutput", "uap"]
+__all__ = []
 
 from dataclasses import dataclass
 

@@ -1,3 +1,5 @@
+"""Utility functions for interoperability with different array types."""
+
 from __future__ import annotations
 
 __all__ = ["as_numpy", "to_numpy", "to_numpy_iter"]

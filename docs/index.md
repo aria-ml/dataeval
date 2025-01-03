@@ -201,7 +201,7 @@ Everything you need to become an expert with DataEval.
 ::::{grid} 1 1 2 2
 :gutter: 4
 
-:::{grid-item-card} [API Reference](reference/index.md){.font-title}
+:::{grid-item-card} [API Reference](reference/index.rst){.font-title}
 :text-align: center
 :link: reference/index
 :link-type: doc
@@ -256,6 +256,14 @@ how_to/index
 :::
 
 :::{toctree}
+:caption: Reference
+:hidden:
+
+reference/index
+
+:::
+
+:::{toctree}
 :caption: Explanation
 :hidden:
 :maxdepth: 2
@@ -263,14 +271,6 @@ how_to/index
 concepts/index
 workflows/index
 concepts/glossary
-:::
-
-:::{toctree}
-:caption: Reference
-:hidden:
-:maxdepth: 1
-
-reference/index
 :::
 
 :::{toctree}

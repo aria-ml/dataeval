@@ -92,6 +92,7 @@ jupyter-client = {version = ">=8.6.0"}
 jupyter-cache = {version = "*"}
 myst-nb = {version = ">=1.0.0"}
 pydata-sphinx-theme = {version = ">=0.15.4"}
+sphinx-autoapi = {version = "*"}
 sphinx-design = {version = "*"}
 sphinx-tabs = {version = "*"}
 Sphinx = {version = ">=7.2.6"}

@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from torchmetrics.utilities.data import dim_zero_cat
 
 from dataeval.detectors.ood import OOD_AE
-from dataeval.metrics.estimators import ber
+from dataeval.metrics.estimators._ber import ber
 from dataeval.utils.tensorflow.models import AE, create_model
 
 BASE_OPTS = ["Base", "Both"]

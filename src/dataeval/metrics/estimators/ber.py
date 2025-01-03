@@ -5,11 +5,12 @@ KNN based estimate for the :term:`Bayes error rate<Bayes Error Rate (BER)>`
 
 Learning to Bound the Multi-class Bayes Error (Th. 3 and Th. 4)
 https://arxiv.org/abs/1811.06419
+
 """
 
 from __future__ import annotations
 
-__all__ = ["BEROutput", "ber"]
+__all__ = []
 
 from dataclasses import dataclass
 from typing import Literal
@@ -38,6 +39,7 @@ class BEROutput(Output):
     """
 
     ber: float
+
     ber_lower: float
 
 

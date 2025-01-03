@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["BalanceOutput", "balance"]
+__all__ = []
 
 import contextlib
 import warnings
@@ -129,12 +129,14 @@ def balance(
     ----------
     metadata : Metadata
         Preprocessed metadata from :func:`dataeval.utils.metadata.preprocess`
+    num_neighbors : int, default 5
+        Number of points to consider as neighbors
 
     Returns
     -------
     BalanceOutput
-        (num_factors+1) x (num_factors+1) estimate of mutual information
-        between num_factors metadata factors and class label. Symmetry is enforced.
+        (num_factors+1) x (num_factors+1) estimate of mutual information \
+            between num_factors metadata factors and class label. Symmetry is enforced.
 
     Note
     ----

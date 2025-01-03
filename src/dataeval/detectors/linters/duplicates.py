@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["DuplicatesOutput", "Duplicates"]
+__all__ = []
 
 from dataclasses import dataclass
 from typing import Generic, Iterable, Sequence, TypeVar, overload
@@ -51,13 +51,6 @@ class Duplicates:
     ----------
     only_exact : bool, default False
         Only inspect the dataset for exact image matches
-
-    Example
-    -------
-    Initialize the Duplicates class:
-
-    >>> all_dupes = Duplicates()
-    >>> exact_dupes = Duplicates(only_exact=True)
     """
 
     def __init__(self, only_exact: bool = False) -> None:
@@ -112,6 +105,7 @@ class Duplicates:
 
         Example
         -------
+        >>> exact_dupes = Duplicates(only_exact=True)
         >>> exact_dupes.from_stats([hashes1, hashes2])
         DuplicatesOutput(exact=[{0: [3, 20]}, {0: [16], 1: [12]}], near=[])
         """
@@ -159,7 +153,8 @@ class Duplicates:
 
         Example
         -------
-        >>> all_dupes.evaluate(images)
+        >>> all_dupes = Duplicates()
+        >>> all_dupes.evaluate(duplicate_images)
         DuplicatesOutput(exact=[[3, 20], [16, 37]], near=[[3, 20, 22], [12, 18], [13, 36], [14, 31], [17, 27], [19, 38, 47]])
         """  # noqa: E501
         self.stats = hashstats(data)

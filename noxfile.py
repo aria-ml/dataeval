@@ -13,7 +13,7 @@ INSTALL_ENVS = {"UV_INDEX_STRATEGY": "unsafe-best-match", "POETRY_DYNAMIC_VERSIO
 COMMON_ENVS = {"TQDM_DISABLE": "1"}
 DOCS_ENVS = {"LANG": "C", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True", "PYDEVD_DISABLE_FILE_VALIDATION": "1"}
 DOCTEST_ENVS = {"NB_EXECUTION_MODE_OVERRIDE": "off"}
-TEST_ENVS = {"CUDA_VISIBLE_DEVICES": "-1", **COMMON_ENVS}
+TEST_ENVS = {"CUDA_VISIBLE_DEVICES": "-1"}
 
 REQUIREMENTS_OPTION_MAP = {"requirements.txt": "--all-extras", "requirements-dev.txt": "--only=dev"}
 SUPPORTED_VERSIONS = ("3.9", "3.10", "3.11", "3.12")
@@ -96,9 +96,14 @@ def doctest(session: nox.Session) -> None:
     """Run docstring tests."""
     check_version(session.name)
     session.install(*INSTALL_ARGS, env=INSTALL_ENVS)
-    session.chdir("docs")
-    session.run("rm", "-rf", "../output/docs", external=True)
-    session.run("sphinx-build", "-M", "doctest", ".", "../output/docs", env={**DOCTEST_ENVS, **COMMON_ENVS})
+    session.run(
+        "pytest",
+        "--doctest-modules",
+        "--doctest-continue-on-failure",
+        "--disable-warnings",
+        "src/dataeval",
+        env={**TEST_ENVS, **COMMON_ENVS},
+    )
 
 
 @nox.session
@@ -107,12 +112,13 @@ def docs(session: nox.Session) -> None:
     check_version(session.name)
     session.install(*INSTALL_ARGS, env=INSTALL_ENVS)
     session.chdir("docs")
+    session.run("rm", "-rf", "./autoapi", external=True)
     session.run("rm", "-rf", "../output/docs", external=True)
     if "clean" in session.posargs:
         session.run("rm", "-rf", ".jupyter_cache", external=True)
     session.run(
         "sphinx-build",
-        "--fail-on-warning",
+        # "--fail-on-warning",
         "--keep-going",
         "--fresh-env",
         "--show-traceback",

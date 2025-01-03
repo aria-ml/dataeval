@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 import dataeval.metrics.stats.base as base
+from tests.doctest import *  # noqa: F403 - configure doctest
 
 TEMP_CONTENTS = "ABCDEF1234567890"
 
@@ -13,7 +14,9 @@ TEMP_CONTENTS = "ABCDEF1234567890"
 base.DEFAULT_PROCESSES = 1
 
 
-RNG = np.random.default_rng(0)
+@pytest.fixture(scope="session")
+def RNG():
+    return np.random.default_rng(0)
 
 
 @pytest.fixture(scope="session")
