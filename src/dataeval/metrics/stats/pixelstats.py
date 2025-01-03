@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["PixelStatsOutput", "pixelstats"]
+__all__ = []
 
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable
@@ -106,15 +106,10 @@ def pixelstats(
     --------
     Calculating the statistics on the images, whose shape is (C, H, W)
 
-    >>> results = pixelstats(images)
+    >>> results = pixelstats(stats_images)
     >>> print(results.mean)
-    [0.04828 0.562   0.06726 0.09937 0.1315  0.1636  0.1957  0.2278  0.26
-     0.292   0.3242  0.3562  0.3884  0.4204  0.4526  0.4846  0.5166  0.549
-     0.581   0.6133  0.6455  0.6772  0.7095  0.7417  0.774   0.8057  0.838
-     0.87    0.9023  0.934  ]
+    [0.2903 0.2108 0.397  0.596  0.743 ]
     >>> print(results.entropy)
-    [3.238  3.303  0.8125 1.028  0.8223 1.046  0.8247 1.041  0.8203 1.012
-     0.812  0.9883 0.795  0.9243 0.9243 0.795  0.9907 0.8125 1.028  0.8223
-     1.046  0.8247 1.041  0.8203 1.012  0.812  0.9883 0.795  0.9243 0.9243]
+    [4.99  2.371 1.179 2.406 0.668]
     """
     return run_stats(images, bboxes, per_channel, [PixelStatsProcessor])[0]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["HashStatsOutput", "hashstats"]
+__all__ = []
 
 from dataclasses import dataclass
 from typing import Callable, Iterable
@@ -147,10 +147,10 @@ def hashstats(
     --------
     Calculating the statistics on the images, whose shape is (C, H, W)
 
-    >>> results = hashstats(images)
+    >>> results = hashstats(stats_images)
     >>> print(results.xxhash)
-    ['a72434443d6e7336', 'efc12c2f14581d79', '4a1e03483a27d674', '3a3ecedbcf814226']
+    ['6274f837b34ed9f0', '256504fdb6e3d2a4', '7dd0c56ca8474fb0', '50956ad4592f5bbc', '5ba2354079d42aa5']
     >>> print(results.pchash)
-    ['8f25506af46a7c6a', '8000808000008080', '8e71f18e0ef18e0e', 'a956d6a956d6a928']
+    ['a666999999666666', 'e666999999266666', 'e666999966663299', 'e666999999266666', '96e91656e91616e9']
     """
     return run_stats(images, bboxes, False, [HashStatsProcessor])[0]

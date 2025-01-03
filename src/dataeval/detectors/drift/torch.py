@@ -127,7 +127,7 @@ def _squared_pairwise_distance(
 
 def sigma_median(x: torch.Tensor, y: torch.Tensor, dist: torch.Tensor) -> torch.Tensor:
     """
-    Bandwidth estimation using the median heuristic :cite:t:`Gretton2012`.
+    Bandwidth estimation using the median heuristic `Gretton2012`
 
     Parameters
     ----------

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+__all__ = []
+
 import numbers
 import warnings
 from typing import Any
@@ -41,11 +43,9 @@ def get_least_likely_features(
     Imagine we have 3 data examples, and that the corresponding metadata contains 2 features called time and
     altitude, as shown below.
 
-    >>> from dataeval._internal.metrics.metadata_least_likely import get_least_likely_features
-    >>> import numpy
     >>> metadata = {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112]}
     >>> new_metadata = {"time": [7.8, 11.12], "altitude": [532, -211101]}
-    >>> is_ood = numpy.array([True, True])
+    >>> is_ood = np.array([True, True])
     >>> get_least_likely_features(metadata, new_metadata, is_ood)
     [('time', 2.0), ('altitude', 33.245346)]
     """

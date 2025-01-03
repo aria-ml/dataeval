@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["DatasetStatsOutput", "ChannelStatsOutput", "datasetstats", "channelstats"]
+__all__ = []
 
 from dataclasses import dataclass
 from typing import Any, Iterable
@@ -119,13 +119,11 @@ def datasetstats(
     --------
     Calculating the dimension, pixel and visual stats for a dataset with bounding boxes
 
-    >>> stats = datasetstats(images, bboxes)
+    >>> stats = datasetstats(stats_images, bboxes)
     >>> print(stats.dimensionstats.aspect_ratio)
-    [ 0.864   0.5884 16.      1.143   1.692   0.5835  0.6665  2.555   1.3
-      0.8335  1.      0.6     0.522  15.      3.834   1.75    0.75    0.7   ]
-    >>> print(stats.visualstats.contrast)
-    [1.744   1.946   0.1164  0.0635  0.0633  0.06274 0.0429  0.0317  0.0317
-     0.02576 0.02081 0.02171 0.01915 0.01767 0.01799 0.01595 0.01433 0.01478]
+    [ 0.864   0.5884 16.      1.143   1.692   0.5835  0.6665  2.555   1.3   ]
+    >>> print(stats.visualstats.sharpness)
+    [4.04   4.434  0.2778 4.957  5.145  5.22   4.957  3.076  2.855 ]
     """
     outputs = run_stats(images, bboxes, False, [DimensionStatsProcessor, PixelStatsProcessor, VisualStatsProcessor])
     return DatasetStatsOutput(*outputs, labelstats=labelstats(labels) if labels else None)  # type: ignore
@@ -162,12 +160,10 @@ def channelstats(
     --------
     Calculating the per-channel pixel and visual stats for a dataset
 
-    >>> stats = channelstats(images)
+    >>> stats = channelstats(stats_images)
     >>> print(stats.visualstats.darkness)
-    [0.07495 0.1748  0.275   0.1047  0.11096 0.1172  0.2047  0.2109  0.2172
-     0.3047  0.311   0.3171  0.4048  0.411   0.4172  0.505   0.5107  0.517
-     0.6045  0.611   0.617   0.7046  0.711   0.7173  0.8047  0.811   0.8174
-     0.905   0.911   0.917  ]
+    [0.1499 0.3499 0.55   0.2094 0.2219 0.2344 0.4194 0.6094 0.622  0.6343
+     0.8154]
     """
     outputs = run_stats(images, bboxes, True, [PixelStatsProcessor, VisualStatsProcessor])
     return ChannelStatsOutput(*outputs)  # type: ignore

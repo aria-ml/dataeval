@@ -5,8 +5,6 @@
 
 from os import getenv
 
-import numpy as np
-
 # -----------------------------------------------------------------------------
 # Project configuration
 # -----------------------------------------------------------------------------
@@ -28,9 +26,9 @@ language = "en"
 
 extensions = [
     # Internal Sphinx extensions
+    "autoapi.extension",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
-    "sphinx.ext.doctest",
     "sphinx.ext.napoleon",
     "sphinx.ext.graphviz",
     "sphinx.ext.mathjax",
@@ -62,8 +60,26 @@ exclude_patterns = [
 # Extension configurations
 # -----------------------------------------------------------------------------
 
-autodoc_type_aliases = {"ArrayLike": "ArrayLike"}
-autosummary_generate = False
+# autodoc_type_aliases = {"ArrayLike": "ArrayLike"}
+# autosummary_generate = False
+
+autoapi_dirs = ["../src/dataeval/"]
+autoapi_type = "python"
+autoapi_root = "reference"
+autoapi_file_pattern = "*.py"
+autoapi_python_class_content = "both"
+autoapi_options = [
+    "members",
+    "show-module-summary",
+    "imported-members",
+]
+autoapi_generate_api_docs = True
+autoapi_keep_files = True
+autodoc_typehints = "description"
+autoapi_own_page_level = "function"
+autoapi_member_order = "groupwise"
+
+needs_title_optional = True
 
 # -----------------------------------------------------------------------------
 # MyST-NB settings
@@ -96,33 +112,15 @@ html_theme_options = {
     "logo": {"text": "DataEval"},
 }
 
-# Set numpy print option to legacy 1.25 so native numpy types
-# are not printed with dtype information.
 
-# WITHOUT LEGACY=1.25
-# >>> np.int32(16)
-# np.int32(16)
-
-# WITH LEGACY=1.25
-# >>> np.int32(16)
-# 16
-
-if np.__version__[0] == "2":
-    np.set_printoptions(legacy="1.25")
-
-
-# because we expose private modules in public namespaces
-# and rename some classes, documentation recognizes these
-# public classes as aliases, which we don't want
-def normalize_module(mod_names):
-    import importlib
-
-    for mod_name in mod_names:
-        mod = importlib.import_module(mod_name)
-        for cls_name in mod.__all__:
-            cls = getattr(mod, cls_name)
-            cls.__name__ = cls_name
-            cls.__module__ = mod_name
+def autoapi_skip_member(app, what, name, obj, skip, options):
+    # skip undocumented attributes
+    if what == "attribute" and obj.docstring == "":
+        skip = True
+    # skip modules with undefined or empty __all__
+    if (what == "module" or what == "package") and (obj.all is None or len(obj.all) == 0):
+        skip = True
+    return skip
 
 
 def setup(app):
@@ -133,8 +131,10 @@ def setup(app):
 
     warnings.filterwarnings("ignore")
 
+    app.connect("autoapi-skip-member", autoapi_skip_member)
+
     path.append(getcwd())
     import data
 
     if nb_execution_mode != "off":
-        data.download()
+        data.download()  # type: ignore

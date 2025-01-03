@@ -4,6 +4,7 @@ dist/
 data
 
 docs/_*/
+docs/reference
 !docs/_static
 
 docs/tutorials/notebooks/checkpoints/

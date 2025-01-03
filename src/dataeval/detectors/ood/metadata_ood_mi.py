@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+__all__ = []
+
 import numbers
 import warnings
 from typing import Any
@@ -51,11 +53,10 @@ def get_metadata_ood_mi(
     --------
     Imagine we have 3 data examples, and that the corresponding metadata contains 2 features called time and altitude.
 
-        >>> import numpy
-        >>> metadata = {"time": numpy.linspace(0, 10, 100), "altitude": numpy.linspace(0, 16, 100) ** 2}
-        >>> is_ood = metadata["altitude"] > 100
-        >>> print(get_metadata_ood_mi(metadata, is_ood, discrete_features=False))
-        {'time': 0.933074285817367, 'altitude': 0.9407686591507002}
+    >>> metadata = {"time": np.linspace(0, 10, 100), "altitude": np.linspace(0, 16, 100) ** 2}
+    >>> is_ood = metadata["altitude"] > 100
+    >>> get_metadata_ood_mi(metadata, is_ood, discrete_features=False, random_state=0)
+    {'time': 0.9359596758173668, 'altitude': 0.9407686591507002}
     """
     numerical_keys = [k for k, v in metadata.items() if all(isinstance(vi, numbers.Number) for vi in v)]
     if len(numerical_keys) < len(metadata):

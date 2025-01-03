@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["VisualStatsOutput", "visualstats"]
+__all__ = []
 
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable
@@ -112,15 +112,10 @@ def visualstats(
     --------
     Calculating the :term:`statistics<Statistics>` on the images, whose shape is (C, H, W)
 
-    >>> results = visualstats(images)
+    >>> results = visualstats(stats_images)
     >>> print(results.brightness)
-    [0.02246 0.5557  0.06805 0.1014  0.1348  0.1681  0.2014  0.2347  0.268
-     0.3015  0.3347  0.3682  0.4014  0.4348  0.468   0.5015  0.5347  0.568
-     0.6016  0.635   0.668   0.701   0.735   0.768   0.8013  0.835   0.868
-     0.9014  0.9346  0.9683 ]
+    [0.1353 0.2085 0.4143 0.6084 0.8135]
     >>> print(results.contrast)
-    [2.041 1.332 1.293 1.279 1.272 1.268 1.265 1.263 1.261 1.26  1.259 1.258
-     1.258 1.257 1.257 1.256 1.256 1.255 1.255 1.255 1.255 1.254 1.254 1.254
-     1.254 1.254 1.254 1.253 1.253 1.253]
+    [2.04  1.331 1.261 1.279 1.253]
     """
     return run_stats(images, bboxes, per_channel, [VisualStatsProcessor])[0]
