@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["boxratiostats"]
+__all__ = []
 
 import copy
 from typing import Any, Callable, Generic, TypeVar, cast
@@ -130,17 +130,16 @@ def boxratiostats(
     --------
     Calculating the box ratio statistics using the dimension stats of the boxes and images
 
-    >>> imagestats = dimensionstats(images)
-    >>> boxstats = dimensionstats(images, bboxes)
+    >>> from dataeval.metrics.stats import dimensionstats
+    >>> imagestats = dimensionstats(stats_images)
+    >>> boxstats = dimensionstats(stats_images, bboxes)
     >>> ratiostats = boxratiostats(boxstats, imagestats)
     >>> print(ratiostats.aspect_ratio)
-    [ 1.15169271  0.78450521 21.33333333  1.5234375   2.25651042  0.77799479
-      0.88867188  3.40625     1.73307292  1.11132812  0.75018315  0.45018315
-      0.69596354 20.          5.11197917  2.33333333  0.75        0.70019531]
+    [ 0.86376953  0.58837891 16.          0.85714286  1.26959707  0.43772894
+      0.66650391  3.83296703  1.95018315]
     >>> print(ratiostats.size)
-    [0.03401693 0.01383464 0.00130208 0.01822917 0.02327474 0.00683594
-     0.01220703 0.0168457  0.01057943 0.00976562 0.00130208 0.01098633
-     0.02246094 0.0012207  0.01123047 0.00911458 0.02636719 0.06835938]
+    [0.0255127  0.01037598 0.00097656 0.01822917 0.02327474 0.00683594
+     0.00915527 0.03369141 0.02115885]
     """
     output_cls = type(boxstats)
     if type(boxstats) is not type(imgstats):

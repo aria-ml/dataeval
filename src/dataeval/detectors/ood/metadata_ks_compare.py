@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+__all__ = []
+
 import numbers
 import warnings
 from typing import Any, Mapping, NamedTuple
@@ -40,51 +42,41 @@ class KSOutput(MappingOutput[str, MetadataKSResult]):
 def meta_distribution_compare(
     md0: Mapping[str, list[Any] | NDArray[Any]], md1: Mapping[str, list[Any] | NDArray[Any]]
 ) -> KSOutput:
-    """Measures the featurewise distance between two metadata distributions, and computes a p-value to evaluate its
-        significance.
+    """
+    Measures the featurewise distance between two metadata distributions, and computes a p-value to evaluate its
+    significance.
 
-        Uses the Earth Mover's Distance and the Kolmogorov-Smirnov two-sample test, featurewise.
+    Uses the Earth Mover's Distance and the Kolmogorov-Smirnov two-sample test, featurewise.
 
-        Parameters
-        ----------
-        md0 : Mapping[str, list[Any] | NDArray[Any]]
-            A set of arrays of values, indexed by metadata feature names, with one value per data example per feature.
-        md1 : Mapping[str, list[Any] | NDArray[Any]]
-            Another set of arrays of values, indexed by metadata feature names, with one value per data example per
-            feature.
+    Parameters
+    ----------
+    md0 : Mapping[str, list[Any] | NDArray[Any]]
+        A set of arrays of values, indexed by metadata feature names, with one value per data example per feature.
+    md1 : Mapping[str, list[Any] | NDArray[Any]]
+        Another set of arrays of values, indexed by metadata feature names, with one value per data example per
+        feature.
 
-        Returns
-        -------
-        dict[str, KstestResult]
-            A dictionary with keys corresponding to metadata feature names, and values that are KstestResult objects, as
-            defined by scipy.stats.ks_2samp. These values also have two additional attributes: shift_magnitude and
-            statistic_location. The first is the Earth Mover's Distance normalized by the interquartile range (IQR) of
-            the reference, while the second is the value at which the KS statistic has its maximum, measured in
-            IQR-normalized units relative to the median of the reference distribution.
+    Returns
+    -------
+    dict[str, KstestResult]
+        A dictionary with keys corresponding to metadata feature names, and values that are KstestResult objects, as
+        defined by scipy.stats.ks_2samp. These values also have two additional attributes: shift_magnitude and
+        statistic_location. The first is the Earth Mover's Distance normalized by the interquartile range (IQR) of
+        the reference, while the second is the value at which the KS statistic has its maximum, measured in
+        IQR-normalized units relative to the median of the reference distribution.
 
-        Examples
-        --------
-        Imagine we have 3 data examples, and that the corresponding metadata contains 2 features called time and
-        altitude.
+    Examples
+    --------
+    Imagine we have 3 data examples, and that the corresponding metadata contains 2 features called time and
+    altitude.
 
-    >>> import numpy
     >>> md0 = {"time": [1.2, 3.4, 5.6], "altitude": [235, 6789, 101112]}
     >>> md1 = {"time": [7.8, 9.10, 11.12], "altitude": [532, 9876, 211101]}
-    >>> md_out = meta_distribution_compare(md0, md1).mdc
+    >>> md_out = meta_distribution_compare(md0, md1)
     >>> for k, v in md_out.items():
-    >>>     print(k)
-    >>>     for kv in v:
-    >>>         print("\t", f"{kv}: {v[kv]:.3f}")
-    time
-            statistic: 1.000
-            statistic_location: 0.444
-            shift_magnitude: 2.700
-            pvalue: 0.000
-    altitude
-            statistic: 0.333
-            statistic_location: 0.478
-            shift_magnitude: 0.749
-            pvalue: 0.944
+    ...     print(f"{k}: { {kv: round(vv, 3) for kv, vv in v._asdict().items()} }")
+    time: {'statistic': 1.0, 'statistic_location': 0.444, 'shift_magnitude': 2.7, 'pvalue': 0.0}
+    altitude: {'statistic': 0.333, 'statistic_location': 0.478, 'shift_magnitude': 0.749, 'pvalue': 0.944}
     """
 
     if (metadata_keys := md0.keys()) != md1.keys():

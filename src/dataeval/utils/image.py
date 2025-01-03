@@ -63,8 +63,8 @@ def edge_filter(image: ArrayLike, offset: float = 0.5) -> NDArray[np.uint8]:
     """
     Returns the image filtered using a 3x3 edge detection kernel:
     [[ -1, -1, -1 ],
-     [ -1,  8, -1 ],
-     [ -1, -1, -1 ]]
+    [ -1,  8, -1 ],
+    [ -1, -1, -1 ]]
     """
     edges = convolve2d(image, EDGE_KERNEL, mode="same", boundary="symm") + offset
     np.clip(edges, 0, 255, edges)

@@ -36,7 +36,7 @@ The [interquartile range](https://en.wikipedia.org/wiki/Interquartile_range) met
 The default threshold value for `iqr` is 1.5. The equation for `iqr` is:  
 Interquartile range $= distance > threshold * (Q_3 - Q_1)$, where distance is the greater of $25th quartile - value$ or $value - 75th quartile$
 
-The [Outliers](../reference/detectors/linters/outliers.md) API will give more information on how to use the functionality.
+The {func}`.Outliers` API will give more information on how to use the functionality.
 The user has the option to specify:
 - the metrics that the imagestats function should create a distribution for by selecting which flags the Outliers consumes,
 - the statistical method used by the class, and

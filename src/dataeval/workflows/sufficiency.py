@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["SufficiencyOutput", "Sufficiency"]
+__all__ = []
 
 import contextlib
 import warnings
@@ -514,7 +514,13 @@ class Sufficiency(Generic[T]):
         Examples
         --------
         >>> suff = Sufficiency(
-        ...     model=model, train_ds=train_ds, test_ds=test_ds, train_fn=train_fn, eval_fn=eval_fn, runs=3, substeps=5
+        ...     model=model,
+        ...     train_ds=train_ds,
+        ...     test_ds=test_ds,
+        ...     train_fn=train_fn,
+        ...     eval_fn=eval_fn,
+        ...     runs=3,
+        ...     substeps=5,
         ... )
         >>> suff.evaluate()
         SufficiencyOutput(steps=array([  1,   3,  10,  31, 100], dtype=uint32), params={'test': array([ 0., 42.,  0.])}, measures={'test': array([1., 1., 1., 1., 1.])})

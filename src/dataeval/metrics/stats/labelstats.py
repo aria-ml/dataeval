@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["LabelStatsOutput", "labelstats"]
+__all__ = []
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass
@@ -86,13 +86,13 @@ def labelstats(
 
     >>> stats = labelstats(labels)
     >>> stats.label_counts_per_class
-    {'chicken': 3, 'cow': 8, 'horse': 9, 'pig': 7, 'sheep': 7}
+    {'chicken': 12, 'cow': 5, 'horse': 4, 'pig': 7, 'sheep': 4}
     >>> stats.label_counts_per_image
-    [3, 2, 3, 4, 1, 5, 4, 4, 4, 4]
+    [3, 3, 5, 3, 2, 5, 5, 2, 2, 2]
     >>> stats.image_counts_per_label
-    {'chicken': 2, 'cow': 6, 'horse': 7, 'pig': 5, 'sheep': 7}
+    {'chicken': 8, 'cow': 4, 'horse': 4, 'pig': 7, 'sheep': 4}
     >>> (stats.image_count, stats.class_count, stats.label_count)
-    (10, 5, 34)
+    (10, 5, 32)
     """
     label_counts = Counter()
     image_counts = Counter()

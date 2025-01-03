@@ -1,8 +1,14 @@
+"""
+DataEval provides a simple interface to characterize image data and its impact on model performance
+across classification and object-detection tasks. It also provides capabilities to select and curate
+datasets to test and train performant, robust, unbiased and reliable AI models and monitor for data
+shifts that impact performance of deployed models.
+"""
+
 from __future__ import annotations
 
-__version__ = "0.0.0"
-
 __all__ = ["detectors", "log", "metrics", "utils", "workflows"]
+__version__ = "0.0.0"
 
 import logging
 

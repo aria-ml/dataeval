@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__ = ["DiversityOutput", "diversity"]
+__all__ = []
 
 import contextlib
 from dataclasses import dataclass
@@ -227,21 +227,21 @@ def diversity(
 
     >>> div_simp = diversity(metadata, method="simpson")
     >>> div_simp.diversity_index
-    array([0.72413793, 0.88636364, 0.72413793])
+    array([0.6       , 0.80882353, 1.        , 0.8       ])
 
     >>> div_simp.classwise
-    array([[0.69230769, 0.68965517],
-           [0.5       , 0.8       ]])
+    array([[0.5       , 0.8       , 0.8       ],
+           [0.63043478, 0.97560976, 0.52830189]])
 
     Compute Shannon diversity index of metadata and class labels
 
     >>> div_shan = diversity(metadata, method="shannon")
     >>> div_shan.diversity_index
-    array([0.8812909 , 0.96748876, 0.8812909 ])
+    array([0.81127812, 0.9426312 , 1.        , 0.91829583])
 
     >>> div_shan.classwise
-    array([[0.91651644, 0.86312057],
-           [0.68260619, 0.91829583]])
+    array([[0.68260619, 0.91829583, 0.91829583],
+           [0.81443569, 0.99107606, 0.76420451]])
 
     See Also
     --------
