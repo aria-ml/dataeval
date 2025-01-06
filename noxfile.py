@@ -127,10 +127,10 @@ def docs(session: nox.Session) -> None:
         "--builder",
         "html",
         "--doctree-dir",
-        "_build/doctrees",
+        "build/doctrees",
         "--define",
         "language=en",
-        ".",
+        "source",
         "../output/docs/html",
         env={**DOCS_ENVS, **COMMON_ENVS},
     )
@@ -142,9 +142,8 @@ def docs(session: nox.Session) -> None:
 def lock(session: nox.Session) -> None:
     """Lock dependencies in "poetry.lock" with --no-update. Update dependencies by calling `nox -e lock -- update`."""
     update_args = [] if "update" in session.posargs else ["--no-update"]
-    session.install("poetry", "poetry-lock-groups-plugin", "poetry2conda")
+    session.install("poetry<2", "poetry-lock-groups-plugin", "poetry2conda")
     session.run("cp", "-f", "environment/poetry.lock", "poetry.lock", external=True)
-    session.run("poetry", "config", "warnings.export", "false")
     session.run("poetry", "lock", "--with=dev", *update_args)
     for file, option in REQUIREMENTS_OPTION_MAP.items():
         session.run("poetry", "export", option, "--without-hashes", "-o", f"environment/{file}")
@@ -156,7 +155,7 @@ def lock(session: nox.Session) -> None:
 @nox.session
 def check(session: nox.Session) -> None:
     """Validate lock file and exported dependency files are up to date."""
-    session.install("poetry")
+    session.install("poetry<2")
     session.run_always("cp", "-f", "poetry.lock", "poetry.tmp", external=True)
     session.run_always("mkdir", "-p", "output/tmp", external=True)
 

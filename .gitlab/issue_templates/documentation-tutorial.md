@@ -36,7 +36,7 @@ Tutorial Headings
 - [ ] What you'll learn
 - [ ] What you'll need
 - [ ] On your own (Optional)
-- [ ] In practice... <!-- The fine print that you avoided can go in this section.  -->
+- [ ] In practice... <!-- The fine print that you avoided can go in this section. -->
 - [ ] Further Reading <!-- Link to explanations or external documents -->
 
 Body of Tutorial

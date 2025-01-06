@@ -25,7 +25,7 @@ class DatasetStatsOutput(Output):
 
     This class represents the outputs of various stats functions against a single
     dataset, such that each index across all stat outputs are representative of
-    the same source image.  Modifying or mixing outputs will result in inaccurate
+    the same source image. Modifying or mixing outputs will result in inaccurate
     outlier calculations if not created correctly.
 
     Attributes
@@ -60,7 +60,7 @@ class ChannelStatsOutput(Output):
 
     This class represents the outputs of various per-channel stats functions against
     a single dataset, such that each index across all stat outputs are representative
-    of the same source image.  Modifying or mixing outputs will result in inaccurate
+    of the same source image. Modifying or mixing outputs will result in inaccurate
     outlier calculations if not created correctly.
 
     Attributes

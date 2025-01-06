@@ -36,7 +36,7 @@ Choose your preferred method of installation below or follow our [installation g
 * [Installing from GitHub](#installing-from-github)
 
 ### **Installing with pip**
-You can install DataEval directly from pypi.org using the following command.  The optional dependencies of DataEval are `torch`, `tensorflow` and `all`.  Using `torch` enables Sufficiency metrics, and `tensorflow` enables OOD Detection.
+You can install DataEval directly from pypi.org using the following command.  The optional dependencies of DataEval are `all`.
 
 ```
 pip install dataeval[all]
