@@ -230,13 +230,6 @@ verify lock:
   rules: *on_run_with_deps
 
 ### DOCS ###
-  
-doctest:
-  stage: docs
-  extends: .nox
-  script:
-    - nox -e doctest
-  rules: *on_run_with_docs
 
 docs:
   stage: docs
@@ -250,6 +243,34 @@ docs:
     paths:
       - output/docs/.jupyter_cache/
       - output/docs/html/
+  rules: *on_run_with_docs
+
+doctest:
+  stage: docs
+  extends: .nox
+  script:
+    - nox -e doctest
+  rules: *on_run_with_docs
+
+linkchecker:
+  stage: docs
+  needs: []
+  image:
+    name: ghcr.io/tcort/markdown-link-check:stable
+    entrypoint: ["/bin/sh", "-c"]
+  script:
+    - markdown-link-check *.md
+    - markdown-link-check ./docs/source
+  rules: *on_run_with_docs
+
+markdownlint:
+  stage: docs
+  needs: []
+  image:
+    name: davidanson/markdownlint-cli2
+    entrypoint: [""]
+  script:
+    - markdownlint-cli2 "docs/**/*.md" "#node_modules"
   rules: *on_run_with_docs
 
 pages:
