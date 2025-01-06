@@ -41,7 +41,7 @@ def pchash(image: ArrayLike) -> str:
     """
     Performs a perceptual hash on an image by resizing to a square NxN image
     using the Lanczos algorithm where N is 32x32 or the largest multiple of
-    8 that is smaller than the input image dimensions.  The resampled image
+    8 that is smaller than the input image dimensions. The resampled image
     is compressed using a discrete cosine transform and the lowest frequency
     component is encoded as a bit array of greater or less than median value
     and returned as a hex string.
@@ -92,7 +92,7 @@ def pchash(image: ArrayLike) -> str:
 def xxhash(image: ArrayLike) -> str:
     """
     Performs a fast non-cryptographic hash using the xxhash algorithm
-    (xxhash.com) against the image as a flattened bytearray.  The hash
+    (xxhash.com) against the image as a flattened bytearray. The hash
     is returned as a hex string.
 
     Parameters
