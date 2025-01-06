@@ -15,12 +15,12 @@ RUN pip install --no-cache \
     torchvision==0.20.1+cpu \
     requests
 WORKDIR /docs
-COPY docs/data.py data.py
+COPY docs/source/data.py source/data.py
 COPY src/dataeval/utils/torch/datasets.py dataeval/utils/torch/datasets.py
 RUN python -c "\
-from os import getcwd; \
-from sys import path; \
-path.append(getcwd()); \
+import os; \
+import sys; \
+sys.path.append(os.path.join(os.getcwd(), 'source')); \
 import data; \
 data.download(); \
 "

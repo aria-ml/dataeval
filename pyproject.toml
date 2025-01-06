@@ -65,7 +65,7 @@ optional = true
 [tool.poetry.group.dev.dependencies]
 nox = {version = "*", extras = ["uv"]}
 uv = {version = "*"}
-poetry = {version = "*"}
+poetry = {version = "<2"}
 poetry-lock-groups-plugin = {version = "*"}
 poetry2conda = {version = "*"}
 numpy = {version = ">=2.0.2"}
@@ -154,7 +154,7 @@ exclude = [
   ".jupyter_cache",
   "*env*",
   "output",
-  "_build",
+  "build",
   ".nox",
   ".tox",
   "prototype",
@@ -184,7 +184,7 @@ docstring-code-format = true
 docstring-code-line-length = "dynamic"
 
 [tool.codespell]
-skip = './*env*,./prototype,./output,./docs/_build,./docs/.jupyter_cache,CHANGELOG.md,poetry.lock,*.html'
+skip = './*env*,./prototype,./output,./docs/build,./docs/.jupyter_cache,CHANGELOG.md,poetry.lock,*.html'
 ignore-words-list = ["Hart"]
 
 [build-system]
