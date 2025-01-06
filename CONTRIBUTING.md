@@ -2,7 +2,7 @@
 
 Thank you for your interest in being part of our community of active developers!
 
-## How Can I Contribute
+## How Can I Contribute?
 
 ### Reporting Bugs
 

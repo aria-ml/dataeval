@@ -1,45 +1,69 @@
 ---
-sd_hide_title: true
+sd_hide_title: True
 ---
 
-# Overview
+# Home
+
+## Welcome to DataEval's Documentation
 
 ::::{grid}
 :reverse:
 :gutter: 3 4 4 4
 :margin: 1 2 1 2
 
-:::{grid-item}
+:::{grid-item} 
 :columns: 12 4 4 4
 
-```{image} _static/DataEval_Logo.png
+:::{image} _static/DataEval_Logo.png
 :width: 200px
 :class: sd-m-auto
-```
 
 :::
 
-:::{grid-item}
+:::{grid-item} 
 :columns: 12 8 8 8
 :child-align: justify
 :class: sd-fs-5
 
-```{rubric} **Welcome to DataEval's Documentation!**
+```{include} ../README.md
+:start-after: <!-- start tagline -->
+:end-before: <!-- end tagline -->
 ```
 
-Where experts come to build _robust_, _reliable_, and _responsible_ models.
-
 :::
+
 ::::
 
-----------------
+---
+
+## Our Mission
+
+:::{include} ../README.md
+:start-after: <!-- start needs -->
+:end-before: <!-- end needs -->
+:::
+
+:::{include} ../README.md
+:start-after: <!-- start JATIC interop -->
+:end-before: <!-- end JATIC interop -->
+:::
 
 ## Key Features
 
-- Novel algorithms that characterize image data and its impact on model performance
-- Works for image classification and object detection tasks
-- Full integration with the JATIC Toolbox by CDAO
-- Open source
+DataEval provides many powerful tools to assist in the following T&E tasks:
+
+**Model-agnostic metrics that bound real-world performance**
+- relevance/completeness/coverage
+- metafeatures (data complexity)
+
+**Model-specific metrics that guide model selection and training**
+- dataset sufficiency
+- data/model complexity mismatch
+
+**Metrics for post-deployment monitoring of data with bounds on model performance to guide retraining**
+- dataset-shift metrics
+- model performance bounds under covariate shift
+- guidance on sampling to assess model error and model retraining
 
 ----------------
 
@@ -83,7 +107,7 @@ Quick overview detailing each algorithm's functionality and requirements.
 ::::
 
 
-## Start Here
+## Get Started
 
 We are proud of our tools, so we highlighted some simple but powerful functionality that you can try yourself!
 
@@ -231,9 +255,20 @@ Find the word in the glossary.
 
 ## [Contributing](contributing.md)
 
+DataEval is an open-source software that is open for anyone to request features, fix bugs, or reach out for help. 
+
+Follow our [contributing guide](contributing.md) to get started!
+
 ## [Changelog](changelog.md)
 
 DataEval's development changelog
+
+## Attribution
+
+:::{include} ../README.md
+:start-after: <!-- start attribution -->
+:end-before: <!-- end attribution -->
+:::
 
 <!-- BELOW IS SIDEBAR TOC TREE -->
 
