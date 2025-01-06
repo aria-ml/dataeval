@@ -1,40 +1,48 @@
 # DataEval
 
+To view our extensive collection of tutorials, how-to's, explanation guides, and reference material, please visit our documentation on **[Read the Docs](https://dataeval.readthedocs.io/)**
+
 ## About DataEval
 
-DataEval focuses on characterizing image data and its impact on model performance across Classification and object-detection tasks.
+<!-- start tagline -->
 
-<!-- start about -->
+DataEval curates datasets to train and test performant, robust, unbiased and reliable AI models and monitors for data shifts that impact performance of deployed models. 
 
-**Model-agnostic metrics that bound real-world performance**
-- relevance/completeness/coverage
-- metafeatures (data complexity)
+<!-- end tagline -->
 
-**Model-specific metrics that guide model selection and training**
-- dataset sufficiency
-- data/model complexity mismatch
+### Our mission
 
-**Metrics for post-deployment monitoring of data with bounds on model performance to guide retraining**
-- dataset-shift metrics
-- model performance bounds under covariate shift
-- guidance on sampling to assess model error and model retraining
+<!-- start needs -->
 
-<!-- end about -->
+DataEval is an effective, powerful, and reliable set of tools for any T&E engineer. Throughout all stages of the machine learning lifecycle, DataEval supports **model development, data analysis, and monitoring with state-of-the-art algorithms to help you solve difficult problems. With a focus on computer vision tasks, DataEval provides simple, but effective metrics for performance estimation, bias detection, and dataset linting.
+
+<!-- end needs -->
+
+<!-- start JATIC interop -->
+DataEval is easy to install, supports a wide range of Python versions, and is compatible with many of the most popular packages in the scientific and T&E communities.
+DataEval also has native interopability between JATIC's suite of tools when using MAITE-compliant datasets and models.
+<!-- end JATIC interop -->
 
 ## Getting Started
 
-### Requirements
-- Python 3.9-3.11
+**Python versions:** 3.9 - 3.12
 
-### Installing DataEval
+**Supported packages**: *NumPy*, *Pandas*, *Sci-kit learn*, *MAITE*, *NRTK*, *Gradient*
 
+Choose your preferred method of installation below or follow our [installation guide](https://dataeval.readthedocs.io/en/v0.74.2/installation.html).
+
+* [Installing with pip](#installing-with-pip)
+* [Installing with conda/mamba](#installing-with-conda)
+* [Installing from GitHub](#installing-from-github)
+
+### **Installing with pip**
 You can install DataEval directly from pypi.org using the following command.  The optional dependencies of DataEval are `torch`, `tensorflow` and `all`.  Using `torch` enables Sufficiency metrics, and `tensorflow` enables OOD Detection.
 
 ```
 pip install dataeval[all]
 ```
 
-### Installing DataEval in Conda/Mamba
+### **Installing with conda**
 
 DataEval can be installed in a Conda/Mamba environment using the provided `environment.yaml` file.  As some dependencies
 are installed from the `pytorch` channel, the channel is specified in the below example.
@@ -43,7 +51,7 @@ are installed from the `pytorch` channel, the channel is specified in the below 
 micromamba create -f environment\environment.yaml -c pytorch
 ```
 
-### Installing DataEval from GitHub
+### **Installing from GitHub**
 
 To install DataEval from source locally on Ubuntu, you will need `git-lfs` to download larger, binary source files and `poetry` for project dependency management.
 
@@ -58,8 +66,6 @@ git clone https://github.com/aria-ml/dataeval.git
 cd dataeval
 ```
 
-
-
 Install DataEval with optional dependencies for development.
 ```
 poetry install --all-extras --with dev
@@ -70,12 +76,22 @@ Now that DataEval is installed, you can run commands in the poetry virtual envir
 poetry shell
 ```
 
-### Documentation and Tutorials
-For more ideas on getting started using DataEval in your workflow, additional information and tutorials are in our Sphinx documentation hosted on [Read the Docs](https://dataeval.readthedocs.io/).
+## Contact Us
 
-## Attribution
-This project uses code from the [Alibi-Detect](https://github.com/SeldonIO/alibi-detect) python library developed by SeldonIO.  Additional documentation from the developers are also available [here](https://docs.seldon.io/projects/alibi-detect/en/stable/).
+If you have any questions, feel free to reach out to the people below:
 
-## POCs
 - **POC**: Scott Swan @scott.swan
 - **DPOC**: Andrew Weng @aweng
+
+## Acknowledgement
+
+<!-- start attribution -->
+
+### Alibi-Detect
+This project uses code from the [Alibi-Detect](https://github.com/SeldonIO/alibi-detect) Python library developed by SeldonIO.\
+Additional documentation from their developers is available on the [Alibi-Detect documentation page](https://docs.seldon.io/projects/alibi-detect/en/stable/).
+
+### CDAO Funding Acknowledgement
+This material is based upon work supported by the Chief Digital and Artificial Intelligence Office under Contract No. W519TC-23-9-2033. The views and conclusions contained herein are those of the author(s) and should not be interpreted as necessarily representing the official policies or endorsements, either expressed or implied, of the U.S. Government.
+
+<!-- end attribution -->
