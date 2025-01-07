@@ -193,7 +193,7 @@ class StatsProcessorOutput(NamedTuple):
     results: list[dict[str, Any]]
     source_indices: list[SourceIndex]
     box_counts: list[int]
-    warnings_list: list[tuple[int, int, NDArray[np.float64], tuple[int, ...]]]
+    warnings_list: list[str]
 
 
 def process_stats(
@@ -206,13 +206,13 @@ def process_stats(
     results_list: list[dict[str, Any]] = []
     source_indices: list[SourceIndex] = []
     box_counts: list[int] = []
-    warnings_list: list[tuple[int, int, NDArray[np.float64], tuple[int, ...]]] = []
+    warnings_list: list[str] = []
     nboxes = [None] if boxes is None else normalize_box_shape(boxes)
     for i_b, box in enumerate(nboxes):
         i_b = None if box is None else i_b
         processor_list = [p(image, box, per_channel) for p in stats_processor_cls]
         if any(not p._is_valid_slice for p in processor_list) and i_b is not None and box is not None:
-            warnings_list.append((i, i_b, box, image.shape))
+            warnings_list.append(f"Bounding box [{i}][{i_b}]: {box} is out of bounds of {image.shape}.")
         results_list.append({k: v for p in processor_list for k, v in p.process().items()})
         if per_channel:
             source_indices.extend([SourceIndex(i, i_b, c) for c in range(image_boxes[0].shape[-3])])
@@ -302,7 +302,7 @@ def run_stats(
 
     # warnings are not emitted while in multiprocessing pools so we emit after gathering all warnings
     for w in warning_list:
-        warnings.warn(f"Bounding box [{w[0]}][{w[1]}]: {w[2]} is out of bounds of {w[3]}.", UserWarning)
+        warnings.warn(w, UserWarning)
 
     output = {}
     for results in results_list:
