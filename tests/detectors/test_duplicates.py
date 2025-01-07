@@ -5,10 +5,6 @@ from dataeval.detectors.linters.duplicates import Duplicates
 from dataeval.metrics.stats.hashstats import hashstats
 
 
-def get_dataset(count: int, channels: int):
-    return [np.random.random((channels, 16, 16)) for _ in range(count)]
-
-
 class TestDuplicates:
     def test_duplicates(self):
         data = np.random.random((20, 3, 16, 16))
@@ -63,3 +59,19 @@ class TestDuplicates:
             dupes.from_stats(1234)  # type: ignore
         with pytest.raises(TypeError):
             dupes.from_stats([1234])  # type: ignore
+
+    def test_duplicates_ignore_non_duplicate_too_small(self):
+        dupes = Duplicates()
+        images = [np.random.random((3, 16, 16)) for _ in range(20)]
+        images[3] = np.zeros((3, 5, 5))
+        images[5] = np.ones((3, 5, 5))
+        results = dupes.evaluate(images)
+        assert len(results.near) == 0
+
+    def test_duplicates_ignore_duplicate_too_small(self):
+        dupes = Duplicates()
+        images = [np.random.random((3, 16, 16)) for _ in range(20)]
+        images[3] = np.zeros((3, 5, 5))
+        images[5] = np.zeros((3, 5, 5))
+        results = dupes.evaluate(images)
+        assert len(results.near) == 0
