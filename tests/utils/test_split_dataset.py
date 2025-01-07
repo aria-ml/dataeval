@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from src.dataeval.utils.split_dataset import (
+from dataeval.utils.dataset.split import (
     SplitDatasetOutput,
     _validate_labels,
     calculate_validation_fraction,

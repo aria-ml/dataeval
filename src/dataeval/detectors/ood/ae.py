@@ -18,10 +18,10 @@ import numpy as np
 import torch
 from numpy.typing import ArrayLike
 
-from dataeval.detectors.ood.base import OODScoreOutput
-from dataeval.detectors.ood.base_torch import OODBase
+from dataeval.detectors.ood.base import OODBase
+from dataeval.detectors.ood.output import OODScoreOutput
 from dataeval.interop import as_numpy
-from dataeval.utils.torch.utils import predict_batch
+from dataeval.utils.torch.internal import predict_batch
 
 
 class OOD_AE(OODBase):
@@ -30,7 +30,7 @@ class OOD_AE(OODBase):
 
     Parameters
     ----------
-    model : AriaAutoencoder
+    model : Autoencoder
         An Autoencoder model.
     """
 
