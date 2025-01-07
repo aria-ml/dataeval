@@ -17,10 +17,10 @@ import torch
 import torch.nn as nn
 from numpy.typing import NDArray
 
-from dataeval.utils.torch.utils import get_device, predict_batch
+from dataeval.utils.torch.internal import get_device, predict_batch
 
 
-def _mmd2_from_kernel_matrix(
+def mmd2_from_kernel_matrix(
     kernel_mat: torch.Tensor, m: int, permute: bool = False, zero_diag: bool = True
 ) -> torch.Tensor:
     """
@@ -151,7 +151,7 @@ def sigma_median(x: torch.Tensor, y: torch.Tensor, dist: torch.Tensor) -> torch.
     return sigma
 
 
-class _GaussianRBF(nn.Module):
+class GaussianRBF(nn.Module):
     """
     Gaussian RBF kernel: k(x,y) = exp(-(1/(2*sigma^2)||x-y||^2).
 
@@ -179,18 +179,18 @@ class _GaussianRBF(nn.Module):
     ) -> None:
         super().__init__()
         init_sigma_fn = sigma_median if init_sigma_fn is None else init_sigma_fn
-        self.config = {
+        self.config: dict[str, Any] = {
             "sigma": sigma,
             "trainable": trainable,
             "init_sigma_fn": init_sigma_fn,
         }
         if sigma is None:
-            self.log_sigma = nn.Parameter(torch.empty(1), requires_grad=trainable)
-            self.init_required = True
+            self.log_sigma: nn.Parameter = nn.Parameter(torch.empty(1), requires_grad=trainable)
+            self.init_required: bool = True
         else:
             sigma = sigma.reshape(-1)  # [Ns,]
-            self.log_sigma = nn.Parameter(sigma.log(), requires_grad=trainable)
-            self.init_required = False
+            self.log_sigma: nn.Parameter = nn.Parameter(sigma.log(), requires_grad=trainable)
+            self.init_required: bool = False
         self.init_sigma_fn = init_sigma_fn
         self.trainable = trainable
 
@@ -200,8 +200,8 @@ class _GaussianRBF(nn.Module):
 
     def forward(
         self,
-        x: np.ndarray | torch.Tensor,
-        y: np.ndarray | torch.Tensor,
+        x: np.ndarray[Any, Any] | torch.Tensor,
+        y: np.ndarray[Any, Any] | torch.Tensor,
         infer_sigma: bool = False,
     ) -> torch.Tensor:
         x, y = torch.as_tensor(x), torch.as_tensor(y)
@@ -213,7 +213,7 @@ class _GaussianRBF(nn.Module):
             sigma = self.init_sigma_fn(x, y, dist)
             with torch.no_grad():
                 self.log_sigma.copy_(sigma.log().clone())
-            self.init_required = False
+            self.init_required: bool = False
 
         gamma = 1.0 / (2.0 * self.sigma**2)  # [Ns,]
         # TODO: do matrix multiplication after all?

@@ -5,7 +5,8 @@ import numpy as np
 import pytest
 from numpy.typing import ArrayLike
 
-from dataeval.detectors.ood.base import OODBaseMixin, OODGMMMixin, OODScoreOutput
+from dataeval.detectors.ood.mixin import OODBaseMixin, OODGMMMixin
+from dataeval.detectors.ood.output import OODScoreOutput
 
 image_shape = (32, 32, 1)
 model = MagicMock()

@@ -17,9 +17,10 @@ import torch
 from numpy.typing import ArrayLike
 
 from dataeval.detectors.drift.base import BaseDrift, DriftBaseOutput, UpdateStrategy, preprocess_x, update_x_ref
-from dataeval.detectors.drift.torch import _GaussianRBF, _mmd2_from_kernel_matrix, get_device
+from dataeval.detectors.drift.torch import GaussianRBF, mmd2_from_kernel_matrix
 from dataeval.interop import as_numpy
 from dataeval.output import set_metadata
+from dataeval.utils.torch.internal import get_device
 
 
 @dataclass(frozen=True)
@@ -109,7 +110,7 @@ class DriftMMD(BaseDrift):
 
         # initialize kernel
         sigma_tensor = torch.from_numpy(as_numpy(sigma)).to(self.device) if sigma is not None else None
-        self._kernel = _GaussianRBF(sigma_tensor).to(self.device)
+        self._kernel = GaussianRBF(sigma_tensor).to(self.device)
 
         # compute kernel matrix for the reference data
         if self._infer_sigma or isinstance(sigma_tensor, torch.Tensor):
@@ -150,9 +151,9 @@ class DriftMMD(BaseDrift):
         n = x.shape[0]
         kernel_mat = self._kernel_matrix(x_ref, torch.from_numpy(x).to(self.device))
         kernel_mat = kernel_mat - torch.diag(kernel_mat.diag())  # zero diagonal
-        mmd2 = _mmd2_from_kernel_matrix(kernel_mat, n, permute=False, zero_diag=False)
+        mmd2 = mmd2_from_kernel_matrix(kernel_mat, n, permute=False, zero_diag=False)
         mmd2_permuted = torch.Tensor(
-            [_mmd2_from_kernel_matrix(kernel_mat, n, permute=True, zero_diag=False) for _ in range(self.n_permutations)]
+            [mmd2_from_kernel_matrix(kernel_mat, n, permute=True, zero_diag=False) for _ in range(self.n_permutations)]
         )
         mmd2, mmd2_permuted = mmd2.detach().cpu(), mmd2_permuted.detach().cpu()
         p_val = (mmd2 <= mmd2_permuted).float().mean()

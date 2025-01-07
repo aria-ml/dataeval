@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from requests import HTTPError, RequestException, Response
 
-from dataeval.utils.torch.datasets import MNIST, _check_exists, _extract_archive, _get_file, _validate_file
+from dataeval.utils.dataset.datasets import MNIST, _check_exists, _extract_archive, _get_file, _validate_file
 
 TEMP_MD5 = "d149274109b50d5147c09d6fc7e80c71"
 TEMP_SHA256 = "2b749913055289cb3a5c602a17196b5437dc59bba50e986ea449012a303f7201"
@@ -57,7 +57,7 @@ class MockHTTPError(HTTPError):
         self.response.status_code = 404
 
 
-@patch("dataeval.utils.torch.datasets.requests.get", side_effect=MockHTTPError())
+@patch("dataeval.utils.dataset.datasets.requests.get", side_effect=MockHTTPError())
 @pytest.mark.xdist_group(name="mnist_download")
 def test_get_file_http_error(mock_get, mnist_download):
     parent, name = mnist_download
@@ -65,7 +65,7 @@ def test_get_file_http_error(mock_get, mnist_download):
         _get_file(root=parent, fname=name, origin="http://mock", file_hash=TEMP_SHA256, md5=True)
 
 
-@patch("dataeval.utils.torch.datasets.requests.get", side_effect=RequestException())
+@patch("dataeval.utils.dataset.datasets.requests.get", side_effect=RequestException())
 @pytest.mark.xdist_group(name="mnist_download")
 def test_get_file_request_error(mock_get, mnist_download):
     _, name = mnist_download

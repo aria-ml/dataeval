@@ -2,7 +2,7 @@ import pytest
 import torch
 from torch.utils.data import DataLoader
 
-from dataeval.utils.torch.models import AriaAutoencoder, Decoder, Encoder
+from dataeval.utils.torch.models import Autoencoder, Decoder, Encoder
 from dataeval.utils.torch.trainer import AETrainer, get_images_from_batch
 from tests.mock.data import DataEvalDataset
 
@@ -46,7 +46,7 @@ class TestChannels:
 
     def test_autoencoder(self, channels):
         """The channel size matches after encoding and decoding"""
-        ae = AriaAutoencoder(channels=channels)
+        ae = Autoencoder(channels=channels)
         # NCHW
         images = torch.ones(size=[1, channels, 32, 32])
         result = ae(images)
@@ -61,7 +61,7 @@ class TestTrainer:
         """Aria provided :term:`autoencoder<Autoencoder>` can be trained"""
         images = torch.ones(size=(5, 3, 32, 32))
         dataset = DataEvalDataset(images)
-        ae = AriaAutoencoder(channels=3)
+        ae = Autoencoder(channels=3)
         trainer = AETrainer(model=ae)
         trainer.train(dataset, epochs=5)
 
@@ -82,7 +82,7 @@ class TestTrainer:
         """Aria provided autoencoder has evaluate on new data"""
         images = torch.ones(size=[5, 3, 32, 32])
         dataset = DataEvalDataset(images)
-        ae = AriaAutoencoder(channels=3)
+        ae = Autoencoder(channels=3)
         trainer = AETrainer(model=ae)
         loss = trainer.eval(dataset)
         assert loss > 0
@@ -90,7 +90,7 @@ class TestTrainer:
     def test_encode_aria_ae(self):
         images = torch.ones(size=(5, 3, 32, 32))
         dataset = DataEvalDataset(images)
-        ae = AriaAutoencoder(channels=3)
+        ae = Autoencoder(channels=3)
         trainer = AETrainer(model=ae)
         embeddings = trainer.encode(dataset)
         assert embeddings.shape == (5, 64, 7, 7)
@@ -98,7 +98,7 @@ class TestTrainer:
     def test_encode_batch(self):
         images = torch.ones(size=(20, 3, 32, 32))
         dataset = DataEvalDataset(images)
-        ae = AriaAutoencoder(channels=3)
+        ae = Autoencoder(channels=3)
         trainer = AETrainer(model=ae)
         embeddings = trainer.encode(dataset)
         # Checks batch stacking functionality
@@ -165,7 +165,7 @@ class TestTrainer:
 )
 class TestGPU:
     def test_trainer_device(self, device):
-        model = AriaAutoencoder()
+        model = Autoencoder()
         trainer = AETrainer(model, device=device)
         # Check trainer device set properly
         assert trainer.device == torch.device(device)
