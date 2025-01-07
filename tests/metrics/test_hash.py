@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 
 from dataeval.metrics.stats.hashstats import pchash, xxhash
 
@@ -27,8 +26,8 @@ def test_pchash():
 
 
 def test_pchash_image_too_small():
-    with pytest.raises(ValueError):
-        pchash(np.full((2, 2), 20))
+    result = pchash(np.full((2, 2), 20))
+    assert result == ""
 
 
 def test_pchash_same():

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import warnings
+
 __all__ = []
 
 from dataclasses import dataclass
@@ -54,13 +56,15 @@ def pchash(image: ArrayLike) -> str:
     Returns
     -------
     str
-        The hex string hash of the image using perceptual hashing
+        The hex string hash of the image using perceptual hashing, or empty
+        string if the image is too small to be hashed
     """
     # Verify that the image is at least larger than an 8x8 image
     arr = as_numpy(image)
     min_dim = min(arr.shape[-2:])
     if min_dim < HASH_SIZE + 1:
-        raise ValueError(f"Image must be larger than {HASH_SIZE}x{HASH_SIZE} for fuzzy hashing.")
+        warnings.warn(f"Image must be larger than {HASH_SIZE}x{HASH_SIZE} for fuzzy hashing.")
+        return ""
 
     # Calculates the dimensions of the resized square image
     resize_dim = HASH_SIZE * min((min_dim - 1) // HASH_SIZE, MAX_FACTOR)
