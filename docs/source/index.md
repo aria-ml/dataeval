@@ -25,25 +25,24 @@ sd_hide_title: True
 :child-align: justify
 :class: sd-fs-5
 
-```{include} ../README.md
+```{include} ../../README.md
 :start-after: <!-- start tagline -->
 :end-before: <!-- end tagline -->
 ```
 
 :::
-
 ::::
 
 ---
 
 ## Our Mission
 
-:::{include} ../README.md
+:::{include} ../../README.md
 :start-after: <!-- start needs -->
 :end-before: <!-- end needs -->
 :::
 
-:::{include} ../README.md
+:::{include} ../../README.md
 :start-after: <!-- start JATIC interop -->
 :end-before: <!-- end JATIC interop -->
 :::
@@ -105,7 +104,6 @@ DataEval.
 Quick overview detailing each algorithm's functionality and requirements.
 
 :::
-
 ::::
 
 ## Get Started
@@ -179,7 +177,6 @@ Already know what you're looking for?
 Check out these curated guides to see how DataEval can improve your workflows.
 
 :::
-
 ::::
 
 <!-- SECTION END -->
@@ -273,11 +270,11 @@ Follow our [contributing guide](contributing.md) to get started!
 
 ## [Changelog](changelog.md)
 
-DataEval's development changelog
+DataEval's development changelog.
 
 ## Attribution
 
-:::{include} ../README.md
+:::{include} ../../README.md
 :start-after: <!-- start attribution -->
 :end-before: <!-- end attribution -->
 :::
