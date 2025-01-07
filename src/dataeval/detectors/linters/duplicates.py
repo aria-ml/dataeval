@@ -66,7 +66,8 @@ class Duplicates:
         if not self.only_exact:
             near_dict: dict[int, list] = {}
             for i, value in enumerate(stats["pchash"]):
-                near_dict.setdefault(value, []).append(i)
+                if value:
+                    near_dict.setdefault(value, []).append(i)
             near = [sorted(v) for v in near_dict.values() if len(v) > 1 and not any(set(v).issubset(x) for x in exact)]
         else:
             near = []
