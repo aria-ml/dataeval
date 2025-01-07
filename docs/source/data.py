@@ -17,7 +17,7 @@ def cwd(rel_path):
 
 
 def download():
-    from dataeval.utils.torch.datasets import CIFAR10, MNIST, VOCDetection
+    from dataeval.utils.dataset.datasets import CIFAR10, MNIST, VOCDetection
 
     # Assume we are running in the docs directory with notebooks in tutorials/notebooks
     with cwd("source/how_to/notebooks"):

@@ -1,3 +1,8 @@
+"""
+Metadata related utility functions that help organize raw metadata into :class:`Metadata` objects
+for use within `DataEval`.
+"""
+
 from __future__ import annotations
 
 __all__ = ["Metadata", "preprocess", "merge"]

@@ -13,7 +13,7 @@ import pytest
 import torch
 from sklearn.datasets import load_digits
 
-from dataeval.detectors.ood.ae_torch import OOD_AE
+from dataeval.detectors.ood.ae import OOD_AE
 from dataeval.utils.torch.models import AE
 
 threshold_perc = [90.0]

@@ -15,13 +15,8 @@ import pytest
 import torch
 import torch.nn as nn
 
-from dataeval.detectors.drift.torch import (
-    _GaussianRBF,
-    _mmd2_from_kernel_matrix,
-    _squared_pairwise_distance,
-    get_device,
-    predict_batch,
-)
+from dataeval.detectors.drift.torch import GaussianRBF, _squared_pairwise_distance, mmd2_from_kernel_matrix
+from dataeval.utils.torch.internal import get_device, predict_batch
 
 
 def id_fn(x):
@@ -151,8 +146,8 @@ class TestMMDKernelMatrix:
         if not zero_diag:
             kernel_mat -= torch.diag(kernel_mat.diag())
             kernel_mat_2 -= torch.diag(kernel_mat_2.diag())
-        mmd = _mmd2_from_kernel_matrix(kernel_mat, m, permute=permute, zero_diag=zero_diag)
-        mmd_2 = _mmd2_from_kernel_matrix(kernel_mat_2, m, permute=permute, zero_diag=zero_diag)
+        mmd = mmd2_from_kernel_matrix(kernel_mat, m, permute=permute, zero_diag=zero_diag)
+        mmd_2 = mmd2_from_kernel_matrix(kernel_mat_2, m, permute=permute, zero_diag=zero_diag)
         if not permute:
             assert mmd_2.numpy() < mmd.numpy()
 
@@ -163,6 +158,6 @@ def test_drift_get_device(device):
 
 
 def test_gaussianrbf_forward_valueerror():
-    g = _GaussianRBF(trainable=True)
+    g = GaussianRBF(trainable=True)
     with pytest.raises(ValueError):
         g.forward(np.zeros((2, 2)), np.zeros((2, 2)), infer_sigma=True)
