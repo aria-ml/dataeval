@@ -1,7 +1,5 @@
 """
-Adapted for Pytorch from:
-
-Source code derived from Alibi-Detect 0.11.4
+Adapted for Pytorch from Alibi-Detect 0.11.4
 https://github.com/SeldonIO/alibi-detect/tree/v0.11.4
 
 Original code Copyright (c) 2023 Seldon Technologies Ltd
@@ -10,13 +8,38 @@ Licensed under Apache Software License (Apache 2.0)
 
 from __future__ import annotations
 
+__all__ = []
+
+from typing import NamedTuple, TypeVar
+
 import numpy as np
 import torch
 
-from dataeval.utils.gmm import GaussianMixtureModelParams
+TGMMData = TypeVar("TGMMData")
 
 
-def gmm_params(z: torch.Tensor, gamma: torch.Tensor) -> GaussianMixtureModelParams[torch.Tensor]:
+class GaussianMixtureModelParams(NamedTuple):
+    """
+    phi : torch.Tensor
+        Mixture component distribution weights.
+    mu : torch.Tensor
+        Mixture means.
+    cov : torch.Tensor
+        Mixture covariance.
+    L : torch.Tensor
+        Cholesky decomposition of `cov`.
+    log_det_cov : torch.Tensor
+        Log of the determinant of `cov`.
+    """
+
+    phi: torch.Tensor
+    mu: torch.Tensor
+    cov: torch.Tensor
+    L: torch.Tensor
+    log_det_cov: torch.Tensor
+
+
+def gmm_params(z: torch.Tensor, gamma: torch.Tensor) -> GaussianMixtureModelParams:
     """
     Compute parameters of Gaussian Mixture Model.
 
@@ -58,7 +81,7 @@ def gmm_params(z: torch.Tensor, gamma: torch.Tensor) -> GaussianMixtureModelPara
 
 def gmm_energy(
     z: torch.Tensor,
-    params: GaussianMixtureModelParams[torch.Tensor],
+    params: GaussianMixtureModelParams,
     return_mean: bool = True,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """

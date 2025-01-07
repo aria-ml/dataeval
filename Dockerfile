@@ -16,7 +16,7 @@ RUN pip install --no-cache \
     requests
 WORKDIR /docs
 COPY docs/source/data.py source/data.py
-COPY src/dataeval/utils/torch/datasets.py dataeval/utils/torch/datasets.py
+COPY src/dataeval/utils/dataset/datasets.py dataeval/utils/dataset/datasets.py
 RUN python -c "\
 import os; \
 import sys; \

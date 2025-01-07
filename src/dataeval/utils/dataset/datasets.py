@@ -1,3 +1,5 @@
+"""Provides access to common Computer Vision datasets."""
+
 from __future__ import annotations
 
 __all__ = ["MNIST", "CIFAR10", "VOCDetection"]

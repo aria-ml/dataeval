@@ -20,7 +20,8 @@ from scipy.stats import entropy
 
 from dataeval.detectors.drift.base import DriftOutput, UpdateStrategy
 from dataeval.detectors.drift.ks import DriftKS
-from dataeval.detectors.drift.torch import get_device, preprocess_drift
+from dataeval.detectors.drift.torch import preprocess_drift
+from dataeval.utils.torch.internal import get_device
 
 
 def classifier_uncertainty(

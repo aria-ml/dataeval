@@ -1,6 +1,8 @@
+"""Simple PyTorch model architectures used by DataEval."""
+
 from __future__ import annotations
 
-__all__ = ["AriaAutoencoder", "Encoder", "Decoder"]
+__all__ = ["Autoencoder", "Encoder", "Decoder"]
 
 import math
 from typing import Any
@@ -9,7 +11,7 @@ import torch
 import torch.nn as nn
 
 
-class AriaAutoencoder(nn.Module):
+class Autoencoder(nn.Module):
     """
     An autoencoder model with a separate encoder and decoder.
 
@@ -63,7 +65,7 @@ class Encoder(nn.Module):
     """
     A simple encoder to be used in an autoencoder model.
 
-    This is the encoder used by the AriaAutoencoder model.
+    This is the encoder used by the Autoencoder model.
 
     Parameters
     ----------
@@ -104,7 +106,7 @@ class Decoder(nn.Module):
     """
     A simple decoder to be used in an autoencoder model.
 
-    This is the decoder used by the AriaAutoencoder model.
+    This is the decoder used by the Autoencoder model.
 
     Parameters
     ----------
@@ -142,14 +144,14 @@ class Decoder(nn.Module):
 
 class AE(nn.Module):
     """
-    An autoencoder model with a separate encoder and decoder. Meant to replace the TensorFlow model called AE, which we
-      used as the core of an autoencoder-based OOD detector, i.e. as an argument to OOD_AE().
+    An autoencoder model with a separate encoder and decoder used as the core of an autoencoder-based
+    OOD detector, i.e. as an argument to OOD_AE().
 
     Parameters
     ----------
     input_shape : tuple[int, int, int]
         Number of input channels, number of rows, number of columns.() Number of examples per batch will be inferred
-          at runtime.)
+        at runtime.)
     """
 
     def __init__(self, input_shape: tuple[int, int, int]) -> None:
@@ -279,7 +281,7 @@ class Decoder_AE(nn.Module):
     """
     A simple decoder to be used in an autoencoder model.
 
-    This is the decoder used by the AriaAutoencoder model.
+    This is the decoder used by the Autoencoder model.
 
     Parameters
     ----------
