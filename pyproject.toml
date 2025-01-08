@@ -184,7 +184,7 @@ docstring-code-format = true
 docstring-code-line-length = "dynamic"
 
 [tool.codespell]
-skip = './*env*,./prototype,./output,./docs/build,./docs/.jupyter_cache,CHANGELOG.md,poetry.lock,*.html'
+skip = './*env*,./prototype,./output,./docs/build,./docs/source/.jupyter_cache,CHANGELOG.md,poetry.lock,*.html'
 ignore-words-list = ["Hart"]
 
 [build-system]

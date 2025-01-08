@@ -419,7 +419,7 @@ class ReleaseGen:
     def _generate_jupyter_cache_actions(self) -> List[Dict[str, str]]:
         # cannot use 'latest-known-good' because 404 on download - investigate
         ref = "main"
-        cache_path = "docs/.jupyter_cache"
+        cache_path = "docs/source/.jupyter_cache"
         output_path = path.join("output", cache_path)
         self.gl.get_artifacts(job="docs", dest="./", ref=ref)
         if not path.exists(output_path):

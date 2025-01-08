@@ -3,24 +3,24 @@ from os import chdir, getcwd, makedirs, path
 
 
 @contextmanager
-def cwd(rel_path):
-    old_path = getcwd()
-    new_path = path.abspath(rel_path)
-    print(f"push: {old_path} -> {new_path}")
+def cd(rel_path: str):
+    """Change folder relative to current file"""
+    cur_path = getcwd()
+    new_path = path.join(path.dirname(__file__), rel_path)
+    print(f"push: {cur_path} -> {new_path}")
     makedirs(new_path, exist_ok=True)
     chdir(new_path)
     try:
         yield
     finally:
-        print(f"pop: {old_path} <- {new_path}")
-        chdir(old_path)
+        print(f"pop: {cur_path} <- {new_path}")
+        chdir(cur_path)
 
 
 def download():
     from dataeval.utils.dataset.datasets import CIFAR10, MNIST, VOCDetection
 
-    # Assume we are running in the docs directory with notebooks in tutorials/notebooks
-    with cwd("source/how_to/notebooks"):
+    with cd("how_to/notebooks"):
         # AETrainerTutorial.ipynb
         # BayesErrorRateEstimationTutorial.ipynb
         # ClassLearningCurvesTutorial.ipynb
@@ -35,7 +35,7 @@ def download():
         # LintingTutorial.ipynb
         CIFAR10(root="./data", train=False, download=True)
 
-    with cwd("source/tutorials"):
+    with cd("tutorials"):
         # EDA_Part1.ipynb
         # EDA_Part2.ipynb
         # EDA_Part3.ipynb
