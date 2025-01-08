@@ -50,15 +50,14 @@ function build_image() {
     target=$1
 
     cache_images=("$target")
-    if [[ $target == docs ]]; then
-        cache_images+=("data")
+    if [[ $target != base ]]; then
         cache_images+=("base")
     fi
 
     # create cache array
     cache=()
     for cache_image in ${cache_images[@]}; do
-        if [[ ${BRANCH_CACHE} && $cache_image != data ]]; then
+        if [[ ${BRANCH_CACHE} ]]; then
             cache+=("${BRANCH_CACHE}${cache_image}")
         fi
         # always cache from main
@@ -75,28 +74,16 @@ function build_image() {
         cache_to_arg=""
     fi
 
-    # only push an image up to the registry for docs images
-    if [[ $target == docs ]]; then
-        image_tag="${TASK_IMAGE}${target}"
-    fi
-
-    # build output_arg as appropriate if image needs to be pushed, otherwise just populate the registry cache
-    if [[ $image_tag ]]; then
-        output_arg="--output type=image,name=${image_tag}"
+    if [[ $target != base || $save_build_images ]]; then
+        # build output_arg as appropriate if image is needed otherwise just populate the registry cache
+        # docker container driver will not load images to local store without tag and load args
+        output_arg="--output type=image,name=${target} --tag ${target} --load"
     else
         output_arg="--output type=cacheonly"
     fi
 
-    if [[ $target == docs || $save_build_images ]]; then
-        # By default the docker-container driver doesn't load images to the
-        # local docker images store, these args will cause it to do so.
-        load_arg="--tag ${image_tag} --load"
-    fi
-
     docker_build_cmd="docker buildx build \
-        $load_arg \
         --builder $builder_name \
-        $no_cache_filter_arg \
         $cache_from_arg \
         $cache_to_arg \
         $output_arg \
@@ -125,8 +112,7 @@ function run_image() {
     # Clear any residual containers from previous runs
     docker rm -f $container_name 2> /dev/null || true
 
-    image_tag="${TASK_IMAGE}${target}"
-    docker_run_cmd="docker run --tty --env TERM=xterm-256color --interactive --name $container_name $gpuflag $image_tag $clean"
+    docker_run_cmd="docker run --tty --env TERM=xterm-256color --interactive --name $container_name $gpuflag $task $clean"
 
     mkdir -p output
     echo "=================================================="
@@ -169,18 +155,12 @@ else
     shopt -u extglob
 fi
 
-# construct image and cache names
-export TASK_IMAGE="${namespace}/${repository}:${tag_prefix}"
-
 export MAIN_CACHE="${namespace}/cache"
 if [[ $tag_prefix ]]; then
     export BRANCH_CACHE="${namespace}/cache:${tag_prefix}"
 fi
 
 if [[ $CI ]]; then
-    if [[ $branch_name == $main_branch ]]; then
-        build_image data
-    fi
     build_image base
 fi
 
