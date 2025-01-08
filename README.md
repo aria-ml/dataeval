@@ -36,9 +36,10 @@ Choose your preferred method of installation below or follow our [installation g
 * [Installing from GitHub](#installing-from-github)
 
 ### **Installing with pip**
+
 You can install DataEval directly from pypi.org using the following command.  The optional dependencies of DataEval are `all`.
 
-```
+```bash
 pip install dataeval[all]
 ```
 
@@ -47,7 +48,7 @@ pip install dataeval[all]
 DataEval can be installed in a Conda/Mamba environment using the provided `environment.yaml` file.  As some dependencies
 are installed from the `pytorch` channel, the channel is specified in the below example.
 
-```
+```bash
 micromamba create -f environment\environment.yaml -c pytorch
 ```
 
@@ -55,24 +56,27 @@ micromamba create -f environment\environment.yaml -c pytorch
 
 To install DataEval from source locally on Ubuntu, you will need `git-lfs` to download larger, binary source files and `poetry` for project dependency management.
 
-```
+```bash
 sudo apt-get install git-lfs
 pip install poetry
 ```
 
 Pull the source down and change to the DataEval project directory.
-```
+
+```bash
 git clone https://github.com/aria-ml/dataeval.git
 cd dataeval
 ```
 
 Install DataEval with optional dependencies for development.
-```
+
+```bash
 poetry install --all-extras --with dev
 ```
 
 Now that DataEval is installed, you can run commands in the poetry virtual environment by prefixing shell commands with `poetry run`, or activate the virtual environment directly in the shell.
-```
+
+```bash
 poetry shell
 ```
 
@@ -80,18 +84,20 @@ poetry shell
 
 If you have any questions, feel free to reach out to the people below:
 
-- **POC**: Scott Swan @scott.swan
-- **DPOC**: Andrew Weng @aweng
+* **POC**: Scott Swan @scott.swan
+* **DPOC**: Andrew Weng @aweng
 
 ## Acknowledgement
 
 <!-- start attribution -->
 
 ### Alibi-Detect
+
 This project uses code from the [Alibi-Detect](https://github.com/SeldonIO/alibi-detect) Python library developed by SeldonIO.\
 Additional documentation from their developers is available on the [Alibi-Detect documentation page](https://docs.seldon.io/projects/alibi-detect/en/stable/).
 
 ### CDAO Funding Acknowledgement
+
 This material is based upon work supported by the Chief Digital and Artificial Intelligence Office under Contract No. W519TC-23-9-2033. The views and conclusions contained herein are those of the author(s) and should not be interpreted as necessarily representing the official policies or endorsements, either expressed or implied, of the U.S. Government.
 
 <!-- end attribution -->
