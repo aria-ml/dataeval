@@ -7,24 +7,6 @@ ARG python_version="3.11"
 ARG output_dir="/dataeval/output"
 
 
-######################## data image ########################
-FROM python:3.11 as data
-RUN pip install --no-cache \
-    --extra-index-url https://download.pytorch.org/whl/cpu \
-    torch==2.5.1+cpu \
-    torchvision==0.20.1+cpu \
-    requests
-WORKDIR /docs
-COPY docs/source/data.py source/data.py
-COPY src/dataeval/utils/dataset/datasets.py dataeval/utils/dataset/datasets.py
-RUN python -c "\
-import os; \
-import sys; \
-sys.path.append(os.path.join(os.getcwd(), 'source')); \
-import data; \
-data.download(); \
-"
-
 ######################## cuda image ########################
 FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04 as cuda
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -59,7 +41,17 @@ ENV PATH=/${USER}/.venv/bin:${PATH}
 
 ######################## docs image ########################
 FROM base as docs
-COPY --chown=${UID} --link --from=data /docs docs
+ARG UID
+COPY --chown=${UID} docs/source/data.py docs/source/data.py
+COPY --chown=${UID} src/dataeval/utils/dataset/datasets.py src/dataeval/utils/dataset/datasets.py
+ARG USER
+RUN python -c "\
+import os; \
+import sys; \
+sys.path.extend(['/${USER}/docs/source', '/${USER}/src']); \
+import data; \
+data.download(); \
+"
 COPY --chown=${UID} pyproject.toml poetry.lock ./
 COPY --chown=${UID} src/ src/
 COPY --chown=${UID} *.md ./
