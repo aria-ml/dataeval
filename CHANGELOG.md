@@ -1,6 +1,27 @@
-[//]: # (e7a284de9d814f516b25b36712392311ada3039e)
+[//]: # (ed98b6b1784b04ad3796983cf93932cb444f7076)
 
 # DataEval Change Log
+
+## v0.75.0
+
+🌟 **Feature Release**
+- `3aa12cb3` - Refactor bias metadata helpers
+
+    Metadata preprocessing functions have been moved from `dataeval.metrics.bias.metadata_preprocessing` to `dataeval.utils.metadata`.
+
+🛠️ **Improvements and Enhancements**
+- `ed98b6b1` - Return empty string for hashes on too small images
+
+    `pchash` now returns empty string when attempting to perform perception hashing against images or chips that are too small to meaningfully hash. `Duplicates` also ignore empty perception hashes to avoid false positive detections.
+- `b144fa1c` - Change torch to be required dependency
+
+    PyTorch is now a required dependency and the `torch` extra is no longer required for full functionality
+
+📝 **Miscellaneous**
+- `6e4474b2` - Refactor utils and fix associated docstrings, documentation and notebooks
+- `ff87cee6` - Update documentation and CI pipelines to comply with SDP DR-3
+- `aa7d9205` - Updated README.md format, added tagline and cdao funding acknowledgment
+- `82559846` - Replace manual markdown files with autoapi generated rst files
 
 ## v0.74.2
 
