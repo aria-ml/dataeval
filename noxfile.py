@@ -131,10 +131,10 @@ def docs(session: nox.Session) -> None:
         "--define",
         "language=en",
         ".",
-        "../output/docs/html",
+        "../../output/docs/html",
         env={**DOCS_ENVS, **COMMON_ENVS},
     )
-    session.run("cp", "-R", ".jupyter_cache", "../output/docs", external=True)
+    session.run("cp", "-R", ".jupyter_cache", "../../output/docs", external=True)
     session.run("bash", "-c", RESTORE_CMD, external=True)
 
 
