@@ -13,10 +13,10 @@ from versiontag import VersionTag
 
 CHANGELOG_FILE = "CHANGELOG.md"
 # need to read this to update the doc links
-HOWTO_INDEX_FILE = "docs/how_to/index.md"
-TUTORIAL_INDEX_FILE = "docs/tutorials/index.md"
-NOTEBOOK_DIRECTORY = "docs/how_to/notebooks"
-TUTORIAL_DIRECTORY = "docs/tutorials"
+HOWTO_INDEX_FILE = "docs/source/how_to/index.md"
+TUTORIAL_INDEX_FILE = "docs/source/tutorials/index.md"
+NOTEBOOK_DIRECTORY = "docs/source/how_to/notebooks"
+TUTORIAL_DIRECTORY = "docs/source/tutorials"
 TAB = "    "
 
 version_pattern = re.compile(r"v([0-9]+)\.([0-9]+)\.([0-9]+)")
