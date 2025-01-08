@@ -1,3 +1,5 @@
 **/build
 **/.tox
 **/.nox
+**/*.pyc
+**/__pycache__
