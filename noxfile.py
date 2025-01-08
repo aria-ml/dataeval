@@ -20,7 +20,7 @@ SUPPORTED_VERSIONS = ("3.9", "3.10", "3.11", "3.12")
 
 RESTORE_CMD = """
 if (which git) > /dev/null; then
-    if [[ ! $(git status --porcelain | grep docs/.jupyter_cache | grep --invert-match global.db) ]]; then
+    if [[ ! $(git status --porcelain | grep docs/source/.jupyter_cache | grep --invert-match global.db) ]]; then
         echo "No cache changes - reverting global.db";
         git restore .jupyter_cache/global.db;
     fi;
@@ -111,9 +111,9 @@ def docs(session: nox.Session) -> None:
     """Generate documentation. Clear the jupyter cache by calling `nox -e docs -- clean`."""
     check_version(session.name)
     session.install(*INSTALL_ARGS, env=INSTALL_ENVS)
-    session.chdir("docs")
-    session.run("rm", "-rf", "./autoapi", external=True)
-    session.run("rm", "-rf", "../output/docs", external=True)
+    session.chdir("docs/source")
+    session.run("rm", "-rf", "./reference", external=True)
+    session.run("rm", "-rf", "../../output/docs", external=True)
     if "clean" in session.posargs:
         session.run("rm", "-rf", ".jupyter_cache", external=True)
     session.run(
@@ -127,10 +127,10 @@ def docs(session: nox.Session) -> None:
         "--builder",
         "html",
         "--doctree-dir",
-        "build/doctrees",
+        "../build/doctrees",
         "--define",
         "language=en",
-        "source",
+        ".",
         "../output/docs/html",
         env={**DOCS_ENVS, **COMMON_ENVS},
     )
