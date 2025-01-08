@@ -10,7 +10,7 @@ from os import getenv
 # -----------------------------------------------------------------------------
 
 project = "DataEval"
-copyright = "2024, ARiA"  # noqa: A001
+copyright = "2025, ARiA"  # noqa: A001
 author = "ARiA"
 
 site_url = "https://github.com/aria-ml/dataeval/"
