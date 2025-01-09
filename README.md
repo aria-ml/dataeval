@@ -14,7 +14,7 @@ DataEval curates datasets to train and test performant, robust, unbiased and rel
 
 <!-- start needs -->
 
-DataEval is an effective, powerful, and reliable set of tools for any T&E engineer. Throughout all stages of the machine learning lifecycle, DataEval supports **model development, data analysis, and monitoring with state-of-the-art algorithms to help you solve difficult problems. With a focus on computer vision tasks, DataEval provides simple, but effective metrics for performance estimation, bias detection, and dataset linting.
+DataEval is an effective, powerful, and reliable set of tools for any T&E engineer. Throughout all stages of the machine learning lifecycle, DataEval supports model development, data analysis, and monitoring with state-of-the-art algorithms to help you solve difficult problems. With a focus on computer vision tasks, DataEval provides simple, but effective metrics for performance estimation, bias detection, and dataset linting.
 
 <!-- end needs -->
 
@@ -89,7 +89,7 @@ If you have any questions, feel free to reach out to the people below:
 
 ## Acknowledgement
 
-<!-- start attribution -->
+<!-- start acknowledgement -->
 
 ### Alibi-Detect
 
@@ -100,4 +100,4 @@ Additional documentation from their developers is available on the [Alibi-Detect
 
 This material is based upon work supported by the Chief Digital and Artificial Intelligence Office under Contract No. W519TC-23-9-2033. The views and conclusions contained herein are those of the author(s) and should not be interpreted as necessarily representing the official policies or endorsements, either expressed or implied, of the U.S. Government.
 
-<!-- end attribution -->
+<!-- end acknowledgement -->
