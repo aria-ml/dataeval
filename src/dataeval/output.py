@@ -3,6 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 import inspect
+import logging
 import sys
 from collections.abc import Mapping
 from datetime import datetime, timezone
@@ -81,29 +82,34 @@ def set_metadata(fn: Callable[P, R] | None = None, *, state: list[str] | None = 
                 return f"{v.__class__.__name__}: len={len(v)}"
             return f"{v.__class__.__name__}"
 
-        time = datetime.now(timezone.utc)
-        result = fn(*args, **kwargs)
-        duration = (datetime.now(timezone.utc) - time).total_seconds()
-        fn_params = inspect.signature(fn).parameters
-
+        # Collect function metadata
         # set all params with defaults then update params with mapped arguments and explicit keyword args
+        fn_params = inspect.signature(fn).parameters
         arguments = {k: None if v.default is inspect.Parameter.empty else v.default for k, v in fn_params.items()}
         arguments.update(zip(fn_params, args))
         arguments.update(kwargs)
         arguments = {k: fmt(v) for k, v in arguments.items()}
-        state_attrs = (
-            {k: fmt(getattr(args[0], k)) for k in state if "self" in arguments} if "self" in arguments and state else {}
-        )
-        name = (
-            f"{args[0].__class__.__module__}.{args[0].__class__.__name__}.{fn.__name__}"
-            if "self" in arguments
-            else f"{fn.__module__}.{fn.__qualname__}"
-        )
+        is_method = "self" in arguments
+        state_attrs = {k: fmt(getattr(args[0], k)) for k in state or []} if is_method else {}
+        module = args[0].__class__.__module__ if is_method else fn.__module__.removeprefix("src.")
+        class_prefix = f".{args[0].__class__.__name__}." if is_method else "."
+        name = f"{module}{class_prefix}{fn.__name__}"
+        arguments = {k: v for k, v in arguments.items() if k != "self"}
+
+        # Execute function and record elapsed time
+        _logger = logging.getLogger(module)
+        time = datetime.now(timezone.utc)
+        _logger.log(logging.INFO, f">>> Executing '{name}': args={arguments} state={state} <<<")
+        result = fn(*args, **kwargs)
+        duration = (datetime.now(timezone.utc) - time).total_seconds()
+        _logger.log(logging.INFO, f">>> Completed '{name}': args={arguments} state={state} duration={duration} <<<")
+
+        # Update output with recorded metadata
         metadata = {
             "_name": name,
             "_execution_time": time,
             "_execution_duration": duration,
-            "_arguments": {k: v for k, v in arguments.items() if k != "self"},
+            "_arguments": arguments,
             "_state": state_attrs,
             "_version": __version__,
         }
