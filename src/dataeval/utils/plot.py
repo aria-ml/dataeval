@@ -70,12 +70,17 @@ def heatmap(
     # Rotate the tick labels and set their alignment.
     plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
 
-    # Turn spines off and create white grid.
-    ax.spines[:].set_visible(False)
+    light_gray = "0.9"
+    # Turn spines on and create light gray easily visible grid.
+    for spine in ax.spines.values():
+        spine.set_visible(True)
+        spine.set_color(light_gray)
 
-    ax.set_xticks(np.arange(np_data.shape[1] + 1) - 0.5, minor=True)
-    ax.set_yticks(np.arange(np_data.shape[0] + 1) - 0.5, minor=True)
-    ax.grid(which="minor", color="w", linestyle="-", linewidth=3)
+    xticks = np.arange(np_data.shape[1] + 1) - 0.5
+    yticks = np.arange(np_data.shape[0] + 1) - 0.5
+    ax.set_xticks(xticks, minor=True)
+    ax.set_yticks(yticks, minor=True)
+    ax.grid(which="minor", color=light_gray, linestyle="-", linewidth=3)
     ax.tick_params(which="minor", bottom=False, left=False)
 
     if xlabel:
