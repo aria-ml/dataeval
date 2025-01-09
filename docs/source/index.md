@@ -261,22 +261,22 @@ Find the word in the glossary.
 
 <!-- SECTION END -->
 
-## [Contributing](contributing.md)
+## Contributing
 
 DataEval is an open-source software that is open for anyone to request
 features, fix bugs, or reach out for help.
 
 Follow our [contributing guide](contributing.md) to get started!
 
-## [Changelog](changelog.md)
+## Changelog
 
-DataEval's development changelog.
+DataEval's development [changelog](changelog.md).
 
-## Attribution
+## Acknowledgement
 
 :::{include} ../../README.md
-:start-after: <!-- start attribution -->
-:end-before: <!-- end attribution -->
+:start-after: <!-- start acknowledgement -->
+:end-before: <!-- end acknowledgement -->
 :::
 
 <!-- BELOW IS SIDEBAR TOC TREE -->
