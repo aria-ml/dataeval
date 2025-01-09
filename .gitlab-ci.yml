@@ -273,23 +273,53 @@ markdownlint:
     - markdownlint-cli2 "docs/**/*.md" "#node_modules"
   rules: *on_run_with_docs
 
-pages:
-  stage: docs
+### RELEASE ###
+
+.publish_merge_request_env:
+  stage: release
+  artifacts:
+    paths:
+      - public/
+  environment:
+    name: $CI_MERGE_REQUEST_IID/$ENV_SLUG
+    url: "https://jatic.pages.jatic.net/-/aria/$CI_PROJECT_NAME/-/jobs/$CI_JOB_ID/artifacts/public/index.html"
+    auto_stop_in: 1 week
+  rules:
+    - *exclude_main
+    - *on_run_with_docs
+
+docs preview:
+  extends: .publish_merge_request_env
   needs:
     - job: docs
       artifacts: true
+  script:
+    - mv output/docs/html/ ./public/
+  variables:
+    ENV_SLUG: docs
+
+code coverage:
+  extends: .publish_merge_request_env
+  needs:
     - job: coverage
       artifacts: true
   script:
+    - mv htmlcov/ ./public/
+  variables:
+    ENV_SLUG: ccov
+
+pages:
+  stage: release
+  needs:
+    - job: docs
+      artifacts: true
+  script:
     - mv output/docs/html/ ./public/
-    - mv htmlcov/ ./public/coverage/
   artifacts:
     paths:
       - public
   rules: *on_commit_main_only
-
-### RELEASE ###
-
+  
 update cache:
   stage: release
   needs:
@@ -307,15 +337,6 @@ update cache:
     - git push https://dataeval-bot:${DATAEVAL_BUILD_PAT}@gitlab.jatic.net/jatic/aria/dataeval.git
   rules:
     - *on_run_with_docs
-
-update merge request:
-  stage: release
-  before_script:
-    - uv pip install requests --system
-  script:
-    - .gitlab/scripts/update_merge_request.py $CI_MERGE_REQUEST_IID $CI_PIPELINE_ID
-  allow_failure: true
-  rules: *on_merge_request_only
 
 # This job will only run if all previous stages have succeeded,
 # and it creates a tag that signifies that all testing has passed.

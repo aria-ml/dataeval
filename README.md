@@ -93,7 +93,7 @@ If you have any questions, feel free to reach out to the people below:
 
 ### Alibi-Detect
 
-This project uses code from the [Alibi-Detect](https://github.com/SeldonIO/alibi-detect) Python library developed by SeldonIO.\
+This project has adapted code from the [Alibi-Detect](https://github.com/SeldonIO/alibi-detect) Python library developed by SeldonIO.\
 Additional documentation from their developers is available on the [Alibi-Detect documentation page](https://docs.seldon.io/projects/alibi-detect/en/stable/).
 
 ### CDAO Funding Acknowledgement
