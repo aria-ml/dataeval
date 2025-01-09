@@ -6,7 +6,6 @@ import numpy as np
 import pytest
 
 import dataeval.metrics.stats.base as base
-from tests.docs import *  # noqa: F403 - configure doctests
 
 TEMP_CONTENTS = "ABCDEF1234567890"
 
