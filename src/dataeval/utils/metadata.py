@@ -18,7 +18,6 @@ from scipy.stats import wasserstein_distance as wd
 from dataeval.interop import as_numpy, to_numpy
 from dataeval.output import Output, set_metadata
 
-TNum = TypeVar("TNum", int, float)
 DISCRETE_MIN_WD = 0.054
 CONTINUOUS_MIN_SAMPLE_SIZE = 20
 
@@ -329,7 +328,7 @@ class Metadata(Output):
 def preprocess(
     raw_metadata: Iterable[Mapping[str, Any]],
     class_labels: ArrayLike | str,
-    continuous_factor_bins: Mapping[str, int | list[tuple[TNum, TNum]]] | None = None,
+    continuous_factor_bins: Mapping[str, int | Iterable[float]] | None = None,
     auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
     exclude: Iterable[str] | None = None,
 ) -> Metadata:
@@ -348,8 +347,9 @@ def preprocess(
     class_labels : ArrayLike or string
         If arraylike, expects the labels for each image (image classification) or each object (object detection).
         If the labels are included in the metadata dictionary, pass in the key value.
-    continuous_factor_bins : Mapping[str, int] or Mapping[str, list[tuple[TNum, TNum]]] or None, default None
-        User provided dictionary specifying how to bin the continuous metadata factors
+    continuous_factor_bins : Mapping[str, int or Iterable[float]] or None, default None
+        User provided dictionary specifying how to bin the continuous metadata factors where the value is either
+        an int to represent the number of bins, or a list of floats representing the edges for each bin.
     auto_bin_method : "uniform_width" or "uniform_count" or "clusters", default "uniform_width"
         Method by which the function will automatically bin continuous metadata factors. It is recommended
         that the user provide the bins through the `continuous_factor_bins`.
@@ -439,7 +439,7 @@ def preprocess(
     )
 
 
-def _user_defined_bin(data: list[Any] | NDArray[Any], binning: int | list[tuple[TNum, TNum]]) -> NDArray[np.intp]:
+def _user_defined_bin(data: list[Any] | NDArray[Any], binning: int | Iterable[float]) -> NDArray[np.intp]:
     """
     Digitizes a list of values into a given number of bins.
 
@@ -447,8 +447,8 @@ def _user_defined_bin(data: list[Any] | NDArray[Any], binning: int | list[tuple[
     ----------
     data : list | NDArray
         The values to be digitized.
-    binning :  int | list[tuple[TNum, TNum]]
-        The number of bins for the discrete values that data will be digitized into.
+    binning :  int | Iterable[float]
+        The number of bins or list of bin edges for the discrete values that data will be digitized into.
 
     Returns
     -------
@@ -461,12 +461,12 @@ def _user_defined_bin(data: list[Any] | NDArray[Any], binning: int | list[tuple[
             "Encountered a data value with non-numeric type when digitizing a factor. "
             "Ensure all occurrences of continuous factors are numeric types."
         )
-    if type(binning) is int:
+    if isinstance(binning, int):
         _, bin_edges = np.histogram(data, bins=binning)
         bin_edges[-1] = np.inf
         bin_edges[0] = -np.inf
     else:
-        bin_edges = binning
+        bin_edges = list(binning)
     return np.digitize(data, bin_edges)
 
 
