@@ -147,13 +147,13 @@ def boxratiostats(
     if boxstats.source_index[-1].image != imgstats.source_index[-1].image:
         raise ValueError("Stats index_map length mismatch. Check if the correct box and image stats were provided.")
     if all(count == 0 for count in boxstats.box_count):
-        raise TypeError("Input for boxstats must contain box information.")
+        raise ValueError("Input for boxstats must contain box information.")
     if any(count != 0 for count in imgstats.box_count):
-        raise TypeError("Input for imgstats must not contain box information.")
+        raise ValueError("Input for imgstats must not contain box information.")
     boxstats_has_channels = any(si.channel is None for si in boxstats.source_index)
     imgstats_has_channels = any(si.channel is None for si in imgstats.source_index)
     if boxstats_has_channels != imgstats_has_channels:
-        raise TypeError("Input for boxstats and imgstats must have matching channel information.")
+        raise ValueError("Input for boxstats and imgstats must have matching channel information.")
 
     output_dict = {}
     for key in boxstats.dict():

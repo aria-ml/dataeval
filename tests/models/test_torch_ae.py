@@ -2,7 +2,7 @@ import pytest
 import torch
 from torch.utils.data import DataLoader
 
-from dataeval.utils.torch.models import Autoencoder, Decoder, Encoder
+from dataeval.utils.torch.models import AE, Autoencoder, Decoder, Encoder
 from dataeval.utils.torch.trainer import AETrainer, get_images_from_batch
 from tests.mock.data import DataEvalDataset
 
@@ -178,3 +178,11 @@ class TestGPU:
         # i.e. param.to("cuda"), param.device equals device(type="cuda", index=0)
         for param in m.parameters():
             assert param.device.type == torch.device(device).type
+
+
+class TestAE:
+    def test_encode_output_shape(self):
+        ae = AE(input_shape=(1, 32, 32))
+        images = torch.ones(size=[1, 1, 32, 32])
+        encoded = ae.encode(images)
+        assert encoded.shape == (1, 256)

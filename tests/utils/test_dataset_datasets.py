@@ -194,7 +194,7 @@ class TestMNIST:
     def test_mnist_slice_back(self, mnist_npy):
         """Test the functionality of slicing from the back."""
         datasetA = MNIST(root=mnist_npy, size=1000, slice_back=True, randomize=True)
-        datasetB = MNIST(root=mnist_npy, size=1000)
+        datasetB = MNIST(root=mnist_npy, size=1000, randomize=False)
         assert np.all(datasetA.targets == datasetB.targets)
         assert not np.all(datasetA.data == datasetB.data)
 

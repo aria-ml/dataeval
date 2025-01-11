@@ -1,14 +1,25 @@
 from functools import partial
+from typing import Any
 
 import numpy as np
 import pytest
 from numpy.random import randint
 from numpy.typing import NDArray
 
+import dataeval.metrics.stats.base as stats_base
 from dataeval.metrics.stats import dimensionstats, hashstats, labelstats, pixelstats, visualstats
-from dataeval.metrics.stats.base import SOURCE_INDEX, BaseStatsOutput, StatsProcessor, process_stats_unpack
-from dataeval.metrics.stats.boxratiostats import boxratiostats
-from dataeval.metrics.stats.datasetstats import channelstats, datasetstats
+from dataeval.metrics.stats.base import (
+    SOURCE_INDEX,
+    BaseStatsOutput,
+    StatsProcessor,
+    normalize_box_shape,
+    process_stats_unpack,
+)
+from dataeval.metrics.stats.boxratiostats import boxratiostats, calculate_ratios
+from dataeval.metrics.stats.datasetstats import ChannelStatsOutput, DatasetStatsOutput, channelstats, datasetstats
+
+# do not run stats tests using multiple processing
+stats_base.DEFAULT_PROCESSES = 1
 
 
 def get_dataset(count: int, channels: int):
@@ -52,9 +63,9 @@ class LengthProcessor(StatsProcessor[LengthStatsOutput]):
     }
 
 
+@pytest.mark.parametrize("box", [np.array([0, 0, 16, 16]), None])
+@pytest.mark.parametrize("per_channel", [False, True])
 class TestBaseStats:
-    @pytest.mark.parametrize("box", [np.array([0, 0, 16, 16]), None])
-    @pytest.mark.parametrize("per_channel", [False, True])
     def test_process_stats_unpack(self, box, per_channel):
         results_list: list[dict[str, NDArray[np.int_]]] = []
         images = DATA_3
@@ -65,6 +76,18 @@ class TestBaseStats:
             r = partial_fn(args)
             results_list.extend(r.results)
         assert len(results_list) == len(DATA_3)
+
+    def test_stats_processor_properties(self, box, per_channel):
+        image = (DATA_3[0] * 255).astype(np.int32)
+        processor = LengthProcessor(image, box, per_channel)
+        shape = (3, 64, 64) if box is None else (3, 16, 16)
+        scaled_shape = (shape[0], shape[1] * shape[2]) if per_channel else shape
+
+        assert processor.shape == shape
+        assert processor.image.shape == shape
+        assert np.max(processor.image) > 1
+        assert processor.scaled.shape == scaled_shape
+        assert np.max(processor.scaled) <= 1
 
 
 class TestStats:
@@ -192,12 +215,12 @@ class TestStats:
     def test_boxratio_only_boxstats(self):
         boxes = get_bboxes(10, 4)
         boxstats = dimensionstats(DATA_3, boxes)
-        with pytest.raises(TypeError):
+        with pytest.raises(ValueError):
             boxratiostats(boxstats, boxstats)
 
     def test_boxratio_only_imagestats(self):
         imagestats = dimensionstats(DATA_3, None)
-        with pytest.raises(TypeError):
+        with pytest.raises(ValueError):
             boxratiostats(imagestats, imagestats)
 
     def test_boxratio_mismatch_stats_type(self):
@@ -292,3 +315,54 @@ class TestStats:
         generator = (np.ones((3, 16, 16)) for _ in range(10))
         stats = datasetstats(generator)
         assert len(stats.dimensionstats) == 10
+
+    def test_boxratiostats_channel_mismatch(self):
+        boxes = get_bboxes(10, 4)
+        boxstats = pixelstats(DATA_3, boxes, per_channel=False)
+        imagestats = pixelstats(DATA_3, None, per_channel=True)
+        with pytest.raises(ValueError):
+            boxratiostats(boxstats, imagestats)
+
+    def test_calculate_ratios_invalid_key(self):
+        with pytest.raises(KeyError):
+            calculate_ratios("not_here", MockStatsOutput(10), MockStatsOutput(10))
+
+
+class MockStatsOutput(BaseStatsOutput):
+    def __init__(self, length: int, name: str = "mock"):
+        self.length = length
+        self.name = name
+
+    def __len__(self) -> int:
+        return self.length
+
+    def dict(self) -> dict[str, Any]:
+        return {self.name: self.name, f"{self.name}_length": self.length}
+
+
+class TestStatsOutput:
+    def test_datasetstats_post_init_length_mismatch(self):
+        with pytest.raises(ValueError):
+            DatasetStatsOutput(MockStatsOutput(10), MockStatsOutput(10), MockStatsOutput(10), MockStatsOutput(20))  # type: ignore
+
+    def test_channelstats_post_init_length_mismatch(self):
+        with pytest.raises(ValueError):
+            ChannelStatsOutput(MockStatsOutput(10), MockStatsOutput(20))  # type: ignore
+
+    def test_channelstats_dict(self):
+        c = ChannelStatsOutput(MockStatsOutput(2, "one"), MockStatsOutput(2, "two"))  # type: ignore
+        assert c.dict() == {"one": "one", "one_length": 2, "two": "two", "two_length": 2}
+
+
+class TestNormalizeBoxShape:
+    def test_ndim_1(self):
+        box = normalize_box_shape(np.array([1]))
+        np.testing.assert_array_equal(box, np.array([[1]]))
+
+    def test_ndim_2(self):
+        box = normalize_box_shape(np.array([[1, 2, 3, 4]]))
+        np.testing.assert_array_equal(box, np.array([[1, 2, 3, 4]]))
+
+    def test_ndim_gt_2_raises(self):
+        with pytest.raises(ValueError):
+            normalize_box_shape(np.array([[[0]]]))

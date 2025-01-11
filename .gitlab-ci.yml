@@ -198,29 +198,7 @@ test:
 conda:
   extends: .conda_all
   script:
-    - pytest -n8 --dist loadgroup
-  rules: *on_run
-
-coverage:
-  needs: [test]
-  before_script:
-    - uv pip install coverage --system
-  script:
-    # TODO: Move coverage report generation in to build script (and/or resolve issue with using symlinks instead of a full recursive copy)
-    - cp --recursive $(pwd) /dataeval
-    - coverage combine ./output
-    - coverage report -m --skip-empty --precision=2
-    - coverage xml --skip-empty
-    - coverage html --skip-empty
-  coverage: "/(?i)total.*? (100(?:\\.0+)?\\%|[1-9]?\\d(?:\\.\\d+)?\\%)$/"
-  artifacts:
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage.xml
-    paths:
-      - coverage.xml
-      - htmlcov/
+    - pytest tests/test_mindeps.py
   rules: *on_run
 
 verify lock:
@@ -284,11 +262,33 @@ markdownlint:
     name: $CI_MERGE_REQUEST_IID/$ENV_SLUG
     url: "https://jatic.pages.jatic.net/-/aria/$CI_PROJECT_NAME/-/jobs/$CI_JOB_ID/artifacts/public/index.html"
     auto_stop_in: 1 week
-  rules:
-    - *exclude_main
-    - *on_run_with_docs
 
-docs preview:
+code coverage:
+  extends: .publish_merge_request_env
+  needs: [test]
+  before_script:
+    - uv pip install coverage --system
+  script:
+    - cp --recursive $(pwd) /dataeval
+    - coverage combine ./output
+    - coverage report -m --skip-empty --precision=2
+    - coverage xml --skip-empty
+    - coverage html --skip-empty
+    - mv htmlcov/ ./public/
+  coverage: "/(?i)total.*? (100(?:\\.0+)?\\%|[1-9]?\\d(?:\\.\\d+)?\\%)$/"
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - coverage.xml
+      - public/
+  variables:
+    ENV_SLUG: ccov
+  rules: *on_run
+
+pages preview:
   extends: .publish_merge_request_env
   needs:
     - job: docs
@@ -297,16 +297,9 @@ docs preview:
     - mv output/docs/html/ ./public/
   variables:
     ENV_SLUG: docs
-
-code coverage:
-  extends: .publish_merge_request_env
-  needs:
-    - job: coverage
-      artifacts: true
-  script:
-    - mv htmlcov/ ./public/
-  variables:
-    ENV_SLUG: ccov
+  rules:
+    - *exclude_main
+    - *on_run_with_docs
 
 pages:
   stage: release
