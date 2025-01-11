@@ -394,8 +394,8 @@ def preprocess(
                 "but are not keys in the `metadata` dictionary. Delete these keys from `continuous_factor_bins` "
                 "or add corresponding entries to the `metadata` dictionary."
             )
-        for factor, grouping in continuous_factor_bins.items():
-            discrete_metadata[factor] = _user_defined_bin(metadata[factor], grouping)
+        for factor, bins in continuous_factor_bins.items():
+            discrete_metadata[factor] = _digitize_data(metadata[factor], bins)
             continuous_metadata[factor] = metadata[factor]
 
     # Determine category of the rest of the keys
@@ -439,7 +439,7 @@ def preprocess(
     )
 
 
-def _user_defined_bin(data: list[Any] | NDArray[Any], binning: int | Iterable[float]) -> NDArray[np.intp]:
+def _digitize_data(data: list[Any] | NDArray[Any], bins: int | Iterable[float]) -> NDArray[np.intp]:
     """
     Digitizes a list of values into a given number of bins.
 
@@ -447,7 +447,7 @@ def _user_defined_bin(data: list[Any] | NDArray[Any], binning: int | Iterable[fl
     ----------
     data : list | NDArray
         The values to be digitized.
-    binning :  int | Iterable[float]
+    bins : int | Iterable[float]
         The number of bins or list of bin edges for the discrete values that data will be digitized into.
 
     Returns
@@ -461,12 +461,12 @@ def _user_defined_bin(data: list[Any] | NDArray[Any], binning: int | Iterable[fl
             "Encountered a data value with non-numeric type when digitizing a factor. "
             "Ensure all occurrences of continuous factors are numeric types."
         )
-    if isinstance(binning, int):
-        _, bin_edges = np.histogram(data, bins=binning)
+    if isinstance(bins, int):
+        _, bin_edges = np.histogram(data, bins=bins)
         bin_edges[-1] = np.inf
         bin_edges[0] = -np.inf
     else:
-        bin_edges = list(binning)
+        bin_edges = list(bins)
     return np.digitize(data, bin_edges)
 
 

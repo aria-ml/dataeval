@@ -4,8 +4,8 @@ import pytest
 from dataeval.utils.metadata import (
     CONTINUOUS_MIN_SAMPLE_SIZE,
     _binning_function,
+    _digitize_data,
     _is_continuous,
-    _user_defined_bin,
     preprocess,
 )
 
@@ -107,33 +107,33 @@ class TestUserDefinedBinUnit:
     def test_nbins_returns_array(self):
         factors = [0.1, 1.1, 1.2]
         bincounts = 2
-        hist = _user_defined_bin(factors, bincounts)
+        hist = _digitize_data(factors, bincounts)
         assert type(hist) is np.ndarray
 
     def test_bin_edges_returns_array(self):
         factors = [0.1, 1.1, 1.2]
         bin_edges = [-np.inf, 1, np.inf]
-        hist = _user_defined_bin(factors, bin_edges)
+        hist = _digitize_data(factors, bin_edges)
         assert type(hist) is np.ndarray
 
     def test_crashes_with_negative_nbins(self):
         factors = [0.1, 1.1, 1.2]
         bincounts = -10
         with pytest.raises(ValueError):
-            _user_defined_bin(factors, bincounts)
+            _digitize_data(factors, bincounts)
 
     def test_crashes_with_wrong_order(self):
         factors = [0.1, 1.1, 1.2]
         bin_edges = [np.inf, 1, 2]
         with pytest.raises(ValueError):
-            _user_defined_bin(factors, bin_edges)
+            _digitize_data(factors, bin_edges)
 
     def test_mixed_type(self):
         factors = [1, "a", 4.0]
         bins = 3
         err_msg = "Encountered a data value with non-numeric type when digitizing a factor."
         with pytest.raises(TypeError) as e:
-            _user_defined_bin(factors, bins)
+            _digitize_data(factors, bins)
         assert err_msg in str(e.value)
 
 
@@ -141,25 +141,25 @@ class TestUserDefinedBinFunctional:
     def test_udb_regression_nbins(self):
         factors = [0.1, 1.1, 1.2]
         bincounts = 2
-        hist = _user_defined_bin(factors, bincounts)
+        hist = _digitize_data(factors, bincounts)
         assert np.all(hist == [1, 2, 2])
 
     def test_udb_regression_bin_edges(self):
         factors = [0.1, 1.1, 1.2]
         bin_edges = [-np.inf, 1, np.inf]
-        hist = _user_defined_bin(factors, bin_edges)
+        hist = _digitize_data(factors, bin_edges)
         assert np.all(hist == [1, 2, 2])
 
     def test_udb_regression_flipped_bin_edges(self):
         factors = [0.1, 1.1, 1.2]
         bin_edges = [np.inf, 1, -np.inf]
-        hist = _user_defined_bin(factors, bin_edges)
+        hist = _digitize_data(factors, bin_edges)
         assert np.all(hist == [2, 1, 1])
 
     def test_narrow_bin_edges(self):
         factors = [0.1, 1.1, 1.5]
         bin_edges = [-10, 1, 1.2]
-        hist = _user_defined_bin(factors, bin_edges)
+        hist = _digitize_data(factors, bin_edges)
         assert np.all(hist == [1, 2, 3])
 
 
