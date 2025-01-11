@@ -9,6 +9,8 @@ variables:
   BASE_LAYER: bookworm
   FORCE_COLOR: '1'
   UPDATE_CACHE_MESSAGE: 'Update documentation jupyter-cache'
+  ENV_ROOT: 'production'
+  ENV_AUTO_STOP_IN: 'never'
 
 workflow:
   # Allows jobs in this workflow to be interrupted:
@@ -20,6 +22,9 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == 'schedule' && $CREATE_NEW_RELEASE
     # Merge Request Workflow
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      variables:
+        ENV_ROOT: $CI_MERGE_REQUEST_IID
+        ENV_AUTO_STOP_IN: '1 week'
     # Skip CHANGELOG.md updates
     - if: $CI_COMMIT_BRANCH == 'main'
       changes: ["CHANGELOG.md"]
@@ -29,7 +34,7 @@ workflow:
     # Commit Main Branch Workflow
     - if: $CI_COMMIT_BRANCH == 'main'
       variables:
-        DOCS_RUNNER_TAG: multi-gpu
+        DOCS_RUNNER_TAG: 'multi-gpu'
 
 default:
   # This should allow pipelines to auto-cancel when redundant:
@@ -259,9 +264,9 @@ markdownlint:
     paths:
       - public/
   environment:
-    name: $CI_MERGE_REQUEST_IID/$ENV_SLUG
+    name: $ENV_ROOT/$ENV_SLUG
     url: "https://jatic.pages.jatic.net/-/aria/$CI_PROJECT_NAME/-/jobs/$CI_JOB_ID/artifacts/public/index.html"
-    auto_stop_in: 1 week
+    auto_stop_in: $ENV_AUTO_STOP_IN
 
 code coverage:
   extends: .publish_merge_request_env
