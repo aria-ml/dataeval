@@ -60,19 +60,12 @@ class TestMDPreprocessingUnit:
         with pytest.warns(UserWarning, match=err_msg):
             preprocess(factors, labels)
 
-    def test_exclude_raw_metadata_only(self):
-        factors = [{"data1": [0.1, 0.2, 0.3], "data2": [1, 2, 3]}]
+    @pytest.mark.parametrize("factors", ([{"a": [1, 2, 3], "b": [1, 2, 3]}], [{"a": [1, 2, 3]}]))
+    @pytest.mark.parametrize("bincounts", ({"a": 1, "b": 1}, {"a": 1}))
+    def test_exclude_raw_metadata_only(self, factors, bincounts):
         labels = [0, 0, 0]
-        bincounts = {"data1": 1}
-        output = preprocess(factors, labels, bincounts, exclude=["data2"])
-        assert "data2" not in output.class_names
-
-    def test_exclude_raw_metadata_and_bincounts(self):
-        factors = [{"data1": [0.1, 0.2, 0.3], "data2": [1, 2, 3]}]
-        labels = [0, 0, 0]
-        bincounts = {"data1": 1, "data2": 1}
-        output = preprocess(factors, labels, bincounts, exclude=["data2"])
-        assert "data2" not in output.class_names
+        output = preprocess(factors, labels, bincounts, exclude=["b"])
+        assert "b" not in output.class_names
 
     def test_is_metadata_dict_of_dicts(self):
         assert not _is_metadata_dict_of_dicts({"a": 1})

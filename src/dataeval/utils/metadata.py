@@ -367,12 +367,10 @@ def preprocess(
     continuous_factor_bins = dict(continuous_factor_bins) if continuous_factor_bins else None
 
     # Drop any excluded metadata keys
-    if exclude:
-        for k in list(metadata):
-            if k in exclude:
-                metadata.pop(k)
-            if continuous_factor_bins:
-                continuous_factor_bins.pop(k)
+    for k in exclude or ():
+        metadata.pop(k, None)
+        if continuous_factor_bins:
+            continuous_factor_bins.pop(k, None)
 
     # Get the class label array in numeric form
     class_array = as_numpy(metadata.pop(class_labels)) if isinstance(class_labels, str) else as_numpy(class_labels)
