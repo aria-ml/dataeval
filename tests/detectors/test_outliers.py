@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.detectors.linters.outliers import Outliers, _get_outlier_mask
+from dataeval.detectors.linters.outliers import Outliers, OutliersOutput, _get_outlier_mask
 from dataeval.metrics.stats import DatasetStatsOutput, dimensionstats, pixelstats, visualstats
 
 
@@ -60,3 +60,15 @@ class TestOutliers:
             outliers.from_stats(1234)  # type: ignore
         with pytest.raises(TypeError):
             outliers.from_stats([1234])  # type: ignore
+
+
+class TestOutliersOutput:
+    outlier = {1: {"a": 1.0, "b": 1.0}, 3: {"a": 1.0, "b": 1.0}, 5: {"a": 1.0, "b": 1.0}}
+
+    def test_dict_len(self):
+        output = OutliersOutput(self.outlier)
+        assert len(output) == 3
+
+    def test_list_len(self):
+        output = OutliersOutput([self.outlier, self.outlier])
+        assert len(output) == 6

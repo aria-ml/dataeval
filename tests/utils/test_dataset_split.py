@@ -5,6 +5,7 @@ from numpy.typing import NDArray
 from dataeval.utils.dataset.split import (
     SplitDatasetOutput,
     _validate_labels,
+    bin_kmeans,
     calculate_validation_fraction,
     get_group_ids,
     is_groupable,
@@ -290,3 +291,13 @@ class TestFunctionalSplits:
         check_sample_leakage(splits)
         check_group_leakage(splits, groups, keys)
         check_stratification(labels, splits, tolerance=0.15)
+
+
+def test_get_groupids_empty():
+    empty = get_group_ids({}, [], 1)
+    assert empty == np.array([0], dtype=np.intp)
+
+
+def test_bin_kmeans_ndim_not_1():
+    bins = bin_kmeans(np.random.random((100, 2)))
+    assert bins.shape == (100,)

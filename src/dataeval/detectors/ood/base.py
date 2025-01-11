@@ -87,7 +87,7 @@ class OODBaseGMM(OODBase, OODGMMMixin[GaussianMixtureModelParams]):
         batch_size: int,
         verbose: bool,
     ) -> None:
-        super(OODBase).fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
+        super().fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
 
         # Calculate the GMM parameters
         _, z, gamma = cast(tuple[torch.Tensor, torch.Tensor, torch.Tensor], self.model(x_ref))

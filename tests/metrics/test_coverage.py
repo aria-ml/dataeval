@@ -51,12 +51,12 @@ class TestCoverageUnit:
         assert isinstance(output, Figure)
 
     def test_coverage_plot(self):
-        images = np.ones((6, 28, 28), dtype=np.intp)
-        result = _plot(images, 6)
+        images = np.ones((7, 28, 28), dtype=np.intp)
+        result = _plot(images, 7)
         assert isinstance(result, Figure)
-        images = np.ones((6, 28), dtype=np.intp)
+        images = np.ones((7, 28), dtype=np.intp)
         with pytest.raises(ValueError):
-            result = _plot(images, 6)
+            _plot(images, 7)
 
 
 class TestCoverageFunctional:
