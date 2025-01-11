@@ -9,10 +9,6 @@ variables:
   BASE_LAYER: bookworm
   FORCE_COLOR: '1'
   UPDATE_CACHE_MESSAGE: 'Update documentation jupyter-cache'
-  ENV_ID: 'main'
-  COVERAGE_URL: 'https://jatic.pages.jatic.net/aria/dataeval/coverage/'
-  JOB_ARTIFACTS_URL: 'https://jatic.pages.jatic.net/-/aria/$CI_PROJECT_NAME/-/jobs/$CI_JOB_ID/artifacts/public/index.html'
-  ENV_AUTO_STOP_IN: 'never'
 
 workflow:
   # Allows jobs in this workflow to be interrupted:
@@ -25,9 +21,7 @@ workflow:
     # Merge Request Workflow
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
       variables:
-        ENV_ID: $CI_MERGE_REQUEST_IID
-        ENV_AUTO_STOP_IN: '1 week'
-        COVERAGE_URL: $JOB_ARTIFACTS_URL
+        ENV_PREFIX: '$CI_MERGE_REQUEST_IID/'
     # Skip CHANGELOG.md updates
     - if: $CI_COMMIT_BRANCH == 'main'
       changes: ["CHANGELOG.md"]
@@ -267,11 +261,11 @@ markdownlint:
     paths:
       - public/
   environment:
-    name: $ENV_JOB/$ENV_ID
-    url: $ENV_URL
-    auto_stop_in: $ENV_AUTO_STOP_IN
+    name: '$ENV_PREFIX$ENV_JOB'
+    url: 'https://jatic.pages.jatic.net/-/aria/$CI_PROJECT_NAME/-/jobs/$CI_JOB_ID/artifacts/public/index.html'
+    auto_stop_in: '1 week'
 
-code coverage:
+coverage:
   extends: .publish_merge_request_env
   needs: [test]
   before_script:
@@ -293,8 +287,7 @@ code coverage:
       - coverage.xml
       - public/
   variables:
-    ENV_JOB: ccov
-    ENV_URL: $COVERAGE_URL
+    ENV_JOB: coverage
   rules: *on_run
 
 pages preview:
@@ -306,7 +299,6 @@ pages preview:
     - mv output/docs/html/ ./public/
   variables:
     ENV_JOB: docs
-    ENV_URL: $JOB_ARTIFACTS_URL
   rules:
     - *exclude_main
     - *on_run_with_docs
