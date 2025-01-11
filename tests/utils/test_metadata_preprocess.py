@@ -3,9 +3,10 @@ import pytest
 
 from dataeval.utils.metadata import (
     CONTINUOUS_MIN_SAMPLE_SIZE,
-    _binning_function,
+    _bin_data,
     _digitize_data,
     _is_continuous,
+    _is_metadata_dict_of_dicts,
     preprocess,
 )
 
@@ -58,6 +59,24 @@ class TestMDPreprocessingUnit:
         err_msg = "A user defined binning was not provided for data."
         with pytest.warns(UserWarning, match=err_msg):
             preprocess(factors, labels)
+
+    def test_exclude_raw_metadata_only(self):
+        factors = [{"data1": [0.1, 0.2, 0.3], "data2": [1, 2, 3]}]
+        labels = [0, 0, 0]
+        bincounts = {"data1": 1}
+        output = preprocess(factors, labels, bincounts, exclude=["data2"])
+        assert "data2" not in output.class_names
+
+    def test_exclude_raw_metadata_and_bincounts(self):
+        factors = [{"data1": [0.1, 0.2, 0.3], "data2": [1, 2, 3]}]
+        labels = [0, 0, 0]
+        bincounts = {"data1": 1, "data2": 1}
+        output = preprocess(factors, labels, bincounts, exclude=["data2"])
+        assert "data2" not in output.class_names
+
+    def test_is_metadata_dict_of_dicts(self):
+        assert not _is_metadata_dict_of_dicts({"a": 1})
+        assert not _is_metadata_dict_of_dicts({"a": [1], "b": 1})
 
 
 class TestMDPreprocessingFunctional:
@@ -174,14 +193,14 @@ class TestBinningUnit:
         ],
     )
     def test_binning_method(self, method, data, expected_result):
-        output = _binning_function(data, method)
+        output = _bin_data(data, method)
         assert np.unique(output).size == expected_result
 
     def test_clusters_warn(self):
         data = np.array([0, 4, 3, 5, 6, 8] * 15)
         err_msg = "Binning by clusters is currently unavailable until changes to the clustering function go through."
         with pytest.warns(UserWarning, match=err_msg):
-            output = _binning_function(data, "clusters")
+            output = _bin_data(data, "clusters")
         assert np.unique(output).size == 6
 
 

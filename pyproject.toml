@@ -137,6 +137,7 @@ parallel = true
 [tool.coverage.report]
 exclude_also = [
   "raise NotImplementedError",
+  ": \\.\\.\\."
 ]
 include = ["*/src/dataeval/*"]
 omit = [

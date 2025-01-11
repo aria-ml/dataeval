@@ -100,13 +100,13 @@ class BaseStatsOutput(Output):
         for source_index in list(self.source_index) + [None]:
             if source_index is None or source_index.image > cur_image:
                 mask.extend(cur_mask if matches(cur_max_channel + 1, channel_count) else [False for _ in cur_mask])
-                if source_index is None:
-                    break
-                cur_image = source_index.image
-                cur_max_channel = 0
-                cur_mask.clear()
-            cur_mask.append(matches(source_index.channel, channel_index))
-            cur_max_channel = max(cur_max_channel, source_index.channel or 0)
+                if source_index is not None:
+                    cur_image = source_index.image
+                    cur_max_channel = 0
+                    cur_mask.clear()
+            if source_index is not None:
+                cur_mask.append(matches(source_index.channel, channel_index))
+                cur_max_channel = max(cur_max_channel, source_index.channel or 0)
         return mask
 
     def __len__(self) -> int:

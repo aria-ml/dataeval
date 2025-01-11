@@ -1,9 +1,10 @@
 import logging
 from pathlib import PosixPath
 
+import numpy as np
 import torch
 
-from dataeval.interop import to_numpy
+from dataeval.interop import to_numpy, to_numpy_iter
 
 
 class TestInterop:
@@ -11,6 +12,20 @@ class TestInterop:
         t = torch.tensor([1, 2, 3, 4, 5])
         n = to_numpy(t)
         assert list(n) == list(t)
+
+    def test_torch_non_tensor_to_numpy(self):
+        t = torch.int
+        n = to_numpy(t)  # type: ignore
+        assert n.shape == ()
+
+    def test_to_numpy_iter(self):
+        t = [torch.tensor([1]), torch.tensor([2, 3]), torch.tensor([4, 5, 6])]
+        count = 0
+        for n in to_numpy_iter(t):
+            count += 1
+            assert len(n) == count
+            assert isinstance(n, np.ndarray)
+        assert count == 3
 
 
 class TestInteropLogging:
