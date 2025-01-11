@@ -14,7 +14,7 @@ if __name__ == "__main__":
     delete_set = {re.sub(r"[^a-zA-Z0-9]+", "-", branch) for branch in (merged_set - opened_set)}
 
     # Build list of registry image tags that should be deleted
-    registry_tags = {"cache": set(), "dev": set()}
+    registry_tags = {"cache": set()}
     for repository in registry_tags:
         for artifact in hb.list_artifacts(repository):
             for tag in artifact["tags"] or []:
