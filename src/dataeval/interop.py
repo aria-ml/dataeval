@@ -46,7 +46,7 @@ def to_numpy(array: ArrayLike | None, copy: bool = True) -> NDArray[Any]:
     if isinstance(array, np.ndarray):
         return array.copy() if copy else array
 
-    if array.__class__.__module__.startswith("tensorflow"):
+    if array.__class__.__module__.startswith("tensorflow"):  # pragma: no cover - removed tf from deps
         tf = _try_import("tensorflow")
         if tf and tf.is_tensor(array):
             _logger.log(logging.INFO, "Converting Tensorflow array to NumPy array.")

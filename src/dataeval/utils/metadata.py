@@ -364,11 +364,15 @@ def preprocess(
     # Transform metadata into single, flattened dictionary
     metadata, image_repeats = merge(raw_metadata)
 
+    continuous_factor_bins = dict(continuous_factor_bins) if continuous_factor_bins else None
+
     # Drop any excluded metadata keys
     if exclude:
         for k in list(metadata):
             if k in exclude:
                 metadata.pop(k)
+            if continuous_factor_bins:
+                continuous_factor_bins.pop(k)
 
     # Get the class label array in numeric form
     class_array = as_numpy(metadata.pop(class_labels)) if isinstance(class_labels, str) else as_numpy(class_labels)
@@ -417,7 +421,7 @@ def preprocess(
                     "bins using the continuous_factor_bins parameter.",
                     UserWarning,
                 )
-                discrete_metadata[key] = _binning_function(data, auto_bin_method)
+                discrete_metadata[key] = _bin_data(data, auto_bin_method)
         else:
             _, discrete_metadata[key] = np.unique(data, return_inverse=True)
 
@@ -470,7 +474,7 @@ def _digitize_data(data: list[Any] | NDArray[Any], bins: int | Iterable[float]) 
     return np.digitize(data, bin_edges)
 
 
-def _binning_function(data: NDArray[Any], bin_method: str) -> NDArray[np.int_]:
+def _bin_data(data: NDArray[Any], bin_method: str) -> NDArray[np.int_]:
     """
     Bins continuous data through either equal width bins, equal amounts in each bin, or by clusters.
     """
@@ -482,19 +486,19 @@ def _binning_function(data: NDArray[Any], bin_method: str) -> NDArray[np.int_]:
         )
         bin_method = "uniform_width"
 
-    if bin_method != "clusters":
-        counts, bin_edges = np.histogram(data, bins="auto")
-        n_bins = counts.size
-        if counts[counts > 0].min() < 10:
-            for _ in range(20):
-                n_bins -= 1
-                counts, bin_edges = np.histogram(data, bins=n_bins)
-                if counts[counts > 0].min() >= 10 or n_bins < 2:
-                    break
+    # if bin_method != "clusters":  # restore this when clusters bin_method is available
+    counts, bin_edges = np.histogram(data, bins="auto")
+    n_bins = counts.size
+    if counts[counts > 0].min() < 10:
+        counter = 20
+        while counts[counts > 0].min() < 10 and n_bins >= 2 and counter > 0:
+            counter -= 1
+            n_bins -= 1
+            counts, bin_edges = np.histogram(data, bins=n_bins)
 
-        if bin_method == "uniform_count":
-            quantiles = np.linspace(0, 100, n_bins + 1)
-            bin_edges = np.asarray(np.percentile(data, quantiles))
+    if bin_method == "uniform_count":
+        quantiles = np.linspace(0, 100, n_bins + 1)
+        bin_edges = np.asarray(np.percentile(data, quantiles))
 
     bin_edges[0] = -np.inf  # type: ignore # until the clusters speed up is merged
     bin_edges[-1] = np.inf  # type: ignore # and the _binning_by_clusters can be uncommented

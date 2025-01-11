@@ -6,22 +6,15 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
-from itertools import product
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-import torch
 from sklearn.datasets import load_digits
 
 from dataeval.detectors.ood.ae import OOD_AE
 from dataeval.utils.torch.models import AE
 
-threshold_perc = [90.0]
-loss_fn = [torch.nn.MSELoss(), None]
-ood_type = ["instance", "feature"]
-
-tests = list(product(threshold_perc, loss_fn, ood_type))[:-1]
-n_tests = len(tests)
 input_shape = (1, 8, 8)
 
 
@@ -35,21 +28,16 @@ def x_ref() -> np.ndarray:
     return X
 
 
-@pytest.fixture
-def ae_params(request):
-    return tests[request.param]
-
-
-@pytest.mark.parametrize("ae_params", list(range(n_tests)), indirect=True)
-def test_ae(ae_params, x_ref):
+@pytest.mark.parametrize("ood_type", ["instance", "feature"])
+def test_ae(ood_type, x_ref):
     # OutlierAE parameters
-    threshold_perc, loss_fn, ood_type = ae_params
+    threshold_perc = 90.0
 
     # init OutlierAE
     ae = OOD_AE(AE(input_shape=input_shape))
 
     # fit OutlierAE, infer threshold and compute scores
-    ae.fit(x_ref, threshold_perc=threshold_perc, loss_fn=loss_fn, epochs=1, verbose=True)
+    ae.fit(x_ref, threshold_perc=threshold_perc, epochs=1, verbose=True)
     iscore = ae._ref_score.instance_score
     perc_score = 100 * (iscore < ae._threshold_score()).sum() / iscore.shape[0]
     assert threshold_perc + 5 > perc_score > threshold_perc - 5
@@ -68,3 +56,19 @@ def test_ae(ae_params, x_ref):
         assert od_preds.is_ood.sum() == (od_preds.feature_score > scores).sum()
 
     assert od_preds.instance_score.shape == (x_ref.shape[0],)
+
+
+@patch("dataeval.detectors.ood.ae.OODBase.fit")
+def test_custom_loss_fn(mock_fit, x_ref):
+    mock_loss_fn = MagicMock()
+    ae = OOD_AE(AE(input_shape=input_shape))
+    ae.fit(x_ref, 0.0, mock_loss_fn)
+    assert isinstance(mock_fit.call_args_list[0][0][2], MagicMock)
+
+
+@patch("dataeval.detectors.ood.ae.OODBase.fit")
+def test_custom_optimizer(mock_fit, x_ref):
+    mock_opt = MagicMock()
+    ae = OOD_AE(AE(input_shape=input_shape))
+    ae.fit(x_ref, 0.0, None, mock_opt)
+    assert isinstance(mock_fit.call_args_list[0][0][3], MagicMock)
