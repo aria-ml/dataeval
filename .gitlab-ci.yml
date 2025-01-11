@@ -9,6 +9,7 @@ variables:
   BASE_LAYER: bookworm
   FORCE_COLOR: '1'
   UPDATE_CACHE_MESSAGE: 'Update documentation jupyter-cache'
+  ENV_AUTO_STOP_IN: '1 week'
 
 workflow:
   # Allows jobs in this workflow to be interrupted:
@@ -32,6 +33,7 @@ workflow:
     - if: $CI_COMMIT_BRANCH == 'main'
       variables:
         DOCS_RUNNER_TAG: 'multi-gpu'
+        ENV_AUTO_STOP_IN: 'never'
 
 default:
   # This should allow pipelines to auto-cancel when redundant:
@@ -263,7 +265,7 @@ markdownlint:
   environment:
     name: '$ENV_PREFIX$ENV_JOB'
     url: 'https://jatic.pages.jatic.net/-/aria/$CI_PROJECT_NAME/-/jobs/$CI_JOB_ID/artifacts/public/index.html'
-    auto_stop_in: '1 week'
+    auto_stop_in: '$ENV_AUTO_STOP_IN'
 
 coverage:
   extends: .publish_merge_request_env
