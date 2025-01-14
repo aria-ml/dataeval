@@ -26,7 +26,7 @@ class BoxImageStatsOutputSlice(Generic[TStatOutput]):
         def __getitem__(self, key: str) -> NDArray[np.float64]:
             _stat = cast(np.ndarray, getattr(self._stats, key)).astype(np.float64)
             _shape = _stat[0].shape
-            _slice = _stat[self._slice[0] : self._slice[1]]
+            _slice = _stat[int(self._slice[0]) : int(self._slice[1])]
             return _slice.reshape(-1, self._channels, *_shape) if self._channels else _slice.reshape(-1, *_shape)
 
     box: StatSlicer
