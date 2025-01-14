@@ -1,4 +1,5 @@
 from functools import partial
+from random import random
 from typing import Any
 
 import numpy as np
@@ -26,15 +27,17 @@ def get_dataset(count: int, channels: int):
     return [np.random.random((channels, 64, 64)) for _ in range(count)]
 
 
-def get_bboxes(count: int, boxes_per_image: int):
+def get_bboxes(count: int, boxes_per_image: int, as_float: bool):
     boxes = []
     for _ in range(count):
         box = []
         for _ in range(boxes_per_image):
-            x0 = randint(1, 24)
-            y0 = randint(1, 24)
-            x1 = x0 + randint(1, 24)
-            y1 = y0 + randint(1, 24)
+            if as_float:
+                x0, y0 = (random() * 24), (random() * 24)
+                x1, y1 = x0 + 1 + (random() * 23), y0 + 1 + (random() * 23)
+            else:
+                x0, y0 = randint(0, 24), randint(0, 24)
+                x1, y1 = x0 + randint(1, 24), y0 + randint(1, 24)
             box.append([x0, y0, x1, y1])
         boxes.append(np.asarray(box))
     return boxes
@@ -119,26 +122,6 @@ class TestStats:
         if hasattr(results, SOURCE_INDEX) and results.source_index is not None:
             assert len(results.source_index) == length
 
-    def test_stats_with_bboxes(self):
-        boxes = get_bboxes(10, 4)
-        results = pixelstats(DATA_1, boxes, True)
-        assert len(results) == 10 * 4
-
-    def test_array_stats_with_bboxes_per_channel_true(self):
-        boxes = get_bboxes(10, 4)
-        results = pixelstats(DATA_3, boxes, True)
-        assert len(results) == 10 * 4 * 3
-
-    def test_array_stats_with_bboxes_per_channel_false(self):
-        boxes = get_bboxes(10, 4)
-        results = pixelstats(DATA_3, boxes, False)
-        assert len(results) == 10 * 4
-
-    def test_dimension_stats_with_bboxes(self):
-        boxes = get_bboxes(10, 4)
-        results = dimensionstats(DATA_3, boxes)
-        assert len(results) == 10 * 4
-
     def test_stats_no_boxes_channel_mask_max_channels_3(self):
         results = pixelstats(DATA_3 + DATA_1, per_channel=True)
         mask = results.get_channel_mask(0, 3)
@@ -151,91 +134,15 @@ class TestStats:
         assert len(mask) == len(results)
         assert sum(1 for b in mask if b) == 10 + 10
 
-    def test_stats_with_boxes_channel_mask_max_channels_3(self):
-        boxes = get_bboxes(20, 4)
-        results = pixelstats(DATA_3 + DATA_1, boxes, per_channel=True)
-        mask = results.get_channel_mask(0, 3)
-        assert len(mask) == len(results)
-        assert sum(1 for b in mask if b) == 10 * 4
-
-    def test_stats_with_boxes_channel_mask_max_channels_none(self):
-        boxes = get_bboxes(20, 4)
-        results = pixelstats(DATA_3 + DATA_1, boxes, per_channel=True)
-        mask = results.get_channel_mask(0)
-        assert len(mask) == len(results)
-        assert sum(1 for b in mask if b) == (10 + 10) * 4
-
-    def test_stats_with_boxes_channel_mask_all_channels_max_channels_3(self):
-        boxes = get_bboxes(20, 4)
-        results = pixelstats(DATA_3 + DATA_1, boxes, per_channel=True)
-        mask = results.get_channel_mask(None, 3)
-        assert len(mask) == len(results)
-        assert sum(1 for b in mask if b) == 10 * 3 * 4
-
     def test_stats_len_with_no_annotations(self):
         output = BaseStatsOutput([], np.array([]))
         object.__setattr__(output, "__annotations__", {})
         assert len(output) == 0
 
-    def test_boxratio_dimensionstats(self):
-        boxes = get_bboxes(10, 4)
-        boxstats = dimensionstats(DATA_3, boxes)
-        imagestats = dimensionstats(DATA_3, None)
-        ratiostats = boxratiostats(boxstats, imagestats)
-        assert ratiostats is not None
-
-    def test_boxratio_pixelstats(self):
-        boxes = get_bboxes(10, 4)
-        boxstats = pixelstats(DATA_3, boxes)
-        imagestats = pixelstats(DATA_3, None)
-        ratiostats = boxratiostats(boxstats, imagestats)
-        assert ratiostats is not None
-
-    def test_boxratio_pixelstats_per_channel(self):
-        boxes = get_bboxes(10, 4)
-        boxstats = pixelstats(DATA_3, boxes, True)
-        imagestats = pixelstats(DATA_3, None, True)
-        ratiostats = boxratiostats(boxstats, imagestats)
-        assert ratiostats is not None
-
-    def test_boxratio_visualstats(self):
-        boxes = get_bboxes(10, 4)
-        boxstats = visualstats(DATA_3, boxes)
-        imagestats = visualstats(DATA_3, None)
-        ratiostats = boxratiostats(boxstats, imagestats)
-        assert ratiostats is not None
-
-    def test_boxratio_visualstats_per_channel(self):
-        boxes = get_bboxes(10, 4)
-        boxstats = pixelstats(DATA_3, boxes, True)
-        imagestats = pixelstats(DATA_3, None, True)
-        ratiostats = boxratiostats(boxstats, imagestats)
-        assert ratiostats is not None
-
-    def test_boxratio_only_boxstats(self):
-        boxes = get_bboxes(10, 4)
-        boxstats = dimensionstats(DATA_3, boxes)
-        with pytest.raises(ValueError):
-            boxratiostats(boxstats, boxstats)
-
     def test_boxratio_only_imagestats(self):
         imagestats = dimensionstats(DATA_3, None)
         with pytest.raises(ValueError):
             boxratiostats(imagestats, imagestats)
-
-    def test_boxratio_mismatch_stats_type(self):
-        boxes = get_bboxes(10, 4)
-        boxstats = visualstats(DATA_3, boxes)
-        imagestats = dimensionstats(DATA_3, None)
-        with pytest.raises(TypeError):
-            boxratiostats(boxstats, imagestats)
-
-    def test_boxratio_mismatch_stats_source(self):
-        boxes = get_bboxes(10, 4)
-        boxstats = dimensionstats(DATA_3, boxes)
-        imagestats = dimensionstats(DATA_1 + DATA_1, None)
-        with pytest.raises(ValueError):
-            boxratiostats(boxstats, imagestats)
 
     def test_stats_box_out_of_range(self):
         boxes = [np.array([0, 0, 1, 1]), np.array([-1, -1, 100, 100])]
@@ -243,41 +150,14 @@ class TestStats:
             boxstats = dimensionstats(DATA_1, boxes)
         assert boxstats is not None
 
-    def test_stats_div_by_zero(self):
-        images = [np.zeros((1, 64, 64)) for _ in range(10)]
-        boxes = get_bboxes(10, 4)
-        vi = visualstats(images)
-        vb = visualstats(images, boxes)
-        pi = pixelstats(images)
-        pb = pixelstats(images, boxes)
-        rv = boxratiostats(vb, vi)
-        rb = boxratiostats(pb, pi)
-
-        for v in [m.dict().values() for m in [vi, vb, pi, pb, rv, rb]]:
-            if isinstance(v, np.ndarray):
-                assert not np.isnan(np.sum(v))
-                assert not np.isinf(np.sum(v))
-
     def test_stats_source_index_no_boxes_no_channels(self):
         stats = pixelstats(DATA_3)
         assert all(si.box is None for si in stats.source_index)
         assert all(si.channel is None for si in stats.source_index)
 
-    def test_stats_source_index_with_boxes_no_channels(self):
-        boxes = get_bboxes(10, 2)
-        stats = pixelstats(DATA_3, boxes)
-        assert all(si.box is not None for si in stats.source_index)
-        assert all(si.channel is None for si in stats.source_index)
-
     def test_stats_source_index_no_boxes_with_channels(self):
         stats = pixelstats(DATA_3, per_channel=True)
         assert all(si.box is None for si in stats.source_index)
-        assert all(si.channel is not None for si in stats.source_index)
-
-    def test_stats_source_index_with_boxes_with_channels(self):
-        boxes = get_bboxes(10, 2)
-        stats = pixelstats(DATA_3, boxes, per_channel=True)
-        assert all(si.box is not None for si in stats.source_index)
         assert all(si.channel is not None for si in stats.source_index)
 
     def test_labelstats_str_keys(self):
@@ -316,16 +196,142 @@ class TestStats:
         stats = datasetstats(generator)
         assert len(stats.dimensionstats) == 10
 
-    def test_boxratiostats_channel_mismatch(self):
-        boxes = get_bboxes(10, 4)
+    def test_calculate_ratios_invalid_key(self):
+        with pytest.raises(KeyError):
+            calculate_ratios("not_here", MockStatsOutput(10), MockStatsOutput(10))
+
+
+@pytest.mark.parametrize("as_float", [True, False])
+class TestBBoxStats:
+    def test_stats_with_bboxes(self, as_float):
+        boxes = get_bboxes(10, 4, as_float)
+        results = pixelstats(DATA_1, boxes, True)
+        assert len(results) == 10 * 4
+
+    def test_array_stats_with_bboxes_per_channel_true(self, as_float):
+        boxes = get_bboxes(10, 4, as_float)
+        results = pixelstats(DATA_3, boxes, True)
+        assert len(results) == 10 * 4 * 3
+
+    def test_array_stats_with_bboxes_per_channel_false(self, as_float):
+        boxes = get_bboxes(10, 4, as_float)
+        results = pixelstats(DATA_3, boxes, False)
+        assert len(results) == 10 * 4
+
+    def test_dimension_stats_with_bboxes(self, as_float):
+        boxes = get_bboxes(10, 4, as_float)
+        results = dimensionstats(DATA_3, boxes)
+        assert len(results) == 10 * 4
+
+    def test_stats_with_boxes_channel_mask_max_channels_3(self, as_float):
+        boxes = get_bboxes(20, 4, as_float)
+        results = pixelstats(DATA_3 + DATA_1, boxes, per_channel=True)
+        mask = results.get_channel_mask(0, 3)
+        assert len(mask) == len(results)
+        assert sum(1 for b in mask if b) == 10 * 4
+
+    def test_stats_with_boxes_channel_mask_max_channels_none(self, as_float):
+        boxes = get_bboxes(20, 4, as_float)
+        results = pixelstats(DATA_3 + DATA_1, boxes, per_channel=True)
+        mask = results.get_channel_mask(0)
+        assert len(mask) == len(results)
+        assert sum(1 for b in mask if b) == (10 + 10) * 4
+
+    def test_stats_with_boxes_channel_mask_all_channels_max_channels_3(self, as_float):
+        boxes = get_bboxes(20, 4, as_float)
+        results = pixelstats(DATA_3 + DATA_1, boxes, per_channel=True)
+        mask = results.get_channel_mask(None, 3)
+        assert len(mask) == len(results)
+        assert sum(1 for b in mask if b) == 10 * 3 * 4
+
+    def test_boxratio_dimensionstats(self, as_float):
+        boxes = get_bboxes(10, 4, as_float)
+        boxstats = dimensionstats(DATA_3, boxes)
+        imagestats = dimensionstats(DATA_3, None)
+        ratiostats = boxratiostats(boxstats, imagestats)
+        assert ratiostats is not None
+
+    def test_boxratio_pixelstats(self, as_float):
+        boxes = get_bboxes(10, 4, as_float)
+        boxstats = pixelstats(DATA_3, boxes)
+        imagestats = pixelstats(DATA_3, None)
+        ratiostats = boxratiostats(boxstats, imagestats)
+        assert ratiostats is not None
+
+    def test_boxratio_pixelstats_per_channel(self, as_float):
+        boxes = get_bboxes(10, 4, as_float)
+        boxstats = pixelstats(DATA_3, boxes, True)
+        imagestats = pixelstats(DATA_3, None, True)
+        ratiostats = boxratiostats(boxstats, imagestats)
+        assert ratiostats is not None
+
+    def test_boxratio_visualstats(self, as_float):
+        boxes = get_bboxes(10, 4, as_float)
+        boxstats = visualstats(DATA_3, boxes)
+        imagestats = visualstats(DATA_3, None)
+        ratiostats = boxratiostats(boxstats, imagestats)
+        assert ratiostats is not None
+
+    def test_boxratio_visualstats_per_channel(self, as_float):
+        boxes = get_bboxes(10, 4, as_float)
+        boxstats = pixelstats(DATA_3, boxes, True)
+        imagestats = pixelstats(DATA_3, None, True)
+        ratiostats = boxratiostats(boxstats, imagestats)
+        assert ratiostats is not None
+
+    def test_boxratio_only_boxstats(self, as_float):
+        boxes = get_bboxes(10, 4, as_float)
+        boxstats = dimensionstats(DATA_3, boxes)
+        with pytest.raises(ValueError):
+            boxratiostats(boxstats, boxstats)
+
+    def test_boxratio_mismatch_stats_type(self, as_float):
+        boxes = get_bboxes(10, 4, as_float)
+        boxstats = visualstats(DATA_3, boxes)
+        imagestats = dimensionstats(DATA_3, None)
+        with pytest.raises(TypeError):
+            boxratiostats(boxstats, imagestats)
+
+    def test_boxratio_mismatch_stats_source(self, as_float):
+        boxes = get_bboxes(10, 4, as_float)
+        boxstats = dimensionstats(DATA_3, boxes)
+        imagestats = dimensionstats(DATA_1 + DATA_1, None)
+        with pytest.raises(ValueError):
+            boxratiostats(boxstats, imagestats)
+
+    def test_stats_source_index_with_boxes_no_channels(self, as_float):
+        boxes = get_bboxes(10, 2, as_float)
+        stats = pixelstats(DATA_3, boxes)
+        assert all(si.box is not None for si in stats.source_index)
+        assert all(si.channel is None for si in stats.source_index)
+
+    def test_stats_source_index_with_boxes_with_channels(self, as_float):
+        boxes = get_bboxes(10, 2, as_float)
+        stats = pixelstats(DATA_3, boxes, per_channel=True)
+        assert all(si.box is not None for si in stats.source_index)
+        assert all(si.channel is not None for si in stats.source_index)
+
+    def test_boxratiostats_channel_mismatch(self, as_float):
+        boxes = get_bboxes(10, 4, as_float)
         boxstats = pixelstats(DATA_3, boxes, per_channel=False)
         imagestats = pixelstats(DATA_3, None, per_channel=True)
         with pytest.raises(ValueError):
             boxratiostats(boxstats, imagestats)
 
-    def test_calculate_ratios_invalid_key(self):
-        with pytest.raises(KeyError):
-            calculate_ratios("not_here", MockStatsOutput(10), MockStatsOutput(10))
+    def test_stats_div_by_zero(self, as_float):
+        images = [np.zeros((1, 64, 64)) for _ in range(10)]
+        boxes = get_bboxes(10, 4, as_float)
+        vi = visualstats(images)
+        vb = visualstats(images, boxes)
+        pi = pixelstats(images)
+        pb = pixelstats(images, boxes)
+        rv = boxratiostats(vb, vi)
+        rb = boxratiostats(pb, pi)
+
+        for v in [m.dict().values() for m in [vi, vb, pi, pb, rv, rb]]:
+            if isinstance(v, np.ndarray):
+                assert not np.isnan(np.sum(v))
+                assert not np.isinf(np.sum(v))
 
 
 class MockStatsOutput(BaseStatsOutput):
