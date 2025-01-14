@@ -126,7 +126,7 @@ class StatsProcessor(Generic[TStatsOutput]):
         self.raw = image
         self.width: int = image.shape[-1]
         self.height: int = image.shape[-2]
-        self.box: NDArray[Any] = np.array([0, 0, self.width, self.height]) if box is None else box
+        self.box: NDArray[np.int64] = np.array([0, 0, self.width, self.height]) if box is None else box.astype(np.int64)
         self._per_channel = per_channel
         self._image = None
         self._shape = None

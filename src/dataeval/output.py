@@ -96,11 +96,14 @@ def set_metadata(fn: Callable[P, R] | None = None, *, state: list[str] | None = 
         name = f"{module}{class_prefix}{fn.__name__}"
         arguments = {k: v for k, v in arguments.items() if k != "self"}
 
-        # Execute function and record elapsed time
         _logger = logging.getLogger(module)
         time = datetime.now(timezone.utc)
         _logger.log(logging.INFO, f">>> Executing '{name}': args={arguments} state={state} <<<")
+
+        ##### EXECUTE FUNCTION #####
         result = fn(*args, **kwargs)
+        ############################
+
         duration = (datetime.now(timezone.utc) - time).total_seconds()
         _logger.log(logging.INFO, f">>> Completed '{name}': args={arguments} state={state} duration={duration} <<<")
 
