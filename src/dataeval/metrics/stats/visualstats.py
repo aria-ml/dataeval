@@ -18,7 +18,7 @@ QUARTILES = (0, 25, 50, 75, 100)
 @dataclass(frozen=True)
 class VisualStatsOutput(BaseStatsOutput):
     """
-    Output class for :func:`visualstats` stats metric
+    Output class for :func:`visualstats` stats metric.
 
     Attributes
     ----------
@@ -81,7 +81,7 @@ def visualstats(
     per_channel: bool = False,
 ) -> VisualStatsOutput:
     """
-    Calculates visual statistics for each image
+    Calculates visual :term:`statistics` for each image.
 
     This function computes various visual metrics (e.g., :term:`brightness<Brightness>`, darkness, contrast, blurriness)
     on the images as a whole.

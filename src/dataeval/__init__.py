@@ -24,10 +24,10 @@ def log(level: int = logging.DEBUG, handler: logging.Handler | None = None) -> N
     Parameters
     ----------
     level : int, default logging.DEBUG(10)
-        Set the logging level for the logger
+        Set the logging level for the logger.
     handler : logging.Handler, optional
         Sets the logging handler for the logger if provided, otherwise logger will be
-        provided with a StreamHandler
+        provided with a StreamHandler.
     """
     import logging
 

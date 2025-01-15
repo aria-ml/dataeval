@@ -26,7 +26,7 @@ from dataeval.utils.torch.internal import get_device
 @dataclass(frozen=True)
 class DriftMMDOutput(DriftBaseOutput):
     """
-    Output class for :class:`DriftMMD` :term:`drift<Drift>` detector
+    Output class for :class:`DriftMMD` :term:`drift<Drift>` detector.
 
     Attributes
     ----------
@@ -51,7 +51,8 @@ class DriftMMDOutput(DriftBaseOutput):
 
 class DriftMMD(BaseDrift):
     """
-    :term:`Maximum Mean Discrepancy (MMD) Drift Detection` algorithm using a permutation test.
+    :term:`Maximum Mean Discrepancy (MMD) Drift Detection` algorithm \
+    using a permutation test.
 
     Parameters
     ----------

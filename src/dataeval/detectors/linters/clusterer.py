@@ -18,7 +18,7 @@ from dataeval.utils.shared import flatten
 @dataclass(frozen=True)
 class ClustererOutput(Output):
     """
-    Output class for :class:`Clusterer` lint detector
+    Output class for :class:`Clusterer` lint detector.
 
     Attributes
     ----------
@@ -131,7 +131,8 @@ class _ClusterMergeEntry:
 
 class Clusterer:
     """
-    Uses hierarchical clustering to flag dataset properties of interest like Outliers and :term:`duplicates<Duplicates>`
+    Uses hierarchical clustering to flag dataset properties of interest like outliers \
+    and :term:`duplicates<Duplicates>`.
 
     Parameters
     ----------

@@ -22,7 +22,8 @@ from dataeval.interop import to_numpy
 
 class DriftKS(BaseDriftUnivariate):
     """
-    :term:`Drift` detector employing the Kolmogorov-Smirnov (KS) distribution test.
+    :term:`Drift` detector employing the :term:`Kolmogorov-Smirnov (KS) \
+    distribution<Kolmogorov-Smirnov (K-S) test>` test.
 
     The KS test detects changes in the maximum distance between two data
     distributions with Bonferroni or :term:`False Discovery Rate (FDR)` correction
