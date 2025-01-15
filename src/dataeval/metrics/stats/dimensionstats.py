@@ -16,7 +16,7 @@ from dataeval.utils.image import get_bitdepth
 @dataclass(frozen=True)
 class DimensionStatsOutput(BaseStatsOutput):
     """
-    Output class for :func:`dimensionstats` stats metric
+    Output class for :func:`dimensionstats` stats metric.
 
     Attributes
     ----------
@@ -79,7 +79,7 @@ def dimensionstats(
     bboxes: Iterable[ArrayLike] | None = None,
 ) -> DimensionStatsOutput:
     """
-    Calculates dimension :term:`statistics<Statistics>` for each image
+    Calculates dimension :term:`statistics<Statistics>` for each image.
 
     This function computes various dimensional metrics (e.g., width, height, channels)
     on the images or individual bounding boxes for each image.

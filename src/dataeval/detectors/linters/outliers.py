@@ -24,7 +24,7 @@ TIndexIssueMap = TypeVar("TIndexIssueMap", IndexIssueMap, list[IndexIssueMap])
 @dataclass(frozen=True)
 class OutliersOutput(Generic[TIndexIssueMap], Output):
     """
-    Output class for :class:`Outliers` lint detector
+    Output class for :class:`Outliers` lint detector.
 
     Attributes
     ----------
@@ -71,7 +71,7 @@ def _get_outlier_mask(
 
 class Outliers:
     r"""
-    Calculates statistical Outliers of a dataset using various statistical tests applied to each image
+    Calculates statistical outliers of a dataset using various statistical tests applied to each image.
 
     Parameters
     ----------
@@ -164,7 +164,7 @@ class Outliers:
         self, stats: OutlierStatsOutput | DatasetStatsOutput | Sequence[OutlierStatsOutput]
     ) -> OutliersOutput[IndexIssueMap] | OutliersOutput[list[IndexIssueMap]]:
         """
-        Returns indices of Outliers with the issues identified for each
+        Returns indices of Outliers with the issues identified for each.
 
         Parameters
         ----------

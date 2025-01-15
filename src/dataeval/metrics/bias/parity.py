@@ -21,7 +21,7 @@ TData = TypeVar("TData", np.float64, NDArray[np.float64])
 @dataclass(frozen=True)
 class ParityOutput(Generic[TData], Output):
     """
-    Output class for :func:`parity` and :func:`label_parity` :term:`bias<Bias>` metrics
+    Output class for :func:`parity` and :func:`label_parity` :term:`bias<Bias>` metrics.
 
     Attributes
     ----------
@@ -123,8 +123,8 @@ def label_parity(
     num_classes: int | None = None,
 ) -> ParityOutput[np.float64]:
     """
-    Calculate the chi-square statistic to assess the :term:`parity<Parity>` between expected and
-    observed label distributions.
+    Calculate the chi-square statistic to assess the :term:`parity<Parity>` \
+    between expected and observed label distributions.
 
     This function computes the frequency distribution of classes in both expected and observed labels, normalizes
     the expected distribution to match the total number of observed labels, and then calculates the chi-square
@@ -208,8 +208,8 @@ def label_parity(
 @set_metadata
 def parity(metadata: Metadata) -> ParityOutput[NDArray[np.float64]]:
     """
-    Calculate chi-square statistics to assess the linear relationship between multiple factors
-    and class labels.
+    Calculate chi-square statistics to assess the linear relationship \
+    between multiple factors and class labels.
 
     This function computes the chi-square statistic for each metadata factor to determine if there is
     a significant relationship between the factor values and class labels. The chi-square statistic is

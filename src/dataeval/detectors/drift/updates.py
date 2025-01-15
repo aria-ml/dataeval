@@ -1,5 +1,5 @@
 """
-Update strategies inform how the :term:`drift<Drift>` detector classes update the reference data when monitoring
+Update strategies inform how the :term:`drift<Drift>` detector classes update the reference data when monitoring.
 for drift.
 """
 
