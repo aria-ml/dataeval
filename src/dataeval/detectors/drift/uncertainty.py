@@ -66,8 +66,8 @@ def classifier_uncertainty(
 
 class DriftUncertainty:
     """
-    Test for a change in the number of instances falling into regions on which the
-    model is uncertain.
+    Test for a change in the number of instances falling into regions on which \
+        the model is uncertain.
 
     Performs a K-S test on prediction entropies.
 

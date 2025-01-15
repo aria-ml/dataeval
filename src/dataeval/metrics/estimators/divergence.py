@@ -21,7 +21,7 @@ from dataeval.utils.shared import compute_neighbors, get_method, minimum_spannin
 @dataclass(frozen=True)
 class DivergenceOutput(Output):
     """
-    Output class for :func:`divergence` estimator metric
+    Output class for :func:`divergence` estimator metric.
 
     Attributes
     ----------
@@ -59,7 +59,7 @@ def divergence_mst(data: NDArray[np.float64], labels: NDArray[np.int_]) -> int:
 
 def divergence_fnn(data: NDArray[np.float64], labels: NDArray[np.int_]) -> int:
     """
-    Calculates the estimated label errors based on their nearest neighbors
+    Calculates the estimated label errors based on their nearest neighbors.
 
     Parameters
     ----------
@@ -81,7 +81,7 @@ def divergence_fnn(data: NDArray[np.float64], labels: NDArray[np.int_]) -> int:
 @set_metadata
 def divergence(data_a: ArrayLike, data_b: ArrayLike, method: Literal["FNN", "MST"] = "FNN") -> DivergenceOutput:
     """
-    Calculates the :term`divergence` and any errors between the datasets
+    Calculates the :term:`divergence` and any errors between the datasets.
 
     Parameters
     ----------

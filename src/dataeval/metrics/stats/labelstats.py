@@ -15,7 +15,7 @@ from dataeval.output import Output, set_metadata
 @dataclass(frozen=True)
 class LabelStatsOutput(Output):
     """
-    Output class for :func:`labelstats` stats metric
+    Output class for :func:`labelstats` stats metric.
 
     Attributes
     ----------
@@ -62,7 +62,7 @@ def labelstats(
     labels: Iterable[ArrayLike],
 ) -> LabelStatsOutput:
     """
-    Calculates :term:`statistics<Statistics>` for data labels
+    Calculates :term:`statistics<Statistics>` for data labels.
 
     This function computes counting metrics (e.g., total per class, total per image)
     on the labels.

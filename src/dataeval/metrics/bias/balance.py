@@ -23,8 +23,8 @@ with contextlib.suppress(ImportError):
 @dataclass(frozen=True)
 class BalanceOutput(Output):
     """
-    Output class for :func:`balance` bias metric
-
+    Output class for :func:`balance` :term:`bias<Bias>` metric.
+    
     Attributes
     ----------
     balance : NDArray[np.float64]
@@ -123,7 +123,7 @@ def balance(
     num_neighbors: int = 5,
 ) -> BalanceOutput:
     """
-    Mutual information (MI) between factors (class label, metadata, label/image properties)
+    Mutual information (MI) between factors (class label, metadata, label/image properties).
 
     Parameters
     ----------

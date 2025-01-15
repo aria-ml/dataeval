@@ -19,7 +19,7 @@ TIndexCollection = TypeVar("TIndexCollection", DuplicateGroup, DatasetDuplicateG
 @dataclass(frozen=True)
 class DuplicatesOutput(Generic[TIndexCollection], Output):
     """
-    Output class for :class:`Duplicates` lint detector
+    Output class for :class:`Duplicates` lint detector.
 
     Attributes
     ----------
@@ -39,8 +39,8 @@ class DuplicatesOutput(Generic[TIndexCollection], Output):
 
 class Duplicates:
     """
-    Finds the duplicate images in a dataset using xxhash for exact :term:`duplicates<Duplicates>`
-    and pchash for near duplicates
+    Finds the duplicate images in a dataset using xxhash for exact \
+    :term:`duplicates<Duplicates>` and pchash for near duplicates.
 
     Attributes
     ----------

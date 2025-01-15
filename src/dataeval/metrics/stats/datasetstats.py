@@ -21,7 +21,7 @@ from dataeval.output import Output, set_metadata
 @dataclass(frozen=True)
 class DatasetStatsOutput(Output):
     """
-    Output class for :func:`datasetstats` stats metric
+    Output class for :func:`datasetstats` stats metric.
 
     This class represents the outputs of various stats functions against a single
     dataset, such that each index across all stat outputs are representative of
@@ -56,7 +56,7 @@ class DatasetStatsOutput(Output):
 @dataclass(frozen=True)
 class ChannelStatsOutput(Output):
     """
-    Output class for :func:`channelstats` stats metric
+    Output class for :func:`channelstats` stats metric.
 
     This class represents the outputs of various per-channel stats functions against
     a single dataset, such that each index across all stat outputs are representative
@@ -91,7 +91,7 @@ def datasetstats(
     labels: Iterable[ArrayLike] | None = None,
 ) -> DatasetStatsOutput:
     """
-    Calculates various :term:`statistics<Statistics>` for each image
+    Calculates various :term:`statistics<Statistics>` for each image.
 
     This function computes dimension, pixel and visual metrics
     on the images or individual bounding boxes for each image as
@@ -135,7 +135,7 @@ def channelstats(
     bboxes: Iterable[ArrayLike] | None = None,
 ) -> ChannelStatsOutput:
     """
-    Calculates various per-channel statistics for each image
+    Calculates various per-channel :term:`statistics` for each image.
 
     This function computes pixel and visual metrics on the images
     or individual bounding boxes for each image.

@@ -1,5 +1,5 @@
 """
-Statistics metrics calculate a variety of image properties and pixel statistics
+Statistics metrics calculate a variety of image properties and pixel statistics \
 and label statistics against the images and labels of a dataset.
 """
 

@@ -20,7 +20,7 @@ from dataeval.output import Output, set_metadata
 @dataclass(frozen=True)
 class UAPOutput(Output):
     """
-    Output class for :func:`uap` estimator metric
+    Output class for :func:`uap` estimator metric.
 
     Attributes
     ----------
@@ -34,8 +34,8 @@ class UAPOutput(Output):
 @set_metadata
 def uap(labels: ArrayLike, scores: ArrayLike) -> UAPOutput:
     """
-    FR Test Statistic based estimate of the empirical mean precision for
-    the upperbound average precision
+    FR Test Statistic based estimate of the empirical mean precision for the \
+    upperbound average precision.
 
     Parameters
     ----------

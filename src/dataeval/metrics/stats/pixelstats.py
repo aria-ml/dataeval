@@ -16,7 +16,7 @@ from dataeval.output import set_metadata
 @dataclass(frozen=True)
 class PixelStatsOutput(BaseStatsOutput):
     """
-    Output class for :func:`pixelstats` stats metric
+    Output class for :func:`pixelstats` stats metric.
 
     Attributes
     ----------
@@ -74,7 +74,7 @@ def pixelstats(
     per_channel: bool = False,
 ) -> PixelStatsOutput:
     """
-    Calculates pixel :term:`statistics<Statistics>` for each image
+    Calculates pixel :term:`statistics<Statistics>` for each image.
 
     This function computes various statistical metrics (e.g., mean, standard deviation, entropy)
     on the images as a whole.

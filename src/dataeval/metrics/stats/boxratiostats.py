@@ -102,7 +102,7 @@ def boxratiostats(
     imgstats: TStatOutput,
 ) -> TStatOutput:
     """
-    Calculates ratio :term:`statistics<Statistics>` of box outputs over image outputs
+    Calculates ratio :term:`statistics<Statistics>` of box outputs over image outputs.
 
     Parameters
     ----------

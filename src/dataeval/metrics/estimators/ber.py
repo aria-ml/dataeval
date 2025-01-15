@@ -28,7 +28,7 @@ from dataeval.utils.shared import compute_neighbors, get_classes_counts, get_met
 @dataclass(frozen=True)
 class BEROutput(Output):
     """
-    Output class for :func:`ber` estimator metric
+    Output class for :func:`ber` estimator metric.
 
     Attributes
     ----------
@@ -44,7 +44,7 @@ class BEROutput(Output):
 
 
 def ber_mst(images: NDArray[np.float64], labels: NDArray[np.int_], k: int = 1) -> tuple[float, float]:
-    """Calculates the :term:`Bayes error rate<Bayes Error Rate (BER)>` using a minimum spanning tree
+    """Calculates the :term:`Bayes error rate<Bayes Error Rate (BER)>` using a minimum spanning tree.
 
     Parameters
     ----------
@@ -119,7 +119,8 @@ def knn_lowerbound(value: float, classes: int, k: int) -> float:
 @set_metadata
 def ber(images: ArrayLike, labels: ArrayLike, k: int = 1, method: Literal["KNN", "MST"] = "KNN") -> BEROutput:
     """
-    An estimator for Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` using FR or KNN test statistic basis
+    An estimator for Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` \
+    using FR or KNN test statistic basis.
 
     Parameters
     ----------

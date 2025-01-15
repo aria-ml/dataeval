@@ -1,5 +1,5 @@
 """
-Bias metrics check for skewed or imbalanced datasets and incomplete feature
+Bias metrics check for skewed or imbalanced datasets and incomplete feature \
 representation which may impact model performance.
 """
 

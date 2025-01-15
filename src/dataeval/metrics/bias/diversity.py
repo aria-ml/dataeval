@@ -51,7 +51,7 @@ def _plot(labels: NDArray[Any], bar_heights: NDArray[Any]) -> Figure:
 @dataclass(frozen=True)
 class DiversityOutput(Output):
     """
-    Output class for :func:`diversity` :term:`bias<Bias>` metric
+    Output class for :func:`diversity` :term:`bias<Bias>` metric.
 
     Attributes
     ----------
@@ -197,8 +197,9 @@ def diversity(
     method: Literal["simpson", "shannon"] = "simpson",
 ) -> DiversityOutput:
     """
-    Compute :term:`diversity<Diversity>` and classwise diversity for discrete/categorical variables and,
-    through standard histogram binning, for continuous variables.
+    Compute :term:`diversity<Diversity>` and classwise diversity for \
+        discrete/categorical variables through standard histogram binning, \
+        for continuous variables.
 
     We define diversity as a normalized form of the inverse Simpson diversity index.
 
