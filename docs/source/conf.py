@@ -38,11 +38,11 @@ extensions = [
     "enum_tools.autoenum",
 ]
 
+# Coverage show missing items
+coverage_show_missing_items = True
+
 # The suffix of source filenames.
 source_suffix = [".rst", ".md"]
-
-# Add any paths that contain templates here, relative to this directory.
-templates_path = ["_templates"]
 
 # List of items that shouldn't be included in the build.
 exclude_patterns = [
@@ -63,6 +63,10 @@ exclude_patterns = [
 # autodoc_type_aliases = {"ArrayLike": "ArrayLike"}
 # autosummary_generate = False
 
+#---------------------------------------------------------------------------------
+# Autoapi settings including templates
+#---------------------------------------------------------------------------------
+
 autoapi_dirs = ["../../src/dataeval/"]
 autoapi_type = "python"
 autoapi_root = "reference"
@@ -80,6 +84,24 @@ autoapi_own_page_level = "function"
 autoapi_member_order = "groupwise"
 
 needs_title_optional = True
+
+# need this for autoapi templates.  Need both of the next two commands
+# for different parts of the process. 
+autoapi_template_dir = "./_templates/autoapi"
+# Add any paths that contain templates here, relative to this directory.
+templates_path = ["_templates", "_templates/autoapi"]
+
+napoleon_use_ivar = True  # to correctly handle Attributes header in various classes
+
+# define contains method for auto api template marcros
+def contains(seq, item):
+    return item in seq
+
+# add the method to the jinja environment
+def prepare_jinja_env(jinja_env) -> None:
+    jinja_env.tests["contains"] = contains
+
+autoapi_prepare_jinja_env = prepare_jinja_env
 
 # -----------------------------------------------------------------------------
 # MyST-NB settings
@@ -102,7 +124,6 @@ myst_heading_anchors = 4
 html_theme = "pydata_sphinx_theme"
 html_logo = "_static/DataEval_Logo.png"
 html_favicon = "_static/DataEval_Favicon.png"
-
 
 html_show_sourcelink = True
 html_static_path = ["_static"]

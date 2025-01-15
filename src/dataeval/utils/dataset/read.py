@@ -10,7 +10,7 @@ from torch.utils.data import Dataset
 
 def read_dataset(dataset: Dataset[Any]) -> list[list[Any]]:
     """
-    Extract information from a dataset at each index into individual lists of each information position
+    Extract information from a dataset at each index into individual lists of each information position.
 
     Parameters
     ----------

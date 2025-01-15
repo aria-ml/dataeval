@@ -25,7 +25,7 @@ MAX_FACTOR = 4
 @dataclass(frozen=True)
 class HashStatsOutput(BaseStatsOutput):
     """
-    Output class for :func:`hashstats` stats metric
+    Output class for :func:`hashstats` stats metric.
 
     Attributes
     ----------
@@ -126,7 +126,7 @@ def hashstats(
     bboxes: Iterable[ArrayLike] | None = None,
 ) -> HashStatsOutput:
     """
-    Calculates hashes for each image
+    Calculates hashes for each image.
 
     This function computes hashes from the images including exact hashes and perception-based
     hashes. These hash values can be used to determine if images are exact or near matches.

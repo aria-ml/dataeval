@@ -26,7 +26,7 @@ class TrainValSplit(NamedTuple):
 @dataclass(frozen=True)
 class SplitDatasetOutput(Output):
     """
-    Output class containing test indices and a list of TrainValSplits
+    Output class containing test indices and a list of TrainValSplits.
 
     Attributes
     ----------

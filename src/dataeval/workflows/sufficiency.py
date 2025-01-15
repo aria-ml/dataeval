@@ -24,7 +24,7 @@ with contextlib.suppress(ImportError):
 @dataclass(frozen=True)
 class SufficiencyOutput(Output):
     """
-    Output class for :class:`Sufficiency` workflow
+    Output class for :class:`Sufficiency` workflow.
 
     Attributes
     ----------
@@ -378,7 +378,7 @@ T = TypeVar("T")
 
 class Sufficiency(Generic[T]):
     """
-    Project dataset :term:`sufficiency<Sufficiency>` using given a model and evaluation criteria
+    Project dataset :term:`sufficiency<Sufficiency>` using given a model and evaluation criteria.
 
     Parameters
     ----------

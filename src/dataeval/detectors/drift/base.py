@@ -45,7 +45,7 @@ class UpdateStrategy(ABC):
 @dataclass(frozen=True)
 class DriftBaseOutput(Output):
     """
-    Base output class for Drift detector classes
+    Base output class for Drift Detector classes
 
     Attributes
     ----------
@@ -64,7 +64,7 @@ class DriftBaseOutput(Output):
 @dataclass(frozen=True)
 class DriftOutput(DriftBaseOutput):
     """
-    Output class for :class:`DriftCVM`, :class:`DriftKS`, and :class:`DriftUncertainty` drift detectors
+    Output class for :class:`DriftCVM`, :class:`DriftKS`, and :class:`DriftUncertainty` drift detectors.
 
     Attributes
     ----------

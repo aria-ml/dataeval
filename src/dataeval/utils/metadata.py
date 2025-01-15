@@ -1,6 +1,6 @@
 """
-Metadata related utility functions that help organize raw metadata into :class:`Metadata` objects
-for use within `DataEval`.
+Metadata related utility functions that help organize raw metadata into \
+:class:`Metadata` objects for use within `DataEval`.
 """
 
 from __future__ import annotations
@@ -295,7 +295,7 @@ def merge(
 @dataclass(frozen=True)
 class Metadata(Output):
     """
-    Dataclass containing binned metadata from the :func:`preprocess` function
+    Dataclass containing binned metadata from the :func:`preprocess` function.
 
     Attributes
     ----------
