@@ -88,6 +88,7 @@ certifi = {version = ">=2024.07.04"}
 enum_tools = {version = ">=0.12.0", extras = ["sphinx"]}
 ipykernel = {version = ">=6.26.0"}
 ipywidgets = {version = ">=8.1.1"}
+jinja2 = {version = ">=3.1.5"}
 jupyter-client = {version = ">=8.6.0"}
 jupyter-cache = {version = "*"}
 myst-nb = {version = ">=1.0.0"}

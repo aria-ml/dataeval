@@ -1515,4 +1515,4 @@ all = ["matplotlib"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "1a81c44036fce8d9ca7b6b115e492f78d3747e30ad0a91c766cd1aa1b4900b92"
+content-hash = "cb8d6038ddf15538795934eeea47755232053f1b60c14d2cf3cc6276307418ba"
