@@ -26,6 +26,7 @@ def id_fn(x):
 class TestPredictBatch:
     n, n_features, n_classes, latent_dim = 100, 10, 5, 2
     x = np.zeros((n, n_features), dtype=np.float32)
+    t = torch.zeros((n, n_features), dtype=torch.float32)
 
     class MyModel(nn.Module):
         n_features, n_classes = 10, 5
@@ -46,17 +47,22 @@ class TestPredictBatch:
 
     # model, batch size, dtype, preprocessing function
     tests_predict = [
-        (MyModel(multi_out=False), 2, np.float32, None),
-        (MyModel(multi_out=False), int(1e10), np.float32, None),
-        (MyModel(multi_out=False), int(1e10), torch.float32, None),
-        (MyModel(multi_out=True), int(1e10), torch.float32, None),
-        (MyModel(multi_out=False), int(1e10), np.float32, id_fn),
-        (AutoEncoder, 2, np.float32, None),
-        (AutoEncoder, int(1e10), np.float32, None),
-        (AutoEncoder, int(1e10), torch.float32, None),
-        (id_fn, 2, np.float32, None),
-        (id_fn, 2, torch.float32, None),
-        (id_fn, 2, np.float32, id_fn),
+        (x, MyModel(multi_out=False), 2, np.float32, None),
+        (x, MyModel(multi_out=False), int(1e10), np.float32, None),
+        (x, MyModel(multi_out=False), int(1e10), torch.float32, None),
+        (x, MyModel(multi_out=True), int(1e10), torch.float32, None),
+        (x, MyModel(multi_out=False), int(1e10), np.float32, id_fn),
+        (t, MyModel(multi_out=True), int(1e10), torch.float32, None),
+        (t, MyModel(multi_out=False), int(1e10), np.float32, id_fn),
+        (x, AutoEncoder, 2, np.float32, None),
+        (x, AutoEncoder, int(1e10), np.float32, None),
+        (x, AutoEncoder, int(1e10), torch.float32, None),
+        (t, AutoEncoder, int(1e10), np.float32, None),
+        (t, AutoEncoder, int(1e10), torch.float32, None),
+        (x, id_fn, 2, np.float32, None),
+        (x, id_fn, 2, torch.float32, None),
+        (x, id_fn, 2, np.float32, id_fn),
+        (t, id_fn, 2, torch.float32, None),
     ]
     n_tests = len(tests_predict)
 
@@ -66,9 +72,9 @@ class TestPredictBatch:
 
     @pytest.mark.parametrize("params", list(range(n_tests)), indirect=True)
     def test_predict_batch(self, params):
-        model, batch_size, dtype, preprocess_fn = params
+        x, model, batch_size, dtype, preprocess_fn = params
         preds = predict_batch(
-            self.x,
+            x,
             model,
             batch_size=batch_size,
             preprocess_fn=preprocess_fn,
