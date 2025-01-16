@@ -5,7 +5,14 @@ import numpy as np
 import pytest
 from requests import HTTPError, RequestException, Response
 
-from dataeval.utils.dataset.datasets import MNIST, _check_exists, _extract_archive, _get_file, _validate_file
+from dataeval.utils.dataset.datasets import (
+    MNIST,
+    _check_exists,
+    _download_dataset,
+    _extract_archive,
+    _get_file,
+    _validate_file,
+)
 
 TEMP_MD5 = "d149274109b50d5147c09d6fc7e80c71"
 TEMP_SHA256 = "2b749913055289cb3a5c602a17196b5437dc59bba50e986ea449012a303f7201"
@@ -79,6 +86,15 @@ def test_extract_archive(zip_file):
     assert str(zip_file.parent) == location
     location = _extract_archive(zip_file, zip_file.parent, remove_finished=True)
     assert str(zip_file.parent) == location
+
+
+@patch("dataeval.utils.dataset.datasets._get_file")
+@patch("dataeval.utils.dataset.datasets._extract_archive")
+@pytest.mark.parametrize("md5", [True, False])
+def test_download_dataset_extract_on_mnist_zip(mock_extract_archive, mock_get_file, md5, tmp_path):
+    _download_dataset("mock", tmp_path, "mock.zip", "abc", md5=md5)
+    assert mock_get_file.called
+    assert mock_extract_archive.called == md5
 
 
 class TestMNIST:
