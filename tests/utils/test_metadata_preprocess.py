@@ -61,7 +61,7 @@ class TestMDPreprocessingUnit:
             preprocess(factors, labels)
 
     @pytest.mark.parametrize("factors", ([{"a": [1, 2, 3], "b": [1, 2, 3]}], [{"a": [1, 2, 3]}]))
-    @pytest.mark.parametrize("bincounts", ({"a": 1, "b": 1}, {"a": 1}))
+    @pytest.mark.parametrize("bincounts", ({"a": 1, "b": 1}, {"a": 1}, None))
     def test_exclude_raw_metadata_only(self, factors, bincounts):
         labels = [0, 0, 0]
         output = preprocess(factors, labels, bincounts, exclude=["b"])
