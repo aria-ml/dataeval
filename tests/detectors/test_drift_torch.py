@@ -9,6 +9,7 @@ Licensed under Apache Software License (Apache 2.0)
 from __future__ import annotations
 
 from itertools import product
+from typing import Any, Literal
 
 import numpy as np
 import pytest
@@ -31,33 +32,42 @@ class TestPredictBatch:
     class MyModel(nn.Module):
         n_features, n_classes = 10, 5
 
-        def __init__(self, multi_out: bool = False):
+        def __init__(self, output: Literal["single", "multi", "numpy", "list", "unsupported"] = "single"):
             super().__init__()
             self.dense = nn.Linear(self.n_features, self.n_classes)
-            self.multi_out = multi_out
+            self.output = output
 
-        def forward(self, x: torch.Tensor) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
+        def forward(self, x: torch.Tensor) -> Any:
             out = self.dense(x)
-            if not self.multi_out:
-                return out
-            else:
+            if self.output == "multi":
                 return out, out
+            elif self.output == "numpy":
+                return out.numpy()
+            elif self.output == "list":
+                return [out, out]
+            elif self.output == "unsupported":
+                return {1, 2, 3}
+            return out
 
     AutoEncoder = nn.Sequential(nn.Linear(n_features, latent_dim), nn.Linear(latent_dim, n_features))
 
     # model, batch size, dtype, preprocessing function
     tests_predict = [
-        (x, MyModel(multi_out=False), 2, np.float32, None),
-        (x, MyModel(multi_out=False), int(1e10), np.float32, None),
-        (x, MyModel(multi_out=False), int(1e10), torch.float32, None),
-        (x, MyModel(multi_out=True), int(1e10), torch.float32, None),
-        (x, MyModel(multi_out=False), int(1e10), np.float32, id_fn),
-        (t, MyModel(multi_out=True), int(1e10), torch.float32, None),
-        (t, MyModel(multi_out=False), int(1e10), np.float32, id_fn),
+        (x, MyModel("single"), 2, np.float32, None),
+        (x, MyModel("single"), int(1e10), np.float32, None),
+        (x, MyModel("single"), int(1e10), torch.float32, None),
+        (x, MyModel("single"), int(1e10), np.float32, id_fn),
+        (t, MyModel("single"), int(1e10), np.float32, id_fn),
+        (x, MyModel("multi"), int(1e10), torch.float32, None),
+        (t, MyModel("multi"), 2, torch.float32, None),
+        (x, MyModel("numpy"), int(1e10), np.float32, None),
+        (t, MyModel("numpy"), int(1e10), np.float32, None),
+        (x, MyModel("list"), 2, np.float32, None),
+        (t, MyModel("list"), int(1e10), torch.float32, None),
         (x, AutoEncoder, 2, np.float32, None),
         (x, AutoEncoder, int(1e10), np.float32, None),
-        (x, AutoEncoder, int(1e10), torch.float32, None),
         (t, AutoEncoder, int(1e10), np.float32, None),
+        (x, AutoEncoder, int(1e10), torch.float32, None),
         (t, AutoEncoder, int(1e10), torch.float32, None),
         (x, id_fn, 2, np.float32, None),
         (x, id_fn, 2, torch.float32, None),
@@ -88,6 +98,10 @@ class TestPredictBatch:
             assert preds.shape == self.x.shape
         elif isinstance(model, nn.Module):
             assert preds.shape == (self.n, self.n_classes)
+
+    def test_predict_batch_unsupported_model(self):
+        with pytest.raises(TypeError):
+            predict_batch(self.x, self.MyModel("unsupported"), device=get_device("cpu"))
 
 
 class TestSquaredPairwiseDistance:
