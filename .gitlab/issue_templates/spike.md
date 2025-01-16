@@ -29,5 +29,5 @@ This template is to be used when a decision is required to determine whether a p
 <!-- (What papers were researched? What were the relevant points to DataEval?) -->
 
 
-/label ~issue::spike
+/label ~ARiA ~issue::spike ~needs::elaboration
 
