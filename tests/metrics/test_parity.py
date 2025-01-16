@@ -268,3 +268,17 @@ class TestMDParityFunctional:
         # Looks for a warning that there are (class,factor1) pairs with too low frequency
         with pytest.warns(UserWarning):
             parity(metadata)
+
+    def test_underquantized_has_repeated_low_freqs(self):
+        """
+        This quantizes factor1 such that there are large regions with bins
+        that contain a small number of points.
+        """
+        labels = [0] * 5 + [1] * 5 + [0] * 5 + [1] * 5
+        factors = [{"factor1": list(np.arange(10)) + list(np.arange(10))}]
+        continuous_bincounts = {"factor1": 10}
+        metadata = preprocess(factors, labels, continuous_bincounts)
+
+        # Looks for a warning that there are (class,factor1) pairs with too low frequency
+        with pytest.warns(UserWarning):
+            parity(metadata)
