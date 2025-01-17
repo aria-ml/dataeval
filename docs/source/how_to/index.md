@@ -1,5 +1,4 @@
-How-to Guides
-=========
+# How-to Guides
 
 These guides demonstrate more in-depth features and customizations of DataEval
 features for more advanced users.
@@ -7,8 +6,7 @@ features for more advanced users.
 In addition to viewing them in our documentation, these notebooks can also be
 opened in Google Colab to be used interactively!
 
-Detectors
----------
+## Detectors
 
 - [How to detect if the data distribution is changing](notebooks/DriftDetectionTutorial.ipynb)
   [![Open In Colab][colab-badge]][drift-colab]
@@ -22,8 +20,8 @@ Detectors
   [![Open In Colab][colab-badge]][lint-colab]
 
 :::{toctree}
+:caption: Detectors
 :hidden:
-:maxdepth: 1
 
 notebooks/DriftDetectionTutorial.ipynb
 notebooks/OODDetectionTutorial.ipynb
@@ -32,8 +30,7 @@ notebooks/DuplicatesTutorial.ipynb
 notebooks/LintingTutorial.ipynb
 :::
 
-Metrics
--------
+## Metrics
 
 - [How to determine if a dataset can meet performance requirements](notebooks/BayesErrorRateEstimationTutorial.ipynb)
   [![Open In Colab][colab-badge]][ber-colab]
@@ -45,8 +42,8 @@ Metrics
   [![Open In Colab][colab-badge]][cov-colab]
 
 :::{toctree}
+:caption: Metrics
 :hidden:
-:maxdepth: 1
 
 notebooks/BayesErrorRateEstimationTutorial.ipynb
 notebooks/HPDivergenceTutorial.ipynb
@@ -54,8 +51,7 @@ notebooks/ClassLabelAnalysisTutorial.ipynb
 notebooks/CoverageTutorial.ipynb
 :::
 
-Workflows
----------
+## Workflows
 
 - [How to determine the amount of data needed to meet image classification performance requirements](notebooks/ClassLearningCurvesTutorial.ipynb)
   [![Open In Colab][colab-badge]][suff-colab]
@@ -63,37 +59,36 @@ Workflows
   [![Open In Colab][colab-badge]][odlc-colab]
 
 :::{toctree}
+:caption: Workflows
 :hidden:
-:maxdepth: 1
 
 notebooks/ClassLearningCurvesTutorial.ipynb
 html/ODLearningCurvesTutorial.md
 :::
 
-Models
-------
+## Models
 
 - [How to create image embeddings with an autoencoder](notebooks/AETrainerTutorial.ipynb)
   [![Open In Colab][colab-badge]][ae-colab]
 % - How to use the AETrainer with different model architectures (future how-to)
 
+[colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
+[ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/BayesErrorRateEstimationTutorial.ipynb
+[suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/ClassLearningCurvesTutorial.ipynb
+[div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/HPDivergenceTutorial.ipynb
+[drift-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/DriftDetectionTutorial.ipynb
+[out-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/OODDetectionTutorial.ipynb
+[ae-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/AETrainerTutorial.ipynb
+[lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/ClassLabelAnalysisTutorial.ipynb
+[odlc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/ODLearningCurvesTutorial.ipynb
+[clust-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/ClustererTutorial.ipynb
+[dup-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/DuplicatesTutorial.ipynb
+[lint-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/LintingTutorial.ipynb
+[cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/CoverageTutorial.ipynb
+
 :::{toctree}
+:caption: Models
 :hidden:
-:maxdepth: 1
 
 notebooks/AETrainerTutorial.ipynb
 :::
-
-[colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
-[ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/how_to/notebooks/BayesErrorRateEstimationTutorial.ipynb
-[suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/how_to/notebooks/ClassLearningCurvesTutorial.ipynb
-[div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/how_to/notebooks/HPDivergenceTutorial.ipynb
-[drift-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/how_to/notebooks/DriftDetectionTutorial.ipynb
-[out-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/how_to/notebooks/OODDetectionTutorial.ipynb
-[ae-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/how_to/notebooks/AETrainerTutorial.ipynb
-[lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/how_to/notebooks/ClassLabelAnalysisTutorial.ipynb
-[odlc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/how_to/notebooks/ODLearningCurvesTutorial.ipynb
-[clust-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/how_to/notebooks/ClustererTutorial.ipynb
-[dup-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/how_to/notebooks/DuplicatesTutorial.ipynb
-[lint-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/how_to/notebooks/LintingTutorial.ipynb
-[cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/how_to/notebooks/CoverageTutorial.ipynb

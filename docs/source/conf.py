@@ -36,6 +36,7 @@ extensions = [
     "sphinx_design",
     "myst_nb",
     "enum_tools.autoenum",
+    "sphinx_immaterial",
 ]
 
 # Coverage show missing items
@@ -56,22 +57,19 @@ exclude_patterns = [
     "how_to/notebooks/ODLearningCurvesTutorial.ipynb",
 ]
 
-# -----------------------------------------------------------------------------
-# Extension configurations
-# -----------------------------------------------------------------------------
+# Add any paths that contain templates here, relative to this directory.
+# Default autoapi templates are at {pyenv}/lib/python{ver}/site-packages/autoapi/templates
+templates_path = ["_templates", "_templates/autoapi"]
 
-# autodoc_type_aliases = {"ArrayLike": "ArrayLike"}
-# autosummary_generate = False
-
-#---------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------
 # Autoapi settings including templates
-#---------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------
 
 autoapi_dirs = ["../../src/dataeval/"]
 autoapi_type = "python"
-autoapi_root = "reference"
+autoapi_root = "reference/autoapi"
 autoapi_file_pattern = "*.py"
-autoapi_python_class_content = "both"
+autoapi_python_class_content = "class"
 autoapi_options = [
     "members",
     "show-module-summary",
@@ -82,24 +80,27 @@ autoapi_keep_files = True
 autodoc_typehints = "description"
 autoapi_own_page_level = "function"
 autoapi_member_order = "groupwise"
+autoapi_add_toctree_entry = False
 
-needs_title_optional = True
-
-# need this for autoapi templates.  Need both of the next two commands
-# for different parts of the process. 
+# need this for autoapi templates
 autoapi_template_dir = "./_templates/autoapi"
-# Add any paths that contain templates here, relative to this directory.
-templates_path = ["_templates", "_templates/autoapi"]
 
-napoleon_use_ivar = True  # to correctly handle Attributes header in various classes
+graphviz_output_format = "svg"
 
-# define contains method for auto api template marcros
+# ---------------------------------------------------------------------------------
+# Autoapi jinja environment prep
+# ---------------------------------------------------------------------------------
+
+
+# define contains method for auto api template macros
 def contains(seq, item):
     return item in seq
+
 
 # add the method to the jinja environment
 def prepare_jinja_env(jinja_env) -> None:
     jinja_env.tests["contains"] = contains
+
 
 autoapi_prepare_jinja_env = prepare_jinja_env
 
@@ -116,21 +117,49 @@ nb_execution_timeout = -1
 
 myst_enable_extensions = ["attrs_inline", "colon_fence", "dollarmath", "html_image"]
 myst_heading_anchors = 4
+myst_footnote_transition = False
 
 # -----------------------------------------------------------------------------
 # HTML output
 # -----------------------------------------------------------------------------
 
-html_theme = "pydata_sphinx_theme"
+html_theme = "sphinx_immaterial"
 html_logo = "_static/DataEval_Logo.png"
 html_favicon = "_static/DataEval_Favicon.png"
 
 html_show_sourcelink = True
 html_static_path = ["_static"]
-html_css_files = ["ARiA.css"]
 html_theme_options = {
-    "navigation_depth": 2,
-    "logo": {"text": "DataEval"},
+    "repo_url": "https://github.com/aria-ml/dataeval/",
+    "icon": {"repo": "fontawesome/brands/github"},
+    "palette": [
+        {
+            "media": "(prefers-color-scheme: light)",
+            "scheme": "default",
+            "primary": "white",
+            "accent": "indigo",
+            "toggle": {
+                "icon": "material/toggle-switch-off-outline",
+                "name": "Switch to dark mode",
+            },
+        },
+        {
+            "media": "(prefers-color-scheme: dark)",
+            "scheme": "slate",
+            "primary": "black",
+            "accent": "light-blue",
+            "toggle": {
+                "icon": "material/toggle-switch",
+                "name": "Switch to light mode",
+            },
+        },
+    ],
+    "features": [
+        "navigation.expand",
+        "navigation.instant",
+        "navigation.sections",
+        "navigation.tabs",
+    ],
 }
 
 
@@ -159,4 +188,4 @@ def setup(app):
         sys.path.append(os.path.dirname(__file__))
         import data
 
-        data.download()
+        data.download()  # type: ignore

@@ -1,4 +1,4 @@
-# Contributing to DataEval
+# Contributing
 
 Thank you for your interest in being part of our community of active
 developers!

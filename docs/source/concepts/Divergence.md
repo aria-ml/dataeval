@@ -1,4 +1,4 @@
-# Dataset {term}`divergence<Divergence>`
+# Divergence
 
 ## What is it
 
@@ -37,8 +37,8 @@ $$
 
 a quite intuitive diverence metric.
 
-There are two methods of estimating this divergence in {term}`DataEval`. The
-first is the MST-based estimator derived in
+There are two methods of estimating this divergence in DataEval. The first is
+the MST-based estimator derived in
 [Learning to Bound the Multi-class Bayes Error][ber]. The second is a kNN-based
 estimator from [Nearest neighbor pattern classification][knn]. Some
 [empirical results](https://arxiv.org/abs/2108.13034) suggest that there is not

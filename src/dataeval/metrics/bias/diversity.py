@@ -201,7 +201,8 @@ def diversity(
         discrete/categorical variables through standard histogram binning, \
         for continuous variables.
 
-    We define diversity as a normalized form of the inverse Simpson diversity index.
+    The method specified defines diversity as the inverse Simpson diversity index linearly rescaled to
+    the unit interval, or the normalized form of the Shannon entropy.
 
     diversity = 1 implies that samples are evenly distributed across a particular factor
     diversity = 0 implies that all samples belong to one category/bin
@@ -210,11 +211,8 @@ def diversity(
     ----------
     metadata : Metadata
         Preprocessed metadata from :func:`dataeval.utils.metadata.preprocess`
-
-    Note
-    ----
-    - The expression is undefined for q=1, but it approaches the Shannon entropy in the limit.
-    - If there is only one category, the diversity index takes a value of 0.
+    method : "simpson" or "shannon", default "simpson"
+        The methodology used for defining diversity
 
     Returns
     -------
@@ -222,9 +220,14 @@ def diversity(
         Diversity index per column of self.data or each factor in self.names and
         classwise diversity [n_class x n_factor]
 
+    Note
+    ----
+    - The expression is undefined for q=1, but it approaches the Shannon entropy in the limit.
+    - If there is only one category, the diversity index takes a value of 0.
+
     Example
     -------
-    Compute Simpson diversity index of metadata and class labels
+    Compute the diversity index of metadata and class labels
 
     >>> div_simp = diversity(metadata, method="simpson")
     >>> div_simp.diversity_index

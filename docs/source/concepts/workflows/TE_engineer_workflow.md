@@ -1,9 +1,9 @@
 # Testing and evaluation engineer workflow
 
 In this workflow, we will describe how a testing and evaluation (T&E) engineer
-can use {term}`DataEval`, and which components of our toolkit are suitable for
-their use. The T&E engineer interacts with DataEval at both the data
-engineering, and monitoring stages of the AI/ML lifecycle.
+can use DataEval, and which components of our toolkit are suitable for their
+use. The T&E engineer interacts with DataEval at both the data engineering, and
+monitoring stages of the AI/ML lifecycle.
 
 ![DataEval Lifecycle](./figures/DataEval.png)
 
@@ -113,5 +113,5 @@ These results indicate that the operational set has shifted substantially, a
 result confirmed but some of the analyses above. Such indications should tell
 the T&E engineer that the model should be retrained.
 
-With all of these tools in {term}`DataEval`, a T&E engineer can conduct
-analyses at multiple stages of the AI/ML lifecycle.
+With all of these tools in DataEval, a T&E engineer can conduct analyses at
+multiple stages of the AI/ML lifecycle.

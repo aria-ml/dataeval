@@ -11,7 +11,11 @@ ARG output_dir="/dataeval/output"
 FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04 as cuda
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends libgl1 clang sudo
+    apt-get update && apt-get install -y --no-install-recommends \
+        libgl1 \
+        graphviz \
+        clang \
+        sudo
 ARG UID
 ARG USER
 # Dev container tools expect non-root users to be able to sudo in a
@@ -74,7 +78,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         git-lfs \
         gnupg2 \
         openssh-server \
-        parallel
+        parallel \
+        graphviz
 RUN addgroup --gid 1001 docker
 ARG USER
 RUN usermod -a -G docker ${USER}

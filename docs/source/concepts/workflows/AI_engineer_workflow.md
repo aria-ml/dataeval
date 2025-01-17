@@ -2,9 +2,9 @@
 
 In this workflow, we will describe how an
 {term}`artificial intelligence<Artificial Intelligence (AI)>` engineer can use
-{term}`DataEval`, and which components of our toolkit are suitable for their
-use. The AI engineer interacts with DataEval at the data engineering, model
-development, and monitoring stages of the AI/ML lifecycle.
+DataEval, and which components of our toolkit are suitable for their use. The
+AI engineer interacts with DataEval at the data engineering, model development,
+and monitoring stages of the AI/ML lifecycle.
 
 ![DataEval Lifecycle](./figures/DataEval.png)
 
@@ -131,8 +131,8 @@ training set, and is therefore flagged as
 {term}`out of distribution<Out-of-distribution (OOD)>`. This would constitute
 a retraining event for the AI engineer.
 
-Finally, the AI engineer can look at overall *dataset drift*. {term}`DataEval`
-has several tests which determine if the operational dataset is significantly
+Finally, the AI engineer can look at overall *dataset drift*. DataEval has
+several tests which determine if the operational dataset is significantly
 different from the training data. Such changes are known to be associated with
 performance degradation, so the AI engineer would trigger retraining as a
 result of significant drift. An example output can be seen below:

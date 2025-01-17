@@ -36,7 +36,7 @@ class OODScoreOutput(Output):
     """
     Output class for instance and feature scores from out-of-distribution detectors.
 
-    Parameters
+    Attributes
     ----------
     instance_score : NDArray
         Instance score of the evaluated dataset.
