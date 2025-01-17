@@ -1,4 +1,4 @@
-# Cleaning Datasets
+# Dataset Cleaning
 
 ## What is Data Cleaning?
 
@@ -102,66 +102,41 @@ This principle emphasizes that the quality of output from analysis and models
 is determined by the quality of input data. If the input data is flawed, the
 output will be unreliable, regardless of the sophistication of the analysis.
 
-## Data Cleaning with {term}`DataEval`
-
-DataEval is a data analysis and monitoring library with some dedicated functions
-and classes for data cleaning.
+## Data Cleaning Metrics
 
 DataEval's data cleaning functions and classes are:
 
-* [dimensionstats](Stats.md#dimensionstats) function
-* [hashstats](Stats.md#hashstats) function
-* [pixelstats](Stats.md#pixelstats) function
-* [visualstats](Stats.md#visualstats) function
-* [Clusterer](Clusterer.md) class
-* [Duplicates](Duplicates.md) class
-* [Outliers](Outliers.md) class
-
-These functions and classes facilitate the creation of dataset statistics and
-the identification of abnormal data points and {term}`duplicates<Duplicates>`:
-
-* The **hashstats** function creates image hashes on a per image basis.
-* The **dimensionstats** function creates dataset statistics on a per image
-  basis.
-* The **pixelstats** and **visualstats** functions create dataset statistics on
-  a per image per channel basis.
-* The **Clusterer** class clusters the data and identifies data points which do
-  not fit into a cluster.
-* The **Duplicates** class identifies duplicate images.
-* The **Outliers** class analyzes the dataset statistics for Outliers based on
-  the chosen statistical method.
+* [dimensionstats](Stats.md#dimensionstats) - creates dimension statistics on a
+  per image basis
+* [hashstats](Stats.md#hashstats) - creates image hashes on a per image basis
+* [pixelstats](Stats.md#pixelstats) - create pixel level statistics on a per
+  image and optionally per channel basis
+* [visualstats](Stats.md#visualstats) - create visual statistics on a per image
+  and optionally per channel basis
+* [Clusterer](Clustering.md) - clusters the data and identifies data points
+  which do not fit into a cluster
+* [Duplicates](#duplicate-detection) - identifies exact and near
+  duplicate images
+* [Outliers](Outliers.md) - analyzes the dataset for outliers based on the
+  chosen statistical method
 
 To see data cleaning in action using DataEval, check out our
 [Data Cleaning Guide](../tutorials/EDA_Part1.ipynb).
 
-### Data Cleaning Metrics
+## Duplicate Detection
 
-Below is a list of all of the metrics available for analysis and the category
-the stats metric belongs to:
+With the {term}`Duplicates` class, exact matches are found using a byte hash of
+the data information, while near matches (such as a crop of another image or a
+distoration of another image) use a perception based hash.
 
-* hashstats
-  * xxhash
-  * pchash
-* dimensionstats
-  * width
-  * height
-  * size
-  * aspect_ratio
-  * channels
-  * depth
-* visualstats
-  * brightness
-  * darkness
-  * contrast
-  * sharpness
-  * missing
-  * zero
-* pixelstats
-  * mean
-  * std
-  * var
-  * skew
-  * kurtosis
-  * entropy
-  * percentiles
-  * histogram
+The byte hash is achieved through the use of the
+[python-xxHash](https://github.com/ifduyue/python-xxhash) Python module,
+which is based on Yann Collet's [xxHash](https://github.com/Cyan4973/xxHash) C
+library.
+
+The perceptual hash is achieved on an image by resizing to a square NxN image
+using the Lanczos algorithm where N is 32x32 or the largest multiple of 8 that
+is smaller than the input image dimensions. The resampled image is compressed
+using a discrete cosine transform and the lowest frequency component is encoded
+as a bit array of greater or less than median value and returned as a hex
+string.

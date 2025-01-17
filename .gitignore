@@ -4,7 +4,7 @@ dist/
 data
 
 docs/build/
-docs/source/reference/
+docs/source/reference/autoapi
 docs/source/tutorials/notebooks/checkpoints/
 docs/source/tutorials/notebooks/data/
 

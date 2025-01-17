@@ -83,8 +83,8 @@ and whether data need to be augmented for training and evaluation.
 
 It is important to note that correlational relationships within a dataset
 measured by balance metrics only indicate _opportunity_ for shortcut learning;
-balance and other metrics within {term}`DataEval` do not measure whether
-shortcut learning has occurred. It is important to interrogate potential biases
+balance and other metrics within DataEval do not measure whether shortcut
+learning has occurred. It is important to interrogate potential biases
 exhibited by the trained model and to assess the need for further data
 augmentation to mitigate or compensate observed biases.
 
@@ -99,8 +99,8 @@ variable, as there is typically no presumed ordering between classes; however,
 other metadata factors, such as latitude and longitude or time stamps may take
 continuous (ordered) values.
 
-The implementation of mutual information within {term}`DataEval` draws on
-multiple implementations within the scikit-learn package including
+The implementation of mutual information within DataEval draws on multiple
+implementations within the scikit-learn package including
 [`mutual_info_classification`] and [`mutual_info_regression`].
 For categorical or discrete target variables, `mutual_info_classif` computes
 the mutual information with respect to both discrete/categorical and continuous

@@ -92,7 +92,7 @@ jinja2 = {version = ">=3.1.5"}
 jupyter-client = {version = ">=8.6.0"}
 jupyter-cache = {version = "*"}
 myst-nb = {version = ">=1.0.0"}
-pydata-sphinx-theme = {version = ">=0.15.4"}
+sphinx-immaterial = {version = "*"}
 sphinx-autoapi = {version = "*"}
 sphinx-design = {version = "*"}
 sphinx-tabs = {version = "*"}

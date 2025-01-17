@@ -1,4 +1,4 @@
-# Algorithm Overview
+# Algorithm Summary
 
 The following tables summarize the advised use cases and technical
 requirements for the algorithms provided by the DataEval library.
@@ -11,12 +11,12 @@ Refer to the method-specific pages for more detailed information.
 |:---|:---|:---:|:---:|:---:|
 |[Balance](Balance.md)|Assesses the metadata distribution across classes|✔|✔||
 |[BER](BER.md)|Determines feasibility by estimating the error rate|✔|||
-|[Clusterer](Clusterer.md)|Groups data to detect outliers and duplicates|✔|✔|✔|
+|[Clusterer](Clustering.md)|Groups data to detect outliers and duplicates|✔|✔|✔|
 |[Coverage](Coverage.md)|Measures how well the dataset covers the input space|✔|✔|✔|
 |[Divergence](Divergence.md)|Detects differences between dataset distributions|✔|✔||
 |[Diversity](Diversity.md)|Assesses the spread of metadata factors|✔|✔||
 |[Drift](Drift.md)|Detects data distribution shifts from training data|✔|✔||
-|[Duplicates](Duplicates.md)|Identifies duplicate data entries|✔|✔|✔|
+|[Duplicates](DataCleaning.md#duplicate-detection)|Identifies duplicate data entries|✔|✔|✔|
 |[Label Parity](LabelParity.md)|Detects differences between label distributions|✔|✔||
 |[Out-of-Distribution](OOD.md)|Detects data points that fall outside training distribution|✔|✔||
 |[Outliers](Outliers.md)|Identifies anomalous data points based on deviations from mean|✔|✔|✔|
@@ -33,12 +33,12 @@ A red checkmark means the algorithm accepts multiple data types.
 |:---|:---:|:---:|:---:|:---:|:---:|
 |[Balance](Balance.md)||✔||✔||
 |[BER](BER.md)|✔|✔||||
-|[Clusterer](Clusterer.md)|✔|||||
+|[Clusterer](Clustering.md)|✔|||||
 |[Coverage](Coverage.md)|✔|||||
 |[Divergence](Divergence.md)|✔|||||
 |[Diversity](Diversity.md)||✔||✔||
 |[Drift](Drift.md)|✔|||||
-|[Duplicates](Duplicates.md)|✔|||||
+|[Duplicates](DataCleaning.md#duplicate-detection)|✔|||||
 |[Label Parity](LabelParity.md)||✔||||
 |[Out-of-Distribution](OOD.md)|✔|||||
 |[Outliers](Outliers.md)|[✔]{.red-text}||[✔]{.red-text}|||

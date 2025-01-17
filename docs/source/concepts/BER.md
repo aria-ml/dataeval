@@ -1,12 +1,13 @@
-# {term}`Bayes Error Rate (BER)` Estimation
+# Bayes Error Rate
 
 ## What is it
 
-Bayes error rate refers to the {term}`irreducible error<Irreducible Error>`
-in a particular {term}`classification<Classification>` problem. The `ber`
-function assesses the {term}`feasibility<Feasibility>` of a machine learning
-classification task by estimating this error rate. Bayes error rate has a
-formal definition given by the following:
+{term}`Bayes Error Rate<Bayes Error Rate (BER)>` or BER refers to the
+{term}`irreducible error<Irreducible Error>` in a particular
+{term}`classification<Classification>` problem. The `ber` function assesses the
+{term}`feasibility<Feasibility>` of a machine learning classification task by
+estimating this error rate. Bayes error rate has a formal definition given by
+the following:
 
 $$\text{BER}= E_X[P(Y\neq y \mid \argmax_i P(Y=i \mid X=x)=y)]$$
 
@@ -37,7 +38,7 @@ example, take the following problematic images from the
 [MNIST](https://en.wikipedia.org/wiki/MNIST_database) dataset (taken from
 [here](https://www.kaggle.com/code/cdeotte/25-million-images-0-99757-mnist)):
 
-![problem](images/difficult.png)
+![problem](../reference/images/difficult.png)
 
 It is very difficult for even a human to classify these images, and the
 conditional distributions of labels for them are certainly non-deterministic.
@@ -49,7 +50,7 @@ One way of understanding how we try to estimate BER is to look at
 [UMAP](https://arxiv.org/abs/1802.03426) (a simple dimension reduction
 technique) to embed the MNIST images in 2-dimensional space.
 
-![embed](images/UMAP.png)
+![embed](../reference/images/UMAP.png)
 
 Here the colors represent the different labels (digits). While most are
 separated, a small fraction of them are in the wrong cluster or lie in the

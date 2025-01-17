@@ -37,7 +37,7 @@ AUROC
     - 1: A perfect model that can correctly distinguish between all positive and negative class points
 
 Artificial Intelligence (AI)
-    Artificial Intelligence, or AI, is technology that enables computers and machines to simulate human intelligence and problem-solving capabilities. It is modeled after the decision-making processes of the human brain that can ‘learn’ from available data and make increasingly more accurate classifications or predictions over time. For the applications in {term}`DataEval`, Neural Networks are the main modeling method.
+    Artificial Intelligence, or AI, is technology that enables computers and machines to simulate human intelligence and problem-solving capabilities. It is modeled after the decision-making processes of the human brain that can ‘learn’ from available data and make increasingly more accurate classifications or predictions over time. For the applications in DataEval, Neural Networks are the main modeling method.
 
     See {term}`Neural Network`
 
@@ -132,9 +132,6 @@ Cramér-von Mises (CVM) Drift Detection
 ## D
 
 ```{glossary}
-DataEval
-    Name of the ARiA application for Test and Evaluation (T&E) of {term}`machine learning<Machine Learning (ML)>` and {term}`artificial intelligence<Artificial Intelligence (AI)>` applications.
-
 Dataset Splits
     Dataset splits, also known as data splitting, is the process of dividing a data set into multiple subsets to help train, test and evaluate {term}`machine learning<Machine Learning (ML)>` models.
 
@@ -163,7 +160,7 @@ Drift
     In predictive analytics, data science, {term}`machine learning<Machine Learning (ML)>` and related fields, the phenomenon where the statistical properties of the data change over time. It occurs when the underlying distribution of the input features or the target variable (what the model is trying to predict) shifts, leading to a discrepancy between the training data and the real-world data the model encounters during deployment.
 
 Duplicates
-    Statistical duplicates, or duplicate data, are repeated records or observations in a dataset. They can be caused by human error, technical errors, and/or data manipulation. In the case of {term}`DataEval` for the image classification and/or detection tasks, exact matches are found using a byte hash of the image information, while near matches use a {term}`perception-based hash<Perception-Based Hash>`
+    Statistical duplicates, or duplicate data, are repeated records or observations in a dataset. They can be caused by human error, technical errors, and/or data manipulation. In the case of DataEval for the image classification and/or detection tasks, exact matches are found using a byte hash of the image information, while near matches use a {term}`perception-based hash<Perception-Based Hash>`
 ```
 
 ## E
@@ -233,7 +230,7 @@ Generative Model
 
 ```{glossary}
 Hamming Distance
-    The Hamming Distance between two strings of equal length is the number of positions at which these strings vary. In more technical terms, it is a measure of the minimum number of changes required to turn one string into the other. In {term}`DataEval`, images are turned (hashed) into strings in order to compute their Hamming Distance.
+    The Hamming Distance between two strings of equal length is the number of positions at which these strings vary. In more technical terms, it is a measure of the minimum number of changes required to turn one string into the other. In DataEval, images are turned (hashed) into strings in order to compute their Hamming Distance.
 
 Hilbert Space
     A  Hilbert Space is an inner product space that is a complete space where distance between instances can be measured with respect to the norm or distance function induced by the inner product. The Hilbert Space generalizes the Euclidean space to a finite or infinite dimensional space. Usually, the Hilbert Space is high dimensional. By convention in {term}`machine learning<Machine Learning (ML)>`, unless otherwise stated, Hilbert space is also referred to as the *feature space*.
@@ -285,7 +282,7 @@ Latent Space
     Also known as a Latent Feature Space or Encoded Space, is an embedding of a set of items within a {term}`manifold<Manifold>` in which items resembling each other under some encoding are positioned close to one another. Positions are defined by a set of *latent* variables that emerge from the properties of the objects. For example, placing images within a Gaussian Distribution based upon their color properties defines the parameters of the Gaussian and reduces the number of parameters for the images.
 
 Linter
-    The data linter identifies potential issues (lints) in the ML training data. The term "linter" stems from the origins of a tool known as "lint," which was initially developed by Stephen C. Johnson in 1978 at Bell Labs. For {term}`DataEval` and imagery, it identifies issues such as image quality (overly bright/dark, overly blurry, lacking information), unusual image properties (shape,size, **channels*), as well as duplicates and outliers.
+    The data linter identifies potential issues (lints) in the ML training data. The term "linter" stems from the origins of a tool known as "lint," which was initially developed by Stephen C. Johnson in 1978 at Bell Labs. For DataEval and imagery, it identifies issues such as image quality (overly bright/dark, overly blurry, lacking information), unusual image properties (shape,size, **channels*), as well as duplicates and outliers.
 ```
 
 ## M
@@ -351,7 +348,7 @@ Operational Drift
     Operational drift is specific type of {term}`drift<Drift>` defined as data drift during data model operations. It occurs when the data used in operation is not like data used during training of a {term}`machine learning<Machine Learning (ML)>` model. It can make the model less accurate in its predictions/classifications.
 
 Outlier Detection
-    Outlier Detection is process of detecting data/images that significantly deviate from the rest of the data/images. {term}`DataEval` uses the measure of two standard deviations of the  average of the relevant distance measure to identify outliers.
+    Outlier Detection is process of detecting data/images that significantly deviate from the rest of the data/images. DataEval uses the measure of two standard deviations of the  average of the relevant distance measure to identify outliers.
 
 Outliers (Images)
     Images which differ significantly from all or most of the other images in a dataset.
@@ -454,7 +451,7 @@ Statistics
     Statistics is a branch of applied mathematics that involves the collection, description, analysis, and inference of conclusions from quantitative data.
 
 Sufficiency
-    Sufficiency, in the context of data analysis and the {term}`DataEval` tool, is the notion that the model and/or dataset are capable of satisfying the operational requirements. See {term}`Bayes Error Rate (BER)` and {term}`Upper-bound Average Precision (UAP)`.
+    Sufficiency, in the context of data analysis and the DataEval tool, is the notion that the model and/or dataset are capable of satisfying the operational requirements. See {term}`Bayes Error Rate (BER)` and {term}`Upper-bound Average Precision (UAP)`.
 
 Supervised Learning
     Supervised Learning is a category of {term}`machine learning<Machine Learning (ML)>` that uses labeled datasets to train algorithms to predict outcomes and recognize patterns. Unlike {term}`unsupervised learning<Unsupervised Learning>`, supervised learning algorithms are given labeled training data to learn the relationship between the inputs and the outputs.

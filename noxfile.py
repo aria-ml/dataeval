@@ -112,7 +112,7 @@ def docs(session: nox.Session) -> None:
     check_version(session.name)
     session.install(*INSTALL_ARGS, env=INSTALL_ENVS)
     session.chdir("docs/source")
-    session.run("rm", "-rf", "./reference", external=True)
+    session.run("rm", "-rf", "./reference/autoapi", external=True)
     session.run("rm", "-rf", "../../output/docs", external=True)
     if "clean" in session.posargs:
         session.run("rm", "-rf", ".jupyter_cache", external=True)
