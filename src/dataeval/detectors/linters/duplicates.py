@@ -92,7 +92,7 @@ class Duplicates:
 
         Parameters
         ----------
-        data : HashStatsOutput | Sequence[HashStatsOutput]
+        hashes : HashStatsOutput | Sequence[HashStatsOutput]
             The output(s) from a hashstats analysis
 
         Returns

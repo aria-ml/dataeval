@@ -1,12 +1,10 @@
-# Image Statistics Functions
+# Statistical Analysis
 
 The image statistics functions assist with understanding the dataset.
 It can be used to get a big picture view of the dataset and it's underlying
 distribution.
 
 ## dimensionstats
-
-### What is the dimensionstats function
 
 The dimensionstats function is an aggregate metric that calculates various
 dimension based statistics for each individual image:
@@ -23,8 +21,6 @@ if there are any issues with any of the images in the dataset.
 
 ## hashstats
 
-### What is the hashstats function
-
 The hashstats function is an aggregate metric that calculates various hash
 values for each individual image:
 
@@ -37,8 +33,6 @@ This function can be used in conjunction with the
 
 ## labelstats
 
-### What is the labelstats function
-
 The labelstats function provides summary statistics across classes and labels:
 
 - label_counts_per_class
@@ -50,8 +44,6 @@ The labelstats function provides summary statistics across classes and labels:
 - class_count
 
 ## pixelstats
-
-### What is the pixelstats function
 
 The pixelstats function is an aggregate metric that calculates normal
 statistics about pixel values for each individual image:
@@ -69,8 +61,6 @@ This function can be used in conjunction with the Outliers class to determine
 if there are any issues with any of the images in the dataset.
 
 ## visualstats
-
-### What is the visualstats function
 
 The visualstats function is an aggregate metric that calculates visual quality
 statistics for each individual image:

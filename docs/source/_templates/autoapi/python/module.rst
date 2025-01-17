@@ -24,7 +24,7 @@ Submodules
 
 .. autoapisummary::
 
-            {{ macros.auto_summary(visible_submodules, title="") }}
+            {{ macros.auto_summary(visible_submodules) }}
 
 .. toctree::
    :maxdepth: 1
