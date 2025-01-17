@@ -1,4 +1,4 @@
-# Detecting {term}`drift<Drift>` in Datasets
+# Drift
 
 ## What is {term}`drift<Drift>`?
 
@@ -205,7 +205,7 @@ This method is especially useful when the reference set is distinct from the
 training set, as it helps detect shifts in regions where the model's
 predictions are less confident.
 
-## Detecting {term}`drift<Drift>` with {term}`DataEval`
+## Detecting {term}`drift<Drift>`
 
 DataEval is a comprehensive data analysis and monitoring library that provides
 several classes specifically designed for drift detection. These classes

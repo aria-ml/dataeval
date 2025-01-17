@@ -12,9 +12,9 @@ whether a dataset is sampled uniformly with respect to metadata and contextual
 variables.
 
 Diversity indices are normalized measures of uniformity taking values on the
-interval [0, 1]. {term}`DataEval` offers two diversity indices&mdash;the
-inverse Simpson diversity index and the normalized Shannon entropy. Values near
-1 indicate uniform sampling, while values near 0 indicate imbalanced sampling,
+interval [0, 1]. DataEval offers two diversity indices&mdash;the inverse
+Simpson diversity index and the normalized Shannon entropy. Values near 1
+indicate uniform sampling, while values near 0 indicate imbalanced sampling,
 e.g. all values taking a single value.
 
 Classwise diversity indices measure uniformity of metadata factors among
@@ -60,8 +60,8 @@ where $p_i$ are discrete probabilities for bin $i$ where $p_i \neq 0$. When the
 data take $N$ unique values and are uniformly sampled, $p_i = 1/N$ for $ i =
 1\ldots N$, which makes $d = 1 / \left( \sum_i^N 1/N\right) = 1$. The minimum
 value of the Simpson diversity index is $d = 1/N$ when $p_i = 1, p_j = 0 \,
-\forall j \neq i$. The metric reported by {term}`DataEval`, $d'$, is rescaled
-linearly to the interval $[0, 1]$ using
+\forall j \neq i$. The metric reported by DataEval, $d'$, is rescaled linearly
+to the interval $[0, 1]$ using
 
 $$
 d' = \frac{d - (1/N)}{1 - (1/N)} = \frac{d N - 1}{ N - 1}.
@@ -108,9 +108,9 @@ The Shannon entropy approaches 0 as the PDF approaches a single bin, i.e. $1
 \log(1)= 0$. Variables have a single value with probability 1 indicating no
 uncertainty. Normalizing the entropy by its maximum value of $\log N$
 could lead to ambiguity in this case due to an indeterminate form; however, in
-{term}`DataEval` the ambiguity is resolved by assigning the limit of the
-unnormalized entropy&mdash;i.e. not reversing the interpretation of the
-single-bin entropy through a normalization artifact.
+DataEval the ambiguity is resolved by assigning the limit of the unnormalized
+entropy&mdash;i.e. not reversing the interpretation of the single-bin entropy
+through a normalization artifact.
 
 When distributions collapse to a single bin, data take a single value with
 probability 1. There is no uncertainty (entropy) and no diversity, which is
