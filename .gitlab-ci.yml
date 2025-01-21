@@ -335,6 +335,15 @@ update cache:
   rules:
     - *on_run_with_docs
 
+validate release tag:
+  stage: release
+  needs: []
+  script:
+    - .gitlab/scripts/validate_release_label.py
+  rules:
+    - *exclude_main
+    - *on_run
+
 # This job will only run if all previous stages have succeeded,
 # and it creates a tag that signifies that all testing has passed.
 tag release candidate:
