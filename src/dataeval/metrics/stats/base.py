@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataeval.utils.plot import histogram_plot
+
 __all__ = []
 
 import re
@@ -111,6 +113,20 @@ class BaseStatsOutput(Output):
 
     def __len__(self) -> int:
         return len(self.source_index)
+
+
+def _is_plottable(k: str, v: Any, excluded_keys: Iterable[str]) -> bool:
+    return isinstance(v, np.ndarray) and v[v != 0].size > 0 and all(k != x for x in excluded_keys)
+
+
+class HistogramPlotMixin:
+    _excluded_keys: Iterable[str] = []
+
+    def dict(self) -> dict[str, Any]: ...
+
+    def plot(self, log: bool) -> None:
+        data_dict = {k: v for k, v in self.dict().items() if _is_plottable(k, v, self._excluded_keys)}
+        histogram_plot(data_dict, log)
 
 
 TStatsOutput = TypeVar("TStatsOutput", bound=BaseStatsOutput, covariant=True)

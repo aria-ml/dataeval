@@ -1,4 +1,4 @@
-# Outliers Class
+# Outliers
 
 ## What is it
 
@@ -6,6 +6,10 @@ The Outliers class is a data cleaning class used to identify images that are
 reducing the quality or integrity of the dataset. It identifies the images by
 calculating the statistical outliers of a dataset using various statistical
 tests applied to each metric from the [imagestats](Stats.md) function.
+
+Because the statistical tests rely on a data distribution, the results are
+based on the data evaluated. This means that changing the data either through
+adding to it or removing some of it, will result in different results.
 
 ## When to use it
 
@@ -20,8 +24,8 @@ clean a dataset.
 
 ## Theory behind it
 
-The Outliers class heavily relies upon the imagestats function to create a data
-distribution for specific metrics. Outliers then analyzes the distribution
+The Outliers class relies upon the [stat functions](Stats.md) to create a data
+distribution for specific metrics. The class then analyzes the distribution
 through a statistical test.
 
 There are 3 different statistical tests that the Outliers class can use for
@@ -66,18 +70,24 @@ $$
 where distance is the greater of $25th\ quartile - value$ or
 $value - 75th\ quartile$
 
+## Class Options
+
 The {func}`.Outliers` API will give more information on how to use the
 functionality. The user has the option to specify:
 
-- the metrics that the imagestats function should create a distribution for by
-  selecting which flags the Outliers consumes
 - the statistical method used by the class
 - the threshold the Outliers should compare with for identifying outliers
+
+For more information on the algorithms/methods used to create the data
+distribution, see the [Stats](Stats.md) concept page.
+
+## Class Output
 
 The Outliers class outputs a results dictionary with the keys being the images
 which were extreme in at least one metric as measured by the chosen statistical
 test. The value for each image in the results dictionary is a dictionary with
 the metric and the image's value in the given metric as the key-value pair.
 
-For more information on the metrics used, see the list in the
-[Data Cleaning](DataCleaning.md#data-cleaning-metrics) page.
+The Outliers class does not identify the reason that the image is flagged.
+The functionality of mapping issues to specific aspects of the image is outside
+the scope of the Outliers class.
