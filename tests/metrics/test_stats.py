@@ -13,11 +13,18 @@ from dataeval.metrics.stats.base import (
     SOURCE_INDEX,
     BaseStatsOutput,
     StatsProcessor,
+    _is_plottable,
     normalize_box_shape,
     process_stats_unpack,
 )
 from dataeval.metrics.stats.boxratiostats import boxratiostats, calculate_ratios
-from dataeval.metrics.stats.datasetstats import ChannelStatsOutput, DatasetStatsOutput, channelstats, datasetstats
+from dataeval.metrics.stats.datasetstats import (
+    ChannelStatsOutput,
+    DatasetStatsOutput,
+    _get_channels,
+    channelstats,
+    datasetstats,
+)
 
 # do not run stats tests using multiple processing
 stats_base.DEFAULT_PROCESSES = 1
@@ -160,29 +167,6 @@ class TestStats:
         assert all(si.box is None for si in stats.source_index)
         assert all(si.channel is not None for si in stats.source_index)
 
-    def test_labelstats_str_keys(self):
-        label_array = np.random.choice(["horse", "cow", "sheep", "pig", "chicken"], 50)
-        labels = []
-        for i in range(10):
-            num_labels = np.random.choice(5) + 1
-            selected_labels = list(label_array[5 * i : 5 * i + num_labels])
-            labels.append(selected_labels)
-
-        stats = labelstats(labels)
-        assert stats is not None
-
-    def test_labelstats_int_keys(self):
-        labels = [[0, 0, 0, 0, 0], [0, 1], [0, 1, 2], [0, 1, 2, 3]]
-        stats = labelstats(labels)
-
-        assert stats.label_counts_per_class == {0: 8, 1: 3, 2: 2, 3: 1}
-        assert stats.image_indices_per_label == {0: [0, 1, 2, 3], 1: [1, 2, 3], 2: [2, 3], 3: [3]}
-        assert stats.image_counts_per_label == {0: 4, 1: 3, 2: 2, 3: 1}
-        assert stats.label_counts_per_image == [5, 2, 3, 4]
-        assert stats.image_count == 4
-        assert stats.class_count == 4
-        assert stats.label_count == 14
-
     def test_datasetstats(self):
         ds_stats = datasetstats(DATA_3)
         assert ds_stats is not None
@@ -199,6 +183,77 @@ class TestStats:
     def test_calculate_ratios_invalid_key(self):
         with pytest.raises(KeyError):
             calculate_ratios("not_here", MockStatsOutput(10), MockStatsOutput(10))
+
+
+class TestLabelStats:
+    @pytest.mark.parametrize("two_d, not_list", [[True, True], [True, False], [False, True], [False, False]])
+    def test_labelstats_str_keys(self, two_d, not_list):
+        label_array = np.random.choice(["horse", "cow", "sheep", "pig", "chicken"], 50)
+        if two_d and not_list:
+            labels = label_array.reshape((10, 5))
+            classes, label_counts = np.unique(label_array, return_counts=True)
+        elif two_d:
+            labels = []
+            for i in range(10):
+                num_labels = np.random.choice(5) + 1
+                selected_labels = list(label_array[5 * i : 5 * i + num_labels])
+                labels.append(selected_labels)
+            classes, label_counts = np.unique(np.concatenate(labels), return_counts=True)
+        else:
+            labels = label_array if not_list else list(label_array)
+            classes, label_counts = np.unique(label_array, return_counts=True)
+
+        stats = labelstats(labels)
+        assert stats is not None
+        assert stats.image_count == len(labels)
+        assert stats.class_count == len(classes)
+        assert stats.label_counts_per_class == dict(zip(classes, label_counts))
+
+    @pytest.mark.parametrize("two_d", [True, False])
+    def test_labelstats_int_keys(self, two_d):
+        label_array = [[0, 0, 0, 0, 0], [0, 1], [0, 1, 2], [0, 1, 2, 3]]
+        labels = label_array if two_d else np.concatenate(label_array)
+        stats = labelstats(labels)
+
+        assert stats.label_counts_per_class == {0: 8, 1: 3, 2: 2, 3: 1}
+        assert stats.class_count == 4
+        assert stats.label_count == 14
+        if two_d:
+            assert stats.image_indices_per_label == {0: [0, 1, 2, 3], 1: [1, 2, 3], 2: [2, 3], 3: [3]}
+            assert stats.image_counts_per_label == {0: 4, 1: 3, 2: 2, 3: 1}
+            assert stats.label_counts_per_image == [5, 2, 3, 4]
+            assert stats.image_count == 4
+        else:
+            assert stats.image_indices_per_label == {0: [0, 1, 2, 3, 4, 5, 7, 10], 1: [6, 8, 11], 2: [9, 12], 3: [13]}
+            assert stats.image_counts_per_label == {0: 8, 1: 3, 2: 2, 3: 1}
+            assert stats.label_counts_per_image == [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+            assert stats.image_count == 14
+
+    @pytest.mark.parametrize(
+        "labels, err, err_msg",
+        [
+            [np.random.randint(5, size=(3, 3, 3)), ValueError, "The label array must not have more than 2 dimensions."],
+            [
+                [[[["horse"], ["pig"]], [["dog"]], [["cat"], ["pig"]]]],
+                ValueError,
+                "The label list must not be empty or have more than 2 levels of nesting.",
+            ],
+            [
+                [0, [1, 2], [[3], [4, 5]]],
+                ValueError,
+                "The label list must not be empty or have more than 2 levels of nesting.",
+            ],
+            [
+                (np.random.choice([0, 1, 2, 3, 4], size=3) for _ in range(10)),
+                TypeError,
+                "Labels must be either a NumPy array or a list.",
+            ],
+        ],
+    )
+    def test_label_errors(self, labels, err, err_msg):
+        with pytest.raises(err) as e:
+            labelstats(labels)
+        assert err_msg in str(e.value)
 
 
 @pytest.mark.parametrize("as_float", [True, False])
@@ -372,3 +427,75 @@ class TestNormalizeBoxShape:
     def test_ndim_gt_2_raises(self):
         with pytest.raises(ValueError):
             normalize_box_shape(np.array([[[0]]]))
+
+
+class TestStatsPlotting:
+    @pytest.mark.parametrize(
+        "stats, data, log, channel",
+        [
+            [dimensionstats, DATA_3, False, None],
+            [pixelstats, DATA_3, True, None],
+            [datasetstats, DATA_3, True, None],
+            [visualstats, DATA_1, False, None],
+            [channelstats, DATA_3, False, None],
+            [channelstats, DATA_3, False, 2],
+            [channelstats, DATA_3, False, [0, 2]],
+        ],
+    )
+    def test_stats_plot(self, stats, data, log, channel):
+        results = stats(data)
+        if channel is None:
+            results.plot(log=log)
+        elif isinstance(channel, int):
+            results.plot(log=log, channel_limit=channel)
+        else:
+            results.plot(log=log, channel_index=channel)
+
+    def test_labelstats_to_table(self):
+        label_array = np.concatenate(
+            [
+                np.random.choice(["horse", "cow", "sheep", "pig", "chicken"], 45),
+                np.random.permutation(["horse", "cow", "sheep", "pig", "chicken"]),
+            ]
+        )
+        print(label_array)
+        stats = labelstats(label_array)
+        assert stats is not None
+        table_result = stats.to_table()
+        assert isinstance(table_result, str)
+
+    def test_is_plottable(self):
+        answer_dict = {"x": np.array([0, 1, 2])}
+        test_dict = {"x": np.array([0, 1, 2]), "w": [5, 4], "percentile": np.array([0, 1, 2])}
+
+        data_dict = {k: v for k, v in test_dict.items() if _is_plottable(k, v, ["percentile"])}
+
+        assert len(data_dict) == len(answer_dict)
+        for result, expected in zip(data_dict, answer_dict):
+            assert (data_dict[result] == answer_dict[expected]).all()
+
+    @pytest.mark.parametrize(
+        "value, param, expected",
+        [
+            [2.0, "limit", [3, None]],
+            [[0, 1], "limit", [3, None]],
+            ["first", "limit", [3, None]],
+            [60, "limit", [3, None]],
+            [2, "limit", [2, None]],
+            [1.0, "index", [3, None]],
+            [[1, 2], "index", [2, [False, True, True] * 10]],
+            [[2.1, 3.0], "index", [3, None]],
+            [0, "index", [1, [True, False, False] * 10]],
+            [50, "index", [3, None]],
+            ["second", "index", [3, None]],
+        ],
+    )
+    def test_channelstats_plot_params(self, value, param, expected):
+        results = channelstats(DATA_3)
+        if param == "limit":
+            max_chan, ch_mask = _get_channels(results, channel_limit=value)
+        else:
+            max_chan, ch_mask = _get_channels(results, channel_index=value)
+
+        assert max_chan == expected[0]
+        assert ch_mask == expected[1]

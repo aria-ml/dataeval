@@ -7,7 +7,7 @@ from typing import Any, Iterable
 
 from numpy.typing import ArrayLike
 
-from dataeval.metrics.stats.base import BaseStatsOutput, run_stats
+from dataeval.metrics.stats.base import BaseStatsOutput, HistogramPlotMixin, _is_plottable, run_stats
 from dataeval.metrics.stats.dimensionstats import (
     DimensionStatsOutput,
     DimensionStatsProcessor,
@@ -16,10 +16,11 @@ from dataeval.metrics.stats.labelstats import LabelStatsOutput, labelstats
 from dataeval.metrics.stats.pixelstats import PixelStatsOutput, PixelStatsProcessor
 from dataeval.metrics.stats.visualstats import VisualStatsOutput, VisualStatsProcessor
 from dataeval.output import Output, set_metadata
+from dataeval.utils.plot import channel_histogram_plot
 
 
 @dataclass(frozen=True)
-class DatasetStatsOutput(Output):
+class DatasetStatsOutput(Output, HistogramPlotMixin):
     """
     Output class for :func:`datasetstats` stats metric.
 
@@ -41,6 +42,8 @@ class DatasetStatsOutput(Output):
     visualstats: VisualStatsOutput
     labelstats: LabelStatsOutput | None = None
 
+    _excluded_keys = ["histogram", "percentiles"]
+
     def _outputs(self) -> list[Output]:
         return [s for s in (self.dimensionstats, self.pixelstats, self.visualstats, self.labelstats) if s is not None]
 
@@ -51,6 +54,29 @@ class DatasetStatsOutput(Output):
         lengths = [len(s) for s in self._outputs() if isinstance(s, BaseStatsOutput)]
         if not all(length == lengths[0] for length in lengths):
             raise ValueError("All StatsOutput classes must contain the same number of image sources.")
+
+
+def _get_channels(cls, channel_limit: int | None = None, channel_index: int | Iterable[int] | None = None):
+    raw_channels = max([si.channel for si in cls.dict()["source_index"]]) + 1
+    if isinstance(channel_index, int):
+        max_channels = 1 if channel_index < raw_channels else raw_channels
+        ch_mask = cls.pixelstats.get_channel_mask(channel_index)
+    elif isinstance(channel_index, Iterable) and all(isinstance(val, int) for val in list(channel_index)):
+        max_channels = len(list(channel_index))
+        ch_mask = cls.pixelstats.get_channel_mask(channel_index)
+    elif isinstance(channel_limit, int):
+        max_channels = channel_limit
+        ch_mask = cls.pixelstats.get_channel_mask(None, channel_limit)
+    else:
+        max_channels = raw_channels
+        ch_mask = None
+
+    if max_channels > raw_channels:
+        max_channels = raw_channels
+    if ch_mask is not None and not any(ch_mask):
+        ch_mask = None
+
+    return max_channels, ch_mask
 
 
 @dataclass(frozen=True)
@@ -82,6 +108,13 @@ class ChannelStatsOutput(Output):
         lengths = [len(s) for s in self._outputs()]
         if not all(length == lengths[0] for length in lengths):
             raise ValueError("All StatsOutput classes must contain the same number of image sources.")
+
+    def plot(
+        self, log: bool, channel_limit: int | None = None, channel_index: int | Iterable[int] | None = None
+    ) -> None:
+        max_channels, ch_mask = _get_channels(self, channel_limit, channel_index)
+        data_dict = {k: v for k, v in self.dict().items() if _is_plottable(k, v, ("histogram", "percentiles"))}
+        channel_histogram_plot(data_dict, log, max_channels, ch_mask)
 
 
 @set_metadata

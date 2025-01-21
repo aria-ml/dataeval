@@ -3,6 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 import contextlib
+from typing import Any
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -129,3 +130,120 @@ def format_text(*args: str) -> str:
     """
     x = args[0]
     return f"{x:.2f}".replace("0.00", "0").replace("0.", ".").replace("nan", "")
+
+
+def histogram_plot(
+    data_dict: dict[str, Any],
+    log: bool = True,
+    xlabel: str = "values",
+    ylabel: str = "counts",
+) -> Figure:
+    """
+    Plots a formatted histogram
+
+    Parameters
+    ----------
+    data_dict : dict
+        Dictionary containing the metrics and their value arrays
+    log : bool, default True
+        If True, plots the histogram on a semi-log scale (y axis)
+    xlabel : str, default "values"
+        X-axis label
+    ylabel : str, default "counts"
+        Y-axis label
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        Formatted plot of histograms
+    """
+    import matplotlib.pyplot as plt
+
+    num_metrics = len(data_dict)
+    if num_metrics > 2:
+        rows = int(len(data_dict) / 3)
+        fig, axs = plt.subplots(rows, 3, figsize=(10, rows * 2.5))
+    else:
+        fig, axs = plt.subplots(1, num_metrics, figsize=(4 * num_metrics, 4))
+
+    for ax, metric in zip(
+        axs.flat,
+        data_dict,
+    ):
+        # Plot the histogram for the chosen metric
+        ax.hist(data_dict[metric], bins=20, log=log)
+
+        # Add labels to the histogram
+        ax.set_title(metric)
+        ax.set_ylabel(ylabel)
+        ax.set_xlabel(xlabel)
+
+    fig.tight_layout()
+    return fig
+
+
+def channel_histogram_plot(
+    data_dict: dict[str, Any],
+    log: bool = True,
+    max_channels: int = 3,
+    ch_mask: list[bool] | None = None,
+    xlabel: str = "values",
+    ylabel: str = "counts",
+) -> Figure:
+    """
+    Plots a formatted heatmap
+
+    Parameters
+    ----------
+    data_dict : dict
+        Dictionary containing the metrics and their value arrays
+    log : bool, default True
+        If True, plots the histogram on a semi-log scale (y axis)
+    xlabel : str, default "values"
+        X-axis label
+    ylabel : str, default "counts"
+        Y-axis label
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        Formatted plot of histograms
+    """
+    import matplotlib.pyplot as plt
+
+    channelwise_metrics = ["mean", "std", "var", "skew", "zeros", "brightness", "contrast", "darkness", "entropy"]
+    data_keys = [key for key in data_dict if key in channelwise_metrics]
+    label_kwargs = {"label": [f"Channel {i}" for i in range(max_channels)]}
+
+    num_metrics = len(data_keys)
+    if num_metrics > 2:
+        rows = int(len(data_keys) / 3)
+        fig, axs = plt.subplots(rows, 3, figsize=(10, rows * 2.5))
+    else:
+        fig, axs = plt.subplots(1, num_metrics, figsize=(4 * num_metrics, 4))
+
+    for ax, metric in zip(
+        axs.flat,
+        data_keys,
+    ):
+        # Plot the histogram for the chosen metric
+        data = data_dict[metric][ch_mask].reshape(-1, max_channels)
+        ax.hist(
+            data,
+            bins=20,
+            density=True,
+            log=log,
+            **label_kwargs,
+        )
+        # Only plot the labels once for channels
+        if label_kwargs:
+            ax.legend()
+            label_kwargs = {}
+
+        # Add labels to the histogram
+        ax.set_title(metric)
+        ax.set_ylabel(ylabel)
+        ax.set_xlabel(xlabel)
+
+    fig.tight_layout()
+    return fig

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from dataeval.detectors.linters.outliers import Outliers, OutliersOutput, _get_outlier_mask
-from dataeval.metrics.stats import DatasetStatsOutput, dimensionstats, pixelstats, visualstats
+from dataeval.metrics.stats import DatasetStatsOutput, LabelStatsOutput, dimensionstats, pixelstats, visualstats
 
 
 class TestOutliers:
@@ -64,11 +64,45 @@ class TestOutliers:
 
 class TestOutliersOutput:
     outlier = {1: {"a": 1.0, "b": 1.0}, 3: {"a": 1.0, "b": 1.0}, 5: {"a": 1.0, "b": 1.0}}
+    outlier2 = {2: {"a": 2.0, "d": 2.0}, 6: {"a": 1.0, "d": 1.0}, 7: {"a": 0.5, "c": 0.5}}
 
     def test_dict_len(self):
         output = OutliersOutput(self.outlier)
         assert len(output) == 3
 
     def test_list_len(self):
-        output = OutliersOutput([self.outlier, self.outlier])
+        output = OutliersOutput([self.outlier, self.outlier2])
         assert len(output) == 6
+
+    def test_to_table(self):
+        output = OutliersOutput(self.outlier)
+        assert len(output) == 3
+        lstat = LabelStatsOutput(
+            {"horse": 3, "dog": 4, "mule": 3},
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            {"horse": 3, "dog": 4, "mule": 3},
+            {"horse": [0, 3, 7], "dog": [1, 4, 6, 9], "mule": [2, 5, 8]},
+            10,
+            3,
+            10,
+        )
+        table_result = output.to_table(lstat)
+        assert isinstance(table_result, str)
+        assert table_result[:35] == "  Class |    a    |    b    | Total"
+
+    def test_to_table_list(self):
+        output = OutliersOutput([self.outlier2, self.outlier])
+        assert len(output) == 6
+        lstat = LabelStatsOutput(
+            {"horse": 3, "dog": 4, "mule": 3},
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            {"horse": 3, "dog": 4, "mule": 3},
+            {"horse": [0, 3, 7], "dog": [1, 4, 6, 9], "mule": [2, 5, 8]},
+            10,
+            3,
+            10,
+        )
+        table_result = output.to_table(lstat)
+        assert isinstance(table_result, str)
+        print(table_result)
+        assert table_result[:45] == "  Class |    a    |    c    |    d    | Total"

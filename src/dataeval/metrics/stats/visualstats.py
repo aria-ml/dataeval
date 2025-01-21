@@ -8,7 +8,7 @@ from typing import Any, Callable, Iterable
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval.metrics.stats.base import BaseStatsOutput, StatsProcessor, run_stats
+from dataeval.metrics.stats.base import BaseStatsOutput, HistogramPlotMixin, StatsProcessor, run_stats
 from dataeval.output import set_metadata
 from dataeval.utils.image import edge_filter
 
@@ -16,7 +16,7 @@ QUARTILES = (0, 25, 50, 75, 100)
 
 
 @dataclass(frozen=True)
-class VisualStatsOutput(BaseStatsOutput):
+class VisualStatsOutput(BaseStatsOutput, HistogramPlotMixin):
     """
     Output class for :func:`visualstats` stats metric.
 
@@ -45,6 +45,8 @@ class VisualStatsOutput(BaseStatsOutput):
     sharpness: NDArray[np.float16]
     zeros: NDArray[np.float16]
     percentiles: NDArray[np.float16]
+
+    _excluded_keys = ["percentiles"]
 
 
 class VisualStatsProcessor(StatsProcessor[VisualStatsOutput]):
