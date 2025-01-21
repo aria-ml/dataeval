@@ -26,4 +26,8 @@ The Clusterer can be used during the EDA process to perform the following:
 - identify outliers in your dataset
 - identify duplicates in your dataset
 
-## Theory behind it
+## Class Output
+
+The Clusterer class does not identify the reason that the image is an
+outlier. The functionality of mapping issues to specific aspects of the
+image is outside the scope of the Clusterer class.

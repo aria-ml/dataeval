@@ -8,13 +8,13 @@ from typing import Any, Callable, Iterable
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval.metrics.stats.base import BaseStatsOutput, StatsProcessor, run_stats
+from dataeval.metrics.stats.base import BaseStatsOutput, HistogramPlotMixin, StatsProcessor, run_stats
 from dataeval.output import set_metadata
 from dataeval.utils.image import get_bitdepth
 
 
 @dataclass(frozen=True)
-class DimensionStatsOutput(BaseStatsOutput):
+class DimensionStatsOutput(BaseStatsOutput, HistogramPlotMixin):
     """
     Output class for :func:`dimensionstats` stats metric.
 

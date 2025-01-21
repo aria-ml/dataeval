@@ -9,12 +9,12 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy.stats import entropy, kurtosis, skew
 
-from dataeval.metrics.stats.base import BaseStatsOutput, StatsProcessor, run_stats
+from dataeval.metrics.stats.base import BaseStatsOutput, HistogramPlotMixin, StatsProcessor, run_stats
 from dataeval.output import set_metadata
 
 
 @dataclass(frozen=True)
-class PixelStatsOutput(BaseStatsOutput):
+class PixelStatsOutput(BaseStatsOutput, HistogramPlotMixin):
     """
     Output class for :func:`pixelstats` stats metric.
 
@@ -44,11 +44,13 @@ class PixelStatsOutput(BaseStatsOutput):
     histogram: NDArray[np.uint32]
     entropy: NDArray[np.float16]
 
+    _excluded_keys = ["histogram"]
+
 
 class PixelStatsProcessor(StatsProcessor[PixelStatsOutput]):
     output_class: type = PixelStatsOutput
     image_function_map: dict[str, Callable[[StatsProcessor[PixelStatsOutput]], Any]] = {
-        "mean": lambda self: np.mean(self.scaled),
+        "mean": lambda x: np.mean(x.scaled),
         "std": lambda x: np.std(x.scaled),
         "var": lambda x: np.var(x.scaled),
         "skew": lambda x: np.nan_to_num(skew(x.scaled.ravel())),
