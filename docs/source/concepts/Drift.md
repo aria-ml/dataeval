@@ -1,8 +1,8 @@
 # Drift
 
-## What is {term}`drift<Drift>`?
+## What is drift?
 
-Drift refers to the phenomenon where the statistical properties of data change
+{term}`Drift` refers to the phenomenon where the statistical properties of data change
 over time, leading to discrepancies between the data a model was trained on and
 the data it encounters during deployment. This can significantly degrading the
 performance of {term}`machine learning<Machine Learning (ML)>` models, as the
@@ -121,7 +121,7 @@ environments.
 ## When to monitor for drift
 
 Once a model has been approved for operation/deployment, monitoring for
-{term}`drift<Drift>` should begin. Regardless of whether the model has been
+drift should begin. Regardless of whether the model has been
 deployed in a contiunous or discrete manner, all new data that the model
 digests should be analyzed for drift.
 
@@ -130,7 +130,7 @@ digests should be analyzed for drift.
 ### _Cramér-von Mises_
 
 The {term}`Cramér-von Mises<Cramér-von Mises (CVM) Drift Detection>` test is a
-non-parametric method used for detecting {term}`Drift` by comparing two
+non-parametric method used for detecting drift by comparing two
 empirical distributions. For two distributions $F(z)$ and $F_{ref}(z)$, the CVM
 test statistic is calculated as:
 
@@ -205,7 +205,7 @@ This method is especially useful when the reference set is distinct from the
 training set, as it helps detect shifts in regions where the model's
 predictions are less confident.
 
-## Detecting {term}`drift<Drift>`
+## Detecting drift
 
 DataEval is a comprehensive data analysis and monitoring library that provides
 several classes specifically designed for drift detection. These classes
@@ -217,16 +217,15 @@ DataEval's drift detection classes are:
 - **{func}`.DriftCVM`**: Implements the Cramér-von Mises (CVM) test for
   feature-wise drift detection.
 - **{func}`.DriftKS`**: Implements the
-  {term}`Kolmogorov-Smirnov test<Kolmogorov-Smirnov (K-S) test>` for detecting
-  feature-wise distributional shifts.
+  Kolmogorov-Smirnov test for detecting feature-wise distributional shifts.
 - **{func}`.DriftMMD`**: Utilizes the Maximum Mean Discrepancy (MMD) test to
   detect drift in multivariate data using kernel methods.
 - **{func}`.DriftUncertainty`**: Detects drift by analyzing changes in the
   model's uncertainty across datasets.
 
-To see how these detectors work in practice, refer to our Monitoring Guide,
+To see how these detectors work in practice, refer to our
+[Monitoring Guide](../tutorials/Data_Monitoring.ipynb),
 where you can explore real-world examples of drift detection using DataEval.
-<!-- [Monitoring Guide](../tutorials/Monitoring.ipynb) -->
 
 ## References
 

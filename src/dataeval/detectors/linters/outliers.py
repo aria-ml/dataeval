@@ -2,6 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
+# import contextlib
 from dataclasses import dataclass
 from typing import Generic, Iterable, Literal, Sequence, TypeVar, Union, overload
 
@@ -12,13 +13,72 @@ from dataeval.detectors.linters.merged_stats import combine_stats, get_dataset_s
 from dataeval.metrics.stats.base import BOX_COUNT, SOURCE_INDEX
 from dataeval.metrics.stats.datasetstats import DatasetStatsOutput, datasetstats
 from dataeval.metrics.stats.dimensionstats import DimensionStatsOutput
+from dataeval.metrics.stats.labelstats import LabelStatsOutput
 from dataeval.metrics.stats.pixelstats import PixelStatsOutput
 from dataeval.metrics.stats.visualstats import VisualStatsOutput
 from dataeval.output import Output, set_metadata
 
+# with contextlib.suppress(ImportError):
+#     import pandas as pd
+
+
 IndexIssueMap = dict[int, dict[str, float]]
 OutlierStatsOutput = Union[DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput]
 TIndexIssueMap = TypeVar("TIndexIssueMap", IndexIssueMap, list[IndexIssueMap])
+
+
+def _reorganize_by_class_and_metric(result, lstats):
+    """Flip result from grouping by image to grouping by class and metric"""
+    metrics = {}
+    class_wise = {label: {} for label in lstats.image_indices_per_label}
+
+    # Group metrics and calculate class-wise counts
+    for img, group in result.items():
+        for extreme in group:
+            metrics.setdefault(extreme, []).append(img)
+            for label, images in lstats.image_indices_per_label.items():
+                if img in images:
+                    class_wise[label][extreme] = class_wise[label].get(extreme, 0) + 1
+
+    return metrics, class_wise
+
+
+def _create_table(metrics, class_wise):
+    """Create table for displaying the results"""
+    max_class_length = max(len(str(label)) for label in class_wise) + 2
+    max_total = max(len(metrics[group]) for group in metrics) + 2
+
+    table_header = " | ".join(
+        [f"{'Class':>{max_class_length}}"]
+        + [f"{group:^{max(5, len(str(group))) + 2}}" for group in sorted(metrics.keys())]
+        + [f"{'Total':<{max_total}}"]
+    )
+    table_rows = []
+
+    for class_cat, results in class_wise.items():
+        table_value = [f"{class_cat:>{max_class_length}}"]
+        total = 0
+        for group in sorted(metrics.keys()):
+            count = results.get(group, 0)
+            table_value.append(f"{count:^{max(5, len(str(group))) + 2}}")
+            total += count
+        table_value.append(f"{total:^{max_total}}")
+        table_rows.append(" | ".join(table_value))
+
+    table = [table_header] + table_rows
+    return table
+
+
+# def _create_pandas_dataframe(class_wise):
+#     """Create data for pandas dataframe"""
+#     data = []
+#     for label, metrics_dict in class_wise.items():
+#         row = {"Class": label}
+#         total = sum(metrics_dict.values())
+#         row.update(metrics_dict)  # Add metric counts
+#         row["Total"] = total
+#         data.append(row)
+#     return data
 
 
 @dataclass(frozen=True)
@@ -44,6 +104,39 @@ class OutliersOutput(Generic[TIndexIssueMap], Output):
             return len(self.issues)
         else:
             return sum(len(d) for d in self.issues)
+
+    def to_table(self, labelstats: LabelStatsOutput) -> str:
+        if isinstance(self.issues, dict):
+            metrics, classwise = _reorganize_by_class_and_metric(self.issues, labelstats)
+            listed_table = _create_table(metrics, classwise)
+            table = "\n".join(listed_table)
+        else:
+            outertable = []
+            for d in self.issues:
+                metrics, classwise = _reorganize_by_class_and_metric(d, labelstats)
+                listed_table = _create_table(metrics, classwise)
+                str_table = "\n".join(listed_table)
+                outertable.append(str_table)
+            table = "\n\n".join(outertable)
+        return table
+
+    # def to_dataframe(self, labelstats: LabelStatsOutput) -> pd.DataFrame:
+    #     import pandas as pd
+
+    #     if isinstance(self.issues, dict):
+    #         _, classwise = _reorganize_by_class_and_metric(self.issues, labelstats)
+    #         data = _create_pandas_dataframe(classwise)
+    #         df = pd.DataFrame(data)
+    #     else:
+    #         df_list = []
+    #         for i, d in enumerate(self.issues):
+    #             _, classwise = _reorganize_by_class_and_metric(d, labelstats)
+    #             data = _create_pandas_dataframe(classwise)
+    #             single_df = pd.DataFrame(data)
+    #             single_df["Dataset"] = i
+    #             df_list.append(single_df)
+    #         df = pd.concat(df_list)
+    #     return df
 
 
 def _get_outlier_mask(

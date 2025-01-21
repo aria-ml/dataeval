@@ -36,3 +36,9 @@ say an image is uncovered, and recommend the user investigate it further.
 While the decision to label an individual image as uncovered is dependent on an
 (arbitrary) radius, it stands to reason that uncovered images will have more
 systemic meta-feature undersampling than covered images on average.
+
+## Class Output
+
+The coverage function does not identify the reason that the image is
+uncovered. The functionality of mapping coverage to specific aspects of the
+image is outside the scope of the coverage function.
