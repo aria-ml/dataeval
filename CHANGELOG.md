@@ -1,6 +1,27 @@
-[//]: # (ed98b6b1784b04ad3796983cf93932cb444f7076)
+[//]: # (4647edca409e9cb885ba7437ec60007e9d918fd4)
 
 # DataEval Change Log
+
+## v0.76.0
+
+🌟 **Feature Release**
+- `4647edca` - Expose flatten metadata function and update docstring
+
+🛠️ **Improvements and Enhancements**
+- `27d34a0c` - Incorporating NAWCAD feedback to improve the documentation for the stat functions, outliers class and coverage class
+
+📝 **Miscellaneous**
+- `c9998971` - Switch themes to sphinx-immaterial, enable graphviz and restructure documentation
+- `3dedde8f` - Adding templates for auto generation of docs
+- `8aaa89f3` - add deep dive prototype
+- `d9d902f3` - Allow for float type bounding boxes
+- `9bc0f910` - Add additional code coverage tests
+- `15f1ae84` - Add logging to output metadata decorator
+- `01cef92b` - Split conftest for tests and doctests
+- `adc8e293` - Publish MR docs and code coverage to deployment environments
+- `a3fc1f6c` - Moves document link to body to match other header titles
+- `69892fd3` - Visibility enhancements to BalanceOutput.plot() heatmap
+- `b6ab03a6` - Simplify docker build script for docs
 
 ## v0.75.0
 
