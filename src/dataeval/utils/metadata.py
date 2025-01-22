@@ -5,7 +5,7 @@ Metadata related utility functions that help organize raw metadata into \
 
 from __future__ import annotations
 
-__all__ = ["Metadata", "preprocess", "merge"]
+__all__ = ["Metadata", "preprocess", "merge", "flatten"]
 
 import warnings
 from dataclasses import dataclass
@@ -145,9 +145,7 @@ def _flatten_dict_inner(
     return items, size
 
 
-def _flatten_dict(
-    d: Mapping[str, Any], sep: str, ignore_lists: bool, fully_qualified: bool
-) -> tuple[dict[str, Any], int]:
+def flatten(d: Mapping[str, Any], sep: str, ignore_lists: bool, fully_qualified: bool) -> tuple[dict[str, Any], int]:
     """
     Flattens a dictionary and converts values to numeric values when possible.
 
@@ -160,12 +158,12 @@ def _flatten_dict(
     ignore_lists : bool
         Option to skip expanding lists within metadata
     fully_qualified : bool
-        Option to return dictionary keys full qualified instead of minimized
+        Option to return dictionary keys full qualified instead of reduced
 
     Returns
     -------
-    dict[str, Any]
-        A flattened dictionary
+    tuple[dict[str, Any], int]
+        A tuple of the flattened dictionary and the length of detected lists in metadata
     """
     expanded, size = _flatten_dict_inner(d, parent_keys=(), nested=ignore_lists)
 
@@ -259,9 +257,7 @@ def merge(
 
     image_repeats = np.zeros(len(dicts))
     for i, d in enumerate(dicts):
-        flattened, image_repeats[i] = _flatten_dict(
-            d, sep="_", ignore_lists=ignore_lists, fully_qualified=fully_qualified
-        )
+        flattened, image_repeats[i] = flatten(d, sep="_", ignore_lists=ignore_lists, fully_qualified=fully_qualified)
         isect = isect.intersection(flattened.keys()) if isect else set(flattened.keys())
         union = union.union(flattened.keys())
         for k, v in flattened.items():
