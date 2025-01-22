@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,137,55
+/aria-ml/dataeval/blob/main/.gitlab/scripts/gitlab.py,28,4
+/aria-ml/dataeval/blob/main/.gitlab/scripts/releasegen.py,26,3
+/aria-ml/dataeval/actions,22,5
+/aria-ml/dataeval/tree/main/.gitlab/scripts,21,3
+/aria-ml/dataeval/tree/main/.gitlab,20,4
+/aria-ml/dataeval/network/dependencies,18,3
+/aria-ml/dataeval/blob/main/.gitlab/scripts/create_release.py,18,2
+/aria-ml/dataeval/blob/867e7efe5fadd1290bc0489a33e0a5c14933ac3c/.gitlab/scripts/create_release.py,15,10
+/aria-ml/dataeval/blob/main/pyproject.toml,15,5
