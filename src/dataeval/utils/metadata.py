@@ -9,6 +9,7 @@ __all__ = ["Metadata", "preprocess", "merge", "flatten"]
 
 import warnings
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Iterable, Literal, Mapping, TypeVar, overload
 
 import numpy as np
@@ -20,6 +21,12 @@ from dataeval.output import Output, set_metadata
 
 DISCRETE_MIN_WD = 0.054
 CONTINUOUS_MIN_SAMPLE_SIZE = 20
+
+
+class DropReason(Enum):
+    INCONSISTENT_KEY = "inconsistent_key"
+    INCONSISTENT_SIZE = "inconsistent_size"
+    NESTED_LIST = "nested_list"
 
 
 T = TypeVar("T")
@@ -100,7 +107,11 @@ def _get_key_indices(keys: Iterable[tuple[str, ...]]) -> dict[tuple[str, ...], i
 
 
 def _flatten_dict_inner(
-    d: Mapping[str, Any], parent_keys: tuple[str, ...], size: int | None = None, nested: bool = False
+    d: Mapping[str, Any],
+    dropped: dict[tuple[str, ...], set[DropReason]],
+    parent_keys: tuple[str, ...],
+    size: int | None = None,
+    nested: bool = False,
 ) -> tuple[dict[tuple[str, ...], Any], int | None]:
     """
     Recursive internal function for flattening a dictionary.
@@ -109,6 +120,8 @@ def _flatten_dict_inner(
     ----------
     d : dict[str, Any]
         Dictionary to flatten
+    dropped: set[tuple[str, ...]]
+        Reference to set of dropped keys from the dictionary
     parent_keys : tuple[str, ...]
         Parent keys to the current dictionary being flattened
     size : int or None, default None
@@ -126,26 +139,30 @@ def _flatten_dict_inner(
     for k, v in d.items():
         new_keys: tuple[str, ...] = parent_keys + (k,)
         if isinstance(v, dict):
-            fd, size = _flatten_dict_inner(v, new_keys, size=size, nested=nested)
+            fd, size = _flatten_dict_inner(v, dropped, new_keys, size=size, nested=nested)
             items.update(fd)
         elif isinstance(v, (list, tuple)):
-            if not nested and (size is None or size == len(v)):
+            if nested:
+                dropped.setdefault(parent_keys + (k,), set()).add(DropReason.NESTED_LIST)
+            elif size is not None and size != len(v):
+                dropped.setdefault(parent_keys + (k,), set()).add(DropReason.INCONSISTENT_SIZE)
+            else:
                 size = len(v)
                 if all(isinstance(i, dict) for i in v):
                     for sub_dict in v:
-                        fd, size = _flatten_dict_inner(sub_dict, new_keys, size=size, nested=True)
+                        fd, size = _flatten_dict_inner(sub_dict, dropped, new_keys, size=size, nested=True)
                         for fk, fv in fd.items():
                             items.setdefault(fk, []).append(fv)
                 else:
                     items[new_keys] = v
-            else:
-                warnings.warn(f"Dropping nested list found in '{parent_keys + (k, )}'.")
         else:
             items[new_keys] = v
     return items, size
 
 
-def flatten(d: Mapping[str, Any], sep: str, ignore_lists: bool, fully_qualified: bool) -> tuple[dict[str, Any], int]:
+def flatten(
+    d: Mapping[str, Any], sep: str, ignore_lists: bool, fully_qualified: bool
+) -> tuple[dict[str, Any], int, dict[str, set[str]]]:
     """
     Flattens a dictionary and converts values to numeric values when possible.
 
@@ -162,24 +179,33 @@ def flatten(d: Mapping[str, Any], sep: str, ignore_lists: bool, fully_qualified:
 
     Returns
     -------
-    tuple[dict[str, Any], int]
-        A tuple of the flattened dictionary and the length of detected lists in metadata
+    tuple[dict[str, Any], int, dict[str, set[str]]]
+        - [0]: Dictionary of flattened values with the keys reformatted as a hierarchical tuple of strings
+        - [1]: Size of the values in the flattened dictionary
+        - [2]: Dictionary of fully qualified keys and reasons for being dropped from the output dictionary
     """
-    expanded, size = _flatten_dict_inner(d, parent_keys=(), nested=ignore_lists)
+    dropped: dict[tuple[str, ...], set[DropReason]] = {}
+    expanded, size = _flatten_dict_inner(d, dropped=dropped, parent_keys=(), nested=ignore_lists)
 
     output = {}
-    if fully_qualified:
-        expanded = {sep.join(k): v for k, v in expanded.items()}
-    else:
-        keys = _get_key_indices(expanded)
-        expanded = {sep.join(k[keys[k] :]): v for k, v in expanded.items()}
     for k, v in expanded.items():
         cv = _convert_type(v)
-        if isinstance(cv, list) and len(cv) == size:
-            output[k] = cv
+        if isinstance(cv, list):
+            if len(cv) == size:
+                output[k] = cv
+            else:
+                dropped.setdefault(k, set()).add(DropReason.INCONSISTENT_KEY)
         elif not isinstance(cv, list):
             output[k] = cv if not size else [cv] * size
-    return output, size if size is not None else 1
+
+    dropped_output = {sep.join(k): {vv.value for vv in v} for k, v in dropped.items()}
+    if fully_qualified:
+        output = {sep.join(k): v for k, v in output.items()}
+    else:
+        keys = _get_key_indices(output)
+        output = {sep.join(k[keys[k] :]): v for k, v in output.items()}
+
+    return output, size if size is not None else 1, dropped_output
 
 
 def _is_metadata_dict_of_dicts(metadata: Mapping) -> bool:
@@ -202,12 +228,12 @@ def merge(
     ignore_lists: bool = False,
     fully_qualified: bool = False,
     as_numpy: bool = False,
-) -> tuple[dict[str, list[Any]] | dict[str, NDArray[Any]], NDArray[np.int_]]:
+) -> tuple[dict[str, list[Any]] | dict[str, NDArray[Any]], NDArray[np.int_], dict[str, set[str]]]:
     """
     Merges a collection of metadata dictionaries into a single flattened dictionary of keys and values.
 
-    Nested dictionaries are flattened, and lists are expanded. Nested lists are dropped as the
-    expanding into multiple hierarchical trees is not supported.
+    Nested dictionaries are flattened, and lists are expanded. Nested lists are dropped as expanding
+    into multiple hierarchical trees is not supported.
 
     Parameters
     ----------
@@ -222,10 +248,10 @@ def merge(
 
     Returns
     -------
-    dict[str, list[Any]] or dict[str, NDArray[Any]]
-        A single dictionary containing the flattened data as lists or NumPy arrays
-    NDArray[np.int_]
-        Array defining where individual images start, helpful when working with object detection metadata
+    tuple[dict[str, list[Any]] | dict[str, NDArray[Any]], NDArray[np.int_], set[str]]
+        - [0]: A single dictionary containing the flattened data as lists or NumPy arrays
+        - [1]: Array defining where individual images start, helpful when working with object detection metadata
+        - [2]: Set of fully qualified inconsistent keys for dropped metadata
 
     Note
     ----
@@ -234,11 +260,13 @@ def merge(
     Example
     -------
     >>> list_metadata = [{"common": 1, "target": [{"a": 1, "b": 3, "c": 5}, {"a": 2, "b": 4}], "source": "example"}]
-    >>> reorganized_metadata, image_indicies = merge(list_metadata)
+    >>> reorganized_metadata, image_indicies, dropped_keys = merge(list_metadata)
     >>> reorganized_metadata
     {'common': [1, 1], 'a': [1, 2], 'b': [3, 4], 'source': ['example', 'example']}
     >>> image_indicies
     array([0])
+    >>> dropped_keys
+    {'target_c': {'inconsistent_key'}}
     """
     merged: dict[str, list[Any]] = {}
     isect: set[str] = set()
@@ -256,15 +284,20 @@ def merge(
         dicts = list(metadata)
 
     image_repeats = np.zeros(len(dicts))
+    dropped: dict[str, set[DropReason]] = {}
     for i, d in enumerate(dicts):
-        flattened, image_repeats[i] = flatten(d, sep="_", ignore_lists=ignore_lists, fully_qualified=fully_qualified)
+        flattened, image_repeats[i], dropped_inner = flatten(
+            d, sep="_", ignore_lists=ignore_lists, fully_qualified=fully_qualified
+        )
         isect = isect.intersection(flattened.keys()) if isect else set(flattened.keys())
-        union = union.union(flattened.keys())
+        union.update(flattened.keys())
+        for k, v in dropped_inner.items():
+            dropped.setdefault(k, set()).update({DropReason(vv) for vv in v})
         for k, v in flattened.items():
             merged.setdefault(k, []).extend(flattened[k]) if isinstance(v, list) else merged.setdefault(k, []).append(v)
 
-    if len(union) > len(isect):
-        warnings.warn(f"Inconsistent metadata keys found. Dropping {union - isect} from metadata.")
+    for k in union - isect:
+        dropped.setdefault(k, set()).add(DropReason.INCONSISTENT_KEY)
 
     output: dict[str, Any] = {}
 
@@ -285,7 +318,7 @@ def merge(
         cv = _convert_type(merged[k])
         output[k] = np.array(cv) if as_numpy else cv
 
-    return output, image_indicies
+    return output, image_indicies, {k: {vv.value for vv in v} for k, v in dropped.items()}
 
 
 @dataclass(frozen=True)
@@ -309,6 +342,8 @@ class Metadata(Output):
         Array of unique class names (for use with plotting)
     total_num_factors : int
         Sum of discrete_factor_names and continuous_factor_names plus 1 for class
+    dropped_factor_names: set[str]
+        Set of factor names that were dropped due to inconsistent availability in the raw metadata
     """
 
     discrete_factor_names: list[str]
@@ -318,6 +353,7 @@ class Metadata(Output):
     class_labels: NDArray[np.int_]
     class_names: NDArray[Any]
     total_num_factors: int
+    dropped_factor_names: dict[str, set[str]]
 
 
 @set_metadata
@@ -358,7 +394,7 @@ def preprocess(
         Output class containing the binned metadata
     """
     # Transform metadata into single, flattened dictionary
-    metadata, image_repeats = merge(raw_metadata)
+    metadata, image_repeats, dropped_keys = merge(raw_metadata)
 
     continuous_factor_bins = dict(continuous_factor_bins) if continuous_factor_bins else None
 
@@ -434,6 +470,7 @@ def preprocess(
         numerical_labels,
         unique_classes,
         total_num_factors,
+        dropped_keys,
     )
 
 
