@@ -72,7 +72,7 @@ $value - 75th\ quartile$
 
 ## Class Options
 
-The {func}`.Outliers` API will give more information on how to use the
+The {class}`.Outliers` API will give more information on how to use the
 functionality. The user has the option to specify:
 
 - the statistical method used by the class

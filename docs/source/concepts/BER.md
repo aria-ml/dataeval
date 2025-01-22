@@ -38,7 +38,7 @@ example, take the following problematic images from the
 [MNIST](https://en.wikipedia.org/wiki/MNIST_database) dataset (taken from
 [here](https://www.kaggle.com/code/cdeotte/25-million-images-0-99757-mnist)):
 
-![problem](../reference/images/difficult.png)
+![problem](../_static/images/reference/difficult.png)
 
 It is very difficult for even a human to classify these images, and the
 conditional distributions of labels for them are certainly non-deterministic.
@@ -50,7 +50,7 @@ One way of understanding how we try to estimate BER is to look at
 [UMAP](https://arxiv.org/abs/1802.03426) (a simple dimension reduction
 technique) to embed the MNIST images in 2-dimensional space.
 
-![embed](../reference/images/UMAP.png)
+![embed](../_static/images/reference/UMAP.png)
 
 Here the colors represent the different labels (digits). While most are
 separated, a small fraction of them are in the wrong cluster or lie in the

@@ -2401,8 +2401,6 @@ optional = false
 python-versions = ">=3"
 files = [
     {file = "nvidia_cublas_cu11-11.11.3.6-py3-none-manylinux1_x86_64.whl", hash = "sha256:39fb40e8f486dd8a2ddb8fdeefe1d5b28f5b99df01c87ab3676f057a74a5a6f3"},
-    {file = "nvidia_cublas_cu11-11.11.3.6-py3-none-manylinux2014_aarch64.whl", hash = "sha256:5ccae9e069a2c6be9af9cb5a0b0c6928c19c7915e390d15f598a1eead2a01a7a"},
-    {file = "nvidia_cublas_cu11-11.11.3.6-py3-none-manylinux2014_x86_64.whl", hash = "sha256:60252822adea5d0b10cd990a7dc7bedf7435f30ae40083c7a624a85a43225abc"},
     {file = "nvidia_cublas_cu11-11.11.3.6-py3-none-win_amd64.whl", hash = "sha256:6ab12b1302bef8ac1ff4414edd1c059e57f4833abef9151683fb8f4de25900be"},
 ]
 
@@ -4198,6 +4196,27 @@ jinja2 = ">=2.10"
 markupsafe = ">=1"
 
 [[package]]
+name = "sphinx-new-tab-link"
+version = "0.6.1"
+description = "Open external links in new tabs of the browser in Sphinx HTML documents"
+optional = false
+python-versions = "*"
+files = [
+    {file = "sphinx_new_tab_link-0.6.1-py3-none-any.whl", hash = "sha256:48900b4eea02c4ac0f11360d211e57a0659b68e73e9f7822de8a8b5b9b344320"},
+    {file = "sphinx_new_tab_link-0.6.1.tar.gz", hash = "sha256:856886e42facc2b1b4d1b937fe192635b40979a96bde30ffc6ae22d494797cb0"},
+]
+
+[package.dependencies]
+Sphinx = ">=7.3"
+sphinxcontrib-extdevhelper-kasane = "*"
+
+[package.extras]
+dev = ["taskipy"]
+lint = ["autoflake", "black", "flake8", "isort", "pyupgrade"]
+testing = ["beautifulsoup4", "defusedxml", "pytest", "pytest-randomly"]
+typecheck = ["mypy", "types-beautifulsoup4", "types-docutils"]
+
+[[package]]
 name = "sphinx-prompt"
 version = "1.8.0"
 description = "Sphinx directive to add unselectable prompt"
@@ -4298,6 +4317,23 @@ files = [
 lint = ["mypy", "ruff (==0.5.5)", "types-docutils"]
 standalone = ["Sphinx (>=5)"]
 test = ["pytest"]
+
+[[package]]
+name = "sphinxcontrib-extdevhelper-kasane"
+version = "0.2.0"
+description = "襲 - Provide dynamic inheritance shortcuts to make Sphinx extension development easier"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "sphinxcontrib-extdevhelper-kasane-0.2.0.tar.gz", hash = "sha256:4dc7b00327f33c7b421c27122b40278eeaca43f24601b572cee5616d31b206a9"},
+    {file = "sphinxcontrib_extdevhelper_kasane-0.2.0-py3-none-any.whl", hash = "sha256:20f94e3b209cddec24596234458ea3887e7a7ad45b54a4d0a5bf169ff45a38f1"},
+]
+
+[package.dependencies]
+Sphinx = "*"
+
+[package.extras]
+dev = ["autoflake", "black", "flake8", "isort", "mypy", "pytest", "pytest-randomly", "pyupgrade", "taskipy"]
 
 [[package]]
 name = "sphinxcontrib-htmlhelp"
@@ -5147,4 +5183,4 @@ all = ["matplotlib"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "4b002998dc26b8c509a69d570f80c90c0dc75631d60e5335e8909a365408b1d0"
+content-hash = "50136628bb7802f67471b281d339a1f5efae5bcebab36282f8a7e8ce49f0b47d"

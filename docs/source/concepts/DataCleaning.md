@@ -106,50 +106,48 @@ output will be unreliable, regardless of the sophistication of the analysis.
 
 DataEval's data cleaning functions and classes are:
 
-* [boxratiostats](Stats.md#boxratiostats) function
-* [datasetstats](Stats.md#datasetstats) function
-* [dimensionstats](Stats.md#dimensionstats) function
-* [hashstats](Stats.md#hashstats) function
-* [labelstats](Stats.md#labelstats) function
-* [pixelstats](Stats.md#pixelstats) function
-* [visualstats](Stats.md#visualstats) function
-* [Clusterer](Clusterer.md) class
-* [Duplicates](Duplicates.md) class
-* [Outliers](Outliers.md) class
+```{list-table}
+:widths: 20 80
+:header-rows: 0
 
-These functions and classes facilitate the creation of dataset statistics and
-the identification of abnormal data points and {term}`duplicates<Duplicates>`:
 
-* The **hashstats** function creates image hashes on a per image basis and is
-  used by the _Duplicates_ class.
-* The **dimensionstats** function creates dataset statistics on a per image
-  basis.
-* The **pixelstats** and **visualstats** functions create dataset statistics on
-  a per image per channel basis.
-* The **labelstats** function creates dataset statistics on the labels.
-* The **datasetstats** function runs the dimensionstats, pixelstats, visualstats,
-  and labelstats functions on a given dataset.
-* The **boxratiostats** function compares the statistics between a set of
-  bounding boxes and their corresponding images.
-* The **Clusterer** class clusters the data and identifies data points which do
-  not fit into a cluster.
-* The **Duplicates** class identifies duplicate images.
-* The **Outliers** class analyzes the dataset statistics for Outliers based on
-  the chosen statistical method.
+* - {func}`boxratiostats <.boxratiostats>`
+  - Compares the statistics between a set of bounding boxes and their
+    corresponding images.
+* - {func}`datasetstats <.datasetstats>`
+  - Runs `dimensionstats`, `pixelstats`, `visualstats`, and `labelstats`
+    functions on a given dataset.
+* - {func}`dimensionstats <.dimensionstats>`
+  - Creates dataset statistics on a per image basis.
+* - {func}`hashstats <.hashstats>`
+  - Creates hex-encoded image hashes on a per image basis.
+* - {func}`labelstats <.labelstats>`
+  - Creates dataset statistics on the labels.
+* - {func}`pixelstats <.pixelstats>`
+  - Creates dataset statistics on a per image per channel basis.
+* - {func}`visualstats <.visualstats>`
+  - Creates dataset statistics on a per image per channel basis.
+* - {class}`.Clusterer`
+  - Clusters the data and identifies data points which do not fit.
+* - {class}`.Duplicates`
+  - Identifies duplicate and near duplicate images.
+* - {class}`.Outliers`
+  - Analyzes the dataset statistics for Outliers based on the chosen
+    statistical method.
+```
 
 To see data cleaning in action using DataEval, check out our
 [Data Cleaning Guide](../tutorials/EDA_Part1.ipynb).
 
-See the [Stats](Stats.md) concept page to learn more about the algorithms/methods
-used by the functions above.
+See the [Stats](Stats.md) concept page to learn more about the
+algorithms/methods used by the functions above.
 
-Each of the classes above have their own concept page, see the
-[Clusterer](Clusterer.md), [Duplicates](Duplicates.md), and [Outliers](Outliers.md)
-pages to learn more about their algorithms and the stat functions used by them.
+See the [Clusterer](Clustering.md) and [Outliers](Outliers.md) concept pages to
+learn more about their algorithms and the stat functions used by them.
 
 ## Duplicate Detection
 
-With the {term}`Duplicates` class, exact matches are found using a byte hash of
+With the {term}`Duplicates`, exact matches are found using a byte hash of
 the data information, while near matches (such as a crop of another image or a
 distoration of another image) use a perception based hash.
 

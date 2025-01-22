@@ -15,7 +15,7 @@ CHANGELOG_FILE = "CHANGELOG.md"
 # need to read this to update the doc links
 HOWTO_INDEX_FILE = "docs/source/how_to/index.md"
 TUTORIAL_INDEX_FILE = "docs/source/tutorials/index.md"
-NOTEBOOK_DIRECTORY = "docs/source/how_to/notebooks"
+NOTEBOOK_DIRECTORY = "docs/source/how_to"
 TUTORIAL_DIRECTORY = "docs/source/tutorials"
 TAB = "    "
 

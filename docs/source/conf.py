@@ -26,17 +26,16 @@ language = "en"
 
 extensions = [
     # Internal Sphinx extensions
-    "autoapi.extension",
-    "sphinx.ext.autodoc",
-    "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
     "sphinx.ext.graphviz",
     "sphinx.ext.mathjax",
     # External extensions
-    "sphinx_design",
-    "myst_nb",
+    "autoapi.extension",
     "enum_tools.autoenum",
+    "myst_nb",
+    "sphinx_design",
     "sphinx_immaterial",
+    "sphinx_new_tab_link",
 ]
 
 # Coverage show missing items
@@ -53,8 +52,6 @@ exclude_patterns = [
     # Specific directories -- relative to source directories
     ".jupyter_cache",
     "build",
-    # Specific documents
-    "how_to/notebooks/ODLearningCurvesTutorial.ipynb",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -76,7 +73,8 @@ autoapi_options = [
     "imported-members",
 ]
 autoapi_generate_api_docs = True
-autoapi_keep_files = True
+# uncomment to review or debug generated content
+# autoapi_keep_files = True
 autodoc_typehints = "description"
 autoapi_own_page_level = "function"
 autoapi_member_order = "groupwise"
@@ -124,8 +122,8 @@ myst_footnote_transition = False
 # -----------------------------------------------------------------------------
 
 html_theme = "sphinx_immaterial"
-html_logo = "_static/DataEval_Logo.png"
-html_favicon = "_static/DataEval_Favicon.png"
+html_logo = "_static/images/DataEval_Logo.png"
+html_favicon = "_static/images/DataEval_Favicon.png"
 
 html_show_sourcelink = True
 html_static_path = ["_static"]
@@ -159,6 +157,7 @@ html_theme_options = {
         "navigation.instant",
         "navigation.sections",
         "navigation.tabs",
+        "navigation.tabs.sticky",
     ],
 }
 

@@ -20,9 +20,10 @@ SUPPORTED_VERSIONS = ("3.9", "3.10", "3.11", "3.12")
 
 RESTORE_CMD = """
 if (which git) > /dev/null; then
+    git restore ./reference/autoapi/dataeval/index.rst
     if [[ ! $(git status --porcelain | grep docs/source/.jupyter_cache | grep --invert-match global.db) ]]; then
         echo "No cache changes - reverting global.db";
-        git restore .jupyter_cache/global.db;
+        git restore ./.jupyter_cache/global.db;
     fi;
 fi
 """
@@ -112,13 +113,12 @@ def docs(session: nox.Session) -> None:
     check_version(session.name)
     session.install(*INSTALL_ARGS, env=INSTALL_ENVS)
     session.chdir("docs/source")
-    session.run("rm", "-rf", "./reference/autoapi", external=True)
     session.run("rm", "-rf", "../../output/docs", external=True)
     if "clean" in session.posargs:
         session.run("rm", "-rf", ".jupyter_cache", external=True)
     session.run(
         "sphinx-build",
-        # "--fail-on-warning",
+        "--fail-on-warning",
         "--keep-going",
         "--fresh-env",
         "--show-traceback",
@@ -135,7 +135,7 @@ def docs(session: nox.Session) -> None:
         env={**DOCS_ENVS, **COMMON_ENVS},
     )
     session.run("cp", "-R", ".jupyter_cache", "../../output/docs", external=True)
-    session.run("bash", "-c", RESTORE_CMD, external=True)
+    session.run_always("bash", "-c", RESTORE_CMD, external=True)
 
 
 @nox.session

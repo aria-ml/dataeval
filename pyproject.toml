@@ -92,9 +92,10 @@ jinja2 = {version = ">=3.1.5"}
 jupyter-client = {version = ">=8.6.0"}
 jupyter-cache = {version = "*"}
 myst-nb = {version = ">=1.0.0"}
-sphinx-immaterial = {version = "*"}
 sphinx-autoapi = {version = "*"}
 sphinx-design = {version = "*"}
+sphinx-immaterial = {version = "*"}
+sphinx-new-tab-link = {version = "*"}
 sphinx-tabs = {version = "*"}
 Sphinx = {version = ">=7.2.6"}
 torchmetrics = {version = ">=1.0.0", source = "pytorch"}

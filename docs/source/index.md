@@ -8,7 +8,7 @@
 :::{grid-item}
 :columns: 12 4 4 4
 
-:::{image} _static/DataEval_Logo.png
+:::{image} _static/images/DataEval_Logo.png
 :width: 200px
 :class: sd-m-auto
 
