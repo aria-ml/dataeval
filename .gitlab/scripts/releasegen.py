@@ -420,7 +420,7 @@ class ReleaseGen:
         # cannot use 'latest-known-good' because 404 on download - investigate
         ref = "main"
         cache_path = "docs/source/.jupyter_cache"
-        output_path = path.join("output", cache_path)
+        output_path = "output/docs/.jupyter_cache"
         self.gl.get_artifacts(job="docs", dest="./", ref=ref)
         if not path.exists(output_path):
             raise FileNotFoundError(f"Artifacts downloaded from {ref} does not contain {output_path}")
