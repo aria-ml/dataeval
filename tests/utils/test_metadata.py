@@ -25,7 +25,11 @@ class TestUtilsMetadata:
         },
     }
 
-    inconsistent_keys = [{"a": 1, "b": 1}, {"a": 2}]
+    inconsistent_keys = [
+        {"a": 1, "b": [1], "c": [1, 2]},
+        {"a": 2},
+        {"a": 3, "d": [{"e": {"f": [{"g": 1, "h": 2}]}}]},
+    ]
 
     voc_test = [
         {
@@ -229,7 +233,7 @@ class TestUtilsMetadata:
     }
 
     def test_ignore_lists(self):
-        a, b = merge([self.duplicate_keys], ignore_lists=True)
+        a, b, _ = merge([self.duplicate_keys], ignore_lists=True)
         assert b == np.array([0])
         assert {k: list(v) for k, v in a.items()} == {
             "a": [1],
@@ -242,7 +246,7 @@ class TestUtilsMetadata:
         }
 
     def test_fully_qualified_keys(self):
-        a, b = merge([self.duplicate_keys], fully_qualified=True)
+        a, b, _ = merge([self.duplicate_keys], fully_qualified=True)
         assert b == np.array([0])
         assert {k: list(v) for k, v in a.items()} == {
             "a": [1, 1, 1],
@@ -260,7 +264,7 @@ class TestUtilsMetadata:
 
     @pytest.mark.parametrize("as_numpy", [False, True])
     def test_duplicate_keys(self, as_numpy):
-        a, b = merge([self.duplicate_keys], as_numpy=as_numpy)
+        a, b, _ = merge([self.duplicate_keys], as_numpy=as_numpy)
         assert b == np.array([0])
         assert {k: list(v) for k, v in a.items()} == {
             "a": [1, 1, 1],
@@ -278,16 +282,25 @@ class TestUtilsMetadata:
 
     @pytest.mark.parametrize("as_numpy", [False, True])
     def test_inconsistent_keys(self, as_numpy):
-        with pytest.warns(UserWarning, match="Inconsistent metadata keys found."):
-            a, b = merge(self.inconsistent_keys, as_numpy=as_numpy)
-        assert b.size == 2
-        assert (b == [0, 1]).all()
-        assert {k: list(v) for k, v in a.items()} == {"a": [1, 2]}
+        a, b, d = merge(self.inconsistent_keys, as_numpy=as_numpy)
+        assert b.size == 3
+        assert (b == [0, 1, 2]).all()
+        assert {k: list(v) for k, v in a.items()} == {"a": [1, 2, 3]}
+        assert len(d) == 3
+        assert d["b"] == {"inconsistent_key"}
+        assert d["c"] == {"inconsistent_size"}
+        assert d["d_e_f"] == {"nested_list"}
+
+    def test_inconsistent_key(self):
+        list_metadata = [{"common": 1, "target": [{"a": 1, "b": 3, "c": 5}, {"a": 2, "b": 4}], "source": "example"}]
+        reorganized_metadata, image_indicies, dropped_keys = merge(list_metadata)
+        assert reorganized_metadata == {"common": [1, 1], "a": [1, 2], "b": [3, 4], "source": ["example", "example"]}
+        assert image_indicies == np.array([0])
+        assert dropped_keys == {"target_c": {"inconsistent_key"}}
 
     @pytest.mark.parametrize("as_numpy", [False, True])
     def test_voc_test(self, as_numpy):
-        with pytest.warns(UserWarning, match="Dropping nested list"):
-            a, b = merge(self.voc_test, as_numpy=as_numpy)
+        a, b, d = merge(self.voc_test, as_numpy=as_numpy)
         assert b.size == 3
         assert (b == [0, 3, 8]).all()
         assert {k: list(v) for k, v in a.items()} == {
@@ -394,9 +407,11 @@ class TestUtilsMetadata:
             "ymax": [420, 167, 167, 35, 121, 237, 188, 282, 375, 375, 357],
             "difficult": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         }
+        assert len(d) == 1
+        assert d["annotation_object_part"] == {"nested_list"}
 
     def test_dict_of_dicts(self):
-        output, _ = merge(self.dict_of_dicts)  # type: ignore
+        output, _, _ = merge(self.dict_of_dicts)  # type: ignore
         assert output == {
             "keys": ["sample1", "sample2", "sample3", "sample4"],
             "a_that": [37.0, 3.0, 3.7, 137.0],
