@@ -251,8 +251,11 @@ markdownlint:
   image:
     name: davidanson/markdownlint-cli2
     entrypoint: [""]
-  script:
-    - markdownlint-cli2 "docs/**/*.md" "#node_modules"
+  script: |
+    markdownlint-cli2 README.md || FAIL=1
+    markdownlint-cli2 CONTRIBUTING.md || FAIL=1
+    markdownlint-cli2 "docs/**/*.md" "#node_modules" || FAIL=1
+    exit $FAIL
   rules: *on_run_with_docs
 
 ### RELEASE ###

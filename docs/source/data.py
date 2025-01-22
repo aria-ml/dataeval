@@ -20,7 +20,7 @@ def cd(rel_path: str):
 def download():
     from dataeval.utils.dataset.datasets import CIFAR10, MNIST, VOCDetection
 
-    with cd("how_to/notebooks"):
+    with cd("how_to"):
         # AETrainerTutorial.ipynb
         # BayesErrorRateEstimationTutorial.ipynb
         # ClassLearningCurvesTutorial.ipynb
