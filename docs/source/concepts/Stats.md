@@ -179,7 +179,7 @@ stats = datasetstats(d[0] for d in ds)
 stats.plot(log=True)
 ```
 
-![image](datasetstat_img_results.png)
+![image](../_static/images/concepts/datasetstat_img_results.png)
 
 Example code and result for the `channelstats` function:
 
@@ -208,7 +208,7 @@ ch_stats = channelstats(d[0] for d in ds)
 ch_stats.plot(log=False, channel_limit=3)
 ```
 
-![image](channelstat_img_results.png)
+![image](../_static/images/concepts/channelstat_img_results.png)
 
 #### Using the visualization for a quick analysis
 

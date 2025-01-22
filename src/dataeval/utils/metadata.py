@@ -248,7 +248,7 @@ def merge(
 
     Returns
     -------
-    tuple[dict[str, list[Any]] | dict[str, NDArray[Any]], NDArray[np.int_], set[str]]
+    tuple[dict[str, list[Any]] | dict[str, NDArray[Any]], NDArray[np.int], set[str]]
         - [0]: A single dictionary containing the flattened data as lists or NumPy arrays
         - [1]: Array defining where individual images start, helpful when working with object detection metadata
         - [2]: Set of fully qualified inconsistent keys for dropped metadata
@@ -607,7 +607,7 @@ def get_counts(data: NDArray[np.int_], min_num_bins: int | None = None) -> NDArr
 
     Returns
     -------
-    NDArray[np.int_]
+    NDArray[np.int]
         Bin counts per column of data.
     """
     max_value = data.max() + 1 if min_num_bins is None else min_num_bins

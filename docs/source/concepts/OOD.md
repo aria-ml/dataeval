@@ -27,7 +27,7 @@ An {term}`autoencoder<Autoencoder>` is a {term}`neural network<Neural Network>`
 which takes input data, compresses it down to a smaller dimensional space, and
 then attempts to reconstruct the original input data from the compressed data.
 
-![ae](../reference/images/ae.png) (<https://www.compthree.com/blog/autoencoder/>)
+![ae](../_static/images/reference/ae.png) (<https://www.compthree.com/blog/autoencoder/>)
 
 If a trained autoencoder encounters an image which falls outside the data
 {term}`manifold<Manifold>` on which it is trained, it will generally do a poor

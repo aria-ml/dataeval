@@ -36,11 +36,11 @@ functionality that you can try yourself!
 ::::{grid} 1 1 2 2
 :gutter: 4
 
-:::{grid-item-card} [Bayes Error Rate](../how_to/notebooks/BayesErrorRateEstimationTutorial.ipynb){.font-title}
+:::{grid-item-card} [Bayes Error Rate](../how_to/BayesErrorRateEstimationTutorial.ipynb){.font-title}
 :text-align: center
-:link: ../how_to/notebooks/BayesErrorRateEstimationTutorial
+:link: ../how_to/BayesErrorRateEstimationTutorial
 :link-type: doc
-:img-bottom: ../_static/ber_plot_thumbnail.png
+:img-bottom: ../_static/images/ber_plot_thumbnail.png
 
 Accurately calculate the maximum performance of your dataset.
 
@@ -51,11 +51,11 @@ Accurately calculate the maximum performance of your dataset.
 
 :::
 
-:::{grid-item-card} [Model Sufficiency](../how_to/notebooks/ClassLearningCurvesTutorial.ipynb){.font-title}
+:::{grid-item-card} [Model Sufficiency](../how_to/ClassLearningCurvesTutorial.ipynb){.font-title}
 :text-align: center
-:link: ../how_to/notebooks/ClassLearningCurvesTutorial
+:link: ../how_to/ClassLearningCurvesTutorial
 :link-type: doc
-:img-bottom: ../_static/suff_plot_thumbnail.png
+:img-bottom: ../_static/images/suff_plot_thumbnail.png
 
 Estimate your model's performance based on the size of your dataset
 

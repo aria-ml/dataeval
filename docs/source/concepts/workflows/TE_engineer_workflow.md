@@ -5,7 +5,7 @@ can use DataEval, and which components of our toolkit are suitable for their
 use. The T&E engineer interacts with DataEval at both the data engineering, and
 monitoring stages of the AI/ML lifecycle.
 
-![DataEval Lifecycle](./figures/DataEval.png)
+![DataEval Lifecycle](../../_static/images/concepts/DataEval.png)
 
 ## Data engineering
 
@@ -26,7 +26,7 @@ the image data that may impact model training downstream. In cases where
 substantial issues exist in some images, they can be filtered out or adjusted
 in some way. An example output of linting can be seen below:
 
-![Linting](./figures/linting.png)
+![Linting](../../_static/images/concepts/linting.png)
 
 In this case, some of the bright and dark images in particular are nearly
 unusable, and would be very difficult for even a knowledgeable human to
@@ -47,9 +47,9 @@ subcategories. In such cases, a T&E engineer may want to upsample or
 downsample certain image classes or metadata factors to maintain
 {term}`Balance`. Examples outputs for these metrics can be seen below:
 
-![Balance](./figures/balance.png)
+![Balance](../../_static/images/concepts/balance.png)
 
-![Diversity](./figures/diversity.png)
+![Diversity](../../_static/images/concepts/diversity.png)
 
 In this particular case, there seems to be quite low
 {term}`diversity<Diversity>` in cloud coverage, but this pattern is repeated
@@ -82,7 +82,7 @@ accurately, may not correspond to regions that are densely sampled in the
 performance degradation *even if* the operational environment itself has not
 changed. An example of a coverage output can be seen below:
 
-![Coverage](./figures/coverage.png)
+![Coverage](../../_static/images/concepts/coverage.png)
 
 In this example, the T&E engineer was able to identify high-contrast electric
 substations as a potentially problematic subclass in the operational dataset.
@@ -93,7 +93,7 @@ was trained. Such images can indicate to a T&E engineer that there has been a
 qualitative shift in image distribution, or that a new, operationally relevant
 class has emerged. An example OOD output can be seen below:
 
-![Coverage](./figures/OOD.png)
+![Coverage](../../_static/images/concepts/OOD.png)
 
 Here, we can see that a new type of powerplant, a solar farm, has emerged in
 the operational dataset. This type of powerplant was not present in the
@@ -107,7 +107,7 @@ different from the training data. Such changes are known to be associated with
 performance degradation, so the T&E engineer would trigger retraining as a
 result of significant drift. An example output can be seen below:
 
-![Drift](./figures/drift.png)
+![Drift](../../_static/images/concepts/drift.png)
 
 These results indicate that the operational set has shifted substantially, a
 result confirmed but some of the analyses above. Such indications should tell

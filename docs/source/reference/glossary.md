@@ -21,7 +21,7 @@ Accuracy
 
     A binary example with benign and malignant tumor detection rates is shown in the following image:
 
-    ![binary accuracy example](./images/binary_accuracy_example.png)
+    ![binary accuracy example](../_static/images/reference/binary_accuracy_example.png)
 
 AUROC
     The Area Under the ROC Curve (AUROC) is a metric that measures the performance of a {term}`classification<Classification>` model at all possible classification thresholds. It's calculated by measuring the two-dimensional area underneath a ROC curve from (0,0) to (1,1). AUROC can range from 0 to 1, with higher values indicating better performance:
@@ -111,7 +111,7 @@ Confusion Matrix
 
     See {term}`True Positive Rate (TP)`, {term}`True Negative Rate (TN)`, {term}`False Positive Rate (FP)`, {term}`False Negative Rate (FN)`
 
-    ![Confusion Matrix](./images/confusion_matrix.png)
+    ![Confusion Matrix](../_static/images/reference/confusion_matrix.png)
 
 Contractive Autoencoder (CAE)
     A type of {term}`autoencoder<Autoencoder>` which is designed to be sensitive to small changes in the training dataset. It attempts to increase the robustness of the model by emphasizing the accurate encoding of small changes in the training data.
@@ -297,7 +297,7 @@ Manifold
 Maximum Pooling
     Method used in the {term}`pooling layer<Pooling Layer>` of a {term}`convolutional neural netwok<Convolutional Neural Network (CNN)>`. It uses the maximum value in a group of pixel values (typically a 2 x 2 or 3 x 3 area) produced from the {term}`convolutional layer<Convolutional Layer>` to reduce the dimensionality of the result. An image of the operation is shown below.
 
-    ![Maximum Pooling Example](./images/max_pooling.png)
+    ![Maximum Pooling Example](../_static/images/reference/max_pooling.png)
 
 Maximum Mean Discrepancy (MMD) Drift Detection
     MMD Drift Detection is a method which compares the mean {term}`embeddings<Embeddings>` of each sample: A reference sample and a target sample. For example, one might use the mean image embedding for a set of training data, and compare that to the mean embedding of an operational dataset. If the two means are significantly different from one another, drift is detected. What constitutes a "significant" difference stems from underlying assumptions about the distribution of embeddings. More info can be found here:
@@ -324,7 +324,7 @@ Mutual Information (MI)
 Neural Network
     A neural network is a method in {term}`artificial intelligence<Artificial Intelligence (AI)>` that teaches computers to process data in a way that is inspired by the human brain. An example depiction is shown below:
 
-    ![Example Neural Network](./images/neural_network_example.png)
+    ![Example Neural Network](../_static/images/reference/neural_network_example.png)
 
 Null Hypothesis
     In scientific research, the null hypothesis (often denoted H0) is the claim that the effect being studied does not exist. The null hypothesis can also be described as the hypothesis in which no relationship exists between the two sets of data or variables being analyzed. If the null hypothesis is true, any experimentally observed effect is due to chance alone, hence the term "null".
@@ -356,7 +356,7 @@ Outliers (Images)
 Out-of-distribution (OOD)
     Out-of-distribution (OOD) data refers to data that is different from the data used to train the {term}`machine learning<Machine Learning (Ml)>` model. For example, data collected in a different way, at a different time, under different conditions, or for a different task than the data on which the model was originally trained. An illustration is shown below:
 
-    ![Out Of Distribution Illustration](./images/out_of_distribution.png)
+    ![Out Of Distribution Illustration](../_static/images/reference/out_of_distribution.png)
 
 Overfitting
     Overfitting occurs when the {term}`machine learning<Machine Learning (ML)>` model cannot generalize. The model begins to predict heavily towards the distribution of the {term}`developmental dataset<Developmental Dataset>` which can hurt the model's predictions on the {term}`operational dataset<Operational Dataset>`. Overfitting happens due to several reasons, such as:
@@ -396,7 +396,7 @@ Precision
 Precision Recall Curve
     A plot which shows {term}`precision<Precision>` (Y Axis) vs. {term}`recall<Recall>` (X axis) scores for one or more {term}`machine learning<Machine Learning (ML)>` models as a function of the {term}`confidence level<Confidence Level>` to make a prediction. In general, as confidence levels drop, precision decreases as recall increases. The curves are used to visualize the accuracy of a model using various measures including {term}`F1-score<F1-Score>`, *Area Under the Curve (AUROC)* and *Average Precision (AP)*. An example is shown below:
 
-    ![Example Precision Recall Curve](./images/precision_recall_curve.png)
+    ![Example Precision Recall Curve](../_static/images/reference/precision_recall_curve.png)
 
 Principal Component Analysis (PCA)
     Principal component analysis (PCA) is a linear {term}`dimensionality reduction<Dimensionality Reduction>` technique with applications in exploratory data analysis, visualization and data preprocessing. The data is linearly transformed onto a new coordinate system such that the directions (principal components) capturing the largest variation in the data can be easily identified.
@@ -421,7 +421,7 @@ Recall
 Receiver Operating Characteristic Curve
     A curve frequently used to evaluate the performance of {term}`binary classification<Binary Classification>` algorithms. It provides a graphical representation of a classifier's performance. It plots the {term}`true positive rate<True Positive Rate (TP)>` vs the {term}`false positive rate<False Positive Rate (FP)>` at a variety of thresholds. An example image is shown below:
 
-    ![Example ROC Curve](./images/ROC_curve.png)
+    ![Example ROC Curve](../_static/images/reference/ROC_curve.png)
 
 Regularized Autoencoder
     A type of {term}`autoencoder<Autoencoder>` used mostly in {term}`classification<Classification>` tasks. Types include *Sparse*, *Denoising* and *Contractive*. Regularization is a method for constraining the model in order to prevent {term}`overfitting<Overfitting>` and improve its ability to generalize to new data.
@@ -445,7 +445,7 @@ Statistical Independence
 Statistical Manifold
     An abstract space where each point is a probability distribution. An illustration of the concept is shown below:
 
-    ![statistical manifold](./images/statistical_manifold.png)
+    ![statistical manifold](../_static/images/reference/statistical_manifold.png)
 
 Statistics
     Statistics is a branch of applied mathematics that involves the collection, description, analysis, and inference of conclusions from quantitative data.

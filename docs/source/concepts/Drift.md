@@ -214,13 +214,13 @@ datasets efficiently.
 
 DataEval's drift detection classes are:
 
-- **{func}`.DriftCVM`**: Implements the Cramér-von Mises (CVM) test for
+- **{class}`.DriftCVM`**: Implements the Cramér-von Mises (CVM) test for
   feature-wise drift detection.
-- **{func}`.DriftKS`**: Implements the
+- **{class}`.DriftKS`**: Implements the
   Kolmogorov-Smirnov test for detecting feature-wise distributional shifts.
-- **{func}`.DriftMMD`**: Utilizes the Maximum Mean Discrepancy (MMD) test to
+- **{class}`.DriftMMD`**: Utilizes the Maximum Mean Discrepancy (MMD) test to
   detect drift in multivariate data using kernel methods.
-- **{func}`.DriftUncertainty`**: Detects drift by analyzing changes in the
+- **{class}`.DriftUncertainty`**: Detects drift by analyzing changes in the
   model's uncertainty across datasets.
 
 To see how these detectors work in practice, refer to our
