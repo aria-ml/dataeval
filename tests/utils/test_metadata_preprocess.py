@@ -15,9 +15,8 @@ class TestMDPreprocessingUnit:
     def test_uneven_factor_lengths(self):
         labels = [0] * 5 + [1] * 5
         factors = [{"factor1": ["a"] * 10, "factor2": ["b"] * 11}]
-        err_msg = """[UserWarning("Dropping nested list found in '('factor2',)'.")]"""
-        with pytest.warns(UserWarning, match=err_msg):
-            preprocess(factors, labels)
+        merged = preprocess(factors, labels)
+        assert "factor2" in merged.dropped_factor_names
 
     def test_bad_factor_ref(self):
         labels = [0] * 5 + [1] * 5
