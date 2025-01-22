@@ -73,18 +73,18 @@ html/ODLearningCurvesTutorial.md
 % - How to use the AETrainer with different model architectures (future how-to)
 
 [colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
-[ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/BayesErrorRateEstimationTutorial.ipynb
-[suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/ClassLearningCurvesTutorial.ipynb
-[div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/HPDivergenceTutorial.ipynb
-[drift-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/DriftDetectionTutorial.ipynb
-[out-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/OODDetectionTutorial.ipynb
-[ae-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/AETrainerTutorial.ipynb
-[lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/ClassLabelAnalysisTutorial.ipynb
-[odlc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/ODLearningCurvesTutorial.ipynb
-[clust-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/ClustererTutorial.ipynb
-[dup-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/DuplicatesTutorial.ipynb
-[lint-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/LintingTutorial.ipynb
-[cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/how_to/notebooks/CoverageTutorial.ipynb
+[ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.0/docs/source/how_to/notebooks/BayesErrorRateEstimationTutorial.ipynb
+[suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.0/docs/source/how_to/notebooks/ClassLearningCurvesTutorial.ipynb
+[div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.0/docs/source/how_to/notebooks/HPDivergenceTutorial.ipynb
+[drift-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.0/docs/source/how_to/notebooks/DriftDetectionTutorial.ipynb
+[out-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.0/docs/source/how_to/notebooks/OODDetectionTutorial.ipynb
+[ae-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.0/docs/source/how_to/notebooks/AETrainerTutorial.ipynb
+[lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.0/docs/source/how_to/notebooks/ClassLabelAnalysisTutorial.ipynb
+[odlc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.0/docs/source/how_to/notebooks/ODLearningCurvesTutorial.ipynb
+[clust-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.0/docs/source/how_to/notebooks/ClustererTutorial.ipynb
+[dup-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.0/docs/source/how_to/notebooks/DuplicatesTutorial.ipynb
+[lint-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.0/docs/source/how_to/notebooks/LintingTutorial.ipynb
+[cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.0/docs/source/how_to/notebooks/CoverageTutorial.ipynb
 
 :::{toctree}
 :caption: Models

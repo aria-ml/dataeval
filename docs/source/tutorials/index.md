@@ -27,10 +27,10 @@ EDA_Part3.ipynb
 - [Data Monitoring Guide](Data_Monitoring.ipynb) [![Open In Colab][colab-badge]][monitoring-colab]
 
 [colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
-[eda-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/tutorials/EDA_Part1.ipynb
-[dataspace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/tutorials/EDA_Part2.ipynb
-[bias-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/tutorials/EDA_Part3.ipynb
-[monitoring-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/tutorials/Data_Monitoring.ipynb
+[eda-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.0/docs/source/tutorials/EDA_Part1.ipynb
+[dataspace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.0/docs/source/tutorials/EDA_Part2.ipynb
+[bias-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.0/docs/source/tutorials/EDA_Part3.ipynb
+[monitoring-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.0/docs/source/tutorials/Data_Monitoring.ipynb
 
 :::{toctree}
 :caption: Data Monitoring
