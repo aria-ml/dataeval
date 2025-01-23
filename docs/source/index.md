@@ -50,7 +50,7 @@ DataEval provides many powerful tools to assist in the following T&E tasks:
   - dataset sufficiency
   - data/model complexity mismatch
 - **Metrics for post-deployment monitoring of data with bounds on model
-  performance to guide retraining**
+ performance to guide retraining**
   - dataset-shift metrics
   - model performance bounds under covariate shift
   - guidance on sampling to assess model error and model retraining
