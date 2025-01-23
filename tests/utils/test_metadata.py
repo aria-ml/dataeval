@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.utils.metadata import _convert_type, _try_cast, merge
+from dataeval.utils.metadata import _convert_type, _try_cast, flatten, merge
 
 
 class TestUtilsMetadata:
@@ -233,7 +233,7 @@ class TestUtilsMetadata:
     }
 
     def test_ignore_lists(self):
-        a, b, _ = merge([self.duplicate_keys], ignore_lists=True)
+        a, b = merge([self.duplicate_keys], ignore_lists=True)
         assert b == np.array([0])
         assert {k: list(v) for k, v in a.items()} == {
             "a": [1],
@@ -246,7 +246,7 @@ class TestUtilsMetadata:
         }
 
     def test_fully_qualified_keys(self):
-        a, b, _ = merge([self.duplicate_keys], fully_qualified=True)
+        a, b = merge([self.duplicate_keys], fully_qualified=True)
         assert b == np.array([0])
         assert {k: list(v) for k, v in a.items()} == {
             "a": [1, 1, 1],
@@ -264,7 +264,7 @@ class TestUtilsMetadata:
 
     @pytest.mark.parametrize("as_numpy", [False, True])
     def test_duplicate_keys(self, as_numpy):
-        a, b, _ = merge([self.duplicate_keys], as_numpy=as_numpy)
+        a, b = merge([self.duplicate_keys], as_numpy=as_numpy)
         assert b == np.array([0])
         assert {k: list(v) for k, v in a.items()} == {
             "a": [1, 1, 1],
@@ -282,7 +282,7 @@ class TestUtilsMetadata:
 
     @pytest.mark.parametrize("as_numpy", [False, True])
     def test_inconsistent_keys(self, as_numpy):
-        a, b, d = merge(self.inconsistent_keys, as_numpy=as_numpy)
+        a, b, d = merge(self.inconsistent_keys, return_dropped=True, as_numpy=as_numpy)
         assert b.size == 3
         assert (b == [0, 1, 2]).all()
         assert {k: list(v) for k, v in a.items()} == {"a": [1, 2, 3]}
@@ -293,14 +293,14 @@ class TestUtilsMetadata:
 
     def test_inconsistent_key(self):
         list_metadata = [{"common": 1, "target": [{"a": 1, "b": 3, "c": 5}, {"a": 2, "b": 4}], "source": "example"}]
-        reorganized_metadata, image_indicies, dropped_keys = merge(list_metadata)
+        reorganized_metadata, image_indices, dropped_keys = merge(list_metadata, return_dropped=True)
         assert reorganized_metadata == {"common": [1, 1], "a": [1, 2], "b": [3, 4], "source": ["example", "example"]}
-        assert image_indicies == np.array([0])
+        assert image_indices == np.array([0])
         assert dropped_keys == {"target_c": {"inconsistent_key"}}
 
     @pytest.mark.parametrize("as_numpy", [False, True])
     def test_voc_test(self, as_numpy):
-        a, b, d = merge(self.voc_test, as_numpy=as_numpy)
+        a, b, d = merge(self.voc_test, return_dropped=True, as_numpy=as_numpy)
         assert b.size == 3
         assert (b == [0, 3, 8]).all()
         assert {k: list(v) for k, v in a.items()} == {
@@ -411,7 +411,7 @@ class TestUtilsMetadata:
         assert d["annotation_object_part"] == {"nested_list"}
 
     def test_dict_of_dicts(self):
-        output, _, _ = merge(self.dict_of_dicts)  # type: ignore
+        output, _ = merge(self.dict_of_dicts)  # type: ignore
         assert output == {
             "keys": ["sample1", "sample2", "sample3", "sample4"],
             "a_that": [37.0, 3.0, 3.7, 137.0],
@@ -451,3 +451,19 @@ class TestUtilsMetadata:
     )
     def test_convert_type(self, value, output):
         assert output == _convert_type(value)
+
+    @pytest.mark.filterwarnings("error")
+    def test_flatten_no_dropped_no_warn(self):
+        flatten({"a": {"b": 1, "c": 2}}, return_dropped=False)
+
+    def test_flatten_no_dropped_warns(self):
+        with pytest.warns(UserWarning, match=r"Metadata keys.*were dropped\."):
+            flatten(self.inconsistent_keys[0], return_dropped=False)
+
+    @pytest.mark.filterwarnings("error")
+    def test_merge_no_dropped_no_warn(self):
+        merge([{"a": {"b": 1, "c": 2}}], return_dropped=False)
+
+    def test_merge_no_dropped_warns(self):
+        with pytest.warns(UserWarning, match=r"Metadata keys.*were dropped\."):
+            merge(self.inconsistent_keys, return_dropped=False)
