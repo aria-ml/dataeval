@@ -5178,9 +5178,9 @@ test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", 
 type = ["pytest-mypy"]
 
 [extras]
-all = ["matplotlib"]
+all = ["matplotlib", "pandas"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "50136628bb7802f67471b281d339a1f5efae5bcebab36282f8a7e8ce49f0b47d"
+content-hash = "be9c07c125a754aa1d714951678ba3fbbc6027dbf7c3b9ae12b1afe2fa44f27c"
