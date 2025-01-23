@@ -106,3 +106,33 @@ class TestOutliersOutput:
         assert isinstance(table_result, str)
         print(table_result)
         assert table_result[:45] == "  Class |    a    |    c    |    d    | Total"
+
+    def test_to_dataframe_list(self):
+        output = OutliersOutput([self.outlier2, self.outlier])
+        assert len(output) == 6
+        lstat = LabelStatsOutput(
+            {"horse": 3, "dog": 4, "mule": 3},
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            {"horse": 3, "dog": 4, "mule": 3},
+            {"horse": [0, 3, 7], "dog": [1, 4, 6, 9], "mule": [2, 5, 8]},
+            10,
+            3,
+            10,
+        )
+        output_df = output.to_dataframe(lstat)
+        assert output_df.shape == (6, 7)
+
+    def test_to_dataframe_dict(self):
+        output = OutliersOutput(self.outlier)
+        assert len(output) == 3
+        lstat = LabelStatsOutput(
+            {"horse": 3, "dog": 4, "mule": 3},
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            {"horse": 3, "dog": 4, "mule": 3},
+            {"horse": [0, 3, 7], "dog": [1, 4, 6, 9], "mule": [2, 5, 8]},
+            10,
+            3,
+            10,
+        )
+        output_df = output.to_dataframe(lstat)
+        assert output_df.shape == (3, 4)
