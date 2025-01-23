@@ -9,7 +9,7 @@
 estimating this error rate. Bayes error rate has a formal definition given by
 the following:
 
-$$\text{BER}= E_X[P(Y\neq y \mid \argmax_i P(Y=i \mid X=x)=y)]$$
+$$\text{BER}= E_X[P(Y\neq y~{\operatorname{argmax}}_i~P(Y=i \mid X=x)=y)]$$
 
 Put into words, it is the misclassification rate of the best possible classifier.
 

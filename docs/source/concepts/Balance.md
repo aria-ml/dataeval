@@ -34,7 +34,7 @@ conditions, with limited target {term}`diversity<Diversity>`, etc. A model
 trained on these realistic datasets could learn to use secondary information to
 perform the primary learning task, reducing the model's ability to generalize
 to new domains or to perform unexpectedly when presented with new data.
-{term}`balance<Balance>` metrics provide a method for identifying relationships
+{term}`Balance` metrics provide a method for identifying relationships
 between dataset factors and class labels _a priori_. A T&E engineer or model
 developer should then use that information to design tests for model
 generalization or data augmentation to mitigate the opportunity for shortcut
@@ -64,8 +64,8 @@ In addition to identifying possible shortcuts, {term}`balance<Balance>` metrics
 may identify issues where data are sampled disproportionately with respect to a
 particular factor. For instance, in the example above where the model is
 trained on images where cows nearly always appear in a grassy field, classwise
-balance, would show a strong relationship between the `cow` class label and
-grassy field environment, provided that background information is encoded in
+balance would show a strong relationship between the `cow` class label and
+grassy field environment provided that background information is encoded in
 the metadata. Given the apparent correlation between the `cow` class label and
 grassy field background, a model developer or T&E engineer should first assess
 whether the correlation is problematic and whether the dataset should be
@@ -93,7 +93,7 @@ augmentation to mitigate or compensate observed biases.
 {term}`Mutual information<Mutual Information (MI)>` is a metric that is often
 used for measuring the quality of dataset clustering or for feature selection,
 and there are several formulations to measure relationships between two
-Categorical Variables, between categorical and continuous variables, and
+categorical variables, between categorical and continuous variables, and
 between two continuous variables. We consider class label a categorical
 variable, as there is typically no presumed ordering between classes; however,
 other metadata factors, such as latitude and longitude or time stamps may take
