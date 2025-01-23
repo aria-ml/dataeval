@@ -23,16 +23,18 @@ Installing from `pip`
 pip install dataeval
 ```
 
-DataEval also has installable *extras* that provide a access to additional
-output formats and utility functions for visual analysis of your data.
+DataEval also has an installable *extras* `all` that provide access to
+additional output formats and utility functions for analysis of your data.
 
 ```{list-table}
 :header-rows: 1
 
-* - Extras
-  - Additional Modules/Functionality
-* - `all`
-  - Plot functionality through `matplotlib`
+* - Additional Functionality
+  - Plot visualizations
+  - Dataframe outputs
+* - Modules Installed
+  - `matplotlib`
+  - `pandas`
 ```
 
 Installing from `pip` with extras
