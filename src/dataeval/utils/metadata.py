@@ -160,9 +160,33 @@ def _flatten_dict_inner(
     return items, size
 
 
+@overload
 def flatten(
-    d: Mapping[str, Any], sep: str, ignore_lists: bool, fully_qualified: bool
-) -> tuple[dict[str, Any], int, dict[str, set[str]]]:
+    d: Mapping[str, Any],
+    return_dropped: Literal[True],
+    sep: str = "_",
+    ignore_lists: bool = False,
+    fully_qualified: bool = False,
+) -> tuple[dict[str, Any], int, dict[str, set[str]]]: ...
+
+
+@overload
+def flatten(
+    d: Mapping[str, Any],
+    return_dropped: Literal[False] = False,
+    sep: str = "_",
+    ignore_lists: bool = False,
+    fully_qualified: bool = False,
+) -> tuple[dict[str, Any], int]: ...
+
+
+def flatten(
+    d: Mapping[str, Any],
+    return_dropped: bool = False,
+    sep: str = "_",
+    ignore_lists: bool = False,
+    fully_qualified: bool = False,
+):
     """
     Flattens a dictionary and converts values to numeric values when possible.
 
@@ -170,22 +194,26 @@ def flatten(
     ----------
     d : dict[str, Any]
         Dictionary to flatten
-    sep : str
+    return_dropped: bool, default False
+        Option to return a dictionary of dropped keys and the reason(s) for dropping
+    sep : str, default "_"
         String separator to use when concatenating key names
-    ignore_lists : bool
+    ignore_lists : bool, default False
         Option to skip expanding lists within metadata
-    fully_qualified : bool
-        Option to return dictionary keys full qualified instead of reduced
+    fully_qualified : bool, default False
+        Option to return dictionary keys fully qualified instead of reduced
 
     Returns
     -------
-    tuple[dict[str, Any], int, dict[str, set[str]]]
-        - [0]: Dictionary of flattened values with the keys reformatted as a hierarchical tuple of strings
-        - [1]: Size of the values in the flattened dictionary
-        - [2]: Dictionary of fully qualified keys and reasons for being dropped from the output dictionary
+    dict[str, Any]
+        Dictionary of flattened values with the keys reformatted as a hierarchical tuple of strings
+    int
+        Size of the values in the flattened dictionary
+    dict[str, set[str]], Optional
+        Dictionary containing dropped keys and reason(s) for dropping
     """
-    dropped: dict[tuple[str, ...], set[DropReason]] = {}
-    expanded, size = _flatten_dict_inner(d, dropped=dropped, parent_keys=(), nested=ignore_lists)
+    dropped_inner: dict[tuple[str, ...], set[DropReason]] = {}
+    expanded, size = _flatten_dict_inner(d, dropped=dropped_inner, parent_keys=(), nested=ignore_lists)
 
     output = {}
     for k, v in expanded.items():
@@ -194,18 +222,25 @@ def flatten(
             if len(cv) == size:
                 output[k] = cv
             else:
-                dropped.setdefault(k, set()).add(DropReason.INCONSISTENT_KEY)
+                dropped_inner.setdefault(k, set()).add(DropReason.INCONSISTENT_KEY)
         elif not isinstance(cv, list):
             output[k] = cv if not size else [cv] * size
 
-    dropped_output = {sep.join(k): {vv.value for vv in v} for k, v in dropped.items()}
     if fully_qualified:
         output = {sep.join(k): v for k, v in output.items()}
     else:
         keys = _get_key_indices(output)
         output = {sep.join(k[keys[k] :]): v for k, v in output.items()}
 
-    return output, size if size is not None else 1, dropped_output
+    size = size if size is not None else 1
+    dropped = {sep.join(k): {vv.value for vv in v} for k, v in dropped_inner.items()}
+
+    if return_dropped:
+        return (output, size, dropped)
+    else:
+        if dropped:
+            warnings.warn(f"Metadata keys {list(dropped)} were dropped.")
+        return output, size
 
 
 def _is_metadata_dict_of_dicts(metadata: Mapping) -> bool:
@@ -223,12 +258,33 @@ def _is_metadata_dict_of_dicts(metadata: Mapping) -> bool:
     return set(metadata[keys[0]]) == set(metadata[keys[1]])
 
 
+@overload
 def merge(
     metadata: Iterable[Mapping[str, Any]],
+    return_dropped: Literal[True],
     ignore_lists: bool = False,
     fully_qualified: bool = False,
     as_numpy: bool = False,
-) -> tuple[dict[str, list[Any]] | dict[str, NDArray[Any]], NDArray[np.int_], dict[str, set[str]]]:
+) -> tuple[dict[str, list[Any]] | dict[str, NDArray[Any]], NDArray[np.int_], dict[str, set[str]]]: ...
+
+
+@overload
+def merge(
+    metadata: Iterable[Mapping[str, Any]],
+    return_dropped: Literal[False] = False,
+    ignore_lists: bool = False,
+    fully_qualified: bool = False,
+    as_numpy: bool = False,
+) -> tuple[dict[str, list[Any]] | dict[str, NDArray[Any]], NDArray[np.int_]]: ...
+
+
+def merge(
+    metadata: Iterable[Mapping[str, Any]],
+    return_dropped: bool = False,
+    ignore_lists: bool = False,
+    fully_qualified: bool = False,
+    as_numpy: bool = False,
+):
     """
     Merges a collection of metadata dictionaries into a single flattened dictionary of keys and values.
 
@@ -239,6 +295,8 @@ def merge(
     ----------
     metadata : Iterable[Mapping[str, Any]]
         Iterable collection of metadata dictionaries to flatten and merge
+    return_dropped: bool, default False
+        Option to return a dictionary of dropped keys and the reason(s) for dropping
     ignore_lists : bool, default False
         Option to skip expanding lists within metadata
     fully_qualified : bool, default False
@@ -248,10 +306,12 @@ def merge(
 
     Returns
     -------
-    tuple[dict[str, list[Any]] | dict[str, NDArray[Any]], NDArray[np.int], set[str]]
-        - [0]: A single dictionary containing the flattened data as lists or NumPy arrays
-        - [1]: Array defining where individual images start, helpful when working with object detection metadata
-        - [2]: Set of fully qualified inconsistent keys for dropped metadata
+    dict[str, list[Any]] | dict[str, NDArray[Any]]
+        A single dictionary containing the flattened data as lists or NumPy arrays
+    NDArray[np.int]
+        Array defining where individual images start, helpful when working with object detection metadata
+    dict[str, set[str]], Optional
+        Dictionary containing dropped keys and reason(s) for dropping
 
     Note
     ----
@@ -260,10 +320,10 @@ def merge(
     Example
     -------
     >>> list_metadata = [{"common": 1, "target": [{"a": 1, "b": 3, "c": 5}, {"a": 2, "b": 4}], "source": "example"}]
-    >>> reorganized_metadata, image_indicies, dropped_keys = merge(list_metadata)
+    >>> reorganized_metadata, image_indices, dropped_keys = merge(list_metadata, return_dropped=True)
     >>> reorganized_metadata
     {'common': [1, 1], 'a': [1, 2], 'b': [3, 4], 'source': ['example', 'example']}
-    >>> image_indicies
+    >>> image_indices
     array([0])
     >>> dropped_keys
     {'target_c': {'inconsistent_key'}}
@@ -273,6 +333,7 @@ def merge(
     union: set[str] = set()
     keys: list[str] | None = None
     dicts: list[Mapping[str, Any]]
+    dropped: dict[str, set[str]]
 
     # EXPERIMENTAL
     if isinstance(metadata, Mapping) and _is_metadata_dict_of_dicts(metadata):
@@ -284,32 +345,35 @@ def merge(
         dicts = list(metadata)
 
     image_repeats = np.zeros(len(dicts))
-    dropped: dict[str, set[DropReason]] = {}
+    dropped_aggregated: dict[str, set[DropReason]] = {}
     for i, d in enumerate(dicts):
         flattened, image_repeats[i], dropped_inner = flatten(
-            d, sep="_", ignore_lists=ignore_lists, fully_qualified=fully_qualified
+            d,
+            return_dropped=True,
+            ignore_lists=ignore_lists,
+            fully_qualified=fully_qualified,
         )
         isect = isect.intersection(flattened.keys()) if isect else set(flattened.keys())
         union.update(flattened.keys())
         for k, v in dropped_inner.items():
-            dropped.setdefault(k, set()).update({DropReason(vv) for vv in v})
+            dropped_aggregated.setdefault(k, set()).update({DropReason(vv) for vv in v})
         for k, v in flattened.items():
             merged.setdefault(k, []).extend(flattened[k]) if isinstance(v, list) else merged.setdefault(k, []).append(v)
 
     for k in union - isect:
-        dropped.setdefault(k, set()).add(DropReason.INCONSISTENT_KEY)
+        dropped_aggregated.setdefault(k, set()).add(DropReason.INCONSISTENT_KEY)
 
     output: dict[str, Any] = {}
 
     if image_repeats.sum() == image_repeats.size:
-        image_indicies = np.arange(image_repeats.size)
+        image_indices = np.arange(image_repeats.size)
     else:
         image_ids = np.arange(image_repeats.size)
         image_data = np.concatenate(
             [np.repeat(image_ids[i], image_repeats[i]) for i in range(image_ids.size)], dtype=np.int_
         )
         _, image_unsorted = np.unique(image_data, return_index=True)
-        image_indicies = np.sort(image_unsorted)
+        image_indices = np.sort(image_unsorted)
 
     if keys:
         output["keys"] = np.array(keys) if as_numpy else keys
@@ -318,7 +382,13 @@ def merge(
         cv = _convert_type(merged[k])
         output[k] = np.array(cv) if as_numpy else cv
 
-    return output, image_indicies, {k: {vv.value for vv in v} for k, v in dropped.items()}
+    if return_dropped:
+        dropped = {k: {vv.value for vv in v} for k, v in dropped_aggregated.items()}
+        return output, image_indices, dropped
+    else:
+        if dropped_aggregated:
+            warnings.warn(f"Metadata keys {list(dropped_aggregated)} were dropped.")
+        return output, image_indices
 
 
 @dataclass(frozen=True)
@@ -394,7 +464,7 @@ def preprocess(
         Output class containing the binned metadata
     """
     # Transform metadata into single, flattened dictionary
-    metadata, image_repeats, dropped_keys = merge(raw_metadata)
+    metadata, image_repeats, dropped = merge(raw_metadata, return_dropped=True)
 
     continuous_factor_bins = dict(continuous_factor_bins) if continuous_factor_bins else None
 
@@ -470,7 +540,7 @@ def preprocess(
         numerical_labels,
         unique_classes,
         total_num_factors,
-        dropped_keys,
+        dropped,
     )
 
 
@@ -536,7 +606,7 @@ def _bin_data(data: NDArray[Any], bin_method: str) -> NDArray[np.int_]:
     return np.digitize(data, bin_edges)  # type: ignore
 
 
-def _is_continuous(data: NDArray[np.number], image_indicies: NDArray[np.number]) -> bool:
+def _is_continuous(data: NDArray[np.number], image_indices: NDArray[np.number]) -> bool:
     """
     Determines whether the data is continuous or discrete using the Wasserstein distance.
 
@@ -555,11 +625,11 @@ def _is_continuous(data: NDArray[np.number], image_indicies: NDArray[np.number])
     measured from a uniform distribution is greater or less than 0.054, respectively.
     """
     # Check if the metadata is image specific
-    _, data_indicies_unsorted = np.unique(data, return_index=True)
-    if data_indicies_unsorted.size == image_indicies.size:
-        data_indicies = np.sort(data_indicies_unsorted)
-        if (data_indicies == image_indicies).all():
-            data = data[data_indicies]
+    _, data_indices_unsorted = np.unique(data, return_index=True)
+    if data_indices_unsorted.size == image_indices.size:
+        data_indices = np.sort(data_indices_unsorted)
+        if (data_indices == image_indices).all():
+            data = data[data_indices]
 
     # OLD METHOD
     # uvals = np.unique(data)
