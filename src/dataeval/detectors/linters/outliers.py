@@ -2,7 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
-# import contextlib
+import contextlib
 from dataclasses import dataclass
 from typing import Generic, Iterable, Literal, Sequence, TypeVar, Union, overload
 
@@ -18,8 +18,8 @@ from dataeval.metrics.stats.pixelstats import PixelStatsOutput
 from dataeval.metrics.stats.visualstats import VisualStatsOutput
 from dataeval.output import Output, set_metadata
 
-# with contextlib.suppress(ImportError):
-#     import pandas as pd
+with contextlib.suppress(ImportError):
+    import pandas as pd
 
 
 IndexIssueMap = dict[int, dict[str, float]]
@@ -69,16 +69,16 @@ def _create_table(metrics, class_wise):
     return table
 
 
-# def _create_pandas_dataframe(class_wise):
-#     """Create data for pandas dataframe"""
-#     data = []
-#     for label, metrics_dict in class_wise.items():
-#         row = {"Class": label}
-#         total = sum(metrics_dict.values())
-#         row.update(metrics_dict)  # Add metric counts
-#         row["Total"] = total
-#         data.append(row)
-#     return data
+def _create_pandas_dataframe(class_wise):
+    """Create data for pandas dataframe"""
+    data = []
+    for label, metrics_dict in class_wise.items():
+        row = {"Class": label}
+        total = sum(metrics_dict.values())
+        row.update(metrics_dict)  # Add metric counts
+        row["Total"] = total
+        data.append(row)
+    return data
 
 
 @dataclass(frozen=True)
@@ -120,23 +120,23 @@ class OutliersOutput(Generic[TIndexIssueMap], Output):
             table = "\n\n".join(outertable)
         return table
 
-    # def to_dataframe(self, labelstats: LabelStatsOutput) -> pd.DataFrame:
-    #     import pandas as pd
+    def to_dataframe(self, labelstats: LabelStatsOutput) -> pd.DataFrame:
+        import pandas as pd
 
-    #     if isinstance(self.issues, dict):
-    #         _, classwise = _reorganize_by_class_and_metric(self.issues, labelstats)
-    #         data = _create_pandas_dataframe(classwise)
-    #         df = pd.DataFrame(data)
-    #     else:
-    #         df_list = []
-    #         for i, d in enumerate(self.issues):
-    #             _, classwise = _reorganize_by_class_and_metric(d, labelstats)
-    #             data = _create_pandas_dataframe(classwise)
-    #             single_df = pd.DataFrame(data)
-    #             single_df["Dataset"] = i
-    #             df_list.append(single_df)
-    #         df = pd.concat(df_list)
-    #     return df
+        if isinstance(self.issues, dict):
+            _, classwise = _reorganize_by_class_and_metric(self.issues, labelstats)
+            data = _create_pandas_dataframe(classwise)
+            df = pd.DataFrame(data)
+        else:
+            df_list = []
+            for i, d in enumerate(self.issues):
+                _, classwise = _reorganize_by_class_and_metric(d, labelstats)
+                data = _create_pandas_dataframe(classwise)
+                single_df = pd.DataFrame(data)
+                single_df["Dataset"] = i
+                df_list.append(single_df)
+            df = pd.concat(df_list)
+        return df
 
 
 def _get_outlier_mask(

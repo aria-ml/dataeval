@@ -2,7 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
-# import contextlib
+import contextlib
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, TypeVar
@@ -13,8 +13,8 @@ from numpy.typing import ArrayLike
 from dataeval.interop import as_numpy
 from dataeval.output import Output, set_metadata
 
-# with contextlib.suppress(ImportError):
-#     import pandas as pd
+with contextlib.suppress(ImportError):
+    import pandas as pd
 
 
 @dataclass(frozen=True)
@@ -73,24 +73,24 @@ class LabelStatsOutput(Output):
 
         return table_str
 
-    # def to_dataframe(self) -> pd.DataFrame:
-    #     import pandas as pd
+    def to_dataframe(self) -> pd.DataFrame:
+        import pandas as pd
 
-    #     class_list = []
-    #     total_count = []
-    #     image_count = []
-    #     for cls in self.label_counts_per_class:
-    #         class_list.append(cls)
-    #         total_count.append(self.label_counts_per_class[cls])
-    #         image_count.append(self.image_counts_per_label[cls])
+        class_list = []
+        total_count = []
+        image_count = []
+        for cls in self.label_counts_per_class:
+            class_list.append(cls)
+            total_count.append(self.label_counts_per_class[cls])
+            image_count.append(self.image_counts_per_label[cls])
 
-    #     return pd.DataFrame(
-    #         {
-    #             "Label": class_list,
-    #             "Total Count": total_count,
-    #             "Image Count": image_count,
-    #         }
-    #     )
+        return pd.DataFrame(
+            {
+                "Label": class_list,
+                "Total Count": total_count,
+                "Image Count": image_count,
+            }
+        )
 
 
 TKey = TypeVar("TKey", int, str)

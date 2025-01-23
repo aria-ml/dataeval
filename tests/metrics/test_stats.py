@@ -255,6 +255,12 @@ class TestLabelStats:
             labelstats(labels)
         assert err_msg in str(e.value)
 
+    def test_label_stats_to_dataframe(self):
+        label_array = [[0, 0, 0, 0, 0], [0, 1], [0, 1, 2], [0, 1, 2, 3]]
+        stats = labelstats(label_array)
+        stats_df = stats.to_dataframe()
+        assert stats_df.shape == (4, 3)
+
 
 @pytest.mark.parametrize("as_float", [True, False])
 class TestBBoxStats:
