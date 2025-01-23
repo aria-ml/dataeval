@@ -224,18 +224,18 @@ class TestIsContinuousUnit:
     )
     def test_is_continuous_repeats(self, data, repeats):
         _, image_unsorted = np.unique(repeats, return_index=True)
-        image_indicies = np.sort(image_unsorted)
-        output = _is_continuous(data, image_indicies)
+        image_indices = np.sort(image_unsorted)
+        output = _is_continuous(data, image_indices)
         assert output is not True
 
     def test_is_coninuous_warning(self):
         data = np.array([0, 4, 3, 5, 6, 8] * 15)
         repeats = np.array([0, 4, 3, 5, 6, 8] * 15)
         _, image_unsorted = np.unique(repeats, return_index=True)
-        image_indicies = np.sort(image_unsorted)
+        image_indices = np.sort(image_unsorted)
         warn_msg = (
             f"[UserWarning('All samples look discrete with so few data points (< {CONTINUOUS_MIN_SAMPLE_SIZE})')]"
         )
         with pytest.warns(UserWarning, match=warn_msg):
-            output = _is_continuous(data, image_indicies)
+            output = _is_continuous(data, image_indices)
         assert output is not True
