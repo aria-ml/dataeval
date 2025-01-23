@@ -8,7 +8,7 @@ opened in Google Colab to be used interactively!
 
 ## Detectors
 
-- [How to detect if the data distribution is changing](DriftDetectionTutorial.ipynb)
+- [How to detect if the data distribution is changing (Drift Detection Tutorial Using Multiple Drift Detectors)](DriftDetectionTutorial.ipynb)
   [![Open In Colab][colab-badge]][drift-colab]
 - [How to monitor for outliers during deployment](OODDetectionTutorial.ipynb)
   [![Open In Colab][colab-badge]][out-colab]
