@@ -64,8 +64,9 @@ class _Category(IntEnum):
     DEPRECATION = 2
     IMPROVEMENT = 3
     FIX = 4
-    UNKNOWN = 5
-    TAG = 6
+    MISCELLANEOUS = 5
+    UNKNOWN = 6
+    TAG = 7
 
     @classmethod
     def from_label(cls, value: str) -> "_Category":
@@ -79,6 +80,8 @@ class _Category(IntEnum):
             return _Category.DEPRECATION
         elif "release::major" in value:
             return _Category.MAJOR
+        elif "release::misc" in value:
+            return _Category.MISCELLANEOUS
         return _Category.UNKNOWN
 
     @classmethod
@@ -93,8 +96,9 @@ class _Category(IntEnum):
             return "🚧 **Deprecations and Removals**"
         elif value == _Category.MAJOR:
             return "🚀 **Major Release**"
-        else:
+        elif value == _Category.MISCELLANEOUS:
             return "📝 **Miscellaneous**"
+        raise ValueError("Do not generate release markdown for UNKNOWN entries")
 
     @classmethod
     def version_type(cls, value: "_Category") -> Literal["MAJOR", "MINOR", "PATCH"]:
@@ -248,6 +252,9 @@ class ReleaseGen:
 
         categories = sorted(entries)
         for category in categories:
+            # skip unknown categories
+            if category == _Category.UNKNOWN:
+                continue
             merges = entries[category]
             lines.append("")
             lines.append(_Category.to_markdown(category))
