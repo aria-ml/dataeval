@@ -179,14 +179,14 @@ class TestLabelIndependenceFunctional:
 class TestMDParityUnit:
     def test_warns_with_not_enough_frequency(self):
         labels = [0, 1]
-        factors = [{"factor1": [10, 20]}]
+        factors = {"factor1": [10, 20]}
         metadata = preprocess(factors, labels)
         with pytest.warns(UserWarning):
             parity(metadata)
 
     def test_passes_with_enough_frequency(self):
         labels = [0] * 5 + [1] * 5
-        factors = [{"factor1": ["foo"] * 10}]
+        factors = {"factor1": ["foo"] * 10}
         metadata = preprocess(factors, labels)
         parity(metadata)
 
@@ -199,7 +199,7 @@ class TestMDParityFunctional:
         corresponds to class and factor1 being highly correlated.
         """
         labels = [0] * 5 + [1] * 5
-        factors = [{"factor1": ["a"] * 5 + ["b"] * 5}]
+        factors = {"factor1": ["a"] * 5 + ["b"] * 5}
         metadata = preprocess(factors, labels)
         result = parity(metadata)
 
@@ -212,7 +212,7 @@ class TestMDParityFunctional:
         that chi2 and p correspond to factor1 being uncorrelated with class.
         """
         labels = [0] * 5 + [1] * 5
-        factors = [{"factor1": ["foo"] * 10}]
+        factors = {"factor1": ["foo"] * 10}
         metadata = preprocess(factors, labels)
         result = parity(metadata)
 
@@ -226,12 +226,12 @@ class TestMDParityFunctional:
         This verifies that the '11' and '10' values get grouped together.
         """
         labels = [0] * 5 + [1] * 5
-        factors = [{"factor1": [10] * 2 + [11] * 3 + [20] * 5}]
+        factors = {"factor1": [10] * 2 + [11] * 3 + [20] * 5}
         continuous_bincounts = {"factor1": 2}
         metadata = preprocess(factors, labels, continuous_bincounts)
         result1 = parity(metadata)
 
-        discrete_dataset = [{"factor2": [10] * 5 + [20] * 5}]
+        discrete_dataset = {"factor2": [10] * 5 + [20] * 5}
         metadata = preprocess(discrete_dataset, labels)
         result2 = parity(metadata)
 
@@ -246,7 +246,7 @@ class TestMDParityFunctional:
         factor1 is the same over the entire dataset.
         """
         labels = [0] * 5 + [1] * 5
-        factors = [{"factor1": [10] * 2 + [11] * 3 + [20] * 5}]
+        factors = {"factor1": [10] * 2 + [11] * 3 + [20] * 5}
         continuous_bincounts = {"factor1": 1}
         metadata = preprocess(factors, labels, continuous_bincounts)
         result = parity(metadata)
@@ -261,7 +261,7 @@ class TestMDParityFunctional:
         that contain a small number of points.
         """
         labels = [0] * 5 + [1] * 5
-        factors = [{"factor1": list(np.arange(10))}]
+        factors = {"factor1": list(np.arange(10))}
         continuous_bincounts = {"factor1": 10}
         metadata = preprocess(factors, labels, continuous_bincounts)
 
@@ -275,7 +275,7 @@ class TestMDParityFunctional:
         that contain a small number of points.
         """
         labels = [0] * 5 + [1] * 5 + [0] * 5 + [1] * 5
-        factors = [{"factor1": list(np.arange(10)) + list(np.arange(10))}]
+        factors = {"factor1": list(np.arange(10)) + list(np.arange(10))}
         continuous_bincounts = {"factor1": 10}
         metadata = preprocess(factors, labels, continuous_bincounts)
 

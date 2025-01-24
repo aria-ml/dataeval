@@ -27,13 +27,13 @@ def metadata_results():
     ]
     cat_vals = [1.1, 1.1, 0.1, 0.1, 1.1, 0.1, 1.1, 0.1, 0.1, 1.1, 1.1, 0.1]
     class_labels = ["dog", "dog", "dog", "cat", "dog", "cat", "dog", "dog", "dog", "cat", "cat", "cat"]
-    md = [{"var_cat": str_vals, "var_cnt": cnt_vals, "var_float_cat": cat_vals}]
+    md = {"var_cat": str_vals, "var_cnt": cnt_vals, "var_float_cat": cat_vals}
     return preprocess(md, class_labels, {"var_cnt": 3, "var_float_cat": 2})
 
 
 @pytest.fixture
 def mismatch_metadata():
-    raw_metadata = [{"factor1": list(range(10)), "factor2": list(range(10)), "factor3": list(range(10))}]
+    raw_metadata = {"factor1": list(range(10)), "factor2": list(range(10)), "factor3": list(range(10))}
     class_labels = [1] * 10
     continuous_bins = {"factor1": 5, "factor2": 5, "factor3": 5}
     return preprocess(raw_metadata, class_labels, continuous_bins)
@@ -41,7 +41,7 @@ def mismatch_metadata():
 
 @pytest.fixture
 def simple_metadata():
-    raw_metadata = [{"factor1": [1] * 100 + [2] * 100, "factor2": [1] * 100 + [2] * 100}]
+    raw_metadata = {"factor1": [1] * 100 + [2] * 100, "factor2": [1] * 100 + [2] * 100}
     class_labels = [1] * 100 + [2] * 100
     return preprocess(raw_metadata, class_labels)
 
