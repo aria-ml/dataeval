@@ -1,4 +1,3 @@
-import numpy as np
 import pytest
 
 from dataeval.utils.metadata import _convert_type, _try_cast, flatten, merge
@@ -233,8 +232,7 @@ class TestUtilsMetadata:
     }
 
     def test_ignore_lists(self):
-        a, b = merge([self.duplicate_keys], ignore_lists=True)
-        assert b == np.array([0])
+        a, d = merge([self.duplicate_keys], return_dropped=True, ignore_lists=True)
         assert {k: list(v) for k, v in a.items()} == {
             "a": [1],
             "b1": ["b1"],
@@ -243,11 +241,12 @@ class TestUtilsMetadata:
             "f": [5],
             "g": [6],
             "h": [1],
+            "_image_index": [0],
         }
+        assert d == {"c_d": ["nested_list"], "c_h": ["nested_list"]}
 
     def test_fully_qualified_keys(self):
-        a, b = merge([self.duplicate_keys], fully_qualified=True)
-        assert b == np.array([0])
+        a, d = merge([self.duplicate_keys], return_dropped=True, fully_qualified=True)
         assert {k: list(v) for k, v in a.items()} == {
             "a": [1, 1, 1],
             "b_b1": ["b1", "b1", "b1"],
@@ -260,12 +259,13 @@ class TestUtilsMetadata:
             "d_d_f": [5, 5, 5],
             "d_d_g": [6, 6, 6],
             "d_h": [1, 1, 1],
+            "_image_index": [0, 0, 0],
         }
+        assert d == {"c_d_z": ["inconsistent_key"]}
 
-    @pytest.mark.parametrize("as_numpy", [False, True])
-    def test_duplicate_keys(self, as_numpy):
-        a, b = merge([self.duplicate_keys], as_numpy=as_numpy)
-        assert b == np.array([0])
+    @pytest.mark.parametrize("return_numpy", [False, True])
+    def test_duplicate_keys(self, return_numpy):
+        a = merge([self.duplicate_keys], return_numpy=return_numpy)
         assert {k: list(v) for k, v in a.items()} == {
             "a": [1, 1, 1],
             "b1": ["b1", "b1", "b1"],
@@ -278,31 +278,33 @@ class TestUtilsMetadata:
             "d_d_f": [5, 5, 5],
             "d_d_g": [6, 6, 6],
             "d_h": [1, 1, 1],
+            "_image_index": [0, 0, 0],
         }
 
-    @pytest.mark.parametrize("as_numpy", [False, True])
-    def test_inconsistent_keys(self, as_numpy):
-        a, b, d = merge(self.inconsistent_keys, return_dropped=True, as_numpy=as_numpy)
-        assert b.size == 3
-        assert (b == [0, 1, 2]).all()
-        assert {k: list(v) for k, v in a.items()} == {"a": [1, 2, 3]}
-        assert len(d) == 3
-        assert d["b"] == {"inconsistent_key"}
-        assert d["c"] == {"inconsistent_size"}
-        assert d["d_e_f"] == {"nested_list"}
+    @pytest.mark.parametrize("return_numpy", [False, True])
+    def test_inconsistent_keys(self, return_numpy):
+        a, d = merge(self.inconsistent_keys, return_dropped=True, return_numpy=return_numpy)
+        assert {k: list(v) for k, v in a.items()} == {
+            "a": [1, 2, 3],
+            "_image_index": [0, 1, 2],
+        }
+        assert d == {"b": ["inconsistent_key"], "c": ["inconsistent_size"], "d_e_f": ["nested_list"]}
 
     def test_inconsistent_key(self):
         list_metadata = [{"common": 1, "target": [{"a": 1, "b": 3, "c": 5}, {"a": 2, "b": 4}], "source": "example"}]
-        reorganized_metadata, image_indices, dropped_keys = merge(list_metadata, return_dropped=True)
-        assert reorganized_metadata == {"common": [1, 1], "a": [1, 2], "b": [3, 4], "source": ["example", "example"]}
-        assert image_indices == np.array([0])
-        assert dropped_keys == {"target_c": {"inconsistent_key"}}
+        reorganized_metadata, dropped_keys = merge(list_metadata, return_dropped=True)
+        assert reorganized_metadata == {
+            "common": [1, 1],
+            "a": [1, 2],
+            "b": [3, 4],
+            "source": ["example", "example"],
+            "_image_index": [0, 0],
+        }
+        assert dropped_keys == {"target_c": ["inconsistent_key"]}
 
-    @pytest.mark.parametrize("as_numpy", [False, True])
-    def test_voc_test(self, as_numpy):
-        a, b, d = merge(self.voc_test, return_dropped=True, as_numpy=as_numpy)
-        assert b.size == 3
-        assert (b == [0, 3, 8]).all()
+    @pytest.mark.parametrize("return_numpy", [False, True])
+    def test_voc_test(self, return_numpy):
+        a = merge(self.voc_test, return_numpy=return_numpy)
         assert {k: list(v) for k, v in a.items()} == {
             "folder": [
                 "VOC2011",
@@ -406,12 +408,11 @@ class TestUtilsMetadata:
             "xmax": [471, 289, 289, 203, 273, 395, 500, 500, 500, 361, 212],
             "ymax": [420, 167, 167, 35, 121, 237, 188, 282, 375, 375, 357],
             "difficult": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            "_image_index": [0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2],
         }
-        assert len(d) == 1
-        assert d["annotation_object_part"] == {"nested_list"}
 
     def test_dict_of_dicts(self):
-        output, _ = merge(self.dict_of_dicts)  # type: ignore
+        output, dropped = merge(self.dict_of_dicts, return_dropped=True)  # type: ignore
         assert output == {
             "keys": ["sample1", "sample2", "sample3", "sample4"],
             "a_that": [37.0, 3.0, 3.7, 137.0],
@@ -419,6 +420,13 @@ class TestUtilsMetadata:
             "c": ["today", "yesterday", "tomorrow", "today"],
             "when": [0.4, 14.4, 4.0, 75.0],
             "what": [23.0, 2.3, 0.23, 14.0],
+            "_image_index": [0, 1, 2, 3],
+        }
+        assert dropped == {
+            "a_this": ["inconsistent_key"],
+            "b_this": ["inconsistent_key"],
+            "d": ["inconsistent_key", "nested_list"],
+            "this": ["inconsistent_key"],
         }
 
     @pytest.mark.parametrize(
