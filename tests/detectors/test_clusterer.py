@@ -25,7 +25,7 @@ def get_blobs(std=0.3):
     return blobs
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def functional_data():
     functional_data = get_blobs()
     functional_data[79] = functional_data[24]
@@ -34,13 +34,13 @@ def functional_data():
     return functional_data
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def duplicate_data():
     x = np.ones(shape=(6, 2))
     return x
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def outlier_data():
     test_data = get_blobs()
     rng = np.random.default_rng(33)

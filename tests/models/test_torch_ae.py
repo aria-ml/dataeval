@@ -7,7 +7,7 @@ from dataeval.utils.torch.trainer import AETrainer, get_images_from_batch
 from tests.mock.data import DataEvalDataset
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def dataset(images=None, labels=None, bboxes=None):
     return DataEvalDataset(images, labels, bboxes)
 

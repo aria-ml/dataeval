@@ -59,7 +59,7 @@ class TestFunctionalClassifierUncertainty:
     )
     n_tests = len(test_params)
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def clfuncdrift_params(self, request):
         return self.test_params[request.param]
 
@@ -114,7 +114,7 @@ class TestClassifierUncertainty:
     tests_cu = ["probs", "logits"]
     n_tests_cu = len(tests_cu)
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def cu_params(self, request):
         return self.tests_cu[request.param]
 

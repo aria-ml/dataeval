@@ -6,7 +6,7 @@ from dataeval.metrics.bias import diversity
 from dataeval.utils.metadata import preprocess
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def metadata_results():
     str_vals = ["a", "a", "a", "a", "b", "a", "a", "a", "b", "b"]
     cnt_vals = [0.63784, -0.86422, -0.1017, -1.95131, -0.08494, -1.02940, 0.07908, -0.31724, -1.45562, 1.03368]

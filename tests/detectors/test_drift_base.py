@@ -25,7 +25,7 @@ class TestUpdateReference:
     tests_update = list(product(n, n_features, update_method))
     n_tests_update = len(tests_update)
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def update_params(self, request):
         return self.tests_update[request.param]
 

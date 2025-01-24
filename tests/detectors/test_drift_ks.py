@@ -31,7 +31,7 @@ class TestKSDrift:
     )
     n_tests = len(tests_ksdrift)
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def ksdrift_params(self, request):
         return self.tests_ksdrift[request.param]
 

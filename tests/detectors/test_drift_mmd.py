@@ -79,7 +79,7 @@ class TestMMDDrift:
     )
     n_tests = len(tests_mmddrift)
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def mmd_params(self, request):
         return self.tests_mmddrift[request.param]
 

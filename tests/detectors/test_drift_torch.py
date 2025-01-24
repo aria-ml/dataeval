@@ -76,7 +76,7 @@ class TestPredictBatch:
     ]
     n_tests = len(tests_predict)
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def params(self, request):
         return self.tests_predict[request.param]
 
@@ -110,7 +110,7 @@ class TestSquaredPairwiseDistance:
     tests_pairwise = list(product(n_features, n_instances))
     n_tests_pairwise = len(tests_pairwise)
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def pairwise_params(self, request):
         return self.tests_pairwise[request.param]
 
@@ -144,7 +144,7 @@ class TestMMDKernelMatrix:
     tests_mmd_from_kernel_matrix = list(product(n, m, permute, zero_diag))
     n_tests_mmd_from_kernel_matrix = len(tests_mmd_from_kernel_matrix)
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def mmd_from_kernel_matrix_params(self, request):
         return self.tests_mmd_from_kernel_matrix[request.param]
 
