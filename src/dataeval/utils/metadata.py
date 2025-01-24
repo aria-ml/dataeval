@@ -21,6 +21,7 @@ from dataeval.output import Output, set_metadata
 
 DISCRETE_MIN_WD = 0.054
 CONTINUOUS_MIN_SAMPLE_SIZE = 20
+DEFAULT_IMAGE_INDEX_KEY = "_image_index"
 
 
 class DropReason(Enum):
@@ -48,8 +49,8 @@ def _convert_type(data: str) -> int | float | str: ...
 
 def _convert_type(data: list[str] | str) -> list[int] | list[float] | list[str] | int | float | str:
     """
-    Converts a value or a list of values to the simplest form possible, in preferred order of `int`,
-    `float`, or `string`.
+    Converts a value or a list of values to the simplest form possible,
+    in preferred order of `int`, `float`, or `string`.
 
     Parameters
     ----------
@@ -106,6 +107,10 @@ def _get_key_indices(keys: Iterable[tuple[str, ...]]) -> dict[tuple[str, ...], i
     return indices
 
 
+def _sorted_drop_reasons(d: dict[str, set[DropReason]]) -> dict[str, list[str]]:
+    return {k: sorted({vv.value for vv in v}) for k, v in sorted(d.items(), key=lambda item: item[1])}
+
+
 def _flatten_dict_inner(
     d: Mapping[str, Any],
     dropped: dict[tuple[str, ...], set[DropReason]],
@@ -132,7 +137,8 @@ def _flatten_dict_inner(
     Returns
     -------
     tuple[dict[tuple[str, ...], Any], int | None]
-        - [0]: Dictionary of flattened values with the keys reformatted as a hierarchical tuple of strings
+        - [0]: Dictionary of flattened values with the keys reformatted as a
+               hierarchical tuple of strings
         - [1]: Size, if any, of the current list of values
     """
     items: dict[tuple[str, ...], Any] = {}
@@ -167,7 +173,7 @@ def flatten(
     sep: str = "_",
     ignore_lists: bool = False,
     fully_qualified: bool = False,
-) -> tuple[dict[str, Any], int, dict[str, set[str]]]: ...
+) -> tuple[dict[str, Any], int, dict[str, list[str]]]: ...
 
 
 @overload
@@ -209,7 +215,7 @@ def flatten(
         Dictionary of flattened values with the keys reformatted as a hierarchical tuple of strings
     int
         Size of the values in the flattened dictionary
-    dict[str, set[str]], Optional
+    dict[str, list[str]], Optional
         Dictionary containing dropped keys and reason(s) for dropping
     """
     dropped_inner: dict[tuple[str, ...], set[DropReason]] = {}
@@ -233,10 +239,10 @@ def flatten(
         output = {sep.join(k[keys[k] :]): v for k, v in output.items()}
 
     size = size if size is not None else 1
-    dropped = {sep.join(k): {vv.value for vv in v} for k, v in dropped_inner.items()}
+    dropped = {sep.join(k): v for k, v in dropped_inner.items()}
 
     if return_dropped:
-        return (output, size, dropped)
+        return output, size, _sorted_drop_reasons(dropped)
     else:
         if dropped:
             warnings.warn(f"Metadata keys {list(dropped)} were dropped.")
@@ -264,8 +270,8 @@ def merge(
     return_dropped: Literal[True],
     ignore_lists: bool = False,
     fully_qualified: bool = False,
-    as_numpy: bool = False,
-) -> tuple[dict[str, list[Any]] | dict[str, NDArray[Any]], NDArray[np.int_], dict[str, set[str]]]: ...
+    return_numpy: bool = False,
+) -> tuple[dict[str, list[Any]] | dict[str, NDArray[Any]], dict[str, list[str]]]: ...
 
 
 @overload
@@ -274,8 +280,8 @@ def merge(
     return_dropped: Literal[False] = False,
     ignore_lists: bool = False,
     fully_qualified: bool = False,
-    as_numpy: bool = False,
-) -> tuple[dict[str, list[Any]] | dict[str, NDArray[Any]], NDArray[np.int_]]: ...
+    return_numpy: bool = False,
+) -> dict[str, list[Any]] | dict[str, NDArray[Any]]: ...
 
 
 def merge(
@@ -283,13 +289,16 @@ def merge(
     return_dropped: bool = False,
     ignore_lists: bool = False,
     fully_qualified: bool = False,
-    as_numpy: bool = False,
+    return_numpy: bool = False,
 ):
     """
-    Merges a collection of metadata dictionaries into a single flattened dictionary of keys and values.
+    Merges a collection of metadata dictionaries into a single flattened
+    dictionary of keys and values.
 
-    Nested dictionaries are flattened, and lists are expanded. Nested lists are dropped as expanding
-    into multiple hierarchical trees is not supported.
+    Nested dictionaries are flattened, and lists are expanded. Nested lists are
+    dropped as the expanding into multiple hierarchical trees is not supported.
+    The function adds an internal "_image_index" key to the metadata dictionary
+    for consumption by the preprocess function.
 
     Parameters
     ----------
@@ -301,39 +310,35 @@ def merge(
         Option to skip expanding lists within metadata
     fully_qualified : bool, default False
         Option to return dictionary keys full qualified instead of minimized
-    as_numpy : bool, default False
+    return_numpy : bool, default False
         Option to return results as lists or NumPy arrays
 
     Returns
     -------
     dict[str, list[Any]] | dict[str, NDArray[Any]]
         A single dictionary containing the flattened data as lists or NumPy arrays
-    NDArray[np.int]
-        Array defining where individual images start, helpful when working with object detection metadata
-    dict[str, set[str]], Optional
+    dict[str, list[str]], Optional
         Dictionary containing dropped keys and reason(s) for dropping
 
     Note
     ----
-    Nested lists of values and inconsistent keys are dropped in the merged metadata dictionary
+    Nested lists of values and inconsistent keys are dropped in the merged
+    metadata dictionary
 
     Example
     -------
     >>> list_metadata = [{"common": 1, "target": [{"a": 1, "b": 3, "c": 5}, {"a": 2, "b": 4}], "source": "example"}]
-    >>> reorganized_metadata, image_indices, dropped_keys = merge(list_metadata, return_dropped=True)
+    >>> reorganized_metadata, dropped_keys = merge(list_metadata, return_dropped=True)
     >>> reorganized_metadata
-    {'common': [1, 1], 'a': [1, 2], 'b': [3, 4], 'source': ['example', 'example']}
-    >>> image_indices
-    array([0])
+    {'common': [1, 1], 'a': [1, 2], 'b': [3, 4], 'source': ['example', 'example'], '_image_index': [0, 0]}
     >>> dropped_keys
-    {'target_c': {'inconsistent_key'}}
+    {'target_c': ['inconsistent_key']}
     """
     merged: dict[str, list[Any]] = {}
     isect: set[str] = set()
     union: set[str] = set()
     keys: list[str] | None = None
     dicts: list[Mapping[str, Any]]
-    dropped: dict[str, set[str]]
 
     # EXPERIMENTAL
     if isinstance(metadata, Mapping) and _is_metadata_dict_of_dicts(metadata):
@@ -344,8 +349,8 @@ def merge(
     else:
         dicts = list(metadata)
 
-    image_repeats = np.zeros(len(dicts))
-    dropped_aggregated: dict[str, set[DropReason]] = {}
+    image_repeats = np.zeros(len(dicts), dtype=np.int_)
+    dropped: dict[str, set[DropReason]] = {}
     for i, d in enumerate(dicts):
         flattened, image_repeats[i], dropped_inner = flatten(
             d,
@@ -356,14 +361,12 @@ def merge(
         isect = isect.intersection(flattened.keys()) if isect else set(flattened.keys())
         union.update(flattened.keys())
         for k, v in dropped_inner.items():
-            dropped_aggregated.setdefault(k, set()).update({DropReason(vv) for vv in v})
+            dropped.setdefault(k, set()).update({DropReason(vv) for vv in v})
         for k, v in flattened.items():
             merged.setdefault(k, []).extend(flattened[k]) if isinstance(v, list) else merged.setdefault(k, []).append(v)
 
     for k in union - isect:
-        dropped_aggregated.setdefault(k, set()).add(DropReason.INCONSISTENT_KEY)
-
-    output: dict[str, Any] = {}
+        dropped.setdefault(k, set()).add(DropReason.INCONSISTENT_KEY)
 
     if image_repeats.sum() == image_repeats.size:
         image_indices = np.arange(image_repeats.size)
@@ -372,23 +375,25 @@ def merge(
         image_data = np.concatenate(
             [np.repeat(image_ids[i], image_repeats[i]) for i in range(image_ids.size)], dtype=np.int_
         )
-        _, image_unsorted = np.unique(image_data, return_index=True)
+        _, image_unsorted = np.unique(image_data, return_inverse=True)
         image_indices = np.sort(image_unsorted)
 
+    output: dict[str, Any] = {}
+
     if keys:
-        output["keys"] = np.array(keys) if as_numpy else keys
+        output["keys"] = np.array(keys) if return_numpy else keys
 
     for k in (key for key in merged if key in isect):
         cv = _convert_type(merged[k])
-        output[k] = np.array(cv) if as_numpy else cv
+        output[k] = np.array(cv) if return_numpy else cv
+    output[DEFAULT_IMAGE_INDEX_KEY] = np.array(image_indices) if return_numpy else list(image_indices)
 
     if return_dropped:
-        dropped = {k: {vv.value for vv in v} for k, v in dropped_aggregated.items()}
-        return output, image_indices, dropped
+        return output, _sorted_drop_reasons(dropped)
     else:
-        if dropped_aggregated:
-            warnings.warn(f"Metadata keys {list(dropped_aggregated)} were dropped.")
-        return output, image_indices
+        if dropped:
+            warnings.warn(f"Metadata keys {list(dropped)} were dropped.")
+        return output
 
 
 @dataclass(frozen=True)
@@ -399,21 +404,22 @@ class Metadata(Output):
     Attributes
     ----------
     discrete_factor_names : list[str]
-        List containing factor names for the original data that was discrete and the binned continuous data
+        List containing factor names for the original data that was discrete and
+        the binned continuous data
     discrete_data : NDArray[np.int]
-        Array containing values for the original data that was discrete and the binned continuous data
+        Array containing values for the original data that was discrete and the
+        binned continuous data
     continuous_factor_names : list[str]
         List containing factor names for the original continuous data
     continuous_data : NDArray[np.int or np.double] | None
-        Array containing values for the original continuous data or None if there was no continuous data
+        Array containing values for the original continuous data or None if there
+        was no continuous data
     class_labels : NDArray[np.int]
         Numerical class labels for the images/objects
     class_names : NDArray[Any]
         Array of unique class names (for use with plotting)
     total_num_factors : int
         Sum of discrete_factor_names and continuous_factor_names plus 1 for class
-    dropped_factor_names: set[str]
-        Set of factor names that were dropped due to inconsistent availability in the raw metadata
     """
 
     discrete_factor_names: list[str]
@@ -423,16 +429,16 @@ class Metadata(Output):
     class_labels: NDArray[np.int_]
     class_names: NDArray[Any]
     total_num_factors: int
-    dropped_factor_names: dict[str, set[str]]
 
 
 @set_metadata
 def preprocess(
-    raw_metadata: Iterable[Mapping[str, Any]],
+    metadata: dict[str, list[Any]] | dict[str, NDArray[Any]],
     class_labels: ArrayLike | str,
     continuous_factor_bins: Mapping[str, int | Iterable[float]] | None = None,
     auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
     exclude: Iterable[str] | None = None,
+    image_index_key: str = "_image_index",
 ) -> Metadata:
     """
     Restructures the metadata to be in the correct format for the bias functions.
@@ -444,28 +450,54 @@ def preprocess(
 
     Parameters
     ----------
-    raw_metadata : Iterable[Mapping[str, Any]]
-        Iterable collection of metadata dictionaries to flatten and merge.
+    metadata : dict[str, list[Any] | NDArray[Any]]
+        A flat dictionary which contains all of the metadata on a per image (classification)
+        or per object (object detection) basis. Length of lists/array should match the length
+        of the label list/array.
     class_labels : ArrayLike or string
-        If arraylike, expects the labels for each image (image classification) or each object (object detection).
-        If the labels are included in the metadata dictionary, pass in the key value.
+        If arraylike, expects the labels for each image (image classification)
+        or each object (object detection). If the labels are included in the
+        metadata dictionary, pass in the key value.
     continuous_factor_bins : Mapping[str, int or Iterable[float]] or None, default None
-        User provided dictionary specifying how to bin the continuous metadata factors where the value is either
-        an int to represent the number of bins, or a list of floats representing the edges for each bin.
+        User provided dictionary specifying how to bin the continuous metadata
+        factors where the value is either an int to represent the number of bins,
+        or a list of floats representing the edges for each bin.
     auto_bin_method : "uniform_width" or "uniform_count" or "clusters", default "uniform_width"
-        Method by which the function will automatically bin continuous metadata factors. It is recommended
-        that the user provide the bins through the `continuous_factor_bins`.
+        Method by which the function will automatically bin continuous metadata factors.
+        It is recommended that the user provide the bins through the `continuous_factor_bins`.
     exclude : Iterable[str] or None, default None
         User provided collection of metadata keys to exclude when processing metadata.
+    image_index_key : str, default "_image_index"
+        User provided metadata key which maps the metadata entry to the source image.
 
     Returns
     -------
     Metadata
         Output class containing the binned metadata
-    """
-    # Transform metadata into single, flattened dictionary
-    metadata, image_repeats, dropped = merge(raw_metadata, return_dropped=True)
 
+    See Also
+    --------
+    merge
+    """
+    # Check that metadata is a single, flattened dictionary with uniform array lengths
+    check_length = -1
+    for k, v in metadata.items():
+        if not isinstance(v, (list, tuple, np.ndarray)):
+            raise TypeError(
+                "Metadata dictionary needs to be a single dictionary whose values "
+                "are arraylike containing the metadata on a per image or per object basis."
+            )
+        else:
+            if check_length == -1:
+                check_length = len(v)
+            else:
+                if check_length != len(v):
+                    raise ValueError(
+                        "The lists/arrays in the metadata dict have varying lengths. "
+                        "Preprocess needs them to be uniform in length."
+                    )
+
+    # Grab continuous factors if supplied
     continuous_factor_bins = dict(continuous_factor_bins) if continuous_factor_bins else None
 
     # Drop any excluded metadata keys
@@ -474,18 +506,27 @@ def preprocess(
         if continuous_factor_bins:
             continuous_factor_bins.pop(k, None)
 
-    # Get the class label array in numeric form
+    # Get the class label array in numeric form and check its dimensions
     class_array = as_numpy(metadata.pop(class_labels)) if isinstance(class_labels, str) else as_numpy(class_labels)
     if class_array.ndim > 1:
         raise ValueError(
             f"Got class labels with {class_array.ndim}-dimensional "
             f"shape {class_array.shape}, but expected a 1-dimensional array."
         )
+    # Check if the label array is the same length as the metadata arrays
+    elif len(class_array) != check_length:
+        raise ValueError(
+            f"The length of the label array {len(class_array)} is not the same as "
+            f"the length of the metadata arrays {check_length}."
+        )
     if not np.issubdtype(class_array.dtype, np.int_):
         unique_classes, numerical_labels = np.unique(class_array, return_inverse=True)
     else:
         numerical_labels = class_array
         unique_classes = np.unique(class_array)
+
+    # Determine if _image_index is given
+    image_indices = as_numpy(metadata[image_index_key]) if image_index_key in metadata else np.arange(check_length)
 
     # Bin according to user supplied bins
     continuous_metadata = {}
@@ -507,7 +548,7 @@ def preprocess(
     for key in remaining_keys:
         data = to_numpy(metadata[key])
         if np.issubdtype(data.dtype, np.number):
-            result = _is_continuous(data, image_repeats)
+            result = _is_continuous(data, image_indices)
             if result:
                 continuous_metadata[key] = data
             unique_samples, ordinal_data = np.unique(data, return_inverse=True)
@@ -525,7 +566,7 @@ def preprocess(
         else:
             _, discrete_metadata[key] = np.unique(data, return_inverse=True)
 
-    # splitting out the dictionaries into the keys and values
+    # Split out the dictionaries into the keys and values
     discrete_factor_names = list(discrete_metadata.keys())
     discrete_data = np.stack(list(discrete_metadata.values()), axis=-1)
     continuous_factor_names = list(continuous_metadata.keys())
@@ -540,7 +581,6 @@ def preprocess(
         numerical_labels,
         unique_classes,
         total_num_factors,
-        dropped,
     )
 
 

@@ -253,13 +253,11 @@ def parity(metadata: Metadata) -> ParityOutput[NDArray[np.float64]]:
     >>> from dataeval.utils.metadata import preprocess
     >>> rng = np.random.default_rng(175)
     >>> labels = rng.choice([0, 1, 2], (100))
-    >>> metadata_dict = [
-    ...     {
+    >>> metadata_dict = {
     ...         "age": list(rng.choice([25, 30, 35, 45], (100))),
     ...         "income": list(rng.choice([50000, 65000, 80000], (100))),
     ...         "gender": list(rng.choice(["M", "F"], (100))),
-    ...     }
-    ... ]
+    ... }
     >>> continuous_factor_bincounts = {"age": 4, "income": 3}
     >>> metadata = preprocess(metadata_dict, labels, continuous_factor_bincounts)
     >>> parity(metadata)
