@@ -8,7 +8,7 @@ from dataeval.metrics.bias.balance import _validate_num_neighbors, balance
 from dataeval.utils.metadata import preprocess
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def metadata_results():
     str_vals = ["b", "b", "b", "b", "b", "a", "a", "b", "a", "b", "b", "a"]
     cnt_vals = [
@@ -31,7 +31,7 @@ def metadata_results():
     return preprocess(md, class_labels, {"var_cnt": 3, "var_float_cat": 2})
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def mismatch_metadata():
     raw_metadata = {"factor1": list(range(10)), "factor2": list(range(10)), "factor3": list(range(10))}
     class_labels = [1] * 10
@@ -39,7 +39,7 @@ def mismatch_metadata():
     return preprocess(raw_metadata, class_labels, continuous_bins)
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def simple_metadata():
     raw_metadata = {"factor1": [1] * 100 + [2] * 100, "factor2": [1] * 100 + [2] * 100}
     class_labels = [1] * 100 + [2] * 100

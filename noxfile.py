@@ -50,7 +50,7 @@ def dev(session: nox.Session) -> None:
 def test(session: nox.Session) -> None:
     """Run unit tests with coverage reporting. Specify version using `nox -P {version} -e test`."""
     python_version = check_version(session.name)
-    pytest_args = ["--cov", "-n8", "--dist", "loadgroup", f"--junitxml=output/junit.{python_version}.xml"]
+    pytest_args = ["--cov", "-n8", "--dist", "loadscope", f"--junitxml=output/junit.{python_version}.xml"]
     cov_term_args = ["--cov-report", "term"]
     cov_xml_args = ["--cov-report", f"xml:output/coverage.{python_version}.xml"]
     cov_html_args = ["--cov-report", f"html:output/htmlcov.{python_version}"]

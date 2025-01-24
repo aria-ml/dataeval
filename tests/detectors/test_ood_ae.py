@@ -19,7 +19,7 @@ input_shape = (1, 8, 8)
 
 
 # load iris data
-@pytest.fixture
+@pytest.fixture(scope="module")
 def x_ref() -> np.ndarray:
     X, y = load_digits(return_X_y=True)
     assert isinstance(X, np.ndarray)

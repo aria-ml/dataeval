@@ -20,7 +20,7 @@ class TestCVMDrift:
     tests_cvmdrift = list(n_features)
     n_tests = len(tests_cvmdrift)
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def cvmdrift_params(self, request):
         return self.tests_cvmdrift[request.param]
 
