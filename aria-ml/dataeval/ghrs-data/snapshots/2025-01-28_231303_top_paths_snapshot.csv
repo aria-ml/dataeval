@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,120,76
+/aria-ml/dataeval/network/dependencies,18,3
+/aria-ml/dataeval/actions,14,4
+/aria-ml/dataeval/pulse,12,4
+/aria-ml/dataeval/graphs/traffic,12,1
+/aria-ml/dataeval/forks,9,3
+/aria-ml/dataeval/actions/new,9,1
+/aria-ml/dataeval/blob/main/.gitlab/scripts/releasegen.py,9,1
+/aria-ml/dataeval/network,7,4
+/aria-ml/dataeval/network/dependents,7,2
