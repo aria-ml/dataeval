@@ -143,8 +143,7 @@ exclude_also = [
 ]
 include = ["*/src/dataeval/*"]
 omit = [
-  "*/torch/blocks.py",
-  "*/torch/utils.py",
+  "*/torch/_blocks.py",
 ]
 fail_under = 90
 

@@ -7,7 +7,7 @@ from typing import Sequence, TypeVar
 
 import numpy as np
 
-from dataeval.metrics.stats.base import BaseStatsOutput
+from dataeval.metrics.stats._base import BaseStatsOutput
 
 TStatsOutput = TypeVar("TStatsOutput", bound=BaseStatsOutput)
 

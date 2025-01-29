@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from matplotlib.figure import Figure
 
-from dataeval.metrics.bias.balance import _validate_num_neighbors, balance
+from dataeval.metrics.bias._balance import _validate_num_neighbors, balance
 from dataeval.utils.metadata import preprocess
 
 

@@ -3,7 +3,7 @@ from typing import Iterable
 
 import numpy as np
 
-from dataeval.output import MappingOutput, Output, set_metadata
+from dataeval._output import MappingOutput, Output, set_metadata
 
 
 @dataclass

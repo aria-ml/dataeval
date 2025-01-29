@@ -12,7 +12,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.detectors.drift.base import UpdateStrategy
+from dataeval.detectors.drift._base import UpdateStrategy
 
 
 class LastSeenUpdate(UpdateStrategy):

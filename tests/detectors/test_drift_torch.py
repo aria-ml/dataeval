@@ -16,8 +16,8 @@ import pytest
 import torch
 import torch.nn as nn
 
-from dataeval.detectors.drift.torch import GaussianRBF, _squared_pairwise_distance, mmd2_from_kernel_matrix
-from dataeval.utils.torch.internal import get_device, predict_batch
+from dataeval.detectors.drift._torch import GaussianRBF, _squared_pairwise_distance, mmd2_from_kernel_matrix
+from dataeval.utils.torch._internal import get_device, predict_batch
 
 
 def id_fn(x):

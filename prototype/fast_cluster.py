@@ -19,9 +19,9 @@ from fast_hdbscan.cluster_trees import (
     CondensedTree,
 )
 
-from dataeval.interop import to_numpy
-from dataeval.output import Output, set_metadata
-from dataeval.utils.shared import flatten
+from dataeval._interop import to_numpy
+from dataeval._output import Output, set_metadata
+from dataeval.utils._shared import flatten
 from fast_mst import calculate_neighbor_distances, minimum_spanning_tree
 from fast_cluster_utils import _cluster_variance, _compare_links_to_std, _group_mst_by_clusters
 

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from dataeval.utils.dataset.split import (
+from dataeval.utils.data._split import (
     SplitDatasetOutput,
     _validate_labels,
     bin_kmeans,

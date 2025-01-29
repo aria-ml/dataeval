@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 from sklearn.linear_model import LogisticRegression
 
-from dataeval.detectors.drift.uncertainty import DriftUncertainty, classifier_uncertainty
+from dataeval.detectors.drift._uncertainty import DriftUncertainty, classifier_uncertainty
 from dataeval.detectors.drift.updates import LastSeenUpdate, ReservoirSamplingUpdate
 
 

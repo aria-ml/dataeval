@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from requests import HTTPError, RequestException, Response
 
-from dataeval.utils.dataset.datasets import (
+from dataeval.utils.data.datasets import (
     MNIST,
     _check_exists,
     _download_dataset,
@@ -58,13 +58,13 @@ class TestMNISTFile:
         )
         assert str(parent / "mnist") == location
 
-    @patch("dataeval.utils.dataset.datasets.requests.get", side_effect=MockHTTPError())
+    @patch("dataeval.utils.data.datasets.requests.get", side_effect=MockHTTPError())
     def test_get_file_http_error(self, mock_get, mnist_download):
         parent, name = mnist_download
         with pytest.raises(RuntimeError):
             _get_file(root=parent, fname=name, origin="http://mock", file_hash=TEMP_SHA256, md5=True)
 
-    @patch("dataeval.utils.dataset.datasets.requests.get", side_effect=RequestException())
+    @patch("dataeval.utils.data.datasets.requests.get", side_effect=RequestException())
     def test_get_file_request_error(self, mock_get, mnist_download):
         _, name = mnist_download
         with pytest.raises(ValueError):
@@ -76,8 +76,8 @@ class TestMNISTFile:
         location = _extract_archive(zip_file, zip_file.parent, remove_finished=True)
         assert str(zip_file.parent) == location
 
-    @patch("dataeval.utils.dataset.datasets._get_file")
-    @patch("dataeval.utils.dataset.datasets._extract_archive")
+    @patch("dataeval.utils.data.datasets._get_file")
+    @patch("dataeval.utils.data.datasets._extract_archive")
     @pytest.mark.parametrize("md5", [True, False])
     def test_download_dataset_extract_on_mnist_zip(self, mock_extract_archive, mock_get_file, md5, tmp_path):
         _download_dataset("mock", tmp_path, "mock.zip", "abc", md5=md5)

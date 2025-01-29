@@ -1,12 +1,13 @@
 *venv*/
 __pycache__/
 dist/
-data
+
+data/
+!src/dataeval/utils/data
 
 docs/build/
 docs/source/reference/autoapi
 docs/source/tutorials/notebooks/checkpoints/
-docs/source/tutorials/notebooks/data/
 
 output/
 .coverage*

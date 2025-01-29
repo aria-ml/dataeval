@@ -18,10 +18,10 @@ import numpy as np
 import torch
 from numpy.typing import ArrayLike
 
+from dataeval._interop import as_numpy
 from dataeval.detectors.ood.base import OODBase
 from dataeval.detectors.ood.output import OODScoreOutput
-from dataeval.interop import as_numpy
-from dataeval.utils.torch.internal import predict_batch
+from dataeval.utils.torch._internal import predict_batch
 
 
 class OOD_AE(OODBase):
