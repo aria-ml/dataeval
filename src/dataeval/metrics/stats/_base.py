@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataeval.utils.plot import histogram_plot
+from dataeval.utils._plot import histogram_plot
 
 __all__ = []
 
@@ -16,9 +16,9 @@ import numpy as np
 import tqdm
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval.interop import to_numpy_iter
-from dataeval.output import Output
-from dataeval.utils.image import normalize_image_shape, rescale
+from dataeval._interop import to_numpy_iter
+from dataeval._output import Output
+from dataeval.utils._image import normalize_image_shape, rescale
 
 DTYPE_REGEX = re.compile(r"NDArray\[np\.(.*?)\]")
 SOURCE_INDEX = "source_index"

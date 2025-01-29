@@ -14,20 +14,20 @@ from typing import Callable, Literal
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
-from scipy.stats import ks_2samp
+from scipy.stats import cramervonmises_2samp
 
-from dataeval.detectors.drift.base import BaseDriftUnivariate, UpdateStrategy, preprocess_x
-from dataeval.interop import to_numpy
+from dataeval._interop import to_numpy
+from dataeval.detectors.drift._base import BaseDriftUnivariate, UpdateStrategy, preprocess_x
 
 
-class DriftKS(BaseDriftUnivariate):
+class DriftCVM(BaseDriftUnivariate):
     """
-    :term:`Drift` detector employing the :term:`Kolmogorov-Smirnov (KS) \
-    distribution<Kolmogorov-Smirnov (K-S) test>` test.
+    :term:`Drift` detector employing the :term:`Cramér-von Mises (CVM) Drift Detection` test.
 
-    The KS test detects changes in the maximum distance between two data
-    distributions with Bonferroni or :term:`False Discovery Rate (FDR)` correction
-    for multivariate data.
+    The CVM test detects changes in the distribution of continuous
+    univariate data. For multivariate data, a separate CVM test is applied to each
+    feature, and the obtained p-values are aggregated via the Bonferroni or
+    :term:`False Discovery Rate (FDR)` corrections.
 
     Parameters
     ----------
@@ -46,14 +46,11 @@ class DriftKS(BaseDriftUnivariate):
         using the last n instances seen by the detector with LastSeenUpdateStrategy
         or via reservoir sampling with ReservoirSamplingUpdateStrategy.
     preprocess_fn : Callable | None, default None
-        Function to preprocess the data before computing the data :term:`drift<Drift>` metrics.
+        Function to preprocess the data before computing the data drift metrics.
         Typically a :term:`dimensionality reduction<Dimensionality Reduction>` technique.
     correction : "bonferroni" | "fdr", default "bonferroni"
         Correction type for multivariate data. Either 'bonferroni' or 'fdr' (False
         Discovery Rate).
-    alternative : "two-sided" | "less" | "greater", default "two-sided"
-        Defines the alternative hypothesis. Options are 'two-sided', 'less' or
-        'greater'.
     n_features : int | None, default None
         Number of features used in the statistical test. No need to pass it if no
         preprocessing takes place. In case of a preprocessing step, this can also
@@ -68,7 +65,6 @@ class DriftKS(BaseDriftUnivariate):
         update_x_ref: UpdateStrategy | None = None,
         preprocess_fn: Callable[[ArrayLike], ArrayLike] | None = None,
         correction: Literal["bonferroni", "fdr"] = "bonferroni",
-        alternative: Literal["two-sided", "less", "greater"] = "two-sided",
         n_features: int | None = None,
     ) -> None:
         super().__init__(
@@ -81,13 +77,11 @@ class DriftKS(BaseDriftUnivariate):
             n_features=n_features,
         )
 
-        # Other attributes
-        self.alternative = alternative
-
     @preprocess_x
     def score(self, x: ArrayLike) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         """
-        Compute KS scores and :term:Statistics` per feature.
+        Performs the two-sample Cramér-von Mises test(s), computing the :term:`p-value<P-value>` and
+        test statistic per feature.
 
         Parameters
         ----------
@@ -97,13 +91,14 @@ class DriftKS(BaseDriftUnivariate):
         Returns
         -------
         tuple[NDArray, NDArray]
-            Feature level :term:p-values and KS statistic
+            Feature level p-values and CVM statistic
         """
-        x = to_numpy(x)
-        x = x.reshape(x.shape[0], -1)
+        x_np = to_numpy(x)
+        x_np = x_np.reshape(x_np.shape[0], -1)
         x_ref = self.x_ref.reshape(self.x_ref.shape[0], -1)
         p_val = np.zeros(self.n_features, dtype=np.float32)
         dist = np.zeros_like(p_val)
         for f in range(self.n_features):
-            dist[f], p_val[f] = ks_2samp(x_ref[:, f], x[:, f], alternative=self.alternative, method="exact")
+            result = cramervonmises_2samp(x_ref[:, f], x_np[:, f], method="auto")
+            p_val[f], dist[f] = result.pvalue, result.statistic
         return p_val, dist

@@ -8,7 +8,7 @@ from typing import Literal
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.output import Output
+from dataeval._output import Output
 
 
 @dataclass(frozen=True)

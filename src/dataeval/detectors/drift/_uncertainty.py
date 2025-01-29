@@ -18,10 +18,10 @@ from numpy.typing import ArrayLike, NDArray
 from scipy.special import softmax
 from scipy.stats import entropy
 
-from dataeval.detectors.drift.base import DriftOutput, UpdateStrategy
-from dataeval.detectors.drift.ks import DriftKS
-from dataeval.detectors.drift.torch import preprocess_drift
-from dataeval.utils.torch.internal import get_device
+from dataeval.detectors.drift._base import DriftOutput, UpdateStrategy
+from dataeval.detectors.drift._ks import DriftKS
+from dataeval.detectors.drift._torch import preprocess_drift
+from dataeval.utils.torch._internal import get_device
 
 
 def classifier_uncertainty(

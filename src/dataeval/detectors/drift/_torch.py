@@ -17,7 +17,7 @@ import torch
 import torch.nn as nn
 from numpy.typing import NDArray
 
-from dataeval.utils.torch.internal import get_device, predict_batch
+from dataeval.utils.torch._internal import get_device, predict_batch
 
 
 def mmd2_from_kernel_matrix(

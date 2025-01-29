@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from dataeval.detectors.linters.duplicates import Duplicates
-from dataeval.metrics.stats.hashstats import hashstats
+from dataeval.metrics.stats._hashstats import hashstats
 
 
 class TestDuplicates:

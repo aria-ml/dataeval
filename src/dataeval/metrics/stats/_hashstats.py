@@ -13,10 +13,10 @@ from numpy.typing import ArrayLike
 from PIL import Image
 from scipy.fftpack import dct
 
-from dataeval.interop import as_numpy
-from dataeval.metrics.stats.base import BaseStatsOutput, StatsProcessor, run_stats
-from dataeval.output import set_metadata
-from dataeval.utils.image import normalize_image_shape, rescale
+from dataeval._interop import as_numpy
+from dataeval._output import set_metadata
+from dataeval.metrics.stats._base import BaseStatsOutput, StatsProcessor, run_stats
+from dataeval.utils._image import normalize_image_shape, rescale
 
 HASH_SIZE = 8
 MAX_FACTOR = 4

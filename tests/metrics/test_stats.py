@@ -7,9 +7,9 @@ import pytest
 from numpy.random import randint
 from numpy.typing import NDArray
 
-import dataeval.metrics.stats.base as stats_base
+import dataeval.metrics.stats._base as stats_base
 from dataeval.metrics.stats import dimensionstats, hashstats, labelstats, pixelstats, visualstats
-from dataeval.metrics.stats.base import (
+from dataeval.metrics.stats._base import (
     SOURCE_INDEX,
     BaseStatsOutput,
     StatsProcessor,
@@ -17,8 +17,8 @@ from dataeval.metrics.stats.base import (
     normalize_box_shape,
     process_stats_unpack,
 )
-from dataeval.metrics.stats.boxratiostats import boxratiostats, calculate_ratios
-from dataeval.metrics.stats.datasetstats import (
+from dataeval.metrics.stats._boxratiostats import boxratiostats, calculate_ratios
+from dataeval.metrics.stats._datasetstats import (
     ChannelStatsOutput,
     DatasetStatsOutput,
     _get_channels,

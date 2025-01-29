@@ -15,7 +15,7 @@ __all__ = [
     "parity",
 ]
 
-from dataeval.metrics.bias.balance import BalanceOutput, balance
-from dataeval.metrics.bias.coverage import CoverageOutput, coverage
-from dataeval.metrics.bias.diversity import DiversityOutput, diversity
-from dataeval.metrics.bias.parity import ParityOutput, label_parity, parity
+from dataeval.metrics.bias._balance import BalanceOutput, balance
+from dataeval.metrics.bias._coverage import CoverageOutput, coverage
+from dataeval.metrics.bias._diversity import DiversityOutput, diversity
+from dataeval.metrics.bias._parity import ParityOutput, label_parity, parity

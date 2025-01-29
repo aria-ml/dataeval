@@ -1,6 +1,6 @@
 import numpy as np
 
-from dataeval.metrics.estimators.uap import uap
+from dataeval.metrics.estimators._uap import uap
 
 
 class TestUAP:

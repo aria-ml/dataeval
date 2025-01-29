@@ -1,6 +1,6 @@
 import numpy as np
 
-from dataeval.metrics.stats.hashstats import pchash, xxhash
+from dataeval.metrics.stats._hashstats import pchash, xxhash
 
 
 def test_xxhash():

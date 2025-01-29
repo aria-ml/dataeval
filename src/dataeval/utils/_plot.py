@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import ArrayLike
 
-from dataeval.interop import to_numpy
+from dataeval._interop import to_numpy
 
 with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure

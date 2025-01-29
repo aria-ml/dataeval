@@ -13,7 +13,7 @@ from sklearn.metrics import silhouette_score
 from sklearn.model_selection import GroupKFold, KFold, StratifiedGroupKFold, StratifiedKFold
 from sklearn.utils.multiclass import type_of_target
 
-from dataeval.output import Output, set_metadata
+from dataeval._output import Output, set_metadata
 
 
 class TrainValSplit(NamedTuple):

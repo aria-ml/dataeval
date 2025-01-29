@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.metrics.estimators.ber import BEROutput, ber, ber_knn, ber_mst, knn_lowerbound
+from dataeval.metrics.estimators._ber import BEROutput, ber, ber_knn, ber_mst, knn_lowerbound
 
 
 class TestFunctionalBER:

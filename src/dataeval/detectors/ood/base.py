@@ -15,10 +15,10 @@ from typing import Callable, cast
 import torch
 from numpy.typing import ArrayLike
 
+from dataeval._interop import to_numpy
 from dataeval.detectors.ood.mixin import OODBaseMixin, OODFitMixin, OODGMMMixin
-from dataeval.interop import to_numpy
-from dataeval.utils.torch.gmm import GaussianMixtureModelParams, gmm_params
-from dataeval.utils.torch.internal import get_device, trainer
+from dataeval.utils.torch._gmm import GaussianMixtureModelParams, gmm_params
+from dataeval.utils.torch._internal import get_device, trainer
 
 
 class OODBase(OODBaseMixin[torch.nn.Module], OODFitMixin[Callable[..., torch.nn.Module], torch.optim.Optimizer]):

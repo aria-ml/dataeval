@@ -17,7 +17,7 @@ if sys.version_info >= (3, 10):
 else:
     from typing_extensions import ParamSpec
 
-from dataeval.interop import as_numpy
+from dataeval._interop import as_numpy
 
 EPSILON = 1e-5
 HASH_SIZE = 8

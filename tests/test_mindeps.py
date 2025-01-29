@@ -3,11 +3,11 @@ from importlib.util import find_spec
 import numpy as np
 import pytest
 
+from dataeval._interop import to_numpy
 from dataeval.detectors.drift import DriftCVM, DriftKS
 from dataeval.detectors.linters import Duplicates, Outliers
-from dataeval.interop import to_numpy
 from dataeval.metrics.bias import coverage
-from dataeval.metrics.bias.parity import label_parity
+from dataeval.metrics.bias._parity import label_parity
 from dataeval.metrics.estimators import ber, divergence, uap
 from dataeval.metrics.stats import dimensionstats, hashstats, pixelstats, visualstats
 

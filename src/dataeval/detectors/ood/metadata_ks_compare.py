@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 from scipy.stats import iqr, ks_2samp
 from scipy.stats import wasserstein_distance as emd
 
-from dataeval.output import MappingOutput, set_metadata
+from dataeval._output import MappingOutput, set_metadata
 
 
 class MetadataKSResult(NamedTuple):

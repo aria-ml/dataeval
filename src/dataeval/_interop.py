@@ -12,7 +12,7 @@ from typing import Any, Iterable, Iterator
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval.log import LogMessage
+from dataeval._log import LogMessage
 
 _logger = logging.getLogger(__name__)
 

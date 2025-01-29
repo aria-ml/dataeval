@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.utils.image import edge_filter, get_bitdepth, normalize_image_shape, rescale
+from dataeval.utils._image import edge_filter, get_bitdepth, normalize_image_shape, rescale
 
 
 def test_get_bitdepth_negatives():
