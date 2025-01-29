@@ -465,7 +465,7 @@ class TestUtilsMetadata:
         flatten({"a": {"b": 1, "c": 2}}, return_dropped=False)
 
     def test_flatten_no_dropped_warns(self):
-        with pytest.warns(UserWarning, match=r"Metadata keys.*were dropped\."):
+        with pytest.warns(UserWarning, match=r"Metadata entries were dropped"):
             flatten(self.inconsistent_keys[0], return_dropped=False)
 
     @pytest.mark.filterwarnings("error")
@@ -473,5 +473,5 @@ class TestUtilsMetadata:
         merge([{"a": {"b": 1, "c": 2}}], return_dropped=False)
 
     def test_merge_no_dropped_warns(self):
-        with pytest.warns(UserWarning, match=r"Metadata keys.*were dropped\."):
+        with pytest.warns(UserWarning, match=r"Metadata entries were dropped"):
             merge(self.inconsistent_keys, return_dropped=False)

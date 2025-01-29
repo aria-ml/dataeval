@@ -37,7 +37,7 @@ def _plot(labels: NDArray[Any], bar_heights: NDArray[Any]) -> Figure:
     """
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(10, 10))
+    fig, ax = plt.subplots(figsize=(8, 8))
 
     ax.bar(labels, bar_heights)
     ax.set_xlabel("Factors")
