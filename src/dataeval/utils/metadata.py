@@ -21,7 +21,6 @@ from dataeval.output import Output, set_metadata
 
 DISCRETE_MIN_WD = 0.054
 CONTINUOUS_MIN_SAMPLE_SIZE = 20
-DEFAULT_IMAGE_INDEX_KEY = "_image_index"
 
 
 class DropReason(Enum):
@@ -245,7 +244,8 @@ def flatten(
         return output, size, _sorted_drop_reasons(dropped)
     else:
         if dropped:
-            warnings.warn(f"Metadata keys {list(dropped)} were dropped.")
+            dropped_items = "\n".join([f"    {k}: {v}" for k, v in _sorted_drop_reasons(dropped).items()])
+            warnings.warn(f"Metadata entries were dropped:\n{dropped_items}")
         return output, size
 
 
@@ -271,6 +271,7 @@ def merge(
     ignore_lists: bool = False,
     fully_qualified: bool = False,
     return_numpy: bool = False,
+    image_index_key: str = "_image_index",
 ) -> tuple[dict[str, list[Any]] | dict[str, NDArray[Any]], dict[str, list[str]]]: ...
 
 
@@ -281,6 +282,7 @@ def merge(
     ignore_lists: bool = False,
     fully_qualified: bool = False,
     return_numpy: bool = False,
+    image_index_key: str = "_image_index",
 ) -> dict[str, list[Any]] | dict[str, NDArray[Any]]: ...
 
 
@@ -290,6 +292,7 @@ def merge(
     ignore_lists: bool = False,
     fully_qualified: bool = False,
     return_numpy: bool = False,
+    image_index_key: str = "_image_index",
 ):
     """
     Merges a collection of metadata dictionaries into a single flattened
@@ -312,6 +315,8 @@ def merge(
         Option to return dictionary keys full qualified instead of minimized
     return_numpy : bool, default False
         Option to return results as lists or NumPy arrays
+    image_index_key : str, default "_image_index"
+        User provided metadata key which maps the metadata entry to the source image.
 
     Returns
     -------
@@ -386,13 +391,15 @@ def merge(
     for k in (key for key in merged if key in isect):
         cv = _convert_type(merged[k])
         output[k] = np.array(cv) if return_numpy else cv
-    output[DEFAULT_IMAGE_INDEX_KEY] = np.array(image_indices) if return_numpy else list(image_indices)
+    if image_index_key not in output:
+        output[image_index_key] = image_indices if return_numpy else image_indices.tolist()
 
     if return_dropped:
         return output, _sorted_drop_reasons(dropped)
     else:
         if dropped:
-            warnings.warn(f"Metadata keys {list(dropped)} were dropped.")
+            dropped_items = "\n".join([f"    {k}: {v}" for k, v in _sorted_drop_reasons(dropped).items()])
+            warnings.warn(f"Metadata entries were dropped:\n{dropped_items}")
         return output
 
 
@@ -433,11 +440,12 @@ class Metadata(Output):
 
 @set_metadata
 def preprocess(
-    metadata: dict[str, list[Any]] | dict[str, NDArray[Any]],
+    metadata: Mapping[str, list[Any] | NDArray[Any]],
     class_labels: ArrayLike | str,
     continuous_factor_bins: Mapping[str, int | Iterable[float]] | None = None,
     auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
     exclude: Iterable[str] | None = None,
+    include: Iterable[str] | None = None,
     image_index_key: str = "_image_index",
 ) -> Metadata:
     """
@@ -450,7 +458,7 @@ def preprocess(
 
     Parameters
     ----------
-    metadata : dict[str, list[Any] | NDArray[Any]]
+    metadata : Mapping[str, list[Any] or NDArray[Any]]
         A flat dictionary which contains all of the metadata on a per image (classification)
         or per object (object detection) basis. Length of lists/array should match the length
         of the label list/array.
@@ -467,6 +475,10 @@ def preprocess(
         It is recommended that the user provide the bins through the `continuous_factor_bins`.
     exclude : Iterable[str] or None, default None
         User provided collection of metadata keys to exclude when processing metadata.
+        Not to be used in conjunction with include.
+    include : Iterable[str] or None, default None
+        User provided collection of metadata keys to include when processing metadata.
+        Not to be used in conjunction with exclude.
     image_index_key : str, default "_image_index"
         User provided metadata key which maps the metadata entry to the source image.
 
@@ -479,6 +491,27 @@ def preprocess(
     --------
     merge
     """
+    if include is not None and exclude is not None:
+        raise ValueError("Parameters `include` and `exclude` are mutually exclusive.")
+
+    # Determine if _image_index is given
+    image_indices = as_numpy(metadata[image_index_key]) if image_index_key in metadata else None
+
+    # Include specified metadata keys
+    if include:
+        metadata = {i: metadata[i] for i in include if i in metadata}
+        continuous_factor_bins = (
+            {i: continuous_factor_bins[i] for i in include if i in continuous_factor_bins}
+            if continuous_factor_bins
+            else {}
+        )
+    else:
+        metadata = dict(metadata)
+        continuous_factor_bins = dict(continuous_factor_bins) if continuous_factor_bins else {}
+        for k in exclude or ():
+            metadata.pop(k, None)
+            continuous_factor_bins.pop(k, None)
+
     # Check that metadata is a single, flattened dictionary with uniform array lengths
     check_length = -1
     for k, v in metadata.items():
@@ -496,15 +529,8 @@ def preprocess(
                         "The lists/arrays in the metadata dict have varying lengths. "
                         "Preprocess needs them to be uniform in length."
                     )
-
-    # Grab continuous factors if supplied
-    continuous_factor_bins = dict(continuous_factor_bins) if continuous_factor_bins else None
-
-    # Drop any excluded metadata keys
-    for k in exclude or ():
-        metadata.pop(k, None)
-        if continuous_factor_bins:
-            continuous_factor_bins.pop(k, None)
+    if image_indices is None:
+        image_indices = np.arange(check_length)
 
     # Get the class label array in numeric form and check its dimensions
     class_array = as_numpy(metadata.pop(class_labels)) if isinstance(class_labels, str) else as_numpy(class_labels)
@@ -524,9 +550,6 @@ def preprocess(
     else:
         numerical_labels = class_array
         unique_classes = np.unique(class_array)
-
-    # Determine if _image_index is given
-    image_indices = as_numpy(metadata[image_index_key]) if image_index_key in metadata else np.arange(check_length)
 
     # Bin according to user supplied bins
     continuous_metadata = {}
