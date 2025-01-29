@@ -99,14 +99,16 @@ class TestBalanceUnit:
         classwise_output = mi.plot(plot_classwise=True)
         assert isinstance(classwise_output, Figure)
 
-    def test_plotting_vars(self, metadata_results):
+    @pytest.mark.parametrize("factor_type", ("discrete", "continuous", "both"))
+    def test_plotting_vars(self, metadata_results, factor_type):
         mi = balance(metadata_results)
-        heat_labels = np.arange(len(mi.factor_names))
-        output = mi.plot(heat_labels[:-1], heat_labels[1:], False)
+        factor_names = mi._by_factor_type("factor_names", factor_type)
+        heat_labels = np.arange(len(factor_names))
+        output = mi.plot(heat_labels[:-1], heat_labels[1:], plot_classwise=False, factor_type=factor_type)
         assert isinstance(output, Figure)
         _, row_labels = np.unique(mi.class_list, return_inverse=True)
-        col_labels = np.arange(len(mi.factor_names))
-        classwise_output = mi.plot(row_labels, col_labels, plot_classwise=True)
+        col_labels = np.arange(len(factor_names))
+        classwise_output = mi.plot(row_labels, col_labels, plot_classwise=True, factor_type=factor_type)
         assert isinstance(classwise_output, Figure)
 
 
