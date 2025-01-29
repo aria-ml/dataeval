@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from dataeval.detectors.drift.base import BaseDriftUnivariate, preprocess_x
+from dataeval.detectors.drift._base import BaseDriftUnivariate, preprocess_x
 from dataeval.detectors.drift.updates import LastSeenUpdate, ReservoirSamplingUpdate
 
 

@@ -11,7 +11,7 @@ from itertools import product
 import numpy as np
 import pytest
 
-from dataeval.detectors.drift.ks import DriftKS
+from dataeval.detectors.drift._ks import DriftKS
 from dataeval.detectors.drift.updates import LastSeenUpdate, ReservoirSamplingUpdate
 
 

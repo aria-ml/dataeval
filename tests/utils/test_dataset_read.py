@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.utils.dataset.read import read_dataset
+from dataeval.utils.data._read import read_dataset
 
 
 class TestDatasetReader:

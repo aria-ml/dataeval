@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from dataeval.utils.shared import compute_neighbors, get_classes_counts, minimum_spanning_tree
+from dataeval.utils._shared import compute_neighbors, get_classes_counts, minimum_spanning_tree
 
 
 def test_class_min():

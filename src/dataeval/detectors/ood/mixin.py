@@ -10,8 +10,8 @@ from typing import Callable, Generic, Literal, TypeVar
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval.interop import to_numpy
-from dataeval.output import set_metadata
+from dataeval._interop import to_numpy
+from dataeval._output import set_metadata
 
 TGMMParams = TypeVar("TGMMParams")
 

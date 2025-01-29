@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 import torch
 
-import dataeval.utils.torch.gmm as torch_gmm
+import dataeval.utils.torch._gmm as torch_gmm
 
 N, K, D = 10, 5, 1
 z = np.random.rand(N, D).astype(np.float32)

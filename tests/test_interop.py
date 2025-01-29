@@ -4,7 +4,7 @@ from pathlib import PosixPath
 import numpy as np
 import torch
 
-from dataeval.interop import to_numpy, to_numpy_iter
+from dataeval._interop import to_numpy, to_numpy_iter
 
 
 class TestInterop:
