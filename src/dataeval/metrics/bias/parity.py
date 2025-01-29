@@ -2,6 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
+import contextlib
 import warnings
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
@@ -14,6 +15,9 @@ from scipy.stats.contingency import chi2_contingency, crosstab
 from dataeval.interop import as_numpy, to_numpy
 from dataeval.output import Output, set_metadata
 from dataeval.utils.metadata import Metadata
+
+with contextlib.suppress(ImportError):
+    import pandas as pd
 
 TData = TypeVar("TData", np.float64, NDArray[np.float64])
 
@@ -31,11 +35,32 @@ class ParityOutput(Generic[TData], Output):
         p-value(s) of the test
     metadata_names : list[str] | None
         Names of each metadata factor
+    insufficient_data: dict
+        Dictionary of metadata factors with less than 5 class occurrences per value
     """
 
     score: TData
     p_value: TData
     metadata_names: list[str] | None
+    insufficient_data: dict[str, dict[int, dict[str, int]]]
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """
+        Exports the parity output results to a pandas DataFrame.
+
+        Returns
+        -------
+        pd.DataFrame
+        """
+        import pandas as pd
+
+        return pd.DataFrame(
+            index=self.metadata_names,  # type: ignore - list[str] is documented as acceptable index type
+            data={
+                "score": self.score.round(2),
+                "p-value": self.p_value.round(2),
+            },
+        )
 
 
 def normalize_expected_dist(expected_dist: NDArray[Any], observed_dist: NDArray[Any]) -> NDArray[Any]:
@@ -171,7 +196,7 @@ def label_parity(
     >>> expected_labels = rng.choice([0, 1, 2, 3, 4], (100))
     >>> observed_labels = rng.choice([2, 3, 0, 4, 1], (100))
     >>> label_parity(expected_labels, observed_labels)
-    ParityOutput(score=14.007374204742625, p_value=0.0072715574616218, metadata_names=None)
+    ParityOutput(score=14.007374204742625, p_value=0.0072715574616218, metadata_names=None, insufficient_data={})
     """
 
     # Calculate
@@ -202,7 +227,7 @@ def label_parity(
         )
 
     cs, p = chisquare(f_obs=observed_dist, f_exp=expected_dist)
-    return ParityOutput(cs, p, None)
+    return ParityOutput(cs, p, None, {})
 
 
 @set_metadata
@@ -252,7 +277,7 @@ def parity(metadata: Metadata) -> ParityOutput[NDArray[np.float64]]:
 
     >>> from dataeval.utils.metadata import preprocess
     >>> rng = np.random.default_rng(175)
-    >>> labels = rng.choice([0, 1, 2], (100))
+    >>> labels = rng.choice(["doctor", "artist", "teacher"], (100))
     >>> metadata_dict = {
     ...         "age": list(rng.choice([25, 30, 35, 45], (100))),
     ...         "income": list(rng.choice([50000, 65000, 80000], (100))),
@@ -261,11 +286,11 @@ def parity(metadata: Metadata) -> ParityOutput[NDArray[np.float64]]:
     >>> continuous_factor_bincounts = {"age": 4, "income": 3}
     >>> metadata = preprocess(metadata_dict, labels, continuous_factor_bincounts)
     >>> parity(metadata)
-    ParityOutput(score=array([7.35731943, 5.46711299, 0.51506212]), p_value=array([0.28906231, 0.24263543, 0.77295762]), metadata_names=['age', 'income', 'gender'])
+    ParityOutput(score=array([7.35731943, 5.46711299, 0.51506212]), p_value=array([0.28906231, 0.24263543, 0.77295762]), metadata_names=['age', 'income', 'gender'], insufficient_data={'age': {3: {'artist': 4}, 4: {'artist': 4, 'teacher': 3}}, 'income': {1: {'artist': 3}}})
     """  # noqa: E501
     chi_scores = np.zeros(metadata.discrete_data.shape[1])
     p_values = np.zeros_like(chi_scores)
-    not_enough_data = {}
+    insufficient_data = {}
     for i, col_data in enumerate(metadata.discrete_data.T):
         # Builds a contingency matrix where entry at index (r,c) represents
         # the frequency of current_factor_name achieving value unique_factor_values[r]
@@ -279,14 +304,14 @@ def parity(metadata: Metadata) -> ParityOutput[NDArray[np.float64]]:
         current_factor_name = metadata.discrete_factor_names[i]
         for int_factor, int_class in zip(counts[0], counts[1]):
             if contingency_matrix[int_factor, int_class] > 0:
-                factor_category = unique_factor_values[int_factor]
-                if current_factor_name not in not_enough_data:
-                    not_enough_data[current_factor_name] = {}
-                if factor_category not in not_enough_data[current_factor_name]:
-                    not_enough_data[current_factor_name][factor_category] = []
-                not_enough_data[current_factor_name][factor_category].append(
-                    (metadata.class_names[int_class], int(contingency_matrix[int_factor, int_class]))
-                )
+                factor_category = unique_factor_values[int_factor].item()
+                if current_factor_name not in insufficient_data:
+                    insufficient_data[current_factor_name] = {}
+                if factor_category not in insufficient_data[current_factor_name]:
+                    insufficient_data[current_factor_name][factor_category] = {}
+                class_name = metadata.class_names[int_class].item()
+                class_count = contingency_matrix[int_factor, int_class].item()
+                insufficient_data[current_factor_name][factor_category][class_name] = class_count
 
         # This deletes rows containing only zeros,
         # because scipy.stats.chi2_contingency fails when there are rows containing only zeros.
@@ -299,24 +324,7 @@ def parity(metadata: Metadata) -> ParityOutput[NDArray[np.float64]]:
         chi_scores[i] = chi2
         p_values[i] = p
 
-    if not_enough_data:
-        factor_msg = []
-        for factor, fact_dict in not_enough_data.items():
-            stacked_msg = []
-            for key, value in fact_dict.items():
-                msg = []
-                for item in value:
-                    msg.append(f"label {item[0]}: {item[1]} occurrences")
-                flat_msg = "\n\t\t".join(msg)
-                stacked_msg.append(f"value {key} - {flat_msg}\n\t")
-            factor_msg.append(factor + " - " + "".join(stacked_msg))
+    if insufficient_data:
+        warnings.warn("Some factors did not meet the recommended 5 occurrences for each value-label combination.")
 
-        message = "\n".join(factor_msg)
-
-        warnings.warn(
-            f"The following factors did not meet the recommended 5 occurrences for each value-label combination. \n\
-            Recommend rerunning parity after adjusting the following factor-value-label combinations: \n{message}",
-            UserWarning,
-        )
-
-    return ParityOutput(chi_scores, p_values, metadata.discrete_factor_names)
+    return ParityOutput(chi_scores, p_values, metadata.discrete_factor_names, insufficient_data)
