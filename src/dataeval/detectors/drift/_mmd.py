@@ -16,11 +16,11 @@ from typing import Callable
 import torch
 from numpy.typing import ArrayLike
 
-from dataeval.detectors.drift.base import BaseDrift, DriftBaseOutput, UpdateStrategy, preprocess_x, update_x_ref
-from dataeval.detectors.drift.torch import GaussianRBF, mmd2_from_kernel_matrix
-from dataeval.interop import as_numpy
-from dataeval.output import set_metadata
-from dataeval.utils.torch.internal import get_device
+from dataeval._interop import as_numpy
+from dataeval._output import set_metadata
+from dataeval.detectors.drift._base import BaseDrift, DriftBaseOutput, UpdateStrategy, preprocess_x, update_x_ref
+from dataeval.detectors.drift._torch import GaussianRBF, mmd2_from_kernel_matrix
+from dataeval.utils.torch._internal import get_device
 
 
 @dataclass(frozen=True)

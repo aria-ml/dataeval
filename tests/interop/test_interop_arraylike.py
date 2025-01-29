@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import torch
 
-from dataeval.interop import to_numpy
+from dataeval._interop import to_numpy
 
 array_native = [[0, 1], [2, 3]]
 array_expected = np.asarray(array_native)

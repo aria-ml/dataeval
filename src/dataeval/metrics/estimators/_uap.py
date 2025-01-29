@@ -13,8 +13,8 @@ from dataclasses import dataclass
 from numpy.typing import ArrayLike
 from sklearn.metrics import average_precision_score
 
-from dataeval.interop import as_numpy
-from dataeval.output import Output, set_metadata
+from dataeval._interop import as_numpy
+from dataeval._output import Output, set_metadata
 
 
 @dataclass(frozen=True)

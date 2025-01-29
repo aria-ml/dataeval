@@ -16,8 +16,8 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy.stats import wasserstein_distance as wd
 
-from dataeval.interop import as_numpy, to_numpy
-from dataeval.output import Output, set_metadata
+from dataeval._interop import as_numpy, to_numpy
+from dataeval._output import Output, set_metadata
 
 DISCRETE_MIN_WD = 0.054
 CONTINUOUS_MIN_SAMPLE_SIZE = 20

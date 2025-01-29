@@ -14,8 +14,8 @@ from numpy.typing import ArrayLike, NDArray
 from scipy.optimize import basinhopping
 from torch.utils.data import Dataset
 
-from dataeval.interop import as_numpy
-from dataeval.output import Output, set_metadata
+from dataeval._interop import as_numpy
+from dataeval._output import Output, set_metadata
 
 with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure

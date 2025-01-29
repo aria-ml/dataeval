@@ -12,9 +12,9 @@ import scipy as sp
 from numpy.typing import NDArray
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 
-from dataeval.output import Output, set_metadata
+from dataeval._output import Output, set_metadata
+from dataeval.utils._plot import heatmap
 from dataeval.utils.metadata import Metadata, get_counts
-from dataeval.utils.plot import heatmap
 
 with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure

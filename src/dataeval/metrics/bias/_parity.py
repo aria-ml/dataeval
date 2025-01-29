@@ -12,8 +12,8 @@ from numpy.typing import ArrayLike, NDArray
 from scipy.stats import chisquare
 from scipy.stats.contingency import chi2_contingency, crosstab
 
-from dataeval.interop import as_numpy, to_numpy
-from dataeval.output import Output, set_metadata
+from dataeval._interop import as_numpy, to_numpy
+from dataeval._output import Output, set_metadata
 from dataeval.utils.metadata import Metadata
 
 with contextlib.suppress(ImportError):

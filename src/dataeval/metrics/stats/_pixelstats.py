@@ -9,8 +9,8 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy.stats import entropy, kurtosis, skew
 
-from dataeval.metrics.stats.base import BaseStatsOutput, HistogramPlotMixin, StatsProcessor, run_stats
-from dataeval.output import set_metadata
+from dataeval._output import set_metadata
+from dataeval.metrics.stats._base import BaseStatsOutput, HistogramPlotMixin, StatsProcessor, run_stats
 
 
 @dataclass(frozen=True)

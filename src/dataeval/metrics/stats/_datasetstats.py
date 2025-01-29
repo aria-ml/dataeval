@@ -7,16 +7,16 @@ from typing import Any, Iterable
 
 from numpy.typing import ArrayLike
 
-from dataeval.metrics.stats.base import BaseStatsOutput, HistogramPlotMixin, _is_plottable, run_stats
-from dataeval.metrics.stats.dimensionstats import (
+from dataeval._output import Output, set_metadata
+from dataeval.metrics.stats._base import BaseStatsOutput, HistogramPlotMixin, _is_plottable, run_stats
+from dataeval.metrics.stats._dimensionstats import (
     DimensionStatsOutput,
     DimensionStatsProcessor,
 )
-from dataeval.metrics.stats.labelstats import LabelStatsOutput, labelstats
-from dataeval.metrics.stats.pixelstats import PixelStatsOutput, PixelStatsProcessor
-from dataeval.metrics.stats.visualstats import VisualStatsOutput, VisualStatsProcessor
-from dataeval.output import Output, set_metadata
-from dataeval.utils.plot import channel_histogram_plot
+from dataeval.metrics.stats._labelstats import LabelStatsOutput, labelstats
+from dataeval.metrics.stats._pixelstats import PixelStatsOutput, PixelStatsProcessor
+from dataeval.metrics.stats._visualstats import VisualStatsOutput, VisualStatsProcessor
+from dataeval.utils._plot import channel_histogram_plot
 
 
 @dataclass(frozen=True)

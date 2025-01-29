@@ -20,9 +20,9 @@ from numpy.typing import ArrayLike, NDArray
 from scipy.sparse import coo_matrix
 from scipy.stats import mode
 
-from dataeval.interop import as_numpy
-from dataeval.output import Output, set_metadata
-from dataeval.utils.shared import compute_neighbors, get_classes_counts, get_method, minimum_spanning_tree
+from dataeval._interop import as_numpy
+from dataeval._output import Output, set_metadata
+from dataeval.utils._shared import compute_neighbors, get_classes_counts, get_method, minimum_spanning_tree
 
 
 @dataclass(frozen=True)

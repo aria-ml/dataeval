@@ -11,9 +11,9 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy.spatial.distance import pdist, squareform
 
-from dataeval.interop import to_numpy
-from dataeval.output import Output, set_metadata
-from dataeval.utils.shared import flatten
+from dataeval._interop import to_numpy
+from dataeval._output import Output, set_metadata
+from dataeval.utils._shared import flatten
 
 with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure
