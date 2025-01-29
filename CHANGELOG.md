@@ -1,6 +1,18 @@
-[//]: # (4647edca409e9cb885ba7437ec60007e9d918fd4)
+[//]: # (a8a4cd4fc45c62eb34cfebb8bd87cc4e5294a6bc)
 
 # DataEval Change Log
+
+## v0.76.1
+
+🛠️ **Improvements and Enhancements**
+- `a8a4cd4f` - Remove merge from preprocess and address metadata array length inconsistencies
+- `f8061eca` - Add option to return dropped keys from metadata utility functions
+- `a4ddbed1` - Add pandas dependency to `all` extras option
+- `5b05981e` - Expose dropped keys from nested lists and inconsistent keys in metadata merge and preprocess
+
+📝 **Miscellaneous**
+- `a20766ec` - Updates to documentation
+- `961ad923` - Miscellaneous docs changes
 
 ## v0.76.0
 

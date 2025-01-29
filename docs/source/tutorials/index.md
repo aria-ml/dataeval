@@ -50,9 +50,9 @@ EDA_Part3.ipynb
 <!-- Ref links -->
 
 <!-- markdownlint-disable MD053 -->
-[eda-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/tutorials/EDA_Part1.ipynb
-[dataspace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/tutorials/EDA_Part2.ipynb
-[bias-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/tutorials/EDA_Part3.ipynb
+[eda-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.1/docs/source/tutorials/EDA_Part1.ipynb
+[dataspace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.1/docs/source/tutorials/EDA_Part2.ipynb
+[bias-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.1/docs/source/tutorials/EDA_Part3.ipynb
 <!-- markdownlint-enable MD053 -->
 
 <!-- END DATA ENGINEERING -->
@@ -79,7 +79,7 @@ Data_Monitoring.ipynb
 <!-- ref links -->
 
 <!-- markdownlint-disable MD053 -->
-[monitoring-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.75.0/docs/source/tutorials/Data_Monitoring.ipynb
+[monitoring-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.76.1/docs/source/tutorials/Data_Monitoring.ipynb
 <!-- markdownlint-enable MD053 -->
 
 <!-- END MONITORING -->
