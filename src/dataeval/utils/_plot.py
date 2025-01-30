@@ -171,7 +171,7 @@ def histogram_plot(
         data_dict,
     ):
         # Plot the histogram for the chosen metric
-        ax.hist(data_dict[metric], bins=20, log=log)
+        ax.hist(data_dict[metric].astype(np.float64), bins=20, log=log)
 
         # Add labels to the histogram
         ax.set_title(metric)
@@ -229,7 +229,7 @@ def channel_histogram_plot(
         # Plot the histogram for the chosen metric
         data = data_dict[metric][ch_mask].reshape(-1, max_channels)
         ax.hist(
-            data,
+            data.astype(np.float64),
             bins=20,
             density=True,
             log=log,
