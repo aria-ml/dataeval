@@ -7,6 +7,7 @@ from dataeval.detectors.ood.metadata_least_likely import get_least_likely_featur
 
 
 # Inputs with expected valid results:
+@pytest.mark.required
 @pytest.mark.parametrize(
     "md0, md1, is_ood, expected",
     (
@@ -60,6 +61,7 @@ def test_output_values(md0, md1, is_ood, expected: list[tuple[str, float]]):
 
 
 # Inputs that raise Exceptions
+@pytest.mark.required
 @pytest.mark.parametrize(
     "md0, md1, is_ood, error_msg",
     (
@@ -91,6 +93,7 @@ def test_invalid_inputs(md0, md1, is_ood, error_msg):
 
 
 # inputs that raise a warning
+@pytest.mark.required
 @pytest.mark.parametrize(
     "md0, md1, is_ood, warning",
     (
@@ -108,6 +111,7 @@ def test_nonsense_inputs(md0, md1, is_ood, warning):
 
 
 # With a more realistic number of samples, make sure that
+@pytest.mark.optional
 def test_bigdata_unlikely_features():
     nbig = 1000
     feature_names = ["temperature", "DJIA", "uptime"]

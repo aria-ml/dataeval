@@ -2,11 +2,13 @@ import logging
 from pathlib import PosixPath
 
 import numpy as np
+import pytest
 import torch
 
 from dataeval._interop import to_numpy, to_numpy_iter
 
 
+@pytest.mark.optional
 class TestInterop:
     def test_torch_to_numpy(self):
         t = torch.tensor([1, 2, 3, 4, 5])
@@ -28,6 +30,7 @@ class TestInterop:
         assert count == 3
 
 
+@pytest.mark.required
 class TestInteropLogging:
     def test_logging(self, tmp_path: PosixPath):
         log = logging.getLogger("dataeval")

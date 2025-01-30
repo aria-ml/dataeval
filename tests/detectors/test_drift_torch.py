@@ -24,6 +24,7 @@ def id_fn(x):
     return x
 
 
+@pytest.mark.required
 class TestPredictBatch:
     n, n_features, n_classes, latent_dim = 100, 10, 5, 2
     x = np.zeros((n, n_features), dtype=np.float32)
@@ -104,6 +105,7 @@ class TestPredictBatch:
             predict_batch(self.x, self.MyModel("unsupported"), device=get_device("cpu"))
 
 
+@pytest.mark.required
 class TestSquaredPairwiseDistance:
     n_features = [2, 5]
     n_instances = [(100, 100), (100, 75)]
@@ -130,6 +132,7 @@ class TestSquaredPairwiseDistance:
         np.testing.assert_almost_equal(dist_xx.trace(), 0.0, decimal=5)
 
 
+@pytest.mark.required
 class TestMMDKernelMatrix:
     n_features = [2, 5]
     n_instances = [(100, 100), (100, 75)]
@@ -172,11 +175,13 @@ class TestMMDKernelMatrix:
             assert mmd_2.numpy() < mmd.numpy()
 
 
+@pytest.mark.required
 @pytest.mark.parametrize("device", [None, torch.device("cpu"), "cpu", "gpu", "cuda", "random"])
 def test_drift_get_device(device):
     assert isinstance(get_device(device), torch.device)
 
 
+@pytest.mark.required
 def test_gaussianrbf_forward_valueerror():
     g = GaussianRBF(trainable=True)
     with pytest.raises(ValueError):

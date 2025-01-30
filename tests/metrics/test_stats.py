@@ -73,6 +73,7 @@ class LengthProcessor(StatsProcessor[LengthStatsOutput]):
     }
 
 
+@pytest.mark.required
 @pytest.mark.parametrize("box", [np.array([0, 0, 16, 16]), None])
 @pytest.mark.parametrize("per_channel", [False, True])
 class TestBaseStats:
@@ -100,6 +101,7 @@ class TestBaseStats:
         assert np.max(processor.scaled) <= 1
 
 
+@pytest.mark.required
 class TestStats:
     @pytest.mark.parametrize(
         "stats, data, per_channel, attribute, length",
@@ -185,6 +187,7 @@ class TestStats:
             calculate_ratios("not_here", MockStatsOutput(10), MockStatsOutput(10))
 
 
+@pytest.mark.required
 class TestLabelStats:
     @pytest.mark.parametrize("two_d, not_list", [[True, True], [True, False], [False, True], [False, False]])
     def test_labelstats_str_keys(self, two_d, not_list):
@@ -255,13 +258,15 @@ class TestLabelStats:
             labelstats(labels)
         assert err_msg in str(e.value)
 
-    def test_label_stats_to_dataframe(self):
+    @pytest.mark.requires_all
+    def test_labelstats_to_dataframe(self):
         label_array = [[0, 0, 0, 0, 0], [0, 1], [0, 1, 2], [0, 1, 2, 3]]
         stats = labelstats(label_array)
         stats_df = stats.to_dataframe()
         assert stats_df.shape == (4, 3)
 
 
+@pytest.mark.required
 @pytest.mark.parametrize("as_float", [True, False])
 class TestBBoxStats:
     def test_stats_with_bboxes(self, as_float):
@@ -395,6 +400,7 @@ class TestBBoxStats:
                 assert not np.isinf(np.sum(v))
 
 
+@pytest.mark.required
 class MockStatsOutput(BaseStatsOutput):
     def __init__(self, length: int, name: str = "mock"):
         self.length = length
@@ -407,6 +413,7 @@ class MockStatsOutput(BaseStatsOutput):
         return {self.name: self.name, f"{self.name}_length": self.length}
 
 
+@pytest.mark.required
 class TestStatsOutput:
     def test_datasetstats_post_init_length_mismatch(self):
         with pytest.raises(ValueError):
@@ -421,6 +428,7 @@ class TestStatsOutput:
         assert c.dict() == {"one": "one", "one_length": 2, "two": "two", "two_length": 2}
 
 
+@pytest.mark.required
 class TestNormalizeBoxShape:
     def test_ndim_1(self):
         box = normalize_box_shape(np.array([1]))
@@ -435,6 +443,8 @@ class TestNormalizeBoxShape:
             normalize_box_shape(np.array([[[0]]]))
 
 
+@pytest.mark.requires_all
+@pytest.mark.required
 class TestStatsPlotting:
     @pytest.mark.parametrize(
         "stats, data, log, channel",

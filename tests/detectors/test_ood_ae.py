@@ -28,6 +28,7 @@ def x_ref() -> np.ndarray:
     return X
 
 
+@pytest.mark.optional
 @pytest.mark.parametrize("ood_type", ["instance", "feature"])
 def test_ae(ood_type, x_ref):
     # OutlierAE parameters
@@ -58,6 +59,7 @@ def test_ae(ood_type, x_ref):
     assert od_preds.instance_score.shape == (x_ref.shape[0],)
 
 
+@pytest.mark.required
 @patch("dataeval.detectors.ood.ae.OODBase.fit")
 def test_custom_loss_fn(mock_fit, x_ref):
     mock_loss_fn = MagicMock()
@@ -66,6 +68,7 @@ def test_custom_loss_fn(mock_fit, x_ref):
     assert isinstance(mock_fit.call_args_list[0][0][2], MagicMock)
 
 
+@pytest.mark.required
 @patch("dataeval.detectors.ood.ae.OODBase.fit")
 def test_custom_optimizer(mock_fit, x_ref):
     mock_opt = MagicMock()

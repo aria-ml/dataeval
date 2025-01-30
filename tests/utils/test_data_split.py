@@ -88,6 +88,7 @@ def check_group_leakage(splits: SplitDatasetOutput, metadata: dict[str, NDArray]
 ####################################################################################################
 
 
+@pytest.mark.required
 class TestInputValidation:
     """Tests the boundaries of the inputs to split dataset"""
 
@@ -193,6 +194,7 @@ class TestInputValidation:
         assert expected == result
 
 
+@pytest.mark.required
 class TestGroupData:
     def test_label_metadata_length_mismatch(self, labels, groups):
         """Tests the case where the length of metadata values is not the same as the labels"""
@@ -228,6 +230,7 @@ class TestGroupData:
         assert not result
 
 
+@pytest.mark.optional
 def test_list_labels(labels):
     """Tests proper stratification when given a list of labels"""
 
@@ -236,6 +239,7 @@ def test_list_labels(labels):
     check_stratification(labels, splits, tolerance=0.01)
 
 
+@pytest.mark.optional
 @pytest.mark.parametrize("val_frac", (0.1, 0.7, 0.99))
 def test_split_dataset(labels, val_frac) -> None:
     """Tests no sample leakage at varying validation fractions"""
@@ -244,6 +248,7 @@ def test_split_dataset(labels, val_frac) -> None:
     check_sample_leakage(splits)
 
 
+@pytest.mark.optional
 @pytest.mark.parametrize("num_folds", [1, 10])
 @pytest.mark.parametrize("test_frac", [0.0, 0.25])
 class TestFunctionalSplits:
@@ -293,11 +298,13 @@ class TestFunctionalSplits:
         check_stratification(labels, splits, tolerance=0.15)
 
 
+@pytest.mark.required
 def test_get_groupids_empty():
     empty = get_group_ids({}, [], 1)
     assert empty == np.array([0], dtype=np.intp)
 
 
+@pytest.mark.required
 def test_bin_kmeans_ndim_not_1():
     bins = bin_kmeans(np.random.random((100, 2)))
     assert bins.shape == (100,)

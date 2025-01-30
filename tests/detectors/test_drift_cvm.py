@@ -14,6 +14,7 @@ from dataeval.detectors.drift._cvm import DriftCVM
 np.random.seed(0)
 
 
+@pytest.mark.required
 class TestCVMDrift:
     n, n_test = 500, 200
     n_features = [2]  # TODO - test 1D case once BaseUnivariateDrift updated

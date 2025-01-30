@@ -2,6 +2,7 @@ from copy import deepcopy
 
 import numpy as np
 import numpy.testing as npt
+import pytest
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -31,6 +32,7 @@ class Net(nn.Module):
         return x
 
 
+@pytest.mark.required
 class TestSufficiencyUtils:
     def test_f_out(self):
         n_i = np.geomspace(30, 3000, 20).astype(np.intp)

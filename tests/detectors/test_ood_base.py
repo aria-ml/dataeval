@@ -23,18 +23,21 @@ class MockOODGMM(OODBaseGMM):
         return OODScoreOutput(np.array([0.0]), np.array([0.0]))
 
 
+@pytest.mark.required
 def test_invalid_data_raises_typeerror():
     outlier = MockOOD(model)
     with pytest.raises(TypeError):
         outlier._get_data_info("invalid")  # type: ignore
 
 
+@pytest.mark.required
 def test_validate_state_raises_runtimeerror():
     outlier = MockOOD(model)
     with pytest.raises(RuntimeError):
         outlier._validate_state(np.array([]))
 
 
+@pytest.mark.required
 def test_validate_raises_runtimeerror():
     outlier = MockOOD(model)
     outlier._data_info = (image_shape, np.float64)
@@ -42,6 +45,7 @@ def test_validate_raises_runtimeerror():
         outlier._validate(np.array([0], dtype=np.int8))  # type: ignore
 
 
+@pytest.mark.required
 def test_validate_state_additional_attrs():
     outlier = MockOOD(model)
     outlier._ref_score = "not none"  # type: ignore
@@ -52,6 +56,7 @@ def test_validate_state_additional_attrs():
     outlier._validate_state(np.array([0.0], dtype=np.float32))
 
 
+@pytest.mark.required
 def test_oodbasegmm_fit():
     outlier = MockOODGMM(lambda _: (1, 1, 1))  # type: ignore
     mock_trainer = patch("dataeval.detectors.ood.base.trainer").start()

@@ -12,6 +12,7 @@ def dataset(images=None, labels=None, bboxes=None):
     return DataEvalDataset(images, labels, bboxes)
 
 
+@pytest.mark.required
 @pytest.mark.parametrize(
     "channels",
     [
@@ -54,6 +55,7 @@ class TestChannels:
         assert result.shape[1] == channels
 
 
+@pytest.mark.required
 class TestTrainer:
     """Tests the AETrainer class"""
 
@@ -144,6 +146,7 @@ class TestTrainer:
             assert imgs.shape == (8, 3, 32, 32)
 
 
+@pytest.mark.optional
 @pytest.mark.parametrize(
     "device",
     [
@@ -180,6 +183,7 @@ class TestGPU:
             assert param.device.type == torch.device(device).type
 
 
+@pytest.mark.required
 class TestAE:
     def test_encode_output_shape(self):
         ae = AE(input_shape=(1, 32, 32))
