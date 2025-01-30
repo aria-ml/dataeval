@@ -129,6 +129,11 @@ reportMissingImports = false
 norecursedirs = ["prototype"]
 testpaths = ["tests"]
 addopts = ["--pythonwarnings=ignore::DeprecationWarning", "--verbose", "--durations=20", "--durations-min=1.0"]
+markers = [
+  "required: marks tests for required features",
+  "optional: marks tests for optional features",
+  "requires_all: marks tests that require the all extras",
+]
 
 [tool.coverage.run]
 source = ["src/dataeval"]

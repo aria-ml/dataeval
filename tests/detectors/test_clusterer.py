@@ -50,6 +50,7 @@ def outlier_data():
     return test_data
 
 
+@pytest.mark.required
 class TestMatrixOps:
     @pytest.mark.parametrize(
         "shape",
@@ -93,6 +94,7 @@ class TestMatrixOps:
             assert not np.any(np.isnan(c._larr))  # Should contain no NaN
 
 
+@pytest.mark.required
 class TestCluster:
     def test_init_not_copy(self):
         """Variables are calculated correctly when not copying"""
@@ -176,6 +178,7 @@ class TestCluster:
         del array, int32  # Remove imports
 
 
+@pytest.mark.required
 class TestClusterPosition:
     def test_get_by_name(self):
         cp = _ClusterPosition(1, 1)
@@ -183,6 +186,7 @@ class TestClusterPosition:
         assert cp.cid
 
 
+@pytest.mark.required
 class TestClusterMergeEntry:
     def test_arithmetic_ops(self):
         cme = _ClusterMergeEntry(1, 1, 1, True)
@@ -194,6 +198,7 @@ class TestClusterMergeEntry:
         assert cme_more > cme > cme_less
 
 
+@pytest.mark.required
 class TestClustererValidate:
     @pytest.mark.parametrize(
         "data, error, error_msg",
@@ -223,6 +228,7 @@ class TestClustererValidate:
         Clusterer._validate_data(data.reshape((2, -1)))
 
 
+@pytest.mark.required
 class TestClustererInit:
     def test_on_init(self, functional_data):
         """Tests that the init correctly sets the distance matrix and linkage array"""
@@ -276,6 +282,7 @@ class TestClustererInit:
         npt.assert_array_equal(Clusterer(functional_data).data, functional_data)
 
 
+@pytest.mark.required
 class TestCreateClusters:
     """Tests all functions related to and including the `create_clusters` method"""
 
@@ -379,6 +386,7 @@ class TestCreateClusters:
         assert c.clusters == x
 
 
+@pytest.mark.required
 class TestClusterOutliers:
     """Tests all functions related to and including the `find_outliers` method"""
 
@@ -451,6 +459,7 @@ class TestClusterOutliers:
         assert all(x in outliers for x in indices)
 
 
+@pytest.mark.required
 class TestClusterDuplicates:
     """Tests all functions related to and including the `find_duplicates` method"""
 
@@ -493,6 +502,7 @@ class TestClusterDuplicates:
         assert not len(results.potential_duplicates)
 
 
+@pytest.mark.required
 class TestClustererGetLastMergeLevels:
     """Tests all functions related to and including the `get_last_merge_levels` method"""
 
@@ -548,6 +558,7 @@ class TestClustererGetLastMergeLevels:
         assert x.get(1) == 0  # Inner cluster
 
 
+@pytest.mark.optional
 class TestClustererEvaluate:
     """Tests the evaluate function with known dataset and results"""
 

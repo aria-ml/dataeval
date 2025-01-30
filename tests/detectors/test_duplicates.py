@@ -5,6 +5,7 @@ from dataeval.detectors.linters.duplicates import Duplicates
 from dataeval.metrics.stats._hashstats import hashstats
 
 
+@pytest.mark.required
 class TestDuplicates:
     def test_duplicates(self):
         data = np.random.random((20, 3, 16, 16))

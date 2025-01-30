@@ -3,11 +3,16 @@ import warnings
 
 import numpy as np
 import pytest
-from matplotlib.figure import Figure
+
+try:
+    from matplotlib.figure import Figure
+except ImportError:
+    Figure = type(None)
 
 from dataeval.metrics.bias._coverage import _plot, coverage
 
 
+@pytest.mark.required
 class TestCoverageUnit:
     def test_fails_with_invalid_radius_type(self):
         embs = np.zeros((100, 2))
@@ -41,6 +46,9 @@ class TestCoverageUnit:
         np.testing.assert_array_equal(x.indices, x_flat.indices)
         np.testing.assert_array_equal(x.radii, x_flat.radii)
 
+
+@pytest.mark.requires_all
+class TestCoveragePlot:
     def test_base_plotting(self):
         images = np.zeros((20, 3, 28, 28), dtype=np.intp)
         images[1] += 80
@@ -59,6 +67,7 @@ class TestCoverageUnit:
             _plot(images, 7)
 
 
+@pytest.mark.optional
 class TestCoverageFunctional:
     def test_naive_answer(self):
         embs = np.zeros((100, 2))

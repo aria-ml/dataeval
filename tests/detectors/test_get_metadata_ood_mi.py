@@ -9,6 +9,7 @@ RANDOM_STATE = 42
 
 
 # Inputs with expected valid results:
+@pytest.mark.required
 @pytest.mark.parametrize(
     "md0, is_ood, expected",
     (
@@ -34,6 +35,7 @@ def test_output_values(md0, is_ood, expected: dict[str, float]):
 
 
 # # Inputs that raise Exceptions
+@pytest.mark.required
 @pytest.mark.parametrize(
     "md0, is_ood, error_msg",
     (
@@ -56,6 +58,7 @@ def test_invalid_inputs(md0, is_ood, error_msg):
 
 
 # # inputs that raise a warning
+@pytest.mark.required
 @pytest.mark.parametrize(
     "md0, is_ood, warning",
     (

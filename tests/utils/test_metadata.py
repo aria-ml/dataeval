@@ -3,6 +3,7 @@ import pytest
 from dataeval.utils.metadata import _convert_type, _try_cast, flatten, merge
 
 
+@pytest.mark.required
 class TestUtilsMetadata:
     duplicate_keys = {
         "a": 1,

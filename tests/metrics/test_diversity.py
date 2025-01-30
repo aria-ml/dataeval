@@ -1,6 +1,10 @@
 import numpy as np
 import pytest
-from matplotlib.figure import Figure
+
+try:
+    from matplotlib.figure import Figure
+except ImportError:
+    Figure = type(None)
 
 from dataeval.metrics.bias import diversity
 from dataeval.utils.metadata import preprocess
@@ -15,6 +19,7 @@ def metadata_results():
     return preprocess(md, class_labels, {"var_cnt": 3})
 
 
+@pytest.mark.required
 class TestDiversityUnit:
     @pytest.mark.parametrize("met", ["Simpson", "ShANnOn"])
     def test_invalid_method(self, metadata_results, met):
@@ -36,6 +41,9 @@ class TestDiversityUnit:
         assert type(result.factor_names[0]) is str
         assert type(result.meta()["arguments"]["method"]) is str
 
+
+@pytest.mark.requires_all
+class TestDiversityPlot:
     def test_base_plotting(self, metadata_results):
         result = diversity(metadata_results, method="simpson")
         output = result.plot()
@@ -51,6 +59,7 @@ class TestDiversityUnit:
         assert isinstance(classwise_output, Figure)
 
 
+@pytest.mark.optional
 class TestDiversityFunctional:
     @pytest.mark.parametrize(
         "metadata, expected_result",

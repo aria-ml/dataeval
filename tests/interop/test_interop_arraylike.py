@@ -8,6 +8,7 @@ array_native = [[0, 1], [2, 3]]
 array_expected = np.asarray(array_native)
 
 
+@pytest.mark.optional
 class TestInteropArrayLike:
     @pytest.mark.parametrize(
         "param, expected",

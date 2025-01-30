@@ -57,6 +57,7 @@ def preprocess_list(x: list[np.ndarray]) -> np.ndarray:
     return np.concatenate(x, axis=0)
 
 
+@pytest.mark.required
 class TestMMDDrift:
     n_features = [10]
     preprocess = [
@@ -142,6 +143,7 @@ class TestMMDDrift:
             assert preds.distance <= preds.distance_threshold
 
 
+@pytest.mark.required
 def test_mmd_init_preprocess_fn_valueerror():
     with pytest.raises(ValueError):
         DriftMMD([], preprocess_fn="NotCallable")  # type: ignore

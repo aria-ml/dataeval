@@ -9,6 +9,7 @@ def get_dataset(count: int, channels: int):
     return [np.random.random((channels, 16, 16)) for _ in range(count)]
 
 
+@pytest.mark.required
 class TestMergingStats:
     def test_image_stats_addition(self):
         data_a = get_dataset(10, 1)

@@ -42,7 +42,7 @@ def predict_batch(
     model: Callable | torch.nn.Module | torch.nn.Sequential,
     device: torch.device | None = None,
     batch_size: int = int(1e10),
-    preprocess_fn: Callable | None = None,
+    preprocess_fn: Callable[[torch.Tensor], torch.Tensor] | None = None,
     dtype: type[np.generic] | torch.dtype = np.float32,
 ) -> NDArray[Any] | torch.Tensor | tuple[Any, ...]:
     """
@@ -75,7 +75,8 @@ def predict_batch(
     n = len(x)
     n_minibatch = int(np.ceil(n / batch_size))
     return_np = not isinstance(dtype, torch.dtype)
-    preds = []
+    preds_tuple = None
+    preds_array = []
     with torch.no_grad():
         for i in range(n_minibatch):
             istart, istop = i * batch_size, min((i + 1) * batch_size, n)
@@ -83,23 +84,17 @@ def predict_batch(
             if isinstance(preprocess_fn, Callable):
                 x_batch = preprocess_fn(x_batch)
 
-            preds_tmp = model(x_batch.to(torch.float32).to(device))
+            preds_tmp = model(x_batch.to(dtype=torch.float32, device=device))
             if isinstance(preds_tmp, (list, tuple)):
-                if len(preds) == 0:  # init tuple with lists to store predictions
-                    preds = tuple([] for _ in range(len(preds_tmp)))
+                if preds_tuple is None:  # init tuple with lists to store predictions
+                    preds_tuple = tuple([] for _ in range(len(preds_tmp)))
                 for j, p in enumerate(preds_tmp):
-                    if isinstance(p, torch.Tensor):
-                        p = p.cpu()
-                    preds[j].append(p if not return_np or isinstance(p, np.ndarray) else p.numpy())
+                    p = p.cpu() if isinstance(p, torch.Tensor) else p
+                    preds_tuple[j].append(p if not return_np or isinstance(p, np.ndarray) else p.numpy())
             elif isinstance(preds_tmp, (np.ndarray, torch.Tensor)):
-                if isinstance(preds_tmp, torch.Tensor):
-                    preds_tmp = preds_tmp.cpu()
-                if isinstance(preds, tuple):
-                    preds = list(preds)
-                preds.append(
-                    preds_tmp
-                    if not return_np or isinstance(preds_tmp, np.ndarray)  # type: ignore
-                    else preds_tmp.numpy()
+                preds_tmp = preds_tmp.cpu() if isinstance(preds_tmp, torch.Tensor) else preds_tmp
+                preds_array.append(
+                    preds_tmp if not return_np or isinstance(preds_tmp, np.ndarray) else preds_tmp.numpy()
                 )
             else:
                 raise TypeError(
@@ -108,9 +103,7 @@ def predict_batch(
                     torch.Tensor."
                 )
     concat = partial(np.concatenate, axis=0) if return_np else partial(torch.cat, dim=0)
-    out: tuple | np.ndarray | torch.Tensor = (
-        tuple(concat(p) for p in preds) if isinstance(preds, tuple) else concat(preds)  # type: ignore
-    )
+    out = tuple(concat(p) for p in preds_tuple) if preds_tuple is not None else concat(preds_array)
     return out
 
 
@@ -154,18 +147,21 @@ def trainer(
     verbose
         Whether to print training progress.
     """
+    if loss_fn is None:
+        loss_fn = torch.nn.MSELoss()
+
     if optimizer is None:
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     if y_train is None:
-        dataset = TensorDataset(torch.from_numpy(x_train).to(torch.float32))
-
+        dataset = TensorDataset(torch.from_numpy(x_train).to(dtype=torch.float32))
     else:
         dataset = TensorDataset(
-            torch.from_numpy(x_train).to(torch.float32), torch.from_numpy(y_train).to(torch.float32)
+            torch.from_numpy(x_train).to(dtype=torch.float32),
+            torch.from_numpy(y_train).to(dtype=torch.float32),
         )
 
-    loader = DataLoader(dataset=dataset)
+    loader = DataLoader(dataset=dataset, batch_size=batch_size)
 
     model = model.to(device)
 
