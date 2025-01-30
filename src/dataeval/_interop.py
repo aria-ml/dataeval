@@ -25,7 +25,7 @@ def _try_import(module_name) -> ModuleType | None:
 
     try:
         module = import_module(module_name)
-    except ImportError:  # pragma: no cover - covered by test_mindeps.py
+    except ImportError:  # pragma: no cover
         _logger.log(logging.INFO, f"Unable to import {module_name}.")
         module = None
 

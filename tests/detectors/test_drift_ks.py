@@ -15,6 +15,7 @@ from dataeval.detectors.drift._ks import DriftKS
 from dataeval.detectors.drift.updates import LastSeenUpdate, ReservoirSamplingUpdate
 
 
+@pytest.mark.required
 class TestKSDrift:
     n, n_hidden, n_classes = 200, 10, 5
     n_features = [1, 10]

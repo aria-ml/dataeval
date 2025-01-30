@@ -17,6 +17,7 @@ z = np.random.rand(N, D).astype(np.float32)
 gamma = np.random.rand(N, K).astype(np.float32)
 
 
+@pytest.mark.required
 @pytest.mark.parametrize(
     "module, tz, tg",
     [

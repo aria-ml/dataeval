@@ -4,6 +4,7 @@ import pytest
 from dataeval.utils.data._read import read_dataset
 
 
+@pytest.mark.required
 class TestDatasetReader:
     """
     Tests the dataset reader aggregates data into separate List[ArrayLike] from tuple return

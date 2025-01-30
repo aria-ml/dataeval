@@ -7,8 +7,12 @@ import numpy.testing as npt
 import pytest
 import torch
 import torch.nn as nn
-from matplotlib.figure import Figure
 from torch.utils.data import DataLoader
+
+try:
+    from matplotlib.figure import Figure
+except ImportError:
+    Figure = type(None)
 
 from dataeval.workflows import Sufficiency
 from dataeval.workflows.sufficiency import (
@@ -59,6 +63,7 @@ def mock_ds(length: int | None):
     return ds
 
 
+@pytest.mark.required
 class TestSufficiency:
     def test_mock_run(self) -> None:
         eval_fn = MagicMock()
@@ -234,6 +239,8 @@ class TestSufficiency:
             )
 
 
+@pytest.mark.requires_all
+@pytest.mark.required
 class TestSufficiencyPlot:
     def test_plot(self):
         """Tests that a plot is generated"""
@@ -322,6 +329,7 @@ class TestSufficiencyPlot:
         assert result[2].axes[0].get_title().startswith("test2")
 
 
+@pytest.mark.required
 class TestSufficiencyProject:
     def test_measure_length_invalid(self):
         with pytest.raises(ValueError):
@@ -407,6 +415,7 @@ class TestSufficiencyProject:
         assert result["test1"].shape == (2, 4)
 
 
+@pytest.mark.required
 class TestSufficiencyInverseProject:
     def test_empty_data(self):
         """

@@ -177,7 +177,7 @@ lint:
   rules: *on_run
 
 minimum install:
-  extends: .nox
+  extends: .nox_all
   script:
     - nox -e deps
   rules: *on_run_with_code
@@ -202,7 +202,7 @@ test:
 conda:
   extends: .conda_all
   script:
-    - pytest tests/test_mindeps.py
+    - pytest -m "not optional"
   rules: *on_run
 
 verify lock:

@@ -6,6 +6,7 @@ from dataeval.metrics.estimators._divergence import divergence, divergence_fnn, 
 np.random.seed(0)
 
 
+@pytest.mark.required
 class TestDivergence:
     @pytest.mark.parametrize(
         "method, output",

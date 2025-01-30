@@ -5,6 +5,7 @@ from dataeval.detectors.linters.outliers import Outliers, OutliersOutput, _get_o
 from dataeval.metrics.stats import DatasetStatsOutput, LabelStatsOutput, dimensionstats, pixelstats, visualstats
 
 
+@pytest.mark.required
 class TestOutliers:
     def test_outliers(self):
         outliers = Outliers()
@@ -62,6 +63,7 @@ class TestOutliers:
             outliers.from_stats([1234])  # type: ignore
 
 
+@pytest.mark.required
 class TestOutliersOutput:
     outlier = {1: {"a": 1.0, "b": 1.0}, 3: {"a": 1.0, "b": 1.0}, 5: {"a": 1.0, "b": 1.0}}
     outlier2 = {2: {"a": 2.0, "d": 2.0}, 6: {"a": 1.0, "d": 1.0}, 7: {"a": 0.5, "c": 0.5}}
@@ -107,6 +109,7 @@ class TestOutliersOutput:
         print(table_result)
         assert table_result[:45] == "  Class |    a    |    c    |    d    | Total"
 
+    @pytest.mark.requires_all
     def test_to_dataframe_list(self):
         output = OutliersOutput([self.outlier2, self.outlier])
         assert len(output) == 6
@@ -122,6 +125,7 @@ class TestOutliersOutput:
         output_df = output.to_dataframe(lstat)
         assert output_df.shape == (6, 7)
 
+    @pytest.mark.requires_all
     def test_to_dataframe_dict(self):
         output = OutliersOutput(self.outlier)
         assert len(output) == 3

@@ -2,7 +2,11 @@ from contextlib import nullcontext as does_not_raise
 
 import numpy as np
 import pytest
-from matplotlib.figure import Figure
+
+try:
+    from matplotlib.figure import Figure
+except ImportError:
+    Figure = type(None)
 
 from dataeval.metrics.bias._balance import _validate_num_neighbors, balance
 from dataeval.utils.metadata import preprocess
@@ -46,6 +50,7 @@ def simple_metadata():
     return preprocess(raw_metadata, class_labels)
 
 
+@pytest.mark.required
 class TestBalanceUnit:
     @pytest.mark.parametrize(
         "test_param, expected_exception, err_msg",
@@ -92,6 +97,10 @@ class TestBalanceUnit:
                 if k in expected_type:
                     assert v.dtype == expected_type[k]
 
+
+@pytest.mark.requires_all
+@pytest.mark.required
+class TestBalancePlot:
     def test_base_plotting(self, metadata_results):
         mi = balance(metadata_results)
         output = mi.plot()
@@ -112,6 +121,7 @@ class TestBalanceUnit:
         assert isinstance(classwise_output, Figure)
 
 
+@pytest.mark.optional
 class TestBalanceFunctional:
     def test_unity_balance(self, simple_metadata):
         output = balance(simple_metadata)

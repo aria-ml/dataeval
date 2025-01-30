@@ -1,8 +1,10 @@
 import numpy as np
+import pytest
 
 from dataeval.metrics.estimators._uap import uap
 
 
+@pytest.mark.required
 class TestUAP:
     def test_uap(self):
         labels = np.arange(10).repeat(100)
