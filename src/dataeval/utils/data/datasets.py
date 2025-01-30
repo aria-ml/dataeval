@@ -8,14 +8,112 @@ import hashlib
 import os
 import zipfile
 from pathlib import Path
-from typing import Literal, TypeVar
+from typing import Any, Callable, Literal, TypeVar
 from warnings import warn
 
 import numpy as np
 import requests
 from numpy.typing import NDArray
+from torch import Tensor
 from torch.utils.data import Dataset
-from torchvision.datasets import CIFAR10, VOCDetection
+from torchvision.datasets import CIFAR10 as _CIFAR10
+from torchvision.datasets import VOCDetection as _VOCDetection
+
+TDatum = TypeVar("TDatum")
+
+
+class DatasetWrapperMixin(Dataset[TDatum]):
+    _data: Dataset[TDatum]
+
+    def __getitem__(self, index: int) -> TDatum:
+        return self._data.__getitem__(index)
+
+    def __len__(self) -> int:
+        len_fn: Callable[[], int] | None = getattr(self._data, "__len__", None)
+        if len_fn is None:
+            raise NotImplementedError("Dataset does not have a length function.")
+
+        return len_fn()
+
+
+class InfoMixin:
+    _image_set: str
+
+    def info(self) -> str:
+        """Pretty prints dataset name and info"""
+
+        return f"{self._image_set.capitalize()}\n{'-' * len(self._image_set)}\n{self}\n"
+
+
+class CIFAR10(DatasetWrapperMixin[tuple[Tensor, int]], InfoMixin):
+    """
+    `CIFAR10 <https://www.cs.toronto.edu/~kriz/cifar.html>`_ Dataset.
+
+    Parameters
+    ----------
+    root : str or pathlib.Path
+        Root directory of the CIFAR10 Dataset.
+    train : bool, default True
+        If True, creates dataset from training set, otherwise creates from test set.
+    download : bool, default False
+        If true, downloads the dataset from the internet and puts it in root directory.
+        If dataset is already downloaded, it is not downloaded again.
+    transform : Callable or None, default None:
+        A function/transform that takes in a PIL image and returns a transformed version.
+        E.g, ``torchvision.transforms.RandomCrop``
+    target_transform : Callable or None, default None:
+        A function/transform that takes in the target and transforms it.
+    """
+
+    def __init__(
+        self,
+        root: str | Path,
+        train: bool = True,
+        download: bool = False,
+        transform: Callable | None = None,
+        target_transform: Callable | None = None,
+    ) -> None:
+        self._data = _CIFAR10(root, train, transform, target_transform, download)
+        self._image_set = "train" if train else "test"
+
+
+class VOCDetection(DatasetWrapperMixin[tuple[Tensor, dict[str, Any]]], InfoMixin):
+    """
+    `Pascal VOC <http://host.robots.ox.ac.uk/pascal/VOC/>`_ Detection Dataset.
+
+    Parameters
+    ----------
+    root : str or pathlib.Path
+        Root directory of the VOC Dataset.
+    year : "2007", "2008", "2009", "2010", "2011" or "2012", default "2012"
+        The dataset year.
+    image_set : "train", "trainval", "val", or "test", default "train"
+        "test" is only valid for the year "2007"
+    download : bool, default False
+        If true, downloads the dataset from the internet and puts it in root directory.
+        If dataset is already downloaded, it is not downloaded again.
+    transform : Callable or None, default None:
+        A function/transform that takes in a PIL image and returns a transformed version.
+        E.g, ``torchvision.transforms.RandomCrop``
+    target_transform : Callable or None, default None:
+        A function/transform that takes in the target and transforms it.
+    transforms : Callable or None, default None
+        A function/transform that takes input sample and its target as entry and returns a transformed version.
+    """
+
+    def __init__(
+        self,
+        root: str | Path,
+        year: Literal["2007", "2008", "2009", "2010", "2011", "2012"] = "2012",
+        image_set: Literal["train", "trainval", "val", "test"] = "train",
+        download: bool = False,
+        transform: Callable | None = None,
+        target_transform: Callable | None = None,
+        transforms: Callable | None = None,
+    ) -> None:
+        self._data = _VOCDetection(root, year, image_set, download, transform, target_transform, transforms)
+        self._image_set = image_set
+
 
 ClassStringMap = Literal["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
 TClassMap = TypeVar("TClassMap", ClassStringMap, int, list[ClassStringMap], list[int])
@@ -174,46 +272,46 @@ def _subselect(arr: NDArray, count: int, from_back: bool = False):
     return arr[:count]
 
 
-class MNIST(Dataset[tuple[NDArray[np.float64], int]]):
+class MNIST(Dataset[tuple[NDArray[np.float64], int]], InfoMixin):
     """MNIST Dataset and Corruptions.
 
-    Args:
-        root : str | ``pathlib.Path``
-            Root directory of dataset where the ``mnist_c/`` folder exists.
-        train : bool, default True
-            If True, creates dataset from ``train_images.npy`` and ``train_labels.npy``.
-        download : bool, default False
-            If True, downloads the dataset from the internet and puts it in root
-            directory. If dataset is already downloaded, it is not downloaded again.
-        size : int, default -1
-            Limit the dataset size, must be a value greater than 0.
-        unit_interval : bool, default False
-            Shift the data values to the unit interval [0-1].
-        dtype : type | None, default None
-            Change the :term:`NumPy` dtype - data is loaded as np.uint8
-        channels : Literal['channels_first' | 'channels_last'] | None, default None
-            Location of channel axis if desired, default has no channels (N, 28, 28)
-        flatten : bool, default False
-            Flatten data into single dimension (N, 784) - cannot use both channels and flatten,
-            channels takes priority over flatten.
-        normalize : tuple[mean, std] | None, default None
-            Normalize images acorrding to provided mean and standard deviation
-        corruption : Literal['identity' | 'shot_noise' | 'impulse_noise' | 'glass_blur' |
-            'motion_blur' | 'shear' | 'scale' | 'rotate' | 'brightness' | 'translate' | 'stripe' |
-            'fog' | 'spatter' | 'dotted_line' | 'zigzag' | 'canny_edges'] | None, default None
-            The desired corruption style or None.
-        classes : Literal["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
-            | int | list[int] | list[Literal["zero", "one", "two", "three", "four", "five", "six", "seven",
-            "eight", "nine"]] | None, default None
-            Option to select specific classes from dataset.
-        balance : bool, default True
-            If True, returns equal number of samples for each class.
-        randomize : bool, default True
-            If True, shuffles the data prior to selection - uses a set seed for reproducibility.
-        slice_back : bool, default False
-            If True and size has a value greater than 0, then grabs selection starting at the last image.
-        verbose : bool, default True
-            If True, outputs print statements.
+    Parameters
+    ----------
+    root : str or pathlib.Path
+        Root directory of dataset where the ``mnist_c/`` folder exists.
+    train : bool, default True
+        If True, creates dataset from ``train_images.npy`` and ``train_labels.npy``.
+    download : bool, default False
+        If True, downloads the dataset from the internet and puts it in root
+        directory. If dataset is already downloaded, it is not downloaded again.
+    size : int, default -1
+        Limit the dataset size, must be a value greater than 0.
+    unit_interval : bool, default False
+        Shift the data values to the unit interval [0-1].
+    dtype : type | None, default None
+        Change the :term:`NumPy` dtype - data is loaded as np.uint8
+    channels : "channels_first", "channels_last" or None, default None
+        Location of channel axis if desired, default has no channels (N, 28, 28)
+    flatten : bool, default False
+        Flatten data into single dimension (N, 784) - cannot use both channels and flatten,
+        channels takes priority over flatten.
+    normalize : tuple[mean, std] or None, default None
+        Normalize images acorrding to provided mean and standard deviation
+    corruption : "identity", "shot_noise", "impulse_noise", "glass_blur", "motion_blur", \
+        "shear", "scale", "rotate", "brightness", "translate", "stripe" "fog", "spatter", \
+        "dotted_line", "zigzag", "canny_edges" or None, default None
+        The desired corruption style or None.
+    classes : "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", \
+        int, list, or None, default None
+        Option to select specific classes from dataset.
+    balance : bool, default True
+        If True, returns equal number of samples for each class.
+    randomize : bool, default True
+        If True, shuffles the data prior to selection - uses a set seed for reproducibility.
+    slice_back : bool, default False
+        If True and size has a value greater than 0, then grabs selection starting at the last image.
+    verbose : bool, default True
+        If True, outputs print statements.
     """
 
     _mirrors: tuple[str, ...] = (
@@ -275,6 +373,7 @@ class MNIST(Dataset[tuple[NDArray[np.float64], int]]):
         self.data: NDArray[np.float64]
         self.targets: NDArray[np.int_]
         self.size: int
+        self._image_set = "train" if train else "test"
 
         self._class_set = []
         if classes is not None:
