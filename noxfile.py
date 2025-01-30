@@ -80,7 +80,7 @@ def deps(session: nox.Session) -> None:
     """Run unit tests against standard installation."""
     check_version(session.name)
     session.install(".", "pytest", env=INSTALL_ENVS)
-    session.run("pytest", "tests/test_mindeps.py")
+    session.run("pytest", "-m", "not (requires_all or optional)")
 
 
 @nox.session

@@ -4,6 +4,7 @@ import pytest
 from dataeval.metrics.estimators._ber import BEROutput, ber, ber_knn, ber_mst, knn_lowerbound
 
 
+@pytest.mark.required
 class TestFunctionalBER:
     """Tests the functional methods used in BER"""
 
@@ -60,6 +61,7 @@ class TestFunctionalBER:
         assert method(*args) == method(*args_flat)
 
 
+@pytest.mark.required
 class TestAPIBER:
     """Tests the user facing BER Class"""
 

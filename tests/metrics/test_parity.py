@@ -39,6 +39,7 @@ class MockDistributionDataset:
         return (self.image, self.labels[idx])
 
 
+@pytest.mark.required
 class TestLabelIndependenceUnit:
     def test_fails_with_imbalanced_nclasses(self):
         f_exp = [1]
@@ -139,6 +140,7 @@ class TestLabelIndependenceUnit:
             label_parity(labels_expected, labels_observed)
 
 
+@pytest.mark.optional
 class TestLabelIndependenceFunctional:
     def test_scipy_example_data(self):
         """

@@ -12,6 +12,7 @@ from dataeval.utils.metadata import (
 )
 
 
+@pytest.mark.required
 class TestMDPreprocessingUnit:
     def test_uneven_factor_lengths(self):
         labels = [0] * 10 + [1] * 10
@@ -106,6 +107,7 @@ class TestMDPreprocessingUnit:
         assert discrete_data.shape[0] == 8
 
 
+@pytest.mark.optional
 class TestMDPreprocessingFunctional:
     def test_nbins(self):
         factors = {"data1": [0.1, 0.2, 0.3, 1.1, 1.2]}
@@ -149,6 +151,7 @@ class TestMDPreprocessingFunctional:
         assert len(np.unique(disc_factors)) == 5
 
 
+@pytest.mark.required
 class TestUserDefinedBinUnit:
     def test_nbins_returns_array(self):
         factors = [0.1, 1.1, 1.2]
@@ -183,6 +186,7 @@ class TestUserDefinedBinUnit:
         assert err_msg in str(e.value)
 
 
+@pytest.mark.optional
 class TestUserDefinedBinFunctional:
     def test_udb_regression_nbins(self):
         factors = [0.1, 1.1, 1.2]
@@ -209,6 +213,7 @@ class TestUserDefinedBinFunctional:
         assert np.all(hist == [1, 2, 3])
 
 
+@pytest.mark.required
 class TestBinningUnit:
     @pytest.mark.parametrize(
         "method, data, expected_result",
@@ -231,6 +236,7 @@ class TestBinningUnit:
         assert np.unique(output).size == 6
 
 
+@pytest.mark.required
 class TestIsContinuousUnit:
     @pytest.mark.parametrize(
         "data, repeats",

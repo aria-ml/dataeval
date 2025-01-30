@@ -8,6 +8,7 @@ from dataeval.detectors.ood.metadata_ks_compare import meta_distribution_compare
 
 
 # Inputs with expected valid results:
+@pytest.mark.required
 @pytest.mark.parametrize(
     "md0, md1, expected",
     (
@@ -106,6 +107,7 @@ def test_output_values(md0, md1, expected: dict[str, dict[str, float]]):
 
 
 # # Inputs that raise Exceptions
+@pytest.mark.required
 @pytest.mark.parametrize(
     "md0, md1, error_msg",
     (
@@ -127,6 +129,7 @@ def test_invalid_inputs(md0, md1, error_msg):
 
 
 # # inputs that raise a warning
+@pytest.mark.required
 @pytest.mark.parametrize(
     "md0, md1, warning",
     (
@@ -146,6 +149,7 @@ def test_nonsense_inputs(md0, md1, warning):
 
 
 # Use a more realistic number of samples; make sure no warning is emitted.
+@pytest.mark.optional
 def test_bigdata_unlikely_features():
     with warnings.catch_warnings() as record:
         warnings.simplefilter("error")

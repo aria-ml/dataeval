@@ -26,6 +26,7 @@ class MockHTTPError(HTTPError):
         self.response.status_code = 404
 
 
+@pytest.mark.optional
 class TestMNISTFile:
     def test_check_exists_path_exists(self, capsys, mnist_file):
         _check_exists(mnist_file, "fakeurl", "root", mnist_file.name, "file_hash", False, True)
@@ -85,6 +86,7 @@ class TestMNISTFile:
         assert mock_extract_archive.called == md5
 
 
+@pytest.mark.optional
 class TestMNIST:
     def test_mnist_initialization(self, mnist_npy):
         """Test MNIST dataset initialization."""

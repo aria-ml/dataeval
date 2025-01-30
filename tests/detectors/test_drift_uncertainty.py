@@ -42,6 +42,7 @@ def id_fn(x: list) -> torch.Tensor:
     return torch.from_numpy(np.concatenate(x, axis=0))
 
 
+@pytest.mark.required
 class TestFunctionalClassifierUncertainty:
     p_val = [0.05]
     n_features = [16]
@@ -103,6 +104,7 @@ class TestFunctionalClassifierUncertainty:
         assert preds_0.distances < preds_1.distances
 
 
+@pytest.mark.required
 class TestClassifierUncertainty:
     n, n_features = 100, 10
     shape = (n_features,)

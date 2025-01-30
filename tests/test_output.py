@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 import numpy as np
+import pytest
 
 from dataeval._output import MappingOutput, Output, set_metadata
 
@@ -31,6 +32,7 @@ class MockMetric:
 class MockMappingOutput(MappingOutput[str, float]): ...
 
 
+@pytest.mark.required
 class TestOutputMetadata:
     def test_output_metadata_str(self):
         output = mock_metric(1, True, "value")
@@ -88,6 +90,7 @@ class TestOutputMetadata:
         }
 
 
+@pytest.mark.required
 class TestMappingOutput:
     data = {"mock_key": 1.0}
 
