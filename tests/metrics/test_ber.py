@@ -11,9 +11,9 @@ class TestFunctionalBER:
     @pytest.mark.parametrize(
         "method, k, expected",
         [
-            (ber_mst, None, (0.009, 0.004511306604042031)),
-            (ber_knn, 1, (0.0, 0.0)),
-            (ber_knn, 10, (0.0, 0.0)),
+            ("MST", None, (0.009, 0.004511306604042031)),
+            ("KNN", 1, (0.0, 0.0)),
+            ("KNN", 10, (0.0, 0.0)),
         ],
     )
     def test_ber_on_mock_data(self, method, k, expected):
@@ -23,8 +23,8 @@ class TestFunctionalBER:
         data = np.ones((1000, 28, 28)) * labels[:, np.newaxis, np.newaxis]
         data[:, 13:16, 13:16] += 1
         data[-200:, 13:16, 13:16] += rng.choice(5)
-        result = method(data, labels, k) if k else method(data, labels)
-        assert result == expected
+        result = ber(data, labels, k, method=method) if k else ber(data, labels, method=method)
+        assert (result.ber, result.ber_lower) == expected
 
     @pytest.mark.parametrize(
         "value, classes, k, expected",
