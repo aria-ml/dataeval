@@ -147,6 +147,8 @@ def coverage(
     Raises
     ------
     ValueError
+        If embeddings are not on the unit interval [0-1]
+    ValueError
         If length of :term:`embeddings<Embeddings>` is less than or equal to num_observations
     ValueError
         If radius_type is unknown
@@ -161,7 +163,7 @@ def coverage(
     >>> results.uncovered_indices
     array([447, 412,   8,  32,  63])
     >>> results.coverage_radius
-    0.8459038956941765
+    0.17592147193757596
 
     Reference
     ---------
@@ -172,6 +174,8 @@ def coverage(
 
     # Calculate distance matrix, look at the (num_observations + 1)th farthest neighbor for each image.
     embeddings = to_numpy(embeddings)
+    if np.min(embeddings) < 0 or np.max(embeddings) > 1:
+        raise ValueError("Embeddings must be on the unit interval [0-1].")
     len_embeddings = len(embeddings)
     if len_embeddings <= num_observations:
         raise ValueError(

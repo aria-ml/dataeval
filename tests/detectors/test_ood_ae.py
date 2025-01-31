@@ -23,7 +23,7 @@ input_shape = (1, 8, 8)
 def x_ref() -> np.ndarray:
     X, y = load_digits(return_X_y=True)
     assert isinstance(X, np.ndarray)
-    X = X.astype(np.float32)
+    X = (X.astype(np.float32)) / 255.0
     X = X.reshape(X.shape[0], *input_shape)
     return X
 
