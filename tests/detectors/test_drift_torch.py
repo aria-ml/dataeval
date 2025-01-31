@@ -16,8 +16,9 @@ import pytest
 import torch
 import torch.nn as nn
 
+from dataeval.config import get_device
 from dataeval.detectors.drift._torch import GaussianRBF, _squared_pairwise_distance, mmd2_from_kernel_matrix
-from dataeval.utils.torch._internal import get_device, predict_batch
+from dataeval.utils.torch._internal import predict_batch
 
 
 def id_fn(x):
@@ -176,7 +177,7 @@ class TestMMDKernelMatrix:
 
 
 @pytest.mark.required
-@pytest.mark.parametrize("device", [None, torch.device("cpu"), "cpu", "gpu", "cuda", "random"])
+@pytest.mark.parametrize("device", [None, torch.device("cpu"), "cpu", "cuda"])
 def test_drift_get_device(device):
     assert isinstance(get_device(device), torch.device)
 
