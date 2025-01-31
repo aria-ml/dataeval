@@ -46,14 +46,19 @@ class TestCoverageUnit:
         np.testing.assert_array_equal(x.uncovered_indices, x_flat.uncovered_indices)
         np.testing.assert_array_equal(x.critical_value_radii, x_flat.critical_value_radii)
 
+    def test_non_unit_interval(self):
+        embs = np.random.random(size=(100, 16, 16)) * 2
+        with pytest.raises(ValueError):
+            coverage(embs)
+
 
 @pytest.mark.requires_all
 class TestCoveragePlot:
     def test_base_plotting(self):
-        images = np.zeros((20, 3, 28, 28), dtype=np.intp)
-        images[1] += 80
-        images[5] += 240
-        images[7] += 160
+        images = np.zeros((20, 3, 28, 28), dtype=np.float64)
+        images[1] += 0.3
+        images[5] += 0.9
+        images[7] += 0.8
         result = coverage(images, num_observations=10, percent=0.15)
         output = result.plot(images, 3)
         assert isinstance(output, Figure)
