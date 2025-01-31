@@ -89,10 +89,12 @@ def doctest_metrics_bias_coverage(doctest_namespace):
     import sklearn.datasets as dsets
 
     blobs = dsets.make_blobs(n_samples=500, centers=np.array([(1, 1), (3, 3)]), cluster_std=0.5, random_state=498)
+    blobs = np.asarray(blobs[0], dtype=np.float64)
+    blobs = blobs - np.min(blobs)
+    blobs = blobs / np.max(blobs)
 
     """dataeval.metrics.bias.coverage.coverage"""
-
-    doctest_namespace["embeddings"] = blobs[0]
+    doctest_namespace["embeddings"] = blobs
 
 
 @pytest.fixture(autouse=True)

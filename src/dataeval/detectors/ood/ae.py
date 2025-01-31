@@ -16,9 +16,8 @@ from typing import Callable
 
 import numpy as np
 import torch
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 
-from dataeval._interop import as_numpy
 from dataeval.detectors.ood.base import OODBase
 from dataeval.detectors.ood.output import OODScoreOutput
 from dataeval.utils.torch._internal import predict_batch
@@ -55,9 +54,7 @@ class OOD_AE(OODBase):
 
         super().fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
 
-    def _score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
-        self._validate(X := as_numpy(X))
-
+    def _score(self, X: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput:
         # reconstruct instances
         X_recon = predict_batch(X, self.model, batch_size=batch_size)
 
