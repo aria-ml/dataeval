@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-from numpy.typing import ArrayLike
+from numpy.typing import NDArray
 
 from dataeval.detectors.ood.base import OODBaseGMM
 from dataeval.detectors.ood.mixin import OODBaseMixin, OODGMMMixin
@@ -14,12 +14,12 @@ model = MagicMock()
 
 
 class MockOOD(OODGMMMixin, OODBaseMixin[Callable]):
-    def _score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
+    def _score(self, X: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput:
         return OODScoreOutput(np.array([0.0]), np.array([0.0]))
 
 
 class MockOODGMM(OODBaseGMM):
-    def _score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
+    def _score(self, X: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput:
         return OODScoreOutput(np.array([0.0]), np.array([0.0]))
 
 
@@ -65,3 +65,11 @@ def test_oodbasegmm_fit():
 
     assert mock_trainer.called
     assert mock_gmm_params.called
+
+
+@pytest.mark.required
+def test_ood_unit_interval():
+    data = np.random.randint(0, 255, size=(10, 3, 16, 16))
+    outlier = MockOOD(lambda _: (1, 1, 1))  # type: ignore
+    with pytest.raises(ValueError):
+        outlier._get_data_info(data)

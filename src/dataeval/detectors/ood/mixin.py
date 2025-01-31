@@ -10,7 +10,7 @@ from typing import Callable, Generic, Literal, TypeVar
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval._interop import to_numpy
+from dataeval._interop import as_numpy, to_numpy
 from dataeval._output import set_metadata
 
 TGMMParams = TypeVar("TGMMParams")
@@ -73,6 +73,9 @@ class OODBaseMixin(Generic[TModel], ABC):
     def _get_data_info(self, X: NDArray) -> tuple[tuple, type]:
         if not isinstance(X, np.ndarray):
             raise TypeError("Dataset should of type: `NDArray`.")
+        if np.min(X) < 0 or np.max(X) > 1:
+            raise ValueError("Embeddings must be on the unit interval [0-1].")
+
         return X.shape[1:], X.dtype.type
 
     def _validate(self, X: NDArray) -> None:
@@ -90,7 +93,7 @@ class OODBaseMixin(Generic[TModel], ABC):
         self._validate(X)
 
     @abstractmethod
-    def _score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput: ...
+    def _score(self, X: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput: ...
 
     @set_metadata
     def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
@@ -105,11 +108,17 @@ class OODBaseMixin(Generic[TModel], ABC):
             Number of instances to process in each batch.
             Use a smaller batch size if your dataset is large or if you encounter memory issues.
 
+        Raises
+        ------
+        ValueError
+            X input data must be unit interval [0-1].
+
         Returns
         -------
         OODScoreOutput
             An object containing the instance-level and feature-level OOD scores.
         """
+        self._validate(X := as_numpy(X).astype(np.float32))
         return self._score(X, batch_size)
 
     def _threshold_score(self, ood_type: Literal["feature", "instance"] = "instance") -> np.floating:
@@ -134,12 +143,17 @@ class OODBaseMixin(Generic[TModel], ABC):
         ood_type : "feature" | "instance", default "instance"
             Predict out-of-distribution at the 'feature' or 'instance' level.
 
+        Raises
+        ------
+        ValueError
+            X input data must be unit interval [0-1].
+
         Returns
         -------
         Dictionary containing the outlier predictions for the selected level,
         and the OOD scores for the data including both 'instance' and 'feature' (if present) level scores.
         """
-        self._validate_state(X := to_numpy(X))
+        self._validate_state(X := to_numpy(X).astype(np.float32))
         # compute outlier scores
         score = self.score(X, batch_size=batch_size)
         ood_pred = score.get(ood_type) > self._threshold_score(ood_type)
