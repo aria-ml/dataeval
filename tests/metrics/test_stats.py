@@ -7,7 +7,7 @@ import pytest
 from numpy.random import randint
 from numpy.typing import NDArray
 
-import dataeval.metrics.stats._base as stats_base
+from dataeval.config import set_max_processes
 from dataeval.metrics.stats import dimensionstats, hashstats, labelstats, pixelstats, visualstats
 from dataeval.metrics.stats._base import (
     SOURCE_INDEX,
@@ -27,7 +27,7 @@ from dataeval.metrics.stats._datasetstats import (
 )
 
 # do not run stats tests using multiple processing
-stats_base.DEFAULT_PROCESSES = 1
+set_max_processes(1)
 
 
 def get_dataset(count: int, channels: int):

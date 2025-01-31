@@ -11,30 +11,7 @@ from numpy.typing import NDArray
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
-
-def get_device(device: str | torch.device | None = None) -> torch.device:
-    """
-    Instantiates a PyTorch device object.
-
-    Parameters
-    ----------
-    device : str | torch.device | None, default None
-        Either ``None``, a str ('gpu' or 'cpu') indicating the device to choose, or an
-        already instantiated device object. If ``None``, the GPU is selected if it is
-        detected, otherwise the CPU is used as a fallback.
-
-    Returns
-    -------
-    The instantiated device object.
-    """
-    if isinstance(device, torch.device):  # Already a torch device
-        return device
-    else:  # Instantiate device
-        if device is None or device.lower() in ["gpu", "cuda"]:
-            torch_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        else:
-            torch_device = torch.device("cpu")
-    return torch_device
+from dataeval.config import get_device
 
 
 def predict_batch(
