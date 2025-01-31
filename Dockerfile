@@ -8,7 +8,7 @@ ARG output_dir="/dataeval/output"
 
 
 ######################## cuda image ########################
-FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04 as cuda
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 as cuda
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
