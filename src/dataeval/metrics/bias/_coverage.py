@@ -75,17 +75,17 @@ class CoverageOutput(Output):
 
     Attributes
     ----------
-    indices : NDArray[np.intp]
+    uncovered_indices : NDArray[np.intp]
         Array of uncovered indices
-    radii : NDArray[np.float64]
+    critical_value_radii : NDArray[np.float64]
         Array of critical value radii
-    critical_value : float
+    coverage_radius : float
         Radius for :term:`coverage<Coverage>`
     """
 
-    indices: NDArray[np.intp]
-    radii: NDArray[np.float64]
-    critical_value: float
+    uncovered_indices: NDArray[np.intp]
+    critical_value_radii: NDArray[np.float64]
+    coverage_radius: float
 
     def plot(self, images: ArrayLike, top_k: int = 6) -> Figure:
         """
@@ -102,8 +102,9 @@ class CoverageOutput(Output):
         -------
         matplotlib.figure.Figure
         """
+
         # Determine which images to plot
-        highest_uncovered_indices = self.indices[:top_k]
+        highest_uncovered_indices = self.uncovered_indices[:top_k]
 
         # Grab the images
         images = to_numpy(images)
@@ -119,7 +120,7 @@ class CoverageOutput(Output):
 def coverage(
     embeddings: ArrayLike,
     radius_type: Literal["adaptive", "naive"] = "adaptive",
-    k: int = 20,
+    num_observations: int = 20,
     percent: float = 0.01,
 ) -> CoverageOutput:
     """
@@ -132,7 +133,7 @@ def coverage(
         Function expects the data to have 2 dimensions, N number of observations in a P-dimesionial space.
     radius_type : {"adaptive", "naive"}, default "adaptive"
         The function used to determine radius.
-    k : int, default 20
+    num_observations : int, default 20
         Number of observations required in order to be covered.
         [1] suggests that a minimum of 20-50 samples is necessary.
     percent : float, default 0.01
@@ -146,7 +147,7 @@ def coverage(
     Raises
     ------
     ValueError
-        If length of :term:`embeddings<Embeddings>` is less than or equal to k
+        If length of :term:`embeddings<Embeddings>` is less than or equal to num_observations
     ValueError
         If radius_type is unknown
 
@@ -157,9 +158,9 @@ def coverage(
     Example
     -------
     >>> results = coverage(embeddings)
-    >>> results.indices
+    >>> results.uncovered_indices
     array([447, 412,   8,  32,  63])
-    >>> results.critical_value
+    >>> results.coverage_radius
     0.8459038956941765
 
     Reference
@@ -169,26 +170,29 @@ def coverage(
     [1] Seymour Sudman. 1976. Applied sampling. Academic Press New York (1976).
     """
 
-    # Calculate distance matrix, look at the (k+1)th farthest neighbor for each image.
+    # Calculate distance matrix, look at the (num_observations + 1)th farthest neighbor for each image.
     embeddings = to_numpy(embeddings)
-    n = len(embeddings)
-    if n <= k:
+    len_embeddings = len(embeddings)
+    if len_embeddings <= num_observations:
         raise ValueError(
-            f"Number of observations n={n} is less than or equal to the specified number of neighbors k={k}."
+            f"Length of embeddings ({len_embeddings}) is less than or equal to the specified number of \
+                observations ({num_observations})."
         )
-    mat = squareform(pdist(flatten(embeddings))).astype(np.float64)
-    sorted_dists = np.sort(mat, axis=1)
-    crit = sorted_dists[:, k + 1]
+    embeddings_matrix = squareform(pdist(flatten(embeddings))).astype(np.float64)
+    sorted_dists = np.sort(embeddings_matrix, axis=1)
+    critical_value_radii = sorted_dists[:, num_observations + 1]
 
     d = embeddings.shape[1]
     if radius_type == "naive":
-        rho = (1 / math.sqrt(math.pi)) * ((2 * k * math.gamma(d / 2 + 1)) / (n)) ** (1 / d)
-        pvals = np.where(crit > rho)[0]
+        coverage_radius = (1 / math.sqrt(math.pi)) * (
+            (2 * num_observations * math.gamma(d / 2 + 1)) / (len_embeddings)
+        ) ** (1 / d)
+        uncovered_indices = np.where(critical_value_radii > coverage_radius)[0]
     elif radius_type == "adaptive":
-        # Use data adaptive cutoff as rho
-        selection = int(max(n * percent, 1))
-        pvals = np.argsort(crit)[::-1][:selection]
-        rho = float(np.mean(np.sort(crit)[::-1][selection - 1 : selection + 1]))
+        # Use data adaptive cutoff as coverage_radius
+        selection = int(max(len_embeddings * percent, 1))
+        uncovered_indices = np.argsort(critical_value_radii)[::-1][:selection]
+        coverage_radius = float(np.mean(np.sort(critical_value_radii)[::-1][selection - 1 : selection + 1]))
     else:
         raise ValueError(f"{radius_type} is an invalid radius type. Expected 'adaptive' or 'naive'")
-    return CoverageOutput(pvals, crit, rho)
+    return CoverageOutput(uncovered_indices, critical_value_radii, coverage_radius)
