@@ -16,8 +16,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy.stats import ks_2samp
 
-from dataeval._interop import to_numpy
-from dataeval.detectors.drift._base import BaseDriftUnivariate, UpdateStrategy, preprocess_x
+from dataeval.detectors.drift._base import BaseDriftUnivariate, UpdateStrategy
 
 
 class DriftKS(BaseDriftUnivariate):
@@ -84,26 +83,5 @@ class DriftKS(BaseDriftUnivariate):
         # Other attributes
         self.alternative = alternative
 
-    @preprocess_x
-    def score(self, x: ArrayLike) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
-        """
-        Compute KS scores and :term:Statistics` per feature.
-
-        Parameters
-        ----------
-        x : ArrayLike
-            Batch of instances.
-
-        Returns
-        -------
-        tuple[NDArray, NDArray]
-            Feature level :term:p-values and KS statistic
-        """
-        x = to_numpy(x)
-        x = x.reshape(x.shape[0], -1)
-        x_ref = self.x_ref.reshape(self.x_ref.shape[0], -1)
-        p_val = np.zeros(self.n_features, dtype=np.float32)
-        dist = np.zeros_like(p_val)
-        for f in range(self.n_features):
-            dist[f], p_val[f] = ks_2samp(x_ref[:, f], x[:, f], alternative=self.alternative, method="exact")
-        return p_val, dist
+    def _score_fn(self, x: NDArray[np.float32], y: NDArray[np.float32]) -> tuple[np.float32, np.float32]:
+        return ks_2samp(x, y, alternative=self.alternative, method="exact")

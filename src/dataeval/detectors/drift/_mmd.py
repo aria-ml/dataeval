@@ -16,7 +16,6 @@ from typing import Callable
 import torch
 from numpy.typing import ArrayLike
 
-from dataeval._interop import as_numpy
 from dataeval._output import set_metadata
 from dataeval.config import get_device
 from dataeval.detectors.drift._base import BaseDrift, DriftBaseOutput, UpdateStrategy, preprocess_x, update_x_ref
@@ -110,12 +109,12 @@ class DriftMMD(BaseDrift):
         self.device: torch.device = get_device(device)
 
         # initialize kernel
-        sigma_tensor = torch.from_numpy(as_numpy(sigma)).to(self.device) if sigma is not None else None
+        sigma_tensor = torch.tensor(sigma, device=self.device) if sigma is not None else None
         self._kernel = GaussianRBF(sigma_tensor).to(self.device)
 
         # compute kernel matrix for the reference data
         if self._infer_sigma or isinstance(sigma_tensor, torch.Tensor):
-            x = torch.from_numpy(self.x_ref).to(self.device)
+            x = torch.tensor(self.x_ref, device=self.device)
             self._k_xx = self._kernel(x, x, infer_sigma=self._infer_sigma)
             self._infer_sigma = False
         else:
@@ -147,21 +146,21 @@ class DriftMMD(BaseDrift):
             p-value obtained from the permutation test, MMD^2 between the reference and test set,
             and MMD^2 threshold above which :term:`drift<Drift>` is flagged
         """
-        x = as_numpy(x)
-        x_ref = torch.from_numpy(self.x_ref).to(self.device)
+        x_ref = torch.tensor(self.x_ref, device=self.device)
+        x = torch.tensor(x, device=self.device)
         n = x.shape[0]
-        kernel_mat = self._kernel_matrix(x_ref, torch.from_numpy(x).to(self.device))
+        kernel_mat = self._kernel_matrix(x_ref, x)
         kernel_mat = kernel_mat - torch.diag(kernel_mat.diag())  # zero diagonal
         mmd2 = mmd2_from_kernel_matrix(kernel_mat, n, permute=False, zero_diag=False)
-        mmd2_permuted = torch.Tensor(
-            [mmd2_from_kernel_matrix(kernel_mat, n, permute=True, zero_diag=False) for _ in range(self.n_permutations)]
+        mmd2_permuted = torch.tensor(
+            [mmd2_from_kernel_matrix(kernel_mat, n, permute=True, zero_diag=False)] * self.n_permutations,
+            device=self.device,
         )
-        mmd2, mmd2_permuted = mmd2.detach().cpu(), mmd2_permuted.detach().cpu()
         p_val = (mmd2 <= mmd2_permuted).float().mean()
         # compute distance threshold
         idx_threshold = int(self.p_val * len(mmd2_permuted))
         distance_threshold = torch.sort(mmd2_permuted, descending=True).values[idx_threshold]
-        return p_val.numpy().item(), mmd2.numpy().item(), distance_threshold.numpy().item()
+        return float(p_val.item()), float(mmd2.item()), float(distance_threshold.item())
 
     @set_metadata
     @preprocess_x
