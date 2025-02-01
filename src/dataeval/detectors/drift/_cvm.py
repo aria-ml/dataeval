@@ -16,8 +16,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy.stats import cramervonmises_2samp
 
-from dataeval._interop import to_numpy
-from dataeval.detectors.drift._base import BaseDriftUnivariate, UpdateStrategy, preprocess_x
+from dataeval.detectors.drift._base import BaseDriftUnivariate, UpdateStrategy
 
 
 class DriftCVM(BaseDriftUnivariate):
@@ -77,28 +76,6 @@ class DriftCVM(BaseDriftUnivariate):
             n_features=n_features,
         )
 
-    @preprocess_x
-    def score(self, x: ArrayLike) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
-        """
-        Performs the two-sample Cramér-von Mises test(s), computing the :term:`p-value<P-value>` and
-        test statistic per feature.
-
-        Parameters
-        ----------
-        x : ArrayLike
-            Batch of instances.
-
-        Returns
-        -------
-        tuple[NDArray, NDArray]
-            Feature level p-values and CVM statistic
-        """
-        x_np = to_numpy(x)
-        x_np = x_np.reshape(x_np.shape[0], -1)
-        x_ref = self.x_ref.reshape(self.x_ref.shape[0], -1)
-        p_val = np.zeros(self.n_features, dtype=np.float32)
-        dist = np.zeros_like(p_val)
-        for f in range(self.n_features):
-            result = cramervonmises_2samp(x_ref[:, f], x_np[:, f], method="auto")
-            p_val[f], dist[f] = result.pvalue, result.statistic
-        return p_val, dist
+    def _score_fn(self, x: NDArray[np.float32], y: NDArray[np.float32]) -> tuple[np.float32, np.float32]:
+        result = cramervonmises_2samp(x, y, method="auto")
+        return np.float32(result.statistic), np.float32(result.pvalue)

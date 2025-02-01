@@ -10,15 +10,16 @@ from __future__ import annotations
 
 __all__ = []
 
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Callable, Literal, TypeVar
+from typing import Any, Callable, Literal, Sized, TypeVar
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval._interop import as_numpy
+from dataeval._interop import as_numpy, to_numpy
 from dataeval._output import Output, set_metadata
 
 R = TypeVar("R")
@@ -196,7 +197,7 @@ class BaseDrift:
         if correction not in ["bonferroni", "fdr"]:
             raise ValueError("`correction` must be `bonferroni` or `fdr`.")
 
-        self._x_ref = as_numpy(x_ref)
+        self._x_ref = x_ref
         self.x_ref_preprocessed: bool = x_ref_preprocessed
 
         # Other attributes
@@ -204,25 +205,25 @@ class BaseDrift:
         self.update_x_ref = update_x_ref
         self.preprocess_fn = preprocess_fn
         self.correction = correction
-        self.n: int = len(self._x_ref)
+        self.n: int = len(x_ref) if isinstance(x_ref, Sized) else len(as_numpy(x_ref))
 
         # Ref counter for preprocessed x
         self._x_refcount = 0
 
     @property
-    def x_ref(self) -> NDArray[Any]:
+    def x_ref(self) -> ArrayLike:
         """
         Retrieve the reference data, applying preprocessing if not already done.
 
         Returns
         -------
-        NDArray
+        ArrayLike
             The reference dataset (`x_ref`), preprocessed if needed.
         """
         if not self.x_ref_preprocessed:
             self.x_ref_preprocessed = True
             if self.preprocess_fn is not None:
-                self._x_ref = as_numpy(self.preprocess_fn(self._x_ref))
+                self._x_ref = self.preprocess_fn(self._x_ref)
 
         return self._x_ref
 
@@ -323,32 +324,43 @@ class BaseDriftUnivariate(BaseDrift):
         # lazy process n_features as needed
         if not isinstance(self._n_features, int):
             # compute number of features for the univariate tests
-            if not isinstance(self.preprocess_fn, Callable) or self.x_ref_preprocessed:
-                # infer features from preprocessed reference data
-                self._n_features = self.x_ref.reshape(self.x_ref.shape[0], -1).shape[-1]
-            else:
-                # infer number of features after applying preprocessing step
-                x = as_numpy(self.preprocess_fn(self._x_ref[0:1]))  # type: ignore
-                self._n_features = x.reshape(x.shape[0], -1).shape[-1]
+            x_ref_np = (
+                as_numpy(self.x_ref)
+                if not isinstance(self.preprocess_fn, Callable) or self.x_ref_preprocessed
+                else as_numpy(self.preprocess_fn(as_numpy(self._x_ref)[0:1]))
+            )
+            # infer features from preprocessed reference data
+            self._n_features = math.prod(x_ref_np.shape[1:])  # Multiplies all channel sizes after first
 
         return self._n_features
 
     @preprocess_x
-    @abstractmethod
     def score(self, x: ArrayLike) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         """
-        Abstract method to calculate feature scores after preprocessing.
+        Calculates p-values and test statistics per feature.
 
         Parameters
         ----------
         x : ArrayLike
-            The batch of data to calculate univariate :term:`drift<Drift>` scores for each feature.
+            Batch of instances
 
         Returns
         -------
         tuple[NDArray, NDArray]
-            A tuple containing p-values and distance :term:`statistics<Statistics>` for each feature.
+            Feature level p-values and test statistics
         """
+        x_np = to_numpy(x)
+        x_np = x_np.reshape(x_np.shape[0], -1)
+        x_ref_np = as_numpy(self.x_ref)
+        x_ref_np = x_ref_np.reshape(x_ref_np.shape[0], -1)
+        p_val = np.zeros(self.n_features, dtype=np.float32)
+        dist = np.zeros_like(p_val)
+        for f in range(self.n_features):
+            dist[f], p_val[f] = self._score_fn(x_ref_np[:, f], x_np[:, f])
+        return p_val, dist
+
+    @abstractmethod
+    def _score_fn(self, x: NDArray[np.float32], y: NDArray[np.float32]) -> tuple[np.float32, np.float32]: ...
 
     def _apply_correction(self, p_vals: NDArray) -> tuple[bool, float]:
         """
