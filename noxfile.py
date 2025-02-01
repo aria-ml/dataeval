@@ -42,6 +42,7 @@ def check_version(version: str) -> str:
 def dev(session: nox.Session) -> None:
     """Set up a python development environment at `.venv-{version}`. Specify version using `nox -P {version} -e dev`."""
     python_version = check_version(session.name)
+    session.run("rm", "-rf", f".venv-{python_version}", external=True)
     session.run("uv", "venv", "--python", python_version, f".venv-{python_version}", "--seed", external=True)
     session.run("uv", "pip", "install", "--python", f".venv-{python_version}", *INSTALL_ARGS, env=INSTALL_ENVS)
 
