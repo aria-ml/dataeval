@@ -17,12 +17,12 @@ developers for a better metric in a Kaggle-style AI competition.
       edge [arrowsize=0.6]
       layout="neato"
 
-      1 [label="I: Scope And\nObjectives",style="rounded,filled",pos="1.7,2.5!",xref=":ref:`scope-and-objectives`"]
-      2 [label="II: Data\nEngineering",style="rounded,filled",pos="3.4,1.8!",xref=":ref:`data-engineering`"]
-      3 [label="III: Model\nDevelopment",style="rounded,filled",pos="3.4,0.9!",xref=":ref:`model-development`"]
-      4 [label="IV: Deployment",style="rounded,filled",pos="1.7,0.2!",xref=":ref:`deployment`"]
-      5 [label="V: Monitoring",style="rounded,filled",pos="0.0,0.9!",xref=":ref:`monitoring`"]
-      6 [label="VI: Analysis",style="rounded,filled",pos="0.0,1.8!",xref=":ref:`analysis`"]
+      1 [xref="{ref}`Scope And Objectives <scope-and-objectives>`",style="rounded,filled",pos="1.7,2.5!"]
+      2 [xref="{ref}`Data Engineering <data-engineering>`",style="rounded,filled",pos="3.4,1.8!"]
+      3 [xref="{ref}`Model Development<model-development>`",style="rounded,filled",pos="3.4,0.9!"]
+      4 [xref="{ref}`Deployment <deployment>`",style="rounded,filled",pos="1.7,0.2!"]
+      5 [xref="{ref}`Monitoring <monitoring>`",style="rounded,filled",pos="0.0,0.9!"]
+      6 [xref="{ref}`Analysis <analysis>`",style="rounded,filled",pos="0.0,1.8!"]
       
       1:e->2:n; 2:s->3:n; 3:s->4:e; 4:w->5:s; 5:n->6:s; 6:n->1:w
 
@@ -39,6 +39,8 @@ developers for a better metric in a Kaggle-style AI competition.
 * roles and responsibilities across stages and personnel are dynamic
 * "mind" (models) and "data" are both important
 
+(scope-and-objectives)=
+
 ## Scope And Objectives
 
 ```{graphviz}
@@ -48,12 +50,12 @@ developers for a better metric in a Kaggle-style AI competition.
       edge [arrowsize=0.6]
       layout="neato"
 
-      1 [label="I: Scope And\nObjectives",style="rounded,filled",pos="1.7,2.5!",fillcolor="#4151B0",fontcolor="white"]
-      2 [label="II: Data\nEngineering",style="rounded,filled",pos="3.4,1.8!",xref=":ref:`data-engineering`"]
-      3 [label="III: Model\nDevelopment",style="rounded,filled",pos="3.4,0.9!",xref=":ref:`model-development`"]
-      4 [label="IV: Deployment",style="rounded,filled",pos="1.7,0.2!",xref=":ref:`deployment`"]
-      5 [label="V: Monitoring",style="rounded,filled",pos="0.0,0.9!",xref=":ref:`monitoring`"]
-      6 [label="VI: Analysis",style="rounded,filled",pos="0.0,1.8!",xref=":ref:`analysis`",fontcolor="gray",color="#C0C0C030",fillcolor="#C0C0C030"]
+      1 [xref="{ref}`Scope And Objectives <scope-and-objectives>`",style="rounded,filled",pos="1.7,2.5!",fillcolor="#4151B0",fontcolor="white"]
+      2 [xref="{ref}`Data Engineering <data-engineering>`",style="rounded,filled",pos="3.4,1.8!"]
+      3 [xref="{ref}`Model Development<model-development>`",style="rounded,filled",pos="3.4,0.9!"]
+      4 [xref="{ref}`Deployment <deployment>`",style="rounded,filled",pos="1.7,0.2!"]
+      5 [xref="{ref}`Monitoring <monitoring>`",style="rounded,filled",pos="0.0,0.9!"]
+      6 [xref="{ref}`Analysis <analysis>`",style="rounded,filled",pos="0.0,1.8!",fontcolor="gray",color="#C0C0C030",fillcolor="#C0C0C030"]
       
       1:e->2:n
       2:s->3:n [color="#C0C0C030",fillcolor="#C0C0C030"]
@@ -89,6 +91,8 @@ developers for a better metric in a Kaggle-style AI competition.
   * restrictions on lifetime learning
   * ...
 
+(data-engineering)=
+
 ## Data Engineering
 
 ```{graphviz}
@@ -98,12 +102,12 @@ developers for a better metric in a Kaggle-style AI competition.
       edge [arrowsize=0.6]
       layout="neato"
 
-      1 [label="I: Scope And\nObjectives",style="rounded,filled",pos="1.7,2.5!",xref=":ref:`scope-and-objectives`"]
-      2 [label="II: Data\nEngineering",style="rounded,filled",pos="3.4,1.8!",fillcolor="#4151B0",fontcolor="white"]
-      3 [label="III: Model\nDevelopment",style="rounded,filled",pos="3.4,0.9!",xref=":ref:`model-development`"]
-      4 [label="IV: Deployment",style="rounded,filled",pos="1.7,0.2!",xref=":ref:`deployment`",fontcolor="gray",color="#C0C0C030",fillcolor="#C0C0C030"]
-      5 [label="V: Monitoring",style="rounded,filled",pos="0.0,0.9!",xref=":ref:`monitoring`"]
-      6 [label="VI: Analysis",style="rounded,filled",pos="0.0,1.8!",xref=":ref:`analysis`"]
+      1 [xref="{ref}`Scope And Objectives <scope-and-objectives>`",style="rounded,filled",pos="1.7,2.5!"]
+      2 [xref="{ref}`Data Engineering <data-engineering>`",style="rounded,filled",pos="3.4,1.8!",fillcolor="#4151B0",fontcolor="white"]
+      3 [xref="{ref}`Model Development<model-development>`",style="rounded,filled",pos="3.4,0.9!"]
+      4 [xref="{ref}`Deployment <deployment>`",style="rounded,filled",pos="1.7,0.2!",fontcolor="gray",color="#C0C0C030",fillcolor="#C0C0C030"]
+      5 [xref="{ref}`Monitoring <monitoring>`",style="rounded,filled",pos="0.0,0.9!"]
+      6 [xref="{ref}`Analysis <analysis>`",style="rounded,filled",pos="0.0,1.8!"]
       
       1:e->2:n [color="#C0C0C030",fillcolor="#C0C0C030"]
       2:s->3:n
@@ -137,6 +141,8 @@ developers for a better metric in a Kaggle-style AI competition.
 * perform exploratory data analysis
   * data complexity / metafeatures to evaluate achievability of objectives
 
+(model-development)=
+
 ## Model Development
 
 ```{graphviz}
@@ -146,12 +152,12 @@ developers for a better metric in a Kaggle-style AI competition.
       edge [arrowsize=0.6]
       layout="neato"
 
-      1 [label="I: Scope And\nObjectives",style="rounded,filled",pos="1.7,2.5!",xref=":ref:`scope-and-objectives`"]
-      2 [label="II: Data\nEngineering",style="rounded,filled",pos="3.4,1.8!",xref=":ref:`data-engineering`",fontcolor="gray",color="#C0C0C030",fillcolor="#C0C0C030"]
-      3 [label="III: Model\nDevelopment",style="rounded,filled",pos="3.4,0.9!",fillcolor="#4151B0",fontcolor="white"]
-      4 [label="IV: Deployment",style="rounded,filled",pos="1.7,0.2!",xref=":ref:`deployment`"]
-      5 [label="V: Monitoring",style="rounded,filled",pos="0.0,0.9!",xref=":ref:`monitoring`"]
-      6 [label="VI: Analysis",style="rounded,filled",pos="0.0,1.8!",xref=":ref:`analysis`"]
+      1 [xref="{ref}`Scope And Objectives <scope-and-objectives>`",style="rounded,filled",pos="1.7,2.5!"]
+      2 [xref="{ref}`Data Engineering <data-engineering>`",style="rounded,filled",pos="3.4,1.8!",fontcolor="gray",color="#C0C0C030",fillcolor="#C0C0C030"]
+      3 [xref="{ref}`Model Development<model-development>`",style="rounded,filled",pos="3.4,0.9!",fillcolor="#4151B0",fontcolor="white"]
+      4 [xref="{ref}`Deployment <deployment>`",style="rounded,filled",pos="1.7,0.2!"]
+      5 [xref="{ref}`Monitoring <monitoring>`",style="rounded,filled",pos="0.0,0.9!"]
+      6 [xref="{ref}`Analysis <analysis>`",style="rounded,filled",pos="0.0,1.8!"]
       
       1:e->2:n [color="#C0C0C030",fillcolor="#C0C0C030"]
       2:s->3:n [color="#C0C0C030",fillcolor="#C0C0C030"]
@@ -185,6 +191,8 @@ developers for a better metric in a Kaggle-style AI competition.
   * fairness and generalization
   * robustness and fault tolerance
 
+(deployment)=
+
 ## Deployment
 
 ```{graphviz}
@@ -194,12 +202,12 @@ developers for a better metric in a Kaggle-style AI competition.
       edge [arrowsize=0.6]
       layout="neato"
 
-      1 [label="I: Scope And\nObjectives",style="rounded,filled",pos="1.7,2.5!",xref=":ref:`scope-and-objectives`"]
-      2 [label="II: Data\nEngineering",style="rounded,filled",pos="3.4,1.8!",xref=":ref:`data-engineering`",fontcolor="gray",color="#C0C0C030",fillcolor="#C0C0C030"]
-      3 [label="III: Model\nDevelopment",style="rounded,filled",pos="3.4,0.9!",xref=":ref:`model-development`",fontcolor="gray",color="#C0C0C030",fillcolor="#C0C0C030"]
-      4 [label="IV: Deployment",style="rounded,filled",pos="1.7,0.2!",fillcolor="#4151B0",fontcolor="white"]
-      5 [label="V: Monitoring",style="rounded,filled",pos="0.0,0.9!",xref=":ref:`monitoring`"]
-      6 [label="VI: Analysis",style="rounded,filled",pos="0.0,1.8!",xref=":ref:`analysis`",fontcolor="gray",color="#C0C0C030",fillcolor="#C0C0C030"]
+      1 [xref="{ref}`Scope And Objectives <scope-and-objectives>`",style="rounded,filled",pos="1.7,2.5!"]
+      2 [xref="{ref}`Data Engineering <data-engineering>`",style="rounded,filled",pos="3.4,1.8!",fontcolor="gray",color="#C0C0C030",fillcolor="#C0C0C030"]
+      3 [xref="{ref}`Model Development<model-development>`",style="rounded,filled",pos="3.4,0.9!",fontcolor="gray",color="#C0C0C030",fillcolor="#C0C0C030"]
+      4 [xref="{ref}`Deployment <deployment>`",style="rounded,filled",pos="1.7,0.2!",fillcolor="#4151B0",fontcolor="white"]
+      5 [xref="{ref}`Monitoring <monitoring>`",style="rounded,filled",pos="0.0,0.9!"]
+      6 [xref="{ref}`Analysis <analysis>`",style="rounded,filled",pos="0.0,1.8!",fontcolor="gray",color="#C0C0C030",fillcolor="#C0C0C030"]
       
       1:e->2:n [color="#C0C0C030",fillcolor="#C0C0C030"]
       2:s->3:n [color="#C0C0C030",fillcolor="#C0C0C030"]
@@ -231,6 +239,8 @@ developers for a better metric in a Kaggle-style AI competition.
    be assessed.
 ```
 
+(monitoring)=
+
 ## Monitoring
 
 ```{graphviz}
@@ -240,12 +250,12 @@ developers for a better metric in a Kaggle-style AI competition.
       edge [arrowsize=0.6]
       layout="neato"
 
-      1 [label="I: Scope And\nObjectives",style="rounded,filled",pos="1.7,2.5!",xref=":ref:`scope-and-objectives`"]
-      2 [label="II: Data\nEngineering",style="rounded,filled",pos="3.4,1.8!",xref=":ref:`data-engineering`"]
-      3 [label="III: Model\nDevelopment",style="rounded,filled",pos="3.4,0.9!",xref=":ref:`model-development`"]
-      4 [label="IV: Deployment",style="rounded,filled",pos="1.7,0.2!",xref=":ref:`deployment`",fontcolor="gray",color="#C0C0C030",fillcolor="#C0C0C030"]
-      5 [label="V: Monitoring",style="rounded,filled",pos="0.0,0.9!",fillcolor="#4151B0",fontcolor="white"]
-      6 [label="VI: Analysis",style="rounded,filled",pos="0.0,1.8!",xref=":ref:`analysis`"]
+      1 [xref="{ref}`Scope And Objectives <scope-and-objectives>`",style="rounded,filled",pos="1.7,2.5!"]
+      2 [xref="{ref}`Data Engineering <data-engineering>`",style="rounded,filled",pos="3.4,1.8!"]
+      3 [xref="{ref}`Model Development<model-development>`",style="rounded,filled",pos="3.4,0.9!"]
+      4 [xref="{ref}`Deployment <deployment>`",style="rounded,filled",pos="1.7,0.2!",fontcolor="gray",color="#C0C0C030",fillcolor="#C0C0C030"]
+      5 [xref="{ref}`Monitoring <monitoring>`",style="rounded,filled",pos="0.0,0.9!",fillcolor="#4151B0",fontcolor="white"]
+      6 [xref="{ref}`Analysis <analysis>`",style="rounded,filled",pos="0.0,1.8!"]
       
       1:e->2:n [color="#C0C0C030",fillcolor="#C0C0C030"]
       2:s->3:n [color="#C0C0C030",fillcolor="#C0C0C030"]
@@ -278,6 +288,8 @@ developers for a better metric in a Kaggle-style AI competition.
   * uncertainty/confidence shifts
   * accuracy/performance metrics
 
+(analysis)=
+
 ## Analysis
 
 ```{graphviz}
@@ -287,12 +299,12 @@ developers for a better metric in a Kaggle-style AI competition.
       edge [arrowsize=0.6]
       layout="neato"
 
-      1 [label="I: Scope And\nObjectives",style="rounded,filled",pos="1.7,2.5!",xref=":ref:`scope-and-objectives`"]
-      2 [label="II: Data\nEngineering",style="rounded,filled",pos="3.4,1.8!",xref=":ref:`data-engineering`"]
-      3 [label="III: Model\nDevelopment",style="rounded,filled",pos="3.4,0.9!",xref=":ref:`model-development`"]
-      4 [label="IV: Deployment",style="rounded,filled",pos="1.7,0.2!",xref=":ref:`deployment`",fontcolor="gray",color="#C0C0C030",fillcolor="#C0C0C030"]
-      5 [label="V: Monitoring",style="rounded,filled",pos="0.0,0.9!",xref=":ref:`monitoring`",fontcolor="gray",color="#C0C0C030",fillcolor="#C0C0C030"]
-      6 [label="VI: Analysis",style="rounded,filled",pos="0.0,1.8!",fillcolor="#4151B0",fontcolor="white"]
+      1 [xref="{ref}`Scope And Objectives <scope-and-objectives>`",style="rounded,filled",pos="1.7,2.5!"]
+      2 [xref="{ref}`Data Engineering <data-engineering>`",style="rounded,filled",pos="3.4,1.8!"]
+      3 [xref="{ref}`Model Development<model-development>`",style="rounded,filled",pos="3.4,0.9!"]
+      4 [xref="{ref}`Deployment <deployment>`",style="rounded,filled",pos="1.7,0.2!",fontcolor="gray",color="#C0C0C030",fillcolor="#C0C0C030"]
+      5 [xref="{ref}`Monitoring <monitoring>`",style="rounded,filled",pos="0.0,0.9!",fontcolor="gray",color="#C0C0C030",fillcolor="#C0C0C030"]
+      6 [xref="{ref}`Analysis <analysis>`",style="rounded,filled",pos="0.0,1.8!",fillcolor="#4151B0",fontcolor="white"]
       
       1:e->2:n [color="#C0C0C030",fillcolor="#C0C0C030"]
       2:s->3:n [color="#C0C0C030",fillcolor="#C0C0C030"]

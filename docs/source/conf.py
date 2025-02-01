@@ -35,6 +35,7 @@ extensions = [
     "myst_nb",
     "sphinx_design",
     "sphinx_immaterial",
+    "sphinx_immaterial.graphviz",
     "sphinx_new_tab_link",
 ]
 
@@ -82,8 +83,6 @@ autoapi_add_toctree_entry = False
 
 # need this for autoapi templates
 autoapi_template_dir = "./_templates/autoapi"
-
-graphviz_output_format = "svg"
 
 # ---------------------------------------------------------------------------------
 # Autoapi jinja environment prep
