@@ -5,7 +5,7 @@ __all__ = []
 import contextlib
 import warnings
 from dataclasses import dataclass
-from typing import Any, Callable, Generic, Iterable, Mapping, Sequence, TypeVar, cast
+from typing import Any, Callable, Generic, Iterable, Mapping, Sequence, Sized, TypeVar, cast
 
 import numpy as np
 import torch
@@ -277,9 +277,9 @@ def reset_parameters(model: nn.Module) -> nn.Module:
 
 
 def validate_dataset_len(dataset: Dataset[Any]) -> int:
-    if not hasattr(dataset, "__len__"):
+    if not isinstance(dataset, Sized):
         raise TypeError("Must provide a dataset with a length attribute")
-    length: int = dataset.__len__()  # type: ignore
+    length: int = len(dataset)
     if length <= 0:
         raise ValueError("Dataset length must be greater than 0")
     return length

@@ -8,7 +8,7 @@ import hashlib
 import os
 import zipfile
 from pathlib import Path
-from typing import Any, Callable, Literal, TypeVar
+from typing import Any, Callable, Literal, Sized, TypeVar
 from warnings import warn
 
 import numpy as np
@@ -29,11 +29,10 @@ class DatasetWrapperMixin(Dataset[TDatum]):
         return self._data.__getitem__(index)
 
     def __len__(self) -> int:
-        len_fn: Callable[[], int] | None = getattr(self._data, "__len__", None)
-        if len_fn is None:
-            raise NotImplementedError("Dataset does not have a length function.")
+        if isinstance(self._data, Sized):
+            return len(self._data)
 
-        return len_fn()
+        raise NotImplementedError("Dataset does not have a length function.")
 
 
 class InfoMixin:
