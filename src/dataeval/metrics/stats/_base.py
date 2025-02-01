@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from functools import partial
 from itertools import repeat
 from multiprocessing import Pool
-from typing import Any, Callable, Generic, Iterable, NamedTuple, Optional, TypeVar, Union
+from typing import Any, Callable, Generic, Iterable, NamedTuple, Optional, Sized, TypeVar, Union
 
 import numpy as np
 import tqdm
@@ -293,7 +293,7 @@ def run_stats(
     bbox_iter = repeat(None) if bboxes is None else to_numpy_iter(bboxes)
 
     warning_list = []
-    total_for_status = getattr(images, "__len__")() if hasattr(images, "__len__") else None
+    total_for_status = len(images) if isinstance(images, Sized) else None
     stats_processor_cls = stats_processor_cls if isinstance(stats_processor_cls, Iterable) else [stats_processor_cls]
 
     # TODO: Introduce global controls for CPU job parallelism and GPU configurations
