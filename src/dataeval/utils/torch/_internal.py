@@ -48,7 +48,7 @@ def predict_batch(
     """
     device = get_device(device)
     if isinstance(x, np.ndarray):
-        x = torch.from_numpy(x).to(device)
+        x = torch.tensor(x, device=device)
     n = len(x)
     n_minibatch = int(np.ceil(n / batch_size))
     return_np = not isinstance(dtype, torch.dtype)
@@ -61,7 +61,7 @@ def predict_batch(
             if isinstance(preprocess_fn, Callable):
                 x_batch = preprocess_fn(x_batch)
 
-            preds_tmp = model(x_batch.to(dtype=torch.float32, device=device))
+            preds_tmp = model(x_batch.to(dtype=torch.float32))
             if isinstance(preds_tmp, (list, tuple)):
                 if preds_tuple is None:  # init tuple with lists to store predictions
                     preds_tuple = tuple([] for _ in range(len(preds_tmp)))
@@ -131,12 +131,9 @@ def trainer(
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     if y_train is None:
-        dataset = TensorDataset(torch.from_numpy(x_train).to(dtype=torch.float32))
+        dataset = TensorDataset(torch.tensor(x_train, dtype=torch.float32))
     else:
-        dataset = TensorDataset(
-            torch.from_numpy(x_train).to(dtype=torch.float32),
-            torch.from_numpy(y_train).to(dtype=torch.float32),
-        )
+        dataset = TensorDataset(torch.tensor(x_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.float32))
 
     loader = DataLoader(dataset=dataset, batch_size=batch_size)
 
