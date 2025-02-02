@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,107,76
+/aria-ml/dataeval/actions,9,1
+/aria-ml/dataeval/actions/new,9,1
+/aria-ml/dataeval/branches,7,2
+/aria-ml/dataeval/blob/github-repo-stats/aria-ml/dataeval/latest-report/report.pdf,6,3
+/aria-ml/dataeval/blob/main/docs/source/tutorials/index.md,6,1
+/aria-ml/dataeval/actions/workflows/github-repo-stats.yml,5,1
+/aria-ml/dataeval/tree/v0.75.0/src/dataeval,5,1
+/aria-ml/dataeval/tree/github-repo-stats,4,2
+/aria-ml/dataeval/tree/main,4,2
