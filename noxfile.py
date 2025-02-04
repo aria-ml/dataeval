@@ -57,7 +57,15 @@ def test(session: nox.Session) -> None:
     cov_html_args = ["--cov-report", f"html:output/htmlcov.{python_version}"]
 
     session.install(*INSTALL_ARGS, env=INSTALL_ENVS)
-    session.run("pytest", *pytest_args, *cov_term_args, *cov_xml_args, *cov_html_args, env={**TEST_ENVS, **COMMON_ENVS})
+    session.run(
+        "pytest",
+        *pytest_args,
+        *cov_term_args,
+        *cov_xml_args,
+        *cov_html_args,
+        *session.posargs,
+        env={**TEST_ENVS, **COMMON_ENVS},
+    )
     session.run("mv", ".coverage", f"output/.coverage.{python_version}", external=True)
 
 
@@ -97,13 +105,14 @@ def lint(session: nox.Session) -> None:
 def doctest(session: nox.Session) -> None:
     """Run docstring tests."""
     check_version(session.name)
+    target = session.posargs if session.posargs else ["src/dataeval"]
     session.install(*INSTALL_ARGS, env=INSTALL_ENVS)
     session.run(
         "pytest",
         "--doctest-modules",
         "--doctest-continue-on-failure",
         "--disable-warnings",
-        "src/dataeval",
+        *target,
         env={**TEST_ENVS, **COMMON_ENVS},
     )
 
