@@ -1,6 +1,21 @@
-[//]: # (a8a4cd4fc45c62eb34cfebb8bd87cc4e5294a6bc)
+[//]: # (3f0f4a3a59c84ae6c28e409b519465ffb7a806ac)
 
 # DataEval Change Log
+
+## v0.77.0
+
+🌟 **Feature Release**
+- `a1974e41` - Add global config module to control default device and max processes
+
+👾 **Fixes**
+- `c5ca814d` - Enforce unit interval in OOD detector and coverage metric
+- `41c4437b` - CoverageOutput attributes renamed for clarity
+
+    Attributes renamed:
+    - `indices` -> `uncovered_indices`
+    - `radii` -> `critical_value_radii`
+    - `critical_value` -> `coverage_radius`
+- `99631a94` - Fix ax.hist on small ranges in NumPy 2.1+
 
 ## v0.76.1
 
