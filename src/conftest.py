@@ -86,6 +86,18 @@ def doctest_metrics_bias_coverage(doctest_namespace):
 
 
 @pytest.fixture(autouse=True)
+def doctest_metrics_estimators_clusterer(doctest_namespace):
+    import sklearn.datasets as dsets
+
+    images = dsets.make_blobs(n_samples=50, centers=np.array([(-1, -1), (1, 1)]), cluster_std=0.5, random_state=33)[0]
+    images[9] = images[24]
+    images[23] = images[48] + 1e-5
+
+    """dataeval.metrics.estimators.clusterer"""
+    doctest_namespace["clusterer_images"] = images
+
+
+@pytest.fixture(autouse=True)
 def doctest_metrics_estimators_divergence(doctest_namespace):
     import sklearn.datasets as dsets
 

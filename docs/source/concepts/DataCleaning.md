@@ -127,7 +127,7 @@ DataEval's data cleaning functions and classes are:
   - Creates dataset statistics on a per image per channel basis.
 * - {func}`visualstats <.visualstats>`
   - Creates dataset statistics on a per image per channel basis.
-* - {class}`.Clusterer`
+* - {func}`.clusterer`
   - Clusters the data and identifies data points which do not fit.
 * - {class}`.Duplicates`
   - Identifies duplicate and near duplicate images.

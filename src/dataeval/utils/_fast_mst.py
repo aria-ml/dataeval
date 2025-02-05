@@ -5,10 +5,15 @@
 
 __all__ = []
 
+import warnings
+
 import numba
 import numpy as np
-from fast_hdbscan.disjoint_set import ds_find, ds_rank_create
 from sklearn.neighbors import NearestNeighbors
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", category=FutureWarning)
+    from fast_hdbscan.disjoint_set import ds_find, ds_rank_create
 
 
 @numba.njit()
