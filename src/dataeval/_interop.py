@@ -7,7 +7,7 @@ __all__ = []
 import logging
 from importlib import import_module
 from types import ModuleType
-from typing import Any, Iterable, Iterator
+from typing import Any, Iterable, Iterator, TypeVar, overload
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -17,6 +17,52 @@ from dataeval._log import LogMessage
 _logger = logging.getLogger(__name__)
 
 _MODULE_CACHE = {}
+TYPE_MAP = {int: 0, float: 1, str: 2}
+T = TypeVar("T")
+
+
+def _try_cast(v: Any, t: type[T]) -> T | None:
+    """Casts a value to a type or returns None if unable"""
+    try:
+        return t(v)  # type: ignore
+    except (TypeError, ValueError):
+        return None
+
+
+@overload
+def _simplify_type(data: list[str]) -> list[int] | list[float] | list[str]: ...
+@overload
+def _simplify_type(data: str) -> int | float | str: ...
+
+
+def _simplify_type(data: list[str] | str) -> list[int] | list[float] | list[str] | int | float | str:
+    """
+    Simplifies a value or a list of values to the simplest form possible,
+    in preferred order of `int`, `float`, or `string`.
+
+    Parameters
+    ----------
+    data : list[str] | str
+        A list of values or a single value
+
+    Returns
+    -------
+    list[int | float | str] | int | float | str
+        The same values converted to the numerical type if possible
+    """
+    if not isinstance(data, list):
+        value = _try_cast(data, float)
+        return str(data) if value is None else int(value) if value.is_integer() else value
+
+    converted = []
+    max_type = 0
+    for value in data:
+        value = _simplify_type(value)
+        max_type = max(max_type, TYPE_MAP.get(type(value), 2))
+        converted.append(value)
+    for i in range(len(converted)):
+        converted[i] = list(TYPE_MAP)[max_type](converted[i])
+    return converted
 
 
 def _try_import(module_name) -> ModuleType | None:

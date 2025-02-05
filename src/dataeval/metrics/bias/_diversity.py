@@ -11,9 +11,10 @@ import scipy as sp
 from numpy.typing import ArrayLike, NDArray
 
 from dataeval._output import Output, set_metadata
+from dataeval.utils._bin import get_counts
 from dataeval.utils._plot import heatmap
 from dataeval.utils._shared import get_method
-from dataeval.utils.metadata import Metadata, get_counts
+from dataeval.utils.metadata import Metadata
 
 with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure
