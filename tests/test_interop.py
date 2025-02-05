@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import torch
 
-from dataeval._interop import to_numpy, to_numpy_iter
+from dataeval._interop import _simplify_type, _try_cast, to_numpy, to_numpy_iter
 
 
 @pytest.mark.optional
@@ -42,3 +42,37 @@ class TestInteropLogging:
         t = torch.tensor([1, 2, 3, 4, 5])
         to_numpy(t)
         assert (tmp_path / "test.log").exists()
+
+
+@pytest.mark.required
+class TestCastSimplify:
+    @pytest.mark.parametrize(
+        "value, target, output",
+        (
+            ("123", int, 123),
+            ("123", float, 123.0),
+            ("123", str, "123"),
+            ("12.3", int, None),
+            ("12.3", float, 12.3),
+            ("12.3", str, "12.3"),
+            ("foo", int, None),
+            ("foo", float, None),
+            ("foo", str, "foo"),
+        ),
+    )
+    def test_try_cast_(self, value, target, output):
+        assert output == _try_cast(value, target)
+
+    @pytest.mark.parametrize(
+        "value, output",
+        (
+            ("123", 123),
+            ("12.3", 12.3),
+            ("foo", "foo"),
+            ([123, "12.3"], [123.0, 12.3]),
+            ([123, "foo"], ["123", "foo"]),
+            (["123", "456"], [123, 456]),
+        ),
+    )
+    def test_convert_type(self, value, output):
+        assert output == _simplify_type(value)

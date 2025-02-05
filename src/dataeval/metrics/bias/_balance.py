@@ -13,8 +13,9 @@ from numpy.typing import NDArray
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 
 from dataeval._output import Output, set_metadata
+from dataeval.utils._bin import get_counts
 from dataeval.utils._plot import heatmap
-from dataeval.utils.metadata import Metadata, get_counts
+from dataeval.utils.metadata import Metadata
 
 with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure
