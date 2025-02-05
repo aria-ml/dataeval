@@ -10,71 +10,55 @@ __all__ = ["Metadata", "preprocess", "merge", "flatten"]
 import warnings
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterable, Literal, Mapping, TypeVar, overload
+from typing import Any, Iterable, Literal, Mapping, overload
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
-from scipy.stats import wasserstein_distance as wd
 
-from dataeval._interop import as_numpy, to_numpy
+from dataeval._interop import _simplify_type, as_numpy, to_numpy
 from dataeval._output import Output, set_metadata
+from dataeval.utils._bin import bin_data, digitize_data, is_continuous
 
-DISCRETE_MIN_WD = 0.054
-CONTINUOUS_MIN_SAMPLE_SIZE = 20
+
+@dataclass(frozen=True)
+class Metadata(Output):
+    """
+    Dataclass containing binned metadata from the :func:`preprocess` function.
+
+    Attributes
+    ----------
+    discrete_factor_names : list[str]
+        List containing factor names for the original data that was discrete and
+        the binned continuous data
+    discrete_data : NDArray[np.int]
+        Array containing values for the original data that was discrete and the
+        binned continuous data
+    continuous_factor_names : list[str]
+        List containing factor names for the original continuous data
+    continuous_data : NDArray[np.int or np.double] | None
+        Array containing values for the original continuous data or None if there
+        was no continuous data
+    class_labels : NDArray[np.int]
+        Numerical class labels for the images/objects
+    class_names : NDArray[Any]
+        Array of unique class names (for use with plotting)
+    total_num_factors : int
+        Sum of discrete_factor_names and continuous_factor_names plus 1 for class
+    """
+
+    discrete_factor_names: list[str]
+    discrete_data: NDArray[np.int_]
+    continuous_factor_names: list[str]
+    continuous_data: NDArray[np.int_ | np.double] | None
+    class_labels: NDArray[np.int_]
+    class_names: NDArray[Any]
+    total_num_factors: int
 
 
 class DropReason(Enum):
     INCONSISTENT_KEY = "inconsistent_key"
     INCONSISTENT_SIZE = "inconsistent_size"
     NESTED_LIST = "nested_list"
-
-
-T = TypeVar("T")
-
-
-def _try_cast(v: Any, t: type[T]) -> T | None:
-    """Casts a value to a type or returns None if unable"""
-    try:
-        return t(v)  # type: ignore
-    except (TypeError, ValueError):
-        return None
-
-
-@overload
-def _convert_type(data: list[str]) -> list[int] | list[float] | list[str]: ...
-@overload
-def _convert_type(data: str) -> int | float | str: ...
-
-
-def _convert_type(data: list[str] | str) -> list[int] | list[float] | list[str] | int | float | str:
-    """
-    Converts a value or a list of values to the simplest form possible,
-    in preferred order of `int`, `float`, or `string`.
-
-    Parameters
-    ----------
-    data : list[str] | str
-        A list of values or a single value
-
-    Returns
-    -------
-    list[int | float | str] | int | float | str
-        The same values converted to the numerical type if possible
-    """
-    if not isinstance(data, list):
-        value = _try_cast(data, float)
-        return str(data) if value is None else int(value) if value.is_integer() else value
-
-    converted = []
-    TYPE_MAP = {int: 0, float: 1, str: 2}
-    max_type = 0
-    for value in data:
-        value = _convert_type(value)
-        max_type = max(max_type, TYPE_MAP.get(type(value), 2))
-        converted.append(value)
-    for i in range(len(converted)):
-        converted[i] = list(TYPE_MAP)[max_type](converted[i])
-    return converted
 
 
 def _get_key_indices(keys: Iterable[tuple[str, ...]]) -> dict[tuple[str, ...], int]:
@@ -222,7 +206,7 @@ def flatten(
 
     output = {}
     for k, v in expanded.items():
-        cv = _convert_type(v)
+        cv = _simplify_type(v)
         if isinstance(cv, list):
             if len(cv) == size:
                 output[k] = cv
@@ -389,7 +373,7 @@ def merge(
         output["keys"] = np.array(keys) if return_numpy else keys
 
     for k in (key for key in merged if key in isect):
-        cv = _convert_type(merged[k])
+        cv = _simplify_type(merged[k])
         output[k] = np.array(cv) if return_numpy else cv
     if image_index_key not in output:
         output[image_index_key] = image_indices if return_numpy else image_indices.tolist()
@@ -401,41 +385,6 @@ def merge(
             dropped_items = "\n".join([f"    {k}: {v}" for k, v in _sorted_drop_reasons(dropped).items()])
             warnings.warn(f"Metadata entries were dropped:\n{dropped_items}")
         return output
-
-
-@dataclass(frozen=True)
-class Metadata(Output):
-    """
-    Dataclass containing binned metadata from the :func:`preprocess` function.
-
-    Attributes
-    ----------
-    discrete_factor_names : list[str]
-        List containing factor names for the original data that was discrete and
-        the binned continuous data
-    discrete_data : NDArray[np.int]
-        Array containing values for the original data that was discrete and the
-        binned continuous data
-    continuous_factor_names : list[str]
-        List containing factor names for the original continuous data
-    continuous_data : NDArray[np.int or np.double] | None
-        Array containing values for the original continuous data or None if there
-        was no continuous data
-    class_labels : NDArray[np.int]
-        Numerical class labels for the images/objects
-    class_names : NDArray[Any]
-        Array of unique class names (for use with plotting)
-    total_num_factors : int
-        Sum of discrete_factor_names and continuous_factor_names plus 1 for class
-    """
-
-    discrete_factor_names: list[str]
-    discrete_data: NDArray[np.int_]
-    continuous_factor_names: list[str]
-    continuous_data: NDArray[np.int_ | np.double] | None
-    class_labels: NDArray[np.int_]
-    class_names: NDArray[Any]
-    total_num_factors: int
 
 
 @set_metadata
@@ -563,7 +512,7 @@ def preprocess(
                 "or add corresponding entries to the `metadata` dictionary."
             )
         for factor, bins in continuous_factor_bins.items():
-            discrete_metadata[factor] = _digitize_data(metadata[factor], bins)
+            discrete_metadata[factor] = digitize_data(metadata[factor], bins)
             continuous_metadata[factor] = metadata[factor]
 
     # Determine category of the rest of the keys
@@ -571,7 +520,7 @@ def preprocess(
     for key in remaining_keys:
         data = to_numpy(metadata[key])
         if np.issubdtype(data.dtype, np.number):
-            result = _is_continuous(data, image_indices)
+            result = is_continuous(data, image_indices)
             if result:
                 continuous_metadata[key] = data
             unique_samples, ordinal_data = np.unique(data, return_inverse=True)
@@ -585,7 +534,7 @@ def preprocess(
                     "bins using the continuous_factor_bins parameter.",
                     UserWarning,
                 )
-                discrete_metadata[key] = _bin_data(data, auto_bin_method)
+                discrete_metadata[key] = bin_data(data, auto_bin_method)
         else:
             _, discrete_metadata[key] = np.unique(data, return_inverse=True)
 
@@ -605,147 +554,3 @@ def preprocess(
         unique_classes,
         total_num_factors,
     )
-
-
-def _digitize_data(data: list[Any] | NDArray[Any], bins: int | Iterable[float]) -> NDArray[np.intp]:
-    """
-    Digitizes a list of values into a given number of bins.
-
-    Parameters
-    ----------
-    data : list | NDArray
-        The values to be digitized.
-    bins : int | Iterable[float]
-        The number of bins or list of bin edges for the discrete values that data will be digitized into.
-
-    Returns
-    -------
-    NDArray[np.intp]
-        The digitized values
-    """
-
-    if not np.all([np.issubdtype(type(n), np.number) for n in data]):
-        raise TypeError(
-            "Encountered a data value with non-numeric type when digitizing a factor. "
-            "Ensure all occurrences of continuous factors are numeric types."
-        )
-    if isinstance(bins, int):
-        _, bin_edges = np.histogram(data, bins=bins)
-        bin_edges[-1] = np.inf
-        bin_edges[0] = -np.inf
-    else:
-        bin_edges = list(bins)
-    return np.digitize(data, bin_edges)
-
-
-def _bin_data(data: NDArray[Any], bin_method: str) -> NDArray[np.int_]:
-    """
-    Bins continuous data through either equal width bins, equal amounts in each bin, or by clusters.
-    """
-    if bin_method == "clusters":
-        # bin_edges = _binning_by_clusters(data)
-        warnings.warn(
-            "Binning by clusters is currently unavailable until changes to the clustering function go through.",
-            UserWarning,
-        )
-        bin_method = "uniform_width"
-
-    # if bin_method != "clusters":  # restore this when clusters bin_method is available
-    counts, bin_edges = np.histogram(data, bins="auto")
-    n_bins = counts.size
-    if counts[counts > 0].min() < 10:
-        counter = 20
-        while counts[counts > 0].min() < 10 and n_bins >= 2 and counter > 0:
-            counter -= 1
-            n_bins -= 1
-            counts, bin_edges = np.histogram(data, bins=n_bins)
-
-    if bin_method == "uniform_count":
-        quantiles = np.linspace(0, 100, n_bins + 1)
-        bin_edges = np.asarray(np.percentile(data, quantiles))
-
-    bin_edges[0] = -np.inf  # type: ignore # until the clusters speed up is merged
-    bin_edges[-1] = np.inf  # type: ignore # and the _binning_by_clusters can be uncommented
-    return np.digitize(data, bin_edges)  # type: ignore
-
-
-def _is_continuous(data: NDArray[np.number], image_indices: NDArray[np.number]) -> bool:
-    """
-    Determines whether the data is continuous or discrete using the Wasserstein distance.
-
-    Given a 1D sample, we consider the intervals between adjacent points. For a continuous distribution,
-    a point is equally likely to lie anywhere in the interval bounded by its two neighbors. Furthermore,
-    we can put all "between neighbor" locations on the same scale of 0 to 1 by subtracting the smaller
-    neighbor and dividing out the length of the interval. (Duplicates are either assigned to zero or
-    ignored, depending on context). These normalized locations will be much more uniformly distributed
-    for continuous data than for discrete, and this gives us a way to distinguish them. Call this the
-    Normalized Near Neighbor distribution (NNN), defined on the interval [0,1].
-
-    The Wasserstein distance is available in scipy.stats.wasserstein_distance. We can use it to measure
-    how close the NNN is to a uniform distribution over [0,1]. We found that as long as a sample has at
-    least 20 points, and furthermore at least half as many points as there are discrete values, we can
-    reliably distinguish discrete from continuous samples by testing that the Wasserstein distance
-    measured from a uniform distribution is greater or less than 0.054, respectively.
-    """
-    # Check if the metadata is image specific
-    _, data_indices_unsorted = np.unique(data, return_index=True)
-    if data_indices_unsorted.size == image_indices.size:
-        data_indices = np.sort(data_indices_unsorted)
-        if (data_indices == image_indices).all():
-            data = data[data_indices]
-
-    # OLD METHOD
-    # uvals = np.unique(data)
-    # pct_unique = uvals.size / data.size
-    # return pct_unique < threshold
-
-    n_examples = len(data)
-
-    if n_examples < CONTINUOUS_MIN_SAMPLE_SIZE:
-        warnings.warn(
-            f"All samples look discrete with so few data points (< {CONTINUOUS_MIN_SAMPLE_SIZE})", UserWarning
-        )
-        return False
-
-    # Require at least 3 unique values before bothering with NNN
-    xu = np.unique(data, axis=None)
-    if xu.size < 3:
-        return False
-
-    Xs = np.sort(data)
-
-    X0, X1 = Xs[0:-2], Xs[2:]  # left and right neighbors
-
-    dx = np.zeros(n_examples - 2)  # no dx at end points
-    gtz = (X1 - X0) > 0  # check for dups; dx will be zero for them
-    dx[np.logical_not(gtz)] = 0.0
-
-    dx[gtz] = (Xs[1:-1] - X0)[gtz] / (X1 - X0)[gtz]  # the core idea: dx is NNN samples.
-
-    shift = wd(dx, np.linspace(0, 1, dx.size))  # how far is dx from uniform, for this feature?
-
-    return shift < DISCRETE_MIN_WD  # if NNN is close enough to uniform, consider the sample continuous.
-
-
-def get_counts(data: NDArray[np.int_], min_num_bins: int | None = None) -> NDArray[np.int_]:
-    """
-    Returns columnwise unique counts for discrete data.
-
-    Parameters
-    ----------
-    data : NDArray
-        Array containing integer values for metadata factors
-    min_num_bins : int | None, default None
-        Minimum number of bins for bincount, helps force consistency across runs
-
-    Returns
-    -------
-    NDArray[np.int]
-        Bin counts per column of data.
-    """
-    max_value = data.max() + 1 if min_num_bins is None else min_num_bins
-    cnt_array = np.zeros((max_value, data.shape[1]), dtype=np.int_)
-    for idx in range(data.shape[1]):
-        cnt_array[:, idx] = np.bincount(data[:, idx], minlength=max_value)
-
-    return cnt_array

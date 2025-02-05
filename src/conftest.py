@@ -22,18 +22,6 @@ def add_np(doctest_namespace):
 
 
 @pytest.fixture(autouse=True)
-def doctest_detectors_linters_clusterer(doctest_namespace):
-    import sklearn.datasets as dsets
-
-    images = dsets.make_blobs(n_samples=50, centers=np.array([(-1, -1), (1, 1)]), cluster_std=0.5, random_state=33)[0]
-    images[9] = images[24]
-    images[23] = images[48] + 1e-5
-
-    """dataeval.detectors.linters.Clusterer"""
-    doctest_namespace["clusterer_images"] = images
-
-
-@pytest.fixture(autouse=True)
 def doctest_detectors_linters_duplicates(doctest_namespace):
     from dataeval.metrics.stats import hashstats
 
@@ -95,6 +83,18 @@ def doctest_metrics_bias_coverage(doctest_namespace):
 
     """dataeval.metrics.bias.coverage.coverage"""
     doctest_namespace["embeddings"] = blobs
+
+
+@pytest.fixture(autouse=True)
+def doctest_metrics_estimators_clusterer(doctest_namespace):
+    import sklearn.datasets as dsets
+
+    images = dsets.make_blobs(n_samples=50, centers=np.array([(-1, -1), (1, 1)]), cluster_std=0.5, random_state=33)[0]
+    images[9] = images[24]
+    images[23] = images[48] + 1e-5
+
+    """dataeval.metrics.estimators.clusterer"""
+    doctest_namespace["clusterer_images"] = images
 
 
 @pytest.fixture(autouse=True)

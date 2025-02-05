@@ -42,6 +42,8 @@ packages = [
 [tool.poetry.dependencies]
 # required
 python = ">=3.9,<3.13"
+fast_hdbscan = {version = ">=0.2.0"}
+numba = {version = ">=0.59.1"}
 numpy = {version = ">=1.24.2"}
 pillow = {version = ">=10.3.0"}
 requests = {version = "*"}
@@ -149,6 +151,8 @@ exclude_also = [
 include = ["*/src/dataeval/*"]
 omit = [
   "*/torch/_blocks.py",
+  "*/_clusterer.py",
+  "*/_fast_mst.py",
 ]
 fail_under = 90
 
