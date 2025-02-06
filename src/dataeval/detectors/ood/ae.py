@@ -29,8 +29,31 @@ class OOD_AE(OODBase):
 
     Parameters
     ----------
-    model : Autoencoder
-        An Autoencoder model.
+    model : torch.nn.Module
+        An autoencoder model to use for encoding and reconstruction of images
+        for detection of out-of-distribution samples.
+    device : str or torch.Device or None, default None
+        The device to use for the detector. None will default to the global
+        configuration selection if set, otherwise "cuda" then "cpu" by availability.
+
+    Example
+    -------
+    Perform out-of-distribution detection on test data.
+
+    >>> from dataeval.utils.torch.models import AE
+
+    >>> input_shape = train_images[0].shape
+    >>> ood = OOD_AE(AE(input_shape))
+
+    Train the autoencoder using the training data.
+
+    >>> ood.fit(train_images, threshold_perc=95, epochs=10)
+
+    Test for out-of-distribution samples on the test data.
+
+    >>> output = ood.predict(test_images)
+    >>> output.is_ood
+    array([False, False,  True, False, False, False,  True, False])
     """
 
     def __init__(self, model: torch.nn.Module, device: str | torch.device | None = None) -> None:

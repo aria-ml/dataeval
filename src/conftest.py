@@ -55,6 +55,20 @@ def doctest_detectors_linters_outliers(doctest_namespace):
 
 
 @pytest.fixture(autouse=True)
+def doctest_detectors_ood_oodae(doctest_namespace):
+    train_images = np.zeros((20, 1, 32, 32), dtype=np.float32)
+    test_images = np.zeros((8, 1, 32, 32), dtype=np.float32)
+    train_images[5] = 1
+    test_images[2] = 1
+    test_images[6] = 1
+
+    """dataeval.detectors.ood.OOD_AE"""
+
+    doctest_namespace["train_images"] = train_images
+    doctest_namespace["test_images"] = test_images
+
+
+@pytest.fixture(autouse=True)
 def doctest_metrics_bias_balance_diversity(doctest_namespace):
     from dataeval.utils.metadata import preprocess
 

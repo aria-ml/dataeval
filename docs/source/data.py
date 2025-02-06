@@ -28,7 +28,6 @@ def download():
         # DriftDetectionTutorial.ipynb
         # DuplicatesTutorial.ipynb
         # HPDivergenceTutorial.ipynb
-        # OODDetectionTutorial.ipynb
         MNIST(root="./data", train=True, download=True)
         MNIST(root="./data", train=True, download=True, corruption="translate")
 
