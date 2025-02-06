@@ -72,6 +72,7 @@ autoapi_options = [
     "members",
     "show-module-summary",
     "imported-members",
+    "inherited-members",
 ]
 autoapi_generate_api_docs = True
 # uncomment to review or debug generated content
@@ -161,6 +162,11 @@ html_theme_options = {
 }
 
 
+def inherits_from(obj, full_name: str) -> bool:
+    parent = obj.obj.get("inherited_from")
+    return bool(parent and parent.get("full_name") == full_name)
+
+
 def autoapi_skip_member(app, what, name, obj, skip, options):
     # skip undocumented attributes
     if what == "attribute" and obj.docstring == "":
@@ -168,6 +174,10 @@ def autoapi_skip_member(app, what, name, obj, skip, options):
     # skip modules with undefined or empty __all__
     if (what == "module" or what == "package") and (obj.all is None or len(obj.all) == 0):
         skip = True
+    # selectively skip inherited members
+    if inherits_from(obj, "torch.nn.modules.module.Module"):
+        skip = True
+
     return skip
 
 
