@@ -33,21 +33,10 @@ def ds_union_by_rank(disjoint_set, point, nbr):
     return 1
 
 
-@numba.njit()
-def _transpose(array):
-    return array.T.copy()
-
-
-@numba.njit()
-def _init_mst(num_points):
-    """Initializes a graph as a numpy array (self, neighbor, distance)."""
-    return np.zeros((num_points - 1, 3), dtype=np.float32)
-
-
 @numba.njit(locals={"i": numba.types.uint32, "nbr": numba.types.uint32, "dist": numba.types.float32})
 def _init_tree(n_neighbors, n_distance):
     # Initial graph to hold tree connections
-    tree = _init_mst(n_neighbors.size)
+    tree = np.zeros((n_neighbors.size - 1, 3), dtype=np.float32)
     disjoint_set = ds_rank_create(n_neighbors.size)
     cluster_points = np.empty(n_neighbors.size, dtype=np.uint32)
 
@@ -139,8 +128,8 @@ def _calculate_cluster_neighbors(data, groups, point_array):
 
 def minimum_spanning_tree(data, neighbors, distances):
     # Transpose arrays to get number of samples along a row
-    k_neighbors = _transpose(neighbors).astype(np.uint32)
-    k_distances = _transpose(distances).astype(np.float32)
+    k_neighbors = neighbors.T.astype(np.uint32).copy()
+    k_distances = distances.T.astype(np.float32).copy()
 
     # Create cluster merging tracker
     merge_tracker = np.full((k_neighbors.shape[0] + 1, k_neighbors.shape[1]), -1, dtype=np.int32)
