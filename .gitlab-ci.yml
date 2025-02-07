@@ -225,6 +225,7 @@ docs:
     paths:
       - output/docs/.jupyter_cache/
       - output/docs/html/
+    when: always
   rules: *on_run_with_docs
 
 doctest:
