@@ -330,7 +330,7 @@ class BaseDriftUnivariate(BaseDrift):
                 else as_numpy(self.preprocess_fn(as_numpy(self._x_ref)[0:1]))
             )
             # infer features from preprocessed reference data
-            self._n_features = math.prod(x_ref_np.shape[1:])  # Multiplies all channel sizes after first
+            self._n_features = int(math.prod(x_ref_np.shape[1:]))  # Multiplies all channel sizes after first
 
         return self._n_features
 
