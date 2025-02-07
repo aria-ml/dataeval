@@ -50,7 +50,7 @@ RATIOSTATS_OVERRIDE_MAP: dict[type, dict[str, Callable[..., NDArray[Any]]]] = {
             "depth": lambda x: x.box["depth"],
             "distance": lambda x: x.box["distance"],
         }
-    )
+    ),
 }
 
 
@@ -87,11 +87,8 @@ def calculate_ratios(key: str, box_stats: BaseStatsOutput, img_stats: BaseStatsO
         stats = BoxImageStatsOutputSlice(box_stats, (box_i, box_j), img_stats, (img_i, img_j))
         out_type = type(box_stats)
         use_override = out_type in RATIOSTATS_OVERRIDE_MAP and key in RATIOSTATS_OVERRIDE_MAP[out_type]
-        ratio = (
-            RATIOSTATS_OVERRIDE_MAP[out_type][key](stats)
-            if use_override
-            else np.nan_to_num(stats.box[key] / stats.img[key])
-        )
+        with np.errstate(divide="ignore", invalid="ignore"):
+            ratio = RATIOSTATS_OVERRIDE_MAP[out_type][key](stats) if use_override else stats.box[key] / stats.img[key]
         out_stats[box_i:box_j] = ratio.reshape(-1, *out_stats[box_i].shape)
     return out_stats
 

@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-from dataeval.config import get_max_processes
-from dataeval.utils._plot import histogram_plot
-
 __all__ = []
 
 import re
 import warnings
+from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
 from itertools import repeat
 from multiprocessing import Pool
-from typing import Any, Callable, Generic, Iterable, NamedTuple, Optional, Sized, TypeVar, Union
+from typing import Any, Callable, Generic, Iterable, NamedTuple, Optional, Sequence, Sized, TypeVar, Union
 
 import numpy as np
 import tqdm
@@ -19,7 +17,9 @@ from numpy.typing import ArrayLike, NDArray
 
 from dataeval._interop import to_numpy_iter
 from dataeval._output import Output
+from dataeval.config import get_max_processes
 from dataeval.utils._image import normalize_image_shape, rescale
+from dataeval.utils._plot import histogram_plot
 
 DTYPE_REGEX = re.compile(r"NDArray\[np\.(.*?)\]")
 SOURCE_INDEX = "source_index"
@@ -326,3 +326,40 @@ def run_stats(
 
     outputs = [s.convert_output(output, source_index, box_count) for s in stats_processor_cls]
     return outputs
+
+
+def add_stats(a: TStatsOutput, b: TStatsOutput) -> TStatsOutput:
+    if type(a) is not type(b):
+        raise TypeError(f"Types {type(a)} and {type(b)} cannot be added.")
+
+    sum_dict = deepcopy(a.dict())
+
+    for k in sum_dict:
+        if isinstance(sum_dict[k], list):
+            sum_dict[k].extend(b.dict()[k])
+        else:
+            sum_dict[k] = np.concatenate((sum_dict[k], b.dict()[k]))
+
+    return type(a)(**sum_dict)
+
+
+def combine_stats(stats: Sequence[TStatsOutput]) -> tuple[TStatsOutput, list[int]]:
+    output = None
+    dataset_steps = []
+    cur_len = 0
+    for s in stats:
+        output = s if output is None else add_stats(output, s)
+        cur_len += len(s)
+        dataset_steps.append(cur_len)
+    if output is None:
+        raise TypeError("Cannot combine empty sequence of stats.")
+    return output, dataset_steps
+
+
+def get_dataset_step_from_idx(idx: int, dataset_steps: list[int]) -> tuple[int, int]:
+    last_step = 0
+    for i, step in enumerate(dataset_steps):
+        if idx < step:
+            return i, idx - last_step
+        last_step = step
+    return -1, idx

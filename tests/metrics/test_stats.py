@@ -14,6 +14,9 @@ from dataeval.metrics.stats._base import (
     BaseStatsOutput,
     StatsProcessor,
     _is_plottable,
+    add_stats,
+    combine_stats,
+    get_dataset_step_from_idx,
     normalize_box_shape,
     process_stats_unpack,
 )
@@ -515,3 +518,53 @@ class TestStatsPlotting:
 
         assert max_chan == expected[0]
         assert ch_mask == expected[1]
+
+
+@pytest.mark.required
+class TestCombineStats:
+    def test_image_stats_addition(self):
+        results_a = pixelstats(DATA_1)
+        results_b = pixelstats(DATA_1)
+        results_added = add_stats(results_a, results_b)
+        results_alldata = pixelstats(DATA_1 + DATA_1)
+        assert len(results_added.mean) == 20
+        assert len(results_alldata.mean) == 20
+
+    def test_channel_stats_addition(self):
+        results_a = pixelstats(DATA_3, per_channel=True)
+        results_b = pixelstats(DATA_1, per_channel=True)
+        results_c = pixelstats(DATA_3, per_channel=True)
+        results_added, dataset_steps = combine_stats((results_a, results_b, results_c))
+        results_alldata = pixelstats(DATA_3 + DATA_1 + DATA_3, per_channel=True)
+        assert results_added is not None
+        np.testing.assert_array_equal(results_added.mean, results_alldata.mean)
+        assert dataset_steps == [30, 40, 70]
+
+    def test_combine_different_stats_fail(self):
+        stats_a = pixelstats(DATA_1)
+        stats_b = hashstats(DATA_1)
+        with pytest.raises(TypeError):
+            add_stats(stats_a, stats_b)
+
+    def test_combine_different_types(self):
+        stats_a = pixelstats(DATA_1)
+        random_obj = "hello"
+        with pytest.raises(TypeError):
+            add_stats(stats_a, random_obj)  # type: ignore
+
+    def test_get_dataset_step_from_idx_no_steps(self):
+        results = get_dataset_step_from_idx(0, [])
+        assert results == (-1, 0)
+
+    def test_combine_stats_with_invalid_stat_types(self):
+        stats = pixelstats(DATA_1)
+        with pytest.raises(TypeError):
+            combine_stats([])  # type: ignore
+        with pytest.raises(TypeError):
+            combine_stats([None])  # type: ignore
+        with pytest.raises(TypeError):
+            combine_stats([1, None])  # type: ignore
+        with pytest.raises(TypeError):
+            combine_stats([stats, None])  # type: ignore
+        with pytest.raises(TypeError):
+            combine_stats([stats, 1, None])  # type: ignore
