@@ -23,8 +23,8 @@ class PtModel(nn.Module):
         super().__init__()
         self.dense1 = nn.Linear(n_features, 20)
         self.dense2 = nn.Linear(20, n_labels)
-        self.dropout = nn.Dropout(0.5) if dropout else lambda x: x
-        self.softmax = nn.Softmax() if softmax else lambda x: x
+        self.dropout = nn.Dropout(0.5) if dropout else nn.Identity()
+        self.softmax = nn.Softmax() if softmax else nn.Identity()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = nn.ReLU()(self.dense1(x))
@@ -94,12 +94,12 @@ class TestFunctionalClassifierUncertainty:
 
         preds_0 = cd.predict(x_test0)
         assert cd._detector.n == len(x_test0) + len(x_ref)
-        assert not preds_0.is_drift
+        assert not preds_0.drifted
         assert preds_0.distances >= 0
 
         preds_1 = cd.predict(x_test1)
         assert cd._detector.n == len(x_test1) + len(x_test0) + len(x_ref)
-        assert preds_1.is_drift
+        assert preds_1.drifted
         assert preds_1.distances >= 0
         assert preds_0.distances < preds_1.distances
 

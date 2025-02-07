@@ -87,7 +87,7 @@ class DriftUncertainty:
         Reference data can optionally be updated using an UpdateStrategy class. Update
         using the last n instances seen by the detector with LastSeenUpdateStrategy
         or via reservoir sampling with ReservoirSamplingUpdateStrategy.
-    preds_type : "probs" | "logits", default "logits"
+    preds_type : "probs" | "logits", default "probs"
         Type of prediction output by the model. Options are 'probs' (in [0,1]) or
         'logits' (in [-inf,inf]).
     batch_size : int, default 32
@@ -98,7 +98,22 @@ class DriftUncertainty:
         objects to a batch which can be processed by the model.
     device : str | None, default None
         Device type used. The default None tries to use the GPU and falls back on
-        CPU if needed. Can be specified by passing either 'cuda', 'gpu' or 'cpu'.
+        CPU if needed. Can be specified by passing either 'cuda' or 'cpu'.
+
+    Example
+    -------
+    >>> model = ClassificationModel()
+    >>> drift = DriftUncertainty(x_ref, model=model, batch_size=20)
+
+    Verify reference images have not drifted
+
+    >>> drift.predict(x_ref.copy()).drifted
+    False
+
+    Test incoming images for drift
+
+    >>> drift.predict(x_test).drifted
+    True
     """
 
     def __init__(

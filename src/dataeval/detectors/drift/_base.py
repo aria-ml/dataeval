@@ -47,16 +47,9 @@ class UpdateStrategy(ABC):
 class DriftBaseOutput(Output):
     """
     Base output class for Drift Detector classes
-
-    Attributes
-    ----------
-    is_drift : bool
-        Drift prediction for the images
-    threshold : float
-        Threshold after multivariate correction if needed
     """
 
-    is_drift: bool
+    drifted: bool
     threshold: float
     p_val: float
     distance: float
@@ -65,14 +58,18 @@ class DriftBaseOutput(Output):
 @dataclass(frozen=True)
 class DriftOutput(DriftBaseOutput):
     """
-    Output class for :class:`DriftCVM`, :class:`DriftKS`, and :class:`DriftUncertainty` drift detectors.
+    Output class for :class:`.DriftCVM`, :class:`.DriftKS`, and :class:`.DriftUncertainty` drift detectors.
 
     Attributes
     ----------
-    is_drift : bool
+    drifted : bool
         :term:`Drift` prediction for the images
     threshold : float
         Threshold after multivariate correction if needed
+    p_val : float
+        Instance-level p-value
+    distance : float
+        Instance-level distance
     feature_drift : NDArray
         Feature-level array of images detected to have drifted
     feature_threshold : float
@@ -83,7 +80,7 @@ class DriftOutput(DriftBaseOutput):
         Feature-level distances
     """
 
-    # is_drift: bool
+    # drifted: bool
     # threshold: float
     # p_val: float
     # distance: float
