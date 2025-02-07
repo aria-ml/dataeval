@@ -17,7 +17,7 @@ with warnings.catch_warnings():
 
 
 @numba.njit()
-def ds_union_by_rank(disjoint_set, point, nbr):
+def _ds_union_by_rank(disjoint_set, point, nbr):
     y = ds_find(disjoint_set, point)
     x = ds_find(disjoint_set, nbr)
 
@@ -43,7 +43,7 @@ def _init_tree(n_neighbors, n_distance):
     int_tree = 0
     for i in range(n_neighbors.size):
         nbr = n_neighbors[i]
-        connect = ds_union_by_rank(disjoint_set, i, nbr)
+        connect = _ds_union_by_rank(disjoint_set, i, nbr)
         if connect == 1:
             dist = n_distance[i]
             tree[int_tree] = (np.float32(i), np.float32(nbr), dist)
@@ -67,7 +67,7 @@ def _update_tree_by_distance(tree, int_tree, disjoint_set, n_neighbors, n_distan
     for i in range(n_neighbors.size):
         point = point_sorted[i]
         nbr = nbrs_sorted[i]
-        connect = ds_union_by_rank(disjoint_set, point, nbr)
+        connect = _ds_union_by_rank(disjoint_set, point, nbr)
         if connect == 1:
             dist = dist_sorted[i]
             tree[int_tree] = (np.float32(point), np.float32(nbr), dist)
