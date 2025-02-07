@@ -39,12 +39,12 @@ class ClassificationModel(PtModel):
         super().__init__(16, 3, True)
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="session")
 def add_np(doctest_namespace):
     doctest_namespace["np"] = np
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="session")
 def doctest_detectors_linters_duplicates(doctest_namespace):
     rng = np.random.default_rng(273)
     base = np.concatenate([np.ones((5, 10)), np.zeros((5, 10))])
@@ -59,7 +59,7 @@ def doctest_detectors_linters_duplicates(doctest_namespace):
     doctest_namespace["hashes2"] = hashstats(images[25:])
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="session")
 def doctest_detectors_linters_outliers(doctest_namespace):
     images = np.ones((30, 1, 128, 128), dtype=np.int32) * 2
     images = images + np.repeat(np.arange(10), 3 * 128 * 128).reshape(30, -1, 128, 128)
@@ -73,7 +73,7 @@ def doctest_detectors_linters_outliers(doctest_namespace):
     doctest_namespace["stats2"] = pixelstats(images[15:])
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="session")
 def doctest_detectors_ood_drift(doctest_namespace):
     train_images = np.zeros((50, 1, 16, 16), dtype=np.float32)
     test_images = np.ones((8, 1, 16, 16), dtype=np.float32)
@@ -89,7 +89,7 @@ def doctest_detectors_ood_drift(doctest_namespace):
     doctest_namespace["encoder"] = Autoencoder(1)
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="session")
 def doctest_detectors_drift_uncertainty(doctest_namespace):
     x_ref = np.random.randn(*(500, 16)).astype(np.float32)
     x_test = np.ones_like(x_ref)
@@ -98,7 +98,7 @@ def doctest_detectors_drift_uncertainty(doctest_namespace):
     doctest_namespace["x_test"] = x_test
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="session")
 def doctest_metrics_bias_balance_diversity(doctest_namespace):
     str_vals = ["b", "b", "b", "b", "b", "a", "a", "b", "a", "b", "b", "a"]
     class_labels = [1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0]
@@ -114,7 +114,7 @@ def doctest_metrics_bias_balance_diversity(doctest_namespace):
     doctest_namespace["metadata"] = metadata
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="session")
 def doctest_metrics_bias_coverage(doctest_namespace):
     blobs = dsets.make_blobs(n_samples=500, centers=np.array([(1, 1), (3, 3)]), cluster_std=0.5, random_state=498)
     blobs = np.asarray(blobs[0], dtype=np.float64)
@@ -125,7 +125,7 @@ def doctest_metrics_bias_coverage(doctest_namespace):
     doctest_namespace["embeddings"] = blobs
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="session")
 def doctest_metrics_estimators_clusterer(doctest_namespace):
     images = dsets.make_blobs(n_samples=50, centers=np.array([(-1, -1), (1, 1)]), cluster_std=0.5, random_state=33)[0]
     images[9] = images[24]
@@ -135,7 +135,7 @@ def doctest_metrics_estimators_clusterer(doctest_namespace):
     doctest_namespace["clusterer_images"] = images
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="session")
 def doctest_metrics_estimators_divergence(doctest_namespace):
     a = dsets.make_blobs(n_samples=50, centers=np.array([(-1, -1), (1, 1)]), cluster_std=0.3, random_state=712)[0]
     b = dsets.make_blobs(n_samples=50, centers=np.array([(-0.5, -0.5), (1, 1)]), cluster_std=0.3, random_state=712)[0]
@@ -146,7 +146,7 @@ def doctest_metrics_estimators_divergence(doctest_namespace):
     doctest_namespace["datasetB"] = b
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="session")
 def doctest_metrics_stats(doctest_namespace):
     images = np.repeat(np.arange(65536, dtype=np.int32), 4 * 5).reshape(5, -1, 128, 128)[:, :3, :, :]
     for i in range(5):
@@ -192,7 +192,7 @@ def doctest_metrics_stats(doctest_namespace):
     doctest_namespace["labels"] = labels
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="session")
 def doctest_workflows_sufficiency(doctest_namespace):
     model = MagicMock()
     train_ds = MagicMock()
