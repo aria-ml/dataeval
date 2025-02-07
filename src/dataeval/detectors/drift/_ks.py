@@ -57,6 +57,21 @@ class DriftKS(BaseDriftUnivariate):
         Number of features used in the statistical test. No need to pass it if no
         preprocessing takes place. In case of a preprocessing step, this can also
         be inferred automatically but could be more expensive to compute.
+
+    Example
+    -------
+    >>> from functools import partial
+    >>> from dataeval.detectors.drift import preprocess_drift
+
+    Use a preprocess function to encode images before testing for drift
+
+    >>> preprocess_fn = partial(preprocess_drift, model=encoder, batch_size=64)
+    >>> drift = DriftKS(train_images, preprocess_fn=preprocess_fn)
+
+    Test incoming images for drift
+
+    >>> drift.predict(test_images).drifted
+    True
     """
 
     def __init__(

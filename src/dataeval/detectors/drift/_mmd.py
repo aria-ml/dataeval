@@ -29,7 +29,7 @@ class DriftMMDOutput(DriftBaseOutput):
 
     Attributes
     ----------
-    is_drift : bool
+    drifted : bool
         Drift prediction for the images
     threshold : float
         :term:`P-Value` used for significance of the permutation test
@@ -41,7 +41,7 @@ class DriftMMDOutput(DriftBaseOutput):
         MMD^2 threshold above which drift is flagged
     """
 
-    # is_drift: bool
+    # drifted: bool
     # threshold: float
     # p_val: float
     # distance: float
@@ -83,6 +83,21 @@ class DriftMMD(BaseDrift):
     device : str | None, default None
         Device type used. The default None uses the GPU and falls back on CPU.
         Can be specified by passing either 'cuda', 'gpu' or 'cpu'.
+
+    Example
+    -------
+    >>> from functools import partial
+    >>> from dataeval.detectors.drift import preprocess_drift
+
+    Use a preprocess function to encode images before testing for drift
+
+    >>> preprocess_fn = partial(preprocess_drift, model=encoder, batch_size=64)
+    >>> drift = DriftMMD(train_images, preprocess_fn=preprocess_fn)
+
+    Test incoming images for drift
+
+    >>> drift.predict(test_images).drifted
+    True
     """
 
     def __init__(

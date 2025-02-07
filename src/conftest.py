@@ -1,7 +1,21 @@
 """doctest fixtures"""
 
+import pathlib
+import sys
+
+sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute() / "tests" / "detectors"))
+
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pytest
+import sklearn.datasets as dsets
+import torch
+from test_drift_uncertainty import PtModel
+
+from dataeval.metrics.stats import dimensionstats, hashstats, pixelstats
+from dataeval.utils.metadata import preprocess
+from dataeval.utils.torch.models import Autoencoder
 
 # Set numpy print option to legacy 1.25 so native numpy types
 # are not printed with dtype information.
@@ -15,6 +29,15 @@ if np.__version__[0] == "2":
     # 16
     np.set_printoptions(legacy="1.25")  # type: ignore
 
+# Set manual seeds
+np.random.seed(0)
+torch.manual_seed(0)
+
+
+class ClassificationModel(PtModel):
+    def __init__(self):
+        super().__init__(16, 3, True)
+
 
 @pytest.fixture(autouse=True)
 def add_np(doctest_namespace):
@@ -23,8 +46,6 @@ def add_np(doctest_namespace):
 
 @pytest.fixture(autouse=True)
 def doctest_detectors_linters_duplicates(doctest_namespace):
-    from dataeval.metrics.stats import hashstats
-
     rng = np.random.default_rng(273)
     base = np.concatenate([np.ones((5, 10)), np.zeros((5, 10))])
     images = np.stack([rng.permutation(base) * i for i in range(50)], axis=0)
@@ -40,8 +61,6 @@ def doctest_detectors_linters_duplicates(doctest_namespace):
 
 @pytest.fixture(autouse=True)
 def doctest_detectors_linters_outliers(doctest_namespace):
-    from dataeval.metrics.stats import pixelstats
-
     images = np.ones((30, 1, 128, 128), dtype=np.int32) * 2
     images = images + np.repeat(np.arange(10), 3 * 128 * 128).reshape(30, -1, 128, 128)
     images[10:13, :, 50:80, 50:80] = 0
@@ -55,23 +74,32 @@ def doctest_detectors_linters_outliers(doctest_namespace):
 
 
 @pytest.fixture(autouse=True)
-def doctest_detectors_ood_oodae(doctest_namespace):
-    train_images = np.zeros((20, 1, 32, 32), dtype=np.float32)
-    test_images = np.zeros((8, 1, 32, 32), dtype=np.float32)
-    train_images[5] = 1
-    test_images[2] = 1
-    test_images[6] = 1
+def doctest_detectors_ood_drift(doctest_namespace):
+    train_images = np.zeros((50, 1, 16, 16), dtype=np.float32)
+    test_images = np.ones((8, 1, 16, 16), dtype=np.float32)
+    test_images[2] = 0
 
     """dataeval.detectors.ood.OOD_AE"""
+    """dataeval.detectors.drift.DriftKS"""
+    """dataeval.detectors.drift.DriftCVM"""
+    """dataeval.detectors.drift.DriftMMD"""
 
     doctest_namespace["train_images"] = train_images
     doctest_namespace["test_images"] = test_images
+    doctest_namespace["encoder"] = Autoencoder(1)
+
+
+@pytest.fixture(autouse=True)
+def doctest_detectors_drift_uncertainty(doctest_namespace):
+    x_ref = np.random.randn(*(500, 16)).astype(np.float32)
+    x_test = np.ones_like(x_ref)
+    doctest_namespace["ClassificationModel"] = ClassificationModel
+    doctest_namespace["x_ref"] = x_ref
+    doctest_namespace["x_test"] = x_test
 
 
 @pytest.fixture(autouse=True)
 def doctest_metrics_bias_balance_diversity(doctest_namespace):
-    from dataeval.utils.metadata import preprocess
-
     str_vals = ["b", "b", "b", "b", "b", "a", "a", "b", "a", "b", "b", "a"]
     class_labels = [1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0]
     cnt_vals = [-0.54, -0.32, 0.41, 1.04, -0.13, 1.37, -0.67, 0.35, 0.90, 0.09, -0.74, -0.92]
@@ -88,8 +116,6 @@ def doctest_metrics_bias_balance_diversity(doctest_namespace):
 
 @pytest.fixture(autouse=True)
 def doctest_metrics_bias_coverage(doctest_namespace):
-    import sklearn.datasets as dsets
-
     blobs = dsets.make_blobs(n_samples=500, centers=np.array([(1, 1), (3, 3)]), cluster_std=0.5, random_state=498)
     blobs = np.asarray(blobs[0], dtype=np.float64)
     blobs = blobs - np.min(blobs)
@@ -101,8 +127,6 @@ def doctest_metrics_bias_coverage(doctest_namespace):
 
 @pytest.fixture(autouse=True)
 def doctest_metrics_estimators_clusterer(doctest_namespace):
-    import sklearn.datasets as dsets
-
     images = dsets.make_blobs(n_samples=50, centers=np.array([(-1, -1), (1, 1)]), cluster_std=0.5, random_state=33)[0]
     images[9] = images[24]
     images[23] = images[48] + 1e-5
@@ -113,8 +137,6 @@ def doctest_metrics_estimators_clusterer(doctest_namespace):
 
 @pytest.fixture(autouse=True)
 def doctest_metrics_estimators_divergence(doctest_namespace):
-    import sklearn.datasets as dsets
-
     a = dsets.make_blobs(n_samples=50, centers=np.array([(-1, -1), (1, 1)]), cluster_std=0.3, random_state=712)[0]
     b = dsets.make_blobs(n_samples=50, centers=np.array([(-0.5, -0.5), (1, 1)]), cluster_std=0.3, random_state=712)[0]
 
@@ -126,8 +148,6 @@ def doctest_metrics_estimators_divergence(doctest_namespace):
 
 @pytest.fixture(autouse=True)
 def doctest_metrics_stats(doctest_namespace):
-    from dataeval.metrics.stats import dimensionstats
-
     images = np.repeat(np.arange(65536, dtype=np.int32), 4 * 5).reshape(5, -1, 128, 128)[:, :3, :, :]
     for i in range(5):
         for j in range(3):
@@ -174,10 +194,6 @@ def doctest_metrics_stats(doctest_namespace):
 
 @pytest.fixture(autouse=True)
 def doctest_workflows_sufficiency(doctest_namespace):
-    from unittest.mock import MagicMock, patch
-
-    import numpy as np
-
     model = MagicMock()
     train_ds = MagicMock()
     train_ds.__len__.return_value = 100
