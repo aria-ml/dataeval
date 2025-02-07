@@ -25,7 +25,6 @@ def download():
         # BayesErrorRateEstimationTutorial.ipynb
         # ClassLearningCurvesTutorial.ipynb
         # ClassLabelAnalysisTutorial.ipynb
-        # DriftDetectionTutorial.ipynb
         # DuplicatesTutorial.ipynb
         # HPDivergenceTutorial.ipynb
         MNIST(root="./data", train=True, download=True)

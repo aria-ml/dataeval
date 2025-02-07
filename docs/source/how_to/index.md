@@ -8,8 +8,6 @@ opened in Google Colab to be used interactively!
 
 ## Detectors
 
-- [How to detect if the data distribution is changing (Drift Detection Tutorial Using Multiple Drift Detectors)](DriftDetectionTutorial.ipynb)
-  [![Open In Colab][colab-badge]][drift-colab]
 - [How to identify outliers and/or anomalies in a dataset](ClustererTutorial.ipynb)
   [![Open In Colab][colab-badge]][clust-colab]
 - [How to detect duplicates in a dataset](DuplicatesTutorial.ipynb)
@@ -21,7 +19,6 @@ opened in Google Colab to be used interactively!
 :caption: Detectors
 :hidden:
 
-DriftDetectionTutorial.ipynb
 ClustererTutorial.ipynb
 DuplicatesTutorial.ipynb
 LintingTutorial.ipynb
@@ -70,7 +67,6 @@ ClassLearningCurvesTutorial.ipynb
 [ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.77.0/docs/source/how_to/BayesErrorRateEstimationTutorial.ipynb
 [suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.77.0/docs/source/how_to/ClassLearningCurvesTutorial.ipynb
 [div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.77.0/docs/source/how_to/HPDivergenceTutorial.ipynb
-[drift-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.77.0/docs/source/how_to/DriftDetectionTutorial.ipynb
 [ae-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.77.0/docs/source/how_to/AETrainerTutorial.ipynb
 [lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.77.0/docs/source/how_to/ClassLabelAnalysisTutorial.ipynb
 [clust-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.77.0/docs/source/how_to/ClustererTutorial.ipynb

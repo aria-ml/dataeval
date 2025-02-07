@@ -47,13 +47,13 @@ class OOD_AE(OODBase):
 
     Train the autoencoder using the training data.
 
-    >>> ood.fit(train_images, threshold_perc=95, epochs=10)
+    >>> ood.fit(train_images, threshold_perc=99, epochs=20)
 
     Test for out-of-distribution samples on the test data.
 
     >>> output = ood.predict(test_images)
     >>> output.is_ood
-    array([False, False,  True, False, False, False,  True, False])
+    array([ True,  True, False,  True,  True,  True,  True,  True])
     """
 
     def __init__(self, model: torch.nn.Module, device: str | torch.device | None = None) -> None:
