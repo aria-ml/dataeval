@@ -12,7 +12,7 @@ model = AE((1, 16, 16))
 @pytest.mark.parametrize("y_train", (None, np.zeros((3, 1, 16, 16))))
 @pytest.mark.parametrize("loss_fn", (None, torch.nn.MSELoss()))
 @pytest.mark.parametrize("optimizer", (None, torch.optim.Adam(model.parameters())))
-@pytest.mark.parametrize("preprocess_fn", (None, lambda x: x))
+@pytest.mark.parametrize("preprocess_fn", (None, torch.nn.Identity()))
 @pytest.mark.parametrize("batch_size", (1, 3))
 class TestTorchTrainerCPU:
     def test_torch_trainer(self, y_train, loss_fn, optimizer, preprocess_fn, batch_size):
@@ -35,7 +35,7 @@ class TestTorchTrainerCPU:
 @pytest.mark.parametrize("y_train", (None, np.zeros((3, 1, 16, 16))))
 @pytest.mark.parametrize("loss_fn", (None, torch.nn.MSELoss()))
 @pytest.mark.parametrize("optimizer", (None, torch.optim.Adam(model.parameters())))
-@pytest.mark.parametrize("preprocess_fn", (None, lambda x: x))
+@pytest.mark.parametrize("preprocess_fn", (None, torch.nn.Identity()))
 @pytest.mark.parametrize("batch_size", (1, 3))
 class TestTorchTrainerCUDA:
     def test_torch_trainer(self, y_train, loss_fn, optimizer, preprocess_fn, batch_size):

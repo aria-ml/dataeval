@@ -57,7 +57,7 @@ class TestKSDrift:
         )
         x = x_ref.copy()
         preds = cd.predict(x)
-        assert not preds.is_drift
+        assert not preds.drifted
         assert cd.n == x.shape[0] + x_ref.shape[0]
         assert cd.x_ref.shape[0] == min(update_x_ref.n, x.shape[0] + x_ref.shape[0])  # type: ignore
         assert preds.feature_drift.shape[0] == cd.n_features
@@ -72,11 +72,11 @@ class TestKSDrift:
 
         preds_high = cd.predict(X_high)
         if alternative != "less":
-            assert preds_high.is_drift
+            assert preds_high.drifted
 
         preds_low = cd.predict(X_low)
         if alternative != "greater":
-            assert preds_low.is_drift
+            assert preds_low.drifted
 
         assert preds_low.distances.min() >= 0.0  # type: ignore
 
