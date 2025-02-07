@@ -8,7 +8,7 @@ from typing import Generic, Iterable, Sequence, TypeVar, overload
 from numpy.typing import ArrayLike
 
 from dataeval._output import Output, set_metadata
-from dataeval.detectors.linters.merged_stats import combine_stats, get_dataset_step_from_idx
+from dataeval.metrics.stats._base import combine_stats, get_dataset_step_from_idx
 from dataeval.metrics.stats._hashstats import HashStatsOutput, hashstats
 
 DuplicateGroup = list[int]

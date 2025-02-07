@@ -10,8 +10,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from dataeval._output import Output, set_metadata
-from dataeval.detectors.linters.merged_stats import combine_stats, get_dataset_step_from_idx
-from dataeval.metrics.stats._base import BOX_COUNT, SOURCE_INDEX
+from dataeval.metrics.stats._base import BOX_COUNT, SOURCE_INDEX, combine_stats, get_dataset_step_from_idx
 from dataeval.metrics.stats._datasetstats import DatasetStatsOutput, datasetstats
 from dataeval.metrics.stats._dimensionstats import DimensionStatsOutput
 from dataeval.metrics.stats._labelstats import LabelStatsOutput

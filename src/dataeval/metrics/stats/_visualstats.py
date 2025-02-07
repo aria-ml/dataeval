@@ -53,9 +53,9 @@ class VisualStatsProcessor(StatsProcessor[VisualStatsOutput]):
     output_class: type = VisualStatsOutput
     image_function_map: dict[str, Callable[[StatsProcessor[VisualStatsOutput]], Any]] = {
         "brightness": lambda x: x.get("percentiles")[1],
-        "contrast": lambda x: np.nan_to_num(
-            (np.max(x.get("percentiles")) - np.min(x.get("percentiles"))) / np.mean(x.get("percentiles"))
-        ),
+        "contrast": lambda x: 0
+        if np.mean(x.get("percentiles")) == 0
+        else (np.max(x.get("percentiles")) - np.min(x.get("percentiles"))) / np.mean(x.get("percentiles")),
         "darkness": lambda x: x.get("percentiles")[-2],
         "missing": lambda x: np.count_nonzero(np.isnan(np.sum(x.image, axis=0))) / np.prod(x.shape[-2:]),
         "sharpness": lambda x: np.std(edge_filter(np.mean(x.image, axis=0))),

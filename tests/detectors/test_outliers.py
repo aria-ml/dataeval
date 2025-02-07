@@ -43,7 +43,7 @@ class TestOutliers:
         results = outliers.from_stats((stats1, stats2, stats3))
         assert results is not None
 
-    def test_outliers_with_merged_stats(self):
+    def test_outliers_with_combined_stats(self):
         dataset1 = np.zeros((50, 3, 16, 16))
         dataset2 = np.zeros((50, 3, 16, 16))
         dataset2[0] = 1
