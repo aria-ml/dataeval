@@ -41,7 +41,7 @@ class InfoMixin:
     def info(self) -> str:
         """Pretty prints dataset name and info"""
 
-        return f"{self._image_set.capitalize()}\n{'-' * len(self._image_set)}\n{self}\n"
+        return f"{self._image_set.capitalize()}\n{'-' * len(self._image_set)}\n{str(self)}\n"
 
 
 class CIFAR10(DatasetWrapperMixin[tuple[Tensor, int]], InfoMixin):
@@ -112,6 +112,9 @@ class VOCDetection(DatasetWrapperMixin[tuple[Tensor, dict[str, Any]]], InfoMixin
     ) -> None:
         self._data = _VOCDetection(root, year, image_set, download, transform, target_transform, transforms)
         self._image_set = image_set
+
+    def __str__(self) -> str:
+        return str(self._data)
 
 
 ClassStringMap = Literal["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
