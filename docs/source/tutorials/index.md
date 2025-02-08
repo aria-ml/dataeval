@@ -37,7 +37,7 @@ EDA_Part3.ipynb
   - Learn about the impacts of unstructured, raw data and how to transform it
     into a reliable, robust dataset.
   - [![Open In Colab][colab-badge]][eda-colab]
-* - [Assess the Data Space](EDA_Part2.ipynb)
+* - [Assess an unlabeled data space](./EDA_Part2.ipynb)
   - Learn how to fix and prevent gaps in data to develop more reliable and
     robust models.
   - [![Open In Colab][colab-badge]][dataspace-colab]

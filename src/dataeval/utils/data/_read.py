@@ -5,7 +5,12 @@ __all__ = []
 from collections import defaultdict
 from typing import Any
 
-from torch.utils.data import Dataset
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
+
+from dataeval.utils.data.datasets import VOCDetection
 
 
 def read_dataset(dataset: Dataset[Any]) -> list[list[Any]]:
@@ -61,3 +66,46 @@ def read_dataset(dataset: Dataset[Any]) -> list[list[Any]]:
             ddict[i].append(d)
 
     return list(ddict.values())
+
+
+# Reduce overhead cost by not tracking tensor gradients
+@torch.no_grad
+def batch_voc(
+    dataset: VOCDetection, model: nn.Module, batch_size: int = 64, flatten_labels: bool = False
+) -> tuple[torch.Tensor, list[str] | list[list[str]]]:
+    """
+    Iterates through the dataset to generate model embeddings and store labels
+
+    Note
+    ----
+    Due to a bug with the VOCDetection dataset and DataLoaders,
+    the batching is done manually
+    """
+
+    model.eval()
+    embeddings = []
+    images, labels = [], []
+
+    dataloader = DataLoader(dataset)
+
+    for i, (image, targets) in tqdm(enumerate(dataloader), desc="Batching VOC", mininterval=1):
+        # Aggregate images -> [image]
+        images.append(image[0])
+        # Aggregate all objects in an image
+        objects: list[dict[str, list[str]]] = targets["annotation"]["object"]
+
+        # Extract only the label from each object
+        lbls = [obj["name"][0] for obj in objects]
+
+        # Creates either a 1-D or 2-D array of the labels
+        labels.extend(lbls) if flatten_labels else labels.append(lbls)
+
+        if (i + 1) % batch_size == 0:
+            outputs = model(torch.stack(images))
+            embeddings.append(outputs)
+            images = []
+
+    # Add last batch even if not full batch size
+    embeddings.append(model(torch.stack(images)))
+
+    return torch.vstack(embeddings).cpu(), labels
