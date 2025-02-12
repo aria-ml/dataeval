@@ -1,6 +1,12 @@
-[//]: # (3f0f4a3a59c84ae6c28e409b519465ffb7a806ac)
+[//]: # (9a420f7d907bcc82e2967a88da13ea79dd06c8f1)
 
 # DataEval Change Log
+
+## v0.77.1
+
+🛠️ **Improvements and Enhancements**
+- `9a420f7d` - Update Assess the data space tutorial to fit JATIC DR-2.3
+- `3ab63f3e` - Integrate clusterer speed improvements with numba
 
 ## v0.77.0
 
