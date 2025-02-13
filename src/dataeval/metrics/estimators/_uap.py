@@ -20,7 +20,7 @@ from dataeval._output import Output, set_metadata
 @dataclass(frozen=True)
 class UAPOutput(Output):
     """
-    Output class for :func:`uap` estimator metric.
+    Output class for :func:`.uap` estimator metric.
 
     Attributes
     ----------

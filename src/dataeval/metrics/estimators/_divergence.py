@@ -21,7 +21,7 @@ from dataeval.utils._shared import compute_neighbors, get_method, minimum_spanni
 @dataclass(frozen=True)
 class DivergenceOutput(Output):
     """
-    Output class for :func:`divergence` estimator metric.
+    Output class for :func:`.divergence` estimator metric.
 
     Attributes
     ----------

@@ -28,7 +28,7 @@ from dataeval.utils._shared import compute_neighbors, get_classes_counts, get_me
 @dataclass(frozen=True)
 class BEROutput(Output):
     """
-    Output class for :func:`ber` estimator metric.
+    Output class for :func:`.ber` estimator metric.
 
     Attributes
     ----------

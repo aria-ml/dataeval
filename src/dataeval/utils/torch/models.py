@@ -5,11 +5,16 @@ from __future__ import annotations
 __all__ = ["Autoencoder", "Encoder", "Decoder", "ResNet18"]
 
 import math
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 import torch
 import torch.nn as nn
 from torchvision.models import ResNet18_Weights, resnet18
+
+
+@runtime_checkable
+class SupportsEncode(Protocol):
+    def encode(self, x: Any) -> Any: ...
 
 
 class Autoencoder(nn.Module):

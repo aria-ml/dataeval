@@ -24,7 +24,7 @@ with contextlib.suppress(ImportError):
 @dataclass(frozen=True)
 class BalanceOutput(Output):
     """
-    Output class for :func:`balance` :term:`bias<Bias>` metric.
+    Output class for :func:`.balance` :term:`bias<Bias>` metric.
 
     Attributes
     ----------
@@ -178,7 +178,7 @@ def balance(
     Parameters
     ----------
     metadata : Metadata
-        Preprocessed metadata from :func:`dataeval.utils.metadata.preprocess`
+        Preprocessed metadata from :func:`.preprocess`
     num_neighbors : int, default 5
         Number of points to consider as neighbors
 

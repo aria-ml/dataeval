@@ -1,52 +1,28 @@
-"""Provides access to common Computer Vision datasets."""
-
 from __future__ import annotations
 
-__all__ = ["MNIST", "CIFAR10", "VOCDetection"]
+__all__ = []
 
 import hashlib
 import os
 import zipfile
 from pathlib import Path
-from typing import Any, Callable, Literal, Sized, TypeVar
+from typing import Any, Callable, Literal, TypeVar
 from warnings import warn
 
 import numpy as np
 import requests
+import torch
 from numpy.typing import NDArray
-from torch import Tensor
-from torch.utils.data import Dataset
+from torch.nn.functional import one_hot
 from torchvision.datasets import CIFAR10 as _CIFAR10
-from torchvision.datasets import VOCDetection as _VOCDetection
+from torchvision.transforms import v2
 
-TDatum = TypeVar("TDatum")
-
-
-class DatasetWrapperMixin(Dataset[TDatum]):
-    _data: Dataset[TDatum]
-
-    def __getitem__(self, index: int) -> TDatum:
-        return self._data.__getitem__(index)
-
-    def __len__(self) -> int:
-        if isinstance(self._data, Sized):
-            return len(self._data)
-
-        raise NotImplementedError("Dataset does not have a length function.")
+from dataeval.utils.data.datasets._types import ImageClassificationDataset, InfoMixin
 
 
-class InfoMixin:
-    _image_set: str
-
-    def info(self) -> str:
-        """Pretty prints dataset name and info"""
-
-        return f"{self._image_set.capitalize()}\n{'-' * len(self._image_set)}\n{str(self)}\n"
-
-
-class CIFAR10(DatasetWrapperMixin[tuple[Tensor, int]], InfoMixin):
+class CIFAR10(ImageClassificationDataset[torch.Tensor], InfoMixin):
     """
-    `CIFAR10 <https://www.cs.toronto.edu/~kriz/cifar.html>`_ Dataset.
+    `CIFAR10 <https://www.cs.toronto.edu/~kriz/cifar.html>`_ Dataset as Torch tensors.
 
     Parameters
     ----------
@@ -59,7 +35,7 @@ class CIFAR10(DatasetWrapperMixin[tuple[Tensor, int]], InfoMixin):
         If dataset is already downloaded, it is not downloaded again.
     transform : Callable or None, default None:
         A function/transform that takes in a PIL image and returns a transformed version.
-        E.g, ``torchvision.transforms.RandomCrop``
+        ToImage() and ToDtype(torch.float32, scale=True) are applied by default.
     target_transform : Callable or None, default None:
         A function/transform that takes in the target and transforms it.
     """
@@ -72,49 +48,19 @@ class CIFAR10(DatasetWrapperMixin[tuple[Tensor, int]], InfoMixin):
         transform: Callable | None = None,
         target_transform: Callable | None = None,
     ) -> None:
+        if transform is None:
+            transform = v2.Compose([v2.ToImage(), v2.ToDtype(torch.float32, scale=True)])
+
         self._data = _CIFAR10(root, train, transform, target_transform, download)
         self._image_set = "train" if train else "test"
 
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, dict[str, Any]]:
+        item: tuple[torch.Tensor, int] = self._data[index]
+        target = one_hot(torch.tensor(item[1]), len(self._data.class_to_idx))
+        return item[0], target, {}
 
-class VOCDetection(DatasetWrapperMixin[tuple[Tensor, dict[str, Any]]], InfoMixin):
-    """
-    `Pascal VOC <http://host.robots.ox.ac.uk/pascal/VOC/>`_ Detection Dataset.
-
-    Parameters
-    ----------
-    root : str or pathlib.Path
-        Root directory of the VOC Dataset.
-    year : "2007", "2008", "2009", "2010", "2011" or "2012", default "2012"
-        The dataset year.
-    image_set : "train", "trainval", "val", or "test", default "train"
-        "test" is only valid for the year "2007"
-    download : bool, default False
-        If true, downloads the dataset from the internet and puts it in root directory.
-        If dataset is already downloaded, it is not downloaded again.
-    transform : Callable or None, default None:
-        A function/transform that takes in a PIL image and returns a transformed version.
-        E.g, ``torchvision.transforms.RandomCrop``
-    target_transform : Callable or None, default None:
-        A function/transform that takes in the target and transforms it.
-    transforms : Callable or None, default None
-        A function/transform that takes input sample and its target as entry and returns a transformed version.
-    """
-
-    def __init__(
-        self,
-        root: str | Path,
-        year: Literal["2007", "2008", "2009", "2010", "2011", "2012"] = "2012",
-        image_set: Literal["train", "trainval", "val", "test"] = "train",
-        download: bool = False,
-        transform: Callable | None = None,
-        target_transform: Callable | None = None,
-        transforms: Callable | None = None,
-    ) -> None:
-        self._data = _VOCDetection(root, year, image_set, download, transform, target_transform, transforms)
-        self._image_set = image_set
-
-    def __str__(self) -> str:
-        return str(self._data)
+    def __len__(self) -> int:
+        return len(self._data)
 
 
 ClassStringMap = Literal["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
@@ -274,7 +220,7 @@ def _subselect(arr: NDArray, count: int, from_back: bool = False):
     return arr[:count]
 
 
-class MNIST(Dataset[tuple[NDArray[np.float64], int]], InfoMixin):
+class MNIST(ImageClassificationDataset[NDArray[np.float64]], InfoMixin):
     """MNIST Dataset and Corruptions.
 
     Parameters
@@ -479,17 +425,19 @@ class MNIST(Dataset[tuple[NDArray[np.float64], int]], InfoMixin):
         if self.flatten and self.channels is None:
             self.data = self.data.reshape(self.data.shape[0], -1)
 
-    def __getitem__(self, index: int) -> tuple[NDArray[np.float64], int]:
+    def __getitem__(self, index: int) -> tuple[NDArray[np.float64], NDArray[np.float64], dict[str, Any]]:
         """
         Args:
             index (int): Index
 
         Returns:
-            tuple: (image, target) where target is index of the target class.
+            tuple: (image, label, dict) where target is index of the target class.
         """
-        img, target = self.data[index], int(self.targets[index])
+        img, label = self.data[index], int(self.targets[index])
+        target = np.zeros((10,))
+        target[label] = 1
 
-        return img, target
+        return img, target, {}
 
     def __len__(self) -> int:
         return len(self.data)

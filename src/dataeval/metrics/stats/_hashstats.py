@@ -25,7 +25,7 @@ MAX_FACTOR = 4
 @dataclass(frozen=True)
 class HashStatsOutput(BaseStatsOutput):
     """
-    Output class for :func:`hashstats` stats metric.
+    Output class for :func:`.hashstats` stats metric.
 
     Attributes
     ----------

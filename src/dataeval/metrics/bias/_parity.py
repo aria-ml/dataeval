@@ -25,7 +25,7 @@ TData = TypeVar("TData", np.float64, NDArray[np.float64])
 @dataclass(frozen=True)
 class ParityOutput(Generic[TData], Output):
     """
-    Output class for :func:`parity` and :func:`label_parity` :term:`bias<Bias>` metrics.
+    Output class for :func:`.parity` and :func:`.label_parity` :term:`bias<Bias>` metrics.
 
     Attributes
     ----------
@@ -243,7 +243,7 @@ def parity(metadata: Metadata) -> ParityOutput[NDArray[np.float64]]:
     Parameters
     ----------
     metadata : Metadata
-        Preprocessed metadata from :func:`dataeval.utils.metadata.preprocess`
+        Preprocessed metadata from :func:`.preprocess`
 
     Returns
     -------

@@ -3,9 +3,10 @@ from __future__ import annotations
 __all__ = []
 
 from dataclasses import dataclass
-from typing import Generic, Iterable, Sequence, TypeVar, overload
+from typing import Any, Generic, Iterable, Sequence, TypeVar, overload
 
 from numpy.typing import ArrayLike
+from torch.utils.data import Dataset
 
 from dataeval._output import Output, set_metadata
 from dataeval.metrics.stats._base import combine_stats, get_dataset_step_from_idx
@@ -19,7 +20,7 @@ TIndexCollection = TypeVar("TIndexCollection", DuplicateGroup, DatasetDuplicateG
 @dataclass(frozen=True)
 class DuplicatesOutput(Generic[TIndexCollection], Output):
     """
-    Output class for :class:`Duplicates` lint detector.
+    Output class for :class:`.Duplicates` lint detector.
 
     Attributes
     ----------
@@ -133,8 +134,15 @@ class Duplicates:
 
         return DuplicatesOutput(**duplicates)
 
+    @overload
+    def evaluate(self, data: Iterable[ArrayLike]) -> DuplicatesOutput[DuplicateGroup]: ...
+    @overload
+    def evaluate(self, data: Dataset[tuple[ArrayLike, Any, dict[str, Any]]]) -> DuplicatesOutput[DuplicateGroup]: ...
+
     @set_metadata(state=["only_exact"])
-    def evaluate(self, data: Iterable[ArrayLike]) -> DuplicatesOutput[DuplicateGroup]:
+    def evaluate(
+        self, data: Iterable[ArrayLike] | Dataset[tuple[ArrayLike, Any, dict[str, Any]]]
+    ) -> DuplicatesOutput[DuplicateGroup]:
         """
         Returns duplicate image indices for both exact matches and near matches
 
@@ -158,6 +166,7 @@ class Duplicates:
         >>> all_dupes.evaluate(duplicate_images)
         DuplicatesOutput(exact=[[3, 20], [16, 37]], near=[[3, 20, 22], [12, 18], [13, 36], [14, 31], [17, 27], [19, 38, 47]])
         """  # noqa: E501
-        self.stats = hashstats(data)
+        images = (d[0] for d in data) if isinstance(data, Dataset) else data
+        self.stats = hashstats(images)
         duplicates = self._get_duplicates(self.stats.dict())
         return DuplicatesOutput(**duplicates)
