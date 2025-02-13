@@ -20,7 +20,7 @@ with contextlib.suppress(ImportError):
 @dataclass(frozen=True)
 class LabelStatsOutput(Output):
     """
-    Output class for :func:`labelstats` stats metric.
+    Output class for :func:`.labelstats` stats metric.
 
     Attributes
     ----------

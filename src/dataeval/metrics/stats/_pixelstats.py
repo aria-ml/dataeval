@@ -16,7 +16,7 @@ from dataeval.metrics.stats._base import BaseStatsOutput, HistogramPlotMixin, St
 @dataclass(frozen=True)
 class PixelStatsOutput(BaseStatsOutput, HistogramPlotMixin):
     """
-    Output class for :func:`pixelstats` stats metric.
+    Output class for :func:`.pixelstats` stats metric.
 
     Attributes
     ----------

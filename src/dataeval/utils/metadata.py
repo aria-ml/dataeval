@@ -1,11 +1,11 @@
 """
 Metadata related utility functions that help organize raw metadata into \
-:class:`Metadata` objects for use within `DataEval`.
+:class:`.Metadata` objects for use within `DataEval`.
 """
 
 from __future__ import annotations
 
-__all__ = ["Metadata", "preprocess", "merge", "flatten"]
+__all__ = ["preprocess", "merge", "flatten"]
 
 import warnings
 from dataclasses import dataclass
@@ -23,7 +23,7 @@ from dataeval.utils._bin import bin_data, digitize_data, is_continuous
 @dataclass(frozen=True)
 class Metadata(Output):
     """
-    Dataclass containing binned metadata from the :func:`preprocess` function.
+    Dataclass containing binned metadata from the :func:`.preprocess` function.
 
     Attributes
     ----------

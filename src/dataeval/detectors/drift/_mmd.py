@@ -25,7 +25,7 @@ from dataeval.detectors.drift._torch import GaussianRBF, mmd2_from_kernel_matrix
 @dataclass(frozen=True)
 class DriftMMDOutput(DriftBaseOutput):
     """
-    Output class for :class:`DriftMMD` :term:`drift<Drift>` detector.
+    Output class for :class:`.DriftMMD` :term:`drift<Drift>` detector.
 
     Attributes
     ----------
@@ -124,12 +124,12 @@ class DriftMMD(BaseDrift):
         self.device: torch.device = get_device(device)
 
         # initialize kernel
-        sigma_tensor = torch.tensor(sigma, device=self.device) if sigma is not None else None
+        sigma_tensor = torch.as_tensor(sigma, device=self.device) if sigma is not None else None
         self._kernel = GaussianRBF(sigma_tensor).to(self.device)
 
         # compute kernel matrix for the reference data
         if self._infer_sigma or isinstance(sigma_tensor, torch.Tensor):
-            x = torch.tensor(self.x_ref, device=self.device)
+            x = torch.as_tensor(self.x_ref, device=self.device)
             self._k_xx = self._kernel(x, x, infer_sigma=self._infer_sigma)
             self._infer_sigma = False
         else:
@@ -161,8 +161,8 @@ class DriftMMD(BaseDrift):
             p-value obtained from the permutation test, MMD^2 between the reference and test set,
             and MMD^2 threshold above which :term:`drift<Drift>` is flagged
         """
-        x_ref = torch.tensor(self.x_ref, device=self.device)
-        x = torch.tensor(x, device=self.device)
+        x_ref = torch.as_tensor(self.x_ref, device=self.device)
+        x = torch.as_tensor(x, device=self.device)
         n = x.shape[0]
         kernel_mat = self._kernel_matrix(x_ref, x)
         kernel_mat = kernel_mat - torch.diag(kernel_mat.diag())  # zero diagonal

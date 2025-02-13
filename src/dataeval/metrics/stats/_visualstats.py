@@ -18,7 +18,7 @@ QUARTILES = (0, 25, 50, 75, 100)
 @dataclass(frozen=True)
 class VisualStatsOutput(BaseStatsOutput, HistogramPlotMixin):
     """
-    Output class for :func:`visualstats` stats metric.
+    Output class for :func:`.visualstats` stats metric.
 
     Attributes
     ----------

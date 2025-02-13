@@ -52,7 +52,7 @@ def _plot(labels: NDArray[Any], bar_heights: NDArray[Any]) -> Figure:
 @dataclass(frozen=True)
 class DiversityOutput(Output):
     """
-    Output class for :func:`diversity` :term:`bias<Bias>` metric.
+    Output class for :func:`.diversity` :term:`bias<Bias>` metric.
 
     Attributes
     ----------
@@ -211,7 +211,7 @@ def diversity(
     Parameters
     ----------
     metadata : Metadata
-        Preprocessed metadata from :func:`dataeval.utils.metadata.preprocess`
+        Preprocessed metadata from :func:`.preprocess`
     method : "simpson" or "shannon", default "simpson"
         The methodology used for defining diversity
 
