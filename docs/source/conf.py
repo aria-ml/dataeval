@@ -26,6 +26,7 @@ language = "en"
 
 extensions = [
     # Internal Sphinx extensions
+    "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
     "sphinx.ext.graphviz",
     "sphinx.ext.mathjax",

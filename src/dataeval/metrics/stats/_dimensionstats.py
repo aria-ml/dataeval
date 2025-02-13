@@ -16,7 +16,7 @@ from dataeval.utils._image import get_bitdepth
 @dataclass(frozen=True)
 class DimensionStatsOutput(BaseStatsOutput, HistogramPlotMixin):
     """
-    Output class for :func:`dimensionstats` stats metric.
+    Output class for :func:`.dimensionstats` stats metric.
 
     Attributes
     ----------
