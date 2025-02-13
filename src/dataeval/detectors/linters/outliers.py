@@ -4,10 +4,11 @@ __all__ = []
 
 import contextlib
 from dataclasses import dataclass
-from typing import Generic, Iterable, Literal, Sequence, TypeVar, Union, overload
+from typing import Any, Generic, Iterable, Literal, Sequence, TypeVar, Union, overload
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
+from torch.utils.data import Dataset
 
 from dataeval._output import Output, set_metadata
 from dataeval.metrics.stats._base import BOX_COUNT, SOURCE_INDEX, combine_stats, get_dataset_step_from_idx
@@ -83,7 +84,7 @@ def _create_pandas_dataframe(class_wise):
 @dataclass(frozen=True)
 class OutliersOutput(Generic[TIndexIssueMap], Output):
     """
-    Output class for :class:`Outliers` lint detector.
+    Output class for :class:`.Outliers` lint detector.
 
     Attributes
     ----------
@@ -321,8 +322,15 @@ class Outliers:
 
         return OutliersOutput(output_list)
 
+    @overload
+    def evaluate(self, data: Iterable[ArrayLike]) -> OutliersOutput[IndexIssueMap]: ...
+    @overload
+    def evaluate(self, data: Dataset[tuple[ArrayLike, Any, dict[str, Any]]]) -> OutliersOutput[IndexIssueMap]: ...
+
     @set_metadata(state=["use_dimension", "use_pixel", "use_visual", "outlier_method", "outlier_threshold"])
-    def evaluate(self, data: Iterable[ArrayLike]) -> OutliersOutput[IndexIssueMap]:
+    def evaluate(
+        self, data: Iterable[ArrayLike] | Dataset[tuple[ArrayLike, Any, dict[str, Any]]]
+    ) -> OutliersOutput[IndexIssueMap]:
         """
         Returns indices of Outliers with the issues identified for each
 
@@ -348,6 +356,7 @@ class Outliers:
         >>> results.issues[10]
         {'skew': -3.906, 'kurtosis': 13.266, 'entropy': 0.2128, 'contrast': 1.25, 'zeros': 0.05493}
         """
-        self.stats = datasetstats(images=data)
+        images = (d[0] for d in data) if isinstance(data, Dataset) else data
+        self.stats = datasetstats(images=images)
         outliers = self._get_outliers(self.stats.dict())
         return OutliersOutput(outliers)

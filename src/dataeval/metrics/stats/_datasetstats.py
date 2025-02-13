@@ -22,7 +22,7 @@ from dataeval.utils._plot import channel_histogram_plot
 @dataclass(frozen=True)
 class DatasetStatsOutput(Output, HistogramPlotMixin):
     """
-    Output class for :func:`datasetstats` stats metric.
+    Output class for :func:`.datasetstats` stats metric.
 
     This class represents the outputs of various stats functions against a single
     dataset, such that each index across all stat outputs are representative of
@@ -82,7 +82,7 @@ def _get_channels(cls, channel_limit: int | None = None, channel_index: int | It
 @dataclass(frozen=True)
 class ChannelStatsOutput(Output):
     """
-    Output class for :func:`channelstats` stats metric.
+    Output class for :func:`.channelstats` stats metric.
 
     This class represents the outputs of various per-channel stats functions against
     a single dataset, such that each index across all stat outputs are representative

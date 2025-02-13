@@ -24,7 +24,7 @@ with contextlib.suppress(ImportError):
 @dataclass(frozen=True)
 class SufficiencyOutput(Output):
     """
-    Output class for :class:`Sufficiency` workflow.
+    Output class for :class:`.Sufficiency` workflow.
 
     Attributes
     ----------

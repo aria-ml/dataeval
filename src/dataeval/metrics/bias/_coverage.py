@@ -71,7 +71,7 @@ def _plot(images: NDArray[Any], num_images: int) -> Figure:
 @dataclass(frozen=True)
 class CoverageOutput(Output):
     """
-    Output class for :func:`coverage` :term:`bias<Bias>` metric.
+    Output class for :func:`.coverage` :term:`bias<Bias>` metric.
 
     Attributes
     ----------
