@@ -8,12 +8,13 @@ from typing import Any, Literal
 
 import numpy as np
 import scipy as sp
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 
 from dataeval._output import Output, set_metadata
+from dataeval.typing import ArrayLike
 from dataeval.utils._bin import get_counts
+from dataeval.utils._method import get_method
 from dataeval.utils._plot import heatmap
-from dataeval.utils._shared import get_method
 from dataeval.utils.metadata import Metadata
 
 with contextlib.suppress(ImportError):
@@ -192,6 +193,9 @@ def diversity_simpson(
     return ev_index
 
 
+_DIVERSITY_FN_MAP = {"simpson": diversity_simpson, "shannon": diversity_shannon}
+
+
 @set_metadata
 def diversity(
     metadata: Metadata,
@@ -252,7 +256,7 @@ def diversity(
     --------
     scipy.stats.entropy
     """
-    diversity_fn = get_method({"simpson": diversity_simpson, "shannon": diversity_shannon}, method)
+    diversity_fn = get_method(_DIVERSITY_FN_MAP, method)
     discretized_data = np.hstack((metadata.class_labels[:, np.newaxis], metadata.discrete_data))
     cnts = get_counts(discretized_data)
     num_bins = np.bincount(np.nonzero(cnts)[1])

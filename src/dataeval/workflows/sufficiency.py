@@ -10,12 +10,13 @@ from typing import Any, Callable, Generic, Iterable, Mapping, Sequence, Sized, T
 import numpy as np
 import torch
 import torch.nn as nn
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 from scipy.optimize import basinhopping
 from torch.utils.data import Dataset
 
-from dataeval._interop import as_numpy
 from dataeval._output import Output, set_metadata
+from dataeval.typing import ArrayLike
+from dataeval.utils._array import as_numpy
 
 with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure
@@ -460,13 +461,13 @@ class Sufficiency(Generic[T]):
     @property
     def eval_fn(
         self,
-    ) -> Callable[[nn.Module, Dataset[T]], dict[str, float] | Mapping[str, ArrayLike]]:
+    ) -> Callable[[nn.Module, Dataset[T]], Mapping[str, float] | Mapping[str, ArrayLike]]:
         return self._eval_fn
 
     @eval_fn.setter
     def eval_fn(
         self,
-        value: Callable[[nn.Module, Dataset[T]], dict[str, float] | Mapping[str, ArrayLike]],
+        value: Callable[[nn.Module, Dataset[T]], Mapping[str, float] | Mapping[str, ArrayLike]],
     ) -> None:
         if not callable(value):
             raise TypeError("Must provide a callable for eval_fn.")

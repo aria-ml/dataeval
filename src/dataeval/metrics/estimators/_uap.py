@@ -10,11 +10,11 @@ __all__ = []
 
 from dataclasses import dataclass
 
-from numpy.typing import ArrayLike
 from sklearn.metrics import average_precision_score
 
-from dataeval._interop import as_numpy
 from dataeval._output import Output, set_metadata
+from dataeval.typing import ArrayLike
+from dataeval.utils._array import as_numpy
 
 
 @dataclass(frozen=True)

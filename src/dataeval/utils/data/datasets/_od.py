@@ -4,15 +4,11 @@ __all__ = []
 
 from pathlib import Path
 from typing import Any, Callable, Literal
+from xml.etree.ElementTree import parse
 
 import torch
 from torchvision.datasets import VOCDetection as _VOCDetection
 from torchvision.transforms import v2
-
-try:
-    from defusedxml.ElementTree import parse as ET_parse  # type: ignore
-except ImportError:
-    from xml.etree.ElementTree import parse as ET_parse
 
 from dataeval.utils.data.datasets._types import InfoMixin, ObjectDetectionDataset, ObjectDetectionTarget
 
@@ -61,7 +57,7 @@ class VOCDetection(ObjectDetectionDataset[torch.Tensor], InfoMixin):
         # pull out an alphabetized list of labels
         labels: set[str] = set()
         for i in range(len(self._data)):
-            objects = self._data.parse_voc_xml(ET_parse(self._data.annotations[i]).getroot())["annotation"]["object"]
+            objects = self._data.parse_voc_xml(parse(self._data.annotations[i]).getroot())["annotation"]["object"]
             labels.update([o["name"] for o in objects])
             if len(objects) == 20:
                 break
@@ -70,7 +66,7 @@ class VOCDetection(ObjectDetectionDataset[torch.Tensor], InfoMixin):
     def __str__(self) -> str:
         return str(self._data)
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, ObjectDetectionTarget, dict[str, Any]]:
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, ObjectDetectionTarget[torch.Tensor], dict[str, Any]]:
         datum = self._data[index]
 
         boxes: list[torch.Tensor] = []

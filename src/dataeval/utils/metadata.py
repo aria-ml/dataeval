@@ -13,11 +13,14 @@ from enum import Enum
 from typing import Any, Iterable, Literal, Mapping, overload
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 
-from dataeval._interop import _simplify_type, as_numpy, to_numpy
 from dataeval._output import Output, set_metadata
+from dataeval.typing import ArrayLike
+from dataeval.utils._array import as_numpy, to_numpy
 from dataeval.utils._bin import bin_data, digitize_data, is_continuous
+
+_TYPE_MAP = {int: 0, float: 1, str: 2}
 
 
 @dataclass(frozen=True)
@@ -59,6 +62,45 @@ class DropReason(Enum):
     INCONSISTENT_KEY = "inconsistent_key"
     INCONSISTENT_SIZE = "inconsistent_size"
     NESTED_LIST = "nested_list"
+
+
+@overload
+def _simplify_type(data: list[str]) -> list[int] | list[float] | list[str]: ...
+@overload
+def _simplify_type(data: str) -> int | float | str: ...
+
+
+def _simplify_type(data: list[str] | str) -> list[int] | list[float] | list[str] | int | float | str:
+    """
+    Simplifies a value or a list of values to the simplest form possible,
+    in preferred order of `int`, `float`, or `string`.
+
+    Parameters
+    ----------
+    data : list[str] | str
+        A list of values or a single value
+
+    Returns
+    -------
+    list[int | float | str] | int | float | str
+        The same values converted to the numerical type if possible
+    """
+    if not isinstance(data, list):
+        try:
+            value = float(data)
+        except (TypeError, ValueError):
+            value = None
+        return str(data) if value is None else int(value) if value.is_integer() else value
+
+    converted = []
+    max_type = 0
+    for value in data:
+        value = _simplify_type(value)
+        max_type = max(max_type, _TYPE_MAP.get(type(value), 2))
+        converted.append(value)
+    for i in range(len(converted)):
+        converted[i] = list(_TYPE_MAP)[max_type](converted[i])
+    return converted
 
 
 def _get_key_indices(keys: Iterable[tuple[str, ...]]) -> dict[tuple[str, ...], int]:

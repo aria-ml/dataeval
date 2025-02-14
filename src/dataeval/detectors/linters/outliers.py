@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Generic, Iterable, Literal, Sequence, TypeVar, Union, overload
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 from torch.utils.data import Dataset
 
 from dataeval._output import Output, set_metadata
@@ -17,6 +17,7 @@ from dataeval.metrics.stats._dimensionstats import DimensionStatsOutput
 from dataeval.metrics.stats._labelstats import LabelStatsOutput
 from dataeval.metrics.stats._pixelstats import PixelStatsOutput
 from dataeval.metrics.stats._visualstats import VisualStatsOutput
+from dataeval.typing import ArrayLike
 
 with contextlib.suppress(ImportError):
     import pandas as pd

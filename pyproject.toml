@@ -186,6 +186,9 @@ per-file-ignores = { "*.ipynb" = ["E402"] }
 [tool.ruff.lint.isort]
 known-first-party = ["dataeval"]
 
+[tool.ruff.lint.flake8-builtins]
+builtins-strict-checking = false
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
