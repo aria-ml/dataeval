@@ -4,7 +4,7 @@ __all__ = []
 
 import warnings
 from dataclasses import dataclass
-from typing import Any, Iterator, NamedTuple, Protocol
+from typing import Any, Iterator, Protocol
 
 import numpy as np
 from numpy.typing import NDArray
@@ -16,7 +16,8 @@ from sklearn.utils.multiclass import type_of_target
 from dataeval._output import Output, set_metadata
 
 
-class TrainValSplit(NamedTuple):
+@dataclass
+class TrainValSplit:
     """Tuple containing train and validation indices"""
 
     train: NDArray[np.intp]
@@ -274,8 +275,7 @@ def get_group_ids(metadata: dict[str, Any], group_names: list[str], num_samples:
     for name, feature in features2group.items():
         if len(feature) != num_samples:
             raise ValueError(
-                f"Feature length does not match number of labels. "
-                f"Got {len(feature)} features and {num_samples} samples"
+                f"Feature length does not match number of labels. Got {len(feature)} features and {num_samples} samples"
             )
 
         if type_of_target(feature) == "continuous":

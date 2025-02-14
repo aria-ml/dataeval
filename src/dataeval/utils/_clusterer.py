@@ -3,7 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 import warnings
-from typing import NamedTuple
+from dataclasses import dataclass
 
 import numba
 import numpy as np
@@ -63,7 +63,8 @@ def compare_links_to_cluster_std(mst, clusters):
     return exact_dup[exact_idx], near_dup[near_idx]
 
 
-class ClusterData(NamedTuple):
+@dataclass
+class ClusterData:
     clusters: NDArray[np.intp]
     mst: NDArray[np.double]
     linkage_tree: NDArray[np.double]

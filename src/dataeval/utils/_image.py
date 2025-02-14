@@ -2,7 +2,8 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Any, NamedTuple
+from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -12,7 +13,8 @@ EDGE_KERNEL = np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]], dtype=np.int8)
 BIT_DEPTH = (1, 8, 12, 16, 32)
 
 
-class BitDepth(NamedTuple):
+@dataclass
+class BitDepth:
     depth: int
     pmin: float | int
     pmax: float | int

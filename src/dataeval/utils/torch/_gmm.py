@@ -10,7 +10,8 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import NamedTuple, TypeVar
+from dataclasses import dataclass
+from typing import TypeVar
 
 import numpy as np
 import torch
@@ -18,7 +19,8 @@ import torch
 TGMMData = TypeVar("TGMMData")
 
 
-class GaussianMixtureModelParams(NamedTuple):
+@dataclass
+class GaussianMixtureModelParams:
     """
     phi : torch.Tensor
         Mixture component distribution weights.

@@ -11,7 +11,12 @@ from tqdm import tqdm
 
 from dataeval.config import get_device
 from dataeval.utils._targets import Targets
-from dataeval.utils.data.datasets._types import ImageClassificationDataset, ObjectDetectionDataset, TArrayLike
+from dataeval.utils.data.datasets._types import (
+    ImageClassificationDataset,
+    ObjectDetectionDataset,
+    ObjectDetectionTarget,
+    TArrayLike,
+)
 from dataeval.utils.torch.models import SupportsEncode
 
 
@@ -61,7 +66,7 @@ def collate(
     embeddings: list[torch.Tensor] | torch.Tensor = []
     images, targets, metadata, source = [], [], [], []
 
-    is_target_dict = False
+    is_od_target = False
 
     collate_fn = collate_as_tensor_fn if model is not None else default_collate_fn
     dataloader = DataLoader(dataset, batch_size=batch_size, collate_fn=collate_fn)
@@ -77,8 +82,8 @@ def collate(
             embeddings.extend(outputs)
 
         # process target
-        if is_target_dict := is_target_dict or isinstance(target[0], dict):
-            target = [{k: torch.as_tensor(v).detach().cpu() for k, v in t.items()} for t in target]
+        if is_od_target := is_od_target or isinstance(target[0], ObjectDetectionTarget):
+            target = [{k: torch.as_tensor(v).detach().cpu() for k, v in t.__dict__.items()} for t in target]
             source.extend([i] * len(target))
         else:
             target = [torch.as_tensor(t).detach().cpu() for t in target]
@@ -87,7 +92,7 @@ def collate(
         # process metadata
         metadata.extend(metadatum)
 
-    if is_target_dict:
+    if is_od_target:
         labels = np.asarray([int(label) for t in targets for label in t.get("labels", [])], dtype=np.intp)
         scores = np.asarray([float(score) for t in targets for score in t.get("scores", [])], dtype=np.float32)
         bboxes = np.asarray([box.numpy(force=True) for t in targets for box in t.get("boxes", [])], dtype=np.float32)

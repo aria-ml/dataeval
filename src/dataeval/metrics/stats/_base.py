@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from functools import partial
 from itertools import repeat
 from multiprocessing import Pool
-from typing import Any, Callable, Generic, Iterable, NamedTuple, Optional, Sequence, Sized, TypeVar, Union
+from typing import Any, Callable, Generic, Iterable, Optional, Sequence, Sized, TypeVar, Union
 
 import numpy as np
 import tqdm
@@ -47,7 +47,8 @@ def normalize_box_shape(bounding_box: NDArray[Any]) -> NDArray[Any]:
         return bounding_box
 
 
-class SourceIndex(NamedTuple):
+@dataclass
+class SourceIndex:
     """
     Attributes
     ----------
@@ -203,7 +204,8 @@ class StatsProcessor(Generic[TStatsOutput]):
         return cls.output_class(**output, source_index=source_index, box_count=np.asarray(box_count, dtype=np.uint16))
 
 
-class StatsProcessorOutput(NamedTuple):
+@dataclass
+class StatsProcessorOutput:
     results: list[dict[str, Any]]
     source_indices: list[SourceIndex]
     box_counts: list[int]
