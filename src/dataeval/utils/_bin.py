@@ -156,19 +156,19 @@ def bin_by_clusters(data: NDArray[np.number[Any]]) -> NDArray[np.float64]:
     """
     # Create initial clusters
 
-    clusters, _, _, _, _, k_neighbors, _ = get_clusters(data)
+    c = get_clusters(data)
 
     # Create bins from clusters
-    bin_edges = np.zeros(clusters.max() + 2)
-    for group in range(clusters.max() + 1):
-        points = np.nonzero(clusters == group)[0]
+    bin_edges = np.zeros(c.clusters.max() + 2)
+    for group in range(c.clusters.max() + 1):
+        points = np.nonzero(c.clusters == group)[0]
         bin_edges[group] = data[points].min()
 
     # Get the outliers
-    outliers = np.nonzero(clusters == -1)[0]
+    outliers = np.nonzero(c.clusters == -1)[0]
 
     # Identify non-outlier neighbors
-    nbrs = k_neighbors[outliers]
+    nbrs = c.k_neighbors[outliers]
     nbrs = np.where(np.isin(nbrs, outliers), -1, nbrs)
 
     # Find the nearest non-outlier neighbor for each outlier
@@ -190,7 +190,7 @@ def bin_by_clusters(data: NDArray[np.number[Any]]) -> NDArray[np.float64]:
             extend_bins.append(min2add)
         else:
             if min2add < data[nnbr]:
-                cluster = clusters[nnbr]
+                cluster = c.clusters[nnbr]
                 bin_edges[cluster] = min2add
     if extend_bins:
         bin_edges = np.concatenate([bin_edges, extend_bins])

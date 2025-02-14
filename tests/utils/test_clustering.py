@@ -25,19 +25,19 @@ class TestMatrixOps:
         test_sets = (rand_arr, dup_arr)
 
         for test_set in test_sets:
-            _, mst, linkage_tree, _, _, _, k_distances = get_clusters(test_set)
+            c = get_clusters(test_set)
 
             # Distance matrix
-            assert not np.any(np.isnan(k_distances))  # Should contain no NaN
-            assert (k_distances >= 0).all()  # Distances are always positive or 0 (same data point)
+            assert not np.any(np.isnan(c.k_distances))  # Should contain no NaN
+            assert (c.k_distances >= 0).all()  # Distances are always positive or 0 (same data point)
 
             # Minimum spanning tree
-            assert not np.any(np.isnan(mst))  # Should contain no NaN
-            print(mst)
+            assert not np.any(np.isnan(c.mst))  # Should contain no NaN
+            print(c.mst)
 
             # Linkage arr
-            assert not np.any(np.isnan(linkage_tree))  # Should contain no NaN
-            print(linkage_tree)
+            assert not np.any(np.isnan(c.linkage_tree))  # Should contain no NaN
+            print(c.linkage_tree)
 
 
 @pytest.mark.required

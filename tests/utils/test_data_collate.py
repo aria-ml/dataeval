@@ -3,6 +3,7 @@ import pytest
 import torch
 
 from dataeval.utils.data._collate import collate
+from dataeval.utils.data.datasets._types import ObjectDetectionTarget
 
 
 @pytest.mark.required
@@ -51,7 +52,7 @@ class TestCollateDataset:
             # Images, ObjectDetectionTarget, Metadata
             [
                 np.ones((10, 3, 3)),
-                [{"labels": [0, 1, 2], "boxes": [[0, 1, 2], [3, 4, 5]]} for _ in range(10)],
+                [ObjectDetectionTarget([[0, 1, 2], [3, 4, 5]], [0, 1, 2], []) for _ in range(10)],
                 [{i: i} for i in range(10)],
             ],
         ],
@@ -89,14 +90,7 @@ class TestCollateDataset:
             ],
             [
                 torch.ones((10, 3, 3)),
-                [
-                    {
-                        "labels": torch.arange(10),
-                        "boxes": torch.ones((10, 4)),
-                        "scores": torch.arange(10),
-                    }
-                    for _ in range(10)
-                ],
+                [ObjectDetectionTarget(torch.ones((10, 4)), torch.arange(10), torch.arange(10)) for _ in range(10)],
             ],
         ],
     )
