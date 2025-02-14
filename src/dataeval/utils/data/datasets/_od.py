@@ -84,7 +84,7 @@ class VOCDetection(ObjectDetectionDataset[torch.Tensor], InfoMixin):
 
         return (
             datum[0],
-            {"boxes": torch.stack(boxes), "labels": torch.tensor(labels), "scores": torch.zeros((len(labels),))},
+            ObjectDetectionTarget(torch.stack(boxes), torch.tensor(labels), torch.zeros((len(labels),))),
             datum[1],
         )
 

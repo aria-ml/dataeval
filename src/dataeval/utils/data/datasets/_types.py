@@ -3,7 +3,8 @@ from __future__ import annotations
 __all__ = []
 
 from abc import ABC, abstractmethod
-from typing import Any, Sequence, TypedDict, TypeVar, Union
+from dataclasses import dataclass
+from typing import Any, Sequence, TypeVar, Union
 
 from numpy.typing import NDArray
 from torch import Tensor
@@ -34,7 +35,8 @@ class InfoMixin:
 class ImageClassificationDataset(SizedDataset[tuple[TArrayLike, TArrayLike, dict[str, Any]]]): ...
 
 
-class ObjectDetectionTarget(TypedDict):
+@dataclass
+class ObjectDetectionTarget:
     boxes: ArrayLike
     labels: ArrayLike
     scores: ArrayLike
