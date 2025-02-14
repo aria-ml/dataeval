@@ -6,9 +6,9 @@ import contextlib
 from typing import Any
 
 import numpy as np
-from numpy.typing import ArrayLike
 
-from dataeval._interop import to_numpy
+from dataeval.typing import ArrayLike
+from dataeval.utils._array import to_numpy
 
 with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure

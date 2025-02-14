@@ -4,6 +4,8 @@ import warnings
 import numpy as np
 import pytest
 
+from dataeval.utils._array import flatten
+
 try:
     from matplotlib.figure import Figure
 except ImportError:
@@ -36,15 +38,11 @@ class TestCoverageUnit:
         result = coverage(embs, "adaptive", num_observations=1)
         np.testing.assert_array_equal(result.critical_value_radii, np.zeros(100))
 
-    def test_high_dim_data(self):
-        """High dimensional data should not affect calculations"""
+    def test_high_dim_data_valueerror(self):
+        """High dimensional data should raise valueerror"""
         embs = np.random.random(size=(100, 16, 16))
-        x = coverage(embs)
-        x_flat = coverage(embs.reshape((100, -1)))
-
-        assert x.coverage_radius == x_flat.coverage_radius
-        np.testing.assert_array_equal(x.uncovered_indices, x_flat.uncovered_indices)
-        np.testing.assert_array_equal(x.critical_value_radii, x_flat.critical_value_radii)
+        with pytest.raises(ValueError):
+            coverage(embs)
 
     def test_non_unit_interval(self):
         embs = np.random.random(size=(100, 16, 16)) * 2
@@ -59,7 +57,7 @@ class TestCoveragePlot:
         images[1] += 0.3
         images[5] += 0.9
         images[7] += 0.8
-        result = coverage(images, num_observations=10, percent=0.15)
+        result = coverage(flatten(images), num_observations=10, percent=0.15)
         output = result.plot(images, 3)
         assert isinstance(output, Figure)
 

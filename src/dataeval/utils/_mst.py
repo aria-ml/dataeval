@@ -2,53 +2,17 @@ from __future__ import annotations
 
 __all__ = []
 
-import sys
-from typing import Any, Callable, Literal, TypeVar
+from typing import Any, Literal
 
-import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import minimum_spanning_tree as mst
 from scipy.spatial.distance import pdist, squareform
 from sklearn.neighbors import NearestNeighbors
 
-if sys.version_info >= (3, 10):
-    from typing import ParamSpec
-else:
-    from typing_extensions import ParamSpec
-
-from dataeval._interop import as_numpy
+from dataeval.utils._array import flatten
 
 EPSILON = 1e-5
-HASH_SIZE = 8
-MAX_FACTOR = 4
-
-
-P = ParamSpec("P")
-R = TypeVar("R")
-
-
-def get_method(method_map: dict[str, Callable[P, R]], method: str) -> Callable[P, R]:
-    if method not in method_map:
-        raise ValueError(f"Specified method {method} is not a valid method: {method_map}.")
-    return method_map[method]
-
-
-def flatten(array: ArrayLike) -> NDArray[Any]:
-    """
-    Flattens input array from (N, ... ) to (N, -1) where all samples N have all data in their last dimension
-
-    Parameters
-    ----------
-    X : NDArray, shape - (N, ... )
-        Input array
-
-    Returns
-    -------
-    NDArray, shape - (N, -1)
-    """
-    nparr = as_numpy(array)
-    return nparr.reshape((nparr.shape[0], -1))
 
 
 def minimum_spanning_tree(X: NDArray[Any]) -> Any:
@@ -71,32 +35,6 @@ def minimum_spanning_tree(X: NDArray[Any]) -> Any:
     dense_eudist = squareform(pdist(X)) + EPSILON
     eudist_csr = csr_matrix(dense_eudist)
     return mst(eudist_csr)
-
-
-def get_classes_counts(labels: NDArray[np.int_]) -> tuple[int, int]:
-    """
-    Returns the classes and counts of from an array of labels
-
-    Parameters
-    ----------
-    label : NDArray
-        Numpy labels array
-
-    Returns
-    -------
-        Classes and counts
-
-    Raises
-    ------
-    ValueError
-        If the number of unique classes is less than 2
-    """
-    classes, counts = np.unique(labels, return_counts=True)
-    M = len(classes)
-    if M < 2:
-        raise ValueError("Label vector contains less than 2 classes!")
-    N = int(np.sum(counts))
-    return M, N
 
 
 def compute_neighbors(

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import numba
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", category=FutureWarning)
@@ -24,9 +24,9 @@ with warnings.catch_warnings():
         mst_to_linkage_tree,
     )
 
-from dataeval._interop import to_numpy
+from dataeval.typing import ArrayLike
+from dataeval.utils._array import flatten, to_numpy
 from dataeval.utils._fast_mst import calculate_neighbor_distances, minimum_spanning_tree
-from dataeval.utils._shared import flatten
 
 
 @numba.njit(parallel=True, locals={"i": numba.types.int32})
@@ -74,7 +74,7 @@ class ClusterData:
     k_distances: NDArray[np.double]
 
 
-def get_clusters(data: ArrayLike) -> ClusterData:
+def cluster(data: ArrayLike) -> ClusterData:
     single_cluster = False
     cluster_selection_epsilon = 0.0
     # cluster_selection_method = "eom"

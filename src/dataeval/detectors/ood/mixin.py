@@ -8,10 +8,11 @@ from abc import ABC, abstractmethod
 from typing import Callable, Generic, Literal, TypeVar
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 
-from dataeval._interop import as_numpy, to_numpy
 from dataeval._output import set_metadata
+from dataeval.typing import ArrayLike
+from dataeval.utils._array import as_numpy, to_numpy
 
 TGMMParams = TypeVar("TGMMParams")
 

@@ -8,10 +8,10 @@ from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, TypeVar
 
 import numpy as np
-from numpy.typing import ArrayLike
 
-from dataeval._interop import as_numpy
 from dataeval._output import Output, set_metadata
+from dataeval.typing import ArrayLike
+from dataeval.utils._array import as_numpy
 
 with contextlib.suppress(ImportError):
     import pandas as pd

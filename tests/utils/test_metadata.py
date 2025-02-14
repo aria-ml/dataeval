@@ -1,6 +1,6 @@
 import pytest
 
-from dataeval.utils.metadata import flatten, merge
+from dataeval.utils.metadata import _simplify_type, flatten, merge
 
 
 @pytest.mark.required
@@ -445,3 +445,20 @@ class TestUtilsMetadata:
     def test_merge_no_dropped_warns(self):
         with pytest.warns(UserWarning, match=r"Metadata entries were dropped"):
             merge(self.inconsistent_keys, return_dropped=False)
+
+
+@pytest.mark.required
+class TestCastSimplify:
+    @pytest.mark.parametrize(
+        "value, output",
+        (
+            ("123", 123),
+            ("12.3", 12.3),
+            ("foo", "foo"),
+            ([123, "12.3"], [123.0, 12.3]),
+            ([123, "foo"], ["123", "foo"]),
+            (["123", "456"], [123, 456]),
+        ),
+    )
+    def test_convert_type(self, value, output):
+        assert output == _simplify_type(value)

@@ -2,32 +2,53 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Any, Iterable, Sequence, TypeVar
+from typing import Any, Iterable, Sequence, TypeVar, overload
 
 import numpy as np
 import torch
+from numpy.typing import NDArray
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+import dataeval.utils._targets as targets
+import dataeval.utils.data.datasets._types as dataset_types
 from dataeval.config import get_device
-from dataeval.utils._targets import Targets
-from dataeval.utils.data.datasets._types import (
-    ImageClassificationDataset,
-    ObjectDetectionDataset,
-    ObjectDetectionTarget,
-    TArrayLike,
-)
+from dataeval.utils.data.datasets._types import ObjectDetectionTarget
 from dataeval.utils.torch.models import SupportsEncode
+
+# Type aliasing for documentation of overloaded signatures
+TArray = TypeVar("TArray", Sequence[Any], NDArray[Any], torch.Tensor)
+ImageClassificationDataset = dataset_types.ImageClassificationDataset
+ObjectDetectionDataset = dataset_types.ObjectDetectionDataset
+Targets = targets.Targets
+
+
+@overload
+def collate(
+    dataset: ImageClassificationDataset[TArray] | ObjectDetectionDataset[TArray],
+    model: torch.nn.Module,
+    device: torch.device | str | None = None,
+    batch_size: int = 64,
+) -> tuple[torch.Tensor, Targets, list[dict[str, Any]]]: ...
+
+
+@overload
+def collate(
+    dataset: ImageClassificationDataset[TArray] | ObjectDetectionDataset[TArray],
+    model: None = None,
+    device: torch.device | str | None = None,
+    batch_size: int = 64,
+) -> tuple[list[TArray], Targets, list[dict[str, Any]]]: ...
 
 
 # Reduce overhead cost by not tracking tensor gradients
 @torch.no_grad
 def collate(
-    dataset: ImageClassificationDataset[TArrayLike] | ObjectDetectionDataset[TArrayLike],
+    dataset: ImageClassificationDataset[TArray] | ObjectDetectionDataset[TArray],
     model: torch.nn.Module | None = None,
     device: torch.device | str | None = None,
     batch_size: int = 64,
-) -> tuple[torch.Tensor, Targets, list[dict[str, Any]]] | tuple[list[TArrayLike], Targets, list[dict[str, Any]]]:
+) -> tuple[torch.Tensor, Targets, list[dict[str, Any]]] | tuple[list[TArray], Targets, list[dict[str, Any]]]:
     """
     Collates a dataset to images/embeddings, targets and metadata.
 

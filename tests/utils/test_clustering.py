@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.utils._clusterer import get_clusters
+from dataeval.utils._clusterer import cluster
 
 
 @pytest.mark.required
@@ -25,7 +25,7 @@ class TestMatrixOps:
         test_sets = (rand_arr, dup_arr)
 
         for test_set in test_sets:
-            c = get_clusters(test_set)
+            c = cluster(test_set)
 
             # Distance matrix
             assert not np.any(np.isnan(c.k_distances))  # Should contain no NaN
@@ -56,9 +56,9 @@ class TestClustererValidate:
     )
     def test_invalid(self, data, error, error_msg):
         with pytest.raises(error) as e:
-            get_clusters(data)
+            cluster(data)
         assert e.value.args[0] == error_msg
 
     def test_valid(self):
         data = np.ones((2, 1, 2, 3, 4))
-        get_clusters(data.reshape((2, -1)))
+        cluster(data.reshape((2, -1)))

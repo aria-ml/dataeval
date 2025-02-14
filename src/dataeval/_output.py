@@ -32,9 +32,23 @@ class Output:
         return f"{self.__class__.__name__}: {str(self.dict())}"
 
     def dict(self) -> dict[str, Any]:
+        """
+        Output attributes as a dictionary.
+
+        Returns
+        -------
+        dict[str, Any]
+        """
         return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
 
     def meta(self) -> dict[str, Any]:
+        """
+        Execution metadata as a dictionary.
+
+        Returns
+        -------
+        dict[str, Any]
+        """
         return {k.removeprefix("_"): v for k, v in self.__dict__.items() if k.startswith("_")}
 
 
