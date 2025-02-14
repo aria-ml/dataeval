@@ -8,12 +8,12 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 from scipy.spatial.distance import pdist, squareform
 
-from dataeval._interop import to_numpy
 from dataeval._output import Output, set_metadata
-from dataeval.utils._shared import flatten
+from dataeval.typing import ArrayLike
+from dataeval.utils._array import ensure_embeddings, flatten, to_numpy
 
 with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure
@@ -129,8 +129,8 @@ def coverage(
     Parameters
     ----------
     embeddings : ArrayLike, shape - (N, P)
-        A dataset in an ArrayLike format.
-        Function expects the data to have 2 dimensions, N number of observations in a P-dimesionial space.
+        Dataset embeddings as unit interval [0, 1].
+        Function expects the data to have 2 dimensions, N number of observations in a P-dimensional space.
     radius_type : {"adaptive", "naive"}, default "adaptive"
         The function used to determine radius.
     num_observations : int, default 20
@@ -147,7 +147,7 @@ def coverage(
     Raises
     ------
     ValueError
-        If embeddings are not on the unit interval [0-1]
+        If embeddings are not unit interval [0-1]
     ValueError
         If length of :term:`embeddings<Embeddings>` is less than or equal to num_observations
     ValueError
@@ -173,9 +173,7 @@ def coverage(
     """
 
     # Calculate distance matrix, look at the (num_observations + 1)th farthest neighbor for each image.
-    embeddings = to_numpy(embeddings)
-    if np.min(embeddings) < 0 or np.max(embeddings) > 1:
-        raise ValueError("Embeddings must be on the unit interval [0-1].")
+    embeddings = ensure_embeddings(embeddings, dtype=np.float64, unit_interval=True)
     len_embeddings = len(embeddings)
     if len_embeddings <= num_observations:
         raise ValueError(

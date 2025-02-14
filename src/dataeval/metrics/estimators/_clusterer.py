@@ -5,11 +5,12 @@ __all__ = []
 from dataclasses import dataclass
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 
-from dataeval._interop import as_numpy
 from dataeval._output import Output
-from dataeval.utils._clusterer import compare_links_to_cluster_std, get_clusters, sorted_union_find
+from dataeval.typing import ArrayLike
+from dataeval.utils._array import as_numpy
+from dataeval.utils._clusterer import cluster, compare_links_to_cluster_std, sorted_union_find
 
 
 @dataclass(frozen=True)
@@ -94,5 +95,5 @@ def clusterer(data: ArrayLike) -> ClustererOutput:
             4,  2,  0,  0,  1,  2,  0,  1,  3,  0,  3,  3,  4,  0,  0,  3,  0,
             3, -1,  0,  0,  2,  4,  3,  4,  0,  1,  0, -1,  3,  0,  0,  0])
     """
-    c = get_clusters(data)
+    c = cluster(data)
     return ClustererOutput(c.clusters, c.mst, c.linkage_tree, as_numpy(c.condensed_tree), c.membership_strengths)

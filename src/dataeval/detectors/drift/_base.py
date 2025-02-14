@@ -14,13 +14,14 @@ import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Callable, Literal, Sized, TypeVar
+from typing import Any, Callable, Literal, TypeVar
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 
-from dataeval._interop import as_numpy, to_numpy
 from dataeval._output import Output, set_metadata
+from dataeval.typing import Array, ArrayLike
+from dataeval.utils._array import as_numpy, to_numpy
 
 R = TypeVar("R")
 
@@ -202,7 +203,7 @@ class BaseDrift:
         self.update_x_ref = update_x_ref
         self.preprocess_fn = preprocess_fn
         self.correction = correction
-        self.n: int = len(x_ref) if isinstance(x_ref, Sized) else len(as_numpy(x_ref))
+        self.n: int = len(x_ref)
 
         # Ref counter for preprocessed x
         self._x_refcount = 0
@@ -321,13 +322,14 @@ class BaseDriftUnivariate(BaseDrift):
         # lazy process n_features as needed
         if not isinstance(self._n_features, int):
             # compute number of features for the univariate tests
-            x_ref_np = (
-                as_numpy(self.x_ref)
-                if not isinstance(self.preprocess_fn, Callable) or self.x_ref_preprocessed
-                else as_numpy(self.preprocess_fn(as_numpy(self._x_ref)[0:1]))
+            x_ref = (
+                self.x_ref
+                if self.preprocess_fn is None or self.x_ref_preprocessed
+                else self.preprocess_fn(self._x_ref[0:1])
             )
             # infer features from preprocessed reference data
-            self._n_features = int(math.prod(x_ref_np.shape[1:]))  # Multiplies all channel sizes after first
+            shape = x_ref.shape if isinstance(x_ref, Array) else as_numpy(x_ref).shape
+            self._n_features = int(math.prod(shape[1:]))  # Multiplies all channel sizes after first
 
         return self._n_features
 

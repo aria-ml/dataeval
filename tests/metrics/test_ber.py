@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.metrics.estimators._ber import BEROutput, ber, ber_knn, ber_mst, knn_lowerbound
+from dataeval.metrics.estimators._ber import BEROutput, ber, ber_knn, ber_mst, get_classes_counts, knn_lowerbound
 
 
 @pytest.mark.required
@@ -20,9 +20,9 @@ class TestFunctionalBER:
         """Methods correctly calculate BER with given params"""
         rng = np.random.default_rng(3)
         labels = np.concatenate([rng.choice(10, 500), np.arange(10).repeat(50)])
-        data = np.ones((1000, 28, 28)) * labels[:, np.newaxis, np.newaxis]
-        data[:, 13:16, 13:16] += 1
-        data[-200:, 13:16, 13:16] += rng.choice(5)
+        data = np.ones((1000, 784)) * labels[:, np.newaxis]
+        data[:, 13:16] += 1
+        data[-200:, 13:16] += rng.choice(5)
         result = ber(data, labels, k, method=method) if k else ber(data, labels, method=method)
         assert (result.ber, result.ber_lower) == expected
 
@@ -73,3 +73,13 @@ class TestAPIBER:
     def test_ber_output_format(self):
         result = BEROutput(0.8, 0.2)
         assert result.dict() == {"ber": 0.8, "ber_lower": 0.2}
+
+    def test_ber_high_dim_data_valueerror(self):
+        """High dimensional data should raise valueerror"""
+        embs = np.random.random(size=(100, 16, 16))
+        with pytest.raises(ValueError):
+            ber(embs, embs)
+
+    def test_class_min(self):
+        with pytest.raises(ValueError):
+            get_classes_counts(np.ones(1, dtype=np.int_))

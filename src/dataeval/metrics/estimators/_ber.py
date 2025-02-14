@@ -16,13 +16,15 @@ from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 from scipy.sparse import coo_matrix
 from scipy.stats import mode
 
-from dataeval._interop import as_numpy
 from dataeval._output import Output, set_metadata
-from dataeval.utils._shared import compute_neighbors, get_classes_counts, get_method, minimum_spanning_tree
+from dataeval.typing import ArrayLike
+from dataeval.utils._array import as_numpy, ensure_embeddings
+from dataeval.utils._method import get_method
+from dataeval.utils._mst import compute_neighbors, minimum_spanning_tree
 
 
 @dataclass(frozen=True)
@@ -116,18 +118,21 @@ def knn_lowerbound(value: float, classes: int, k: int) -> float:
     return ((classes - 1) / classes) * (1 - np.sqrt(max(0, 1 - ((classes / (classes - 1)) * value))))
 
 
+_BER_FN_MAP = {"KNN": ber_knn, "MST": ber_mst}
+
+
 @set_metadata
-def ber(images: ArrayLike, labels: ArrayLike, k: int = 1, method: Literal["KNN", "MST"] = "KNN") -> BEROutput:
+def ber(embeddings: ArrayLike, labels: ArrayLike, k: int = 1, method: Literal["KNN", "MST"] = "KNN") -> BEROutput:
     """
     An estimator for Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` \
     using FR or KNN test statistic basis.
 
     Parameters
     ----------
-    images : ArrayLike (N, ... )
-        Array of images or image :term:`embeddings<Embeddings>`
+    embeddings : ArrayLike (N, ... )
+        Array of image :term:`embeddings<Embeddings>`
     labels : ArrayLike (N, 1)
-        Array of labels for each image or image embedding
+        Array of labels for each image
     k : int, default 1
         Number of nearest neighbors for KNN estimator -- ignored by MST estimator
     method : Literal["KNN", "MST"], default "KNN"
@@ -152,8 +157,34 @@ def ber(images: ArrayLike, labels: ArrayLike, k: int = 1, method: Literal["KNN",
     >>> ber(images, labels)
     BEROutput(ber=0.04, ber_lower=0.020416847668728033)
     """
-    ber_fn = get_method({"KNN": ber_knn, "MST": ber_mst}, method)
-    X = as_numpy(images)
+    ber_fn = get_method(_BER_FN_MAP, method)
+    X = ensure_embeddings(embeddings, dtype=np.float64)
     y = as_numpy(labels)
     upper, lower = ber_fn(X, y, k)
     return BEROutput(upper, lower)
+
+
+def get_classes_counts(labels: NDArray[np.int_]) -> tuple[int, int]:
+    """
+    Returns the classes and counts of from an array of labels
+
+    Parameters
+    ----------
+    label : NDArray
+        Numpy labels array
+
+    Returns
+    -------
+        Classes and counts
+
+    Raises
+    ------
+    ValueError
+        If the number of unique classes is less than 2
+    """
+    classes, counts = np.unique(labels, return_counts=True)
+    M = len(classes)
+    if M < 2:
+        raise ValueError("Label vector contains less than 2 classes!")
+    N = int(np.sum(counts))
+    return M, N

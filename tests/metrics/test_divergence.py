@@ -22,6 +22,7 @@ class TestDivergence:
         covariates = np.ones((1000, 28, 28)) * labels[:, np.newaxis, np.newaxis]
         covariates[:, 13:16, 13:16] += 1
         covariates[-200:, 13:16, 13:16] += rng.choice(5)
+        covariates /= covariates.max()
         inds = np.array([x % 2 == 0 for x in labels])
         rev_inds = np.invert(inds)
         even = covariates[inds, :, :]

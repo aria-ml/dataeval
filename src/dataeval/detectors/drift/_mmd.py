@@ -14,12 +14,12 @@ from dataclasses import dataclass
 from typing import Callable
 
 import torch
-from numpy.typing import ArrayLike
 
 from dataeval._output import set_metadata
 from dataeval.config import get_device
 from dataeval.detectors.drift._base import BaseDrift, DriftBaseOutput, UpdateStrategy, preprocess_x, update_x_ref
 from dataeval.detectors.drift._torch import GaussianRBF, mmd2_from_kernel_matrix
+from dataeval.typing import ArrayLike
 
 
 @dataclass(frozen=True)
@@ -162,9 +162,9 @@ class DriftMMD(BaseDrift):
             and MMD^2 threshold above which :term:`drift<Drift>` is flagged
         """
         x_ref = torch.as_tensor(self.x_ref, device=self.device)
-        x = torch.as_tensor(x, device=self.device)
-        n = x.shape[0]
-        kernel_mat = self._kernel_matrix(x_ref, x)
+        x_test = torch.as_tensor(x, device=self.device)
+        n = x_test.shape[0]
+        kernel_mat = self._kernel_matrix(x_ref, x_test)
         kernel_mat = kernel_mat - torch.diag(kernel_mat.diag())  # zero diagonal
         mmd2 = mmd2_from_kernel_matrix(kernel_mat, n, permute=False, zero_diag=False)
         mmd2_permuted = torch.tensor(

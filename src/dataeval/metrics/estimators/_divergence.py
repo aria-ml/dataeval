@@ -11,11 +11,13 @@ from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 
-from dataeval._interop import as_numpy
 from dataeval._output import Output, set_metadata
-from dataeval.utils._shared import compute_neighbors, get_method, minimum_spanning_tree
+from dataeval.typing import ArrayLike
+from dataeval.utils._array import ensure_embeddings
+from dataeval.utils._method import get_method
+from dataeval.utils._mst import compute_neighbors, minimum_spanning_tree
 
 
 @dataclass(frozen=True)
@@ -78,18 +80,21 @@ def divergence_fnn(data: NDArray[np.float64], labels: NDArray[np.int_]) -> int:
     return errors
 
 
+_DIVERGENCE_FN_MAP = {"FNN": divergence_fnn, "MST": divergence_mst}
+
+
 @set_metadata
-def divergence(data_a: ArrayLike, data_b: ArrayLike, method: Literal["FNN", "MST"] = "FNN") -> DivergenceOutput:
+def divergence(emb_a: ArrayLike, emb_b: ArrayLike, method: Literal["FNN", "MST"] = "FNN") -> DivergenceOutput:
     """
     Calculates the :term:`divergence` and any errors between the datasets.
 
     Parameters
     ----------
-    data_a : ArrayLike, shape - (N, P)
-        A dataset in an ArrayLike format to compare.
+    emb_a : ArrayLike, shape - (N, P)
+        Image embeddings in an ArrayLike format to compare.
         Function expects the data to have 2 dimensions, N number of observations in a P-dimensionial space.
-    data_b : ArrayLike, shape - (N, P)
-        A dataset in an ArrayLike format to compare.
+    emb_b : ArrayLike, shape - (N, P)
+        Image embeddings in an ArrayLike format to compare.
         Function expects the data to have 2 dimensions, N number of observations in a P-dimensionial space.
     method : Literal["MST, "FNN"], default "FNN"
         Method used to estimate dataset :term:`divergence<Divergence>`
@@ -125,9 +130,9 @@ def divergence(data_a: ArrayLike, data_b: ArrayLike, method: Literal["FNN", "MST
     >>> divergence(datasetA, datasetB)
     DivergenceOutput(divergence=0.28, errors=36)
     """
-    div_fn = get_method({"FNN": divergence_fnn, "MST": divergence_mst}, method)
-    a = as_numpy(data_a)
-    b = as_numpy(data_b)
+    div_fn = get_method(_DIVERGENCE_FN_MAP, method)
+    a = ensure_embeddings(emb_a, dtype=np.float64)
+    b = ensure_embeddings(emb_b, dtype=np.float64)
     N = a.shape[0]
     M = b.shape[0]
 

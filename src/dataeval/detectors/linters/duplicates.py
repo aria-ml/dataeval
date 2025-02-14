@@ -5,12 +5,12 @@ __all__ = []
 from dataclasses import dataclass
 from typing import Any, Generic, Iterable, Sequence, TypeVar, overload
 
-from numpy.typing import ArrayLike
 from torch.utils.data import Dataset
 
 from dataeval._output import Output, set_metadata
 from dataeval.metrics.stats._base import combine_stats, get_dataset_step_from_idx
 from dataeval.metrics.stats._hashstats import HashStatsOutput, hashstats
+from dataeval.typing import ArrayLike
 
 DuplicateGroup = list[int]
 DatasetDuplicateGroupMap = dict[int, DuplicateGroup]

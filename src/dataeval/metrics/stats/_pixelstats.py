@@ -6,11 +6,12 @@ from dataclasses import dataclass
 from typing import Any, Callable, Iterable
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 from scipy.stats import entropy, kurtosis, skew
 
 from dataeval._output import set_metadata
 from dataeval.metrics.stats._base import BaseStatsOutput, HistogramPlotMixin, StatsProcessor, run_stats
+from dataeval.typing import ArrayLike
 
 
 @dataclass(frozen=True)
