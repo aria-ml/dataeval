@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 from scipy.signal import convolve2d
 
 EDGE_KERNEL = np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]], dtype=np.int8)
@@ -61,7 +61,7 @@ def normalize_image_shape(image: NDArray[Any]) -> NDArray[Any]:
         raise ValueError("Images must have 2 or more dimensions.")
 
 
-def edge_filter(image: ArrayLike, offset: float = 0.5) -> NDArray[np.uint8]:
+def edge_filter(image: NDArray[Any], offset: float = 0.5) -> NDArray[np.uint8]:
     """
     Returns the image filtered using a 3x3 edge detection kernel:
     [[ -1, -1, -1 ],

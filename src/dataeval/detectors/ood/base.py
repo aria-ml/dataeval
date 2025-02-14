@@ -13,11 +13,11 @@ __all__ = []
 from typing import Callable, cast
 
 import torch
-from numpy.typing import ArrayLike
 
-from dataeval._interop import to_numpy
 from dataeval.config import get_device
 from dataeval.detectors.ood.mixin import OODBaseMixin, OODFitMixin, OODGMMMixin
+from dataeval.typing import ArrayLike
+from dataeval.utils._array import to_numpy
 from dataeval.utils.torch._gmm import GaussianMixtureModelParams, gmm_params
 from dataeval.utils.torch._internal import trainer
 

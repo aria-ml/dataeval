@@ -13,11 +13,12 @@ from typing import Any, Callable, Generic, Iterable, Optional, Sequence, Sized, 
 
 import numpy as np
 import tqdm
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 
-from dataeval._interop import to_numpy_iter
 from dataeval._output import Output
 from dataeval.config import get_max_processes
+from dataeval.typing import ArrayLike
+from dataeval.utils._array import to_numpy_iter
 from dataeval.utils._image import normalize_image_shape, rescale
 from dataeval.utils._plot import histogram_plot
 

@@ -9,7 +9,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.stats import wasserstein_distance as wd
 
-from dataeval.utils._clusterer import get_clusters
+from dataeval.utils._clusterer import cluster
 
 DISCRETE_MIN_WD = 0.054
 CONTINUOUS_MIN_SAMPLE_SIZE = 20
@@ -156,7 +156,7 @@ def bin_by_clusters(data: NDArray[np.number[Any]]) -> NDArray[np.float64]:
     """
     # Create initial clusters
 
-    c = get_clusters(data)
+    c = cluster(data)
 
     # Create bins from clusters
     bin_edges = np.zeros(c.clusters.max() + 2)
@@ -190,8 +190,8 @@ def bin_by_clusters(data: NDArray[np.number[Any]]) -> NDArray[np.float64]:
             extend_bins.append(min2add)
         else:
             if min2add < data[nnbr]:
-                cluster = c.clusters[nnbr]
-                bin_edges[cluster] = min2add
+                clusters = c.clusters[nnbr]
+                bin_edges[clusters] = min2add
     if extend_bins:
         bin_edges = np.concatenate([bin_edges, extend_bins])
 

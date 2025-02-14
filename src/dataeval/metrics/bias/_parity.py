@@ -8,12 +8,13 @@ from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 from scipy.stats import chisquare
 from scipy.stats.contingency import chi2_contingency, crosstab
 
-from dataeval._interop import as_numpy, to_numpy
 from dataeval._output import Output, set_metadata
+from dataeval.typing import ArrayLike
+from dataeval.utils._array import as_numpy
 from dataeval.utils.metadata import Metadata
 
 with contextlib.suppress(ImportError):
@@ -134,7 +135,7 @@ def validate_dist(label_dist: NDArray[Any], label_name: str) -> None:
         raise ValueError(f"No labels found in the {label_name} dataset")
     if np.any(label_dist < 5):
         warnings.warn(
-            f"Labels {np.where(label_dist<5)[0]} in {label_name}"
+            f"Labels {np.where(label_dist < 5)[0]} in {label_name}"
             " dataset have frequencies less than 5. This may lead"
             " to invalid chi-squared evaluation.",
             UserWarning,
@@ -204,8 +205,8 @@ def label_parity(
         num_classes = 0
 
     # Calculate the class frequencies associated with the datasets
-    observed_dist = np.bincount(to_numpy(observed_labels), minlength=num_classes)
-    expected_dist = np.bincount(to_numpy(expected_labels), minlength=num_classes)
+    observed_dist = np.bincount(as_numpy(observed_labels), minlength=num_classes)
+    expected_dist = np.bincount(as_numpy(expected_labels), minlength=num_classes)
 
     # Validate
     validate_dist(observed_dist, "observed")

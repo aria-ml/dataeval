@@ -3,15 +3,11 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from dataeval.utils._shared import compute_neighbors, get_classes_counts, minimum_spanning_tree
+from dataeval.utils._mst import compute_neighbors, minimum_spanning_tree
 
 
 @pytest.mark.required
-class TestSharedUtils:
-    def test_class_min(self):
-        with pytest.raises(ValueError):
-            get_classes_counts(np.ones(1, dtype=np.int_))
-
+class TestMst:
     def test_mst(self):
         images = np.ones((10, 3, 3))
         assert minimum_spanning_tree(images).shape == (10, 10)

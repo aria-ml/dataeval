@@ -9,13 +9,13 @@ from typing import Callable, Iterable
 
 import numpy as np
 import xxhash as xxh
-from numpy.typing import ArrayLike
 from PIL import Image
 from scipy.fftpack import dct
 
-from dataeval._interop import as_numpy
 from dataeval._output import set_metadata
 from dataeval.metrics.stats._base import BaseStatsOutput, StatsProcessor, run_stats
+from dataeval.typing import ArrayLike
+from dataeval.utils._array import as_numpy
 from dataeval.utils._image import normalize_image_shape, rescale
 
 HASH_SIZE = 8
