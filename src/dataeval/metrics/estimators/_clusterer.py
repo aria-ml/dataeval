@@ -94,6 +94,5 @@ def clusterer(data: ArrayLike) -> ClustererOutput:
             4,  2,  0,  0,  1,  2,  0,  1,  3,  0,  3,  3,  4,  0,  0,  3,  0,
             3, -1,  0,  0,  2,  4,  3,  4,  0,  1,  0, -1,  3,  0,  0,  0])
     """
-    clusters, mst, linkage_tree, condensed_tree, membership_strengths, _, _ = get_clusters(data)
-
-    return ClustererOutput(clusters, mst, linkage_tree, as_numpy(condensed_tree), membership_strengths)
+    c = get_clusters(data)
+    return ClustererOutput(c.clusters, c.mst, c.linkage_tree, as_numpy(c.condensed_tree), c.membership_strengths)

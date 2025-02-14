@@ -505,23 +505,22 @@ def split_dataset(
         if is_groupable(possible_groups, group_partitions):
             groups = possible_groups
 
-    test_indices: NDArray[np.intp]
     index = np.arange(label_length)
 
-    tv_indices, test_indices = (
+    tvs = (
         single_split(index=index, labels=labels, split_frac=test_frac, groups=groups, stratified=stratify)
         if test_frac
-        else (index, np.array([], dtype=np.intp))
+        else TrainValSplit(index, np.array([], dtype=np.intp))
     )
 
-    tv_labels = labels[tv_indices]
-    tv_groups = groups[tv_indices] if groups is not None else None
+    tv_labels = labels[tvs.train]
+    tv_groups = groups[tvs.train] if groups is not None else None
 
     if num_folds == 1:
-        tv_splits = [single_split(tv_indices, tv_labels, val_frac, tv_groups, stratify)]
+        tv_splits = [single_split(tvs.train, tv_labels, val_frac, tv_groups, stratify)]
     else:
-        tv_splits = make_splits(tv_indices, tv_labels, num_folds, tv_groups, stratify)
+        tv_splits = make_splits(tvs.train, tv_labels, num_folds, tv_groups, stratify)
 
-    folds: list[TrainValSplit] = [TrainValSplit(tv_indices[split.train], tv_indices[split.val]) for split in tv_splits]
+    folds: list[TrainValSplit] = [TrainValSplit(tvs.train[split.train], tvs.train[split.val]) for split in tv_splits]
 
-    return SplitDatasetOutput(test_indices, folds)
+    return SplitDatasetOutput(tvs.val, folds)

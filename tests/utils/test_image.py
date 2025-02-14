@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.utils._image import edge_filter, get_bitdepth, normalize_image_shape, rescale
+from dataeval.utils._image import BitDepth, edge_filter, get_bitdepth, normalize_image_shape, rescale
 
 
 @pytest.mark.required
@@ -9,27 +9,27 @@ class TestImageUtils:
     def test_get_bitdepth_negatives(self):
         image = np.random.random((3, 28, 28)) - 0.5
         bitdepth = get_bitdepth(image)
-        assert bitdepth == (0, np.min(image), np.max(image))
+        assert bitdepth == BitDepth(0, np.min(image), np.max(image))  # type: ignore
 
     def test_get_bitdepth_float(self):
         image = np.random.random((3, 28, 28))
         bitdepth = get_bitdepth(image)
-        assert bitdepth == (1, 0, 1)
+        assert bitdepth == BitDepth(1, 0, 1)
 
     def test_get_bitdepth_8bit(self):
         image = (np.random.random((3, 28, 28)) * (2**8 - 1)).astype(np.uint8)
         bitdepth = get_bitdepth(image)
-        assert bitdepth == (8, 0, (2**8 - 1))
+        assert bitdepth == BitDepth(8, 0, (2**8 - 1))
 
     def test_get_bitdepth_16bit(self):
         image = (np.random.random((3, 28, 28)) * (2**16 - 1)).astype(np.uint16)
         bitdepth = get_bitdepth(image)
-        assert bitdepth == (16, 0, (2**16 - 1))
+        assert bitdepth == BitDepth(16, 0, (2**16 - 1))
 
     def test_get_bitdepth_64bit(self):
         image = (np.random.random((3, 28, 28)) * (2**64 - 1)).astype(np.uint64)
         bitdepth = get_bitdepth(image)
-        assert bitdepth == (32, 0, (2**32 - 1))
+        assert bitdepth == BitDepth(32, 0, (2**32 - 1))
 
     def test_rescale_noop(self):
         image = np.random.random((3, 28, 28))
