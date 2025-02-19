@@ -1,6 +1,17 @@
-[//]: # (9a420f7d907bcc82e2967a88da13ea79dd06c8f1)
+[//]: # (d9e0f8b0a95b7bcef9cb0ddbe831db9ae5defdb1)
 
 # DataEval Change Log
+
+## v0.78.0
+
+🌟 **Feature Release**
+- `bff82522` - Add collate function and convert packaged datasets to MAITE protocols
+
+    * Changes all dataset utility classes to use `MAITE` protocol formats (`MNIST`, `CIFAR10`, and `VOCDetection`)
+    * Addes `collate` to aggregate (and encode) `MAITE`datasets into images/embeddings, targets, and metadata
+
+🛠️ **Improvements and Enhancements**
+- `d9e0f8b0` - Enforce embeddings on functions/methods that take embedding inputs
 
 ## v0.77.1
 
