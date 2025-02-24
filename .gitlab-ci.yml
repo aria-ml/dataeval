@@ -220,7 +220,7 @@ docs:
   tags:
     - $DOCS_RUNNER_TAG
   script:
-    - ./build --push --gpu $DOCS_CLEAN
+    - ./docs/docker_build --push --gpu $DOCS_CLEAN
   artifacts:
     paths:
       - output/docs/.jupyter_cache/

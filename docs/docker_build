@@ -17,6 +17,13 @@ EOF
 exit $1
 }
 
+if [[ $PWD == */dataeval/docs ]]; then
+    restore_dir=1
+    pushd ..
+else
+    restore_dir=0
+fi
+
 options=$(getopt -l "help,quiet,clean,gpu,push" -o "hq" -n "build" -- "$@")
 eval set -- "$options"
 while true; do
@@ -166,3 +173,7 @@ fi
 
 build_image docs
 run_image docs
+
+if [[ $restore_dir ]]; then
+    popd
+fi
