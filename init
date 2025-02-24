@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo -e "\033[1;31mPlease wait for this script to complete before allowing vscode to Reload Window!\033[0m"
+echo -e "\033[1;31mPlease ensure this script runs to completion!\033[0m"
 echo
 
 # Check for uv
@@ -38,8 +38,8 @@ fi
 echo -n ${versions[*]} | xargs -n1 bash -c '\
     echo "Creating python virtual environment for $0..." && \
     rm -rf .venv-$0 && \
-    uv venv --seed --python $0 .venv-$0 --link-mode copy && \
-    uv pip install --python .venv-$0 --index-strategy unsafe-best-match --link-mode copy --no-deps \
+    uv venv --seed --python $0 .venv-$0 --link-mode symlink && \
+    uv pip install --python .venv-$0 --index-strategy unsafe-best-match --link-mode symlink --no-deps \
         -e . \
         -r environment/requirements.txt \
         -r environment/requirements-dev.txt'
@@ -48,5 +48,9 @@ echo -n ${versions[*]} | xargs -n1 bash -c '\
 echo
 
 echo
-echo -e '\033[1;37mIt is now safe to reload the window (\033[1;32mDeveloper: Reload Window\033[1;37m) and select a Python interpretor (\033[1;32mPython: Select Interpreter\033[1;37m) from the Command Palette.'
+if [[ -v $REMOTE_CONTAINERS ]]; then
+    echo -e '\033[1;37mActivate your desired virtual environment (e.g. \033[1;32msource .venv-'${versions[-1]}'/bin/activate\033[1;37m) before proceeding.'
+else
+    echo -e '\033[1;37mIt is now safe to reload the window (\033[1;32mDeveloper: Reload Window\033[1;37m) and select a Python interpreter (\033[1;32mPython: Select Interpreter\033[1;37m) from the Command Palette.'
+fi
 echo
