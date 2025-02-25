@@ -174,6 +174,6 @@ fi
 build_image docs
 run_image docs
 
-if [[ $restore_dir ]]; then
+if [[ $restore_dir == 1 ]]; then
     popd
 fi
