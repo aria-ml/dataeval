@@ -44,8 +44,6 @@ def outlier_data():
 class TestClusterer:
     """Tests all functions related to and including the `create_clusters` method"""
 
-    clusterer_output = clusterer(np.zeros((3, 1)))
-
     @pytest.mark.parametrize("data_func", ["functional_data", "duplicate_data", "outlier_data"])
     def test_create_clusters(self, data_func, request):
         """
