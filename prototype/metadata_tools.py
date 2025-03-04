@@ -14,7 +14,7 @@ from typing import Dict, List, Union, Mapping
 
 from dataeval.detectors.ood.metadata_ood_mi import get_metadata_ood_mi
 from dataeval.detectors.ood.metadata_ks_compare import meta_distribution_compare
-from dataeval.detectors.ood.metadata_least_likely import get_least_likely_features
+from dataeval.metadata.metadata_least_likely import get_least_likely_features
 
 import pytest
 
