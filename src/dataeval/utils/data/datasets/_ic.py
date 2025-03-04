@@ -168,15 +168,27 @@ def _download_dataset(url: str, file_path: Path, timeout: int = 60) -> None:
 
 
 def _zip_extraction(file_path, directory, verbose: bool = False):
-    """Single function to extract and then flatten if necessary"""
+    """
+    Single function to extract and then flatten if necessary.
+    Recursively extracts nested zip files as well.
+    Extracts and flattens all folders to the base directory.
+    """
     _extract_archive(file_path, directory, verbose)
+    # Look for nested zip files in the extraction directory and extract them recursively.
+    # Does NOT extract in place - extracts everything to directory
+    for child in directory.iterdir():
+        if child.suffix == ".zip":
+            if verbose:
+                print(f"Extracting nested zip: {child} to {directory}")
+            _extract_archive(child, directory, verbose)
+    # Determine if there are nested folders and remove them
+    # Helps ensure there that data is at most one folder below main directory
     _flatten_extraction(directory, verbose)
 
 
 def _extract_archive(file_path: Path, extract_to: Path, verbose: bool = False) -> None:
     """
     Extracts the zip file to the given directory.
-    Recursively extracts nested zip files as well.
     """
     try:
         with zipfile.ZipFile(file_path, "r") as zip_ref:
@@ -184,13 +196,6 @@ def _extract_archive(file_path: Path, extract_to: Path, verbose: bool = False) -
             file_path.unlink()
     except zipfile.BadZipFile:
         raise FileNotFoundError(f"{file_path.name} is not a valid zip file, skipping extraction.")
-
-    # Look for nested zip files in the extraction directory and extract them recursively.
-    for child in extract_to.iterdir():
-        if child.suffix == ".zip":
-            if verbose:
-                print(f"Extracting nested zip: {child}")
-            _extract_archive(child, extract_to, verbose)
 
 
 def _flatten_extraction(base_directory: Path, verbose: bool = False) -> None:
