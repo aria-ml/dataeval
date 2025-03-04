@@ -47,15 +47,18 @@ class Metadata(Output):
         Array of unique class names (for use with plotting)
     total_num_factors : int
         Sum of discrete_factor_names and continuous_factor_names plus 1 for class
+    image_indices : NDArray[np.int]
+        Array of the image index that is mapped by the index of the factor
     """
 
     discrete_factor_names: list[str]
     discrete_data: NDArray[np.int_]
     continuous_factor_names: list[str]
-    continuous_data: NDArray[np.int_ | np.double] | None
+    continuous_data: NDArray[np.int_ | np.double]
     class_labels: NDArray[np.int_]
     class_names: NDArray[Any]
     total_num_factors: int
+    image_indices: NDArray[np.int_]
 
 
 class DropReason(Enum):
@@ -485,8 +488,11 @@ def preprocess(
     if include is not None and exclude is not None:
         raise ValueError("Parameters `include` and `exclude` are mutually exclusive.")
 
-    # Determine if _image_index is given
-    image_indices = as_numpy(metadata[image_index_key]) if image_index_key in metadata else None
+    image_indices = None
+    # Get and remove _image_index if given
+    if image_index_key in metadata:
+        metadata = dict(metadata)
+        image_indices = as_numpy(metadata.pop(image_index_key))
 
     # Include specified metadata keys
     if include:
@@ -584,7 +590,7 @@ def preprocess(
     discrete_factor_names = list(discrete_metadata.keys())
     discrete_data = np.stack(list(discrete_metadata.values()), axis=-1)
     continuous_factor_names = list(continuous_metadata.keys())
-    continuous_data = np.stack(list(continuous_metadata.values()), axis=-1) if continuous_metadata else None
+    continuous_data = np.stack(list(continuous_metadata.values()), axis=-1) if continuous_metadata else np.array([])
     total_num_factors = len(discrete_factor_names + continuous_factor_names) + 1
 
     return Metadata(
@@ -595,4 +601,5 @@ def preprocess(
         numerical_labels,
         unique_classes,
         total_num_factors,
+        image_indices=image_indices,
     )
