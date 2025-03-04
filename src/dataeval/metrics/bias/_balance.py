@@ -234,7 +234,7 @@ def balance(
     mi = np.full((num_factors, num_factors), np.nan, dtype=np.float32)
     data = np.hstack((metadata.class_labels[:, np.newaxis], metadata.discrete_data))
     discretized_data = data
-    if metadata.continuous_data is not None:
+    if len(metadata.continuous_data):
         data = np.hstack((data, metadata.continuous_data))
         discrete_idx = [metadata.discrete_factor_names.index(name) for name in metadata.continuous_factor_names]
         discretized_data = np.hstack((discretized_data, metadata.discrete_data[:, discrete_idx]))
