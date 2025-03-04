@@ -94,8 +94,8 @@ class TestBaseICDatasetFile:
         assert _validate_file(dataset_no_zip, hash_value, use_md5)
 
     @pytest.mark.parametrize("verbose", [True, False])
-    def test_extract_archive_nested_zip(self, capsys, dataset_nested_zip, verbose):
-        _extract_archive(dataset_nested_zip, dataset_nested_zip.parent, verbose)
+    def test_zip_extraction_nested_zip(self, capsys, dataset_nested_zip, verbose):
+        _zip_extraction(dataset_nested_zip, dataset_nested_zip.parent, verbose)
         if verbose:
             captured = capsys.readouterr()
             assert "Extracting nested zip" in captured.out
