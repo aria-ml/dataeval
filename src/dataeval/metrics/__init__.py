@@ -5,4 +5,4 @@ can then be analyzed in the context of a given problem.
 
 __all__ = ["bias", "estimators", "stats"]
 
-from dataeval.metrics import bias, estimators, stats
+from . import bias, estimators, stats

@@ -2,12 +2,14 @@ import numpy as np
 import pytest
 import torch
 
-from dataeval.utils.data._collate import collate
+from dataeval.utils._targets import Targets
+from dataeval.utils.data._processor import DataProcessor
 from dataeval.utils.data.datasets._types import ObjectDetectionTarget
+from dataeval.utils.metadata import Metadata
 
 
 @pytest.mark.required
-class TestCollateDataset:
+class TestDataProcessor:
     """
     Test collate aggregates MAITE style data into separate collections from tuple return
     """
@@ -39,10 +41,9 @@ class TestCollateDataset:
 
         ds = ICDataset(data, labels)
 
-        result = collate(ds)  # type: ignore -> dont need to subclass from torch.utils.data.Dataset
+        dp = DataProcessor(ds, batch_size=64)  # type: ignore -> dont need to subclass from torch.utils.data.Dataset
 
-        assert isinstance(result, tuple)
-        assert len(result) == 3
+        assert len(ds) == len(dp.embeddings)
 
     @pytest.mark.parametrize(
         "data, labels, metadata",
@@ -76,10 +77,9 @@ class TestCollateDataset:
 
         ds = ODDataset(data, labels, metadata)
 
-        result = collate(ds)  # type: ignore -> dont need to subclass from torch.utils.data.Dataset
+        dp = DataProcessor(ds, batch_size=64)  # type: ignore -> dont need to subclass from torch.utils.data.Dataset
 
-        assert isinstance(result, tuple)
-        assert len(result) == 3
+        assert len(ds) == len(dp.embeddings)
 
     @pytest.mark.parametrize(
         "data, targets",
@@ -115,6 +115,16 @@ class TestCollateDataset:
             def encode(self, x):
                 return x
 
-        result = collate(TorchDataset(), model=IdentityModel())  # type: ignore
+        ds = TorchDataset()
 
-        assert len(result) == 3
+        dp = DataProcessor(ds, batch_size=64, model=IdentityModel(), device="cpu")  # type: ignore
+
+        assert len(ds) == len(dp.embeddings)
+        assert len(dp) == len(ds)
+
+        for i in range(len(ds)):
+            assert torch.allclose(dp.images[i], data[i])
+            assert torch.allclose(dp.embeddings[i], data[i])
+
+        assert isinstance(dp.targets, Targets)
+        assert isinstance(dp.metadata, Metadata)

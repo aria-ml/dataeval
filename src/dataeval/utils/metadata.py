@@ -10,13 +10,13 @@ __all__ = ["preprocess", "merge", "flatten"]
 import warnings
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Iterable, Literal, Mapping, overload
+from typing import Any, Iterable, Literal, Mapping, Sequence, overload
 
 import numpy as np
 from numpy.typing import NDArray
 
 from dataeval._output import Output, set_metadata
-from dataeval.typing import ArrayLike
+from dataeval.typing import Array, ArrayLike
 from dataeval.utils._array import as_numpy, to_numpy
 from dataeval.utils._bin import bin_data, digitize_data, is_continuous
 
@@ -300,6 +300,7 @@ def merge(
     ignore_lists: bool = False,
     fully_qualified: bool = False,
     return_numpy: bool = False,
+    targets_per_image: Sequence[int] | None = None,
     image_index_key: str = "_image_index",
 ) -> tuple[dict[str, list[Any]] | dict[str, NDArray[Any]], dict[str, list[str]]]: ...
 
@@ -311,6 +312,7 @@ def merge(
     ignore_lists: bool = False,
     fully_qualified: bool = False,
     return_numpy: bool = False,
+    targets_per_image: Sequence[int] | None = None,
     image_index_key: str = "_image_index",
 ) -> dict[str, list[Any]] | dict[str, NDArray[Any]]: ...
 
@@ -321,6 +323,7 @@ def merge(
     ignore_lists: bool = False,
     fully_qualified: bool = False,
     return_numpy: bool = False,
+    targets_per_image: Sequence[int] | None = None,
     image_index_key: str = "_image_index",
 ):
     """
@@ -344,6 +347,8 @@ def merge(
         Option to return dictionary keys full qualified instead of minimized
     return_numpy : bool, default False
         Option to return results as lists or NumPy arrays
+    targets_per_image : Sequence[int] or None, default None
+        Number of targets for each image metadata entry
     image_index_key : str, default "_image_index"
         User provided metadata key which maps the metadata entry to the source image.
 
@@ -383,15 +388,24 @@ def merge(
     else:
         dicts = list(metadata)
 
+    if targets_per_image is not None and len(dicts) != len(targets_per_image):
+        raise ValueError("Number of targets per image must be equal to number of metadata entries.")
+
     image_repeats = np.zeros(len(dicts), dtype=np.int_)
     dropped: dict[str, set[DropReason]] = {}
     for i, d in enumerate(dicts):
         flattened, image_repeats[i], dropped_inner = flatten(
-            d,
-            return_dropped=True,
-            ignore_lists=ignore_lists,
-            fully_qualified=fully_qualified,
+            d, return_dropped=True, ignore_lists=ignore_lists, fully_qualified=fully_qualified
         )
+        if targets_per_image is not None:
+            # check for mismatch in targets per image and force ignore_lists
+            if not ignore_lists and targets_per_image[i] != image_repeats[i]:
+                flattened, image_repeats[i], dropped_inner = flatten(
+                    d, return_dropped=True, ignore_lists=True, fully_qualified=fully_qualified
+                )
+            if targets_per_image[i] != image_repeats[i]:
+                flattened = {k: [v] * targets_per_image[i] for k, v in flattened.items()}
+            image_repeats[i] = targets_per_image[i]
         isect = isect.intersection(flattened.keys()) if isect else set(flattened.keys())
         union.update(flattened.keys())
         for k, v in dropped_inner.items():
@@ -440,7 +454,7 @@ def preprocess(
     auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
     exclude: Iterable[str] | None = None,
     include: Iterable[str] | None = None,
-    image_index_key: str = "_image_index",
+    image_index_key: ArrayLike | str = "_image_index",
 ) -> Metadata:
     """
     Restructures the metadata to be in the correct format for the bias functions.
@@ -473,7 +487,7 @@ def preprocess(
     include : Iterable[str] or None, default None
         User provided collection of metadata keys to include when processing metadata.
         Not to be used in conjunction with exclude.
-    image_index_key : str, default "_image_index"
+    image_index_key : ArrayLike or str, default "_image_index"
         User provided metadata key which maps the metadata entry to the source image.
 
     Returns
@@ -488,11 +502,14 @@ def preprocess(
     if include is not None and exclude is not None:
         raise ValueError("Parameters `include` and `exclude` are mutually exclusive.")
 
-    image_indices = None
-    # Get and remove _image_index if given
-    if image_index_key in metadata:
-        metadata = dict(metadata)
-        image_indices = as_numpy(metadata.pop(image_index_key))
+    # Determine if _image_index is given
+    image_indices = (
+        as_numpy(metadata[image_index_key])
+        if isinstance(image_index_key, str) and image_index_key in metadata
+        else as_numpy(image_index_key)
+        if isinstance(image_index_key, (Sequence, Array))
+        else None
+    )
 
     # Include specified metadata keys
     if include:
@@ -508,6 +525,10 @@ def preprocess(
         for k in exclude or ():
             metadata.pop(k, None)
             continuous_factor_bins.pop(k, None)
+
+    # Remove generated "_image_index" if present
+    if "_image_index" in metadata:
+        metadata.pop("_image_index", None)
 
     # Check that metadata is a single, flattened dictionary with uniform array lengths
     check_length = -1
@@ -567,7 +588,7 @@ def preprocess(
     remaining_keys = set(metadata.keys()) - set(continuous_metadata.keys())
     for key in remaining_keys:
         data = to_numpy(metadata[key])
-        if np.issubdtype(data.dtype, np.number):
+        if key != image_index_key and np.issubdtype(data.dtype, np.number):
             result = is_continuous(data, image_indices)
             if result:
                 continuous_metadata[key] = data
