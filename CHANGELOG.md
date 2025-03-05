@@ -1,6 +1,13 @@
-[//]: # (d9e0f8b0a95b7bcef9cb0ddbe831db9ae5defdb1)
+[//]: # (841425ff4d9c812f1df1dece1bf168c26c8ba70c)
 
 # DataEval Change Log
+
+## v0.79.0
+
+🌟 **Feature Release**
+- `841425ff` - Release Metadata OOD function most_deviated_factors
+
+    Adds a new explanatory function using Metadata and an OODOutput
 
 ## v0.78.0
 
