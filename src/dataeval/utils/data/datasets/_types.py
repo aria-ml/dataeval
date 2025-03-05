@@ -9,7 +9,7 @@ from typing import Any, Generic, TypeVar
 from torch.utils.data import Dataset
 
 TDatum = TypeVar("TDatum")
-TArrayLike = TypeVar("TArrayLike")
+TArray = TypeVar("TArray")
 
 
 class InfoMixin:
@@ -29,14 +29,14 @@ class SizedDataset(Dataset[TDatum], ABC):
     def __len__(self) -> int: ...
 
 
-class ImageClassificationDataset(SizedDataset[tuple[TArrayLike, TArrayLike, dict[str, Any]]]): ...
+class ImageClassificationDataset(SizedDataset[tuple[TArray, TArray, dict[str, Any]]]): ...
 
 
 @dataclass
-class ObjectDetectionTarget(Generic[TArrayLike]):
-    boxes: TArrayLike
-    labels: TArrayLike
-    scores: TArrayLike
+class ObjectDetectionTarget(Generic[TArray]):
+    boxes: TArray
+    labels: TArray
+    scores: TArray
 
 
-class ObjectDetectionDataset(SizedDataset[tuple[TArrayLike, ObjectDetectionTarget[TArrayLike], dict[str, Any]]]): ...
+class ObjectDetectionDataset(SizedDataset[tuple[TArray, ObjectDetectionTarget[TArray], dict[str, Any]]]): ...

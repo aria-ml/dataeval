@@ -4,7 +4,7 @@ Common type hints used for interoperability with DataEval.
 
 __all__ = ["Array", "ArrayLike"]
 
-from typing import Any, Protocol, Sequence, Union, runtime_checkable
+from typing import Any, Iterator, Protocol, Sequence, TypeVar, Union, runtime_checkable
 
 
 @runtime_checkable
@@ -39,8 +39,11 @@ class Array(Protocol):
     def shape(self) -> tuple[int, ...]: ...
     def __array__(self) -> Any: ...
     def __getitem__(self, key: Any, /) -> Any: ...
+    def __iter__(self) -> Iterator[Any]: ...
     def __len__(self) -> int: ...
 
+
+TArray = TypeVar("TArray", bound=Array)
 
 ArrayLike = Union[Sequence[Any], Array]
 """
