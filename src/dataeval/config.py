@@ -42,9 +42,7 @@ def get_device(override: str | device | int | None = None) -> torch.device:
     """
     if override is None:
         global _device
-        if _device is None:
-            _device = torch.device("cpu")
-        return _device
+        return torch.get_default_device() if _device is None else _device
     else:
         return torch.device(override)
 
