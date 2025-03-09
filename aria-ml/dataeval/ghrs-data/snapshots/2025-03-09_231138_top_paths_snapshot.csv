@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,54,34
+/aria-ml/dataeval/commits/main,7,1
+/aria-ml/dataeval/tree/main/docs/source,4,3
+/aria-ml/dataeval/tree/576546cda58fd32c9833bc3b1370314a9baa5658,4,1
+/aria-ml/dataeval/tree/main/src/dataeval,3,2
+/aria-ml/dataeval/tree/main/src/dataeval/utils,3,2
+/aria-ml/dataeval/blob/49101e0a8bedb09dae7e61b3262b75fd37ed947f/.gitlab/scripts/gitlab.py,3,1
+/aria-ml/dataeval/tree/576546cda58fd32c9833bc3b1370314a9baa5658/docs/source,3,1
+/aria-ml/dataeval/tree/main/src/dataeval/metrics,3,1
+/aria-ml/dataeval/tree/main/src/dataeval/metrics/estimators,3,1
