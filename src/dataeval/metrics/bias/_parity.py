@@ -15,7 +15,7 @@ from scipy.stats.contingency import chi2_contingency, crosstab
 from dataeval._output import Output, set_metadata
 from dataeval.typing import ArrayLike
 from dataeval.utils._array import as_numpy
-from dataeval.utils.metadata import Metadata
+from dataeval.utils.data import Metadata
 
 with contextlib.suppress(ImportError):
     import pandas as pd
@@ -24,26 +24,9 @@ TData = TypeVar("TData", np.float64, NDArray[np.float64])
 
 
 @dataclass(frozen=True)
-class ParityOutput(Generic[TData], Output):
-    """
-    Output class for :func:`.parity` and :func:`.label_parity` :term:`bias<Bias>` metrics.
-
-    Attributes
-    ----------
-    score : np.float64 | NDArray[np.float64]
-        chi-squared score(s) of the test
-    p_value : np.float64 | NDArray[np.float64]
-        p-value(s) of the test
-    metadata_names : list[str] | None
-        Names of each metadata factor
-    insufficient_data: dict
-        Dictionary of metadata factors with less than 5 class occurrences per value
-    """
-
+class BaseParityOutput(Generic[TData], Output):
     score: TData
     p_value: TData
-    metadata_names: list[str] | None
-    insufficient_data: dict[str, dict[int, dict[str, int]]]
 
     def to_dataframe(self) -> pd.DataFrame:
         """
@@ -56,12 +39,49 @@ class ParityOutput(Generic[TData], Output):
         import pandas as pd
 
         return pd.DataFrame(
-            index=self.metadata_names,  # type: ignore - list[str] is documented as acceptable index type
+            index=self.factor_names,  # type: ignore - list[str] is documented as acceptable index type
             data={
                 "score": self.score.round(2),
                 "p-value": self.p_value.round(2),
             },
         )
+
+
+@dataclass(frozen=True)
+class LabelParityOutput(BaseParityOutput[np.float64]):
+    """
+    Output class for :func:`.label_parity` :term:`bias<Bias>` metrics.
+
+    Attributes
+    ----------
+    score : np.float64
+        chi-squared score(s) of the test
+    p_value : np.float64
+        p-value(s) of the test
+    """
+
+
+@dataclass(frozen=True)
+class ParityOutput(BaseParityOutput[NDArray[np.float64]]):
+    """
+    Output class for :func:`.parity` :term:`bias<Bias>` metrics.
+
+    Attributes
+    ----------
+    score : NDArray[np.float64]
+        chi-squared score(s) of the test
+    p_value : NDArray[np.float64]
+        p-value(s) of the test
+    factor_names : list[str]
+        Names of each metadata factor
+    insufficient_data: dict
+        Dictionary of metadata factors with less than 5 class occurrences per value
+    """
+
+    # score: NDArray[np.float64]
+    # p_value: NDArray[np.float64]
+    factor_names: list[str]
+    insufficient_data: dict[str, dict[int, dict[str, int]]]
 
 
 def normalize_expected_dist(expected_dist: NDArray[Any], observed_dist: NDArray[Any]) -> NDArray[Any]:
@@ -147,7 +167,7 @@ def label_parity(
     expected_labels: ArrayLike,
     observed_labels: ArrayLike,
     num_classes: int | None = None,
-) -> ParityOutput[np.float64]:
+) -> LabelParityOutput:
     """
     Calculate the chi-square statistic to assess the :term:`parity<Parity>` \
     between expected and observed label distributions.
@@ -168,7 +188,7 @@ def label_parity(
 
     Returns
     -------
-    ParityOutput[np.float64]
+    LabelParityOutput
         chi-squared score and :term`P-Value` of the test
 
     Raises
@@ -197,7 +217,7 @@ def label_parity(
     >>> expected_labels = rng.choice([0, 1, 2, 3, 4], (100))
     >>> observed_labels = rng.choice([2, 3, 0, 4, 1], (100))
     >>> label_parity(expected_labels, observed_labels)
-    ParityOutput(score=14.007374204742625, p_value=0.0072715574616218, metadata_names=None, insufficient_data={})
+    LabelParityOutput(score=14.007374204742625, p_value=0.0072715574616218)
     """
 
     # Calculate
@@ -228,11 +248,11 @@ def label_parity(
         )
 
     cs, p = chisquare(f_obs=observed_dist, f_exp=expected_dist)
-    return ParityOutput(cs, p, None, {})
+    return LabelParityOutput(cs, p)
 
 
 @set_metadata
-def parity(metadata: Metadata) -> ParityOutput[NDArray[np.float64]]:
+def parity(metadata: Metadata) -> ParityOutput:
     """
     Calculate chi-square statistics to assess the linear relationship \
     between multiple factors and class labels.
@@ -244,7 +264,7 @@ def parity(metadata: Metadata) -> ParityOutput[NDArray[np.float64]]:
     Parameters
     ----------
     metadata : Metadata
-        Preprocessed metadata from :func:`.preprocess`
+        Preprocessed metadata
 
     Returns
     -------
@@ -276,18 +296,17 @@ def parity(metadata: Metadata) -> ParityOutput[NDArray[np.float64]]:
     --------
     Randomly creating some "continuous" and categorical variables using ``np.random.default_rng``
 
-    >>> from dataeval.utils.metadata import preprocess
-    >>> rng = np.random.default_rng(175)
-    >>> labels = rng.choice(["doctor", "artist", "teacher"], (100))
-    >>> metadata_dict = {
-    ...         "age": list(rng.choice([25, 30, 35, 45], (100))),
-    ...         "income": list(rng.choice([50000, 65000, 80000], (100))),
-    ...         "gender": list(rng.choice(["M", "F"], (100))),
-    ... }
-    >>> continuous_factor_bincounts = {"age": 4, "income": 3}
-    >>> metadata = preprocess(metadata_dict, labels, continuous_factor_bincounts)
+    >>> metadata = generate_random_metadata(
+    ...     labels=["doctor", "artist", "teacher"],
+    ...     factors={
+    ...         "age": [25, 30, 35, 45],
+    ...         "income": [50000, 65000, 80000],
+    ...         "gender": ["M", "F"]},
+    ...     length=100,
+    ...     random_seed=175)
+    >>> metadata.continuous_factor_bins = {"age": 4, "income": 3}
     >>> parity(metadata)
-    ParityOutput(score=array([7.35731943, 5.46711299, 0.51506212]), p_value=array([0.28906231, 0.24263543, 0.77295762]), metadata_names=['age', 'income', 'gender'], insufficient_data={'age': {3: {'artist': 4}, 4: {'artist': 4, 'teacher': 3}}, 'income': {1: {'artist': 3}}})
+    ParityOutput(score=array([7.35731943, 5.46711299, 0.51506212]), p_value=array([0.28906231, 0.24263543, 0.77295762]), factor_names=['age', 'income', 'gender'], insufficient_data={'age': {3: {'doctor': 4}, 4: {'doctor': 4, 'teacher': 3}}, 'income': {1: {'doctor': 3}}})
     """  # noqa: E501
     chi_scores = np.zeros(metadata.discrete_data.shape[1])
     p_values = np.zeros_like(chi_scores)
@@ -310,7 +329,7 @@ def parity(metadata: Metadata) -> ParityOutput[NDArray[np.float64]]:
                     insufficient_data[current_factor_name] = {}
                 if factor_category not in insufficient_data[current_factor_name]:
                     insufficient_data[current_factor_name][factor_category] = {}
-                class_name = metadata.class_names[int_class].item()
+                class_name = metadata.class_names[int_class]
                 class_count = contingency_matrix[int_factor, int_class].item()
                 insufficient_data[current_factor_name][factor_category][class_name] = class_count
 

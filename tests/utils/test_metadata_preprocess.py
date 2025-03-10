@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
 
-from dataeval.utils.metadata import _is_metadata_dict_of_dicts, merge, preprocess
+from dataeval.utils.metadata import _is_metadata_dict_of_dicts, merge
+from tests.conftest import preprocess
 
 
 @pytest.mark.required
@@ -11,7 +12,7 @@ class TestMDPreprocessingUnit:
         factors = {"factor1": ["a"] * 10, "factor2": ["b"] * 11}
         err_msg = "The lists/arrays in the metadata dict have varying lengths."
         with pytest.raises(ValueError) as e:
-            preprocess(factors, labels)
+            preprocess(factors, labels)._process()
         assert err_msg in str(e.value)
 
     def test_bad_factor_ref(self):
@@ -20,7 +21,7 @@ class TestMDPreprocessingUnit:
         continuous_bincounts = {"something_else": 2}
         err_msg = "The keys - {'something_else'} - are present in the `continuous_factor_bins` dictionary "
         with pytest.raises(KeyError) as e:
-            preprocess(factors, labels, continuous_bincounts)
+            preprocess(factors, labels, continuous_bincounts)._process()
         assert err_msg in str(e.value)
 
     def test_wrong_shape(self):
@@ -28,7 +29,7 @@ class TestMDPreprocessingUnit:
         factors = {"factor1": [10, 20]}
         err_msg = "Got class labels with 2-dimensional shape (2, 1), but expected a 1-dimensional array."
         with pytest.raises(ValueError) as e:
-            preprocess(factors, labels)
+            preprocess(factors, labels)._process()
         assert err_msg in str(e.value)
 
     def test_doesnt_modify_input(self):
@@ -53,7 +54,7 @@ class TestMDPreprocessingUnit:
         labels = list(np.random.randint(5, size=len(data_values)))
         err_msg = "A user defined binning was not provided for data."
         with pytest.warns(UserWarning, match=err_msg):
-            preprocess(factors, labels)
+            preprocess(factors, labels)._process()
 
     @pytest.mark.parametrize("factors", ({"a": [1, 2, 3], "b": [1, 2, 3]}, {"a": [1, 2, 3]}))
     @pytest.mark.parametrize("bincounts", ({"a": 1, "b": 1}, {"a": 1}, None))
@@ -77,26 +78,8 @@ class TestMDPreprocessingUnit:
         flat_factors = merge(factors)
         err_msg = f"The length of the label array {len(labels)} is not the same as"
         with pytest.raises(ValueError) as e:
-            preprocess(flat_factors, labels)
+            preprocess(flat_factors, labels)._process()
         assert err_msg in str(e.value)
-
-    def test_label_in_dict(self):
-        factors = [
-            {"data1": 2, "class": "d"},
-            {"data1": 3, "class": "b"},
-            {"data1": 1, "class": "c"},
-            {"data1": 3, "class": "a"},
-            {"data1": 1, "class": "d"},
-            {"data1": 2, "class": "b"},
-            {"data1": 2, "class": "c"},
-            {"data1": 3, "class": "a"},
-        ]
-        flat_factors = merge(factors)
-        output = preprocess(flat_factors, "class")
-        discrete_data = output.discrete_data
-        assert len(output.class_labels) == 8
-        assert all(output.class_names == ["a", "b", "c", "d"])
-        assert discrete_data.shape[0] == 8
 
 
 @pytest.mark.optional

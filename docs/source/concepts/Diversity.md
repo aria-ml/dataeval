@@ -42,9 +42,9 @@ development.
 
 In order to use {term}`diversity<Diversity>`, the user must supply their
 metadata in a DataEval specific format. Because of this requirement, DataEval
-has a `preprocess` function that will take in user [metadata](Metadata.md) and
-format it into DataEval's format. The diversity function takes in the output of
-the {func}`.preprocess` function for its analysis.
+has a `Metadata` class that will take in user [metadata](Metadata.md) and
+format it into DataEval's format. The `diversity` function takes in the
+`Metadata` class for its analysis.
 
 ## Theory behind it
 
