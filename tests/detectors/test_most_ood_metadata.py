@@ -13,8 +13,9 @@ from dataeval.metadata._ood import (
     _validate_keys,
     most_deviated_factors,
 )
-from dataeval.utils.metadata import Metadata
-from src.dataeval.utils.metadata import merge, preprocess
+from dataeval.utils.data import Metadata
+from src.dataeval.utils.metadata import merge
+from tests.conftest import preprocess
 
 BIG_SAMPLES_COUNT = 1000
 BIG_FEATURE_NAMES = ["DJIA", "temperature", "uptime"]
@@ -34,16 +35,18 @@ class MockMetadata(Metadata):
         continuous_factor_names = [] if continuous_factor_names is None else continuous_factor_names
         continuous_data = np.array([]) if continuous_data is None else continuous_data
 
-        super().__init__(
-            discrete_factor_names=discrete_factor_names,
-            discrete_data=discrete_data,
-            continuous_factor_names=continuous_factor_names,
-            continuous_data=continuous_data,
-            class_names=np.array([]),
-            class_labels=np.array([]),
-            total_num_factors=total_num_factors,
-            image_indices=np.array([]),
-        )
+        super().__init__(None)  # type: ignore
+        self._collated = True
+        self._raw = []
+        self._processed = True
+        self._discrete_factor_names = discrete_factor_names
+        self._discrete_data = discrete_data
+        self._continuous_factor_names = continuous_factor_names
+        self._continuous_data = continuous_data
+        self._class_names = np.array([])
+        self._class_labels = np.array([])
+        self._total_num_factors = total_num_factors
+        self._image_indices = np.array([])
 
 
 @pytest.fixture

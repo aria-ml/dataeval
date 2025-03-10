@@ -2,14 +2,14 @@ import numpy as np
 import pytest
 import torch
 
-from dataeval.utils._targets import Targets
-from dataeval.utils.data._processor import DataProcessor
+from dataeval.utils.data import Metadata, Targets
+from dataeval.utils.data._embeddings import Embeddings
+from dataeval.utils.data._images import Images
 from dataeval.utils.data.datasets._types import ObjectDetectionTarget
-from dataeval.utils.metadata import Metadata
 
 
 @pytest.mark.required
-class TestDataProcessor:
+class TestEmbeddings:
     """
     Test collate aggregates MAITE style data into separate collections from tuple return
     """
@@ -41,9 +41,9 @@ class TestDataProcessor:
 
         ds = ICDataset(data, labels)
 
-        dp = DataProcessor(ds, batch_size=64)  # type: ignore -> dont need to subclass from torch.utils.data.Dataset
+        em = Embeddings(ds, batch_size=64)  # type: ignore -> dont need to subclass from torch.utils.data.Dataset
 
-        assert len(ds) == len(dp.embeddings)
+        assert len(ds) == len(em)
 
     @pytest.mark.parametrize(
         "data, labels, metadata",
@@ -77,9 +77,9 @@ class TestDataProcessor:
 
         ds = ODDataset(data, labels, metadata)
 
-        dp = DataProcessor(ds, batch_size=64)  # type: ignore -> dont need to subclass from torch.utils.data.Dataset
+        em = Embeddings(ds, batch_size=64)  # type: ignore -> dont need to subclass from torch.utils.data.Dataset
 
-        assert len(ds) == len(dp.embeddings)
+        assert len(ds) == len(em)
 
     @pytest.mark.parametrize(
         "data, targets",
@@ -98,6 +98,8 @@ class TestDataProcessor:
         """Tests with basic identity model"""
 
         class TorchDataset(torch.utils.data.Dataset):
+            metadata = {"id": 0, "index2label": {k: str(k) for k in range(10)}}
+
             def __init__(self):
                 self.data = data
                 self.targets = targets
@@ -117,14 +119,15 @@ class TestDataProcessor:
 
         ds = TorchDataset()
 
-        dp = DataProcessor(ds, batch_size=64, model=IdentityModel(), device="cpu")  # type: ignore
+        im = Images(ds)  # type: ignore
+        em = Embeddings(ds, batch_size=64, model=IdentityModel(), device="cpu")  # type: ignore
+        md = Metadata(ds)  # type: ignore
 
-        assert len(ds) == len(dp.embeddings)
-        assert len(dp) == len(ds)
+        assert len(ds) == len(em)
+        assert len(em) == len(ds)
 
         for i in range(len(ds)):
-            assert torch.allclose(dp.images[i], data[i])
-            assert torch.allclose(dp.embeddings[i], data[i])
+            assert torch.allclose(im[i], data[i])
+            assert torch.allclose(em[i], data[i])
 
-        assert isinstance(dp.targets, Targets)
-        assert isinstance(dp.metadata, Metadata)
+        assert isinstance(md.targets, Targets)

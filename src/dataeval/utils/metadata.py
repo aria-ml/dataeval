@@ -1,64 +1,19 @@
 """
-Metadata related utility functions that help organize raw metadata into \
-:class:`.Metadata` objects for use within `DataEval`.
+Utility functions that help organize raw metadata.
 """
 
 from __future__ import annotations
 
-__all__ = ["preprocess", "merge", "flatten"]
+__all__ = ["merge", "flatten"]
 
 import warnings
-from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Iterable, Literal, Mapping, Sequence, overload
 
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval._output import Output, set_metadata
-from dataeval.typing import Array, ArrayLike
-from dataeval.utils._array import as_numpy, to_numpy
-from dataeval.utils._bin import bin_data, digitize_data, is_continuous
-
 _TYPE_MAP = {int: 0, float: 1, str: 2}
-
-
-@dataclass(frozen=True)
-class Metadata(Output):
-    """
-    Dataclass containing binned metadata from the :func:`.preprocess` function.
-
-    Attributes
-    ----------
-    discrete_factor_names : list[str]
-        List containing factor names for the original data that was discrete and
-        the binned continuous data
-    discrete_data : NDArray[np.int]
-        Array containing values for the original data that was discrete and the
-        binned continuous data
-    continuous_factor_names : list[str]
-        List containing factor names for the original continuous data
-    continuous_data : NDArray[np.int or np.double] | None
-        Array containing values for the original continuous data or None if there
-        was no continuous data
-    class_labels : NDArray[np.int]
-        Numerical class labels for the images/objects
-    class_names : NDArray[Any]
-        Array of unique class names (for use with plotting)
-    total_num_factors : int
-        Sum of discrete_factor_names and continuous_factor_names plus 1 for class
-    image_indices : NDArray[np.int]
-        Array of the image index that is mapped by the index of the factor
-    """
-
-    discrete_factor_names: list[str]
-    discrete_data: NDArray[np.int_]
-    continuous_factor_names: list[str]
-    continuous_data: NDArray[np.int_ | np.double]
-    class_labels: NDArray[np.int_]
-    class_names: NDArray[Any]
-    total_num_factors: int
-    image_indices: NDArray[np.int_]
 
 
 class DropReason(Enum):
@@ -333,7 +288,7 @@ def merge(
     Nested dictionaries are flattened, and lists are expanded. Nested lists are
     dropped as the expanding into multiple hierarchical trees is not supported.
     The function adds an internal "_image_index" key to the metadata dictionary
-    for consumption by the preprocess function.
+    used by the `Metadata` class.
 
     Parameters
     ----------
@@ -444,183 +399,3 @@ def merge(
             dropped_items = "\n".join([f"    {k}: {v}" for k, v in _sorted_drop_reasons(dropped).items()])
             warnings.warn(f"Metadata entries were dropped:\n{dropped_items}")
         return output
-
-
-@set_metadata
-def preprocess(
-    metadata: Mapping[str, list[Any] | NDArray[Any]],
-    class_labels: ArrayLike | str,
-    continuous_factor_bins: Mapping[str, int | Iterable[float]] | None = None,
-    auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
-    exclude: Iterable[str] | None = None,
-    include: Iterable[str] | None = None,
-    image_index_key: ArrayLike | str = "_image_index",
-) -> Metadata:
-    """
-    Restructures the metadata to be in the correct format for the bias functions.
-
-    This identifies whether the incoming metadata is discrete or continuous,
-    and whether the data is already binned or still needs binning.
-    It accepts a list of dictionaries containing the per image metadata and
-    automatically adjusts for multiple targets in an image.
-
-    Parameters
-    ----------
-    metadata : Mapping[str, list[Any] or NDArray[Any]]
-        A flat dictionary which contains all of the metadata on a per image (classification)
-        or per object (object detection) basis. Length of lists/array should match the length
-        of the label list/array.
-    class_labels : ArrayLike or string
-        If arraylike, expects the labels for each image (image classification)
-        or each object (object detection). If the labels are included in the
-        metadata dictionary, pass in the key value.
-    continuous_factor_bins : Mapping[str, int or Iterable[float]] or None, default None
-        User provided dictionary specifying how to bin the continuous metadata
-        factors where the value is either an int to represent the number of bins,
-        or a list of floats representing the edges for each bin.
-    auto_bin_method : "uniform_width" or "uniform_count" or "clusters", default "uniform_width"
-        Method by which the function will automatically bin continuous metadata factors.
-        It is recommended that the user provide the bins through the `continuous_factor_bins`.
-    exclude : Iterable[str] or None, default None
-        User provided collection of metadata keys to exclude when processing metadata.
-        Not to be used in conjunction with include.
-    include : Iterable[str] or None, default None
-        User provided collection of metadata keys to include when processing metadata.
-        Not to be used in conjunction with exclude.
-    image_index_key : ArrayLike or str, default "_image_index"
-        User provided metadata key which maps the metadata entry to the source image.
-
-    Returns
-    -------
-    Metadata
-        Output class containing the binned metadata
-
-    See Also
-    --------
-    merge
-    """
-    if include is not None and exclude is not None:
-        raise ValueError("Parameters `include` and `exclude` are mutually exclusive.")
-
-    # Determine if _image_index is given
-    image_indices = (
-        as_numpy(metadata[image_index_key])
-        if isinstance(image_index_key, str) and image_index_key in metadata
-        else as_numpy(image_index_key)
-        if isinstance(image_index_key, (Sequence, Array))
-        else None
-    )
-
-    # Include specified metadata keys
-    if include:
-        metadata = {i: metadata[i] for i in include if i in metadata}
-        continuous_factor_bins = (
-            {i: continuous_factor_bins[i] for i in include if i in continuous_factor_bins}
-            if continuous_factor_bins
-            else {}
-        )
-    else:
-        metadata = dict(metadata)
-        continuous_factor_bins = dict(continuous_factor_bins) if continuous_factor_bins else {}
-        for k in exclude or ():
-            metadata.pop(k, None)
-            continuous_factor_bins.pop(k, None)
-
-    # Remove generated "_image_index" if present
-    if "_image_index" in metadata:
-        metadata.pop("_image_index", None)
-
-    # Check that metadata is a single, flattened dictionary with uniform array lengths
-    check_length = -1
-    for k, v in metadata.items():
-        if not isinstance(v, (list, tuple, np.ndarray)):
-            raise TypeError(
-                "Metadata dictionary needs to be a single dictionary whose values "
-                "are arraylike containing the metadata on a per image or per object basis."
-            )
-        else:
-            if check_length == -1:
-                check_length = len(v)
-            else:
-                if check_length != len(v):
-                    raise ValueError(
-                        "The lists/arrays in the metadata dict have varying lengths. "
-                        "Preprocess needs them to be uniform in length."
-                    )
-    if image_indices is None:
-        image_indices = np.arange(check_length)
-
-    # Get the class label array in numeric form and check its dimensions
-    class_array = as_numpy(metadata.pop(class_labels)) if isinstance(class_labels, str) else as_numpy(class_labels)
-    if class_array.ndim > 1:
-        raise ValueError(
-            f"Got class labels with {class_array.ndim}-dimensional "
-            f"shape {class_array.shape}, but expected a 1-dimensional array."
-        )
-    # Check if the label array is the same length as the metadata arrays
-    elif len(class_array) != check_length:
-        raise ValueError(
-            f"The length of the label array {len(class_array)} is not the same as "
-            f"the length of the metadata arrays {check_length}."
-        )
-    if not np.issubdtype(class_array.dtype, np.int_):
-        unique_classes, numerical_labels = np.unique(class_array, return_inverse=True)
-    else:
-        numerical_labels = class_array
-        unique_classes = np.unique(class_array)
-
-    # Bin according to user supplied bins
-    continuous_metadata = {}
-    discrete_metadata = {}
-    if continuous_factor_bins is not None and continuous_factor_bins != {}:
-        invalid_keys = set(continuous_factor_bins.keys()) - set(metadata.keys())
-        if invalid_keys:
-            raise KeyError(
-                f"The keys - {invalid_keys} - are present in the `continuous_factor_bins` dictionary "
-                "but are not keys in the `metadata` dictionary. Delete these keys from `continuous_factor_bins` "
-                "or add corresponding entries to the `metadata` dictionary."
-            )
-        for factor, bins in continuous_factor_bins.items():
-            discrete_metadata[factor] = digitize_data(metadata[factor], bins)
-            continuous_metadata[factor] = metadata[factor]
-
-    # Determine category of the rest of the keys
-    remaining_keys = set(metadata.keys()) - set(continuous_metadata.keys())
-    for key in remaining_keys:
-        data = to_numpy(metadata[key])
-        if key != image_index_key and np.issubdtype(data.dtype, np.number):
-            result = is_continuous(data, image_indices)
-            if result:
-                continuous_metadata[key] = data
-            unique_samples, ordinal_data = np.unique(data, return_inverse=True)
-            if unique_samples.size <= np.max([20, data.size * 0.01]):
-                discrete_metadata[key] = ordinal_data
-            else:
-                warnings.warn(
-                    f"A user defined binning was not provided for {key}. "
-                    f"Using the {auto_bin_method} method to discretize the data. "
-                    "It is recommended that the user rerun and supply the desired "
-                    "bins using the continuous_factor_bins parameter.",
-                    UserWarning,
-                )
-                discrete_metadata[key] = bin_data(data, auto_bin_method)
-        else:
-            _, discrete_metadata[key] = np.unique(data, return_inverse=True)
-
-    # Split out the dictionaries into the keys and values
-    discrete_factor_names = list(discrete_metadata.keys())
-    discrete_data = np.stack(list(discrete_metadata.values()), axis=-1)
-    continuous_factor_names = list(continuous_metadata.keys())
-    continuous_data = np.stack(list(continuous_metadata.values()), axis=-1) if continuous_metadata else np.array([])
-    total_num_factors = len(discrete_factor_names + continuous_factor_names) + 1
-
-    return Metadata(
-        discrete_factor_names,
-        discrete_data,
-        continuous_factor_names,
-        continuous_data,
-        numerical_labels,
-        unique_classes,
-        total_num_factors,
-        image_indices=image_indices,
-    )

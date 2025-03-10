@@ -10,10 +10,15 @@ import torch
 from torchvision.datasets import VOCDetection as _VOCDetection
 from torchvision.transforms import v2
 
-from dataeval.utils.data.datasets._types import InfoMixin, ObjectDetectionDataset, ObjectDetectionTarget
+from dataeval.utils.data.datasets._types import (
+    DatasetMetadata,
+    InfoMixin,
+    ObjectDetectionDataset,
+    ObjectDetectionTarget,
+)
 
 
-class VOCDetection(ObjectDetectionDataset[torch.Tensor], InfoMixin):
+class VOCDetection(ObjectDetectionDataset[torch.Tensor, DatasetMetadata], InfoMixin):
     """
     `Pascal VOC <http://host.robots.ox.ac.uk/pascal/VOC/>`_ Detection Dataset.
 
@@ -38,6 +43,7 @@ class VOCDetection(ObjectDetectionDataset[torch.Tensor], InfoMixin):
     """
 
     _data: _VOCDetection
+    metadata: DatasetMetadata
 
     def __init__(
         self,
@@ -62,6 +68,11 @@ class VOCDetection(ObjectDetectionDataset[torch.Tensor], InfoMixin):
             if len(objects) == 20:
                 break
         self.classes: list[str] = sorted(labels)
+
+        self.metadata = {
+            "id": f"{self.__class__.__name__}_{year}_{image_set}",
+            "index2label": {i: self.classes[i] for i in range(len(self.classes))},
+        }
 
     def __str__(self) -> str:
         return str(self._data)

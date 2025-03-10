@@ -15,7 +15,7 @@ from sklearn.feature_selection import mutual_info_classif, mutual_info_regressio
 from dataeval._output import Output, set_metadata
 from dataeval.utils._bin import get_counts
 from dataeval.utils._plot import heatmap
-from dataeval.utils.metadata import Metadata
+from dataeval.utils.data import Metadata
 
 with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure
@@ -36,15 +36,15 @@ class BalanceOutput(Output):
         Estimate of mutual information between metadata factors and individual class labels
     factor_names : list[str]
         Names of each metadata factor
-    class_list : NDArray
-        Array of the class labels present in the dataset
+    class_names : list[str]
+        List of the class labels present in the dataset
     """
 
     balance: NDArray[np.float64]
     factors: NDArray[np.float64]
     classwise: NDArray[np.float64]
     factor_names: list[str]
-    class_list: NDArray[Any]
+    class_names: list[str]
 
     @overload
     def _by_factor_type(
@@ -109,7 +109,7 @@ class BalanceOutput(Output):
         """
         if plot_classwise:
             if row_labels is None:
-                row_labels = self.class_list
+                row_labels = self.class_names
             if col_labels is None:
                 col_labels = self._by_factor_type("factor_names", factor_type)
 
@@ -178,7 +178,7 @@ def balance(
     Parameters
     ----------
     metadata : Metadata
-        Preprocessed metadata from :func:`.preprocess`
+        Preprocessed metadata
     num_neighbors : int, default 5
         Number of points to consider as neighbors
 
@@ -268,7 +268,7 @@ def balance(
     factors = nmi[1:, 1:]
 
     # assume class is a factor
-    num_classes = metadata.class_names.size
+    num_classes = len(metadata.class_names)
     classwise_mi = np.full((num_classes, num_factors), np.nan, dtype=np.float32)
 
     # classwise targets
