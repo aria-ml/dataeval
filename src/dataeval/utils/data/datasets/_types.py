@@ -2,9 +2,9 @@ from __future__ import annotations
 
 __all__ = []
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypedDict, TypeVar
 
 from torch.utils.data import Dataset
 
@@ -21,7 +21,17 @@ class InfoMixin:
         return f"{self._image_set.capitalize()}\n{'-' * len(self._image_set)}\n{str(self)}\n"
 
 
-class SizedDataset(Dataset[TDatum], ABC):
+class DatasetMetadata(TypedDict):
+    id: str
+    index2label: dict[int, str]
+
+
+TDatasetMetadata = TypeVar("TDatasetMetadata", bound=DatasetMetadata)
+
+
+class SizedDataset(Dataset[TDatum], Generic[TDatum, TDatasetMetadata]):
+    metadata: TDatasetMetadata
+
     @abstractmethod
     def __getitem__(self, index: int) -> TDatum: ...
 
@@ -29,7 +39,7 @@ class SizedDataset(Dataset[TDatum], ABC):
     def __len__(self) -> int: ...
 
 
-class ImageClassificationDataset(SizedDataset[tuple[TArray, TArray, dict[str, Any]]]): ...
+class ImageClassificationDataset(SizedDataset[tuple[TArray, TArray, dict[str, Any]], TDatasetMetadata]): ...
 
 
 @dataclass
@@ -39,4 +49,6 @@ class ObjectDetectionTarget(Generic[TArray]):
     scores: TArray
 
 
-class ObjectDetectionDataset(SizedDataset[tuple[TArray, ObjectDetectionTarget[TArray], dict[str, Any]]]): ...
+class ObjectDetectionDataset(
+    SizedDataset[tuple[TArray, ObjectDetectionTarget[TArray], dict[str, Any]], TDatasetMetadata]
+): ...

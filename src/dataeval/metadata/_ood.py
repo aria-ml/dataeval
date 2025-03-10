@@ -8,7 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.detectors.ood import OODOutput
-from dataeval.utils.metadata import Metadata
+from dataeval.utils.data import Metadata
 
 
 def _validate_keys(keys1: list[str], keys2: list[str]) -> None:

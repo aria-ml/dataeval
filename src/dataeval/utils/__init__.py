@@ -4,9 +4,6 @@ in setting up data and architectures that are guaranteed to work with applicable
 DataEval metrics.
 """
 
-__all__ = ["data", "metadata", "torch", "Metadata", "Targets"]
-
-from dataeval.utils._targets import Targets
-from dataeval.utils.metadata import Metadata
+__all__ = ["data", "metadata", "torch"]
 
 from . import data, metadata, torch

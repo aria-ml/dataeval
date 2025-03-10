@@ -39,9 +39,9 @@ imbalance.
 
 In order to use DataEval's bias metrics, the user must supply their metadata in
 a DataEval specific format. Because of this requirement, DataEval has a
-{func}`.preprocess` function that will take in user metadata and format it into
-DataEval's format. Each bias metric takes in the output of the
-{func}`.preprocess` function for its analysis.
+`Metadata` class that will take in user [metadata](Metadata.md) and format it
+into DataEval's format. The bias functions take in the `Metadata` class for
+its analysis.
 
 ## Why is it important?
 

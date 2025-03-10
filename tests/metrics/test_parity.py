@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from dataeval.metrics.bias._parity import label_parity, parity
-from dataeval.utils.metadata import preprocess
+from tests.conftest import preprocess
 
 
 class MockDistributionDataset:

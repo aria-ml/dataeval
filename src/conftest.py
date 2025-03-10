@@ -2,6 +2,10 @@
 
 import pathlib
 import sys
+from typing import Sequence
+
+from dataeval.utils.data._metadata import Metadata
+from dataeval.utils.data._targets import Targets
 
 sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute() / "tests" / "detectors"))
 
@@ -14,7 +18,6 @@ import torch
 from test_drift_uncertainty import PtModel
 
 from dataeval.metrics.stats import dimensionstats, hashstats, pixelstats
-from dataeval.utils.metadata import preprocess
 from dataeval.utils.torch.models import Autoencoder
 
 # Set numpy print option to legacy 1.25 so native numpy types
@@ -34,14 +37,31 @@ np.random.seed(0)
 torch.manual_seed(0)
 
 
+def generate_random_metadata(
+    labels: Sequence[str], factors: dict[str, Sequence[str]], length: int, random_seed: int
+) -> Metadata:
+    rng = np.random.default_rng(random_seed)
+    targets = Targets(rng.choice(labels, (length)), np.zeros((length), dtype=np.float32), None, None)
+    metadata_dict = {k: list(rng.choice(v, (length))) for k, v in factors.items()}
+    metadata = Metadata(None)  # type: ignore
+    metadata._raw = [{} for _ in range(len(labels))]
+    metadata._collated = True
+    metadata._targets = targets
+    metadata._class_labels = targets.labels
+    metadata._class_names = list(labels)
+    metadata._merged = metadata_dict, {}
+    return metadata
+
+
 class ClassificationModel(PtModel):
     def __init__(self):
         super().__init__(16, 3, True)
 
 
 @pytest.fixture(autouse=True, scope="session")
-def add_np(doctest_namespace):
+def add_all(doctest_namespace):
     doctest_namespace["np"] = np
+    doctest_namespace["generate_random_metadata"] = generate_random_metadata
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -106,7 +126,14 @@ def doctest_metrics_bias_balance_diversity(doctest_namespace):
     cat_vals = [1.1, 1.1, 0, 0, 1.1, 0, 1.1, 0, 0, 1.1, 1.1, 0]
     metadata_dict = {"var_cat": str_vals, "var_cnt": cnt_vals, "var_float_cat": cat_vals}
     continuous_factor_bincounts = {"var_cnt": 5, "var_float_cat": 2}
-    metadata = preprocess(metadata_dict, class_labels, continuous_factor_bincounts)
+    targets = Targets(labels=np.asarray(class_labels), scores=np.ndarray([]), bboxes=None, source=None)
+    metadata = Metadata(None, continuous_factor_bins=continuous_factor_bincounts)  # type: ignore
+    metadata._collated = True
+    metadata._raw = [{} for _ in range(len(class_labels))]
+    metadata._targets = targets
+    metadata._class_labels = np.asarray(class_labels)
+    metadata._class_names = ["cat", "dog"]
+    metadata._merged = metadata_dict, {}
 
     """dataeval.metrics.bias.balance.balance"""
     """dataeval.metrics.bias.diversity.diversity"""

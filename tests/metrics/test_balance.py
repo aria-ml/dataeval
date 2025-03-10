@@ -9,7 +9,7 @@ except ImportError:
     Figure = type(None)
 
 from dataeval.metrics.bias._balance import _validate_num_neighbors, balance
-from dataeval.utils.metadata import preprocess
+from tests.conftest import preprocess
 
 
 @pytest.fixture(scope="module")
@@ -79,14 +79,15 @@ class TestBalanceUnit:
             "balance": (num_vars,),
             "factors": (num_vars - 1, num_vars - 1),
             "classwise": (2, num_vars),
-            "class_list": (np.unique(metadata_results.class_labels).size,),
             "factor_names": (num_vars),
+            "class_names": (np.unique(metadata_results.class_labels).size),
         }
         expected_type = {
             "balance": float,
             "factors": float,
             "classwise": float,
             "factor_names": list,
+            "class_names": list,
         }
         mi = balance(metadata_results)
         for k, v in mi.dict().items():
@@ -115,7 +116,7 @@ class TestBalancePlot:
         heat_labels = np.arange(len(factor_names))
         output = mi.plot(heat_labels[:-1], heat_labels[1:], plot_classwise=False, factor_type=factor_type)
         assert isinstance(output, Figure)
-        _, row_labels = np.unique(mi.class_list, return_inverse=True)
+        _, row_labels = np.unique(mi.class_names, return_inverse=True)
         col_labels = np.arange(len(factor_names))
         classwise_output = mi.plot(row_labels, col_labels, plot_classwise=True, factor_type=factor_type)
         assert isinstance(classwise_output, Figure)
