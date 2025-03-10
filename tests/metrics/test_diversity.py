@@ -7,7 +7,7 @@ except ImportError:
     Figure = type(None)
 
 from dataeval.metrics.bias import diversity
-from dataeval.utils.metadata import preprocess
+from tests.conftest import preprocess
 
 
 @pytest.fixture(scope="module")
@@ -53,7 +53,7 @@ class TestDiversityPlot:
 
     def test_plotting_vars(self, metadata_results):
         result = diversity(metadata_results, method="shannon")
-        row_labels = np.arange(result.class_list.size)
+        row_labels = np.arange(len(result.class_names))
         col_labels = np.arange(len(result.factor_names))
         classwise_output = result.plot(row_labels, col_labels, plot_classwise=True)
         assert isinstance(classwise_output, Figure)

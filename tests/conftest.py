@@ -8,7 +8,37 @@ import numpy as np
 import pytest
 from PIL import Image
 
+from dataeval.utils.data._metadata import Metadata
+from dataeval.utils.data._targets import Targets
+
 TEMP_CONTENTS = "ABCDEF1234567890"
+
+
+def preprocess(factors, class_labels, continuous_factor_bins=None, exclude=None, include=None):
+    if isinstance(class_labels[0], str):
+        class_names = sorted(set(class_labels))
+        index2label = {i: class_names[i] for i in range(len(class_names))}
+        class_labels = [class_names.index(i) for i in class_labels]
+    elif isinstance(class_labels[0], int):
+        index2label = {i: str(i) for i in range(max(class_labels) + 1)}
+    else:
+        index2label = {}
+    targets = Targets(labels=np.asarray(class_labels), scores=np.ndarray([]), bboxes=None, source=None)
+    metadata = Metadata(
+        None,  # type: ignore
+        continuous_factor_bins=continuous_factor_bins,
+        exclude=exclude,
+        include=include,
+    )
+
+    # set internal attributes
+    metadata._raw = [{} for _ in range(len(class_labels))]
+    metadata._targets = targets
+    metadata._class_labels = targets.labels
+    metadata._class_names = [index2label.get(i, str(i)) for i in np.unique(targets.labels)]
+    metadata._collated = True
+    metadata._merged = factors, {}
+    return metadata
 
 
 @pytest.fixture(scope="session")

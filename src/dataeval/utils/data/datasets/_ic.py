@@ -20,7 +20,7 @@ from torchvision.datasets import CIFAR10 as _CIFAR10
 from torchvision.transforms import v2
 from tqdm import tqdm
 
-from dataeval.utils.data.datasets._types import ImageClassificationDataset, InfoMixin
+from dataeval.utils.data.datasets._types import DatasetMetadata, ImageClassificationDataset, InfoMixin
 
 
 class DataLocation(NamedTuple):
@@ -30,7 +30,7 @@ class DataLocation(NamedTuple):
     checksum: str
 
 
-class CIFAR10(ImageClassificationDataset[torch.Tensor], InfoMixin):
+class CIFAR10(ImageClassificationDataset[torch.Tensor, DatasetMetadata], InfoMixin):
     """
     `CIFAR10 <https://www.cs.toronto.edu/~kriz/cifar.html>`_ Dataset as Torch tensors.
 
@@ -277,7 +277,7 @@ def _data_subselection(
     return selection
 
 
-class BaseICDataset(ImageClassificationDataset[NDArray[np.float64]], ABC):
+class BaseICDataset(ImageClassificationDataset[NDArray[np.float64], DatasetMetadata], ABC):
     """
     Base class for internet downloaded datasets.
     """
@@ -289,6 +289,7 @@ class BaseICDataset(ImageClassificationDataset[NDArray[np.float64]], ABC):
     #    'md5': boolean, True if it's the checksum value is md5
     #    'checksum': str, the associated checksum for the downloaded file
     _resources: list[DataLocation]
+    metadata: DatasetMetadata
     index2label: dict[int, str]
     label2index: dict[str, int]
 
@@ -320,7 +321,7 @@ class BaseICDataset(ImageClassificationDataset[NDArray[np.float64]], ABC):
         self.from_back = slice_back
         self.verbose = verbose
         self._one_hot_encoder = np.eye(len(self.index2label))
-        self.metadata: dict[str, Any] = {"id": self.__class__.__name__, "index2label": self.index2label}
+        self.metadata = {"id": self.__class__.__name__, "index2label": self.index2label}
         self.class_set: set[int]
         self.num_classes: int
         self._data: NDArray[Any]
@@ -558,7 +559,6 @@ class MNIST(BaseICDataset, InfoMixin):
         self.train = train  # training set or test set
         self.corruption = corruption
         self._image_set = "train" if train else "test"
-        self.metadata["split"] = self._image_set
         self._data: NDArray[np.float64]
         self._targets: NDArray[np.int_]
         self._datum_metadata: dict[str, list[Any]]

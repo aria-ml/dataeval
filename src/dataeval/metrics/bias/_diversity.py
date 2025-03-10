@@ -15,7 +15,7 @@ from dataeval.typing import ArrayLike
 from dataeval.utils._bin import get_counts
 from dataeval.utils._method import get_method
 from dataeval.utils._plot import heatmap
-from dataeval.utils.metadata import Metadata
+from dataeval.utils.data import Metadata
 
 with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure
@@ -63,14 +63,14 @@ class DiversityOutput(Output):
         Classwise diversity index [n_class x n_factor]
     factor_names : list[str]
         Names of each metadata factor
-    class_list : NDArray[Any]
+    class_names : list[str]
         Class labels for each value in the dataset
     """
 
     diversity_index: NDArray[np.double]
     classwise: NDArray[np.double]
     factor_names: list[str]
-    class_list: NDArray[Any]
+    class_names: list[str]
 
     def plot(
         self,
@@ -92,7 +92,7 @@ class DiversityOutput(Output):
         """
         if plot_classwise:
             if row_labels is None:
-                row_labels = self.class_list
+                row_labels = self.class_names
             if col_labels is None:
                 col_labels = self.factor_names
 
@@ -215,7 +215,7 @@ def diversity(
     Parameters
     ----------
     metadata : Metadata
-        Preprocessed metadata from :func:`.preprocess`
+        Preprocessed metadata
     method : "simpson" or "shannon", default "simpson"
         The methodology used for defining diversity
 
