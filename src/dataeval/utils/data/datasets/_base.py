@@ -8,7 +8,7 @@ import tarfile
 import zipfile
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Literal, NamedTuple, TypeVar
+from typing import Any, Literal, NamedTuple
 from warnings import warn
 
 import numpy as np
@@ -23,55 +23,12 @@ from dataeval.utils.data.datasets._types import (
     InfoMixin,
     ObjectDetectionDataset,
     ObjectDetectionTarget,
+    SegmentationDataset,
+    SegmentationTarget,
 )
 
 ARCHIVE_ENDINGS = [".zip", ".tar", ".tgz"]
 COMPRESS_ENDINGS = [".gz", ".bz2"]
-MNISTClassStringMap = Literal["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
-TMNISTClassMap = TypeVar("TMNISTClassMap", MNISTClassStringMap, int, list[MNISTClassStringMap], list[int])
-CIFARClassStringMap = Literal["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
-TCIFARClassMap = TypeVar("TCIFARClassMap", CIFARClassStringMap, int, list[CIFARClassStringMap], list[int])
-VOCClassStringMap = Literal[
-    "aeroplane",
-    "bicycle",
-    "bird",
-    "boat",
-    "bottle",
-    "bus",
-    "car",
-    "cat",
-    "chair",
-    "cow",
-    "diningtable",
-    "dog",
-    "horse",
-    "motorbike",
-    "person",
-    "pottedplant",
-    "sheep",
-    "sofa",
-    "train",
-    "tvmonitor",
-]
-TVOCClassMap = TypeVar("TVOCClassMap", VOCClassStringMap, int, list[VOCClassStringMap], list[int])
-CorruptionStringMap = Literal[
-    "identity",
-    "shot_noise",
-    "impulse_noise",
-    "glass_blur",
-    "motion_blur",
-    "shear",
-    "scale",
-    "rotate",
-    "brightness",
-    "translate",
-    "stripe",
-    "fog",
-    "spatter",
-    "dotted_line",
-    "zigzag",
-    "canny_edges",
-]
 
 
 class DataLocation(NamedTuple):
@@ -326,6 +283,7 @@ class BaseDataset(InfoMixin):
         dtype: type | None = None,
         channels: Literal["channels_first", "channels_last"] = "channels_first",
         flatten: bool = False,
+        crop: int | None = None,
         normalize: tuple[float, float] | None = None,
         balance: bool = False,
         slice_back: bool = False,
@@ -340,6 +298,7 @@ class BaseDataset(InfoMixin):
         self.dtype = dtype
         self.channels = channels
         self.flatten = flatten
+        self.crop = crop
         self.normalize = normalize
         self.balance = balance
         self.from_back = slice_back
@@ -361,6 +320,7 @@ class BaseDataset(InfoMixin):
         self._year: str
         self._labels: list[Any]
         self._annotations: list[str]
+        self._masks: list[str]
         self._datum_metadata: dict[str, list[Any]]
         self._resource: DataLocation
         self._reorder: NDArray[np.intp]
@@ -405,6 +365,7 @@ class BaseDataset(InfoMixin):
     ) -> (
         tuple[NDArray[Any], NDArray[np.uintp], dict[str, Any]]
         | tuple[NDArray[Any], ObjectDetectionTarget[NDArray[Any]], dict[str, Any]]
+        | tuple[NDArray[Any], SegmentationTarget[NDArray[Any]], dict[str, Any]]
     ): ...
 
     @abstractmethod
@@ -415,7 +376,7 @@ class BaseDataset(InfoMixin):
     def __len__(self) -> int:
         return len(self._filepaths)
 
-    def _reduce_classes(self, classes: TMNISTClassMap | TCIFARClassMap | TVOCClassMap | None) -> set[int]:
+    def _reduce_classes(self, classes: Any) -> set[int]:
         temp_set = []
         if classes is not None:
             if not isinstance(classes, (list, tuple, np.ndarray)):
@@ -462,6 +423,22 @@ class BaseDataset(InfoMixin):
         if self.verbose:
             print("Running data transformations steps.")
 
+        if isinstance(self.crop, int):
+            h, w, _ = image.shape
+            if h >= self.crop:
+                hstart = (image.shape[0] - self.crop) // 2
+                image = image[hstart : hstart + self.crop]
+            else:
+                diff = self.crop - h
+                image = np.pad(image, ((diff // 2, diff - (diff // 2)), (0, 0), (0, 0)))
+
+            if w >= self.crop:
+                wstart = (image.shape[1] - self.crop) // 2
+                image = image[:, wstart : wstart + self.crop]
+            else:
+                diff = self.crop - w
+                image = np.pad(image, ((0, 0), (diff // 2, diff - (diff // 2)), (0, 0)))
+
         if self.flatten:
             image = image.reshape(image.size)
         elif self.channels == "channels_first":
@@ -494,6 +471,7 @@ class BaseClassificationDataset(BaseDataset, ImageClassificationDataset[NDArray[
         dtype: type | None = None,
         channels: Literal["channels_first", "channels_last"] = "channels_first",
         flatten: bool = False,
+        crop: int | None = None,
         normalize: tuple[float, float] | None = None,
         balance: bool = False,
         slice_back: bool = False,
@@ -508,6 +486,7 @@ class BaseClassificationDataset(BaseDataset, ImageClassificationDataset[NDArray[
             dtype,
             channels,
             flatten,
+            crop,
             normalize,
             balance,
             slice_back,
@@ -565,6 +544,7 @@ class BaseDetectionDataset(BaseDataset):
         unit_interval: bool = False,
         dtype: type | None = None,
         channels: Literal["channels_first", "channels_last"] = "channels_first",
+        crop: int | None = None,
         normalize: tuple[float, float] | None = None,
         # balance: bool = False,
         slice_back: bool = False,
@@ -579,6 +559,7 @@ class BaseDetectionDataset(BaseDataset):
             dtype,
             channels,
             False,
+            crop,
             normalize,
             False,
             slice_back,
@@ -614,6 +595,40 @@ class BaseODDataset(BaseDetectionDataset, ObjectDetectionDataset[NDArray[np.floa
         img = self._transforms(img)
 
         target = ObjectDetectionTarget(boxes, labels, scores)
+
+        img_metadata = {key: val[index] for key, val in self._datum_metadata.items()}
+        img_metadata = img_metadata | additional_metadata
+
+        return img, target, img_metadata
+
+
+class BaseSegDataset(BaseDetectionDataset, SegmentationDataset[NDArray[Any], DatasetMetadata]):
+    """
+    Base class for segmentation datasets.
+    """
+
+    def __getitem__(self, index: int) -> tuple[NDArray[Any], SegmentationTarget[NDArray[Any]], dict[str, Any]]:
+        """
+        Args
+        ----
+        index : int
+            Value of the desired data point
+
+        Returns
+        -------
+        tuple[NDArray[Any], SegmentationTarget[NDArray[Any]], dict[str, Any]]
+            Image, target, datum_metadata - target.mask returns the ground truth mask
+        """
+        # Grab the labels from the annotations
+        _, labels, additional_metadata = self._read_annotations(self._annotations[index])
+        scores = np.ones(len(labels))
+        # Grab the ground truth masks
+        mask = self._read_file(self._masks[index])
+        # Get the image
+        img = self._read_file(self._filepaths[index])
+        img = self._transforms(img)
+
+        target = SegmentationTarget(mask, labels, scores)
 
         img_metadata = {key: val[index] for key, val in self._datum_metadata.items()}
         img_metadata = img_metadata | additional_metadata

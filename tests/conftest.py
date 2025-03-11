@@ -152,9 +152,9 @@ def mnist_npy(tmp_path_factory):
 @pytest.fixture(scope="session")
 def ship_fake(tmp_path_factory):
     temp = tmp_path_factory.mktemp("data")
-    ship_temp = temp / "shipdataset" / "shipsnet"
+    ship_temp = temp / "ships" / "shipsnet"
     ship_temp.mkdir(parents=True, exist_ok=True)
-    scene_temp = temp / "shipdataset" / "scenes"
+    scene_temp = temp / "ships" / "scenes"
     scene_temp.mkdir(parents=True, exist_ok=True)
     labels = np.concatenate([np.ones(1000, dtype=np.uint8), np.zeros(3000, dtype=np.uint8)])
     data = np.ones((4000, 10, 10, 3), dtype=np.uint8) * labels[:, np.newaxis, np.newaxis, np.newaxis]
@@ -163,6 +163,12 @@ def ship_fake(tmp_path_factory):
         image.save(ship_temp / f"{labels[i]}__abc__105_{i}.png")
     scene = Image.fromarray(np.ones((1500, 1250, 3), dtype=np.uint8))
     scene.save(scene_temp / "img_1.png")
+    yield temp
+
+
+@pytest.fixture(scope="session")
+def cifar_fake(tmp_path_factory):
+    temp = tmp_path_factory.mktemp("data")
     yield temp
 
 
@@ -193,4 +199,90 @@ def milco_fake(tmp_path_factory):
         object2 = f"{int(np.random.choice([0, 1]))} {829 / 1024} {115 / 1024} {56 / 1024} {43 / 1024}"
         with open(c_temp / f"{i}_2015.txt", mode="w") as f:
             f.write(f"{object1}\n{object2}")
+    yield temp
+
+
+@pytest.fixture
+def voc_fake(tmp_path):
+    temp = tmp_path / "data"
+    temp.mkdir()
+    random_temp = tmp_path / "random"
+    random_temp.mkdir()
+    base_nested = random_temp / "2011VOC" / "AnotherFolder"
+    base_nested.mkdir(parents=True, exist_ok=True)
+    img_temp = base_nested / "JPEGImages"
+    img_temp.mkdir(exist_ok=True)
+    label_temp = base_nested / "Annotations"
+    label_temp.mkdir(exist_ok=True)
+    sets_temp = base_nested / "ImageSets" / "Main"
+    sets_temp.mkdir(parents=True, exist_ok=True)
+    seg_temp = base_nested / "SegmentationClass"
+    seg_temp.mkdir(exist_ok=True)
+    file_list = [f"2009_00{i}573" for i in range(3)]
+    img = Image.fromarray(np.ones((10, 10, 3), dtype=np.uint8))
+    complicate = np.zeros((10, 10, 3), dtype=np.uint8)
+    complicate[3:7, 3:7] = 4
+    seg = Image.fromarray(complicate)
+    annotation_str = """
+    <annotation>
+        <folder>VOC2012</folder>
+        <filename>2009_001573.jpg</filename>
+        <source>
+            <database>The VOC2007 Database</database>
+            <annotation>PASCAL VOC2007</annotation>
+            <image>flickr</image>
+        </source>
+        <size>
+            <width>500</width>
+            <height>375</height>
+            <depth>3</depth>
+        </size>
+        <segmented>1</segmented>
+        <object>
+            <name>dog</name>
+            <pose>Unspecified</pose>
+            <truncated>0</truncated>
+            <difficult>0</difficult>
+            <bndbox>
+                <xmin>123</xmin>
+                <ymin>115</ymin>
+                <xmax>379</xmax>
+                <ymax>275</ymax>
+            </bndbox>
+        </object>
+        <object>
+            <name>chair</name>
+            <pose>Frontal</pose>
+            <truncated>1</truncated>
+            <difficult>0</difficult>
+            <bndbox>
+                <xmin>75</xmin>
+                <ymin>1</ymin>
+                <xmax>428</xmax>
+                <ymax>375</ymax>
+            </bndbox>
+        </object>
+    </annotation>
+    """
+    # Creating the sample files
+    for file in file_list:
+        img_save = img_temp / (file + ".jpg")
+        img.save(img_save)
+        seg_save = seg_temp / (file + ".jpg")
+        seg.save(seg_save)
+        label_save = label_temp / (file + ".xml")
+        with open(label_save, "w") as f:
+            f.write(annotation_str)
+    with open(sets_temp / "train.txt", "w") as f:
+        f.write("\n".join(file_list))
+    with open(sets_temp / "val.txt", "w") as f:
+        f.write("\n".join([file_list[0], file_list[2]]))
+    with open(sets_temp / "trainval.txt", "w") as f:
+        f.write("\n".join(file_list))
+    with open(sets_temp / "test.txt", "w") as f:
+        f.write(file_list[1])
+
+    # Making the tar file
+    shutil.make_archive(str(temp / "VOCtrainval_11-May-2012"), "tar", base_dir=(random_temp / "2011VOC"))
+
     yield temp

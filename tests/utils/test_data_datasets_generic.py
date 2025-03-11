@@ -17,9 +17,11 @@ from dataeval.utils.data.datasets._base import (
     _ic_data_subselection,
     _validate_file,
 )
-from dataeval.utils.data.datasets._ic import MNIST, ShipDataset
-from dataeval.utils.data.datasets._od import MILCO
-from dataeval.utils.data.datasets._types import ObjectDetectionTarget
+from dataeval.utils.data.datasets._milco import MILCO
+from dataeval.utils.data.datasets._mnist import MNIST
+from dataeval.utils.data.datasets._ships import Ships
+from dataeval.utils.data.datasets._types import ObjectDetectionTarget, SegmentationTarget
+from dataeval.utils.data.datasets._voc import VOCSegmentation
 
 TEMP_MD5 = "d149274109b50d5147c09d6fc7e80c71"
 TEMP_SHA256 = "2b749913055289cb3a5c602a17196b5437dc59bba50e986ea449012a303f7201"
@@ -282,7 +284,7 @@ class TestBaseDataset:
     )
     def test_dataset_channels(self, ship_fake, channels, expected_img, expected_scene):
         """Test channels_first functionality."""
-        dataset = ShipDataset(root=str(ship_fake), size=1000, channels=channels)
+        dataset = Ships(root=str(ship_fake), size=1000, channels=channels)
         img, _, _ = dataset[0]
         assert img.shape == expected_img
         scene = dataset.get_scene(0)
@@ -306,7 +308,7 @@ class TestBaseICDataset:
     @pytest.mark.parametrize("balance, from_back", [(True, False), (False, True), (False, False)])
     def test_dataset_preprocess_metadata(self, ship_fake, wrong_mnist, balance, from_back):
         """Test selecting different sized datasets with and without metadata."""
-        dataset = ShipDataset(root=ship_fake, balance=balance, slice_back=from_back)
+        dataset = Ships(root=ship_fake, balance=balance, slice_back=from_back)
         assert dataset._datum_metadata != {}
         dataset = MNIST(root=wrong_mnist, balance=balance, slice_back=from_back)
         assert dataset._datum_metadata == {}
@@ -315,8 +317,8 @@ class TestBaseICDataset:
     def test_dataset_slice_back(self, ship_fake, mnist_npy, ship, expected):
         """Test the functionality of slicing from the back."""
         if ship:
-            datasetA = ShipDataset(root=ship_fake, size=-1, slice_back=True)
-            datasetB = ShipDataset(root=ship_fake, size=1000, slice_back=True, balance=False)
+            datasetA = Ships(root=ship_fake, size=-1, slice_back=True)
+            datasetB = Ships(root=ship_fake, size=1000, slice_back=True, balance=False)
         else:
             datasetA = MNIST(root=mnist_npy, size=-1, slice_back=True)
             datasetB = MNIST(root=mnist_npy, size=1000, slice_back=True, balance=False)
@@ -341,6 +343,7 @@ class TestBaseICDataset:
             assert "id" in dataset.metadata
             assert dataset.class_set != {}
             assert dataset.num_classes is not None
+            assert len(dataset) == 1000
             img, *_ = dataset[0]
             assert img.shape == (1, 28, 28)
             this = dataset.info()
@@ -351,7 +354,7 @@ class TestBaseICDataset:
 class TestBaseODDataset:
     def test_od_dataset(self, milco_fake):
         "Test to make sure the BaseODDataset has all the required parts"
-        dataset = MILCO(root=milco_fake)
+        dataset = MILCO(root=milco_fake)  # type: ignore
         if isinstance(dataset, MILCO):
             assert dataset._resources is not None
             assert dataset.index2label != {}
@@ -365,3 +368,57 @@ class TestBaseODDataset:
                 assert img.shape == (3, 10, 10)
                 assert isinstance(target, ObjectDetectionTarget)
                 assert "year" in datum_meta
+
+
+@pytest.mark.optional
+class TestBaseVOCDataset:
+    def mock_resources(self, base):
+        resources = [
+            DataLocation(
+                url="http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar",
+                filename="VOCtrainval_11-May-2012.tar",
+                md5=True,
+                checksum=get_tmp_hash(base / "VOCtrainval_11-May-2012.tar"),
+            ),
+        ]
+        return resources
+
+    def test_seg_dataset(self, voc_fake, monkeypatch):
+        "Test to make sure the BaseSegDataset has all the required parts"
+        monkeypatch.setattr(VOCSegmentation, "_resources", self.mock_resources(voc_fake))
+        dataset = VOCSegmentation(root=voc_fake)
+        if isinstance(dataset, VOCSegmentation):
+            assert dataset._resources is not None
+            assert dataset.index2label != {}
+            assert dataset.label2index != {}
+            assert "id" in dataset.metadata
+            assert dataset.class_set != {}
+            assert dataset.num_classes is not None
+            assert len(dataset) == 3
+            img, target, datum_meta = dataset[1]
+            assert img.shape == (3, 10, 10)
+            assert isinstance(target, SegmentationTarget)
+            assert "pose" in datum_meta
+
+    def test_voc_wrong_year(self, voc_fake):
+        """Test ask for test set with wrong year"""
+        err_msg = "The only test set available is for the year 2007, not 2012."
+        with pytest.raises(ValueError) as e:
+            VOCSegmentation(root=voc_fake, image_set="test")
+        assert err_msg in str(e.value)
+
+    def test_voc_2007_test(self, voc_fake, monkeypatch):
+        """Test correctly ask for test set"""
+        monkeypatch.setattr(VOCSegmentation, "_resources", self.mock_resources(voc_fake))
+        dataset = VOCSegmentation(
+            root=voc_fake,
+            image_set="test",
+            year="2007",
+            size=1,
+            unit_interval=True,
+            dtype=np.float32,
+            channels="channels_last",
+            normalize=(2.0, 1.0),
+            slice_back=True,
+        )
+        assert dataset.dataset_dir.stem == "VOC2007"
