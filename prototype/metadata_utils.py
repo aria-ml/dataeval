@@ -74,9 +74,9 @@ class InstanceMNIST(blank_object):
                 print(f'Unknown corruption type {c}.')
                 raise ValueError
 
-            mnist = MNIST(root='./data', corruption=c, size=size, randomize=False, balance=False, verbose=False) # type: ignore
-            images, labels = mnist._load_data_inner()
-            images, labels = images[ishuff], labels[ishuff]
+            mnist = MNIST(root='./data', corruption=c, size=size, balance=False) # type: ignore
+            images, labels = mnist._loaded_data, mnist._labels
+            images, labels = images[ishuff], np.array(labels, dtype=np.intp)[ishuff]
 
             images, labels = images[ic*size:ic*size+size], labels[ic*size:ic*size+size]
             images = (np.reshape(images, (size, 1, *images.shape[1:]))/255.0).astype(np.float32)
