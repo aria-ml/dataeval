@@ -27,7 +27,7 @@ def download():
         # ClassLabelAnalysisTutorial.ipynb
         # DuplicatesTutorial.ipynb
         # HPDivergenceTutorial.ipynb
-        MNIST(root="./data", download=True, train=True, corruption="translate")
+        MNIST(root="./data", download=True, image_set="train", corruption="translate")
 
         # LintingTutorial.ipynb
         CIFAR10(root="./data", train=False, download=True)
