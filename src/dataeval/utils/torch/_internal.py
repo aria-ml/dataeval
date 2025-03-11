@@ -156,7 +156,7 @@ def trainer(
             y_hat = model(x)
             y = x if y is None else y
 
-            loss = loss_fn(y, y_hat)  # type: ignore
+            loss = loss_fn(y, *y_hat) if isinstance(y_hat, tuple) else loss_fn(y, y_hat)  # type: ignore
 
             optimizer.zero_grad()
             loss.backward()

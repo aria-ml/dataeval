@@ -2,8 +2,7 @@ import torch
 from torchvision.datasets.vision import VisionDataset
 from torch.utils.data import Dataset
 import numpy as np
-import tensorflow as tf
-# import tensorflow_datasets as tfds
+
 from scipy.spatial import ConvexHull
 from dataeval.utils.data.datasets import MNIST
 from types import SimpleNamespace as blank_object
@@ -29,9 +28,15 @@ class InstanceMNIST(blank_object):
     Interface to corrupted MNIST, along with self-generated intrinsic metadata. The latter comes from a catalog of
     simple functions that compute something about each image. A user can easily add new functions to compute other 
     quantities of interest if desired. 
+
+    This class has attributes that are Pytorch MNIST datasets, one for each corruption requested. These attributes are built using MakeDataset.
     """
     def __init__(self, corruptions=None, size=None, **kwargs):
-        MNIST_NUM_IMAGES = 60000
+        train = kwargs.get('train')
+        train = True if train is None else train
+
+        MNIST_NUM_IMAGES = 60000 if train else 10000
+        print(f'train is {train}, MNIST_NUM_IMAGES: {MNIST_NUM_IMAGES}')
 
         self.rng = np.random.default_rng(1234)
         ishuff = self.rng.permutation(MNIST_NUM_IMAGES)
@@ -79,10 +84,12 @@ class InstanceMNIST(blank_object):
             images, labels = images[ishuff], np.array(labels, dtype=np.intp)[ishuff]
 
             images, labels = images[ic*size:ic*size+size], labels[ic*size:ic*size+size]
-            images = (np.reshape(images, (size, 1, *images.shape[1:]))/255.0).astype(np.float32)
+            # images = (np.reshape(images, (size, 1, *images.shape[1:]))/255.0).astype(np.float32) # some fix in MNIST class obviates this
+            images = (images - images.min())/(images.max() - images.min()).astype(np.float32) # And THIS has become necessary!!!
 
 
-            nsamp, nchan, ny, nx = images.shape
+
+            nsamp, ny, nx, nchan = images.shape
 
             self.x, self.y = np.meshgrid(np.linspace(0, nx - 1, nx), np.linspace(0, ny - 1, ny))
 
@@ -94,7 +101,8 @@ class InstanceMNIST(blank_object):
 
     def __getitem__(self, corruption, idx):
         myself = getattr(self, corruption)
-        img = torch.tensor(myself.images[idx:idx+1, 0, :, :]) # idx:idx+1 yields a leading dimension of 1
+        # img = torch.tensor(myself.images[idx:idx+1, 0, :, :]) # idx:idx+1 yields a leading dimension of 1
+        img = torch.tensor(myself.images[idx:idx+1, :, :, 0]) # idx:idx+1 yields a leading dimension of 1
         label = myself.labels[idx]
         metadata = myself.metadata[idx]
 
@@ -204,7 +212,7 @@ def collate_fn_2(batch):
     # Let's create a tensor that concatenates all your images on a new axis.
     # Is there another way to do this?
     # xs = torch.cat([torch.tensor(i).unsqueeze(0) for i in xs], dim=0)
-    xs = torch.stack(xs)
+    xs = torch.stack(xs).to(torch.float32)
     # Let's create another tensor that combines all your class labels.
     ys = torch.tensor([i for i in ys])
 
