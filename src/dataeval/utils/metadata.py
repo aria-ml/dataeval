@@ -127,6 +127,8 @@ def _flatten_dict_inner(
     items: dict[tuple[str, ...], Any] = {}
     for k, v in d.items():
         new_keys: tuple[str, ...] = parent_keys + (k,)
+        if isinstance(v, np.ndarray):
+            v = v.tolist()
         if isinstance(v, dict):
             fd, size = _flatten_dict_inner(v, dropped, new_keys, size=size, nested=nested)
             items.update(fd)
