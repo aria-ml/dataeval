@@ -75,7 +75,7 @@ class InstanceMNIST(blank_object):
                 raise ValueError
 
             mnist = MNIST(root='./data', corruption=c, size=size, randomize=False, balance=False, verbose=False) # type: ignore
-            images, labels = mnist._load_data()
+            images, labels = mnist._load_data_inner()
             images, labels = images[ishuff], labels[ishuff]
 
             images, labels = images[ic*size:ic*size+size], labels[ic*size:ic*size+size]

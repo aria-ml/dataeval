@@ -17,13 +17,13 @@ class InfoMixin:
 
     def info(self) -> str:
         """Pretty prints dataset name and information."""
-
-        return f"{self._image_set.capitalize()}\n{'-' * len(self._image_set)}\n{str(self)}\n"
+        return f"{self._image_set.capitalize()}\n{'-' * len(self._image_set)}\n{self.__class__.__name__}\n{str(self)}\n"
 
 
 class DatasetMetadata(TypedDict):
     id: str
     index2label: dict[int, str]
+    split: str
 
 
 TDatasetMetadata = TypeVar("TDatasetMetadata", bound=DatasetMetadata)
