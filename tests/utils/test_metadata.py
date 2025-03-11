@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 from dataeval.utils.metadata import _simplify_type, flatten, merge
@@ -30,6 +31,8 @@ class TestUtilsMetadata:
         {"a": 2},
         {"a": 3, "d": [{"e": {"f": [{"g": 1, "h": 2}]}}]},
     ]
+
+    numpy_value = [{"time": np.array([1.2, 3.4, 5.6]), "altitude": [235, 6789, 101112], "point": 4}]
 
     voc_test = [
         {
@@ -445,6 +448,16 @@ class TestUtilsMetadata:
     def test_merge_no_dropped_warns(self):
         with pytest.warns(UserWarning, match=r"Metadata entries were dropped"):
             merge(self.inconsistent_keys, return_dropped=False)
+
+    def test_handle_numpy(self):
+        output, dropped = merge(self.numpy_value, return_dropped=True)
+        assert output == {
+            "time": [1.2, 3.4, 5.6],
+            "altitude": [235, 6789, 101112],
+            "point": [4, 4, 4],
+            "_image_index": [0, 0, 0],
+        }
+        assert dropped == {}
 
 
 @pytest.mark.required
