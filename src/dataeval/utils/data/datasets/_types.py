@@ -52,3 +52,15 @@ class ObjectDetectionTarget(Generic[TArray]):
 class ObjectDetectionDataset(
     SizedDataset[tuple[TArray, ObjectDetectionTarget[TArray], dict[str, Any]], TDatasetMetadata]
 ): ...
+
+
+@dataclass
+class SegmentationTarget(Generic[TArray]):
+    mask: TArray
+    labels: TArray
+    scores: TArray
+
+
+class SegmentationDataset(
+    SizedDataset[tuple[TArray, SegmentationTarget[TArray], dict[str, Any]], TDatasetMetadata]
+): ...

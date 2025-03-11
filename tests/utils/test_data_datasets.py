@@ -1,9 +1,22 @@
+import hashlib
 from collections import Counter
 
 import numpy as np
 import pytest
 
-from dataeval.utils.data.datasets._ic import MNIST, ShipDataset
+from dataeval.utils.data.datasets._base import DataLocation
+from dataeval.utils.data.datasets._cifar10 import CIFAR10
+from dataeval.utils.data.datasets._mnist import MNIST
+from dataeval.utils.data.datasets._ships import Ships
+from dataeval.utils.data.datasets._voc import VOCDetection
+
+
+def get_tmp_hash(fpath, chunk_size=65535):
+    hasher = hashlib.md5()
+    with open(fpath, "rb") as fpath_file:
+        while chunk := fpath_file.read(chunk_size):
+            hasher.update(chunk)
+    return hasher.hexdigest()
 
 
 @pytest.mark.optional
@@ -73,12 +86,64 @@ class TestMNIST:
 class TestShipDataset:
     def test_ship_initialization(self, ship_fake):
         """Test Ship dataset initialization."""
-        dataset = ShipDataset(root=str(ship_fake))
+        dataset = Ships(root=str(ship_fake))
         assert isinstance(dataset._labels, list)
         assert isinstance(dataset._labels[0], int)
         assert len(dataset) == 4000
         img, *_ = dataset[0]
         assert img.shape == (3, 10, 10)
+        assert dataset._datum_metadata != {}
         scene = dataset.get_scene(0)
         assert scene.shape == (3, 1500, 1250)
-        assert dataset._datum_metadata
+
+
+@pytest.mark.optional
+class TestCIFAR10:
+    def test_cifar10_initialization(self, cifar_fake):
+        """Test CIFAR10 dataset initialization."""
+        dataset = CIFAR10(root=cifar_fake, download=True)
+        assert isinstance(dataset._labels, list)
+        assert isinstance(dataset._labels[0], int)
+        assert len(dataset) == 50000
+        img, *_ = dataset[0]
+        assert img.shape == (3, 32, 32)
+        assert dataset._datum_metadata != {}
+
+    def test_cifar10_base(self, cifar_fake):
+        """Test CIFAR10 dataset with base"""
+        dataset = CIFAR10(root=cifar_fake, image_set="base")
+        assert isinstance(dataset._labels, list)
+        assert isinstance(dataset._labels[0], int)
+        assert len(dataset) == 60000
+        img, *_ = dataset[0]
+        assert img.shape == (3, 32, 32)
+        assert dataset._datum_metadata != {}
+
+
+@pytest.mark.optional
+class TestVOC:
+    def mock_resources(self, voc_fake):
+        resources = [
+            DataLocation(
+                url="http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar",
+                filename="VOCtrainval_11-May-2012.tar",
+                md5=True,
+                checksum=get_tmp_hash(voc_fake / "VOCtrainval_11-May-2012.tar"),
+            ),
+        ]
+        return resources
+
+    def test_voc_detection(self, voc_fake, monkeypatch):
+        """Test VOC detection dataset initialization"""
+        monkeypatch.setattr(VOCDetection, "_resources", self.mock_resources(voc_fake))
+        dataset = VOCDetection(root=voc_fake)
+        img, target, datum_meta = dataset[0]
+        assert img.shape == (3, 10, 10)
+        assert np.all(target.labels == [11, 8])
+        assert "pose" in datum_meta
+
+        dataset = VOCDetection(root=voc_fake / "VOC2012", image_set="val")
+        img, target, datum_meta = dataset[0]
+        assert img.shape == (3, 10, 10)
+        assert np.all(target.labels == [11, 8])
+        assert "pose" in datum_meta
