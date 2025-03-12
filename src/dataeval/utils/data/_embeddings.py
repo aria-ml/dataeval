@@ -3,7 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 import math
-from typing import Iterator, Sequence
+from typing import Any, Iterator, Sequence
 
 import torch
 from torch.utils.data import DataLoader, Subset
@@ -11,11 +11,7 @@ from tqdm import tqdm
 
 from dataeval.config import get_device
 from dataeval.typing import TArray
-from dataeval.utils.data.datasets._types import (
-    ImageClassificationDataset,
-    ObjectDetectionDataset,
-    TDatasetMetadata,
-)
+from dataeval.utils.data.datasets._types import SizedDataset
 from dataeval.utils.torch.models import SupportsEncode
 
 
@@ -45,9 +41,9 @@ class Embeddings:
 
     def __init__(
         self,
-        dataset: ImageClassificationDataset[TArray, TDatasetMetadata]
-        | ObjectDetectionDataset[TArray, TDatasetMetadata],
+        dataset: SizedDataset[TArray, Any],
         batch_size: int,
+        indices: Sequence[int] | None = None,
         model: torch.nn.Module | None = None,
         device: torch.device | str | None = None,
         verbose: bool = False,
@@ -57,6 +53,7 @@ class Embeddings:
         self.verbose = verbose
 
         self._dataset = dataset
+        self._indices = indices if indices is not None else range(len(dataset))
         model = torch.nn.Flatten() if model is None else model
         self._model = model.to(self.device).eval()
         self._encoder = model.encode if isinstance(model, SupportsEncode) else model
@@ -90,7 +87,9 @@ class Embeddings:
             embeddings = self._encoder(torch.stack(images).to(self.device))
             yield embeddings
 
-    def __getitem__(self, key: slice | int) -> torch.Tensor:
+    def __getitem__(self, key: int | slice | list[int]) -> torch.Tensor:
+        if isinstance(key, list):
+            return torch.vstack(list(self._batch(key))).to(self.device)
         if isinstance(key, slice):
             return torch.vstack(list(self._batch(range(len(self._dataset))[key]))).to(self.device)
         elif isinstance(key, int):
