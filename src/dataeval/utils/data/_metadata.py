@@ -8,14 +8,12 @@ from typing import TYPE_CHECKING, Any, Literal, Mapping, Sequence
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.typing import TArray
+from dataeval.typing import Array
 from dataeval.utils._array import as_numpy, to_numpy
 from dataeval.utils._bin import bin_data, digitize_data, is_continuous
 from dataeval.utils.data.datasets._types import (
-    ImageClassificationDataset,
-    ObjectDetectionDataset,
+    AnnotatedDataset,
     ObjectDetectionTarget,
-    TDatasetMetadata,
 )
 from dataeval.utils.metadata import merge
 
@@ -67,8 +65,7 @@ class Metadata:
 
     def __init__(
         self,
-        dataset: ImageClassificationDataset[TArray, TDatasetMetadata]
-        | ObjectDetectionDataset[TArray, TDatasetMetadata],
+        dataset: AnnotatedDataset[Any, Any],
         *,
         continuous_factor_bins: Mapping[str, int | Sequence[float]] | None = None,
         auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
@@ -215,10 +212,12 @@ class Metadata:
                 bboxes.extend(as_numpy(target.boxes).tolist())
                 scores.extend(as_numpy(target.scores).tolist())
                 srcidx.extend([i] * target_len)
-            else:
+            elif isinstance(target, Array):
                 target_len = 1
                 labels.append(int(np.argmax(as_numpy(target))))
                 scores.append(target)
+            else:
+                raise TypeError("Encountered unsupported target type in dataset")
 
             is_od = is_od_target if is_od is None else is_od
             if is_od != is_od_target:

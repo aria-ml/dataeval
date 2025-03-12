@@ -3,13 +3,23 @@ from __future__ import annotations
 __all__ = []
 
 from pathlib import Path
-from typing import Any, Literal, TypeVar
+from typing import Any, Literal, Sequence, TypeVar
 from xml.etree.ElementTree import parse
 
-import numpy as np
+import torch
 from numpy.typing import NDArray
 
-from dataeval.utils.data.datasets._base import BaseDetectionDataset, BaseODDataset, BaseSegDataset, DataLocation
+from dataeval.utils.data.datasets._base import (
+    BaseDataset,
+    BaseODDataset,
+    BaseSegDataset,
+    DataLocation,
+)
+from dataeval.utils.data.datasets._mixin import BaseDatasetNumpyMixin, BaseDatasetTorchMixin
+from dataeval.utils.data.datasets._types import ObjectDetectionTarget, SegmentationTarget, Transform
+
+_TArray = TypeVar("_TArray")
+_TTarget = TypeVar("_TTarget")
 
 VOCClassStringMap = Literal[
     "aeroplane",
@@ -36,7 +46,7 @@ VOCClassStringMap = Literal[
 TVOCClassMap = TypeVar("TVOCClassMap", VOCClassStringMap, int, list[VOCClassStringMap], list[int])
 
 
-class BaseVOCDataset(BaseDetectionDataset):
+class BaseVOCDataset(BaseDataset[_TArray, _TTarget, list[str]]):
     _resources = [
         DataLocation(
             url="http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar",
@@ -104,55 +114,55 @@ class BaseVOCDataset(BaseDetectionDataset):
         18: "train",
         19: "tvmonitor",
     }
-    label2index: dict[str, int] = {v: k for k, v in index2label.items()}
 
-    def _unique_id(self) -> str:
-        unique_id = f"{self.__class__.__name__}_{self._image_set}_{self._year}"
-        if self.size > 0:
-            unique_id += f"_{self.size}"
-        if self.unit_interval:
-            unique_id += "_on-unit-interval"
-        if self.dtype is not None:
-            unique_id += f"_{self.dtype}"
-        if self.channels == "channels_last":
-            unique_id += "_channels-last"
-        if self.normalize:
-            unique_id += "_normalized"
-        # if self.balance:
-        #     unique_id += "_balanced"
-        if self.from_back:
-            unique_id += "_sliced-from-back"
+    def __init__(
+        self,
+        root: str | Path,
+        year: Literal["2007", "2008", "2009", "2010", "2011", "2012"] = "2012",
+        image_set: Literal["train", "val", "test", "base"] = "train",
+        download: bool = False,
+        transforms: Transform[_TArray] | Sequence[Transform[_TArray]] | None = None,
+        verbose: bool = False,
+    ) -> None:
+        self.year = year
+        self._resource_index = self._get_year_image_set_index(year, image_set)
+        super().__init__(
+            root,
+            download,
+            image_set,
+            transforms,
+            verbose,
+        )
 
-        return unique_id
-
-    def _get_directory(self, year) -> None:
+    def _get_dataset_dir(self) -> Path:
         """Function to reassign the dataset directory for common use with the VOC detection and segmentation classes"""
-        self.dataset_dir.rmdir()
-        if self.root.stem == f"VOC{year}":
-            self.dataset_dir: Path = self.root
+        if self._root.stem == f"VOC{self.year}":
+            dataset_dir: Path = self._root
         else:
-            self.dataset_dir: Path = self.root / f"VOC{year}"
-        if not self.dataset_dir.exists():
-            self.dataset_dir.mkdir(parents=True, exist_ok=True)
+            dataset_dir: Path = self._root / f"VOC{self.year}"
+        if not dataset_dir.exists():
+            dataset_dir.mkdir(parents=True, exist_ok=True)
+        return dataset_dir
 
-    def _check_year_image_set(self, year, image_set) -> None:
+    def _get_year_image_set_index(self, year, image_set) -> int:
         """Function to ensure that the correct resource file is accessed"""
         if year == "2007" and image_set == "test":
-            self._resource = self._resources[-1]
+            return -1
         elif year != "2007" and image_set == "test":
             raise ValueError(
                 f"The only test set available is for the year 2007, not {year}. "
                 "Either select the year 2007 or use a different image_set."
             )
         else:
-            self._resource = self._resources[2012 - int(year)]
+            return 2012 - int(year)
 
-    def _get_image_set_dict(self) -> None:
+    def _get_image_sets(self) -> dict[str, list[str]]:
         """Function to create the list of images in each image set"""
-        image_folder = self.dataset_dir / "JPEGImages"
-        image_set_list = ["train", "val", "trainval"] if self._image_set != "test" else ["test"]
+        image_folder = self.path / "JPEGImages"
+        image_set_list = ["train", "val", "trainval"] if self.image_set != "test" else ["test"]
+        image_sets = {}
         for image_set in image_set_list:
-            text_file = self.dataset_dir / "ImageSets" / "Main" / (image_set + ".txt")
+            text_file = self.path / "ImageSets" / "Main" / (image_set + ".txt")
             selected_images: list[str] = []
             with open(text_file) as f:
                 for line in f.readlines():
@@ -160,20 +170,21 @@ class BaseVOCDataset(BaseDetectionDataset):
                     selected_images.append(str(image_folder / (out + ".jpg")))
 
             name = "base" if image_set == "trainval" else image_set
-            self._image_set_dict[name] = selected_images
+            image_sets[name] = selected_images
+        return image_sets
 
     def _load_data_inner(self) -> tuple[list[str], list[str], dict[str, Any]]:
         """Function to load in the file paths for the data, annotations and segmentation masks"""
         file_meta = {"year": [], "image_id": [], "mask_path": []}
-        ann_folder = self.dataset_dir / "Annotations"
-        seg_folder = self.dataset_dir / "SegmentationClass"
+        ann_folder = self.path / "Annotations"
+        seg_folder = self.path / "SegmentationClass"
 
         # Load in the image sets
-        self._get_image_set_dict()
+        image_sets = self._get_image_sets()
 
         # Get the data, annotations and metadata
         annotations = []
-        data = self._image_set_dict[self._image_set]
+        data = image_sets[self.image_set]
         for entry in data:
             file_name = Path(entry).name
             file_stem = Path(entry).stem
@@ -186,9 +197,8 @@ class BaseVOCDataset(BaseDetectionDataset):
 
         return data, annotations, file_meta
 
-    def _read_annotations(self, annotation: str) -> tuple[NDArray[np.float64], NDArray[np.uintp], dict[str, Any]]:
-        """Function for extracting the info out of the text files"""
-        boxes = []
+    def _read_annotations(self, annotation: str) -> tuple[list[list[float]], list[int], dict[str, Any]]:
+        boxes: list[list[float]] = []
         label_str = []
         root = parse(annotation).getroot()
         num_objects = len(root.findall("object"))
@@ -213,19 +223,21 @@ class BaseVOCDataset(BaseDetectionDataset):
             additional_meta["difficult"].append(int(obj.findtext("difficult", default="-1")))
             boxes.append(
                 [
-                    int(obj.findtext("bndbox/xmin", default="0")),
-                    int(obj.findtext("bndbox/ymin", default="0")),
-                    int(obj.findtext("bndbox/xmax", default="0")),
-                    int(obj.findtext("bndbox/ymax", default="0")),
+                    float(obj.findtext("bndbox/xmin", default="0")),
+                    float(obj.findtext("bndbox/ymin", default="0")),
+                    float(obj.findtext("bndbox/xmax", default="0")),
+                    float(obj.findtext("bndbox/ymax", default="0")),
                 ]
             )
-
         labels = [self.label2index[label] for label in label_str]
+        return boxes, labels, additional_meta
 
-        return np.array(boxes, dtype=np.float64), np.array(labels, dtype=np.uintp), additional_meta
 
-
-class VOCDetection(BaseVOCDataset, BaseODDataset):
+class VOCDetection(
+    BaseVOCDataset[NDArray[Any], ObjectDetectionTarget[NDArray[Any]]],
+    BaseODDataset[NDArray[Any]],
+    BaseDatasetNumpyMixin,
+):
     """
     `Pascal VOC <http://host.robots.ox.ac.uk/pascal/VOC/>`_ Detection Dataset.
 
@@ -241,23 +253,8 @@ class VOCDetection(BaseVOCDataset, BaseODDataset):
         If "base", then the combined dataset of "train" and "val" is returned.
     year : "2007", "2008", "2009", "2010", "2011" or "2012", default "2012"
         The dataset year.
-    size : int, default -1
-        Limit the dataset size, must be a value greater than 0.
-    classes : "aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow", \
-        "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor", \
-        int, list, or None, default None
-        Option to select specific classes from dataset. Classes are 0-9, any other number is ignored.
-    unit_interval : bool, default False
-        Shift the data values to the unit interval [0-1].
-    dtype : type | None, default None
-        If None, data is loaded as np.uint8.
-        Otherwise specify the desired :term:`NumPy` dtype.
-    channels : "channels_first" or "channels_last", default channels_first
-        Location of channel axis if desired, default is downloaded image which contains channels last
-    normalize : tuple[mean, std] or None, default None
-        Normalize images acorrding to provided mean and standard deviation
-    slice_back : bool, default False
-        If True and size has a value greater than 0, then grabs selection starting at the last image.
+    transforms : Transform | Sequence[Transform] | None, default None
+        Transform(s) to apply to the data.
     verbose : bool, default False
         If True, outputs print statements.
 
@@ -267,63 +264,56 @@ class VOCDetection(BaseVOCDataset, BaseODDataset):
         Dictionary which translates from class integers to the associated class strings.
     label2index : dict
         Dictionary which translates from class strings to the associated class integers.
-    dataset_dir : Path
-        Location of the folder containing the data. Different from `root` if downloading data.
+    path : Path
+        Location of the folder containing the data.
     metadata : dict
         Dictionary containing Dataset metadata, such as `id` which returns the dataset class name.
-    class_set : set
-        The chosen set of labels to use. This is a binary dataset so there is only 0 ("MILCO") and 1 ("NOMBO").
-    num_classes : int
-        The number of classes in `class_set`.
     """
 
-    def __init__(
-        self,
-        root: str | Path,
-        download: bool = False,
-        image_set: Literal["train", "val", "test", "base"] = "train",
-        year: Literal["2007", "2008", "2009", "2010", "2011", "2012"] = "2012",
-        size: int = -1,
-        classes: TVOCClassMap | None = None,
-        unit_interval: bool = False,
-        dtype: type | None = None,
-        channels: Literal["channels_first", "channels_last"] = "channels_first",
-        crop: int | None = None,
-        normalize: tuple[float, float] | None = None,
-        # balance: bool = False,
-        slice_back: bool = False,
-        verbose: bool = False,
-    ) -> None:
-        self._year = year
-        super().__init__(
-            root,
-            download,
-            image_set,
-            size,
-            unit_interval,
-            dtype,
-            channels,
-            crop,
-            normalize,
-            # balance,
-            slice_back,
-            verbose,
-        )
 
-        self.class_set: set[int] = self._reduce_classes(classes)
-        self.num_classes: int = len(self.class_set)
-        self._image_set = image_set
-        self._filepaths: list[str]
+class VOCDetectionTorch(
+    BaseVOCDataset[torch.Tensor, ObjectDetectionTarget[torch.Tensor]],
+    BaseODDataset[torch.Tensor],
+    BaseDatasetTorchMixin,
+):
+    """
+    `Pascal VOC <http://host.robots.ox.ac.uk/pascal/VOC/>`_ Detection Dataset.
 
-        # Adjust the directory and make sure image_set and year are compatible
-        self._get_directory(year)
-        self._check_year_image_set(year, image_set)
+    Parameters
+    ----------
+    root : str or pathlib.Path
+        Root directory of dataset where the ``vocdataset`` folder exists.
+    download : bool, default False
+        If True, downloads the dataset from the internet and puts it in root directory.
+        Class checks to see if data is already downloaded to ensure it does not create a duplicate download.
+    image_set : "train", "val", "test", or "base", default "train"
+        If "test", then dataset year must be "2007".
+        If "base", then the combined dataset of "train" and "val" is returned.
+    year : "2007", "2008", "2009", "2010", "2011" or "2012", default "2012"
+        The dataset year.
+    transforms : Transform | Sequence[Transform] | None, default None
+        Transform(s) to apply to the data.
+    verbose : bool, default False
+        If True, outputs print statements.
 
-        # Get the image files
-        self._filepaths, self._annotations, self._datum_metadata = self._load_data()
+    Attributes
+    ----------
+    index2label : dict
+        Dictionary which translates from class integers to the associated class strings.
+    label2index : dict
+        Dictionary which translates from class strings to the associated class integers.
+    path : Path
+        Location of the folder containing the data.
+    metadata : dict
+        Dictionary containing Dataset metadata, such as `id` which returns the dataset class name.
+    """
 
 
-class VOCSegmentation(BaseVOCDataset, BaseSegDataset):
+class VOCSegmentation(
+    BaseVOCDataset[NDArray[Any], SegmentationTarget[NDArray[Any]]],
+    BaseSegDataset[NDArray[Any]],
+    BaseDatasetNumpyMixin,
+):
     """
     `Pascal VOC <http://host.robots.ox.ac.uk/pascal/VOC/>`_ Segmentation Dataset.
 
@@ -339,23 +329,8 @@ class VOCSegmentation(BaseVOCDataset, BaseSegDataset):
         If "base", then the combined dataset of "train" and "val" is returned.
     year : "2007", "2008", "2009", "2010", "2011" or "2012", default "2012"
         The dataset year.
-    size : int, default -1
-        Limit the dataset size, must be a value greater than 0.
-    classes : "aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow", \
-        "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor", \
-        int, list, or None, default None
-        Option to select specific classes from dataset. Classes are 0-9, any other number is ignored.
-    unit_interval : bool, default False
-        Shift the data values to the unit interval [0-1].
-    dtype : type | None, default None
-        If None, data is loaded as np.uint8.
-        Otherwise specify the desired :term:`NumPy` dtype.
-    channels : "channels_first" or "channels_last", default channels_first
-        Location of channel axis if desired, default is downloaded image which contains channels last
-    normalize : tuple[mean, std] or None, default None
-        Normalize images acorrding to provided mean and standard deviation
-    slice_back : bool, default False
-        If True and size has a value greater than 0, then grabs selection starting at the last image.
+    transforms : Transform | Sequence[Transform] | None, default None
+        Transform(s) to apply to the data.
     verbose : bool, default False
         If True, outputs print statements.
 
@@ -365,58 +340,13 @@ class VOCSegmentation(BaseVOCDataset, BaseSegDataset):
         Dictionary which translates from class integers to the associated class strings.
     label2index : dict
         Dictionary which translates from class strings to the associated class integers.
-    dataset_dir : Path
-        Location of the folder containing the data. Different from `root` if downloading data.
+    path : Path
+        Location of the folder containing the data.
     metadata : dict
         Dictionary containing Dataset metadata, such as `id` which returns the dataset class name.
-    class_set : set
-        The chosen set of labels to use. This is a binary dataset so there is only 0 ("MILCO") and 1 ("NOMBO").
-    num_classes : int
-        The number of classes in `class_set`.
     """
 
-    def __init__(
-        self,
-        root: str | Path,
-        download: bool = False,
-        image_set: Literal["train", "val", "test", "base"] = "train",
-        year: Literal["2007", "2008", "2009", "2010", "2011", "2012"] = "2012",
-        size: int = -1,
-        classes: TVOCClassMap | None = None,
-        unit_interval: bool = False,
-        dtype: type | None = None,
-        channels: Literal["channels_first", "channels_last"] = "channels_first",
-        crop: int | None = None,
-        normalize: tuple[float, float] | None = None,
-        # balance: bool = False,
-        slice_back: bool = False,
-        verbose: bool = False,
-    ) -> None:
-        self._year = year
-        super().__init__(
-            root,
-            download,
-            image_set,
-            size,
-            unit_interval,
-            dtype,
-            channels,
-            crop,
-            normalize,
-            # balance,
-            slice_back,
-            verbose,
-        )
-
-        self.class_set: set[int] = self._reduce_classes(classes)
-        self.num_classes: int = len(self.class_set)
-        self._image_set = image_set
-        self._filepaths: list[str]
-
-        # Adjust the directory and make sure image_set and year are compatible
-        self._get_directory(year)
-        self._check_year_image_set(year, image_set)
-
-        # Get the image files
-        self._filepaths, self._annotations, self._datum_metadata = self._load_data()
-        self._masks = self._datum_metadata.pop("mask_path")
+    def _load_data(self) -> tuple[list[str], list[str], dict[str, list[Any]]]:
+        filepaths, targets, datum_metadata = super()._load_data()
+        self._masks = datum_metadata.pop("mask_path")
+        return filepaths, targets, datum_metadata

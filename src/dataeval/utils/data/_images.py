@@ -2,14 +2,10 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Generic, Iterator, Sequence, overload
+from typing import Any, Generic, Iterator, Sequence, overload
 
 from dataeval.typing import TArray
-from dataeval.utils.data.datasets._types import (
-    ImageClassificationDataset,
-    ObjectDetectionDataset,
-    TDatasetMetadata,
-)
+from dataeval.utils.data.datasets._types import SizedDataset
 
 
 class Images(Generic[TArray]):
@@ -26,8 +22,7 @@ class Images(Generic[TArray]):
 
     def __init__(
         self,
-        dataset: ImageClassificationDataset[TArray, TDatasetMetadata]
-        | ObjectDetectionDataset[TArray, TDatasetMetadata],
+        dataset: SizedDataset[TArray, Any],
     ) -> None:
         self._dataset = dataset
 
@@ -47,12 +42,14 @@ class Images(Generic[TArray]):
         return self[:]
 
     @overload
-    def __getitem__(self, key: slice) -> Sequence[TArray]: ...
+    def __getitem__(self, key: slice | list[int]) -> Sequence[TArray]: ...
 
     @overload
     def __getitem__(self, key: int) -> TArray: ...
 
-    def __getitem__(self, key: int | slice) -> Sequence[TArray] | TArray:
+    def __getitem__(self, key: int | slice | list[int]) -> Sequence[TArray] | TArray:
+        if isinstance(key, list):
+            return [self._dataset[i][0] for i in key]
         if isinstance(key, slice):
             indices = list(range(len(self._dataset))[key])
             return [self._dataset[i][0] for i in indices]

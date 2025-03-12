@@ -1,17 +1,19 @@
 from __future__ import annotations
 
+from dataeval.utils.data.datasets._mixin import BaseDatasetNumpyMixin
+
 __all__ = []
 
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Sequence
 
-import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.utils.data.datasets._base import BaseODDataset, DataLocation
+from dataeval.utils.data.datasets._types import Transform
 
 
-class MILCO(BaseODDataset):
+class MILCO(BaseODDataset[NDArray[Any]], BaseDatasetNumpyMixin):
     """
     A side-scan sonar dataset focused on mine (object) detection.
 
@@ -41,19 +43,8 @@ class MILCO(BaseODDataset):
     download : bool, default False
         If True, downloads the dataset from the internet and puts it in root directory.
         Class checks to see if data is already downloaded to ensure it does not create a duplicate download.
-    size : int, default -1
-        Limit the dataset size, must be a value greater than 0.
-    unit_interval : bool, default False
-        Shift the data values to the unit interval [0-1].
-    dtype : type | None, default None
-        If None, data is loaded as np.uint8.
-        Otherwise specify the desired :term:`NumPy` dtype.
-    channels : "channels_first" or "channels_last", default channels_first
-        Location of channel axis if desired, default is downloaded image which contains channels last
-    normalize : tuple[mean, std] or None, default None
-        Normalize images acorrding to provided mean and standard deviation
-    slice_back : bool, default False
-        If True and size has a value greater than 0, then grabs selection starting at the last image.
+    transforms : Transform | Sequence[Transform] | None, default None
+        Transform(s) to apply to the data.
     verbose : bool, default False
         If True, outputs print statements.
 
@@ -63,14 +54,10 @@ class MILCO(BaseODDataset):
         Dictionary which translates from class integers to the associated class strings.
     label2index : dict
         Dictionary which translates from class strings to the associated class integers.
-    dataset_dir : Path
-        Location of the folder containing the data. Different from `root` if downloading data.
+    path : Path
+        Location of the folder containing the data.
     metadata : dict
         Dictionary containing Dataset metadata, such as `id` which returns the dataset class name.
-    class_set : set
-        The chosen set of labels to use. This is a binary dataset so there is only 0 ("MILCO") and 1 ("NOMBO").
-    num_classes : int
-        The number of classes in `class_set`.
     """
 
     _resources = [
@@ -98,62 +85,48 @@ class MILCO(BaseODDataset):
         0: "MILCO",
         1: "NOMBO",
     }
-    label2index: dict[str, int] = {v: k for k, v in index2label.items()}
 
     def __init__(
         self,
         root: str | Path,
         download: bool = False,
-        size: int = -1,
-        unit_interval: bool = False,
-        dtype: type | None = None,
-        channels: Literal["channels_first", "channels_last"] = "channels_first",
-        normalize: tuple[float, float] | None = None,
-        crop: int | None = None,
-        # balance: bool = False,
-        slice_back: bool = False,
+        transforms: Transform[NDArray[Any]] | Sequence[Transform[NDArray[Any]]] | None = None,
         verbose: bool = False,
     ) -> None:
         super().__init__(
             root,
             download,
             "base",
-            size,
-            unit_interval,
-            dtype,
-            channels,
-            crop,
-            normalize,
-            # balance,
-            slice_back,
+            transforms,
             verbose,
         )
 
-        self.class_set: set[int] = set(self.index2label)
-        self.num_classes: int = len(self.class_set)
-        self._filepaths: list[str] = []
-        self._annotations: list[str] = []
-        self._datum_metadata: dict[str, list[Any]] = {}
+    def _load_data(self) -> tuple[list[str], list[str], dict[str, list[Any]]]:
+        filepaths: list[str] = []
+        targets: list[str] = []
+        datum_metadata: dict[str, list[Any]] = {}
+        metadata_list: list[dict[str, Any]] = []
 
         # Load the data
-        metadata_list = []
         for resource in self._resources:
             self._resource = resource
-            result = self._load_data()
-            self._filepaths.extend(result[0])
-            self._annotations.extend(result[1])
-            metadata_list.append(result[2])
+            filepath, target, metadata = super()._load_data()
+            filepaths.extend(filepath)
+            targets.extend(target)
+            metadata_list.append(metadata)
 
         # Adjust datum metadata to correct format
         for data_dict in metadata_list:
             for key, val in data_dict.items():
-                if key not in self._datum_metadata:
-                    self._datum_metadata[str(key)] = []
-                self._datum_metadata[str(key)].extend(val)
+                if key not in datum_metadata:
+                    datum_metadata[str(key)] = []
+                datum_metadata[str(key)].extend(val)
+
+        return filepaths, targets, datum_metadata
 
     def _load_data_inner(self) -> tuple[list[str], list[str], dict[str, Any]]:
         file_data = {"year": [], "image_id": [], "data_path": [], "label_path": []}
-        data_folder = self.dataset_dir / self._resource.filename[:-4]
+        data_folder = self.path / self._resource.filename[:-4]
         for entry in data_folder.iterdir():
             if entry.is_file() and entry.suffix == ".jpg":
                 # Remove file extension and split by "_"
@@ -167,7 +140,7 @@ class MILCO(BaseODDataset):
 
         return data, annotations, file_data
 
-    def _read_annotations(self, annotation: str) -> tuple[NDArray[np.float64], NDArray[np.uintp], dict[str, Any]]:
+    def _read_annotations(self, annotation: str) -> tuple[list[list[float]], list[int], dict[str, Any]]:
         """Function for extracting the info out of the text files"""
         labels: list[int] = []
         boxes: list[list[float]] = []
@@ -177,4 +150,4 @@ class MILCO(BaseODDataset):
                 labels.append(int(out[0]))
                 boxes.append([float(out[1]), float(out[2]), float(out[3]), float(out[4])])
 
-        return np.array(boxes, dtype=np.float64), np.array(labels, dtype=np.uintp), {}
+        return boxes, labels, {}
