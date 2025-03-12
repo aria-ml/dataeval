@@ -1,6 +1,7 @@
 """Provides utility functions for interacting with Computer Vision datasets."""
 
 __all__ = [
+    "collate",
     "datasets",
     "Embeddings",
     "Images",
@@ -16,4 +17,4 @@ from dataeval.utils.data._metadata import Metadata
 from dataeval.utils.data._split import SplitDatasetOutput, split_dataset
 from dataeval.utils.data._targets import Targets
 
-from . import datasets
+from . import collate, datasets
