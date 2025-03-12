@@ -1,6 +1,23 @@
-[//]: # (841425ff4d9c812f1df1dece1bf168c26c8ba70c)
+[//]: # (529e5595d327117238b45a85ff5916b27731fed0)
 
 # DataEval Change Log
+
+## v0.80.0
+
+🌟 **Feature Release**
+- `94a10b03` - Refactor Images, Embeddings and Metadata as a stateful classes using Dataset inputs
+- `353ac6bd` - Add DataProcessor class to handle extraction of images, embeddings, targets and metadata from datasets
+
+🛠️ **Improvements and Enhancements**
+- `529e5595` - Merging current WIP state of OODdetector, based on universal embeddings from sigma-optimal-VAE, along with OOD_VAE_minimal notebook.
+
+👾 **Fixes**
+- `a2a7057e` - Adjust merge to handle numpy arrays
+
+    Adds in a numpy array check and if true returns the array as a list prior to normal processing
+
+📝 **Miscellaneous**
+- `e55cb3f2` - Use cpu as default torch device
 
 ## v0.79.0
 
