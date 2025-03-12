@@ -2,9 +2,7 @@ import numpy as np
 import pytest
 import torch
 
-from dataeval.utils.data import Metadata, Targets
-from dataeval.utils.data._embeddings import Embeddings
-from dataeval.utils.data._images import Images
+from dataeval.utils.data import Embeddings, Images, Metadata, Targets
 from dataeval.utils.data.datasets._types import ObjectDetectionTarget
 
 

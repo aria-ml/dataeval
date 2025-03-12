@@ -1,66 +1,61 @@
 from __future__ import annotations
 
-__all__ = []
-
+import sys
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Any, Generic, TypedDict, TypeVar
+from typing import Any, Generic, Protocol, TypedDict, TypeVar
+
+if sys.version_info >= (3, 11):
+    from typing import NotRequired, Required
+else:
+    from typing_extensions import NotRequired, Required
 
 from torch.utils.data import Dataset
 
-TDatum = TypeVar("TDatum")
-TArray = TypeVar("TArray")
+_TArray = TypeVar("_TArray")
+_TTarget = TypeVar("_TTarget")
 
 
-class InfoMixin:
-    _image_set: str
-
-    def info(self) -> str:
-        """Pretty prints dataset name and information."""
-        return f"{self._image_set.capitalize()}\n{'-' * len(self._image_set)}\n{self.__class__.__name__}\n{str(self)}\n"
-
-
-class DatasetMetadata(TypedDict):
-    id: str
-    index2label: dict[int, str]
-    split: str
-
-
-TDatasetMetadata = TypeVar("TDatasetMetadata", bound=DatasetMetadata)
-
-
-class SizedDataset(Dataset[TDatum], Generic[TDatum, TDatasetMetadata]):
-    metadata: TDatasetMetadata
-
+class SizedDataset(Dataset[tuple[_TArray, _TTarget, dict[str, Any]]]):
     @abstractmethod
-    def __getitem__(self, index: int) -> TDatum: ...
+    def __getitem__(self, index: Any) -> tuple[_TArray, _TTarget, dict[str, Any]]: ...
 
     @abstractmethod
     def __len__(self) -> int: ...
 
 
-class ImageClassificationDataset(SizedDataset[tuple[TArray, TArray, dict[str, Any]], TDatasetMetadata]): ...
+class DatasetMetadata(TypedDict):
+    id: Required[str]
+    index2label: Required[dict[int, str]]
+    split: NotRequired[str]
+
+
+class AnnotatedDataset(SizedDataset[_TArray, _TTarget]):
+    metadata: DatasetMetadata
+
+
+class ImageClassificationDataset(AnnotatedDataset[_TArray, _TArray]): ...
 
 
 @dataclass
-class ObjectDetectionTarget(Generic[TArray]):
-    boxes: TArray
-    labels: TArray
-    scores: TArray
+class ObjectDetectionTarget(Generic[_TArray]):
+    boxes: _TArray
+    labels: _TArray
+    scores: _TArray
 
 
-class ObjectDetectionDataset(
-    SizedDataset[tuple[TArray, ObjectDetectionTarget[TArray], dict[str, Any]], TDatasetMetadata]
-): ...
+class ObjectDetectionDataset(AnnotatedDataset[_TArray, ObjectDetectionTarget[_TArray]]): ...
 
 
 @dataclass
-class SegmentationTarget(Generic[TArray]):
-    mask: TArray
-    labels: TArray
-    scores: TArray
+class SegmentationTarget(Generic[_TArray]):
+    mask: _TArray
+    labels: _TArray
+    scores: _TArray
 
 
-class SegmentationDataset(
-    SizedDataset[tuple[TArray, SegmentationTarget[TArray], dict[str, Any]], TDatasetMetadata]
-): ...
+class SegmentationDataset(AnnotatedDataset[_TArray, SegmentationTarget[_TArray]]): ...
+
+
+class Transform(Protocol, Generic[_TArray]):
+    def __call__(self, data: _TArray, /) -> _TArray: ...
