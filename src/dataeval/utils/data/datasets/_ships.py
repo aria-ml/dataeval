@@ -10,7 +10,7 @@ from numpy.typing import NDArray
 
 from dataeval.utils.data.datasets._base import BaseICDataset, DataLocation
 from dataeval.utils.data.datasets._mixin import BaseDatasetNumpyMixin
-from dataeval.utils.data.datasets._types import Transform
+from dataeval.utils.data.types import Transform
 
 
 class Ships(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):

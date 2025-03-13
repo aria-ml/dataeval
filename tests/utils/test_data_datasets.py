@@ -8,8 +8,8 @@ from dataeval.utils.data.datasets._cifar10 import CIFAR10
 from dataeval.utils.data.datasets._milco import MILCO
 from dataeval.utils.data.datasets._mnist import MNIST
 from dataeval.utils.data.datasets._ships import Ships
-from dataeval.utils.data.datasets._types import ObjectDetectionTarget
 from dataeval.utils.data.datasets._voc import VOCDetection
+from dataeval.utils.data.types import ObjectDetectionTarget
 
 
 def get_tmp_hash(fpath, chunk_size=65535):

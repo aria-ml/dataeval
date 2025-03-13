@@ -8,8 +8,8 @@ from typing import Any, Generic, Iterator, Literal, NamedTuple, Sequence, TypeVa
 
 from dataeval.utils.data.datasets._fileio import _ensure_exists
 from dataeval.utils.data.datasets._mixin import BaseDatasetMixin
-from dataeval.utils.data.datasets._types import (
-    AnnotatedDataset,
+from dataeval.utils.data.types import (
+    Dataset,
     DatasetMetadata,
     ImageClassificationDataset,
     ObjectDetectionDataset,
@@ -21,6 +21,7 @@ from dataeval.utils.data.datasets._types import (
 
 _TArray = TypeVar("_TArray")
 _TTarget = TypeVar("_TTarget")
+_TRawTarget = TypeVar("_TRawTarget", list[int], list[str])
 
 
 class DataLocation(NamedTuple):
@@ -30,10 +31,7 @@ class DataLocation(NamedTuple):
     checksum: str
 
 
-TRawTarget = TypeVar("TRawTarget", list[int], list[str])
-
-
-class BaseDataset(AnnotatedDataset[_TArray, _TTarget], Generic[_TArray, _TTarget, TRawTarget]):
+class BaseDataset(Dataset[_TArray, _TTarget], Generic[_TArray, _TTarget, _TRawTarget]):
     """
     Base class for internet downloaded datasets.
     """
@@ -65,7 +63,7 @@ class BaseDataset(AnnotatedDataset[_TArray, _TTarget], Generic[_TArray, _TTarget
         # Internal Attributes
         self._download = download
         self._filepaths: list[str]
-        self._targets: TRawTarget
+        self._targets: _TRawTarget
         self._datum_metadata: dict[str, list[Any]]
         self._resource: DataLocation = self._resources[self._resource_index]
         self._label2index = {v: k for k, v in self.index2label.items()}
@@ -114,7 +112,7 @@ class BaseDataset(AnnotatedDataset[_TArray, _TTarget], Generic[_TArray, _TTarget
         unique_id = f"{self.__class__.__name__}_{self.image_set}"
         return unique_id
 
-    def _load_data(self) -> tuple[list[str], TRawTarget, dict[str, Any]]:
+    def _load_data(self) -> tuple[list[str], _TRawTarget, dict[str, Any]]:
         """
         Function to determine if data can be accessed or if it needs to be downloaded and/or extracted.
         """
@@ -131,7 +129,7 @@ class BaseDataset(AnnotatedDataset[_TArray, _TTarget], Generic[_TArray, _TTarget
         return result
 
     @abstractmethod
-    def _load_data_inner(self) -> tuple[list[str], TRawTarget, dict[str, Any]]: ...
+    def _load_data_inner(self) -> tuple[list[str], _TRawTarget, dict[str, Any]]: ...
 
     def _transform(self, image: _TArray) -> _TArray:
         """Function to transform the image prior to returning based on parameters passed in."""
@@ -140,7 +138,7 @@ class BaseDataset(AnnotatedDataset[_TArray, _TTarget], Generic[_TArray, _TTarget
         return image
 
     def __len__(self) -> int:
-        return len(self._filepaths)
+        return self.size
 
 
 class BaseICDataset(

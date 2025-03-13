@@ -16,7 +16,7 @@ from dataeval.utils.data.datasets._base import (
     DataLocation,
 )
 from dataeval.utils.data.datasets._mixin import BaseDatasetNumpyMixin, BaseDatasetTorchMixin
-from dataeval.utils.data.datasets._types import ObjectDetectionTarget, SegmentationTarget, Transform
+from dataeval.utils.data.types import ObjectDetectionTarget, SegmentationTarget, Transform
 
 _TArray = TypeVar("_TArray")
 _TTarget = TypeVar("_TTarget")

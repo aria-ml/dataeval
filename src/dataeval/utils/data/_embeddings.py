@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from dataeval.config import get_device
 from dataeval.typing import TArray
-from dataeval.utils.data.datasets._types import SizedDataset
+from dataeval.utils.data.types import Dataset
 from dataeval.utils.torch.models import SupportsEncode
 
 
@@ -41,7 +41,7 @@ class Embeddings:
 
     def __init__(
         self,
-        dataset: SizedDataset[TArray, Any],
+        dataset: Dataset[TArray, Any],
         batch_size: int,
         indices: Sequence[int] | None = None,
         model: torch.nn.Module | None = None,

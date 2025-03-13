@@ -4,8 +4,8 @@ import pytest
 
 from dataeval.utils.data.datasets._base import DataLocation
 from dataeval.utils.data.datasets._mnist import MNIST
-from dataeval.utils.data.datasets._types import SegmentationTarget
 from dataeval.utils.data.datasets._voc import VOCSegmentation
+from dataeval.utils.data.types import SegmentationTarget
 
 TEMP_MD5 = "d149274109b50d5147c09d6fc7e80c71"
 TEMP_SHA256 = "2b749913055289cb3a5c602a17196b5437dc59bba50e986ea449012a303f7201"
