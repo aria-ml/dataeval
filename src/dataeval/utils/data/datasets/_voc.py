@@ -9,6 +9,7 @@ from xml.etree.ElementTree import parse
 import torch
 from numpy.typing import NDArray
 
+from dataeval.utils.data._types import ObjectDetectionTarget, SegmentationTarget, Transform
 from dataeval.utils.data.datasets._base import (
     BaseDataset,
     BaseODDataset,
@@ -16,7 +17,6 @@ from dataeval.utils.data.datasets._base import (
     DataLocation,
 )
 from dataeval.utils.data.datasets._mixin import BaseDatasetNumpyMixin, BaseDatasetTorchMixin
-from dataeval.utils.data.types import ObjectDetectionTarget, SegmentationTarget, Transform
 
 _TArray = TypeVar("_TArray")
 _TTarget = TypeVar("_TTarget")

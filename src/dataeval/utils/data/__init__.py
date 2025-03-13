@@ -3,7 +3,6 @@
 __all__ = [
     "collate",
     "datasets",
-    "types",
     "Embeddings",
     "Images",
     "Metadata",
@@ -18,4 +17,4 @@ from dataeval.utils.data._metadata import Metadata
 from dataeval.utils.data._split import SplitDatasetOutput, split_dataset
 from dataeval.utils.data._targets import Targets
 
-from . import collate, datasets, types
+from . import collate, datasets

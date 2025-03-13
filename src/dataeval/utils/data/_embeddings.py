@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from dataeval.config import get_device
 from dataeval.typing import TArray
-from dataeval.utils.data.types import Dataset
+from dataeval.utils.data._types import Dataset
 from dataeval.utils.torch.models import SupportsEncode
 
 

@@ -5,7 +5,7 @@ __all__ = []
 from typing import Any, Generic, Iterator, Sequence, overload
 
 from dataeval.typing import TArray
-from dataeval.utils.data.types import Dataset
+from dataeval.utils.data._types import Dataset
 
 
 class Images(Generic[TArray]):
