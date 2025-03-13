@@ -6,9 +6,7 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import Any, Generic, Iterator, Literal, NamedTuple, Sequence, TypeVar
 
-from dataeval.utils.data.datasets._fileio import _ensure_exists
-from dataeval.utils.data.datasets._mixin import BaseDatasetMixin
-from dataeval.utils.data.types import (
+from dataeval.utils.data._types import (
     Dataset,
     DatasetMetadata,
     ImageClassificationDataset,
@@ -18,6 +16,8 @@ from dataeval.utils.data.types import (
     SegmentationTarget,
     Transform,
 )
+from dataeval.utils.data.datasets._fileio import _ensure_exists
+from dataeval.utils.data.datasets._mixin import BaseDatasetMixin
 
 _TArray = TypeVar("_TArray")
 _TTarget = TypeVar("_TTarget")

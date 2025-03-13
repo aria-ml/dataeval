@@ -75,7 +75,7 @@ def _get_key_indices(keys: Iterable[tuple[str, ...]]) -> dict[tuple[str, ...], i
     dict[tuple[str, ...], int]
         Mapping of tuple keys to starting index
     """
-    indices = {k: -1 for k in keys}
+    indices = dict.fromkeys(keys, -1)
     ks = list(keys)
     while len(ks) > 0:
         seen: dict[tuple[str, ...], list[tuple[str, ...]]] = {}

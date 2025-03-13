@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 from dataeval.typing import Array
 from dataeval.utils._array import as_numpy, to_numpy
 from dataeval.utils._bin import bin_data, digitize_data, is_continuous
-from dataeval.utils.data.types import (
+from dataeval.utils.data._types import (
     Dataset,
     ObjectDetectionTarget,
 )

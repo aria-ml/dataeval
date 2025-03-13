@@ -3,7 +3,7 @@ import pytest
 import torch
 
 from dataeval.utils.data import Embeddings, Images, Metadata, Targets
-from dataeval.utils.data.types import ObjectDetectionTarget
+from dataeval.utils.data._types import ObjectDetectionTarget
 
 
 @pytest.mark.required

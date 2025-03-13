@@ -47,7 +47,7 @@ ENV PATH=/${USER}/.venv/bin:${PATH}
 FROM base as docs
 ARG UID
 COPY --chown=${UID} docs/source/data.py docs/source/data.py
-COPY --chown=${UID} src/dataeval/utils/data/types.py src/dataeval/utils/data/types.py
+COPY --chown=${UID} src/dataeval/utils/data/_types.py src/dataeval/utils/data/_types.py
 COPY --chown=${UID} src/dataeval/utils/data/datasets/*.py src/dataeval/utils/data/datasets/
 ARG USER
 RUN python -c "\

@@ -9,9 +9,9 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
+from dataeval.utils.data._types import Transform
 from dataeval.utils.data.datasets._base import BaseICDataset, DataLocation
 from dataeval.utils.data.datasets._mixin import BaseDatasetNumpyMixin
-from dataeval.utils.data.types import Transform
 
 CIFARClassStringMap = Literal["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
 TCIFARClassMap = TypeVar("TCIFARClassMap", CIFARClassStringMap, int, list[CIFARClassStringMap], list[int])
