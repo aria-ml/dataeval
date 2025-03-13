@@ -10,7 +10,7 @@ from typing import Any, Sequence
 from numpy.typing import NDArray
 
 from dataeval.utils.data.datasets._base import BaseODDataset, DataLocation
-from dataeval.utils.data.datasets._types import Transform
+from dataeval.utils.data.types import Transform
 
 
 class MILCO(BaseODDataset[NDArray[Any]], BaseDatasetNumpyMixin):

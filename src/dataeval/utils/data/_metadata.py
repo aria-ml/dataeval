@@ -11,8 +11,8 @@ from numpy.typing import NDArray
 from dataeval.typing import Array
 from dataeval.utils._array import as_numpy, to_numpy
 from dataeval.utils._bin import bin_data, digitize_data, is_continuous
-from dataeval.utils.data.datasets._types import (
-    AnnotatedDataset,
+from dataeval.utils.data.types import (
+    Dataset,
     ObjectDetectionTarget,
 )
 from dataeval.utils.metadata import merge
@@ -65,7 +65,7 @@ class Metadata:
 
     def __init__(
         self,
-        dataset: AnnotatedDataset[Any, Any],
+        dataset: Dataset[Any, Any],
         *,
         continuous_factor_bins: Mapping[str, int | Sequence[float]] | None = None,
         auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
@@ -231,7 +231,7 @@ class Metadata:
         self._targets = Targets(labels, scores, bboxes, srcidx)
         self._raw = raw
 
-        index2label = self._dataset.metadata["index2label"] or {}
+        index2label = self._dataset.metadata.get("index2label", {})
         self._class_labels = self._targets.labels
         self._class_names = [index2label.get(i, str(i)) for i in np.unique(self._class_labels)]
         self._collated = True

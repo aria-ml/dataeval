@@ -6,4 +6,12 @@ from dataeval.utils.data.datasets._mnist import MNIST
 from dataeval.utils.data.datasets._ships import Ships
 from dataeval.utils.data.datasets._voc import VOCDetection, VOCDetectionTorch, VOCSegmentation
 
-__all__ = ["MNIST", "Ships", "CIFAR10", "MILCO", "VOCDetection", "VOCDetectionTorch", "VOCSegmentation"]
+__all__ = [
+    "MNIST",
+    "Ships",
+    "CIFAR10",
+    "MILCO",
+    "VOCDetection",
+    "VOCDetectionTorch",
+    "VOCSegmentation",
+]
