@@ -32,7 +32,7 @@ workflow:
     # Commit Main Branch Workflow
     - if: $CI_COMMIT_BRANCH == 'main'
       variables:
-        DOCS_RUNNER_TAG: 'multi-gpu'
+        # DOCS_RUNNER_TAG: 'multi-gpu'  # temporarily disable multi-gpu as runner is down
         ENV_AUTO_STOP_IN: 'never'
 
 default:
