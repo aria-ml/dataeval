@@ -240,3 +240,21 @@ def doctest_workflows_sufficiency(doctest_namespace):
     doctest_namespace["test_ds"] = test_ds
     doctest_namespace["train_fn"] = train_fn
     doctest_namespace["eval_fn"] = eval_fn
+
+
+@pytest.fixture(autouse=True, scope="session")
+def doctest_sampledataset(doctest_namespace):
+    class SampleDataset(torch.utils.data.Dataset):
+        def __init__(self, size: int, class_count: int) -> None:
+            self._size = size
+            self._class_count = class_count
+
+        def __getitem__(self, index: int) -> tuple[str, np.ndarray, dict[str, int]]:
+            one_hot_label = np.zeros(10)
+            one_hot_label[index % self._class_count] = 1
+            return f"data_{index}", one_hot_label, {"id": index}
+
+        def __len__(self) -> int:
+            return self._size
+
+    doctest_namespace["SampleDataset"] = SampleDataset
