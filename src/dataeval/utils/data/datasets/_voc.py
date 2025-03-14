@@ -4,9 +4,9 @@ __all__ = []
 
 from pathlib import Path
 from typing import Any, Literal, Sequence, TypeVar
-from xml.etree.ElementTree import parse
 
 import torch
+from defusedxml.ElementTree import parse
 from numpy.typing import NDArray
 
 from dataeval.utils.data._types import ObjectDetectionTarget, SegmentationTarget, Transform
