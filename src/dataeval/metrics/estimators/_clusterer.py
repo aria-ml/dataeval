@@ -10,7 +10,6 @@ from numpy.typing import NDArray
 from dataeval._output import Output
 from dataeval.typing import ArrayLike
 from dataeval.utils._array import as_numpy
-from dataeval.utils._clusterer import cluster, compare_links_to_cluster_std, sorted_union_find
 
 
 @dataclass(frozen=True)
@@ -59,6 +58,9 @@ class ClustererOutput(Output):
         Tuple[List[List[int]], List[List[int]]]
             The exact :term:`duplicates<Duplicates>` and near duplicates as lists of related indices
         """
+        # Delay load numba compiled functions
+        from dataeval.utils._clusterer import compare_links_to_cluster_std, sorted_union_find
+
         exact_indices, near_indices = compare_links_to_cluster_std(self.mst, self.clusters)
         exact_dupes = sorted_union_find(exact_indices)
         near_dupes = sorted_union_find(near_indices)
@@ -95,5 +97,8 @@ def clusterer(data: ArrayLike) -> ClustererOutput:
             4,  2,  0,  0,  1,  2,  0,  1,  3,  0,  3,  3,  4,  0,  0,  3,  0,
             3, -1,  0,  0,  2,  4,  3,  4,  0,  1,  0, -1,  3,  0,  0,  0])
     """
+    # Delay load numba compiled functions
+    from dataeval.utils._clusterer import cluster
+
     c = cluster(data)
     return ClustererOutput(c.clusters, c.mst, c.linkage_tree, as_numpy(c.condensed_tree), c.membership_strengths)

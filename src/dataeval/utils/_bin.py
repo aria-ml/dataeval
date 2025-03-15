@@ -9,8 +9,6 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.stats import wasserstein_distance as wd
 
-from dataeval.utils._clusterer import cluster
-
 DISCRETE_MIN_WD = 0.054
 CONTINUOUS_MIN_SAMPLE_SIZE = 20
 
@@ -154,8 +152,10 @@ def bin_by_clusters(data: NDArray[np.number[Any]]) -> NDArray[np.float64]:
     Bins continuous data by using the Clusterer to identify clusters
     and incorporates outliers by adding them to the nearest bin.
     """
-    # Create initial clusters
+    # Delay load numba compiled functions
+    from dataeval.utils._clusterer import cluster
 
+    # Create initial clusters
     c = cluster(data)
 
     # Create bins from clusters
