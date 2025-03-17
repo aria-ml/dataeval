@@ -13,8 +13,8 @@ _TTarget = TypeVar("_TTarget")
 
 class SelectionStage(IntEnum):
     STATE = 0
-    ORDER = 1
-    FILTER = 2
+    FILTER = 1
+    ORDER = 2
 
 
 class Selection(Generic[_TData, _TTarget]):
