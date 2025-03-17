@@ -5,6 +5,7 @@ import pytest
 
 from dataeval.utils.data._selection import Select
 from dataeval.utils.data.selections._classfilter import ClassFilter
+from dataeval.utils.data.selections._indices import Indices
 from dataeval.utils.data.selections._limit import Limit
 from dataeval.utils.data.selections._reverse import Reverse
 from dataeval.utils.data.selections._shuffle import Shuffle
@@ -122,3 +123,26 @@ class TestSelectionClasses:
         shuffled_order = [data for data, _, _ in select]
         assert original_order != shuffled_order
         assert "Shuffle(seed=0)" in str(select)
+
+    def test_indices(self, mock_dataset):
+        indices = Indices([12, 10, 8, 6, 4, 2, 0])
+        select = Select(mock_dataset, indices)
+        assert len(select) == 5
+        assert select._selection == [8, 6, 4, 2, 0]
+        assert "Indices(indices=[12, 10, 8, 6, 4, 2, 0])" in str(select)
+
+    def test_indices_repeats(self, mock_dataset):
+        indices = Indices([12, 12, 4, 4, 12, 12, 0])
+        select = Select(mock_dataset, indices)
+        assert len(select) == 3
+        assert select._selection == [4, 4, 0]
+        assert "Indices(indices=[12, 12, 4, 4, 12, 12, 0])" in str(select)
+
+    def test_indices_with_classfilter(self, mock_dataset):
+        class_filter = ClassFilter(classes=[0, 1], balance=False)
+        indices = Indices([12, 10, 8, 6, 4, 2, 0])
+        select = Select(mock_dataset, [indices, class_filter])
+        assert len(select) == 3
+        assert select._selection == [6, 4, 0]
+        assert "ClassFilter(classes=[0, 1], balance=False)" in str(select)
+        assert "Indices(indices=[12, 10, 8, 6, 4, 2, 0])" in str(select)
