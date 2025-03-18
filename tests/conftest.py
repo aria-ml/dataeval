@@ -22,8 +22,9 @@ def preprocess(factors, class_labels, continuous_factor_bins=None, exclude=None,
     elif isinstance(class_labels[0], int):
         index2label = {i: str(i) for i in range(max(class_labels) + 1)}
     else:
-        index2label = {}
-    targets = Targets(labels=np.asarray(class_labels), scores=np.ndarray([]), bboxes=None, source=None)
+        index2label = {0: "mock"}
+    scores = np.zeros((len(class_labels), len(index2label)), dtype=np.float32)
+    targets = Targets(labels=np.asarray(class_labels), scores=scores, bboxes=None, source=None)
     metadata = Metadata(
         None,  # type: ignore
         continuous_factor_bins=continuous_factor_bins,
