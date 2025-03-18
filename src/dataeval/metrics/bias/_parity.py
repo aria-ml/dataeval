@@ -306,7 +306,7 @@ def parity(metadata: Metadata) -> ParityOutput:
     ...     random_seed=175)
     >>> metadata.continuous_factor_bins = {"age": 4, "income": 3}
     >>> parity(metadata)
-    ParityOutput(score=array([7.35731943, 5.46711299, 0.51506212]), p_value=array([0.28906231, 0.24263543, 0.77295762]), factor_names=['age', 'income', 'gender'], insufficient_data={'age': {3: {'doctor': 4}, 4: {'doctor': 4, 'teacher': 3}}, 'income': {1: {'doctor': 3}}})
+    ParityOutput(score=array([7.35731943, 5.46711299, 0.51506212]), p_value=array([0.28906231, 0.24263543, 0.77295762]), factor_names=['age', 'income', 'gender'], insufficient_data={'age': {3: {'artist': 4}, 4: {'artist': 4, 'teacher': 3}}, 'income': {1: {'artist': 3}}})
     """  # noqa: E501
     chi_scores = np.zeros(metadata.discrete_data.shape[1])
     p_values = np.zeros_like(chi_scores)

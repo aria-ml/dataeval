@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 import numpy as np
 import pytest
 import torch
@@ -51,7 +53,7 @@ class TestEmbeddings:
             # Images, ObjectDetectionTarget, Metadata
             [
                 np.ones((10, 3, 3)),
-                [ObjectDetectionTarget([[0, 1, 2], [3, 4, 5]], [0, 1, 2], []) for _ in range(10)],
+                [ObjectDetectionTarget([[0, 1, 2, 3], [4, 5, 6, 7]], [0, 1], [1, 0]) for _ in range(10)],
                 [{i: i} for i in range(10)],
             ],
         ],
@@ -83,12 +85,12 @@ class TestEmbeddings:
         "data, targets",
         [
             [
-                torch.ones((10, 3, 3)),
+                torch.ones((10, 1, 3, 3)),
                 torch.nn.functional.one_hot(torch.arange(10)),
             ],
             [
-                torch.ones((10, 3, 3)),
-                [ObjectDetectionTarget(torch.ones((10, 4)), torch.arange(10), torch.arange(10)) for _ in range(10)],
+                torch.ones((10, 1, 3, 3)),
+                [ObjectDetectionTarget(torch.ones(10, 4), torch.zeros(10), torch.zeros(10)) for _ in range(10)],
             ],
         ],
     )
@@ -117,7 +119,6 @@ class TestEmbeddings:
 
         ds = TorchDataset()
 
-        im = Images(ds)  # type: ignore
         em = Embeddings(ds, batch_size=64, model=IdentityModel(), device="cpu")  # type: ignore
         md = Metadata(ds)  # type: ignore
 
@@ -125,7 +126,45 @@ class TestEmbeddings:
         assert len(em) == len(ds)
 
         for i in range(len(ds)):
-            assert torch.allclose(im[i], data[i])
             assert torch.allclose(em[i], data[i])
 
+        for idx, e in enumerate(em):
+            torch.allclose(ds[idx][0], e)
+
         assert isinstance(md.targets, Targets)
+
+    def test_embeddings(self):
+        mock_dataset = MagicMock()
+        mock_dataset.__len__.return_value = 10
+        mock_dataset.__getitem__.side_effect = lambda _: (np.zeros((3, 16, 16)), [], {})
+
+        embs = Embeddings(mock_dataset, 10, model=torch.nn.Identity())
+        assert isinstance(embs.to_tensor(), torch.Tensor)
+        assert len(embs.to_tensor()) == len(embs)
+
+        assert len(embs[0:3]) == 3
+        assert np.array_equal(embs[0].cpu().numpy(), np.zeros((3, 16, 16)))
+
+        for emb in embs:
+            assert np.array_equal(emb.cpu().numpy(), np.zeros((3, 16, 16)))
+
+        with pytest.raises(TypeError):
+            embs["string"]  # type: ignore
+
+    def test_images(self):
+        mock_dataset = MagicMock()
+        mock_dataset.__len__.return_value = 10
+        mock_dataset.__getitem__.side_effect = lambda _: (np.zeros((3, 16, 16)), [], {})
+
+        images = Images(mock_dataset)
+        assert isinstance(images.to_list(), list)
+        assert len(images.to_list()) == len(images)
+
+        assert len(images[0:3]) == 3
+        assert np.array_equal(images[0], np.zeros((3, 16, 16)))
+
+        for image in images:
+            assert np.array_equal(image, np.zeros((3, 16, 16)))
+
+        with pytest.raises(TypeError):
+            images["string"]  # type: ignore
