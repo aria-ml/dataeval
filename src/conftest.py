@@ -2,7 +2,7 @@
 
 import pathlib
 import sys
-from typing import Sequence
+from typing import Mapping, Sequence
 
 from dataeval.utils.data._metadata import Metadata
 from dataeval.utils.data._targets import Targets
@@ -38,10 +38,12 @@ torch.manual_seed(0)
 
 
 def generate_random_metadata(
-    labels: Sequence[str], factors: dict[str, Sequence[str]], length: int, random_seed: int
+    labels: Sequence[str], factors: Mapping[str, Sequence[str]], length: int, random_seed: int
 ) -> Metadata:
     rng = np.random.default_rng(random_seed)
-    targets = Targets(rng.choice(labels, (length)), np.zeros((length), dtype=np.float32), None, None)
+    labels_arr = rng.choice(range(len(labels)), (length))
+    scores_arr = np.eye(len(labels))[labels_arr].astype(np.float32)
+    targets = Targets(labels_arr, scores_arr, None, None)
     metadata_dict = {k: list(rng.choice(v, (length))) for k, v in factors.items()}
     metadata = Metadata(None)  # type: ignore
     metadata._raw = [{} for _ in range(len(labels))]
@@ -126,7 +128,9 @@ def doctest_metrics_bias_balance_diversity(doctest_namespace):
     cat_vals = [1.1, 1.1, 0, 0, 1.1, 0, 1.1, 0, 0, 1.1, 1.1, 0]
     metadata_dict = {"var_cat": str_vals, "var_cnt": cnt_vals, "var_float_cat": cat_vals}
     continuous_factor_bincounts = {"var_cnt": 5, "var_float_cat": 2}
-    targets = Targets(labels=np.asarray(class_labels), scores=np.ndarray([]), bboxes=None, source=None)
+    labels = np.asarray(class_labels)
+    scores = np.eye(2)[labels].astype(np.float32)
+    targets = Targets(labels=labels, scores=scores, bboxes=None, source=None)
     metadata = Metadata(None, continuous_factor_bins=continuous_factor_bincounts)  # type: ignore
     metadata._collated = True
     metadata._raw = [{} for _ in range(len(class_labels))]
