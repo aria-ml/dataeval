@@ -241,10 +241,8 @@ class Metadata:
             return
 
         targets_per_image = (
-            np.arange(len(self.raw))
-            if self.targets.source is None
-            else np.unique(self.targets.source, return_counts=True)[1]
-        ).tolist()
+            None if self.targets.source is None else np.unique(self.targets.source, return_counts=True)[1].tolist()
+        )
         self._merged = merge(self.raw, return_dropped=True, ignore_lists=False, targets_per_image=targets_per_image)
 
     def _validate(self) -> None:
