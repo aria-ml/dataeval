@@ -2,13 +2,14 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Any, Generic, Iterator, Sequence, overload
+from typing import Any, Generic, Iterator, Sequence, TypeVar, overload
 
-from dataeval.typing import TArray
-from dataeval.utils.data._types import Dataset
+from dataeval.typing import SizedDataset
+
+T = TypeVar("T")
 
 
-class Images(Generic[TArray]):
+class Images(Generic[T]):
     """
     Collection of image data from a dataset.
 
@@ -20,13 +21,10 @@ class Images(Generic[TArray]):
         Dataset to access images from.
     """
 
-    def __init__(
-        self,
-        dataset: Dataset[TArray, Any],
-    ) -> None:
+    def __init__(self, dataset: SizedDataset[tuple[T, Any, Any]]) -> None:
         self._dataset = dataset
 
-    def to_list(self) -> Sequence[TArray]:
+    def to_list(self) -> Sequence[T]:
         """
         Converts entire dataset to a sequence of images.
 
@@ -42,12 +40,12 @@ class Images(Generic[TArray]):
         return self[:]
 
     @overload
-    def __getitem__(self, key: slice | list[int]) -> Sequence[TArray]: ...
+    def __getitem__(self, key: slice | list[int]) -> Sequence[T]: ...
 
     @overload
-    def __getitem__(self, key: int) -> TArray: ...
+    def __getitem__(self, key: int) -> T: ...
 
-    def __getitem__(self, key: int | slice | list[int]) -> Sequence[TArray] | TArray:
+    def __getitem__(self, key: int | slice | list[int]) -> Sequence[T] | T:
         if isinstance(key, list):
             return [self._dataset[i][0] for i in key]
         if isinstance(key, slice):
@@ -57,7 +55,7 @@ class Images(Generic[TArray]):
             return self._dataset[key][0]
         raise TypeError("Invalid argument type.")
 
-    def __iter__(self) -> Iterator[TArray]:
+    def __iter__(self) -> Iterator[T]:
         for i in range(len(self._dataset)):
             yield self._dataset[i][0]
 

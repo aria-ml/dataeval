@@ -5,10 +5,9 @@ __all__ = []
 from enum import IntEnum
 from typing import Any, Generic, Iterator, Sequence, TypeVar
 
-from dataeval.utils.data._types import Dataset
+from dataeval.typing import AnnotatedDataset, TDatasetMetadata
 
-_TData = TypeVar("_TData")
-_TTarget = TypeVar("_TTarget")
+_TDatum = TypeVar("_TDatum")
 
 
 class SelectionStage(IntEnum):
@@ -17,16 +16,16 @@ class SelectionStage(IntEnum):
     ORDER = 2
 
 
-class Selection(Generic[_TData, _TTarget]):
+class Selection(Generic[_TDatum]):
     stage: SelectionStage
 
-    def __call__(self, dataset: Select[_TData, _TTarget]) -> None: ...
+    def __call__(self, dataset: Select[_TDatum, TDatasetMetadata]) -> None: ...
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}({', '.join([f'{k}={v}' for k, v in self.__dict__.items()])})"
 
 
-class Select(Generic[_TData, _TTarget], Dataset[_TData, _TTarget]):
+class Select(Generic[_TDatum, TDatasetMetadata], AnnotatedDataset[_TDatum, TDatasetMetadata]):
     """
     Wraps a dataset and applies selection criteria to it.
 
@@ -60,21 +59,22 @@ class Select(Generic[_TData, _TTarget], Dataset[_TData, _TTarget]):
     (data_20, 0, {'id': 20})
     """
 
-    _dataset: Dataset[_TData, _TTarget]
+    _dataset: AnnotatedDataset[_TDatum, TDatasetMetadata]
     _selection: list[int]
-    _selections: Sequence[Selection[_TData, _TTarget]]
+    _selections: Sequence[Selection[_TDatum]]
     _size_limit: int
 
     def __init__(
         self,
-        dataset: Dataset[_TData, _TTarget],
-        selections: Selection[_TData, _TTarget] | list[Selection[_TData, _TTarget]] | None = None,
+        dataset: AnnotatedDataset[_TDatum, TDatasetMetadata],
+        selections: Selection[_TDatum] | list[Selection[_TDatum]] | None = None,
     ) -> None:
         self._dataset = dataset
         self._size_limit = len(dataset)
         self._selection = list(range(self._size_limit))
         self._selections = self._sort_selections(selections)
         self.__dict__.update(dataset.__dict__)
+        self.metadata = getattr(dataset, "metadata", {"id": dataset.__class__.__name__})  # type: ignore
 
         if self._selections:
             self._apply_selections()
@@ -86,9 +86,7 @@ class Select(Generic[_TData, _TTarget], Dataset[_TData, _TTarget]):
         selections = f"Selections: [{', '.join([str(s) for s in self._sort_selections(self._selections)])}]"
         return f"{title}\n{sep}{nt}{selections}\n\n{self._dataset}"
 
-    def _sort_selections(
-        self, selections: Selection[_TData, _TTarget] | Sequence[Selection[_TData, _TTarget]] | None
-    ) -> list[Selection]:
+    def _sort_selections(self, selections: Selection[_TDatum] | Sequence[Selection[_TDatum]] | None) -> list[Selection]:
         if not selections:
             return []
 
@@ -108,10 +106,10 @@ class Select(Generic[_TData, _TTarget], Dataset[_TData, _TTarget]):
         selfattr = getattr(self._dataset, name, None)
         return selfattr if selfattr is not None else getattr(self._dataset, name)
 
-    def __getitem__(self, index: int) -> tuple[_TData, _TTarget, dict[str, Any]]:
+    def __getitem__(self, index: int) -> _TDatum:
         return self._dataset[self._selection[index]]
 
-    def __iter__(self) -> Iterator[tuple[_TData, _TTarget, dict[str, Any]]]:
+    def __iter__(self) -> Iterator[_TDatum]:
         for i in range(len(self)):
             yield self[i]
 

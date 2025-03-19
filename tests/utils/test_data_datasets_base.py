@@ -2,9 +2,9 @@ import hashlib
 
 import pytest
 
-from dataeval.utils.data._types import SegmentationTarget
 from dataeval.utils.data.datasets._base import DataLocation
 from dataeval.utils.data.datasets._mnist import MNIST
+from dataeval.utils.data.datasets._types import SegmentationTarget
 from dataeval.utils.data.datasets._voc import VOCSegmentation
 
 TEMP_MD5 = "d149274109b50d5147c09d6fc7e80c71"

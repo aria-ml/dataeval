@@ -11,11 +11,7 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import NotRequired, Required
 
-from torch.utils.data import Dataset as _Dataset
-
-_TArray = TypeVar("_TArray")
-_TData = TypeVar("_TData", covariant=True)
-_TTarget = TypeVar("_TTarget", covariant=True)
+from torch.utils.data import Dataset
 
 
 class DatasetMetadata(TypedDict):
@@ -24,14 +20,17 @@ class DatasetMetadata(TypedDict):
     split: NotRequired[str]
 
 
-class Dataset(_Dataset[tuple[_TData, _TTarget, dict[str, Any]]]):
+_TDatum = TypeVar("_TDatum")
+_TArray = TypeVar("_TArray")
+
+
+class AnnotatedDataset(Dataset[_TDatum]):
     metadata: DatasetMetadata
 
-    def __getitem__(self, index: Any) -> tuple[_TData, _TTarget, dict[str, Any]]: ...
     def __len__(self) -> int: ...
 
 
-class ImageClassificationDataset(Dataset[_TArray, _TArray]): ...
+class ImageClassificationDataset(AnnotatedDataset[tuple[_TArray, _TArray, dict[str, Any]]]): ...
 
 
 @dataclass
@@ -41,7 +40,7 @@ class ObjectDetectionTarget(Generic[_TArray]):
     scores: _TArray
 
 
-class ObjectDetectionDataset(Dataset[_TArray, ObjectDetectionTarget[_TArray]]): ...
+class ObjectDetectionDataset(AnnotatedDataset[tuple[_TArray, ObjectDetectionTarget[_TArray], dict[str, Any]]]): ...
 
 
 @dataclass
@@ -51,7 +50,7 @@ class SegmentationTarget(Generic[_TArray]):
     scores: _TArray
 
 
-class SegmentationDataset(Dataset[_TArray, SegmentationTarget[_TArray]]): ...
+class SegmentationDataset(AnnotatedDataset[tuple[_TArray, SegmentationTarget[_TArray], dict[str, Any]]]): ...
 
 
 class Transform(Generic[_TArray], Protocol):
