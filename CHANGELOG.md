@@ -1,6 +1,16 @@
-[//]: # (529e5595d327117238b45a85ff5916b27731fed0)
+[//]: # (833d39ba0ca7a925cbcbcbb0a79ec3f70a025508)
 
 # DataEval Change Log
+
+## v0.81.0
+
+🌟 **Feature Release**
+- `101fea34` - Add selection feature for datasets
+
+📝 **Miscellaneous**
+- `efc90630` - Add index based selection helper
+- `666e2866` - Add collate helper functions for Dataloaders
+- `4e92ae90` - Restructure typing for Datasets to allow better extensibility for other data classes
 
 ## v0.80.0
 
