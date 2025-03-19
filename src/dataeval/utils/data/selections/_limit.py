@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataeval.typing import TDatasetMetadata
+
 __all__ = []
 
 from typing import Any
@@ -7,7 +9,7 @@ from typing import Any
 from dataeval.utils.data._selection import Select, Selection, SelectionStage
 
 
-class Limit(Selection[Any, Any]):
+class Limit(Selection[Any]):
     """
     Limit the size of the dataset.
 
@@ -22,5 +24,5 @@ class Limit(Selection[Any, Any]):
     def __init__(self, size: int) -> None:
         self.size = size
 
-    def __call__(self, dataset: Select[Any, Any]) -> None:
+    def __call__(self, dataset: Select[Any, TDatasetMetadata]) -> None:
         dataset._size_limit = self.size

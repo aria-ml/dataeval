@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataeval.typing import TDatasetMetadata
+
 __all__ = []
 
 from typing import Any
@@ -9,7 +11,7 @@ import numpy as np
 from dataeval.utils.data._selection import Select, Selection, SelectionStage
 
 
-class Shuffle(Selection[Any, Any]):
+class Shuffle(Selection[Any]):
     """
     Shuffle the dataset using a seed.
 
@@ -24,6 +26,6 @@ class Shuffle(Selection[Any, Any]):
     def __init__(self, seed: int):
         self.seed = seed
 
-    def __call__(self, dataset: Select[Any, Any]) -> None:
+    def __call__(self, dataset: Select[Any, TDatasetMetadata]) -> None:
         rng = np.random.default_rng(self.seed)
         rng.shuffle(dataset._selection)

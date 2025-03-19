@@ -2,19 +2,16 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Sequence, TypeVar
+from typing import Generic, Sequence
 
 import numpy as np
 
-from dataeval.typing import Array
+from dataeval.typing import Array, ImageClassificationDatum, TArray, TDatasetMetadata
 from dataeval.utils._array import as_numpy
 from dataeval.utils.data._selection import Select, Selection, SelectionStage
 
-_TData = TypeVar("_TData")
-_TTarget = TypeVar("_TTarget", bound=Array)
 
-
-class ClassFilter(Selection[_TData, _TTarget]):
+class ClassFilter(Selection[ImageClassificationDatum[TArray]], Generic[TArray]):
     """
     Filter and balance the dataset by class.
 
@@ -37,7 +34,7 @@ class ClassFilter(Selection[_TData, _TTarget]):
         self.classes = classes
         self.balance = balance
 
-    def __call__(self, dataset: Select[_TData, _TTarget]) -> None:
+    def __call__(self, dataset: Select[ImageClassificationDatum[TArray], TDatasetMetadata]) -> None:
         if self.classes is None and not self.balance:
             return
 

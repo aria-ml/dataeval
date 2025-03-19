@@ -8,13 +8,14 @@ from typing import TYPE_CHECKING, Any, Literal, Mapping, Sequence
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.typing import Array
+from dataeval.typing import (
+    AnnotatedDataset,
+    Array,
+    ObjectDetectionTarget,
+    TDatasetMetadata,
+)
 from dataeval.utils._array import as_numpy, to_numpy
 from dataeval.utils._bin import bin_data, digitize_data, is_continuous
-from dataeval.utils.data._types import (
-    Dataset,
-    ObjectDetectionTarget,
-)
 from dataeval.utils.metadata import merge
 
 if TYPE_CHECKING:
@@ -65,7 +66,7 @@ class Metadata:
 
     def __init__(
         self,
-        dataset: Dataset[Any, Any],
+        dataset: AnnotatedDataset[tuple[Any, Any, dict[str, Any]], TDatasetMetadata],
         *,
         continuous_factor_bins: Mapping[str, int | Sequence[float]] | None = None,
         auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
