@@ -3,12 +3,12 @@ import hashlib
 import numpy as np
 import pytest
 
-from dataeval.utils.data._types import ObjectDetectionTarget
 from dataeval.utils.data.datasets._base import DataLocation
 from dataeval.utils.data.datasets._cifar10 import CIFAR10
 from dataeval.utils.data.datasets._milco import MILCO
 from dataeval.utils.data.datasets._mnist import MNIST
 from dataeval.utils.data.datasets._ships import Ships
+from dataeval.utils.data.datasets._types import ObjectDetectionTarget
 from dataeval.utils.data.datasets._voc import VOCDetection
 
 

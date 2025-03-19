@@ -10,8 +10,7 @@ from torch.utils.data import DataLoader, Subset
 from tqdm import tqdm
 
 from dataeval.config import get_device
-from dataeval.typing import TArray
-from dataeval.utils.data._types import Dataset
+from dataeval.typing import SizedDataset, TArray
 from dataeval.utils.torch.models import SupportsEncode
 
 
@@ -41,7 +40,7 @@ class Embeddings:
 
     def __init__(
         self,
-        dataset: Dataset[TArray, Any],
+        dataset: SizedDataset[tuple[TArray, Any, Any]],
         batch_size: int,
         indices: Sequence[int] | None = None,
         model: torch.nn.Module | None = None,
@@ -78,7 +77,7 @@ class Embeddings:
     @torch.no_grad
     def _batch(self, indices: Sequence[int]) -> Iterator[torch.Tensor]:
         # manual batching
-        dataloader = DataLoader(Subset(self._dataset, indices), batch_size=self.batch_size, collate_fn=self._collate_fn)
+        dataloader = DataLoader(Subset(self._dataset, indices), batch_size=self.batch_size, collate_fn=self._collate_fn)  # type: ignore
         for i, images in (
             tqdm(enumerate(dataloader), total=math.ceil(len(indices) / self.batch_size), desc="Batch processing")
             if self.verbose
