@@ -6,8 +6,10 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import Any, Generic, Iterator, Literal, NamedTuple, Sequence, TypeVar
 
-from dataeval.utils.data._types import (
-    Dataset,
+from dataeval.utils.data.datasets._fileio import _ensure_exists
+from dataeval.utils.data.datasets._mixin import BaseDatasetMixin
+from dataeval.utils.data.datasets._types import (
+    AnnotatedDataset,
     DatasetMetadata,
     ImageClassificationDataset,
     ObjectDetectionDataset,
@@ -16,8 +18,6 @@ from dataeval.utils.data._types import (
     SegmentationTarget,
     Transform,
 )
-from dataeval.utils.data.datasets._fileio import _ensure_exists
-from dataeval.utils.data.datasets._mixin import BaseDatasetMixin
 
 _TArray = TypeVar("_TArray")
 _TTarget = TypeVar("_TTarget")
@@ -31,7 +31,7 @@ class DataLocation(NamedTuple):
     checksum: str
 
 
-class BaseDataset(Dataset[_TArray, _TTarget], Generic[_TArray, _TTarget, _TRawTarget]):
+class BaseDataset(AnnotatedDataset[tuple[_TArray, _TTarget, dict[str, Any]]], Generic[_TArray, _TTarget, _TRawTarget]):
     """
     Base class for internet downloaded datasets.
     """
