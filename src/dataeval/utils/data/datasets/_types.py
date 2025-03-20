@@ -2,16 +2,11 @@ from __future__ import annotations
 
 __all__ = []
 
-import sys
 from dataclasses import dataclass
 from typing import Any, Generic, Protocol, TypedDict, TypeVar
 
-if sys.version_info >= (3, 11):
-    from typing import NotRequired, Required
-else:
-    from typing_extensions import NotRequired, Required
-
 from torch.utils.data import Dataset
+from typing_extensions import NotRequired, Required
 
 
 class DatasetMetadata(TypedDict):

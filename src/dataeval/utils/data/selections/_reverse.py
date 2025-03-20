@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataeval.typing import TDatasetMetadata
-
 __all__ = []
 
 from typing import Any
@@ -16,5 +14,5 @@ class Reverse(Selection[Any]):
 
     stage = SelectionStage.ORDER
 
-    def __call__(self, dataset: Select[Any, TDatasetMetadata]) -> None:
+    def __call__(self, dataset: Select[Any]) -> None:
         dataset._selection.reverse()

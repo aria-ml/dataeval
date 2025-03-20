@@ -49,8 +49,8 @@ def heatmap(
     from matplotlib.ticker import FuncFormatter
 
     np_data = to_numpy(data)
-    rows = row_labels if isinstance(row_labels, list) else to_numpy(row_labels)
-    cols = col_labels if isinstance(col_labels, list) else to_numpy(col_labels)
+    rows: list[str] = [str(n) for n in to_numpy(row_labels)]
+    cols: list[str] = [str(n) for n in to_numpy(col_labels)]
 
     fig, ax = plt.subplots(figsize=(10, 10))
 
