@@ -2,16 +2,32 @@
 Common type hints used for interoperability with DataEval.
 """
 
-__all__ = ["Array", "ArrayLike"]
+__all__ = [
+    "Array",
+    "ArrayLike",
+    "Dataset",
+    "AnnotatedDataset",
+    "DatasetMetadata",
+    "ImageClassificationDatum",
+    "ImageClassificationDataset",
+    "ObjectDetectionTarget",
+    "ObjectDetectionDatum",
+    "ObjectDetectionDataset",
+    "SegmentationTarget",
+    "SegmentationDatum",
+    "SegmentationDataset",
+]
 
 
 import sys
 from typing import Any, Generic, Iterator, Protocol, Sequence, TypedDict, TypeVar, Union, runtime_checkable
 
-if sys.version_info >= (3, 11):
-    from typing import NotRequired, Required
+from typing_extensions import NotRequired, Required
+
+if sys.version_info >= (3, 10):
+    from typing import TypeAlias
 else:
-    from typing_extensions import NotRequired, Required
+    from typing_extensions import TypeAlias
 
 
 @runtime_checkable
@@ -50,62 +66,169 @@ class Array(Protocol):
     def __len__(self) -> int: ...
 
 
-T = TypeVar("T", covariant=True)
-TArray = TypeVar("TArray", bound=Array)
-
-ArrayLike = Union[Sequence[Any], Array]
+_T_co = TypeVar("_T_co", covariant=True)
+_ScalarType = Union[int, float, bool, str]
+ArrayLike: TypeAlias = Union[Sequence[_ScalarType], Sequence[Array], Array]
 """
 Type alias for array-like objects used for interoperability with DataEval.
 
 This includes native Python sequences, as well as objects that conform to
-the `Array` protocol.
+the :class:`Array` protocol.
 """
 
 
-class DatasetMetadata(TypedDict):
+class DatasetMetadata(TypedDict, total=False):
+    """
+    Dataset level metadata required for all `AnnotatedDataset` classes.
+
+    Attributes
+    ----------
+    id : Required[str]
+        A unique identifier for the dataset
+    index2label : NotRequired[dict[int, str]]
+        A lookup table converting label value to class name
+    """
+
     id: Required[str]
     index2label: NotRequired[dict[int, str]]
 
 
-TDatasetMetadata = TypeVar("TDatasetMetadata", bound=DatasetMetadata)
-
-
 @runtime_checkable
-class Dataset(Generic[T], Protocol):
-    def __getitem__(self, index: int, /) -> T: ...
+class Dataset(Generic[_T_co], Protocol):
+    """
+    Protocol for a generic `Dataset`.
 
+    Methods
+    -------
+    __getitem__(index: int)
+        Returns datum at specified index.
+    __len__()
+        Returns dataset length.
+    """
 
-@runtime_checkable
-class SizedDataset(Dataset[T], Protocol):
+    def __getitem__(self, index: int, /) -> _T_co: ...
     def __len__(self) -> int: ...
 
 
 @runtime_checkable
-class AnnotatedDataset(SizedDataset[T], Generic[T, TDatasetMetadata], Protocol):
-    metadata: TDatasetMetadata
+class AnnotatedDataset(Dataset[_T_co], Generic[_T_co], Protocol):
+    """
+    Protocol for a generic `AnnotatedDataset`.
+
+    Attributes
+    ----------
+    metadata : :class:`.DatasetMetadata` or derivatives.
+
+    Methods
+    -------
+    __getitem__(index: int)
+        Returns datum at specified index.
+    __len__()
+        Returns dataset length.
+
+    Notes
+    -----
+    Inherits from :class:`.Dataset`.
+    """
+
+    @property
+    def metadata(self) -> DatasetMetadata: ...
+
+
+# ========== IMAGE CLASSIFICATION DATASETS ==========
+
+
+ImageClassificationDatum: TypeAlias = tuple[Array, Array, dict[str, Any]]
+"""
+A type definition for an image classification datum tuple.
+
+- :class:`Array` of shape (C, H, W) - Image data in channel, height, width format.
+- :class:`Array` of shape (N,) - Class label as one-hot encoded ground-truth or prediction confidences.
+- dict[str, Any] - Datum level metadata.
+"""
+
+
+ImageClassificationDataset: TypeAlias = AnnotatedDataset[ImageClassificationDatum]
+"""
+A type definition for an :class:`AnnotatedDataset` of :class:`ImageClassificationDatum` elements.
+"""
+
+# ========== OBJECT DETECTION DATASETS ==========
 
 
 @runtime_checkable
-class ObjectDetectionTarget(Generic[TArray], Protocol):
-    boxes: TArray
-    labels: TArray
-    scores: TArray
+class ObjectDetectionTarget(Protocol):
+    """
+    A protocol for targets in an Object Detection dataset.
+
+    Attributes
+    ----------
+    boxes : :class:`Array` of shape (N, 4)
+    labels : :class:`Array` of shape (N,)
+    scores : :class:`Array` of shape (N, M)
+    """
+
+    @property
+    def boxes(self) -> Array: ...
+
+    @property
+    def labels(self) -> Array: ...
+
+    @property
+    def scores(self) -> Array: ...
+
+
+ObjectDetectionDatum: TypeAlias = tuple[Array, ObjectDetectionTarget, dict[str, Any]]
+"""
+A type definition for an object detection datum tuple.
+
+- :class:`Array` of shape (C, H, W) - Image data in channel, height, width format.
+- :class:`ObjectDetectionTarget` - Object detection target information for the image.
+- dict[str, Any] - Datum level metadata.
+"""
+
+
+ObjectDetectionDataset: TypeAlias = AnnotatedDataset[ObjectDetectionDatum]
+"""
+A type definition for an :class:`AnnotatedDataset` of :class:`ObjectDetectionDatum` elements.
+"""
+
+
+# ========== SEGMENTATION DATASETS ==========
 
 
 @runtime_checkable
-class SegmentationTarget(Generic[TArray], Protocol):
-    mask: TArray
-    labels: TArray
-    scores: TArray
+class SegmentationTarget(Protocol):
+    """
+    A protocol for targets in a Segmentation dataset.
+
+    Attributes
+    ----------
+    mask : :class:`Array`
+    labels : :class:`Array`
+    scores : :class:`Array`
+    """
+
+    @property
+    def mask(self) -> Array: ...
+
+    @property
+    def labels(self) -> Array: ...
+
+    @property
+    def scores(self) -> Array: ...
 
 
-DatumMetadata = dict[str, Any]
+SegmentationDatum: TypeAlias = tuple[Array, SegmentationTarget, dict[str, Any]]
+"""
+A type definition for an image classification datum tuple.
 
-ImageClassificationDatum = tuple[TArray, TArray, DatumMetadata]
-ImageClassificationDataset = AnnotatedDataset[ImageClassificationDatum[TArray], TDatasetMetadata]
+- :class:`Array` of shape (C, H, W) - Image data in channel, height, width format.
+- :class:`SegmentationTarget` - Segmentation target information for the image.
+- dict[str, Any] - Datum level metadata.
+"""
 
-ObjectDetectionDatum = tuple[TArray, ObjectDetectionTarget[TArray], DatumMetadata]
-ObjectDetectionDataset = AnnotatedDataset[ObjectDetectionDatum[TArray], TDatasetMetadata]
-
-SegmentationDatum = tuple[TArray, SegmentationTarget[TArray], DatumMetadata]
-SegmentationDataset = AnnotatedDataset[SegmentationDatum[TArray], TDatasetMetadata]
+SegmentationDataset: TypeAlias = AnnotatedDataset[SegmentationDatum]
+"""
+A type definition for an :class:`AnnotatedDataset` of :class:`SegmentationDatum` elements.
+"""

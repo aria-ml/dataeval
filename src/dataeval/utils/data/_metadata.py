@@ -12,7 +12,6 @@ from dataeval.typing import (
     AnnotatedDataset,
     Array,
     ObjectDetectionTarget,
-    TDatasetMetadata,
 )
 from dataeval.utils._array import as_numpy, to_numpy
 from dataeval.utils._bin import bin_data, digitize_data, is_continuous
@@ -66,7 +65,7 @@ class Metadata:
 
     def __init__(
         self,
-        dataset: AnnotatedDataset[tuple[Any, Any, dict[str, Any]], TDatasetMetadata],
+        dataset: AnnotatedDataset[tuple[Any, Any, dict[str, Any]]],
         *,
         continuous_factor_bins: Mapping[str, int | Sequence[float]] | None = None,
         auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",

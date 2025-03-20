@@ -4,18 +4,13 @@ __all__ = []
 
 import inspect
 import logging
-import sys
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from functools import partial, wraps
 from typing import Any, Callable, Iterator, TypeVar
 
 import numpy as np
-
-if sys.version_info >= (3, 10):
-    from typing import ParamSpec
-else:
-    from typing_extensions import ParamSpec
+from typing_extensions import ParamSpec
 
 from dataeval import __version__
 

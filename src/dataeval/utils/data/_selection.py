@@ -5,7 +5,7 @@ __all__ = []
 from enum import IntEnum
 from typing import Any, Generic, Iterator, Sequence, TypeVar
 
-from dataeval.typing import AnnotatedDataset, TDatasetMetadata
+from dataeval.typing import AnnotatedDataset, DatasetMetadata
 
 _TDatum = TypeVar("_TDatum")
 
@@ -19,13 +19,13 @@ class SelectionStage(IntEnum):
 class Selection(Generic[_TDatum]):
     stage: SelectionStage
 
-    def __call__(self, dataset: Select[_TDatum, TDatasetMetadata]) -> None: ...
+    def __call__(self, dataset: Select[_TDatum]) -> None: ...
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}({', '.join([f'{k}={v}' for k, v in self.__dict__.items()])})"
 
 
-class Select(Generic[_TDatum, TDatasetMetadata], AnnotatedDataset[_TDatum, TDatasetMetadata]):
+class Select(AnnotatedDataset[_TDatum]):
     """
     Wraps a dataset and applies selection criteria to it.
 
@@ -59,14 +59,14 @@ class Select(Generic[_TDatum, TDatasetMetadata], AnnotatedDataset[_TDatum, TData
     (data_20, 0, {'id': 20})
     """
 
-    _dataset: AnnotatedDataset[_TDatum, TDatasetMetadata]
+    _dataset: AnnotatedDataset[_TDatum]
     _selection: list[int]
     _selections: Sequence[Selection[_TDatum]]
     _size_limit: int
 
     def __init__(
         self,
-        dataset: AnnotatedDataset[_TDatum, TDatasetMetadata],
+        dataset: AnnotatedDataset[_TDatum],
         selections: Selection[_TDatum] | list[Selection[_TDatum]] | None = None,
     ) -> None:
         self._dataset = dataset
@@ -74,10 +74,19 @@ class Select(Generic[_TDatum, TDatasetMetadata], AnnotatedDataset[_TDatum, TData
         self._selection = list(range(self._size_limit))
         self._selections = self._sort_selections(selections)
         self.__dict__.update(dataset.__dict__)
-        self.metadata = getattr(dataset, "metadata", {"id": dataset.__class__.__name__})  # type: ignore
+
+        # Ensure metadata is populated correctly as DatasetMetadata TypedDict
+        _metadata = getattr(dataset, "metadata", {})
+        if "id" not in _metadata:
+            _metadata["id"] = dataset.__class__.__name__
+        self._metadata = DatasetMetadata(**_metadata)
 
         if self._selections:
             self._apply_selections()
+
+    @property
+    def metadata(self) -> DatasetMetadata:
+        return self._metadata
 
     def __str__(self) -> str:
         nt = "\n    "
