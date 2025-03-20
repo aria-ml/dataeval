@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+from random import choice
 from zipfile import ZipFile
 
 import numpy as np
@@ -170,6 +171,24 @@ def ship_fake(tmp_path_factory):
 @pytest.fixture(scope="session")
 def cifar_fake(tmp_path_factory):
     temp = tmp_path_factory.mktemp("data")
+    cifar_temp = temp / "cifar10" / "cifar-10-batches-bin"
+    cifar_temp.mkdir(parents=True, exist_ok=True)
+
+    for filename in [
+        "data_batch_1.bin",
+        "data_batch_2.bin",
+        "data_batch_3.bin",
+        "data_batch_4.bin",
+        "data_batch_5.bin",
+        "test_batch.bin",
+    ]:
+        with open(cifar_temp / filename, "wb") as file:
+            # Write 10000 images for each batch
+            for _ in range(10000):
+                # Write label
+                file.write(choice(range(10)).to_bytes(1, byteorder="big"))
+                # Write 3072 zeros
+                file.write(bytes(3072))
     yield temp
 
 

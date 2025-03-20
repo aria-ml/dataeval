@@ -102,7 +102,7 @@ class TestShipDataset:
 class TestCIFAR10:
     def test_cifar10_initialization(self, cifar_fake):
         """Test CIFAR10 dataset initialization."""
-        dataset = CIFAR10(root=cifar_fake, download=True)
+        dataset = CIFAR10(root=cifar_fake)
         assert isinstance(dataset._targets, list)
         assert isinstance(dataset._targets[0], int)
         assert len(dataset) == 50000
