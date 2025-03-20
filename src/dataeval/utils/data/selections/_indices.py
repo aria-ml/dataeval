@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataeval.typing import TDatasetMetadata
-
 __all__ = []
 
 from typing import Any, Sequence
@@ -24,5 +22,5 @@ class Indices(Selection[Any]):
     def __init__(self, indices: Sequence[int]) -> None:
         self.indices = indices
 
-    def __call__(self, dataset: Select[Any, TDatasetMetadata]) -> None:
+    def __call__(self, dataset: Select[Any]) -> None:
         dataset._selection = [index for index in self.indices if index in dataset._selection]

@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, Subset
 from tqdm import tqdm
 
 from dataeval.config import get_device
-from dataeval.typing import SizedDataset, TArray
+from dataeval.typing import Array, Dataset
 from dataeval.utils.torch.models import SupportsEncode
 
 
@@ -40,7 +40,7 @@ class Embeddings:
 
     def __init__(
         self,
-        dataset: SizedDataset[tuple[TArray, Any, Any]],
+        dataset: Dataset[tuple[Array, Any, Any]],
         batch_size: int,
         indices: Sequence[int] | None = None,
         model: torch.nn.Module | None = None,

@@ -4,7 +4,7 @@ __all__ = []
 
 from typing import Any, Generic, Iterator, Sequence, TypeVar, overload
 
-from dataeval.typing import SizedDataset
+from dataeval.typing import Dataset
 
 T = TypeVar("T")
 
@@ -21,7 +21,7 @@ class Images(Generic[T]):
         Dataset to access images from.
     """
 
-    def __init__(self, dataset: SizedDataset[tuple[T, Any, Any]]) -> None:
+    def __init__(self, dataset: Dataset[tuple[T, Any, Any]]) -> None:
         self._dataset = dataset
 
     def to_list(self) -> Sequence[T]:
@@ -35,7 +35,7 @@ class Images(Generic[T]):
 
         Returns
         -------
-        list[TArray]
+        list[T]
         """
         return self[:]
 
