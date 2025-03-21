@@ -68,7 +68,7 @@ class Array(Protocol):
 
 _T_co = TypeVar("_T_co", covariant=True)
 _ScalarType = Union[int, float, bool, str]
-ArrayLike: TypeAlias = Union[Sequence[_ScalarType], Sequence[Array], Array]
+ArrayLike: TypeAlias = Union[Sequence[_ScalarType], Sequence[Sequence[_ScalarType]], Sequence[Array], Array]
 """
 Type alias for array-like objects used for interoperability with DataEval.
 
@@ -163,19 +163,19 @@ class ObjectDetectionTarget(Protocol):
 
     Attributes
     ----------
-    boxes : :class:`Array` of shape (N, 4)
-    labels : :class:`Array` of shape (N,)
-    scores : :class:`Array` of shape (N, M)
+    boxes : :class:`ArrayLike` of shape (N, 4)
+    labels : :class:`ArrayLike` of shape (N,)
+    scores : :class:`ArrayLike` of shape (N, M)
     """
 
     @property
-    def boxes(self) -> Array: ...
+    def boxes(self) -> ArrayLike: ...
 
     @property
-    def labels(self) -> Array: ...
+    def labels(self) -> ArrayLike: ...
 
     @property
-    def scores(self) -> Array: ...
+    def scores(self) -> ArrayLike: ...
 
 
 ObjectDetectionDatum: TypeAlias = tuple[Array, ObjectDetectionTarget, dict[str, Any]]
@@ -204,19 +204,19 @@ class SegmentationTarget(Protocol):
 
     Attributes
     ----------
-    mask : :class:`Array`
-    labels : :class:`Array`
-    scores : :class:`Array`
+    mask : :class:`ArrayLike`
+    labels : :class:`ArrayLike`
+    scores : :class:`ArrayLike`
     """
 
     @property
-    def mask(self) -> Array: ...
+    def mask(self) -> ArrayLike: ...
 
     @property
-    def labels(self) -> Array: ...
+    def labels(self) -> ArrayLike: ...
 
     @property
-    def scores(self) -> Array: ...
+    def scores(self) -> ArrayLike: ...
 
 
 SegmentationDatum: TypeAlias = tuple[Array, SegmentationTarget, dict[str, Any]]

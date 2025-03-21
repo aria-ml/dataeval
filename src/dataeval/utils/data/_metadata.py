@@ -276,6 +276,10 @@ class Metadata:
         if self._processed and not force:
             return
 
+        # Trigger collate and merge if not yet done
+        self._collate()
+        self._merge()
+
         # Validate the metadata dimensions
         self._validate()
 
@@ -341,7 +345,11 @@ class Metadata:
 
         # Split out the dictionaries into the keys and values
         self._discrete_factor_names = list(discrete_metadata.keys())
-        self._discrete_data = np.stack(list(discrete_metadata.values()), axis=-1, dtype=np.int64)
+        self._discrete_data = (
+            np.stack(list(discrete_metadata.values()), axis=-1, dtype=np.int64)
+            if discrete_metadata
+            else np.array([], dtype=np.int64)
+        )
         self._continuous_factor_names = list(continuous_metadata.keys())
         self._continuous_data = (
             np.stack(list(continuous_metadata.values()), axis=-1, dtype=np.float64)
