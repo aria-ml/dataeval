@@ -10,8 +10,11 @@ __all__ = [
     "SplitDatasetOutput",
     "Targets",
     "split_dataset",
+    "to_image_classification_dataset",
+    "to_object_detection_dataset",
 ]
 
+from dataeval.utils.data._dataset import to_image_classification_dataset, to_object_detection_dataset
 from dataeval.utils.data._embeddings import Embeddings
 from dataeval.utils.data._images import Images
 from dataeval.utils.data._metadata import Metadata
