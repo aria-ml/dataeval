@@ -109,7 +109,7 @@ def dimensionstats(
 
     >>> results = dimensionstats(stats_images)
     >>> print(results.aspect_ratio)
-    [1.     1.     1.333  1.     0.6665]
+    [1.    1.    1.333 1.    0.667]
     >>> print(results.channels)
     [3 3 1 3 1]
     """

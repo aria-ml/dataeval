@@ -8,48 +8,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.detectors.ood import OODOutput
+from dataeval.metadata._utils import _compare_keys, _validate_factors_and_data
 from dataeval.utils.data import Metadata
-
-
-def _validate_keys(keys1: list[str], keys2: list[str]) -> None:
-    """
-    Raises error when two lists are not equivalent including ordering
-
-    Parameters
-    ----------
-    keys1 : list of strings
-        List of strings to compare
-    keys2 : list of strings
-        List of strings to compare
-
-    Raises
-    ------
-    ValueError
-        If lists do not have the same values, value counts, or ordering
-    """
-
-    if keys1 != keys2:
-        raise ValueError(f"Metadata keys must be identical, got {keys1} and {keys2}")
-
-
-def _validate_factors_and_data(factors: list[str], data: NDArray) -> None:
-    """
-    Raises error when the number of factors and number of rows do not match
-
-    Parameters
-    ----------
-    factors : list of strings
-        List of factor names of size N
-    data : NDArray
-        Array of values with shape (M, N)
-
-    Raises
-    ------
-    ValueError
-        If the length of factors does not equal the length of the transposed data
-    """
-    if len(factors) != len(data.T):
-        raise ValueError(f"Factors and data have mismatched lengths. Got {len(factors)} and {len(data.T)}")
 
 
 def _combine_metadata(metadata_1: Metadata, metadata_2: Metadata) -> tuple[list[str], list[NDArray], list[NDArray]]:
@@ -93,7 +53,7 @@ def _combine_metadata(metadata_1: Metadata, metadata_2: Metadata) -> tuple[list[
 
     # Validate and attach discrete data
     if metadata_1.discrete_factor_names:
-        _validate_keys(metadata_1.discrete_factor_names, metadata_2.discrete_factor_names)
+        _compare_keys(metadata_1.discrete_factor_names, metadata_2.discrete_factor_names)
         _validate_factors_and_data(metadata_1.discrete_factor_names, metadata_1.discrete_data)
 
         factor_names.extend(metadata_1.discrete_factor_names)
@@ -102,7 +62,7 @@ def _combine_metadata(metadata_1: Metadata, metadata_2: Metadata) -> tuple[list[
 
     # Validate and attach continuous data
     if metadata_1.continuous_factor_names:
-        _validate_keys(metadata_1.continuous_factor_names, metadata_2.continuous_factor_names)
+        _compare_keys(metadata_1.continuous_factor_names, metadata_2.continuous_factor_names)
         _validate_factors_and_data(metadata_1.continuous_factor_names, metadata_1.continuous_data)
 
         factor_names.extend(metadata_1.continuous_factor_names)
@@ -189,6 +149,23 @@ def most_deviated_factors(
        and have equivalent factor names and lengths
     2. The flag at index `i` in :attr:`.OODOutput.is_ood` must correspond
        directly to sample `i` of `metadata_2` being out-of-distribution from `metadata_1`
+
+    Examples
+    --------
+
+    >>> from dataeval.detectors.ood import OODOutput
+
+    All samples are out-of-distribution
+
+    >>> is_ood = OODOutput(np.array([True, True, True]), np.array([]), np.array([]))
+    >>> most_deviated_factors(metadata1, metadata2, is_ood)
+    [('time', 2.0), ('time', 2.592), ('time', 3.51)]
+
+    If there are no out-of-distribution samples, a list is returned
+
+    >>> is_ood = OODOutput(np.array([False, False, False]), np.array([]), np.array([]))
+    >>> most_deviated_factors(metadata1, metadata2, is_ood)
+    []
     """
 
     ood_mask: NDArray[np.bool] = ood.is_ood
@@ -204,6 +181,7 @@ def most_deviated_factors(
         metadata_2=metadata_2,
     )
 
+    # Stack discrete and continuous factors as separate factors. Must have equal sample counts
     metadata_ref = np.hstack(md_1) if md_1 else np.array([])
     metadata_tst = np.hstack(md_2) if md_2 else np.array([])
 
@@ -226,7 +204,7 @@ def most_deviated_factors(
     deviations = _calc_median_deviations(metadata_ref, metadata_tst)
 
     # Get most impactful factor deviation of each sample for ood samples only
-    deviation = np.max(deviations, axis=1)[ood_mask]
+    deviation = np.max(deviations, axis=1)[ood_mask].astype(np.float16)
 
     # Get indices of most impactful factors for ood samples only
     max_factors = np.argmax(deviations, axis=1)[ood_mask]
@@ -235,4 +213,5 @@ def most_deviated_factors(
     most_ood_factors = np.array(factor_names)[max_factors].tolist()
 
     # List of tuples matching the factor name with its deviation
-    return [(factor, dev.item()) for factor, dev in zip(most_ood_factors, deviation)]
+
+    return [(factor, dev) for factor, dev in zip(most_ood_factors, deviation)]

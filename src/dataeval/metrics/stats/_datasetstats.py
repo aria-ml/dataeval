@@ -150,9 +150,9 @@ def datasetstats(
 
     >>> stats = datasetstats(stats_images, bboxes)
     >>> print(stats.dimensionstats.aspect_ratio)
-    [ 0.864   0.5884 16.      1.143   1.692   0.5835  0.6665  2.555   1.3   ]
+    [ 0.864  0.588 16.     1.143  1.692  0.583  0.667  2.555  1.3  ]
     >>> print(stats.visualstats.sharpness)
-    [4.04   4.434  0.2778 4.957  5.145  5.22   4.957  3.076  2.855 ]
+    [4.04  4.434 0.278 4.957 5.145 5.22  4.957 3.076 2.855]
     """
     outputs = run_stats(images, bboxes, False, [DimensionStatsProcessor, PixelStatsProcessor, VisualStatsProcessor])
     return DatasetStatsOutput(*outputs, labelstats=labelstats(labels) if labels else None)  # type: ignore
@@ -191,8 +191,7 @@ def channelstats(
 
     >>> stats = channelstats(stats_images)
     >>> print(stats.visualstats.darkness)
-    [0.1499 0.3499 0.55   0.2094 0.2219 0.2344 0.4194 0.6094 0.622  0.6343
-     0.8154]
+    [0.15  0.35  0.55  0.209 0.222 0.234 0.419 0.609 0.622 0.634 0.815]
     """
     outputs = run_stats(images, bboxes, True, [PixelStatsProcessor, VisualStatsProcessor])
     return ChannelStatsOutput(*outputs)  # type: ignore

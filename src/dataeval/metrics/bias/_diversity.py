@@ -236,21 +236,21 @@ def diversity(
 
     >>> div_simp = diversity(metadata, method="simpson")
     >>> div_simp.diversity_index
-    array([0.6       , 0.80882353, 1.        , 0.8       ])
+    array([0.6  , 0.809, 1.   , 0.8  ])
 
     >>> div_simp.classwise
-    array([[0.5       , 0.8       , 0.8       ],
-           [0.63043478, 0.97560976, 0.52830189]])
+    array([[0.5  , 0.8  , 0.8  ],
+           [0.63 , 0.976, 0.528]])
 
     Compute Shannon diversity index of metadata and class labels
 
     >>> div_shan = diversity(metadata, method="shannon")
     >>> div_shan.diversity_index
-    array([0.81127812, 0.9426312 , 1.        , 0.91829583])
+    array([0.811, 0.943, 1.   , 0.918])
 
     >>> div_shan.classwise
-    array([[0.68260619, 0.91829583, 0.91829583],
-           [0.81443569, 0.99107606, 0.76420451]])
+    array([[0.683, 0.918, 0.918],
+           [0.814, 0.991, 0.764]])
 
     See Also
     --------

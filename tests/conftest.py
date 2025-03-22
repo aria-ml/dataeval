@@ -14,6 +14,8 @@ from dataeval.utils.data._targets import Targets
 
 TEMP_CONTENTS = "ABCDEF1234567890"
 
+pytest_plugins = ["tests.fixtures.metadata"]
+
 
 def preprocess(factors, class_labels, continuous_factor_bins=None, exclude=None, include=None):
     if isinstance(class_labels[0], str):
@@ -44,7 +46,7 @@ def preprocess(factors, class_labels, continuous_factor_bins=None, exclude=None,
 
 
 @pytest.fixture(scope="session")
-def RNG():
+def RNG() -> np.random.Generator:
     return np.random.default_rng(0)
 
 

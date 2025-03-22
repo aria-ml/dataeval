@@ -111,7 +111,7 @@ def pixelstats(
 
     >>> results = pixelstats(stats_images)
     >>> print(results.mean)
-    [0.2903 0.2108 0.397  0.596  0.743 ]
+    [0.29  0.211 0.397 0.596 0.743]
     >>> print(results.entropy)
     [4.99  2.371 1.179 2.406 0.668]
     """

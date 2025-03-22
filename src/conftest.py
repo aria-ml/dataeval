@@ -4,6 +4,7 @@ import pathlib
 import sys
 from typing import Mapping, Sequence
 
+from dataeval.detectors.ood import OODOutput
 from dataeval.utils.data._metadata import Metadata
 from dataeval.utils.data._targets import Targets
 
@@ -30,7 +31,8 @@ if np.__version__[0] == "2":
     # WITH LEGACY=1.25
     # >>> np.int32(16)
     # 16
-    np.set_printoptions(legacy="1.25")  # type: ignore
+    np.set_printoptions(legacy="1.25", precision=3)  # type: ignore
+
 
 # Set manual seeds
 np.random.seed(0)
@@ -64,6 +66,26 @@ class ClassificationModel(PtModel):
 def add_all(doctest_namespace):
     doctest_namespace["np"] = np
     doctest_namespace["generate_random_metadata"] = generate_random_metadata
+    doctest_namespace["OODOutput"] = OODOutput
+
+
+@pytest.fixture(autouse=True, scope="session")
+def doctest_metadata_explanatory_funcs(doctest_namespace):
+    md1 = MagicMock(spec=Metadata)
+    md2 = MagicMock(spec=Metadata)
+
+    md1.discrete_factor_names = []
+    md1.continuous_factor_names = ["time", "altitude"]
+    md1.continuous_data = np.array([[1.2, 235], [3.4, 6789], [5.6, 101112]])
+    md1.total_num_factors = 2
+
+    md2.discrete_factor_names = []
+    md2.continuous_factor_names = ["time", "altitude"]
+    md2.continuous_data = np.array([[7.8, 532], [9.10, 9876], [11.12, 211101]])
+    md2.total_num_factors = 2
+
+    doctest_namespace["metadata1"] = md1
+    doctest_namespace["metadata2"] = md2
 
 
 @pytest.fixture(autouse=True, scope="session")
