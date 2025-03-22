@@ -117,7 +117,7 @@ def visualstats(
 
     >>> results = visualstats(stats_images)
     >>> print(results.brightness)
-    [0.1353 0.2085 0.4143 0.6084 0.8135]
+    [0.135 0.208 0.414 0.608 0.813]
     >>> print(results.contrast)
     [2.04  1.331 1.261 1.279 1.253]
     """

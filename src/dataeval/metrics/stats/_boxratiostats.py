@@ -132,11 +132,9 @@ def boxratiostats(
     >>> boxstats = dimensionstats(stats_images, bboxes)
     >>> ratiostats = boxratiostats(boxstats, imagestats)
     >>> print(ratiostats.aspect_ratio)
-    [ 0.86376953  0.58837891 16.          0.85714286  1.26959707  0.43772894
-      0.66650391  3.83296703  1.95018315]
+    [ 0.864  0.588 16.     0.857  1.27   0.438  0.667  3.833  1.95 ]
     >>> print(ratiostats.size)
-    [0.0255127  0.01037598 0.00097656 0.01822917 0.02327474 0.00683594
-     0.00915527 0.03369141 0.02115885]
+    [0.026 0.01  0.001 0.018 0.023 0.007 0.009 0.034 0.021]
     """
     output_cls = type(boxstats)
     if type(boxstats) is not type(imgstats):

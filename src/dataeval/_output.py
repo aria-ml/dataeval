@@ -69,6 +69,9 @@ class MappingOutput(Mapping[TKey, TValue], Output):
     def dict(self) -> dict[str, TValue]:
         return {str(k): v for k, v in self._data.items()}
 
+    def __str__(self) -> str:
+        return str(self.dict())
+
 
 P = ParamSpec("P")
 R = TypeVar("R", bound=Output)
