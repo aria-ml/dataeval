@@ -32,7 +32,7 @@ DataEval is easy to install, supports a wide range of Python versions, and is
 compatible with many of the most popular packages in the scientific and T&E
 communities.
 
-DataEval also has native interopability between JATIC's suite of tools when
+DataEval also has native interoperability between JATIC's suite of tools when
 using MAITE-compliant datasets and models.
 <!-- end JATIC interop -->
 
