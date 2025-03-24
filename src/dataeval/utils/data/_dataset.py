@@ -18,7 +18,7 @@ def _validate_data(
     datum_type: Literal["ic", "od"],
     images: Array | Sequence[Array],
     labels: Sequence[int] | Sequence[Sequence[int]],
-    bboxes: Sequence[Sequence[tuple[float, float, float, float]]] | None,
+    bboxes: Sequence[Sequence[Sequence[float]]] | None,
     metadata: Sequence[dict[str, Any]] | None,
 ) -> None:
     # Validate inputs
@@ -41,12 +41,12 @@ def _validate_data(
             raise TypeError("Labels must be a sequence of sequences of integers for object detection.")
         if (
             bboxes is None
-            or not isinstance(bboxes, Sequence)
-            or not isinstance(bboxes[0], Sequence)
-            or not isinstance(bboxes[0][0], tuple)
+            or not isinstance(bboxes, (Sequence, Array))
+            or not isinstance(bboxes[0], (Sequence, Array))
+            or not isinstance(bboxes[0][0], (Sequence, Array))
             or not len(bboxes[0][0]) == 4
         ):
-            raise TypeError("Boxes must be a sequence of sequences of (x0,y0,x1,y1) tuples for object detection.")
+            raise TypeError("Boxes must be a sequence of sequences of (x0, y0, x1, y1) for object detection.")
 
 
 def _find_max(arr: ArrayLike) -> Any:
@@ -111,7 +111,7 @@ class CustomImageClassificationDataset(BaseAnnotatedDataset[Sequence[int]], Imag
 
 class CustomObjectDetectionDataset(BaseAnnotatedDataset[Sequence[Sequence[int]]], ObjectDetectionDataset):
     class ObjectDetectionTarget:
-        def __init__(self, labels: Sequence[int], bboxes: Sequence[tuple[float, float, float, float]]) -> None:
+        def __init__(self, labels: Sequence[int], bboxes: Sequence[Sequence[float]]) -> None:
             self._labels = labels
             self._bboxes = bboxes
             self._scores = [1.0] * len(labels)
@@ -121,7 +121,7 @@ class CustomObjectDetectionDataset(BaseAnnotatedDataset[Sequence[Sequence[int]]]
             return self._labels
 
         @property
-        def boxes(self) -> Sequence[tuple[float, float, float, float]]:
+        def boxes(self) -> Sequence[Sequence[float]]:
             return self._bboxes
 
         @property
@@ -132,7 +132,7 @@ class CustomObjectDetectionDataset(BaseAnnotatedDataset[Sequence[Sequence[int]]]
         self,
         images: Array | Sequence[Array],
         labels: Sequence[Sequence[int]],
-        bboxes: Sequence[Sequence[tuple[float, float, float, float]]],
+        bboxes: Sequence[Sequence[Sequence[float]]],
         metadata: Sequence[dict[str, Any]] | None,
         classes: Sequence[str] | None,
         name: str | None = None,
@@ -188,7 +188,7 @@ def to_image_classification_dataset(
 def to_object_detection_dataset(
     images: Array | Sequence[Array],
     labels: Sequence[Sequence[int]],
-    bboxes: Sequence[Sequence[tuple[float, float, float, float]]],
+    bboxes: Sequence[Sequence[Sequence[float]]],
     metadata: Sequence[dict[str, Any]] | None,
     classes: Sequence[str] | None,
     name: str | None = None,
@@ -202,8 +202,8 @@ def to_object_detection_dataset(
         The images to use in the dataset.
     labels : Sequence[Sequence[int]]
         The labels to use in the dataset.
-    bboxes : Sequence[Sequence[tuple[float, float, float, float]]]
-        The bounding boxes to use in the dataset.
+    bboxes : Sequence[Sequence[Sequence[float]]]
+        The bounding boxes (x0,y0,x1,y0) to use in the dataset.
     metadata : Sequence[dict[str, Any]] | None
         The metadata to use in the dataset.
     classes : Sequence[str] | None
