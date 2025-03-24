@@ -5,6 +5,18 @@ from dataeval.detectors.linters.duplicates import Duplicates
 from dataeval.metrics.stats._hashstats import hashstats
 
 
+class MockDataset:
+    def __len__(self):
+        return 20
+
+    def __iter__(self):
+        for _ in range(20):
+            yield np.random.random((3, 16, 16))
+
+    def __getitem__(self, _):
+        return np.random.random((3, 16, 16))
+
+
 @pytest.mark.required
 class TestDuplicates:
     def test_duplicates(self):
@@ -76,3 +88,8 @@ class TestDuplicates:
         images[5] = np.zeros((3, 5, 5))
         results = dupes.evaluate(images)
         assert len(results.near) == 0
+
+    def test_duplicates_dataset(self):
+        dupes = Duplicates()
+        results = dupes.evaluate(MockDataset())
+        assert results is not None

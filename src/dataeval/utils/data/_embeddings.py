@@ -86,7 +86,7 @@ class Embeddings:
             embeddings = self._encoder(torch.stack(images).to(self.device))
             yield embeddings
 
-    def __getitem__(self, key: int | slice | list[int]) -> torch.Tensor:
+    def __getitem__(self, key: int | slice | list[int], /) -> torch.Tensor:
         if isinstance(key, list):
             return torch.vstack(list(self._batch(key))).to(self.device)
         if isinstance(key, slice):

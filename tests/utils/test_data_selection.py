@@ -29,7 +29,7 @@ def mock_dataset():
 class TestSelectionClasses:
     def test_classfilter_classes_only(self, mock_dataset):
         # Test ClassFilter classes
-        class_filter = ClassFilter(classes=[0, 1])
+        class_filter = ClassFilter(classes=(0, 1))
         select = Select(mock_dataset, selections=[class_filter])
         assert len(select) == 7
         counts = {0: 0, 1: 0}
@@ -37,7 +37,7 @@ class TestSelectionClasses:
             label = int(np.argmax(target))
             counts[label] = counts[label] + 1
         assert counts == {0: 4, 1: 3}
-        assert "ClassFilter(classes=[0, 1], balance=False)" in str(select)
+        assert "ClassFilter(classes=(0, 1), balance=False)" in str(select)
 
     def test_classfilter_balance_only(self, mock_dataset):
         # Test ClassFilter balance

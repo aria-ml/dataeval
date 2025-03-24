@@ -4,12 +4,12 @@ __all__ = []
 
 import re
 import warnings
+from collections import ChainMap
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
-from itertools import repeat
 from multiprocessing import Pool
-from typing import Any, Callable, Generic, Iterable, Optional, Sequence, Sized, TypeVar, Union
+from typing import Any, Callable, Generic, Iterable, Optional, Sequence, TypeVar, Union, cast
 
 import numpy as np
 import tqdm
@@ -17,10 +17,10 @@ from numpy.typing import NDArray
 
 from dataeval._output import Output
 from dataeval.config import get_max_processes
-from dataeval.typing import ArrayLike
-from dataeval.utils._array import to_numpy_iter
+from dataeval.typing import ArrayLike, Dataset, ObjectDetectionTarget
+from dataeval.utils._array import to_numpy
 from dataeval.utils._image import normalize_image_shape, rescale
-from dataeval.utils._plot import histogram_plot
+from dataeval.utils._plot import channel_histogram_plot, histogram_plot
 
 DTYPE_REGEX = re.compile(r"NDArray\[np\.(.*?)\]")
 SOURCE_INDEX = "source_index"
@@ -79,6 +79,12 @@ class BaseStatsOutput(Output):
     source_index: list[SourceIndex]
     box_count: NDArray[np.uint16]
 
+    def __post_init__(self) -> None:
+        length = len(self.source_index)
+        bad = {k: len(v) for k, v in self.dict().items() if k not in [SOURCE_INDEX, BOX_COUNT] and len(v) != length}
+        if bad:
+            raise ValueError(f"All values must have the same length as source_index. Bad values: {str(bad)}.")
+
     def get_channel_mask(
         self,
         channel_index: OptionalRange,
@@ -114,19 +120,40 @@ class BaseStatsOutput(Output):
     def __len__(self) -> int:
         return len(self.source_index)
 
+    def _get_channels(
+        self, channel_limit: int | None = None, channel_index: int | Iterable[int] | None = None
+    ) -> tuple[int, list[bool] | None]:
+        source_index = self.dict()[SOURCE_INDEX]
+        raw_channels = int(max([si.channel or 0 for si in source_index])) + 1
+        if isinstance(channel_index, int):
+            max_channels = 1 if channel_index < raw_channels else raw_channels
+            ch_mask = self.get_channel_mask(channel_index)
+        elif isinstance(channel_index, Iterable) and all(isinstance(val, int) for val in list(channel_index)):
+            max_channels = len(list(channel_index))
+            ch_mask = self.get_channel_mask(channel_index)
+        elif isinstance(channel_limit, int):
+            max_channels = channel_limit
+            ch_mask = self.get_channel_mask(None, channel_limit)
+        else:
+            max_channels = raw_channels
+            ch_mask = None
 
-def _is_plottable(k: str, v: Any, excluded_keys: Iterable[str]) -> bool:
-    return isinstance(v, np.ndarray) and v[v != 0].size > 0 and all(k != x for x in excluded_keys)
+        if max_channels > raw_channels:
+            max_channels = raw_channels
+        if ch_mask is not None and not any(ch_mask):
+            ch_mask = None
 
+        return max_channels, ch_mask
 
-class HistogramPlotMixin:
-    _excluded_keys: Iterable[str] = []
-
-    def dict(self) -> dict[str, Any]: ...
-
-    def plot(self, log: bool) -> None:
-        data_dict = {k: v for k, v in self.dict().items() if _is_plottable(k, v, self._excluded_keys)}
-        histogram_plot(data_dict, log)
+    def plot(
+        self, log: bool, channel_limit: int | None = None, channel_index: int | Iterable[int] | None = None
+    ) -> None:
+        max_channels, ch_mask = self._get_channels(channel_limit, channel_index)
+        d = {k: v for k, v in self.dict().items() if isinstance(v, np.ndarray) and v[v != 0].size > 0 and v.ndim == 1}
+        if max_channels == 1:
+            histogram_plot(d, log)
+        else:
+            channel_histogram_plot(d, log, max_channels, ch_mask)
 
 
 TStatsOutput = TypeVar("TStatsOutput", bound=BaseStatsOutput, covariant=True)
@@ -193,10 +220,9 @@ class StatsProcessor(Generic[TStatsOutput]):
         cls, source: dict[str, Any], source_index: list[SourceIndex], box_count: list[int]
     ) -> TStatsOutput:
         output = {}
-        for key in source:
-            if key not in cls.output_class.__annotations__:
-                continue
-            stat_type: str = cls.output_class.__annotations__[key]
+        attrs = dict(ChainMap(*(getattr(c, "__annotations__", {}) for c in cls.output_class.__mro__)))
+        for key in (key for key in source if key in attrs):
+            stat_type: str = attrs[key]
             dtype_match = re.match(DTYPE_REGEX, stat_type)
             if dtype_match is not None:
                 output[key] = np.asarray(source[key], dtype=np.dtype(dtype_match.group(1)))
@@ -215,16 +241,20 @@ class StatsProcessorOutput:
 
 def process_stats(
     i: int,
-    image_boxes: tuple[NDArray[Any], NDArray[Any] | None],
+    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
+    per_box: bool,
     per_channel: bool,
     stats_processor_cls: Iterable[type[StatsProcessor[TStatsOutput]]],
 ) -> StatsProcessorOutput:
-    image, boxes = image_boxes
+    data = dataset[i]
+    image, target = (to_numpy(cast(ArrayLike, data[0])), data[1]) if isinstance(data, tuple) else (to_numpy(data), None)
+    target = None if not isinstance(target, ObjectDetectionTarget) else target
+    boxes = to_numpy(target.boxes) if target is not None else None
     results_list: list[dict[str, Any]] = []
     source_indices: list[SourceIndex] = []
     box_counts: list[int] = []
     warnings_list: list[str] = []
-    nboxes = [None] if boxes is None else normalize_box_shape(boxes)
+    nboxes = [None] if boxes is None or not per_box else normalize_box_shape(boxes)
     for i_b, box in enumerate(nboxes):
         i_b = None if box is None else i_b
         processor_list = [p(image, box, per_channel) for p in stats_processor_cls]
@@ -232,7 +262,7 @@ def process_stats(
             warnings_list.append(f"Bounding box [{i}][{i_b}]: {box} is out of bounds of {image.shape}.")
         results_list.append({k: v for p in processor_list for k, v in p.process().items()})
         if per_channel:
-            source_indices.extend([SourceIndex(i, i_b, c) for c in range(image_boxes[0].shape[-3])])
+            source_indices.extend([SourceIndex(i, i_b, c) for c in range(image.shape[-3])])
         else:
             source_indices.append(SourceIndex(i, i_b, None))
     box_counts.append(0 if boxes is None else len(boxes))
@@ -240,16 +270,18 @@ def process_stats(
 
 
 def process_stats_unpack(
-    args: tuple[int, tuple[NDArray[Any], NDArray[Any] | None]],
+    i: int,
+    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
+    per_box: bool,
     per_channel: bool,
     stats_processor_cls: Iterable[type[StatsProcessor[TStatsOutput]]],
 ) -> StatsProcessorOutput:
-    return process_stats(*args, per_channel=per_channel, stats_processor_cls=stats_processor_cls)
+    return process_stats(i, dataset, per_box=per_box, per_channel=per_channel, stats_processor_cls=stats_processor_cls)
 
 
 def run_stats(
-    images: Iterable[ArrayLike],
-    bboxes: Iterable[ArrayLike] | None,
+    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
+    per_box: bool,
     per_channel: bool,
     stats_processor_cls: Iterable[type[StatsProcessor[TStatsOutput]]],
 ) -> list[TStatsOutput]:
@@ -262,13 +294,11 @@ def run_stats(
 
     Parameters
     ----------
-    images : Iterable[ArrayLike]
-        An iterable of images (e.g., list of arrays), where each image is represented as an
-        array-like structure (e.g., :term:`NumPy` arrays).
-    bboxes : Iterable[ArrayLike]
-        An iterable of bounding boxes (e.g. list of arrays) where each bounding box is represented
-        as an array-like structure in the format of (X0, Y0, X1, Y1). The length of the bounding boxes
-        iterable should match the length of the input images.
+    data : Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]]
+        A dataset of images and targets to compute statistics on.
+    per_box : bool
+        A flag which determines if the statistics should be evaluated on a per-box basis or not.
+        If the dataset does not include bounding boxes, this flag is ignored.
     per_channel : bool
         A flag which determines if the states should be evaluated on a per-channel basis or not.
     stats_processor_cls : Iterable[type[StatsProcessor]]
@@ -276,10 +306,8 @@ def run_stats(
 
     Returns
     -------
-    dict[str, NDArray]]
-        A dictionary containing the computed statistics for each image.
-        The dictionary keys correspond to the names of the statistics, and the values are :term:`NumPy` arrays
-        with the results of the computations.
+    list[TStatsOutput]
+        A list of output classes containing the computed statistics
 
     Note
     ----
@@ -293,20 +321,24 @@ def run_stats(
     results_list: list[dict[str, NDArray[np.float64]]] = []
     source_index: list[SourceIndex] = []
     box_count: list[int] = []
-    bbox_iter = repeat(None) if bboxes is None else to_numpy_iter(bboxes)
 
     warning_list = []
-    total_for_status = len(images) if isinstance(images, Sized) else None
     stats_processor_cls = stats_processor_cls if isinstance(stats_processor_cls, Iterable) else [stats_processor_cls]
 
     # TODO: Introduce global controls for CPU job parallelism and GPU configurations
     with Pool(processes=get_max_processes()) as p:
         for r in tqdm.tqdm(
             p.imap(
-                partial(process_stats_unpack, per_channel=per_channel, stats_processor_cls=stats_processor_cls),
-                enumerate(zip(to_numpy_iter(images), bbox_iter)),
+                partial(
+                    process_stats_unpack,
+                    dataset=dataset,
+                    per_box=per_box,
+                    per_channel=per_channel,
+                    stats_processor_cls=stats_processor_cls,
+                ),
+                range(len(dataset)),
             ),
-            total=total_for_status,
+            total=len(dataset),
         ):
             results_list.extend(r.results)
             source_index.extend(r.source_indices)
