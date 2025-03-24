@@ -4,20 +4,20 @@ __all__ = []
 
 import contextlib
 from dataclasses import dataclass
-from typing import Any, Generic, Iterable, Literal, Sequence, TypeVar, Union, overload
+from typing import Any, Generic, Literal, Sequence, TypeVar, Union, overload
 
 import numpy as np
 from numpy.typing import NDArray
-from torch.utils.data import Dataset
 
 from dataeval._output import Output, set_metadata
 from dataeval.metrics.stats._base import BOX_COUNT, SOURCE_INDEX, combine_stats, get_dataset_step_from_idx
-from dataeval.metrics.stats._datasetstats import DatasetStatsOutput, datasetstats
 from dataeval.metrics.stats._dimensionstats import DimensionStatsOutput
+from dataeval.metrics.stats._imagestats import ImageStatsOutput, imagestats
 from dataeval.metrics.stats._labelstats import LabelStatsOutput
 from dataeval.metrics.stats._pixelstats import PixelStatsOutput
 from dataeval.metrics.stats._visualstats import VisualStatsOutput
-from dataeval.typing import ArrayLike
+from dataeval.typing import Array, Dataset
+from dataeval.utils.data._images import Images
 
 with contextlib.suppress(ImportError):
     import pandas as pd
@@ -28,18 +28,18 @@ OutlierStatsOutput = Union[DimensionStatsOutput, PixelStatsOutput, VisualStatsOu
 TIndexIssueMap = TypeVar("TIndexIssueMap", IndexIssueMap, list[IndexIssueMap])
 
 
-def _reorganize_by_class_and_metric(result, lstats):
+def _reorganize_by_class_and_metric(result: IndexIssueMap, lstats: LabelStatsOutput):
     """Flip result from grouping by image to grouping by class and metric"""
     metrics = {}
-    class_wise = {label: {} for label in lstats.image_indices_per_label}
+    class_wise = {label: {} for label in lstats.class_names}
 
     # Group metrics and calculate class-wise counts
     for img, group in result.items():
         for extreme in group:
             metrics.setdefault(extreme, []).append(img)
-            for label, images in lstats.image_indices_per_label.items():
+            for i, images in enumerate(lstats.image_indices_per_class):
                 if img in images:
-                    class_wise[label][extreme] = class_wise[label].get(extreme, 0) + 1
+                    class_wise[lstats.class_names[i]][extreme] = class_wise[lstats.class_names[i]].get(extreme, 0) + 1
 
     return metrics, class_wise
 
@@ -227,7 +227,7 @@ class Outliers:
         outlier_method: Literal["zscore", "modzscore", "iqr"] = "modzscore",
         outlier_threshold: float | None = None,
     ):
-        self.stats: DatasetStatsOutput
+        self.stats: ImageStatsOutput
         self.use_dimension = use_dimension
         self.use_pixel = use_pixel
         self.use_visual = use_visual
@@ -248,23 +248,23 @@ class Outliers:
         return dict(sorted(flagged_images.items()))
 
     @overload
-    def from_stats(self, stats: OutlierStatsOutput | DatasetStatsOutput) -> OutliersOutput[IndexIssueMap]: ...
+    def from_stats(self, stats: OutlierStatsOutput | ImageStatsOutput) -> OutliersOutput[IndexIssueMap]: ...
 
     @overload
     def from_stats(self, stats: Sequence[OutlierStatsOutput]) -> OutliersOutput[list[IndexIssueMap]]: ...
 
     @set_metadata(state=["outlier_method", "outlier_threshold"])
     def from_stats(
-        self, stats: OutlierStatsOutput | DatasetStatsOutput | Sequence[OutlierStatsOutput]
+        self, stats: OutlierStatsOutput | ImageStatsOutput | Sequence[OutlierStatsOutput]
     ) -> OutliersOutput[IndexIssueMap] | OutliersOutput[list[IndexIssueMap]]:
         """
         Returns indices of Outliers with the issues identified for each.
 
         Parameters
         ----------
-        stats : OutlierStatsOutput | DatasetStatsOutput | Sequence[OutlierStatsOutput]
+        stats : OutlierStatsOutput | ImageStatsOutput | Sequence[OutlierStatsOutput]
             The output(s) from a dimensionstats, pixelstats, or visualstats metric
-            analysis or an aggregate DatasetStatsOutput
+            analysis or an aggregate ImageStatsOutput
 
         Returns
         -------
@@ -291,11 +291,7 @@ class Outliers:
         >>> results.issues[1]
         {}
         """  # noqa: E501
-        if isinstance(stats, DatasetStatsOutput):
-            outliers = self._get_outliers({k: v for o in stats._outputs() for k, v in o.dict().items()})
-            return OutliersOutput(outliers)
-
-        if isinstance(stats, (DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput)):
+        if isinstance(stats, (ImageStatsOutput, DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput)):
             return OutliersOutput(self._get_outliers(stats.dict()))
 
         if not isinstance(stats, Sequence):
@@ -306,7 +302,7 @@ class Outliers:
         stats_map: dict[type, list[int]] = {}
         for i, stats_output in enumerate(stats):
             if not isinstance(
-                stats_output, (DatasetStatsOutput, DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput)
+                stats_output, (ImageStatsOutput, DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput)
             ):
                 raise TypeError(
                     "Invalid stats output type; only use output from dimensionstats, pixelstats or visualstats."
@@ -323,22 +319,15 @@ class Outliers:
 
         return OutliersOutput(output_list)
 
-    @overload
-    def evaluate(self, data: Iterable[ArrayLike]) -> OutliersOutput[IndexIssueMap]: ...
-    @overload
-    def evaluate(self, data: Dataset[tuple[ArrayLike, Any, dict[str, Any]]]) -> OutliersOutput[IndexIssueMap]: ...
-
     @set_metadata(state=["use_dimension", "use_pixel", "use_visual", "outlier_method", "outlier_threshold"])
-    def evaluate(
-        self, data: Iterable[ArrayLike] | Dataset[tuple[ArrayLike, Any, dict[str, Any]]]
-    ) -> OutliersOutput[IndexIssueMap]:
+    def evaluate(self, data: Dataset[Array] | Dataset[tuple[Array, Any, Any]]) -> OutliersOutput[IndexIssueMap]:
         """
         Returns indices of Outliers with the issues identified for each
 
         Parameters
         ----------
-        data : Iterable[ArrayLike], shape - (C, H, W)
-            A dataset of images in an ArrayLike format
+        data : Iterable[Array], shape - (C, H, W)
+            A dataset of images in an Array format
 
         Returns
         -------
@@ -355,9 +344,9 @@ class Outliers:
         >>> list(results.issues)
         [10, 12]
         >>> results.issues[10]
-        {'skew': -3.906, 'kurtosis': 13.266, 'entropy': 0.2128, 'contrast': 1.25, 'zeros': 0.05493}
+        {'contrast': 1.25, 'zeros': 0.05493, 'skew': -3.906, 'kurtosis': 13.266, 'entropy': 0.2128}
         """
-        images = (d[0] for d in data) if isinstance(data, Dataset) else data
-        self.stats = datasetstats(images=images)
+        images = Images(data) if isinstance(data, Dataset) else data
+        self.stats = imagestats(images)
         outliers = self._get_outliers(self.stats.dict())
         return OutliersOutput(outliers)

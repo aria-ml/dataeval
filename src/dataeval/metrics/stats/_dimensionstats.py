@@ -3,19 +3,19 @@ from __future__ import annotations
 __all__ = []
 
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable
+from typing import Any, Callable
 
 import numpy as np
 from numpy.typing import NDArray
 
 from dataeval._output import set_metadata
-from dataeval.metrics.stats._base import BaseStatsOutput, HistogramPlotMixin, StatsProcessor, run_stats
-from dataeval.typing import ArrayLike
+from dataeval.metrics.stats._base import BaseStatsOutput, StatsProcessor, run_stats
+from dataeval.typing import ArrayLike, Dataset
 from dataeval.utils._image import get_bitdepth
 
 
 @dataclass(frozen=True)
-class DimensionStatsOutput(BaseStatsOutput, HistogramPlotMixin):
+class DimensionStatsOutput(BaseStatsOutput):
     """
     Output class for :func:`.dimensionstats` stats metric.
 
@@ -76,8 +76,9 @@ class DimensionStatsProcessor(StatsProcessor[DimensionStatsOutput]):
 
 @set_metadata
 def dimensionstats(
-    images: Iterable[ArrayLike],
-    bboxes: Iterable[ArrayLike] | None = None,
+    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
+    *,
+    per_box: bool = False,
 ) -> DimensionStatsOutput:
     """
     Calculates dimension :term:`statistics<Statistics>` for each image.
@@ -87,10 +88,10 @@ def dimensionstats(
 
     Parameters
     ----------
-    images : Iterable[ArrayLike]
-        Images to perform calculations on
-    bboxes : Iterable[ArrayLike] or None
-        Bounding boxes in `xyxy` format for each image to perform calculations on
+    dataset : Dataset
+        Dataset to perform calculations on.
+    per_box : bool, default False
+        If True, perform calculations on each bounding box.
 
     Returns
     -------
@@ -105,12 +106,12 @@ def dimensionstats(
 
     Examples
     --------
-    Calculating the dimension statistics on the images, whose shape is (C, H, W)
+    Calculate the dimension statistics of a dataset of 8 images, whose shape is (C, H, W).
 
-    >>> results = dimensionstats(stats_images)
+    >>> results = dimensionstats(dataset)
     >>> print(results.aspect_ratio)
-    [1.    1.    1.333 1.    0.667]
+    [1.    1.    1.333 1.    0.667 1.    1.    1.   ]
     >>> print(results.channels)
-    [3 3 1 3 1]
+    [3 3 1 3 1 3 3 3]
     """
-    return run_stats(images, bboxes, False, [DimensionStatsProcessor])[0]
+    return run_stats(dataset, per_box, False, [DimensionStatsProcessor])[0]

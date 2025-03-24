@@ -3,14 +3,13 @@ from __future__ import annotations
 __all__ = []
 
 from dataclasses import dataclass
-from typing import Any, Generic, Iterable, Sequence, TypeVar, overload
-
-from torch.utils.data import Dataset
+from typing import Any, Generic, Sequence, TypeVar, overload
 
 from dataeval._output import Output, set_metadata
+from dataeval.metrics.stats import HashStatsOutput, hashstats
 from dataeval.metrics.stats._base import combine_stats, get_dataset_step_from_idx
-from dataeval.metrics.stats._hashstats import HashStatsOutput, hashstats
-from dataeval.typing import ArrayLike
+from dataeval.typing import Array, Dataset
+from dataeval.utils.data._images import Images
 
 DuplicateGroup = list[int]
 DatasetDuplicateGroupMap = dict[int, DuplicateGroup]
@@ -134,22 +133,15 @@ class Duplicates:
 
         return DuplicatesOutput(**duplicates)
 
-    @overload
-    def evaluate(self, data: Iterable[ArrayLike]) -> DuplicatesOutput[DuplicateGroup]: ...
-    @overload
-    def evaluate(self, data: Dataset[tuple[ArrayLike, Any, dict[str, Any]]]) -> DuplicatesOutput[DuplicateGroup]: ...
-
     @set_metadata(state=["only_exact"])
-    def evaluate(
-        self, data: Iterable[ArrayLike] | Dataset[tuple[ArrayLike, Any, dict[str, Any]]]
-    ) -> DuplicatesOutput[DuplicateGroup]:
+    def evaluate(self, data: Dataset[Array] | Dataset[tuple[Array, Any, Any]]) -> DuplicatesOutput[DuplicateGroup]:
         """
         Returns duplicate image indices for both exact matches and near matches
 
         Parameters
         ----------
-        data : Iterable[ArrayLike], shape - (N, C, H, W) | StatsOutput | Sequence[StatsOutput]
-            A dataset of images in an ArrayLike format or the output(s) from a hashstats analysis
+        data : Iterable[Array], shape - (N, C, H, W) | Dataset[tuple[Array, Any, Any]]
+            A dataset of images in an Array format or the output(s) from a hashstats analysis
 
         Returns
         -------
@@ -166,7 +158,7 @@ class Duplicates:
         >>> all_dupes.evaluate(duplicate_images)
         DuplicatesOutput(exact=[[3, 20], [16, 37]], near=[[3, 20, 22], [12, 18], [13, 36], [14, 31], [17, 27], [19, 38, 47]])
         """  # noqa: E501
-        images = (d[0] for d in data) if isinstance(data, Dataset) else data
+        images = Images(data) if isinstance(data, Dataset) else data
         self.stats = hashstats(images)
         duplicates = self._get_duplicates(self.stats.dict())
         return DuplicatesOutput(**duplicates)

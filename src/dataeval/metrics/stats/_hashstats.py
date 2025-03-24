@@ -5,7 +5,7 @@ import warnings
 __all__ = []
 
 from dataclasses import dataclass
-from typing import Callable, Iterable
+from typing import Any, Callable
 
 import numpy as np
 import xxhash as xxh
@@ -14,7 +14,7 @@ from scipy.fftpack import dct
 
 from dataeval._output import set_metadata
 from dataeval.metrics.stats._base import BaseStatsOutput, StatsProcessor, run_stats
-from dataeval.typing import ArrayLike
+from dataeval.typing import ArrayLike, Dataset
 from dataeval.utils._array import as_numpy
 from dataeval.utils._image import normalize_image_shape, rescale
 
@@ -122,8 +122,9 @@ class HashStatsProcessor(StatsProcessor[HashStatsOutput]):
 
 @set_metadata
 def hashstats(
-    images: Iterable[ArrayLike],
-    bboxes: Iterable[ArrayLike] | None = None,
+    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
+    *,
+    per_box: bool = False,
 ) -> HashStatsOutput:
     """
     Calculates hashes for each image.
@@ -133,10 +134,10 @@ def hashstats(
 
     Parameters
     ----------
-    images : ArrayLike
-        Images to hashing
-    bboxes : Iterable[ArrayLike] or None
-        Bounding boxes in `xyxy` format for each image
+    dataset : Dataset
+        Dataset to perform calculations on.
+    per_box : bool, default False
+        If True, perform calculations on each bounding box.
 
     Returns
     -------
@@ -149,12 +150,12 @@ def hashstats(
 
     Examples
     --------
-    Calculating the statistics on the images, whose shape is (C, H, W)
+    Calculate the hashes of a dataset of images, whose shape is (C, H, W)
 
-    >>> results = hashstats(stats_images)
-    >>> print(results.xxhash)
-    ['6274f837b34ed9f0', '256504fdb6e3d2a4', '7dd0c56ca8474fb0', '50956ad4592f5bbc', '5ba2354079d42aa5']
-    >>> print(results.pchash)
-    ['a666999999666666', 'e666999999266666', 'e666999966663299', 'e666999999266666', '96e91656e91616e9']
+    >>> results = hashstats(dataset)
+    >>> print(results.xxhash[:5])
+    ['66a93f556577c086', 'd8b686fb405c4105', '7ffdb4990ad44ac6', '42cd4c34c80f6006', 'c5519e36ac1f8839']
+    >>> print(results.pchash[:5])
+    ['e666999999266666', 'e666999999266666', 'e666999966666299', 'e666999999266666', '96e91656e91616e9']
     """
-    return run_stats(images, bboxes, False, [HashStatsProcessor])[0]
+    return run_stats(dataset, per_box, False, [HashStatsProcessor])[0]

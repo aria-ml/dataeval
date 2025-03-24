@@ -7,13 +7,12 @@ class uses to identify outliers.
 
 ## What are the statistical analysis functions
 
-There are eight different DataEval stat functions for analyzing a dataset:
+There are seven different DataEval stat functions for analyzing a dataset:
 
 - `boxratiostats`
-- `channelstats`
-- `datasetstats`
 - `dimensionstats`
 - `hashstats`
+- `imagestats`
 - `labelstats`
 - `pixelstats`
 - `visualstats`
@@ -37,10 +36,11 @@ above mentioned stat functions.
 This function can be used in conjunction with the Outliers class to determine
 if there are any issues with any of the images in the dataset.
 
-### datasetstats
+### imagestats
 
-The {func}`.datasetstats` function provides an easy way to run the
-dimensionstats, pixelstats, visualstats, and labelstats on a given dataset.
+The {func}`.imagestats` function provides an easy way to run the
+dimensionstats, pixelstats, and visualstats on the images of a dataset or the
+pixelstats, and visualstats over each channel of the images of a dataset.
 
 ### dimensionstats
 

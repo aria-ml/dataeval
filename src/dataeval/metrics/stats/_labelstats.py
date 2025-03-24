@@ -5,16 +5,19 @@ __all__ = []
 import contextlib
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping, TypeVar
+from typing import Any, Mapping, TypeVar
 
 import numpy as np
 
 from dataeval._output import Output, set_metadata
-from dataeval.typing import ArrayLike
+from dataeval.typing import AnnotatedDataset, ArrayLike
 from dataeval.utils._array import as_numpy
+from dataeval.utils.data._metadata import Metadata
 
 with contextlib.suppress(ImportError):
     import pandas as pd
+
+TValue = TypeVar("TValue")
 
 
 @dataclass(frozen=True)
@@ -24,15 +27,15 @@ class LabelStatsOutput(Output):
 
     Attributes
     ----------
-    label_counts_per_class : dict[str | int, int]
+    label_counts_per_class : dict[int, int]
         Dictionary whose keys are the different label classes and
         values are total counts of each class
     label_counts_per_image : list[int]
         Number of labels per image
-    image_counts_per_label : dict[str | int, int]
+    image_counts_per_class : dict[int, int]
         Dictionary whose keys are the different label classes and
         values are total counts of each image the class is present in
-    image_indices_per_label : dict[str | int, list]
+    image_indices_per_class : dict[int, list]
         Dictionary whose keys are the different label classes and
         values are lists containing the images that have that label
     image_count : int
@@ -41,69 +44,62 @@ class LabelStatsOutput(Output):
         Total number of classes present
     label_count : int
         Total number of labels present
+    class_names : list[str]
     """
 
-    label_counts_per_class: dict[str | int, int]
+    label_counts_per_class: list[int]
     label_counts_per_image: list[int]
-    image_counts_per_label: dict[str | int, int]
-    image_indices_per_label: dict[str | int, list[int]]
+    image_counts_per_class: list[int]
+    image_indices_per_class: list[list[int]]
     image_count: int
     class_count: int
     label_count: int
+    class_names: list[str]
 
     def to_table(self) -> str:
-        max_char = max(len(key) if isinstance(key, str) else key // 10 + 1 for key in self.label_counts_per_class)
+        max_char = max(len(name) if isinstance(name, str) else name // 10 + 1 for name in self.class_names)
         max_char = max(max_char, 5)
-        max_label = max(list(self.label_counts_per_class.values()))
-        max_img = max(list(self.image_counts_per_label.values()))
+        max_label = max(list(self.label_counts_per_class))
+        max_img = max(list(self.image_counts_per_class))
         max_num = int(np.ceil(np.log10(max(max_label, max_img))))
         max_num = max(max_num, 11)
 
         # Display basic counts
-        table_str = f"Class Count: {self.class_count}\n"
-        table_str += f"Label Count: {self.label_count}\n"
-        table_str += f"Average # Labels per Image: {round(np.mean(self.label_counts_per_image), 2)}\n"
-        table_str += "--------------------------------------\n"
+        table_str = [f"Class Count: {self.class_count}"]
+        table_str += [f"Label Count: {self.label_count}"]
+        table_str += [f"Average # Labels per Image: {round(np.mean(self.label_counts_per_image), 2)}"]
+        table_str += ["--------------------------------------"]
 
         # Display counts per class
-        table_str += f"{'Label':>{max_char}}: Total Count - Image Count\n"
-        for cls in self.label_counts_per_class:
-            table_str += f"{cls:>{max_char}}: {self.label_counts_per_class[cls]:^{max_num}} "
-            table_str += f"- {self.image_counts_per_label[cls]:^{max_num}}\n"
+        table_str += [f"{'Label':>{max_char}}: Total Count - Image Count"]
+        for cls in range(len(self.class_names)):
+            table_str += [
+                f"{self.class_names[cls]:>{max_char}}: {self.label_counts_per_class[cls]:^{max_num}}"
+                + " - "
+                + f"{self.image_counts_per_class[cls]:^{max_num}}".rstrip()
+            ]
 
-        return table_str
+        return "\n".join(table_str)
 
     def to_dataframe(self) -> pd.DataFrame:
         import pandas as pd
 
-        class_list = []
         total_count = []
         image_count = []
-        for cls in self.label_counts_per_class:
-            class_list.append(cls)
+        for cls in range(len(self.class_names)):
             total_count.append(self.label_counts_per_class[cls])
-            image_count.append(self.image_counts_per_label[cls])
+            image_count.append(self.image_counts_per_class[cls])
 
         return pd.DataFrame(
             {
-                "Label": class_list,
+                "Label": self.class_names,
                 "Total Count": total_count,
                 "Image Count": image_count,
             }
         )
 
 
-TKey = TypeVar("TKey", int, str)
-
-
-def sort(d: Mapping[TKey, Any]) -> dict[TKey, Any]:
-    """
-    Sort mappings by key in increasing order
-    """
-    return dict(sorted(d.items(), key=lambda x: x[0]))
-
-
-def _ensure_2d(labels: Iterable[ArrayLike]) -> Iterable[ArrayLike]:
+def _ensure_2d(labels: ArrayLike) -> ArrayLike:
     if isinstance(labels, np.ndarray):
         return labels[:, None]
     else:
@@ -116,7 +112,7 @@ def _get_list_depth(lst):
     return 0
 
 
-def _check_labels_dimension(labels: Iterable[ArrayLike]) -> Iterable[ArrayLike]:
+def _check_labels_dimension(labels: ArrayLike) -> ArrayLike:
     # Check for nested lists beyond 2 levels
 
     if isinstance(labels, np.ndarray):
@@ -138,10 +134,12 @@ def _check_labels_dimension(labels: Iterable[ArrayLike]) -> Iterable[ArrayLike]:
         raise TypeError("Labels must be either a NumPy array or a list.")
 
 
+def _sort_to_list(d: Mapping[int, TValue]) -> list[TValue]:
+    return [v for _, v in sorted(d.items())]
+
+
 @set_metadata
-def labelstats(
-    labels: Iterable[ArrayLike],
-) -> LabelStatsOutput:
+def labelstats(dataset: Metadata | AnnotatedDataset[Any]) -> LabelStatsOutput:
     """
     Calculates :term:`statistics<Statistics>` for data labels.
 
@@ -150,40 +148,45 @@ def labelstats(
 
     Parameters
     ----------
-    labels : ArrayLike, shape - [label] | [[label]] or (N,M) | (N,)
-        Lists or :term:`NumPy` array of labels.
-        A set of lists where each list contains all labels per image -
-        (e.g. [[label1, label2], [label2], [label1, label3]] or [label1, label2, label1, label3]).
-        If a numpy array, N is the number of images, M is the number of labels per image.
+    dataset : Metadata or ImageClassificationDataset or ObjectDetect
 
     Returns
     -------
     LabelStatsOutput
-        A dictionary-like object containing the computed counting metrics for the labels.
+        A dataclass containing the computed counting metrics for the labels.
 
     Examples
     --------
-    Calculating the :term:`statistics<Statistics>` on labels for a set of data
+    Calculate basic :term:`statistics<Statistics>` on labels for a dataset.
 
-    >>> stats = labelstats(labels)
-    >>> stats.label_counts_per_class
-    {'chicken': 12, 'cow': 5, 'horse': 4, 'pig': 7, 'sheep': 4}
-    >>> stats.label_counts_per_image
-    [3, 3, 5, 3, 2, 5, 5, 2, 2, 2]
-    >>> stats.image_counts_per_label
-    {'chicken': 8, 'cow': 4, 'horse': 4, 'pig': 7, 'sheep': 4}
-    >>> (stats.image_count, stats.class_count, stats.label_count)
-    (10, 5, 32)
+    >>> from dataeval.utils.data import Metadata
+    >>> stats = labelstats(Metadata(dataset))
+    >>> print(stats.to_table())
+    Class Count: 5
+    Label Count: 15
+    Average # Labels per Image: 1.88
+    --------------------------------------
+      Label: Total Count - Image Count
+      horse:      2      -      2
+        cow:      4      -      3
+      sheep:      2      -      2
+        pig:      2      -      2
+    chicken:      5      -      5
     """
-    label_counts = Counter()
-    image_counts = Counter()
+    dataset = Metadata(dataset) if isinstance(dataset, AnnotatedDataset) else dataset
+
+    label_counts: Counter[int] = Counter()
+    image_counts: Counter[int] = Counter()
     index_location = defaultdict(list[int])
     label_per_image: list[int] = []
+
+    index2label = dict(enumerate(dataset.class_names))
+    labels = [target.labels.tolist() for target in dataset.targets]
 
     labels_2d = _check_labels_dimension(labels)
 
     for i, group in enumerate(labels_2d):
-        group = as_numpy(group)
+        group = as_numpy(group).tolist()
 
         # Count occurrences of each label in all sublists
         label_counts.update(group)
@@ -200,11 +203,12 @@ def labelstats(
             index_location[item].append(i)
 
     return LabelStatsOutput(
-        label_counts_per_class=sort(label_counts),
+        label_counts_per_class=_sort_to_list(label_counts),
         label_counts_per_image=label_per_image,
-        image_counts_per_label=sort(image_counts),
-        image_indices_per_label=sort(index_location),
+        image_counts_per_class=_sort_to_list(image_counts),
+        image_indices_per_class=_sort_to_list(index_location),
         image_count=len(label_per_image),
         class_count=len(label_counts),
         label_count=sum(label_counts.values()),
+        class_names=list(index2label.values()),
     )

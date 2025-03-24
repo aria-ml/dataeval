@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Iterator
+
 __all__ = []
 
 from dataclasses import dataclass
@@ -52,10 +54,16 @@ class Targets:
                 + f"    source: {None if self.source is None else self.source.shape}\n"
             )
 
-    def __len__(self) -> int:
-        return len(self.labels)
+        if self.bboxes is not None and len(self.bboxes) > 0 and self.bboxes.shape[-1] != 4:
+            raise ValueError("Bounding boxes must be in (x0,y0,x1,y1) format.")
 
-    def at(self, idx: int) -> Targets:
+    def __len__(self) -> int:
+        if self.source is None:
+            return len(self.labels)
+        else:
+            return len(np.unique(self.source))
+
+    def __getitem__(self, idx: int, /) -> Targets:
         if self.source is None or self.bboxes is None:
             return Targets(
                 np.atleast_1d(self.labels[idx]),
@@ -71,3 +79,7 @@ class Targets:
                 np.atleast_2d(self.bboxes[mask]),
                 np.atleast_1d(self.source[mask]),
             )
+
+    def __iter__(self) -> Iterator[Targets]:
+        for i in range(len(self.labels)) if self.source is None else np.unique(self.source):
+            yield self[i]
