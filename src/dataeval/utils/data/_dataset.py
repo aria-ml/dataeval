@@ -84,6 +84,78 @@ class BaseAnnotatedDataset(Generic[_TLabels]):
         return len(self._images)
 
 
+class CustomImageClassificationDataset(BaseAnnotatedDataset[Sequence[int]], ImageClassificationDataset):
+    def __init__(
+        self,
+        images: Array | Sequence[Array],
+        labels: Sequence[int],
+        metadata: Sequence[dict[str, Any]] | None,
+        classes: Sequence[str] | None,
+        name: str | None = None,
+    ) -> None:
+        super().__init__("ic", images, labels, metadata, classes)
+        if name is not None:
+            self.__name__ = name
+            self.__class__.__name__ = name
+            self.__class__.__qualname__ = name
+
+    def __getitem__(self, idx: int, /) -> tuple[Array, Array, dict[str, Any]]:
+        one_hot = [0.0] * len(self._index2label)
+        one_hot[self._labels[idx]] = 1.0
+        return (
+            self._images[idx],
+            as_numpy(one_hot),
+            self._metadata[idx] if self._metadata is not None else {},
+        )
+
+
+class CustomObjectDetectionDataset(BaseAnnotatedDataset[Sequence[Sequence[int]]], ObjectDetectionDataset):
+    class ObjectDetectionTarget:
+        def __init__(self, labels: Sequence[int], bboxes: Sequence[tuple[float, float, float, float]]) -> None:
+            self._labels = labels
+            self._bboxes = bboxes
+            self._scores = [1.0] * len(labels)
+
+        @property
+        def labels(self) -> Sequence[int]:
+            return self._labels
+
+        @property
+        def boxes(self) -> Sequence[tuple[float, float, float, float]]:
+            return self._bboxes
+
+        @property
+        def scores(self) -> Sequence[float]:
+            return self._scores
+
+    def __init__(
+        self,
+        images: Array | Sequence[Array],
+        labels: Sequence[Sequence[int]],
+        bboxes: Sequence[Sequence[tuple[float, float, float, float]]],
+        metadata: Sequence[dict[str, Any]] | None,
+        classes: Sequence[str] | None,
+        name: str | None = None,
+    ) -> None:
+        super().__init__("od", images, labels, metadata, classes)
+        if name is not None:
+            self.__name__ = name
+            self.__class__.__name__ = name
+            self.__class__.__qualname__ = name
+        self._bboxes = bboxes
+
+    @property
+    def metadata(self) -> DatasetMetadata:
+        return DatasetMetadata(id=self._id, index2label=self._index2label)
+
+    def __getitem__(self, idx: int, /) -> tuple[Array, ObjectDetectionTarget, dict[str, Any]]:
+        return (
+            self._images[idx],
+            self.ObjectDetectionTarget(self._labels[idx], self._bboxes[idx]),
+            self._metadata[idx] if self._metadata is not None else {},
+        )
+
+
 def to_image_classification_dataset(
     images: Array | Sequence[Array],
     labels: Sequence[int],
@@ -110,25 +182,7 @@ def to_image_classification_dataset(
     ImageClassificationDataset
     """
     _validate_data("ic", images, labels, None, metadata)
-
-    class CustomImageClassificationDataset(BaseAnnotatedDataset[Sequence[int]], ImageClassificationDataset):
-        def __init__(self) -> None:
-            super().__init__("ic", images, labels, metadata, classes)
-            if name is not None:
-                self.__name__ = name
-                self.__class__.__name__ = name
-                self.__class__.__qualname__ = name
-
-        def __getitem__(self, idx: int, /) -> tuple[Array, Array, dict[str, Any]]:
-            one_hot = [0.0] * len(self._index2label)
-            one_hot[self._labels[idx]] = 1.0
-            return (
-                self._images[idx],
-                as_numpy(one_hot),
-                self._metadata[idx] if self._metadata is not None else {},
-            )
-
-    return CustomImageClassificationDataset()
+    return CustomImageClassificationDataset(images, labels, metadata, classes, name)
 
 
 def to_object_detection_dataset(
@@ -160,43 +214,4 @@ def to_object_detection_dataset(
     ObjectDetectionDataset
     """
     _validate_data("od", images, labels, bboxes, metadata)
-
-    class CustomObjectDetectionDataset(BaseAnnotatedDataset[Sequence[Sequence[int]]], ObjectDetectionDataset):
-        class ObjectDetectionTarget:
-            def __init__(self, labels: Sequence[int], bboxes: Sequence[tuple[float, float, float, float]]) -> None:
-                self._labels = labels
-                self._bboxes = bboxes
-                self._scores = [1.0] * len(labels)
-
-            @property
-            def labels(self) -> Sequence[int]:
-                return self._labels
-
-            @property
-            def boxes(self) -> Sequence[tuple[float, float, float, float]]:
-                return self._bboxes
-
-            @property
-            def scores(self) -> Sequence[float]:
-                return self._scores
-
-        def __init__(self) -> None:
-            super().__init__("od", images, labels, metadata, classes)
-            if name is not None:
-                self.__name__ = name
-                self.__class__.__name__ = name
-                self.__class__.__qualname__ = name
-            self._bboxes = bboxes
-
-        @property
-        def metadata(self) -> DatasetMetadata:
-            return DatasetMetadata(id=self._id, index2label=self._index2label)
-
-        def __getitem__(self, idx: int, /) -> tuple[Array, ObjectDetectionTarget, dict[str, Any]]:
-            return (
-                self._images[idx],
-                self.ObjectDetectionTarget(self._labels[idx], self._bboxes[idx]),
-                self._metadata[idx] if self._metadata is not None else {},
-            )
-
-    return CustomObjectDetectionDataset()
+    return CustomObjectDetectionDataset(images, labels, bboxes, metadata, classes, name)
