@@ -3,21 +3,21 @@ from __future__ import annotations
 __all__ = []
 
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable
+from typing import Any, Callable
 
 import numpy as np
 from numpy.typing import NDArray
 
 from dataeval._output import set_metadata
-from dataeval.metrics.stats._base import BaseStatsOutput, HistogramPlotMixin, StatsProcessor, run_stats
-from dataeval.typing import ArrayLike
+from dataeval.metrics.stats._base import BaseStatsOutput, StatsProcessor, run_stats
+from dataeval.typing import ArrayLike, Dataset
 from dataeval.utils._image import edge_filter
 
 QUARTILES = (0, 25, 50, 75, 100)
 
 
 @dataclass(frozen=True)
-class VisualStatsOutput(BaseStatsOutput, HistogramPlotMixin):
+class VisualStatsOutput(BaseStatsOutput):
     """
     Output class for :func:`.visualstats` stats metric.
 
@@ -46,8 +46,6 @@ class VisualStatsOutput(BaseStatsOutput, HistogramPlotMixin):
     sharpness: NDArray[np.float16]
     zeros: NDArray[np.float16]
     percentiles: NDArray[np.float16]
-
-    _excluded_keys = ["percentiles"]
 
 
 class VisualStatsProcessor(StatsProcessor[VisualStatsOutput]):
@@ -79,8 +77,9 @@ class VisualStatsProcessor(StatsProcessor[VisualStatsOutput]):
 
 @set_metadata
 def visualstats(
-    images: Iterable[ArrayLike],
-    bboxes: Iterable[ArrayLike] | None = None,
+    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
+    *,
+    per_box: bool = False,
     per_channel: bool = False,
 ) -> VisualStatsOutput:
     """
@@ -91,10 +90,12 @@ def visualstats(
 
     Parameters
     ----------
-    images : Iterable[ArrayLike]
-        Images to perform calculations on
-    bboxes : Iterable[ArrayLike] or None
-        Bounding boxes in `xyxy` format for each image to perform calculations on
+    dataset : Dataset
+        Dataset to perform calculations on.
+    per_box : bool, default False
+        If True, perform calculations on each bounding box.
+    per_channel : bool, default False
+        If True, perform calculations on each channel.
 
     Returns
     -------
@@ -113,12 +114,12 @@ def visualstats(
 
     Examples
     --------
-    Calculating the :term:`statistics<Statistics>` on the images, whose shape is (C, H, W)
+    Calculate the visual statistics of a dataset of 8 images, whose shape is (C, H, W).
 
-    >>> results = visualstats(stats_images)
+    >>> results = visualstats(dataset)
     >>> print(results.brightness)
-    [0.135 0.208 0.414 0.608 0.813]
+    [0.084 0.13  0.259 0.38  0.508 0.63  0.755 0.88 ]
     >>> print(results.contrast)
-    [2.04  1.331 1.261 1.279 1.253]
+    [2.04  1.331 1.261 1.279 1.253 1.268 1.265 1.263]
     """
-    return run_stats(images, bboxes, per_channel, [VisualStatsProcessor])[0]
+    return run_stats(dataset, per_box, per_channel, [VisualStatsProcessor])[0]

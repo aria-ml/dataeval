@@ -3,19 +3,19 @@ from __future__ import annotations
 __all__ = []
 
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable
+from typing import Any, Callable
 
 import numpy as np
 from numpy.typing import NDArray
 from scipy.stats import entropy, kurtosis, skew
 
 from dataeval._output import set_metadata
-from dataeval.metrics.stats._base import BaseStatsOutput, HistogramPlotMixin, StatsProcessor, run_stats
-from dataeval.typing import ArrayLike
+from dataeval.metrics.stats._base import BaseStatsOutput, StatsProcessor, run_stats
+from dataeval.typing import ArrayLike, Dataset
 
 
 @dataclass(frozen=True)
-class PixelStatsOutput(BaseStatsOutput, HistogramPlotMixin):
+class PixelStatsOutput(BaseStatsOutput):
     """
     Output class for :func:`.pixelstats` stats metric.
 
@@ -45,8 +45,6 @@ class PixelStatsOutput(BaseStatsOutput, HistogramPlotMixin):
     histogram: NDArray[np.uint32]
     entropy: NDArray[np.float16]
 
-    _excluded_keys = ["histogram"]
-
 
 class PixelStatsProcessor(StatsProcessor[PixelStatsOutput]):
     output_class: type = PixelStatsOutput
@@ -72,8 +70,9 @@ class PixelStatsProcessor(StatsProcessor[PixelStatsOutput]):
 
 @set_metadata
 def pixelstats(
-    images: Iterable[ArrayLike],
-    bboxes: Iterable[ArrayLike] | None = None,
+    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
+    *,
+    per_box: bool = False,
     per_channel: bool = False,
 ) -> PixelStatsOutput:
     """
@@ -84,10 +83,12 @@ def pixelstats(
 
     Parameters
     ----------
-    images : Iterable[ArrayLike]
-        Images to perform calculations on
-    bboxes : Iterable[ArrayLike] or None
-        Bounding boxes in `xyxy` format for each image to perform calculations
+    dataset : Dataset
+        Dataset to perform calculations on.
+    per_box : bool, default False
+        If True, perform calculations on each bounding box.
+    per_channel : bool, default False
+        If True, perform calculations on each channel.
 
     Returns
     -------
@@ -107,12 +108,12 @@ def pixelstats(
 
     Examples
     --------
-    Calculating the statistics on the images, whose shape is (C, H, W)
+    Calculate the pixel statistics of a dataset of 8 images, whose shape is (C, H, W).
 
-    >>> results = pixelstats(stats_images)
+    >>> results = pixelstats(dataset)
     >>> print(results.mean)
-    [0.29  0.211 0.397 0.596 0.743]
+    [0.181 0.132 0.248 0.373 0.464 0.613 0.734 0.854]
     >>> print(results.entropy)
-    [4.99  2.371 1.179 2.406 0.668]
+    [4.527 1.883 0.811 1.883 0.298 1.883 1.883 1.883]
     """
-    return run_stats(images, bboxes, per_channel, [PixelStatsProcessor])[0]
+    return run_stats(dataset, per_box, per_channel, [PixelStatsProcessor])[0]

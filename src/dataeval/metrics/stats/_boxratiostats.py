@@ -125,25 +125,28 @@ def boxratiostats(
 
     Examples
     --------
-    Calculating the box ratio statistics using the dimension stats of the boxes and images
+    Calculate the box ratio statistics using the dimension stats of the images and boxes
+    on a dataset containing 15 targets.
 
     >>> from dataeval.metrics.stats import dimensionstats
-    >>> imagestats = dimensionstats(stats_images)
-    >>> boxstats = dimensionstats(stats_images, bboxes)
+    >>> imagestats = dimensionstats(dataset, per_box=False)
+    >>> boxstats = dimensionstats(dataset, per_box=True)
     >>> ratiostats = boxratiostats(boxstats, imagestats)
     >>> print(ratiostats.aspect_ratio)
-    [ 0.864  0.588 16.     0.857  1.27   0.438  0.667  3.833  1.95 ]
+    [ 0.864  0.588 16.     0.857  1.27   0.438  0.667  3.833  1.95   0.833
+      1.     0.6    0.522 15.     3.834]
     >>> print(ratiostats.size)
-    [0.026 0.01  0.001 0.018 0.023 0.007 0.009 0.034 0.021]
+    [0.026 0.01  0.001 0.018 0.023 0.007 0.009 0.034 0.021 0.007 0.001 0.008
+     0.017 0.001 0.008]
     """
     output_cls = type(boxstats)
     if type(boxstats) is not type(imgstats):
         raise TypeError("Must provide stats outputs of the same type.")
     if boxstats.source_index[-1].image != imgstats.source_index[-1].image:
         raise ValueError("Stats index_map length mismatch. Check if the correct box and image stats were provided.")
-    if all(count == 0 for count in boxstats.box_count):
+    if any(src_idx.box is None for src_idx in boxstats.source_index):
         raise ValueError("Input for boxstats must contain box information.")
-    if any(count != 0 for count in imgstats.box_count):
+    if any(src_idx.box is not None for src_idx in imgstats.source_index):
         raise ValueError("Input for imgstats must not contain box information.")
     boxstats_has_channels = any(si.channel is None for si in boxstats.source_index)
     imgstats_has_channels = any(si.channel is None for si in imgstats.source_index)
