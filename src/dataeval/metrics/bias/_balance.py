@@ -2,149 +2,16 @@ from __future__ import annotations
 
 __all__ = []
 
-import contextlib
 import warnings
-from dataclasses import dataclass
-from typing import Any, Literal, overload
 
 import numpy as np
 import scipy as sp
-from numpy.typing import NDArray
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 
-from dataeval._output import Output, set_metadata
+from dataeval.outputs import BalanceOutput
+from dataeval.outputs._base import set_metadata
 from dataeval.utils._bin import get_counts
-from dataeval.utils._plot import heatmap
 from dataeval.utils.data import Metadata
-
-with contextlib.suppress(ImportError):
-    from matplotlib.figure import Figure
-
-
-@dataclass(frozen=True)
-class BalanceOutput(Output):
-    """
-    Output class for :func:`.balance` :term:`bias<Bias>` metric.
-
-    Attributes
-    ----------
-    balance : NDArray[np.float64]
-        Estimate of mutual information between metadata factors and class label
-    factors : NDArray[np.float64]
-        Estimate of inter/intra-factor mutual information
-    classwise : NDArray[np.float64]
-        Estimate of mutual information between metadata factors and individual class labels
-    factor_names : list[str]
-        Names of each metadata factor
-    class_names : list[str]
-        List of the class labels present in the dataset
-    """
-
-    balance: NDArray[np.float64]
-    factors: NDArray[np.float64]
-    classwise: NDArray[np.float64]
-    factor_names: list[str]
-    class_names: list[str]
-
-    @overload
-    def _by_factor_type(
-        self,
-        attr: Literal["factor_names"],
-        factor_type: Literal["discrete", "continuous", "both"],
-    ) -> list[str]: ...
-
-    @overload
-    def _by_factor_type(
-        self,
-        attr: Literal["balance", "factors", "classwise"],
-        factor_type: Literal["discrete", "continuous", "both"],
-    ) -> NDArray[np.float64]: ...
-
-    def _by_factor_type(
-        self,
-        attr: Literal["balance", "factors", "classwise", "factor_names"],
-        factor_type: Literal["discrete", "continuous", "both"],
-    ) -> NDArray[np.float64] | list[str]:
-        # if not filtering by factor_type then just return the requested attribute without mask
-        if factor_type == "both":
-            return getattr(self, attr)
-
-        # create the mask for the selected factor_type
-        mask_lambda = (
-            (lambda x: "-continuous" not in x) if factor_type == "discrete" else (lambda x: "-discrete" not in x)
-        )
-
-        # return the masked attribute
-        if attr == "factor_names":
-            return [x.replace(f"-{factor_type}", "") for x in self.factor_names if mask_lambda(x)]
-        else:
-            factor_type_mask = [mask_lambda(x) for x in self.factor_names]
-            if attr == "factors":
-                return self.factors[factor_type_mask[1:]][:, factor_type_mask[1:]]
-            elif attr == "balance":
-                return self.balance[factor_type_mask]
-            elif attr == "classwise":
-                return self.classwise[:, factor_type_mask]
-
-    def plot(
-        self,
-        row_labels: list[Any] | NDArray[Any] | None = None,
-        col_labels: list[Any] | NDArray[Any] | None = None,
-        plot_classwise: bool = False,
-        factor_type: Literal["discrete", "continuous", "both"] = "discrete",
-    ) -> Figure:
-        """
-        Plot a heatmap of balance information
-
-        Parameters
-        ----------
-        row_labels : ArrayLike or None, default None
-            List/Array containing the labels for rows in the histogram
-        col_labels : ArrayLike or None, default None
-            List/Array containing the labels for columns in the histogram
-        plot_classwise : bool, default False
-            Whether to plot per-class balance instead of global balance
-        factor_type : "discrete", "continuous", or "both", default "discrete"
-            Whether to plot discretized values, continuous values, or to include both
-        """
-        if plot_classwise:
-            if row_labels is None:
-                row_labels = self.class_names
-            if col_labels is None:
-                col_labels = self._by_factor_type("factor_names", factor_type)
-
-            fig = heatmap(
-                self._by_factor_type("classwise", factor_type),
-                row_labels,
-                col_labels,
-                xlabel="Factors",
-                ylabel="Class",
-                cbarlabel="Normalized Mutual Information",
-            )
-        else:
-            # Combine balance and factors results
-            data = np.concatenate(
-                [
-                    self._by_factor_type("balance", factor_type)[np.newaxis, 1:],
-                    self._by_factor_type("factors", factor_type),
-                ],
-                axis=0,
-            )
-            # Create a mask for the upper triangle of the symmetrical array, ignoring the diagonal
-            mask = np.triu(data + 1, k=0) < 1
-            # Finalize the data for the plot, last row is last factor x last factor so it gets dropped
-            heat_data = np.where(mask, np.nan, data)[:-1]
-            # Creating label array for heat map axes
-            heat_labels = self._by_factor_type("factor_names", factor_type)
-
-            if row_labels is None:
-                row_labels = heat_labels[:-1]
-            if col_labels is None:
-                col_labels = heat_labels[1:]
-
-            fig = heatmap(heat_data, row_labels, col_labels, cbarlabel="Normalized Mutual Information")
-
-        return fig
 
 
 def _validate_num_neighbors(num_neighbors: int) -> int:

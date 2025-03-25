@@ -2,115 +2,17 @@ from __future__ import annotations
 
 __all__ = []
 
-import contextlib
-from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Literal
 
 import numpy as np
 import scipy as sp
 from numpy.typing import NDArray
 
-from dataeval._output import Output, set_metadata
-from dataeval.typing import ArrayLike
+from dataeval.outputs import DiversityOutput
+from dataeval.outputs._base import set_metadata
 from dataeval.utils._bin import get_counts
 from dataeval.utils._method import get_method
-from dataeval.utils._plot import heatmap
 from dataeval.utils.data import Metadata
-
-with contextlib.suppress(ImportError):
-    from matplotlib.figure import Figure
-
-
-def _plot(labels: NDArray[Any], bar_heights: NDArray[Any]) -> Figure:
-    """
-    Plots a formatted bar plot
-
-    Parameters
-    ----------
-    labels : NDArray
-        Array containing the labels for each bar
-    bar_heights : NDArray
-        Array containing the values for each bar
-
-    Returns
-    -------
-    matplotlib.figure.Figure
-        Bar plot figure
-    """
-    import matplotlib.pyplot as plt
-
-    fig, ax = plt.subplots(figsize=(8, 8))
-
-    ax.bar(labels, bar_heights)
-    ax.set_xlabel("Factors")
-
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
-
-    fig.tight_layout()
-    return fig
-
-
-@dataclass(frozen=True)
-class DiversityOutput(Output):
-    """
-    Output class for :func:`.diversity` :term:`bias<Bias>` metric.
-
-    Attributes
-    ----------
-    diversity_index : NDArray[np.double]
-        :term:`Diversity` index for classes and factors
-    classwise : NDArray[np.double]
-        Classwise diversity index [n_class x n_factor]
-    factor_names : list[str]
-        Names of each metadata factor
-    class_names : list[str]
-        Class labels for each value in the dataset
-    """
-
-    diversity_index: NDArray[np.double]
-    classwise: NDArray[np.double]
-    factor_names: list[str]
-    class_names: list[str]
-
-    def plot(
-        self,
-        row_labels: ArrayLike | None = None,
-        col_labels: ArrayLike | None = None,
-        plot_classwise: bool = False,
-    ) -> Figure:
-        """
-        Plot a heatmap of diversity information
-
-        Parameters
-        ----------
-        row_labels : ArrayLike or None, default None
-            List/Array containing the labels for rows in the histogram
-        col_labels : ArrayLike or None, default None
-            List/Array containing the labels for columns in the histogram
-        plot_classwise : bool, default False
-            Whether to plot per-class balance instead of global balance
-        """
-        if plot_classwise:
-            if row_labels is None:
-                row_labels = self.class_names
-            if col_labels is None:
-                col_labels = self.factor_names
-
-            fig = heatmap(
-                self.classwise,
-                row_labels,
-                col_labels,
-                xlabel="Factors",
-                ylabel="Class",
-                cbarlabel=f"Normalized {self.meta()['arguments']['method'].title()} Index",
-            )
-
-        else:
-            # Creating label array for heat map axes
-            heat_labels = np.concatenate((["class"], self.factor_names))
-            fig = _plot(heat_labels, self.diversity_index)
-
-        return fig
 
 
 def diversity_shannon(

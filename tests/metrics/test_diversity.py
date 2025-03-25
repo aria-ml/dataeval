@@ -1,6 +1,8 @@
 import numpy as np
 import pytest
 
+from dataeval.outputs._base import ExecutionMetadata
+
 try:
     from matplotlib.figure import Figure
 except ImportError:
@@ -38,8 +40,8 @@ class TestDiversityUnit:
         result = diversity(metadata_results, method=met)
         assert np.issubdtype(result.diversity_index.dtype, np.double)
         assert np.issubdtype(result.classwise.dtype, np.double)
-        assert type(result.factor_names[0]) is str
-        assert type(result.meta()["arguments"]["method"]) is str
+        assert isinstance(result.factor_names[0], str)
+        assert isinstance(result.meta, ExecutionMetadata)
 
 
 @pytest.mark.requires_all

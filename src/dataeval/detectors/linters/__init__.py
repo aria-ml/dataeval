@@ -9,5 +9,6 @@ __all__ = [
     "OutliersOutput",
 ]
 
-from dataeval.detectors.linters.duplicates import Duplicates, DuplicatesOutput
-from dataeval.detectors.linters.outliers import Outliers, OutliersOutput
+from dataeval.detectors.linters.duplicates import Duplicates
+from dataeval.detectors.linters.outliers import Outliers
+from dataeval.outputs._linters import DuplicatesOutput, OutliersOutput

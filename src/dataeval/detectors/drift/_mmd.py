@@ -10,42 +10,16 @@ from __future__ import annotations
 
 __all__ = []
 
-from dataclasses import dataclass
 from typing import Callable
 
 import torch
 
-from dataeval._output import set_metadata
 from dataeval.config import get_device
-from dataeval.detectors.drift._base import BaseDrift, DriftBaseOutput, UpdateStrategy, preprocess_x, update_x_ref
+from dataeval.detectors.drift._base import BaseDrift, UpdateStrategy, preprocess_x, update_x_ref
 from dataeval.detectors.drift._torch import GaussianRBF, mmd2_from_kernel_matrix
+from dataeval.outputs import DriftMMDOutput
+from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike
-
-
-@dataclass(frozen=True)
-class DriftMMDOutput(DriftBaseOutput):
-    """
-    Output class for :class:`.DriftMMD` :term:`drift<Drift>` detector.
-
-    Attributes
-    ----------
-    drifted : bool
-        Drift prediction for the images
-    threshold : float
-        :term:`P-Value` used for significance of the permutation test
-    p_val : float
-        P-value obtained from the permutation test
-    distance : float
-        MMD^2 between the reference and test set
-    distance_threshold : float
-        MMD^2 threshold above which drift is flagged
-    """
-
-    # drifted: bool
-    # threshold: float
-    # p_val: float
-    # distance: float
-    distance_threshold: float
 
 
 class DriftMMD(BaseDrift):

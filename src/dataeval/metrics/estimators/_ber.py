@@ -12,7 +12,6 @@ from __future__ import annotations
 
 __all__ = []
 
-from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
@@ -20,29 +19,12 @@ from numpy.typing import NDArray
 from scipy.sparse import coo_matrix
 from scipy.stats import mode
 
-from dataeval._output import Output, set_metadata
+from dataeval.outputs import BEROutput
+from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike
 from dataeval.utils._array import as_numpy, ensure_embeddings
 from dataeval.utils._method import get_method
 from dataeval.utils._mst import compute_neighbors, minimum_spanning_tree
-
-
-@dataclass(frozen=True)
-class BEROutput(Output):
-    """
-    Output class for :func:`.ber` estimator metric.
-
-    Attributes
-    ----------
-    ber : float
-        The upper bounds of the :term:`Bayes error rate<Bayes Error Rate (BER)>`
-    ber_lower : float
-        The lower bounds of the Bayes Error Rate
-    """
-
-    ber: float
-
-    ber_lower: float
 
 
 def ber_mst(images: NDArray[np.float64], labels: NDArray[np.int_], k: int = 1) -> tuple[float, float]:

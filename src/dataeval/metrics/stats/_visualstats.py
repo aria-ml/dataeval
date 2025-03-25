@@ -2,50 +2,17 @@ from __future__ import annotations
 
 __all__ = []
 
-from dataclasses import dataclass
 from typing import Any, Callable
 
 import numpy as np
-from numpy.typing import NDArray
 
-from dataeval._output import set_metadata
-from dataeval.metrics.stats._base import BaseStatsOutput, StatsProcessor, run_stats
+from dataeval.metrics.stats._base import StatsProcessor, run_stats
+from dataeval.outputs import VisualStatsOutput
+from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike, Dataset
 from dataeval.utils._image import edge_filter
 
 QUARTILES = (0, 25, 50, 75, 100)
-
-
-@dataclass(frozen=True)
-class VisualStatsOutput(BaseStatsOutput):
-    """
-    Output class for :func:`.visualstats` stats metric.
-
-    Attributes
-    ----------
-    brightness : NDArray[np.float16]
-        Brightness of the images
-    contrast : NDArray[np.float16]
-        Image contrast ratio
-    darkness : NDArray[np.float16]
-        Darkness of the images
-    missing : NDArray[np.float16]
-        Percentage of the images with missing pixels
-    sharpness : NDArray[np.float16]
-        Sharpness of the images
-    zeros : NDArray[np.float16]
-        Percentage of the images with zero value pixels
-    percentiles : NDArray[np.float16]
-        Percentiles of the pixel values of the images with quartiles of (0, 25, 50, 75, 100)
-    """
-
-    brightness: NDArray[np.float16]
-    contrast: NDArray[np.float16]
-    darkness: NDArray[np.float16]
-    missing: NDArray[np.float16]
-    sharpness: NDArray[np.float16]
-    zeros: NDArray[np.float16]
-    percentiles: NDArray[np.float16]
 
 
 class VisualStatsProcessor(StatsProcessor[VisualStatsOutput]):

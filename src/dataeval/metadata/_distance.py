@@ -9,8 +9,8 @@ import numpy as np
 from scipy.stats import iqr, ks_2samp
 from scipy.stats import wasserstein_distance as emd
 
-from dataeval._output import MappingOutput
 from dataeval.metadata._utils import _compare_keys, _validate_factors_and_data
+from dataeval.outputs._base import MappingOutput
 from dataeval.typing import ArrayLike
 from dataeval.utils.data import Metadata
 

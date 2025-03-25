@@ -4,7 +4,6 @@ import warnings
 
 __all__ = []
 
-from dataclasses import dataclass
 from typing import Any, Callable
 
 import numpy as np
@@ -12,31 +11,15 @@ import xxhash as xxh
 from PIL import Image
 from scipy.fftpack import dct
 
-from dataeval._output import set_metadata
-from dataeval.metrics.stats._base import BaseStatsOutput, StatsProcessor, run_stats
+from dataeval.metrics.stats._base import StatsProcessor, run_stats
+from dataeval.outputs import HashStatsOutput
+from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike, Dataset
 from dataeval.utils._array import as_numpy
 from dataeval.utils._image import normalize_image_shape, rescale
 
 HASH_SIZE = 8
 MAX_FACTOR = 4
-
-
-@dataclass(frozen=True)
-class HashStatsOutput(BaseStatsOutput):
-    """
-    Output class for :func:`.hashstats` stats metric.
-
-    Attributes
-    ----------
-    xxhash : List[str]
-        xxHash hash of the images as a hex string
-    pchash : List[str]
-        :term:`Perception-based Hash` of the images as a hex string
-    """
-
-    xxhash: list[str]
-    pchash: list[str]
 
 
 def pchash(image: ArrayLike) -> str:

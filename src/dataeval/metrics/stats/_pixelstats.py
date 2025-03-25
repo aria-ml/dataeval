@@ -2,48 +2,15 @@ from __future__ import annotations
 
 __all__ = []
 
-from dataclasses import dataclass
 from typing import Any, Callable
 
 import numpy as np
-from numpy.typing import NDArray
 from scipy.stats import entropy, kurtosis, skew
 
-from dataeval._output import set_metadata
-from dataeval.metrics.stats._base import BaseStatsOutput, StatsProcessor, run_stats
+from dataeval.metrics.stats._base import StatsProcessor, run_stats
+from dataeval.outputs import PixelStatsOutput
+from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike, Dataset
-
-
-@dataclass(frozen=True)
-class PixelStatsOutput(BaseStatsOutput):
-    """
-    Output class for :func:`.pixelstats` stats metric.
-
-    Attributes
-    ----------
-    mean : NDArray[np.float16]
-        Mean of the pixel values of the images
-    std : NDArray[np.float16]
-        Standard deviation of the pixel values of the images
-    var : NDArray[np.float16]
-        :term:`Variance` of the pixel values of the images
-    skew : NDArray[np.float16]
-        Skew of the pixel values of the images
-    kurtosis : NDArray[np.float16]
-        Kurtosis of the pixel values of the images
-    histogram : NDArray[np.uint32]
-        Histogram of the pixel values of the images across 256 bins scaled between 0 and 1
-    entropy : NDArray[np.float16]
-        Entropy of the pixel values of the images
-    """
-
-    mean: NDArray[np.float16]
-    std: NDArray[np.float16]
-    var: NDArray[np.float16]
-    skew: NDArray[np.float16]
-    kurtosis: NDArray[np.float16]
-    histogram: NDArray[np.uint32]
-    entropy: NDArray[np.float16]
 
 
 class PixelStatsProcessor(StatsProcessor[PixelStatsOutput]):
