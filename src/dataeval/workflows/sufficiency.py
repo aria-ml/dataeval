@@ -189,7 +189,7 @@ class Sufficiency(Generic[T]):
         ...     substeps=5,
         ... )
         >>> suff.evaluate()
-        SufficiencyOutput(steps=array([  1,   3,  10,  31, 100], dtype=uint32), measures={'test': array([1., 1., 1., 1., 1.])})
+        SufficiencyOutput(steps=array([  1,   3,  10,  31, 100], dtype=uint32), measures={'test': array([1., 1., 1., 1., 1.])}, n_iter=1000)
         """  # noqa: E501
         if eval_at is not None:
             ranges = np.asarray(list(eval_at) if isinstance(eval_at, Iterable) else [eval_at])
