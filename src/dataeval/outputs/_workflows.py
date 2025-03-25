@@ -203,10 +203,13 @@ class SufficiencyOutput(Output):
         Array of sample sizes
     measures : Dict[str, NDArray]
         Average of values observed for each sample size step for each measure
+    n_iter : int, default 1000
+        Number of iterations to perform in the basin-hopping curve-fit process
     """
 
     steps: NDArray[np.uint32]
     measures: dict[str, NDArray[np.float64]]
+    n_iter: int = 1000
 
     def __post_init__(self) -> None:
         c = len(self.steps)
@@ -218,21 +221,16 @@ class SufficiencyOutput(Output):
 
     @property
     def params(self) -> dict[str, NDArray[Any]]:
-        return self.get_params()
-
-    def get_params(self, n_iter: int | None = None) -> dict[str, NDArray[Any]]:
         if self._params is None:
             self._params = {}
-        n_iter = 1000 if n_iter is None and not self._params else sorted(self._params)[-1]
-        if n_iter not in self._params:
-            self._params[n_iter] = get_curve_params(self.measures, self.steps, n_iter)
-        return self._params[n_iter]
+        if self.n_iter not in self._params:
+            self._params[self.n_iter] = get_curve_params(self.measures, self.steps, self.n_iter)
+        return self._params[self.n_iter]
 
     @set_metadata
     def project(
         self,
         projection: int | Iterable[int],
-        n_iter: int = 1000,
     ) -> SufficiencyOutput:
         """
         Projects the measures for each step.
@@ -241,8 +239,6 @@ class SufficiencyOutput(Output):
         ----------
         projection : int | Iterable[int]
             Step or steps to project
-        n_iter : int, default 1000
-            Iteration to use when calculating the inverse power curve
 
         Returns
         -------
@@ -265,12 +261,12 @@ class SufficiencyOutput(Output):
             if measures.ndim > 1:
                 result = []
                 for i in range(len(measures)):
-                    projected = project_steps(self.get_params(n_iter)[name][i], projection)
+                    projected = project_steps(self.params[name][i], projection)
                     result.append(projected)
                 output[name] = np.array(result)
             else:
-                output[name] = project_steps(self.get_params(n_iter)[name], projection)
-        proj = SufficiencyOutput(projection, output)
+                output[name] = project_steps(self.params[name], projection)
+        proj = SufficiencyOutput(projection, output, self.n_iter)
         proj._params = self._params
         return proj
 
@@ -316,18 +312,20 @@ class SufficiencyOutput(Output):
                         f"{name}_{class_name}",
                         self.steps,
                         measure,
-                        self.get_params()[name][i],
+                        self.params[name][i],
                         extrapolated,
                     )
                     plots.append(fig)
 
             else:
-                fig = plot_measure(name, self.steps, measures, self.get_params()[name], extrapolated)
+                fig = plot_measure(name, self.steps, measures, self.params[name], extrapolated)
                 plots.append(fig)
 
         return plots
 
-    def inv_project(self, targets: Mapping[str, ArrayLike], n_iter: int = 1000) -> dict[str, NDArray[np.float64]]:
+    def inv_project(
+        self, targets: Mapping[str, ArrayLike], n_iter: int | None = None
+    ) -> dict[str, NDArray[np.float64]]:
         """
         Calculate training samples needed to achieve target model metric values.
 
@@ -336,8 +334,8 @@ class SufficiencyOutput(Output):
         targets : Mapping[str, ArrayLike]
             Mapping of target metric scores (from 0.0 to 1.0) that we want
             to achieve, where the key is the name of the metric.
-        n_iter : int, default 1000
-            Iteration to use when calculating the inverse power curve
+        n_iter : int or None, default None
+            Iteration to use when calculating the inverse power curve, if None defaults to 1000
 
         Returns
         -------
@@ -358,9 +356,9 @@ class SufficiencyOutput(Output):
                 projection[name] = np.zeros((len(measure), len(tarray)))
                 for i in range(len(measure)):
                     projection[name][i] = inv_project_steps(
-                        self.get_params(n_iter)[name][i], tarray[i] if tarray.ndim == measure.ndim else tarray
+                        self.params[name][i], tarray[i] if tarray.ndim == measure.ndim else tarray
                     )
             else:
-                projection[name] = inv_project_steps(self.get_params(n_iter)[name], tarray)
+                projection[name] = inv_project_steps(self.params[name], tarray)
 
         return projection
