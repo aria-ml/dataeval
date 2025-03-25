@@ -8,27 +8,13 @@ from __future__ import annotations
 
 __all__ = []
 
-from dataclasses import dataclass
 
 from sklearn.metrics import average_precision_score
 
-from dataeval._output import Output, set_metadata
+from dataeval.outputs import UAPOutput
+from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike
 from dataeval.utils._array import as_numpy
-
-
-@dataclass(frozen=True)
-class UAPOutput(Output):
-    """
-    Output class for :func:`.uap` estimator metric.
-
-    Attributes
-    ----------
-    uap : float
-        The empirical mean precision estimate
-    """
-
-    uap: float
 
 
 @set_metadata

@@ -13,7 +13,8 @@ __all__ = [
     "UAPOutput",
 ]
 
-from dataeval.metrics.estimators._ber import BEROutput, ber
-from dataeval.metrics.estimators._clusterer import ClustererOutput, clusterer
-from dataeval.metrics.estimators._divergence import DivergenceOutput, divergence
-from dataeval.metrics.estimators._uap import UAPOutput, uap
+from dataeval.metrics.estimators._ber import ber
+from dataeval.metrics.estimators._clusterer import clusterer
+from dataeval.metrics.estimators._divergence import divergence
+from dataeval.metrics.estimators._uap import uap
+from dataeval.outputs._estimators import BEROutput, ClustererOutput, DivergenceOutput, UAPOutput

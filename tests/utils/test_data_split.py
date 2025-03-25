@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
+from dataeval.outputs._utils import SplitDatasetOutput
 from dataeval.utils.data._split import (
-    SplitDatasetOutput,
     _validate_labels,
     bin_kmeans,
     calculate_validation_fraction,
@@ -216,7 +216,7 @@ class TestGroupData:
         uniques, group_ids = np.unique(values, axis=0, return_inverse=True)
 
         error_msg = (
-            f"Groups must be greater than num partitions. Got {len(uniques)} and {len(uniques)+1}. "
+            f"Groups must be greater than num partitions. Got {len(uniques)} and {len(uniques) + 1}. "
             "Reverting to ungrouped partitioning"
         )
         with pytest.warns(UserWarning, match=error_msg):

@@ -14,8 +14,6 @@ from numpy.typing import NDArray
 from dataeval.config import set_max_processes
 from dataeval.metrics.stats import dimensionstats, hashstats, labelstats, pixelstats, visualstats
 from dataeval.metrics.stats._base import (
-    SOURCE_INDEX,
-    BaseStatsOutput,
     StatsProcessor,
     add_stats,
     combine_stats,
@@ -27,6 +25,7 @@ from dataeval.metrics.stats._boxratiostats import boxratiostats, calculate_ratio
 from dataeval.metrics.stats._imagestats import (
     imagestats,
 )
+from dataeval.outputs._stats import SOURCE_INDEX, BaseStatsOutput
 from dataeval.utils.data._dataset import _find_max, to_image_classification_dataset, to_object_detection_dataset
 from dataeval.utils.data._metadata import Metadata
 from dataeval.utils.data._targets import Targets

@@ -14,9 +14,9 @@ __all__ = [
 ]
 
 from dataeval.detectors.drift import updates
-from dataeval.detectors.drift._base import DriftOutput
 from dataeval.detectors.drift._cvm import DriftCVM
 from dataeval.detectors.drift._ks import DriftKS
-from dataeval.detectors.drift._mmd import DriftMMD, DriftMMDOutput
+from dataeval.detectors.drift._mmd import DriftMMD
 from dataeval.detectors.drift._torch import preprocess_drift
 from dataeval.detectors.drift._uncertainty import DriftUncertainty
+from dataeval.outputs._drift import DriftMMDOutput, DriftOutput

@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
 
-from dataeval.metrics.estimators._ber import BEROutput, ber, ber_knn, ber_mst, get_classes_counts, knn_lowerbound
+from dataeval.metrics.estimators._ber import ber, ber_knn, ber_mst, get_classes_counts, knn_lowerbound
+from dataeval.outputs._estimators import BEROutput
 
 
 @pytest.mark.required
