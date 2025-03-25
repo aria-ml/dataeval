@@ -11,7 +11,7 @@ try:
 except ImportError:
     Figure = type(None)
 
-from dataeval.metrics.bias._coverage import _plot, coverage
+from dataeval.metrics.bias._coverage import coverage
 
 
 @pytest.mark.required
@@ -60,14 +60,9 @@ class TestCoveragePlot:
         result = coverage(flatten(images), num_observations=10, percent=0.15)
         output = result.plot(images, 3)
         assert isinstance(output, Figure)
-
-    def test_coverage_plot(self):
-        images = np.ones((7, 28, 28), dtype=np.intp)
-        result = _plot(images, 7)
-        assert isinstance(result, Figure)
-        images = np.ones((7, 28), dtype=np.intp)
+        images = np.ones((10, 28), dtype=np.intp)
         with pytest.raises(ValueError):
-            _plot(images, 7)
+            result.plot(images, 3)
 
 
 @pytest.mark.optional

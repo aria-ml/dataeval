@@ -2,7 +2,8 @@ import numpy as np
 import pytest
 
 from dataeval.detectors.linters.outliers import Outliers, OutliersOutput, _get_outlier_mask
-from dataeval.metrics.stats import ImageStatsOutput, LabelStatsOutput, dimensionstats, pixelstats, visualstats
+from dataeval.metrics.stats import dimensionstats, pixelstats, visualstats
+from dataeval.outputs._stats import ImageStatsOutput, LabelStatsOutput
 
 
 @pytest.mark.required

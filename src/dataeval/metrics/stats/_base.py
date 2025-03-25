@@ -9,30 +9,19 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
 from multiprocessing import Pool
-from typing import Any, Callable, Generic, Iterable, Optional, Sequence, TypeVar, Union, cast
+from typing import Any, Callable, Generic, Iterable, Sequence, TypeVar, cast
 
 import numpy as np
 import tqdm
 from numpy.typing import NDArray
 
-from dataeval._output import Output
 from dataeval.config import get_max_processes
+from dataeval.outputs._stats import BaseStatsOutput, SourceIndex
 from dataeval.typing import ArrayLike, Dataset, ObjectDetectionTarget
 from dataeval.utils._array import to_numpy
 from dataeval.utils._image import normalize_image_shape, rescale
-from dataeval.utils._plot import channel_histogram_plot, histogram_plot
 
 DTYPE_REGEX = re.compile(r"NDArray\[np\.(.*?)\]")
-SOURCE_INDEX = "source_index"
-BOX_COUNT = "box_count"
-
-OptionalRange = Optional[Union[int, Iterable[int]]]
-
-
-def matches(index: int | None, opt_range: OptionalRange) -> bool:
-    if index is None or opt_range is None:
-        return True
-    return index in opt_range if isinstance(opt_range, Iterable) else index == opt_range
 
 
 def normalize_box_shape(bounding_box: NDArray[Any]) -> NDArray[Any]:
@@ -46,114 +35,6 @@ def normalize_box_shape(bounding_box: NDArray[Any]) -> NDArray[Any]:
         raise ValueError("Bounding boxes must have 2 dimensions: (# of boxes in an image, [X,Y,W,H]) -> (N,4)")
     else:
         return bounding_box
-
-
-@dataclass
-class SourceIndex:
-    """
-    Attributes
-    ----------
-    image: int
-        Index of the source image
-    box : int | None
-        Index of the box of the source image
-    channel : int | None
-        Index of the channel of the source image
-    """
-
-    image: int
-    box: int | None
-    channel: int | None
-
-
-@dataclass(frozen=True)
-class BaseStatsOutput(Output):
-    """
-    Attributes
-    ----------
-    source_index : List[SourceIndex]
-        Mapping from statistic to source image, box and channel index
-    box_count : NDArray[np.uint16]
-    """
-
-    source_index: list[SourceIndex]
-    box_count: NDArray[np.uint16]
-
-    def __post_init__(self) -> None:
-        length = len(self.source_index)
-        bad = {k: len(v) for k, v in self.dict().items() if k not in [SOURCE_INDEX, BOX_COUNT] and len(v) != length}
-        if bad:
-            raise ValueError(f"All values must have the same length as source_index. Bad values: {str(bad)}.")
-
-    def get_channel_mask(
-        self,
-        channel_index: OptionalRange,
-        channel_count: OptionalRange = None,
-    ) -> list[bool]:
-        """
-        Boolean mask for results filtered to specified channel index and optionally the count
-        of the channels per image.
-
-        Parameters
-        ----------
-        channel_index : int | Iterable[int] | None
-            Index or indices of channel(s) to filter for
-        channel_count : int | Iterable[int] | None
-            Optional count(s) of channels to filter for
-        """
-        mask: list[bool] = []
-        cur_mask: list[bool] = []
-        cur_image = 0
-        cur_max_channel = 0
-        for source_index in list(self.source_index) + [None]:
-            if source_index is None or source_index.image > cur_image:
-                mask.extend(cur_mask if matches(cur_max_channel + 1, channel_count) else [False for _ in cur_mask])
-                if source_index is not None:
-                    cur_image = source_index.image
-                    cur_max_channel = 0
-                    cur_mask.clear()
-            if source_index is not None:
-                cur_mask.append(matches(source_index.channel, channel_index))
-                cur_max_channel = max(cur_max_channel, source_index.channel or 0)
-        return mask
-
-    def __len__(self) -> int:
-        return len(self.source_index)
-
-    def _get_channels(
-        self, channel_limit: int | None = None, channel_index: int | Iterable[int] | None = None
-    ) -> tuple[int, list[bool] | None]:
-        source_index = self.dict()[SOURCE_INDEX]
-        raw_channels = int(max([si.channel or 0 for si in source_index])) + 1
-        if isinstance(channel_index, int):
-            max_channels = 1 if channel_index < raw_channels else raw_channels
-            ch_mask = self.get_channel_mask(channel_index)
-        elif isinstance(channel_index, Iterable) and all(isinstance(val, int) for val in list(channel_index)):
-            max_channels = len(list(channel_index))
-            ch_mask = self.get_channel_mask(channel_index)
-        elif isinstance(channel_limit, int):
-            max_channels = channel_limit
-            ch_mask = self.get_channel_mask(None, channel_limit)
-        else:
-            max_channels = raw_channels
-            ch_mask = None
-
-        if max_channels > raw_channels:
-            max_channels = raw_channels
-        if ch_mask is not None and not any(ch_mask):
-            ch_mask = None
-
-        return max_channels, ch_mask
-
-    def plot(
-        self, log: bool, channel_limit: int | None = None, channel_index: int | Iterable[int] | None = None
-    ) -> None:
-        max_channels, ch_mask = self._get_channels(channel_limit, channel_index)
-        d = {k: v for k, v in self.dict().items() if isinstance(v, np.ndarray) and v[v != 0].size > 0 and v.ndim == 1}
-        if max_channels == 1:
-            histogram_plot(d, log)
-        else:
-            channel_histogram_plot(d, log, max_channels, ch_mask)
 
 
 TStatsOutput = TypeVar("TStatsOutput", bound=BaseStatsOutput, covariant=True)

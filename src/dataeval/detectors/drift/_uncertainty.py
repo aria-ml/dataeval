@@ -19,9 +19,10 @@ from scipy.special import softmax
 from scipy.stats import entropy
 
 from dataeval.config import get_device
-from dataeval.detectors.drift._base import DriftOutput, UpdateStrategy
+from dataeval.detectors.drift._base import UpdateStrategy
 from dataeval.detectors.drift._ks import DriftKS
 from dataeval.detectors.drift._torch import preprocess_drift
+from dataeval.outputs import DriftOutput
 from dataeval.typing import ArrayLike
 
 

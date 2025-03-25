@@ -7,15 +7,32 @@ from __future__ import annotations
 
 __all__ = ["LastSeenUpdate", "ReservoirSamplingUpdate"]
 
+from abc import ABC, abstractmethod
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.detectors.drift._base import UpdateStrategy
+
+class BaseUpdateStrategy(ABC):
+    """
+    Updates reference dataset for drift detector
+
+    Parameters
+    ----------
+    n : int
+        Update with last n instances seen by the detector.
+    """
+
+    def __init__(self, n: int) -> None:
+        self.n = n
+
+    @abstractmethod
+    def __call__(self, x_ref: NDArray[Any], x: NDArray[Any], count: int) -> NDArray[Any]:
+        """Abstract implementation of update strategy"""
 
 
-class LastSeenUpdate(UpdateStrategy):
+class LastSeenUpdate(BaseUpdateStrategy):
     """
     Updates reference dataset for :term:`drift<Drift>` detector using last seen method.
 
@@ -30,7 +47,7 @@ class LastSeenUpdate(UpdateStrategy):
         return x_updated[-self.n :]
 
 
-class ReservoirSamplingUpdate(UpdateStrategy):
+class ReservoirSamplingUpdate(BaseUpdateStrategy):
     """
     Updates reference dataset for :term:`drift<Drift>` detector using reservoir sampling method.
 

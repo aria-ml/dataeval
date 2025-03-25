@@ -2,7 +2,8 @@ import numpy as np
 import pytest
 import sklearn.datasets as dsets
 
-from dataeval.metrics.estimators import ClustererOutput, clusterer
+from dataeval.metrics.estimators import clusterer
+from dataeval.outputs._estimators import ClustererOutput
 
 
 def get_blobs(std=0.3):

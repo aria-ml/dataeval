@@ -7,8 +7,8 @@ import warnings
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.detectors.ood import OODOutput
 from dataeval.metadata._utils import _compare_keys, _validate_factors_and_data
+from dataeval.outputs import OODOutput
 from dataeval.utils.data import Metadata
 
 

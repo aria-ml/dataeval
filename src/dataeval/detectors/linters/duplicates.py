@@ -2,39 +2,15 @@ from __future__ import annotations
 
 __all__ = []
 
-from dataclasses import dataclass
-from typing import Any, Generic, Sequence, TypeVar, overload
+from typing import Any, Sequence, overload
 
-from dataeval._output import Output, set_metadata
-from dataeval.metrics.stats import HashStatsOutput, hashstats
+from dataeval.metrics.stats import hashstats
 from dataeval.metrics.stats._base import combine_stats, get_dataset_step_from_idx
+from dataeval.outputs import DuplicatesOutput, HashStatsOutput
+from dataeval.outputs._base import set_metadata
+from dataeval.outputs._linters import DatasetDuplicateGroupMap, DuplicateGroup
 from dataeval.typing import Array, Dataset
 from dataeval.utils.data._images import Images
-
-DuplicateGroup = list[int]
-DatasetDuplicateGroupMap = dict[int, DuplicateGroup]
-TIndexCollection = TypeVar("TIndexCollection", DuplicateGroup, DatasetDuplicateGroupMap)
-
-
-@dataclass(frozen=True)
-class DuplicatesOutput(Generic[TIndexCollection], Output):
-    """
-    Output class for :class:`.Duplicates` lint detector.
-
-    Attributes
-    ----------
-    exact : list[list[int] | dict[int, list[int]]]
-        Indices of images that are exact matches
-    near: list[list[int] | dict[int, list[int]]]
-        Indices of images that are near matches
-
-    - For a single dataset, indices are returned as a list of index groups.
-    - For multiple datasets, indices are returned as dictionaries where the key is the
-      index of the dataset, and the value is the list index groups from that dataset.
-    """
-
-    exact: list[TIndexCollection]
-    near: list[TIndexCollection]
 
 
 class Duplicates:

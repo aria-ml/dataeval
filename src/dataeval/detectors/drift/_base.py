@@ -11,84 +11,28 @@ from __future__ import annotations
 __all__ = []
 
 import math
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from abc import abstractmethod
 from functools import wraps
-from typing import Any, Callable, Literal, TypeVar
+from typing import Any, Callable, Literal, Protocol, TypeVar, runtime_checkable
 
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval._output import Output, set_metadata
+from dataeval.outputs import DriftOutput
+from dataeval.outputs._base import set_metadata
 from dataeval.typing import Array, ArrayLike
 from dataeval.utils._array import as_numpy, to_numpy
 
 R = TypeVar("R")
 
 
-class UpdateStrategy(ABC):
+@runtime_checkable
+class UpdateStrategy(Protocol):
     """
-    Updates reference dataset for drift detector
-
-    Parameters
-    ----------
-    n : int
-        Update with last n instances seen by the detector.
+    Protocol for reference dataset update strategy for drift detectors
     """
 
-    def __init__(self, n: int) -> None:
-        self.n = n
-
-    @abstractmethod
-    def __call__(self, x_ref: NDArray[Any], x: NDArray[Any], count: int) -> NDArray[Any]:
-        """Abstract implementation of update strategy"""
-
-
-@dataclass(frozen=True)
-class DriftBaseOutput(Output):
-    """
-    Base output class for Drift Detector classes
-    """
-
-    drifted: bool
-    threshold: float
-    p_val: float
-    distance: float
-
-
-@dataclass(frozen=True)
-class DriftOutput(DriftBaseOutput):
-    """
-    Output class for :class:`.DriftCVM`, :class:`.DriftKS`, and :class:`.DriftUncertainty` drift detectors.
-
-    Attributes
-    ----------
-    drifted : bool
-        :term:`Drift` prediction for the images
-    threshold : float
-        Threshold after multivariate correction if needed
-    p_val : float
-        Instance-level p-value
-    distance : float
-        Instance-level distance
-    feature_drift : NDArray
-        Feature-level array of images detected to have drifted
-    feature_threshold : float
-        Feature-level threshold to determine drift
-    p_vals : NDArray
-        Feature-level p-values
-    distances : NDArray
-        Feature-level distances
-    """
-
-    # drifted: bool
-    # threshold: float
-    # p_val: float
-    # distance: float
-    feature_drift: NDArray[np.bool_]
-    feature_threshold: float
-    p_vals: NDArray[np.float32]
-    distances: NDArray[np.float32]
+    def __call__(self, x_ref: NDArray[Any], x: NDArray[Any], count: int) -> NDArray[Any]: ...
 
 
 def update_x_ref(fn: Callable[..., R]) -> Callable[..., R]:
