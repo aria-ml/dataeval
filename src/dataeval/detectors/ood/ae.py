@@ -19,7 +19,7 @@ import torch
 from numpy.typing import NDArray
 
 from dataeval.detectors.ood.base import OODBase
-from dataeval.detectors.ood.output import OODScoreOutput
+from dataeval.outputs import OODScoreOutput
 from dataeval.typing import ArrayLike
 from dataeval.utils.torch._internal import predict_batch
 

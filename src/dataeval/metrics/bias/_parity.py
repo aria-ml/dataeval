@@ -2,86 +2,19 @@ from __future__ import annotations
 
 __all__ = []
 
-import contextlib
 import warnings
-from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 from scipy.stats import chisquare
 from scipy.stats.contingency import chi2_contingency, crosstab
 
-from dataeval._output import Output, set_metadata
+from dataeval.outputs import LabelParityOutput, ParityOutput
+from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike
 from dataeval.utils._array import as_numpy
 from dataeval.utils.data import Metadata
-
-with contextlib.suppress(ImportError):
-    import pandas as pd
-
-TData = TypeVar("TData", np.float64, NDArray[np.float64])
-
-
-@dataclass(frozen=True)
-class BaseParityOutput(Generic[TData], Output):
-    score: TData
-    p_value: TData
-
-    def to_dataframe(self) -> pd.DataFrame:
-        """
-        Exports the parity output results to a pandas DataFrame.
-
-        Returns
-        -------
-        pd.DataFrame
-        """
-        import pandas as pd
-
-        return pd.DataFrame(
-            index=self.factor_names,  # type: ignore - list[str] is documented as acceptable index type
-            data={
-                "score": self.score.round(2),
-                "p-value": self.p_value.round(2),
-            },
-        )
-
-
-@dataclass(frozen=True)
-class LabelParityOutput(BaseParityOutput[np.float64]):
-    """
-    Output class for :func:`.label_parity` :term:`bias<Bias>` metrics.
-
-    Attributes
-    ----------
-    score : np.float64
-        chi-squared score(s) of the test
-    p_value : np.float64
-        p-value(s) of the test
-    """
-
-
-@dataclass(frozen=True)
-class ParityOutput(BaseParityOutput[NDArray[np.float64]]):
-    """
-    Output class for :func:`.parity` :term:`bias<Bias>` metrics.
-
-    Attributes
-    ----------
-    score : NDArray[np.float64]
-        chi-squared score(s) of the test
-    p_value : NDArray[np.float64]
-        p-value(s) of the test
-    factor_names : list[str]
-        Names of each metadata factor
-    insufficient_data: dict
-        Dictionary of metadata factors with less than 5 class occurrences per value
-    """
-
-    # score: NDArray[np.float64]
-    # p_value: NDArray[np.float64]
-    factor_names: list[str]
-    insufficient_data: dict[str, dict[int, dict[str, int]]]
 
 
 def normalize_expected_dist(expected_dist: NDArray[Any], observed_dist: NDArray[Any]) -> NDArray[Any]:

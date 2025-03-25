@@ -18,7 +18,7 @@ import numpy as np
 import torch
 
 from dataeval.detectors.ood.base import OODBase
-from dataeval.detectors.ood.output import OODScoreOutput
+from dataeval.outputs import OODScoreOutput
 from dataeval.typing import ArrayLike
 from dataeval.utils._array import as_numpy
 from dataeval.utils.torch._internal import predict_batch

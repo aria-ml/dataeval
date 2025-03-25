@@ -5,6 +5,7 @@ __all__ = []
 import inspect
 import logging
 from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import partial, wraps
 from typing import Any, Callable, Iterator, TypeVar
@@ -15,36 +16,61 @@ from typing_extensions import ParamSpec
 from dataeval import __version__
 
 
+@dataclass(frozen=True)
+class ExecutionMetadata:
+    """
+    Metadata about the execution of the function or method for the Output class.
+
+    Attributes
+    ----------
+    name: str
+        Name of the function or method
+    execution_time: datetime
+        Time of execution
+    execution_duration: float
+        Duration of execution in seconds
+    arguments: dict[str, Any]
+        Arguments passed to the function or method
+    state: dict[str, Any]
+        State attributes of the executing class
+    version: str
+        Version of DataEval
+    """
+
+    name: str
+    execution_time: datetime
+    execution_duration: float
+    arguments: dict[str, Any]
+    state: dict[str, Any]
+    version: str
+
+    @classmethod
+    def empty(cls) -> ExecutionMetadata:
+        return ExecutionMetadata(
+            name="",
+            execution_time=datetime.min,
+            execution_duration=0.0,
+            arguments={},
+            state={},
+            version=__version__,
+        )
+
+
 class Output:
-    _name: str
-    _execution_time: datetime
-    _execution_duration: float
-    _arguments: dict[str, str]
-    _state: dict[str, str]
-    _version: str
+    _meta: ExecutionMetadata | None = None
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}: {str(self.dict())}"
 
     def dict(self) -> dict[str, Any]:
-        """
-        Output attributes as a dictionary.
+        return {k: v for k, v in self.__dict__.items() if k != "_meta"}
 
-        Returns
-        -------
-        dict[str, Any]
+    @property
+    def meta(self) -> ExecutionMetadata:
         """
-        return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
-
-    def meta(self) -> dict[str, Any]:
+        Metadata about the execution of the function or method for the Output class.
         """
-        Execution metadata as a dictionary.
-
-        Returns
-        -------
-        dict[str, Any]
-        """
-        return {k.removeprefix("_"): v for k, v in self.__dict__.items() if k.startswith("_")}
+        return self._meta or ExecutionMetadata.empty()
 
 
 TKey = TypeVar("TKey", str, int, float, set)
@@ -120,16 +146,8 @@ def set_metadata(fn: Callable[P, R] | None = None, *, state: list[str] | None = 
         _logger.log(logging.INFO, f">>> Completed '{name}': args={arguments} state={state} duration={duration} <<<")
 
         # Update output with recorded metadata
-        metadata = {
-            "_name": name,
-            "_execution_time": time,
-            "_execution_duration": duration,
-            "_arguments": arguments,
-            "_state": state_attrs,
-            "_version": __version__,
-        }
-        for k, v in metadata.items():
-            object.__setattr__(result, k, v)
+        metadata = ExecutionMetadata(name, time, duration, arguments, state_attrs, __version__)
+        object.__setattr__(result, "_meta", metadata)
         return result
 
     return wrapper

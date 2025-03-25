@@ -7,7 +7,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from dataeval.workflows.sufficiency import calc_params, f_out, reset_parameters
+from dataeval.outputs._workflows import calc_params, f_out
+from dataeval.workflows.sufficiency import reset_parameters
 
 np.random.seed(0)
 torch.manual_seed(0)

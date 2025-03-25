@@ -4,14 +4,14 @@ import pathlib
 import sys
 from typing import Mapping, Sequence
 
-from dataeval.detectors.ood import OODOutput
+from dataeval.outputs._ood import OODOutput
 from dataeval.utils.data._dataset import to_object_detection_dataset
 from dataeval.utils.data._metadata import Metadata
 from dataeval.utils.data._targets import Targets
 
 sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute() / "tests" / "detectors"))
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -252,9 +252,6 @@ def doctest_workflows_sufficiency(doctest_namespace):
     train_fn = MagicMock()
     eval_fn = MagicMock()
     eval_fn.return_value = {"test": 1.0}
-
-    mock_params = patch("dataeval.workflows.sufficiency.calc_params").start()
-    mock_params.return_value = np.array([0.0, 42.0, 0.0])
 
     """dataeval.workflows.sufficiency.Sufficiency"""
 

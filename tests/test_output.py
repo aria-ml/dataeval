@@ -4,7 +4,7 @@ from typing import Iterable
 import numpy as np
 import pytest
 
-from dataeval._output import MappingOutput, Output, set_metadata
+from dataeval.outputs._base import ExecutionMetadata, MappingOutput, Output, set_metadata
 
 
 @dataclass
@@ -49,25 +49,25 @@ class TestOutputMetadata:
         assert output_dict == {"test1": 1, "test2": True, "test3": "value"}
 
     def test_output_metadata_meta(self):
-        output_meta = mock_metric(1, True, "value").meta()
-        assert output_meta["name"] == "tests.test_output.mock_metric"
-        assert output_meta["execution_time"]
-        assert output_meta["execution_duration"] > 0
-        assert set(output_meta["arguments"]) == {"arg1", "arg2", "arg3"}
-        assert output_meta["state"] == {}
-        assert output_meta["version"]
+        output_meta = mock_metric(1, True, "value").meta
+        assert output_meta.name == "tests.test_output.mock_metric"
+        assert output_meta.execution_time
+        assert output_meta.execution_duration > 0
+        assert set(output_meta.arguments) == {"arg1", "arg2", "arg3"}
+        assert output_meta.state == {}
+        assert output_meta.version
 
     def test_output_default_args_kwargs(self):
         output = MockMetric().evaluate(1, True)
         output_dict = output.dict()
         assert output_dict == {"test1": 1, "test2": True, "test3": "mock_default"}
-        output_meta = output.meta()
-        assert output_meta["name"] == "tests.test_output.MockMetric.evaluate"
-        assert output_meta["execution_time"]
-        assert output_meta["execution_duration"] > 0
-        assert output_meta["arguments"] == {"arg1": 1, "arg2": True, "arg3": "mock_default"}
-        assert output_meta["state"] == {"state1": 1, "state2": 1.5, "state3": "list: len=5"}
-        assert output_meta["version"]
+        output_meta = output.meta
+        assert output_meta.name == "tests.test_output.MockMetric.evaluate"
+        assert output_meta.execution_time
+        assert output_meta.execution_duration > 0
+        assert output_meta.arguments == {"arg1": 1, "arg2": True, "arg3": "mock_default"}
+        assert output_meta.state == {"state1": 1, "state2": 1.5, "state3": "list: len=5"}
+        assert output_meta.version
 
     def test_output_metadata_text(self):
         @set_metadata
@@ -78,8 +78,8 @@ class TestOutputMetadata:
             np.array([[1, 2], [3, 4], [5, 6]]), [1, 2, 3], {1: 1, 2: 2}, range(5), (1, 2, 3, 4), b"bytes", MockMetric()
         )
 
-        meta = result.meta()
-        assert meta["arguments"] == {
+        meta = result.meta
+        assert meta.arguments == {
             "a": "ndarray: shape=(3, 2)",
             "s": "list: len=3",
             "d": "dict: len=2",
@@ -97,7 +97,7 @@ class TestMappingOutput:
     def test_mapping_output(self):
         t = MockMappingOutput(self.data)
 
-        assert t.meta() == {}
+        assert t.meta == ExecutionMetadata.empty()
         assert len(t) == 1
         assert t.dict() == self.data
 
@@ -107,6 +107,6 @@ class TestMappingOutput:
             return MockMappingOutput(self.data)
 
         t = mock_output()
-        assert t.meta() != {}
+        assert t.meta != {}
         assert len(t) == 1
         assert t.dict() == self.data

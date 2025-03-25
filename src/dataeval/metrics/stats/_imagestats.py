@@ -2,50 +2,15 @@ from __future__ import annotations
 
 __all__ = []
 
-from dataclasses import dataclass
 from typing import Any, Literal, overload
 
-from dataeval._output import set_metadata
 from dataeval.metrics.stats._base import run_stats
-from dataeval.metrics.stats._dimensionstats import DimensionStatsOutput, DimensionStatsProcessor
-from dataeval.metrics.stats._pixelstats import PixelStatsOutput, PixelStatsProcessor
-from dataeval.metrics.stats._visualstats import VisualStatsOutput, VisualStatsProcessor
-from dataeval.typing import (
-    ArrayLike,
-    Dataset,
-)
-
-
-@dataclass(frozen=True)
-class ImageStatsOutput(DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput):
-    """
-    Output class for :func:`.imagestats` stats metric.
-
-    This class represents the combined outputs of various stats functions against a
-    single dataset, such that each index across all stat outputs are representative
-    of the same source image. Modifying or mixing outputs will result in inaccurate
-    outlier calculations if not created correctly.
-
-    See Also
-    --------
-    DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput
-    """
-
-
-@dataclass(frozen=True)
-class ChannelStatsOutput(PixelStatsOutput, VisualStatsOutput):
-    """
-    Output class for :func:`.imagestats` stats metric.
-
-    This class represents the outputs of various per-channel stats functions against
-    a single dataset, such that each index across all stat outputs are representative
-    of the same source image. Modifying or mixing outputs will result in inaccurate
-    outlier calculations if not created correctly.
-
-    See Also
-    --------
-    PixelStatsOutput, VisualStatsOutput
-    """
+from dataeval.metrics.stats._dimensionstats import DimensionStatsProcessor
+from dataeval.metrics.stats._pixelstats import PixelStatsProcessor
+from dataeval.metrics.stats._visualstats import VisualStatsProcessor
+from dataeval.outputs import ChannelStatsOutput, ImageStatsOutput
+from dataeval.outputs._base import set_metadata
+from dataeval.typing import ArrayLike, Dataset
 
 
 @overload

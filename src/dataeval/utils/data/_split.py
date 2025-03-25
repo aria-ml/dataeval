@@ -3,7 +3,6 @@ from __future__ import annotations
 __all__ = []
 
 import warnings
-from dataclasses import dataclass
 from typing import Any, Iterator, Protocol
 
 import numpy as np
@@ -13,32 +12,8 @@ from sklearn.metrics import silhouette_score
 from sklearn.model_selection import GroupKFold, KFold, StratifiedGroupKFold, StratifiedKFold
 from sklearn.utils.multiclass import type_of_target
 
-from dataeval._output import Output, set_metadata
-
-
-@dataclass
-class TrainValSplit:
-    """Tuple containing train and validation indices"""
-
-    train: NDArray[np.intp]
-    val: NDArray[np.intp]
-
-
-@dataclass(frozen=True)
-class SplitDatasetOutput(Output):
-    """
-    Output class containing test indices and a list of TrainValSplits.
-
-    Attributes
-    ----------
-    test: NDArray[np.intp]
-        Indices for the test set
-    folds: list[TrainValSplit]
-        List where each index contains the indices for the train and validation splits
-    """
-
-    test: NDArray[np.intp]
-    folds: list[TrainValSplit]
+from dataeval.outputs._base import set_metadata
+from dataeval.outputs._utils import SplitDatasetOutput, TrainValSplit
 
 
 class KFoldSplitter(Protocol):

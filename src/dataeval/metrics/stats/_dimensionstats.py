@@ -2,57 +2,15 @@ from __future__ import annotations
 
 __all__ = []
 
-from dataclasses import dataclass
 from typing import Any, Callable
 
 import numpy as np
-from numpy.typing import NDArray
 
-from dataeval._output import set_metadata
-from dataeval.metrics.stats._base import BaseStatsOutput, StatsProcessor, run_stats
+from dataeval.metrics.stats._base import StatsProcessor, run_stats
+from dataeval.outputs import DimensionStatsOutput
+from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike, Dataset
 from dataeval.utils._image import get_bitdepth
-
-
-@dataclass(frozen=True)
-class DimensionStatsOutput(BaseStatsOutput):
-    """
-    Output class for :func:`.dimensionstats` stats metric.
-
-    Attributes
-    ----------
-    left : NDArray[np.int32]
-        Offsets from the left edge of images in pixels
-    top : NDArray[np.int32]
-        Offsets from the top edge of images in pixels
-    width : NDArray[np.uint32]
-        Width of the images in pixels
-    height : NDArray[np.uint32]
-        Height of the images in pixels
-    channels : NDArray[np.uint8]
-        Channel count of the images in pixels
-    size : NDArray[np.uint32]
-        Size of the images in pixels
-    aspect_ratio : NDArray[np.float16]
-        :term:`ASspect Ratio<Aspect Ratio>` of the images (width/height)
-    depth : NDArray[np.uint8]
-        Color depth of the images in bits
-    center : NDArray[np.uint16]
-        Offset from center in [x,y] coordinates of the images in pixels
-    distance : NDArray[np.float16]
-        Distance in pixels from center
-    """
-
-    left: NDArray[np.int32]
-    top: NDArray[np.int32]
-    width: NDArray[np.uint32]
-    height: NDArray[np.uint32]
-    channels: NDArray[np.uint8]
-    size: NDArray[np.uint32]
-    aspect_ratio: NDArray[np.float16]
-    depth: NDArray[np.uint8]
-    center: NDArray[np.int16]
-    distance: NDArray[np.float16]
 
 
 class DimensionStatsProcessor(StatsProcessor[DimensionStatsOutput]):

@@ -8,27 +8,7 @@ from typing import Literal
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval._output import Output
-
-
-@dataclass(frozen=True)
-class OODOutput(Output):
-    """
-    Output class for predictions from out-of-distribution detectors.
-
-    Attributes
-    ----------
-    is_ood : NDArray
-        Array of images that are detected as :term:Out-of-Distribution (OOD)`
-    instance_score : NDArray
-        Instance score of the evaluated dataset
-    feature_score : NDArray | None
-        Feature score, if available, of the evaluated dataset
-    """
-
-    is_ood: NDArray[np.bool_]
-    instance_score: NDArray[np.float32]
-    feature_score: NDArray[np.float32] | None
+from dataeval.outputs._base import Output
 
 
 @dataclass(frozen=True)
@@ -49,7 +29,7 @@ class OODScoreOutput(Output):
 
     def get(self, ood_type: Literal["instance", "feature"]) -> NDArray[np.float32]:
         """
-        Returns either the instance or feature score
+        Returns either the instance or feature score.
 
         Parameters
         ----------
@@ -61,3 +41,23 @@ class OODScoreOutput(Output):
             Either the instance or feature score based on input selection
         """
         return self.instance_score if ood_type == "instance" or self.feature_score is None else self.feature_score
+
+
+@dataclass(frozen=True)
+class OODOutput(Output):
+    """
+    Output class for predictions from out-of-distribution detectors.
+
+    Attributes
+    ----------
+    is_ood : NDArray
+        Array of images that are detected as :term:Out-of-Distribution (OOD)`
+    instance_score : NDArray
+        Instance score of the evaluated dataset
+    feature_score : NDArray | None
+        Feature score, if available, of the evaluated dataset
+    """
+
+    is_ood: NDArray[np.bool_]
+    instance_score: NDArray[np.float32]
+    feature_score: NDArray[np.float32] | None

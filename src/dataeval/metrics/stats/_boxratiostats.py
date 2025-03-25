@@ -8,9 +8,8 @@ from typing import Any, Callable, Generic, TypeVar, cast
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval._output import set_metadata
-from dataeval.metrics.stats._base import BOX_COUNT, SOURCE_INDEX, BaseStatsOutput
-from dataeval.metrics.stats._dimensionstats import DimensionStatsOutput
+from dataeval.outputs._base import set_metadata
+from dataeval.outputs._stats import BOX_COUNT, SOURCE_INDEX, BaseStatsOutput, DimensionStatsOutput
 
 TStatOutput = TypeVar("TStatOutput", bound=BaseStatsOutput, contravariant=True)
 ArraySlice = tuple[int, int]

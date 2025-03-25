@@ -21,9 +21,18 @@ __all__ = [
 ]
 
 from dataeval.metrics.stats._boxratiostats import boxratiostats
-from dataeval.metrics.stats._dimensionstats import DimensionStatsOutput, dimensionstats
-from dataeval.metrics.stats._hashstats import HashStatsOutput, hashstats
-from dataeval.metrics.stats._imagestats import ChannelStatsOutput, ImageStatsOutput, imagestats
-from dataeval.metrics.stats._labelstats import LabelStatsOutput, labelstats
-from dataeval.metrics.stats._pixelstats import PixelStatsOutput, pixelstats
-from dataeval.metrics.stats._visualstats import VisualStatsOutput, visualstats
+from dataeval.metrics.stats._dimensionstats import dimensionstats
+from dataeval.metrics.stats._hashstats import hashstats
+from dataeval.metrics.stats._imagestats import imagestats
+from dataeval.metrics.stats._labelstats import labelstats
+from dataeval.metrics.stats._pixelstats import pixelstats
+from dataeval.metrics.stats._visualstats import visualstats
+from dataeval.outputs._stats import (
+    ChannelStatsOutput,
+    DimensionStatsOutput,
+    HashStatsOutput,
+    ImageStatsOutput,
+    LabelStatsOutput,
+    PixelStatsOutput,
+    VisualStatsOutput,
+)

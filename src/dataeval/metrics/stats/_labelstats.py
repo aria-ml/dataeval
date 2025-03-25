@@ -2,101 +2,18 @@ from __future__ import annotations
 
 __all__ = []
 
-import contextlib
 from collections import Counter, defaultdict
-from dataclasses import dataclass
 from typing import Any, Mapping, TypeVar
 
 import numpy as np
 
-from dataeval._output import Output, set_metadata
+from dataeval.outputs import LabelStatsOutput
+from dataeval.outputs._base import set_metadata
 from dataeval.typing import AnnotatedDataset, ArrayLike
 from dataeval.utils._array import as_numpy
 from dataeval.utils.data._metadata import Metadata
 
-with contextlib.suppress(ImportError):
-    import pandas as pd
-
 TValue = TypeVar("TValue")
-
-
-@dataclass(frozen=True)
-class LabelStatsOutput(Output):
-    """
-    Output class for :func:`.labelstats` stats metric.
-
-    Attributes
-    ----------
-    label_counts_per_class : dict[int, int]
-        Dictionary whose keys are the different label classes and
-        values are total counts of each class
-    label_counts_per_image : list[int]
-        Number of labels per image
-    image_counts_per_class : dict[int, int]
-        Dictionary whose keys are the different label classes and
-        values are total counts of each image the class is present in
-    image_indices_per_class : dict[int, list]
-        Dictionary whose keys are the different label classes and
-        values are lists containing the images that have that label
-    image_count : int
-        Total number of images present
-    class_count : int
-        Total number of classes present
-    label_count : int
-        Total number of labels present
-    class_names : list[str]
-    """
-
-    label_counts_per_class: list[int]
-    label_counts_per_image: list[int]
-    image_counts_per_class: list[int]
-    image_indices_per_class: list[list[int]]
-    image_count: int
-    class_count: int
-    label_count: int
-    class_names: list[str]
-
-    def to_table(self) -> str:
-        max_char = max(len(name) if isinstance(name, str) else name // 10 + 1 for name in self.class_names)
-        max_char = max(max_char, 5)
-        max_label = max(list(self.label_counts_per_class))
-        max_img = max(list(self.image_counts_per_class))
-        max_num = int(np.ceil(np.log10(max(max_label, max_img))))
-        max_num = max(max_num, 11)
-
-        # Display basic counts
-        table_str = [f"Class Count: {self.class_count}"]
-        table_str += [f"Label Count: {self.label_count}"]
-        table_str += [f"Average # Labels per Image: {round(np.mean(self.label_counts_per_image), 2)}"]
-        table_str += ["--------------------------------------"]
-
-        # Display counts per class
-        table_str += [f"{'Label':>{max_char}}: Total Count - Image Count"]
-        for cls in range(len(self.class_names)):
-            table_str += [
-                f"{self.class_names[cls]:>{max_char}}: {self.label_counts_per_class[cls]:^{max_num}}"
-                + " - "
-                + f"{self.image_counts_per_class[cls]:^{max_num}}".rstrip()
-            ]
-
-        return "\n".join(table_str)
-
-    def to_dataframe(self) -> pd.DataFrame:
-        import pandas as pd
-
-        total_count = []
-        image_count = []
-        for cls in range(len(self.class_names)):
-            total_count.append(self.label_counts_per_class[cls])
-            image_count.append(self.image_counts_per_class[cls])
-
-        return pd.DataFrame(
-            {
-                "Label": self.class_names,
-                "Total Count": total_count,
-                "Image Count": image_count,
-            }
-        )
 
 
 def _ensure_2d(labels: ArrayLike) -> ArrayLike:

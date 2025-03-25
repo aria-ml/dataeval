@@ -7,7 +7,7 @@ from numpy.typing import NDArray
 
 from dataeval.detectors.ood.base import OODBaseGMM
 from dataeval.detectors.ood.mixin import OODBaseMixin, OODGMMMixin
-from dataeval.detectors.ood.output import OODScoreOutput
+from dataeval.outputs._ood import OODScoreOutput
 
 image_shape = (32, 32, 1)
 model = MagicMock()

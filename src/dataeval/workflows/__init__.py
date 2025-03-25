@@ -4,4 +4,5 @@ Workflows perform a sequence of actions to analyze the dataset and make predicti
 
 __all__ = ["Sufficiency", "SufficiencyOutput"]
 
-from dataeval.workflows.sufficiency import Sufficiency, SufficiencyOutput
+from dataeval.outputs._workflows import SufficiencyOutput
+from dataeval.workflows.sufficiency import Sufficiency

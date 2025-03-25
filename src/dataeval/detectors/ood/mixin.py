@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataeval.detectors.ood.output import OODOutput, OODScoreOutput
-
 __all__ = []
 
 from abc import ABC, abstractmethod
@@ -10,7 +8,8 @@ from typing import Callable, Generic, Literal, TypeVar
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval._output import set_metadata
+from dataeval.outputs import OODOutput, OODScoreOutput
+from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike
 from dataeval.utils._array import as_numpy, to_numpy
 

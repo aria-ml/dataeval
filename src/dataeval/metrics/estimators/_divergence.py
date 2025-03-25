@@ -7,34 +7,17 @@ from __future__ import annotations
 
 __all__ = []
 
-from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval._output import Output, set_metadata
+from dataeval.outputs import DivergenceOutput
+from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike
 from dataeval.utils._array import ensure_embeddings
 from dataeval.utils._method import get_method
 from dataeval.utils._mst import compute_neighbors, minimum_spanning_tree
-
-
-@dataclass(frozen=True)
-class DivergenceOutput(Output):
-    """
-    Output class for :func:`.divergence` estimator metric.
-
-    Attributes
-    ----------
-    divergence : float
-        :term:`Divergence` value calculated between 2 datasets ranging between 0.0 and 1.0
-    errors : int
-        The number of differing edges between the datasets
-    """
-
-    divergence: float
-    errors: int
 
 
 def divergence_mst(data: NDArray[np.float64], labels: NDArray[np.int_]) -> int:
