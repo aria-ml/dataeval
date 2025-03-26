@@ -153,7 +153,7 @@ def boxratiostats(
         raise ValueError("Input for boxstats and imgstats must have matching channel information.")
 
     output_dict = {}
-    for key in boxstats.dict():
+    for key in boxstats.data():
         output_dict[key] = calculate_ratios(key, boxstats, imgstats)
 
     return output_cls(**output_dict)

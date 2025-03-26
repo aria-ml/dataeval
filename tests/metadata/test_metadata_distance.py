@@ -5,7 +5,8 @@ import pytest
 from numpy.random import Generator
 
 from dataeval.metadata import metadata_distance
-from dataeval.metadata._distance import MetadataKSResult, _calculate_drift
+from dataeval.metadata._distance import _calculate_drift
+from dataeval.outputs import MetadataDistanceValues
 
 
 def mock_metadata(factor_names, continuous_data) -> MagicMock:
@@ -70,14 +71,14 @@ class TestMetadataDistance:
         assert metadata_distance(m1, m2) == {}
 
     def test_min_equals_max(self):
-        """Test that any factors that have no deviation return an empty MetadataKSResult"""
+        """Test that any factors that have no deviation return an empty MetadataDistanceValues"""
 
         m1 = mock_metadata(["a"], np.ones((32, 1)))
         m2 = mock_metadata(["a"], np.ones((32, 1)))
 
         result = metadata_distance(m1, m2)
 
-        assert result == {"a": MetadataKSResult(0.0, 0.0, 0.0, 1.0)}
+        assert result == {"a": MetadataDistanceValues(0.0, 0.0, 0.0, 1.0)}
 
 
 @pytest.mark.required

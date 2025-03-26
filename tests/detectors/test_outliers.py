@@ -50,7 +50,7 @@ class TestOutliers:
         stats2 = pixelstats(dataset2)
         stats1 = dimensionstats(dataset1)
         outliers = Outliers()
-        stats = ImageStatsOutput(**{k: v for d in (stats1, stats2, stats3) for k, v in d.dict().items()})
+        stats = ImageStatsOutput(**{k: v for d in (stats1, stats2, stats3) for k, v in d.data().items()})
         results = outliers.from_stats(stats)
         assert results is not None
 

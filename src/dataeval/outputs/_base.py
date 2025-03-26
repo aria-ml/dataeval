@@ -4,11 +4,11 @@ __all__ = []
 
 import inspect
 import logging
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import partial, wraps
-from typing import Any, Callable, Iterator, TypeVar
+from typing import Any, Callable, Generic, Iterator, TypeVar, overload
 
 import numpy as np
 from typing_extensions import ParamSpec
@@ -56,16 +56,13 @@ class ExecutionMetadata:
         )
 
 
-class Output:
+T = TypeVar("T", covariant=True)
+
+
+class GenericOutput(Generic[T]):
     _meta: ExecutionMetadata | None = None
 
-    def __str__(self) -> str:
-        return f"{self.__class__.__name__}: {str(self.dict())}"
-
-    def dict(self) -> dict[str, Any]:
-        return {k: v for k, v in self.__dict__.items() if k != "_meta"}
-
-    @property
+    def data(self) -> T: ...
     def meta(self) -> ExecutionMetadata:
         """
         Metadata about the execution of the function or method for the Output class.
@@ -73,34 +70,66 @@ class Output:
         return self._meta or ExecutionMetadata.empty()
 
 
+class Output(GenericOutput[dict[str, Any]]):
+    def data(self) -> dict[str, Any]:
+        return {k: v for k, v in self.__dict__.items() if k != "_meta"}
+
+    def __repr__(self) -> str:
+        return str(self)
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}({', '.join([f'{k}={v}' for k, v in self.data().items()])})"
+
+
+class BaseCollectionMixin(Collection[Any]):
+    __slots__ = ["_data"]
+
+    def data(self) -> Any:
+        return self._data
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({repr(self._data)})"
+
+    def __str__(self) -> str:
+        return str(self._data)
+
+
 TKey = TypeVar("TKey", str, int, float, set)
 TValue = TypeVar("TValue")
 
 
-class MappingOutput(Mapping[TKey, TValue], Output):
-    __slots__ = ["_data"]
-
+class MappingOutput(Mapping[TKey, TValue], BaseCollectionMixin, GenericOutput[Mapping[TKey, TValue]]):
     def __init__(self, data: Mapping[TKey, TValue]):
         self._data = data
 
     def __getitem__(self, key: TKey) -> TValue:
-        return self._data.__getitem__(key)
+        return self._data[key]
 
     def __iter__(self) -> Iterator[TKey]:
-        return self._data.__iter__()
+        return iter(self._data)
 
-    def __len__(self) -> int:
-        return self._data.__len__()
 
-    def dict(self) -> dict[str, TValue]:
-        return {str(k): v for k, v in self._data.items()}
+class SequenceOutput(Sequence[TValue], BaseCollectionMixin, GenericOutput[Sequence[TValue]]):
+    def __init__(self, data: Sequence[TValue]):
+        self._data = data
 
-    def __str__(self) -> str:
-        return str(self.dict())
+    @overload
+    def __getitem__(self, index: int) -> TValue: ...
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[TValue]: ...
+
+    def __getitem__(self, index: int | slice) -> TValue | Sequence[TValue]:
+        return self._data[index]
+
+    def __iter__(self) -> Iterator[TValue]:
+        return iter(self._data)
 
 
 P = ParamSpec("P")
-R = TypeVar("R", bound=Output)
+R = TypeVar("R", bound=GenericOutput)
 
 
 def set_metadata(fn: Callable[P, R] | None = None, *, state: list[str] | None = None) -> Callable[P, R]:

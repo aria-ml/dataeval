@@ -169,7 +169,7 @@ class Outliers:
         {}
         """  # noqa: E501
         if isinstance(stats, (ImageStatsOutput, DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput)):
-            return OutliersOutput(self._get_outliers(stats.dict()))
+            return OutliersOutput(self._get_outliers(stats.data()))
 
         if not isinstance(stats, Sequence):
             raise TypeError(
@@ -189,7 +189,7 @@ class Outliers:
         output_list: list[dict[int, dict[str, float]]] = [{} for _ in stats]
         for _, indices in stats_map.items():
             substats, dataset_steps = combine_stats([stats[i] for i in indices])
-            outliers = self._get_outliers(substats.dict())
+            outliers = self._get_outliers(substats.data())
             for idx, issue in outliers.items():
                 k, v = get_dataset_step_from_idx(idx, dataset_steps)
                 output_list[indices[k]][v] = issue
@@ -225,5 +225,5 @@ class Outliers:
         """
         images = Images(data) if isinstance(data, Dataset) else data
         self.stats = imagestats(images)
-        outliers = self._get_outliers(self.stats.dict())
+        outliers = self._get_outliers(self.stats.data())
         return OutliersOutput(outliers)

@@ -76,7 +76,7 @@ class TestMetadataValidation:
                 metadata_2=MagicMock(),
                 ood=ood,
             )
-            assert res == []
+        assert res._data == []
 
     @pytest.mark.parametrize(
         "lst",

@@ -10,7 +10,8 @@ from scipy.stats import iqr, ks_2samp
 from scipy.stats import wasserstein_distance as emd
 
 from dataeval.metadata._utils import _compare_keys, _validate_factors_and_data
-from dataeval.outputs._base import MappingOutput
+from dataeval.outputs import MetadataDistanceOutput, MetadataDistanceValues
+from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike
 from dataeval.utils.data import Metadata
 
@@ -21,41 +22,6 @@ class KSType(NamedTuple):
     statistic: float
     statistic_location: float
     pvalue: float
-
-
-class MetadataKSResult(NamedTuple):
-    """
-    Attributes
-    ----------
-    statistic : float
-        the KS statistic
-    location : float
-        The value at which the KS statistic has its maximum, measured in IQR-normalized units relative
-        to the median of the reference distribution.
-    dist : float
-        The Earth Mover's Distance normalized by the interquartile range (IQR) of the reference
-    pvalue : float
-        The p-value from the KS two-sample test
-    """
-
-    statistic: float
-    location: float
-    dist: float
-    pvalue: float
-
-
-class KSOutput(MappingOutput[str, MetadataKSResult]):
-    """
-    Output class for results of ks_2samp featurewise comparisons of new metadata to reference metadata.
-
-
-    Attributes
-    ----------
-    key: str
-        Metadata feature names
-    value: :class:`MetadataKSResult`
-        Output per feature name containing the statistic, statistic location, distance, and pvalue.
-    """
 
 
 def _calculate_drift(x1: ArrayLike, x2: ArrayLike) -> float:
@@ -74,7 +40,8 @@ def _calculate_drift(x1: ArrayLike, x2: ArrayLike) -> float:
     return distance if xmin == xmax else distance / (xmax - xmin)
 
 
-def metadata_distance(metadata1: Metadata, metadata2: Metadata) -> KSOutput:
+@set_metadata
+def metadata_distance(metadata1: Metadata, metadata2: Metadata) -> MetadataDistanceOutput:
     """
     Measures the feature-wise distance between two continuous metadata distributions and
     computes a p-value to evaluate its significance.
@@ -90,8 +57,8 @@ def metadata_distance(metadata1: Metadata, metadata2: Metadata) -> KSOutput:
 
     Returns
     -------
-    dict[str, KstestResult]
-        A dictionary with keys corresponding to metadata feature names, and values that are KstestResult objects, as
+    MetadataDistanceOutput
+        A mapping with keys corresponding to metadata feature names, and values that are KstestResult objects, as
         defined by scipy.stats.ks_2samp.
 
     See Also
@@ -110,7 +77,7 @@ def metadata_distance(metadata1: Metadata, metadata2: Metadata) -> KSOutput:
     >>> list(output)
     ['time', 'altitude']
     >>> output["time"]
-    MetadataKSResult(statistic=1.0, location=0.44354838709677413, dist=2.7, pvalue=0.0)
+    MetadataDistanceValues(statistic=1.0, location=0.44354838709677413, dist=2.7, pvalue=0.0)
     """
 
     _compare_keys(metadata1.continuous_factor_names, metadata2.continuous_factor_names)
@@ -134,7 +101,7 @@ def metadata_distance(metadata1: Metadata, metadata2: Metadata) -> KSOutput:
         )
 
     # Set default for statistic, location, and magnitude to zero and pvalue to one
-    results: dict[str, MetadataKSResult] = {}
+    results: dict[str, MetadataDistanceValues] = {}
 
     # Per factor
     for i, fname in enumerate(fnames):
@@ -147,7 +114,7 @@ def metadata_distance(metadata1: Metadata, metadata2: Metadata) -> KSOutput:
 
         # Default case
         if xmin == xmax:
-            results[fname] = MetadataKSResult(statistic=0.0, location=0.0, dist=0.0, pvalue=1.0)
+            results[fname] = MetadataDistanceValues(statistic=0.0, location=0.0, dist=0.0, pvalue=1.0)
             continue
 
         ks_result = cast(KSType, ks_2samp(fdata1, fdata2, method="asymp"))
@@ -157,11 +124,11 @@ def metadata_distance(metadata1: Metadata, metadata2: Metadata) -> KSOutput:
 
         drift = _calculate_drift(fdata1, fdata2)
 
-        results[fname] = MetadataKSResult(
+        results[fname] = MetadataDistanceValues(
             statistic=ks_result.statistic,
             location=loc,
             dist=drift,
             pvalue=ks_result.pvalue,
         )
 
-    return KSOutput(results)
+    return MetadataDistanceOutput(results)
