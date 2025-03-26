@@ -7,7 +7,7 @@ from typing import Generic, Iterator, Sequence, TypeVar
 
 from dataeval.typing import AnnotatedDataset, DatasetMetadata
 
-_TDatum = TypeVar("_TDatum")
+_TDatum = TypeVar("_TDatum", covariant=True)
 
 
 class SelectionStage(IntEnum):

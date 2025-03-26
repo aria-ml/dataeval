@@ -2,7 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Sequence
+from typing import Sequence, TypeVar
 
 import numpy as np
 
@@ -10,8 +10,10 @@ from dataeval.typing import Array, ImageClassificationDatum
 from dataeval.utils._array import as_numpy
 from dataeval.utils.data._selection import Select, Selection, SelectionStage
 
+TImageClassificationDatum = TypeVar("TImageClassificationDatum", bound=ImageClassificationDatum, covariant=True)
 
-class ClassFilter(Selection[ImageClassificationDatum]):
+
+class ClassFilter(Selection[TImageClassificationDatum]):
     """
     Filter and balance the dataset by class.
 
@@ -34,7 +36,7 @@ class ClassFilter(Selection[ImageClassificationDatum]):
         self.classes = classes
         self.balance = balance
 
-    def __call__(self, dataset: Select[ImageClassificationDatum]) -> None:
+    def __call__(self, dataset: Select[TImageClassificationDatum]) -> None:
         if self.classes is None and not self.balance:
             return
 
