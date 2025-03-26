@@ -1,6 +1,19 @@
-[//]: # (833d39ba0ca7a925cbcbcbb0a79ec3f70a025508)
+[//]: # (033d035885d33246e8bb74defe82815bc4c9dd54)
 
 # DataEval Change Log
+
+## v0.82.0
+
+🌟 **Feature Release**
+- `7ad22a7c` - Switch all stats classes to use dataset inputs and change `datasetstats` to `imagestats`
+- `e1da1768` - Integrate meta_distribution_compare as metadata_distance
+
+🛠️ **Improvements and Enhancements**
+- `fc8b68c2` - Spike: Define which metrics comprise completeness metrics
+
+📝 **Miscellaneous**
+- `70a8e1e2` - Create lightweight dataset wrapper factory functions
+- `fef938d5` - Simplify typing and add more docstrings to dataeval.typing module
 
 ## v0.81.0
 
