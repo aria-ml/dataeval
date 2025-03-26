@@ -3,7 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 from enum import IntEnum
-from typing import Any, Generic, Iterator, Sequence, TypeVar
+from typing import Generic, Iterator, Sequence, TypeVar
 
 from dataeval.typing import AnnotatedDataset, DatasetMetadata
 
@@ -110,10 +110,6 @@ class Select(AnnotatedDataset[_TDatum]):
         for selection in self._selections:
             selection(self)
         self._selection = self._selection[: self._size_limit]
-
-    def __getattr__(self, name: str, /) -> Any:
-        selfattr = getattr(self._dataset, name, None)
-        return selfattr if selfattr is not None else getattr(self._dataset, name)
 
     def __getitem__(self, index: int) -> _TDatum:
         return self._dataset[self._selection[index]]
