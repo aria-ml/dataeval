@@ -4,7 +4,7 @@ __all__ = []
 
 import contextlib
 from dataclasses import dataclass
-from typing import Iterable, Optional, Union
+from typing import Any, Iterable, Optional, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -127,15 +127,21 @@ class BaseStatsOutput(Output):
 
         return max_channels, ch_mask
 
+    def factors(self) -> dict[str, NDArray[Any]]:
+        return {
+            k: v
+            for k, v in self.data().items()
+            if k not in (SOURCE_INDEX, BOX_COUNT) and isinstance(v, np.ndarray) and v[v != 0].size > 0 and v.ndim == 1
+        }
+
     def plot(
         self, log: bool, channel_limit: int | None = None, channel_index: int | Iterable[int] | None = None
     ) -> None:
         max_channels, ch_mask = self._get_channels(channel_limit, channel_index)
-        d = {k: v for k, v in self.data().items() if isinstance(v, np.ndarray) and v[v != 0].size > 0 and v.ndim == 1}
         if max_channels == 1:
-            histogram_plot(d, log)
+            histogram_plot(self.factors(), log)
         else:
-            channel_histogram_plot(d, log, max_channels, ch_mask)
+            channel_histogram_plot(self.factors(), log, max_channels, ch_mask)
 
 
 @dataclass(frozen=True)

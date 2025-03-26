@@ -3,7 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 import warnings
-from typing import TYPE_CHECKING, Any, Literal, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Literal, Mapping, Sequence, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -11,6 +11,7 @@ from numpy.typing import NDArray
 from dataeval.typing import (
     AnnotatedDataset,
     Array,
+    ArrayLike,
     ObjectDetectionTarget,
 )
 from dataeval.utils._array import as_numpy, to_numpy
@@ -276,15 +277,11 @@ class Metadata:
         if self._processed and not force:
             return
 
-        # Trigger collate and merge if not yet done
-        self._collate()
-        self._merge()
+        # Create image indices from targets
+        self._image_indices = np.arange(len(self.raw)) if self.targets.source is None else self.targets.source
 
         # Validate the metadata dimensions
         self._validate()
-
-        # Create image indices from targets
-        self._image_indices = np.arange(len(self.raw)) if self.targets.source is None else self.targets.source
 
         # Include specified metadata keys
         if self.include:
@@ -358,3 +355,15 @@ class Metadata:
         )
         self._total_num_factors = len(self._discrete_factor_names + self._continuous_factor_names) + 1
         self._processed = True
+
+    def add_factors(self, factors: Mapping[str, ArrayLike]) -> None:
+        self._merge()
+        self._processed = False
+        target_len = len(self.targets.source) if self.targets.source is not None else len(self.targets)
+        if any(len(v) != target_len for v in factors.values()):
+            raise ValueError(
+                "The lists/arrays in the provided factors have a different length than the current metadata factors."
+            )
+        merged = cast(tuple[dict[str, ArrayLike], dict[str, list[str]]], self._merged)[0]
+        for k, v in factors.items():
+            merged[k] = v

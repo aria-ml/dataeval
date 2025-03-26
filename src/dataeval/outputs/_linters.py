@@ -35,6 +35,8 @@ class DuplicatesOutput(Output, Generic[TIndexCollection]):
     near: list[list[int] | dict[int, list[int]]]
         Indices of images that are near matches
 
+    Notes
+    -----
     - For a single dataset, indices are returned as a list of index groups.
     - For multiple datasets, indices are returned as dictionaries where the key is the
       index of the dataset, and the value is the list index groups from that dataset.
