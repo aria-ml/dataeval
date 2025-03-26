@@ -1,7 +1,7 @@
 variables:
   PYTHON_LATEST_SUPPORTED_VERSION: '3.12'
   DOCKER_DRIVER: overlay2
-  SAST_EXCLUDED_PATHS: spec,test,tests,tmp,.nox,output,prototype
+  SAST_EXCLUDED_PATHS: spec,test,tests,tmp,.nox,output
   DOCS_RUNNER_TAG: single-gpu
   UV_CACHE_DIR: .uv-cache
   UV_LINK_MODE: copy
