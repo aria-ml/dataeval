@@ -90,7 +90,7 @@ class TestBalanceUnit:
             "class_names": list,
         }
         mi = balance(metadata_results)
-        for k, v in mi.dict().items():
+        for k, v in mi.data().items():
             if type(v) is list:
                 assert len(v) == expected_shape[k]
             else:

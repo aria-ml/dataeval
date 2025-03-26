@@ -8,7 +8,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.metadata._utils import _compare_keys, _validate_factors_and_data
-from dataeval.outputs import OODOutput
+from dataeval.outputs import MostDeviatedFactorsOutput, OODOutput
+from dataeval.outputs._base import set_metadata
 from dataeval.utils.data import Metadata
 
 
@@ -119,11 +120,12 @@ def _calc_median_deviations(reference: NDArray, test: NDArray) -> NDArray:
     return np.abs(np.where(test_dev >= 0, test_dev / pscale, test_dev / nscale))  # (S_t, F)
 
 
+@set_metadata
 def most_deviated_factors(
     metadata_1: Metadata,
     metadata_2: Metadata,
     ood: OODOutput,
-) -> list[tuple[str, float]]:
+) -> MostDeviatedFactorsOutput:
     """
     Determines greatest deviation in metadata features per out of distribution sample in metadata_2.
 
@@ -159,20 +161,20 @@ def most_deviated_factors(
 
     >>> is_ood = OODOutput(np.array([True, True, True]), np.array([]), np.array([]))
     >>> most_deviated_factors(metadata1, metadata2, is_ood)
-    [('time', 2.0), ('time', 2.592), ('time', 3.51)]
+    MostDeviatedFactorsOutput([('time', 2.0), ('time', 2.592), ('time', 3.51)])
 
     If there are no out-of-distribution samples, a list is returned
 
     >>> is_ood = OODOutput(np.array([False, False, False]), np.array([]), np.array([]))
     >>> most_deviated_factors(metadata1, metadata2, is_ood)
-    []
+    MostDeviatedFactorsOutput([])
     """
 
     ood_mask: NDArray[np.bool] = ood.is_ood
 
     # No metadata correlated with out of distribution data
     if not any(ood_mask):
-        return []
+        return MostDeviatedFactorsOutput([])
 
     # Combines reference and test factor names and data if exists and match exactly
     # shape -> (samples, factors)
@@ -190,7 +192,7 @@ def most_deviated_factors(
             f"At least 3 reference metadata samples are needed, got {len(metadata_ref)}",
             UserWarning,
         )
-        return []
+        return MostDeviatedFactorsOutput([])
 
     if len(metadata_tst) != len(ood_mask):
         raise ValueError(
@@ -214,4 +216,4 @@ def most_deviated_factors(
 
     # List of tuples matching the factor name with its deviation
 
-    return [(factor, dev) for factor, dev in zip(most_ood_factors, deviation)]
+    return MostDeviatedFactorsOutput([(factor, dev) for factor, dev in zip(most_ood_factors, deviation)])

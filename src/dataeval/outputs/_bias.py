@@ -364,7 +364,7 @@ class DiversityOutput(Output):
                 col_labels,
                 xlabel="Factors",
                 ylabel="Class",
-                cbarlabel=f"Normalized {asdict(self.meta)['arguments']['method'].title()} Index",
+                cbarlabel=f"Normalized {asdict(self.meta())['arguments']['method'].title()} Index",
             )
 
         else:

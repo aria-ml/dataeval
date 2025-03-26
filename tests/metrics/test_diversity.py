@@ -41,7 +41,7 @@ class TestDiversityUnit:
         assert np.issubdtype(result.diversity_index.dtype, np.double)
         assert np.issubdtype(result.classwise.dtype, np.double)
         assert isinstance(result.factor_names[0], str)
-        assert isinstance(result.meta, ExecutionMetadata)
+        assert isinstance(result.meta(), ExecutionMetadata)
 
 
 @pytest.mark.requires_all

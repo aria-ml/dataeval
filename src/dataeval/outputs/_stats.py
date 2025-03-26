@@ -63,7 +63,7 @@ class BaseStatsOutput(Output):
 
     def __post_init__(self) -> None:
         length = len(self.source_index)
-        bad = {k: len(v) for k, v in self.dict().items() if k not in [SOURCE_INDEX, BOX_COUNT] and len(v) != length}
+        bad = {k: len(v) for k, v in self.data().items() if k not in [SOURCE_INDEX, BOX_COUNT] and len(v) != length}
         if bad:
             raise ValueError(f"All values must have the same length as source_index. Bad values: {str(bad)}.")
 
@@ -105,7 +105,7 @@ class BaseStatsOutput(Output):
     def _get_channels(
         self, channel_limit: int | None = None, channel_index: int | Iterable[int] | None = None
     ) -> tuple[int, list[bool] | None]:
-        source_index = self.dict()[SOURCE_INDEX]
+        source_index = self.data()[SOURCE_INDEX]
         raw_channels = int(max([si.channel or 0 for si in source_index])) + 1
         if isinstance(channel_index, int):
             max_channels = 1 if channel_index < raw_channels else raw_channels
@@ -131,7 +131,7 @@ class BaseStatsOutput(Output):
         self, log: bool, channel_limit: int | None = None, channel_index: int | Iterable[int] | None = None
     ) -> None:
         max_channels, ch_mask = self._get_channels(channel_limit, channel_index)
-        d = {k: v for k, v in self.dict().items() if isinstance(v, np.ndarray) and v[v != 0].size > 0 and v.ndim == 1}
+        d = {k: v for k, v in self.data().items() if isinstance(v, np.ndarray) and v[v != 0].size > 0 and v.ndim == 1}
         if max_channels == 1:
             histogram_plot(d, log)
         else:
