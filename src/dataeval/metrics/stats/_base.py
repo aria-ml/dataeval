@@ -248,13 +248,13 @@ def add_stats(a: TStatsOutput, b: TStatsOutput) -> TStatsOutput:
     if type(a) is not type(b):
         raise TypeError(f"Types {type(a)} and {type(b)} cannot be added.")
 
-    sum_dict = deepcopy(a.dict())
+    sum_dict = deepcopy(a.data())
 
     for k in sum_dict:
         if isinstance(sum_dict[k], list):
-            sum_dict[k].extend(b.dict()[k])
+            sum_dict[k].extend(b.data()[k])
         else:
-            sum_dict[k] = np.concatenate((sum_dict[k], b.dict()[k]))
+            sum_dict[k] = np.concatenate((sum_dict[k], b.data()[k]))
 
     return type(a)(**sum_dict)
 

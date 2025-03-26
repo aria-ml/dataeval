@@ -157,4 +157,4 @@ class OODBaseMixin(Generic[TModel], ABC):
         # compute outlier scores
         score = self.score(X, batch_size=batch_size)
         ood_pred = score.get(ood_type) > self._threshold_score(ood_type)
-        return OODOutput(is_ood=ood_pred, **score.dict())
+        return OODOutput(is_ood=ood_pred, **score.data())

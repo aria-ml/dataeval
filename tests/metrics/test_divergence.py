@@ -30,7 +30,7 @@ class TestDivergence:
         even = even.reshape((even.shape[0], -1))
         odd = odd.reshape((odd.shape[0], -1))
         result = divergence(even, odd, method)
-        assert result.dict() == output
+        assert result.data() == output
 
     @pytest.mark.parametrize(
         "method, expected_errors",
