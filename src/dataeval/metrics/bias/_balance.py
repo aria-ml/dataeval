@@ -91,6 +91,9 @@ def balance(
     sklearn.feature_selection.mutual_info_regression
     sklearn.metrics.mutual_info_score
     """
+    if not metadata.discrete_factor_names and not metadata.continuous_factor_names:
+        raise ValueError("No factors found in provided metadata.")
+
     num_neighbors = _validate_num_neighbors(num_neighbors)
 
     num_factors = metadata.total_num_factors

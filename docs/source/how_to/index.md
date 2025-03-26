@@ -34,6 +34,8 @@ LintingTutorial.ipynb
   [![Open In Colab][colab-badge]][lbl-colab]
 - [How to detect undersampled data subsets](CoverageTutorial.ipynb)
   [![Open In Colab][colab-badge]][cov-colab]
+- [How to add statistics as intrinsic metadata for bias analysis](IntrinsicMetadata.ipynb)
+  [![Open In Colab][colab-badge]][imd-colab]
 
 :::{toctree}
 :caption: Metrics
@@ -43,6 +45,7 @@ BayesErrorRateEstimationTutorial.ipynb
 HPDivergenceTutorial.ipynb
 ClassLabelAnalysisTutorial.ipynb
 CoverageTutorial.ipynb
+IntrinsicMetadata.ipynb
 :::
 
 ## Workflows
@@ -73,6 +76,7 @@ ClassLearningCurvesTutorial.ipynb
 [dup-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.82.0/docs/source/how_to/DuplicatesTutorial.ipynb
 [lint-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.82.0/docs/source/how_to/LintingTutorial.ipynb
 [cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.82.0/docs/source/how_to/CoverageTutorial.ipynb
+[imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.82.0/docs/source/how_to/IntrinsicMetadata.ipynb
 
 :::{toctree}
 :caption: Models

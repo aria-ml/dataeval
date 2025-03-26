@@ -241,6 +241,8 @@ def parity(metadata: Metadata) -> ParityOutput:
     >>> parity(metadata)
     ParityOutput(score=array([7.357, 5.467, 0.515]), p_value=array([0.289, 0.243, 0.773]), factor_names=['age', 'income', 'gender'], insufficient_data={'age': {3: {'artist': 4}, 4: {'artist': 4, 'teacher': 3}}, 'income': {1: {'artist': 3}}})
     """  # noqa: E501
+    if not metadata.discrete_factor_names and not metadata.continuous_factor_names:
+        raise ValueError("No factors found in provided metadata.")
 
     chi_scores = np.zeros(metadata.discrete_data.shape[1])
     p_values = np.zeros_like(chi_scores)

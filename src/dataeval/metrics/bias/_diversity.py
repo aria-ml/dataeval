@@ -158,6 +158,9 @@ def diversity(
     --------
     scipy.stats.entropy
     """
+    if not metadata.discrete_factor_names and not metadata.continuous_factor_names:
+        raise ValueError("No factors found in provided metadata.")
+
     diversity_fn = get_method(_DIVERSITY_FN_MAP, method)
     discretized_data = np.hstack((metadata.class_labels[:, np.newaxis], metadata.discrete_data))
     cnts = get_counts(discretized_data)
