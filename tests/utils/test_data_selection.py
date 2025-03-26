@@ -146,3 +146,14 @@ class TestSelectionClasses:
         assert select._selection == [6, 4, 0]
         assert "ClassFilter(classes=[0, 1], balance=False)" in str(select)
         assert "Indices(indices=[12, 10, 8, 6, 4, 2, 0])" in str(select)
+
+    def test_indices_with_classfilter_layered(self, mock_dataset):
+        class_filter = ClassFilter(classes=[0, 1], balance=False)
+        select_cf = Select(mock_dataset, class_filter)
+        assert len(select_cf) == 7
+        indices = Indices([12, 10, 8, 6, 4, 2, 0])
+        select = Select(select_cf, indices)
+        assert len(select) == 4
+        assert select._selection == [6, 4, 2, 0]
+        assert "ClassFilter(classes=[0, 1], balance=False)" in str(select_cf)
+        assert "Indices(indices=[12, 10, 8, 6, 4, 2, 0])" in str(select)

@@ -69,11 +69,11 @@ class Select(AnnotatedDataset[_TDatum]):
         dataset: AnnotatedDataset[_TDatum],
         selections: Selection[_TDatum] | list[Selection[_TDatum]] | None = None,
     ) -> None:
+        self.__dict__.update(dataset.__dict__)
         self._dataset = dataset
         self._size_limit = len(dataset)
         self._selection = list(range(self._size_limit))
         self._selections = self._sort_selections(selections)
-        self.__dict__.update(dataset.__dict__)
 
         # Ensure metadata is populated correctly as DatasetMetadata TypedDict
         _metadata = getattr(dataset, "metadata", {})
