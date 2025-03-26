@@ -83,9 +83,6 @@ pytest-xdist = {version = "*"}
 coverage = {version = "*", extras = ["toml"]}
 # type
 pyright = {version = "*", extras = ["nodejs"]}
-# prototype
-maite = {version = "*"}
-seaborn = {version = "*"}
 # docs
 certifi = {version = ">=2024.07.04"}
 enum_tools = {version = ">=0.12.0", extras = ["sphinx"]}
@@ -129,7 +126,6 @@ xxhash = { name = "python-xxhash" }
 reportMissingImports = false
 
 [tool.pytest.ini_options]
-norecursedirs = ["prototype"]
 testpaths = ["tests"]
 addopts = ["--pythonwarnings=ignore::DeprecationWarning", "--verbose", "--durations=20", "--durations-min=1.0"]
 markers = [
@@ -169,7 +165,6 @@ exclude = [
   "build",
   ".nox",
   ".tox",
-  "prototype",
 ]
 line-length = 120
 indent-width = 4
@@ -199,7 +194,7 @@ docstring-code-format = true
 docstring-code-line-length = "dynamic"
 
 [tool.codespell]
-skip = './*env*,./prototype,./output,./docs/build,./docs/source/.jupyter_cache,CHANGELOG.md,poetry.lock,*.html,./docs/source/*/data'
+skip = './*env*,./output,./docs/build,./docs/source/.jupyter_cache,CHANGELOG.md,poetry.lock,*.html,./docs/source/*/data'
 ignore-words-list = ["Hart"]
 
 [build-system]

@@ -1712,4 +1712,4 @@ all = ["matplotlib", "pandas"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "d047fc58918512b172e6a11c13de9feecdb90dfc961e19963d0009bcfc7d572e"
+content-hash = "714947c65257617aa11b1a9528f7d4ef5e613130e60db14958b4d020b0c1c75d"
