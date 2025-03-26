@@ -88,13 +88,13 @@ class Duplicates:
         """
 
         if isinstance(hashes, HashStatsOutput):
-            return DuplicatesOutput(**self._get_duplicates(hashes.dict()))
+            return DuplicatesOutput(**self._get_duplicates(hashes.data()))
 
         if not isinstance(hashes, Sequence):
             raise TypeError("Invalid stats output type; only use output from hashstats.")
 
         combined, dataset_steps = combine_stats(hashes)
-        duplicates = self._get_duplicates(combined.dict())
+        duplicates = self._get_duplicates(combined.data())
 
         # split up results from combined dataset into individual dataset buckets
         for dup_type, dup_list in duplicates.items():
@@ -136,5 +136,5 @@ class Duplicates:
         """  # noqa: E501
         images = Images(data) if isinstance(data, Dataset) else data
         self.stats = hashstats(images)
-        duplicates = self._get_duplicates(self.stats.dict())
+        duplicates = self._get_duplicates(self.stats.data())
         return DuplicatesOutput(**duplicates)

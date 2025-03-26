@@ -4,7 +4,7 @@ from typing import Iterable
 import numpy as np
 import pytest
 
-from dataeval.outputs._base import ExecutionMetadata, MappingOutput, Output, set_metadata
+from dataeval.outputs._base import ExecutionMetadata, MappingOutput, Output, SequenceOutput, set_metadata
 
 
 @dataclass
@@ -32,11 +32,18 @@ class MockMetric:
 class MockMappingOutput(MappingOutput[str, float]): ...
 
 
+class MockSequenceOutput(SequenceOutput[float]): ...
+
+
 @pytest.mark.required
 class TestOutputMetadata:
     def test_output_metadata_str(self):
         output = mock_metric(1, True, "value")
-        assert str(output) == f"MockOutput: {str(output.dict())}"
+        assert "MockOutput(test1=1" in str(output)
+
+    def test_output_metadata_repr(self):
+        output = mock_metric(1, True, "value")
+        assert "MockOutput(test1=1" in repr(output)
 
     def test_output_metadata_data(self):
         output = mock_metric(1, True, "value")
@@ -45,11 +52,11 @@ class TestOutputMetadata:
         assert output.test3 == "value"
 
     def test_output_metadata_dict(self):
-        output_dict = mock_metric(1, True, "value").dict()
+        output_dict = mock_metric(1, True, "value").data()
         assert output_dict == {"test1": 1, "test2": True, "test3": "value"}
 
     def test_output_metadata_meta(self):
-        output_meta = mock_metric(1, True, "value").meta
+        output_meta = mock_metric(1, True, "value").meta()
         assert output_meta.name == "tests.test_output.mock_metric"
         assert output_meta.execution_time
         assert output_meta.execution_duration > 0
@@ -59,9 +66,9 @@ class TestOutputMetadata:
 
     def test_output_default_args_kwargs(self):
         output = MockMetric().evaluate(1, True)
-        output_dict = output.dict()
+        output_dict = output.data()
         assert output_dict == {"test1": 1, "test2": True, "test3": "mock_default"}
-        output_meta = output.meta
+        output_meta = output.meta()
         assert output_meta.name == "tests.test_output.MockMetric.evaluate"
         assert output_meta.execution_time
         assert output_meta.execution_duration > 0
@@ -78,7 +85,7 @@ class TestOutputMetadata:
             np.array([[1, 2], [3, 4], [5, 6]]), [1, 2, 3], {1: 1, 2: 2}, range(5), (1, 2, 3, 4), b"bytes", MockMetric()
         )
 
-        meta = result.meta
+        meta = result.meta()
         assert meta.arguments == {
             "a": "ndarray: shape=(3, 2)",
             "s": "list: len=3",
@@ -91,22 +98,42 @@ class TestOutputMetadata:
 
 
 @pytest.mark.required
-class TestMappingOutput:
-    data = {"mock_key": 1.0}
+class TestCollectionOutput:
+    dict_data = {"mock_key": 1.0}
+    list_data = [1.0]
 
     def test_mapping_output(self):
-        t = MockMappingOutput(self.data)
+        t = MockMappingOutput(self.dict_data)
 
-        assert t.meta == ExecutionMetadata.empty()
+        assert t.meta() == ExecutionMetadata.empty()
         assert len(t) == 1
-        assert t.dict() == self.data
+        assert t.data() == self.dict_data
 
     def test_mapping_output_meta(self):
         @set_metadata
         def mock_output():
-            return MockMappingOutput(self.data)
+            return MockMappingOutput(self.dict_data)
 
         t = mock_output()
-        assert t.meta != {}
+        assert t.meta() != {}
         assert len(t) == 1
-        assert t.dict() == self.data
+        assert t.data() == self.dict_data
+
+    def test_sequence_output(self):
+        t = MockSequenceOutput(self.list_data)
+
+        assert t.meta() == ExecutionMetadata.empty()
+        assert len(t) == 1
+        assert t.data() == self.list_data
+        assert str(t)
+        assert repr(t)
+
+    def test_sequence_output_meta(self):
+        @set_metadata
+        def mock_output():
+            return MockSequenceOutput(self.list_data)
+
+        t = mock_output()
+        assert t.meta() != {}
+        assert len(t) == 1
+        assert t.data() == self.list_data

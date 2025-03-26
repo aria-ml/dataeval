@@ -73,7 +73,7 @@ class TestAPIBER:
 
     def test_ber_output_format(self):
         result = BEROutput(0.8, 0.2)
-        assert result.dict() == {"ber": 0.8, "ber_lower": 0.2}
+        assert result.data() == {"ber": 0.8, "ber_lower": 0.2}
 
     def test_ber_high_dim_data_valueerror(self):
         """High dimensional data should raise valueerror"""

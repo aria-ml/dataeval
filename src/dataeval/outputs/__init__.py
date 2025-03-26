@@ -8,6 +8,7 @@ from ._bias import BalanceOutput, CoverageOutput, DiversityOutput, LabelParityOu
 from ._drift import DriftMMDOutput, DriftOutput
 from ._estimators import BEROutput, ClustererOutput, DivergenceOutput, UAPOutput
 from ._linters import DuplicatesOutput, OutliersOutput
+from ._metadata import MetadataDistanceOutput, MetadataDistanceValues, MostDeviatedFactorsOutput
 from ._ood import OODOutput, OODScoreOutput
 from ._stats import (
     ChannelStatsOutput,
@@ -39,6 +40,9 @@ __all__ = [
     "ImageStatsOutput",
     "LabelParityOutput",
     "LabelStatsOutput",
+    "MetadataDistanceOutput",
+    "MetadataDistanceValues",
+    "MostDeviatedFactorsOutput",
     "OODOutput",
     "OODScoreOutput",
     "OutliersOutput",

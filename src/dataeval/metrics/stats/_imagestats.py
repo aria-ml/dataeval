@@ -91,4 +91,4 @@ def imagestats(
         output_cls = ImageStatsOutput
 
     outputs = run_stats(dataset, per_box, per_channel, processors)
-    return output_cls(**{k: v for d in outputs for k, v in d.dict().items()})
+    return output_cls(**{k: v for d in outputs for k, v in d.data().items()})

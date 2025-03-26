@@ -24,7 +24,7 @@ TIndexIssueMap = TypeVar("TIndexIssueMap", IndexIssueMap, list[IndexIssueMap])
 
 
 @dataclass(frozen=True)
-class DuplicatesOutput(Generic[TIndexCollection], Output):
+class DuplicatesOutput(Output, Generic[TIndexCollection]):
     """
     Output class for :class:`.Duplicates` lint detector.
 
@@ -99,7 +99,7 @@ def _create_pandas_dataframe(class_wise):
 
 
 @dataclass(frozen=True)
-class OutliersOutput(Generic[TIndexIssueMap], Output):
+class OutliersOutput(Output, Generic[TIndexIssueMap]):
     """
     Output class for :class:`.Outliers` lint detector.
 

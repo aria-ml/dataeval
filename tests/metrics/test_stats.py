@@ -375,7 +375,7 @@ class TestBBoxStats:
         rv = boxratiostats(vb, vi)
         rb = boxratiostats(pb, pi)
 
-        for v in [m.dict().values() for m in [vi, vb, pi, pb, rv, rb]]:
+        for v in [m.data().values() for m in [vi, vb, pi, pb, rv, rb]]:
             if isinstance(v, np.ndarray):
                 assert not np.isnan(np.sum(v))
                 assert not np.isinf(np.sum(v))
@@ -390,7 +390,7 @@ class MockStatsOutput(BaseStatsOutput):
     def __len__(self) -> int:
         return self.length
 
-    def dict(self) -> dict[str, Any]:
+    def data(self) -> dict[str, Any]:
         return {self.name: self.name, f"{self.name}_length": self.length}
 
 
