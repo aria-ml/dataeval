@@ -93,7 +93,7 @@ class Select(AnnotatedDataset[_TDatum]):
         title = f"{self.__class__.__name__} Dataset"
         sep = "-" * len(title)
         selections = f"Selections: [{', '.join([str(s) for s in self._sort_selections(self._selections)])}]"
-        return f"{title}\n{sep}{nt}{selections}{nt}Size: {len(self)}\n\n{self._dataset}"
+        return f"{title}\n{sep}{nt}{selections}{nt}Selected Size: {len(self)}\n\n{self._dataset}"
 
     def _sort_selections(self, selections: Selection[_TDatum] | Sequence[Selection[_TDatum]] | None) -> list[Selection]:
         if not selections:
