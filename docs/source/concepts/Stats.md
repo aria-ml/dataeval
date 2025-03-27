@@ -39,8 +39,9 @@ if there are any issues with any of the images in the dataset.
 ### imagestats
 
 The {func}`.imagestats` function provides an easy way to run the
-dimensionstats, pixelstats, and visualstats on the images of a dataset or the
-pixelstats, and visualstats over each channel of the images of a dataset.
+`dimensionstats`, `pixelstats`, and `visualstats` on the images of a dataset
+or the `pixelstats`, and `visualstats` over each channel of the images of a
+dataset.
 
 ### dimensionstats
 
@@ -152,11 +153,11 @@ results are grouped lists and has no visualization function, and the
 `labelstats` function whose results can be visualized instead with the
 `to_table` function.
 
-Example code and result for the `datasetstats` function:
+Example code and result for the `imagestats` function for images:
 
 ```python
 # Load the statistic metric from DataEval
-from dataeval.metrics.stats import datasetstats
+from dataeval.metrics.stats import imagestats
 
 # Loading in the PASCAL VOC 2011 dataset for this example
 to_tensor = v2.ToImage()
@@ -170,10 +171,10 @@ ds = VOCDetection(
 
 # This stat function takes about 1-3 minutes to run depending on your hardware
 
-# Calculate the datasetstats for the images
-# Note: the stat function expects the images as an iterable
-#       and in the (C,H,W) format
-stats = datasetstats(d[0] for d in ds)
+# Calculate the imagestats for the images
+# Note: the stat function expects the images as a dataset
+#       with images in the (C,H,W) format
+stats = imagestats(ds)
 
 # Visualize the results
 stats.plot(log=True)
@@ -181,11 +182,11 @@ stats.plot(log=True)
 
 ![image](../_static/images/concepts/datasetstat_img_results.png)
 
-Example code and result for the `channelstats` function:
+Example code and result for the `imagestats` function for channels per image:
 
 ```python
 # Load the statistic metric from DataEval
-from dataeval.metrics.stats import channelstats
+from dataeval.metrics.stats import imagestats
 
 # Loading in the PASCAL VOC 2011 dataset for this example
 to_tensor = v2.ToImage()
@@ -199,10 +200,10 @@ ds = VOCDetection(
 
 # This stat function takes about 1-3 minutes to run depending on your hardware
 
-# Calculate the datasetstats for the images
-# Note: the stat function expects the images as an iterable
-#       and in the (C,H,W) format
-ch_stats = channelstats(d[0] for d in ds)
+# Calculate the imagestats per channel for the images
+# Note: the stat function expects the images as a dataset
+#       with images in the (C,H,W) format
+ch_stats = imagestats(ds, per_channel=True)
 
 # Visualize the results
 ch_stats.plot(log=False, channel_limit=3)
@@ -235,7 +236,7 @@ detect image processing errors and channel bias.
 
 For example, below is a quick analysis of the above example plots.
 
-In regards to the datasetstats plot, there are a few key insights:
+In regards to the `imagestats` plot, there are a few key insights:
 
 1. The channel metric has only one value, 3, which is interesting since
 some of the images in the dataset are greyscale, and greyscale images
@@ -251,7 +252,7 @@ distribution and none have an extended tail, which is a good sign.
 While these insights don't identify the exact images that may be
 problematic, they highlight where to focus on with further analysis.
 
-In regards to the channelstats plot, the only insight is that there
+In regards to the per-channel plot, the only insight is that there
 is very little difference across the channels for each metric.
 Therefore, there are no additional concerns beyond those from the
-datasetstats plot.
+`imagestats` plot.
