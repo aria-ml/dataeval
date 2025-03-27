@@ -114,13 +114,13 @@ DataEval's data cleaning functions and classes are:
 * - {func}`boxratiostats <.boxratiostats>`
   - Compares the statistics between a set of bounding boxes and their
     corresponding images.
-* - {func}`datasetstats <.datasetstats>`
-  - Runs `dimensionstats`, `pixelstats`, `visualstats`, and `labelstats`
-    functions on a given dataset.
 * - {func}`dimensionstats <.dimensionstats>`
   - Creates dataset statistics on a per image basis.
 * - {func}`hashstats <.hashstats>`
   - Creates hex-encoded image hashes on a per image basis.
+* - {func}`imagestats <.imagestats>`
+  - Runs `dimensionstats`, `pixelstats`, `visualstats`, and `labelstats`
+    functions on a given dataset.
 * - {func}`labelstats <.labelstats>`
   - Creates dataset statistics on the labels.
 * - {func}`pixelstats <.pixelstats>`

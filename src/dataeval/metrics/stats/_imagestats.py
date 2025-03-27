@@ -42,8 +42,8 @@ def imagestats(
     Calculates various :term:`statistics<Statistics>` for each image.
 
     This function computes dimension, pixel and visual metrics
-    on the images or individual bounding boxes for each image as
-    well as label statistics if provided.
+    on the images or individual bounding boxes for each image. If
+    performing calculations per channel dimension stats are excluded.
 
     Parameters
     ----------
@@ -61,7 +61,7 @@ def imagestats(
 
     See Also
     --------
-    dimensionstats, labelstats, pixelstats, visualstats, Outliers
+    dimensionstats, pixelstats, visualstats
 
     Examples
     --------
