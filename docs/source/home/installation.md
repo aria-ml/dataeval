@@ -49,7 +49,7 @@ pip install dataeval[all]
 Installing from `conda`
 
 ```bash
-conda install dataeval
+conda install dataeval -c conda-forge
 ```
 
 :::
@@ -72,10 +72,19 @@ Pull the source down and change to the DataEval project directory.
     cd dataeval
 ```
 
-Install DataEval with optional dependencies for development.
+Install DataEval with all extras
 
 ```bash
-    poetry install --all-extras --with dev
+    poetry install --all-extras
+```
+
+(Optional) To install the development environment for DataEval, update
+the lock file and then run the installation command with the `dev` group
+specified.
+
+```bash
+    poetry lock
+    poetry install --all-extras --with=dev
 ```
 
 Now that DataEval is installed, you can run commands in the poetry virtual
