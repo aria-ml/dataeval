@@ -9,7 +9,7 @@ import torch
 from torch.utils.data import DataLoader, Subset
 from tqdm import tqdm
 
-from dataeval.config import get_device
+from dataeval.config import DeviceLike, get_device
 from dataeval.typing import Array, Dataset
 from dataeval.utils.torch.models import SupportsEncode
 
@@ -24,13 +24,14 @@ class Embeddings:
     ----------
     dataset : ImageClassificationDataset or ObjectDetectionDataset
         Dataset to access original images from.
-    batch_size : int, optional
+    batch_size : int
         Batch size to use when encoding images.
-    model : torch.nn.Module, optional
+    model : torch.nn.Module or None, default None
         Model to use for encoding images.
-    device : torch.device, optional
-        Device to use for encoding images.
-    verbose : bool, optional
+    device : DeviceLike or None, default None
+        The hardware device to use if specified, otherwise uses the DataEval
+        default or torch default.
+    verbose : bool, default False
         Whether to print progress bar when encoding images.
     """
 
@@ -43,7 +44,7 @@ class Embeddings:
         dataset: Dataset[tuple[Array, Any, Any]],
         batch_size: int,
         model: torch.nn.Module | None = None,
-        device: torch.device | str | None = None,
+        device: DeviceLike | None = None,
         verbose: bool = False,
     ) -> None:
         self.device = get_device(device)

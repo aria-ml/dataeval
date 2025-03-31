@@ -85,20 +85,20 @@ class DriftUncertainty:
         Whether the given reference data ``x_ref`` has been preprocessed yet.
         If ``True``, only the test data ``x`` will be preprocessed at prediction time.
         If ``False``, the reference data will also be preprocessed.
-    update_x_ref : UpdateStrategy | None, default None
+    update_x_ref : UpdateStrategy or None, default None
         Reference data can optionally be updated using an UpdateStrategy class. Update
         using the last n instances seen by the detector with LastSeenUpdateStrategy
         or via reservoir sampling with ReservoirSamplingUpdateStrategy.
-    preds_type : "probs" | "logits", default "probs"
+    preds_type : "probs" or "logits", default "probs"
         Type of prediction output by the model. Options are 'probs' (in [0,1]) or
         'logits' (in [-inf,inf]).
     batch_size : int, default 32
         Batch size used to evaluate model. Only relevant when backend has been
         specified for batch prediction.
-    preprocess_batch_fn : Callable | None, default None
+    preprocess_batch_fn : Callable or None, default None
         Optional batch preprocessing function. For example to convert a list of
         objects to a batch which can be processed by the model.
-    device : str | None, default None
+    device : DeviceLike or None, default None
         Device type used. The default None tries to use the GPU and falls back on
         CPU if needed. Can be specified by passing either 'cuda' or 'cpu'.
 

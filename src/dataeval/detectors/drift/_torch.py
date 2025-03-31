@@ -17,7 +17,7 @@ import torch
 import torch.nn as nn
 from numpy.typing import NDArray
 
-from dataeval.config import get_device
+from dataeval.config import DeviceLike, get_device
 from dataeval.utils.torch._internal import predict_batch
 
 
@@ -59,7 +59,7 @@ def mmd2_from_kernel_matrix(
 def preprocess_drift(
     x: NDArray[Any],
     model: nn.Module,
-    device: str | torch.device | None = None,
+    device: DeviceLike | None = None,
     preprocess_batch_fn: Callable | None = None,
     batch_size: int = int(1e10),
     dtype: type[np.generic] | torch.dtype = np.float32,
@@ -73,15 +73,15 @@ def preprocess_drift(
         Batch of instances.
     model : nn.Module
         Model used for preprocessing.
-    device : torch.device | None, default None
-        Device type used. The default None tries to use the GPU and falls back on CPU.
-        Can be specified by passing either torch.device('cuda') or torch.device('cpu').
-    preprocess_batch_fn : Callable | None, default None
+    device : DeviceLike or None, default None
+        The hardware device to use if specified, otherwise uses the DataEval
+        default or torch default.
+    preprocess_batch_fn : Callable or None, default None
         Optional batch preprocessing function. For example to convert a list of objects
         to a batch which can be processed by the PyTorch model.
     batch_size : int, default 1e10
         Batch size used during prediction.
-    dtype : np.dtype | torch.dtype, default np.float32
+    dtype : np.dtype or torch.dtype, default np.float32
         Model output type, either a :term:`NumPy` or torch dtype, e.g. np.float32 or torch.float32.
 
     Returns

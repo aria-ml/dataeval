@@ -14,7 +14,7 @@ from typing import Callable, cast
 
 import torch
 
-from dataeval.config import get_device
+from dataeval.config import DeviceLike, get_device
 from dataeval.detectors.ood.mixin import OODBaseMixin, OODFitMixin, OODGMMMixin
 from dataeval.typing import ArrayLike
 from dataeval.utils._array import to_numpy
@@ -23,7 +23,7 @@ from dataeval.utils.torch._internal import trainer
 
 
 class OODBase(OODBaseMixin[torch.nn.Module], OODFitMixin[Callable[..., torch.nn.Module], torch.optim.Optimizer]):
-    def __init__(self, model: torch.nn.Module, device: str | torch.device | None = None) -> None:
+    def __init__(self, model: torch.nn.Module, device: DeviceLike | None = None) -> None:
         self.device: torch.device = get_device(device)
         super().__init__(model)
 

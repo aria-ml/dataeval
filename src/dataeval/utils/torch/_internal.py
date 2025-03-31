@@ -11,13 +11,13 @@ from numpy.typing import NDArray
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
-from dataeval.config import get_device
+from dataeval.config import DeviceLike, get_device
 
 
 def predict_batch(
     x: NDArray[Any] | torch.Tensor,
     model: Callable | torch.nn.Module | torch.nn.Sequential,
-    device: torch.device | None = None,
+    device: DeviceLike | None = None,
     batch_size: int = int(1e10),
     preprocess_fn: Callable[[torch.Tensor], torch.Tensor] | None = None,
     dtype: type[np.generic] | torch.dtype = np.float32,
@@ -31,9 +31,9 @@ def predict_batch(
         Batch of instances.
     model : Callable | nn.Module | nn.Sequential
         PyTorch model.
-    device : torch.device | None, default None
-        Device type used. The default None tries to use the GPU and falls back on CPU.
-        Can be specified by passing either torch.device('cuda') or torch.device('cpu').
+    device : DeviceLike or None, default None
+        The hardware device to use if specified, otherwise uses the DataEval
+        default or torch default.
     batch_size : int, default 1e10
         Batch size used during prediction.
     preprocess_fn : Callable | None, default None

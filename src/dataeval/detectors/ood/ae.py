@@ -18,6 +18,7 @@ import numpy as np
 import torch
 from numpy.typing import NDArray
 
+from dataeval.config import DeviceLike
 from dataeval.detectors.ood.base import OODBase
 from dataeval.outputs import OODScoreOutput
 from dataeval.typing import ArrayLike
@@ -33,9 +34,9 @@ class OOD_AE(OODBase):
     model : torch.nn.Module
         An autoencoder model to use for encoding and reconstruction of images
         for detection of out-of-distribution samples.
-    device : str or torch.Device or None, default None
-        The device to use for the detector. None will default to the global
-        configuration selection if set, otherwise "cuda" then "cpu" by availability.
+    device : DeviceLike or None, default None
+        The hardware device to use if specified, otherwise uses the DataEval
+        default or torch default.
 
     Example
     -------
@@ -57,7 +58,7 @@ class OOD_AE(OODBase):
     array([ True,  True, False,  True,  True,  True,  True,  True])
     """
 
-    def __init__(self, model: torch.nn.Module, device: str | torch.device | None = None) -> None:
+    def __init__(self, model: torch.nn.Module, device: DeviceLike | None = None) -> None:
         super().__init__(model, device)
 
     def fit(
