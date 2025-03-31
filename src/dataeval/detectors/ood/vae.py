@@ -17,6 +17,7 @@ from typing import Callable
 import numpy as np
 import torch
 
+from dataeval.config import DeviceLike
 from dataeval.detectors.ood.base import OODBase
 from dataeval.outputs import OODScoreOutput
 from dataeval.typing import ArrayLike
@@ -34,7 +35,7 @@ class OOD_VAE(OODBase):
         An Autoencoder model.
     """
 
-    def __init__(self, model: torch.nn.Module, device: str | torch.device | None = None) -> None:
+    def __init__(self, model: torch.nn.Module, device: DeviceLike | None = None) -> None:
         super().__init__(model, device)
 
     def fit(

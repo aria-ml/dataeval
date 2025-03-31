@@ -4,36 +4,59 @@ Global configuration settings for DataEval.
 
 from __future__ import annotations
 
-__all__ = ["get_device", "set_device", "get_max_processes", "set_max_processes"]
+__all__ = ["get_device", "set_device", "get_max_processes", "set_max_processes", "DeviceLike"]
+
+import sys
+from typing import Union
+
+if sys.version_info >= (3, 10):
+    from typing import TypeAlias
+else:
+    from typing_extensions import TypeAlias
 
 import torch
-from torch import device
 
-_device: device | None = None
+_device: torch.device | None = None
 _processes: int | None = None
 
+DeviceLike: TypeAlias = Union[int, str, tuple[str, int], torch.device]
+"""
+Type alias for types that are acceptable for specifying a torch.device.
 
-def set_device(device: str | device | int) -> None:
+See Also
+--------
+`torch.device <https://pytorch.org/docs/stable/tensor_attributes.html#torch.device>`_
+"""
+
+
+def _todevice(device: DeviceLike) -> torch.device:
+    return torch.device(*device) if isinstance(device, tuple) else torch.device(device)
+
+
+def set_device(device: DeviceLike) -> None:
     """
     Sets the default device to use when executing against a PyTorch backend.
 
     Parameters
     ----------
-    device : str or int or `torch.device`
-        The default device to use. See `torch.device <https://pytorch.org/docs/stable/tensor_attributes.html#torch.device>`_
-        documentation for more information.
+    device : DeviceLike
+        The default device to use. See documentation for more information.
+
+    See Also
+    --------
+    `torch.device <https://pytorch.org/docs/stable/tensor_attributes.html#torch.device>`_
     """
     global _device
-    _device = torch.device(device)
+    _device = _todevice(device)
 
 
-def get_device(override: str | device | int | None = None) -> torch.device:
+def get_device(override: DeviceLike | None = None) -> torch.device:
     """
     Returns the PyTorch device to use.
 
     Parameters
     ----------
-    override : str or int or `torch.device` or None, default None
+    override : DeviceLike or None, default None
         The user specified override if provided, otherwise returns the default device.
 
     Returns
@@ -44,7 +67,7 @@ def get_device(override: str | device | int | None = None) -> torch.device:
         global _device
         return torch.get_default_device() if _device is None else _device
     else:
-        return torch.device(override)
+        return _todevice(override)
 
 
 def set_max_processes(processes: int | None) -> None:
