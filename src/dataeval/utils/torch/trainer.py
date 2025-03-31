@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataeval.config import DeviceLike, get_device
+
 __all__ = ["AETrainer"]
 
 from typing import Any
@@ -25,9 +27,9 @@ class AETrainer:
     ----------
     model : nn.Module
         The model to be trained.
-    device : str or torch.device, default "auto"
-        The hardware device to use for training.
-        If "auto", the device will be set to "cuda" if available, otherwise "cpu".
+    device : DeviceLike or None, default None
+        The hardware device to use if specified, otherwise uses the DataEval
+        default or torch default.
     batch_size : int, default 8
         The number of images to process in a batch.
     """
@@ -35,13 +37,11 @@ class AETrainer:
     def __init__(
         self,
         model: nn.Module,
-        device: str | torch.device = "auto",
+        device: DeviceLike | None = None,
         batch_size: int = 8,
     ):
-        if device == "auto":
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.device: torch.device = torch.device(device)
-        self.model: nn.Module = model.to(device)
+        self.device: torch.device = get_device(device)
+        self.model: nn.Module = model.to(self.device)
         self.batch_size = batch_size
 
     def train(self, dataset: Dataset[Any], epochs: int = 25) -> list[float]:
