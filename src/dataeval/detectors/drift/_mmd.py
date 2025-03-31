@@ -14,7 +14,7 @@ from typing import Callable
 
 import torch
 
-from dataeval.config import get_device
+from dataeval.config import DeviceLike, get_device
 from dataeval.detectors.drift._base import BaseDrift, UpdateStrategy, preprocess_x, update_x_ref
 from dataeval.detectors.drift._torch import GaussianRBF, mmd2_from_kernel_matrix
 from dataeval.outputs import DriftMMDOutput
@@ -31,7 +31,7 @@ class DriftMMD(BaseDrift):
     ----------
     x_ref : ArrayLike
         Data used as reference distribution.
-    p_val : float | None, default 0.05
+    p_val : float or None, default 0.05
         :term:`P-value` used for significance of the statistical test for each feature.
         If the FDR correction method is used, this corresponds to the acceptable
         q-value.
@@ -39,14 +39,14 @@ class DriftMMD(BaseDrift):
         Whether the given reference data ``x_ref`` has been preprocessed yet.
         If ``True``, only the test data ``x`` will be preprocessed at prediction time.
         If ``False``, the reference data will also be preprocessed.
-    update_x_ref : UpdateStrategy | None, default None
+    update_x_ref : UpdateStrategy or None, default None
         Reference data can optionally be updated using an UpdateStrategy class. Update
         using the last n instances seen by the detector with LastSeenUpdateStrategy
         or via reservoir sampling with ReservoirSamplingUpdateStrategy.
-    preprocess_fn : Callable | None, default None
+    preprocess_fn : Callable or None, default None
         Function to preprocess the data before computing the data drift metrics.
         Typically a :term:`dimensionality reduction<Dimensionality Reduction>` technique.
-    sigma : ArrayLike | None, default None
+    sigma : ArrayLike or None, default None
         Optionally set the internal GaussianRBF kernel bandwidth. Can also pass multiple
         bandwidth values as an array. The kernel evaluation is then averaged over
         those bandwidths.
@@ -54,9 +54,9 @@ class DriftMMD(BaseDrift):
         Whether to already configure the kernel bandwidth from the reference data.
     n_permutations : int, default 100
         Number of permutations used in the permutation test.
-    device : str | None, default None
-        Device type used. The default None uses the GPU and falls back on CPU.
-        Can be specified by passing either 'cuda', 'gpu' or 'cpu'.
+    device : DeviceLike or None, default None
+        The hardware device to use if specified, otherwise uses the DataEval
+        default or torch default.
 
     Example
     -------
@@ -84,7 +84,7 @@ class DriftMMD(BaseDrift):
         sigma: ArrayLike | None = None,
         configure_kernel_from_x_ref: bool = True,
         n_permutations: int = 100,
-        device: str | torch.device | None = None,
+        device: DeviceLike | None = None,
     ) -> None:
         super().__init__(x_ref, p_val, x_ref_preprocessed, update_x_ref, preprocess_fn)
 
