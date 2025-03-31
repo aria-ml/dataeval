@@ -42,7 +42,6 @@ class Embeddings:
         self,
         dataset: Dataset[tuple[Array, Any, Any]],
         batch_size: int,
-        indices: Sequence[int] | None = None,
         model: torch.nn.Module | None = None,
         device: torch.device | str | None = None,
         verbose: bool = False,
@@ -52,7 +51,6 @@ class Embeddings:
         self.verbose = verbose
 
         self._dataset = dataset
-        self._indices = indices if indices is not None else range(len(dataset))
         model = torch.nn.Flatten() if model is None else model
         self._model = model.to(self.device).eval()
         self._encoder = model.encode if isinstance(model, SupportsEncode) else model
