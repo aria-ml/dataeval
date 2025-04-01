@@ -19,6 +19,7 @@ import sklearn.datasets as dsets
 import torch
 from test_drift_uncertainty import PtModel
 
+from dataeval.config import set_seed
 from dataeval.metrics.stats import hashstats, pixelstats
 from dataeval.utils.torch.models import Autoencoder
 
@@ -36,8 +37,7 @@ if np.__version__[0] == "2":
 
 
 # Set manual seeds
-np.random.seed(0)
-torch.manual_seed(0)
+set_seed(0, all_generators=True)
 
 
 def generate_random_metadata(
