@@ -5,8 +5,6 @@ import pytest
 
 from dataeval.detectors.ood.metadata_ood_mi import get_metadata_ood_mi
 
-RANDOM_STATE = 42
-
 
 # Inputs with expected valid results:
 @pytest.mark.required
@@ -26,7 +24,7 @@ RANDOM_STATE = 42
     ),
 )
 def test_output_values(md0, is_ood, expected: dict[str, float]):
-    output = get_metadata_ood_mi(md0, is_ood, random_state=RANDOM_STATE)
+    output = get_metadata_ood_mi(md0, is_ood)
     print("\n", flush=True)
     for k in output:
         print(f"{k}: {output[k]}, {expected[k]}", flush=True)
@@ -54,7 +52,7 @@ def test_output_values(md0, is_ood, expected: dict[str, float]):
 )
 def test_invalid_inputs(md0, is_ood, error_msg):
     with pytest.raises(ValueError, match=error_msg):
-        get_metadata_ood_mi(md0, is_ood, random_state=RANDOM_STATE)
+        get_metadata_ood_mi(md0, is_ood)
 
 
 # # inputs that raise a warning
@@ -71,4 +69,4 @@ def test_invalid_inputs(md0, is_ood, error_msg):
 )
 def test_nonsense_inputs(md0, is_ood, warning):
     with pytest.warns(UserWarning, match=warning):
-        get_metadata_ood_mi(md0, is_ood, random_state=RANDOM_STATE)
+        get_metadata_ood_mi(md0, is_ood)

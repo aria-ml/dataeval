@@ -14,10 +14,12 @@ if sys.version_info >= (3, 10):
 else:
     from typing_extensions import TypeAlias
 
+import numpy as np
 import torch
 
 _device: torch.device | None = None
 _processes: int | None = None
+_seed: int | None = None
 
 DeviceLike: TypeAlias = Union[int, str, tuple[str, int], torch.device]
 """
@@ -98,3 +100,35 @@ def get_max_processes() -> int | None:
     """
     global _processes
     return _processes
+
+
+def set_seed(seed: int | None, all_generators: bool = False) -> None:
+    """
+    Sets the seed for use by classes that allow for a random state or seed.
+
+    Parameters
+    ----------
+    seed : int or None
+        The seed to use.
+    all_generators : bool, default False
+        Whether to set the seed for all generators, including NumPy and PyTorch.
+    """
+    global _seed
+    _seed = seed
+
+    if all_generators:
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+
+
+def get_seed() -> int | None:
+    """
+    Returns the seed for random state or seed.
+
+    Returns
+    -------
+    int or None
+        The seed to use.
+    """
+    global _seed
+    return _seed
