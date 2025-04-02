@@ -8,6 +8,7 @@ import numpy as np
 import scipy as sp
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 
+from dataeval.config import get_seed
 from dataeval.outputs import BalanceOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.utils._bin import get_counts
@@ -113,7 +114,7 @@ def balance(
                 data[:, idx],
                 discrete_features=is_discrete,  # type: ignore
                 n_neighbors=num_neighbors,
-                random_state=0,
+                random_state=get_seed(),
             )
         else:
             mi[idx, :] = mutual_info_classif(
@@ -121,7 +122,7 @@ def balance(
                 data[:, idx],
                 discrete_features=is_discrete,  # type: ignore
                 n_neighbors=num_neighbors,
-                random_state=0,
+                random_state=get_seed(),
             )
 
     # Normalization via entropy
@@ -150,7 +151,7 @@ def balance(
             tgt_bin[:, idx],
             discrete_features=is_discrete,  # type: ignore
             n_neighbors=num_neighbors,
-            random_state=0,
+            random_state=get_seed(),
         )
 
     # Classwise normalization via entropy
