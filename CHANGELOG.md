@@ -1,6 +1,20 @@
-[//]: # (033d035885d33246e8bb74defe82815bc4c9dd54)
+[//]: # (94b31bf14e66e4d6c6bf4f772396b2c6676b84a8)
 
 # DataEval Change Log
+
+## v0.82.1
+
+🛠️ **Improvements and Enhancements**
+- `4b6bbab8` - Intrinsic metadata using image statistics
+
+👾 **Fixes**
+- `9bae7f1a` - Perform __dict__ override hack before setting other parameters
+- `a9e3fde1` - HOTFIX: remove cyclical call to getattr in Select wrapper class
+
+📝 **Miscellaneous**
+- `94b31bf1` - Create a package wide configuration for random seeds
+- `36746ef9` - Switch to DeviceLike for typing of torch device
+- `13ff9fd0` - Better genericize output classes and add Sequence based output collection class
 
 ## v0.82.0
 
