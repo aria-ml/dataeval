@@ -52,3 +52,10 @@ class MetadataDistanceOutput(MappingOutput[str, MetadataDistanceValues]):
     value : :class:`.MetadataDistanceValues`
         Output per feature name containing the statistic, statistic location, distance, and pvalue.
     """
+
+
+class OODPredictorOutput(MappingOutput[str, float]):
+    """
+    Output class for results of :func:`find_ood_predictors` for the
+    mutual information between factors and being out of distribution
+    """
