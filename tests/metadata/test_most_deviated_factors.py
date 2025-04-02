@@ -11,7 +11,7 @@ from dataeval.metadata._ood import (
     _combine_metadata,
     _compare_keys,
     _validate_factors_and_data,
-    most_deviated_factors,
+    find_most_deviated_factors,
 )
 
 
@@ -71,9 +71,9 @@ class TestMetadataValidation:
         # Neither have enough samples
         warn_msg = f"At least 3 reference metadata samples are needed, got {samples}"
         with pytest.warns(UserWarning, match=warn_msg):
-            res = most_deviated_factors(
-                metadata_1=MagicMock(),
-                metadata_2=MagicMock(),
+            res = find_most_deviated_factors(
+                metadata_ref=MagicMock(),
+                metadata_tst=MagicMock(),
                 ood=ood,
             )
         assert res._data == []
@@ -117,7 +117,7 @@ class TestMetadataValidation:
         error_msg = f"ood and test metadata must have the same length, got {length} and 3 respectively."
 
         with pytest.raises(ValueError, match=error_msg):
-            most_deviated_factors(MagicMock(), MagicMock(), ood)
+            find_most_deviated_factors(MagicMock(), MagicMock(), ood)
 
     def test_error_disc_cont_samples(self, RNG: Generator):
         """
@@ -136,7 +136,7 @@ class TestMetadataValidation:
         )
 
         with pytest.raises(ValueError):
-            most_deviated_factors(md, md, ood)
+            find_most_deviated_factors(md, md, ood)
 
 
 @pytest.mark.required
@@ -170,7 +170,7 @@ class TestDeviatedFactors:
         mock_calc_median_dev.return_value = devs
 
         factors = ["a", "b", "c"]
-        result = most_deviated_factors(
+        result = find_most_deviated_factors(
             mock_metadata(factors, RNG.random(shape), cont_factor_names=[]),
             mock_metadata(factors, RNG.random(shape), cont_factor_names=[]),
             ood,
@@ -194,7 +194,7 @@ class TestDeviatedFactors:
 
         ood = mock_ood_output(np.array([True, True, True]))
         m1 = mock_metadata(["a", "b", "c"], np.ones((3, 3)), [], [])
-        result = most_deviated_factors(m1, m1, ood=ood)
+        result = find_most_deviated_factors(m1, m1, ood=ood)
 
         assert len(result) == 3
         assert result[0] == ("a", 0.0)  # zero deviation in all ones
@@ -332,7 +332,7 @@ class TestFunctional:
 
         is_ood = np.array([True] * samples)
         ood = mock_ood_output(is_ood=is_ood)
-        output = most_deviated_factors(metadata_ref_big, metadata_tst_big, ood)
+        output = find_most_deviated_factors(metadata_ref_big, metadata_tst_big, ood)
 
         half = samples // 2
 
