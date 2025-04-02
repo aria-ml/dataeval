@@ -12,6 +12,7 @@ from sklearn.metrics import silhouette_score
 from sklearn.model_selection import GroupKFold, KFold, StratifiedGroupKFold, StratifiedKFold
 from sklearn.utils.multiclass import type_of_target
 
+from dataeval.config import get_seed
 from dataeval.outputs._base import set_metadata
 from dataeval.outputs._utils import SplitDatasetOutput, TrainValSplit
 
@@ -212,9 +213,9 @@ def bin_kmeans(array: NDArray[Any]) -> NDArray[np.intp]:
         best_score = 0.50
     bin_index = np.zeros(len(array), dtype=np.intp)
     for k in range(2, 20):
-        clusterer = KMeans(n_clusters=k)
+        clusterer = KMeans(n_clusters=k, random_state=get_seed())
         cluster_labels = clusterer.fit_predict(array)
-        score = silhouette_score(array, cluster_labels, sample_size=25_000)
+        score = silhouette_score(array, cluster_labels, sample_size=25_000, random_state=get_seed())
         if score > best_score:
             best_score = score
             bin_index = cluster_labels.astype(np.intp)

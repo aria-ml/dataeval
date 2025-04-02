@@ -10,6 +10,8 @@ import numpy as np
 from numpy.typing import NDArray
 from sklearn.feature_selection import mutual_info_classif
 
+from dataeval.config import get_seed
+
 # NATS2BITS is the reciprocal of natural log of 2. If you have an information/entropy-type quantity measured in nats,
 #   which is what many library functions return, multiply it by NATS2BITS to get it in bits.
 NATS2BITS = 1.442695
@@ -19,7 +21,6 @@ def get_metadata_ood_mi(
     metadata: dict[str, list[Any] | NDArray[Any]],
     is_ood: NDArray[np.bool_],
     discrete_features: str | bool | NDArray[np.bool_] = False,
-    random_state: int | None = None,
 ) -> dict[str, float]:
     """Computes mutual information between a set of metadata features and an out-of-distribution flag.
 
@@ -39,9 +40,6 @@ def get_metadata_ood_mi(
         A boolean array, with one value per example, that indicates which examples are OOD.
     discrete_features : str | bool | NDArray[np.bool_]
         Either a boolean array or a single boolean value, indicate which features take on discrete values.
-    random_state : int, optional - default None
-        Determines random number generation for small noise added to continuous variables. Set to a value for
-        reproducible results.
 
     Returns
     -------
@@ -55,7 +53,7 @@ def get_metadata_ood_mi(
 
     >>> metadata = {"time": np.linspace(0, 10, 100), "altitude": np.linspace(0, 16, 100) ** 2}
     >>> is_ood = metadata["altitude"] > 100
-    >>> get_metadata_ood_mi(metadata, is_ood, discrete_features=False, random_state=0)
+    >>> get_metadata_ood_mi(metadata, is_ood, discrete_features=False)
     {'time': 0.9359596758173668, 'altitude': 0.9407686591507002}
     """
     numerical_keys = [k for k, v in metadata.items() if all(isinstance(vi, numbers.Number) for vi in v)]
@@ -84,7 +82,7 @@ def get_metadata_ood_mi(
             Xscl,
             is_ood,
             discrete_features=discrete_features,  # type: ignore
-            random_state=random_state,
+            random_state=get_seed(),
         )
         * NATS2BITS
     )

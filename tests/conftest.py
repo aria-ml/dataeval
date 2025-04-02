@@ -9,12 +9,15 @@ import numpy as np
 import pytest
 from PIL import Image
 
+from dataeval.config import set_seed
 from dataeval.utils.data._metadata import Metadata
 from dataeval.utils.data._targets import Targets
 
 TEMP_CONTENTS = "ABCDEF1234567890"
 
 pytest_plugins = ["tests.fixtures.metadata"]
+
+set_seed(0, all_generators=True)
 
 
 def preprocess(factors, class_labels, continuous_factor_bins=None, exclude=None, include=None):
