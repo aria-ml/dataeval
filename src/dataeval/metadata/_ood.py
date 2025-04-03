@@ -157,7 +157,7 @@ def find_most_deviated_factors(
     ood: OODOutput,
 ) -> MostDeviatedFactorsOutput:
     """
-    Determines greatest deviation in metadata features per out of distribution sample in metadata_2.
+    Determine greatest deviation in metadata features per out of distribution sample in test metadata.
 
     Parameters
     ----------
@@ -172,15 +172,16 @@ def find_most_deviated_factors(
 
     Returns
     -------
-    list[tuple[str, float]]
-        An array of the factor name and deviation of the highest metadata deviation for each OOD example in metadata_2.
+    MostDeviatedFactorsOutput
+        An output class containing the factor name and deviation of the highest metadata deviations for each
+        OOD example in the test metadata.
 
     Notes
     -----
     1. Both :class:`.Metadata` inputs must have discrete and continuous data in the shape (samples, factors)
        and have equivalent factor names and lengths
     2. The flag at index `i` in :attr:`.OODOutput.is_ood` must correspond
-       directly to sample `i` of `metadata_2` being out-of-distribution from `metadata_1`
+       directly to sample `i` of `metadata_tst` being out-of-distribution from `metadata_ref`
 
     Examples
     --------
