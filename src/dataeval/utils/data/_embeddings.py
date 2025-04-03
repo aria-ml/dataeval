@@ -57,20 +57,27 @@ class Embeddings:
         self._encoder = model.encode if isinstance(model, SupportsEncode) else model
         self._collate_fn = lambda datum: [torch.as_tensor(i) for i, _, _ in datum]
 
-    def to_tensor(self) -> torch.Tensor:
+    def to_tensor(self, indices: Sequence[int] | None = None) -> torch.Tensor:
         """
-        Converts entire dataset to embeddings.
+        Converts dataset to embeddings.
 
-        Warning
-        -------
-        Will process the entire dataset in batches and return
-        embeddings as a single Tensor in memory.
+        Parameters
+        ----------
+        indices : Sequence[int] or None, default None
+            The indices to convert to embeddings
 
         Returns
         -------
         torch.Tensor
+
+        Warning
+        -------
+        Processing large quantities of data can be resource intensive.
         """
-        return self[:]
+        if indices is not None:
+            return torch.vstack(list(self._batch(indices))).to(self.device)
+        else:
+            return self[:]
 
     # Reduce overhead cost by not tracking tensor gradients
     @torch.no_grad
@@ -85,9 +92,7 @@ class Embeddings:
             embeddings = self._encoder(torch.stack(images).to(self.device))
             yield embeddings
 
-    def __getitem__(self, key: int | slice | list[int], /) -> torch.Tensor:
-        if isinstance(key, list):
-            return torch.vstack(list(self._batch(key))).to(self.device)
+    def __getitem__(self, key: int | slice, /) -> torch.Tensor:
         if isinstance(key, slice):
             return torch.vstack(list(self._batch(range(len(self._dataset))[key]))).to(self.device)
         elif isinstance(key, int):
