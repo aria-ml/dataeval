@@ -4,7 +4,7 @@ __all__ = []
 
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Generic, Iterator, Literal, NamedTuple, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Iterator, Literal, NamedTuple, Sequence, TypeVar
 
 from dataeval.utils.data.datasets._fileio import _ensure_exists
 from dataeval.utils.data.datasets._mixin import BaseDatasetMixin
@@ -16,8 +16,10 @@ from dataeval.utils.data.datasets._types import (
     ObjectDetectionTarget,
     SegmentationDataset,
     SegmentationTarget,
-    Transform,
 )
+
+if TYPE_CHECKING:
+    from dataeval.typing import Transform
 
 _TArray = TypeVar("_TArray")
 _TTarget = TypeVar("_TTarget")

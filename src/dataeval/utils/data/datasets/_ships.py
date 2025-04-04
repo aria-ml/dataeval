@@ -3,14 +3,16 @@ from __future__ import annotations
 __all__ = []
 
 from pathlib import Path
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.utils.data.datasets._base import BaseICDataset, DataLocation
 from dataeval.utils.data.datasets._mixin import BaseDatasetNumpyMixin
-from dataeval.utils.data.datasets._types import Transform
+
+if TYPE_CHECKING:
+    from dataeval.typing import Transform
 
 
 class Ships(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
@@ -32,19 +34,27 @@ class Ships(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
     download : bool, default False
         If True, downloads the dataset from the internet and puts it in root directory.
         Class checks to see if data is already downloaded to ensure it does not create a duplicate download.
+    transforms : Transform, Sequence[Transform] or None, default None
+        Transform(s) to apply to the data.
     verbose : bool, default False
         If True, outputs print statements.
 
     Attributes
     ----------
-    index2label : dict
-        Dictionary which translates from class integers to the associated class strings.
-    label2index : dict
-        Dictionary which translates from class strings to the associated class integers.
-    path : Path
+    path : pathlib.Path
         Location of the folder containing the data.
-    metadata : dict
-        Dictionary containing Dataset metadata, such as `id` which returns the dataset class name.
+    image_set : "base"
+        The base image set is the only available image set for the Ships dataset.
+    index2label : dict[int, str]
+        Dictionary which translates from class integers to the associated class strings.
+    label2index : dict[str, int]
+        Dictionary which translates from class strings to the associated class integers.
+    metadata : DatasetMetadata
+        Typed dictionary containing dataset metadata, such as `id` which returns the dataset class name.
+    transforms : Sequence[Transform]
+        The transforms to be applied to the data.
+    size : int
+        The size of the dataset.
     """
 
     _resources = [
