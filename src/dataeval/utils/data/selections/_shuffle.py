@@ -2,10 +2,13 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Any
+from typing import Any, Sequence
 
 import numpy as np
+from numpy.random import BitGenerator, Generator, SeedSequence
 
+from dataeval.typing import Array, ArrayLike
+from dataeval.utils._array import as_numpy
 from dataeval.utils.data._selection import Select, Selection, SelectionStage
 
 
@@ -15,14 +18,18 @@ class Shuffle(Selection[Any]):
 
     Parameters
     ----------
-    seed
+    seed : int, ArrayLike, SeedSequence, BitGenerator, Generator or None, default None
         Seed for the random number generator.
+
+    See Also
+    --------
+    `NumPy Random Generator <https://numpy.org/doc/stable/reference/random/generator.html>`_
     """
 
     stage = SelectionStage.ORDER
 
-    def __init__(self, seed: int):
-        self.seed = seed
+    def __init__(self, seed: int | ArrayLike | SeedSequence | BitGenerator | Generator | None = None):
+        self.seed = as_numpy(seed) if isinstance(seed, (Sequence, Array)) else seed
 
     def __call__(self, dataset: Select[Any]) -> None:
         rng = np.random.default_rng(self.seed)
