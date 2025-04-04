@@ -6,6 +6,7 @@ from typing import Any, Sequence
 
 import numpy as np
 from numpy.random import BitGenerator, Generator, SeedSequence
+from numpy.typing import NDArray
 
 from dataeval.typing import Array, ArrayLike
 from dataeval.utils._array import as_numpy
@@ -26,6 +27,7 @@ class Shuffle(Selection[Any]):
     `NumPy Random Generator <https://numpy.org/doc/stable/reference/random/generator.html>`_
     """
 
+    seed: int | NDArray[Any] | SeedSequence | BitGenerator | Generator | None
     stage = SelectionStage.ORDER
 
     def __init__(self, seed: int | ArrayLike | SeedSequence | BitGenerator | Generator | None = None):
