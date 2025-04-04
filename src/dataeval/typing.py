@@ -1,5 +1,5 @@
 """
-Common type hints used for interoperability with DataEval.
+Common type protocols used for interoperability with DataEval.
 """
 
 __all__ = [
@@ -16,6 +16,7 @@ __all__ = [
     "SegmentationTarget",
     "SegmentationDatum",
     "SegmentationDataset",
+    "Transform",
 ]
 
 
@@ -66,6 +67,7 @@ class Array(Protocol):
     def __len__(self) -> int: ...
 
 
+T = TypeVar("T")
 _T_co = TypeVar("_T_co", covariant=True)
 _ScalarType = Union[int, float, bool, str]
 ArrayLike: TypeAlias = Union[Sequence[_ScalarType], Sequence[Sequence[_ScalarType]], Sequence[Array], Array]
@@ -140,7 +142,7 @@ class AnnotatedDataset(Dataset[_T_co], Generic[_T_co], Protocol):
 
 ImageClassificationDatum: TypeAlias = tuple[Array, Array, dict[str, Any]]
 """
-A type definition for an image classification datum tuple.
+Type alias for an image classification datum tuple.
 
 - :class:`Array` of shape (C, H, W) - Image data in channel, height, width format.
 - :class:`Array` of shape (N,) - Class label as one-hot encoded ground-truth or prediction confidences.
@@ -150,7 +152,7 @@ A type definition for an image classification datum tuple.
 
 ImageClassificationDataset: TypeAlias = AnnotatedDataset[ImageClassificationDatum]
 """
-A type definition for an :class:`AnnotatedDataset` of :class:`ImageClassificationDatum` elements.
+Type alias for an :class:`AnnotatedDataset` of :class:`ImageClassificationDatum` elements.
 """
 
 # ========== OBJECT DETECTION DATASETS ==========
@@ -159,7 +161,7 @@ A type definition for an :class:`AnnotatedDataset` of :class:`ImageClassificatio
 @runtime_checkable
 class ObjectDetectionTarget(Protocol):
     """
-    A protocol for targets in an Object Detection dataset.
+    Protocol for targets in an Object Detection dataset.
 
     Attributes
     ----------
@@ -180,7 +182,7 @@ class ObjectDetectionTarget(Protocol):
 
 ObjectDetectionDatum: TypeAlias = tuple[Array, ObjectDetectionTarget, dict[str, Any]]
 """
-A type definition for an object detection datum tuple.
+Type alias for an object detection datum tuple.
 
 - :class:`Array` of shape (C, H, W) - Image data in channel, height, width format.
 - :class:`ObjectDetectionTarget` - Object detection target information for the image.
@@ -190,7 +192,7 @@ A type definition for an object detection datum tuple.
 
 ObjectDetectionDataset: TypeAlias = AnnotatedDataset[ObjectDetectionDatum]
 """
-A type definition for an :class:`AnnotatedDataset` of :class:`ObjectDetectionDatum` elements.
+Type alias for an :class:`AnnotatedDataset` of :class:`ObjectDetectionDatum` elements.
 """
 
 
@@ -200,7 +202,7 @@ A type definition for an :class:`AnnotatedDataset` of :class:`ObjectDetectionDat
 @runtime_checkable
 class SegmentationTarget(Protocol):
     """
-    A protocol for targets in a Segmentation dataset.
+    Protocol for targets in a Segmentation dataset.
 
     Attributes
     ----------
@@ -221,7 +223,7 @@ class SegmentationTarget(Protocol):
 
 SegmentationDatum: TypeAlias = tuple[Array, SegmentationTarget, dict[str, Any]]
 """
-A type definition for an image classification datum tuple.
+Type alias for an image classification datum tuple.
 
 - :class:`Array` of shape (C, H, W) - Image data in channel, height, width format.
 - :class:`SegmentationTarget` - Segmentation target information for the image.
@@ -230,5 +232,34 @@ A type definition for an image classification datum tuple.
 
 SegmentationDataset: TypeAlias = AnnotatedDataset[SegmentationDatum]
 """
-A type definition for an :class:`AnnotatedDataset` of :class:`SegmentationDatum` elements.
+Type alias for an :class:`AnnotatedDataset` of :class:`SegmentationDatum` elements.
 """
+
+
+@runtime_checkable
+class Transform(Generic[T], Protocol):
+    """
+    Protocol defining a transform function.
+
+    Requires a `__call__` method that returns transformed data.
+
+    Example
+    -------
+    >>> from typing import Any
+    >>> from numpy.typing import NDArray
+
+    >>> class MyTransform:
+    ...     def __init__(self, divisor: float) -> None:
+    ...         self.divisor = divisor
+    ...
+    ...     def __call__(self, data: NDArray[Any], /) -> NDArray[Any]:
+    ...         return data / self.divisor
+
+    >>> my_transform = MyTransform(divisor=255.0)
+    >>> isinstance(my_transform, Transform)
+    True
+    >>> my_transform(np.array([1, 2, 3]))
+    array([0.004, 0.008, 0.012])
+    """
+
+    def __call__(self, data: T, /) -> T: ...
