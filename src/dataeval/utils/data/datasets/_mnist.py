@@ -3,14 +3,16 @@ from __future__ import annotations
 __all__ = []
 
 from pathlib import Path
-from typing import Any, Literal, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, Sequence, TypeVar
 
 import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.utils.data.datasets._base import BaseICDataset, DataLocation
 from dataeval.utils.data.datasets._mixin import BaseDatasetNumpyMixin
-from dataeval.utils.data.datasets._types import Transform
+
+if TYPE_CHECKING:
+    from dataeval.typing import Transform
 
 MNISTClassStringMap = Literal["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
 TMNISTClassMap = TypeVar("TMNISTClassMap", MNISTClassStringMap, int, list[MNISTClassStringMap], list[int])
@@ -52,19 +54,33 @@ class MNIST(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
         Class checks to see if data is already downloaded to ensure it does not create a duplicate download.
     image_set : "train", "test" or "base", default "train"
         If "base", returns all of the data to allow the user to create their own splits.
+    corruption : "identity", "shot_noise", "impulse_noise", "glass_blur", "motion_blur", \
+        "shear", "scale", "rotate", "brightness", "translate", "stripe", "fog", "spatter", \
+        "dotted_line", "zigzag", "canny_edges" or None, default None
+        Corruption to apply to the data.
+    transforms : Transform, Sequence[Transform] or None, default None
+        Transform(s) to apply to the data.
     verbose : bool, default False
         If True, outputs print statements.
 
     Attributes
     ----------
-    index2label : dict
-        Dictionary which translates from class integers to the associated class strings.
-    label2index : dict
-        Dictionary which translates from class strings to the associated class integers.
-    path : Path
+    path : pathlib.Path
         Location of the folder containing the data.
-    metadata : dict
-        Dictionary containing Dataset metadata, such as `id` which returns the dataset class name.
+    image_set : "train", "test" or "base"
+        The selected image set from the dataset.
+    index2label : dict[int, str]
+        Dictionary which translates from class integers to the associated class strings.
+    label2index : dict[str, int]
+        Dictionary which translates from class strings to the associated class integers.
+    metadata : DatasetMetadata
+        Typed dictionary containing dataset metadata, such as `id` which returns the dataset class name.
+    corruption : str or None
+        Corruption applied to the data.
+    transforms : Sequence[Transform]
+        The transforms to be applied to the data.
+    size : int
+        The size of the dataset.
     """
 
     _resources = [

@@ -3,7 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 from pathlib import Path
-from typing import Any, Literal, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, Sequence, TypeVar
 
 import torch
 from defusedxml.ElementTree import parse
@@ -16,7 +16,10 @@ from dataeval.utils.data.datasets._base import (
     DataLocation,
 )
 from dataeval.utils.data.datasets._mixin import BaseDatasetNumpyMixin, BaseDatasetTorchMixin
-from dataeval.utils.data.datasets._types import ObjectDetectionTarget, SegmentationTarget, Transform
+from dataeval.utils.data.datasets._types import ObjectDetectionTarget, SegmentationTarget
+
+if TYPE_CHECKING:
+    from dataeval.typing import Transform
 
 _TArray = TypeVar("_TArray")
 _TTarget = TypeVar("_TTarget")
@@ -201,6 +204,8 @@ class BaseVOCDataset(BaseDataset[_TArray, _TTarget, list[str]]):
         boxes: list[list[float]] = []
         label_str = []
         root = parse(annotation).getroot()
+        if root is None:
+            raise ValueError(f"Unable to parse {annotation}")
         num_objects = len(root.findall("object"))
         additional_meta: dict[str, Any] = {
             "folder": [root.findtext("folder", default="") for _ in range(num_objects)],
@@ -253,21 +258,27 @@ class VOCDetection(
         If "base", then the combined dataset of "train" and "val" is returned.
     year : "2007", "2008", "2009", "2010", "2011" or "2012", default "2012"
         The dataset year.
-    transforms : Transform | Sequence[Transform] | None, default None
+    transforms : Transform, Sequence[Transform] or None, default None
         Transform(s) to apply to the data.
     verbose : bool, default False
         If True, outputs print statements.
 
     Attributes
     ----------
-    index2label : dict
-        Dictionary which translates from class integers to the associated class strings.
-    label2index : dict
-        Dictionary which translates from class strings to the associated class integers.
-    path : Path
+    path : pathlib.Path
         Location of the folder containing the data.
-    metadata : dict
-        Dictionary containing Dataset metadata, such as `id` which returns the dataset class name.
+    image_set : "train", "val", "test" or "base"
+        The selected image set from the dataset.
+    index2label : dict[int, str]
+        Dictionary which translates from class integers to the associated class strings.
+    label2index : dict[str, int]
+        Dictionary which translates from class strings to the associated class integers.
+    metadata : DatasetMetadata
+        Typed dictionary containing dataset metadata, such as `id` which returns the dataset class name.
+    transforms : Sequence[Transform]
+        The transforms to be applied to the data.
+    size : int
+        The size of the dataset.
     """
 
 
@@ -277,7 +288,7 @@ class VOCDetectionTorch(
     BaseDatasetTorchMixin,
 ):
     """
-    `Pascal VOC <http://host.robots.ox.ac.uk/pascal/VOC/>`_ Detection Dataset.
+    `Pascal VOC <http://host.robots.ox.ac.uk/pascal/VOC/>`_ Detection Dataset as PyTorch tensors.
 
     Parameters
     ----------
@@ -291,21 +302,27 @@ class VOCDetectionTorch(
         If "base", then the combined dataset of "train" and "val" is returned.
     year : "2007", "2008", "2009", "2010", "2011" or "2012", default "2012"
         The dataset year.
-    transforms : Transform | Sequence[Transform] | None, default None
+    transforms : Transform, Sequence[Transform] or None, default None
         Transform(s) to apply to the data.
     verbose : bool, default False
         If True, outputs print statements.
 
     Attributes
     ----------
-    index2label : dict
-        Dictionary which translates from class integers to the associated class strings.
-    label2index : dict
-        Dictionary which translates from class strings to the associated class integers.
-    path : Path
+    path : pathlib.Path
         Location of the folder containing the data.
-    metadata : dict
-        Dictionary containing Dataset metadata, such as `id` which returns the dataset class name.
+    image_set : "train", "val", "test" or "base"
+        The selected image set from the dataset.
+    index2label : dict[int, str]
+        Dictionary which translates from class integers to the associated class strings.
+    label2index : dict[str, int]
+        Dictionary which translates from class strings to the associated class integers.
+    metadata : DatasetMetadata
+        Typed dictionary containing dataset metadata, such as `id` which returns the dataset class name.
+    transforms : Sequence[Transform]
+        The transforms to be applied to the data.
+    size : int
+        The size of the dataset.
     """
 
 
@@ -329,21 +346,27 @@ class VOCSegmentation(
         If "base", then the combined dataset of "train" and "val" is returned.
     year : "2007", "2008", "2009", "2010", "2011" or "2012", default "2012"
         The dataset year.
-    transforms : Transform | Sequence[Transform] | None, default None
+    transforms : Transform, Sequence[Transform] or None, default None
         Transform(s) to apply to the data.
     verbose : bool, default False
         If True, outputs print statements.
 
     Attributes
     ----------
-    index2label : dict
-        Dictionary which translates from class integers to the associated class strings.
-    label2index : dict
-        Dictionary which translates from class strings to the associated class integers.
-    path : Path
+    path : pathlib.Path
         Location of the folder containing the data.
-    metadata : dict
-        Dictionary containing Dataset metadata, such as `id` which returns the dataset class name.
+    image_set : "train", "val", "test" or "base"
+        The selected image set from the dataset.
+    index2label : dict[int, str]
+        Dictionary which translates from class integers to the associated class strings.
+    label2index : dict[str, int]
+        Dictionary which translates from class strings to the associated class integers.
+    metadata : DatasetMetadata
+        Typed dictionary containing dataset metadata, such as `id` which returns the dataset class name.
+    transforms : Sequence[Transform]
+        The transforms to be applied to the data.
+    size : int
+        The size of the dataset.
     """
 
     def _load_data(self) -> tuple[list[str], list[str], dict[str, list[Any]]]:

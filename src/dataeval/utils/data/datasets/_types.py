@@ -3,7 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 from dataclasses import dataclass
-from typing import Any, Generic, Protocol, TypedDict, TypeVar
+from typing import Any, Generic, TypedDict, TypeVar
 
 from torch.utils.data import Dataset
 from typing_extensions import NotRequired, Required
@@ -46,7 +46,3 @@ class SegmentationTarget(Generic[_TArray]):
 
 
 class SegmentationDataset(AnnotatedDataset[tuple[_TArray, SegmentationTarget[_TArray], dict[str, Any]]]): ...
-
-
-class Transform(Generic[_TArray], Protocol):
-    def __call__(self, data: _TArray, /) -> _TArray: ...
