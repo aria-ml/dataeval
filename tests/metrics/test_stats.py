@@ -121,7 +121,7 @@ class TestBaseStats:
             stats_processor_cls=[LengthProcessor],
         )
         for i in range(len(dataset)):
-            r = partial_fn((i, (dataset[i][0], None)))
+            r = partial_fn((i, dataset[i][0], None))
             results_list.extend(r.results)
         assert len(results_list) == len(DATA_3)
 
