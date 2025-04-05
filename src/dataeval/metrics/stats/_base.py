@@ -9,7 +9,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
 from multiprocessing import Pool
-from typing import Any, Callable, Generic, Iterable, Iterator, Sequence, TypeVar, cast
+from typing import Any, Callable, Generic, Iterable, Iterator, Sequence, TypeVar
 
 import numpy as np
 import tqdm
@@ -121,18 +121,14 @@ class StatsProcessorOutput:
 
 
 def process_stats(
-    i_datum: tuple[int, tuple[ArrayLike, Any]],
+    i: int,
+    datum: tuple[ArrayLike, Any],
     per_box: bool,
     per_channel: bool,
     stats_processor_cls: Iterable[type[StatsProcessor[TStatsOutput]]],
 ) -> StatsProcessorOutput:
-    i, datum = i_datum
-    image = to_numpy(cast(ArrayLike, datum[0])) if isinstance(datum, tuple) else to_numpy(datum)
-    boxes = (
-        to_numpy(datum[1].boxes)
-        if per_box and isinstance(datum, tuple) and isinstance(datum[1], ObjectDetectionTarget)
-        else None
-    )
+    image = to_numpy(datum[0])
+    boxes = to_numpy(datum[1].boxes) if isinstance(datum[1], ObjectDetectionTarget) else None
     results_list: list[dict[str, Any]] = []
     source_indices: list[SourceIndex] = []
     box_counts: list[int] = []
@@ -156,7 +152,7 @@ def process_stats_unpack(
     per_channel: bool,
     stats_processor_cls: Iterable[type[StatsProcessor[TStatsOutput]]],
 ) -> StatsProcessorOutput:
-    return process_stats(i_datum, per_box=per_box, per_channel=per_channel, stats_processor_cls=stats_processor_cls)
+    return process_stats(*i_datum, per_box=per_box, per_channel=per_channel, stats_processor_cls=stats_processor_cls)
 
 
 def run_stats(
