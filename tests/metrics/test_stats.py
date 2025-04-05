@@ -116,13 +116,12 @@ class TestBaseStats:
         dataset = get_dataset(DATA_3, targets_per_image=1, as_float=as_float)
         partial_fn = partial(
             process_stats_unpack,
-            dataset=dataset,
             per_box=per_box,
             per_channel=per_channel,
             stats_processor_cls=[LengthProcessor],
         )
         for i in range(len(dataset)):
-            r = partial_fn(i)
+            r = partial_fn((i, (dataset[i][0], None)))
             results_list.extend(r.results)
         assert len(results_list) == len(DATA_3)
 
