@@ -9,7 +9,7 @@ import numpy as np
 from dataeval.metrics.stats._base import StatsProcessor, run_stats
 from dataeval.outputs import VisualStatsOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.typing import ArrayLike, Dataset
+from dataeval.typing import Array, Dataset
 from dataeval.utils._image import edge_filter
 
 QUARTILES = (0, 25, 50, 75, 100)
@@ -44,7 +44,7 @@ class VisualStatsProcessor(StatsProcessor[VisualStatsOutput]):
 
 @set_metadata
 def visualstats(
-    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
+    dataset: Dataset[Array] | Dataset[tuple[Array, Any, Any]],
     *,
     per_box: bool = False,
     per_channel: bool = False,

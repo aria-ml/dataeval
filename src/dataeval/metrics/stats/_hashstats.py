@@ -14,7 +14,7 @@ from scipy.fftpack import dct
 from dataeval.metrics.stats._base import StatsProcessor, run_stats
 from dataeval.outputs import HashStatsOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.typing import ArrayLike, Dataset
+from dataeval.typing import Array, ArrayLike, Dataset
 from dataeval.utils._array import as_numpy
 from dataeval.utils._image import normalize_image_shape, rescale
 
@@ -105,7 +105,7 @@ class HashStatsProcessor(StatsProcessor[HashStatsOutput]):
 
 @set_metadata
 def hashstats(
-    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
+    dataset: Dataset[Array] | Dataset[tuple[Array, Any, Any]],
     *,
     per_box: bool = False,
 ) -> HashStatsOutput:
