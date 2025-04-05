@@ -9,7 +9,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
 from multiprocessing import Pool
-from typing import Any, Callable, Generic, Iterable, Iterator, Sequence, TypeVar
+from typing import Any, Callable, Generic, Iterable, Sequence, TypeVar
 
 import numpy as np
 import tqdm
@@ -122,13 +122,14 @@ class StatsProcessorOutput:
 
 def process_stats(
     i: int,
-    datum: tuple[ArrayLike, Any],
+    image: ArrayLike,
+    target: Any,
     per_box: bool,
     per_channel: bool,
     stats_processor_cls: Iterable[type[StatsProcessor[TStatsOutput]]],
 ) -> StatsProcessorOutput:
-    image = to_numpy(datum[0])
-    boxes = to_numpy(datum[1].boxes) if isinstance(datum[1], ObjectDetectionTarget) else None
+    image = to_numpy(image)
+    boxes = to_numpy(target.boxes) if isinstance(target, ObjectDetectionTarget) else None
     results_list: list[dict[str, Any]] = []
     source_indices: list[SourceIndex] = []
     box_counts: list[int] = []
@@ -147,12 +148,12 @@ def process_stats(
 
 
 def process_stats_unpack(
-    i_datum: tuple[int, tuple[ArrayLike, Any]],
+    args: tuple[int, ArrayLike, Any],
     per_box: bool,
     per_channel: bool,
     stats_processor_cls: Iterable[type[StatsProcessor[TStatsOutput]]],
 ) -> StatsProcessorOutput:
-    return process_stats(*i_datum, per_box=per_box, per_channel=per_channel, stats_processor_cls=stats_processor_cls)
+    return process_stats(*args, per_box=per_box, per_channel=per_channel, stats_processor_cls=stats_processor_cls)
 
 
 def run_stats(
@@ -201,15 +202,11 @@ def run_stats(
     warning_list = []
     stats_processor_cls = stats_processor_cls if isinstance(stats_processor_cls, Iterable) else [stats_processor_cls]
 
-    def _enumerate(
-        dataset: Dataset[Array] | Dataset[tuple[Array, Any, Any]],
-    ) -> Iterator[tuple[int, tuple[Array, Any]]]:
+    def _enumerate(dataset: Dataset[Array] | Dataset[tuple[Array, Any, Any]], per_box: bool):
         for i in range(len(dataset)):
-            item = dataset[i]
-            datum: tuple[Array, Any] = (item[0], item[1]) if isinstance(item, tuple) else (item, None)
-            yield i, datum
+            d = dataset[i]
+            yield i, d[0] if isinstance(d, tuple) else d, d[1] if isinstance(d, tuple) and per_box else None
 
-    # TODO: Introduce global controls for CPU job parallelism and GPU configurations
     with Pool(processes=get_max_processes()) as p:
         for r in tqdm.tqdm(
             p.imap(
@@ -219,7 +216,7 @@ def run_stats(
                     per_channel=per_channel,
                     stats_processor_cls=stats_processor_cls,
                 ),
-                _enumerate(dataset),
+                _enumerate(dataset, per_box),
             ),
             total=len(dataset),
         ):
