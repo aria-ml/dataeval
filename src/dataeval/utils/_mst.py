@@ -10,9 +10,8 @@ from scipy.sparse.csgraph import minimum_spanning_tree as mst
 from scipy.spatial.distance import pdist, squareform
 from sklearn.neighbors import NearestNeighbors
 
+from dataeval.config import EPSILON
 from dataeval.utils._array import flatten
-
-EPSILON = 1e-5
 
 
 def minimum_spanning_tree(X: NDArray[Any]) -> Any:
