@@ -19,6 +19,7 @@ from numpy.typing import NDArray
 from scipy.sparse import coo_matrix
 from scipy.stats import mode
 
+from dataeval.config import EPSILON
 from dataeval.outputs import BEROutput
 from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike
@@ -82,7 +83,7 @@ def ber_knn(images: NDArray[np.float64], labels: NDArray[np.int_], k: int) -> tu
 
 def knn_lowerbound(value: float, classes: int, k: int) -> float:
     """Several cases for computing the BER lower bound"""
-    if value <= 1e-10:
+    if value <= EPSILON:
         return 0.0
 
     if classes == 2 and k != 1:

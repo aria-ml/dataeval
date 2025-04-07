@@ -17,9 +17,17 @@ else:
 import numpy as np
 import torch
 
+### GLOBALS ###
+
 _device: torch.device | None = None
 _processes: int | None = None
 _seed: int | None = None
+
+### CONSTS ###
+
+EPSILON = 1e-10
+
+### TYPES ###
 
 DeviceLike: TypeAlias = Union[int, str, tuple[str, int], torch.device]
 """
@@ -29,6 +37,8 @@ See Also
 --------
 `torch.device <https://pytorch.org/docs/stable/tensor_attributes.html#torch.device>`_
 """
+
+### FUNCS ###
 
 
 def _todevice(device: DeviceLike) -> torch.device:
