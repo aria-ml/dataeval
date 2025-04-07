@@ -8,9 +8,9 @@ and reference material, please visit our documentation on
 
 <!-- start tagline -->
 
-DataEval curates datasets to train and test performant, robust, unbiased and
-reliable AI models and monitors for data shifts that impact performance of
-deployed models.
+DataEval analyzes datasets and models to give users the ability to train and
+test performant, unbiased, and reliable AI models and monitor data for
+impactful shifts to deployed models.
 
 <!-- end tagline -->
 
