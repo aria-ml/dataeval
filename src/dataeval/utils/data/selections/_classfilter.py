@@ -10,7 +10,7 @@ from dataeval.typing import Array, ImageClassificationDatum
 from dataeval.utils._array import as_numpy
 from dataeval.utils.data._selection import Select, Selection, SelectionStage
 
-TImageClassificationDatum = TypeVar("TImageClassificationDatum", bound=ImageClassificationDatum, covariant=True)
+TImageClassificationDatum = TypeVar("TImageClassificationDatum", bound=ImageClassificationDatum)
 
 
 class ClassFilter(Selection[TImageClassificationDatum]):

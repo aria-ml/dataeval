@@ -5,9 +5,9 @@ __all__ = []
 from enum import IntEnum
 from typing import Generic, Iterator, Sequence, TypeVar
 
-from dataeval.typing import AnnotatedDataset, DatasetMetadata
+from dataeval.typing import AnnotatedDataset, DatasetMetadata, Transform
 
-_TDatum = TypeVar("_TDatum", covariant=True)
+_TDatum = TypeVar("_TDatum")
 
 
 class SelectionStage(IntEnum):
@@ -35,6 +35,8 @@ class Select(AnnotatedDataset[_TDatum]):
         The dataset to wrap.
     selections : Selection or list[Selection], optional
         The selection criteria to apply to the dataset.
+    transforms : Transform or list[Transform], optional
+        The transforms to apply to the dataset.
 
     Examples
     --------
@@ -67,13 +69,17 @@ class Select(AnnotatedDataset[_TDatum]):
     def __init__(
         self,
         dataset: AnnotatedDataset[_TDatum],
-        selections: Selection[_TDatum] | list[Selection[_TDatum]] | None = None,
+        selections: Selection[_TDatum] | Sequence[Selection[_TDatum]] | None = None,
+        transforms: Transform[_TDatum] | Sequence[Transform[_TDatum]] | None = None,
     ) -> None:
         self.__dict__.update(dataset.__dict__)
         self._dataset = dataset
         self._size_limit = len(dataset)
         self._selection = list(range(self._size_limit))
-        self._selections = self._sort_selections(selections)
+        self._selections = self._sort(selections)
+        self._transforms = (
+            [] if transforms is None else [transforms] if isinstance(transforms, Transform) else transforms
+        )
 
         # Ensure metadata is populated correctly as DatasetMetadata TypedDict
         _metadata = getattr(dataset, "metadata", {})
@@ -81,8 +87,7 @@ class Select(AnnotatedDataset[_TDatum]):
             _metadata["id"] = dataset.__class__.__name__
         self._metadata = DatasetMetadata(**_metadata)
 
-        if self._selections:
-            self._apply_selections()
+        self._select()
 
     @property
     def metadata(self) -> DatasetMetadata:
@@ -92,10 +97,11 @@ class Select(AnnotatedDataset[_TDatum]):
         nt = "\n    "
         title = f"{self.__class__.__name__} Dataset"
         sep = "-" * len(title)
-        selections = f"Selections: [{', '.join([str(s) for s in self._sort_selections(self._selections)])}]"
-        return f"{title}\n{sep}{nt}{selections}{nt}Selected Size: {len(self)}\n\n{self._dataset}"
+        selections = f"Selections: [{', '.join([str(s) for s in self._selections])}]"
+        transforms = f"Transforms: [{', '.join([str(t) for t in self._transforms])}]"
+        return f"{title}\n{sep}{nt}{selections}{nt}{transforms}{nt}Selected Size: {len(self)}\n\n{self._dataset}"
 
-    def _sort_selections(self, selections: Selection[_TDatum] | Sequence[Selection[_TDatum]] | None) -> list[Selection]:
+    def _sort(self, selections: Selection[_TDatum] | Sequence[Selection[_TDatum]] | None) -> list[Selection]:
         if not selections:
             return []
 
@@ -106,13 +112,18 @@ class Select(AnnotatedDataset[_TDatum]):
         selection_list = [selection for category in sorted(grouped) for selection in grouped[category]]
         return selection_list
 
-    def _apply_selections(self) -> None:
+    def _select(self) -> None:
         for selection in self._selections:
             selection(self)
         self._selection = self._selection[: self._size_limit]
 
+    def _transform(self, datum: _TDatum) -> _TDatum:
+        for t in self._transforms:
+            datum = t(datum)
+        return datum
+
     def __getitem__(self, index: int) -> _TDatum:
-        return self._dataset[self._selection[index]]
+        return self._transform(self._dataset[self._selection[index]])
 
     def __iter__(self) -> Iterator[_TDatum]:
         for i in range(len(self)):
