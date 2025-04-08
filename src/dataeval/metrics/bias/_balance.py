@@ -8,7 +8,7 @@ import numpy as np
 import scipy as sp
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 
-from dataeval.config import get_seed
+from dataeval.config import EPSILON, get_seed
 from dataeval.outputs import BalanceOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.utils._bin import get_counts
@@ -128,7 +128,7 @@ def balance(
     # Normalization via entropy
     bin_cnts = get_counts(discretized_data)
     ent_factor = sp.stats.entropy(bin_cnts, axis=0)
-    norm_factor = 0.5 * np.add.outer(ent_factor, ent_factor) + 1e-6
+    norm_factor = 0.5 * np.add.outer(ent_factor, ent_factor) + EPSILON
 
     # in principle MI should be symmetric, but it is not in practice.
     nmi = 0.5 * (mi + mi.T) / norm_factor
@@ -157,7 +157,7 @@ def balance(
     # Classwise normalization via entropy
     classwise_bin_cnts = get_counts(tgt_bin)
     ent_tgt_bin = sp.stats.entropy(classwise_bin_cnts, axis=0)
-    norm_factor = 0.5 * np.add.outer(ent_tgt_bin, ent_factor) + 1e-6
+    norm_factor = 0.5 * np.add.outer(ent_tgt_bin, ent_factor) + EPSILON
     classwise = classwise_mi / norm_factor
 
     # Grabbing factor names for plotting function
