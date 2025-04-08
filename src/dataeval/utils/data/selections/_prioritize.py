@@ -13,13 +13,11 @@ from numpy.typing import NDArray
 from sklearn.cluster import KMeans
 from sklearn.metrics import pairwise_distances
 
-from dataeval.config import DeviceLike, get_seed
+from dataeval.config import EPSILON, DeviceLike, get_seed
 from dataeval.utils.data import Embeddings, Select
 from dataeval.utils.data._selection import Selection, SelectionStage
 
 _logger = logging.getLogger(__name__)
-
-EPSILON = 1e-10
 
 
 class _Clusters:

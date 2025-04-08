@@ -16,6 +16,8 @@ from typing import TypeVar
 import numpy as np
 import torch
 
+from dataeval.config import EPSILON
+
 TGMMData = TypeVar("TGMMData")
 
 
@@ -74,8 +76,7 @@ def gmm_params(z: torch.Tensor, gamma: torch.Tensor) -> GaussianMixtureModelPara
 
     # cholesky decomposition of covariance and determinant derivation
     D = cov.shape[1]
-    eps = 1e-6
-    L = torch.linalg.cholesky(cov + torch.eye(D) * eps)  # K x D x D
+    L = torch.linalg.cholesky(cov + torch.eye(D) * EPSILON)  # K x D x D
     log_det_cov = 2.0 * torch.sum(torch.log(torch.diagonal(L, dim1=-2, dim2=-1)), 1)  # K
 
     return GaussianMixtureModelParams(phi, mu, cov, L, log_det_cov)
