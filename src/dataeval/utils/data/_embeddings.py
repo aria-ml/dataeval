@@ -102,8 +102,8 @@ class Embeddings:
     def __getitem__(self, key: int | slice, /) -> torch.Tensor:
         if isinstance(key, slice):
             return torch.vstack(list(self._batch(range(len(self._dataset))[key]))).to(self.device)
-        elif isinstance(key, int):
-            return self._encoder(torch.as_tensor(self._dataset[key][0]).to(self.device))
+        elif hasattr(key, "__int__"):
+            return self._encoder(torch.as_tensor(self._dataset[int(key)][0]).to(self.device))
         raise TypeError("Invalid argument type.")
 
     def __iter__(self) -> Iterator[torch.Tensor]:
