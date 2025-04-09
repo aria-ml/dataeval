@@ -33,6 +33,8 @@ class Embeddings:
     device : DeviceLike or None, default None
         The hardware device to use if specified, otherwise uses the DataEval
         default or torch default.
+    cache : bool, default False
+        Whether to cache the embeddings in memory.
     verbose : bool, default False
         Whether to print progress bar when encoding images.
     """
@@ -48,9 +50,11 @@ class Embeddings:
         transforms: Transform[torch.Tensor] | Sequence[Transform[torch.Tensor]] | None = None,
         model: torch.nn.Module | None = None,
         device: DeviceLike | None = None,
+        cache: bool = False,
         verbose: bool = False,
     ) -> None:
         self.device = get_device(device)
+        self.cache = cache
         self.batch_size = batch_size
         self.verbose = verbose
 
@@ -60,6 +64,8 @@ class Embeddings:
         self._model = model.to(self.device).eval()
         self._encoder = model.encode if isinstance(model, SupportsEncode) else model
         self._collate_fn = lambda datum: [torch.as_tensor(i) for i, _, _ in datum]
+        self._cached_idx = set()
+        self._embeddings: torch.Tensor | None = None
 
     def to_tensor(self, indices: Sequence[int] | None = None) -> torch.Tensor:
         """
@@ -100,11 +106,25 @@ class Embeddings:
             yield embeddings
 
     def __getitem__(self, key: int | slice, /) -> torch.Tensor:
-        if isinstance(key, slice):
-            return torch.vstack(list(self._batch(range(len(self._dataset))[key]))).to(self.device)
-        elif hasattr(key, "__int__"):
-            return self._encoder(torch.as_tensor(self._dataset[int(key)][0]).to(self.device))
-        raise TypeError("Invalid argument type.")
+        if not isinstance(key, slice) and not hasattr(key, "__int__"):
+            raise TypeError("Invalid argument type.")
+
+        indices = list(range(len(self._dataset))[key]) if isinstance(key, slice) else [int(key)]
+        if self.cache:
+            uncached = [i for i in indices if i not in self._cached_idx]
+            for i, embeddings in enumerate(self._batch(uncached)):
+                batch = uncached[i * self.batch_size : (i + 1) * self.batch_size]
+                if self._embeddings is None:
+                    self._embeddings = torch.empty(
+                        (len(self._dataset), *embeddings.shape[1:]), dtype=embeddings.dtype, device=self.device
+                    )
+                self._embeddings[batch] = embeddings
+                self._cached_idx.update(batch)
+        if self.cache and self._embeddings is not None:
+            embeddings = self._embeddings[indices].to(self.device)
+        else:
+            embeddings = torch.vstack(list(self._batch(indices))).to(self.device)
+        return embeddings.squeeze(0) if len(indices) == 1 else embeddings
 
     def __iter__(self) -> Iterator[torch.Tensor]:
         # process in batches while yielding individual embeddings

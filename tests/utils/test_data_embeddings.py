@@ -166,3 +166,38 @@ class TestEmbeddings:
 
         with pytest.raises(TypeError):
             images["string"]  # type: ignore
+
+    def test_embeddings_cache(self):
+        mock_dataset = MagicMock()
+        mock_dataset.__len__.return_value = 10
+        mock_dataset.__getitem__.side_effect = lambda _: (np.zeros((3, 16, 16)), [], {})
+
+        embs = Embeddings(mock_dataset, 10, model=torch.nn.Identity(), transforms=lambda x: x + 1, cache=True)
+        assert embs._embeddings is None
+
+        # instantiate mixed embeddings
+        part1 = embs[0:4]
+        assert isinstance(part1, torch.Tensor)
+        assert part1.shape == (4, 3, 16, 16)
+
+        assert isinstance(embs._embeddings, torch.Tensor)
+        assert len(embs._embeddings) == 10
+        assert embs._cached_idx == {0, 1, 2, 3}
+        assert np.array_equal(embs._embeddings[0:4], np.ones((4, 3, 16, 16)))
+
+        # zero out remaining uninitialized embeddings
+        embs._embeddings[4:10] = 0
+
+        part2 = embs[2:7]
+        assert isinstance(part2, torch.Tensor)
+        assert part2.shape == (5, 3, 16, 16)
+        assert np.array_equal(embs._embeddings[2:7], np.ones((5, 3, 16, 16)))
+        assert embs._cached_idx == {0, 1, 2, 3, 4, 5, 6}
+
+        part3 = embs[9]
+        assert isinstance(part3, torch.Tensor)
+        assert part3.shape == (3, 16, 16)
+        assert np.array_equal(embs._embeddings[9], np.ones((3, 16, 16)))
+        assert embs._cached_idx == {0, 1, 2, 3, 4, 5, 6, 9}
+
+        assert np.array_equal(embs._embeddings[7:9], np.zeros((2, 3, 16, 16)))
