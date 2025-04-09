@@ -1,6 +1,18 @@
-[//]: # (94b31bf14e66e4d6c6bf4f772396b2c6676b84a8)
+[//]: # (22206752315dfc8ec688ea367d6276fcca1a7a75)
 
 # DataEval Change Log
+
+## v0.83.0
+
+🌟 **Feature Release**
+- `22206752` - Add transforms to Select dataset class
+- `fca7e907` - Add metadata_ood_mi function as find_ood_predictors
+
+🛠️ **Improvements and Enhancements**
+- `54c28111` - Adjust tagline/purpose statement to mention user effort
+
+📝 **Miscellaneous**
+- `bf415bf8` - Update datatsets docstrings for completeness and move Transform type to typing module
 
 ## v0.82.1
 
