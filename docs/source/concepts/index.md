@@ -80,7 +80,7 @@ Analytics and {term}`machine learning<Machine Learning (ML)>` to develop the
 crucial knowledge one must know to become an expert practitioner.
 
 - [Testing & Evaluation Engineer](workflows/TE_engineer_workflow.md)
-- [Artificial Intelligence Engineer](workflows/AI_engineer_workflow.md)
+- [Artificial Intelligence Engineer](workflows/ML_engineer_workflow.md)
 
 :::{toctree}
 :maxdepth: 1
@@ -88,5 +88,6 @@ crucial knowledge one must know to become an expert practitioner.
 
 Operational Machine Learning Lifecycle <workflows/ML_Lifecycle.md>
 Testing & Evaluation Engineer <workflows/TE_engineer_workflow.md>
-Artificial Intelligence Engineer <workflows/AI_engineer_workflow.md>
+Artificial Intelligence Engineer <workflows/ML_engineer_workflow.md>
+Data Scientist <workflows/data_scientist_workflow.md>
 :::
