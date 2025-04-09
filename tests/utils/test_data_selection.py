@@ -157,10 +157,3 @@ class TestSelectionClasses:
         assert select._selection == [6, 4, 2, 0]
         assert "ClassFilter(classes=[0, 1], balance=False)" in str(select_cf)
         assert "Indices(indices=[12, 10, 8, 6, 4, 2, 0])" in str(select)
-
-    def test_transform(self, mock_dataset):
-        select = Select(mock_dataset, transforms=lambda x: (-x[0], *x[1:]) if isinstance(x, tuple) else -x)
-        assert len(select) == 10
-        for i, (data, _, _) in enumerate(select):
-            assert data == -i
-        assert "Transforms: [<function" in str(select)

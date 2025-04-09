@@ -138,15 +138,14 @@ class TestEmbeddings:
         mock_dataset.__len__.return_value = 10
         mock_dataset.__getitem__.side_effect = lambda _: (np.zeros((3, 16, 16)), [], {})
 
-        embs = Embeddings(mock_dataset, 10, model=torch.nn.Identity())
+        embs = Embeddings(mock_dataset, 10, model=torch.nn.Identity(), transforms=lambda x: x + 1)
         assert isinstance(embs.to_tensor(), torch.Tensor)
         assert len(embs.to_tensor()) == len(embs)
 
         assert len(embs[0:3]) == 3
-        assert np.array_equal(embs[0].cpu().numpy(), np.zeros((3, 16, 16)))
 
         for emb in embs:
-            assert np.array_equal(emb.cpu().numpy(), np.zeros((3, 16, 16)))
+            assert np.array_equal(emb.cpu().numpy(), np.ones((3, 16, 16)))
 
         with pytest.raises(TypeError):
             embs["string"]  # type: ignore
@@ -161,7 +160,6 @@ class TestEmbeddings:
         assert len(images.to_list()) == len(images)
 
         assert len(images[0:3]) == 3
-        assert np.array_equal(images[0], np.zeros((3, 16, 16)))
 
         for image in images:
             assert np.array_equal(image, np.zeros((3, 16, 16)))

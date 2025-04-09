@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, Subset
 from tqdm import tqdm
 
 from dataeval.config import DeviceLike, get_device
-from dataeval.typing import Array, Dataset
+from dataeval.typing import Array, Dataset, Transform
 from dataeval.utils.torch.models import SupportsEncode
 
 
@@ -26,6 +26,8 @@ class Embeddings:
         Dataset to access original images from.
     batch_size : int
         Batch size to use when encoding images.
+    transforms : Transform or Sequence[Transform] or None, default None
+        Transforms to apply to images before encoding.
     model : torch.nn.Module or None, default None
         Model to use for encoding images.
     device : DeviceLike or None, default None
@@ -43,6 +45,7 @@ class Embeddings:
         self,
         dataset: Dataset[tuple[Array, Any, Any]],
         batch_size: int,
+        transforms: Transform[torch.Tensor] | Sequence[Transform[torch.Tensor]] | None = None,
         model: torch.nn.Module | None = None,
         device: DeviceLike | None = None,
         verbose: bool = False,
@@ -53,6 +56,7 @@ class Embeddings:
 
         self._dataset = dataset
         model = torch.nn.Flatten() if model is None else model
+        self._transforms = [transforms] if isinstance(transforms, Transform) else transforms
         self._model = model.to(self.device).eval()
         self._encoder = model.encode if isinstance(model, SupportsEncode) else model
         self._collate_fn = lambda datum: [torch.as_tensor(i) for i, _, _ in datum]
@@ -89,7 +93,10 @@ class Embeddings:
             if self.verbose
             else enumerate(dataloader)
         ):
-            embeddings = self._encoder(torch.stack(images).to(self.device))
+            if self._transforms:
+                images = [transform(image) for transform in self._transforms for image in images]
+            images = torch.stack(images).to(self.device)
+            embeddings = self._encoder(images)
             yield embeddings
 
     def __getitem__(self, key: int | slice, /) -> torch.Tensor:

@@ -5,7 +5,7 @@ __all__ = []
 from enum import IntEnum
 from typing import Generic, Iterator, Sequence, TypeVar
 
-from dataeval.typing import AnnotatedDataset, DatasetMetadata, Transform
+from dataeval.typing import AnnotatedDataset, DatasetMetadata
 
 _TDatum = TypeVar("_TDatum")
 
@@ -70,16 +70,12 @@ class Select(AnnotatedDataset[_TDatum]):
         self,
         dataset: AnnotatedDataset[_TDatum],
         selections: Selection[_TDatum] | Sequence[Selection[_TDatum]] | None = None,
-        transforms: Transform[_TDatum] | Sequence[Transform[_TDatum]] | None = None,
     ) -> None:
         self.__dict__.update(dataset.__dict__)
         self._dataset = dataset
         self._size_limit = len(dataset)
         self._selection = list(range(self._size_limit))
         self._selections = self._sort(selections)
-        self._transforms = (
-            [] if transforms is None else [transforms] if isinstance(transforms, Transform) else transforms
-        )
 
         # Ensure metadata is populated correctly as DatasetMetadata TypedDict
         _metadata = getattr(dataset, "metadata", {})
@@ -98,8 +94,7 @@ class Select(AnnotatedDataset[_TDatum]):
         title = f"{self.__class__.__name__} Dataset"
         sep = "-" * len(title)
         selections = f"Selections: [{', '.join([str(s) for s in self._selections])}]"
-        transforms = f"Transforms: [{', '.join([str(t) for t in self._transforms])}]"
-        return f"{title}\n{sep}{nt}{selections}{nt}{transforms}{nt}Selected Size: {len(self)}\n\n{self._dataset}"
+        return f"{title}\n{sep}{nt}{selections}{nt}Selected Size: {len(self)}\n\n{self._dataset}"
 
     def _sort(self, selections: Selection[_TDatum] | Sequence[Selection[_TDatum]] | None) -> list[Selection]:
         if not selections:
@@ -117,13 +112,8 @@ class Select(AnnotatedDataset[_TDatum]):
             selection(self)
         self._selection = self._selection[: self._size_limit]
 
-    def _transform(self, datum: _TDatum) -> _TDatum:
-        for t in self._transforms:
-            datum = t(datum)
-        return datum
-
     def __getitem__(self, index: int) -> _TDatum:
-        return self._transform(self._dataset[self._selection[index]])
+        return self._dataset[self._selection[index]]
 
     def __iter__(self) -> Iterator[_TDatum]:
         for i in range(len(self)):
