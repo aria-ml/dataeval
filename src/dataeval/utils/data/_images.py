@@ -2,11 +2,15 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Any, Generic, Iterator, Sequence, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, Generic, Iterator, Sequence, TypeVar, cast, overload
 
-from dataeval.typing import Dataset
+from dataeval.typing import Array, Dataset
+from dataeval.utils._array import as_numpy, channels_first_to_last
 
-T = TypeVar("T")
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
+
+T = TypeVar("T", bound=Array)
 
 
 class Images(Generic[T]):
@@ -21,7 +25,10 @@ class Images(Generic[T]):
         Dataset to access images from.
     """
 
-    def __init__(self, dataset: Dataset[tuple[T, Any, Any] | T]) -> None:
+    def __init__(
+        self,
+        dataset: Dataset[tuple[T, Any, Any] | T],
+    ) -> None:
         self._is_tuple_datum = isinstance(dataset[0], tuple)
         self._dataset = dataset
 
@@ -40,25 +47,41 @@ class Images(Generic[T]):
         """
         return self[:]
 
+    def plot(
+        self,
+        indices: Sequence[int],
+        images_per_row: int = 3,
+        figsize: tuple[int, int] = (10, 10),
+    ) -> Figure:
+        import matplotlib.pyplot as plt
+
+        num_images = len(indices)
+        num_rows = (num_images + images_per_row - 1) // images_per_row
+        fig, axes = plt.subplots(num_rows, images_per_row, figsize=figsize)
+        for i, ax in enumerate(axes.flatten()):
+            image = channels_first_to_last(as_numpy(self[i]))
+            ax.imshow(image)
+            ax.axis("off")
+        plt.tight_layout()
+        return fig
+
     @overload
     def __getitem__(self, key: int, /) -> T: ...
     @overload
     def __getitem__(self, key: slice, /) -> Sequence[T]: ...
 
     def __getitem__(self, key: int | slice, /) -> Sequence[T] | T:
-        if self._is_tuple_datum:
-            dataset = cast(Dataset[tuple[T, Any, Any]], self._dataset)
-            if isinstance(key, slice):
-                return [dataset[k][0] for k in range(len(self._dataset))[key]]
-            elif isinstance(key, int):
-                return dataset[key][0]
-        else:
-            dataset = cast(Dataset[T], self._dataset)
-            if isinstance(key, slice):
-                return [dataset[k] for k in range(len(self._dataset))[key]]
-            elif isinstance(key, int):
-                return dataset[key]
+        if isinstance(key, slice):
+            return [self._get_image(k) for k in range(len(self._dataset))[key]]
+        elif hasattr(key, "__int__"):
+            return self._get_image(int(key))
         raise TypeError(f"Key must be integers or slices, not {type(key)}")
+
+    def _get_image(self, index: int) -> T:
+        if self._is_tuple_datum:
+            return cast(Dataset[tuple[T, Any, Any]], self._dataset)[index][0]
+        else:
+            return cast(Dataset[T], self._dataset)[index]
 
     def __iter__(self) -> Iterator[T]:
         for i in range(len(self._dataset)):
