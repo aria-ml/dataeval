@@ -14,9 +14,10 @@ with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure
 
 from dataeval.outputs._base import Output
-from dataeval.typing import ArrayLike
-from dataeval.utils._array import to_numpy
+from dataeval.typing import ArrayLike, Dataset
+from dataeval.utils._array import as_numpy, channels_first_to_last
 from dataeval.utils._plot import heatmap
+from dataeval.utils.data._images import Images
 
 TData = TypeVar("TData", np.float64, NDArray[np.float64])
 
@@ -107,13 +108,13 @@ class CoverageOutput(Output):
     critical_value_radii: NDArray[np.float64]
     coverage_radius: float
 
-    def plot(self, images: ArrayLike, top_k: int = 6) -> Figure:
+    def plot(self, images: Images[Any] | Dataset[Any], top_k: int = 6) -> Figure:
         """
         Plot the top k images together for visualization.
 
         Parameters
         ----------
-        images : ArrayLike
+        images : Images or Dataset
             Original images (not embeddings) in (N, C, H, W) or (N, H, W) format
         top_k : int, default 6
             Number of images to plot (plotting assumes groups of 3)
@@ -130,40 +131,31 @@ class CoverageOutput(Output):
         import matplotlib.pyplot as plt
 
         # Determine which images to plot
-        highest_uncovered_indices = self.uncovered_indices[:top_k]
+        selected_indices = self.uncovered_indices[:top_k]
 
-        # Grab the images
-        selected_images = to_numpy(images)[highest_uncovered_indices]
+        images = Images(images) if isinstance(images, Dataset) else images
 
         # Plot the images
-        num_images = min(top_k, len(images))
-
-        ndim = selected_images.ndim
-        if ndim == 4:
-            selected_images = np.moveaxis(selected_images, 1, -1)
-        elif ndim == 3:
-            selected_images = np.repeat(selected_images[:, :, :, np.newaxis], 3, axis=-1)
-        else:
-            raise ValueError(
-                f"Expected a (N,C,H,W) or a (N, H, W) set of images, but got a {ndim}-dimensional set of images."
-            )
+        num_images = min(top_k, len(selected_indices))
 
         rows = int(np.ceil(num_images / 3))
         fig, axs = plt.subplots(rows, 3, figsize=(9, 3 * rows))
 
         if rows == 1:
             for j in range(3):
-                if j >= len(selected_images):
+                if j >= len(selected_indices):
                     continue
-                axs[j].imshow(selected_images[j])
+                image = channels_first_to_last(as_numpy(images[selected_indices[j]]))
+                axs[j].imshow(image)
                 axs[j].axis("off")
         else:
             for i in range(rows):
                 for j in range(3):
                     i_j = i * 3 + j
-                    if i_j >= len(selected_images):
+                    if i_j >= len(selected_indices):
                         continue
-                    axs[i, j].imshow(selected_images[i_j])
+                    image = channels_first_to_last(as_numpy(images[selected_indices[i_j]]))
+                    axs[i, j].imshow(image)
                     axs[i, j].axis("off")
 
         fig.tight_layout()

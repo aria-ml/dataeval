@@ -13,7 +13,7 @@ import torch
 from numpy.typing import NDArray
 
 from dataeval._log import LogMessage
-from dataeval.typing import ArrayLike
+from dataeval.typing import Array, ArrayLike
 
 _logger = logging.getLogger(__name__)
 
@@ -167,3 +167,28 @@ def flatten(array: ArrayLike) -> NDArray[Any]:
     """
     nparr = as_numpy(array)
     return nparr.reshape((nparr.shape[0], -1))
+
+
+_TArray = TypeVar("_TArray", bound=Array)
+
+
+def channels_first_to_last(array: _TArray) -> _TArray:
+    """
+    Converts array from channels first to channels last format
+
+    Parameters
+    ----------
+    array : ArrayLike
+        Input array
+
+    Returns
+    -------
+    ArrayLike
+        Converted array
+    """
+    if isinstance(array, np.ndarray):
+        return np.transpose(array, (1, 2, 0))
+    elif isinstance(array, torch.Tensor):
+        return torch.permute(array, (1, 2, 0))
+    else:
+        raise TypeError(f"Unsupported array type {type(array)} for conversion.")
