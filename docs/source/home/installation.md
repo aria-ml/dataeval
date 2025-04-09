@@ -14,9 +14,9 @@ We currently support python versions ``3.9`` - ``3.12``
 Now that you have a chosen which DataEval to install, the following methods
 will show you how to install using your preferred method.
 
-::::{tab-set}
+:::::{tab-set}
 
-:::{tab-item} pip
+::::{tab-item} pip
 Installing from `pip`
 
 ```bash
@@ -43,18 +43,24 @@ Installing from `pip` with extras
 pip install dataeval[all]
 ```
 
-:::
+::::
 
-:::{tab-item} conda-forge
+::::{tab-item} conda-forge
 Installing from `conda`
 
 ```bash
-conda install dataeval -c conda-forge
+conda install -c conda-forge dataeval
 ```
+
+:::{note}
+
+Conda installs all *extras* automatically
 
 :::
 
-:::{tab-item} source
+::::
+
+::::{tab-item} source
 
 To install DataEval from source locally on Ubuntu, you will need git-lfs to
 download larger, binary source files and poetry for project dependency
@@ -95,8 +101,8 @@ virtual environment directly in the shell.
     poetry shell
 ```
 
-:::
-
 ::::
+
+:::::
 
 <!-- code languages for text found at https://pygments.org/languages/ -->

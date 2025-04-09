@@ -30,6 +30,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.graphviz",
     "sphinx.ext.mathjax",
+    "sphinx_tabs.tabs",
     # External extensions
     "autoapi.extension",
     "enum_tools.autoenum",

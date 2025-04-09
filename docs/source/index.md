@@ -41,19 +41,62 @@
 
 ## Key Features
 
-DataEval provides many powerful tools to assist in the following T&E tasks:
+DataEval empowers professionals across domains with tools designed to
+enhance their workflows. Explore capabilities specific to your role:
 
-- **Model-agnostic metrics that bound real-world performance**
-  - relevance/completeness/coverage
-  - metafeatures (data complexity)
-- **Model-specific metrics that guide model selection and training**
-  - dataset sufficiency
-  - data/model complexity mismatch
-- **Metrics for post-deployment monitoring of data with bounds on model
- performance to guide retraining**
-  - dataset-shift metrics
-  - model performance bounds under covariate shift
-  - guidance on sampling to assess model error and model retraining
+::::{tab-set}
+
+:::{tab-item} T&E Engineer
+
+Maximize your evaluation processes with tools designed
+for accuracy and reliability:
+
+- Robust Testing: Reduce errors with metrics that reliably work with state of
+  the art image classification and object detection datasets
+- Post-Deployment Monitoring: Keep models on track with
+  easy-to-implement logging of {term}`Operational Drift` metrics
+- Responsive metrics: Optimize evaluation with tailored guidance for error
+  assessment and retraining.
+
+📖 [Learn more about tools for Test & Evaluation Engineers.](./concepts/workflows/TE_engineer_workflow.md)
+
+:::
+
+:::{tab-item} ML Engineer
+
+Accelerate model development with powerful insights for training and deployment:
+
+- Model-Specific Metrics: Evaluate dataset {term}`Sufficiency` and detect
+  data/model complexity mismatches.
+- Performance Optimization: Establish bounds on real-world model performance
+  for improved training strategies.
+- Drift Detection: Rapidly diagnose model degradation under
+  {term}`Operational Drift` to maintain model accuracy and stability.
+
+📖 [Learn more about tools for Machine Learning Engineers.](./concepts/workflows/ML_engineer_workflow.md)
+
+:::
+
+:::{tab-item} Data Scientist
+
+Drive innovation with data-focused tools that uncover hidden patterns and
+complexities:
+
+- Metafeatures: Leverage metrics to analyze data complexity and improve
+  data-driven decisions based on metadata features.
+- Real-World Insights: Improve dataset sampling and improve
+  {term}`Balance`, {term}`Completeness`, and {term}`Coverage`.
+- Error Analysis: Gain actionable feedback to refine datasets and improve
+  performance.
+- Complete Shift Analysis: Quantify impactful changes in data due to
+  [Covariate Shift](./concepts/Drift.md#covariate-shift), {term}`Label Shift`,
+  and {term}`Concept Drift` before they impact your model.
+
+📖 [Learn more about tools for Data Scientists.](./concepts/workflows/data_scientist_workflow.md)
+
+:::
+
+::::
 
 ## Acknowledgement
 
