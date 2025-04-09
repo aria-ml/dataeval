@@ -35,8 +35,6 @@ class Select(AnnotatedDataset[_TDatum]):
         The dataset to wrap.
     selections : Selection or list[Selection], optional
         The selection criteria to apply to the dataset.
-    transforms : Transform or list[Transform], optional
-        The transforms to apply to the dataset.
 
     Examples
     --------
