@@ -1,16 +1,18 @@
+import re
+from unittest.mock import MagicMock
+
 import numpy as np
 import pytest
 from numpy.typing import NDArray
 
 from dataeval.outputs._utils import SplitDatasetOutput
+from dataeval.utils.data._metadata import Metadata
 from dataeval.utils.data._split import (
-    _validate_labels,
-    bin_kmeans,
     calculate_validation_fraction,
-    get_group_ids,
-    is_groupable,
-    is_stratifiable,
     split_dataset,
+    validate_groupable,
+    validate_labels,
+    validate_stratifiable,
 )
 
 
@@ -31,7 +33,16 @@ def groups(_base, RNG):
     """Creates 100 labels and corresponding groups"""
 
     values = np.tile(_base, 20)  # ex. [0, 1, 0, 1, ...]
-    return {"Discrete": values, "Continuous": RNG.normal(loc=values)}
+    return {"Discrete": values, "Binned": RNG.choice(_base, size=100).astype(np.intp)}
+
+
+def get_metadata(labels, groups=None) -> Metadata:
+    metadata = MagicMock(spec=Metadata)
+    metadata.class_labels = labels
+    if groups is not None:
+        metadata.discrete_factor_names = ["Discrete", "Binned"]
+        metadata.discrete_data = np.column_stack(tuple(groups.values()))
+    return metadata
 
 
 def check_sample_leakage(splits: SplitDatasetOutput):
@@ -92,23 +103,17 @@ def check_group_leakage(splits: SplitDatasetOutput, metadata: dict[str, NDArray]
 class TestInputValidation:
     """Tests the boundaries of the inputs to split dataset"""
 
-    @pytest.mark.parametrize("invalid_metadata", [None, {}])
-    def test_missing_metadata(self, invalid_metadata):
-        """Tests that empty or no metadata raises an error if split_on is specified"""
-
-        with pytest.raises(TypeError, match="If split_on is specified, metadata must also be provided, got None"):
-            split_dataset([0, 1, 1], num_folds=2, split_on=["Discrete_Int"], metadata=invalid_metadata)
-
     def test_not_stratifiable(self):
         """Tests case where lowest label count is less than partitions"""
 
-        with pytest.warns(UserWarning):
-            assert not is_stratifiable(np.array([0, 1, 1]), 2)
+        with pytest.raises(ValueError):
+            assert not validate_stratifiable(np.array([0, 1, 1]), 2)
 
     def test_stratifiable(self):
         """Tests that equal lowest label count and partitions is valid"""
 
-        assert is_stratifiable(np.array([0, 0, 1, 1]), 2)
+        validate_stratifiable(np.array([0, 0, 1, 1]), 2)
+        pass
 
     def test_continuous_labels(self, labels):
         """Tests that validate labels raises error with continuous labels"""
@@ -116,7 +121,7 @@ class TestInputValidation:
         cont_labels = labels.astype(np.float64) + np.random.uniform(-1, 1, size=labels.shape)
         error_statement = "Detected continuous labels. Labels must be discrete for proper stratification"
         with pytest.raises(ValueError, match=error_statement):
-            _validate_labels(cont_labels, total_partitions=2)
+            validate_labels(cont_labels, total_partitions=2)
 
     def test_too_many_partitions(self):
         """Tests that an error is raised if there are more partitions than number of labels"""
@@ -127,7 +132,7 @@ class TestInputValidation:
         )
 
         with pytest.raises(ValueError, match=error_statement):
-            _validate_labels(np.array([0]), total_partitions=1)
+            validate_labels(np.array([0]), total_partitions=1)
 
     @pytest.mark.parametrize("folds", (-1, 0))
     def test_invalid_folds(self, folds):
@@ -196,60 +201,48 @@ class TestInputValidation:
 
 @pytest.mark.required
 class TestGroupData:
-    def test_label_metadata_length_mismatch(self, labels, groups):
-        """Tests the case where the length of metadata values is not the same as the labels"""
-
-        # Create copy to prevent affecting other tests. Underlying NDArrays are shared
-        metadata = dict(groups)
-        metadata.update({"Discrete": np.repeat(metadata["Discrete"], 2)})
-        error_statement = (
-            f"Feature length does not match number of labels. "
-            f"Got {len(metadata['Discrete'])} features and {labels.shape[0]} samples"
-        )
-        with pytest.raises(ValueError, match=error_statement):
-            get_group_ids(metadata=metadata, group_names=list(metadata.keys()), num_samples=len(labels))
-
-    def test_too_few_unique_groups(self, groups: dict[str, NDArray]):
-        """Tests that too many folds over small groups of data raises a warning and is not groupable"""
+    def test_too_few_unique_groups(self, groups):
+        """Tests that too many folds over small groups of data raises error and is not groupable"""
 
         values = groups["Discrete"]
         uniques, group_ids = np.unique(values, axis=0, return_inverse=True)
 
-        error_msg = (
-            f"Groups must be greater than num partitions. Got {len(uniques)} and {len(uniques) + 1}. "
-            "Reverting to ungrouped partitioning"
-        )
-        with pytest.warns(UserWarning, match=error_msg):
-            result = is_groupable(group_ids, len(uniques) + 1)
-
-        assert not result
+        error_msg = f"Unique groups ({len(uniques)}) must be greater than num partitions ({len(uniques) + 1})."
+        with pytest.raises(ValueError, match=re.escape(error_msg)):
+            validate_groupable(group_ids, len(uniques) + 1)
 
     def test_single_unique_group(self):
         """Tests that a single unique group is not groupable"""
-        result = is_groupable(np.ones(shape=(100, 1), dtype=np.intp), 1000)
-        assert not result
+        error_msg = "Unique groups (1) must be greater than 1."
+        with pytest.raises(ValueError, match=re.escape(error_msg)):
+            validate_groupable(np.ones(shape=(100, 1), dtype=np.intp), 1000)
+
+    def test_no_valid_groups(self, labels, groups):
+        metadata = get_metadata(labels, groups)
+        keys = ["Foo", "Bar"]
+        error_msg = "Unique groups (1) must be greater than 1."
+        with pytest.raises(ValueError, match=re.escape(error_msg)):
+            split_dataset(
+                metadata,
+                num_folds=1,
+                stratify=False,
+                split_on=keys,
+                val_frac=0.2,
+                test_frac=0.5,
+            )
 
 
-@pytest.mark.optional
-def test_list_labels(labels):
-    """Tests proper stratification when given a list of labels"""
-
-    splits = split_dataset(labels.tolist(), num_folds=1, stratify=True, val_frac=0.1, test_frac=0.1)
-    check_sample_leakage(splits)
-    check_stratification(labels, splits, tolerance=0.01)
-
-
-@pytest.mark.optional
+@pytest.mark.required
 @pytest.mark.parametrize("val_frac", (0.1, 0.7, 0.99))
 def test_split_dataset(labels, val_frac) -> None:
     """Tests no sample leakage at varying validation fractions"""
-
-    splits = split_dataset(labels, val_frac=val_frac)
+    metadata = get_metadata(labels)
+    splits = split_dataset(metadata, val_frac=val_frac)
     check_sample_leakage(splits)
 
 
-@pytest.mark.optional
-@pytest.mark.parametrize("num_folds", [1, 10])
+@pytest.mark.required
+@pytest.mark.parametrize("num_folds", [1, 5])
 @pytest.mark.parametrize("test_frac", [0.0, 0.25])
 class TestFunctionalSplits:
     """Tests split dataset for label miscounts, group and sample leakage, and proper stratification"""
@@ -257,22 +250,23 @@ class TestFunctionalSplits:
     def test_stratification(self, labels, num_folds, test_frac):
         """Tests stratification with no grouping"""
 
+        metadata = get_metadata(labels)
         val_frac = 0.1 if num_folds == 1 else 0.0
-        splits = split_dataset(labels, num_folds=num_folds, stratify=True, val_frac=val_frac, test_frac=test_frac)
+        splits = split_dataset(metadata, num_folds=num_folds, stratify=True, val_frac=val_frac, test_frac=test_frac)
         check_sample_leakage(splits)
         check_stratification(labels, splits, tolerance=0.01)
 
     def test_grouping(self, labels, groups, num_folds, test_frac):
         """Tests grouping with no stratification"""
 
+        metadata = get_metadata(labels, groups)
         val_frac = 0.1 if num_folds == 1 else 0.0
         keys: list[str] = list(groups.keys())
         splits = split_dataset(
-            labels,
+            metadata,
             num_folds=num_folds,
             stratify=False,
             split_on=keys,
-            metadata=groups,
             val_frac=val_frac,
             test_frac=test_frac,
         )
@@ -282,29 +276,17 @@ class TestFunctionalSplits:
     def test_grouped_stratification(self, labels, groups, test_frac, num_folds):
         """Tests grouping and stratification"""
 
+        metadata = get_metadata(labels, groups)
         val_frac = 0.1 if num_folds == 1 else 0.0
         keys: list[str] = list(groups.keys())
         splits = split_dataset(
-            labels,
+            metadata,
             num_folds=num_folds,
             stratify=True,
             split_on=keys,
-            metadata=groups,
             val_frac=val_frac,
             test_frac=test_frac,
         )
         check_sample_leakage(splits)
         check_group_leakage(splits, groups, keys)
         check_stratification(labels, splits, tolerance=0.15)
-
-
-@pytest.mark.required
-def test_get_groupids_empty():
-    empty = get_group_ids({}, [], 1)
-    assert empty == np.array([0], dtype=np.intp)
-
-
-@pytest.mark.required
-def test_bin_kmeans_ndim_not_1():
-    bins = bin_kmeans(np.random.random((100, 2)))
-    assert bins.shape == (100,)
