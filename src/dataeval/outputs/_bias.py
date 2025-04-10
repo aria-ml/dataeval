@@ -163,6 +163,23 @@ class CoverageOutput(Output):
 
 
 @dataclass(frozen=True)
+class CompletenessOutput(Output):
+    """
+    Output from the completeness function.
+
+    Attributes
+    ----------
+    fraction_filled : float
+        Fraction of boxes that contain at least one data point
+    empty_box_centers : List[np.ndarray]
+        List of coordinates for centers of empty boxes
+    """
+
+    fraction_filled: float
+    empty_box_centers: NDArray[np.float64]
+
+
+@dataclass(frozen=True)
 class BalanceOutput(Output):
     """
     Output class for :func:`.balance` :term:`bias<Bias>` metric.
