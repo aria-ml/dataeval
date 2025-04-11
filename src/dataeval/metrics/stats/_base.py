@@ -156,6 +156,12 @@ def process_stats_unpack(
     return process_stats(*args, per_box=per_box, per_channel=per_channel, stats_processor_cls=stats_processor_cls)
 
 
+def _enumerate(dataset: Dataset[Array] | Dataset[tuple[Array, Any, Any]], per_box: bool):
+    for i in range(len(dataset)):
+        d = dataset[i]
+        yield i, d[0] if isinstance(d, tuple) else d, d[1] if isinstance(d, tuple) and per_box else None
+
+
 def run_stats(
     dataset: Dataset[Array] | Dataset[tuple[Array, Any, Any]],
     per_box: bool,
@@ -201,11 +207,6 @@ def run_stats(
 
     warning_list = []
     stats_processor_cls = stats_processor_cls if isinstance(stats_processor_cls, Iterable) else [stats_processor_cls]
-
-    def _enumerate(dataset: Dataset[Array] | Dataset[tuple[Array, Any, Any]], per_box: bool):
-        for i in range(len(dataset)):
-            d = dataset[i]
-            yield i, d[0] if isinstance(d, tuple) else d, d[1] if isinstance(d, tuple) and per_box else None
 
     with Pool(processes=get_max_processes()) as p:
         for r in tqdm.tqdm(

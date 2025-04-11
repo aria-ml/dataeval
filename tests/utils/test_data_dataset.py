@@ -76,6 +76,10 @@ class TestDatasetValidateData:
         with pytest.raises(TypeError, match="Boxes must be a sequence of sequences"):
             _validate_data("od", images, od_labels, self.bad_boxes_type, None)  # type: ignore
 
+    def test_validate_data_unknown_datum_type(self, images, ic_labels):
+        with pytest.raises(ValueError, match="Unknown datum type"):
+            _validate_data("unknown", images, ic_labels, None, None)  # type: ignore
+
 
 class TestDatasetFactoryFunctions:
     def test_to_image_classification_dataset(self, images, ic_labels, classes):
