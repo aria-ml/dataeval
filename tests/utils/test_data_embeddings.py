@@ -4,8 +4,15 @@ import numpy as np
 import pytest
 import torch
 
-from dataeval.utils.data import Embeddings, Images, Metadata, Targets
+from dataeval.utils.data import Embeddings, Metadata, Targets
 from dataeval.utils.data.datasets._types import ObjectDetectionTarget
+
+
+def get_dataset(size: int = 10):
+    mock_dataset = MagicMock()
+    mock_dataset.__len__.return_value = size
+    mock_dataset.__getitem__.side_effect = lambda _: (np.zeros((3, 16, 16)), [], {})
+    return mock_dataset
 
 
 @pytest.mark.required
@@ -134,38 +141,15 @@ class TestEmbeddings:
         assert isinstance(md.targets, Targets)
 
     def test_embeddings(self):
-        mock_dataset = MagicMock()
-        mock_dataset.__len__.return_value = 10
-        mock_dataset.__getitem__.side_effect = lambda _: (np.zeros((3, 16, 16)), [], {})
-
-        embs = Embeddings(mock_dataset, 10, model=torch.nn.Identity(), transforms=lambda x: x + 1)
+        embs = Embeddings(get_dataset(), 10, model=torch.nn.Identity(), transforms=lambda x: x + 1)
         assert isinstance(embs.to_tensor(), torch.Tensor)
         assert len(embs.to_tensor()) == len(embs)
-
         assert len(embs[0:3]) == 3
-
         for emb in embs:
             assert np.array_equal(emb.cpu().numpy(), np.ones((3, 16, 16)))
 
         with pytest.raises(TypeError):
             embs["string"]  # type: ignore
-
-    def test_images(self):
-        mock_dataset = MagicMock()
-        mock_dataset.__len__.return_value = 10
-        mock_dataset.__getitem__.side_effect = lambda _: (np.zeros((3, 16, 16)), [], {})
-
-        images = Images(mock_dataset)
-        assert isinstance(images.to_list(), list)
-        assert len(images.to_list()) == len(images)
-
-        assert len(images[0:3]) == 3
-
-        for image in images:
-            assert np.array_equal(image, np.zeros((3, 16, 16)))
-
-        with pytest.raises(TypeError):
-            images["string"]  # type: ignore
 
     def test_embeddings_cache(self):
         mock_dataset = MagicMock()

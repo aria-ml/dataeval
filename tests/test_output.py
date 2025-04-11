@@ -40,6 +40,7 @@ class TestOutputMetadata:
     def test_output_metadata_str(self):
         output = mock_metric(1, True, "value")
         assert "MockOutput(test1=1" in str(output)
+        assert "MockOutput(test1=1" in repr(output)
 
     def test_output_metadata_repr(self):
         output = mock_metric(1, True, "value")
@@ -108,6 +109,7 @@ class TestCollectionOutput:
         assert t.meta() == ExecutionMetadata.empty()
         assert len(t) == 1
         assert t.data() == self.dict_data
+        assert repr(t)
 
     def test_mapping_output_meta(self):
         @set_metadata
@@ -118,6 +120,7 @@ class TestCollectionOutput:
         assert t.meta() != {}
         assert len(t) == 1
         assert t.data() == self.dict_data
+        assert repr(t)
 
     def test_sequence_output(self):
         t = MockSequenceOutput(self.list_data)

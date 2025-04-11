@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -93,6 +93,15 @@ class TestPrioritizeSorters:
     def test_kmeans_sorter_with_c_greater_than_samples_raises_valueerror(self):
         with pytest.raises(ValueError):
             _KMeansComplexitySorter(c=10, samples=10)
+
+    @patch("dataeval.utils.data.selections._prioritize.KMeans")
+    def test_kmeans_sorter_kmeans_returns_none(self, mock_kmeans_cls):
+        mock_kmeans = mock_kmeans_cls.return_value
+        mock_kmeans.labels_ = None
+        mock_kmeans.cluster_centers_ = None
+        sorter = _KMeansDistanceSorter(c=2, samples=len(self.embeddings))
+        with pytest.raises(ValueError):
+            sorter._sort(self.embeddings)
 
 
 class TestPrioritizeSelection:

@@ -1,9 +1,11 @@
 import warnings
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
 
 from dataeval.metrics.bias._parity import label_parity, parity
+from dataeval.utils.data._metadata import Metadata
 from tests.conftest import preprocess
 
 
@@ -139,6 +141,13 @@ class TestLabelIndependenceUnit:
             warnings.simplefilter("ignore")
             label_parity(labels_expected, labels_observed)
 
+    def test_empty_metadata(self):
+        mock_metadata = MagicMock(spec=Metadata)
+        mock_metadata.discrete_factor_names = []
+        mock_metadata.continuous_factor_names = []
+        with pytest.raises(ValueError):
+            parity(mock_metadata)
+
 
 @pytest.mark.optional
 class TestLabelIndependenceFunctional:
@@ -191,6 +200,14 @@ class TestMDParityUnit:
         factors = {"factor1": ["foo"] * 10}
         metadata = preprocess(factors, labels)
         parity(metadata)
+
+    @pytest.mark.requires_all
+    def test_to_dataframe(self):
+        labels = [0] * 5 + [1] * 5
+        factors = {"factor1": ["foo"] * 10}
+        metadata = preprocess(factors, labels)
+        df = parity(metadata).to_dataframe()
+        assert df is not None
 
 
 class TestMDParityFunctional:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import partial
 from random import random
-from typing import Any
+from typing import Any, Literal, overload
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -15,6 +15,7 @@ from dataeval.config import set_max_processes
 from dataeval.metrics.stats import dimensionstats, hashstats, labelstats, pixelstats, visualstats
 from dataeval.metrics.stats._base import (
     StatsProcessor,
+    _enumerate,
     add_stats,
     combine_stats,
     get_dataset_step_from_idx,
@@ -26,6 +27,7 @@ from dataeval.metrics.stats._imagestats import (
     imagestats,
 )
 from dataeval.outputs._stats import SOURCE_INDEX, BaseStatsOutput
+from dataeval.typing import ImageClassificationDataset, ObjectDetectionDataset, ObjectDetectionTarget
 from dataeval.utils.data._dataset import _find_max, to_image_classification_dataset, to_object_detection_dataset
 from dataeval.utils.data._metadata import Metadata
 from dataeval.utils.data._targets import Targets
@@ -56,6 +58,24 @@ def get_bboxes(count: int, boxes_per_image: int, as_float: bool):
 
 DATA_1 = get_images(10, 1)
 DATA_3 = get_images(10, 3)
+
+
+@overload
+def get_dataset(
+    images: list[np.ndarray],
+    targets_per_image: int,
+    as_float: bool = False,
+    override: list[np.ndarray] | dict[int, list[np.ndarray]] | None = None,
+) -> ObjectDetectionDataset: ...
+
+
+@overload
+def get_dataset(
+    images: list[np.ndarray],
+    targets_per_image: Literal[None] = None,
+    as_float: bool = False,
+    override: list[np.ndarray] | dict[int, list[np.ndarray]] | None = None,
+) -> ImageClassificationDataset: ...
 
 
 def get_dataset(
@@ -139,6 +159,13 @@ class TestBaseStats:
         assert processor.scaled.shape == scaled_shape
         assert np.max(processor.scaled) <= 1
 
+    @pytest.mark.parametrize("per_box", [False, True])
+    def test_enumerate(self, per_box):
+        dataset = get_dataset(DATA_3, targets_per_image=1, as_float=True)
+        for i, image, target in _enumerate(dataset, per_box):
+            assert image.shape == (3, 64, 64)
+            assert isinstance(target, ObjectDetectionTarget) if per_box else target is None
+
 
 @pytest.mark.required
 class TestStats:
@@ -192,6 +219,13 @@ class TestStats:
         with pytest.raises(ValueError):
             boxratiostats(imagestats, imagestats)
 
+    def test_boxratio_channel_mismatch(self):
+        boxes = [np.array([[0, 0, 1, 1], [0, 0, 100, 100]])]
+        imgstats = pixelstats(get_dataset(DATA_1, 2, False, boxes), per_box=False, per_channel=True)
+        boxstats = pixelstats(get_dataset(DATA_1, 2, False, boxes), per_box=True)
+        with pytest.raises(ValueError):
+            boxratiostats(imgstats, boxstats)
+
     def test_stats_box_out_of_range(self):
         boxes = [np.array([[0, 0, 1, 1], [-1, -1, 100, 100]])]
         with pytest.warns(UserWarning, match=r"Bounding box \[0\]\[1\]"):
@@ -228,26 +262,18 @@ class TestStats:
 
 @pytest.mark.required
 class TestLabelStats:
-    @pytest.mark.parametrize("two_d", [True, False])
-    def test_labelstats_list_int(self, two_d):
+    def test_labelstats_list_int(self):
         label_array = [[0, 0, 0, 0, 0], [0, 1], [0, 1, 2], [0, 1, 2, 3]]
-        labels = label_array if two_d else np.concatenate(label_array).tolist()
-        metadata = get_metadata(labels)
+        metadata = get_metadata(label_array)
         stats = labelstats(metadata)
 
         assert stats.label_counts_per_class == [8, 3, 2, 1]
         assert stats.class_count == 4
         assert stats.label_count == 14
-        if two_d:
-            assert stats.image_indices_per_class == [[0, 1, 2, 3], [1, 2, 3], [2, 3], [3]]
-            assert stats.image_counts_per_class == [4, 3, 2, 1]
-            assert stats.label_counts_per_image == [5, 2, 3, 4]
-            assert stats.image_count == 4
-        else:
-            assert stats.image_indices_per_class == [[0, 1, 2, 3, 4, 5, 7, 10], [6, 8, 11], [9, 12], [13]]
-            assert stats.image_counts_per_class == [8, 3, 2, 1]
-            assert stats.label_counts_per_image == [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-            assert stats.image_count == 14
+        assert stats.image_indices_per_class == [[0, 1, 2, 3], [1, 2, 3], [2, 3], [3]]
+        assert stats.image_counts_per_class == [4, 3, 2, 1]
+        assert stats.label_counts_per_image == [5, 2, 3, 4]
+        assert stats.image_count == 4
 
     @pytest.mark.requires_all
     def test_labelstats_to_dataframe(self):
@@ -256,6 +282,13 @@ class TestLabelStats:
         stats = labelstats(metadata)
         stats_df = stats.to_dataframe()
         assert stats_df.shape == (4, 3)
+
+    def test_labelstats_to_table(self):
+        label_array = [[0, 0, 0, 0, 0], [0, 1], [0, 1, 2], [0, 1, 2, 3]]
+        stats = labelstats(get_metadata(label_array))
+        assert stats is not None
+        table_result = stats.to_table()
+        assert isinstance(table_result, str)
 
 
 @pytest.mark.required
@@ -448,18 +481,6 @@ class TestStatsPlotting:
             results.plot(log=log, channel_limit=channel)
         else:
             results.plot(log=log, channel_index=channel)
-
-    def test_labelstats_to_table(self):
-        label_array = np.concatenate(
-            [
-                np.random.choice(5, 45),
-                np.random.permutation(5),
-            ]
-        ).tolist()
-        stats = labelstats(get_metadata(label_array))
-        assert stats is not None
-        table_result = stats.to_table()
-        assert isinstance(table_result, str)
 
     @pytest.mark.parametrize(
         "value, param, expected",

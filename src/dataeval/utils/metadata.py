@@ -214,7 +214,7 @@ def flatten(
                 output[k] = cv
             else:
                 dropped_inner.setdefault(k, set()).add(DropReason.INCONSISTENT_KEY)
-        elif not isinstance(cv, list):
+        else:
             output[k] = cv if not size else [cv] * size
 
     if fully_qualified:
