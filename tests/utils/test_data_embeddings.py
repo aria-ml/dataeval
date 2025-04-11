@@ -173,7 +173,7 @@ class TestEmbeddings:
         mock_dataset.__getitem__.side_effect = lambda _: (np.zeros((3, 16, 16)), [], {})
 
         embs = Embeddings(mock_dataset, 10, model=torch.nn.Identity(), transforms=lambda x: x + 1, cache=True)
-        assert embs._embeddings is None
+        assert not embs._embeddings.shape
 
         # instantiate mixed embeddings
         part1 = embs[0:4]
@@ -201,3 +201,31 @@ class TestEmbeddings:
         assert embs._cached_idx == {0, 1, 2, 3, 4, 5, 6, 9}
 
         assert np.array_equal(embs._embeddings[7:9], np.zeros((2, 3, 16, 16)))
+
+    def test_embeddings_cache_hit(self):
+        mock_dataset = MagicMock()
+        mock_dataset.__len__.return_value = 10
+        mock_dataset.__getitem__.side_effect = lambda _: (np.zeros((3, 16, 16)), [], {})
+
+        embs = Embeddings(mock_dataset, 10, model=torch.nn.Identity(), transforms=lambda x: x + 1, cache=True)
+        t1 = embs.to_tensor()
+        assert isinstance(t1, torch.Tensor)
+        assert len(t1) == 10
+        assert np.array_equal(t1, np.ones((10, 3, 16, 16)))
+
+        embs._embeddings[0:10] = 0
+        t2 = embs.to_tensor()
+        assert np.array_equal(t2, np.zeros((10, 3, 16, 16)))
+
+    def test_embeddings_from_array(self):
+        arr = np.array([[1, 2], [3, 4], [5, 6]])
+        embs = Embeddings.from_array(arr)
+        assert isinstance(embs, Embeddings)
+        assert len(embs) == arr.shape[0]
+        assert np.array_equal(embs.to_tensor().numpy(), arr)
+
+    def test_embeddings_shallow_no_embeddings(self):
+        embs = Embeddings([], 1)
+        embs._shallow = True
+        with pytest.raises(ValueError):
+            embs[0]
