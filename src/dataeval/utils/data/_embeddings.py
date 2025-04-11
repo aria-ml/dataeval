@@ -3,7 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 import math
-from typing import Any, Iterator, Sequence
+from typing import Any, Iterator, Sequence, cast
 
 import torch
 from torch.utils.data import DataLoader, Subset
@@ -55,17 +55,19 @@ class Embeddings:
     ) -> None:
         self.device = get_device(device)
         self.cache = cache
-        self.batch_size = batch_size
+        self.batch_size = batch_size if batch_size > 0 else 1
         self.verbose = verbose
 
         self._dataset = dataset
+        self._length = len(dataset)
         model = torch.nn.Flatten() if model is None else model
         self._transforms = [transforms] if isinstance(transforms, Transform) else transforms
         self._model = model.to(self.device).eval()
         self._encoder = model.encode if isinstance(model, SupportsEncode) else model
         self._collate_fn = lambda datum: [torch.as_tensor(i) for i, _, _ in datum]
         self._cached_idx = set()
-        self._embeddings: torch.Tensor | None = None
+        self._embeddings: torch.Tensor = torch.empty(())
+        self._shallow: bool = False
 
     def to_tensor(self, indices: Sequence[int] | None = None) -> torch.Tensor:
         """
@@ -89,47 +91,96 @@ class Embeddings:
         else:
             return self[:]
 
-    # Reduce overhead cost by not tracking tensor gradients
-    @torch.no_grad
+    @classmethod
+    def from_array(cls, array: Array, device: DeviceLike | None = None) -> Embeddings:
+        """
+        Instantiates a shallow Embeddings object using an array.
+
+        Parameters
+        ----------
+        array : Array
+            The array to convert to embeddings.
+        device : DeviceLike or None, default None
+            The hardware device to use if specified, otherwise uses the DataEval
+            default or torch default.
+
+        Returns
+        -------
+        Embeddings
+
+        Example
+        -------
+        >>> import numpy as np
+        >>> from dataeval.utils.data._embeddings import Embeddings
+        >>> array = np.random.randn(100, 3, 224, 224)
+        >>> embeddings = Embeddings.from_array(array)
+        >>> print(embeddings.to_tensor().shape)
+        torch.Size([100, 3, 224, 224])
+        """
+        embeddings = Embeddings([], 0, None, None, device, True, False)
+        embeddings._length = len(array)
+        embeddings._cached_idx = set(range(len(array)))
+        embeddings._embeddings = torch.as_tensor(array).to(get_device(device))
+        embeddings._shallow = True
+        return embeddings
+
+    def _encode(self, images: list[torch.Tensor]) -> torch.Tensor:
+        if self._transforms:
+            images = [transform(image) for transform in self._transforms for image in images]
+        return self._encoder(torch.stack(images).to(self.device))
+
+    @torch.no_grad()  # Reduce overhead cost by not tracking tensor gradients
     def _batch(self, indices: Sequence[int]) -> Iterator[torch.Tensor]:
-        # manual batching
-        dataloader = DataLoader(Subset(self._dataset, indices), batch_size=self.batch_size, collate_fn=self._collate_fn)  # type: ignore
-        for i, images in (
-            tqdm(enumerate(dataloader), total=math.ceil(len(indices) / self.batch_size), desc="Batch processing")
-            if self.verbose
-            else enumerate(dataloader)
-        ):
-            if self._transforms:
-                images = [transform(image) for transform in self._transforms for image in images]
-            images = torch.stack(images).to(self.device)
-            embeddings = self._encoder(images)
-            yield embeddings
+        dataset = cast(torch.utils.data.Dataset[tuple[Array, Any, Any]], self._dataset)
+        total_batches = math.ceil(len(indices) / self.batch_size)
+
+        # If not caching, process all indices normally
+        if not self.cache:
+            for images in tqdm(
+                DataLoader(Subset(dataset, indices), self.batch_size, collate_fn=self._collate_fn),
+                total=total_batches,
+                desc="Batch embedding",
+                disable=not self.verbose,
+            ):
+                yield self._encode(images)
+            return
+
+        # If caching, process each batch of indices at a time, preserving original order
+        for i in tqdm(range(0, len(indices), self.batch_size), desc="Batch embedding", disable=not self.verbose):
+            batch = indices[i : i + self.batch_size]
+            uncached = [idx for idx in batch if idx not in self._cached_idx]
+
+            if uncached:
+                # Process uncached indices as as single batch
+                for images in DataLoader(Subset(dataset, uncached), len(uncached), collate_fn=self._collate_fn):
+                    embeddings = self._encode(images)
+
+                    if not self._embeddings.shape:
+                        full_shape = (len(self._dataset), *embeddings.shape[1:])
+                        self._embeddings = torch.empty(full_shape, dtype=embeddings.dtype, device=self.device)
+
+                    self._embeddings[uncached] = embeddings
+                    self._cached_idx.update(uncached)
+
+            yield self._embeddings[batch]
 
     def __getitem__(self, key: int | slice, /) -> torch.Tensor:
         if not isinstance(key, slice) and not hasattr(key, "__int__"):
             raise TypeError("Invalid argument type.")
 
+        if self._shallow:
+            if not self._embeddings.shape:
+                raise ValueError("Embeddings not initialized.")
+            return self._embeddings[key]
+
         indices = list(range(len(self._dataset))[key]) if isinstance(key, slice) else [int(key)]
-        if self.cache:
-            uncached = [i for i in indices if i not in self._cached_idx]
-            for i, embeddings in enumerate(self._batch(uncached)):
-                batch = uncached[i * self.batch_size : (i + 1) * self.batch_size]
-                if self._embeddings is None:
-                    self._embeddings = torch.empty(
-                        (len(self._dataset), *embeddings.shape[1:]), dtype=embeddings.dtype, device=self.device
-                    )
-                self._embeddings[batch] = embeddings
-                self._cached_idx.update(batch)
-        if self.cache and self._embeddings is not None:
-            embeddings = self._embeddings[indices].to(self.device)
-        else:
-            embeddings = torch.vstack(list(self._batch(indices))).to(self.device)
-        return embeddings.squeeze(0) if len(indices) == 1 else embeddings
+        result = torch.vstack(list(self._batch(indices))).to(self.device)
+        return result.squeeze(0) if len(indices) == 1 else result
 
     def __iter__(self) -> Iterator[torch.Tensor]:
         # process in batches while yielding individual embeddings
-        for batch in self._batch(range(len(self._dataset))):
+        for batch in self._batch(range(self._length)):
             yield from batch
 
     def __len__(self) -> int:
-        return len(self._dataset)
+        return self._length
