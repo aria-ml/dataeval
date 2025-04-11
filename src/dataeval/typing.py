@@ -23,7 +23,7 @@ __all__ = [
 import sys
 from typing import Any, Generic, Iterator, Protocol, Sequence, TypedDict, TypeVar, Union, runtime_checkable
 
-from typing_extensions import NotRequired, Required
+from typing_extensions import NotRequired, ReadOnly, Required
 
 if sys.version_info >= (3, 10):
     from typing import TypeAlias
@@ -91,8 +91,8 @@ class DatasetMetadata(TypedDict, total=False):
         A lookup table converting label value to class name
     """
 
-    id: Required[str]
-    index2label: NotRequired[dict[int, str]]
+    id: Required[ReadOnly[str]]
+    index2label: NotRequired[ReadOnly[dict[int, str]]]
 
 
 @runtime_checkable
