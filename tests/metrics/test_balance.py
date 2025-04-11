@@ -1,7 +1,10 @@
 from contextlib import nullcontext as does_not_raise
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
+
+from dataeval.utils.data._metadata import Metadata
 
 try:
     from matplotlib.figure import Figure
@@ -97,6 +100,13 @@ class TestBalanceUnit:
                 assert v.shape == expected_shape[k]
                 if k in expected_type:
                     assert v.dtype == expected_type[k]
+
+    def test_empty_metadata(self):
+        mock_metadata = MagicMock(spec=Metadata)
+        mock_metadata.discrete_factor_names = []
+        mock_metadata.continuous_factor_names = []
+        with pytest.raises(ValueError):
+            balance(mock_metadata)
 
 
 @pytest.mark.requires_all
