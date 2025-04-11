@@ -1,7 +1,10 @@
+from unittest.mock import MagicMock
+
 import numpy as np
 import pytest
 
 from dataeval.outputs._base import ExecutionMetadata
+from dataeval.utils.data._metadata import Metadata
 
 try:
     from matplotlib.figure import Figure
@@ -42,6 +45,13 @@ class TestDiversityUnit:
         assert np.issubdtype(result.classwise.dtype, np.double)
         assert isinstance(result.factor_names[0], str)
         assert isinstance(result.meta(), ExecutionMetadata)
+
+    def test_empty_metadata(self):
+        mock_metadata = MagicMock(spec=Metadata)
+        mock_metadata.discrete_factor_names = []
+        mock_metadata.continuous_factor_names = []
+        with pytest.raises(ValueError):
+            diversity(mock_metadata)
 
 
 @pytest.mark.requires_all

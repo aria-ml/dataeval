@@ -47,6 +47,8 @@ def _validate_data(
             or not len(bboxes[0][0]) == 4
         ):
             raise TypeError("Boxes must be a sequence of sequences of (x0, y0, x1, y1) for object detection.")
+    else:
+        raise ValueError(f"Unknown datum type '{datum_type}'. Must be 'ic' or 'od'.")
 
 
 def _find_max(arr: ArrayLike) -> Any:

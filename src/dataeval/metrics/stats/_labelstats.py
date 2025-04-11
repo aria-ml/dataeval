@@ -5,54 +5,16 @@ __all__ = []
 from collections import Counter, defaultdict
 from typing import Any, Mapping, TypeVar
 
-import numpy as np
-
 from dataeval.outputs import LabelStatsOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.typing import AnnotatedDataset, ArrayLike
-from dataeval.utils._array import as_numpy
+from dataeval.typing import AnnotatedDataset
 from dataeval.utils.data._metadata import Metadata
 
 TValue = TypeVar("TValue")
 
 
-def _ensure_2d(labels: ArrayLike) -> ArrayLike:
-    if isinstance(labels, np.ndarray):
-        return labels[:, None]
-    else:
-        return [[lbl] for lbl in labels]  # type: ignore
-
-
-def _get_list_depth(lst):
-    if isinstance(lst, list) and lst:
-        return 1 + max(_get_list_depth(item) for item in lst)
-    return 0
-
-
-def _check_labels_dimension(labels: ArrayLike) -> ArrayLike:
-    # Check for nested lists beyond 2 levels
-
-    if isinstance(labels, np.ndarray):
-        if labels.ndim == 1:
-            return _ensure_2d(labels)
-        elif labels.ndim == 2:
-            return labels
-        else:
-            raise ValueError("The label array must not have more than 2 dimensions.")
-    elif isinstance(labels, list):
-        depth = _get_list_depth(labels)
-        if depth == 1:
-            return _ensure_2d(labels)
-        elif depth == 2:
-            return labels
-        else:
-            raise ValueError("The label list must not be empty or have more than 2 levels of nesting.")
-    else:
-        raise TypeError("Labels must be either a NumPy array or a list.")
-
-
 def _sort_to_list(d: Mapping[int, TValue]) -> list[TValue]:
-    return [v for _, v in sorted(d.items())]
+    return [t[1] for t in sorted(d.items())]
 
 
 @set_metadata
@@ -98,12 +60,9 @@ def labelstats(dataset: Metadata | AnnotatedDataset[Any]) -> LabelStatsOutput:
     label_per_image: list[int] = []
 
     index2label = dict(enumerate(dataset.class_names))
-    labels = [target.labels.tolist() for target in dataset.targets]
 
-    labels_2d = _check_labels_dimension(labels)
-
-    for i, group in enumerate(labels_2d):
-        group = as_numpy(group).tolist()
+    for i, target in enumerate(dataset.targets):
+        group = target.labels.tolist()
 
         # Count occurrences of each label in all sublists
         label_counts.update(group)

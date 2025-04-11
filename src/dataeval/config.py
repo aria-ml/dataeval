@@ -45,13 +45,13 @@ def _todevice(device: DeviceLike) -> torch.device:
     return torch.device(*device) if isinstance(device, tuple) else torch.device(device)
 
 
-def set_device(device: DeviceLike) -> None:
+def set_device(device: DeviceLike | None) -> None:
     """
     Sets the default device to use when executing against a PyTorch backend.
 
     Parameters
     ----------
-    device : DeviceLike
+    device : DeviceLike or None
         The default device to use. See documentation for more information.
 
     See Also
@@ -59,7 +59,7 @@ def set_device(device: DeviceLike) -> None:
     `torch.device <https://pytorch.org/docs/stable/tensor_attributes.html#torch.device>`_
     """
     global _device
-    _device = _todevice(device)
+    _device = None if device is None else _todevice(device)
 
 
 def get_device(override: DeviceLike | None = None) -> torch.device:
