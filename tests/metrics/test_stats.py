@@ -19,7 +19,6 @@ from dataeval.metrics.stats._base import (
     add_stats,
     combine_stats,
     get_dataset_step_from_idx,
-    normalize_box_shape,
     process_stats_unpack,
 )
 from dataeval.metrics.stats._boxratiostats import boxratiostats, calculate_ratios
@@ -27,7 +26,7 @@ from dataeval.metrics.stats._imagestats import (
     imagestats,
 )
 from dataeval.outputs._stats import SOURCE_INDEX, BaseStatsOutput
-from dataeval.typing import ImageClassificationDataset, ObjectDetectionDataset, ObjectDetectionTarget
+from dataeval.typing import ImageClassificationDataset, ObjectDetectionDataset
 from dataeval.utils.data._dataset import _find_max, to_image_classification_dataset, to_object_detection_dataset
 from dataeval.utils.data._metadata import Metadata
 from dataeval.utils.data._targets import Targets
@@ -129,14 +128,12 @@ class LengthProcessor(StatsProcessor[LengthStatsOutput]):
 @pytest.mark.required
 class TestBaseStats:
     @pytest.mark.parametrize("as_float", [False, True])
-    @pytest.mark.parametrize("per_box", [False, True])
     @pytest.mark.parametrize("per_channel", [False, True])
-    def test_process_stats_unpack(self, as_float, per_box, per_channel):
+    def test_process_stats_unpack(self, as_float, per_channel):
         results_list: list[dict[str, NDArray[np.int_]]] = []
         dataset = get_dataset(DATA_3, targets_per_image=1, as_float=as_float)
         partial_fn = partial(
             process_stats_unpack,
-            per_box=per_box,
             per_channel=per_channel,
             stats_processor_cls=[LengthProcessor],
         )
@@ -162,9 +159,9 @@ class TestBaseStats:
     @pytest.mark.parametrize("per_box", [False, True])
     def test_enumerate(self, per_box):
         dataset = get_dataset(DATA_3, targets_per_image=1, as_float=True)
-        for i, image, target in _enumerate(dataset, per_box):
+        for i, image, boxes in _enumerate(dataset, per_box):
             assert image.shape == (3, 64, 64)
-            assert isinstance(target, ObjectDetectionTarget) if per_box else target is None
+            assert isinstance(boxes, list) if per_box else boxes is None
 
 
 @pytest.mark.required
@@ -441,21 +438,6 @@ class TestBaseStatsOutput:
                 source_index=[1, 2, 3, 4],  # type: ignore
                 box_count=np.array([1, 2, 3, 4]),
             )
-
-
-@pytest.mark.required
-class TestNormalizeBoxShape:
-    def test_ndim_1(self):
-        box = normalize_box_shape(np.array([1]))
-        np.testing.assert_array_equal(box, np.array([[1]]))
-
-    def test_ndim_2(self):
-        box = normalize_box_shape(np.array([[1, 2, 3, 4]]))
-        np.testing.assert_array_equal(box, np.array([[1, 2, 3, 4]]))
-
-    def test_ndim_gt_2_raises(self):
-        with pytest.raises(ValueError):
-            normalize_box_shape(np.array([[[0]]]))
 
 
 @pytest.mark.requires_all

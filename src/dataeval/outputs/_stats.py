@@ -4,7 +4,7 @@ __all__ = []
 
 import contextlib
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional, Union
+from typing import Any, Iterable, NamedTuple, Optional, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -22,8 +22,7 @@ SOURCE_INDEX = "source_index"
 BOX_COUNT = "box_count"
 
 
-@dataclass(frozen=True)
-class SourceIndex:
+class SourceIndex(NamedTuple):
     """
     The indices of the source image, box and channel.
 
