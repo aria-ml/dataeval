@@ -71,8 +71,6 @@ class StatsProcessor(Generic[TStatsOutput]):
                 norm = normalize_image_shape(self.raw)
                 self._image = norm[:, self.box[1] : self.box[3], self.box[0] : self.box[2]]
             else:
-                print(self.raw.shape)
-                print(self.box)
                 self._image = np.zeros((self.raw.shape[0], self.box[3] - self.box[1], self.box[2] - self.box[0]))
         return self._image
 
