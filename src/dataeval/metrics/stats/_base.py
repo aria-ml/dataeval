@@ -2,6 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
+import math
 import re
 import warnings
 from collections import ChainMap
@@ -9,7 +10,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
 from multiprocessing import Pool
-from typing import Any, Callable, Generic, Iterable, Sequence, TypeVar
+from typing import Any, Callable, Generic, Iterable, Sequence, TypeVar, cast
 
 import numpy as np
 import tqdm
@@ -23,20 +24,7 @@ from dataeval.utils._image import normalize_image_shape, rescale
 
 DTYPE_REGEX = re.compile(r"NDArray\[np\.(.*?)\]")
 
-
-def normalize_box_shape(bounding_box: NDArray[Any]) -> NDArray[Any]:
-    """
-    Normalizes the bounding box shape into (N,4).
-    """
-    ndim = bounding_box.ndim
-    if ndim == 1:
-        return np.expand_dims(bounding_box, axis=0)
-    elif ndim > 2:
-        raise ValueError("Bounding boxes must have 2 dimensions: (# of boxes in an image, [X,Y,W,H]) -> (N,4)")
-    else:
-        return bounding_box
-
-
+BoundingBox = tuple[float, float, float, float]
 TStatsOutput = TypeVar("TStatsOutput", bound=BaseStatsOutput, covariant=True)
 
 
@@ -46,11 +34,15 @@ class StatsProcessor(Generic[TStatsOutput]):
     image_function_map: dict[str, Callable[[StatsProcessor[TStatsOutput]], Any]] = {}
     channel_function_map: dict[str, Callable[[StatsProcessor[TStatsOutput]], Any]] = {}
 
-    def __init__(self, image: NDArray[Any], box: NDArray[Any] | None, per_channel: bool) -> None:
+    def __init__(self, image: NDArray[Any], box: BoundingBox | None, per_channel: bool) -> None:
         self.raw = image
         self.width: int = image.shape[-1]
         self.height: int = image.shape[-2]
-        self.box: NDArray[np.int64] = np.array([0, 0, self.width, self.height]) if box is None else box.astype(np.int64)
+        box = BoundingBox((0, 0, self.width, self.height)) if box is None else box
+        # Clip the bounding box to image
+        x0, y0 = (min(j, max(0, math.floor(box[i]))) for i, j in zip((0, 1), (self.width - 1, self.height - 1)))
+        x1, y1 = (min(j, max(1, math.ceil(box[i]))) for i, j in zip((2, 3), (self.width, self.height)))
+        self.box: NDArray[np.int64] = np.array([x0, y0, x1, y1], dtype=np.int64)
         self._per_channel = per_channel
         self._image = None
         self._shape = None
@@ -79,6 +71,8 @@ class StatsProcessor(Generic[TStatsOutput]):
                 norm = normalize_image_shape(self.raw)
                 self._image = norm[:, self.box[1] : self.box[3], self.box[0] : self.box[2]]
             else:
+                print(self.raw.shape)
+                print(self.box)
                 self._image = np.zeros((self.raw.shape[0], self.box[3] - self.box[1], self.box[2] - self.box[0]))
         return self._image
 
@@ -123,18 +117,16 @@ class StatsProcessorOutput:
 def process_stats(
     i: int,
     image: ArrayLike,
-    target: Any,
-    per_box: bool,
+    boxes: list[BoundingBox] | None,
     per_channel: bool,
     stats_processor_cls: Iterable[type[StatsProcessor[TStatsOutput]]],
 ) -> StatsProcessorOutput:
     image = to_numpy(image)
-    boxes = to_numpy(target.boxes) if isinstance(target, ObjectDetectionTarget) else None
     results_list: list[dict[str, Any]] = []
     source_indices: list[SourceIndex] = []
     box_counts: list[int] = []
     warnings_list: list[str] = []
-    for i_b, box in [(None, None)] if boxes is None else enumerate(normalize_box_shape(boxes)):
+    for i_b, box in [(None, None)] if boxes is None else enumerate(boxes):
         processor_list = [p(image, box, per_channel) for p in stats_processor_cls]
         if any(not p._is_valid_slice for p in processor_list) and i_b is not None and box is not None:
             warnings_list.append(f"Bounding box [{i}][{i_b}]: {box} is out of bounds of {image.shape}.")
@@ -148,18 +140,24 @@ def process_stats(
 
 
 def process_stats_unpack(
-    args: tuple[int, ArrayLike, Any],
-    per_box: bool,
+    args: tuple[int, Array, list[BoundingBox] | None],
     per_channel: bool,
     stats_processor_cls: Iterable[type[StatsProcessor[TStatsOutput]]],
 ) -> StatsProcessorOutput:
-    return process_stats(*args, per_box=per_box, per_channel=per_channel, stats_processor_cls=stats_processor_cls)
+    return process_stats(*args, per_channel=per_channel, stats_processor_cls=stats_processor_cls)
 
 
 def _enumerate(dataset: Dataset[Array] | Dataset[tuple[Array, Any, Any]], per_box: bool):
     for i in range(len(dataset)):
         d = dataset[i]
-        yield i, d[0] if isinstance(d, tuple) else d, d[1] if isinstance(d, tuple) and per_box else None
+        image = d[0] if isinstance(d, tuple) else d
+        if per_box and isinstance(d, tuple) and isinstance(d[1], ObjectDetectionTarget):
+            boxes = cast(Array, d[1].boxes)
+            target = [BoundingBox(float(box[i]) for i in range(4)) for box in boxes]
+        else:
+            target = None
+
+        yield i, image, target
 
 
 def run_stats(
@@ -213,7 +211,6 @@ def run_stats(
             p.imap(
                 partial(
                     process_stats_unpack,
-                    per_box=per_box,
                     per_channel=per_channel,
                     stats_processor_cls=stats_processor_cls,
                 ),
