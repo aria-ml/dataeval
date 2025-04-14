@@ -1,6 +1,18 @@
-[//]: # (22206752315dfc8ec688ea367d6276fcca1a7a75)
+[//]: # (0adc8b87e8415d7cb3abc3ecb2dac845487698c4)
 
 # DataEval Change Log
+
+## v0.84.0
+
+🌟 **Feature Release**
+- `0c41ca26` - Add factory class method to Embeddings to create from array
+- `3d585e81` - Implement completeness
+- `77bba6d7` - Add caching (in-memory) to embeddings
+
+🛠️ **Improvements and Enhancements**
+- `5a2dc69e` - Change split_dataset to take in Datasets and use Metadata internally
+- `e07b8297` - Add plot function to Images and change coverage plot to take Images
+- `656c8166` - Add user sections to welcome page
 
 ## v0.83.0
 
