@@ -31,11 +31,11 @@ class Ships(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
     ----------
     root : str or pathlib.Path
         Root directory of dataset where the ``shipdataset`` folder exists.
+    transforms : Transform, Sequence[Transform] or None, default None
+        Transform(s) to apply to the data.
     download : bool, default False
         If True, downloads the dataset from the internet and puts it in root directory.
         Class checks to see if data is already downloaded to ensure it does not create a duplicate download.
-    transforms : Transform, Sequence[Transform] or None, default None
-        Transform(s) to apply to the data.
     verbose : bool, default False
         If True, outputs print statements.
 
@@ -55,6 +55,10 @@ class Ships(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
         The transforms to be applied to the data.
     size : int
         The size of the dataset.
+
+    Note
+    ----
+    Data License: `CC BY-SA 4.0 <https://creativecommons.org/licenses/by-sa/4.0/>`_
     """
 
     _resources = [
@@ -74,15 +78,15 @@ class Ships(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
     def __init__(
         self,
         root: str | Path,
-        download: bool = False,
         transforms: Transform[NDArray[Any]] | Sequence[Transform[NDArray[Any]]] | None = None,
+        download: bool = False,
         verbose: bool = False,
     ) -> None:
         super().__init__(
             root,
-            download,
             "base",
             transforms,
+            download,
             verbose,
         )
         self._scenes: list[str] = self._load_scenes()

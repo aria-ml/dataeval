@@ -27,13 +27,13 @@ class CIFAR10(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
     ----------
     root : str or pathlib.Path
         Root directory of dataset where the ``mnist`` folder exists.
-    download : bool, default False
-        If True, downloads the dataset from the internet and puts it in root directory.
-        Class checks to see if data is already downloaded to ensure it does not create a duplicate download.
     image_set : "train", "test" or "base", default "train"
         If "base", returns all of the data to allow the user to create their own splits.
     transforms : Transform, Sequence[Transform] or None, default None
         Transform(s) to apply to the data.
+    download : bool, default False
+        If True, downloads the dataset from the internet and puts it in root directory.
+        Class checks to see if data is already downloaded to ensure it does not create a duplicate download.
     verbose : bool, default False
         If True, outputs print statements.
 
@@ -43,16 +43,16 @@ class CIFAR10(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
         Location of the folder containing the data.
     image_set : "train", "test" or "base"
         The selected image set from the dataset.
+    transforms : Sequence[Transform]
+        The transforms to be applied to the data.
+    size : int
+        The size of the dataset.
     index2label : dict[int, str]
         Dictionary which translates from class integers to the associated class strings.
     label2index : dict[str, int]
         Dictionary which translates from class strings to the associated class integers.
     metadata : DatasetMetadata
         Typed dictionary containing dataset metadata, such as `id` which returns the dataset class name.
-    transforms : Sequence[Transform]
-        The transforms to be applied to the data.
-    size : int
-        The size of the dataset.
     """
 
     _resources = [
@@ -80,16 +80,16 @@ class CIFAR10(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
     def __init__(
         self,
         root: str | Path,
-        download: bool = False,
         image_set: Literal["train", "test", "base"] = "train",
         transforms: Transform[NDArray[Any]] | Sequence[Transform[NDArray[Any]]] | None = None,
+        download: bool = False,
         verbose: bool = False,
     ) -> None:
         super().__init__(
             root,
-            download,
             image_set,
             transforms,
+            download,
             verbose,
         )
 
