@@ -40,8 +40,7 @@ using MAITE-compliant datasets and models.
 
 **Python versions:** 3.9 - 3.12
 
-**Supported packages**: *NumPy*, *Pandas*, *Sci-kit learn*, *MAITE*, *NRTK*,
-*Gradient*
+**Supported packages**: *NumPy*, *Pandas*, *Sci-kit learn*, *MAITE*, *NRTK*
 
 Choose your preferred method of installation below or follow our
 [installation guide](https://dataeval.readthedocs.io/en/v0.74.2/installation.html).
