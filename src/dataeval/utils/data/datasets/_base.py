@@ -51,9 +51,9 @@ class BaseDataset(AnnotatedDataset[tuple[_TArray, _TTarget, dict[str, Any]]], Ge
     def __init__(
         self,
         root: str | Path,
-        download: bool = False,
-        image_set: Literal["train", "val", "test", "base"] = "train",
+        image_set: Literal["train", "val", "test", "operational", "base"] = "train",
         transforms: Transform[_TArray] | Sequence[Transform[_TArray]] | None = None,
+        download: bool = False,
         verbose: bool = False,
     ) -> None:
         self._root: Path = root.absolute() if isinstance(root, Path) else Path(root).absolute()

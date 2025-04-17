@@ -49,9 +49,6 @@ class MNIST(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
     ----------
     root : str or pathlib.Path
         Root directory of dataset where the ``mnist`` folder exists.
-    download : bool, default False
-        If True, downloads the dataset from the internet and puts it in root directory.
-        Class checks to see if data is already downloaded to ensure it does not create a duplicate download.
     image_set : "train", "test" or "base", default "train"
         If "base", returns all of the data to allow the user to create their own splits.
     corruption : "identity", "shot_noise", "impulse_noise", "glass_blur", "motion_blur", \
@@ -60,6 +57,9 @@ class MNIST(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
         Corruption to apply to the data.
     transforms : Transform, Sequence[Transform] or None, default None
         Transform(s) to apply to the data.
+    download : bool, default False
+        If True, downloads the dataset from the internet and puts it in root directory.
+        Class checks to see if data is already downloaded to ensure it does not create a duplicate download.
     verbose : bool, default False
         If True, outputs print statements.
 
@@ -81,6 +81,10 @@ class MNIST(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
         The transforms to be applied to the data.
     size : int
         The size of the dataset.
+    
+    Note
+    ----
+    Data License: `CC BY 4.0 <https://creativecommons.org/licenses/by/4.0/>`_ for corruption dataset
     """
 
     _resources = [
@@ -114,10 +118,10 @@ class MNIST(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
     def __init__(
         self,
         root: str | Path,
-        download: bool = False,
         image_set: Literal["train", "test", "base"] = "train",
         corruption: CorruptionStringMap | None = None,
         transforms: Transform[NDArray[Any]] | Sequence[Transform[NDArray[Any]]] | None = None,
+        download: bool = False,
         verbose: bool = False,
     ) -> None:
         self.corruption = corruption
@@ -127,9 +131,9 @@ class MNIST(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
 
         super().__init__(
             root,
-            download,
             image_set,
             transforms,
+            download,
             verbose,
         )
 
