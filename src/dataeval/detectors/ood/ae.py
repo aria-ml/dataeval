@@ -81,7 +81,7 @@ class OOD_AE(OODBase):
 
     def _score(self, X: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput:
         # reconstruct instances
-        X_recon = predict_batch(X, self.model, batch_size=batch_size)
+        X_recon = predict_batch(X, self.model, batch_size=batch_size).detach().cpu().numpy()
 
         # compute feature and instance level scores
         fscore = np.power(X - X_recon, 2)

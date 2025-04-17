@@ -142,9 +142,16 @@ class TestEmbeddings:
 
     def test_embeddings(self):
         embs = Embeddings(get_dataset(), 10, model=torch.nn.Identity(), transforms=lambda x: x + 1)
-        assert isinstance(embs.to_tensor(), torch.Tensor)
-        assert len(embs.to_tensor()) == len(embs)
         assert len(embs[0:3]) == 3
+
+        embs_tt = embs.to_tensor()
+        assert isinstance(embs_tt, torch.Tensor)
+        assert len(embs_tt) == len(embs)
+
+        embs_np = embs.to_numpy()
+        assert isinstance(embs_np, np.ndarray)
+        assert len(embs_np) == len(embs)
+
         for emb in embs:
             assert np.array_equal(emb.cpu().numpy(), np.ones((3, 16, 16)))
 

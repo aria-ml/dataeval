@@ -8,10 +8,11 @@ from __future__ import annotations
 __all__ = ["LastSeenUpdate", "ReservoirSamplingUpdate"]
 
 from abc import ABC, abstractmethod
-from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
+
+from dataeval.utils._array import flatten
 
 
 class BaseUpdateStrategy(ABC):
@@ -28,8 +29,7 @@ class BaseUpdateStrategy(ABC):
         self.n = n
 
     @abstractmethod
-    def __call__(self, x_ref: NDArray[Any], x: NDArray[Any], count: int) -> NDArray[Any]:
-        """Abstract implementation of update strategy"""
+    def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32], count: int) -> NDArray[np.float32]: ...
 
 
 class LastSeenUpdate(BaseUpdateStrategy):
@@ -42,9 +42,8 @@ class LastSeenUpdate(BaseUpdateStrategy):
         Update with last n instances seen by the detector.
     """
 
-    def __call__(self, x_ref: NDArray[Any], x: NDArray[Any], count: int) -> NDArray[Any]:
-        x_updated = np.concatenate([x_ref, x], axis=0)
-        return x_updated[-self.n :]
+    def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32], count: int) -> NDArray[np.float32]:
+        return np.concatenate([x_ref, flatten(x_new)], axis=0)[-self.n :]
 
 
 class ReservoirSamplingUpdate(BaseUpdateStrategy):
@@ -57,16 +56,18 @@ class ReservoirSamplingUpdate(BaseUpdateStrategy):
         Update with last n instances seen by the detector.
     """
 
-    def __call__(self, x_ref: NDArray[Any], x: NDArray[Any], count: int) -> NDArray[Any]:
-        if x.shape[0] + count <= self.n:
-            return np.concatenate([x_ref, x], axis=0)
+    def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32], count: int) -> NDArray[np.float32]:
+        if x_new.shape[0] + count <= self.n:
+            return np.concatenate([x_ref, flatten(x_new)], axis=0)
 
         n_ref = x_ref.shape[0]
-        output_size = min(self.n, n_ref + x.shape[0])
-        shape = (output_size,) + x.shape[1:]
+        output_size = min(self.n, n_ref + x_new.shape[0])
+        shape = (output_size,) + x_new.shape[1:]
+
         x_reservoir = np.zeros(shape, dtype=x_ref.dtype)
         x_reservoir[:n_ref] = x_ref
-        for item in x:
+
+        for item in x_new:
             count += 1
             if n_ref < self.n:
                 x_reservoir[n_ref, :] = item
