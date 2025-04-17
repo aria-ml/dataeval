@@ -10,33 +10,32 @@ from __future__ import annotations
 
 __all__ = []
 
-from functools import partial
-from typing import Callable, Literal
+from typing import Literal, Sequence, cast
 
 import numpy as np
-from numpy.typing import NDArray
+import torch
 from scipy.special import softmax
 from scipy.stats import entropy
 
-from dataeval.config import get_device
-from dataeval.detectors.drift._base import UpdateStrategy
+from dataeval.config import DeviceLike, get_device
+from dataeval.detectors.drift._base import BaseDrift, UpdateStrategy
 from dataeval.detectors.drift._ks import DriftKS
-from dataeval.detectors.drift._torch import preprocess_drift
 from dataeval.outputs import DriftOutput
-from dataeval.typing import ArrayLike
+from dataeval.typing import Array, Transform
+from dataeval.utils._array import as_numpy
+from dataeval.utils.torch._internal import predict_batch
 
 
 def classifier_uncertainty(
-    x: NDArray[np.float64],
-    model_fn: Callable,
+    preds: Array,
     preds_type: Literal["probs", "logits"] = "probs",
-) -> NDArray[np.float64]:
+) -> torch.Tensor:
     """
     Evaluate model_fn on x and transform predictions to prediction uncertainties.
 
     Parameters
     ----------
-    x : np.ndarray
+    x : Array
         Batch of instances.
     model_fn : Callable
         Function that evaluates a :term:`classification<Classification>` model on x in a single call (contains
@@ -50,23 +49,21 @@ def classifier_uncertainty(
     NDArray
         A scalar indication of uncertainty of the model on each instance in x.
     """
-
-    preds = model_fn(x)
-
+    preds_np = as_numpy(preds)
     if preds_type == "probs":
-        if np.abs(1 - np.sum(preds, axis=-1)).mean() > 1e-6:
+        if np.abs(1 - np.sum(preds_np, axis=-1)).mean() > 1e-6:
             raise ValueError("Probabilities across labels should sum to 1")
-        probs = preds
+        probs = preds_np
     elif preds_type == "logits":
-        probs = softmax(preds, axis=-1)
+        probs = softmax(preds_np, axis=-1)
     else:
         raise NotImplementedError("Only prediction types 'probs' and 'logits' supported.")
 
-    uncertainties = entropy(probs, axis=-1)
-    return uncertainties[:, None]  # Detectors expect N x d  # type: ignore
+    uncertainties = cast(np.ndarray, entropy(probs, axis=-1))
+    return torch.as_tensor(uncertainties[:, None])
 
 
-class DriftUncertainty:
+class DriftUncertainty(BaseDrift):
     """
     Test for a change in the number of instances falling into regions on which \
         the model is uncertain.
@@ -75,29 +72,27 @@ class DriftUncertainty:
 
     Parameters
     ----------
-    x_ref : ArrayLike
+    data : Array
         Data used as reference distribution.
     model : Callable
         :term:`Classification` model outputting class probabilities (or logits)
     p_val : float, default 0.05
         :term:`P-Value` used for the significance of the test.
-    x_ref_preprocessed : bool, default False
-        Whether the given reference data ``x_ref`` has been preprocessed yet.
-        If ``True``, only the test data ``x`` will be preprocessed at prediction time.
-        If ``False``, the reference data will also be preprocessed.
-    update_x_ref : UpdateStrategy or None, default None
+    update_strategy : UpdateStrategy or None, default None
         Reference data can optionally be updated using an UpdateStrategy class. Update
         using the last n instances seen by the detector with LastSeenUpdateStrategy
         or via reservoir sampling with ReservoirSamplingUpdateStrategy.
+    correction : "bonferroni" or "fdr", default "bonferroni"
+        Correction type for multivariate data. Either 'bonferroni' or 'fdr' (False
+        Discovery Rate).
     preds_type : "probs" or "logits", default "probs"
         Type of prediction output by the model. Options are 'probs' (in [0,1]) or
         'logits' (in [-inf,inf]).
     batch_size : int, default 32
         Batch size used to evaluate model. Only relevant when backend has been
         specified for batch prediction.
-    preprocess_batch_fn : Callable or None, default None
-        Optional batch preprocessing function. For example to convert a list of
-        objects to a batch which can be processed by the model.
+    transforms : Transform, Sequence[Transform] or None, default None
+        Transform(s) to apply to the data.
     device : DeviceLike or None, default None
         Device type used. The default None tries to use the GPU and falls back on
         CPU if needed. Can be specified by passing either 'cuda' or 'cpu'.
@@ -120,46 +115,47 @@ class DriftUncertainty:
 
     def __init__(
         self,
-        x_ref: ArrayLike,
-        model: Callable,
+        data: Array,
+        model: torch.nn.Module,
         p_val: float = 0.05,
-        x_ref_preprocessed: bool = False,
-        update_x_ref: UpdateStrategy | None = None,
+        update_strategy: UpdateStrategy | None = None,
+        correction: Literal["bonferroni", "fdr"] = "bonferroni",
         preds_type: Literal["probs", "logits"] = "probs",
         batch_size: int = 32,
-        preprocess_batch_fn: Callable | None = None,
-        device: str | None = None,
+        transforms: Transform[torch.Tensor] | Sequence[Transform[torch.Tensor]] | None = None,
+        device: DeviceLike | None = None,
     ) -> None:
-        def model_fn(x: NDArray) -> NDArray:
-            return preprocess_drift(
-                x,
-                model,  # type: ignore
-                batch_size=batch_size,
-                preprocess_batch_fn=preprocess_batch_fn,
-                device=get_device(device),
-            )
+        self.model: torch.nn.Module = model
+        self.device: torch.device = get_device(device)
+        self.batch_size: int = batch_size
+        self.preds_type: Literal["probs", "logits"] = preds_type
 
-        preprocess_fn = partial(
-            classifier_uncertainty,
-            model_fn=model_fn,
-            preds_type=preds_type,
+        self._transforms = (
+            [] if transforms is None else [transforms] if isinstance(transforms, Transform) else transforms
         )
-
         self._detector = DriftKS(
-            x_ref=x_ref,
+            data=self._preprocess(data).cpu().numpy(),
             p_val=p_val,
-            x_ref_preprocessed=x_ref_preprocessed,
-            update_x_ref=update_x_ref,
-            preprocess_fn=preprocess_fn,  # type: ignore
+            update_strategy=update_strategy,
+            correction=correction,
         )
 
-    def predict(self, x: ArrayLike) -> DriftOutput:
+    def _transform(self, x: torch.Tensor) -> torch.Tensor:
+        for transform in self._transforms:
+            x = transform(x)
+        return x
+
+    def _preprocess(self, x: Array) -> torch.Tensor:
+        preds = predict_batch(x, self.model, self.device, self.batch_size, self._transform)
+        return classifier_uncertainty(preds, self.preds_type)
+
+    def predict(self, x: Array) -> DriftOutput:
         """
         Predict whether a batch of data has drifted from the reference data.
 
         Parameters
         ----------
-        x : ArrayLike
+        x : Array
             Batch of instances.
 
         Returns
@@ -168,4 +164,4 @@ class DriftUncertainty:
             Dictionary containing the drift prediction, :term:`p-value<P-Value>`, and threshold
             statistics.
         """
-        return self._detector.predict(x)
+        return self._detector.predict(self._preprocess(x).cpu().numpy())

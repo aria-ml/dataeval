@@ -14,15 +14,14 @@ from dataeval.utils.data.datasets._base import (
     BaseODDataset,
     BaseSegDataset,
     DataLocation,
+    _TArray,
+    _TTarget,
 )
 from dataeval.utils.data.datasets._mixin import BaseDatasetNumpyMixin, BaseDatasetTorchMixin
 from dataeval.utils.data.datasets._types import ObjectDetectionTarget, SegmentationTarget
 
 if TYPE_CHECKING:
     from dataeval.typing import Transform
-
-_TArray = TypeVar("_TArray")
-_TTarget = TypeVar("_TTarget")
 
 VOCClassStringMap = Literal[
     "aeroplane",

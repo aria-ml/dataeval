@@ -19,9 +19,12 @@ from dataeval.utils.data.datasets._types import (
 )
 
 if TYPE_CHECKING:
-    from dataeval.typing import Transform
+    from dataeval.typing import Array, Transform
 
-_TArray = TypeVar("_TArray")
+    _TArray = TypeVar("_TArray", bound=Array)
+else:
+    _TArray = TypeVar("_TArray")
+
 _TTarget = TypeVar("_TTarget")
 _TRawTarget = TypeVar("_TRawTarget", list[int], list[str])
 

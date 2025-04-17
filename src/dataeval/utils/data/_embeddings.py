@@ -6,6 +6,7 @@ import math
 from typing import Any, Iterator, Sequence, cast
 
 import torch
+from numpy.typing import NDArray
 from torch.utils.data import DataLoader, Subset
 from tqdm import tqdm
 
@@ -45,7 +46,7 @@ class Embeddings:
 
     def __init__(
         self,
-        dataset: Dataset[tuple[Array, Any, Any]],
+        dataset: Dataset[tuple[Array, Any, Any]] | Dataset[Array],
         batch_size: int,
         transforms: Transform[torch.Tensor] | Sequence[Transform[torch.Tensor]] | None = None,
         model: torch.nn.Module | None = None,
@@ -62,9 +63,9 @@ class Embeddings:
         self._length = len(dataset)
         model = torch.nn.Flatten() if model is None else model
         self._transforms = [transforms] if isinstance(transforms, Transform) else transforms
-        self._model = model.to(self.device).eval()
+        self._model = model.to(self.device).eval() if isinstance(model, torch.nn.Module) else model
         self._encoder = model.encode if isinstance(model, SupportsEncode) else model
-        self._collate_fn = lambda datum: [torch.as_tensor(i) for i, _, _ in datum]
+        self._collate_fn = lambda datum: [torch.as_tensor(d[0] if isinstance(d, tuple) else d) for d in datum]
         self._cached_idx = set()
         self._embeddings: torch.Tensor = torch.empty(())
         self._shallow: bool = False
@@ -90,6 +91,42 @@ class Embeddings:
             return torch.vstack(list(self._batch(indices))).to(self.device)
         else:
             return self[:]
+
+    def to_numpy(self, indices: Sequence[int] | None = None) -> NDArray[Any]:
+        """
+        Converts dataset to embeddings as numpy array.
+
+        Parameters
+        ----------
+        indices : Sequence[int] or None, default None
+            The indices to convert to embeddings
+
+        Returns
+        -------
+        NDArray[Any]
+
+        Warning
+        -------
+        Processing large quantities of data can be resource intensive.
+        """
+        return self.to_tensor(indices).cpu().numpy()
+
+    def new(self, dataset: Dataset[tuple[Array, Any, Any]] | Dataset[Array]) -> Embeddings:
+        """
+        Creates a new Embeddings object with the same parameters but a different dataset.
+
+        Parameters
+        ----------
+        dataset : ImageClassificationDataset or ObjectDetectionDataset
+            Dataset to access original images from.
+
+        Returns
+        -------
+        Embeddings
+        """
+        return Embeddings(
+            dataset, self.batch_size, self._transforms, self._model, self.device, self.cache, self.verbose
+        )
 
     @classmethod
     def from_array(cls, array: Array, device: DeviceLike | None = None) -> Embeddings:
@@ -131,7 +168,7 @@ class Embeddings:
 
     @torch.no_grad()  # Reduce overhead cost by not tracking tensor gradients
     def _batch(self, indices: Sequence[int]) -> Iterator[torch.Tensor]:
-        dataset = cast(torch.utils.data.Dataset[tuple[Array, Any, Any]], self._dataset)
+        dataset = cast(torch.utils.data.Dataset, self._dataset)
         total_batches = math.ceil(len(indices) / self.batch_size)
 
         # If not caching, process all indices normally
