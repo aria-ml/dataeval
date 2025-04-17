@@ -10,14 +10,15 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Callable, Literal
+from typing import Literal
 
 import numpy as np
 from numpy.typing import NDArray
 from scipy.stats import ks_2samp
 
 from dataeval.detectors.drift._base import BaseDriftUnivariate, UpdateStrategy
-from dataeval.typing import ArrayLike
+from dataeval.typing import Array
+from dataeval.utils.data._embeddings import Embeddings
 
 
 class DriftKS(BaseDriftUnivariate):
@@ -31,43 +32,34 @@ class DriftKS(BaseDriftUnivariate):
 
     Parameters
     ----------
-    x_ref : ArrayLike
+    data : Embeddings or Array
         Data used as reference distribution.
-    p_val : float | None, default 0.05
+    p_val : float or None, default 0.05
         :term:`p-value<P-Value>` used for significance of the statistical test for each feature.
         If the FDR correction method is used, this corresponds to the acceptable
         q-value.
-    x_ref_preprocessed : bool, default False
-        Whether the given reference data ``x_ref`` has been preprocessed yet.
-        If ``True``, only the test data ``x`` will be preprocessed at prediction time.
-        If ``False``, the reference data will also be preprocessed.
-    update_x_ref : UpdateStrategy | None, default None
+    update_strategy : UpdateStrategy or None, default None
         Reference data can optionally be updated using an UpdateStrategy class. Update
         using the last n instances seen by the detector with LastSeenUpdateStrategy
         or via reservoir sampling with ReservoirSamplingUpdateStrategy.
-    preprocess_fn : Callable | None, default None
-        Function to preprocess the data before computing the data :term:`drift<Drift>` metrics.
-        Typically a :term:`dimensionality reduction<Dimensionality Reduction>` technique.
-    correction : "bonferroni" | "fdr", default "bonferroni"
+    correction : "bonferroni" or "fdr", default "bonferroni"
         Correction type for multivariate data. Either 'bonferroni' or 'fdr' (False
         Discovery Rate).
-    alternative : "two-sided" | "less" | "greater", default "two-sided"
+    alternative : "two-sided", "less" or "greater", default "two-sided"
         Defines the alternative hypothesis. Options are 'two-sided', 'less' or
         'greater'.
     n_features : int | None, default None
-        Number of features used in the statistical test. No need to pass it if no
-        preprocessing takes place. In case of a preprocessing step, this can also
-        be inferred automatically but could be more expensive to compute.
+        Number of features used in the univariate drift tests. If not provided, it will
+        be inferred from the data.
 
     Example
     -------
-    >>> from functools import partial
-    >>> from dataeval.detectors.drift import preprocess_drift
+    >>> from dataeval.utils.data import Embeddings
 
-    Use a preprocess function to encode images before testing for drift
+    Use Embeddings to encode images before testing for drift
 
-    >>> preprocess_fn = partial(preprocess_drift, model=encoder, batch_size=64)
-    >>> drift = DriftKS(train_images, preprocess_fn=preprocess_fn)
+    >>> train_emb = Embeddings(train_images, model=encoder, batch_size=64)
+    >>> drift = DriftKS(train_emb)
 
     Test incoming images for drift
 
@@ -77,21 +69,17 @@ class DriftKS(BaseDriftUnivariate):
 
     def __init__(
         self,
-        x_ref: ArrayLike,
+        data: Embeddings | Array,
         p_val: float = 0.05,
-        x_ref_preprocessed: bool = False,
-        update_x_ref: UpdateStrategy | None = None,
-        preprocess_fn: Callable[[ArrayLike], ArrayLike] | None = None,
+        update_strategy: UpdateStrategy | None = None,
         correction: Literal["bonferroni", "fdr"] = "bonferroni",
         alternative: Literal["two-sided", "less", "greater"] = "two-sided",
         n_features: int | None = None,
     ) -> None:
         super().__init__(
-            x_ref=x_ref,
+            data=data,
             p_val=p_val,
-            x_ref_preprocessed=x_ref_preprocessed,
-            update_x_ref=update_x_ref,
-            preprocess_fn=preprocess_fn,
+            update_strategy=update_strategy,
             correction=correction,
             n_features=n_features,
         )

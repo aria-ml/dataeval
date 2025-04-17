@@ -272,7 +272,7 @@ class Prioritize(Selection[Any]):
             return _KMeansComplexitySorter(samples, self._c)
 
     def _to_normalized_ndarray(self, embeddings: Embeddings, selection: list[int] | None = None) -> NDArray[Any]:
-        emb: NDArray[Any] = embeddings.to_tensor(selection).cpu().numpy()
+        emb: NDArray[Any] = embeddings.to_numpy(selection)
         emb /= max(np.max(np.linalg.norm(emb, axis=1)), EPSILON)
         return emb
 
