@@ -13,9 +13,12 @@ from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
+import torch
 
-from dataeval.detectors.drift._base import BaseDriftUnivariate, preprocess_x
+from dataeval.detectors.drift._base import BaseDriftUnivariate
 from dataeval.detectors.drift.updates import LastSeenUpdate, ReservoirSamplingUpdate
+from dataeval.typing import Dataset
+from dataeval.utils.data._embeddings import Embeddings
 
 
 @pytest.mark.required
@@ -47,61 +50,43 @@ class TestUpdateReference:
 
 @pytest.mark.required
 class TestBaseDrift:
-    def test_base_init_preprocess_fn_valueerror(self):
-        with pytest.raises(ValueError):
-            BaseDriftUnivariate(np.empty([]), preprocess_fn="NotCallable")  # type: ignore
+    model = torch.nn.Identity()
+    batch_size = 10
+    device = torch.device("cpu")
+
+    def get_dataset(self, n: int = 100, n_features: int = 10) -> Dataset:
+        mock = MagicMock(spec=Dataset)
+        mock._selection = list(range(n))
+        mock.__len__.return_value = n
+        mock.__getitem__.return_value = np.random.random(n_features), np.zeros(10), {}
+        return mock
+
+    def get_embeddings(self, n: int = 100, n_features: int = 10) -> Embeddings:
+        return Embeddings(
+            self.get_dataset(n, n_features), batch_size=self.batch_size, model=self.model, device=self.device
+        )
 
     def test_base_init_update_x_ref_valueerror(self):
         with pytest.raises(ValueError):
-            BaseDriftUnivariate(np.empty([]), update_x_ref="invalid")  # type: ignore
+            BaseDriftUnivariate(self.get_embeddings(1), update_strategy="invalid")  # type: ignore
 
     def test_base_init_correction_valueerror(self):
         with pytest.raises(ValueError):
-            BaseDriftUnivariate(np.empty([]), n_features=2, correction="invalid")  # type: ignore
+            BaseDriftUnivariate(self.get_embeddings(1), n_features=2, correction="invalid")  # type: ignore
+
+    def test_base_init_infer_n_features(self):
+        base = BaseDriftUnivariate(self.get_embeddings(1))
+        assert base.n_features == 10
 
     def test_base_init_set_n_features(self):
-        base = BaseDriftUnivariate(np.zeros(1), n_features=1)
+        base = BaseDriftUnivariate(self.get_embeddings(1), n_features=1)
         assert base.n_features == 1
 
     def test_base_predict_correction_valueerror(self):
-        base = BaseDriftUnivariate(np.zeros(1), n_features=1)
+        base = BaseDriftUnivariate(self.get_embeddings(1))
         mock_score = MagicMock()
         mock_score.return_value = (np.array(0.5), np.array(0.5))
         base.score = mock_score
-        base.correction = "invalid"
+        base.correction = "invalid"  # type: ignore
         with pytest.raises(ValueError):
             base.predict(np.empty([]))
-
-    def test_base_preprocess_infer_features(self):
-        base = BaseDriftUnivariate(np.zeros((3, 3)), preprocess_fn=lambda x: x)
-        assert base.n_features == 3
-
-    def test_base_preprocess(self):
-        base = BaseDriftUnivariate(np.zeros(3), n_features=1, preprocess_fn=lambda x: x)
-        np.testing.assert_equal(base._preprocess(base._x_ref), np.zeros(3))
-        np.testing.assert_equal(base._preprocess(np.ones(3)), np.ones(3))
-
-
-@pytest.mark.required
-class TestPreprocessDecorator:
-    _x_refcount = 0
-    _x: np.ndarray | None
-
-    def _preprocess(self, x: np.ndarray) -> np.ndarray:
-        return x
-
-    @preprocess_x
-    def recursive_preprocess(self, x: np.ndarray, n: int, depth: int) -> int:
-        if n < depth:
-            n = n + 1
-            assert n == self._x_refcount
-            assert self._x == x
-            return self.recursive_preprocess(x, n, depth)
-        else:
-            return n
-
-    def test_preprocess_decorator(self):
-        result = self.recursive_preprocess(np.array([10]), 0, 10)
-        assert result == 10
-        assert self._x_refcount == 0
-        assert not hasattr(self, "_x")

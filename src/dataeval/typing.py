@@ -67,8 +67,8 @@ class Array(Protocol):
     def __len__(self) -> int: ...
 
 
-T = TypeVar("T")
 _T_co = TypeVar("_T_co", covariant=True)
+_TArray = TypeVar("_TArray", bound=Array)
 _ScalarType = Union[int, float, bool, str]
 ArrayLike: TypeAlias = Union[Sequence[_ScalarType], Sequence[Sequence[_ScalarType]], Sequence[Array], Array]
 """
@@ -237,7 +237,7 @@ Type alias for an :class:`AnnotatedDataset` of :class:`SegmentationDatum` elemen
 
 
 @runtime_checkable
-class Transform(Generic[T], Protocol):
+class Transform(Generic[_TArray], Protocol):
     """
     Protocol defining a transform function.
 
@@ -262,4 +262,4 @@ class Transform(Generic[T], Protocol):
     array([0.004, 0.008, 0.012])
     """
 
-    def __call__(self, data: T, /) -> T: ...
+    def __call__(self, data: _TArray, /) -> _TArray: ...

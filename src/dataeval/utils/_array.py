@@ -92,7 +92,7 @@ def ensure_embeddings(
 @overload
 def ensure_embeddings(
     embeddings: T,
-    dtype: None,
+    dtype: None = None,
     unit_interval: Literal[True, False, "force"] = False,
 ) -> T: ...
 
@@ -152,21 +152,32 @@ def ensure_embeddings(
         return arr
 
 
-def flatten(array: ArrayLike) -> NDArray[Any]:
+@overload
+def flatten(array: torch.Tensor) -> torch.Tensor: ...
+@overload
+def flatten(array: ArrayLike) -> NDArray[Any]: ...
+
+
+def flatten(array: ArrayLike) -> NDArray[Any] | torch.Tensor:
     """
     Flattens input array from (N, ... ) to (N, -1) where all samples N have all data in their last dimension
 
     Parameters
     ----------
-    X : NDArray, shape - (N, ... )
+    array : ArrayLike
         Input array
 
     Returns
     -------
-    NDArray, shape - (N, -1)
+    np.ndarray or torch.Tensor, shape: (N, -1)
     """
-    nparr = as_numpy(array)
-    return nparr.reshape((nparr.shape[0], -1))
+    if isinstance(array, np.ndarray):
+        nparr = as_numpy(array)
+        return nparr.reshape((nparr.shape[0], -1))
+    elif isinstance(array, torch.Tensor):
+        return torch.flatten(array, start_dim=1)
+    else:
+        raise TypeError(f"Unsupported array type {type(array)}.")
 
 
 _TArray = TypeVar("_TArray", bound=Array)
@@ -191,4 +202,4 @@ def channels_first_to_last(array: _TArray) -> _TArray:
     elif isinstance(array, torch.Tensor):
         return torch.permute(array, (1, 2, 0))
     else:
-        raise TypeError(f"Unsupported array type {type(array)} for conversion.")
+        raise TypeError(f"Unsupported array type {type(array)}.")

@@ -38,24 +38,20 @@ def gen_model(n_features, n_labels, softmax=False, dropout=False):
     return PtModel(n_features, n_labels, softmax, dropout)
 
 
-def id_fn(x: list) -> torch.Tensor:
-    return torch.from_numpy(np.concatenate(x, axis=0))
-
-
 @pytest.mark.required
 class TestFunctionalClassifierUncertainty:
     p_val = [0.05]
     n_features = [16]
     n_labels = [3]
     preds_type = ["probs", "logits"]
-    update_x_ref = [LastSeenUpdate(1000), ReservoirSamplingUpdate(1000), None]
+    update_strategy = [LastSeenUpdate(1000), ReservoirSamplingUpdate(1000), None]
     test_params = list(
         product(
             p_val,
             n_features,
             n_labels,
             preds_type,
-            update_x_ref,
+            update_strategy,
         )
     )
     n_tests = len(test_params)
@@ -71,34 +67,36 @@ class TestFunctionalClassifierUncertainty:
             n_features,
             n_labels,
             preds_type,
-            update_x_ref,
+            update_strategy,
         ) = clfuncdrift_params
 
         np.random.seed(0)
 
         model = gen_model(n_features, n_labels, preds_type == "probs")
-        x_ref = np.random.randn(*(500, n_features)).astype(np.float32)
-        x_test0 = x_ref.copy()
-        x_test1 = np.ones_like(x_ref)
+        x_ref = torch.from_numpy(np.random.randn(*(500, n_features)).astype(np.float32))
+        x_test0 = x_ref.clone()
+        x_test1 = torch.ones_like(x_ref)
 
         cd = DriftUncertainty(
-            x_ref=x_ref,
+            data=x_ref,
             model=model,  # type: ignore
             p_val=p_val,
-            update_x_ref=update_x_ref,
+            update_strategy=update_strategy,
             preds_type=preds_type,
             batch_size=10,
-            preprocess_batch_fn=None,
+            transforms=None,
             device="cpu",
         )
 
         preds_0 = cd.predict(x_test0)
-        assert cd._detector.n == len(x_test0) + len(x_ref)
+        expected_n = len(x_ref) if update_strategy is None else len(x_test0) + len(x_ref)
+        assert cd._detector.n == expected_n
         assert not preds_0.drifted
         assert preds_0.distances >= 0
 
         preds_1 = cd.predict(x_test1)
-        assert cd._detector.n == len(x_test1) + len(x_test0) + len(x_ref)
+        expected_n = len(x_ref) if update_strategy is None else len(x_test1) + len(x_test0) + len(x_ref)
+        assert cd._detector.n == expected_n
         assert preds_1.drifted
         assert preds_1.distances >= 0
         assert preds_0.distances < preds_1.distances
@@ -125,13 +123,14 @@ class TestClassifierUncertainty:
         preds_type = cu_params
         clf = LogisticRegression().fit(self.X_train, self.y_train_clf)
         model_fn = clf.predict_log_proba if preds_type == "logits" else clf.predict_proba
-        uncertainties = classifier_uncertainty(self.X_test, model_fn, preds_type=preds_type)
-        assert uncertainties.shape == (self.X_test.shape[0], 1)
+        x_test = model_fn(self.X_test)
+        uncertainties = classifier_uncertainty(x_test, preds_type=preds_type)  # type: ignore
+        assert uncertainties.shape == (x_test.shape[0], 1)
 
     def test_classifier_uncertainty_notimplementederror(self):
         with pytest.raises(NotImplementedError):
-            classifier_uncertainty(np.empty([]), lambda x: x, "invalid")  # type: ignore
+            classifier_uncertainty(torch.empty([]), "invalid")  # type: ignore
 
     def test_classifier_uncertainty_valueerror(self):
         with pytest.raises(ValueError):
-            classifier_uncertainty(np.empty([]), lambda x: 10 + x, "probs")
+            classifier_uncertainty(torch.empty([]), "probs")

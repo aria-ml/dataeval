@@ -2,7 +2,6 @@ from __future__ import annotations
 
 __all__ = []
 
-from functools import partial
 from typing import Any, Callable
 
 import numpy as np
@@ -12,16 +11,16 @@ from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
 from dataeval.config import DeviceLike, get_device
+from dataeval.typing import Array
 
 
 def predict_batch(
-    x: NDArray[Any] | torch.Tensor,
-    model: Callable | torch.nn.Module | torch.nn.Sequential,
+    x: Array,
+    model: torch.nn.Module,
     device: DeviceLike | None = None,
     batch_size: int = int(1e10),
     preprocess_fn: Callable[[torch.Tensor], torch.Tensor] | None = None,
-    dtype: type[np.generic] | torch.dtype = np.float32,
-) -> NDArray[Any] | torch.Tensor | tuple[Any, ...]:
+) -> torch.Tensor:
     """
     Make batch predictions on a model.
 
@@ -29,7 +28,7 @@ def predict_batch(
     ----------
     x : np.ndarray | torch.Tensor
         Batch of instances.
-    model : Callable | nn.Module | nn.Sequential
+    model : nn.Module
         PyTorch model.
     device : DeviceLike or None, default None
         The hardware device to use if specified, otherwise uses the DataEval
@@ -38,21 +37,18 @@ def predict_batch(
         Batch size used during prediction.
     preprocess_fn : Callable | None, default None
         Optional preprocessing function for each batch.
-    dtype : np.dtype | torch.dtype, default np.float32
-        Model output type, either a :term:`NumPy` or torch dtype, e.g. np.float32 or torch.float32.
 
     Returns
     -------
-    NDArray | torch.Tensor | tuple
-        Numpy array, torch tensor or tuples of those with model outputs.
+    torch.Tensor
+        PyTorch tensor with model outputs.
     """
     device = get_device(device)
-    if isinstance(x, np.ndarray):
-        x = torch.tensor(x, device=device)
+    if isinstance(model, torch.nn.Module):
+        model = model.to(device).eval()
+    x = torch.tensor(x, device=device)
     n = len(x)
     n_minibatch = int(np.ceil(n / batch_size))
-    return_np = not isinstance(dtype, torch.dtype)
-    preds_tuple = None
     preds_array = []
     with torch.no_grad():
         for i in range(n_minibatch):
@@ -60,28 +56,9 @@ def predict_batch(
             x_batch = x[istart:istop]
             if isinstance(preprocess_fn, Callable):
                 x_batch = preprocess_fn(x_batch)
+            preds_array.append(model(x_batch.to(dtype=torch.float32)).cpu())
 
-            preds_tmp = model(x_batch.to(dtype=torch.float32))
-            if isinstance(preds_tmp, (list, tuple)):
-                if preds_tuple is None:  # init tuple with lists to store predictions
-                    preds_tuple = tuple([] for _ in range(len(preds_tmp)))
-                for j, p in enumerate(preds_tmp):
-                    p = p.cpu() if isinstance(p, torch.Tensor) else p
-                    preds_tuple[j].append(p if not return_np or isinstance(p, np.ndarray) else p.numpy())
-            elif isinstance(preds_tmp, (np.ndarray, torch.Tensor)):
-                preds_tmp = preds_tmp.cpu() if isinstance(preds_tmp, torch.Tensor) else preds_tmp
-                preds_array.append(
-                    preds_tmp if not return_np or isinstance(preds_tmp, np.ndarray) else preds_tmp.numpy()
-                )
-            else:
-                raise TypeError(
-                    f"Model output type {type(preds_tmp)} not supported. The model \
-                    output type needs to be one of list, tuple, NDArray or \
-                    torch.Tensor."
-                )
-    concat = partial(np.concatenate, axis=0) if return_np else partial(torch.cat, dim=0)
-    out = tuple(concat(p) for p in preds_tuple) if preds_tuple is not None else concat(preds_array)
-    return out
+    return torch.cat(preds_array, dim=0)
 
 
 def trainer(

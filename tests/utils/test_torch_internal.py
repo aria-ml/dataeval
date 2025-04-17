@@ -2,7 +2,8 @@ import numpy as np
 import pytest
 import torch
 
-from dataeval.utils.torch._internal import trainer
+from dataeval.config import get_device
+from dataeval.utils.torch._internal import predict_batch, trainer
 from dataeval.utils.torch.models import AE
 
 model = AE((1, 16, 16))
@@ -51,3 +52,62 @@ class TestTorchTrainerCUDA:
             device=torch.device("cuda"),
             verbose=False,
         )
+
+
+@pytest.mark.required
+class TestPredictBatch:
+    n, n_features, n_classes, latent_dim = 100, 10, 5, 2
+    x = np.zeros((n, n_features), dtype=np.float32)
+    t = torch.zeros((n, n_features), dtype=torch.float32)
+
+    class MyModel(torch.nn.Module):
+        n_features, n_classes = 10, 5
+
+        def __init__(self):
+            super().__init__()
+            self.dense = torch.nn.Linear(self.n_features, self.n_classes)
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            out = self.dense(x)
+            return out
+
+    AutoEncoder = torch.nn.Sequential(torch.nn.Linear(n_features, latent_dim), torch.nn.Linear(latent_dim, n_features))
+
+    # model, batch size, preprocessing function
+    tests_predict = [
+        (x, AutoEncoder, 2, None),
+        (x, AutoEncoder, int(1e10), None),
+        (t, AutoEncoder, int(1e10), None),
+        (x, AutoEncoder, int(1e10), lambda x: x),
+        (t, AutoEncoder, int(1e10), lambda x: x),
+        (x, lambda x: x, 2, None),
+        (t, lambda x: x, 2, None),
+        (x, lambda x: x, 2, lambda x: x),
+        (t, lambda x: x, 2, lambda x: x),
+    ]
+    n_tests = len(tests_predict)
+
+    @pytest.fixture(scope="class")
+    def params(self, request):
+        return self.tests_predict[request.param]
+
+    @pytest.mark.parametrize("params", list(range(n_tests)), indirect=True)
+    def test_predict_batch(self, params):
+        x, model, batch_size, preprocess_fn = params
+        preds = predict_batch(
+            x,
+            model,
+            batch_size=batch_size,
+            preprocess_fn=preprocess_fn,
+            device=get_device("cpu"),
+        )
+        if isinstance(preds, tuple):
+            preds = preds[0]
+        if isinstance(model, torch.nn.Sequential) or hasattr(model, "__name__") and model.__name__ == "id_fn":
+            assert preds.shape == self.x.shape
+        elif isinstance(model, torch.nn.Module):
+            assert preds.shape == (self.n, self.n_classes)
+
+    def test_predict_batch_unsupported_model(self):
+        with pytest.raises(TypeError):
+            predict_batch(self.x, self.MyModel("unsupported"), device=get_device("cpu"))  # type: ignore
