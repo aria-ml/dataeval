@@ -121,19 +121,19 @@ class BaseVOCDataset(BaseDataset[_TArray, _TTarget, list[str]]):
     def __init__(
         self,
         root: str | Path,
-        year: Literal["2007", "2008", "2009", "2010", "2011", "2012"] = "2012",
         image_set: Literal["train", "val", "test", "base"] = "train",
-        download: bool = False,
+        year: Literal["2007", "2008", "2009", "2010", "2011", "2012"] = "2012",
         transforms: Transform[_TArray] | Sequence[Transform[_TArray]] | None = None,
+        download: bool = False,
         verbose: bool = False,
     ) -> None:
         self.year = year
         self._resource_index = self._get_year_image_set_index(year, image_set)
         super().__init__(
             root,
-            download,
             image_set,
             transforms,
+            download,
             verbose,
         )
 
@@ -191,10 +191,14 @@ class BaseVOCDataset(BaseDataset[_TArray, _TTarget, list[str]]):
         for entry in data:
             file_name = Path(entry).name
             file_stem = Path(entry).stem
-            # Remove file extension and split by "_"
-            parts = file_stem.split("_")
-            file_meta["year"].append(parts[0])
-            file_meta["image_id"].append(parts[1])
+            if self.year != "2007":
+                # Remove file extension and split by "_"
+                parts = file_stem.split("_")
+                file_meta["year"].append(parts[0])
+                file_meta["image_id"].append(parts[1])
+            else:
+                file_meta["year"].append(self.year)
+                file_meta["image_id"].append(file_stem)
             file_meta["mask_path"].append(str(seg_folder / file_name))
             annotations.append(str(ann_folder / file_stem) + ".xml")
 
@@ -250,9 +254,6 @@ class VOCDetection(
     ----------
     root : str or pathlib.Path
         Root directory of dataset where the ``vocdataset`` folder exists.
-    download : bool, default False
-        If True, downloads the dataset from the internet and puts it in root directory.
-        Class checks to see if data is already downloaded to ensure it does not create a duplicate download.
     image_set : "train", "val", "test", or "base", default "train"
         If "test", then dataset year must be "2007".
         If "base", then the combined dataset of "train" and "val" is returned.
@@ -260,6 +261,9 @@ class VOCDetection(
         The dataset year.
     transforms : Transform, Sequence[Transform] or None, default None
         Transform(s) to apply to the data.
+    download : bool, default False
+        If True, downloads the dataset from the internet and puts it in root directory.
+        Class checks to see if data is already downloaded to ensure it does not create a duplicate download.
     verbose : bool, default False
         If True, outputs print statements.
 
@@ -267,6 +271,8 @@ class VOCDetection(
     ----------
     path : pathlib.Path
         Location of the folder containing the data.
+    year : "2007", "2008", "2009", "2010", "2011" or "2012"
+        The selected dataset year.
     image_set : "train", "val", "test" or "base"
         The selected image set from the dataset.
     index2label : dict[int, str]
@@ -279,6 +285,10 @@ class VOCDetection(
         The transforms to be applied to the data.
     size : int
         The size of the dataset.
+
+    Note
+    ----
+    Data License: `Flickr Terms of Use <http://www.flickr.com/terms.gne?legacy=1>`_
     """
 
 
@@ -294,9 +304,6 @@ class VOCDetectionTorch(
     ----------
     root : str or pathlib.Path
         Root directory of dataset where the ``vocdataset`` folder exists.
-    download : bool, default False
-        If True, downloads the dataset from the internet and puts it in root directory.
-        Class checks to see if data is already downloaded to ensure it does not create a duplicate download.
     image_set : "train", "val", "test", or "base", default "train"
         If "test", then dataset year must be "2007".
         If "base", then the combined dataset of "train" and "val" is returned.
@@ -304,6 +311,9 @@ class VOCDetectionTorch(
         The dataset year.
     transforms : Transform, Sequence[Transform] or None, default None
         Transform(s) to apply to the data.
+    download : bool, default False
+        If True, downloads the dataset from the internet and puts it in root directory.
+        Class checks to see if data is already downloaded to ensure it does not create a duplicate download.
     verbose : bool, default False
         If True, outputs print statements.
 
@@ -311,6 +321,8 @@ class VOCDetectionTorch(
     ----------
     path : pathlib.Path
         Location of the folder containing the data.
+    year : "2007", "2008", "2009", "2010", "2011" or "2012"
+        The selected dataset year.
     image_set : "train", "val", "test" or "base"
         The selected image set from the dataset.
     index2label : dict[int, str]
@@ -323,6 +335,10 @@ class VOCDetectionTorch(
         The transforms to be applied to the data.
     size : int
         The size of the dataset.
+
+    Note
+    ----
+    Data License: `Flickr Terms of Use <http://www.flickr.com/terms.gne?legacy=1>`_
     """
 
 
@@ -338,9 +354,6 @@ class VOCSegmentation(
     ----------
     root : str or pathlib.Path
         Root directory of dataset where the ``vocdataset`` folder exists.
-    download : bool, default False
-        If True, downloads the dataset from the internet and puts it in root directory.
-        Class checks to see if data is already downloaded to ensure it does not create a duplicate download.
     image_set : "train", "val", "test", or "base", default "train"
         If "test", then dataset year must be "2007".
         If "base", then the combined dataset of "train" and "val" is returned.
@@ -348,6 +361,9 @@ class VOCSegmentation(
         The dataset year.
     transforms : Transform, Sequence[Transform] or None, default None
         Transform(s) to apply to the data.
+    download : bool, default False
+        If True, downloads the dataset from the internet and puts it in root directory.
+        Class checks to see if data is already downloaded to ensure it does not create a duplicate download.
     verbose : bool, default False
         If True, outputs print statements.
 
@@ -355,6 +371,8 @@ class VOCSegmentation(
     ----------
     path : pathlib.Path
         Location of the folder containing the data.
+    year : "2007", "2008", "2009", "2010", "2011" or "2012"
+        The selected dataset year.
     image_set : "train", "val", "test" or "base"
         The selected image set from the dataset.
     index2label : dict[int, str]
@@ -367,6 +385,10 @@ class VOCSegmentation(
         The transforms to be applied to the data.
     size : int
         The size of the dataset.
+
+    Note
+    ----
+    Data License: `Flickr Terms of Use <http://www.flickr.com/terms.gne?legacy=1>`_
     """
 
     def _load_data(self) -> tuple[list[str], list[str], dict[str, list[Any]]]:
