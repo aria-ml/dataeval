@@ -28,7 +28,7 @@ def replace_long_strings(d, max_length, replacement=None):
     elif isinstance(d, list):
         return [replace_long_strings(i, max_length, replacement) for i in d]
     elif isinstance(d, str) and len(d) > max_length:
-        return replacement or f"{d[:max_length-3]}..."
+        return replacement or f"{d[: max_length - 3]}..."
     else:
         return d
 
