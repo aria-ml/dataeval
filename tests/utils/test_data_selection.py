@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from dataeval.utils.data._selection import Select
+from dataeval.utils.data.selections._classbalance import ClassBalance
 from dataeval.utils.data.selections._classfilter import ClassFilter
 from dataeval.utils.data.selections._indices import Indices
 from dataeval.utils.data.selections._limit import Limit
@@ -27,7 +28,7 @@ def mock_dataset():
 
 @pytest.mark.required
 class TestSelectionClasses:
-    def test_classfilter_classes_only(self, mock_dataset):
+    def test_classfilter(self, mock_dataset):
         # Test ClassFilter classes
         class_filter = ClassFilter(classes=(0, 1))
         select = Select(mock_dataset, selections=[class_filter])
@@ -37,31 +38,33 @@ class TestSelectionClasses:
             label = int(np.argmax(target))
             counts[label] = counts[label] + 1
         assert counts == {0: 4, 1: 3}
-        assert "ClassFilter(classes=(0, 1), balance=False)" in str(select)
+        assert "ClassFilter(classes=(0, 1))" in str(select)
 
-    def test_classfilter_balance_only(self, mock_dataset):
+    def test_classbalance(self, mock_dataset):
         # Test ClassFilter balance
-        class_filter = ClassFilter(balance=True)
-        select = Select(mock_dataset, selections=[class_filter])
+        class_balance = ClassBalance()
+        select = Select(mock_dataset, selections=[class_balance])
         assert len(select) == 9
         counts = {0: 0, 1: 0, 2: 0}
         for _, target, _ in select:
             label = int(np.argmax(target))
             counts[label] = counts[label] + 1
         assert counts == {0: 3, 1: 3, 2: 3}
-        assert "ClassFilter(classes=None, balance=True)" in str(select)
+        assert "ClassBalance()" in str(select)
 
-    def test_classfilter_classes_and_balance(self, mock_dataset):
+    def test_classfilter_and_balance(self, mock_dataset):
         # Test ClassFilter balance
-        class_filter = ClassFilter(classes=[0, 1], balance=True)
-        select = Select(mock_dataset, selections=[class_filter])
+        class_filter = ClassFilter(classes=[0, 1])
+        class_balance = ClassBalance()
+        select = Select(mock_dataset, selections=[class_filter, class_balance])
         assert len(select) == 6
         counts = {0: 0, 1: 0}
         for _, target, _ in select:
             label = int(np.argmax(target))
             counts[label] = counts[label] + 1
         assert counts == {0: 3, 1: 3}
-        assert "ClassFilter(classes=[0, 1], balance=True)" in str(select)
+        assert "ClassFilter(classes=[0, 1])" in str(select)
+        assert "ClassBalance()" in str(select)
 
     def test_classfilter_with_unsupported_target(self):
         class MockTarget:
@@ -76,24 +79,39 @@ class TestSelectionClasses:
         with pytest.raises(TypeError):
             Select(mock_dataset, selections=[class_filter])
 
+    def test_classbalance_with_unsupported_target(self):
+        class MockTarget:
+            def __init__(self, label: int):
+                self.label = label
+
+        mock_dataset = MagicMock()
+        mock_dataset.__len__.return_value = 10
+        mock_dataset.__getitem__.side_effect = lambda idx: (f"data_{idx}", MockTarget(idx), {"id": idx})
+
+        class_balance = ClassBalance()
+        with pytest.raises(TypeError):
+            Select(mock_dataset, selections=[class_balance])
+
     def test_classfilter_with_nothing(self, mock_dataset):
         # Test ClassFilter with no params
-        class_filter = ClassFilter()
+        class_filter = ClassFilter([])
         select = Select(mock_dataset, selections=class_filter)
         assert len(select) == 10
 
-    def test_classfilter_with_limit(self, mock_dataset):
+    def test_classfilter_and_balance_with_limit(self, mock_dataset):
         # Test ClassFilter balance
-        class_filter = ClassFilter(classes=[0, 1], balance=True)
+        class_filter = ClassFilter(classes=[0, 1])
+        class_balance = ClassBalance()
         limit = Limit(size=5)
-        select = Select(mock_dataset, selections=[limit, class_filter])
+        select = Select(mock_dataset, selections=[limit, class_filter, class_balance])
         assert len(select) == 4
         counts = {0: 0, 1: 0}
         for _, target, _ in select:
             label = int(np.argmax(target))
             counts[label] = counts[label] + 1
         assert counts == {0: 2, 1: 2}
-        assert "ClassFilter(classes=[0, 1], balance=True)" in str(select)
+        assert "ClassBalance()" in str(select)
+        assert "ClassFilter(classes=[0, 1])" in str(select)
         assert "Limit(size=5)" in str(select)
 
     def test_limit(self, mock_dataset):
@@ -139,21 +157,21 @@ class TestSelectionClasses:
         assert "Indices(indices=[12, 12, 4, 4, 12, 12, 0])" in str(select)
 
     def test_indices_with_classfilter(self, mock_dataset):
-        class_filter = ClassFilter(classes=[0, 1], balance=False)
+        class_filter = ClassFilter(classes=[0, 1])
         indices = Indices([12, 10, 8, 6, 4, 2, 0])
         select = Select(mock_dataset, [indices, class_filter])
         assert len(select) == 3
         assert select._selection == [6, 4, 0]
-        assert "ClassFilter(classes=[0, 1], balance=False)" in str(select)
+        assert "ClassFilter(classes=[0, 1])" in str(select)
         assert "Indices(indices=[12, 10, 8, 6, 4, 2, 0])" in str(select)
 
     def test_indices_with_classfilter_layered(self, mock_dataset):
-        class_filter = ClassFilter(classes=[0, 1], balance=False)
+        class_filter = ClassFilter(classes=[0, 1])
         select_cf = Select(mock_dataset, class_filter)
         assert len(select_cf) == 7
         indices = Indices([12, 10, 8, 6, 4, 2, 0])
         select = Select(select_cf, indices)
         assert len(select) == 4
         assert select._selection == [6, 4, 2, 0]
-        assert "ClassFilter(classes=[0, 1], balance=False)" in str(select_cf)
+        assert "ClassFilter(classes=[0, 1])" in str(select_cf)
         assert "Indices(indices=[12, 10, 8, 6, 4, 2, 0])" in str(select)

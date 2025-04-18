@@ -1,6 +1,7 @@
 """Provides selection classes for selecting subsets of Computer Vision datasets."""
 
 __all__ = [
+    "ClassBalance",
     "ClassFilter",
     "Indices",
     "Limit",
@@ -9,6 +10,7 @@ __all__ = [
     "Shuffle",
 ]
 
+from dataeval.utils.data.selections._classbalance import ClassBalance
 from dataeval.utils.data.selections._classfilter import ClassFilter
 from dataeval.utils.data.selections._indices import Indices
 from dataeval.utils.data.selections._limit import Limit
