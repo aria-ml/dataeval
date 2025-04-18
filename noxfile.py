@@ -1,9 +1,11 @@
+import os
 import re
 from sys import version_info
 
 import nox
 
 PYTHON_VERSION = f"{version_info[0]}.{version_info[1]}"
+IS_CI = bool(os.environ.get("CI"))
 
 nox.options.default_venv_backend = "uv"
 nox.options.sessions = ["test", "type", "deps", "lint", "doctest", "check"]
@@ -96,8 +98,10 @@ def deps(session: nox.Session) -> None:
 def lint(session: nox.Session) -> None:
     """Perform linting and spellcheck."""
     check_version(session.name)
+
     session.install("ruff", "codespell[toml]")
     session.run("ruff", "check", "--show-fixes", "--exit-non-zero-on-fix", "--fix")
+    session.run("ruff", "format", "--check" if IS_CI else ".")
     session.run("codespell")
 
 
