@@ -2,7 +2,6 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Sequence
 
 import numpy as np
 
@@ -11,34 +10,29 @@ from dataeval.utils._array import as_numpy
 from dataeval.utils.data._selection import Select, Selection, SelectionStage
 
 
-class ClassFilter(Selection[ImageClassificationDatum]):
+class ClassBalance(Selection[ImageClassificationDatum]):
     """
-    Filter the dataset by class.
+    Balance the dataset by class.
 
-    Parameters
-    ----------
-    classes : Sequence[int]
-        The classes to filter by.
+    Note
+    ----
+    The total number of instances of each class will be equalized which may result
+    in a lower total number of instances than specified by the selection limit.
     """
 
     stage = SelectionStage.FILTER
 
-    def __init__(self, classes: Sequence[int]) -> None:
-        self.classes = classes
-
     def __call__(self, dataset: Select[ImageClassificationDatum]) -> None:
-        if not self.classes:
-            return
-
-        selection = []
-        for idx in dataset._selection:
+        class_indices: dict[int, list[int]] = {}
+        for i, idx in enumerate(dataset._selection):
             target = dataset._dataset[idx][1]
             if isinstance(target, Array):
                 label = int(np.argmax(as_numpy(target)))
             else:
                 # ObjectDetectionTarget and SegmentationTarget not supported yet
                 raise TypeError("ClassFilter only supports classification targets as an array of confidence scores.")
-            if label in self.classes:
-                selection.append(idx)
+            class_indices.setdefault(label, []).append(i)
 
-        dataset._selection = selection
+        per_class_limit = min(min(len(c) for c in class_indices.values()), dataset._size_limit // len(class_indices))
+        subselection = sorted([i for v in class_indices.values() for i in v[:per_class_limit]])
+        dataset._selection = [dataset._selection[i] for i in subselection]
