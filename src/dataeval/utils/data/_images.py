@@ -4,13 +4,13 @@ __all__ = []
 
 from typing import TYPE_CHECKING, Any, Generic, Iterator, Sequence, TypeVar, cast, overload
 
-from dataeval.typing import Array, Dataset
+from dataeval.typing import Array, ArrayLike, Dataset
 from dataeval.utils._array import as_numpy, channels_first_to_last
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
-T = TypeVar("T", bound=Array)
+T = TypeVar("T", Array, ArrayLike)
 
 
 class Images(Generic[T]):
