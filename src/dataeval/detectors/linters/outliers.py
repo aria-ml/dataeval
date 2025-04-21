@@ -13,7 +13,7 @@ from dataeval.outputs import DimensionStatsOutput, ImageStatsOutput, OutliersOut
 from dataeval.outputs._base import set_metadata
 from dataeval.outputs._linters import IndexIssueMap, OutlierStatsOutput
 from dataeval.outputs._stats import BOX_COUNT, SOURCE_INDEX
-from dataeval.typing import Array, Dataset
+from dataeval.typing import ArrayLike, Dataset
 from dataeval.utils.data._images import Images
 
 
@@ -197,7 +197,7 @@ class Outliers:
         return OutliersOutput(output_list)
 
     @set_metadata(state=["use_dimension", "use_pixel", "use_visual", "outlier_method", "outlier_threshold"])
-    def evaluate(self, data: Dataset[Array] | Dataset[tuple[Array, Any, Any]]) -> OutliersOutput[IndexIssueMap]:
+    def evaluate(self, data: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]]) -> OutliersOutput[IndexIssueMap]:
         """
         Returns indices of Outliers with the issues identified for each
 

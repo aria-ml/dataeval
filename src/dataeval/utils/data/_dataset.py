@@ -52,10 +52,12 @@ def _validate_data(
 
 
 def _find_max(arr: ArrayLike) -> Any:
-    if isinstance(arr[0], (Iterable, Sequence, Array)):
-        return max([_find_max(x) for x in arr])  # type: ignore
-    else:
-        return max(arr)
+    if isinstance(arr, (Iterable, Sequence, Array)):
+        if isinstance(arr[0], (Iterable, Sequence, Array)):
+            return max([_find_max(x) for x in arr])  # type: ignore
+        else:
+            return max(arr)
+    return arr
 
 
 _TLabels = TypeVar("_TLabels", Sequence[int], Sequence[Sequence[int]])

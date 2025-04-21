@@ -160,7 +160,7 @@ class TestBaseStats:
     def test_enumerate(self, per_box):
         dataset = get_dataset(DATA_3, targets_per_image=1, as_float=True)
         for i, image, boxes in _enumerate(dataset, per_box):
-            assert image.shape == (3, 64, 64)
+            assert np.asarray(image).shape == (3, 64, 64)
             assert isinstance(boxes, list) if per_box else boxes is None
 
 
