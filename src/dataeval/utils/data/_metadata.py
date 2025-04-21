@@ -3,7 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 import warnings
-from typing import TYPE_CHECKING, Any, Literal, Mapping, Sequence, cast
+from typing import TYPE_CHECKING, Any, Literal, Mapping, Sequence, Sized, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -208,8 +208,9 @@ class Metadata:
             raw.append(metadata)
 
             if is_od_target := isinstance(target, ObjectDetectionTarget):
-                target_len = len(target.labels)
-                labels.extend(as_numpy(target.labels).tolist())
+                target_labels = as_numpy(target.labels)
+                target_len = len(target_labels)
+                labels.extend(target_labels.tolist())
                 bboxes.extend(as_numpy(target.boxes).tolist())
                 scores.extend(as_numpy(target.scores).tolist())
                 srcidx.extend([i] * target_len)
@@ -360,7 +361,7 @@ class Metadata:
         self._merge()
         self._processed = False
         target_len = len(self.targets.source) if self.targets.source is not None else len(self.targets)
-        if any(len(v) != target_len for v in factors.values()):
+        if any(len(v if isinstance(v, Sized) else as_numpy(v)) != target_len for v in factors.values()):
             raise ValueError(
                 "The lists/arrays in the provided factors have a different length than the current metadata factors."
             )

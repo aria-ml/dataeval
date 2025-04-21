@@ -11,7 +11,8 @@ from torch.utils.data import DataLoader, Subset
 from tqdm import tqdm
 
 from dataeval.config import DeviceLike, get_device
-from dataeval.typing import Array, Dataset, Transform
+from dataeval.typing import Array, ArrayLike, Dataset, Transform
+from dataeval.utils._array import as_numpy
 from dataeval.utils.torch.models import SupportsEncode
 
 
@@ -46,7 +47,7 @@ class Embeddings:
 
     def __init__(
         self,
-        dataset: Dataset[tuple[Array, Any, Any]] | Dataset[Array],
+        dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike],
         batch_size: int,
         transforms: Transform[torch.Tensor] | Sequence[Transform[torch.Tensor]] | None = None,
         model: torch.nn.Module | None = None,
@@ -111,7 +112,7 @@ class Embeddings:
         """
         return self.to_tensor(indices).cpu().numpy()
 
-    def new(self, dataset: Dataset[tuple[Array, Any, Any]] | Dataset[Array]) -> Embeddings:
+    def new(self, dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike]) -> Embeddings:
         """
         Creates a new Embeddings object with the same parameters but a different dataset.
 
@@ -129,13 +130,13 @@ class Embeddings:
         )
 
     @classmethod
-    def from_array(cls, array: Array, device: DeviceLike | None = None) -> Embeddings:
+    def from_array(cls, array: ArrayLike, device: DeviceLike | None = None) -> Embeddings:
         """
         Instantiates a shallow Embeddings object using an array.
 
         Parameters
         ----------
-        array : Array
+        array : ArrayLike
             The array to convert to embeddings.
         device : DeviceLike or None, default None
             The hardware device to use if specified, otherwise uses the DataEval
@@ -155,6 +156,7 @@ class Embeddings:
         torch.Size([100, 3, 224, 224])
         """
         embeddings = Embeddings([], 0, None, None, device, True, False)
+        array = array if isinstance(array, Array) else as_numpy(array)
         embeddings._length = len(array)
         embeddings._cached_idx = set(range(len(array)))
         embeddings._embeddings = torch.as_tensor(array).to(get_device(device))

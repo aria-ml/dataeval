@@ -21,14 +21,25 @@ __all__ = [
 
 
 import sys
-from typing import Any, Generic, Iterator, Protocol, Sequence, TypedDict, TypeVar, Union, runtime_checkable
+from typing import Any, Generic, Iterator, Protocol, TypedDict, TypeVar, runtime_checkable
 
+import numpy.typing
 from typing_extensions import NotRequired, ReadOnly, Required
 
 if sys.version_info >= (3, 10):
     from typing import TypeAlias
 else:
     from typing_extensions import TypeAlias
+
+
+ArrayLike: TypeAlias = numpy.typing.ArrayLike
+"""
+Type alias for a `Union` representing objects that can be coerced into an array.
+
+See Also
+--------
+`NumPy ArrayLike <https://numpy.org/doc/stable/reference/typing.html#numpy.typing.ArrayLike>`_
+"""
 
 
 @runtime_checkable
@@ -67,16 +78,8 @@ class Array(Protocol):
     def __len__(self) -> int: ...
 
 
+_T = TypeVar("_T")
 _T_co = TypeVar("_T_co", covariant=True)
-_TArray = TypeVar("_TArray", bound=Array)
-_ScalarType = Union[int, float, bool, str]
-ArrayLike: TypeAlias = Union[Sequence[_ScalarType], Sequence[Sequence[_ScalarType]], Sequence[Array], Array]
-"""
-Type alias for array-like objects used for interoperability with DataEval.
-
-This includes native Python sequences, as well as objects that conform to
-the :class:`Array` protocol.
-"""
 
 
 class DatasetMetadata(TypedDict, total=False):
@@ -140,12 +143,12 @@ class AnnotatedDataset(Dataset[_T_co], Generic[_T_co], Protocol):
 # ========== IMAGE CLASSIFICATION DATASETS ==========
 
 
-ImageClassificationDatum: TypeAlias = tuple[Array, Array, dict[str, Any]]
+ImageClassificationDatum: TypeAlias = tuple[ArrayLike, ArrayLike, dict[str, Any]]
 """
 Type alias for an image classification datum tuple.
 
-- :class:`Array` of shape (C, H, W) - Image data in channel, height, width format.
-- :class:`Array` of shape (N,) - Class label as one-hot encoded ground-truth or prediction confidences.
+- :class:`ArrayLike` of shape (C, H, W) - Image data in channel, height, width format.
+- :class:`ArrayLike` of shape (N,) - Class label as one-hot encoded ground-truth or prediction confidences.
 - dict[str, Any] - Datum level metadata.
 """
 
@@ -180,11 +183,11 @@ class ObjectDetectionTarget(Protocol):
     def scores(self) -> ArrayLike: ...
 
 
-ObjectDetectionDatum: TypeAlias = tuple[Array, ObjectDetectionTarget, dict[str, Any]]
+ObjectDetectionDatum: TypeAlias = tuple[ArrayLike, ObjectDetectionTarget, dict[str, Any]]
 """
 Type alias for an object detection datum tuple.
 
-- :class:`Array` of shape (C, H, W) - Image data in channel, height, width format.
+- :class:`ArrayLike` of shape (C, H, W) - Image data in channel, height, width format.
 - :class:`ObjectDetectionTarget` - Object detection target information for the image.
 - dict[str, Any] - Datum level metadata.
 """
@@ -221,11 +224,11 @@ class SegmentationTarget(Protocol):
     def scores(self) -> ArrayLike: ...
 
 
-SegmentationDatum: TypeAlias = tuple[Array, SegmentationTarget, dict[str, Any]]
+SegmentationDatum: TypeAlias = tuple[ArrayLike, SegmentationTarget, dict[str, Any]]
 """
 Type alias for an image classification datum tuple.
 
-- :class:`Array` of shape (C, H, W) - Image data in channel, height, width format.
+- :class:`ArrayLike` of shape (C, H, W) - Image data in channel, height, width format.
 - :class:`SegmentationTarget` - Segmentation target information for the image.
 - dict[str, Any] - Datum level metadata.
 """
@@ -237,7 +240,7 @@ Type alias for an :class:`AnnotatedDataset` of :class:`SegmentationDatum` elemen
 
 
 @runtime_checkable
-class Transform(Generic[_TArray], Protocol):
+class Transform(Generic[_T], Protocol):
     """
     Protocol defining a transform function.
 
@@ -262,4 +265,4 @@ class Transform(Generic[_TArray], Protocol):
     array([0.004, 0.008, 0.012])
     """
 
-    def __call__(self, data: _TArray, /) -> _TArray: ...
+    def __call__(self, data: _T, /) -> _T: ...

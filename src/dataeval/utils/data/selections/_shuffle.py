@@ -8,7 +8,7 @@ import numpy as np
 from numpy.random import BitGenerator, Generator, SeedSequence
 from numpy.typing import NDArray
 
-from dataeval.typing import Array, ArrayLike
+from dataeval.typing import Array
 from dataeval.utils._array import as_numpy
 from dataeval.utils.data._selection import Select, Selection, SelectionStage
 
@@ -30,7 +30,7 @@ class Shuffle(Selection[Any]):
     seed: int | NDArray[Any] | SeedSequence | BitGenerator | Generator | None
     stage = SelectionStage.ORDER
 
-    def __init__(self, seed: int | ArrayLike | SeedSequence | BitGenerator | Generator | None = None):
+    def __init__(self, seed: int | Sequence[int] | Array | SeedSequence | BitGenerator | Generator | None = None):
         self.seed = as_numpy(seed) if isinstance(seed, (Sequence, Array)) else seed
 
     def __call__(self, dataset: Select[Any]) -> None:

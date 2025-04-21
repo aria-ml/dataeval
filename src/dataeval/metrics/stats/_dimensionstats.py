@@ -9,7 +9,7 @@ import numpy as np
 from dataeval.metrics.stats._base import StatsProcessor, run_stats
 from dataeval.outputs import DimensionStatsOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.typing import Array, Dataset
+from dataeval.typing import ArrayLike, Dataset
 from dataeval.utils._image import get_bitdepth
 
 
@@ -34,7 +34,7 @@ class DimensionStatsProcessor(StatsProcessor[DimensionStatsOutput]):
 
 @set_metadata
 def dimensionstats(
-    dataset: Dataset[Array] | Dataset[tuple[Array, Any, Any]],
+    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
     *,
     per_box: bool = False,
 ) -> DimensionStatsOutput:

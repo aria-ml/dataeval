@@ -10,7 +10,7 @@ from scipy.stats import entropy, kurtosis, skew
 from dataeval.metrics.stats._base import StatsProcessor, run_stats
 from dataeval.outputs import PixelStatsOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.typing import Array, Dataset
+from dataeval.typing import ArrayLike, Dataset
 
 
 class PixelStatsProcessor(StatsProcessor[PixelStatsOutput]):
@@ -37,7 +37,7 @@ class PixelStatsProcessor(StatsProcessor[PixelStatsOutput]):
 
 @set_metadata
 def pixelstats(
-    dataset: Dataset[Array] | Dataset[tuple[Array, Any, Any]],
+    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
     *,
     per_box: bool = False,
     per_channel: bool = False,
