@@ -9,7 +9,7 @@ from dataeval.metrics.stats._base import combine_stats, get_dataset_step_from_id
 from dataeval.outputs import DuplicatesOutput, HashStatsOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.outputs._linters import DatasetDuplicateGroupMap, DuplicateGroup
-from dataeval.typing import Array, Dataset
+from dataeval.typing import ArrayLike, Dataset
 from dataeval.utils.data._images import Images
 
 
@@ -110,13 +110,15 @@ class Duplicates:
         return DuplicatesOutput(**duplicates)
 
     @set_metadata(state=["only_exact"])
-    def evaluate(self, data: Dataset[Array] | Dataset[tuple[Array, Any, Any]]) -> DuplicatesOutput[DuplicateGroup]:
+    def evaluate(
+        self, data: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]]
+    ) -> DuplicatesOutput[DuplicateGroup]:
         """
         Returns duplicate image indices for both exact matches and near matches
 
         Parameters
         ----------
-        data : Iterable[Array], shape - (N, C, H, W) | Dataset[tuple[Array, Any, Any]]
+        data : Iterable[ArrayLike], shape - (N, C, H, W) | Dataset[tuple[ArrayLike, Any, Any]]
             A dataset of images in an Array format or the output(s) from a hashstats analysis
 
         Returns

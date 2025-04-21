@@ -10,7 +10,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
 from multiprocessing import Pool
-from typing import Any, Callable, Generic, Iterable, Sequence, TypeVar, cast
+from typing import Any, Callable, Generic, Iterable, Sequence, TypeVar
 
 import numpy as np
 import tqdm
@@ -19,7 +19,7 @@ from numpy.typing import NDArray
 from dataeval.config import get_max_processes
 from dataeval.outputs._stats import BaseStatsOutput, SourceIndex
 from dataeval.typing import Array, ArrayLike, Dataset, ObjectDetectionTarget
-from dataeval.utils._array import to_numpy
+from dataeval.utils._array import as_numpy, to_numpy
 from dataeval.utils._image import normalize_image_shape, rescale
 
 DTYPE_REGEX = re.compile(r"NDArray\[np\.(.*?)\]")
@@ -138,19 +138,19 @@ def process_stats(
 
 
 def process_stats_unpack(
-    args: tuple[int, Array, list[BoundingBox] | None],
+    args: tuple[int, ArrayLike, list[BoundingBox] | None],
     per_channel: bool,
     stats_processor_cls: Iterable[type[StatsProcessor[TStatsOutput]]],
 ) -> StatsProcessorOutput:
     return process_stats(*args, per_channel=per_channel, stats_processor_cls=stats_processor_cls)
 
 
-def _enumerate(dataset: Dataset[Array] | Dataset[tuple[Array, Any, Any]], per_box: bool):
+def _enumerate(dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]], per_box: bool):
     for i in range(len(dataset)):
         d = dataset[i]
         image = d[0] if isinstance(d, tuple) else d
         if per_box and isinstance(d, tuple) and isinstance(d[1], ObjectDetectionTarget):
-            boxes = cast(Array, d[1].boxes)
+            boxes = d[1].boxes if isinstance(d[1].boxes, Array) else as_numpy(d[1].boxes)
             target = [BoundingBox(float(box[i]) for i in range(4)) for box in boxes]
         else:
             target = None
@@ -159,7 +159,7 @@ def _enumerate(dataset: Dataset[Array] | Dataset[tuple[Array, Any, Any]], per_bo
 
 
 def run_stats(
-    dataset: Dataset[Array] | Dataset[tuple[Array, Any, Any]],
+    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
     per_box: bool,
     per_channel: bool,
     stats_processor_cls: Iterable[type[StatsProcessor[TStatsOutput]]],
@@ -173,7 +173,7 @@ def run_stats(
 
     Parameters
     ----------
-    data : Dataset[Array] | Dataset[tuple[Array, Any, Any]]
+    data : Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]]
         A dataset of images and targets to compute statistics on.
     per_box : bool
         A flag which determines if the statistics should be evaluated on a per-box basis or not.

@@ -10,12 +10,12 @@ from dataeval.metrics.stats._pixelstats import PixelStatsProcessor
 from dataeval.metrics.stats._visualstats import VisualStatsProcessor
 from dataeval.outputs import ChannelStatsOutput, ImageStatsOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.typing import Array, Dataset
+from dataeval.typing import ArrayLike, Dataset
 
 
 @overload
 def imagestats(
-    dataset: Dataset[Array] | Dataset[tuple[Array, Any, Any]],
+    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
     *,
     per_box: bool = False,
     per_channel: Literal[True],
@@ -24,7 +24,7 @@ def imagestats(
 
 @overload
 def imagestats(
-    dataset: Dataset[Array] | Dataset[tuple[Array, Any, Any]],
+    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
     *,
     per_box: bool = False,
     per_channel: Literal[False] = False,
@@ -33,7 +33,7 @@ def imagestats(
 
 @set_metadata
 def imagestats(
-    dataset: Dataset[Array] | Dataset[tuple[Array, Any, Any]],
+    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
     *,
     per_box: bool = False,
     per_channel: bool = False,
