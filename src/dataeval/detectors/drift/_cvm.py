@@ -16,9 +16,9 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.stats import cramervonmises_2samp
 
+from dataeval.data._embeddings import Embeddings
 from dataeval.detectors.drift._base import BaseDriftUnivariate, UpdateStrategy
 from dataeval.typing import Array
-from dataeval.utils.data._embeddings import Embeddings
 
 
 class DriftCVM(BaseDriftUnivariate):
@@ -52,7 +52,7 @@ class DriftCVM(BaseDriftUnivariate):
 
     Example
     -------
-    >>> from dataeval.utils.data import Embeddings
+    >>> from dataeval.data import Embeddings
 
     Use Embeddings to encode images before testing for drift
 

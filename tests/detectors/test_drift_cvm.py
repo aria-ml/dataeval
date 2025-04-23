@@ -13,8 +13,8 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
+from dataeval.data._embeddings import Embeddings
 from dataeval.detectors.drift._cvm import DriftCVM
-from dataeval.utils.data._embeddings import Embeddings
 
 np.random.seed(0)
 

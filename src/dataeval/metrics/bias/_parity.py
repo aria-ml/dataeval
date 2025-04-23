@@ -10,11 +10,11 @@ from numpy.typing import NDArray
 from scipy.stats import chisquare
 from scipy.stats.contingency import chi2_contingency, crosstab
 
+from dataeval.data import Metadata
 from dataeval.outputs import LabelParityOutput, ParityOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike
 from dataeval.utils._array import as_numpy
-from dataeval.utils.data import Metadata
 
 
 def normalize_expected_dist(expected_dist: NDArray[Any], observed_dist: NDArray[Any]) -> NDArray[Any]:

@@ -15,11 +15,11 @@ from typing import Any, Callable
 import torch
 
 from dataeval.config import DeviceLike, get_device
+from dataeval.data._embeddings import Embeddings
 from dataeval.detectors.drift._base import BaseDrift, UpdateStrategy, update_strategy
 from dataeval.outputs import DriftMMDOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.typing import Array
-from dataeval.utils.data._embeddings import Embeddings
 
 
 class DriftMMD(BaseDrift):
@@ -51,7 +51,7 @@ class DriftMMD(BaseDrift):
 
     Example
     -------
-    >>> from dataeval.utils.data import Embeddings
+    >>> from dataeval.data import Embeddings
 
     Use Embeddings to encode images before testing for drift
 

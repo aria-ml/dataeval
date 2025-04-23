@@ -10,8 +10,7 @@ import pytest
 from PIL import Image
 
 from dataeval.config import set_seed
-from dataeval.utils.data._metadata import Metadata
-from dataeval.utils.data._targets import Targets
+from dataeval.data import Metadata, Targets
 
 TEMP_CONTENTS = "ABCDEF1234567890"
 
