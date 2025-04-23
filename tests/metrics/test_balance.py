@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from dataeval.utils.data._metadata import Metadata
+from dataeval.data._metadata import Metadata
 
 try:
     from matplotlib.figure import Figure

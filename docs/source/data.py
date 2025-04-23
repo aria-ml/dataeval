@@ -18,7 +18,7 @@ def cd(rel_path: str):
 
 
 def download():
-    from dataeval.utils.data.datasets import CIFAR10, MNIST, VOCDetection
+    from dataeval.utils.datasets import CIFAR10, MNIST, VOCDetection
 
     with cd("how_to"):
         # AETrainerTutorial.ipynb

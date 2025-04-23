@@ -13,11 +13,11 @@ with contextlib.suppress(ImportError):
     import pandas as pd
     from matplotlib.figure import Figure
 
+from dataeval.data._images import Images
 from dataeval.outputs._base import Output
 from dataeval.typing import ArrayLike, Dataset
 from dataeval.utils._array import as_numpy, channels_first_to_last
 from dataeval.utils._plot import heatmap
-from dataeval.utils.data._images import Images
 
 TData = TypeVar("TData", np.float64, NDArray[np.float64])
 

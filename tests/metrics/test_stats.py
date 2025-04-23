@@ -12,6 +12,8 @@ from numpy.random import randint
 from numpy.typing import NDArray
 
 from dataeval.config import set_max_processes
+from dataeval.data._metadata import Metadata
+from dataeval.data._targets import Targets
 from dataeval.metrics.stats import dimensionstats, hashstats, labelstats, pixelstats, visualstats
 from dataeval.metrics.stats._base import (
     StatsProcessor,
@@ -28,8 +30,6 @@ from dataeval.metrics.stats._imagestats import (
 from dataeval.outputs._stats import SOURCE_INDEX, BaseStatsOutput
 from dataeval.typing import ImageClassificationDataset, ObjectDetectionDataset
 from dataeval.utils.data._dataset import _find_max, to_image_classification_dataset, to_object_detection_dataset
-from dataeval.utils.data._metadata import Metadata
-from dataeval.utils.data._targets import Targets
 
 # do not run stats tests using multiple processing
 set_max_processes(1)

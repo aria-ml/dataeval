@@ -4,6 +4,8 @@ Collate functions used with a PyTorch DataLoader to load data from MAITE complia
 
 from __future__ import annotations
 
+__all__ = ["list_collate_fn", "numpy_collate_fn", "torch_collate_fn"]
+
 from typing import Any, Iterable, Sequence, TypeVar
 
 import numpy as np

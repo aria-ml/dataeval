@@ -15,10 +15,10 @@ import numpy as np
 import pytest
 import torch
 
+from dataeval.data._embeddings import Embeddings
 from dataeval.detectors.drift._base import BaseDriftUnivariate
 from dataeval.detectors.drift.updates import LastSeenUpdate, ReservoirSamplingUpdate
 from dataeval.typing import Dataset
-from dataeval.utils.data._embeddings import Embeddings
 
 
 @pytest.mark.required
