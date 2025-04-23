@@ -1,6 +1,13 @@
-[//]: # (0adc8b87e8415d7cb3abc3ecb2dac845487698c4)
+[//]: # (82329adc9dbbdc7053fb4ae93c7cf04d5a122022)
 
 # DataEval Change Log
+
+## v0.84.1
+
+🛠️ **Improvements and Enhancements**
+- `82329adc` - Move to new MAITE/NumPy ArrayLike and loosen type restriction on Datasets
+- `c31915dc` - Split ClassBalance from ClassFilter
+- `48bc2426` - Update drift classes to use DataEval data structures and simplify torch utility functions
 
 ## v0.84.0
 
