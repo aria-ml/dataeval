@@ -101,7 +101,11 @@ Cluster Analysis
     Cluster Analysis is a statistical method for processing data. It is primarily used in {term}`classification<Classification>` projects. It works by organizing items into groups, or clusters, based upon how closely associated they are. The objective of cluster analysis is to find similar groups of subjects, where the “similarity” between each pair of subjects represents a unique characteristic of the group vs. the larger population/sample. It is an {term}`unsupervised learning<Unsupervised Learning>` algorithm, meaning the number of clusters is unknown before running the model.
 
 Completeness
-    A dataset is complete if it contains enough combinations of intrinsic and extrinsic factors to be representative and generalizable when conducting a desired machine learning task. More precisely, data which are complete allow the model to be trained on a wider variety of operationally-relevant contexts. Metrics for quantifying dataset completeness include {term}`diversity<Diversity>`,{term}`balance<Balance>`,{term}`parity<Parity>`, and {term}`coverage<Coverage>`.
+    {term}`Completeness` informs users the degree to which images span the learned embedding space. A complete dataset is one which contains every combination of latent variable ranges.
+
+    {term}`completeness<Completeness>` quantifies dataset completeness. 
+    
+    See, {term}`diversity<Diversity>`,{term}`balance<Balance>`,{term}`parity<Parity>`, and {term}`coverage<Coverage>` for related metrics.
 
 Concept Drift
     Concept drift is a specific kind of data {term}`drift<Drift>` where there is a change in the relationship between the input data and the model target. It reflects the evolution of the underlying problem statement or process over time.
