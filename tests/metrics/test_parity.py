@@ -4,8 +4,8 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
+from dataeval.data._metadata import Metadata
 from dataeval.metrics.bias._parity import label_parity, parity
-from dataeval.utils.data._metadata import Metadata
 from tests.conftest import preprocess
 
 

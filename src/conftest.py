@@ -4,10 +4,10 @@ import pathlib
 import sys
 from typing import Mapping, Sequence
 
+from dataeval.data._metadata import Metadata
+from dataeval.data._targets import Targets
 from dataeval.outputs._ood import OODOutput
 from dataeval.utils.data._dataset import to_object_detection_dataset
-from dataeval.utils.data._metadata import Metadata
-from dataeval.utils.data._targets import Targets
 
 sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute() / "tests" / "detectors"))
 

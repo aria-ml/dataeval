@@ -8,11 +8,11 @@ import numpy as np
 import scipy as sp
 from numpy.typing import NDArray
 
+from dataeval.data import Metadata
 from dataeval.outputs import DiversityOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.utils._bin import get_counts
 from dataeval.utils._method import get_method
-from dataeval.utils.data import Metadata
 
 
 def diversity_shannon(

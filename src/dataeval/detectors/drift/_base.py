@@ -18,11 +18,11 @@ from typing import Callable, Literal, Protocol, TypeVar, runtime_checkable
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval.data import Embeddings
 from dataeval.outputs import DriftOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.typing import Array
 from dataeval.utils._array import as_numpy, flatten
-from dataeval.utils.data import Embeddings
 
 R = TypeVar("R")
 

@@ -9,10 +9,10 @@ from numpy.typing import NDArray
 from sklearn.feature_selection import mutual_info_classif
 
 from dataeval.config import get_seed
+from dataeval.data import Metadata
 from dataeval.metadata._utils import _compare_keys, _validate_factors_and_data
 from dataeval.outputs import MostDeviatedFactorsOutput, OODOutput, OODPredictorOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.utils.data import Metadata
 
 
 def _combine_discrete_continuous(metadata: Metadata) -> tuple[list[str], NDArray[np.float64]]:
@@ -201,7 +201,7 @@ def find_most_deviated_factors(
     MostDeviatedFactorsOutput([])
     """
 
-    ood_mask: NDArray[np.bool] = ood.is_ood
+    ood_mask: NDArray[np.bool_] = ood.is_ood
 
     # No metadata correlated with out of distribution data
     if not any(ood_mask):
@@ -303,7 +303,7 @@ def find_ood_predictors(
     OODPredictorOutput({})
     """
 
-    ood_mask: NDArray[np.bool] = ood.is_ood
+    ood_mask: NDArray[np.bool_] = ood.is_ood
 
     discrete_features_count = len(metadata.discrete_factor_names)
     factors, data = _combine_discrete_continuous(metadata)  # (F, ), (S, F) => F = Fd + Fc
@@ -320,7 +320,7 @@ def find_ood_predictors(
     # Calculate mean, std of each factor over all samples
     scaled_data = (data - np.mean(data, axis=0)) / np.std(data, axis=0, ddof=1)  # (S, F)
 
-    discrete_features = np.zeros_like(factors, dtype=np.bool)
+    discrete_features = np.zeros_like(factors, dtype=np.bool_)
     discrete_features[:discrete_features_count] = True
 
     mutual_info_values = (

@@ -4,13 +4,13 @@ __all__ = []
 
 from typing import Any, Sequence, overload
 
+from dataeval.data._images import Images
 from dataeval.metrics.stats import hashstats
 from dataeval.metrics.stats._base import combine_stats, get_dataset_step_from_idx
 from dataeval.outputs import DuplicatesOutput, HashStatsOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.outputs._linters import DatasetDuplicateGroupMap, DuplicateGroup
 from dataeval.typing import ArrayLike, Dataset
-from dataeval.utils.data._images import Images
 
 
 class Duplicates:

@@ -3,7 +3,10 @@ __pycache__/
 dist/
 
 data/
+!src/dataeval/data
 !src/dataeval/utils/data
+!tests/data
+!tests/utils/data
 
 docs/build/
 docs/source/reference/autoapi
