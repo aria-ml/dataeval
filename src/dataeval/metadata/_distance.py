@@ -9,11 +9,11 @@ import numpy as np
 from scipy.stats import iqr, ks_2samp
 from scipy.stats import wasserstein_distance as emd
 
+from dataeval.data import Metadata
 from dataeval.metadata._utils import _compare_keys, _validate_factors_and_data
 from dataeval.outputs import MetadataDistanceOutput, MetadataDistanceValues
 from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike
-from dataeval.utils.data import Metadata
 
 
 class KSType(NamedTuple):

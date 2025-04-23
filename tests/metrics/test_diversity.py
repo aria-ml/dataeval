@@ -3,8 +3,8 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
+from dataeval.data._metadata import Metadata
 from dataeval.outputs._base import ExecutionMetadata
-from dataeval.utils.data._metadata import Metadata
 
 try:
     from matplotlib.figure import Figure

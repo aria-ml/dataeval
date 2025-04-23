@@ -7,6 +7,7 @@ from typing import Any, Literal, Sequence, overload
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval.data._images import Images
 from dataeval.metrics.stats._base import combine_stats, get_dataset_step_from_idx
 from dataeval.metrics.stats._imagestats import imagestats
 from dataeval.outputs import DimensionStatsOutput, ImageStatsOutput, OutliersOutput, PixelStatsOutput, VisualStatsOutput
@@ -14,7 +15,6 @@ from dataeval.outputs._base import set_metadata
 from dataeval.outputs._linters import IndexIssueMap, OutlierStatsOutput
 from dataeval.outputs._stats import BOX_COUNT, SOURCE_INDEX
 from dataeval.typing import ArrayLike, Dataset
-from dataeval.utils.data._images import Images
 
 
 def _get_outlier_mask(

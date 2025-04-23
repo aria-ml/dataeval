@@ -9,10 +9,10 @@ import scipy as sp
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 
 from dataeval.config import EPSILON, get_seed
+from dataeval.data import Metadata
 from dataeval.outputs import BalanceOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.utils._bin import get_counts
-from dataeval.utils.data import Metadata
 
 
 def _validate_num_neighbors(num_neighbors: int) -> int:

@@ -5,10 +5,10 @@ __all__ = []
 from collections import Counter, defaultdict
 from typing import Any, Mapping, TypeVar
 
+from dataeval.data._metadata import Metadata
 from dataeval.outputs import LabelStatsOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.typing import AnnotatedDataset
-from dataeval.utils.data._metadata import Metadata
 
 TValue = TypeVar("TValue")
 
@@ -38,7 +38,7 @@ def labelstats(dataset: Metadata | AnnotatedDataset[Any]) -> LabelStatsOutput:
     --------
     Calculate basic :term:`statistics<Statistics>` on labels for a dataset.
 
-    >>> from dataeval.utils.data import Metadata
+    >>> from dataeval.data import Metadata
     >>> stats = labelstats(Metadata(dataset))
     >>> print(stats.to_table())
     Class Count: 5
