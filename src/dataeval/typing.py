@@ -98,6 +98,22 @@ class DatasetMetadata(TypedDict, total=False):
     index2label: NotRequired[ReadOnly[dict[int, str]]]
 
 
+class ModelMetadata(TypedDict, total=False):
+    """
+    Model metadata required for all `AnnotatedModel` classes.
+
+    Attributes
+    ----------
+    id : Required[str]
+        A unique identifier for the model
+    index2label : NotRequired[dict[int, str]]
+        A lookup table converting label value to class name
+    """
+
+    id: Required[ReadOnly[str]]
+    index2label: NotRequired[ReadOnly[dict[int, str]]]
+
+
 @runtime_checkable
 class Dataset(Generic[_T_co], Protocol):
     """
@@ -237,6 +253,21 @@ SegmentationDataset: TypeAlias = AnnotatedDataset[SegmentationDatum]
 """
 Type alias for an :class:`AnnotatedDataset` of :class:`SegmentationDatum` elements.
 """
+
+# ========== MODEL ==========
+
+
+@runtime_checkable
+class AnnotatedModel(Protocol):
+    """
+    Protocol for an annotated model.
+    """
+
+    @property
+    def metadata(self) -> ModelMetadata: ...
+
+
+# ========== TRANSFORM ==========
 
 
 @runtime_checkable
