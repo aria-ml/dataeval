@@ -25,6 +25,10 @@ class Selection(Generic[_TDatum]):
         return f"{self.__class__.__name__}({', '.join([f'{k}={v}' for k, v in self.__dict__.items()])})"
 
 
+class Subselection(Generic[_TDatum]):
+    def __call__(self, original: _TDatum) -> _TDatum: ...
+
+
 class Select(AnnotatedDataset[_TDatum]):
     """
     Wraps a dataset and applies selection criteria to it.
@@ -63,6 +67,7 @@ class Select(AnnotatedDataset[_TDatum]):
     _selection: list[int]
     _selections: Sequence[Selection[_TDatum]]
     _size_limit: int
+    _subselections: list[tuple[Subselection[_TDatum], set[int]]]
 
     def __init__(
         self,
@@ -73,7 +78,8 @@ class Select(AnnotatedDataset[_TDatum]):
         self._dataset = dataset
         self._size_limit = len(dataset)
         self._selection = list(range(self._size_limit))
-        self._selections = self._sort(selections)
+        self._selections = self._sort_selections(selections)
+        self._subselections = []
 
         # Ensure metadata is populated correctly as DatasetMetadata TypedDict
         _metadata = getattr(dataset, "metadata", {})
@@ -81,7 +87,7 @@ class Select(AnnotatedDataset[_TDatum]):
             _metadata["id"] = dataset.__class__.__name__
         self._metadata = DatasetMetadata(**_metadata)
 
-        self._select()
+        self._apply_selections()
 
     @property
     def metadata(self) -> DatasetMetadata:
@@ -94,24 +100,31 @@ class Select(AnnotatedDataset[_TDatum]):
         selections = f"Selections: [{', '.join([str(s) for s in self._selections])}]"
         return f"{title}\n{sep}{nt}{selections}{nt}Selected Size: {len(self)}\n\n{self._dataset}"
 
-    def _sort(self, selections: Selection[_TDatum] | Sequence[Selection[_TDatum]] | None) -> list[Selection]:
+    def _sort_selections(
+        self, selections: Selection[_TDatum] | Sequence[Selection[_TDatum]] | None
+    ) -> list[Selection[_TDatum]]:
         if not selections:
             return []
 
-        selections = [selections] if isinstance(selections, Selection) else selections
-        grouped: dict[int, list[Selection]] = {}
-        for selection in selections:
+        selections_list = [selections] if isinstance(selections, Selection) else list(selections)
+        grouped: dict[int, list[Selection[_TDatum]]] = {}
+        for selection in selections_list:
             grouped.setdefault(selection.stage, []).append(selection)
         selection_list = [selection for category in sorted(grouped) for selection in grouped[category]]
         return selection_list
 
-    def _select(self) -> None:
+    def _apply_selections(self) -> None:
         for selection in self._selections:
             selection(self)
         self._selection = self._selection[: self._size_limit]
 
+    def _apply_subselection(self, datum: _TDatum, index: int) -> _TDatum:
+        for subselection, indices in self._subselections:
+            datum = subselection(datum) if index in indices else datum
+        return datum
+
     def __getitem__(self, index: int) -> _TDatum:
-        return self._dataset[self._selection[index]]
+        return self._apply_subselection(self._dataset[self._selection[index]], index)
 
     def __iter__(self) -> Iterator[_TDatum]:
         for i in range(len(self)):

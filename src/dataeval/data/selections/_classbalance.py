@@ -2,7 +2,6 @@ from __future__ import annotations
 
 __all__ = []
 
-
 import numpy as np
 
 from dataeval.data._selection import Select, Selection, SelectionStage
