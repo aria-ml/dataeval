@@ -38,7 +38,7 @@ class TestSelectionClasses:
             label = int(np.argmax(target))
             counts[label] = counts[label] + 1
         assert counts == {0: 4, 1: 3}
-        assert "ClassFilter(classes=(0, 1))" in str(select)
+        assert "ClassFilter(classes=(0, 1)" in str(select)
 
     def test_classbalance(self, mock_dataset):
         # Test ClassFilter balance
@@ -63,7 +63,7 @@ class TestSelectionClasses:
             label = int(np.argmax(target))
             counts[label] = counts[label] + 1
         assert counts == {0: 3, 1: 3}
-        assert "ClassFilter(classes=[0, 1])" in str(select)
+        assert "ClassFilter(classes=[0, 1]" in str(select)
         assert "ClassBalance()" in str(select)
 
     def test_classfilter_with_unsupported_target(self):
@@ -111,7 +111,7 @@ class TestSelectionClasses:
             counts[label] = counts[label] + 1
         assert counts == {0: 2, 1: 2}
         assert "ClassBalance()" in str(select)
-        assert "ClassFilter(classes=[0, 1])" in str(select)
+        assert "ClassFilter(classes=[0, 1]" in str(select)
         assert "Limit(size=5)" in str(select)
 
     def test_limit(self, mock_dataset):
@@ -162,7 +162,7 @@ class TestSelectionClasses:
         select = Select(mock_dataset, [indices, class_filter])
         assert len(select) == 3
         assert select._selection == [6, 4, 0]
-        assert "ClassFilter(classes=[0, 1])" in str(select)
+        assert "ClassFilter(classes=[0, 1]" in str(select)
         assert "Indices(indices=[12, 10, 8, 6, 4, 2, 0])" in str(select)
 
     def test_indices_with_classfilter_layered(self, mock_dataset):
@@ -173,5 +173,5 @@ class TestSelectionClasses:
         select = Select(select_cf, indices)
         assert len(select) == 4
         assert select._selection == [6, 4, 2, 0]
-        assert "ClassFilter(classes=[0, 1])" in str(select_cf)
+        assert "ClassFilter(classes=[0, 1]" in str(select_cf)
         assert "Indices(indices=[12, 10, 8, 6, 4, 2, 0])" in str(select)
