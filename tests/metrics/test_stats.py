@@ -272,7 +272,6 @@ class TestLabelStats:
         assert stats.label_counts_per_image == [5, 2, 3, 4]
         assert stats.image_count == 4
 
-    @pytest.mark.requires_all
     def test_labelstats_to_dataframe(self):
         label_array = [[0, 0, 0, 0, 0], [0, 1], [0, 1, 2], [0, 1, 2, 3]]
         metadata = get_metadata(label_array)

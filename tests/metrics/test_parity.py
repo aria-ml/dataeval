@@ -187,6 +187,7 @@ class TestLabelIndependenceFunctional:
         assert np.isclose(result.p_value, 1)
 
 
+@pytest.mark.required
 class TestMDParityUnit:
     def test_warns_with_not_enough_frequency(self):
         labels = [0, 1]
@@ -201,7 +202,6 @@ class TestMDParityUnit:
         metadata = preprocess(factors, labels)
         parity(metadata)
 
-    @pytest.mark.requires_all
     def test_to_dataframe(self):
         labels = [0] * 5 + [1] * 5
         factors = {"factor1": ["foo"] * 10}

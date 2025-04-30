@@ -31,10 +31,8 @@ additional output formats and utility functions for analysis of your data.
 
 * - Additional Functionality
   - Plot visualizations
-  - Dataframe outputs
 * - Modules Installed
   - `matplotlib`
-  - `pandas`
 ```
 
 Installing from `pip` with extras
