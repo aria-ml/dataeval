@@ -2,16 +2,13 @@ from __future__ import annotations
 
 __all__ = []
 
-import contextlib
 from dataclasses import dataclass
 from typing import Any, Iterable, NamedTuple, Optional, Union
 
 import numpy as np
+import pandas as pd
 from numpy.typing import NDArray
 from typing_extensions import TypeAlias
-
-with contextlib.suppress(ImportError):
-    import pandas as pd
 
 from dataeval.outputs._base import Output
 from dataeval.utils._plot import channel_histogram_plot, histogram_plot
@@ -281,8 +278,6 @@ class LabelStatsOutput(Output):
         -------
         pd.DataFrame
         """
-        import pandas as pd
-
         total_count = []
         image_count = []
         for cls in range(len(self.class_names)):

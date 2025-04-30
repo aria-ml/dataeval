@@ -7,10 +7,10 @@ from dataclasses import asdict, dataclass
 from typing import Any, Literal, TypeVar, overload
 
 import numpy as np
+import pandas as pd
 from numpy.typing import NDArray
 
 with contextlib.suppress(ImportError):
-    import pandas as pd
     from matplotlib.figure import Figure
 
 from dataeval.data._images import Images
@@ -38,8 +38,6 @@ class ToDataFrameMixin:
         -----
         This method requires `pandas <https://pandas.pydata.org/>`_ to be installed.
         """
-        import pandas as pd
-
         return pd.DataFrame(
             index=self.factor_names,  # type: ignore - list[str] is documented as acceptable index type
             data={
