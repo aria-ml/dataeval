@@ -2,14 +2,11 @@ from __future__ import annotations
 
 __all__ = []
 
-import contextlib
 from dataclasses import dataclass
 from typing import Generic, TypeVar, Union
 
+import pandas as pd
 from typing_extensions import TypeAlias
-
-with contextlib.suppress(ImportError):
-    import pandas as pd
 
 from dataeval.outputs._base import Output
 from dataeval.outputs._stats import DimensionStatsOutput, LabelStatsOutput, PixelStatsOutput, VisualStatsOutput
@@ -168,8 +165,6 @@ class OutliersOutput(Output, Generic[TIndexIssueMap]):
         -----
         This method requires `pandas <https://pandas.pydata.org/>`_ to be installed.
         """
-        import pandas as pd
-
         if isinstance(self.issues, dict):
             _, classwise = _reorganize_by_class_and_metric(self.issues, labelstats)
             data = _create_pandas_dataframe(classwise)

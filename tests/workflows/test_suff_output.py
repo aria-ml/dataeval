@@ -63,6 +63,7 @@ class TestSufficiencyPlot:
         assert isinstance(result[0], Figure)
 
     def test_multiplot(self, so_mixed):
+        """ """
         result = so_mixed.plot()
         assert len(result) == 3
         assert isinstance(result[0], Figure)
