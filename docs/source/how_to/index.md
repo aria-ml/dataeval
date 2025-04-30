@@ -67,16 +67,16 @@ ClassLearningCurvesTutorial.ipynb
 % - How to use the AETrainer with different model architectures (future how-to)
 
 [colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
-[ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.84.1/docs/source/how_to/BayesErrorRateEstimationTutorial.ipynb
-[suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.84.1/docs/source/how_to/ClassLearningCurvesTutorial.ipynb
-[div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.84.1/docs/source/how_to/HPDivergenceTutorial.ipynb
-[ae-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.84.1/docs/source/how_to/AETrainerTutorial.ipynb
-[lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.84.1/docs/source/how_to/ClassLabelAnalysisTutorial.ipynb
-[clust-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.84.1/docs/source/how_to/ClustererTutorial.ipynb
-[dup-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.84.1/docs/source/how_to/DuplicatesTutorial.ipynb
-[lint-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.84.1/docs/source/how_to/LintingTutorial.ipynb
-[cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.84.1/docs/source/how_to/CoverageTutorial.ipynb
-[imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.84.1/docs/source/how_to/IntrinsicMetadata.ipynb
+[ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.85.0/docs/source/how_to/BayesErrorRateEstimationTutorial.ipynb
+[suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.85.0/docs/source/how_to/ClassLearningCurvesTutorial.ipynb
+[div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.85.0/docs/source/how_to/HPDivergenceTutorial.ipynb
+[ae-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.85.0/docs/source/how_to/AETrainerTutorial.ipynb
+[lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.85.0/docs/source/how_to/ClassLabelAnalysisTutorial.ipynb
+[clust-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.85.0/docs/source/how_to/ClustererTutorial.ipynb
+[dup-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.85.0/docs/source/how_to/DuplicatesTutorial.ipynb
+[lint-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.85.0/docs/source/how_to/LintingTutorial.ipynb
+[cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.85.0/docs/source/how_to/CoverageTutorial.ipynb
+[imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.85.0/docs/source/how_to/IntrinsicMetadata.ipynb
 
 :::{toctree}
 :caption: Models
