@@ -100,14 +100,12 @@ class TestOutliersOutput:
         print(table_result)
         assert table_result[:45] == "  Class |    a    |    c    |    d    | Total"
 
-    @pytest.mark.requires_all
     def test_to_dataframe_list(self):
         output = OutliersOutput([self.outlier2, self.outlier])
         assert len(output) == 6
         output_df = output.to_dataframe(self.lstat)
         assert output_df.shape == (6, 7)
 
-    @pytest.mark.requires_all
     def test_to_dataframe_dict(self):
         output = OutliersOutput(self.outlier)
         assert len(output) == 3
