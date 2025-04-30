@@ -1,6 +1,16 @@
-[//]: # (82329adc9dbbdc7053fb4ae93c7cf04d5a122022)
+[//]: # (019d011d6a39c99d820f2092d3d2339c14307f4e)
 
 # DataEval Change Log
+
+## v0.85.0
+
+🌟 **Feature Release**
+- `019d011d` - Enable ClassFilter for ObjectDetectionDataset
+- `9d15be15` - Add concept page for Completeness
+
+🛠️ **Improvements and Enhancements**
+- `140cec9d` - Refactor data classes (Embeddings, Images, Metadata, Targets) and function (split_dataset) to be in a first level submodule
+- `9eec7e96` - Add save and load functionality to embeddings
 
 ## v0.84.1
 
