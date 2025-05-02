@@ -7,6 +7,8 @@ __all__ = [
     "DriftKS",
     "DriftMMD",
     "DriftMMDOutput",
+    "DriftMVDC",
+    "DriftMVDCOutput",
     "DriftOutput",
     "DriftUncertainty",
     "UpdateStrategy",
@@ -18,5 +20,6 @@ from dataeval.detectors.drift._base import UpdateStrategy
 from dataeval.detectors.drift._cvm import DriftCVM
 from dataeval.detectors.drift._ks import DriftKS
 from dataeval.detectors.drift._mmd import DriftMMD
+from dataeval.detectors.drift._mvdc import DriftMVDC
 from dataeval.detectors.drift._uncertainty import DriftUncertainty
-from dataeval.outputs._drift import DriftMMDOutput, DriftOutput
+from dataeval.outputs._drift import DriftMMDOutput, DriftMVDCOutput, DriftOutput

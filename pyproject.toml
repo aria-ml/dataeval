@@ -44,6 +44,7 @@ packages = [
 python = ">=3.9,<3.13"
 defusedxml = {version = ">=0.7.1"}
 fast_hdbscan = {version = "0.2.0"}  # 0.2.1 hits a bug in condense_tree comparing float to none
+lightgbm = {version = ">=4"}
 numba = {version = ">=0.59.1"}
 numpy = {version = ">=1.24.2"}
 pandas = {version = ">=2.0"}
