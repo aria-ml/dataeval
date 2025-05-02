@@ -191,6 +191,11 @@ class Metadata:
         self._process()
         return self._image_indices
 
+    @property
+    def image_count(self) -> int:
+        self._process()
+        return int(self._image_indices.max() + 1)
+
     def _collate(self, force: bool = False):
         if self._collated and not force:
             return
@@ -359,12 +364,19 @@ class Metadata:
 
     def add_factors(self, factors: Mapping[str, ArrayLike]) -> None:
         self._merge()
-        self._processed = False
-        target_len = len(self.targets.source) if self.targets.source is not None else len(self.targets)
-        if any(len(v if isinstance(v, Sized) else as_numpy(v)) != target_len for v in factors.values()):
+
+        targets = len(self.targets.source) if self.targets.source is not None else len(self.targets)
+        images = self.image_count
+        lengths = {k: len(v if isinstance(v, Sized) else np.atleast_1d(as_numpy(v))) for k, v in factors.items()}
+        targets_match = all(f == targets for f in lengths.values())
+        images_match = targets_match if images == targets else all(f == images for f in lengths.values())
+        if not targets_match and not images_match:
             raise ValueError(
                 "The lists/arrays in the provided factors have a different length than the current metadata factors."
             )
-        merged = cast(tuple[dict[str, ArrayLike], dict[str, list[str]]], self._merged)[0]
+        merged = cast(dict[str, ArrayLike], self._merged[0] if self._merged is not None else {})
         for k, v in factors.items():
-            merged[k] = v
+            v = as_numpy(v)
+            merged[k] = v if (self.targets.source is None or lengths[k] == targets) else v[self.targets.source]
+
+        self._processed = False
