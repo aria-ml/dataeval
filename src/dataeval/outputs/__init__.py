@@ -5,7 +5,7 @@ as well as runtime metadata for reproducibility and logging.
 
 from ._base import ExecutionMetadata
 from ._bias import BalanceOutput, CompletenessOutput, CoverageOutput, DiversityOutput, LabelParityOutput, ParityOutput
-from ._drift import DriftMMDOutput, DriftOutput
+from ._drift import DriftMMDOutput, DriftMVDCOutput, DriftOutput
 from ._estimators import BEROutput, ClustererOutput, DivergenceOutput, UAPOutput
 from ._linters import DuplicatesOutput, OutliersOutput
 from ._metadata import MetadataDistanceOutput, MetadataDistanceValues, MostDeviatedFactorsOutput, OODPredictorOutput
@@ -34,6 +34,7 @@ __all__ = [
     "DivergenceOutput",
     "DiversityOutput",
     "DriftMMDOutput",
+    "DriftMVDCOutput",
     "DriftOutput",
     "DuplicatesOutput",
     "ExecutionMetadata",
