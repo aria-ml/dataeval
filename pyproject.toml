@@ -132,6 +132,7 @@ markers = [
   "required: marks tests for required features",
   "optional: marks tests for optional features",
   "requires_all: marks tests that require the all extras",
+  "cuda: marks tests that require cuda",
 ]
 
 [tool.coverage.run]

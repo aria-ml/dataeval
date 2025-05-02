@@ -15,7 +15,6 @@ INSTALL_ENVS = {"UV_INDEX_STRATEGY": "unsafe-best-match", "POETRY_DYNAMIC_VERSIO
 COMMON_ENVS = {"TQDM_DISABLE": "1"}
 DOCS_ENVS = {"LANG": "C", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True", "PYDEVD_DISABLE_FILE_VALIDATION": "1"}
 DOCTEST_ENVS = {"NB_EXECUTION_MODE_OVERRIDE": "off"}
-TEST_ENVS = {"CUDA_VISIBLE_DEVICES": "-1"}
 
 REQUIREMENTS_OPTION_MAP = {"requirements.txt": "--all-extras", "requirements-dev.txt": "--only=dev"}
 SUPPORTED_VERSIONS = ("3.9", "3.10", "3.11", "3.12")
@@ -53,7 +52,9 @@ def dev(session: nox.Session) -> None:
 def test(session: nox.Session) -> None:
     """Run unit tests with coverage reporting. Specify version using `nox -P {version} -e test`."""
     python_version = check_version(session.name)
-    pytest_args = ["--cov", "-n8", "--dist", "loadscope", f"--junitxml=output/junit.{python_version}.xml"]
+    pytest_args = ["-m", "not cuda"]
+    xdist_args = ["-n4", "--dist", "loadfile"]
+    cov_args = ["--cov", f"--junitxml=output/junit.{python_version}.xml"]
     cov_term_args = ["--cov-report", "term"]
     cov_xml_args = ["--cov-report", f"xml:output/coverage.{python_version}.xml"]
     cov_html_args = ["--cov-report", f"html:output/htmlcov.{python_version}"]
@@ -62,11 +63,13 @@ def test(session: nox.Session) -> None:
     session.run(
         "pytest",
         *pytest_args,
+        *xdist_args,
+        *cov_args,
         *cov_term_args,
         *cov_xml_args,
         *cov_html_args,
         *session.posargs,
-        env={**TEST_ENVS, **COMMON_ENVS},
+        env={**COMMON_ENVS},
     )
     session.run("mv", ".coverage", f"output/.coverage.{python_version}", external=True)
 
@@ -117,7 +120,7 @@ def doctest(session: nox.Session) -> None:
         "--doctest-continue-on-failure",
         "--disable-warnings",
         *target,
-        env={**TEST_ENVS, **COMMON_ENVS},
+        env={**COMMON_ENVS},
     )
 
 

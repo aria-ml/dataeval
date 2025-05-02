@@ -32,7 +32,7 @@ class TestTorchTrainerCPU:
 
 
 @pytest.mark.optional
-@pytest.mark.skipif(condition=not torch.cuda.is_available(), reason="CUDA is not available")
+@pytest.mark.cuda
 @pytest.mark.parametrize("y_train", (None, np.zeros((3, 1, 16, 16))))
 @pytest.mark.parametrize("loss_fn", (None, torch.nn.MSELoss()))
 @pytest.mark.parametrize("optimizer", (None, torch.optim.Adam(model.parameters())))

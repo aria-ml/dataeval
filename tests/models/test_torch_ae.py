@@ -152,18 +152,9 @@ class TestTrainer:
     [
         "cpu",
         torch.device("cpu"),
-        pytest.param(
-            0,
-            marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="cuda not available"),
-        ),
-        pytest.param(
-            "cuda",
-            marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="cuda not available"),
-        ),
-        pytest.param(
-            torch.device("cuda"),
-            marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="cuda not available"),
-        ),
+        pytest.param(0, marks=pytest.mark.cuda),
+        pytest.param("cuda", marks=pytest.mark.cuda),
+        pytest.param(torch.device("cuda"), marks=pytest.mark.cuda),
     ],
 )
 class TestGPU:
