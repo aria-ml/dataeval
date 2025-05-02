@@ -5,28 +5,27 @@ import pytest
 import torch
 
 from dataeval.data import Embeddings, Metadata, Targets
+from dataeval.typing import DatasetMetadata
 from dataeval.utils.datasets._types import ObjectDetectionTarget
 
 
 class MockDataset:
-    """Basic form of Object Detection Dataset"""
+    metadata = DatasetMetadata({"id": "mock_dataset"})
 
     def __init__(self, data, targets, metadata=None):
         self.data = data
         self.targets = targets
-        self.metadata = metadata
+        self.datum_metadata = metadata
 
     def __getitem__(self, idx):
-        return self.data[idx], self.targets[idx], self.metadata[idx] if self.metadata else {"id": idx}
+        return self.data[idx], self.targets[idx], self.datum_metadata[idx] if self.datum_metadata else {"id": idx}
 
     def __len__(self) -> int:
         return len(self.data)
 
 
 class TorchDataset(torch.utils.data.Dataset):
-    @property
-    def metadata(self):
-        return {"id": 0, "index2label": {k: str(k) for k in range(10)}}
+    metadata = DatasetMetadata({"id": "torch_dataset", "index2label": {k: str(k) for k in range(10)}})
 
     def __init__(self, data, targets):
         self.data = data
@@ -103,7 +102,7 @@ class TestEmbeddings:
         """Tests with basic identity model"""
         ds = TorchDataset(data, targets)
         em = Embeddings(ds, batch_size=64, model=IdentityModel(), device="cpu")
-        md = Metadata(ds)  # type: ignore
+        md = Metadata(ds)
 
         assert len(ds) == len(em)
         assert len(em) == len(ds)
