@@ -17,6 +17,7 @@ from numpy.typing import NDArray
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold
 
+from dataeval.config import get_max_processes, get_seed
 from dataeval.detectors.drift._nml._base import AbstractCalculator, _create_multilevel_index
 from dataeval.detectors.drift._nml._chunk import Chunk, Chunker
 from dataeval.detectors.drift._nml._thresholds import ConstantThreshold, Threshold, calculate_threshold_values
@@ -29,6 +30,7 @@ DEFAULT_LGBM_HYPERPARAMS = {
     "boosting_type": "gbdt",
     "class_weight": None,
     "colsample_bytree": 1.0,
+    "deterministic": True,
     "importance_type": "split",
     "learning_rate": 0.1,
     "max_depth": -1,
@@ -36,10 +38,10 @@ DEFAULT_LGBM_HYPERPARAMS = {
     "min_child_weight": 0.001,
     "min_split_gain": 0.0,
     "n_estimators": 100,
-    "n_jobs": -1,
+    "n_jobs": get_max_processes() or 0,
     "num_leaves": 31,
     "objective": None,
-    "random_state": 13,
+    "random_state": get_seed(),
     "reg_alpha": 0.0,
     "reg_lambda": 0.0,
     "subsample": 1.0,
