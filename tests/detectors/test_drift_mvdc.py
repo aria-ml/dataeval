@@ -35,14 +35,14 @@ class TestMVDC:
     def test_init(self):
         """Test that the detector is instantiated correctly"""
 
-        dc = DriftMVDC(n_folds=5, chunk_size=10, threshold=(0.6, 0.9))
-        assert dc._calc.cv_folds_num == 5
+        dc = DriftMVDC(n_folds=2, chunk_size=10, threshold=(0.6, 0.9))
+        assert dc._calc.cv_folds_num == 2
         threshold = dc._calc.threshold
         assert isinstance(threshold, ConstantThreshold)
         assert (threshold.lower, threshold.upper) == (0.6, 0.9)  # threshold specific to this example data
 
     def test_fit_xref(self, trn_data):
-        dc = DriftMVDC(n_folds=5, chunk_size=10, threshold=(0.6, 0.9))
+        dc = DriftMVDC(n_folds=2, chunk_size=10, threshold=(0.6, 0.9))
         dc._calc = MagicMock()
         dc.fit(trn_data)
         assert dc.x_ref.shape == (100, 4)
@@ -50,7 +50,7 @@ class TestMVDC:
         dc._calc.fit.assert_called()
 
     def test_predict_xtest(self, tst_data):
-        dc = DriftMVDC(n_folds=5, chunk_size=10, threshold=(0.6, 0.9))
+        dc = DriftMVDC(n_folds=2, chunk_size=10, threshold=(0.6, 0.9))
         dc._calc = MagicMock()
         dc.n_features = 4
         dc.predict(tst_data)
@@ -59,7 +59,7 @@ class TestMVDC:
         dc._calc.calculate.assert_called()
 
     def test_predict_xtest_mismatch_features(self, tst_data):
-        dc = DriftMVDC(n_folds=5, chunk_size=10, threshold=(0.6, 0.9))
+        dc = DriftMVDC(n_folds=2, chunk_size=10, threshold=(0.6, 0.9))
         dc.n_features = 5
         with pytest.raises(ValueError):
             dc.predict(tst_data)
@@ -69,7 +69,7 @@ class TestMVDC:
     def test_sequence(self, trn_data, tst_data):
         """Sequential tests, each step is required before proceeding to the next"""
 
-        dc = DriftMVDC(n_folds=5, chunk_size=10)
+        dc = DriftMVDC(n_folds=2, chunk_size=10)
         dc.fit(trn_data)
         assert dc._calc.result is not None
 
