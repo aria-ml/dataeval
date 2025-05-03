@@ -120,7 +120,7 @@ class Select(AnnotatedDataset[_TDatum]):
 
     def _apply_subselection(self, datum: _TDatum, index: int) -> _TDatum:
         for subselection, indices in self._subselections:
-            datum = subselection(datum) if index in indices else datum
+            datum = subselection(datum) if self._selection[index] in indices else datum
         return datum
 
     def __getitem__(self, index: int) -> _TDatum:
