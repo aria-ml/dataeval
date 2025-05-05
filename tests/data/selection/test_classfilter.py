@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
+from dataeval.data._metadata import Metadata
 from dataeval.data._selection import Select
 from dataeval.data.selections._classfilter import ClassFilter
 
@@ -43,7 +44,7 @@ def mock_detection_dataset():
                 labels=np.array([0, 1, 2]),
                 scores=np.array([0.9, 0.8, 0.7]),
             ),
-            {"id": 0, "bbox_metadata": ["box1", "box2", "box3"]},
+            {"id": 0, "bbox_metadata": ["box1", "box2", "box3"], "a": {"b": {"nested": [0, 0, 0]}}},
         ),
         # Item 1: Two boxes with labels 0, 0
         (
@@ -53,7 +54,7 @@ def mock_detection_dataset():
                 labels=np.array([0, 0]),
                 scores=np.array([0.9, 0.8]),
             ),
-            {"id": 1, "bbox_metadata": ["box1", "box2"]},
+            {"id": 1, "bbox_metadata": ["box1", "box2"], "a": {"b": {"nested": [1, 1]}}},
         ),
         # Item 2: Two boxes with labels 1, 2
         (
@@ -63,7 +64,7 @@ def mock_detection_dataset():
                 labels=np.array([1, 2]),
                 scores=np.array([0.9, 0.8]),
             ),
-            {"id": 2, "bbox_metadata": ["box1", "box2"]},
+            {"id": 2, "bbox_metadata": ["box1", "box2"], "a": {"b": {"nested": [2, 2]}}},
         ),
         # Item 3: Two boxes with labels 2, 2
         (
@@ -73,7 +74,7 @@ def mock_detection_dataset():
                 labels=np.array([2, 2]),
                 scores=np.array([0.9, 0.8]),
             ),
-            {"id": 3, "bbox_metadata": ["box1", "box2"]},
+            {"id": 3, "bbox_metadata": ["box1", "box2"], "a": {"b": {"nested": [3, 3]}}},
         ),
     ]
 
@@ -179,3 +180,74 @@ class TestObjectDetectionSelections:
         assert len(target.boxes) == 3
         assert len(target.labels) == 3
         assert np.array_equal(target.labels, np.array([0, 1, 2]))
+
+    def test_detection_filter_index_alignment(self, mock_detection_dataset):
+        """Test that filtering preserves correct index alignment between images, targets, and metadata."""
+        # Only select class 2, which appears in items 0, 2, and 3
+        class_filter = ClassFilter(classes=(2,), filter_detections=True)
+        select = Select(mock_detection_dataset, selections=[class_filter])
+
+        # Check that only items with class 2 are included
+        assert len(select) == 3
+
+        # For each of the selected items, verify that:
+        # 1. Only detections of class 2 remain
+        # 2. The correct image is returned
+        # 3. The metadata is properly aligned and filtered
+
+        # First item should be the original item 0
+        result0 = select[0]
+        image0, target0, metadata0 = result0
+
+        # Verify it's the correct image
+        assert image0 == "image_0"
+
+        # Verify only class 2 detections remain
+        assert len(target0.boxes) == 1
+        assert np.array_equal(target0.labels, np.array([2]))
+        assert np.array_equal(target0.scores, np.array([0.7]))
+
+        # Verify metadata is aligned (should only have the third box metadata)
+        assert metadata0["id"] == 0
+        assert len(metadata0["bbox_metadata"]) == 1
+        assert metadata0["bbox_metadata"] == ["box3"]
+        assert metadata0["a"]["b"]["nested"] == [0]
+
+        # Second item should be the original item 2
+        result1 = select[1]
+        image1, target1, metadata1 = result1
+
+        # Verify it's the correct image
+        assert image1 == "image_2"
+
+        # Verify only class 2 detections remain
+        assert len(target1.boxes) == 1
+        assert np.array_equal(target1.labels, np.array([2]))
+        assert np.array_equal(target1.scores, np.array([0.8]))
+
+        # Verify metadata is aligned
+        assert metadata1["id"] == 2
+        assert len(metadata1["bbox_metadata"]) == 1
+        assert metadata1["bbox_metadata"] == ["box2"]
+
+        # Third item should be the original item 3
+        result2 = select[2]
+        image2, target2, metadata2 = result2
+
+        # Verify it's the correct image
+        assert image2 == "image_3"
+
+        # Verify both boxes remain (both are class 2)
+        assert len(target2.boxes) == 2
+        assert np.array_equal(target2.labels, np.array([2, 2]))
+        assert np.array_equal(target2.scores, np.array([0.9, 0.8]))
+
+        # Verify metadata is aligned
+        assert metadata2["id"] == 3
+        assert len(metadata2["bbox_metadata"]) == 2
+        assert metadata2["bbox_metadata"] == ["box1", "box2"]
+
+        # Verify nested metadata is processed by Metadata class
+        md = Metadata(select)
+        nested_factor = md.discrete_factor_names.index("nested")
+        assert md.discrete_data[:, nested_factor].tolist() == [0, 1, 2, 2]
