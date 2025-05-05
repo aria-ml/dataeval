@@ -10,7 +10,6 @@ from numpy.typing import NDArray
 from dataeval.data._selection import Select, Selection, SelectionStage, Subselection
 from dataeval.typing import Array, ObjectDetectionDatum, ObjectDetectionTarget, SegmentationDatum, SegmentationTarget
 from dataeval.utils._array import as_numpy
-from dataeval.utils.data.metadata import flatten
 
 
 class ClassFilter(Selection[Any]):
@@ -96,13 +95,15 @@ class ClassFilterSubSelection(Subselection[Any]):
     def __init__(self, classes: Sequence[int]) -> None:
         self.classes = classes
 
+    def _filter(self, d: dict[str, Any], mask: NDArray[np.bool_]) -> dict[str, Any]:
+        return {k: self._filter(v, mask) if isinstance(v, dict) else _try_mask_object(v, mask) for k, v in d.items()}
+
     def __call__(self, datum: _TDatum) -> _TDatum:
         # build a mask for any arrays
         image, target, metadata = datum
 
         mask = np.isin(as_numpy(target.labels), self.classes)
-        flattened_metadata = flatten(metadata)[0]
-        filtered_metadata = {k: _try_mask_object(v, mask) for k, v in flattened_metadata.items()}
+        filtered_metadata = self._filter(metadata, mask)
 
         # return a masked datum
         filtered_datum = image, ClassFilterTarget(target, mask), filtered_metadata
