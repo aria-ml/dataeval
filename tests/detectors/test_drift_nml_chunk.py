@@ -24,7 +24,7 @@ class MockChunk(Chunk):
     def __lt__(self, other: Self) -> bool:
         return True
 
-    def _merge(self, other: Self) -> Self:
+    def __add__(self, other: Self) -> Self:
         return other
 
     def dict(self) -> dict[str, Any]:
