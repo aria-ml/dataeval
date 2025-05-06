@@ -46,14 +46,11 @@ class Chunk(ABC):
     def __len__(self):
         return self.data.shape[0]
 
-    def merge(self, other: Self) -> Self:
-        return self._merge(other) if self < other else other._merge(self)
+    @abstractmethod
+    def __add__(self, other: Self) -> Self: ...
 
     @abstractmethod
     def __lt__(self, other: Self) -> bool: ...
-
-    @abstractmethod
-    def _merge(self, other: Self) -> Self: ...
 
     @abstractmethod
     def dict(self) -> dict[str, Any]: ...
@@ -88,10 +85,11 @@ class IndexChunk(Chunk):
     def __lt__(self, other: Self) -> bool:
         return self.end_index < other.start_index
 
-    def _merge(self, other: Self) -> Self:
-        result = copy.deepcopy(self)
-        result.data = pd.concat([self.data, other.data])
-        result.end_index = other.end_index
+    def __add__(self, other: Self) -> Self:
+        a, b = (self, other) if self < other else (other, self)
+        result = copy.deepcopy(a)
+        result.data = pd.concat([a.data, b.data])
+        result.end_index = b.end_index
         return result
 
     def dict(self) -> dict[str, Any]:
@@ -125,11 +123,12 @@ class PeriodChunk(Chunk):
     def __lt__(self, other: Self) -> bool:
         return self.end_datetime < other.start_datetime
 
-    def _merge(self, other: Self) -> Self:
-        result = copy.deepcopy(self)
-        result.data = pd.concat([self.data, other.data])
-        result.end_datetime = other.end_datetime
-        result.chunk_size += other.chunk_size
+    def __add__(self, other: Self) -> Self:
+        a, b = (self, other) if self < other else (other, self)
+        result = copy.deepcopy(a)
+        result.data = pd.concat([a.data, b.data])
+        result.end_datetime = b.end_datetime
+        result.chunk_size += b.chunk_size
         return result
 
     def dict(self) -> dict[str, Any]:
@@ -336,7 +335,7 @@ class SizeBasedChunker(Chunker[IndexChunk]):
                 chunk_size=(data.shape[0] % self.chunk_size),
             )
             if self.incomplete == "append":
-                chunks[-1] = chunks[-1].merge(incomplete_chunk)
+                chunks[-1] += incomplete_chunk
             else:
                 chunks += [incomplete_chunk]
 
