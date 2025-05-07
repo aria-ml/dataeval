@@ -74,11 +74,8 @@ class Output(GenericOutput[dict[str, Any]]):
     def data(self) -> dict[str, Any]:
         return {k: v for k, v in self.__dict__.items() if k != "_meta"}
 
-    def __repr__(self) -> str:
-        return str(self)
-
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}({', '.join([f'{k}={v}' for k, v in self.data().items()])})"
+        return str(self.data())
 
 
 class BaseCollectionMixin(Collection[Any]):

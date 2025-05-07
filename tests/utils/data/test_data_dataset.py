@@ -3,6 +3,7 @@ import pytest
 
 from dataeval.data import Embeddings, Images, Metadata
 from dataeval.utils.data._dataset import (
+    _find_max,
     _validate_data,
     to_image_classification_dataset,
     to_object_detection_dataset,
@@ -86,6 +87,24 @@ class TestDatasetValidateData:
 
 
 class TestDatasetFactoryFunctions:
+    @pytest.mark.parametrize(
+        "array",
+        [
+            [1, 3],
+            [[1, 1, 1], [1, 3]],
+            [[[1, 1], [1, 1]], [[1, 1, 1], [1, 3]], [[1, 1, 1], [1]]],
+        ],
+    )
+    def test_find_max(self, array):
+        assert _find_max(array) == 3
+
+    def test_find_max_non_array(self):
+        assert _find_max(1) == 1
+
+    def test_find_max_bytes_str(self):
+        assert _find_max("foo") == "foo"
+        assert _find_max(b"foo") == b"foo"
+
     def test_to_image_classification_dataset(self, images, ic_labels, classes):
         ds = to_image_classification_dataset(images, ic_labels, None, classes)
         assert len(Images(ds).to_list()) == 10

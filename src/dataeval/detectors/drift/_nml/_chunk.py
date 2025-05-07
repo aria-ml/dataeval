@@ -16,7 +16,6 @@ from abc import ABC, abstractmethod
 from typing import Any, Generic, Literal, Sequence, TypeVar, cast
 
 import pandas as pd
-from dateutil.parser import ParserError
 from pandas import Index, Period
 from typing_extensions import Self
 
@@ -127,6 +126,7 @@ class PeriodChunk(Chunk):
         a, b = (self, other) if self < other else (other, self)
         result = copy.deepcopy(a)
         result.data = pd.concat([a.data, b.data])
+        result.end_index = b.end_index
         result.end_datetime = b.end_datetime
         result.chunk_size += b.chunk_size
         return result
@@ -237,13 +237,7 @@ class PeriodBasedChunker(Chunker[PeriodChunk]):
         if self.timestamp_column_name not in data:
             raise ValueError(f"timestamp column '{self.timestamp_column_name}' not in columns")
 
-        try:
-            grouped = data.groupby(pd.to_datetime(data[self.timestamp_column_name]).dt.to_period(self.offset))
-        except ParserError:
-            raise ValueError(
-                f"could not parse date_column '{self.timestamp_column_name}' values as dates."
-                f"Please verify if you've specified the correct date column."
-            )
+        grouped = data.groupby(pd.to_datetime(data[self.timestamp_column_name]).dt.to_period(self.offset))
 
         for k, v in grouped.groups.items():
             period, index = cast(Period, k), cast(Index, v)
