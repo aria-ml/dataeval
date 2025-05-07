@@ -45,6 +45,7 @@ class TestFunctionalClassifierUncertainty:
     n_labels = [3]
     preds_type = ["probs", "logits"]
     update_strategy = [LastSeenUpdate(1000), ReservoirSamplingUpdate(1000), None]
+    transforms = [None, lambda _: _]
     test_params = list(
         product(
             p_val,
@@ -52,6 +53,7 @@ class TestFunctionalClassifierUncertainty:
             n_labels,
             preds_type,
             update_strategy,
+            transforms,
         )
     )
     n_tests = len(test_params)
@@ -68,6 +70,7 @@ class TestFunctionalClassifierUncertainty:
             n_labels,
             preds_type,
             update_strategy,
+            transforms,
         ) = clfuncdrift_params
 
         np.random.seed(0)
@@ -84,7 +87,7 @@ class TestFunctionalClassifierUncertainty:
             update_strategy=update_strategy,
             preds_type=preds_type,
             batch_size=10,
-            transforms=None,
+            transforms=transforms,
             device="cpu",
         )
 

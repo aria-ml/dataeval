@@ -20,7 +20,7 @@ from sklearn.model_selection import StratifiedKFold
 from dataeval.config import get_max_processes, get_seed
 from dataeval.detectors.drift._nml._base import AbstractCalculator, _create_multilevel_index
 from dataeval.detectors.drift._nml._chunk import Chunk, Chunker
-from dataeval.detectors.drift._nml._thresholds import ConstantThreshold, Threshold, calculate_threshold_values
+from dataeval.detectors.drift._nml._thresholds import ConstantThreshold, Threshold
 from dataeval.outputs._base import set_metadata
 from dataeval.outputs._drift import DriftMVDCOutput
 
@@ -38,10 +38,8 @@ DEFAULT_LGBM_HYPERPARAMS = {
     "min_child_weight": 0.001,
     "min_split_gain": 0.0,
     "n_estimators": 100,
-    "n_jobs": get_max_processes() or 0,
     "num_leaves": 31,
     "objective": None,
-    "random_state": get_seed(),
     "reg_alpha": 0.0,
     "reg_lambda": 0.0,
     "subsample": 1.0,
@@ -126,7 +124,7 @@ class DomainClassifierCalculator(AbstractCalculator):
             self.result._data = pd.concat([self.result._data, res], ignore_index=True)
         return self.result
 
-    def _calculate_chunk(self, chunk: Chunk):
+    def _calculate_chunk(self, chunk: Chunk) -> float:
         if self.result is None:
             # Use information from chunk indices to identify reference chunk's location. This is possible because
             # both the internal reference data copy and the chunk data were sorted by timestamp, so these
@@ -151,7 +149,7 @@ class DomainClassifierCalculator(AbstractCalculator):
             _try = y[train_index]
             _tsx = df_X.iloc[test_index]
             _tsy = y[test_index]
-            model = LGBMClassifier(**self.hyperparameters)
+            model = LGBMClassifier(**self.hyperparameters, n_jobs=get_max_processes(), random_state=get_seed())
             model.fit(_trx, _try)
             preds = np.asarray(model.predict_proba(_tsx), dtype=np.float32)[:, 1]
             all_preds.append(preds)
@@ -159,24 +157,15 @@ class DomainClassifierCalculator(AbstractCalculator):
 
         np_all_preds = np.concatenate(all_preds, axis=0)
         np_all_tgts = np.concatenate(all_tgts, axis=0)
-        try:
-            # catch case where all rows are duplicates
-            result = roc_auc_score(np_all_tgts, np_all_preds)
-        except ValueError as err:
-            if str(err) != "Only one class present in y_true. ROC AUC score is not defined in that case.":
-                raise
-            else:
-                # by definition if reference and chunk exactly match we can't discriminate
-                result = 0.5
-        return result
+        result = roc_auc_score(np_all_tgts, np_all_preds)
+        return 0.5 if result == np.nan else float(result)
 
     def _populate_alert_thresholds(self, result_data: pd.DataFrame) -> pd.DataFrame:
         if self.result is None:
-            self._threshold_values = calculate_threshold_values(
-                threshold=self.threshold,
+            self._threshold_values = self.threshold.calculate(
                 data=result_data.loc[:, ("domain_classifier_auroc", "value")],  # type: ignore | dataframe loc
-                lower_threshold_value_limit=0.0,
-                upper_threshold_value_limit=1.0,
+                lower_limit=0.0,
+                upper_limit=1.0,
                 logger=self._logger,
             )
 

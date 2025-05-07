@@ -350,6 +350,14 @@ def test_count_based_chunker_assigns_observation_range_to_chunk_keys(sample_chun
     assert sut[-1].key == "[16128:20159]"
 
 
+def test_period_based_chunker_raises_ValueError(sample_chunk_data):
+    chunker = PeriodBasedChunker(offset="W", timestamp_column_name="timestamp")
+    bad_dates = sample_chunk_data.copy()
+    bad_dates["timestamp"] = "foo"
+    with pytest.raises(ValueError):
+        chunker.split(bad_dates)
+
+
 @pytest.mark.parametrize(
     "chunker",
     [
@@ -358,6 +366,28 @@ def test_count_based_chunker_assigns_observation_range_to_chunk_keys(sample_chun
         PeriodBasedChunker(offset="W", timestamp_column_name="timestamp"),
     ],
 )
-def test_size_based_chunker_sets_chunk_index(sample_chunk_data, chunker):
-    sut = chunker.split(sample_chunk_data)
-    assert all(chunk.chunk_index == chunk_index for chunk_index, chunk in enumerate(sut))
+class TestChunkOperations:
+    def test_size_based_chunker_sets_chunk_index(self, sample_chunk_data, chunker):
+        sut = chunker.split(sample_chunk_data)
+        assert all(chunk.chunk_index == chunk_index for chunk_index, chunk in enumerate(sut))
+
+    def test_chunk_compare(self, sample_chunk_data, chunker):
+        sut = chunker.split(sample_chunk_data)
+        assert sut[0] < sut[1]
+        assert sut[1] > sut[0]
+
+    def test_chunk_add(self, sample_chunk_data, chunker):
+        sut = chunker.split(sample_chunk_data)
+        combined = sut[0] + sut[1]
+        assert len(combined) == len(sut[0]) + len(sut[1])
+        assert combined.start_index == sut[0].start_index
+        assert combined.end_index == sut[1].end_index
+        if isinstance(combined, PeriodChunk):
+            assert combined.start_datetime == sut[0].start_datetime
+            assert combined.end_datetime == sut[1].end_datetime
+
+
+@pytest.mark.parametrize("chunker_cls", [SizeBasedChunker, CountBasedChunker])
+def test_invalid_incomplete_param(chunker_cls):
+    with pytest.raises(ValueError, match="incomplete=foo is invalid"):
+        chunker_cls(5, incomplete="foo")

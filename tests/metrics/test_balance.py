@@ -131,6 +131,11 @@ class TestBalancePlot:
         classwise_output = mi.plot(row_labels, col_labels, plot_classwise=True, factor_type=factor_type)
         assert isinstance(classwise_output, Figure)
 
+    def test_invalid_factor_type(self, metadata_results):
+        mi = balance(metadata_results)
+        with pytest.raises(ValueError):
+            mi._by_factor_type("foo", "discrete")  # type: ignore
+
 
 @pytest.mark.optional
 class TestBalanceFunctional:

@@ -7,7 +7,25 @@ from numpy.typing import NDArray
 
 from dataeval.data._metadata import Metadata
 from dataeval.data._selection import Select
-from dataeval.data.selections._classfilter import ClassFilter
+from dataeval.data.selections._classfilter import ClassFilter, _try_mask_object
+
+
+@pytest.mark.required
+class TestTryMaskObject:
+    mask = np.array([True, False, False, True])
+
+    @pytest.mark.parametrize(
+        "obj, expected",
+        [
+            ("test", "test"),
+            (np.array([1, 2, 3, 4]), np.array([1, 4])),
+            ([1, 2, 3, 4], [1, 4]),
+        ],
+    )
+    def test_nonmaskable(self, obj, expected):
+        result = _try_mask_object(obj, self.mask)
+        assert len(result) == len(expected)
+        assert all(result[i] == expected[i] for i in range(len(result)))
 
 
 @dataclass

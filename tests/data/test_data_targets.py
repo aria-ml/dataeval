@@ -11,15 +11,17 @@ class TestTargets:
     def test_targets_od_post_init(self):
         Targets(np.array([]), np.array([]), np.array([]), np.array([]))
 
-    def test_targets_post_init_raise_mixed_boxes_source(self):
+    def test_targets_post_init_raise_boxes_no_source(self):
         with pytest.raises(ValueError):
             Targets(np.array([]), np.array([]), np.array([]), None)
+
+    def test_targets_post_init_raise_source_no_boxes(self):
         with pytest.raises(ValueError):
             Targets(np.array([]), np.array([]), None, np.array([]))
 
     def test_targets_post_init_raise_invalid_boxes(self):
         with pytest.raises(ValueError):
-            Targets(np.array([]), np.array([]), np.array([[1]]), np.array([]))
+            Targets(np.array([1]), np.array([1]), np.array([[1]]), np.array([1]))
 
     @pytest.mark.parametrize("pos, objects", [[0, True], [1, True], [2, True], [3, True], [0, False], [1, False]])
     def test_targets_post_init_raise_mismatched_length(self, pos, objects):

@@ -29,10 +29,10 @@ class Threshold(ABC):
     """Class registry lookup to get threshold subclass from threshold_type string"""
 
     def __str__(self) -> str:
-        return self.__str__()
+        return f"{self.__class__.__name__}({str(vars(self))})"
 
     def __repr__(self) -> str:
-        return self.__class__.__name__ + str(vars(self))
+        return str(self)
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, self.__class__) and other.__dict__ == self.__dict__
@@ -41,7 +41,7 @@ class Threshold(ABC):
         Threshold._registry[threshold_type] = cls
 
     @abstractmethod
-    def thresholds(self, data: np.ndarray) -> tuple[float | None, float | None]:
+    def _thresholds(self, data: np.ndarray) -> tuple[float | None, float | None]:
         """Returns lower and upper threshold values when given one or more np.ndarray instances.
 
         Parameters:
@@ -68,6 +68,61 @@ class Threshold(ABC):
             raise ValueError(f"Expected one of {accepted_values} for threshold type, but received '{class_name}'")
 
         return threshold_cls(**obj)
+
+    def calculate(
+        self,
+        data: np.ndarray,
+        lower_limit: float | None = None,
+        upper_limit: float | None = None,
+        override_using_none: bool = False,
+        logger: logging.Logger | None = None,
+    ) -> tuple[float | None, float | None]:
+        """
+        Calculate lower and upper threshold values with respect to the provided Threshold and value limits.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            The data used by the Threshold instance to calculate the lower and upper threshold values.
+            This will often be the values of a drift detection method or performance metric on chunks of reference
+            data.
+        lower_limit : float or None, default None
+            An optional value that serves as a limit for the lower threshold value. Any calculated lower threshold
+            values that end up below this limit will be replaced by this limit value.
+            The limit is often a theoretical constraint enforced by a specific drift detection method or performance
+            metric.
+        upper_threshold_value_limit : float or None, default None
+            An optional value that serves as a limit for the lower threshold value. Any calculated lower threshold
+            values that end up below this limit will be replaced by this limit value.
+            The limit is often a theoretical constraint enforced by a specific drift detection method or performance
+            metric.
+        override_using_none: bool, default False
+            When set to True use None to override threshold values that exceed value limits.
+            This will prevent them from being rendered on plots.
+        logger: Optional[logging.Logger], default=None
+            An optional Logger instance. When provided a warning will be logged when a calculated threshold value
+            gets overridden by a threshold value limit.
+        """
+
+        lower_value, upper_value = self._thresholds(data)
+
+        if lower_limit is not None and lower_value is not None and lower_value <= lower_limit:
+            override_value = None if override_using_none else lower_limit
+            if logger:
+                logger.warning(
+                    f"lower threshold value {lower_value} overridden by lower threshold value limit {override_value}"
+                )
+            lower_value = override_value
+
+        if upper_limit is not None and upper_value is not None and upper_value >= upper_limit:
+            override_value = None if override_using_none else upper_limit
+            if logger:
+                logger.warning(
+                    f"upper threshold value {upper_value} overridden by upper threshold value limit {override_value}"
+                )
+            upper_value = override_value
+
+        return lower_value, upper_value
 
 
 class ConstantThreshold(Threshold, threshold_type="constant"):
@@ -109,7 +164,7 @@ class ConstantThreshold(Threshold, threshold_type="constant"):
         self.lower = lower
         self.upper = upper
 
-    def thresholds(self, data: np.ndarray) -> tuple[float | None, float | None]:
+    def _thresholds(self, data: np.ndarray) -> tuple[float | None, float | None]:
         return self.lower, self.upper
 
     @staticmethod
@@ -173,7 +228,7 @@ class StandardDeviationThreshold(Threshold, threshold_type="standard_deviation")
         self.std_upper_multiplier = std_upper_multiplier
         self.offset_from = offset_from
 
-    def thresholds(self, data: np.ndarray) -> tuple[float | None, float | None]:
+    def _thresholds(self, data: np.ndarray) -> tuple[float | None, float | None]:
         aggregate = self.offset_from(data)
         std = np.nanstd(data)
 
@@ -210,71 +265,3 @@ class StandardDeviationThreshold(Threshold, threshold_type="standard_deviation")
 
         if std_upper_multiplier and std_upper_multiplier < 0:
             raise ValueError(f"'std_upper_multiplier' should be greater than 0 but got value {std_upper_multiplier}")
-
-
-def calculate_threshold_values(
-    threshold: Threshold,
-    data: np.ndarray,
-    lower_threshold_value_limit: float | None = None,
-    upper_threshold_value_limit: float | None = None,
-    override_using_none: bool = False,
-    logger: logging.Logger | None = None,
-    metric_name: str | None = None,
-) -> tuple[float | None, float | None]:
-    """Calculate lower and upper threshold values with respect to the provided Threshold and value limits.
-
-    Parameters:
-        threshold: Threshold
-            The Threshold instance that determines how the lower and upper threshold values will be calculated.
-        data: np.ndarray
-            The data used by the Threshold instance to calculate the lower and upper threshold values.
-            This will often be the values of a drift detection method or performance metric on chunks of reference data.
-        lower_threshold_value_limit: Optional[float], default=None
-            An optional value that serves as a limit for the lower threshold value. Any calculated lower threshold
-            values that end up below this limit will be replaced by this limit value.
-            The limit is often a theoretical constraint enforced by a specific drift detection method or performance
-            metric.
-        upper_threshold_value_limit: Optional[float], default=None
-            An optional value that serves as a limit for the lower threshold value. Any calculated lower threshold
-            values that end up below this limit will be replaced by this limit value.
-            The limit is often a theoretical constraint enforced by a specific drift detection method or performance
-            metric.
-        override_using_none: bool, default=False
-            When set to True use None to override threshold values that exceed value limits.
-            This will prevent them from being rendered on plots.
-        logger: Optional[logging.Logger], default=None
-            An optional Logger instance. When provided a warning will be logged when a calculated threshold value
-            gets overridden by a threshold value limit.
-        metric_name: Optional[str], default=None
-            When provided the metric name will be included within any log messages for additional clarity.
-    """
-
-    lower_threshold_value, upper_threshold_value = threshold.thresholds(data)
-
-    if (
-        lower_threshold_value_limit is not None
-        and lower_threshold_value is not None
-        and lower_threshold_value <= lower_threshold_value_limit
-    ):
-        override_value = None if override_using_none else lower_threshold_value_limit
-        if logger:
-            logger.warning(
-                f"{metric_name + ' ' if metric_name else ''}lower threshold value {lower_threshold_value} "
-                f"overridden by lower threshold value limit {override_value}"
-            )
-        lower_threshold_value = override_value
-
-    if (
-        upper_threshold_value_limit is not None
-        and upper_threshold_value is not None
-        and upper_threshold_value >= upper_threshold_value_limit
-    ):
-        override_value = None if override_using_none else upper_threshold_value_limit
-        if logger:
-            logger.warning(
-                f"{metric_name + ' ' if metric_name else ''}upper threshold value {upper_threshold_value} "
-                f"overridden by upper threshold value limit {override_value}"
-            )
-        upper_threshold_value = override_value
-
-    return lower_threshold_value, upper_threshold_value
