@@ -55,6 +55,18 @@ class TestMetadata:
         with pytest.raises(ValueError, match="provided factors have a different length"):
             mock_metadata.add_factors({"a": np.random.random((20,))})
 
+    def test_exclude_no_op(self):
+        md = Metadata(None, exclude=["a", "b"])  # type: ignore
+        md._processed = True
+        md.exclude = ["b", "a"]
+        assert md._processed
+
+    def test_include_no_op(self):
+        md = Metadata(None, include=["a", "b"])  # type: ignore
+        md._processed = True
+        md.include = ["b", "a"]
+        assert md._processed
+
     def test_exclude_and_include_both_provided(self):
         with pytest.raises(ValueError, match="Filters for `exclude` and `include` are mutually exclusive."):
             Metadata(None, exclude=["a"], include=["b"])  # type: ignore
@@ -129,3 +141,31 @@ class TestMetadata:
     def test_process_exclude(self, mock_ds):
         md = Metadata(mock_ds, exclude=["id"])
         md._process()
+
+    def test_contiguous_factor_bins_setter(self):
+        md = Metadata(None)  # type: ignore
+        md._processed = True
+        md.continuous_factor_bins = {"a": 10}
+        assert not md._processed
+        assert md._continuous_factor_bins == {"a": 10}
+
+    def test_contiguous_factor_bins_setter_no_op(self):
+        md = Metadata(None, continuous_factor_bins={"a": 10})  # type: ignore
+        md._processed = True
+        md.continuous_factor_bins = {"a": 10}
+        assert md._processed
+        assert md._continuous_factor_bins == {"a": 10}
+
+    def test_auto_bin_method_setter(self):
+        md = Metadata(None)  # type: ignore
+        md._processed = True
+        md.auto_bin_method = "clusters"
+        assert not md._processed
+        assert md._auto_bin_method == "clusters"
+
+    def test_auto_bin_method_setter_no_op(self):
+        md = Metadata(None, auto_bin_method="clusters")  # type: ignore
+        md._processed = True
+        md.auto_bin_method = "clusters"
+        assert md._processed
+        assert md._auto_bin_method == "clusters"

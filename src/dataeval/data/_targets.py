@@ -55,7 +55,7 @@ class Targets:
             )
 
         if self.bboxes is not None and len(self.bboxes) > 0 and self.bboxes.shape[-1] != 4:
-            raise ValueError("Bounding boxes must be in (x0,y0,x1,y1) format.")
+            raise ValueError("Bounding boxes must be in (x0, y0, x1, y1) format.")
 
     def __len__(self) -> int:
         if self.source is None:

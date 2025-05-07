@@ -39,12 +39,11 @@ class MockSequenceOutput(SequenceOutput[float]): ...
 class TestOutputMetadata:
     def test_output_metadata_str(self):
         output = mock_metric(1, True, "value")
-        assert "MockOutput(test1=1" in str(output)
-        assert "MockOutput(test1=1" in repr(output)
+        assert "{'test1': 1" in output.__str__()
 
     def test_output_metadata_repr(self):
         output = mock_metric(1, True, "value")
-        assert "MockOutput(test1=1" in repr(output)
+        assert "MockOutput(test1=1" in output.__repr__()
 
     def test_output_metadata_data(self):
         output = mock_metric(1, True, "value")

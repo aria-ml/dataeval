@@ -248,6 +248,7 @@ class Embeddings:
             _logger.log(logging.DEBUG, f"Saved embeddings cache from {path}")
         except Exception as e:
             _logger.log(logging.ERROR, f"Failed to save embeddings cache: {e}")
+            raise e
 
     @classmethod
     def load(cls, path: Path | str) -> Embeddings:

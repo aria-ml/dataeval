@@ -2,10 +2,14 @@ from unittest.mock import MagicMock
 
 import numpy as np
 import numpy.testing as npt
+import pandas as pd
 import pytest
 
+from dataeval.config import use_max_processes
 from dataeval.detectors.drift._mvdc import DriftMVDC
+from dataeval.detectors.drift._nml._base import _validate
 from dataeval.detectors.drift._nml._thresholds import ConstantThreshold
+from dataeval.outputs._drift import DriftMVDCOutput
 
 
 @pytest.fixture
@@ -30,7 +34,23 @@ def trn_data():
     return trnData
 
 
-@pytest.mark.requires_all
+@pytest.fixture
+def result_df():
+    result_dict = {
+        ("chunk", "key"): {i: f"[{i % 5 * 20}:{(i % 5 + 1) * 20 - 1}]" for i in range(10)},
+        ("chunk", "chunk_index"): {i: i % 5 for i in range(10)},
+        ("chunk", "start_index"): {i: i % 5 * 20 for i in range(10)},
+        ("chunk", "end_index"): {i: (i % 5 + 1) * 20 - 1 for i in range(10)},
+        ("chunk", "period"): {i: "reference" if i < 5 else "analysis" for i in range(10)},
+        ("domain_classifier_auroc", "value"): {i: 0.5 if i < 5 else 1.0 for i in range(10)},
+        ("domain_classifier_auroc", "upper_threshold"): dict.fromkeys(range(10), 0.65),
+        ("domain_classifier_auroc", "lower_threshold"): dict.fromkeys(range(10), 0.45),
+        ("domain_classifier_auroc", "alert"): {i: i >= 5 for i in range(10)},
+    }
+    return pd.DataFrame(result_dict)
+
+
+@pytest.mark.required
 class TestMVDC:
     def test_init(self):
         """Test that the detector is instantiated correctly"""
@@ -64,15 +84,29 @@ class TestMVDC:
         with pytest.raises(ValueError):
             dc.predict(tst_data)
 
+    def test_validate_empty(self):
+        df = pd.DataFrame([])
+        with pytest.raises(ValueError):
+            _validate(df)
+
+    def test_validate_feature_mismatch(self):
+        df = pd.DataFrame([[1], [2]])
+        with pytest.raises(ValueError):
+            _validate(df, expected_features=2)
+
+    def test_calculate_before_fit(self):
+        dc = DriftMVDC(n_folds=2, chunk_size=10, threshold=(0.6, 0.9))
+        with pytest.raises(RuntimeError):
+            dc._calc.calculate(None)  # type: ignore
+
     @pytest.mark.optional
-    @pytest.mark.requires_all
     def test_sequence(self, trn_data, tst_data):
         """Sequential tests, each step is required before proceeding to the next"""
 
-        dc = DriftMVDC(n_folds=2, chunk_size=10)
-        dc.fit(trn_data)
+        dc = DriftMVDC(n_folds=2, chunk_count=5)
+        with use_max_processes(4):
+            dc.fit(trn_data)
         assert dc._calc.result is not None
-
         results = dc.predict(tst_data)
         resdf = results.to_df()
         tstdf = resdf[resdf["chunk"]["period"] == "analysis"]
@@ -81,12 +115,68 @@ class TestMVDC:
         isdrift = tstdf["domain_classifier_auroc"]["alert"].values  # type: ignore
         assert np.all(isdrift)  # type: ignore
 
-        # Verify plot generates the figure and it saves correctly, then remove it
-        fig = results.plot(showme=False)
+
+@pytest.mark.required
+class TestDriftMVDCOutput:
+    def test_output_data(self, result_df):
+        output = DriftMVDCOutput(result_df)
+        df = output.data()
+        assert not output.empty
+        assert len(df) == len(output.to_df())
+        assert len(output) == len(df)
+        np.testing.assert_equal(df.to_numpy(), output.to_df().to_numpy())
+
+    def test_output_empty(self):
+        output = DriftMVDCOutput(pd.DataFrame([]))
+        df = output.data()
+        assert output.empty
+        assert len(df) == len(output.to_df())
+        assert len(output) == len(df)
+
+    def test_output_to_df_multilevel(self, result_df):
+        output = DriftMVDCOutput(result_df)
+        ml_df = output.to_df()
+        sl_df = output.to_df(multilevel=False)
+        for col_name in sl_df:
+            assert isinstance(col_name, str)
+        assert len(ml_df) == len(sl_df)
+        assert len(ml_df.index) == len(sl_df.index)
+
+    def test_output_filter(self, result_df):
+        output = DriftMVDCOutput(result_df)
+        o_all = output.filter("all")
+        o_ref = output.filter("reference")
+        o_anl = output.filter("analysis")
+        assert len(o_all) == len(o_ref) + len(o_anl)
+        assert len(o_all.to_df().keys()) == len(o_ref.to_df().keys()) == len(o_anl.to_df().keys())
+
+    def test_output_filter_invalid_metric_raises(self, result_df):
+        output = DriftMVDCOutput(result_df)
+        with pytest.raises(ValueError):
+            output.filter(metrics=1)  # type: ignore
+
+    def test_output_filter_no_metric(self, result_df):
+        output = DriftMVDCOutput(result_df)
+        with pytest.raises(KeyError):
+            output.filter(metrics="foo")
+
+    @pytest.mark.requires_all
+    @pytest.mark.parametrize("showme", (True, False))
+    def test_plot(self, result_df, showme):
+        output = DriftMVDCOutput(result_df)
+
+        fig = output.plot(showme=showme)
         x_data = fig.axes[0].lines[0].get_xdata()
-        x_values = np.arange(0, 20, dtype=int)
+        x_values = np.arange(0, 10, dtype=int)
         npt.assert_array_equal(x_data, x_values)
         assert fig._dpi == 300  # type: ignore
+
+    @pytest.mark.requires_all
+    def test_plot_driftx_not_gt2(self, result_df):
+        modified = result_df.copy().iloc[:2]
+        output = DriftMVDCOutput(modified)
+        fig = output.plot()
+        assert fig
 
 
 if __name__ == "__main__":

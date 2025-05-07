@@ -52,7 +52,7 @@ def _validate_data(
 
 
 def _find_max(arr: ArrayLike) -> Any:
-    if isinstance(arr, (Iterable, Sequence, Array)):
+    if not isinstance(arr, (bytes, str)) and isinstance(arr, (Iterable, Sequence, Array)):
         if isinstance(arr[0], (Iterable, Sequence, Array)):
             return max([_find_max(x) for x in arr])  # type: ignore
         else:
