@@ -5,10 +5,9 @@
     "target": "devcontainer"
   },
 
-  "runArgs": [
-    "--gpus",
-    "all"
-  ],
+  "hostRequirements": {
+    "gpu": "optional"
+  },
 
   "mounts": [
     "source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/dataeval/.gitconfig,type=bind,consistency=cached",
