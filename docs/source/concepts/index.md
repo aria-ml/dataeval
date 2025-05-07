@@ -23,7 +23,7 @@ features.
 - [Bayes Error Rate](BER.md)
 - [Clustering](Clustering.md)
 - [Coverage](Coverage.md)
-- [Completeness](Coverage.md)
+- [Completeness](Completeness.md)
 - [Dataset Cleaning](DataCleaning.md)
 - [Divergence](Divergence.md)
 - [Diversity](Diversity.md)
