@@ -292,3 +292,10 @@ class TestEmbeddings:
         embs = Embeddings.from_array(arr)
         with pytest.raises(ValueError):
             embs.new([])
+
+    @patch("dataeval.data._embeddings.torch.save", side_effect=OSError())
+    def test_embeddings_save_failure(self, tmp_path):
+        arr = np.array([[1, 2], [3, 4], [5, 6]])
+        embs = Embeddings.from_array(arr)
+        with pytest.raises(OSError):
+            embs.save(tmp_path)

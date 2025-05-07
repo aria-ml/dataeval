@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 import numpy as np
 import pytest
 
@@ -48,7 +50,7 @@ def test_constant_threshold_init_raises_invalid_arguments_exception_when_given_w
 @pytest.mark.parametrize("lower, upper", [(0.0, 1.0), (0, 1), (-1, 1), (None, 1.0), (0.1, None), (None, None)])
 def test_constant_threshold_returns_correct_threshold_values(lower, upper):
     t = ConstantThreshold(lower, upper)
-    lt, ut = t.thresholds(np.ndarray(range(10)))
+    lt, ut = t._thresholds(np.ndarray(range(10)))
 
     assert lt == lower
     assert ut == upper
@@ -98,7 +100,7 @@ def test_standard_deviation_threshold_init_raises_invalid_arguments_exception_wh
 def test_standard_deviation_threshold_applies_offset_from(offset_from, expected):
     t = StandardDeviationThreshold(std_lower_multiplier=0, std_upper_multiplier=0, offset_from=offset_from)
 
-    lt, ut = t.thresholds(np.asarray([-1, -0.5, 0, 0.5, 1]))
+    lt, ut = t._thresholds(np.asarray([-1, -0.5, 0, 0.5, 1]))
 
     assert lt == expected
     assert ut == expected
@@ -109,7 +111,7 @@ def test_standard_deviation_threshold_applies_offset_from(offset_from, expected)
 )
 def test_standard_deviation_threshold_correctly_applies_std_lower_multiplier(std_lower_multiplier, expected_threshold):
     t = StandardDeviationThreshold(std_lower_multiplier=std_lower_multiplier, offset_from=np.min)
-    lt, _ = t.thresholds(np.asarray([-1, 1, 1, 1]))
+    lt, _ = t._thresholds(np.asarray([-1, 1, 1, 1]))
     assert lt == expected_threshold
 
 
@@ -121,7 +123,7 @@ def test_standard_deviation_threshold_treats_none_multiplier_as_no_threshold(
     std_lower_multiplier, std_upper_multiplier, exp_lower_threshold, exp_upper_threshold
 ):
     t = StandardDeviationThreshold(std_lower_multiplier, std_upper_multiplier, offset_from=np.min)
-    lt, ut = t.thresholds(np.asarray([-1, 1, 1, 1]))
+    lt, ut = t._thresholds(np.asarray([-1, 1, 1, 1]))
 
     assert lt == exp_lower_threshold
     assert ut == exp_upper_threshold
@@ -138,7 +140,7 @@ def test_standard_deviation_threshold_correctly_returns_thresholds(
     low_mult, up_mult, offset_from, exp_low_threshold, exp_up_threshold
 ):
     t = StandardDeviationThreshold(low_mult, up_mult, offset_from)
-    lt, ut = t.thresholds(np.asarray(range(30)))
+    lt, ut = t._thresholds(np.asarray(range(30)))
 
     assert lt == exp_low_threshold
     assert ut == exp_up_threshold
@@ -156,7 +158,7 @@ def test_standard_deviation_threshold_raises_threshold_exception_when_negative_u
 
 def test_standard_deviation_threshold_deals_with_nan_values():
     t = StandardDeviationThreshold()
-    upper, lower = t.thresholds(np.asarray([-1, 1, np.nan, 1, np.nan]))
+    upper, lower = t._thresholds(np.asarray([-1, 1, np.nan, 1, np.nan]))
     assert upper is not None
     assert lower is not None
     assert not np.isnan(upper)
@@ -179,3 +181,48 @@ def test_standard_deviation_threshold_deals_with_nan_values():
 def test_parse_object(threshold, obj_dict):
     parsed = Threshold.parse_object(obj_dict)
     assert threshold == parsed
+
+
+class MockThreshold(Threshold, threshold_type="mock"):
+    def __init__(self):
+        self.t = (0.2, 0.8)
+
+    def _thresholds(self, data: np.ndarray) -> tuple[float, float]:
+        return self.t
+
+
+def test_threshold_str():
+    t = MockThreshold()
+    assert str(t) == "MockThreshold({'t': (0.2, 0.8)})"
+
+
+def test_threshold_repr():
+    t = MockThreshold()
+    assert repr(t) == "MockThreshold({'t': (0.2, 0.8)})"
+
+
+def test_parse_object_raises_exception_when_threshold_type_is_not_supported():
+    with pytest.raises(ValueError, match="Expected one of"):
+        Threshold.parse_object({"type": "unknown"})
+
+
+@pytest.mark.parametrize(
+    "lower, upper, expected, override, logger",
+    [
+        (0.3, None, (0.3, 0.8), False, False),
+        (None, 0.7, (0.2, 0.7), False, False),
+        (0.3, 0.7, (0.3, 0.7), False, True),
+        (0.3, None, (None, 0.8), True, False),
+        (None, 0.7, (0.2, None), True, False),
+        (0.3, 0.7, (None, None), True, True),
+    ],
+)
+def test_calculate_lower_limit(lower, upper, expected, override, logger):
+    t = MockThreshold()
+    logger = MagicMock() if logger else None
+    thresholds = t.calculate(
+        np.array([]), lower_limit=lower, upper_limit=upper, override_using_none=override, logger=logger
+    )
+    assert thresholds == expected
+    expected_call_count = (lower is not None) + (upper is not None)
+    assert logger is None or logger.warning.call_count == expected_call_count

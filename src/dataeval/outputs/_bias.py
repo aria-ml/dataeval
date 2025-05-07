@@ -137,24 +137,16 @@ class CoverageOutput(Output):
         num_images = min(top_k, len(selected_indices))
 
         rows = int(np.ceil(num_images / 3))
-        fig, axs = plt.subplots(rows, 3, figsize=(9, 3 * rows))
+        fig, axs = plt.subplots(rows, 3, figsize=(9, 3 * rows), squeeze=False)
 
-        if rows == 1:
+        for i in range(rows):
             for j in range(3):
-                if j >= len(selected_indices):
+                i_j = i * 3 + j
+                if i_j >= len(selected_indices):
                     continue
-                image = channels_first_to_last(as_numpy(images[selected_indices[j]]))
-                axs[j].imshow(image)
-                axs[j].axis("off")
-        else:
-            for i in range(rows):
-                for j in range(3):
-                    i_j = i * 3 + j
-                    if i_j >= len(selected_indices):
-                        continue
-                    image = channels_first_to_last(as_numpy(images[selected_indices[i_j]]))
-                    axs[i, j].imshow(image)
-                    axs[i, j].axis("off")
+                image = channels_first_to_last(as_numpy(images[selected_indices[i_j]]))
+                axs[i, j].imshow(image)
+                axs[i, j].axis("off")
 
         fig.tight_layout()
         return fig
@@ -233,14 +225,15 @@ class BalanceOutput(Output):
         # return the masked attribute
         if attr == "factor_names":
             return [x.replace(f"-{factor_type}", "") for x in self.factor_names if mask_lambda(x)]
-        else:
-            factor_type_mask = np.asarray([mask_lambda(x) for x in self.factor_names])
-            if attr == "factors":
-                return self.factors[factor_type_mask[1:]][:, factor_type_mask[1:]]
-            elif attr == "balance":
-                return self.balance[factor_type_mask]
-            elif attr == "classwise":
-                return self.classwise[:, factor_type_mask]
+        factor_type_mask = np.asarray([mask_lambda(x) for x in self.factor_names])
+        if attr == "factors":
+            return self.factors[factor_type_mask[1:]][:, factor_type_mask[1:]]
+        if attr == "balance":
+            return self.balance[factor_type_mask]
+        if attr == "classwise":
+            return self.classwise[:, factor_type_mask]
+
+        raise ValueError(f"Unknown attr {attr} specified.")
 
     def plot(
         self,

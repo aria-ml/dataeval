@@ -160,11 +160,9 @@ def histogram_plot(
     import matplotlib.pyplot as plt
 
     num_metrics = len(data_dict)
-    if num_metrics > 2:
-        rows = int(len(data_dict) / 3)
-        fig, axs = plt.subplots(rows, 3, figsize=(10, rows * 2.5))
-    else:
-        fig, axs = plt.subplots(1, num_metrics, figsize=(4 * num_metrics, 4))
+    rows = int(num_metrics / 3)
+    cols = min(num_metrics, 3)
+    fig, axs = plt.subplots(rows, 3, figsize=(cols * 3 + 1, rows * 3))
 
     for ax, metric in zip(
         axs.flat,
@@ -216,11 +214,9 @@ def channel_histogram_plot(
     label_kwargs = {"label": [f"Channel {i}" for i in range(max_channels)]}
 
     num_metrics = len(data_keys)
-    if num_metrics > 2:
-        rows = int(len(data_keys) / 3)
-        fig, axs = plt.subplots(rows, 3, figsize=(10, rows * 2.5))
-    else:
-        fig, axs = plt.subplots(1, num_metrics, figsize=(4 * num_metrics, 4))
+    rows = int(num_metrics / 3)
+    cols = min(num_metrics, 3)
+    fig, axs = plt.subplots(rows, 3, figsize=(cols * 3 + 1, rows * 3))
 
     for ax, metric in zip(
         axs.flat,

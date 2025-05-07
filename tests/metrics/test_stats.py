@@ -21,6 +21,7 @@ from dataeval.metrics.stats._base import (
     add_stats,
     combine_stats,
     get_dataset_step_from_idx,
+    process_stats,
     process_stats_unpack,
 )
 from dataeval.metrics.stats._boxratiostats import boxratiostats, calculate_ratios
@@ -163,6 +164,12 @@ class TestBaseStats:
             assert np.asarray(image).shape == (3, 64, 64)
             assert isinstance(boxes, list) if per_box else boxes is None
 
+    def test_process_stats_out_of_bounds(self):
+        output = process_stats(0, np.random.random((3, 16, 16)), [(-1.0, -1.0, 16.0, 16.0)], False, [LengthProcessor])
+        warnings = output.warnings_list
+        assert len(warnings) == 1
+        assert warnings[0] == "Bounding box [0][0]: (-1.0, -1.0, 16.0, 16.0) is out of bounds of (3, 16, 16)."
+
 
 @pytest.mark.required
 class TestStats:
@@ -212,16 +219,29 @@ class TestStats:
         assert len(output) == 0
 
     def test_boxratio_only_imagestats(self):
-        imagestats = dimensionstats(get_dataset(DATA_3, 4, True), per_box=True)
-        with pytest.raises(ValueError):
+        imagestats = dimensionstats(get_dataset(DATA_3, 4, True))
+        with pytest.raises(ValueError, match="Input for boxstats must contain box information."):
             boxratiostats(imagestats, imagestats)
 
-    def test_boxratio_channel_mismatch(self):
+    def test_boxratio_only_boxstats(self):
+        boxes = [np.array([[0, 0, 1, 1], [0, 0, 100, 100]])]
+        boxstats = pixelstats(get_dataset(DATA_1, 2, False, boxes), per_box=True)
+        with pytest.raises(ValueError, match="Input for imgstats must not contain box information."):
+            boxratiostats(boxstats, boxstats)
+
+    def test_boxratio_inputs_swapped(self):
         boxes = [np.array([[0, 0, 1, 1], [0, 0, 100, 100]])]
         imgstats = pixelstats(get_dataset(DATA_1, 2, False, boxes), per_box=False, per_channel=True)
         boxstats = pixelstats(get_dataset(DATA_1, 2, False, boxes), per_box=True)
         with pytest.raises(ValueError):
             boxratiostats(imgstats, boxstats)
+
+    def test_boxratio_channel_mismatch(self):
+        boxes = [np.array([[0, 0, 1, 1], [0, 0, 100, 100]])]
+        imgstats = pixelstats(get_dataset(DATA_1, 2, False, boxes), per_box=False, per_channel=True)
+        boxstats = pixelstats(get_dataset(DATA_1, 2, False, boxes), per_box=True)
+        with pytest.raises(ValueError, match="Input for boxstats and imgstats must have matching channel information."):
+            boxratiostats(boxstats, imgstats)
 
     def test_stats_box_out_of_range(self):
         boxes = [np.array([[0, 0, 1, 1], [-1, -1, 100, 100]])]

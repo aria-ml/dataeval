@@ -4,10 +4,10 @@ Global configuration settings for DataEval.
 
 from __future__ import annotations
 
-__all__ = ["get_device", "set_device", "get_max_processes", "set_max_processes", "DeviceLike"]
+__all__ = ["get_device", "set_device", "get_max_processes", "set_max_processes", "use_max_processes", "DeviceLike"]
 
 import sys
-from typing import Union
+from typing import Any, Union
 
 if sys.version_info >= (3, 10):
     from typing import TypeAlias
@@ -110,6 +110,24 @@ def get_max_processes() -> int | None:
     """
     global _processes
     return _processes
+
+
+class MaxProcessesContextManager:
+    def __init__(self, processes: int) -> None:
+        self._processes = processes
+
+    def __enter__(self) -> None:
+        global _processes
+        self._old = _processes
+        set_max_processes(self._processes)
+
+    def __exit__(self, *args: tuple[Any, ...]) -> None:
+        global _processes
+        _processes = self._old
+
+
+def use_max_processes(processes: int) -> MaxProcessesContextManager:
+    return MaxProcessesContextManager(processes)
 
 
 def set_seed(seed: int | None, all_generators: bool = False) -> None:
