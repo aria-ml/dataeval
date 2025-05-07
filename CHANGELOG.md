@@ -1,6 +1,18 @@
-[//]: # (019d011d6a39c99d820f2092d3d2339c14307f4e)
+[//]: # (8d049abeeb0c0a7251e90296a5bbd6d8919cd388)
 
 # DataEval Change Log
+
+## v0.86.0
+
+🌟 **Feature Release**
+- `3a6c1e8b` - Port multi-variate domain classifier from NannyML
+
+🛠️ **Improvements and Enhancements**
+- `6615745b` - Add functionality for image level factors on object detection target metadata
+- `485bc051` - Make pandas a required dependency
+
+👾 **Fixes**
+- `27758e18` - Fix indexing error in subselection
 
 ## v0.85.0
 
