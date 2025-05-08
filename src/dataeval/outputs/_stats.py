@@ -123,11 +123,14 @@ class BaseStatsOutput(Output):
 
         return max_channels, ch_mask
 
-    def factors(self) -> dict[str, NDArray[Any]]:
+    def factors(self, include_empty: bool = True) -> dict[str, NDArray[Any]]:
         return {
             k: v
             for k, v in self.data().items()
-            if k not in (SOURCE_INDEX, BOX_COUNT) and isinstance(v, np.ndarray) and v[v != 0].size > 0 and v.ndim == 1
+            if k not in (SOURCE_INDEX, BOX_COUNT)
+            and isinstance(v, np.ndarray)
+            and (include_empty or v[v != 0].size > 0)
+            and v.ndim == 1
         }
 
     def plot(
