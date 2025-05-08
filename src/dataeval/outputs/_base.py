@@ -66,12 +66,23 @@ class GenericOutput(Generic[T]):
     def meta(self) -> ExecutionMetadata:
         """
         Metadata about the execution of the function or method for the Output class.
+
+        Returns
+        -------
+        ExecutionMetadata
         """
         return self._meta or ExecutionMetadata.empty()
 
 
 class Output(GenericOutput[dict[str, Any]]):
     def data(self) -> dict[str, Any]:
+        """
+        The output data as a dictionary.
+
+        Returns
+        -------
+        dict[str, Any]
+        """
         return {k: v for k, v in self.__dict__.items() if k != "_meta"}
 
     def __str__(self) -> str:
@@ -82,6 +93,13 @@ class BaseCollectionMixin(Collection[Any]):
     __slots__ = ["_data"]
 
     def data(self) -> Any:
+        """
+        The output data as a collection.
+
+        Returns
+        -------
+        Collection
+        """
         return self._data
 
     def __len__(self) -> int:
