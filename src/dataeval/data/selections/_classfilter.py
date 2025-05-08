@@ -68,11 +68,8 @@ _TTarget = TypeVar("_TTarget", ObjectDetectionTarget, SegmentationTarget)
 
 
 def _try_mask_object(obj: _T, mask: NDArray[np.bool_]) -> _T:
-    if isinstance(obj, Sized) and not isinstance(obj, (str, bytes, bytearray)) and len(obj) == len(mask):
-        if isinstance(obj, Array):
-            return obj[mask]
-        elif isinstance(obj, Sequence):
-            return cast(_T, [item for i, item in enumerate(obj) if mask[i]])
+    if not isinstance(obj, (str, bytes, bytearray)) and isinstance(obj, (Sequence, Array)) and len(obj) == len(mask):
+        return obj[mask] if isinstance(obj, Array) else cast(_T, [item for i, item in enumerate(obj) if mask[i]])
     return obj
 
 

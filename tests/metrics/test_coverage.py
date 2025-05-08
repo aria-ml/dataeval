@@ -52,17 +52,23 @@ class TestCoverageUnit:
 
 @pytest.mark.requires_all
 class TestCoveragePlot:
-    def test_base_plotting(self):
+    @pytest.mark.parametrize("n", [1, 3, 5])
+    def test_plot(self, n):
         images = np.zeros((20, 3, 28, 28), dtype=np.float64)
         images[1] += 0.3
         images[5] += 0.9
         images[7] += 0.8
+        images[9] += 0.4
         result = coverage(flatten(images), num_observations=10, percent=0.15)
-        output = result.plot(images, 3)
+        output = result.plot(images, n)
         assert isinstance(output, Figure)
-        images = np.ones((10, 28), dtype=np.intp)
+
+    def test_plot_raises(self):
+        images = np.zeros((20, 3, 28, 28), dtype=np.float64)
+        result = coverage(flatten(images), num_observations=10, percent=0.15)
+        bad_images = np.ones((5, 28), dtype=np.intp)
         with pytest.raises(ValueError):
-            result.plot(images, 3)
+            result.plot(bad_images, 3)
 
 
 @pytest.mark.optional

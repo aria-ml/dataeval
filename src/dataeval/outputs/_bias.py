@@ -128,25 +128,28 @@ class CoverageOutput(Output):
 
         import matplotlib.pyplot as plt
 
+        images = Images(images) if isinstance(images, Dataset) else images
+        if np.max(self.uncovered_indices) > len(images):
+            raise ValueError(
+                f"Uncovered indices {self.uncovered_indices} specify images "
+                f"unavailable in the provided number of images {len(images)}."
+            )
+
         # Determine which images to plot
         selected_indices = self.uncovered_indices[:top_k]
-
-        images = Images(images) if isinstance(images, Dataset) else images
 
         # Plot the images
         num_images = min(top_k, len(selected_indices))
 
         rows = int(np.ceil(num_images / 3))
-        fig, axs = plt.subplots(rows, 3, figsize=(9, 3 * rows), squeeze=False)
+        cols = min(3, num_images)
+        fig, axs = plt.subplots(rows, cols, figsize=(3 * cols, 3 * rows))
 
-        for i in range(rows):
-            for j in range(3):
-                i_j = i * 3 + j
-                if i_j >= len(selected_indices):
-                    continue
-                image = channels_first_to_last(as_numpy(images[selected_indices[i_j]]))
-                axs[i, j].imshow(image)
-                axs[i, j].axis("off")
+        for n, ax in enumerate(np.atleast_1d(axs)):
+            if n < len(selected_indices):
+                image = channels_first_to_last(as_numpy(images[selected_indices[n]]))
+                ax.imshow(image)
+            ax.axis("off")
 
         fig.tight_layout()
         return fig
