@@ -460,7 +460,7 @@ class TestBaseStatsOutput:
                 foo=[1, 2, 3, 4],
                 bar=["a", "b", "c"],
                 source_index=[1, 2, 3, 4],  # type: ignore
-                box_count=np.array([1, 2, 3, 4]),
+                object_count=np.array([1, 2, 3, 4]),
             )
 
 

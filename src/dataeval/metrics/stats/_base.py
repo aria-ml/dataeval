@@ -117,7 +117,7 @@ class StatsProcessor(Generic[TStatsOutput]):
 
     @classmethod
     def convert_output(
-        cls, source: dict[str, Any], source_index: list[SourceIndex], box_count: list[int]
+        cls, source: dict[str, Any], source_index: list[SourceIndex], object_count: list[int]
     ) -> TStatsOutput:
         output = {}
         attrs = dict(ChainMap(*(getattr(c, "__annotations__", {}) for c in cls.output_class.__mro__)))
@@ -128,7 +128,8 @@ class StatsProcessor(Generic[TStatsOutput]):
                 output[key] = np.asarray(source[key], dtype=np.dtype(dtype_match.group(1)))
             else:
                 output[key] = source[key]
-        return cls.output_class(**output, source_index=source_index, box_count=np.asarray(box_count, dtype=np.uint16))
+        np_object_count = np.asarray(object_count, dtype=np.uint16)
+        return cls.output_class(**output, source_index=source_index, object_count=np_object_count)
 
 
 @dataclass
@@ -226,7 +227,7 @@ def run_stats(
     """
     results_list: list[dict[str, NDArray[np.float64]]] = []
     source_index: list[SourceIndex] = []
-    box_count: list[int] = []
+    object_count: list[int] = []
 
     warning_list = []
     stats_processor_cls = stats_processor_cls if isinstance(stats_processor_cls, Iterable) else [stats_processor_cls]
@@ -245,7 +246,7 @@ def run_stats(
         ):
             results_list.extend(r.results)
             source_index.extend(r.source_indices)
-            box_count.extend(r.box_counts)
+            object_count.extend(r.box_counts)
             warning_list.extend(r.warnings_list)
 
     # warnings are not emitted while in multiprocessing pools so we emit after gathering all warnings
@@ -260,7 +261,7 @@ def run_stats(
             else:
                 output.setdefault(stat, []).append(result.tolist() if isinstance(result, np.ndarray) else result)
 
-    outputs = [s.convert_output(output, source_index, box_count) for s in stats_processor_cls]
+    outputs = [s.convert_output(output, source_index, object_count) for s in stats_processor_cls]
     return outputs
 
 

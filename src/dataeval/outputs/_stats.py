@@ -3,7 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 from dataclasses import dataclass
-from typing import Any, Iterable, NamedTuple, Optional, Union
+from typing import TYPE_CHECKING, Any, Iterable, NamedTuple, Optional, Sequence, Union
 
 import numpy as np
 import pandas as pd
@@ -13,10 +13,13 @@ from typing_extensions import TypeAlias
 from dataeval.outputs._base import Output
 from dataeval.utils._plot import channel_histogram_plot, histogram_plot
 
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
+
 OptionalRange: TypeAlias = Optional[Union[int, Iterable[int]]]
 
 SOURCE_INDEX = "source_index"
-BOX_COUNT = "box_count"
+OBJECT_COUNT = "object_count"
 
 
 class SourceIndex(NamedTuple):
@@ -51,15 +54,16 @@ class BaseStatsOutput(Output):
     ----------
     source_index : List[SourceIndex]
         Mapping from statistic to source image, box and channel index
-    box_count : NDArray[np.uint16]
+    object_count : NDArray[np.uint16]
+        The number of detected objects in each image
     """
 
     source_index: list[SourceIndex]
-    box_count: NDArray[np.uint16]
+    object_count: NDArray[np.uint16]
 
     def __post_init__(self) -> None:
         length = len(self.source_index)
-        bad = {k: len(v) for k, v in self.data().items() if k not in [SOURCE_INDEX, BOX_COUNT] and len(v) != length}
+        bad = {k: len(v) for k, v in self.data().items() if k not in [SOURCE_INDEX, OBJECT_COUNT] and len(v) != length}
         if bad:
             raise ValueError(f"All values must have the same length as source_index. Bad values: {str(bad)}.")
 
@@ -123,11 +127,27 @@ class BaseStatsOutput(Output):
 
         return max_channels, ch_mask
 
-    def factors(self, include_empty: bool = True) -> dict[str, NDArray[Any]]:
+    def factors(self, filter: str | Sequence[str] | None = None, include_empty: bool = True) -> dict[str, NDArray[Any]]:  # noqa: A002
+        """
+        Returns all 1-dimensional data as a dictionary of numpy arrays.
+
+        Parameters
+        ----------
+        filter : str, Sequence[str] or None, default None:
+            If provided, only returns keys that match the filter.
+        include_empty : bool, default True
+            If True, include arrays that are all zeros.
+
+        Returns
+        -------
+        dict[str, NDArray[Any]]
+        """
+        _filter = [filter] if isinstance(filter, str) else filter
         return {
             k: v
             for k, v in self.data().items()
-            if k not in (SOURCE_INDEX, BOX_COUNT)
+            if k not in (SOURCE_INDEX, OBJECT_COUNT)
+            and (_filter is None or k in _filter)
             and isinstance(v, np.ndarray)
             and (include_empty or v[v != 0].size > 0)
             and v.ndim == 1
@@ -135,12 +155,28 @@ class BaseStatsOutput(Output):
 
     def plot(
         self, log: bool, channel_limit: int | None = None, channel_index: int | Iterable[int] | None = None
-    ) -> None:
+    ) -> Figure:
+        """
+        Plots the statistics as a set of histograms.
+
+        Parameters
+        ----------
+        log : bool
+            If True, plots the histograms on a logarithmic scale.
+        channel_limit : int or None
+            The maximum number of channels to plot. If None, all channels are plotted.
+        channel_index : int, Iterable[int] or None
+            The index or indices of the channels to plot. If None, all channels are plotted.
+
+        Returns
+        -------
+        matplotlib.Figure
+        """
         max_channels, ch_mask = self._get_channels(channel_limit, channel_index)
         if max_channels == 1:
-            histogram_plot(self.factors(), log)
+            return histogram_plot(self.factors(), log)
         else:
-            channel_histogram_plot(self.factors(), log, max_channels, ch_mask)
+            return channel_histogram_plot(self.factors(), log, max_channels, ch_mask)
 
 
 @dataclass(frozen=True)
