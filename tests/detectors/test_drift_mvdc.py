@@ -161,11 +161,10 @@ class TestDriftMVDCOutput:
             output.filter(metrics="foo")
 
     @pytest.mark.requires_all
-    @pytest.mark.parametrize("showme", (True, False))
-    def test_plot(self, result_df, showme):
+    def test_plot(self, result_df):
         output = DriftMVDCOutput(result_df)
 
-        fig = output.plot(showme=showme)
+        fig = output.plot()
         x_data = fig.axes[0].lines[0].get_xdata()
         x_values = np.arange(0, 10, dtype=int)
         npt.assert_array_equal(x_data, x_values)
@@ -202,7 +201,7 @@ if __name__ == "__main__":
     dc = DriftMVDC(n_folds=cvfold, chunk_size=chunksz, threshold=bounds)
     dc.fit(trnData)
     results = dc.predict(tstData)
-    results.plot(showme=True)  # fig: DomainClassification.png will be to cwd
+    results.plot().show()  # fig: DomainClassification.png will be to cwd
 
     # Test domain data frame and classification
     resdf = results.to_df()

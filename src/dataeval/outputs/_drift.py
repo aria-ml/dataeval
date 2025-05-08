@@ -103,19 +103,13 @@ class DriftMVDCOutput(PerMetricResult):
         metric = Metric(display_name="Domain Classifier", column_name="domain_classifier_auroc")
         super().__init__(results_data, [metric])
 
-    def plot(self, showme: bool = True) -> Figure:
+    def plot(self) -> Figure:
         """
         Render the roc_auc metric over the train/test data in relation to the threshold.
-
-        Parameters
-        ----------
-        showme : bool, default True
-            Option to display the figure.
 
         Returns
         -------
         matplotlib.figure.Figure
-
         """
         import matplotlib.pyplot as plt
 
@@ -146,6 +140,4 @@ class DriftMVDCOutput(PerMetricResult):
             ax.set_ylabel("ROC AUC", fontsize=7)
             ax.set_xlabel("Chunk Index", fontsize=7)
             ax.set_ylim((0.0, 1.1))
-            if showme:
-                plt.show()
         return fig
