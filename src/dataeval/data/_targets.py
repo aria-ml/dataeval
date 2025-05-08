@@ -24,11 +24,13 @@ class Targets:
     labels : NDArray[np.intp]
         Labels (N,) for N images or objects
     scores : NDArray[np.float32]
-        Probability scores (N,M) for N images of M classes or confidence score (N,) of objects
+        Probability scores (N, M) for N images of M classes or confidence score (N,) of objects
     bboxes : NDArray[np.float32] | None
-        Bounding boxes (N,4) for N objects in (x0,y0,x1,y1) format
+        Bounding boxes (N, 4) for N objects in (x0, y0, x1, y1) format
     source : NDArray[np.intp] | None
         Source image index (N,) for N objects
+    size : int
+        Count of objects
     """
 
     labels: NDArray[np.intp]
@@ -56,6 +58,10 @@ class Targets:
 
         if self.bboxes is not None and len(self.bboxes) > 0 and self.bboxes.shape[-1] != 4:
             raise ValueError("Bounding boxes must be in (x0, y0, x1, y1) format.")
+
+    @property
+    def size(self) -> int:
+        return len(self.labels)
 
     def __len__(self) -> int:
         if self.source is None:
