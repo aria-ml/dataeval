@@ -10,7 +10,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
 from multiprocessing import Pool
-from typing import Any, Callable, Generic, Iterable, Sequence, TypeVar
+from typing import Any, Callable, Generic, Iterable, Iterator, Sequence, TypeVar
 
 import numpy as np
 import tqdm
@@ -26,6 +26,33 @@ DTYPE_REGEX = re.compile(r"NDArray\[np\.(.*?)\]")
 
 BoundingBox = tuple[float, float, float, float]
 TStatsOutput = TypeVar("TStatsOutput", bound=BaseStatsOutput, covariant=True)
+
+_S = TypeVar("_S")
+_T = TypeVar("_T")
+
+
+class PoolWrapper:
+    """
+    Wraps `multiprocessing.Pool` to allow for easy switching between
+    multiprocessing and single-threaded execution.
+
+    This helps with debugging and profiling, as well as usage with Jupyter notebooks
+    in VS Code, which does not support subprocess debugging.
+    """
+
+    def __init__(self, processes: int | None) -> None:
+        self.pool = Pool(processes) if processes is not None and processes > 1 else None
+
+    def imap(self, func: Callable[[_S], _T], iterable: Iterable[_S]) -> Iterator[_T]:
+        return map(func, iterable) if self.pool is None else self.pool.imap(func, iterable)
+
+    def __enter__(self, *args: Any, **kwargs: Any) -> PoolWrapper:
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        if self.pool is not None:
+            self.pool.close()
+            self.pool.join()
 
 
 class StatsProcessor(Generic[TStatsOutput]):
@@ -204,7 +231,7 @@ def run_stats(
     warning_list = []
     stats_processor_cls = stats_processor_cls if isinstance(stats_processor_cls, Iterable) else [stats_processor_cls]
 
-    with Pool(processes=get_max_processes()) as p:
+    with PoolWrapper(processes=get_max_processes()) as p:
         for r in tqdm.tqdm(
             p.imap(
                 partial(
@@ -220,8 +247,6 @@ def run_stats(
             source_index.extend(r.source_indices)
             box_count.extend(r.box_counts)
             warning_list.extend(r.warnings_list)
-    p.close()
-    p.join()
 
     # warnings are not emitted while in multiprocessing pools so we emit after gathering all warnings
     for w in warning_list:
