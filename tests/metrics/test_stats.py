@@ -11,7 +11,7 @@ import pytest
 from numpy.random import randint
 from numpy.typing import NDArray
 
-from dataeval.config import set_max_processes
+from dataeval.config import set_max_processes, use_max_processes
 from dataeval.data._metadata import Metadata
 from dataeval.data._targets import Targets
 from dataeval.metrics.stats import dimensionstats, hashstats, labelstats, pixelstats, visualstats
@@ -275,6 +275,11 @@ class TestStats:
     def test_calculate_ratios_invalid_key(self):
         with pytest.raises(KeyError):
             calculate_ratios("not_here", MockStatsOutput(10), MockStatsOutput(10))
+
+    def test_imagestats_multiprocess(self):
+        with use_max_processes(2):
+            stats = imagestats(DATA_3)
+        assert stats is not None
 
 
 @pytest.mark.required
