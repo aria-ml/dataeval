@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 import numpy as np
 
+from dataeval.config import EPSILON
 from dataeval.metrics.stats._base import StatsProcessor, run_stats
 from dataeval.outputs import DimensionStatsOutput
 from dataeval.outputs._base import set_metadata
@@ -16,18 +17,18 @@ from dataeval.utils._image import get_bitdepth
 class DimensionStatsProcessor(StatsProcessor[DimensionStatsOutput]):
     output_class: type = DimensionStatsOutput
     image_function_map: dict[str, Callable[[StatsProcessor[DimensionStatsOutput]], Any]] = {
-        "left": lambda x: x.box[0],
-        "top": lambda x: x.box[1],
-        "width": lambda x: x.box[2] - x.box[0],
-        "height": lambda x: x.box[3] - x.box[1],
+        "left": lambda x: x.box.x0,
+        "top": lambda x: x.box.y0,
+        "width": lambda x: x.box.width,
+        "height": lambda x: x.box.height,
         "channels": lambda x: x.shape[-3],
-        "size": lambda x: (x.box[2] - x.box[0]) * (x.box[3] - x.box[1]),
-        "aspect_ratio": lambda x: (x.box[2] - x.box[0]) / (x.box[3] - x.box[1]),
+        "size": lambda x: x.box.width * x.box.height,
+        "aspect_ratio": lambda x: x.box.width / (x.box.height + EPSILON),
         "depth": lambda x: get_bitdepth(x.image).depth,
-        "center": lambda x: np.asarray([(x.box[0] + x.box[2]) / 2, (x.box[1] + x.box[3]) / 2]),
+        "center": lambda x: np.asarray([(x.box.x0 + x.box.x1) / 2, (x.box.y0 + x.box.y1) / 2]),
         "distance": lambda x: np.sqrt(
-            np.square(((x.box[0] + x.box[2]) / 2) - (x.shape[-1] / 2))
-            + np.square(((x.box[1] + x.box[3]) / 2) - (x.shape[-2] / 2))
+            np.square(((x.box.x0 + x.box.x1) / 2) - (x.shape[-1] / 2))
+            + np.square(((x.box.y0 + x.box.y1) / 2) - (x.shape[-2] / 2))
         ),
     }
 

@@ -16,6 +16,7 @@ from dataeval.data._metadata import Metadata
 from dataeval.data._targets import Targets
 from dataeval.metrics.stats import dimensionstats, hashstats, labelstats, pixelstats, visualstats
 from dataeval.metrics.stats._base import (
+    BoundingBox,
     StatsProcessor,
     _enumerate,
     add_stats,
@@ -165,10 +166,11 @@ class TestBaseStats:
             assert isinstance(boxes, list) if per_box else boxes is None
 
     def test_process_stats_out_of_bounds(self):
-        output = process_stats(0, np.random.random((3, 16, 16)), [(-1.0, -1.0, 16.0, 16.0)], False, [LengthProcessor])
-        warnings = output.warnings_list
-        assert len(warnings) == 1
-        assert warnings[0] == "Bounding box [0][0]: (-1.0, -1.0, 16.0, 16.0) is out of bounds of (3, 16, 16)."
+        invalid_box = BoundingBox(-5.0, -5.0, -1.0, -1.0)
+        expected_warning = f"Bounding box [0][0]: {invalid_box} for image shape (3, 16, 16) is invalid."
+        output = process_stats(0, np.random.random((3, 16, 16)), [invalid_box], False, [LengthProcessor])
+        assert len(output.warnings_list) == 1
+        assert output.warnings_list[0] == expected_warning
 
 
 @pytest.mark.required
@@ -244,7 +246,7 @@ class TestStats:
             boxratiostats(boxstats, imgstats)
 
     def test_stats_box_out_of_range(self):
-        boxes = [np.array([[0, 0, 1, 1], [-1, -1, 100, 100]])]
+        boxes = [np.array([[0, 0, 1, 1], [-10, -10, -1, -1]])]
         with pytest.warns(UserWarning, match=r"Bounding box \[0\]\[1\]"):
             boxstats = dimensionstats(get_dataset(DATA_1, 2, False, boxes), per_box=True)
         assert boxstats is not None
@@ -563,3 +565,88 @@ class TestCombineStats:
             combine_stats([stats, None])  # type: ignore
         with pytest.raises(TypeError):
             combine_stats([stats, 1, None])  # type: ignore
+
+
+IMAGE_COUNT = 20
+CLASS_COUNT = 10
+IMAGE_DIMS = 64
+
+
+@pytest.mark.required
+class TestOffImageBoxes:
+    detections = [np.random.randint(1, 5) for _ in range(IMAGE_COUNT)]
+    images = np.random.randint(0, 256, (IMAGE_COUNT, 3, IMAGE_DIMS, IMAGE_DIMS))
+    labels = [np.random.randint(0, CLASS_COUNT, (n,)).tolist() for n in detections]
+    boxes = [np.sort(np.random.rand(n, 4) * IMAGE_DIMS).tolist() for n in detections]
+    metadata = [{"id": i * n, "pose": np.random.randint(0, 5)} for i, n in enumerate(detections)]
+    classes = [str(i) for i in range(CLASS_COUNT)]
+
+    @pytest.mark.parametrize("box", [(-10.0, -10.0, 20.0, 20.0), (30.0, 30.0, 70.0, 70.0)])
+    def test_off_image_boxes_no_nan(self, box: tuple[float, float, float, float]):
+        # set 2 boxes out of bounds
+        boxes = self.boxes.copy()
+        boxes[0][0] = box
+
+        dataset = to_object_detection_dataset(
+            self.images,
+            self.labels,
+            boxes,
+            self.metadata,
+            self.classes,
+        )
+
+        img_stats = imagestats(dataset)
+        box_stats = imagestats(dataset, per_box=True)
+        chn_stats = imagestats(dataset, per_box=True, per_channel=True)
+
+        for stat in [img_stats, box_stats, chn_stats]:
+            for k, v in stat.factors().items():
+                assert not np.any(np.isnan(v)), f"NaN value found in {k}"
+                assert not np.any(np.isinf(v)), f"Inf value found in {k}"
+
+    @pytest.mark.parametrize("box", [(10, 9, 8, 7), (5, 9, 8, 7), (10, 5, 8, 7)])
+    def test_invalid_bounding_box(self, box: tuple[int, int, int, int]):
+        boxes = self.boxes.copy()
+        boxes[0][0] = box
+
+        dataset = to_object_detection_dataset(
+            self.images,
+            self.labels,
+            boxes,
+            self.metadata,
+            self.classes,
+        )
+
+        with pytest.warns(UserWarning, match="Invalid bounding box coordinates"):
+            imagestats(dataset, per_box=True)
+
+    @pytest.mark.parametrize("box", [(0, 0, 0, 0), (5, 6, 5, 10), (5, 6, 10, 6)])
+    def test_zero_area_bounding_box(self, box: tuple[int, int, int, int]):
+        boxes = self.boxes.copy()
+        boxes[0][0] = box
+
+        dataset = to_object_detection_dataset(
+            self.images,
+            self.labels,
+            boxes,
+            self.metadata,
+            self.classes,
+        )
+
+        output = imagestats(dataset, per_box=True)
+        assert np.isnan(output.mean[0])
+
+    def test_empty_bounding_box(self):
+        boxes = self.boxes.copy()
+        boxes[10][0] = []
+
+        dataset = to_object_detection_dataset(
+            self.images,
+            self.labels,
+            boxes,
+            self.metadata,
+            self.classes,
+        )
+
+        with pytest.raises(ValueError, match="Invalid bounding box format"):
+            imagestats(dataset, per_box=True)
