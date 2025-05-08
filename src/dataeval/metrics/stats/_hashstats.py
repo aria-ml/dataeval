@@ -137,7 +137,7 @@ def hashstats(
 
     >>> results = hashstats(dataset)
     >>> print(results.xxhash[:5])
-    ['66a93f556577c086', 'd8b686fb405c4105', '7ffdb4990ad44ac6', '42cd4c34c80f6006', 'c5519e36ac1f8839']
+    ['69b50a5f06af238c', '5a861d7a23d1afe7', '7ffdb4990ad44ac6', '4f0c366a3298ceac', 'c5519e36ac1f8839']
     >>> print(results.pchash[:5])
     ['e666999999266666', 'e666999999266666', 'e666999966666299', 'e666999999266666', '96e91656e91616e9']
     """
