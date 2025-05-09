@@ -16,18 +16,18 @@ from dataeval.typing import ArrayLike, Dataset
 class PixelStatsProcessor(StatsProcessor[PixelStatsOutput]):
     output_class: type = PixelStatsOutput
     image_function_map: dict[str, Callable[[StatsProcessor[PixelStatsOutput]], Any]] = {
-        "mean": lambda x: np.mean(x.scaled),
-        "std": lambda x: np.std(x.scaled),
-        "var": lambda x: np.var(x.scaled),
+        "mean": lambda x: np.nanmean(x.scaled),
+        "std": lambda x: np.nanstd(x.scaled),
+        "var": lambda x: np.nanvar(x.scaled),
         "skew": lambda x: np.nan_to_num(skew(x.scaled.ravel())),
         "kurtosis": lambda x: np.nan_to_num(kurtosis(x.scaled.ravel())),
         "histogram": lambda x: np.histogram(x.scaled, 256, (0, 1))[0],
         "entropy": lambda x: entropy(x.get("histogram")),
     }
     channel_function_map: dict[str, Callable[[StatsProcessor[PixelStatsOutput]], Any]] = {
-        "mean": lambda x: np.mean(x.scaled, axis=1),
-        "std": lambda x: np.std(x.scaled, axis=1),
-        "var": lambda x: np.var(x.scaled, axis=1),
+        "mean": lambda x: np.nanmean(x.scaled, axis=1),
+        "std": lambda x: np.nanstd(x.scaled, axis=1),
+        "var": lambda x: np.nanvar(x.scaled, axis=1),
         "skew": lambda x: np.nan_to_num(skew(x.scaled, axis=1)),
         "kurtosis": lambda x: np.nan_to_num(kurtosis(x.scaled, axis=1)),
         "histogram": lambda x: np.apply_along_axis(lambda y: np.histogram(y, 256, (0, 1))[0], 1, x.scaled),

@@ -24,8 +24,8 @@ class VisualStatsProcessor(StatsProcessor[VisualStatsOutput]):
         else (np.max(x.get("percentiles")) - np.min(x.get("percentiles"))) / np.mean(x.get("percentiles")),
         "darkness": lambda x: x.get("percentiles")[-2],
         "missing": lambda x: np.count_nonzero(np.isnan(np.sum(x.image, axis=0))) / np.prod(x.shape[-2:]),
-        "sharpness": lambda x: np.std(edge_filter(np.mean(x.image, axis=0))),
-        "zeros": lambda x: np.count_nonzero(np.sum(x.image, axis=0) == 0) / np.prod(x.shape[-2:]),
+        "sharpness": lambda x: np.nanstd(edge_filter(np.mean(x.image, axis=0))),
+        "zeros": lambda x: np.count_nonzero(np.nansum(x.image, axis=0) == 0) / np.prod(x.shape[-2:]),
         "percentiles": lambda x: np.nanpercentile(x.scaled, q=QUARTILES),
     }
     channel_function_map: dict[str, Callable[[StatsProcessor[VisualStatsOutput]], Any]] = {
@@ -36,7 +36,7 @@ class VisualStatsProcessor(StatsProcessor[VisualStatsOutput]):
         ),
         "darkness": lambda x: x.get("percentiles")[:, -2],
         "missing": lambda x: np.count_nonzero(np.isnan(x.image), axis=(1, 2)) / np.prod(x.shape[-2:]),
-        "sharpness": lambda x: np.std(np.vectorize(edge_filter, signature="(m,n)->(m,n)")(x.image), axis=(1, 2)),
+        "sharpness": lambda x: np.nanstd(np.vectorize(edge_filter, signature="(m,n)->(m,n)")(x.image), axis=(1, 2)),
         "zeros": lambda x: np.count_nonzero(x.image == 0, axis=(1, 2)) / np.prod(x.shape[-2:]),
         "percentiles": lambda x: np.nanpercentile(x.scaled, q=QUARTILES, axis=1).T,
     }
