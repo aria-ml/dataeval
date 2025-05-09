@@ -20,6 +20,7 @@ from dataeval.typing import ArrayLike, Dataset
 def _get_outlier_mask(
     values: NDArray, method: Literal["zscore", "modzscore", "iqr"], threshold: float | None
 ) -> NDArray:
+    values = values.astype(np.float64)
     if method == "zscore":
         threshold = threshold if threshold else 3.0
         std = np.std(values)
