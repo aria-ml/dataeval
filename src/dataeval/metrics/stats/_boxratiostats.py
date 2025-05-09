@@ -8,8 +8,9 @@ from typing import Any, Callable, Generic, TypeVar, cast
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval.config import EPSILON
 from dataeval.outputs._base import set_metadata
-from dataeval.outputs._stats import BOX_COUNT, SOURCE_INDEX, BaseStatsOutput, DimensionStatsOutput
+from dataeval.outputs._stats import IMAGE_COUNT, OBJECT_COUNT, SOURCE_INDEX, BaseStatsOutput
 
 TStatOutput = TypeVar("TStatOutput", bound=BaseStatsOutput, contravariant=True)
 ArraySlice = tuple[int, int]
@@ -40,16 +41,12 @@ class BoxImageStatsOutputSlice(Generic[TStatOutput]):
         self.img = self.StatSlicer(img_stats, img_slice)
 
 
-RATIOSTATS_OVERRIDE_MAP: dict[type, dict[str, Callable[..., NDArray[Any]]]] = {
-    DimensionStatsOutput: dict[str, Callable[[BoxImageStatsOutputSlice[DimensionStatsOutput]], NDArray[Any]]](
-        {
-            "left": lambda x: x.box["left"] / x.img["width"],
-            "top": lambda x: x.box["top"] / x.img["height"],
-            "channels": lambda x: x.box["channels"],
-            "depth": lambda x: x.box["depth"],
-            "distance": lambda x: x.box["distance"],
-        }
-    ),
+RATIOSTATS_OVERRIDE_MAP: dict[str, Callable[[BoxImageStatsOutputSlice[Any]], NDArray[Any]]] = {
+    "left": lambda x: x.box["left"] / x.img["width"],
+    "top": lambda x: x.box["top"] / x.img["height"],
+    "channels": lambda x: x.box["channels"],
+    "depth": lambda x: x.box["depth"],
+    "distance": lambda x: x.box["distance"],
 }
 
 
@@ -72,8 +69,10 @@ def calculate_ratios(key: str, box_stats: BaseStatsOutput, img_stats: BaseStatsO
     # Copy over stats index maps and box counts
     if key in (SOURCE_INDEX):
         return copy.deepcopy(stats)
-    elif key == BOX_COUNT:
+    elif key == OBJECT_COUNT:
         return np.copy(stats)
+    elif key == IMAGE_COUNT:
+        return stats
 
     # Calculate ratios for each stat
     out_stats: np.ndarray = np.copy(stats).astype(np.float64)
@@ -84,10 +83,9 @@ def calculate_ratios(key: str, box_stats: BaseStatsOutput, img_stats: BaseStatsO
         box_j = len(box_stats) if i == len(box_map) - 1 else box_map[i + 1]
         img_j = len(img_stats) if i == len(img_map) - 1 else img_map[i + 1]
         stats = BoxImageStatsOutputSlice(box_stats, (box_i, box_j), img_stats, (img_i, img_j))
-        out_type = type(box_stats)
-        use_override = out_type in RATIOSTATS_OVERRIDE_MAP and key in RATIOSTATS_OVERRIDE_MAP[out_type]
+        use_override = key in RATIOSTATS_OVERRIDE_MAP
         with np.errstate(divide="ignore", invalid="ignore"):
-            ratio = RATIOSTATS_OVERRIDE_MAP[out_type][key](stats) if use_override else stats.box[key] / stats.img[key]
+            ratio = RATIOSTATS_OVERRIDE_MAP[key](stats) if use_override else stats.box[key] / (stats.img[key] + EPSILON)
         out_stats[box_i:box_j] = ratio.reshape(-1, *out_stats[box_i].shape)
     return out_stats
 
@@ -141,8 +139,8 @@ def boxratiostats(
     output_cls = type(boxstats)
     if type(boxstats) is not type(imgstats):
         raise TypeError("Must provide stats outputs of the same type.")
-    if boxstats.source_index[-1].image != imgstats.source_index[-1].image:
-        raise ValueError("Stats index_map length mismatch. Check if the correct box and image stats were provided.")
+    if boxstats.image_count != imgstats.image_count:
+        raise ValueError("Stats image count length mismatch. Check if the correct box and image stats were provided.")
     if any(src_idx.box is None for src_idx in boxstats.source_index):
         raise ValueError("Input for boxstats must contain box information.")
     if any(src_idx.box is not None for src_idx in imgstats.source_index):

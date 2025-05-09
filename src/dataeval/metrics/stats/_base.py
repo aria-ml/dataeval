@@ -17,18 +17,54 @@ import tqdm
 from numpy.typing import NDArray
 
 from dataeval.config import get_max_processes
-from dataeval.outputs._stats import BaseStatsOutput, SourceIndex
+from dataeval.outputs._stats import IMAGE_COUNT, OBJECT_COUNT, SOURCE_INDEX, BaseStatsOutput, SourceIndex
 from dataeval.typing import Array, ArrayLike, Dataset, ObjectDetectionTarget
 from dataeval.utils._array import as_numpy, to_numpy
-from dataeval.utils._image import normalize_image_shape, rescale
+from dataeval.utils._image import clip_and_pad, clip_box, is_valid_box, normalize_image_shape, rescale
 
 DTYPE_REGEX = re.compile(r"NDArray\[np\.(.*?)\]")
 
-BoundingBox = tuple[float, float, float, float]
 TStatsOutput = TypeVar("TStatsOutput", bound=BaseStatsOutput, covariant=True)
 
 _S = TypeVar("_S")
 _T = TypeVar("_T")
+
+
+@dataclass
+class BoundingBox:
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+
+    def __post_init__(self) -> None:
+        # Test for invalid coordinates
+        x_swap = self.x0 > self.x1
+        y_swap = self.y0 > self.y1
+        if x_swap or y_swap:
+            warnings.warn(f"Invalid bounding box coordinates: {self} - swapping invalid coordinates.")
+            if x_swap:
+                self.x0, self.x1 = self.x1, self.x0
+            if y_swap:
+                self.y0, self.y1 = self.y1, self.y0
+
+    @property
+    def width(self) -> float:
+        return self.x1 - self.x0
+
+    @property
+    def height(self) -> float:
+        return self.y1 - self.y0
+
+    def to_int(self) -> tuple[int, int, int, int]:
+        """
+        Returns the bounding box as a tuple of integers.
+        """
+        x0_int = math.floor(self.x0)
+        y0_int = math.floor(self.y0)
+        x1_int = math.ceil(self.x1)
+        y1_int = math.ceil(self.y1)
+        return x0_int, y0_int, x1_int, y1_int
 
 
 class PoolWrapper:
@@ -61,24 +97,19 @@ class StatsProcessor(Generic[TStatsOutput]):
     image_function_map: dict[str, Callable[[StatsProcessor[TStatsOutput]], Any]] = {}
     channel_function_map: dict[str, Callable[[StatsProcessor[TStatsOutput]], Any]] = {}
 
-    def __init__(self, image: NDArray[Any], box: BoundingBox | None, per_channel: bool) -> None:
+    def __init__(self, image: NDArray[Any], box: BoundingBox | Iterable[Any] | None, per_channel: bool) -> None:
         self.raw = image
         self.width: int = image.shape[-1]
         self.height: int = image.shape[-2]
-        box = BoundingBox((0, 0, self.width, self.height)) if box is None else box
-        # Clip the bounding box to image
-        x0, y0 = (min(j, max(0, math.floor(box[i]))) for i, j in zip((0, 1), (self.width - 1, self.height - 1)))
-        x1, y1 = (min(j, max(1, math.ceil(box[i]))) for i, j in zip((2, 3), (self.width, self.height)))
-        self.box: NDArray[np.int64] = np.array([x0, y0, x1, y1], dtype=np.int64)
+        box = (0, 0, self.width, self.height) if box is None else box
+        self.box = box if isinstance(box, BoundingBox) else BoundingBox(*box)
         self._per_channel = per_channel
         self._image = None
         self._shape = None
         self._scaled = None
         self._cache = {}
         self._fn_map = self.channel_function_map if per_channel else self.image_function_map
-        self._is_valid_slice = box is None or bool(
-            box[0] >= 0 and box[1] >= 0 and box[2] <= image.shape[-1] and box[3] <= image.shape[-2]
-        )
+        self._is_valid_box = is_valid_box(clip_box(image, self.box.to_int()))
 
     def get(self, fn_key: str) -> NDArray[Any]:
         if fn_key in self.cache_keys:
@@ -94,11 +125,7 @@ class StatsProcessor(Generic[TStatsOutput]):
     @property
     def image(self) -> NDArray[Any]:
         if self._image is None:
-            if self._is_valid_slice:
-                norm = normalize_image_shape(self.raw)
-                self._image = norm[:, self.box[1] : self.box[3], self.box[0] : self.box[2]]
-            else:
-                self._image = np.zeros((self.raw.shape[0], self.box[3] - self.box[1], self.box[2] - self.box[0]))
+            self._image = clip_and_pad(normalize_image_shape(self.raw), self.box.to_int())
         return self._image
 
     @property
@@ -117,7 +144,7 @@ class StatsProcessor(Generic[TStatsOutput]):
 
     @classmethod
     def convert_output(
-        cls, source: dict[str, Any], source_index: list[SourceIndex], box_count: list[int]
+        cls, source: dict[str, Any], source_index: list[SourceIndex], object_count: list[int], image_count: int
     ) -> TStatsOutput:
         output = {}
         attrs = dict(ChainMap(*(getattr(c, "__annotations__", {}) for c in cls.output_class.__mro__)))
@@ -128,14 +155,19 @@ class StatsProcessor(Generic[TStatsOutput]):
                 output[key] = np.asarray(source[key], dtype=np.dtype(dtype_match.group(1)))
             else:
                 output[key] = source[key]
-        return cls.output_class(**output, source_index=source_index, box_count=np.asarray(box_count, dtype=np.uint16))
+        base_attrs = {
+            SOURCE_INDEX: source_index,
+            OBJECT_COUNT: np.asarray(object_count, dtype=np.uint16),
+            IMAGE_COUNT: image_count,
+        }
+        return cls.output_class(**output, **base_attrs)
 
 
 @dataclass
 class StatsProcessorOutput:
     results: list[dict[str, Any]]
     source_indices: list[SourceIndex]
-    box_counts: list[int]
+    object_counts: list[int]
     warnings_list: list[str]
 
 
@@ -153,8 +185,8 @@ def process_stats(
     warnings_list: list[str] = []
     for i_b, box in [(None, None)] if boxes is None else enumerate(boxes):
         processor_list = [p(image, box, per_channel) for p in stats_processor_cls]
-        if any(not p._is_valid_slice for p in processor_list) and i_b is not None and box is not None:
-            warnings_list.append(f"Bounding box [{i}][{i_b}]: {box} is out of bounds of {image.shape}.")
+        if any(not p._is_valid_box for p in processor_list) and i_b is not None and box is not None:
+            warnings_list.append(f"Bounding box [{i}][{i_b}]: {box} for image shape {image.shape} is invalid.")
         results_list.append({k: v for p in processor_list for k, v in p.process().items()})
         if per_channel:
             source_indices.extend([SourceIndex(i, i_b, c) for c in range(image.shape[-3])])
@@ -177,8 +209,11 @@ def _enumerate(dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]]
         d = dataset[i]
         image = d[0] if isinstance(d, tuple) else d
         if per_box and isinstance(d, tuple) and isinstance(d[1], ObjectDetectionTarget):
-            boxes = d[1].boxes if isinstance(d[1].boxes, Array) else as_numpy(d[1].boxes)
-            target = [BoundingBox(float(box[i]) for i in range(4)) for box in boxes]
+            try:
+                boxes = d[1].boxes if isinstance(d[1].boxes, Array) else as_numpy(d[1].boxes)
+                target = [BoundingBox(*(float(box[i]) for i in range(4))) for box in boxes]
+            except (ValueError, IndexError):
+                raise ValueError(f"Invalid bounding box format for image {i}: {d[1].boxes}")
         else:
             target = None
 
@@ -226,7 +261,8 @@ def run_stats(
     """
     results_list: list[dict[str, NDArray[np.float64]]] = []
     source_index: list[SourceIndex] = []
-    box_count: list[int] = []
+    object_count: list[int] = []
+    image_count: int = len(dataset)
 
     warning_list = []
     stats_processor_cls = stats_processor_cls if isinstance(stats_processor_cls, Iterable) else [stats_processor_cls]
@@ -241,11 +277,11 @@ def run_stats(
                 ),
                 _enumerate(dataset, per_box),
             ),
-            total=len(dataset),
+            total=image_count,
         ):
             results_list.extend(r.results)
             source_index.extend(r.source_indices)
-            box_count.extend(r.box_counts)
+            object_count.extend(r.object_counts)
             warning_list.extend(r.warnings_list)
 
     # warnings are not emitted while in multiprocessing pools so we emit after gathering all warnings
@@ -260,7 +296,7 @@ def run_stats(
             else:
                 output.setdefault(stat, []).append(result.tolist() if isinstance(result, np.ndarray) else result)
 
-    outputs = [s.convert_output(output, source_index, box_count) for s in stats_processor_cls]
+    outputs = [s.convert_output(output, source_index, object_count, image_count) for s in stats_processor_cls]
     return outputs
 
 
@@ -271,10 +307,12 @@ def add_stats(a: TStatsOutput, b: TStatsOutput) -> TStatsOutput:
     sum_dict = deepcopy(a.data())
 
     for k in sum_dict:
-        if isinstance(sum_dict[k], list):
+        if isinstance(sum_dict[k], Sequence):
             sum_dict[k].extend(b.data()[k])
-        else:
+        elif isinstance(sum_dict[k], Array):
             sum_dict[k] = np.concatenate((sum_dict[k], b.data()[k]))
+        else:
+            sum_dict[k] += b.data()[k]
 
     return type(a)(**sum_dict)
 
