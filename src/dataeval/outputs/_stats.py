@@ -185,11 +185,16 @@ class BaseStatsOutput(Output):
         -------
         matplotlib.Figure
         """
+        from matplotlib.figure import Figure
+
         max_channels, ch_mask = self._get_channels(channel_limit, channel_index)
+        factors = self.factors(exclude_constant=True)
+        if not factors:
+            return Figure()
         if max_channels == 1:
-            return histogram_plot(self.factors(exclude_constant=True), log)
+            return histogram_plot(factors, log)
         else:
-            return channel_histogram_plot(self.factors(exclude_constant=True), log, max_channels, ch_mask)
+            return channel_histogram_plot(factors, log, max_channels, ch_mask)
 
 
 @dataclass(frozen=True)

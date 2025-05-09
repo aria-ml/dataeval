@@ -10,7 +10,7 @@ from numpy.typing import NDArray
 
 from dataeval.config import EPSILON
 from dataeval.outputs._base import set_metadata
-from dataeval.outputs._stats import IMAGE_COUNT, OBJECT_COUNT, SOURCE_INDEX, BaseStatsOutput
+from dataeval.outputs._stats import BASE_ATTRS, BaseStatsOutput
 
 TStatOutput = TypeVar("TStatOutput", bound=BaseStatsOutput, contravariant=True)
 ArraySlice = tuple[int, int]
@@ -46,7 +46,15 @@ RATIOSTATS_OVERRIDE_MAP: dict[str, Callable[[BoxImageStatsOutputSlice[Any]], NDA
     "top": lambda x: x.box["top"] / x.img["height"],
     "channels": lambda x: x.box["channels"],
     "depth": lambda x: x.box["depth"],
-    "distance": lambda x: x.box["distance"],
+    "distance_center": lambda x: x.box["distance_center"]
+    / (np.sqrt(np.square(x.img["width"]) + np.square(x.img["height"])) / 2),
+    "distance_edge": lambda x: x.box["distance_edge"]
+    / (
+        x.img["width"]
+        if np.min([np.abs(x.box["left"]), np.abs((x.box["width"] + x.box["left"]) - x.img["width"])])
+        < np.min([np.abs(x.box["top"]), np.abs((x.box["height"] + x.box["top"]) - x.img["height"])])
+        else x.img["height"]
+    ),
 }
 
 
@@ -66,13 +74,9 @@ def calculate_ratios(key: str, box_stats: BaseStatsOutput, img_stats: BaseStatsO
 
     stats = getattr(box_stats, key)
 
-    # Copy over stats index maps and box counts
-    if key in (SOURCE_INDEX):
+    # Copy over base attributes
+    if key in BASE_ATTRS:
         return copy.deepcopy(stats)
-    elif key == OBJECT_COUNT:
-        return np.copy(stats)
-    elif key == IMAGE_COUNT:
-        return stats
 
     # Calculate ratios for each stat
     out_stats: np.ndarray = np.copy(stats).astype(np.float64)
