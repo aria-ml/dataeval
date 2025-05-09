@@ -145,10 +145,12 @@ class CoverageOutput(Output):
         cols = min(3, num_images)
         fig, axs = plt.subplots(rows, cols, figsize=(3 * cols, 3 * rows))
 
-        for n, ax in enumerate(np.atleast_1d(axs)):
-            if n < len(selected_indices):
-                image = channels_first_to_last(as_numpy(images[selected_indices[n]]))
-                ax.imshow(image)
+        for image, ax in zip(images[:num_images], axs.flat):
+            image = channels_first_to_last(as_numpy(image))
+            ax.imshow(image)
+            ax.axis("off")
+
+        for ax in axs.flat[num_images:]:
             ax.axis("off")
 
         fig.tight_layout()
