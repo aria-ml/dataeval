@@ -42,8 +42,8 @@ class BoxImageStatsOutputSlice(Generic[TStatOutput]):
 
 
 RATIOSTATS_OVERRIDE_MAP: dict[str, Callable[[BoxImageStatsOutputSlice[Any]], NDArray[Any]]] = {
-    "left": lambda x: x.box["left"] / x.img["width"],
-    "top": lambda x: x.box["top"] / x.img["height"],
+    "offset_x": lambda x: x.box["offset_x"] / x.img["width"],
+    "offset_y": lambda x: x.box["offset_y"] / x.img["height"],
     "channels": lambda x: x.box["channels"],
     "depth": lambda x: x.box["depth"],
     "distance_center": lambda x: x.box["distance_center"]
@@ -51,8 +51,8 @@ RATIOSTATS_OVERRIDE_MAP: dict[str, Callable[[BoxImageStatsOutputSlice[Any]], NDA
     "distance_edge": lambda x: x.box["distance_edge"]
     / (
         x.img["width"]
-        if np.min([np.abs(x.box["left"]), np.abs((x.box["width"] + x.box["left"]) - x.img["width"])])
-        < np.min([np.abs(x.box["top"]), np.abs((x.box["height"] + x.box["top"]) - x.img["height"])])
+        if np.min([np.abs(x.box["offset_x"]), np.abs((x.box["width"] + x.box["offset_x"]) - x.img["width"])])
+        < np.min([np.abs(x.box["offset_y"]), np.abs((x.box["height"] + x.box["offset_y"]) - x.img["height"])])
         else x.img["height"]
     ),
 }
