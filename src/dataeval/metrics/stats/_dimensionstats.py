@@ -26,9 +26,12 @@ class DimensionStatsProcessor(StatsProcessor[DimensionStatsOutput]):
         "aspect_ratio": lambda x: x.box.width / (x.box.height + EPSILON),
         "depth": lambda x: get_bitdepth(x.image).depth,
         "center": lambda x: np.asarray([(x.box.x0 + x.box.x1) / 2, (x.box.y0 + x.box.y1) / 2]),
-        "distance": lambda x: np.sqrt(
-            np.square(((x.box.x0 + x.box.x1) / 2) - (x.shape[-1] / 2))
-            + np.square(((x.box.y0 + x.box.y1) / 2) - (x.shape[-2] / 2))
+        "distance_center": lambda x: np.sqrt(
+            np.square(((x.box.x0 + x.box.x1) / 2) - (x.raw.shape[-1] / 2))
+            + np.square(((x.box.y0 + x.box.y1) / 2) - (x.raw.shape[-2] / 2))
+        ),
+        "distance_edge": lambda x: np.min(
+            [np.abs(x.box.x0), np.abs(x.box.y0), np.abs(x.box.x1 - x.raw.shape[-1]), np.abs(x.box.y1 - x.raw.shape[-2])]
         ),
     }
 
