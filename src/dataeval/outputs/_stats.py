@@ -22,6 +22,8 @@ SOURCE_INDEX = "source_index"
 OBJECT_COUNT = "object_count"
 IMAGE_COUNT = "image_count"
 
+BASE_ATTRS = (SOURCE_INDEX, OBJECT_COUNT, IMAGE_COUNT)
+
 
 class SourceIndex(NamedTuple):
     """
@@ -64,9 +66,8 @@ class BaseStatsOutput(Output):
     image_count: int
 
     def __post_init__(self) -> None:
-        base_attrs = (SOURCE_INDEX, OBJECT_COUNT, IMAGE_COUNT)
         si_length = len(self.source_index)
-        mismatch = {k: len(v) for k, v in self.data().items() if k not in base_attrs and len(v) != si_length}
+        mismatch = {k: len(v) for k, v in self.data().items() if k not in BASE_ATTRS and len(v) != si_length}
         if mismatch:
             raise ValueError(f"All values must have the same length as source_index. Bad values: {str(mismatch)}.")
         oc_length = len(self.object_count)
@@ -135,7 +136,11 @@ class BaseStatsOutput(Output):
 
         return max_channels, ch_mask
 
-    def factors(self, filter: str | Sequence[str] | None = None, include_empty: bool = True) -> dict[str, NDArray[Any]]:  # noqa: A002
+    def factors(
+        self,
+        filter: str | Sequence[str] | None = None,  # noqa: A002
+        exclude_constant: bool = False,
+    ) -> dict[str, NDArray[Any]]:
         """
         Returns all 1-dimensional data as a dictionary of numpy arrays.
 
@@ -143,22 +148,22 @@ class BaseStatsOutput(Output):
         ----------
         filter : str, Sequence[str] or None, default None:
             If provided, only returns keys that match the filter.
-        include_empty : bool, default True
-            If True, include arrays that are all zeros.
+        exclude_constant : bool, default False
+            If True, exclude arrays that contain only a single unique value.
 
         Returns
         -------
         dict[str, NDArray[Any]]
         """
-        _filter = [filter] if isinstance(filter, str) else filter
+        filter_ = [filter] if isinstance(filter, str) else filter
         return {
             k: v
             for k, v in self.data().items()
-            if k not in (SOURCE_INDEX, OBJECT_COUNT)
-            and (_filter is None or k in _filter)
+            if k not in BASE_ATTRS
+            and (filter_ is None or k in filter_)
             and isinstance(v, np.ndarray)
-            and (include_empty or v[v != 0].size > 0)
             and v.ndim == 1
+            and (not exclude_constant or len(np.unique(v)) > 1)
         }
 
     def plot(
@@ -182,9 +187,9 @@ class BaseStatsOutput(Output):
         """
         max_channels, ch_mask = self._get_channels(channel_limit, channel_index)
         if max_channels == 1:
-            return histogram_plot(self.factors(), log)
+            return histogram_plot(self.factors(exclude_constant=True), log)
         else:
-            return channel_histogram_plot(self.factors(), log, max_channels, ch_mask)
+            return channel_histogram_plot(self.factors(exclude_constant=True), log, max_channels, ch_mask)
 
 
 @dataclass(frozen=True)
@@ -210,10 +215,12 @@ class DimensionStatsOutput(BaseStatsOutput):
         :term:`ASspect Ratio<Aspect Ratio>` of the images (width/height)
     depth : NDArray[np.uint8]
         Color depth of the images in bits
-    center : NDArray[np.uint16]
+    center : NDArray[np.uint32]
         Offset from center in [x,y] coordinates of the images in pixels
-    distance : NDArray[np.float16]
+    distance_center : NDArray[np.float32]
         Distance in pixels from center
+    distance_edge : NDArray[np.uint32]
+        Distance in pixels from nearest edge
     """
 
     left: NDArray[np.int32]
@@ -224,8 +231,9 @@ class DimensionStatsOutput(BaseStatsOutput):
     size: NDArray[np.uint32]
     aspect_ratio: NDArray[np.float16]
     depth: NDArray[np.uint8]
-    center: NDArray[np.int16]
-    distance: NDArray[np.float16]
+    center: NDArray[np.int32]
+    distance_center: NDArray[np.float32]
+    distance_edge: NDArray[np.uint32]
 
 
 @dataclass(frozen=True)
