@@ -204,9 +204,9 @@ class DimensionStatsOutput(BaseStatsOutput):
 
     Attributes
     ----------
-    left : NDArray[np.int32]
+    offset_x : NDArray[np.int32]
         Offsets from the left edge of images in pixels
-    top : NDArray[np.int32]
+    offset_y : NDArray[np.int32]
         Offsets from the top edge of images in pixels
     width : NDArray[np.uint32]
         Width of the images in pixels
@@ -217,7 +217,7 @@ class DimensionStatsOutput(BaseStatsOutput):
     size : NDArray[np.uint32]
         Size of the images in pixels
     aspect_ratio : NDArray[np.float16]
-        :term:`ASspect Ratio<Aspect Ratio>` of the images (width/height)
+        :term:`Aspect Ratio<Aspect Ratio>` of the images (width/height)
     depth : NDArray[np.uint8]
         Color depth of the images in bits
     center : NDArray[np.uint32]
@@ -228,8 +228,8 @@ class DimensionStatsOutput(BaseStatsOutput):
         Distance in pixels from nearest edge
     """
 
-    left: NDArray[np.int32]
-    top: NDArray[np.int32]
+    offset_x: NDArray[np.int32]
+    offset_y: NDArray[np.int32]
     width: NDArray[np.uint32]
     height: NDArray[np.uint32]
     channels: NDArray[np.uint8]

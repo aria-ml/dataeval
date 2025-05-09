@@ -17,8 +17,8 @@ from dataeval.utils._image import get_bitdepth
 class DimensionStatsProcessor(StatsProcessor[DimensionStatsOutput]):
     output_class: type = DimensionStatsOutput
     image_function_map: dict[str, Callable[[StatsProcessor[DimensionStatsOutput]], Any]] = {
-        "left": lambda x: x.box.x0,
-        "top": lambda x: x.box.y0,
+        "offset_x": lambda x: x.box.x0,
+        "offset_y": lambda x: x.box.y0,
         "width": lambda x: x.box.width,
         "height": lambda x: x.box.height,
         "channels": lambda x: x.shape[-3],
