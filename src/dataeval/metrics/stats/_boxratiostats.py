@@ -10,7 +10,7 @@ from numpy.typing import NDArray
 
 from dataeval.config import EPSILON
 from dataeval.outputs._base import set_metadata
-from dataeval.outputs._stats import OBJECT_COUNT, SOURCE_INDEX, BaseStatsOutput
+from dataeval.outputs._stats import IMAGE_COUNT, OBJECT_COUNT, SOURCE_INDEX, BaseStatsOutput
 
 TStatOutput = TypeVar("TStatOutput", bound=BaseStatsOutput, contravariant=True)
 ArraySlice = tuple[int, int]
@@ -71,6 +71,8 @@ def calculate_ratios(key: str, box_stats: BaseStatsOutput, img_stats: BaseStatsO
         return copy.deepcopy(stats)
     elif key == OBJECT_COUNT:
         return np.copy(stats)
+    elif key == IMAGE_COUNT:
+        return stats
 
     # Calculate ratios for each stat
     out_stats: np.ndarray = np.copy(stats).astype(np.float64)
@@ -137,8 +139,8 @@ def boxratiostats(
     output_cls = type(boxstats)
     if type(boxstats) is not type(imgstats):
         raise TypeError("Must provide stats outputs of the same type.")
-    if boxstats.source_index[-1].image != imgstats.source_index[-1].image:
-        raise ValueError("Stats index_map length mismatch. Check if the correct box and image stats were provided.")
+    if boxstats.image_count != imgstats.image_count:
+        raise ValueError("Stats image count length mismatch. Check if the correct box and image stats were provided.")
     if any(src_idx.box is None for src_idx in boxstats.source_index):
         raise ValueError("Input for boxstats must contain box information.")
     if any(src_idx.box is not None for src_idx in imgstats.source_index):

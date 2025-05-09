@@ -17,7 +17,7 @@ import tqdm
 from numpy.typing import NDArray
 
 from dataeval.config import get_max_processes
-from dataeval.outputs._stats import BaseStatsOutput, SourceIndex
+from dataeval.outputs._stats import IMAGE_COUNT, OBJECT_COUNT, SOURCE_INDEX, BaseStatsOutput, SourceIndex
 from dataeval.typing import Array, ArrayLike, Dataset, ObjectDetectionTarget
 from dataeval.utils._array import as_numpy, to_numpy
 from dataeval.utils._image import clip_and_pad, clip_box, is_valid_box, normalize_image_shape, rescale
@@ -144,7 +144,7 @@ class StatsProcessor(Generic[TStatsOutput]):
 
     @classmethod
     def convert_output(
-        cls, source: dict[str, Any], source_index: list[SourceIndex], object_count: list[int]
+        cls, source: dict[str, Any], source_index: list[SourceIndex], object_count: list[int], image_count: int
     ) -> TStatsOutput:
         output = {}
         attrs = dict(ChainMap(*(getattr(c, "__annotations__", {}) for c in cls.output_class.__mro__)))
@@ -155,8 +155,12 @@ class StatsProcessor(Generic[TStatsOutput]):
                 output[key] = np.asarray(source[key], dtype=np.dtype(dtype_match.group(1)))
             else:
                 output[key] = source[key]
-        np_object_count = np.asarray(object_count, dtype=np.uint16)
-        return cls.output_class(**output, source_index=source_index, object_count=np_object_count)
+        base_attrs = {
+            SOURCE_INDEX: source_index,
+            OBJECT_COUNT: np.asarray(object_count, dtype=np.uint16),
+            IMAGE_COUNT: image_count,
+        }
+        return cls.output_class(**output, **base_attrs)
 
 
 @dataclass
@@ -207,9 +211,9 @@ def _enumerate(dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]]
         if per_box and isinstance(d, tuple) and isinstance(d[1], ObjectDetectionTarget):
             try:
                 boxes = d[1].boxes if isinstance(d[1].boxes, Array) else as_numpy(d[1].boxes)
-            except ValueError:
+                target = [BoundingBox(*(float(box[i]) for i in range(4))) for box in boxes]
+            except (ValueError, IndexError):
                 raise ValueError(f"Invalid bounding box format for image {i}: {d[1].boxes}")
-            target = [BoundingBox(*(float(box[i]) for i in range(4))) for box in boxes]
         else:
             target = None
 
@@ -258,6 +262,7 @@ def run_stats(
     results_list: list[dict[str, NDArray[np.float64]]] = []
     source_index: list[SourceIndex] = []
     object_count: list[int] = []
+    image_count: int = len(dataset)
 
     warning_list = []
     stats_processor_cls = stats_processor_cls if isinstance(stats_processor_cls, Iterable) else [stats_processor_cls]
@@ -272,7 +277,7 @@ def run_stats(
                 ),
                 _enumerate(dataset, per_box),
             ),
-            total=len(dataset),
+            total=image_count,
         ):
             results_list.extend(r.results)
             source_index.extend(r.source_indices)
@@ -291,7 +296,7 @@ def run_stats(
             else:
                 output.setdefault(stat, []).append(result.tolist() if isinstance(result, np.ndarray) else result)
 
-    outputs = [s.convert_output(output, source_index, object_count) for s in stats_processor_cls]
+    outputs = [s.convert_output(output, source_index, object_count, image_count) for s in stats_processor_cls]
     return outputs
 
 
@@ -302,10 +307,12 @@ def add_stats(a: TStatsOutput, b: TStatsOutput) -> TStatsOutput:
     sum_dict = deepcopy(a.data())
 
     for k in sum_dict:
-        if isinstance(sum_dict[k], list):
+        if isinstance(sum_dict[k], Sequence):
             sum_dict[k].extend(b.data()[k])
-        else:
+        elif isinstance(sum_dict[k], Array):
             sum_dict[k] = np.concatenate((sum_dict[k], b.data()[k]))
+        else:
+            sum_dict[k] += b.data()[k]
 
     return type(a)(**sum_dict)
 

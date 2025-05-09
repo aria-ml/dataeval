@@ -216,7 +216,7 @@ class TestStats:
         assert sum(1 for b in mask if b) == 10 + 10
 
     def test_stats_len_with_no_annotations(self):
-        output = BaseStatsOutput([], np.array([]))
+        output = BaseStatsOutput([], np.array([]), 0)
         object.__setattr__(output, "__annotations__", {})
         assert len(output) == 0
 
@@ -451,18 +451,34 @@ class MockStatsOutput(BaseStatsOutput):
 
 @pytest.mark.required
 class TestBaseStatsOutput:
-    def test_post_init_length_mismatch(self):
+    def test_post_init_si_length_mismatch(self):
         @dataclass(frozen=True)
         class TestStatsOutput(BaseStatsOutput):
             foo: list[int]
             bar: list[str]
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="All values must have the same length as source_index."):
             TestStatsOutput(
                 foo=[1, 2, 3, 4],
                 bar=["a", "b", "c"],
                 source_index=[1, 2, 3, 4],  # type: ignore
                 object_count=np.array([1, 2, 3, 4]),
+                image_count=4,
+            )
+
+    def test_post_init_oc_length_mismatch(self):
+        @dataclass(frozen=True)
+        class TestStatsOutput(BaseStatsOutput):
+            foo: list[int]
+            bar: list[str]
+
+        with pytest.raises(ValueError, match="Total object counts per image does not match image count."):
+            TestStatsOutput(
+                foo=[1, 2, 3, 4],
+                bar=["a", "b", "c", "d"],
+                source_index=[1, 2, 3, 4],  # type: ignore
+                object_count=np.array([1, 2, 3, 4]),
+                image_count=3,
             )
 
 
@@ -567,9 +583,9 @@ class TestCombineStats:
             combine_stats([stats, 1, None])  # type: ignore
 
 
-IMAGE_COUNT = 20
-CLASS_COUNT = 10
-IMAGE_DIMS = 64
+IMAGE_COUNT = 10
+CLASS_COUNT = 5
+IMAGE_DIMS = 32
 
 
 @pytest.mark.required
@@ -581,7 +597,7 @@ class TestOffImageBoxes:
     metadata = [{"id": i * n, "pose": np.random.randint(0, 5)} for i, n in enumerate(detections)]
     classes = [str(i) for i in range(CLASS_COUNT)]
 
-    @pytest.mark.parametrize("box", [(-10.0, -10.0, 20.0, 20.0), (30.0, 30.0, 70.0, 70.0)])
+    @pytest.mark.parametrize("box", [(-10.0, -10.0, 20.0, 20.0), (20.0, 20.0, 50.0, 0.0)])
     def test_off_image_boxes_no_nan(self, box: tuple[float, float, float, float]):
         # set 2 boxes out of bounds
         boxes = self.boxes.copy()
@@ -638,7 +654,7 @@ class TestOffImageBoxes:
 
     def test_empty_bounding_box(self):
         boxes = self.boxes.copy()
-        boxes[10][0] = []
+        boxes[-1][0] = []
 
         dataset = to_object_detection_dataset(
             self.images,
@@ -650,3 +666,35 @@ class TestOffImageBoxes:
 
         with pytest.raises(ValueError, match="Invalid bounding box format"):
             imagestats(dataset, per_box=True)
+
+    def test_no_bounding_box(self):
+        boxes = self.boxes.copy()
+        boxes[-1].clear()
+
+        dataset = to_object_detection_dataset(
+            self.images,
+            self.labels,
+            boxes,
+            self.metadata,
+            self.classes,
+        )
+
+        stats = imagestats(dataset, per_box=True)
+        assert stats.source_index[-1].image == 8
+
+    def test_no_bounding_box_boxratio(self):
+        boxes = self.boxes.copy()
+        boxes[-1].clear()
+
+        dataset = to_object_detection_dataset(
+            self.images,
+            self.labels,
+            boxes,
+            self.metadata,
+            self.classes,
+        )
+
+        imgstats = imagestats(dataset, per_box=False)
+        boxstats = imagestats(dataset, per_box=True)
+        ratiostats = boxratiostats(boxstats, imgstats)
+        assert ratiostats is not None

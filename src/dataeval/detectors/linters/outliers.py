@@ -13,7 +13,7 @@ from dataeval.metrics.stats._imagestats import imagestats
 from dataeval.outputs import DimensionStatsOutput, ImageStatsOutput, OutliersOutput, PixelStatsOutput, VisualStatsOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.outputs._linters import IndexIssueMap, OutlierStatsOutput
-from dataeval.outputs._stats import OBJECT_COUNT, SOURCE_INDEX
+from dataeval.outputs._stats import IMAGE_COUNT, OBJECT_COUNT, SOURCE_INDEX
 from dataeval.typing import ArrayLike, Dataset
 
 
@@ -114,7 +114,7 @@ class Outliers:
     def _get_outliers(self, stats: dict) -> dict[int, dict[str, float]]:
         flagged_images: dict[int, dict[str, float]] = {}
         for stat, values in stats.items():
-            if stat in (SOURCE_INDEX, OBJECT_COUNT):
+            if stat in (SOURCE_INDEX, OBJECT_COUNT, IMAGE_COUNT):
                 continue
             if values.ndim == 1:
                 mask = _get_outlier_mask(values.astype(np.float64), self.outlier_method, self.outlier_threshold)

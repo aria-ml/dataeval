@@ -20,6 +20,7 @@ OptionalRange: TypeAlias = Optional[Union[int, Iterable[int]]]
 
 SOURCE_INDEX = "source_index"
 OBJECT_COUNT = "object_count"
+IMAGE_COUNT = "image_count"
 
 
 class SourceIndex(NamedTuple):
@@ -60,12 +61,19 @@ class BaseStatsOutput(Output):
 
     source_index: list[SourceIndex]
     object_count: NDArray[np.uint16]
+    image_count: int
 
     def __post_init__(self) -> None:
-        length = len(self.source_index)
-        bad = {k: len(v) for k, v in self.data().items() if k not in [SOURCE_INDEX, OBJECT_COUNT] and len(v) != length}
-        if bad:
-            raise ValueError(f"All values must have the same length as source_index. Bad values: {str(bad)}.")
+        base_attrs = (SOURCE_INDEX, OBJECT_COUNT, IMAGE_COUNT)
+        si_length = len(self.source_index)
+        mismatch = {k: len(v) for k, v in self.data().items() if k not in base_attrs and len(v) != si_length}
+        if mismatch:
+            raise ValueError(f"All values must have the same length as source_index. Bad values: {str(mismatch)}.")
+        oc_length = len(self.object_count)
+        if oc_length != self.image_count:
+            raise ValueError(
+                f"Total object counts per image does not match image count. {oc_length} != {self.image_count}."
+            )
 
     def get_channel_mask(
         self,
