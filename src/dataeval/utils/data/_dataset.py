@@ -2,7 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Any, Generic, Iterable, Literal, Sequence, TypeVar
+from typing import Any, Generic, Iterable, Literal, Sequence, SupportsFloat, SupportsInt, TypeVar, cast
 
 from dataeval.typing import (
     Array,
@@ -17,8 +17,8 @@ from dataeval.utils._array import as_numpy
 def _validate_data(
     datum_type: Literal["ic", "od"],
     images: Array | Sequence[Array],
-    labels: Sequence[int] | Sequence[Sequence[int]],
-    bboxes: Sequence[Sequence[Sequence[float]]] | None,
+    labels: Array | Sequence[int] | Sequence[Array] | Sequence[Sequence[int]],
+    bboxes: Array | Sequence[Array] | Sequence[Sequence[Array]] | Sequence[Sequence[Sequence[float]]] | None,
     metadata: Sequence[dict[str, Any]] | None,
 ) -> None:
     # Validate inputs
@@ -34,16 +34,21 @@ def _validate_data(
         raise ValueError(f"Number of metadata ({len(metadata)}) does not match number of images ({dataset_len}).")
 
     if datum_type == "ic":
-        if not isinstance(labels, Sequence) or not isinstance(labels[0], int):
+        if not isinstance(labels, (Sequence, Array)) or not isinstance(labels[0], (int, SupportsInt)):
             raise TypeError("Labels must be a sequence of integers for image classification.")
     elif datum_type == "od":
-        if not isinstance(labels, Sequence) or not isinstance(labels[0], Sequence) or not isinstance(labels[0][0], int):
+        if (
+            not isinstance(labels, (Sequence, Array))
+            or not isinstance(labels[0], (Sequence, Array))
+            or not isinstance(cast(Sequence[Any], labels[0])[0], (int, SupportsInt))
+        ):
             raise TypeError("Labels must be a sequence of sequences of integers for object detection.")
         if (
             bboxes is None
             or not isinstance(bboxes, (Sequence, Array))
             or not isinstance(bboxes[0], (Sequence, Array))
             or not isinstance(bboxes[0][0], (Sequence, Array))
+            or not isinstance(bboxes[0][0][0], (float, SupportsFloat))
             or not len(bboxes[0][0]) == 4
         ):
             raise TypeError("Boxes must be a sequence of sequences of (x0, y0, x1, y1) for object detection.")
@@ -92,12 +97,14 @@ class CustomImageClassificationDataset(BaseAnnotatedDataset[Sequence[int]], Imag
     def __init__(
         self,
         images: Array | Sequence[Array],
-        labels: Sequence[int],
+        labels: Array | Sequence[int],
         metadata: Sequence[dict[str, Any]] | None,
         classes: Sequence[str] | None,
         name: str | None = None,
     ) -> None:
-        super().__init__("ic", images, labels, metadata, classes)
+        super().__init__(
+            "ic", images, as_numpy(labels).tolist() if isinstance(labels, Array) else labels, metadata, classes
+        )
         if name is not None:
             self.__name__ = name
             self.__class__.__name__ = name
@@ -135,18 +142,24 @@ class CustomObjectDetectionDataset(BaseAnnotatedDataset[Sequence[Sequence[int]]]
     def __init__(
         self,
         images: Array | Sequence[Array],
-        labels: Sequence[Sequence[int]],
-        bboxes: Sequence[Sequence[Sequence[float]]],
+        labels: Array | Sequence[Array] | Sequence[Sequence[int]],
+        bboxes: Array | Sequence[Array] | Sequence[Sequence[Array]] | Sequence[Sequence[Sequence[float]]],
         metadata: Sequence[dict[str, Any]] | None,
         classes: Sequence[str] | None,
         name: str | None = None,
     ) -> None:
-        super().__init__("od", images, labels, metadata, classes)
+        super().__init__(
+            "od",
+            images,
+            [as_numpy(label).tolist() if isinstance(label, Array) else label for label in labels],
+            metadata,
+            classes,
+        )
         if name is not None:
             self.__name__ = name
             self.__class__.__name__ = name
             self.__class__.__qualname__ = name
-        self._bboxes = bboxes
+        self._bboxes = [[as_numpy(box).tolist() if isinstance(box, Array) else box for box in bbox] for bbox in bboxes]
 
     @property
     def metadata(self) -> DatasetMetadata:
@@ -162,7 +175,7 @@ class CustomObjectDetectionDataset(BaseAnnotatedDataset[Sequence[Sequence[int]]]
 
 def to_image_classification_dataset(
     images: Array | Sequence[Array],
-    labels: Sequence[int],
+    labels: Array | Sequence[int],
     metadata: Sequence[dict[str, Any]] | None,
     classes: Sequence[str] | None,
     name: str | None = None,
@@ -174,7 +187,7 @@ def to_image_classification_dataset(
     ----------
     images : Array | Sequence[Array]
         The images to use in the dataset.
-    labels : Sequence[int]
+    labels : Array | Sequence[int]
         The labels to use in the dataset.
     metadata : Sequence[dict[str, Any]] | None
         The metadata to use in the dataset.
@@ -191,8 +204,8 @@ def to_image_classification_dataset(
 
 def to_object_detection_dataset(
     images: Array | Sequence[Array],
-    labels: Sequence[Sequence[int]],
-    bboxes: Sequence[Sequence[Sequence[float]]],
+    labels: Array | Sequence[Array] | Sequence[Sequence[int]],
+    bboxes: Array | Sequence[Array] | Sequence[Sequence[Array]] | Sequence[Sequence[Sequence[float]]],
     metadata: Sequence[dict[str, Any]] | None,
     classes: Sequence[str] | None,
     name: str | None = None,
@@ -204,9 +217,9 @@ def to_object_detection_dataset(
     ----------
     images : Array | Sequence[Array]
         The images to use in the dataset.
-    labels : Sequence[Sequence[int]]
+    labels : Array | Sequence[Array] | Sequence[Sequence[int]]
         The labels to use in the dataset.
-    bboxes : Sequence[Sequence[Sequence[float]]]
+    bboxes : Array | Sequence[Array] | Sequence[Sequence[Array]] | Sequence[Sequence[Sequence[float]]]
         The bounding boxes (x0,y0,x1,y0) to use in the dataset.
     metadata : Sequence[dict[str, Any]] | None
         The metadata to use in the dataset.

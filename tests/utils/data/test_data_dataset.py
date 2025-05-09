@@ -1,3 +1,5 @@
+from typing import Any
+
 import numpy as np
 import pytest
 
@@ -11,37 +13,37 @@ from dataeval.utils.data._dataset import (
 
 
 @pytest.fixture(scope="module")
-def images():
+def images() -> list[np.ndarray]:
     return [np.random.random((3, 16, 16)) for _ in range(10)]
 
 
 @pytest.fixture(scope="module")
-def ic_labels():
+def ic_labels() -> list[int]:
     return [np.random.randint(0, 9) for _ in range(10)]
 
 
 @pytest.fixture(scope="module")
-def od_labels():
+def od_labels() -> list[list[int]]:
     return [[np.random.randint(0, 9) for _ in range(i + 1)] for i in range(10)]
 
 
 @pytest.fixture(scope="module")
-def bboxes():
+def bboxes() -> list[list[tuple[float, float, float, float]]]:
     return [[(0.0, 0.0, 10.0, 10.0) for _ in range(i + 1)] for i in range(10)]
 
 
 @pytest.fixture(scope="module")
-def ic_metadata():
+def ic_metadata() -> list[dict[str, int]]:
     return [{"foo": i} for i in range(10)]
 
 
 @pytest.fixture(scope="module")
-def od_metadata():
+def od_metadata() -> list[dict[str, Any]]:
     return [{"foo": i, "bar": [i for _ in range(i + 1)]} for i in range(10)]
 
 
 @pytest.fixture(scope="module")
-def classes():
+def classes() -> list[str]:
     return [str(i) for i in range(10)]
 
 
@@ -152,3 +154,11 @@ class TestDatasetFactoryFunctions:
         ds = to_object_detection_dataset(images, od_labels, bboxes, None, classes, name=name)
         assert name in ds.__repr__()
         assert name in ds.__class__.__name__
+
+    def test_to_object_detection_dataset_with_arrays(self, images, od_labels, bboxes, classes):
+        np_images = [np.array(image) for image in images]
+        np_labels = [np.array(label) for label in od_labels]
+        np_bboxes = [[np.array(box) for box in bbox] for bbox in bboxes]
+        ds = to_object_detection_dataset(np_images, np_labels, np_bboxes, None, classes)
+        assert len(Images(ds).to_list()) == 10
+        assert len(Metadata(ds).image_indices) == 55  # 1 + 2 + 3 + ... + 10
