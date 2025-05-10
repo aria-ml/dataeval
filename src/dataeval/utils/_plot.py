@@ -3,6 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 import contextlib
+import math
 from typing import Any
 
 import numpy as np
@@ -160,7 +161,7 @@ def histogram_plot(
     import matplotlib.pyplot as plt
 
     num_metrics = len(data_dict)
-    rows = int(num_metrics / 3)
+    rows = math.ceil(num_metrics / 3)
     cols = min(num_metrics, 3)
     fig, axs = plt.subplots(rows, 3, figsize=(cols * 3 + 1, rows * 3))
 
@@ -175,6 +176,10 @@ def histogram_plot(
         ax.set_title(metric)
         ax.set_ylabel(ylabel)
         ax.set_xlabel(xlabel)
+
+    for ax in axs.flat[num_metrics:]:
+        ax.axis("off")
+        ax.set_visible(False)
 
     fig.tight_layout()
     return fig
@@ -214,7 +219,7 @@ def channel_histogram_plot(
     label_kwargs = {"label": [f"Channel {i}" for i in range(max_channels)]}
 
     num_metrics = len(data_keys)
-    rows = int(num_metrics / 3)
+    rows = math.ceil(num_metrics / 3)
     cols = min(num_metrics, 3)
     fig, axs = plt.subplots(rows, 3, figsize=(cols * 3 + 1, rows * 3))
 
@@ -240,6 +245,10 @@ def channel_histogram_plot(
         ax.set_title(metric)
         ax.set_ylabel(ylabel)
         ax.set_xlabel(xlabel)
+
+    for ax in axs.flat[num_metrics:]:
+        ax.axis("off")
+        ax.set_visible(False)
 
     fig.tight_layout()
     return fig
