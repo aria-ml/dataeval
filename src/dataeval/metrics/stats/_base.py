@@ -17,7 +17,7 @@ import tqdm
 from numpy.typing import NDArray
 
 from dataeval.config import get_max_processes
-from dataeval.outputs._stats import IMAGE_COUNT, OBJECT_COUNT, SOURCE_INDEX, BaseStatsOutput, SourceIndex
+from dataeval.outputs._stats import BASE_ATTRS, BaseStatsOutput, SourceIndex
 from dataeval.typing import Array, ArrayLike, Dataset, ObjectDetectionTarget
 from dataeval.utils._array import as_numpy, to_numpy
 from dataeval.utils._image import clip_and_pad, clip_box, is_valid_box, normalize_image_shape, rescale
@@ -146,7 +146,7 @@ class StatsProcessor(Generic[TStatsOutput]):
     def convert_output(
         cls, source: dict[str, Any], source_index: list[SourceIndex], object_count: list[int], image_count: int
     ) -> TStatsOutput:
-        output = {}
+        output: dict[str, Any] = {}
         attrs = dict(ChainMap(*(getattr(c, "__annotations__", {}) for c in cls.output_class.__mro__)))
         for key in (key for key in source if key in attrs):
             stat_type: str = attrs[key]
@@ -155,11 +155,9 @@ class StatsProcessor(Generic[TStatsOutput]):
                 output[key] = np.asarray(source[key], dtype=np.dtype(dtype_match.group(1)))
             else:
                 output[key] = source[key]
-        base_attrs = {
-            SOURCE_INDEX: source_index,
-            OBJECT_COUNT: np.asarray(object_count, dtype=np.uint16),
-            IMAGE_COUNT: image_count,
-        }
+        base_attrs: dict[str, Any] = dict(
+            zip(BASE_ATTRS, (source_index, np.asarray(object_count, dtype=np.uint16), image_count))
+        )
         return cls.output_class(**output, **base_attrs)
 
 
@@ -178,18 +176,18 @@ def process_stats(
     per_channel: bool,
     stats_processor_cls: Iterable[type[StatsProcessor[TStatsOutput]]],
 ) -> StatsProcessorOutput:
-    image = to_numpy(image)
+    np_image = to_numpy(image)
     results_list: list[dict[str, Any]] = []
     source_indices: list[SourceIndex] = []
     box_counts: list[int] = []
     warnings_list: list[str] = []
     for i_b, box in [(None, None)] if boxes is None else enumerate(boxes):
-        processor_list = [p(image, box, per_channel) for p in stats_processor_cls]
+        processor_list = [p(np_image, box, per_channel) for p in stats_processor_cls]
         if any(not p._is_valid_box for p in processor_list) and i_b is not None and box is not None:
-            warnings_list.append(f"Bounding box [{i}][{i_b}]: {box} for image shape {image.shape} is invalid.")
+            warnings_list.append(f"Bounding box [{i}][{i_b}]: {box} for image shape {np_image.shape} is invalid.")
         results_list.append({k: v for p in processor_list for k, v in p.process().items()})
         if per_channel:
-            source_indices.extend([SourceIndex(i, i_b, c) for c in range(image.shape[-3])])
+            source_indices.extend([SourceIndex(i, i_b, c) for c in range(np_image.shape[-3])])
         else:
             source_indices.append(SourceIndex(i, i_b, None))
     box_counts.append(0 if boxes is None else len(boxes))
