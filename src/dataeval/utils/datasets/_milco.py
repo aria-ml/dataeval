@@ -38,7 +38,7 @@ class MILCO(BaseODDataset[NDArray[Any]], BaseDatasetNumpyMixin):
     Parameters
     ----------
     root : str or pathlib.Path
-        Root directory of dataset where the ``milco`` folder exists.
+        Root directory where the data should be downloaded to or the ``milco`` folder of the already downloaded data.
     image_set: "train", "operational", or "base", default "train"
         If "train", then the images from 2015, 2017 and 2021 are selected,
         resulting in 315 MILCO objects and 177 NOMBO objects.
@@ -128,6 +128,7 @@ class MILCO(BaseODDataset[NDArray[Any]], BaseDatasetNumpyMixin):
             download,
             verbose,
         )
+        self._bboxes_per_size = True
 
     def _load_data(self) -> tuple[list[str], list[str], dict[str, list[Any]]]:
         filepaths: list[str] = []
@@ -160,15 +161,17 @@ class MILCO(BaseODDataset[NDArray[Any]], BaseDatasetNumpyMixin):
 
     def _load_data_inner(self) -> tuple[list[str], list[str], dict[str, Any]]:
         file_data = {"year": [], "image_id": [], "data_path": [], "label_path": []}
-        data_folder = self.path / self._resource.filename[:-4]
-        for entry in data_folder.iterdir():
-            if entry.is_file() and entry.suffix == ".jpg":
-                # Remove file extension and split by "_"
-                parts = entry.stem.split("_")
-                file_data["image_id"].append(parts[0])
-                file_data["year"].append(parts[1])
-                file_data["data_path"].append(str(entry))
-                file_data["label_path"].append(str(entry.parent / entry.stem) + ".txt")
+        data_folder = sorted((self.path / self._resource.filename[:-4]).glob("*.jpg"))
+        if not data_folder:
+            raise FileNotFoundError
+
+        for entry in data_folder:
+            # Remove file extension and split by "_"
+            parts = entry.stem.split("_")
+            file_data["image_id"].append(parts[0])
+            file_data["year"].append(parts[1])
+            file_data["data_path"].append(str(entry))
+            file_data["label_path"].append(str(entry.parent / entry.stem) + ".txt")
         data = file_data.pop("data_path")
         annotations = file_data.pop("label_path")
 

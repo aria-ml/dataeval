@@ -107,8 +107,8 @@ def _archive_extraction(file_ext, file_path, directory, compression: bool = Fals
             _extract_zip_archive(child, directory)
 
     # Determine if there are nested folders and remove them
-    # Helps ensure there that data is at most one folder below main directory
-    _flatten_extraction(directory, verbose)
+    # Helps ensure that data is at most one folder below main directory
+    # _flatten_extraction(directory, verbose)
 
 
 def _ensure_exists(

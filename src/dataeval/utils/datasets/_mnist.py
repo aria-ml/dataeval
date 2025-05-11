@@ -48,7 +48,7 @@ class MNIST(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
     Parameters
     ----------
     root : str or pathlib.Path
-        Root directory of dataset where the ``mnist`` folder exists.
+        Root directory where the data should be downloaded to or the ``minst`` folder of the already downloaded data.
     image_set : "train", "test" or "base", default "train"
         If "base", returns all of the data to allow the user to create their own splits.
     corruption : "identity", "shot_noise", "impulse_noise", "glass_blur", "motion_blur", \
@@ -154,7 +154,7 @@ class MNIST(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
     def _load_corruption(self) -> tuple[NDArray[Any], NDArray[np.uintp]]:
         """Function to load in the file paths for the data and labels for the different corrupt data formats"""
         corruption = self.corruption if self.corruption is not None else "identity"
-        base_path = self.path / corruption
+        base_path = self.path / "mnist_c" / corruption
         if self.image_set == "base":
             raw_data = []
             raw_labels = []
