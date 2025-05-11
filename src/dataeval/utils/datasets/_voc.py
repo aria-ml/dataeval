@@ -2,6 +2,8 @@ from __future__ import annotations
 
 __all__ = []
 
+import os
+import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Sequence, TypeVar
 
@@ -14,6 +16,7 @@ from dataeval.utils.datasets._base import (
     BaseODDataset,
     BaseSegDataset,
     DataLocation,
+    _ensure_exists,
     _TArray,
     _TTarget,
 )
@@ -51,48 +54,56 @@ TVOCClassMap = TypeVar("TVOCClassMap", VOCClassStringMap, int, list[VOCClassStri
 class BaseVOCDataset(BaseDataset[_TArray, _TTarget, list[str]]):
     _resources = [
         DataLocation(
-            url="http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar",
+            url="https://data.brainchip.com/dataset-mirror/voc/VOCtrainval_11-May-2012.tar",
             filename="VOCtrainval_11-May-2012.tar",
-            md5=True,
-            checksum="6cd6e144f989b92b3379bac3b3de84fd",
+            md5=False,
+            checksum="e14f763270cf193d0b5f74b169f44157a4b0c6efa708f4dd0ff78ee691763bcb",
         ),
         DataLocation(
             url="http://host.robots.ox.ac.uk/pascal/VOC/voc2011/VOCtrainval_25-May-2011.tar",
             filename="VOCtrainval_25-May-2011.tar",
-            md5=True,
-            checksum="6c3384ef61512963050cb5d687e5bf1e",
+            md5=False,
+            checksum="0a7f5f5d154f7290ec65ec3f78b72ef72c6d93ff6d79acd40dc222a9ee5248ba",
         ),
         DataLocation(
             url="http://host.robots.ox.ac.uk/pascal/VOC/voc2010/VOCtrainval_03-May-2010.tar",
             filename="VOCtrainval_03-May-2010.tar",
-            md5=True,
-            checksum="da459979d0c395079b5c75ee67908abb",
+            md5=False,
+            checksum="1af4189cbe44323ab212bff7afbc7d0f55a267cc191eb3aac911037887e5c7d4",
         ),
         DataLocation(
             url="http://host.robots.ox.ac.uk/pascal/VOC/voc2009/VOCtrainval_11-May-2009.tar",
             filename="VOCtrainval_11-May-2009.tar",
-            md5=True,
-            checksum="da459979d0c395079b5c75ee67908abb",
+            md5=False,
+            checksum="11cbe1741fb5bdadbbca3c08e9ec62cd95c14884845527d50847bc2cf57e7fd6",
         ),
         DataLocation(
             url="http://host.robots.ox.ac.uk/pascal/VOC/voc2008/VOCtrainval_14-Jul-2008.tar",
             filename="VOCtrainval_14-Jul-2008.tar",
-            md5=True,
-            checksum="2629fa636546599198acfcfbfcf1904a",
+            md5=False,
+            checksum="7f0ca53c1b5a838fbe946965fc106c6e86832183240af5c88e3f6c306318d42e",
         ),
         DataLocation(
-            url="http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtrainval_06-Nov-2007.tar",
+            url="https://data.brainchip.com/dataset-mirror/voc/VOCtrainval_06-Nov-2007.tar",
             filename="VOCtrainval_06-Nov-2007.tar",
-            md5=True,
-            checksum="c52e279531787c972589f7e41ab4ae64",
+            md5=False,
+            checksum="7d8cd951101b0957ddfd7a530bdc8a94f06121cfc1e511bb5937e973020c7508",
         ),
         DataLocation(
-            url="http://host.robots.ox.ac.uk/pascal/VOC/voc2007/VOCtest_06-Nov-2007.tar",
+            url="https://data.brainchip.com/dataset-mirror/voc/VOC2012test.tar",
+            filename="VOC2012test.tar",
+            md5=False,
+            checksum="f08582b1935816c5eab3bbb1eb6d06201a789eaa173cdf1cf400c26f0cac2fb3",
+        ),
+        DataLocation(
+            url="https://data.brainchip.com/dataset-mirror/voc/VOCtest_06-Nov-2007.tar",
             filename="VOCtest_06-Nov-2007.tar",
-            md5=True,
-            checksum="b6e924de25625d8de591ea690078ad9f",
+            md5=False,
+            checksum="6836888e2e01dca84577a849d339fa4f73e1e4f135d312430c4856b5609b4892",
         ),
     ]
+    _base2007: tuple[int, int] = (5, 7)
+    _base2012: tuple[int, int] = (0, 6)
 
     index2label: dict[int, str] = {
         0: "aeroplane",
@@ -137,11 +148,50 @@ class BaseVOCDataset(BaseDataset[_TArray, _TTarget, list[str]]):
         )
 
     def _get_dataset_dir(self) -> Path:
-        """Function to reassign the dataset directory for common use with the VOC detection and segmentation classes"""
-        if self._root.stem == f"VOC{self.year}":
-            dataset_dir: Path = self._root
-        else:
-            dataset_dir: Path = self._root / f"VOC{self.year}"
+        """Overrides the base function to determine correct dataset directory for VOC class"""
+        return self._find_main_VOC_dir(self._root)
+
+    def _find_main_VOC_dir(self, base: Path) -> Path:
+        """
+        Determine the correct dataset directory for VOC detection and segmentation classes.
+        Handles various directory structure possibilities and validates existence.
+        """
+        # Case 1: Root is already the specific VOC year directory
+        if base.stem == f"VOC{self.year}":
+            if not base.exists():
+                raise NotADirectoryError(f"Directory VOC{self.year} specified but doesn't exist.")
+            return base
+
+        # Case 2: Root is the VOCdevkit directory
+        elif base.stem == "VOCdevkit":
+            dataset_dir: Path = base / f"VOC{self.year}"
+            if not dataset_dir.exists():
+                raise NotADirectoryError(f"Directory VOCdevkit/VOC{self.year} subdirectory doesn't exist.")
+            return dataset_dir
+
+        # Case 3: Check if data is already downloaded in a standard structure
+        standard_dir: Path = base / "VOCdevkit" / f"VOC{self.year}"
+        if standard_dir.exists():
+            return standard_dir
+        if self.year == "2011":
+            standard_dir: Path = base / "TrainVal" / "VOCdevkit" / f"VOC{self.year}"
+            if standard_dir.exists():
+                return standard_dir
+
+        # Case 4: Check if root is or contains a VOCdataset directory
+        dataset_name: str = "VOCdataset"
+        is_dataset_dir: bool = base.stem.lower() == dataset_name.lower()
+        dataset_dir: Path = base if is_dataset_dir else base / dataset_name.lower()
+
+        # Check if expanded data already exists within this directory
+        expanded_dir: Path = dataset_dir / "VOCdevkit" / f"VOC{self.year}"
+        if expanded_dir.exists():
+            return expanded_dir
+        if self.year == "2011":
+            expanded_dir: Path = dataset_dir / "TrainVal" / "VOCdevkit" / f"VOC{self.year}"
+            if expanded_dir.exists():
+                return expanded_dir
+
         if not dataset_dir.exists():
             dataset_dir.mkdir(parents=True, exist_ok=True)
         return dataset_dir
@@ -150,13 +200,141 @@ class BaseVOCDataset(BaseDataset[_TArray, _TTarget, list[str]]):
         """Function to ensure that the correct resource file is accessed"""
         if year == "2007" and image_set == "test":
             return -1
+        elif year == "2012" and image_set == "test":
+            return -2
         elif year != "2007" and image_set == "test":
             raise ValueError(
-                f"The only test set available is for the year 2007, not {year}. "
-                "Either select the year 2007 or use a different image_set."
+                f"The only test sets available are for the years 2007 and 2012, not {year}. "
+                "Either select the year 2007 or 2012, or use a different image_set."
             )
         else:
             return 2012 - int(year)
+
+    def _update_path(self) -> None:
+        """Update the path to the new folder structure"""
+        if self.year == "2011" and self.path.stem.lower() == "vocdataset":
+            self.path: Path = self.path / "TrainVal" / "VOCdevkit" / f"VOC{self.year}"
+        elif self.path.stem.lower() == "vocdataset":
+            self.path: Path = self.path / "VOCdevkit" / f"VOC{self.year}"
+
+    def _load_data_exception(self) -> tuple[list[str], list[str], dict[str, Any]]:
+        """Adjust how the directory is created for the 2007 and 2012 test set"""
+        filepaths: list[str] = []
+        targets: list[str] = []
+        datum_metadata: dict[str, list[Any]] = {}
+        tmp_path: Path = self._root / "tmp_directory_for_download"
+        tmp_path.mkdir(exist_ok=True)
+        resource_idx = self._base2007 if self.year == "2007" else self._base2012
+
+        # Determine if text files exist
+        train_file = self.path / "ImageSets" / "Main" / "trainval.txt"
+        test_file = self.path / "ImageSets" / "Main" / "test.txt"
+        train_exists = train_file.exists()
+        test_exists = test_file.exists()
+
+        if self.image_set == "base":
+            if not train_exists and not test_exists:
+                _ensure_exists(*self._resources[resource_idx[0]], self.path, self._root, self._download, self._verbose)
+                self._update_path()
+                _ensure_exists(*self._resources[resource_idx[1]], tmp_path, self._root, self._download, self._verbose)
+                self._merge_voc_directories(tmp_path)
+
+            elif train_exists and not test_exists:
+                _ensure_exists(*self._resources[resource_idx[1]], tmp_path, self._root, self._download, self._verbose)
+                self._merge_voc_directories(tmp_path)
+
+            elif not train_exists and test_exists:
+                _ensure_exists(*self._resources[resource_idx[0]], tmp_path, self._root, self._download, self._verbose)
+                self._merge_voc_directories(tmp_path)
+
+            # Code to determine what is needed in each category
+            metadata_list: list[dict[str, Any]] = []
+
+            for img_set in ["test", "base"]:
+                self.image_set = img_set
+                resource_filepaths, resource_targets, resource_metadata = self._load_data_inner()
+                filepaths.extend(resource_filepaths)
+                targets.extend(resource_targets)
+                metadata_list.append(resource_metadata)
+
+            # Combine metadata from all resources
+            for data_dict in metadata_list:
+                for key, val in data_dict.items():
+                    str_key = str(key)  # Ensure key is string
+                    if str_key not in datum_metadata:
+                        datum_metadata[str_key] = []
+                    datum_metadata[str_key].extend(val)
+
+        else:
+            self._resource = self._resources[resource_idx[1]]
+
+            if train_exists and not test_exists:
+                _ensure_exists(*self._resource, tmp_path, self._root, self._download, self._verbose)
+                self._merge_voc_directories(tmp_path)
+
+            resource_filepaths, resource_targets, resource_metadata = self._load_try_and_update()
+            filepaths.extend(resource_filepaths)
+            targets.extend(resource_targets)
+            datum_metadata.update(resource_metadata)
+
+        return filepaths, targets, datum_metadata
+
+    def _merge_voc_directories(self, source_dir: Path) -> None:
+        """Merge two VOC directories, handling file conflicts intelligently."""
+        base: Path = self._find_main_VOC_dir(source_dir)
+        # Create all subdirectories in target if they don't exist
+        for dirpath, dirnames, filenames in os.walk(base):
+            # Convert to Path objects
+            source_path = Path(dirpath)
+
+            # Get the relative path from source_dir
+            rel_path = source_path.relative_to(base)
+
+            # Create the corresponding target path
+            target_path = self.path / rel_path
+            target_path.mkdir(parents=True, exist_ok=True)
+
+            # Copy all files
+            for filename in filenames:
+                source_file = source_path / filename
+                target_file = target_path / filename
+
+                # File doesn't exist in target, just move it
+                if not target_file.exists():
+                    shutil.move(source_file, target_file)
+                else:
+                    # File exists in both assume they're identical and skip
+                    pass
+
+        shutil.rmtree(source_dir)
+
+    def _load_try_and_update(self) -> tuple[list[str], list[str], dict[str, Any]]:
+        """Test if data needs to be downloaded and update path if it does"""
+        if self._verbose:
+            print(f"Determining if {self._resource.filename} needs to be downloaded.")
+
+        try:
+            result = self._load_data_inner()
+            if self._verbose:
+                print("No download needed, loaded data successfully.")
+        except FileNotFoundError:
+            _ensure_exists(*self._resource, self.path, self._root, self._download, self._verbose)
+            self._update_path()
+            result = self._load_data_inner()
+        return result
+
+    def _load_data(self) -> tuple[list[str], list[str], dict[str, Any]]:
+        """
+        Function to determine if data can be accessed or if it needs to be downloaded and/or extracted.
+        """
+        # Exception - test sets
+        year_set_bool = (self.image_set == "test" or self.image_set == "base") and (
+            self.year == "2012" or self.year == "2007"
+        )
+        if year_set_bool:
+            return self._load_data_exception()
+
+        return self._load_try_and_update()
 
     def _get_image_sets(self) -> dict[str, list[str]]:
         """Function to create the list of images in each image set"""
@@ -206,20 +384,21 @@ class BaseVOCDataset(BaseDataset[_TArray, _TTarget, list[str]]):
     def _read_annotations(self, annotation: str) -> tuple[list[list[float]], list[int], dict[str, Any]]:
         boxes: list[list[float]] = []
         label_str = []
+        if not Path(annotation).exists():
+            return boxes, label_str, {}
         root = parse(annotation).getroot()
         if root is None:
             raise ValueError(f"Unable to parse {annotation}")
-        num_objects = len(root.findall("object"))
         additional_meta: dict[str, Any] = {
-            "folder": [root.findtext("folder", default="") for _ in range(num_objects)],
-            "filename": [root.findtext("filename", default="") for _ in range(num_objects)],
-            "database": [root.findtext("source/database", default="") for _ in range(num_objects)],
-            "annotation_source": [root.findtext("source/annotation", default="") for _ in range(num_objects)],
-            "image_source": [root.findtext("source/image", default="") for _ in range(num_objects)],
-            "image_width": [int(root.findtext("size/width", default="-1")) for _ in range(num_objects)],
-            "image_height": [int(root.findtext("size/height", default="-1")) for _ in range(num_objects)],
-            "image_depth": [int(root.findtext("size/depth", default="-1")) for _ in range(num_objects)],
-            "segmented": [int(root.findtext("segmented", default="-1")) for _ in range(num_objects)],
+            "folder": root.findtext("folder", default=""),
+            "filename": root.findtext("filename", default=""),
+            "database": root.findtext("source/database", default=""),
+            "annotation_source": root.findtext("source/annotation", default=""),
+            "image_source": root.findtext("source/image", default=""),
+            "image_width": int(root.findtext("size/width", default="-1")),
+            "image_height": int(root.findtext("size/height", default="-1")),
+            "image_depth": int(root.findtext("size/depth", default="-1")),
+            "segmented": int(root.findtext("segmented", default="-1")),
             "pose": [],
             "truncated": [],
             "difficult": [],
@@ -252,9 +431,14 @@ class VOCDetection(
     Parameters
     ----------
     root : str or pathlib.Path
-        Root directory of dataset where the ``vocdataset`` folder exists.
+        Because of the structure of the PASCAL VOC datasets, the root needs to be one of 4 folders.
+        1) Directory containing the year of the **already downloaded** dataset (i.e. .../VOCdevkit/VOC2012 <-)
+        2) Directory to the VOCdevkit folder of the **already downloaded** dataset (i.e. .../VOCdevkit <- /VOC2012)
+        3) Directory to the folder one level up from the VOCdevkit folder,
+        data **may** or **may not** be already downloaded (i.e. ... <- /VOCdevkit/VOC2012)
+        4) Directory to where you would like the dataset to be downloaded
     image_set : "train", "val", "test", or "base", default "train"
-        If "test", then dataset year must be "2007".
+        If "test", then dataset year must be "2007" or "2012". Note that the 2012 test set does not contain annotations.
         If "base", then the combined dataset of "train" and "val" is returned.
     year : "2007", "2008", "2009", "2010", "2011" or "2012", default "2012"
         The dataset year.
@@ -302,9 +486,14 @@ class VOCDetectionTorch(
     Parameters
     ----------
     root : str or pathlib.Path
-        Root directory of dataset where the ``vocdataset`` folder exists.
+        Because of the structure of the PASCAL VOC datasets, the root needs to be one of 4 folders.
+        1) Directory containing the year of the **already downloaded** dataset (i.e. .../VOCdevkit/VOC2012 <-)
+        2) Directory to the VOCdevkit folder of the **already downloaded** dataset (i.e. .../VOCdevkit <- /VOC2012)
+        3) Directory to the folder one level up from the VOCdevkit folder,
+        data **may** or **may not** be already downloaded (i.e. ... <- /VOCdevkit/VOC2012)
+        4) Directory to where you would like the dataset to be downloaded
     image_set : "train", "val", "test", or "base", default "train"
-        If "test", then dataset year must be "2007".
+        If "test", then dataset year must be "2007" or "2012". Note that the 2012 test set does not contain annotations.
         If "base", then the combined dataset of "train" and "val" is returned.
     year : "2007", "2008", "2009", "2010", "2011" or "2012", default "2012"
         The dataset year.
@@ -391,6 +580,14 @@ class VOCSegmentation(
     """
 
     def _load_data(self) -> tuple[list[str], list[str], dict[str, list[Any]]]:
-        filepaths, targets, datum_metadata = super()._load_data()
+        """Overload base load data to split out masks for segmentation."""
+        # Exception - test sets
+        year_set_bool = (self.image_set == "test" or self.image_set == "base") and (
+            self.year == "2012" or self.year == "2007"
+        )
+        if year_set_bool:
+            filepaths, targets, datum_metadata = self._load_data_exception()
+        else:
+            filepaths, targets, datum_metadata = self._load_try_and_update()
         self._masks = datum_metadata.pop("mask_path")
         return filepaths, targets, datum_metadata

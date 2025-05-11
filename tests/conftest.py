@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 from random import choice
@@ -118,14 +119,14 @@ def dataset_nested_folder(mnist_folder):
     np.save(temp_images, train, allow_pickle=False)
     np.save(temp_labels, labels, allow_pickle=False)
 
-    shutil.make_archive(str(mnist_folder / "mnist_c"), "zip", base_dir=(random_temp / "mnist_c"))
+    shutil.make_archive(str(mnist_folder / "mnist_c"), "zip", root_dir=random_temp)
     yield zip_temp
 
 
 @pytest.fixture
 def wrong_mnist(mnist_folder):
-    ident_temp = mnist_folder / "identity"
-    ident_temp.mkdir(exist_ok=True)
+    ident_temp = mnist_folder / "mnist_c" / "identity"
+    ident_temp.mkdir(parents=True, exist_ok=True)
     labels = np.arange(10).repeat(500)
     train = np.ones((5000, 28, 28, 1)) * labels[:, None, None, None]
 
@@ -141,7 +142,7 @@ def mnist_npy(tmp_path_factory):
     temp = tmp_path_factory.mktemp("data")
     mnist_temp = temp / "mnist"
     mnist_temp.mkdir(exist_ok=True)
-    mnistc_temp = mnist_temp / "identity"
+    mnistc_temp = mnist_temp / "mnist_c" / "identity"
     mnistc_temp.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(3)
     labels = np.concatenate([rng.choice(10, 10000), np.arange(10).repeat(4000)])
@@ -169,12 +170,15 @@ def ship_fake(tmp_path_factory):
         image.save(ship_temp / f"{labels[i]}__abc__105_{i}.png")
     scene = Image.fromarray(np.ones((1500, 1250, 3), dtype=np.uint8))
     scene.save(scene_temp / "img_1.png")
+    with open(temp / "ships" / "shipsnet.json", "w") as f:
+        json.dump({"saving": "as_a_json"}, f)
     yield temp
 
 
-@pytest.fixture(scope="session")
-def cifar_fake(tmp_path_factory):
-    temp = tmp_path_factory.mktemp("data")
+@pytest.fixture
+def cifar_fake(tmp_path):
+    temp = tmp_path / "data"
+    temp.mkdir()
     cifar_temp = temp / "cifar10" / "cifar-10-batches-bin"
     cifar_temp.mkdir(parents=True, exist_ok=True)
 
@@ -227,13 +231,19 @@ def milco_fake(tmp_path_factory):
 
 
 @pytest.fixture
-def voc_fake(tmp_path):
+def voc_fake(tmp_path, request):
+    marker = request.node.get_closest_marker("year")
+    year = 2012 if marker is None else marker.args[0]
+
     temp = tmp_path / "data"
     temp.mkdir()
-    random_temp = tmp_path / "random"
+    random_temp = tmp_path / "vocdataset"
     random_temp.mkdir()
-    base_nested = random_temp / "2011VOC" / "AnotherFolder"
-    base_nested.mkdir(parents=True, exist_ok=True)
+    if year != 2011:
+        base_nested = random_temp / "VOCdevkit" / f"VOC{year}"
+    else:
+        base_nested = random_temp / "TrainVal" / "VOCdevkit" / f"VOC{year}"
+    base_nested.mkdir(parents=True)
     img_temp = base_nested / "JPEGImages"
     img_temp.mkdir(exist_ok=True)
     label_temp = base_nested / "Annotations"
@@ -242,7 +252,8 @@ def voc_fake(tmp_path):
     sets_temp.mkdir(parents=True, exist_ok=True)
     seg_temp = base_nested / "SegmentationClass"
     seg_temp.mkdir(exist_ok=True)
-    file_list = [f"2009_00{i}573" for i in range(3)]
+
+    file_list = [f"2009_00{i}573" for i in range(5)]
     img = Image.fromarray(np.ones((10, 10, 3), dtype=np.uint8))
     complicate = np.zeros((10, 10, 3), dtype=np.uint8)
     complicate[3:7, 3:7] = 4
@@ -252,8 +263,8 @@ def voc_fake(tmp_path):
         <folder>VOC2012</folder>
         <filename>2009_001573.jpg</filename>
         <source>
-            <database>The VOC2007 Database</database>
-            <annotation>PASCAL VOC2007</annotation>
+            <database>The VOC2009 Database</database>
+            <annotation>PASCAL VOC2009</annotation>
             <image>flickr</image>
         </source>
         <size>
@@ -298,15 +309,101 @@ def voc_fake(tmp_path):
         with open(label_save, "w") as f:
             f.write(annotation_str)
     with open(sets_temp / "train.txt", "w") as f:
-        f.write("\n".join(file_list))
+        f.write("\n".join(file_list[1:4]))
     with open(sets_temp / "val.txt", "w") as f:
-        f.write("\n".join([file_list[0], file_list[2]]))
+        f.write("\n".join([file_list[0], file_list[-1]]))
     with open(sets_temp / "trainval.txt", "w") as f:
         f.write("\n".join(file_list))
-    with open(sets_temp / "test.txt", "w") as f:
-        f.write(file_list[1])
 
     # Making the tar file
-    shutil.make_archive(str(temp / "VOCtrainval_11-May-2012"), "tar", base_dir=(random_temp / "2011VOC"))
+    shutil.make_archive(str(temp / f"VOCtrainval-{year}"), "tar", root_dir=random_temp)
 
+    # Remove all of the files
+    shutil.rmtree(random_temp)
+
+    yield temp
+
+
+@pytest.fixture
+def voc_fake_test(voc_fake):
+    temp = voc_fake
+    random_temp = temp / "vocdataset"
+    random_temp.mkdir(exist_ok=True)
+    dev_temp = random_temp / "VOCdevkit"
+    dev_temp.mkdir(exist_ok=True)
+    base_nested = dev_temp / "VOC2012"
+    base_nested.mkdir(exist_ok=True)
+    img_temp = base_nested / "JPEGImages"
+    img_temp.mkdir(exist_ok=True)
+    label_temp = base_nested / "Annotations"
+    label_temp.mkdir(exist_ok=True)
+    sets_temp = base_nested / "ImageSets" / "Main"
+    sets_temp.mkdir(parents=True, exist_ok=True)
+    seg_temp = base_nested / "SegmentationClass"
+    seg_temp.mkdir(exist_ok=True)
+
+    file_list = [f"2009_0015{5 + i}3" for i in range(5)]
+    img = Image.fromarray(np.ones((10, 10, 3), dtype=np.uint8))
+    complicate = np.zeros((10, 10, 3), dtype=np.uint8)
+    complicate[3:7, 3:7] = 4
+    seg = Image.fromarray(complicate)
+    annotation_str = """
+    <annotation>
+        <folder>VOC2012</folder>
+        <filename>2009_001563.jpg</filename>
+        <source>
+            <database>The VOC2009 Database</database>
+            <annotation>PASCAL VOC2009</annotation>
+            <image>flickr</image>
+        </source>
+        <size>
+            <width>500</width>
+            <height>375</height>
+            <depth>3</depth>
+        </size>
+        <segmented>1</segmented>
+        <object>
+            <name>dog</name>
+            <pose>Unspecified</pose>
+            <truncated>0</truncated>
+            <difficult>0</difficult>
+            <bndbox>
+                <xmin>123</xmin>
+                <ymin>115</ymin>
+                <xmax>379</xmax>
+                <ymax>275</ymax>
+            </bndbox>
+        </object>
+        <object>
+            <name>chair</name>
+            <pose>Frontal</pose>
+            <truncated>1</truncated>
+            <difficult>0</difficult>
+            <bndbox>
+                <xmin>75</xmin>
+                <ymin>1</ymin>
+                <xmax>428</xmax>
+                <ymax>375</ymax>
+            </bndbox>
+        </object>
+    </annotation>
+    """
+    # Creating the sample files
+    for i, file in enumerate(file_list):
+        img_save = img_temp / (file + ".jpg")
+        img.save(img_save)
+        seg_save = seg_temp / (file + ".jpg")
+        seg.save(seg_save)
+        if i < 3:
+            label_save = label_temp / (file + ".xml")
+            with open(label_save, "w") as f:
+                f.write(annotation_str)
+    with open(sets_temp / "test.txt", "w") as f:
+        f.write("\n".join(file_list))
+
+    # Making the tar file
+    shutil.make_archive(str(temp / "VOC2012test"), "tar", root_dir=random_temp)
+
+    # Removing all the folders
+    shutil.rmtree(random_temp)
     yield temp

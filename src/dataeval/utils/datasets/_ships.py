@@ -30,7 +30,7 @@ class Ships(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
     Parameters
     ----------
     root : str or pathlib.Path
-        Root directory of dataset where the ``shipdataset`` folder exists.
+        Root directory where the data should be downloaded to or the ``ships`` folder of the already downloaded data.
     transforms : Transform, Sequence[Transform] or None, default None
         Transform(s) to apply to the data.
     download : bool, default False
@@ -90,14 +90,23 @@ class Ships(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
             verbose,
         )
         self._scenes: list[str] = self._load_scenes()
+        self._remove_extraneous_json_file()
+
+    def _remove_extraneous_json_file(self):
+        json_path = self.path / "shipsnet.json"
+        if json_path.exists():
+            json_path.unlink()
 
     def _load_data_inner(self) -> tuple[list[str], list[int], dict[str, Any]]:
         """Function to load in the file paths for the data and labels"""
         file_data = {"label": [], "scene_id": [], "longitude": [], "latitude": [], "path": []}
-        data_folder = self.path / "shipsnet"
-        for entry in data_folder.iterdir():
+        data_folder = sorted((self.path / "shipsnet").glob("*.png"))
+        if not data_folder:
+            raise FileNotFoundError
+
+        for entry in data_folder:
             # Remove file extension and split by "_"
-            parts = entry.stem.split("__")  # Removes ".png" and splits the string
+            parts = entry.stem.split("__")
             file_data["label"].append(int(parts[0]))
             file_data["scene_id"].append(parts[1])
             lat_lon = parts[2].split("_")
@@ -110,9 +119,7 @@ class Ships(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
 
     def _load_scenes(self) -> list[str]:
         """Function to load in the file paths for the scene images"""
-        data_folder = self.path / "scenes"
-        scene = [str(entry) for entry in data_folder.iterdir()]
-        return scene
+        return sorted(str(entry) for entry in (self.path / "scenes").glob("*.png"))
 
     def get_scene(self, index: int) -> NDArray[np.uintp]:
         """
