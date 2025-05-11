@@ -6,6 +6,8 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, Iterator, Literal, NamedTuple, Sequence, TypeVar
 
+import numpy as np
+
 from dataeval.utils.datasets._fileio import _ensure_exists
 from dataeval.utils.datasets._mixin import BaseDatasetMixin
 from dataeval.utils.datasets._types import (
@@ -101,11 +103,7 @@ class BaseDataset(AnnotatedDataset[tuple[_TArray, _TTarget, dict[str, Any]]], Ge
 
     def _get_dataset_dir(self) -> Path:
         # Create a designated folder for this dataset (named after the class)
-        if self._root.stem in [
-            self.__class__.__name__.lower(),
-            self.__class__.__name__.upper(),
-            self.__class__.__name__,
-        ]:
+        if self._root.stem.lower() == self.__class__.__name__.lower():
             dataset_dir: Path = self._root
         else:
             dataset_dir: Path = self._root / self.__class__.__name__.lower()
@@ -188,6 +186,8 @@ class BaseODDataset(
     Base class for object detection datasets.
     """
 
+    _bboxes_per_size: bool = False
+
     def __getitem__(self, index: int) -> tuple[_TArray, ObjectDetectionTarget[_TArray], dict[str, Any]]:
         """
         Args
@@ -204,8 +204,12 @@ class BaseODDataset(
         boxes, labels, additional_metadata = self._read_annotations(self._targets[index])
         # Get the image
         img = self._read_file(self._filepaths[index])
+        img_size = img.shape
         img = self._transform(img)
-
+        # Adjust labels if necessary
+        if self._bboxes_per_size and boxes:
+            boxes = boxes * np.array([[img_size[1], img_size[2], img_size[1], img_size[2]]])
+        # Create the Object Detection Target
         target = ObjectDetectionTarget(self._as_array(boxes), self._as_array(labels), self._one_hot_encode(labels))
 
         img_metadata = {key: val[index] for key, val in self._datum_metadata.items()}

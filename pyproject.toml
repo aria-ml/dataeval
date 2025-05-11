@@ -134,6 +134,7 @@ markers = [
   "optional: marks tests for optional features",
   "requires_all: marks tests that require the all extras",
   "cuda: marks tests that require cuda",
+  "year: marks tests that need a specified dataset year",
 ]
 
 [tool.coverage.run]
