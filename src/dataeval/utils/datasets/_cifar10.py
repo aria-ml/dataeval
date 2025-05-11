@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, Literal, Sequence, TypeVar
 
 import numpy as np
 from numpy.typing import NDArray
-from PIL import Image
 
 from dataeval.utils.datasets._base import BaseICDataset, DataLocation
 from dataeval.utils.datasets._mixin import BaseDatasetNumpyMixin
@@ -26,7 +25,7 @@ class CIFAR10(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
     Parameters
     ----------
     root : str or pathlib.Path
-        Root directory of dataset where the ``mnist`` folder exists.
+        Root directory where the data should be downloaded to or the ``cifar10`` folder of the already downloaded data.
     image_set : "train", "test" or "base", default "train"
         If "base", returns all of the data to allow the user to create their own splits.
     transforms : Transform, Sequence[Transform] or None, default None
@@ -93,50 +92,110 @@ class CIFAR10(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
             verbose,
         )
 
+    def _load_bin_data(self, data_folder: list[Path]) -> tuple[list[str], list[int], dict[str, Any]]:
+        batch_nums = np.zeros(60000, dtype=np.uint8)
+        all_labels = np.zeros(60000, dtype=np.uint8)
+        all_images = np.zeros((60000, 3, 32, 32), dtype=np.uint8)
+        # Process each batch file, skipping .meta and .html files
+        for batch_file in data_folder:
+            # Get batch parameters
+            batch_type = "test" if "test" in batch_file.stem else "train"
+            batch_num = 5 if batch_type == "test" else int(batch_file.stem.split("_")[-1]) - 1
+
+            # Load data
+            batch_images, batch_labels = self._unpack_batch_files(batch_file)
+
+            # Stack data
+            num_images = batch_images.shape[0]
+            batch_start = batch_num * num_images
+            all_images[batch_start : batch_start + num_images] = batch_images
+            all_labels[batch_start : batch_start + num_images] = batch_labels
+            batch_nums[batch_start : batch_start + num_images] = batch_num
+
+        # Save data
+        self._loaded_data = all_images
+        np.savez(self.path / "cifar10", images=self._loaded_data, labels=all_labels, batches=batch_nums)
+
+        # Select data
+        image_list = np.arange(all_labels.shape[0]).astype(str)
+        if self.image_set == "train":
+            return (
+                image_list[np.nonzero(batch_nums != 5)[0]].tolist(),
+                all_labels[batch_nums != 5].tolist(),
+                {"batch_num": batch_nums[batch_nums != 5].tolist()},
+            )
+        elif self.image_set == "test":
+            return (
+                image_list[np.nonzero(batch_nums == 5)[0]].tolist(),
+                all_labels[batch_nums == 5].tolist(),
+                {"batch_num": batch_nums[batch_nums == 5].tolist()},
+            )
+        return image_list.tolist(), all_labels.tolist(), {"batch_num": batch_nums.tolist()}
+
     def _load_data_inner(self) -> tuple[list[str], list[int], dict[str, Any]]:
         """Function to load in the file paths for the data and labels and retrieve metadata"""
-        file_meta = {"batch_num": []}
-        raw_data = []
-        labels = []
-        data_folder = self.path / "cifar-10-batches-bin"
-        save_folder = self.path / "images"
-        image_sets: dict[str, list[str]] = {"base": [], "train": [], "test": []}
+        data_file = self.path / "cifar10.npz"
+        if not data_file.exists():
+            data_folder = sorted((self.path / "cifar-10-batches-bin").glob("*.bin"))
+            if not data_folder:
+                raise FileNotFoundError
+            return self._load_bin_data(data_folder)
 
-        # Process each batch file, skipping .meta and .html files
-        for entry in data_folder.iterdir():
-            if entry.suffix == ".bin":
-                batch_data, batch_labels = self._unpack_batch_files(entry)
-                raw_data.append(batch_data)
-                group = "train" if "test" not in entry.stem else "test"
-                name_split = entry.stem.split("_")
-                batch_num = int(name_split[-1]) - 1 if group == "train" else 5
-                file_names = [
-                    str(save_folder / f"{i + 10000 * batch_num:05d}_{self.index2label[label]}.png")
-                    for i, label in enumerate(batch_labels)
-                ]
-                image_sets["base"].extend(file_names)
-                image_sets[group].extend(file_names)
+        # Load data
+        data = np.load(data_file)
+        self._loaded_data = data["images"]
+        all_labels = data["labels"]
+        batch_nums = data["batches"]
 
-                if self.image_set in (group, "base"):
-                    labels.extend(batch_labels)
-                    file_meta["batch_num"].extend([batch_num] * len(labels))
+        # Select data
+        image_list = np.arange(all_labels.shape[0]).astype(str)
+        if self.image_set == "train":
+            return (
+                image_list[np.nonzero(batch_nums != 5)[0]].tolist(),
+                all_labels[batch_nums != 5].tolist(),
+                {"batch_num": batch_nums[batch_nums != 5].tolist()},
+            )
+        elif self.image_set == "test":
+            return (
+                image_list[np.nonzero(batch_nums == 5)[0]].tolist(),
+                all_labels[batch_nums == 5].tolist(),
+                {"batch_num": batch_nums[batch_nums == 5].tolist()},
+            )
+        return image_list.tolist(), all_labels.tolist(), {"batch_num": batch_nums.tolist()}
 
-        # Stack and reshape images
-        images = np.vstack(raw_data).reshape(-1, 3, 32, 32)
-
-        # Save the raw data into images if not already there
-        if not save_folder.exists():
-            save_folder.mkdir(exist_ok=True)
-            for i, file in enumerate(image_sets["base"]):
-                Image.fromarray(images[i].transpose(1, 2, 0).astype(np.uint8)).save(file)
-
-        return image_sets[self.image_set], labels, file_meta
-
-    def _unpack_batch_files(self, file_path: Path) -> tuple[NDArray[Any], list[int]]:
+    def _unpack_batch_files(self, file_path: Path) -> tuple[NDArray[np.uint8], NDArray[np.uint8]]:
         # Load pickle data with latin1 encoding
         with file_path.open("rb") as f:
-            buffer = np.frombuffer(f.read(), "B")
-            labels = buffer[::3073]
-            pixels = np.delete(buffer, np.arange(0, buffer.size, 3073))
-            images = pixels.reshape(-1, 3072)
-        return images, labels.tolist()
+            buffer = np.frombuffer(f.read(), dtype=np.uint8)
+            # Each entry is 1 byte for label + 3072 bytes for image (3*32*32)
+            entry_size = 1 + 3072
+            num_entries = buffer.size // entry_size
+            # Extract labels (first byte of each entry)
+            labels = buffer[::entry_size]
+
+            # Extract image data and reshape to (N, 3, 32, 32)
+            images = np.zeros((num_entries, 3, 32, 32), dtype=np.uint8)
+            for i in range(num_entries):
+                # Skip the label byte and get image data for this entry
+                start_idx = i * entry_size + 1  # +1 to skip label
+                img_flat = buffer[start_idx : start_idx + 3072]
+
+                # The CIFAR format stores channels in blocks (all R, then all G, then all B)
+                # Each channel block is 1024 bytes (32x32)
+                red_channel = img_flat[0:1024].reshape(32, 32)
+                green_channel = img_flat[1024:2048].reshape(32, 32)
+                blue_channel = img_flat[2048:3072].reshape(32, 32)
+
+                # Stack the channels in the proper C×H×W format
+                images[i, 0] = red_channel  # Red channel
+                images[i, 1] = green_channel  # Green channel
+                images[i, 2] = blue_channel  # Blue channel
+        return images, labels
+
+    def _read_file(self, path: str) -> NDArray[Any]:
+        """
+        Function to grab the correct image from the loaded data.
+        Overwrite of the base `_read_file` because data is an all or nothing load.
+        """
+        index = int(path)
+        return self._loaded_data[index]
