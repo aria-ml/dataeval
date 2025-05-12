@@ -39,7 +39,7 @@ Rather than train an expensive object detector, UAP instead trains a classifier
 on only the bounding boxes in a dataset. Put simply, we upperbound the mAP by
 removing localization from the equation. The mAP of the resulting, easier
 classification problem is what is reported by the UAP metric. More information
-on UAP and its origin can be found [here](https://arxiv.org/abs/1911.12451).
+on UAP and its origin can be found in [1].
 
 ## References
 

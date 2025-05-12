@@ -3,6 +3,7 @@ import hashlib
 import numpy as np
 import pytest
 
+from dataeval.utils.datasets._antiuav import AntiUAVDetection
 from dataeval.utils.datasets._base import DataLocation
 from dataeval.utils.datasets._cifar10 import CIFAR10
 from dataeval.utils.datasets._milco import MILCO
@@ -252,8 +253,8 @@ class TestVOC:
 
 @pytest.mark.optional
 class TestMILCO:
-    def test_od_dataset(self, milco_fake):
-        "Test to make sure the BaseODDataset has all the required parts"
+    def test_milco_dataset(self, milco_fake):
+        "Test MILCO dataset initialization"
         dataset = MILCO(root=milco_fake)
         if isinstance(dataset, MILCO):
             assert dataset._resources is not None
@@ -266,3 +267,20 @@ class TestMILCO:
                 assert img.shape == (3, 10, 10)
                 assert isinstance(target, ObjectDetectionTarget)
                 assert "year" in datum_meta
+
+
+@pytest.mark.optional
+class TestAntiUAVDetection:
+    def test_antiuav_dataset(self, antiuav_fake):
+        "Test AntiUAVDetection dataset initialization"
+        dataset = AntiUAVDetection(root=antiuav_fake)
+        if isinstance(dataset, AntiUAVDetection):
+            assert dataset._resources is not None
+            assert dataset.index2label != {}
+            assert dataset.label2index != {}
+            assert "id" in dataset.metadata
+            assert len(dataset) == 12
+            for i in range(12):
+                img, target, datum_meta = dataset[i]
+                assert img.shape == (3, 10, 10)
+                assert isinstance(target, ObjectDetectionTarget)
