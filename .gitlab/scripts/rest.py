@@ -13,24 +13,23 @@ class _VerboseSingleton:
         return cls.instance
 
 
-def verbose(text: str):
+def verbose(text: str) -> None:
     if _VerboseSingleton().verbose:
         print(text)
 
 
-def set_verbose(value: bool):
+def set_verbose(value: bool) -> None:
     _VerboseSingleton().verbose = value
 
 
 def replace_long_strings(d, max_length, replacement=None):
     if isinstance(d, dict):
         return {k: replace_long_strings(v, max_length, replacement) for k, v in d.items()}
-    elif isinstance(d, list):
+    if isinstance(d, list):
         return [replace_long_strings(i, max_length, replacement) for i in d]
-    elif isinstance(d, str) and len(d) > max_length:
+    if isinstance(d, str) and len(d) > max_length:
         return replacement or f"{d[: max_length - 3]}..."
-    else:
-        return d
+    return d
 
 
 class RestWrapper:
@@ -45,7 +44,7 @@ class RestWrapper:
         override_token: str | None = None,
         timeout: int = 10,
         verbose: bool = False,
-    ):
+    ) -> None:
         self.headers: dict
         self.project_url = project_url
         self.token = environ[env_token] if override_token is None else override_token

@@ -196,7 +196,7 @@ class Metadata:
         self._process()
         return int(self._image_indices.max() + 1)
 
-    def _collate(self, force: bool = False):
+    def _collate(self, force: bool = False) -> None:
         if self._collated and not force:
             return
 
@@ -243,7 +243,7 @@ class Metadata:
         self._class_names = [index2label.get(i, str(i)) for i in np.unique(self._class_labels)]
         self._collated = True
 
-    def _merge(self, force: bool = False):
+    def _merge(self, force: bool = False) -> None:
         if self._merged is not None and not force:
             return
 
@@ -266,13 +266,12 @@ class Metadata:
                     "Metadata dictionary needs to be a single dictionary whose values "
                     "are arraylike containing the metadata on a per image or per object basis."
                 )
-            else:
-                check_length = len(v) if check_length is None else check_length
-                if check_length != len(v):
-                    raise ValueError(
-                        "The lists/arrays in the metadata dict have varying lengths. "
-                        "Metadata requires them to be uniform in length."
-                    )
+            check_length = len(v) if check_length is None else check_length
+            if check_length != len(v):
+                raise ValueError(
+                    "The lists/arrays in the metadata dict have varying lengths. "
+                    "Metadata requires them to be uniform in length."
+                )
         if len(self._class_labels) != check_length:
             raise ValueError(
                 f"The length of the label array {len(self._class_labels)} is not the same as "

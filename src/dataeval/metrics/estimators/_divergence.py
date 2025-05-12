@@ -38,8 +38,7 @@ def divergence_mst(data: NDArray[np.float64], labels: NDArray[np.int_]) -> int:
     """
     mst = minimum_spanning_tree(data).toarray()
     edgelist = np.transpose(np.nonzero(mst))
-    errors = np.sum(labels[edgelist[:, 0]] != labels[edgelist[:, 1]])
-    return errors
+    return np.sum(labels[edgelist[:, 0]] != labels[edgelist[:, 1]])
 
 
 def divergence_fnn(data: NDArray[np.float64], labels: NDArray[np.int_]) -> int:
@@ -59,8 +58,7 @@ def divergence_fnn(data: NDArray[np.float64], labels: NDArray[np.int_]) -> int:
         Number of label errors when finding nearest neighbors
     """
     nn_indices = compute_neighbors(data, data)
-    errors = np.sum(np.abs(labels[nn_indices] - labels))
-    return errors
+    return np.sum(np.abs(labels[nn_indices] - labels))
 
 
 _DIVERGENCE_FN_MAP = {"FNN": divergence_fnn, "MST": divergence_mst}

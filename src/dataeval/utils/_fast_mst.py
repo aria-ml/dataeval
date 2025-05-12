@@ -6,9 +6,11 @@
 __all__ = []
 
 import warnings
+from typing import Any
 
 import numba
 import numpy as np
+from numpy.typing import NDArray
 from sklearn.neighbors import NearestNeighbors
 
 with warnings.catch_warnings():
@@ -17,24 +19,26 @@ with warnings.catch_warnings():
 
 
 @numba.njit()
-def _ds_union_by_rank(disjoint_set, point, nbr):
+def _ds_union_by_rank(disjoint_set: tuple[NDArray[np.int32], NDArray[np.int32]], point: int, nbr: int) -> int:
     y = ds_find(disjoint_set, point)
     x = ds_find(disjoint_set, nbr)
 
     if x == y:
         return 0
 
-    if disjoint_set.rank[x] < disjoint_set.rank[y]:
+    if disjoint_set[1][x] < disjoint_set[1][y]:
         x, y = y, x
 
-    disjoint_set.parent[y] = x
-    if disjoint_set.rank[x] == disjoint_set.rank[y]:
-        disjoint_set.rank[x] += 1
+    disjoint_set[0][y] = x
+    if disjoint_set[1][x] == disjoint_set[1][y]:
+        disjoint_set[1][x] += 1
     return 1
 
 
 @numba.njit(locals={"i": numba.types.uint32, "nbr": numba.types.uint32, "dist": numba.types.float32})
-def _init_tree(n_neighbors, n_distance):
+def _init_tree(
+    n_neighbors: NDArray[np.intp], n_distance: NDArray[np.float32]
+) -> tuple[NDArray[np.float32], int, tuple[NDArray[np.int32], NDArray[np.int32]], NDArray[np.uint32]]:
     # Initial graph to hold tree connections
     tree = np.zeros((n_neighbors.size - 1, 3), dtype=np.float32)
     disjoint_set = ds_rank_create(n_neighbors.size)
@@ -56,7 +60,13 @@ def _init_tree(n_neighbors, n_distance):
 
 
 @numba.njit(locals={"i": numba.types.uint32, "nbr": numba.types.uint32})
-def _update_tree_by_distance(tree, int_tree, disjoint_set, n_neighbors, n_distance):
+def _update_tree_by_distance(
+    tree: NDArray[np.float32],
+    int_tree: int,
+    disjoint_set: tuple[NDArray[np.int32], NDArray[np.int32]],
+    n_neighbors: NDArray[np.uint32],
+    n_distance: NDArray[np.float32],
+) -> tuple[NDArray[np.float32], int, tuple[NDArray[np.int32], NDArray[np.int32]], NDArray[np.uint32]]:
     cluster_points = np.empty(n_neighbors.size, dtype=np.uint32)
     sort_dist = np.argsort(n_distance)
     dist_sorted = n_distance[sort_dist]
@@ -80,9 +90,9 @@ def _update_tree_by_distance(tree, int_tree, disjoint_set, n_neighbors, n_distan
 
 
 @numba.njit(locals={"i": numba.types.uint32})
-def _cluster_edges(tracker, last_idx, cluster_distances):
+def _cluster_edges(tracker: NDArray[Any], last_idx: int, cluster_distances: NDArray[Any]) -> list[NDArray[np.intp]]:
     cluster_ids = np.unique(tracker)
-    edge_points = []
+    edge_points: list[NDArray[np.intp]] = []
     for idx in range(cluster_ids.size):
         cluster_points = np.nonzero(tracker == cluster_ids[idx])[0]
         cluster_size = cluster_points.size
@@ -102,14 +112,16 @@ def _cluster_edges(tracker, last_idx, cluster_distances):
     return edge_points
 
 
-def _compute_nn(dataA, dataB, k):
+def _compute_nn(dataA: NDArray[Any], dataB: NDArray[Any], k: int) -> tuple[NDArray[np.int32], NDArray[np.float32]]:
     distances, neighbors = NearestNeighbors(n_neighbors=k + 1, algorithm="brute").fit(dataA).kneighbors(dataB)
     neighbors = np.array(neighbors[:, 1 : k + 1], dtype=np.int32)
     distances = np.array(distances[:, 1 : k + 1], dtype=np.float32)
     return neighbors, distances
 
 
-def _calculate_cluster_neighbors(data, groups, point_array):
+def _calculate_cluster_neighbors(
+    data: NDArray[Any], groups: list[NDArray[np.intp]], point_array: NDArray[Any]
+) -> tuple[NDArray[np.uint32], NDArray[np.float32]]:
     """Rerun nearest neighbor based on clusters"""
     cluster_neighbors = np.zeros(point_array.size, dtype=np.uint32)
     cluster_nbr_distances = np.full(point_array.size, np.inf, dtype=np.float32)
@@ -126,7 +138,9 @@ def _calculate_cluster_neighbors(data, groups, point_array):
     return cluster_neighbors, cluster_nbr_distances
 
 
-def minimum_spanning_tree(data, neighbors, distances):
+def minimum_spanning_tree(
+    data: NDArray[Any], neighbors: NDArray[np.int32], distances: NDArray[np.float32]
+) -> NDArray[np.float32]:
     # Transpose arrays to get number of samples along a row
     k_neighbors = neighbors.T.astype(np.uint32).copy()
     k_distances = distances.T.astype(np.float32).copy()
@@ -168,7 +182,7 @@ def minimum_spanning_tree(data, neighbors, distances):
     return tree
 
 
-def calculate_neighbor_distances(data: np.ndarray, k: int = 10):
+def calculate_neighbor_distances(data: np.ndarray, k: int = 10) -> tuple[NDArray[np.int32], NDArray[np.float32]]:
     # Have the potential to add in other distance calculations - supported calculations:
     # https://github.com/lmcinnes/pynndescent/blob/master/pynndescent/pynndescent_.py#L524
     try:

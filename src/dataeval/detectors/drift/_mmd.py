@@ -95,8 +95,7 @@ class DriftMMD(BaseDrift):
         k_xy = self._kernel(x, y)
         k_xx = self._k_xx if self._k_xx is not None and self.update_strategy is None else self._kernel(x, x)
         k_yy = self._kernel(y, y)
-        kernel_mat = torch.cat([torch.cat([k_xx, k_xy], 1), torch.cat([k_xy.T, k_yy], 1)], 0)
-        return kernel_mat
+        return torch.cat([torch.cat([k_xx, k_xy], 1), torch.cat([k_xy.T, k_yy], 1)], 0)
 
     def score(self, data: Embeddings | Array) -> tuple[float, float, float]:
         """
@@ -205,8 +204,7 @@ def sigma_median(x: torch.Tensor, y: torch.Tensor, dist: torch.Tensor) -> torch.
     n = min(x.shape[0], y.shape[0])
     n = n if (x[:n] == y[:n]).all() and x.shape == y.shape else 0
     n_median = n + (torch.prod(torch.as_tensor(dist.shape)) - n) // 2 - 1
-    sigma = (0.5 * dist.flatten().sort().values[int(n_median)].unsqueeze(dim=-1)) ** 0.5
-    return sigma
+    return (0.5 * dist.flatten().sort().values[int(n_median)].unsqueeze(dim=-1)) ** 0.5
 
 
 class GaussianRBF(torch.nn.Module):
@@ -310,5 +308,4 @@ def mmd2_from_kernel_matrix(
         kernel_mat = kernel_mat[idx][:, idx]
     k_xx, k_yy, k_xy = kernel_mat[:-m, :-m], kernel_mat[-m:, -m:], kernel_mat[-m:, :-m]
     c_xx, c_yy = 1 / (n * (n - 1)), 1 / (m * (m - 1))
-    mmd2 = c_xx * k_xx.sum() + c_yy * k_yy.sum() - 2.0 * k_xy.mean()
-    return mmd2
+    return c_xx * k_xx.sum() + c_yy * k_yy.sum() - 2.0 * k_xy.mean()

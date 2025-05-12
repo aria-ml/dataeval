@@ -8,7 +8,7 @@ class LogMessage:
     Deferred message callback for logging expensive messages.
     """
 
-    def __init__(self, fn: Callable[..., str]):
+    def __init__(self, fn: Callable[..., str]) -> None:
         self._fn = fn
         self._str = None
 

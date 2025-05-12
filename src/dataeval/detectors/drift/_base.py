@@ -13,7 +13,7 @@ __all__ = []
 import math
 from abc import abstractmethod
 from functools import wraps
-from typing import Callable, Literal, Protocol, TypeVar, runtime_checkable
+from typing import Any, Callable, Literal, Protocol, TypeVar, runtime_checkable
 
 import numpy as np
 from numpy.typing import NDArray
@@ -40,7 +40,7 @@ def update_strategy(fn: Callable[..., R]) -> Callable[..., R]:
     """Decorator to update x_ref with x using selected update methodology"""
 
     @wraps(fn)
-    def _(self: BaseDrift, data: Embeddings | Array, *args, **kwargs) -> R:
+    def _(self: BaseDrift, data: Embeddings | Array, *args: tuple[Any, ...], **kwargs: dict[str, Any]) -> R:
         output = fn(self, data, *args, **kwargs)
 
         # update reference dataset
@@ -184,7 +184,7 @@ class BaseDriftUnivariate(BaseDrift):
             threshold = self.p_val / self.n_features
             drift_pred = bool((p_vals < threshold).any())
             return drift_pred, threshold
-        elif self.correction == "fdr":
+        if self.correction == "fdr":
             n = p_vals.shape[0]
             i = np.arange(n) + np.int_(1)
             p_sorted = np.sort(p_vals)
@@ -195,8 +195,7 @@ class BaseDriftUnivariate(BaseDrift):
             except ValueError:  # sorted p-values not below thresholds
                 return bool(below_threshold.any()), q_threshold.min()
             return bool(below_threshold.any()), q_threshold[idx_threshold]
-        else:
-            raise ValueError("`correction` needs to be either `bonferroni` or `fdr`.")
+        raise ValueError("`correction` needs to be either `bonferroni` or `fdr`.")
 
     @set_metadata
     @update_strategy

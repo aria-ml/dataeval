@@ -124,7 +124,7 @@ class CIFAR10(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
                 all_labels[batch_nums != 5].tolist(),
                 {"batch_num": batch_nums[batch_nums != 5].tolist()},
             )
-        elif self.image_set == "test":
+        if self.image_set == "test":
             return (
                 image_list[np.nonzero(batch_nums == 5)[0]].tolist(),
                 all_labels[batch_nums == 5].tolist(),
@@ -155,7 +155,7 @@ class CIFAR10(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
                 all_labels[batch_nums != 5].tolist(),
                 {"batch_num": batch_nums[batch_nums != 5].tolist()},
             )
-        elif self.image_set == "test":
+        if self.image_set == "test":
             return (
                 image_list[np.nonzero(batch_nums == 5)[0]].tolist(),
                 all_labels[batch_nums == 5].tolist(),

@@ -9,7 +9,7 @@ class VersionTag:
     Provides current and pending/next version number for DataEval
     """
 
-    def __init__(self, gitlab: Gitlab):
+    def __init__(self, gitlab: Gitlab) -> None:
         self.gl = gitlab
         self._current = None
         self._pending = None

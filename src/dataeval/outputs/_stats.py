@@ -193,8 +193,7 @@ class BaseStatsOutput(Output):
             return Figure()
         if max_channels == 1:
             return histogram_plot(factors, log)
-        else:
-            return channel_histogram_plot(factors, log, max_channels, ch_mask)
+        return channel_histogram_plot(factors, log, max_channels, ch_mask)
 
 
 @dataclass(frozen=True)

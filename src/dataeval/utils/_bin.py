@@ -195,5 +195,4 @@ def bin_by_clusters(data: NDArray[np.number[Any]]) -> NDArray[np.float64]:
     if extend_bins:
         bin_edges = np.concatenate([bin_edges, extend_bins])
 
-    bin_edges = np.sort(bin_edges)
-    return bin_edges
+    return np.sort(bin_edges)

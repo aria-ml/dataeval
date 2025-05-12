@@ -99,8 +99,7 @@ class _KNNSorter(_Sorter):
             np.fill_diagonal(dists, np.inf)
         else:
             dists = pairwise_distances(embeddings, reference)
-        inds = np.argsort(np.sort(dists, axis=1)[:, self._k])
-        return inds
+        return np.argsort(np.sort(dists, axis=1)[:, self._k])
 
 
 class _KMeansSorter(_Sorter):
@@ -124,15 +123,13 @@ class _KMeansSorter(_Sorter):
 class _KMeansDistanceSorter(_KMeansSorter):
     def _sort(self, embeddings: NDArray[Any], reference: NDArray[Any] | None = None) -> NDArray[np.intp]:
         clst = self._get_clusters(embeddings if reference is None else reference)
-        inds = np.argsort(clst._dist2center(embeddings))
-        return inds
+        return np.argsort(clst._dist2center(embeddings))
 
 
 class _KMeansComplexitySorter(_KMeansSorter):
     def _sort(self, embeddings: NDArray[Any], reference: NDArray[Any] | None = None) -> NDArray[np.intp]:
         clst = self._get_clusters(embeddings if reference is None else reference)
-        inds = clst._sort_by_weights(embeddings)
-        return inds
+        return clst._sort_by_weights(embeddings)
 
 
 class Prioritize(Selection[Any]):
@@ -266,10 +263,10 @@ class Prioritize(Selection[Any]):
     def _get_sorter(self, samples: int) -> _Sorter:
         if self._method == "knn":
             return _KNNSorter(samples, self._k)
-        elif self._method == "kmeans_distance":
+        if self._method == "kmeans_distance":
             return _KMeansDistanceSorter(samples, self._c)
-        else:  # self._method == "kmeans_complexity"
-            return _KMeansComplexitySorter(samples, self._c)
+        # self._method == "kmeans_complexity"
+        return _KMeansComplexitySorter(samples, self._c)
 
     def _to_normalized_ndarray(self, embeddings: Embeddings, selection: list[int] | None = None) -> NDArray[Any]:
         emb: NDArray[Any] = embeddings.to_numpy(selection)

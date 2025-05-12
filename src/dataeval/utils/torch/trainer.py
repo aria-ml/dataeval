@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataeval.config import DeviceLike, get_device
-
 __all__ = ["AETrainer"]
 
 from typing import Any
@@ -12,6 +10,8 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 from torch.utils.data import DataLoader, Dataset
+
+from dataeval.config import DeviceLike, get_device
 
 
 def get_images_from_batch(batch: Any) -> Any:
@@ -39,7 +39,7 @@ class AETrainer:
         model: nn.Module,
         device: DeviceLike | None = None,
         batch_size: int = 8,
-    ):
+    ) -> None:
         self.device: torch.device = get_device(device)
         self.model: nn.Module = model.to(self.device)
         self.batch_size = batch_size

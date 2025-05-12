@@ -146,7 +146,7 @@ class ConstantThreshold(Threshold, threshold_type="constant"):
         None 0.1
     """
 
-    def __init__(self, lower: float | int | None = None, upper: float | int | None = None):
+    def __init__(self, lower: float | int | None = None, upper: float | int | None = None) -> None:
         """Creates a new ConstantThreshold instance.
 
         Args:
@@ -168,7 +168,7 @@ class ConstantThreshold(Threshold, threshold_type="constant"):
         return self.lower, self.upper
 
     @staticmethod
-    def _validate_inputs(lower: float | int | None = None, upper: float | int | None = None):
+    def _validate_inputs(lower: float | int | None = None, upper: float | int | None = None) -> None:
         if lower is not None and not isinstance(lower, (float, int)) or isinstance(lower, bool):
             raise ValueError(f"expected type of 'lower' to be 'float', 'int' or None but got '{type(lower).__name__}'")
 
@@ -204,7 +204,7 @@ class StandardDeviationThreshold(Threshold, threshold_type="standard_deviation")
         std_lower_multiplier: float | int | None = 3,
         std_upper_multiplier: float | int | None = 3,
         offset_from: Callable[[np.ndarray], Any] = np.nanmean,
-    ):
+    ) -> None:
         """Creates a new StandardDeviationThreshold instance.
 
         Args:
@@ -239,7 +239,9 @@ class StandardDeviationThreshold(Threshold, threshold_type="standard_deviation")
         return lower_threshold, upper_threshold
 
     @staticmethod
-    def _validate_inputs(std_lower_multiplier: float | int | None = 3, std_upper_multiplier: float | int | None = 3):
+    def _validate_inputs(
+        std_lower_multiplier: float | int | None = 3, std_upper_multiplier: float | int | None = 3
+    ) -> None:
         if (
             std_lower_multiplier is not None
             and not isinstance(std_lower_multiplier, (float, int))
