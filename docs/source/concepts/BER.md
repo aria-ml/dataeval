@@ -35,8 +35,8 @@ these estimators try to quantify uncertainty along the decision boundary. For
 high dimensional datasets, typically only a fraction of samples are inherently
 problematic when it comes to {term}`classification<Classification>`. For
 example, take the following problematic images from the
-[MNIST](https://en.wikipedia.org/wiki/MNIST_database) dataset (taken from
-[here](https://www.kaggle.com/code/cdeotte/25-million-images-0-99757-mnist)):
+[MNIST](https://en.wikipedia.org/wiki/MNIST_database) dataset (difficult images
+taken from this [kaggle notebook](https://www.kaggle.com/code/cdeotte/25-million-images-0-99757-mnist)):
 
 ![problem](../_static/images/reference/difficult.png)
 
