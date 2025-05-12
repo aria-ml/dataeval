@@ -8,7 +8,6 @@
   "python.testing.unittestEnabled": false,
 
   "ruff.importStrategy": "fromEnvironment",
-  "python.analysis.typeCheckingMode": "basic",
 
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
@@ -16,8 +15,21 @@
     "editor.formatOnSaveMode": "file",
     "editor.codeActionsOnSave": {
       "source.fixAll": "explicit",
-      "source.organizeImports": "explicit"
+      "source.organizeImports": "explicit",
     },
+  },
+  "markdownlint.config": {
+        "MD013": true
+    },
+
+  "[markdown]": {
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": true,
+    "editor.formatOnSaveMode": "file",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.markdownlint": "explicit"
+    }
+    
   },
 
   "notebook.formatOnSave.enabled": true,
