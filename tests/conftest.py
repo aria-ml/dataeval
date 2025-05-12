@@ -407,3 +407,60 @@ def voc_fake_test(voc_fake):
     # Removing all the folders
     shutil.rmtree(random_temp)
     yield temp
+
+
+@pytest.fixture(scope="session")
+def antiuav_fake(tmp_path_factory):
+    temp = tmp_path_factory.mktemp("data")
+    img_temp = temp / "antiuavdetection" / "train" / "img"
+    img_temp.mkdir(parents=True, exist_ok=True)
+    ann_temp = temp / "antiuavdetection" / "train" / "xml"
+    ann_temp.mkdir(exist_ok=True)
+    data = (np.random.random((12, 10, 10, 3)) * 255).astype(np.uint8)
+    annotation_str = """
+    <annotation>
+        <folder>train</folder>
+        <filename>00100.jpg</filename>
+        <path>./train/00100.jpg</path>
+        <source>
+            <database>DUT Anti-UAV Detection</database>
+        </source>
+        <size>
+            <width>550</width>
+            <height>412</height>
+            <depth>3</depth>
+        </size>
+        <segmented>0</segmented>
+        <object>
+            <name>UAV</name>
+            <pose>Unspecified</pose>
+            <truncated>0</truncated>
+            <difficult>0</difficult>
+            <bndbox>
+                <xmin>228</xmin>
+                <ymin>155</ymin>
+                <xmax>353</xmax>
+                <ymax>245</ymax>
+            </bndbox>
+        </object>
+        <object>
+            <name>UAV</name>
+            <pose>Unspecified</pose>
+            <truncated>0</truncated>
+            <difficult>0</difficult>
+            <bndbox>
+                <xmin>36</xmin>
+                <ymin>312</ymin>
+                <xmax>49</xmax>
+                <ymax>337</ymax>
+            </bndbox>
+        </object>
+    </annotation>
+    """
+
+    for i in range(len(data)):
+        image = Image.fromarray(data[i])
+        image.save(img_temp / f"{i:05}.jpg")
+        with open(ann_temp / f"{i:05}.xml", mode="w") as f:
+            f.write(annotation_str)
+    yield temp
