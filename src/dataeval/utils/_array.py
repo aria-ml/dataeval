@@ -23,7 +23,7 @@ T = TypeVar("T", ArrayLike, np.ndarray, torch.Tensor)
 _np_dtype = TypeVar("_np_dtype", bound=np.generic)
 
 
-def _try_import(module_name) -> ModuleType | None:
+def _try_import(module_name: str) -> ModuleType | None:
     if module_name in _MODULE_CACHE:
         return _MODULE_CACHE[module_name]
 
@@ -148,8 +148,7 @@ def ensure_embeddings(
 
     if dtype is None:
         return embeddings
-    else:
-        return arr
+    return arr
 
 
 @overload
@@ -174,10 +173,9 @@ def flatten(array: ArrayLike) -> NDArray[Any] | torch.Tensor:
     if isinstance(array, np.ndarray):
         nparr = as_numpy(array)
         return nparr.reshape((nparr.shape[0], -1))
-    elif isinstance(array, torch.Tensor):
+    if isinstance(array, torch.Tensor):
         return torch.flatten(array, start_dim=1)
-    else:
-        raise TypeError(f"Unsupported array type {type(array)}.")
+    raise TypeError(f"Unsupported array type {type(array)}.")
 
 
 _TArray = TypeVar("_TArray", bound=Array)
@@ -199,7 +197,6 @@ def channels_first_to_last(array: _TArray) -> _TArray:
     """
     if isinstance(array, np.ndarray):
         return np.transpose(array, (1, 2, 0))
-    elif isinstance(array, torch.Tensor):
+    if isinstance(array, torch.Tensor):
         return torch.permute(array, (1, 2, 0))
-    else:
-        raise TypeError(f"Unsupported array type {type(array)}.")
+    raise TypeError(f"Unsupported array type {type(array)}.")

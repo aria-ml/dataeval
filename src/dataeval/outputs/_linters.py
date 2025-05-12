@@ -43,10 +43,12 @@ class DuplicatesOutput(Output, Generic[TIndexCollection]):
     near: list[TIndexCollection]
 
 
-def _reorganize_by_class_and_metric(result: IndexIssueMap, lstats: LabelStatsOutput):
+def _reorganize_by_class_and_metric(
+    result: IndexIssueMap, lstats: LabelStatsOutput
+) -> tuple[dict[str, list[int]], dict[str, dict[str, int]]]:
     """Flip result from grouping by image to grouping by class and metric"""
-    metrics = {}
-    class_wise = {label: {} for label in lstats.class_names}
+    metrics: dict[str, list[int]] = {}
+    class_wise: dict[str, dict[str, int]] = {label: {} for label in lstats.class_names}
 
     # Group metrics and calculate class-wise counts
     for img, group in result.items():
@@ -59,7 +61,7 @@ def _reorganize_by_class_and_metric(result: IndexIssueMap, lstats: LabelStatsOut
     return metrics, class_wise
 
 
-def _create_table(metrics, class_wise):
+def _create_table(metrics: dict[str, list[int]], class_wise: dict[str, dict[str, int]]) -> list[str]:
     """Create table for displaying the results"""
     max_class_length = max(len(str(label)) for label in class_wise) + 2
     max_total = max(len(metrics[group]) for group in metrics) + 2
@@ -69,7 +71,7 @@ def _create_table(metrics, class_wise):
         + [f"{group:^{max(5, len(str(group))) + 2}}" for group in sorted(metrics.keys())]
         + [f"{'Total':<{max_total}}"]
     )
-    table_rows = []
+    table_rows: list[str] = []
 
     for class_cat, results in class_wise.items():
         table_value = [f"{class_cat:>{max_class_length}}"]
@@ -81,15 +83,14 @@ def _create_table(metrics, class_wise):
         table_value.append(f"{total:^{max_total}}")
         table_rows.append(" | ".join(table_value))
 
-    table = [table_header] + table_rows
-    return table
+    return [table_header] + table_rows
 
 
-def _create_pandas_dataframe(class_wise):
+def _create_pandas_dataframe(class_wise: dict[str, dict[str, int]]) -> list[dict[str, str | int]]:
     """Create data for pandas dataframe"""
     data = []
     for label, metrics_dict in class_wise.items():
-        row = {"Class": label}
+        row: dict[str, str | int] = {"Class": label}
         total = sum(metrics_dict.values())
         row.update(metrics_dict)  # Add metric counts
         row["Total"] = total
@@ -118,8 +119,7 @@ class OutliersOutput(Output, Generic[TIndexIssueMap]):
     def __len__(self) -> int:
         if isinstance(self.issues, dict):
             return len(self.issues)
-        else:
-            return sum(len(d) for d in self.issues)
+        return sum(len(d) for d in self.issues)
 
     def to_table(self, labelstats: LabelStatsOutput) -> str:
         """

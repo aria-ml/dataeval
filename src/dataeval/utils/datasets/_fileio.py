@@ -15,7 +15,7 @@ ARCHIVE_ENDINGS = [".zip", ".tar", ".tgz"]
 COMPRESS_ENDINGS = [".gz", ".bz2"]
 
 
-def _validate_file(fpath, file_md5, md5: bool = False, chunk_size=65535) -> bool:
+def _validate_file(fpath: Path | str, file_md5: str, md5: bool = False, chunk_size: int = 65535) -> bool:
     hasher = hashlib.md5(usedforsecurity=False) if md5 else hashlib.sha256()
     with open(fpath, "rb") as fpath_file:
         while chunk := fpath_file.read(chunk_size):
@@ -49,7 +49,7 @@ def _extract_zip_archive(file_path: Path, extract_to: Path) -> None:
     """Extracts the zip file to the given directory."""
     try:
         with zipfile.ZipFile(file_path, "r") as zip_ref:
-            zip_ref.extractall(extract_to)
+            zip_ref.extractall(extract_to)  # noqa: S202
             file_path.unlink()
     except zipfile.BadZipFile:
         raise FileNotFoundError(f"{file_path.name} is not a valid zip file, skipping extraction.")
@@ -59,7 +59,7 @@ def _extract_tar_archive(file_path: Path, extract_to: Path) -> None:
     """Extracts a tar file (or compressed tar) to the specified directory."""
     try:
         with tarfile.open(file_path, "r:*") as tar_ref:
-            tar_ref.extractall(extract_to)
+            tar_ref.extractall(extract_to)  # noqa: S202
             file_path.unlink()
     except tarfile.TarError:
         raise FileNotFoundError(f"{file_path.name} is not a valid tar file, skipping extraction.")
@@ -88,7 +88,9 @@ def _flatten_extraction(base_directory: Path, verbose: bool = False) -> None:
                     _flatten_extraction(base_directory, verbose)
 
 
-def _archive_extraction(file_ext, file_path, directory, compression: bool = False, verbose: bool = False):
+def _archive_extraction(
+    file_ext: str, file_path: Path, directory: Path, compression: bool = False, verbose: bool = False
+) -> None:
     """
     Single function to extract and then flatten if necessary.
     Recursively extracts nested zip files as well.

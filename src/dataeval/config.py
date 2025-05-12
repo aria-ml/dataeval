@@ -78,8 +78,7 @@ def get_device(override: DeviceLike | None = None) -> torch.device:
     if override is None:
         global _device
         return torch.get_default_device() if _device is None else _device
-    else:
-        return _todevice(override)
+    return _todevice(override)
 
 
 def set_max_processes(processes: int | None) -> None:

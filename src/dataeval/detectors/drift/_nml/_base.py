@@ -27,7 +27,9 @@ def _validate(data: pd.DataFrame, expected_features: int | None = None) -> int:
     return data.shape[-1]
 
 
-def _create_multilevel_index(chunks: Sequence[Chunk], result_group_name: str, result_column_names: Sequence[str]):
+def _create_multilevel_index(
+    chunks: Sequence[Chunk], result_group_name: str, result_column_names: Sequence[str]
+) -> pd.MultiIndex:
     chunk_column_names = (*chunks[0].KEYS, "period")
     chunk_tuples = [("chunk", chunk_column_name) for chunk_column_name in chunk_column_names]
     result_tuples = [(result_group_name, column_name) for column_name in result_column_names]
@@ -37,7 +39,7 @@ def _create_multilevel_index(chunks: Sequence[Chunk], result_group_name: str, re
 class AbstractCalculator(ABC):
     """Base class for drift calculation."""
 
-    def __init__(self, chunker: Chunker | None = None, logger: Logger | None = None):
+    def __init__(self, chunker: Chunker | None = None, logger: Logger | None = None) -> None:
         self.chunker = chunker if isinstance(chunker, Chunker) else CountBasedChunker(10)
         self.result: DriftMVDCOutput | None = None
         self.n_features: int | None = None

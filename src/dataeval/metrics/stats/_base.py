@@ -116,8 +116,7 @@ class StatsProcessor(Generic[TStatsOutput]):
             if fn_key not in self._cache:
                 self._cache[fn_key] = self._fn_map[fn_key](self)
             return self._cache[fn_key]
-        else:
-            return self._fn_map[fn_key](self)
+        return self._fn_map[fn_key](self)
 
     def process(self) -> dict[str, Any]:
         return {k: self._fn_map[k](self) for k in self._fn_map}
@@ -202,7 +201,9 @@ def process_stats_unpack(
     return process_stats(*args, per_channel=per_channel, stats_processor_cls=stats_processor_cls)
 
 
-def _enumerate(dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]], per_box: bool):
+def _enumerate(
+    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]], per_box: bool
+) -> Iterator[tuple[int, ArrayLike, Any]]:
     for i in range(len(dataset)):
         d = dataset[i]
         image = d[0] if isinstance(d, tuple) else d
@@ -294,8 +295,7 @@ def run_stats(
             else:
                 output.setdefault(stat, []).append(result.tolist() if isinstance(result, np.ndarray) else result)
 
-    outputs = [s.convert_output(output, source_index, object_count, image_count) for s in stats_processor_cls]
-    return outputs
+    return [s.convert_output(output, source_index, object_count, image_count) for s in stats_processor_cls]
 
 
 def add_stats(a: TStatsOutput, b: TStatsOutput) -> TStatsOutput:

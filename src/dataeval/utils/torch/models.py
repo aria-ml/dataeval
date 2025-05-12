@@ -47,8 +47,7 @@ class Autoencoder(nn.Module):
             The reconstructed output tensor.
         """
         x = self.encoder(x)
-        x = self.decoder(x)
-        return x
+        return self.decoder(x)
 
     def encode(self, x: Any) -> Any:
         """
@@ -188,8 +187,7 @@ class AE(nn.Module):
             The reconstructed output tensor.
         """
         x = self.encoder(x)
-        x = self.decoder(x)
-        return x
+        return self.decoder(x)
 
     def encode(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -278,9 +276,7 @@ class Encoder_AE(nn.Module):
         """
         x = self.encoding_ops(x)
 
-        x = self.flatten(x)
-
-        return x
+        return self.flatten(x)
 
 
 class Decoder_AE(nn.Module):
@@ -334,8 +330,7 @@ class Decoder_AE(nn.Module):
         x = self.input(x)
         x = x.reshape((-1, *self.post_op_shape))
         x = self.decoder(x)
-        x = x.reshape((-1, *self.input_shape))
-        return x
+        return x.reshape((-1, *self.input_shape))
 
 
 class ResNet18(nn.Module):
@@ -355,7 +350,7 @@ class ResNet18(nn.Module):
     Please use with caution if deploying this class or subclasses.
     """
 
-    def __init__(self, embedding_size: int = 128):
+    def __init__(self, embedding_size: int = 128) -> None:
         super().__init__()
         self.model: nn.Module = resnet18(weights=ResNet18_Weights.DEFAULT, progress=False)
         self.model.fc = nn.Linear(self.model.fc.in_features, embedding_size)

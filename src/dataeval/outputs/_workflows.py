@@ -154,10 +154,10 @@ def calc_params(p_i: NDArray[Any], n_i: NDArray[Any], niter: int) -> NDArray[Any
         Array of parameters to recreate line of best fit
     """
 
-    def is_valid(f_new, x_new, f_old, x_old):
+    def is_valid(f_new, x_new, f_old, x_old) -> bool:  # noqa: ANN001
         return f_new != np.nan
 
-    def f(x):
+    def f(x) -> float:  # noqa: ANN001
         try:
             return np.sum(np.square(p_i - f_out(n_i, x)))
         except RuntimeWarning:

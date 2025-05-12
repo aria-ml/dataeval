@@ -144,8 +144,7 @@ class Embeddings:
         """
         if indices is not None:
             return torch.vstack(list(self._batch(indices))).to(self.device)
-        else:
-            return self[:]
+        return self[:]
 
     def to_numpy(self, indices: Sequence[int] | None = None) -> NDArray[Any]:
         """

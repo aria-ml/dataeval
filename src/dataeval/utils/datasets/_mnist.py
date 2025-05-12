@@ -191,8 +191,7 @@ class MNIST(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
 
     def _grab_corruption_data(self, path: Path) -> NDArray[Any]:
         """Function to load in the data numpy array for the previously chosen corrupt format"""
-        x = np.load(path, allow_pickle=False)
-        return x
+        return np.load(path, allow_pickle=False)
 
     def _read_file(self, path: str) -> NDArray[Any]:
         """

@@ -228,11 +228,10 @@ def flatten(
 
     if return_dropped:
         return output, size, _sorted_drop_reasons(dropped)
-    else:
-        if dropped:
-            dropped_items = "\n".join([f"    {k}: {v}" for k, v in _sorted_drop_reasons(dropped).items()])
-            warnings.warn(f"Metadata entries were dropped:\n{dropped_items}")
-        return output, size
+    if dropped:
+        dropped_items = "\n".join([f"    {k}: {v}" for k, v in _sorted_drop_reasons(dropped).items()])
+        warnings.warn(f"Metadata entries were dropped:\n{dropped_items}")
+    return output, size
 
 
 def _is_metadata_dict_of_dicts(metadata: Mapping) -> bool:
@@ -396,8 +395,7 @@ def merge(
 
     if return_dropped:
         return output, _sorted_drop_reasons(dropped)
-    else:
-        if dropped:
-            dropped_items = "\n".join([f"    {k}: {v}" for k, v in _sorted_drop_reasons(dropped).items()])
-            warnings.warn(f"Metadata entries were dropped:\n{dropped_items}")
-        return output
+    if dropped:
+        dropped_items = "\n".join([f"    {k}: {v}" for k, v in _sorted_drop_reasons(dropped).items()])
+        warnings.warn(f"Metadata entries were dropped:\n{dropped_items}")
+    return output

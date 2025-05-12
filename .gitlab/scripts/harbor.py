@@ -21,7 +21,7 @@ class Harbor(RestWrapper):
         token: str | None = None,
         timeout: int = 10,
         verbose: bool = False,
-    ):
+    ) -> None:
         super().__init__(DATAEVAL_PROJECT_URL, DATAEVAL_HARBOR_TOKEN, token, timeout, verbose)
         self.headers = {"Authorization": f"Basic {self.token}"}
 
@@ -42,10 +42,9 @@ class Harbor(RestWrapper):
         if tag_filter:
             params.update({"q": f"tags=~{tag_filter}"})
 
-        r = self._request(get, [REPOSITORIES, repository_name, ARTIFACTS], params)
-        return r
+        return self._request(get, [REPOSITORIES, repository_name, ARTIFACTS], params)
 
-    def delete_tag(self, repository_name: str, tag_name: str):
+    def delete_tag(self, repository_name: str, tag_name: str) -> None:
         """
         Delete a tag 'repository_name:tag_name'
 
