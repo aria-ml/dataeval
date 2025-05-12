@@ -30,7 +30,7 @@ class Chunk(ABC):
     def __init__(
         self,
         data: pd.DataFrame,
-    ):
+    ) -> None:
         self.key: str
         self.data = data
 
@@ -38,11 +38,11 @@ class Chunk(ABC):
         self.end_index: int = -1
         self.chunk_index: int = -1
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         attr_str = ", ".join([f"{k}={v}" for k, v in self.dict().items()])
         return f"{self.__class__.__name__}(data=pd.DataFrame(shape={self.data.shape}), {attr_str})"
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.data.shape[0]
 
     @abstractmethod
@@ -75,7 +75,7 @@ class IndexChunk(Chunk):
         data: pd.DataFrame,
         start_index: int,
         end_index: int,
-    ):
+    ) -> None:
         super().__init__(data)
         self.key = f"[{start_index}:{end_index}]"
         self.start_index: int = start_index
@@ -112,7 +112,7 @@ class PeriodChunk(Chunk):
 
     KEYS = ("key", "chunk_index", "start_date", "end_date", "chunk_size")
 
-    def __init__(self, data: pd.DataFrame, period: Period, chunk_size: int):
+    def __init__(self, data: pd.DataFrame, period: Period, chunk_size: int) -> None:
         super().__init__(data)
         self.key = str(period)
         self.start_datetime = period.start_time
@@ -275,7 +275,7 @@ class SizeBasedChunker(Chunker[IndexChunk]):
         self,
         chunk_size: int,
         incomplete: Literal["append", "drop", "keep"] = "keep",
-    ):
+    ) -> None:
         """Create a new SizeBasedChunker.
 
         Parameters
@@ -308,12 +308,11 @@ class SizeBasedChunker(Chunker[IndexChunk]):
     def _split(self, data: pd.DataFrame) -> list[IndexChunk]:
         def _create_chunk(index: int, data: pd.DataFrame, chunk_size: int) -> IndexChunk:
             chunk_data = data.iloc[index : index + chunk_size]
-            chunk = IndexChunk(
+            return IndexChunk(
                 data=chunk_data,
                 start_index=index,
                 end_index=index + chunk_size - 1,
             )
-            return chunk
 
         chunks = [
             _create_chunk(index=i, data=data, chunk_size=self.chunk_size)
@@ -358,7 +357,7 @@ class CountBasedChunker(Chunker[IndexChunk]):
         self,
         chunk_number: int,
         incomplete: Literal["append", "drop", "keep"] = "keep",
-    ):
+    ) -> None:
         """Creates a new CountBasedChunker.
 
         It will calculate the amount of observations per chunk based on the given chunk count.
@@ -394,5 +393,4 @@ class CountBasedChunker(Chunker[IndexChunk]):
     def _split(self, data: pd.DataFrame) -> list[IndexChunk]:
         chunk_size = data.shape[0] // self.chunk_number
         chunker = SizeBasedChunker(chunk_size, self.incomplete)
-        chunks = chunker.split(data=data)
-        return chunks
+        return chunker.split(data=data)

@@ -176,12 +176,12 @@ target-version = "py38"
 extend-include = ["*.ipynb"]
 
 [tool.ruff.lint]
-select = ["A", "E", "F", "C4", "I", "UP", "NPY", "SIM", "RUF100"]
-ignore = ["NPY002"]
+select = ["A", "ANN", "E", "F", "C4", "I", "NPY", "S", "SIM", "RET", "RUF100", "UP"]
+ignore = ["ANN401", "NPY002"]
 fixable = ["ALL"]
 unfixable = []
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-per-file-ignores = { "*.ipynb" = ["E402"] }
+per-file-ignores = { "*.ipynb" = ["E402"],  "!src/*" = ["ANN", "S", "RET"]}
 
 [tool.ruff.lint.isort]
 known-first-party = ["dataeval"]

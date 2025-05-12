@@ -112,8 +112,7 @@ class BaseDataset(AnnotatedDataset[tuple[_TArray, _TTarget, dict[str, Any]]], Ge
         return dataset_dir
 
     def _unique_id(self) -> str:
-        unique_id = f"{self.__class__.__name__}_{self.image_set}"
-        return unique_id
+        return f"{self.__class__.__name__}_{self.image_set}"
 
     def _load_data(self) -> tuple[list[str], _TRawTarget, dict[str, Any]]:
         """

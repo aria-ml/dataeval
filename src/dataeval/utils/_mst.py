@@ -83,6 +83,4 @@ def compute_neighbors(
 
     nbrs = NearestNeighbors(n_neighbors=k + 1, algorithm=algorithm).fit(B)
     nns = nbrs.kneighbors(A)[1]
-    nns = nns[:, 1:].squeeze()
-
-    return nns
+    return nns[:, 1:].squeeze()

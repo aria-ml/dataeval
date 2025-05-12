@@ -163,7 +163,7 @@ class BaseVOCDataset(BaseDataset[_TArray, _TTarget, list[str]]):
             return base
 
         # Case 2: Root is the VOCdevkit directory
-        elif base.stem == "VOCdevkit":
+        if base.stem == "VOCdevkit":
             dataset_dir: Path = base / f"VOC{self.year}"
             if not dataset_dir.exists():
                 raise NotADirectoryError(f"Directory VOCdevkit/VOC{self.year} subdirectory doesn't exist.")
@@ -196,19 +196,18 @@ class BaseVOCDataset(BaseDataset[_TArray, _TTarget, list[str]]):
             dataset_dir.mkdir(parents=True, exist_ok=True)
         return dataset_dir
 
-    def _get_year_image_set_index(self, year, image_set) -> int:
+    def _get_year_image_set_index(self, year: str, image_set: str) -> int:
         """Function to ensure that the correct resource file is accessed"""
         if year == "2007" and image_set == "test":
             return -1
-        elif year == "2012" and image_set == "test":
+        if year == "2012" and image_set == "test":
             return -2
-        elif year != "2007" and image_set == "test":
+        if year != "2007" and image_set == "test":
             raise ValueError(
                 f"The only test sets available are for the years 2007 and 2012, not {year}. "
                 "Either select the year 2007 or 2012, or use a different image_set."
             )
-        else:
-            return 2012 - int(year)
+        return 2012 - int(year)
 
     def _update_path(self) -> None:
         """Update the path to the new folder structure"""

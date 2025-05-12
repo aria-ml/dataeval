@@ -92,7 +92,7 @@ class Ships(BaseICDataset[NDArray[Any]], BaseDatasetNumpyMixin):
         self._scenes: list[str] = self._load_scenes()
         self._remove_extraneous_json_file()
 
-    def _remove_extraneous_json_file(self):
+    def _remove_extraneous_json_file(self) -> None:
         json_path = self.path / "shipsnet.json"
         if json_path.exists():
             json_path.unlink()

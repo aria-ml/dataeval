@@ -42,14 +42,13 @@ class AbstractResult(GenericOutput[pd.DataFrame]):
         """Export results to pandas dataframe."""
         if multilevel:
             return self._data
-        else:
-            column_names = [
-                "_".join(col).replace("chunk_chunk_chunk", "chunk").replace("chunk_chunk", "chunk")
-                for col in self._data.columns.values
-            ]
-            single_level_data = self._data.copy(deep=True)
-            single_level_data.columns = column_names
-            return single_level_data
+        column_names = [
+            "_".join(col).replace("chunk_chunk_chunk", "chunk").replace("chunk_chunk", "chunk")
+            for col in self._data.columns.values
+        ]
+        single_level_data = self._data.copy(deep=True)
+        single_level_data.columns = column_names
+        return single_level_data
 
     def filter(self, period: str = "all", metrics: str | Sequence[str] | None = None) -> Self:
         """Returns filtered result metric data."""
@@ -67,7 +66,7 @@ class Abstract1DResult(AbstractResult, ABC):
     def __init__(self, results_data: pd.DataFrame) -> None:
         super().__init__(results_data)
 
-    def _filter(self, period: str, metrics=None) -> Self:
+    def _filter(self, period: str, metrics: Sequence[str] | None = None) -> Self:
         data = self._data
         if period != "all":
             data = self._data.loc[self._data.loc[:, ("chunk", "period")] == period, :]  # type: ignore | dataframe loc

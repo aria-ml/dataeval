@@ -35,7 +35,7 @@ class Gitlab(RestWrapper):
         token: str | None = None,
         timeout: int = 10,
         verbose: bool = False,
-    ):
+    ) -> None:
         super().__init__(DATAEVAL_PROJECT_URL, DATAEVAL_BUILD_PAT, token, timeout, verbose)
         self.headers = {"PRIVATE-TOKEN": self.token}
 
@@ -52,8 +52,7 @@ class Gitlab(RestWrapper):
         ----
         https://docs.gitlab.com/ee/api/tags.html#list-project-repository-tags
         """
-        r = self._request(get, TAGS)
-        return r
+        return self._request(get, TAGS)
 
     def add_tag(self, tag_name: str, ref: str = "main", message: str | None = None) -> Dict[str, Any]:
         """
@@ -80,10 +79,9 @@ class Gitlab(RestWrapper):
         tag_content = {"tag_name": tag_name, "ref": ref}
         if message is not None:
             tag_content.update({"message": message})
-        r = self._request(post, TAGS, tag_content)
-        return r
+        return self._request(post, TAGS, tag_content)
 
-    def delete_tag(self, tag_name: str):
+    def delete_tag(self, tag_name: str) -> None:
         """
         Delete a tag
 
@@ -127,8 +125,7 @@ class Gitlab(RestWrapper):
         ----
         https://docs.gitlab.com/ee/api/branches.html#get-single-repository-branch
         """
-        r = self._request(get, f"{BRANCHES}/{branch}")
-        return r
+        return self._request(get, f"{BRANCHES}/{branch}")
 
     def create_repository_branch(self, branch: str, ref: str) -> Dict[str, Any]:
         """
@@ -148,8 +145,7 @@ class Gitlab(RestWrapper):
         ----
         https://docs.gitlab.com/ee/api/branches.html#create-repository-branch
         """
-        r = self._request(post, BRANCHES, {"branch": branch, "ref": ref})
-        return r
+        return self._request(post, BRANCHES, {"branch": branch, "ref": ref})
 
     def list_merge_requests(
         self,
@@ -182,8 +178,7 @@ class Gitlab(RestWrapper):
             params.update({"search": search_title, "in": "title"})
         if order_by is not None:
             params.update({"order_by": order_by})
-        r = self._request(get, MERGE_REQUESTS, params)
-        return r
+        return self._request(get, MERGE_REQUESTS, params)
 
     def create_merge_request(
         self,
@@ -215,7 +210,7 @@ class Gitlab(RestWrapper):
         ----
         https://docs.gitlab.com/ee/api/merge_requests.html#create-mr
         """
-        r = self._request(
+        return self._request(
             post,
             MERGE_REQUESTS,
             None,
@@ -226,7 +221,6 @@ class Gitlab(RestWrapper):
                 "target_branch": target_branch,
             },
         )
-        return r
 
     def update_merge_request(self, mr_iid: int, title: str, description: str) -> Dict[str, Any]:
         """
@@ -250,15 +244,14 @@ class Gitlab(RestWrapper):
         ----
         https://docs.gitlab.com/ee/api/merge_requests.html#update-mr
         """
-        r = self._request(
+        return self._request(
             put,
             [MERGE_REQUESTS, str(mr_iid)],
             None,
             {"title": title, "description": description},
         )
-        return r
 
-    def get_file(self, filepath: str, dest: str, ref: str = "main"):
+    def get_file(self, filepath: str, dest: str, ref: str = "main") -> None:
         """
         Gets the raw file content from the repository
 
@@ -299,8 +292,7 @@ class Gitlab(RestWrapper):
         ----
         https://docs.gitlab.com/ee/api/repository_files.html#get-file-from-repository
         """
-        r = self._request(get, [FILES, filepath], {"ref": ref})
-        return r
+        return self._request(get, [FILES, filepath], {"ref": ref})
 
     def push_file(self, filepath: str, branch: str, commit_message: str, content: str) -> Dict[str, Any]:
         """
@@ -326,7 +318,7 @@ class Gitlab(RestWrapper):
         ----
         https://docs.gitlab.com/ee/api/repository_files.html#update-existing-file-in-repository
         """
-        r = self._request(
+        return self._request(
             put,
             [FILES, filepath],
             None,
@@ -336,7 +328,6 @@ class Gitlab(RestWrapper):
                 "content": content,
             },
         )
-        return r
 
     def cherry_pick(self, sha: str, branch: str = "main") -> Dict[str, Any]:
         """
@@ -358,10 +349,9 @@ class Gitlab(RestWrapper):
         ----
         https://docs.gitlab.com/ee/api/commits.html#cherry-pick-a-commit
         """
-        r = self._request(post, [COMMITS, sha, "cherry_pick"], None, {"branch": branch})
-        return r
+        return self._request(post, [COMMITS, sha, "cherry_pick"], None, {"branch": branch})
 
-    def get_artifacts(self, job: str, dest: str, ref: str = "main"):
+    def get_artifacts(self, job: str, dest: str, ref: str = "main") -> None:
         """
         Gets the artifacts from the last successful pipeline run for the ref specified
 
@@ -404,7 +394,7 @@ class Gitlab(RestWrapper):
         ----
         https://docs.gitlab.com/ee/api/commits.html#create-a-commit-with-multiple-files-and-actions
         """
-        r = self._request(
+        return self._request(
             post,
             [COMMITS],
             None,
@@ -414,16 +404,12 @@ class Gitlab(RestWrapper):
                 "actions": actions,
             },
         )
-        return r
 
     def get_pipeline_jobs(self, pipeline_iid: int):
-        r = self._request(get, [PIPELINES, str(pipeline_iid), JOBS])
-        return r
+        return self._request(get, [PIPELINES, str(pipeline_iid), JOBS])
 
     def create_merge_request_note(self, merge_request_iid: int, body: str):
-        r = self._request(post, [MERGE_REQUESTS, str(merge_request_iid), NOTES], {"body": body})
-        return r
+        return self._request(post, [MERGE_REQUESTS, str(merge_request_iid), NOTES], {"body": body})
 
     def run_pipeline(self, pipeline_id: int):
-        r = self._request(post, ["pipeline_schedules", str(pipeline_id), "play"])
-        return r
+        return self._request(post, ["pipeline_schedules", str(pipeline_id), "play"])

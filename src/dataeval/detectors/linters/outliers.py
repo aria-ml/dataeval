@@ -26,19 +26,18 @@ def _get_outlier_mask(
         std = np.std(values)
         abs_diff = np.abs(values - np.mean(values))
         return std != 0 and (abs_diff / std) > threshold
-    elif method == "modzscore":
+    if method == "modzscore":
         threshold = threshold if threshold else 3.5
         abs_diff = np.abs(values - np.median(values))
         med_abs_diff = np.median(abs_diff) if np.median(abs_diff) != 0 else np.mean(abs_diff)
         mod_z_score = 0.6745 * abs_diff / med_abs_diff
         return mod_z_score > threshold
-    elif method == "iqr":
+    if method == "iqr":
         threshold = threshold if threshold else 1.5
         qrt = np.percentile(values, q=(25, 75), method="midpoint")
         iqr = (qrt[1] - qrt[0]) * threshold
         return (values < (qrt[0] - iqr)) | (values > (qrt[1] + iqr))
-    else:
-        raise ValueError("Outlier method must be 'zscore' 'modzscore' or 'iqr'.")
+    raise ValueError("Outlier method must be 'zscore' 'modzscore' or 'iqr'.")
 
 
 class Outliers:
@@ -104,7 +103,7 @@ class Outliers:
         use_visual: bool = True,
         outlier_method: Literal["zscore", "modzscore", "iqr"] = "modzscore",
         outlier_threshold: float | None = None,
-    ):
+    ) -> None:
         self.stats: ImageStatsOutput
         self.use_dimension = use_dimension
         self.use_pixel = use_pixel
