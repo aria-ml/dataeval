@@ -73,15 +73,14 @@ class Images(Generic[T]):
     def __getitem__(self, key: int | slice, /) -> Sequence[T] | T:
         if isinstance(key, slice):
             return [self._get_image(k) for k in range(len(self._dataset))[key]]
-        elif hasattr(key, "__int__"):
+        if hasattr(key, "__int__"):
             return self._get_image(int(key))
         raise TypeError(f"Key must be integers or slices, not {type(key)}")
 
     def _get_image(self, index: int) -> T:
         if self._is_tuple_datum:
             return cast(Dataset[tuple[T, Any, Any]], self._dataset)[index][0]
-        else:
-            return cast(Dataset[T], self._dataset)[index]
+        return cast(Dataset[T], self._dataset)[index]
 
     def __iter__(self) -> Iterator[T]:
         for i in range(len(self._dataset)):

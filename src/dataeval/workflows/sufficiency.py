@@ -21,7 +21,7 @@ def reset_parameters(model: nn.Module) -> nn.Module:
     """
 
     @torch.no_grad()
-    def weight_reset(m: nn.Module):
+    def weight_reset(m: nn.Module) -> None:
         # Check if the current module has reset_parameters
         reset_parameters = getattr(m, "reset_parameters", None)
         if callable(reset_parameters):
@@ -86,7 +86,7 @@ class Sufficiency(Generic[T]):
         substeps: int = 5,
         train_kwargs: Mapping[str, Any] | None = None,
         eval_kwargs: Mapping[str, Any] | None = None,
-    ):
+    ) -> None:
         self.model = model
         self.train_ds = train_ds
         self.test_ds = test_ds

@@ -34,8 +34,7 @@ class BaseDatasetNumpyMixin(BaseDatasetMixin[NDArray[Any]]):
         return encoded
 
     def _read_file(self, path: str) -> NDArray[Any]:
-        x = np.array(Image.open(path)).transpose(2, 0, 1)
-        return x
+        return np.array(Image.open(path)).transpose(2, 0, 1)
 
 
 class BaseDatasetTorchMixin(BaseDatasetMixin[torch.Tensor]):
@@ -52,5 +51,4 @@ class BaseDatasetTorchMixin(BaseDatasetMixin[torch.Tensor]):
         return encoded
 
     def _read_file(self, path: str) -> torch.Tensor:
-        x = torch.as_tensor(np.array(Image.open(path)).transpose(2, 0, 1))
-        return x
+        return torch.as_tensor(np.array(Image.open(path)).transpose(2, 0, 1))

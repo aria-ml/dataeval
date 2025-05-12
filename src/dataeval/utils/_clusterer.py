@@ -4,6 +4,7 @@ __all__ = []
 
 import warnings
 from dataclasses import dataclass
+from typing import Any
 
 import numba
 import numpy as np
@@ -30,7 +31,9 @@ from dataeval.utils._fast_mst import calculate_neighbor_distances, minimum_spann
 
 
 @numba.njit(parallel=True, locals={"i": numba.types.int32})
-def compare_links_to_cluster_std(mst, clusters):
+def compare_links_to_cluster_std(
+    mst: NDArray[np.float32], clusters: NDArray[np.intp]
+) -> tuple[NDArray[np.int32], NDArray[np.int32]]:
     cluster_ids = np.unique(clusters)
     cluster_grouping = np.full(mst.shape[0], -1, dtype=np.int16)
 
@@ -79,7 +82,7 @@ def cluster(data: ArrayLike) -> ClusterData:
     cluster_selection_epsilon = 0.0
     # cluster_selection_method = "eom"
 
-    x = flatten(to_numpy(data))
+    x: NDArray[Any] = flatten(to_numpy(data))
     samples, features = x.shape  # Due to flatten(), we know shape has a length of 2
     if samples < 2:
         raise ValueError(f"Data should have at least 2 samples; got {samples}")
@@ -125,9 +128,9 @@ def cluster(data: ArrayLike) -> ClusterData:
     return ClusterData(clusters, mst, linkage_tree, condensed_tree, membership_strengths, kneighbors, kdistances)
 
 
-def sorted_union_find(index_groups):
+def sorted_union_find(index_groups: NDArray[np.int32]) -> list[list[np.int32]]:
     """Merges and sorts groups of indices that share any common index"""
-    groups = [[np.int32(x) for x in range(0)] for y in range(0)]
+    groups: list[list[np.int32]] = [[np.int32(x) for x in range(0)] for y in range(0)]
     uniques, inverse = np.unique(index_groups, return_inverse=True)
     inverse = inverse.flatten()
     disjoint_set = ds_rank_create(uniques.size)

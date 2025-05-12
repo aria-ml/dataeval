@@ -23,7 +23,7 @@ _logger = logging.getLogger(__name__)
 class KFoldSplitter(Protocol):
     """Protocol covering sklearn KFold variant splitters"""
 
-    def __init__(self, n_splits: int): ...
+    def __init__(self, n_splits: int) -> None: ...
     def split(self, X: Any, y: Any, groups: Any) -> Iterator[tuple[NDArray[Any], NDArray[Any]]]: ...
 
 
@@ -209,8 +209,7 @@ def get_groups(metadata: Metadata, split_on: Sequence[str] | None) -> NDArray[np
     split_set = set(split_on)
     indices = [i for i, name in enumerate(metadata.discrete_factor_names) if name in split_set]
     binned_features = metadata.discrete_data[:, indices]
-    group_ids = np.unique(binned_features, axis=0, return_inverse=True)[1]
-    return group_ids
+    return np.unique(binned_features, axis=0, return_inverse=True)[1]
 
 
 def make_splits(

@@ -117,7 +117,7 @@ TValue = TypeVar("TValue")
 
 
 class MappingOutput(Mapping[TKey, TValue], BaseCollectionMixin, GenericOutput[Mapping[TKey, TValue]]):
-    def __init__(self, data: Mapping[TKey, TValue]):
+    def __init__(self, data: Mapping[TKey, TValue]) -> None:
         self._data = data
 
     def __getitem__(self, key: TKey) -> TValue:
@@ -128,7 +128,7 @@ class MappingOutput(Mapping[TKey, TValue], BaseCollectionMixin, GenericOutput[Ma
 
 
 class SequenceOutput(Sequence[TValue], BaseCollectionMixin, GenericOutput[Sequence[TValue]]):
-    def __init__(self, data: Sequence[TValue]):
+    def __init__(self, data: Sequence[TValue]) -> None:
         self._data = data
 
     @overload
@@ -155,7 +155,7 @@ def set_metadata(fn: Callable[P, R] | None = None, *, state: list[str] | None = 
 
     @wraps(fn)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        def fmt(v):
+        def fmt(v: Any) -> Any:
             if np.isscalar(v):
                 return v
             if hasattr(v, "shape"):

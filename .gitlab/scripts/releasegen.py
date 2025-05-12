@@ -72,31 +72,31 @@ class _Category(IntEnum):
     def from_label(cls, value: str) -> "_Category":
         if "release::feature" in value:
             return _Category.FEATURE
-        elif "release::improvement" in value:
+        if "release::improvement" in value:
             return _Category.IMPROVEMENT
-        elif "release::fix" in value:
+        if "release::fix" in value:
             return _Category.FIX
-        elif "release::deprecation" in value:
+        if "release::deprecation" in value:
             return _Category.DEPRECATION
-        elif "release::major" in value:
+        if "release::major" in value:
             return _Category.MAJOR
-        elif "release::misc" in value:
+        if "release::misc" in value:
             return _Category.MISCELLANEOUS
         return _Category.UNKNOWN
 
     @classmethod
-    def to_markdown(cls, value: "_Category"):
+    def to_markdown(cls, value: "_Category") -> str:
         if value == _Category.FEATURE:
             return "🌟 **Feature Release**"
-        elif value == _Category.IMPROVEMENT:
+        if value == _Category.IMPROVEMENT:
             return "🛠️ **Improvements and Enhancements**"
-        elif value == _Category.FIX:
+        if value == _Category.FIX:
             return "👾 **Fixes**"
-        elif value == _Category.DEPRECATION:
+        if value == _Category.DEPRECATION:
             return "🚧 **Deprecations and Removals**"
-        elif value == _Category.MAJOR:
+        if value == _Category.MAJOR:
             return "🚀 **Major Release**"
-        elif value == _Category.MISCELLANEOUS:
+        if value == _Category.MISCELLANEOUS:
             return "📝 **Miscellaneous**"
         raise ValueError("Do not generate release markdown for UNKNOWN entries")
 
@@ -112,7 +112,7 @@ class _Category(IntEnum):
 
 
 class _Tag:
-    def __init__(self, response: Dict[str, Any] | None = None, pending: bool | None = None):
+    def __init__(self, response: Dict[str, Any] | None = None, pending: bool | None = None) -> None:
         if response is not None:
             time = response["commit"]["committed_date"]
             self.time: datetime = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S.%f%z")
@@ -151,7 +151,7 @@ class _Merge:
     Extracts elements of merge commits to create the change history contents.
     """
 
-    def __init__(self, response: Dict[str, Any]):
+    def __init__(self, response: Dict[str, Any]) -> None:
         self.time: datetime = datetime.strptime(response["merged_at"][0:19], "%Y-%m-%dT%H:%M:%S").astimezone(UTC)
         self.hash: str = response["merge_commit_sha"]
         self.shorthash: str = response["merge_commit_sha"][0:8]
@@ -181,7 +181,7 @@ class ReleaseGen:
     and changelog updates
     """
 
-    def __init__(self, gitlab: Gitlab):
+    def __init__(self, gitlab: Gitlab) -> None:
         self.gl = gitlab
 
     def _read_changelog(self) -> List[str]:
@@ -360,8 +360,7 @@ class ReleaseGen:
                 "encoding": "text",
                 "content": content,
             }
-        else:
-            return {}
+        return {}
 
     def _update_cache_file_path(self, file_name: str, current_tag: str) -> None | str:
         search_pattern = r"(%|\!)+(pip install -q dataeval){1}(\[\w+\])*"
@@ -438,8 +437,7 @@ class ReleaseGen:
         rmtree(cache_path)
         move(output_path, cache_path)
         # removed pending version for now. will need for permanent solution.
-        actions = self._generate_actions(old_files, self._get_files(cache_path))
-        return actions
+        return self._generate_actions(old_files, self._get_files(cache_path))
 
     def generate(self) -> Tuple[str, List[Dict[str, str]]]:
         version, changelog_action = self._generate_version_and_changelog_action()

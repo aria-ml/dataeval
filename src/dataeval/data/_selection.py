@@ -110,8 +110,7 @@ class Select(AnnotatedDataset[_TDatum]):
         grouped: dict[int, list[Selection[_TDatum]]] = {}
         for selection in selections_list:
             grouped.setdefault(selection.stage, []).append(selection)
-        selection_list = [selection for category in sorted(grouped) for selection in grouped[category]]
-        return selection_list
+        return [selection for category in sorted(grouped) for selection in grouped[category]]
 
     def _apply_selections(self) -> None:
         for selection in self._selections:

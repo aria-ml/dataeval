@@ -66,8 +66,7 @@ class Targets:
     def __len__(self) -> int:
         if self.source is None:
             return len(self.labels)
-        else:
-            return len(np.unique(self.source))
+        return len(np.unique(self.source))
 
     def __getitem__(self, idx: int, /) -> Targets:
         if self.source is None or self.bboxes is None:
@@ -77,14 +76,13 @@ class Targets:
                 None,
                 None,
             )
-        else:
-            mask = np.where(self.source == idx, True, False)
-            return Targets(
-                np.atleast_1d(self.labels[mask]),
-                np.atleast_1d(self.scores[mask]),
-                np.atleast_2d(self.bboxes[mask]),
-                np.atleast_1d(self.source[mask]),
-            )
+        mask = np.where(self.source == idx, True, False)
+        return Targets(
+            np.atleast_1d(self.labels[mask]),
+            np.atleast_1d(self.scores[mask]),
+            np.atleast_2d(self.bboxes[mask]),
+            np.atleast_1d(self.source[mask]),
+        )
 
     def __iter__(self) -> Iterator[Targets]:
         for i in range(len(self.labels)) if self.source is None else np.unique(self.source):
