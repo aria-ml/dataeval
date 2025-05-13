@@ -33,15 +33,15 @@ EDA_Part3.ipynb
 :widths: 20 60 20
 :header-rows: 0
 
-* - [Data Cleaning](EDA_Part1.ipynb)
+* - [](EDA_Part1.ipynb)
   - Learn about the impacts of unstructured, raw data and how to transform it
     into a reliable, robust dataset.
   - [![Open In Colab][colab-badge]][eda-colab]
-* - [Assess an unlabeled data space](./EDA_Part2.ipynb)
+* - [](./EDA_Part2.ipynb)
   - Learn how to fix and prevent gaps in data to develop more reliable and
     robust models.
   - [![Open In Colab][colab-badge]][dataspace-colab]
-* - [Identify Bias and Correlations](EDA_Part3.ipynb)
+* - [](EDA_Part3.ipynb)
   - Learn how correlations in your data and metadata can affect model
     performance and what can be done to remove that bias.
   - [![Open In Colab][colab-badge]][bias-colab]
@@ -70,7 +70,7 @@ Data_Monitoring.ipynb
 :widths: 20 60 20
 :header-rows: 0
 
-* - [Data monitoring](Data_Monitoring.ipynb)
+* - [](Data_Monitoring.ipynb)
   - Learn how to analyze incoming data against training data to ensure deployed
     models stay reliable and robust.
   - [![Open In Colab][colab-badge]][monitoring-colab]
