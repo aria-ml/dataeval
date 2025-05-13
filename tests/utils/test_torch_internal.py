@@ -1,10 +1,12 @@
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pytest
 import torch
 
 from dataeval.config import get_device
 from dataeval.utils.torch._internal import predict_batch, trainer
-from dataeval.utils.torch.models import AE
+from dataeval.utils.torch.models import AE, ResNet18
 
 model = AE((1, 16, 16))
 
@@ -111,3 +113,23 @@ class TestPredictBatch:
     def test_predict_batch_unsupported_model(self):
         with pytest.raises(TypeError):
             predict_batch(self.x, self.MyModel("unsupported"), device=get_device("cpu"))  # type: ignore
+
+
+class TestResNet18:
+    @patch("dataeval.utils.torch.models.resnet18", return_value=MagicMock())
+    def test_resnet18_forward(self, mock_resnet18):
+        model = ResNet18()
+        assert mock_resnet18.call_count == 1
+        model.model.return_value = "bar"  # type: ignore
+        bar = model.forward("foo")  # type: ignore
+        assert bar == "bar"
+
+    @patch("dataeval.utils.torch.models.ResNet18_Weights")
+    def test_resnet18_transforms(self, mock_weights):
+        ResNet18.transforms()
+        assert mock_weights.DEFAULT.transforms.call_count == 1
+
+    @patch("dataeval.utils.torch.models.resnet18", return_value=MagicMock())
+    def test_resnet18_str(self, mock_resnet18):
+        model = ResNet18()
+        assert "MagicMock" in str(model)

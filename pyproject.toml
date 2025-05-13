@@ -176,7 +176,7 @@ target-version = "py38"
 extend-include = ["*.ipynb"]
 
 [tool.ruff.lint]
-select = ["A", "ANN", "E", "F", "C4", "I", "NPY", "S", "SIM", "RET", "RUF100", "UP"]
+select = ["A", "ANN", "C4", "C90", "E", "F", "I", "NPY", "S", "SIM", "RET", "RUF100", "UP"]
 ignore = ["ANN401", "NPY002"]
 fixable = ["ALL"]
 unfixable = []
