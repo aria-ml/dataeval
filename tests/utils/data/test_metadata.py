@@ -169,72 +169,6 @@ class TestUtilsMetadata:
         },
     ]
 
-    dict_of_dicts = {
-        "sample1": {
-            "a": {
-                "that": 37,
-                "this": 43,
-            },
-            "b": {
-                "that": 37,
-                "this": 43,
-            },
-            "c": "today",
-            "d": [1, 2, 3, 4],
-            "e": {
-                "when": 0.4,
-                "what": 23,
-            },
-        },
-        "sample2": {
-            "a": {
-                "that": 3,
-                "this": 3,
-            },
-            "b": {
-                "that": 7,
-                "this": 4,
-            },
-            "c": "yesterday",
-            "d": [2, 3, 4],
-            "e": {
-                "when": 14.4,
-                "what": 2.3,
-            },
-        },
-        "sample3": {
-            "a": {
-                "that": 3.7,
-                "this": 4.3,
-            },
-            "b": {
-                "that": 0.37,
-                "this": 0.43,
-            },
-            "c": "tomorrow",
-            "d": [0.1, 0.2, 0.3, 4],
-            "e": {
-                "when": 4,
-                "what": 0.23,
-            },
-        },
-        "sample4": {
-            "a": {
-                "that": 137,
-                "this": 143,
-            },
-            "b": {
-                "that": 100,
-            },
-            "c": "today",
-            "d": 4,
-            "e": {
-                "when": "75",
-                "what": "14",
-            },
-        },
-    }
-
     def test_ignore_lists(self):
         a, d = merge([self.duplicate_keys], return_dropped=True, ignore_lists=True)
         assert {k: list(v) for k, v in a.items()} == {
@@ -415,24 +349,6 @@ class TestUtilsMetadata:
             "_image_index": [0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2],
         }
 
-    def test_dict_of_dicts(self):
-        output, dropped = merge(self.dict_of_dicts, return_dropped=True)  # type: ignore
-        assert output == {
-            "keys": ["sample1", "sample2", "sample3", "sample4"],
-            "a_that": [37.0, 3.0, 3.7, 137.0],
-            "b_that": [37.0, 7.0, 0.37, 100.0],
-            "c": ["today", "yesterday", "tomorrow", "today"],
-            "when": [0.4, 14.4, 4.0, 75.0],
-            "what": [23.0, 2.3, 0.23, 14.0],
-            "_image_index": [0, 1, 2, 3],
-        }
-        assert dropped == {
-            "a_this": ["inconsistent_key"],
-            "b_this": ["inconsistent_key"],
-            "d": ["inconsistent_key", "nested_list"],
-            "this": ["inconsistent_key"],
-        }
-
     @pytest.mark.filterwarnings("error")
     def test_flatten_no_dropped_no_warn(self):
         flatten({"a": {"b": 1, "c": 2}}, return_dropped=False)
@@ -458,6 +374,15 @@ class TestUtilsMetadata:
             "_image_index": [0, 0, 0],
         }
         assert dropped == {}
+
+    def test_targets_per_image_mismatch(self):
+        targets_per_image = [1]
+        with pytest.raises(ValueError):
+            merge([{"a": 1}, {"a": 2}], targets_per_image=targets_per_image)
+
+    def test_image_index_key_exists_in_output(self):
+        merged = merge([{"a": {"b": 1, "c": 2, "foo": 0}}], image_index_key="foo")
+        assert merged["foo"] == [0]
 
 
 @pytest.mark.required

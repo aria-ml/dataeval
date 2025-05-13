@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.utils.data.metadata import _is_metadata_dict_of_dicts, merge
+from dataeval.utils.data.metadata import merge
 from tests.conftest import preprocess
 
 
@@ -62,10 +62,6 @@ class TestMDPreprocessingUnit:
         labels = [0, 0, 0]
         output = preprocess(factors, labels, bincounts, exclude=["b"])
         assert "b" not in output.class_names
-
-    def test_is_metadata_dict_of_dicts(self):
-        assert not _is_metadata_dict_of_dicts({"a": 1})
-        assert not _is_metadata_dict_of_dicts({"a": [1], "b": 1})
 
     @pytest.mark.parametrize(
         "factors, labels",
