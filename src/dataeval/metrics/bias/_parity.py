@@ -3,6 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 import warnings
+from collections import defaultdict
 from typing import Any
 
 import numpy as np
@@ -246,7 +247,7 @@ def parity(metadata: Metadata) -> ParityOutput:
 
     chi_scores = np.zeros(metadata.discrete_data.shape[1])
     p_values = np.zeros_like(chi_scores)
-    insufficient_data = {}
+    insufficient_data: defaultdict[str, defaultdict[int, dict[str, int]]] = defaultdict(lambda: defaultdict(dict))
     for i, col_data in enumerate(metadata.discrete_data.T):
         # Builds a contingency matrix where entry at index (r,c) represents
         # the frequency of current_factor_name achieving value unique_factor_values[r]
@@ -261,26 +262,22 @@ def parity(metadata: Metadata) -> ParityOutput:
         for int_factor, int_class in zip(counts[0], counts[1]):
             if contingency_matrix[int_factor, int_class] > 0:
                 factor_category = unique_factor_values[int_factor].item()
-                if current_factor_name not in insufficient_data:
-                    insufficient_data[current_factor_name] = {}
-                if factor_category not in insufficient_data[current_factor_name]:
-                    insufficient_data[current_factor_name][factor_category] = {}
                 class_name = metadata.class_names[int_class]
                 class_count = contingency_matrix[int_factor, int_class].item()
                 insufficient_data[current_factor_name][factor_category][class_name] = class_count
 
         # This deletes rows containing only zeros,
         # because scipy.stats.chi2_contingency fails when there are rows containing only zeros.
-        rowsums = np.sum(contingency_matrix, axis=1)
-        rowmask = np.nonzero(rowsums)[0]
-        contingency_matrix = contingency_matrix[rowmask]
+        contingency_matrix = contingency_matrix[np.any(contingency_matrix, axis=1)]
 
-        chi2, p, _, _ = chi2_contingency(contingency_matrix)
-
-        chi_scores[i] = chi2
-        p_values[i] = p
+        chi_scores[i], p_values[i] = chi2_contingency(contingency_matrix)[:2]
 
     if insufficient_data:
         warnings.warn("Some factors did not meet the recommended 5 occurrences for each value-label combination.")
 
-    return ParityOutput(chi_scores, p_values, metadata.discrete_factor_names, insufficient_data)
+    return ParityOutput(
+        score=chi_scores,
+        p_value=p_values,
+        factor_names=metadata.discrete_factor_names,
+        insufficient_data={k: dict(v) for k, v in insufficient_data.items()},
+    )

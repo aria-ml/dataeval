@@ -156,44 +156,35 @@ class BaseVOCDataset(BaseDataset[_TArray, _TTarget, list[str]]):
         Determine the correct dataset directory for VOC detection and segmentation classes.
         Handles various directory structure possibilities and validates existence.
         """
-        # Case 1: Root is already the specific VOC year directory
-        if base.stem == f"VOC{self.year}":
-            if not base.exists():
-                raise NotADirectoryError(f"Directory VOC{self.year} specified but doesn't exist.")
-            return base
 
-        # Case 2: Root is the VOCdevkit directory
-        if base.stem == "VOCdevkit":
-            dataset_dir: Path = base / f"VOC{self.year}"
-            if not dataset_dir.exists():
-                raise NotADirectoryError(f"Directory VOCdevkit/VOC{self.year} subdirectory doesn't exist.")
-            return dataset_dir
+        # VOCdataset directory possibilities
+        dataset_dir = base if base.stem.lower() == "vocdataset" else base / "vocdataset"
 
-        # Case 3: Check if data is already downloaded in a standard structure
-        standard_dir: Path = base / "VOCdevkit" / f"VOC{self.year}"
-        if standard_dir.exists():
-            return standard_dir
-        if self.year == "2011":
-            standard_dir: Path = base / "TrainVal" / "VOCdevkit" / f"VOC{self.year}"
-            if standard_dir.exists():
-                return standard_dir
+        # Define possible directory structures based on patterns
+        # 1. Root is already the specific VOC year directory
+        # 2. Root is the VOCdevkit directory
+        # 3. Standard structure
+        # 4. Special case for year 2011
+        # 5. Within VOCdataset directory
+        # 6. Special case for year 2011 within VOCdataset
+        possible_paths = [
+            base if base.stem == f"VOC{self.year}" else None,
+            base / f"VOC{self.year}" if base.stem == "VOCdevkit" else None,
+            base / "VOCdevkit" / f"VOC{self.year}",
+            base / "TrainVal" / "VOCdevkit" / f"VOC{self.year}" if self.year == "2011" else None,
+            dataset_dir / "VOCdevkit" / f"VOC{self.year}",
+            dataset_dir / "TrainVal" / "VOCdevkit" / f"VOC{self.year}" if self.year == "2011" else None,
+        ]
 
-        # Case 4: Check if root is or contains a VOCdataset directory
-        dataset_name: str = "VOCdataset"
-        is_dataset_dir: bool = base.stem.lower() == dataset_name.lower()
-        dataset_dir: Path = base if is_dataset_dir else base / dataset_name.lower()
+        # Filter out None values and check each path
+        for path in filter(None, possible_paths):
+            if path.exists():
+                return path
 
-        # Check if expanded data already exists within this directory
-        expanded_dir: Path = dataset_dir / "VOCdevkit" / f"VOC{self.year}"
-        if expanded_dir.exists():
-            return expanded_dir
-        if self.year == "2011":
-            expanded_dir: Path = dataset_dir / "TrainVal" / "VOCdevkit" / f"VOC{self.year}"
-            if expanded_dir.exists():
-                return expanded_dir
-
+        # If no existing path is found, create and return the dataset directory
         if not dataset_dir.exists():
             dataset_dir.mkdir(parents=True, exist_ok=True)
+
         return dataset_dir
 
     def _get_year_image_set_index(self, year: str, image_set: str) -> int:

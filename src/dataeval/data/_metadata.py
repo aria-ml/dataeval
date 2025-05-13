@@ -278,35 +278,14 @@ class Metadata:
                 f"the length of the metadata arrays {check_length}."
             )
 
-    def _process(self, force: bool = False) -> None:
-        if self._processed and not force:
-            return
+    def _filter(self, d: Mapping[str, Any]) -> dict[str, Any]:
+        return (
+            {k: d[k] for k in self.include if k in d} if self.include else {k: d[k] for k in d if k not in self.exclude}
+        )
 
-        # Create image indices from targets
-        self._image_indices = np.arange(len(self.raw)) if self.targets.source is None else self.targets.source
-
-        # Validate the metadata dimensions
-        self._validate()
-
-        # Include specified metadata keys
-        if self.include:
-            metadata = {i: self.merged[i] for i in self.include if i in self.merged}
-            continuous_factor_bins = (
-                {i: self.continuous_factor_bins[i] for i in self.include if i in self.continuous_factor_bins}
-                if self.continuous_factor_bins
-                else {}
-            )
-        else:
-            metadata = self.merged
-            continuous_factor_bins = dict(self.continuous_factor_bins) if self.continuous_factor_bins else {}
-            for k in self.exclude:
-                metadata.pop(k, None)
-                continuous_factor_bins.pop(k, None)
-
-        # Remove generated "_image_index" if present
-        if "_image_index" in metadata:
-            metadata.pop("_image_index", None)
-
+    def _split_continuous_discrete(
+        self, metadata: dict[str, NDArray[Any]], continuous_factor_bins: dict[str, int | Sequence[float]]
+    ) -> tuple[dict[str, NDArray[Any]], dict[str, NDArray[np.int64]]]:
         # Bin according to user supplied bins
         continuous_metadata = {}
         discrete_metadata = {}
@@ -345,6 +324,28 @@ class Metadata:
             else:
                 _, discrete_metadata[key] = np.unique(data, return_inverse=True)
 
+        return continuous_metadata, discrete_metadata
+
+    def _process(self, force: bool = False) -> None:
+        if self._processed and not force:
+            return
+
+        # Create image indices from targets
+        self._image_indices = np.arange(len(self.raw)) if self.targets.source is None else self.targets.source
+
+        # Validate the metadata dimensions
+        self._validate()
+
+        # Filter the merged metadata and continuous factor bins
+        metadata = self._filter(self.merged)
+        continuous_factor_bins = self._filter(self.continuous_factor_bins)
+
+        # Remove generated "_image_index" if present
+        metadata.pop("_image_index", None)
+
+        # Split the metadata into continuous and discrete
+        continuous_metadata, discrete_metadata = self._split_continuous_discrete(metadata, continuous_factor_bins)
+
         # Split out the dictionaries into the keys and values
         self._discrete_factor_names = list(discrete_metadata.keys())
         self._discrete_data = (
@@ -362,6 +363,17 @@ class Metadata:
         self._processed = True
 
     def add_factors(self, factors: Mapping[str, ArrayLike]) -> None:
+        """
+        Add additional factors to the metadata.
+
+        The number of measures per factor must match the number of images
+        in the dataset or the number of detections in the dataset.
+
+        Parameters
+        ----------
+        factors : Mapping[str, ArrayLike]
+            Dictionary of factors to add to the metadata.
+        """
         self._merge()
 
         targets = len(self.targets.source) if self.targets.source is not None else len(self.targets)

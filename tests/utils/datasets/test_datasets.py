@@ -242,14 +242,6 @@ class TestVOC:
         assert np.all(target.labels == [11, 8])
         assert "pose" in datum_meta
 
-    def test_voc_path_errors(self, voc_fake):
-        dir_path = voc_fake / "vocdataset" / "VOCdevkit" / "VOC2012"
-        with pytest.raises(NotADirectoryError, match="Directory VOC2012 specified but doesn't exist."):
-            VOCDetection(root=dir_path)
-        dir_path = voc_fake / "vocdataset" / "VOCdevkit"
-        with pytest.raises(NotADirectoryError, match="Directory VOCdevkit/VOC2012 subdirectory doesn't exist."):
-            VOCDetection(root=dir_path)
-
 
 @pytest.mark.optional
 class TestMILCO:

@@ -6,12 +6,11 @@ import requests
 from requests import RequestException, Response
 
 from dataeval.utils.datasets._fileio import (
-    _archive_extraction,
     _download_dataset,
     _ensure_exists,
+    _extract_archive,
     _extract_tar_archive,
     _extract_zip_archive,
-    _flatten_extraction,
     _validate_file,
 )
 
@@ -137,7 +136,7 @@ class TestHelperFunctionsBaseDataset:
 
     @pytest.mark.parametrize("verbose", [True, False])
     def test_zip_extraction_nested_zip(self, capsys, dataset_nested_zip, verbose):
-        _archive_extraction(dataset_nested_zip.suffix, dataset_nested_zip, dataset_nested_zip.parent, False, verbose)
+        _extract_archive(dataset_nested_zip.suffix, dataset_nested_zip, dataset_nested_zip.parent, False, verbose)
         if verbose:
             captured = capsys.readouterr()
             assert "Extracting nested zip" in captured.out
@@ -147,20 +146,6 @@ class TestHelperFunctionsBaseDataset:
         with pytest.raises(FileNotFoundError) as e:
             _extract_zip_archive(dataset_no_zip, dataset_no_zip.parent)
         assert err_msg in str(e.value)
-
-    @pytest.mark.parametrize("verbose", [True, False])
-    def test_flatten_extraction(self, capsys, dataset_nested_folder, verbose):
-        base = dataset_nested_folder.parent
-        _extract_zip_archive(dataset_nested_folder, base)
-        _flatten_extraction(
-            base,
-            verbose,
-        )
-        if verbose:
-            captured = capsys.readouterr()
-            assert "Moving translate to /tmp" in captured.out
-            assert "Removing empty folder mnist_c" in captured.out
-        assert (base / "translate").exists()
 
     def test_tarfile_error(self, dataset_single_zip):
         err_msg = f"{dataset_single_zip.name} is not a valid tar file"
