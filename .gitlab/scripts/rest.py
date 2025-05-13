@@ -58,7 +58,7 @@ class RestWrapper:
             return ""
         return "&".join({f"{k}={v}" for k, v in params.items()})
 
-    def _request(
+    def _request(  # noqa: C901
         self,
         fncall: Callable,
         resource: Union[str, Sequence[str]],
