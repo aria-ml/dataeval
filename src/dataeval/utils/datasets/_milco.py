@@ -185,6 +185,11 @@ class MILCO(BaseODDataset[NDArray[Any]], BaseDatasetNumpyMixin):
             for line in f.readlines():
                 out = line.strip().split(" ")
                 labels.append(int(out[0]))
-                boxes.append([float(out[1]), float(out[2]), float(out[3]), float(out[4])])
+                xcenter, ycenter, width, height = [float(out[1]), float(out[2]), float(out[3]), float(out[4])]
+                x0 = xcenter - width / 2
+                x1 = x0 + width
+                y0 = ycenter - height / 2
+                y1 = y0 + height
+                boxes.append([x0, y0, x1, y1])
 
         return boxes, labels, {}
