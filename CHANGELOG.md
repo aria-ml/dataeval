@@ -1,6 +1,19 @@
-[//]: # (8d049abeeb0c0a7251e90296a5bbd6d8919cd388)
+[//]: # (897e4e0f922aa0929211f4716b706ecb7cc28e56)
 
 # DataEval Change Log
+
+## v0.86.1
+
+🛠️ **Improvements and Enhancements**
+- `28d186c5` - Adjusting dataset loaders for uniformity and deterministic behavior
+- `b0873930` - Improvements to DimensionStats and plotting
+- `8ea38cfe` - Add array types for inputs to dataset helpers
+- `5fe8e4de` - Fix boxratiostats calculations and add missing docstrings
+- `20e8fab6` - add target size and tests
+- `96fd2e23` - include empty factors
+
+👾 **Fixes**
+- `897e4e0f` - Translated MILCO box corners for MAITE compliance
 
 ## v0.86.0
 
