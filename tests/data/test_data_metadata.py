@@ -1,6 +1,5 @@
-from unittest.mock import MagicMock
-
 import numpy as np
+import polars as pl
 import pytest
 
 from dataeval.data._metadata import Metadata
@@ -48,8 +47,8 @@ class TestMetadata:
         md = Metadata(ds)
 
         md.add_factors({"a": np.random.random((factors,))})
-        assert "a" in md.discrete_factor_names
-        assert "a" in md.merged
+        assert "a" in md.factor_names
+        assert "a" in md.dataframe
 
     def test_mismatch_factor_length(self, mock_metadata):
         with pytest.raises(ValueError, match="provided factors have a different length"):
@@ -57,15 +56,15 @@ class TestMetadata:
 
     def test_exclude_no_op(self):
         md = Metadata(None, exclude=["a", "b"])  # type: ignore
-        md._processed = True
+        md._is_binned = True
         md.exclude = ["b", "a"]
-        assert md._processed
+        assert md._is_binned
 
     def test_include_no_op(self):
         md = Metadata(None, include=["a", "b"])  # type: ignore
-        md._processed = True
+        md._is_binned = True
         md.include = ["b", "a"]
-        assert md._processed
+        assert md._is_binned
 
     def test_exclude_and_include_both_provided(self):
         with pytest.raises(ValueError, match="Filters for `exclude` and `include` are mutually exclusive."):
@@ -73,48 +72,48 @@ class TestMetadata:
 
     def test_exclude_setter_from_include(self):
         md = Metadata(None, include=["a"])  # type: ignore
-        md._processed = True
+        md._is_binned = True
         assert not md._exclude
         md.exclude = ["b"]
         assert md._exclude == {"b"}
         assert not md._include
-        assert not md._processed
+        assert not md._is_binned
 
     def test_exclude_setter_from_exclude(self):
         md = Metadata(None, exclude=["a"])  # type: ignore
-        md._processed = True
+        md._is_binned = True
         assert md._exclude == {"a"}
         md.exclude = ["b"]
         assert md._exclude == {"b"}
-        assert not md._processed
+        assert not md._is_binned
 
     def test_include_setter_from_include(self):
         md = Metadata(None, include=["a"])  # type: ignore
-        md._processed = True
+        md._is_binned = True
         assert md._include == {"a"}
         md.include = ["b"]
         assert md._include == {"b"}
-        assert not md._processed
+        assert not md._is_binned
 
     def test_include_setter_from_exclude(self):
         md = Metadata(None, exclude=["a"])  # type: ignore
-        md._processed = True
+        md._is_binned = True
         assert not md._include
         md.include = ["b"]
         assert md._include == {"b"}
         assert not md._exclude
-        assert not md._processed
+        assert not md._is_binned
 
     def test_dropped_factors(self):
         md = Metadata(None)  # type: ignore
-        md._processed = True
-        md._merged = ({"a": [1]}, {"b": ["foo"], "c": ["bar"]})
+        md._is_structured = True
+        md._dropped_factors = {"b": ["foo"], "c": ["bar"]}
         assert md.dropped_factors == {"b": ["foo"], "c": ["bar"]}
 
     def test_unknown_target(self):
         md = Metadata([(np.zeros((3, 16, 16)), "THIS IS NOT A TARGET", {"id": 0})])  # type: ignore
         with pytest.raises(TypeError, match="Encountered unsupported target type in dataset"):
-            md._collate()
+            md._structure()
 
     def test_mixed_target(self):
         md = Metadata(
@@ -124,48 +123,44 @@ class TestMetadata:
             ]  # type: ignore
         )
         with pytest.raises(ValueError, match="Encountered unexpected target type in dataset"):
-            md._collate()
-
-    def test_validate_unknown_merged_values(self):
-        md = Metadata(None)  # type: ignore
-        md._targets = MagicMock()
-        md._targets.labels.ndim = 1
-        md._merged = ({"a": "not a list tuple or array"}, {"b": ["foo"], "c": ["bar"]})  # type: ignore
-        with pytest.raises(TypeError, match="values are arraylike"):
-            md._validate()
+            md._structure()
 
     def test_process_include(self, mock_ds):
         md = Metadata(mock_ds, include=["id"])
-        md._process()
+        md._bin()
 
     def test_process_exclude(self, mock_ds):
         md = Metadata(mock_ds, exclude=["id"])
-        md._process()
+        md._bin()
 
     def test_contiguous_factor_bins_setter(self):
         md = Metadata(None)  # type: ignore
-        md._processed = True
+        md._dataframe = pl.DataFrame()
+        md._is_binned = True
         md.continuous_factor_bins = {"a": 10}
-        assert not md._processed
+        assert not md._is_binned
         assert md._continuous_factor_bins == {"a": 10}
 
     def test_contiguous_factor_bins_setter_no_op(self):
         md = Metadata(None, continuous_factor_bins={"a": 10})  # type: ignore
-        md._processed = True
+        md._dataframe = pl.DataFrame()
+        md._is_binned = True
         md.continuous_factor_bins = {"a": 10}
-        assert md._processed
+        assert md._is_binned
         assert md._continuous_factor_bins == {"a": 10}
 
     def test_auto_bin_method_setter(self):
         md = Metadata(None)  # type: ignore
-        md._processed = True
+        md._dataframe = pl.DataFrame()
+        md._is_binned = True
         md.auto_bin_method = "clusters"
-        assert not md._processed
+        assert not md._is_binned
         assert md._auto_bin_method == "clusters"
 
     def test_auto_bin_method_setter_no_op(self):
         md = Metadata(None, auto_bin_method="clusters")  # type: ignore
-        md._processed = True
+        md._dataframe = pl.DataFrame()
+        md._is_binned = True
         md.auto_bin_method = "clusters"
-        assert md._processed
+        assert md._is_binned
         assert md._auto_bin_method == "clusters"

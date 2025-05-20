@@ -12,7 +12,7 @@ except ImportError:
     Figure = type(None)
 
 from dataeval.metrics.bias._balance import _validate_num_neighbors, balance
-from tests.conftest import preprocess
+from tests.conftest import to_metadata
 
 
 @pytest.fixture(scope="module")
@@ -35,7 +35,7 @@ def metadata_results():
     cat_vals = [1.1, 1.1, 0.1, 0.1, 1.1, 0.1, 1.1, 0.1, 0.1, 1.1, 1.1, 0.1]
     class_labels = ["dog", "dog", "dog", "cat", "dog", "cat", "dog", "dog", "dog", "cat", "cat", "cat"]
     md = {"var_cat": str_vals, "var_cnt": cnt_vals, "var_float_cat": cat_vals}
-    return preprocess(md, class_labels, {"var_cnt": 3, "var_float_cat": 2})
+    return to_metadata(md, class_labels, {"var_cnt": 3, "var_float_cat": 2})
 
 
 @pytest.fixture(scope="module")
@@ -43,14 +43,14 @@ def mismatch_metadata():
     raw_metadata = {"factor1": list(range(10)), "factor2": list(range(10)), "factor3": list(range(10))}
     class_labels = [1] * 10
     continuous_bins = {"factor1": 5, "factor2": 5, "factor3": 5}
-    return preprocess(raw_metadata, class_labels, continuous_bins)
+    return to_metadata(raw_metadata, class_labels, continuous_bins)
 
 
 @pytest.fixture(scope="module")
 def simple_metadata():
     raw_metadata = {"factor1": [1] * 100 + [2] * 100, "factor2": [1] * 100 + [2] * 100}
     class_labels = [1] * 100 + [2] * 100
-    return preprocess(raw_metadata, class_labels)
+    return to_metadata(raw_metadata, class_labels)
 
 
 @pytest.mark.required
@@ -77,7 +77,7 @@ class TestBalanceUnit:
             _validate_num_neighbors(10)
 
     def test_correct_mi_shape_and_dtype(self, metadata_results):
-        num_vars = len(metadata_results.discrete_factor_names + metadata_results.continuous_factor_names) + 1
+        num_vars = len(metadata_results.factor_names) + 1
         expected_shape = {
             "balance": (num_vars,),
             "factors": (num_vars - 1, num_vars - 1),
@@ -103,8 +103,7 @@ class TestBalanceUnit:
 
     def test_empty_metadata(self):
         mock_metadata = MagicMock(spec=Metadata)
-        mock_metadata.discrete_factor_names = []
-        mock_metadata.continuous_factor_names = []
+        mock_metadata.factor_names = []
         with pytest.raises(ValueError):
             balance(mock_metadata)
 
@@ -119,22 +118,16 @@ class TestBalancePlot:
         classwise_output = mi.plot(plot_classwise=True)
         assert isinstance(classwise_output, Figure)
 
-    @pytest.mark.parametrize("factor_type", ("discrete", "continuous", "both"))
-    def test_plotting_vars(self, metadata_results, factor_type):
+    def test_plotting_vars(self, metadata_results):
         mi = balance(metadata_results)
-        factor_names = mi._by_factor_type("factor_names", factor_type)
+        factor_names = mi.factor_names
         heat_labels = np.arange(len(factor_names))
-        output = mi.plot(heat_labels[:-1], heat_labels[1:], plot_classwise=False, factor_type=factor_type)
+        output = mi.plot(heat_labels[:-1], heat_labels[1:], plot_classwise=False)
         assert isinstance(output, Figure)
         _, row_labels = np.unique(mi.class_names, return_inverse=True)
         col_labels = np.arange(len(factor_names))
-        classwise_output = mi.plot(row_labels, col_labels, plot_classwise=True, factor_type=factor_type)
+        classwise_output = mi.plot(row_labels, col_labels, plot_classwise=True)
         assert isinstance(classwise_output, Figure)
-
-    def test_invalid_factor_type(self, metadata_results):
-        mi = balance(metadata_results)
-        with pytest.raises(ValueError):
-            mi._by_factor_type("foo", "discrete")  # type: ignore
 
 
 @pytest.mark.optional

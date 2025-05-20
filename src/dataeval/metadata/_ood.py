@@ -15,95 +15,6 @@ from dataeval.outputs import MostDeviatedFactorsOutput, OODOutput, OODPredictorO
 from dataeval.outputs._base import set_metadata
 
 
-def _combine_discrete_continuous(metadata: Metadata) -> tuple[list[str], NDArray[np.float64]]:
-    """Combines the discrete and continuous data of a :class:`Metadata` object
-
-    Returns
-    -------
-    Tuple[list[str], NDArray]
-        The combined list of factors names and the combined discrete and continuous data
-
-    Note
-    ----
-    Discrete and continuous data must have the same number of samples
-    """
-    names = []
-    data = []
-
-    if metadata.discrete_factor_names and metadata.discrete_data.size != 0:
-        names.extend(metadata.discrete_factor_names)
-        data.append(metadata.discrete_data)
-
-    if metadata.continuous_factor_names and metadata.continuous_data.size != 0:
-        names.extend(metadata.continuous_factor_names)
-        data.append(metadata.continuous_data)
-
-    return names, np.hstack(data, dtype=np.float64) if data else np.array([], dtype=np.float64)
-
-
-def _combine_metadata(
-    metadata_1: Metadata, metadata_2: Metadata
-) -> tuple[list[str], list[NDArray[np.float64 | np.int64]], list[NDArray[np.int64 | np.float64]]]:
-    """
-    Combines the factor names and data arrays of metadata_1 and metadata_2 when the names
-    match exactly and data has the same number of columns (factors).
-
-    Parameters
-    ----------
-    metadata_1 : Metadata
-        The set of factor names used as reference to determine the correct factor names and length of data
-    metadata_2 : Metadata
-        The compared set of factor names and data that must match metadata_1
-
-    Returns
-    -------
-    list[str]
-        The combined discrete and continuous factor names in that order.
-    list[NDArray]
-        Combined discrete and continuous data of metadata_1
-    list[NDArray]
-        Combined discrete and continuous data of metadata_2
-
-    Raises
-    ------
-    ValueError
-        If keys do not match in metadata_1 and metadata_2
-    ValueError
-        If the length of keys do not match the length of the data
-    """
-    factor_names: list[str] = []
-    m1_data: list[NDArray[np.int64 | np.float64]] = []
-    m2_data: list[NDArray[np.int64 | np.float64]] = []
-
-    # Both metadata must have the same number of factors (cols), but not necessarily samples (row)
-    if metadata_1.total_num_factors != metadata_2.total_num_factors:
-        raise ValueError(
-            f"Number of factors differs between metadata_1 ({metadata_1.total_num_factors}) "
-            f"and metadata_2 ({metadata_2.total_num_factors})"
-        )
-
-    # Validate and attach discrete data
-    if metadata_1.discrete_factor_names:
-        _compare_keys(metadata_1.discrete_factor_names, metadata_2.discrete_factor_names)
-        _validate_factors_and_data(metadata_1.discrete_factor_names, metadata_1.discrete_data)
-
-        factor_names.extend(metadata_1.discrete_factor_names)
-        m1_data.append(metadata_1.discrete_data)
-        m2_data.append(metadata_2.discrete_data)
-
-    # Validate and attach continuous data
-    if metadata_1.continuous_factor_names:
-        _compare_keys(metadata_1.continuous_factor_names, metadata_2.continuous_factor_names)
-        _validate_factors_and_data(metadata_1.continuous_factor_names, metadata_1.continuous_data)
-
-        factor_names.extend(metadata_1.continuous_factor_names)
-        m1_data.append(metadata_1.continuous_data)
-        m2_data.append(metadata_2.continuous_data)
-
-    # Turns list of discrete and continuous into one array
-    return factor_names, m1_data, m2_data
-
-
 def _calc_median_deviations(reference: NDArray, test: NDArray) -> NDArray:
     """
     Calculates deviations of the test data from the median of the reference data
@@ -207,16 +118,13 @@ def find_most_deviated_factors(
     if not any(ood_mask):
         return MostDeviatedFactorsOutput([])
 
-    # Combines reference and test factor names and data if exists and match exactly
-    # shape -> (samples, factors)
-    factor_names, md_1, md_2 = _combine_metadata(
-        metadata_1=metadata_ref,
-        metadata_2=metadata_tst,
-    )
+    factor_names = metadata_ref.factor_names
+    ref_data = metadata_ref.factor_data
+    tst_data = metadata_tst.factor_data
 
-    # Stack discrete and continuous factors as separate factors. Must have equal sample counts
-    ref_data = np.hstack(md_1) if md_1 else np.array([])  # (S, Fd + Fc)
-    tst_data = np.hstack(md_2) if md_2 else np.array([])  # (S, Fd + Fc)
+    _compare_keys(factor_names, metadata_tst.factor_names)
+    _validate_factors_and_data(factor_names, ref_data)
+    _validate_factors_and_data(factor_names, tst_data)
 
     if len(ref_data) < 3:
         warnings.warn(
@@ -256,6 +164,7 @@ which is what many library functions return, multiply it by _NATS2BITS to get it
 """
 
 
+@set_metadata
 def find_ood_predictors(
     metadata: Metadata,
     ood: OODOutput,
@@ -305,8 +214,8 @@ def find_ood_predictors(
 
     ood_mask: NDArray[np.bool_] = ood.is_ood
 
-    discrete_features_count = len(metadata.discrete_factor_names)
-    factors, data = _combine_discrete_continuous(metadata)  # (F, ), (S, F) => F = Fd + Fc
+    factors = metadata.factor_names
+    data = metadata.factor_data
 
     # No metadata correlated with out of distribution data, return 0.0 for all factors
     if not any(ood_mask):
@@ -320,14 +229,13 @@ def find_ood_predictors(
     # Calculate mean, std of each factor over all samples
     scaled_data = (data - np.mean(data, axis=0)) / np.std(data, axis=0, ddof=1)  # (S, F)
 
-    discrete_features = np.zeros_like(factors, dtype=np.bool_)
-    discrete_features[:discrete_features_count] = True
+    discrete_features = [info.factor_type != "continuous" for info in metadata.factor_info.values()]
 
     mutual_info_values = (
         mutual_info_classif(
             X=scaled_data,
             y=ood_mask,
-            discrete_features=discrete_features,  # type: ignore -> sklearn issue - NDArray[bool] not of accepted type Union[ArrayLike, 'auto']
+            discrete_features=discrete_features,  # type: ignore - sklearn function not typed
             random_state=get_seed(),
         )
         * _NATS2BITS

@@ -4,7 +4,7 @@ __all__ = []
 
 import contextlib
 from dataclasses import asdict, dataclass
-from typing import Any, Literal, TypeVar, overload
+from typing import Any, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -199,53 +199,11 @@ class BalanceOutput(Output):
     factor_names: list[str]
     class_names: list[str]
 
-    @overload
-    def _by_factor_type(
-        self,
-        attr: Literal["factor_names"],
-        factor_type: Literal["discrete", "continuous", "both"],
-    ) -> list[str]: ...
-
-    @overload
-    def _by_factor_type(
-        self,
-        attr: Literal["balance", "factors", "classwise"],
-        factor_type: Literal["discrete", "continuous", "both"],
-    ) -> NDArray[np.float64]: ...
-
-    def _by_factor_type(
-        self,
-        attr: Literal["balance", "factors", "classwise", "factor_names"],
-        factor_type: Literal["discrete", "continuous", "both"],
-    ) -> NDArray[np.float64] | list[str]:
-        # if not filtering by factor_type then just return the requested attribute without mask
-        if factor_type == "both":
-            return getattr(self, attr)
-
-        # create the mask for the selected factor_type
-        mask_lambda = (
-            (lambda x: "-continuous" not in x) if factor_type == "discrete" else (lambda x: "-discrete" not in x)
-        )
-
-        # return the masked attribute
-        if attr == "factor_names":
-            return [x.replace(f"-{factor_type}", "") for x in self.factor_names if mask_lambda(x)]
-        factor_type_mask = np.asarray([mask_lambda(x) for x in self.factor_names])
-        if attr == "factors":
-            return self.factors[factor_type_mask[1:]][:, factor_type_mask[1:]]
-        if attr == "balance":
-            return self.balance[factor_type_mask]
-        if attr == "classwise":
-            return self.classwise[:, factor_type_mask]
-
-        raise ValueError(f"Unknown attr {attr} specified.")
-
     def plot(
         self,
         row_labels: list[Any] | NDArray[Any] | None = None,
         col_labels: list[Any] | NDArray[Any] | None = None,
         plot_classwise: bool = False,
-        factor_type: Literal["discrete", "continuous", "both"] = "discrete",
     ) -> Figure:
         """
         Plot a heatmap of balance information.
@@ -258,8 +216,6 @@ class BalanceOutput(Output):
             List/Array containing the labels for columns in the histogram
         plot_classwise : bool, default False
             Whether to plot per-class balance instead of global balance
-        factor_type : "discrete", "continuous", or "both", default "discrete"
-            Whether to plot discretized values, continuous values, or to include both
 
         Returns
         -------
@@ -273,10 +229,10 @@ class BalanceOutput(Output):
             if row_labels is None:
                 row_labels = self.class_names
             if col_labels is None:
-                col_labels = self._by_factor_type("factor_names", factor_type)
+                col_labels = self.factor_names
 
             fig = heatmap(
-                self._by_factor_type("classwise", factor_type),
+                self.classwise,
                 row_labels,
                 col_labels,
                 xlabel="Factors",
@@ -287,8 +243,8 @@ class BalanceOutput(Output):
             # Combine balance and factors results
             data = np.concatenate(
                 [
-                    self._by_factor_type("balance", factor_type)[np.newaxis, 1:],
-                    self._by_factor_type("factors", factor_type),
+                    self.balance[np.newaxis, 1:],
+                    self.factors,
                 ],
                 axis=0,
             )
@@ -297,7 +253,7 @@ class BalanceOutput(Output):
             # Finalize the data for the plot, last row is last factor x last factor so it gets dropped
             heat_data = np.where(mask, np.nan, data)[:-1]
             # Creating label array for heat map axes
-            heat_labels = self._by_factor_type("factor_names", factor_type)
+            heat_labels = self.factor_names
 
             if row_labels is None:
                 row_labels = heat_labels[:-1]
@@ -377,7 +333,7 @@ class DiversityOutput(Output):
             import matplotlib.pyplot as plt
 
             fig, ax = plt.subplots(figsize=(8, 8))
-            heat_labels = np.concatenate((["class"], self.factor_names))
+            heat_labels = ["class_labels"] + self.factor_names
             ax.bar(heat_labels, self.diversity_index)
             ax.set_xlabel("Factors")
             plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")

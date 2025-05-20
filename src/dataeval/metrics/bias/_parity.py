@@ -242,13 +242,13 @@ def parity(metadata: Metadata) -> ParityOutput:
     >>> parity(metadata)
     ParityOutput(score=array([7.357, 5.467, 0.515]), p_value=array([0.289, 0.243, 0.773]), factor_names=['age', 'income', 'gender'], insufficient_data={'age': {3: {'artist': 4}, 4: {'artist': 4, 'teacher': 3}}, 'income': {1: {'artist': 3}}})
     """  # noqa: E501
-    if not metadata.discrete_factor_names and not metadata.continuous_factor_names:
+    if not metadata.factor_names:
         raise ValueError("No factors found in provided metadata.")
 
-    chi_scores = np.zeros(metadata.discrete_data.shape[1])
+    chi_scores = np.zeros(metadata.discretized_data.shape[1])
     p_values = np.zeros_like(chi_scores)
     insufficient_data: defaultdict[str, defaultdict[int, dict[str, int]]] = defaultdict(lambda: defaultdict(dict))
-    for i, col_data in enumerate(metadata.discrete_data.T):
+    for i, col_data in enumerate(metadata.discretized_data.T):
         # Builds a contingency matrix where entry at index (r,c) represents
         # the frequency of current_factor_name achieving value unique_factor_values[r]
         # at a data point with class c.
@@ -258,7 +258,7 @@ def parity(metadata: Metadata) -> ParityOutput:
         # Determines if any frequencies are too low
         counts = np.nonzero(contingency_matrix < 5)
         unique_factor_values = np.unique(col_data)
-        current_factor_name = metadata.discrete_factor_names[i]
+        current_factor_name = metadata.factor_names[i]
         for int_factor, int_class in zip(counts[0], counts[1]):
             if contingency_matrix[int_factor, int_class] > 0:
                 factor_category = unique_factor_values[int_factor].item()
@@ -273,11 +273,14 @@ def parity(metadata: Metadata) -> ParityOutput:
         chi_scores[i], p_values[i] = chi2_contingency(contingency_matrix)[:2]
 
     if insufficient_data:
-        warnings.warn("Some factors did not meet the recommended 5 occurrences for each value-label combination.")
+        warnings.warn(
+            f"Factors {list(insufficient_data)} did not meet the recommended "
+            "5 occurrences for each value-label combination."
+        )
 
     return ParityOutput(
         score=chi_scores,
         p_value=p_values,
-        factor_names=metadata.discrete_factor_names,
+        factor_names=metadata.factor_names,
         insufficient_data={k: dict(v) for k, v in insufficient_data.items()},
     )
