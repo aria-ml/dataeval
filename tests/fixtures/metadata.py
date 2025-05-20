@@ -2,7 +2,7 @@ import pytest
 
 from dataeval.data import Metadata
 from dataeval.utils.data.metadata import merge
-from tests.conftest import preprocess
+from tests.conftest import to_metadata
 
 BIG_SAMPLES_COUNT = 1000
 BIG_FEATURE_NAMES = ["DJIA", "temperature", "uptime"]
@@ -21,7 +21,7 @@ def metadata_ref_big(RNG) -> Metadata:
     # Each key has 1000 samples of feature_i
     metadata = {k: X[:, i].tolist() for i, k in enumerate(BIG_FEATURE_NAMES)}
 
-    MD = preprocess(
+    MD = to_metadata(
         merge([metadata]),
         class_labels=range(1000),
         continuous_factor_bins={k: len(v) for k, v in metadata.items()},
@@ -49,7 +49,7 @@ def metadata_tst_big(RNG) -> Metadata:
     # Each key has BIG_SAMPLES_COUNT of feature_i
     metadata_tst = {k: X[:, i].tolist() for i, k in enumerate(BIG_FEATURE_NAMES)}
 
-    MD = preprocess(
+    MD = to_metadata(
         merge([metadata_tst]),
         class_labels=range(1000),
         continuous_factor_bins={k: len(v) for k, v in metadata_tst.items()},

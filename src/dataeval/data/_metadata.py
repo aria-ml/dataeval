@@ -3,19 +3,20 @@ from __future__ import annotations
 __all__ = []
 
 import warnings
-from typing import TYPE_CHECKING, Any, Literal, Mapping, Sequence, Sized, cast
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Iterable, Literal, Mapping, Sequence, Sized
 
 import numpy as np
+import polars as pl
 from numpy.typing import NDArray
 
 from dataeval.typing import (
     AnnotatedDataset,
     Array,
-    ArrayLike,
     ObjectDetectionTarget,
 )
-from dataeval.utils._array import as_numpy, to_numpy
-from dataeval.utils._bin import bin_data, digitize_data, is_continuous
+from dataeval.utils._array import as_numpy
+from dataeval.utils._bin import bin_data, digitize_data
 from dataeval.utils.data.metadata import merge
 
 if TYPE_CHECKING:
@@ -24,31 +25,15 @@ else:
     from dataeval.data._targets import Targets
 
 
+@dataclass
+class FactorInfo:
+    factor_type: Literal["categorical", "continuous", "discrete"] | None = None
+    discretized_col: str | None = None
+
+
 class Metadata:
     """
-    Class containing binned metadata.
-
-    Attributes
-    ----------
-    discrete_factor_names : list[str]
-        List containing factor names for the original data that was discrete and
-        the binned continuous data
-    discrete_data : NDArray[np.int64]
-        Array containing values for the original data that was discrete and the
-        binned continuous data
-    continuous_factor_names : list[str]
-        List containing factor names for the original continuous data
-    continuous_data : NDArray[np.float64] | None
-        Array containing values for the original continuous data or None if there
-        was no continuous data
-    class_labels : NDArray[np.int]
-        Numerical class labels for the images/objects
-    class_names : list[str]
-        List of unique class names
-    total_num_factors : int
-        Sum of discrete_factor_names and continuous_factor_names plus 1 for class
-    image_indices : NDArray[np.intp]
-        Array of the image index that is mapped by the index of the factor
+    Class containing binned metadata using Polars DataFrames.
 
     Parameters
     ----------
@@ -73,13 +58,20 @@ class Metadata:
         exclude: Sequence[str] | None = None,
         include: Sequence[str] | None = None,
     ) -> None:
-        self._collated = False
-        self._merged = None
-        self._processed = False
+        self._targets: Targets
+        self._class_labels: NDArray[np.intp]
+        self._class_names: list[str]
+        self._image_indices: NDArray[np.intp]
+        self._factors: dict[str, FactorInfo]
+        self._dropped_factors: dict[str, list[str]]
+        self._dataframe: pl.DataFrame
+
+        self._is_structured = False
+        self._is_binned = False
 
         self._dataset = dataset
         self._continuous_factor_bins = dict(continuous_factor_bins) if continuous_factor_bins else {}
-        self._auto_bin_method = auto_bin_method
+        self._auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = auto_bin_method
 
         if exclude is not None and include is not None:
             raise ValueError("Filters for `exclude` and `include` are mutually exclusive.")
@@ -89,16 +81,19 @@ class Metadata:
 
     @property
     def targets(self) -> Targets:
-        self._collate()
+        """Target information for the dataset."""
+        self._structure()
         return self._targets
 
     @property
     def raw(self) -> list[dict[str, Any]]:
-        self._collate()
+        """The raw list of metadata dictionaries for the dataset."""
+        self._structure()
         return self._raw
 
     @property
     def exclude(self) -> set[str]:
+        """Factors to exclude from the metadata."""
         return self._exclude
 
     @exclude.setter
@@ -107,10 +102,11 @@ class Metadata:
         if self._exclude != exclude:
             self._exclude = exclude
             self._include = set()
-            self._processed = False
+            self._is_binned = False
 
     @property
     def include(self) -> set[str]:
+        """Factors to include from the metadata."""
         return self._include
 
     @include.setter
@@ -119,85 +115,109 @@ class Metadata:
         if self._include != include:
             self._include = include
             self._exclude = set()
-            self._processed = False
+            self._is_binned = False
 
     @property
     def continuous_factor_bins(self) -> Mapping[str, int | Sequence[float]]:
+        """Map of factor names to bin counts or bin edges."""
         return self._continuous_factor_bins
 
     @continuous_factor_bins.setter
     def continuous_factor_bins(self, bins: Mapping[str, int | Sequence[float]]) -> None:
         if self._continuous_factor_bins != bins:
             self._continuous_factor_bins = dict(bins)
-            self._processed = False
+            self._reset_bins(bins)
 
     @property
-    def auto_bin_method(self) -> str:
+    def auto_bin_method(self) -> Literal["uniform_width", "uniform_count", "clusters"]:
+        """Binning method to use when continuous_factor_bins is not defined."""
         return self._auto_bin_method
 
     @auto_bin_method.setter
     def auto_bin_method(self, method: Literal["uniform_width", "uniform_count", "clusters"]) -> None:
         if self._auto_bin_method != method:
             self._auto_bin_method = method
-            self._processed = False
+            self._reset_bins()
 
     @property
-    def merged(self) -> dict[str, Any]:
-        self._merge()
-        return {} if self._merged is None else self._merged[0]
+    def dataframe(self) -> pl.DataFrame:
+        """Dataframe containing target information and metadata factors."""
+        self._structure()
+        return self._dataframe
 
     @property
     def dropped_factors(self) -> dict[str, list[str]]:
-        self._merge()
-        return {} if self._merged is None else self._merged[1]
+        """Factors that were dropped during preprocessing and the reasons why they were dropped."""
+        self._structure()
+        return self._dropped_factors
 
     @property
-    def discrete_factor_names(self) -> list[str]:
-        self._process()
-        return self._discrete_factor_names
+    def discretized_data(self) -> NDArray[np.int64]:
+        """Factor data with continuous data discretized."""
+        if not self.factor_names:
+            return np.array([], dtype=np.int64)
+
+        self._bin()
+        return (
+            self.dataframe.select([info.discretized_col or name for name, info in self.factor_info.items()])
+            .to_numpy()
+            .astype(np.int64)
+        )
 
     @property
-    def discrete_data(self) -> NDArray[np.int64]:
-        self._process()
-        return self._discrete_data
+    def factor_names(self) -> list[str]:
+        """Factor names of the metadata."""
+        self._structure()
+        return list(self._factors)
 
     @property
-    def continuous_factor_names(self) -> list[str]:
-        self._process()
-        return self._continuous_factor_names
+    def factor_info(self) -> dict[str, FactorInfo]:
+        """Factor types of the metadata."""
+        self._bin()
+        return self._factors
 
     @property
-    def continuous_data(self) -> NDArray[np.float64]:
-        self._process()
-        return self._continuous_data
+    def factor_data(self) -> NDArray[Any]:
+        """Factor data as a NumPy array."""
+        if not self.factor_names:
+            return np.array([], dtype=np.float64)
+
+        # Extract continuous columns and convert to NumPy array
+        return self.dataframe.select(self.factor_names).to_numpy()
 
     @property
     def class_labels(self) -> NDArray[np.intp]:
-        self._collate()
+        """Class labels as a NumPy array."""
+        self._structure()
         return self._class_labels
 
     @property
     def class_names(self) -> list[str]:
-        self._collate()
+        """Class names as a list of strings."""
+        self._structure()
         return self._class_names
 
     @property
-    def total_num_factors(self) -> int:
-        self._process()
-        return self._total_num_factors
-
-    @property
     def image_indices(self) -> NDArray[np.intp]:
-        self._process()
+        """Indices of images as a NumPy array."""
+        self._bin()
         return self._image_indices
 
     @property
     def image_count(self) -> int:
-        self._process()
+        self._bin()
         return int(self._image_indices.max() + 1)
 
-    def _collate(self, force: bool = False) -> None:
-        if self._collated and not force:
+    def _reset_bins(self, cols: Iterable[str] | None = None) -> None:
+        if self._is_binned:
+            columns = self._dataframe.columns
+            for col in (col for col in cols or columns if f"{col}[|]" in columns):
+                self._dataframe.drop_in_place(f"{col}[|]")
+                self._factors[col] = FactorInfo()
+            self._is_binned = False
+
+    def _structure(self) -> None:
+        if self._is_structured:
             return
 
         raw: list[dict[str, Any]] = []
@@ -235,134 +255,108 @@ class Metadata:
         bboxes = as_numpy(bboxes).astype(np.float32) if is_od else None
         srcidx = as_numpy(srcidx).astype(np.intp) if is_od else None
 
+        target_dict = {
+            "image_index": srcidx if srcidx is not None else np.arange(len(labels)),
+            "class_label": labels,
+            "score": scores,
+            "box": bboxes if bboxes is not None else [None] * len(labels),
+        }
+
         self._targets = Targets(labels, scores, bboxes, srcidx)
         self._raw = raw
 
         index2label = self._dataset.metadata.get("index2label", {})
-        self._class_labels = self._targets.labels
+        self._class_labels = labels
         self._class_names = [index2label.get(i, str(i)) for i in np.unique(self._class_labels)]
-        self._collated = True
+        self._image_indices = target_dict["image_index"]
 
-    def _merge(self, force: bool = False) -> None:
-        if self._merged is not None and not force:
+        targets_per_image = None if srcidx is None else np.unique(srcidx, return_counts=True)[1].tolist()
+        merged = merge(raw, return_dropped=True, ignore_lists=False, targets_per_image=targets_per_image)
+
+        reserved = ["image_index", "class_label", "score", "box"]
+        factor_dict = {f"metadata_{k}" if k in reserved else k: v for k, v in merged[0].items() if k != "_image_index"}
+
+        self._factors = dict.fromkeys(factor_dict, FactorInfo())
+        self._dataframe = pl.DataFrame({**target_dict, **factor_dict})
+        self._dropped_factors = merged[1]
+        self._is_structured = True
+
+    def _bin(self) -> None:
+        """Populate factor info and bin non-categorical factors."""
+        if self._is_binned:
             return
 
-        targets_per_image = (
-            None if self.targets.source is None else np.unique(self.targets.source, return_counts=True)[1].tolist()
-        )
-        self._merged = merge(self.raw, return_dropped=True, ignore_lists=False, targets_per_image=targets_per_image)
+        # Start with an empty set of factor info
+        factor_info: dict[str, FactorInfo] = {}
 
-    def _validate(self) -> None:
-        # Check that metadata is a single, flattened dictionary with uniform array lengths
-        check_length = None
-        if self._targets.labels.ndim > 1:
-            raise ValueError(
-                f"Got class labels with {self._targets.labels.ndim}-dimensional "
-                f"shape {self._targets.labels.shape}, but expected a 1-dimensional array."
-            )
-        for v in self.merged.values():
-            if not isinstance(v, (list, tuple, np.ndarray)):
-                raise TypeError(
-                    "Metadata dictionary needs to be a single dictionary whose values "
-                    "are arraylike containing the metadata on a per image or per object basis."
-                )
-            check_length = len(v) if check_length is None else check_length
-            if check_length != len(v):
-                raise ValueError(
-                    "The lists/arrays in the metadata dict have varying lengths. "
-                    "Metadata requires them to be uniform in length."
-                )
-        if len(self._class_labels) != check_length:
-            raise ValueError(
-                f"The length of the label array {len(self._class_labels)} is not the same as "
-                f"the length of the metadata arrays {check_length}."
+        # Create a mutable DataFrame for updates
+        df = self.dataframe.clone()
+        factor_bins = self.continuous_factor_bins
+
+        # Check for invalid keys
+        invalid_keys = set(factor_bins.keys()) - set(df.columns)
+        if invalid_keys:
+            warnings.warn(
+                f"The keys - {invalid_keys} - are present in the `continuous_factor_bins` dictionary "
+                "but are not columns in the metadata DataFrame. Unknown keys will be ignored."
             )
 
-    def _filter(self, d: Mapping[str, Any]) -> dict[str, Any]:
-        return (
-            {k: d[k] for k in self.include if k in d} if self.include else {k: d[k] for k in d if k not in self.exclude}
-        )
-
-    def _split_continuous_discrete(
-        self, metadata: dict[str, NDArray[Any]], continuous_factor_bins: dict[str, int | Sequence[float]]
-    ) -> tuple[dict[str, NDArray[Any]], dict[str, NDArray[np.int64]]]:
-        # Bin according to user supplied bins
-        continuous_metadata = {}
-        discrete_metadata = {}
-        if continuous_factor_bins:
-            invalid_keys = set(continuous_factor_bins.keys()) - set(metadata.keys())
-            if invalid_keys:
-                raise KeyError(
-                    f"The keys - {invalid_keys} - are present in the `continuous_factor_bins` dictionary "
-                    "but are not keys in the `metadata` dictionary. Delete these keys from `continuous_factor_bins` "
-                    "or add corresponding entries to the `metadata` dictionary."
-                )
-            for factor, bins in continuous_factor_bins.items():
-                discrete_metadata[factor] = digitize_data(metadata[factor], bins)
-                continuous_metadata[factor] = metadata[factor]
-
-        # Determine category of the rest of the keys
-        remaining_keys = set(metadata.keys()) - set(continuous_metadata.keys())
-        for key in remaining_keys:
-            data = to_numpy(metadata[key])
-            if np.issubdtype(data.dtype, np.number):
-                result = is_continuous(data, self._image_indices)
-                if result:
-                    continuous_metadata[key] = data
-                unique_samples, ordinal_data = np.unique(data, return_inverse=True)
-                if unique_samples.size <= np.max([20, data.size * 0.01]):
-                    discrete_metadata[key] = ordinal_data
-                else:
+        column_set = set(df.columns)
+        for col in (col for col in self.factor_names if f"{col}[|]" not in column_set):
+            # Get data as numpy array for processing
+            data = df[col].to_numpy()
+            col_dz = f"{col}[|]"
+            if col in factor_bins:
+                # User provided binning
+                bins = factor_bins[col]
+                df = df.with_columns(pl.Series(name=col_dz, values=digitize_data(data, bins).astype(np.int64)))
+                factor_info[col] = FactorInfo("continuous", col_dz)
+            else:
+                # Check if data is numeric
+                unique, ordinal = np.unique(data, return_inverse=True)
+                if not np.issubdtype(data.dtype, np.number) or unique.size <= max(20, data.size * 0.01):
+                    # Non-numeric data or small number of unique values - convert to categorical
+                    df = df.with_columns(pl.Series(name=col_dz, values=ordinal.astype(np.int64)))
+                    factor_info[col] = FactorInfo("categorical", col_dz)
+                elif data.dtype == float:
+                    # Many unique values - discretize by binning
                     warnings.warn(
-                        f"A user defined binning was not provided for {key}. "
+                        f"A user defined binning was not provided for {col}. "
                         f"Using the {self.auto_bin_method} method to discretize the data. "
                         "It is recommended that the user rerun and supply the desired "
                         "bins using the continuous_factor_bins parameter.",
                         UserWarning,
                     )
-                    discrete_metadata[key] = bin_data(data, self.auto_bin_method)
-            else:
-                _, discrete_metadata[key] = np.unique(data, return_inverse=True)
+                    # Create binned version
+                    binned_data = bin_data(data, self.auto_bin_method)
+                    df = df.with_columns(pl.Series(name=col_dz, values=binned_data.astype(np.int64)))
+                    factor_info[col] = FactorInfo("continuous", col_dz)
+                else:
+                    factor_info[col] = FactorInfo("discrete", col_dz)
 
-        return continuous_metadata, discrete_metadata
+        # Store the results
+        self._dataframe = df
+        self._factors.update(factor_info)
+        self._is_binned = True
 
-    def _process(self, force: bool = False) -> None:
-        if self._processed and not force:
-            return
+    def get_factors_by_type(self, factor_type: Literal["categorical", "continuous", "discrete"]) -> list[str]:
+        """
+        Get the names of factors of a specific type.
 
-        # Create image indices from targets
-        self._image_indices = np.arange(len(self.raw)) if self.targets.source is None else self.targets.source
+        Parameters
+        ----------
+        factor_type : Literal["categorical", "continuous", "discrete"]
+            The type of factors to retrieve.
 
-        # Validate the metadata dimensions
-        self._validate()
+        Returns
+        -------
+        list[str]
+            List of factor names of the specified type.
+        """
+        self._bin()
+        return [name for name, info in self.factor_info.items() if info.factor_type == factor_type]
 
-        # Filter the merged metadata and continuous factor bins
-        metadata = self._filter(self.merged)
-        continuous_factor_bins = self._filter(self.continuous_factor_bins)
-
-        # Remove generated "_image_index" if present
-        metadata.pop("_image_index", None)
-
-        # Split the metadata into continuous and discrete
-        continuous_metadata, discrete_metadata = self._split_continuous_discrete(metadata, continuous_factor_bins)
-
-        # Split out the dictionaries into the keys and values
-        self._discrete_factor_names = list(discrete_metadata.keys())
-        self._discrete_data = (
-            np.stack(list(discrete_metadata.values()), axis=-1, dtype=np.int64)
-            if discrete_metadata
-            else np.array([], dtype=np.int64)
-        )
-        self._continuous_factor_names = list(continuous_metadata.keys())
-        self._continuous_data = (
-            np.stack(list(continuous_metadata.values()), axis=-1, dtype=np.float64)
-            if continuous_metadata
-            else np.array([], dtype=np.float64)
-        )
-        self._total_num_factors = len(self._discrete_factor_names + self._continuous_factor_names) + 1
-        self._processed = True
-
-    def add_factors(self, factors: Mapping[str, ArrayLike]) -> None:
+    def add_factors(self, factors: Mapping[str, Any]) -> None:
         """
         Add additional factors to the metadata.
 
@@ -374,7 +368,7 @@ class Metadata:
         factors : Mapping[str, ArrayLike]
             Dictionary of factors to add to the metadata.
         """
-        self._merge()
+        self._structure()
 
         targets = len(self.targets.source) if self.targets.source is not None else len(self.targets)
         images = self.image_count
@@ -385,9 +379,14 @@ class Metadata:
             raise ValueError(
                 "The lists/arrays in the provided factors have a different length than the current metadata factors."
             )
-        merged = cast(dict[str, ArrayLike], self._merged[0] if self._merged is not None else {})
+
+        new_columns = []
         for k, v in factors.items():
             v = as_numpy(v)
-            merged[k] = v if (self.targets.source is None or lengths[k] == targets) else v[self.targets.source]
+            data = v if (self.targets.source is None or lengths[k] == targets) else v[self.targets.source]
+            new_columns.append(pl.Series(name=k, values=data))
+            self._factors[k] = FactorInfo()
 
-        self._processed = False
+        if new_columns:
+            self._dataframe = self.dataframe.with_columns(new_columns)
+            self._is_binned = False

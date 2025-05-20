@@ -6,7 +6,7 @@ import pytest
 
 from dataeval.data._metadata import Metadata
 from dataeval.metrics.bias._parity import label_parity, parity
-from tests.conftest import preprocess
+from tests.conftest import to_metadata
 
 
 class MockDistributionDataset:
@@ -143,8 +143,7 @@ class TestLabelIndependenceUnit:
 
     def test_empty_metadata(self):
         mock_metadata = MagicMock(spec=Metadata)
-        mock_metadata.discrete_factor_names = []
-        mock_metadata.continuous_factor_names = []
+        mock_metadata.factor_names = []
         with pytest.raises(ValueError):
             parity(mock_metadata)
 
@@ -192,20 +191,20 @@ class TestMDParityUnit:
     def test_warns_with_not_enough_frequency(self):
         labels = [0, 1]
         factors = {"factor1": [10, 20]}
-        metadata = preprocess(factors, labels)
+        metadata = to_metadata(factors, labels)
         with pytest.warns(UserWarning):
             parity(metadata)
 
     def test_passes_with_enough_frequency(self):
         labels = [0] * 5 + [1] * 5
         factors = {"factor1": ["foo"] * 10}
-        metadata = preprocess(factors, labels)
+        metadata = to_metadata(factors, labels)
         parity(metadata)
 
     def test_to_dataframe(self):
         labels = [0] * 5 + [1] * 5
         factors = {"factor1": ["foo"] * 10}
-        metadata = preprocess(factors, labels)
+        metadata = to_metadata(factors, labels)
         df = parity(metadata).to_dataframe()
         assert df is not None
 
@@ -219,7 +218,7 @@ class TestMDParityFunctional:
         """
         labels = [0] * 5 + [1] * 5
         factors = {"factor1": ["a"] * 5 + ["b"] * 5}
-        metadata = preprocess(factors, labels)
+        metadata = to_metadata(factors, labels)
         result = parity(metadata)
 
         # Checks that factor1 is highly correlated with class
@@ -232,7 +231,7 @@ class TestMDParityFunctional:
         """
         labels = [0] * 5 + [1] * 5
         factors = {"factor1": ["foo"] * 10}
-        metadata = preprocess(factors, labels)
+        metadata = to_metadata(factors, labels)
         result = parity(metadata)
 
         # Checks that factor1 is uncorrelated with class
@@ -247,11 +246,11 @@ class TestMDParityFunctional:
         labels = [0] * 5 + [1] * 5
         factors = {"factor1": [10] * 2 + [11] * 3 + [20] * 5}
         continuous_bincounts = {"factor1": 2}
-        metadata = preprocess(factors, labels, continuous_bincounts)
+        metadata = to_metadata(factors, labels, continuous_bincounts)
         result1 = parity(metadata)
 
         discrete_dataset = {"factor2": [10] * 5 + [20] * 5}
-        metadata = preprocess(discrete_dataset, labels)
+        metadata = to_metadata(discrete_dataset, labels)
         result2 = parity(metadata)
 
         # Checks that the test on the quantization continuous_dataset is
@@ -267,7 +266,7 @@ class TestMDParityFunctional:
         labels = [0] * 5 + [1] * 5
         factors = {"factor1": [10] * 2 + [11] * 3 + [20] * 5}
         continuous_bincounts = {"factor1": 1}
-        metadata = preprocess(factors, labels, continuous_bincounts)
+        metadata = to_metadata(factors, labels, continuous_bincounts)
         result = parity(metadata)
 
         # Checks if factor1 and class are perfectly uncorrelated
@@ -282,7 +281,7 @@ class TestMDParityFunctional:
         labels = [0] * 5 + [1] * 5
         factors = {"factor1": list(np.arange(10))}
         continuous_bincounts = {"factor1": 10}
-        metadata = preprocess(factors, labels, continuous_bincounts)
+        metadata = to_metadata(factors, labels, continuous_bincounts)
 
         # Looks for a warning that there are (class,factor1) pairs with too low frequency
         with pytest.warns(UserWarning):
@@ -296,7 +295,7 @@ class TestMDParityFunctional:
         labels = [0] * 5 + [1] * 5 + [0] * 5 + [1] * 5
         factors = {"factor1": list(np.arange(10)) + list(np.arange(10))}
         continuous_bincounts = {"factor1": 10}
-        metadata = preprocess(factors, labels, continuous_bincounts)
+        metadata = to_metadata(factors, labels, continuous_bincounts)
 
         # Looks for a warning that there are (class,factor1) pairs with too low frequency
         with pytest.warns(UserWarning):

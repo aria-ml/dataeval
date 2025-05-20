@@ -138,43 +138,45 @@ def diversity(
 
     >>> div_simp = diversity(metadata, method="simpson")
     >>> div_simp.diversity_index
-    array([0.6  , 0.809, 1.   , 0.8  ])
+    array([0.6  , 0.8  , 0.809, 1.   ])
 
     >>> div_simp.classwise
-    array([[0.5  , 0.8  , 0.8  ],
-           [0.63 , 0.976, 0.528]])
+    array([[0.8  , 0.5  , 0.8  ],
+           [0.528, 0.63 , 0.976]])
 
     Compute Shannon diversity index of metadata and class labels
 
     >>> div_shan = diversity(metadata, method="shannon")
     >>> div_shan.diversity_index
-    array([0.811, 0.943, 1.   , 0.918])
+    array([0.811, 0.918, 0.943, 1.   ])
 
     >>> div_shan.classwise
-    array([[0.683, 0.918, 0.918],
-           [0.814, 0.991, 0.764]])
+    array([[0.918, 0.683, 0.918],
+           [0.764, 0.814, 0.991]])
 
     See Also
     --------
     scipy.stats.entropy
     """
-    if not metadata.discrete_factor_names and not metadata.continuous_factor_names:
+    if not metadata.factor_names:
         raise ValueError("No factors found in provided metadata.")
 
     diversity_fn = get_method(_DIVERSITY_FN_MAP, method)
-    discretized_data = np.hstack((metadata.class_labels[:, np.newaxis], metadata.discrete_data))
-    cnts = get_counts(discretized_data)
+    discretized_data = metadata.discretized_data
+    factor_names = metadata.factor_names
+    class_lbl = metadata.class_labels
+
+    class_labels_with_discretized_data = np.hstack((class_lbl[:, np.newaxis], discretized_data))
+    cnts = get_counts(class_labels_with_discretized_data)
     num_bins = np.bincount(np.nonzero(cnts)[1])
     diversity_index = diversity_fn(cnts, num_bins)
 
-    class_lbl = metadata.class_labels
-
     u_classes = np.unique(class_lbl)
-    num_factors = len(metadata.discrete_factor_names)
+    num_factors = len(factor_names)
     classwise_div = np.full((len(u_classes), num_factors), np.nan)
     for idx, cls in enumerate(u_classes):
         subset_mask = class_lbl == cls
-        cls_cnts = get_counts(metadata.discrete_data[subset_mask], min_num_bins=cnts.shape[0])
+        cls_cnts = get_counts(discretized_data[subset_mask], min_num_bins=cnts.shape[0])
         classwise_div[idx, :] = diversity_fn(cls_cnts, num_bins[1:])
 
-    return DiversityOutput(diversity_index, classwise_div, metadata.discrete_factor_names, metadata.class_names)
+    return DiversityOutput(diversity_index, classwise_div, factor_names, metadata.class_names)

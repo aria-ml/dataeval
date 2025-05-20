@@ -4,7 +4,7 @@ import pathlib
 import sys
 from typing import Any, Mapping, Sequence
 
-from dataeval.data._metadata import Metadata
+from dataeval.data._metadata import FactorInfo, Metadata
 from dataeval.data._targets import Targets
 from dataeval.outputs._ood import OODOutput
 from dataeval.utils.data._dataset import to_object_detection_dataset
@@ -14,6 +14,7 @@ sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute() / "tests" / 
 from unittest.mock import MagicMock
 
 import numpy as np
+import polars as pl
 import pytest
 import sklearn.datasets as dsets
 import torch
@@ -50,11 +51,14 @@ def generate_random_metadata(
     metadata_dict = {k: list(rng.choice(v, (length))) for k, v in factors.items()}
     metadata = Metadata(None)  # type: ignore
     metadata._raw = [{} for _ in range(len(labels))]
-    metadata._collated = True
     metadata._targets = targets
     metadata._class_labels = targets.labels
     metadata._class_names = list(labels)
-    metadata._merged = metadata_dict, {}
+    metadata._dataframe = pl.DataFrame(metadata_dict)
+    metadata._factors = dict.fromkeys(factors, FactorInfo("discrete"))
+    metadata._dropped_factors = {}
+    metadata._is_structured = True
+    metadata._is_binned = True
     return metadata
 
 
@@ -75,15 +79,26 @@ def doctest_metadata_explanatory_funcs(doctest_namespace: dict[str, Any]) -> Non
     md1 = MagicMock(spec=Metadata)
     md2 = MagicMock(spec=Metadata)
 
-    md1.discrete_factor_names = []
-    md1.continuous_factor_names = ["time", "altitude"]
-    md1.continuous_data = np.array([[1.2, 235], [3.4, 6789], [5.6, 101112]])
-    md1.total_num_factors = 2
+    factor_names = ["time", "altitude"]
+    factor_data1 = np.array([[1.2, 235], [3.4, 6789], [5.6, 101112]])
+    factor_data2 = np.array([[7.8, 532], [9.10, 9876], [11.12, 211101]])
+    factor_info = dict.fromkeys(factor_names, FactorInfo("continuous"))
 
-    md2.discrete_factor_names = []
-    md2.continuous_factor_names = ["time", "altitude"]
-    md2.continuous_data = np.array([[7.8, 532], [9.10, 9876], [11.12, 211101]])
-    md2.total_num_factors = 2
+    md1.factor_names = factor_names
+    md1.factor_data = factor_data1
+    md1.factor_info = factor_info
+    md1.dataframe = pl.DataFrame(factor_data1, schema=factor_names)
+    md1.get_factors_by_type.side_effect = lambda x: [
+        name for name, info in factor_info.items() if info.factor_type == x
+    ]
+
+    md2.factor_names = factor_names
+    md2.factor_data = factor_data2
+    md2.factor_types = factor_info
+    md2.dataframe = pl.DataFrame(factor_data2, schema=factor_names)
+    md2.get_factors_by_type.side_effect = lambda x: [
+        name for name, info in factor_info.items() if info.factor_type == x
+    ]
 
     doctest_namespace["metadata1"] = md1
     doctest_namespace["metadata2"] = md2
@@ -155,12 +170,14 @@ def doctest_metrics_bias_balance_diversity(doctest_namespace: dict[str, Any]) ->
     scores = np.eye(2)[labels].astype(np.float32)
     targets = Targets(labels=labels, scores=scores, bboxes=None, source=None)
     metadata = Metadata(None, continuous_factor_bins=continuous_factor_bincounts)  # type: ignore
-    metadata._collated = True
+    metadata._is_structured = True
     metadata._raw = [{} for _ in range(len(class_labels))]
     metadata._targets = targets
     metadata._class_labels = np.asarray(class_labels)
     metadata._class_names = ["cat", "dog"]
-    metadata._merged = metadata_dict, {}
+    metadata._dataframe = pl.DataFrame(metadata_dict)
+    metadata._factors = dict.fromkeys(metadata_dict, FactorInfo())
+    metadata._dropped_factors = {}
 
     """dataeval.metrics.bias.balance.balance"""
     """dataeval.metrics.bias.diversity.diversity"""
