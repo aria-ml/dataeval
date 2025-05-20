@@ -267,5 +267,4 @@ class TestObjectDetectionSelections:
 
         # Verify nested metadata is processed by Metadata class
         md = Metadata(select)
-        nested_factor = md.discrete_factor_names.index("nested")
-        assert md.discrete_data[:, nested_factor].tolist() == [0, 1, 2, 2]
+        assert md.dataframe["nested"].to_list() == [0, 2, 3, 3]

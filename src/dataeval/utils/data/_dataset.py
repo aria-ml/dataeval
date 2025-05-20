@@ -19,7 +19,7 @@ def _validate_data(
     images: Array | Sequence[Array],
     labels: Array | Sequence[int] | Sequence[Array] | Sequence[Sequence[int]],
     bboxes: Array | Sequence[Array] | Sequence[Sequence[Array]] | Sequence[Sequence[Sequence[float]]] | None,
-    metadata: Sequence[dict[str, Any]] | None,
+    metadata: Sequence[dict[str, Any]] | dict[str, Sequence[Any]] | None,
 ) -> None:
     # Validate inputs
     dataset_len = len(images)
@@ -30,7 +30,13 @@ def _validate_data(
         raise ValueError(f"Number of labels ({len(labels)}) does not match number of images ({dataset_len}).")
     if bboxes is not None and len(bboxes) != dataset_len:
         raise ValueError(f"Number of bboxes ({len(bboxes)}) does not match number of images ({dataset_len}).")
-    if metadata is not None and len(metadata) != dataset_len:
+    if metadata is not None and (
+        len(metadata) != dataset_len
+        if isinstance(metadata, Sequence)
+        else any(
+            not isinstance(metadatum, Sequence) or len(metadatum) != dataset_len for metadatum in metadata.values()
+        )
+    ):
         raise ValueError(f"Number of metadata ({len(metadata)}) does not match number of images ({dataset_len}).")
 
     if datum_type == "ic":
@@ -54,6 +60,14 @@ def _validate_data(
             raise TypeError("Boxes must be a sequence of sequences of (x0, y0, x1, y1) for object detection.")
     else:
         raise ValueError(f"Unknown datum type '{datum_type}'. Must be 'ic' or 'od'.")
+
+
+def _listify_metadata(
+    metadata: Sequence[dict[str, Any]] | dict[str, Sequence[Any]] | None,
+) -> Sequence[dict[str, Any]] | None:
+    if isinstance(metadata, dict):
+        return [{k: v[i] for k, v in metadata.items()} for i in range(len(next(iter(metadata.values()))))]
+    return metadata
 
 
 def _find_max(arr: ArrayLike) -> Any:
@@ -175,7 +189,7 @@ class CustomObjectDetectionDataset(BaseAnnotatedDataset[Sequence[Sequence[int]]]
 def to_image_classification_dataset(
     images: Array | Sequence[Array],
     labels: Array | Sequence[int],
-    metadata: Sequence[dict[str, Any]] | None,
+    metadata: Sequence[dict[str, Any]] | dict[str, Sequence[Any]] | None,
     classes: Sequence[str] | None,
     name: str | None = None,
 ) -> ImageClassificationDataset:
@@ -188,7 +202,7 @@ def to_image_classification_dataset(
         The images to use in the dataset.
     labels : Array | Sequence[int]
         The labels to use in the dataset.
-    metadata : Sequence[dict[str, Any]] | None
+    metadata : Sequence[dict[str, Any]] | dict[str, Sequence[Any]] | None
         The metadata to use in the dataset.
     classes : Sequence[str] | None
         The classes to use in the dataset.
@@ -198,14 +212,14 @@ def to_image_classification_dataset(
     ImageClassificationDataset
     """
     _validate_data("ic", images, labels, None, metadata)
-    return CustomImageClassificationDataset(images, labels, metadata, classes, name)
+    return CustomImageClassificationDataset(images, labels, _listify_metadata(metadata), classes, name)
 
 
 def to_object_detection_dataset(
     images: Array | Sequence[Array],
     labels: Array | Sequence[Array] | Sequence[Sequence[int]],
     bboxes: Array | Sequence[Array] | Sequence[Sequence[Array]] | Sequence[Sequence[Sequence[float]]],
-    metadata: Sequence[dict[str, Any]] | None,
+    metadata: Sequence[dict[str, Any]] | dict[str, Sequence[Any]] | None,
     classes: Sequence[str] | None,
     name: str | None = None,
 ) -> ObjectDetectionDataset:
@@ -220,7 +234,7 @@ def to_object_detection_dataset(
         The labels to use in the dataset.
     bboxes : Array | Sequence[Array] | Sequence[Sequence[Array]] | Sequence[Sequence[Sequence[float]]]
         The bounding boxes (x0,y0,x1,y0) to use in the dataset.
-    metadata : Sequence[dict[str, Any]] | None
+    metadata : Sequence[dict[str, Any]] | dict[str, Sequence[Any]] | None
         The metadata to use in the dataset.
     classes : Sequence[str] | None
         The classes to use in the dataset.
@@ -230,4 +244,4 @@ def to_object_detection_dataset(
     ObjectDetectionDataset
     """
     _validate_data("od", images, labels, bboxes, metadata)
-    return CustomObjectDetectionDataset(images, labels, bboxes, metadata, classes, name)
+    return CustomObjectDetectionDataset(images, labels, bboxes, _listify_metadata(metadata), classes, name)

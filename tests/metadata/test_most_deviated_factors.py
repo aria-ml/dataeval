@@ -1,4 +1,3 @@
-import re
 from itertools import compress
 from unittest.mock import MagicMock, patch
 
@@ -8,36 +7,11 @@ from numpy.random import Generator
 
 from dataeval.metadata._ood import (
     _calc_median_deviations,
-    _combine_metadata,
     _compare_keys,
     _validate_factors_and_data,
     find_most_deviated_factors,
 )
-
-
-def mock_metadata(factor_names, discrete_data=None, cont_factor_names=None, continuous_data=None) -> MagicMock:
-    """
-    Creates a magic mock method that contains discrete and continuous data and factors
-    but has no hard dependency on Metadata.
-    """
-
-    m = MagicMock()
-
-    m.discrete_factor_names = factor_names
-    count = len(factor_names)
-
-    if cont_factor_names is not None:
-        m.continuous_factor_names = cont_factor_names
-        count += len(cont_factor_names)
-
-    if discrete_data is not None:
-        m.discrete_data = discrete_data
-    if continuous_data is not None:
-        m.continuous_data = continuous_data
-
-    m.total_num_factors = count
-
-    return m
+from tests.metadata._shared import mock_metadata
 
 
 def mock_ood_output(is_ood) -> MagicMock:
@@ -58,22 +32,19 @@ class TestMetadataValidation:
 
     @pytest.mark.parametrize("factors", (1, 10))
     @pytest.mark.parametrize("samples", (0, 1, 2))
-    @patch("dataeval.metadata._ood._combine_metadata")
-    def test_warn_on_insufficient_samples(self, mock, RNG, samples, factors):
+    def test_warn_on_insufficient_samples(self, RNG, samples, factors):
         """
         Tests that a warning is raised when the reference set has less than 3 samples
         """
 
         ood = mock_ood_output(np.array([True]))
-        # Samples are "shared" over discrete and continuous as they are considered different factors
-        mock.return_value = ([], [RNG.random((samples, factors)), RNG.random((samples, factors))], [])
 
         # Neither have enough samples
         warn_msg = f"At least 3 reference metadata samples are needed, got {samples}"
         with pytest.warns(UserWarning, match=warn_msg):
             res = find_most_deviated_factors(
-                metadata_ref=MagicMock(),
-                metadata_tst=MagicMock(),
+                metadata_ref=mock_metadata([str(f) for f in range(factors)], RNG.random((samples, factors))),
+                metadata_tst=mock_metadata([str(f) for f in range(factors)], RNG.random((samples, factors))),
                 ood=ood,
             )
         assert res._data == []
@@ -107,36 +78,17 @@ class TestMetadataValidation:
         _compare_keys(lst, lst)
 
     @pytest.mark.parametrize("length", (2, 4))
-    @patch("dataeval.metadata._ood._combine_metadata")
-    def test_error_ood_testmd_lengths(self, mock, length):
+    def test_error_ood_testmd_lengths(self, length):
         """Tests the case where the ood mask differs from the length of the data lengths"""
 
-        mock.return_value = ([], [np.ones((3, 3))], [np.ones((3, 1))])
-
+        factors = ["a", "b", "c"]
         ood = mock_ood_output(np.array([True] * length))
         error_msg = f"ood and test metadata must have the same length, got {length} and 3 respectively."
 
         with pytest.raises(ValueError, match=error_msg):
-            find_most_deviated_factors(MagicMock(), MagicMock(), ood)
-
-    def test_error_disc_cont_samples(self, RNG: Generator):
-        """
-        Tests that discrete and continuous data with differing number of samples
-        is not allowed as all samples should have every factor
-        """
-
-        ood = mock_ood_output(np.array([True, True, True]))
-
-        # 3 and 4 samples conflict
-        md = mock_metadata(
-            factor_names=["a", "b"],
-            discrete_data=RNG.random((3, 3)),
-            cont_factor_names=["a", "b", "c"],
-            continuous_data=RNG.random((4, 3)),
-        )
-
-        with pytest.raises(ValueError):
-            find_most_deviated_factors(md, md, ood)
+            find_most_deviated_factors(
+                mock_metadata(factors, np.ones((3, 3))), mock_metadata(factors, np.ones((3, 3))), ood
+            )
 
 
 @pytest.mark.required
@@ -171,8 +123,8 @@ class TestDeviatedFactors:
 
         factors = ["a", "b", "c"]
         result = find_most_deviated_factors(
-            mock_metadata(factors, RNG.random(shape), cont_factor_names=[]),
-            mock_metadata(factors, RNG.random(shape), cont_factor_names=[]),
+            mock_metadata(factors, RNG.random(shape)),
+            mock_metadata(factors, RNG.random(shape)),
             ood,
         )
 
@@ -193,7 +145,7 @@ class TestDeviatedFactors:
         """Tests single test value runs with correct output shape and value"""
 
         ood = mock_ood_output(np.array([True, True, True]))
-        m1 = mock_metadata(["a", "b", "c"], np.ones((3, 3)), [], [])
+        m1 = mock_metadata(["a", "b", "c"], np.ones((3, 3)))
         result = find_most_deviated_factors(m1, m1, ood=ood)
 
         assert len(result) == 3
@@ -201,7 +153,7 @@ class TestDeviatedFactors:
 
 
 @pytest.mark.required
-class TestInternalFuncs:
+class TestCalcMedianDeviations:
     @pytest.mark.parametrize("samples_ref", (1, 5, 10, 100))
     @pytest.mark.parametrize("samples_tst", (1, 5, 10, 100))
     @pytest.mark.parametrize("factors", (1, 5, 10))
@@ -215,78 +167,6 @@ class TestInternalFuncs:
 
         assert res.shape == (samples_tst, factors)
         assert not np.any(np.isnan(res))
-
-    def test_error_combine_diff_num_factors(self):
-        """Tests the quick check of total num factors equality"""
-
-        error_msg = re.escape("Number of factors differs between metadata_1 (1) and metadata_2 (2)")
-
-        m1 = mock_metadata(["a"])
-        m2 = mock_metadata(["a", "b"])
-
-        with pytest.raises(ValueError, match=error_msg):
-            _combine_metadata(m1, m2)
-
-    def test_no_factors(self):
-        m1 = mock_metadata([], cont_factor_names=[])
-        m2 = mock_metadata([], cont_factor_names=[])
-
-        result = _combine_metadata(m1, m2)
-
-        assert len(result) == 3
-
-        for res in result:
-            assert res == []
-
-    @pytest.mark.parametrize(
-        "dnames, cnames, expected_shape",
-        [
-            (["discrete"], [], (3, 1)),
-            ([], ["cont"], (5, 1)),
-        ],
-    )
-    def test_one_factor_type(self, dnames, cnames, expected_shape):
-        """Tests that only data with factor names is returned"""
-
-        m1 = mock_metadata(
-            dnames, discrete_data=np.ones((3, 1)), cont_factor_names=cnames, continuous_data=np.ones((5, 1))
-        )
-        m2 = mock_metadata(
-            dnames, discrete_data=np.ones((3, 1)), cont_factor_names=cnames, continuous_data=np.ones((5, 1))
-        )
-
-        result = _combine_metadata(m1, m2)
-
-        assert len(result) == 3
-        f, md1, md2 = result  # factor names, m1 data, m2 data
-
-        assert f == dnames if dnames else cnames
-
-        for md in [md1, md2]:
-            assert len(md) == 1
-            assert isinstance(md[0], np.ndarray)
-            assert md[0].shape == expected_shape
-
-    def test_both_factors(self):
-        m1 = mock_metadata(
-            ["disc"], discrete_data=np.ones((3, 1)), cont_factor_names=["cont"], continuous_data=np.ones((5, 1))
-        )
-        m2 = mock_metadata(
-            ["disc"], discrete_data=np.ones((3, 1)), cont_factor_names=["cont"], continuous_data=np.ones((5, 1))
-        )
-
-        result = _combine_metadata(m1, m2)
-
-        assert len(result) == 3
-        f, md1, md2 = result  # factor names, m1 data, m2 data
-
-        assert f == ["disc", "cont"]
-
-        for md in [md1, md2]:
-            assert len(md) == 2
-            assert isinstance(md1[0], np.ndarray)
-            assert md[0].shape == (3, 1)
-            assert md[1].shape == (5, 1)
 
 
 @pytest.mark.required
@@ -327,8 +207,8 @@ class TestFunctional:
     def test_big_data_with_noise(self, metadata_ref_big, metadata_tst_big):
         """Tests larger matrix with multiple samples and factors"""
 
-        samples = len(metadata_ref_big.discrete_data)
-        feature_names = metadata_ref_big.discrete_factor_names
+        samples = len(metadata_ref_big.factor_data)
+        feature_names = metadata_ref_big.factor_names
 
         is_ood = np.array([True] * samples)
         ood = mock_ood_output(is_ood=is_ood)

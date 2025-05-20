@@ -410,5 +410,5 @@ class TestMNISTMetadata:
 
         mnist = MNIST("data")
         metadata = Metadata(mnist)
-        metadata._merge()
+        metadata._structure()
         assert True  # does not crash

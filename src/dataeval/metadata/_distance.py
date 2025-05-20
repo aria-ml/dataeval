@@ -80,14 +80,17 @@ def metadata_distance(metadata1: Metadata, metadata2: Metadata) -> MetadataDista
     MetadataDistanceValues(statistic=1.0, location=0.44354838709677413, dist=2.7, pvalue=0.0)
     """
 
-    _compare_keys(metadata1.continuous_factor_names, metadata2.continuous_factor_names)
-    fnames = metadata1.continuous_factor_names
+    _compare_keys(metadata1.factor_names, metadata2.factor_names)
+    cont_fnames = metadata1.get_factors_by_type("continuous")
 
-    cont1 = np.atleast_2d(metadata1.continuous_data)  # (S, F)
-    cont2 = np.atleast_2d(metadata2.continuous_data)  # (S, F)
+    if not cont_fnames:
+        return MetadataDistanceOutput({})
 
-    _validate_factors_and_data(fnames, cont1)
-    _validate_factors_and_data(fnames, cont2)
+    cont1 = np.atleast_2d(metadata1.dataframe[cont_fnames].to_numpy())  # (S, F)
+    cont2 = np.atleast_2d(metadata2.dataframe[cont_fnames].to_numpy())  # (S, F)
+
+    _validate_factors_and_data(cont_fnames, cont1)
+    _validate_factors_and_data(cont_fnames, cont2)
 
     N = len(cont1)
     M = len(cont2)
@@ -104,7 +107,7 @@ def metadata_distance(metadata1: Metadata, metadata2: Metadata) -> MetadataDista
     results: dict[str, MetadataDistanceValues] = {}
 
     # Per factor
-    for i, fname in enumerate(fnames):
+    for i, fname in enumerate(cont_fnames):
         fdata1 = cont1[:, i]  # (S, 1)
         fdata2 = cont2[:, i]  # (S, 1)
 
