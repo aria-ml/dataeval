@@ -40,8 +40,8 @@ def get_metadata(labels, groups=None) -> Metadata:
     metadata = MagicMock(spec=Metadata)
     metadata.class_labels = labels
     if groups is not None:
-        metadata.discrete_factor_names = ["Discrete", "Binned"]
-        metadata.discrete_data = np.column_stack(tuple(groups.values()))
+        metadata.factor_names = ["Discrete", "Binned"]
+        metadata.discretized_data = np.column_stack(tuple(groups.values()))
     return metadata
 
 

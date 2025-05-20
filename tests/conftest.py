@@ -11,7 +11,8 @@ import pytest
 from PIL import Image
 
 from dataeval.config import set_seed
-from dataeval.data import Metadata, Targets
+from dataeval.data import Metadata
+from dataeval.utils.data._dataset import to_image_classification_dataset
 
 TEMP_CONTENTS = "ABCDEF1234567890"
 
@@ -20,31 +21,21 @@ pytest_plugins = ["tests.fixtures.metadata"]
 set_seed(0, all_generators=True)
 
 
-def preprocess(factors, class_labels, continuous_factor_bins=None, exclude=None, include=None):
+def to_metadata(factors, class_labels, continuous_factor_bins=None, exclude=None, include=None):
     if isinstance(class_labels[0], str):
         class_names = sorted(set(class_labels))
-        index2label = {i: class_names[i] for i in range(len(class_names))}
         class_labels = [class_names.index(i) for i in class_labels]
-    elif isinstance(class_labels[0], int):
-        index2label = {i: str(i) for i in range(max(class_labels) + 1)}
     else:
-        index2label = {0: "mock"}
-    scores = np.zeros((len(class_labels), len(index2label)), dtype=np.float32)
-    targets = Targets(labels=np.asarray(class_labels), scores=scores, bboxes=None, source=None)
+        class_names = None
+    dataset = to_image_classification_dataset(
+        np.zeros((len(class_labels), 1, 16, 16)), labels=class_labels, metadata=factors, classes=class_names
+    )
     metadata = Metadata(
-        None,  # type: ignore
+        dataset,  # type: ignore
         continuous_factor_bins=continuous_factor_bins,
         exclude=exclude,
         include=include,
     )
-
-    # set internal attributes
-    metadata._raw = [{} for _ in range(len(class_labels))]
-    metadata._targets = targets
-    metadata._class_labels = targets.labels
-    metadata._class_names = [index2label.get(i, str(i)) for i in np.unique(targets.labels)]
-    metadata._collated = True
-    metadata._merged = factors, {}
     return metadata
 
 
