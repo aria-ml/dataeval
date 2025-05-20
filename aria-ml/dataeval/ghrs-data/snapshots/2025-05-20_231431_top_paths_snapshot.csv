@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,98,49
+/aria-ml/dataeval/tree/main/src,8,7
+/aria-ml/dataeval/commits/main,7,1
+/aria-ml/dataeval/tree/main/src/dataeval,6,5
+/aria-ml/dataeval/tree/main,5,4
+/aria-ml/dataeval/tree/main/docs,5,4
+/aria-ml/dataeval/tree/main/src/dataeval/detectors,5,2
+/aria-ml/dataeval/tree/main/src/dataeval/data,3,3
+/aria-ml/dataeval/tree/main/src/dataeval/detectors/drift,3,3
+/aria-ml/dataeval/tree/64e848ca732eff1dde368a047eb1b3c252ceb110,3,1
