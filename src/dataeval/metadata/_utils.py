@@ -1,9 +1,11 @@
 __all__ = []
 
+from typing import Sequence
+
 from numpy.typing import NDArray
 
 
-def _compare_keys(keys1: list[str], keys2: list[str]) -> None:
+def _compare_keys(keys1: Sequence[str], keys2: Sequence[str]) -> None:
     """
     Raises error when two lists are not equivalent including ordering
 
@@ -24,7 +26,7 @@ def _compare_keys(keys1: list[str], keys2: list[str]) -> None:
         raise ValueError(f"Metadata keys must be identical, got {keys1} and {keys2}")
 
 
-def _validate_factors_and_data(factors: list[str], data: NDArray) -> None:
+def _validate_factors_and_data(factors: Sequence[str], data: NDArray) -> None:
     """
     Raises error when the number of factors and number of rows do not match
 

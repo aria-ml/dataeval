@@ -147,7 +147,7 @@ P = ParamSpec("P")
 R = TypeVar("R", bound=GenericOutput)
 
 
-def set_metadata(fn: Callable[P, R] | None = None, *, state: list[str] | None = None) -> Callable[P, R]:
+def set_metadata(fn: Callable[P, R] | None = None, *, state: Sequence[str] | None = None) -> Callable[P, R]:
     """Decorator to stamp Output classes with runtime metadata"""
 
     if fn is None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 from dataclasses import dataclass
+from typing import Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -36,9 +37,9 @@ class SplitDatasetOutput(Output):
     ----------
     test: NDArray[np.intp]
         Indices for the test set
-    folds: list[TrainValSplit]
+    folds: Sequence[TrainValSplit]
         List of train and validation split indices
     """
 
     test: NDArray[np.intp]
-    folds: list[TrainValSplit]
+    folds: Sequence[TrainValSplit]

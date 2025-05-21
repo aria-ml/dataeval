@@ -46,7 +46,7 @@ class Metadata:
 
     def __init__(
         self,
-        dataset: AnnotatedDataset[tuple[Any, Any, dict[str, Any]]],
+        dataset: AnnotatedDataset[tuple[Any, Any, Mapping[str, Any]]],
         *,
         continuous_factor_bins: Mapping[str, int | Sequence[float]] | None = None,
         auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
@@ -59,6 +59,7 @@ class Metadata:
         self._factors: dict[str, FactorInfo]
         self._dropped_factors: dict[str, list[str]]
         self._dataframe: pl.DataFrame
+        self._raw: Sequence[Mapping[str, Any]]
 
         self._is_structured = False
         self._is_binned = False
@@ -74,7 +75,7 @@ class Metadata:
         self._include = set(include or ())
 
     @property
-    def raw(self) -> list[dict[str, Any]]:
+    def raw(self) -> Sequence[Mapping[str, Any]]:
         """The raw list of metadata dictionaries for the dataset."""
         self._structure()
         return self._raw
@@ -134,7 +135,7 @@ class Metadata:
         return self._dataframe
 
     @property
-    def dropped_factors(self) -> dict[str, list[str]]:
+    def dropped_factors(self) -> Mapping[str, Sequence[str]]:
         """Factors that were dropped during preprocessing and the reasons why they were dropped."""
         self._structure()
         return self._dropped_factors
@@ -153,13 +154,13 @@ class Metadata:
         )
 
     @property
-    def factor_names(self) -> list[str]:
+    def factor_names(self) -> Sequence[str]:
         """Factor names of the metadata."""
         self._structure()
         return list(self._factors)
 
     @property
-    def factor_info(self) -> dict[str, FactorInfo]:
+    def factor_info(self) -> Mapping[str, FactorInfo]:
         """Factor types of the metadata."""
         self._bin()
         return self._factors
@@ -180,7 +181,7 @@ class Metadata:
         return self._class_labels
 
     @property
-    def class_names(self) -> list[str]:
+    def class_names(self) -> Sequence[str]:
         """Class names as a list of strings."""
         self._structure()
         return self._class_names
@@ -208,7 +209,7 @@ class Metadata:
         if self._is_structured:
             return
 
-        raw: list[dict[str, Any]] = []
+        raw: Sequence[Mapping[str, Any]] = []
 
         labels = []
         bboxes = []
@@ -325,7 +326,7 @@ class Metadata:
         self._factors.update(factor_info)
         self._is_binned = True
 
-    def get_factors_by_type(self, factor_type: Literal["categorical", "continuous", "discrete"]) -> list[str]:
+    def get_factors_by_type(self, factor_type: Literal["categorical", "continuous", "discrete"]) -> Sequence[str]:
         """
         Get the names of factors of a specific type.
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 from dataclasses import dataclass
+from typing import Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -64,7 +65,7 @@ class ClustererOutput(Output):
         """
         return np.nonzero(self.clusters == -1)[0]
 
-    def find_duplicates(self) -> tuple[list[list[int]], list[list[int]]]:
+    def find_duplicates(self) -> tuple[Sequence[Sequence[int]], Sequence[Sequence[int]]]:
         """
         Finds duplicate and near duplicate data based on cluster average distance
 

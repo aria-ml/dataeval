@@ -4,7 +4,7 @@ __all__ = []
 
 import contextlib
 import math
-from typing import Any
+from typing import Any, Mapping, Sequence
 
 import numpy as np
 
@@ -134,7 +134,7 @@ def format_text(*args: str) -> str:
 
 
 def histogram_plot(
-    data_dict: dict[str, Any],
+    data_dict: Mapping[str, Any],
     log: bool = True,
     xlabel: str = "values",
     ylabel: str = "counts",
@@ -186,10 +186,10 @@ def histogram_plot(
 
 
 def channel_histogram_plot(
-    data_dict: dict[str, Any],
+    data_dict: Mapping[str, Any],
     log: bool = True,
     max_channels: int = 3,
-    ch_mask: list[bool] | None = None,
+    ch_mask: Sequence[bool] | None = None,
     xlabel: str = "values",
     ylabel: str = "counts",
 ) -> Figure:

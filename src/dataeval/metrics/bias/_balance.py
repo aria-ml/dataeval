@@ -157,6 +157,6 @@ def balance(
     classwise = classwise_mi / norm_factor
 
     # Grabbing factor names for plotting function
-    factor_names = ["class_label"] + metadata.factor_names
+    factor_names = ["class_label"] + list(metadata.factor_names)
 
     return BalanceOutput(balance, factors, classwise, factor_names, metadata.class_names)
