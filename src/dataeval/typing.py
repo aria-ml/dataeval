@@ -21,7 +21,7 @@ __all__ = [
 
 
 import sys
-from typing import Any, Generic, Iterator, Protocol, TypedDict, TypeVar, runtime_checkable
+from typing import Any, Generic, Iterator, Mapping, Protocol, TypedDict, TypeVar, runtime_checkable
 
 import numpy.typing
 from typing_extensions import NotRequired, ReadOnly, Required
@@ -159,7 +159,7 @@ class AnnotatedDataset(Dataset[_T_co], Generic[_T_co], Protocol):
 # ========== IMAGE CLASSIFICATION DATASETS ==========
 
 
-ImageClassificationDatum: TypeAlias = tuple[ArrayLike, ArrayLike, dict[str, Any]]
+ImageClassificationDatum: TypeAlias = tuple[ArrayLike, ArrayLike, Mapping[str, Any]]
 """
 Type alias for an image classification datum tuple.
 
@@ -199,7 +199,7 @@ class ObjectDetectionTarget(Protocol):
     def scores(self) -> ArrayLike: ...
 
 
-ObjectDetectionDatum: TypeAlias = tuple[ArrayLike, ObjectDetectionTarget, dict[str, Any]]
+ObjectDetectionDatum: TypeAlias = tuple[ArrayLike, ObjectDetectionTarget, Mapping[str, Any]]
 """
 Type alias for an object detection datum tuple.
 
@@ -240,7 +240,7 @@ class SegmentationTarget(Protocol):
     def scores(self) -> ArrayLike: ...
 
 
-SegmentationDatum: TypeAlias = tuple[ArrayLike, SegmentationTarget, dict[str, Any]]
+SegmentationDatum: TypeAlias = tuple[ArrayLike, SegmentationTarget, Mapping[str, Any]]
 """
 Type alias for an image classification datum tuple.
 

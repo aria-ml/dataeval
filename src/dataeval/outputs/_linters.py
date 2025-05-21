@@ -3,7 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 from dataclasses import dataclass
-from typing import Generic, TypeVar, Union
+from typing import Generic, Mapping, Sequence, TypeVar, Union
 
 import pandas as pd
 from typing_extensions import TypeAlias
@@ -11,13 +11,13 @@ from typing_extensions import TypeAlias
 from dataeval.outputs._base import Output
 from dataeval.outputs._stats import DimensionStatsOutput, LabelStatsOutput, PixelStatsOutput, VisualStatsOutput
 
-DuplicateGroup: TypeAlias = list[int]
-DatasetDuplicateGroupMap: TypeAlias = dict[int, DuplicateGroup]
+DuplicateGroup: TypeAlias = Sequence[int]
+DatasetDuplicateGroupMap: TypeAlias = Mapping[int, DuplicateGroup]
 TIndexCollection = TypeVar("TIndexCollection", DuplicateGroup, DatasetDuplicateGroupMap)
 
-IndexIssueMap: TypeAlias = dict[int, dict[str, float]]
+IndexIssueMap: TypeAlias = Mapping[int, Mapping[str, float]]
 OutlierStatsOutput: TypeAlias = Union[DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput]
-TIndexIssueMap = TypeVar("TIndexIssueMap", IndexIssueMap, list[IndexIssueMap])
+TIndexIssueMap = TypeVar("TIndexIssueMap", IndexIssueMap, Sequence[IndexIssueMap])
 
 
 @dataclass(frozen=True)
@@ -27,9 +27,9 @@ class DuplicatesOutput(Output, Generic[TIndexCollection]):
 
     Attributes
     ----------
-    exact : list[list[int] | dict[int, list[int]]]
+    exact : Sequence[Sequence[int] | Mapping[int, Sequence[int]]]
         Indices of images that are exact matches
-    near: list[list[int] | dict[int, list[int]]]
+    near: Sequence[Sequence[int] | Mapping[int, Sequence[int]]]
         Indices of images that are near matches
 
     Notes
@@ -39,13 +39,13 @@ class DuplicatesOutput(Output, Generic[TIndexCollection]):
       index of the dataset, and the value is the list index groups from that dataset.
     """
 
-    exact: list[TIndexCollection]
-    near: list[TIndexCollection]
+    exact: Sequence[TIndexCollection]
+    near: Sequence[TIndexCollection]
 
 
 def _reorganize_by_class_and_metric(
     result: IndexIssueMap, lstats: LabelStatsOutput
-) -> tuple[dict[str, list[int]], dict[str, dict[str, int]]]:
+) -> tuple[Mapping[str, Sequence[int]], Mapping[str, Mapping[str, int]]]:
     """Flip result from grouping by image to grouping by class and metric"""
     metrics: dict[str, list[int]] = {}
     class_wise: dict[str, dict[str, int]] = {label: {} for label in lstats.class_names}
@@ -61,7 +61,7 @@ def _reorganize_by_class_and_metric(
     return metrics, class_wise
 
 
-def _create_table(metrics: dict[str, list[int]], class_wise: dict[str, dict[str, int]]) -> list[str]:
+def _create_table(metrics: Mapping[str, Sequence[int]], class_wise: Mapping[str, Mapping[str, int]]) -> Sequence[str]:
     """Create table for displaying the results"""
     max_class_length = max(len(str(label)) for label in class_wise) + 2
     max_total = max(len(metrics[group]) for group in metrics) + 2
@@ -71,7 +71,7 @@ def _create_table(metrics: dict[str, list[int]], class_wise: dict[str, dict[str,
         + [f"{group:^{max(5, len(str(group))) + 2}}" for group in sorted(metrics.keys())]
         + [f"{'Total':<{max_total}}"]
     )
-    table_rows: list[str] = []
+    table_rows: Sequence[str] = []
 
     for class_cat, results in class_wise.items():
         table_value = [f"{class_cat:>{max_class_length}}"]
@@ -86,7 +86,7 @@ def _create_table(metrics: dict[str, list[int]], class_wise: dict[str, dict[str,
     return [table_header] + table_rows
 
 
-def _create_pandas_dataframe(class_wise: dict[str, dict[str, int]]) -> list[dict[str, str | int]]:
+def _create_pandas_dataframe(class_wise: Mapping[str, Mapping[str, int]]) -> Sequence[Mapping[str, str | int]]:
     """Create data for pandas dataframe"""
     data = []
     for label, metrics_dict in class_wise.items():
@@ -105,7 +105,7 @@ class OutliersOutput(Output, Generic[TIndexIssueMap]):
 
     Attributes
     ----------
-    issues : dict[int, dict[str, float]] | list[dict[int, dict[str, float]]]
+    issues : Mapping[int, Mapping[str, float]] | Sequence[Mapping[int, Mapping[str, float]]]
         Indices of image Outliers with their associated issue type and calculated values.
 
     - For a single dataset, a dictionary containing the indices of outliers and
@@ -117,7 +117,7 @@ class OutliersOutput(Output, Generic[TIndexIssueMap]):
     issues: TIndexIssueMap
 
     def __len__(self) -> int:
-        if isinstance(self.issues, dict):
+        if isinstance(self.issues, Mapping):
             return len(self.issues)
         return sum(len(d) for d in self.issues)
 
@@ -134,7 +134,7 @@ class OutliersOutput(Output, Generic[TIndexIssueMap]):
         -------
         str
         """
-        if isinstance(self.issues, dict):
+        if isinstance(self.issues, Mapping):
             metrics, classwise = _reorganize_by_class_and_metric(self.issues, labelstats)
             listed_table = _create_table(metrics, classwise)
             table = "\n".join(listed_table)
@@ -165,7 +165,7 @@ class OutliersOutput(Output, Generic[TIndexIssueMap]):
         -----
         This method requires `pandas <https://pandas.pydata.org/>`_ to be installed.
         """
-        if isinstance(self.issues, dict):
+        if isinstance(self.issues, Mapping):
             _, classwise = _reorganize_by_class_and_metric(self.issues, labelstats)
             data = _create_pandas_dataframe(classwise)
             df = pd.DataFrame(data)

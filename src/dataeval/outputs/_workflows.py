@@ -177,7 +177,9 @@ def calc_params(p_i: NDArray[Any], n_i: NDArray[Any], niter: int) -> NDArray[Any
     return res.x
 
 
-def get_curve_params(measures: dict[str, NDArray[Any]], ranges: NDArray[Any], niter: int) -> dict[str, NDArray[Any]]:
+def get_curve_params(
+    measures: Mapping[str, NDArray[Any]], ranges: NDArray[Any], niter: int
+) -> Mapping[str, NDArray[Any]]:
     """Calculates and aggregates parameters for both single and multi-class metrics"""
     output = {}
     for name, measure in measures.items():
@@ -208,7 +210,7 @@ class SufficiencyOutput(Output):
     """
 
     steps: NDArray[np.uint32]
-    measures: dict[str, NDArray[np.float64]]
+    measures: Mapping[str, NDArray[np.float64]]
     n_iter: int = 1000
 
     def __post_init__(self) -> None:
@@ -220,7 +222,7 @@ class SufficiencyOutput(Output):
         self._params = None
 
     @property
-    def params(self) -> dict[str, NDArray[Any]]:
+    def params(self) -> Mapping[str, NDArray[Any]]:
         if self._params is None:
             self._params = {}
         if self.n_iter not in self._params:
@@ -270,7 +272,7 @@ class SufficiencyOutput(Output):
         proj._params = self._params
         return proj
 
-    def plot(self, class_names: Sequence[str] | None = None) -> list[Figure]:
+    def plot(self, class_names: Sequence[str] | None = None) -> Sequence[Figure]:
         """
         Plotting function for data :term:`sufficience<Sufficiency>` tasks.
 
@@ -281,7 +283,7 @@ class SufficiencyOutput(Output):
 
         Returns
         -------
-        list[Figure]
+        Sequence[Figure]
             List of Figures for each measure
 
         Raises
@@ -325,7 +327,7 @@ class SufficiencyOutput(Output):
 
     def inv_project(
         self, targets: Mapping[str, ArrayLike], n_iter: int | None = None
-    ) -> dict[str, NDArray[np.float64]]:
+    ) -> Mapping[str, NDArray[np.float64]]:
         """
         Calculate training samples needed to achieve target model metric values.
 
@@ -339,7 +341,7 @@ class SufficiencyOutput(Output):
 
         Returns
         -------
-        dict[str, NDArray]
+        Mapping[str, NDArray]
             List of the number of training samples needed to achieve each
             corresponding entry in targets
         """

@@ -3,7 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Iterable, NamedTuple, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any, Iterable, Mapping, NamedTuple, Optional, Sequence, Union
 
 import numpy as np
 import pandas as pd
@@ -61,7 +61,7 @@ class BaseStatsOutput(Output):
         The number of detected objects in each image
     """
 
-    source_index: list[SourceIndex]
+    source_index: Sequence[SourceIndex]
     object_count: NDArray[np.uint16]
     image_count: int
 
@@ -80,7 +80,7 @@ class BaseStatsOutput(Output):
         self,
         channel_index: OptionalRange,
         channel_count: OptionalRange = None,
-    ) -> list[bool]:
+    ) -> Sequence[bool]:
         """
         Boolean mask for results filtered to specified channel index and optionally the count
         of the channels per image.
@@ -92,8 +92,8 @@ class BaseStatsOutput(Output):
         channel_count : int | Iterable[int] | None
             Optional count(s) of channels to filter for
         """
-        mask: list[bool] = []
-        cur_mask: list[bool] = []
+        mask: Sequence[bool] = []
+        cur_mask: Sequence[bool] = []
         cur_image = 0
         cur_max_channel = 0
         for source_index in list(self.source_index) + [None]:
@@ -113,7 +113,7 @@ class BaseStatsOutput(Output):
 
     def _get_channels(
         self, channel_limit: int | None = None, channel_index: int | Iterable[int] | None = None
-    ) -> tuple[int, list[bool] | None]:
+    ) -> tuple[int, Sequence[bool] | None]:
         source_index = self.data()[SOURCE_INDEX]
         raw_channels = int(max([si.channel or 0 for si in source_index])) + 1
         if isinstance(channel_index, int):
@@ -140,7 +140,7 @@ class BaseStatsOutput(Output):
         self,
         filter: str | Sequence[str] | None = None,  # noqa: A002
         exclude_constant: bool = False,
-    ) -> dict[str, NDArray[Any]]:
+    ) -> Mapping[str, NDArray[Any]]:
         """
         Returns all 1-dimensional data as a dictionary of numpy arrays.
 
@@ -153,7 +153,7 @@ class BaseStatsOutput(Output):
 
         Returns
         -------
-        dict[str, NDArray[Any]]
+        Mapping[str, NDArray[Any]]
         """
         filter_ = [filter] if isinstance(filter, str) else filter
         return {
@@ -253,8 +253,8 @@ class HashStatsOutput(BaseStatsOutput):
         :term:`Perception-based Hash` of the images as a hex string
     """
 
-    xxhash: list[str]
-    pchash: list[str]
+    xxhash: Sequence[str]
+    pchash: Sequence[str]
 
 
 @dataclass(frozen=True)
@@ -264,15 +264,15 @@ class LabelStatsOutput(Output):
 
     Attributes
     ----------
-    label_counts_per_class : dict[int, int]
+    label_counts_per_class : Mapping[int, int]
         Dictionary whose keys are the different label classes and
         values are total counts of each class
-    label_counts_per_image : list[int]
+    label_counts_per_image : Sequence[int]
         Number of labels per image
-    image_counts_per_class : dict[int, int]
+    image_counts_per_class : Mapping[int, int]
         Dictionary whose keys are the different label classes and
         values are total counts of each image the class is present in
-    image_indices_per_class : dict[int, list]
+    image_indices_per_class : Mapping[int, list]
         Dictionary whose keys are the different label classes and
         values are lists containing the images that have that label
     image_count : int
@@ -281,17 +281,17 @@ class LabelStatsOutput(Output):
         Total number of classes present
     label_count : int
         Total number of labels present
-    class_names : list[str]
+    class_names : Sequence[str]
     """
 
-    label_counts_per_class: list[int]
-    label_counts_per_image: list[int]
-    image_counts_per_class: list[int]
-    image_indices_per_class: list[list[int]]
+    label_counts_per_class: Sequence[int]
+    label_counts_per_image: Sequence[int]
+    image_counts_per_class: Sequence[int]
+    image_indices_per_class: Sequence[Sequence[int]]
     image_count: int
     class_count: int
     label_count: int
-    class_names: list[str]
+    class_names: Sequence[str]
 
     def to_table(self) -> str:
         """

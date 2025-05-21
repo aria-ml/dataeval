@@ -259,7 +259,8 @@ def parity(metadata: Metadata) -> ParityOutput:
         counts = np.nonzero(contingency_matrix < 5)
         unique_factor_values = np.unique(col_data)
         current_factor_name = metadata.factor_names[i]
-        for int_factor, int_class in zip(counts[0], counts[1]):
+        for _factor, _class in zip(counts[0], counts[1]):
+            int_factor, int_class = int(_factor), int(_class)
             if contingency_matrix[int_factor, int_class] > 0:
                 factor_category = unique_factor_values[int_factor].item()
                 class_name = metadata.class_names[int_class]

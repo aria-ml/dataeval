@@ -2,7 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Any, Generic, Iterable, Sequence, Sized, TypeVar, cast
+from typing import Any, Generic, Iterable, Mapping, Sequence, Sized, TypeVar, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -92,7 +92,7 @@ class ClassFilterSubSelection(Subselection[Any]):
     def __init__(self, classes: Sequence[int]) -> None:
         self.classes = classes
 
-    def _filter(self, d: dict[str, Any], mask: NDArray[np.bool_]) -> dict[str, Any]:
+    def _filter(self, d: Mapping[str, Any], mask: NDArray[np.bool_]) -> dict[str, Any]:
         return {k: self._filter(v, mask) if isinstance(v, dict) else _try_mask_object(v, mask) for k, v in d.items()}
 
     def __call__(self, datum: _TDatum) -> _TDatum:

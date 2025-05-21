@@ -4,7 +4,7 @@ __all__ = []
 
 import contextlib
 from dataclasses import asdict, dataclass
-from typing import Any, TypeVar
+from typing import Any, Mapping, Sequence, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -39,7 +39,7 @@ class ToDataFrameMixin:
         This method requires `pandas <https://pandas.pydata.org/>`_ to be installed.
         """
         return pd.DataFrame(
-            index=self.factor_names,  # type: ignore - list[str] is documented as acceptable index type
+            index=self.factor_names,  # type: ignore - Sequence[str] is documented as acceptable index type
             data={
                 "score": self.score.round(2),
                 "p-value": self.p_value.round(2),
@@ -58,7 +58,7 @@ class ParityOutput(ToDataFrameMixin, Output):
         chi-squared score(s) of the test
     p_value : NDArray[np.float64]
         p-value(s) of the test
-    factor_names : list[str]
+    factor_names : Sequence[str]
         Names of each metadata factor
     insufficient_data: dict
         Dictionary of metadata factors with less than 5 class occurrences per value
@@ -66,8 +66,8 @@ class ParityOutput(ToDataFrameMixin, Output):
 
     score: NDArray[np.float64]
     p_value: NDArray[np.float64]
-    factor_names: list[str]
-    insufficient_data: dict[str, dict[int, dict[str, int]]]
+    factor_names: Sequence[str]
+    insufficient_data: Mapping[str, Mapping[int, Mapping[str, int]]]
 
 
 @dataclass(frozen=True)
@@ -187,22 +187,22 @@ class BalanceOutput(Output):
         Estimate of inter/intra-factor mutual information
     classwise : NDArray[np.float64]
         Estimate of mutual information between metadata factors and individual class labels
-    factor_names : list[str]
+    factor_names : Sequence[str]
         Names of each metadata factor
-    class_names : list[str]
+    class_names : Sequence[str]
         List of the class labels present in the dataset
     """
 
     balance: NDArray[np.float64]
     factors: NDArray[np.float64]
     classwise: NDArray[np.float64]
-    factor_names: list[str]
-    class_names: list[str]
+    factor_names: Sequence[str]
+    class_names: Sequence[str]
 
     def plot(
         self,
-        row_labels: list[Any] | NDArray[Any] | None = None,
-        col_labels: list[Any] | NDArray[Any] | None = None,
+        row_labels: Sequence[Any] | NDArray[Any] | None = None,
+        col_labels: Sequence[Any] | NDArray[Any] | None = None,
         plot_classwise: bool = False,
     ) -> Figure:
         """
@@ -276,16 +276,16 @@ class DiversityOutput(Output):
         :term:`Diversity` index for classes and factors
     classwise : NDArray[np.double]
         Classwise diversity index [n_class x n_factor]
-    factor_names : list[str]
+    factor_names : Sequence[str]
         Names of each metadata factor
-    class_names : list[str]
+    class_names : Sequence[str]
         Class labels for each value in the dataset
     """
 
     diversity_index: NDArray[np.double]
     classwise: NDArray[np.double]
-    factor_names: list[str]
-    class_names: list[str]
+    factor_names: Sequence[str]
+    class_names: Sequence[str]
 
     def plot(
         self,
@@ -333,7 +333,7 @@ class DiversityOutput(Output):
             import matplotlib.pyplot as plt
 
             fig, ax = plt.subplots(figsize=(8, 8))
-            heat_labels = ["class_labels"] + self.factor_names
+            heat_labels = ["class_labels"] + list(self.factor_names)
             ax.bar(heat_labels, self.diversity_index)
             ax.set_xlabel("Factors")
             plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
