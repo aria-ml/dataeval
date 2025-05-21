@@ -5,7 +5,6 @@ import sys
 from typing import Any, Mapping, Sequence
 
 from dataeval.data._metadata import FactorInfo, Metadata
-from dataeval.data._targets import Targets
 from dataeval.outputs._ood import OODOutput
 from dataeval.utils.data._dataset import to_object_detection_dataset
 
@@ -46,13 +45,10 @@ def generate_random_metadata(
 ) -> Metadata:
     rng = np.random.default_rng(random_seed)
     labels_arr = rng.choice(range(len(labels)), (length))
-    scores_arr = np.eye(len(labels))[labels_arr].astype(np.float32)
-    targets = Targets(labels_arr, scores_arr, None, None)
     metadata_dict = {k: list(rng.choice(v, (length))) for k, v in factors.items()}
     metadata = Metadata(None)  # type: ignore
     metadata._raw = [{} for _ in range(len(labels))]
-    metadata._targets = targets
-    metadata._class_labels = targets.labels
+    metadata._class_labels = labels_arr
     metadata._class_names = list(labels)
     metadata._dataframe = pl.DataFrame(metadata_dict)
     metadata._factors = dict.fromkeys(factors, FactorInfo("discrete"))
@@ -166,13 +162,9 @@ def doctest_metrics_bias_balance_diversity(doctest_namespace: dict[str, Any]) ->
     cat_vals = [1.1, 1.1, 0, 0, 1.1, 0, 1.1, 0, 0, 1.1, 1.1, 0]
     metadata_dict = {"var_cat": str_vals, "var_cnt": cnt_vals, "var_float_cat": cat_vals}
     continuous_factor_bincounts = {"var_cnt": 5, "var_float_cat": 2}
-    labels = np.asarray(class_labels)
-    scores = np.eye(2)[labels].astype(np.float32)
-    targets = Targets(labels=labels, scores=scores, bboxes=None, source=None)
     metadata = Metadata(None, continuous_factor_bins=continuous_factor_bincounts)  # type: ignore
     metadata._is_structured = True
     metadata._raw = [{} for _ in range(len(class_labels))]
-    metadata._targets = targets
     metadata._class_labels = np.asarray(class_labels)
     metadata._class_names = ["cat", "dog"]
     metadata._dataframe = pl.DataFrame(metadata_dict)
