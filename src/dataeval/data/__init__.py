@@ -6,7 +6,6 @@ __all__ = [
     "Metadata",
     "Select",
     "SplitDatasetOutput",
-    "Targets",
     "split_dataset",
 ]
 
@@ -15,5 +14,4 @@ from dataeval.data._images import Images
 from dataeval.data._metadata import Metadata
 from dataeval.data._selection import Select
 from dataeval.data._split import split_dataset
-from dataeval.data._targets import Targets
 from dataeval.outputs._utils import SplitDatasetOutput

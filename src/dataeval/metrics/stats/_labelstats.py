@@ -2,8 +2,9 @@ from __future__ import annotations
 
 __all__ = []
 
-from collections import Counter, defaultdict
 from typing import Any, Mapping, TypeVar
+
+import polars as pl
 
 from dataeval.data._metadata import Metadata
 from dataeval.outputs import LabelStatsOutput
@@ -52,39 +53,34 @@ def labelstats(dataset: Metadata | AnnotatedDataset[Any]) -> LabelStatsOutput:
         pig:      2      -      2
     chicken:      5      -      5
     """
-    dataset = Metadata(dataset) if isinstance(dataset, AnnotatedDataset) else dataset
+    metadata = Metadata(dataset) if isinstance(dataset, AnnotatedDataset) else dataset
+    metadata_df = metadata.dataframe
 
-    label_counts: Counter[int] = Counter()
-    image_counts: Counter[int] = Counter()
-    index_location = defaultdict(list[int])
-    label_per_image: list[int] = []
+    # Count occurrences of each label across all images
+    label_counts_df = metadata_df.group_by("class_label").len()
+    label_counts = label_counts_df.sort("class_label")["len"].to_list()
 
-    index2label = dict(enumerate(dataset.class_names))
+    # Count unique images per label (how many images contain each label)
+    image_counts_df = metadata_df.select(["image_index", "class_label"]).unique().group_by("class_label").len()
+    image_counts = image_counts_df.sort("class_label")["len"].to_list()
 
-    for i, target in enumerate(dataset.targets):
-        group = target.labels.tolist()
+    # Create index_location mapping (which images contain each label)
+    index_location: list[list[int]] = [[] for _ in range(len(metadata.class_names))]
+    for row in metadata_df.group_by("class_label").agg(pl.col("image_index")).to_dicts():
+        indices = row["image_index"]
+        index_location[row["class_label"]] = sorted(dict.fromkeys(indices)) if isinstance(indices, list) else [indices]
 
-        # Count occurrences of each label in all sublists
-        label_counts.update(group)
-
-        # Get the number of labels per image
-        label_per_image.append(len(group))
-
-        # Create a set of unique items in the current sublist
-        unique_items: set[int] = set(group)
-
-        # Update image counts and index locations
-        image_counts.update(unique_items)
-        for item in unique_items:
-            index_location[item].append(i)
+    # Count labels per image
+    label_per_image_df = metadata_df.group_by("image_index").agg(pl.count().alias("label_count"))
+    label_per_image = label_per_image_df.sort("image_index")["label_count"].to_list()
 
     return LabelStatsOutput(
-        label_counts_per_class=_sort_to_list(label_counts),
+        label_counts_per_class=label_counts,
         label_counts_per_image=label_per_image,
-        image_counts_per_class=_sort_to_list(image_counts),
-        image_indices_per_class=_sort_to_list(index_location),
+        image_counts_per_class=image_counts,
+        image_indices_per_class=index_location,
         image_count=len(label_per_image),
-        class_count=len(label_counts),
-        label_count=sum(label_counts.values()),
-        class_names=list(index2label.values()),
+        class_count=len(metadata.class_names),
+        label_count=sum(label_counts),
+        class_names=metadata.class_names,
     )

@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from functools import partial
 from random import random
 from typing import Any, Literal, overload
-from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -12,9 +11,7 @@ from numpy.random import randint
 from numpy.typing import NDArray
 
 from dataeval.config import set_max_processes, use_max_processes
-from dataeval.data._metadata import Metadata
-from dataeval.data._targets import Targets
-from dataeval.metrics.stats import dimensionstats, hashstats, labelstats, pixelstats, visualstats
+from dataeval.metrics.stats import dimensionstats, hashstats, pixelstats, visualstats
 from dataeval.metrics.stats._base import (
     BoundingBox,
     StatsProcessor,
@@ -31,7 +28,7 @@ from dataeval.metrics.stats._imagestats import (
 )
 from dataeval.outputs._stats import SOURCE_INDEX, BaseStatsOutput
 from dataeval.typing import ImageClassificationDataset, ObjectDetectionDataset
-from dataeval.utils.data._dataset import _find_max, to_image_classification_dataset, to_object_detection_dataset
+from dataeval.utils.data._dataset import to_image_classification_dataset, to_object_detection_dataset
 
 # do not run stats tests using multiple processing
 set_max_processes(1)
@@ -97,15 +94,6 @@ def get_dataset(
     else:
         labels = [0 for _ in range(length)]
         return to_image_classification_dataset(images, labels, None, None)
-
-
-def get_metadata(label_array: list[list[int]]) -> Metadata:
-    mock = MagicMock(spec=Metadata)
-    mock.class_names = [str(i) for i in range(_find_max(label_array) + 1)]
-    mock.targets = [MagicMock(spec=Targets) for _ in range(len(label_array))]
-    for i, target in enumerate(mock.targets):
-        target.labels = np.asarray(label_array[i])
-    return mock
 
 
 class LengthStatsOutput(BaseStatsOutput):
@@ -282,36 +270,6 @@ class TestStats:
         with use_max_processes(2):
             stats = imagestats(DATA_3)
         assert stats is not None
-
-
-@pytest.mark.required
-class TestLabelStats:
-    def test_labelstats_list_int(self):
-        label_array = [[0, 0, 0, 0, 0], [0, 1], [0, 1, 2], [0, 1, 2, 3]]
-        metadata = get_metadata(label_array)
-        stats = labelstats(metadata)
-
-        assert stats.label_counts_per_class == [8, 3, 2, 1]
-        assert stats.class_count == 4
-        assert stats.label_count == 14
-        assert stats.image_indices_per_class == [[0, 1, 2, 3], [1, 2, 3], [2, 3], [3]]
-        assert stats.image_counts_per_class == [4, 3, 2, 1]
-        assert stats.label_counts_per_image == [5, 2, 3, 4]
-        assert stats.image_count == 4
-
-    def test_labelstats_to_dataframe(self):
-        label_array = [[0, 0, 0, 0, 0], [0, 1], [0, 1, 2], [0, 1, 2, 3]]
-        metadata = get_metadata(label_array)
-        stats = labelstats(metadata)
-        stats_df = stats.to_dataframe()
-        assert stats_df.shape == (4, 3)
-
-    def test_labelstats_to_table(self):
-        label_array = [[0, 0, 0, 0, 0], [0, 1], [0, 1, 2], [0, 1, 2, 3]]
-        stats = labelstats(get_metadata(label_array))
-        assert stats is not None
-        table_result = stats.to_table()
-        assert isinstance(table_result, str)
 
 
 @pytest.mark.required

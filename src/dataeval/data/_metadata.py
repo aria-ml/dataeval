@@ -4,7 +4,7 @@ __all__ = []
 
 import warnings
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Iterable, Literal, Mapping, Sequence, Sized
+from typing import Any, Iterable, Literal, Mapping, Sequence
 
 import numpy as np
 import polars as pl
@@ -18,11 +18,6 @@ from dataeval.typing import (
 from dataeval.utils._array import as_numpy
 from dataeval.utils._bin import bin_data, digitize_data
 from dataeval.utils.data.metadata import merge
-
-if TYPE_CHECKING:
-    from dataeval.data import Targets
-else:
-    from dataeval.data._targets import Targets
 
 
 @dataclass
@@ -58,7 +53,6 @@ class Metadata:
         exclude: Sequence[str] | None = None,
         include: Sequence[str] | None = None,
     ) -> None:
-        self._targets: Targets
         self._class_labels: NDArray[np.intp]
         self._class_names: list[str]
         self._image_indices: NDArray[np.intp]
@@ -78,12 +72,6 @@ class Metadata:
 
         self._exclude = set(exclude or ())
         self._include = set(include or ())
-
-    @property
-    def targets(self) -> Targets:
-        """Target information for the dataset."""
-        self._structure()
-        return self._targets
 
     @property
     def raw(self) -> list[dict[str, Any]]:
@@ -255,20 +243,7 @@ class Metadata:
         bboxes = as_numpy(bboxes).astype(np.float32) if is_od else None
         srcidx = as_numpy(srcidx).astype(np.intp) if is_od else None
 
-        target_dict = {
-            "image_index": srcidx if srcidx is not None else np.arange(len(labels)),
-            "class_label": labels,
-            "score": scores,
-            "box": bboxes if bboxes is not None else [None] * len(labels),
-        }
-
-        self._targets = Targets(labels, scores, bboxes, srcidx)
-        self._raw = raw
-
         index2label = self._dataset.metadata.get("index2label", {})
-        self._class_labels = labels
-        self._class_names = [index2label.get(i, str(i)) for i in np.unique(self._class_labels)]
-        self._image_indices = target_dict["image_index"]
 
         targets_per_image = None if srcidx is None else np.unique(srcidx, return_counts=True)[1].tolist()
         merged = merge(raw, return_dropped=True, ignore_lists=False, targets_per_image=targets_per_image)
@@ -276,6 +251,17 @@ class Metadata:
         reserved = ["image_index", "class_label", "score", "box"]
         factor_dict = {f"metadata_{k}" if k in reserved else k: v for k, v in merged[0].items() if k != "_image_index"}
 
+        target_dict = {
+            "image_index": srcidx if srcidx is not None else np.arange(len(labels)),
+            "class_label": labels,
+            "score": scores,
+            "box": bboxes if bboxes is not None else [None] * len(labels),
+        }
+
+        self._raw = raw
+        self._class_labels = labels
+        self._class_names = [index2label.get(i, str(i)) for i in np.unique(labels)]
+        self._image_indices = target_dict["image_index"]
         self._factors = dict.fromkeys(factor_dict, FactorInfo())
         self._dataframe = pl.DataFrame({**target_dict, **factor_dict})
         self._dropped_factors = merged[1]
@@ -356,7 +342,7 @@ class Metadata:
         self._bin()
         return [name for name, info in self.factor_info.items() if info.factor_type == factor_type]
 
-    def add_factors(self, factors: Mapping[str, Any]) -> None:
+    def add_factors(self, factors: Mapping[str, Array | Sequence[Any]]) -> None:
         """
         Add additional factors to the metadata.
 
@@ -365,16 +351,15 @@ class Metadata:
 
         Parameters
         ----------
-        factors : Mapping[str, ArrayLike]
+        factors : Mapping[str, Array | Sequence[Any]]
             Dictionary of factors to add to the metadata.
         """
         self._structure()
 
-        targets = len(self.targets.source) if self.targets.source is not None else len(self.targets)
+        targets = len(self.dataframe)
         images = self.image_count
-        lengths = {k: len(v if isinstance(v, Sized) else np.atleast_1d(as_numpy(v))) for k, v in factors.items()}
-        targets_match = all(f == targets for f in lengths.values())
-        images_match = targets_match if images == targets else all(f == images for f in lengths.values())
+        targets_match = all(len(v) == targets for v in factors.values())
+        images_match = targets_match if images == targets else all(len(v) == images for v in factors.values())
         if not targets_match and not images_match:
             raise ValueError(
                 "The lists/arrays in the provided factors have a different length than the current metadata factors."
@@ -382,8 +367,7 @@ class Metadata:
 
         new_columns = []
         for k, v in factors.items():
-            v = as_numpy(v)
-            data = v if (self.targets.source is None or lengths[k] == targets) else v[self.targets.source]
+            data = as_numpy(v)[self.image_indices]
             new_columns.append(pl.Series(name=k, values=data))
             self._factors[k] = FactorInfo()
 

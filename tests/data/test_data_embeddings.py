@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from dataeval.data import Embeddings, Metadata, Targets
+from dataeval.data import Embeddings
 from dataeval.typing import DatasetMetadata
 from dataeval.utils.datasets._types import ObjectDetectionTarget
 
@@ -102,7 +102,6 @@ class TestEmbeddings:
         """Tests with basic identity model"""
         ds = TorchDataset(data, targets)
         em = Embeddings(ds, batch_size=64, model=IdentityModel(), device="cpu")
-        md = Metadata(ds)
 
         assert len(ds) == len(em)
         assert len(em) == len(ds)
@@ -112,8 +111,6 @@ class TestEmbeddings:
 
         for idx, e in enumerate(em):
             torch.allclose(ds[idx][0], e)
-
-        assert isinstance(md.targets, Targets)
 
     def test_embeddings(self):
         embs = Embeddings(get_dataset(), 10, model=torch.nn.Identity(), transforms=lambda x: x + 1)
