@@ -1,6 +1,14 @@
-[//]: # (897e4e0f922aa0929211f4716b706ecb7cc28e56)
+[//]: # (5caee32e612e683fb7e3b2a1b49b06c19a5eeaa3)
 
 # DataEval Change Log
+
+## v0.86.2
+
+🛠️ **Improvements and Enhancements**
+- `5caee32e` - Update Metadata class to use Polars DataFrame
+
+👾 **Fixes**
+- `f04da307` - MILCO has trouble reading box coordinates delimited by a variable number of spaces.
 
 ## v0.86.1
 
