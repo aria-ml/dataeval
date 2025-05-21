@@ -8,7 +8,7 @@ ARG output_dir="/dataeval/output"
 
 
 ######################## cuda image ########################
-FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 as cuda
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 AS cuda
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
@@ -32,7 +32,7 @@ ENV LC_ALL=C.UTF-8
 ENV LANG=en_US.UTF-8
 
 ######################## base image ########################
-FROM cuda as base
+FROM cuda AS base
 ARG UID
 ARG python_version
 ARG UV_CACHE_DIR=/home/${USER}/.cache/uv
@@ -44,7 +44,7 @@ RUN uv pip install -r environment/requirements-dev.txt
 ENV PATH=/${USER}/.venv/bin:${PATH}
 
 ######################## docs image ########################
-FROM base as docs
+FROM base AS docs
 ARG UID
 COPY --chown=${UID} docs/source/data.py docs/source/data.py
 COPY --chown=${UID} src/dataeval/utils/datasets/*.py src/dataeval/utils/datasets/
@@ -68,7 +68,7 @@ RUN ln -s /dataeval/.venv .nox/docs
 ENTRYPOINT ["nox", "-r", "-e", "docs", "--"]
 
 ######################## devcontainer ########################
-FROM cuda as devcontainer
+FROM cuda AS devcontainer
 USER root
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
