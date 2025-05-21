@@ -39,9 +39,9 @@ LintingTutorial.ipynb
 
 :::
 
-[clust-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.1/docs/source/how_to/nbs/h2_cluster_analysis.ipynb
-[dup-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.1/docs/source/how_to/nbs/h2_deduplicate.ipynb
-[lint-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.1/docs/source/how_to/LintingTutorial.ipynb
+[clust-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.2/docs/source/how_to/nbs/h2_cluster_analysis.ipynb
+[dup-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.2/docs/source/how_to/nbs/h2_deduplicate.ipynb
+[lint-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.2/docs/source/how_to/LintingTutorial.ipynb
 
 ## Metrics
 
@@ -83,11 +83,11 @@ IntrinsicMetadata.ipynb
 
 :::
 
-[ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.1/docs/source/how_to/BayesErrorRateEstimationTutorial.ipynb
-[div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.1/docs/source/how_to/HPDivergenceTutorial.ipynb
-[lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.1/docs/source/how_to/ClassLabelAnalysisTutorial.ipynb
-[cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.1/docs/source/how_to/CoverageTutorial.ipynb
-[imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.1/docs/source/how_to/IntrinsicMetadata.ipynb
+[ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.2/docs/source/how_to/BayesErrorRateEstimationTutorial.ipynb
+[div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.2/docs/source/how_to/HPDivergenceTutorial.ipynb
+[lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.2/docs/source/how_to/ClassLabelAnalysisTutorial.ipynb
+[cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.2/docs/source/how_to/CoverageTutorial.ipynb
+[imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.2/docs/source/how_to/IntrinsicMetadata.ipynb
 
 ## Workflows
 
@@ -113,7 +113,7 @@ ClassLearningCurvesTutorial.ipynb
 
 :::
 
-[suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.1/docs/source/how_to/ClassLearningCurvesTutorial.ipynb
+[suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.2/docs/source/how_to/ClassLearningCurvesTutorial.ipynb
 
 ## Models
 
@@ -138,7 +138,7 @@ AETrainerTutorial.ipynb
 
 :::
 
-[ae-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.1/docs/source/how_to/AETrainerTutorial.ipynb
+[ae-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.2/docs/source/how_to/AETrainerTutorial.ipynb
 
 <!-- Google collab badge icon for all collab links -->
 [colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
