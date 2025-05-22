@@ -327,7 +327,7 @@ update cache:
     - job: docs
       artifacts: true
   script: |
-    git lfs install
+    apk add git-lfs
     git fetch --all --depth 1
     git switch --force ${CI_COMMIT_BRANCH}${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}
     rm -rf docs/source/.jupyter_cache
