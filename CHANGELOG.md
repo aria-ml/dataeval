@@ -1,6 +1,11 @@
-[//]: # (5caee32e612e683fb7e3b2a1b49b06c19a5eeaa3)
+[//]: # (3f3018706e9c5f922bf4c38296ec2bf4670a44fe)
 
 # DataEval Change Log
+
+## v0.86.3
+
+🛠️ **Improvements and Enhancements**
+- `3f301870` - Remove targets and switch to DataFrames for label stats calculations
 
 ## v0.86.2
 
