@@ -71,7 +71,7 @@ def labelstats(dataset: Metadata | AnnotatedDataset[Any]) -> LabelStatsOutput:
         index_location[row["class_label"]] = sorted(dict.fromkeys(indices)) if isinstance(indices, list) else [indices]
 
     # Count labels per image
-    label_per_image_df = metadata_df.group_by("image_index").agg(pl.count().alias("label_count"))
+    label_per_image_df = metadata_df.group_by("image_index").agg(pl.len().alias("label_count"))
     label_per_image = label_per_image_df.sort("image_index")["label_count"].to_list()
 
     return LabelStatsOutput(
