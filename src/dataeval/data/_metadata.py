@@ -319,7 +319,7 @@ class Metadata:
                     df = df.with_columns(pl.Series(name=col_dz, values=binned_data.astype(np.int64)))
                     factor_info[col] = FactorInfo("continuous", col_dz)
                 else:
-                    factor_info[col] = FactorInfo("discrete", col_dz)
+                    factor_info[col] = FactorInfo("discrete", col)
 
         # Store the results
         self._dataframe = df
