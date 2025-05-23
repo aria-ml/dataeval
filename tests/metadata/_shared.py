@@ -38,6 +38,5 @@ def mock_metadata(
     m.factor_data = np.hstack(_factor_data) if _factor_data else np.array([])
     m.factor_info = _factors
     m.dataframe = pl.DataFrame(m.factor_data, schema=m.factor_names)
-    m.get_factors_by_type.side_effect = lambda x: [name for name, info in _factors.items() if info.factor_type == x]
 
     return m
