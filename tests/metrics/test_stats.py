@@ -6,6 +6,7 @@ from random import random
 from typing import Any, Literal, overload
 
 import numpy as np
+import polars as pl
 import pytest
 from numpy.random import randint
 from numpy.typing import NDArray
@@ -26,7 +27,7 @@ from dataeval.metrics.stats._boxratiostats import boxratiostats, calculate_ratio
 from dataeval.metrics.stats._imagestats import (
     imagestats,
 )
-from dataeval.outputs._stats import SOURCE_INDEX, BaseStatsOutput
+from dataeval.outputs._stats import BASE_ATTRS, SOURCE_INDEX, BaseStatsOutput
 from dataeval.typing import ImageClassificationDataset, ObjectDetectionDataset
 from dataeval.utils.data._dataset import to_image_classification_dataset, to_object_detection_dataset
 
@@ -56,6 +57,40 @@ def get_bboxes(count: int, boxes_per_image: int, as_float: bool):
 
 DATA_1 = get_images(10, 1)
 DATA_3 = get_images(10, 3)
+
+
+STATS_ATTRS: dict[str, set[str]] = {
+    "pixelstats": {"mean", "std", "var", "skew", "kurtosis", "entropy", "histogram"},
+    "visualstats": {"brightness", "contrast", "darkness", "missing", "sharpness", "zeros", "percentiles"},
+    "dimensionstats": {
+        "offset_x",
+        "offset_y",
+        "width",
+        "height",
+        "channels",
+        "size",
+        "aspect_ratio",
+        "depth",
+        "center",
+        "distance_center",
+        "distance_edge",
+    },
+    "hashstats": {"xxhash", "pchash"},
+}
+
+STATS_2D_ATTRS: set[str] = {"histogram", "percentiles", "center"}
+
+
+@pytest.fixture
+def stats_attrs(request):
+    """Returns set of attributes for a specific StatsOutput class as defined in STATS_ATTRS"""
+    p: str = request.param
+
+    if p == "imagestats":
+        return set.union(*(STATS_ATTRS[k] for k in ("pixelstats", "visualstats", "dimensionstats")))
+    if p == "channelstats":
+        return set.union(*(STATS_ATTRS[k] for k in ("pixelstats", "visualstats")))
+    return STATS_ATTRS[p]
 
 
 @overload
@@ -656,3 +691,89 @@ class TestOffImageBoxes:
         boxstats = imagestats(dataset, per_box=True)
         ratiostats = boxratiostats(boxstats, imgstats)
         assert ratiostats is not None
+
+
+@pytest.mark.required
+@pytest.mark.parametrize(
+    "stats_fn, stats_attrs",
+    (
+        [pixelstats, "pixelstats"],
+        [visualstats, "visualstats"],
+        [dimensionstats, "dimensionstats"],
+        [imagestats, "imagestats"],
+        [hashstats, "hashstats"],
+    ),
+    indirect=["stats_attrs"],  # Only sends the string to fixture
+)
+class TestStatsDataFormats:
+    def test_stats_data(self, stats_fn, stats_attrs: set):
+        """
+        Test for *StatsOutput class has unique and BaseStatsOutput attributes
+        """
+
+        dataset = get_dataset(DATA_1)
+        data: dict = stats_fn(dataset).data()
+
+        # Test keys align with BaseStatsOutput and *StatsOutput
+        assert isinstance(data, dict)
+
+        # Expects all attributes, including Base and 2-D attributes
+        self._check_keys(
+            keys=set(data),
+            expected_attrs=(stats_attrs | set(BASE_ATTRS)),
+            invalid_attrs=set(),
+        )  # Empty set has no overlap
+
+    def test_stats_factors(self, stats_fn, stats_attrs: set):
+        """
+        Test for *StatsOutput class has unique 1-D attributes and no BaseStatsOutput attributes
+
+        Note
+        ----
+        2-D attributes like histogram are not expected
+        """
+
+        dataset = get_dataset(DATA_1)
+        factors: dict = stats_fn(dataset).factors()
+
+        # Test keys align only with *StatsOutput
+        assert isinstance(factors, dict)
+        self._check_keys(
+            keys=set(factors),
+            expected_attrs=(stats_attrs - STATS_2D_ATTRS),
+            invalid_attrs=(set(BASE_ATTRS) | STATS_2D_ATTRS),
+        )
+
+    def test_stats_to_df(self, stats_fn, stats_attrs: set):
+        """
+        Test for *StatsOutput class has unique 1-D attributes and no BaseStatsOutput attributes
+        as columns in the dataframe
+
+        Note
+        ----
+        2-D attributes like histogram are not expected
+        """
+
+        dataset = get_dataset(DATA_1)
+        dataframe: pl.DataFrame = stats_fn(dataset).to_dataframe()
+
+        # Test dataframe keys align only with *StatsOutput
+        assert isinstance(dataframe, pl.DataFrame)
+
+        self._check_keys(
+            keys=set(dataframe.columns),
+            expected_attrs=(stats_attrs - STATS_2D_ATTRS),
+            invalid_attrs=(set(BASE_ATTRS) | STATS_2D_ATTRS),
+        )
+
+        # Test final shape follows keys and homogeneous lengths
+        rows = len(DATA_1)
+        cols = len(stats_attrs - STATS_2D_ATTRS)
+        assert dataframe.shape == (rows, cols)
+
+    def _check_keys(self, keys: set, expected_attrs: set, invalid_attrs: set):
+        """Checks public attributes equal returned keys"""
+        assert "_meta" not in keys
+
+        assert keys.issubset(expected_attrs)
+        assert keys.isdisjoint(invalid_attrs)

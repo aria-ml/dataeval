@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Iterable, Mapping, NamedTuple, Optional, Sequence, Union
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from numpy.typing import NDArray
 from typing_extensions import TypeAlias
 
@@ -22,7 +22,7 @@ SOURCE_INDEX = "source_index"
 OBJECT_COUNT = "object_count"
 IMAGE_COUNT = "image_count"
 
-BASE_ATTRS = (SOURCE_INDEX, OBJECT_COUNT, IMAGE_COUNT)
+BASE_ATTRS = [SOURCE_INDEX, OBJECT_COUNT, IMAGE_COUNT]
 
 
 class SourceIndex(NamedTuple):
@@ -156,14 +156,21 @@ class BaseStatsOutput(Output):
         Mapping[str, NDArray[Any]]
         """
         filter_ = [filter] if isinstance(filter, str) else filter
+
+        """
+        Performs validation checks to ensure selected keys and constant or 1-D values
+        Each set of checks returns True if a valid value.
+        Only one set of final checks needs to be True to allow the value through
+        """
         return {
             k: v
             for k, v in self.data().items()
-            if k not in BASE_ATTRS
-            and (filter_ is None or k in filter_)
-            and isinstance(v, np.ndarray)
-            and v.ndim == 1
-            and (not exclude_constant or len(np.unique(v)) > 1)
+            if (
+                k not in BASE_ATTRS  # Ignore BaseStatsOutput attributes
+                and (filter_ is None or k in filter_)  # Key is selected
+                and (isinstance(v, np.ndarray) and v.ndim == 1)  # Check valid array
+                and (not exclude_constant or len(np.unique(v)) > 1)  # Check valid numpy "constant"
+            )
         }
 
     def plot(
@@ -194,6 +201,11 @@ class BaseStatsOutput(Output):
         if max_channels == 1:
             return histogram_plot(factors, log)
         return channel_histogram_plot(factors, log, max_channels, ch_mask)
+
+    def to_dataframe(self) -> pl.DataFrame:
+        """Returns the processed factors a polars dataframe of shape (factors, samples)"""
+
+        return pl.DataFrame(self.factors())
 
 
 @dataclass(frozen=True)
@@ -255,6 +267,43 @@ class HashStatsOutput(BaseStatsOutput):
 
     xxhash: Sequence[str]
     pchash: Sequence[str]
+
+    def to_dataframe(self) -> pl.DataFrame:
+        """
+        Returns a polars dataframe for the xxhash and pchash attributes of each sample
+
+        Note
+        ----
+        xxhash and pchash do not follow the normal definition of factors but are
+        helpful attributes of the data
+
+        Examples
+        --------
+        Display the hashes of a dataset of images, whose shape is (C, H, W),
+        as a polars DataFrame
+
+        >>> from dataeval.metrics.stats import hashstats
+        >>> results = hashstats(dataset)
+        >>> print(results.to_dataframe())
+        shape: (8, 2)
+        ┌──────────────────┬──────────────────┐
+        │ xxhash           ┆ pchash           │
+        │ ---              ┆ ---              │
+        │ str              ┆ str              │
+        ╞══════════════════╪══════════════════╡
+        │ 69b50a5f06af238c ┆ e666999999266666 │
+        │ 5a861d7a23d1afe7 ┆ e666999999266666 │
+        │ 7ffdb4990ad44ac6 ┆ e666999966666299 │
+        │ 4f0c366a3298ceac ┆ e666999999266666 │
+        │ c5519e36ac1f8839 ┆ 96e91656e91616e9 │
+        │ e7e92346159a4567 ┆ e666999999266666 │
+        │ 9a538f797a5ba8ee ┆ e666999999266666 │
+        │ 1a658bd2a1baee25 ┆ e666999999266666 │
+        └──────────────────┴──────────────────┘
+        """
+        data = {"xxhash": self.xxhash, "pchash": self.pchash}
+        schema = {"xxhash": str, "pchash": str}
+        return pl.DataFrame(data=data, schema=schema)
 
 
 @dataclass(frozen=True)
@@ -325,17 +374,13 @@ class LabelStatsOutput(Output):
 
         return "\n".join(table_str)
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_dataframe(self) -> pl.DataFrame:
         """
-        Exports the label statistics output results to a pandas DataFrame.
-
-        Notes
-        -----
-        This method requires `pandas <https://pandas.pydata.org/>`_ to be installed.
+        Exports the label statistics output results to a polars DataFrame.
 
         Returns
         -------
-        pd.DataFrame
+        pl.DataFrame
         """
         total_count = []
         image_count = []
@@ -343,7 +388,7 @@ class LabelStatsOutput(Output):
             total_count.append(self.label_counts_per_class[cls])
             image_count.append(self.image_counts_per_class[cls])
 
-        return pd.DataFrame(
+        return pl.DataFrame(
             {
                 "Label": self.class_names,
                 "Total Count": total_count,

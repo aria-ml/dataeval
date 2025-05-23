@@ -29,7 +29,7 @@ class AbstractResult(GenericOutput[pd.DataFrame]):
         self._data = results_data.copy(deep=True)
 
     def data(self) -> pd.DataFrame:
-        return self.to_df()
+        return self.to_dataframe()
 
     @property
     def empty(self) -> bool:
@@ -38,7 +38,7 @@ class AbstractResult(GenericOutput[pd.DataFrame]):
     def __len__(self) -> int:
         return 0 if self.empty else len(self._data)
 
-    def to_df(self, multilevel: bool = True) -> pd.DataFrame:
+    def to_dataframe(self, multilevel: bool = True) -> pd.DataFrame:
         """Export results to pandas dataframe."""
         if multilevel:
             return self._data
