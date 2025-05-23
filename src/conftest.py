@@ -84,17 +84,11 @@ def doctest_metadata_explanatory_funcs(doctest_namespace: dict[str, Any]) -> Non
     md1.factor_data = factor_data1
     md1.factor_info = factor_info
     md1.dataframe = pl.DataFrame(factor_data1, schema=factor_names)
-    md1.get_factors_by_type.side_effect = lambda x: [
-        name for name, info in factor_info.items() if info.factor_type == x
-    ]
 
     md2.factor_names = factor_names
     md2.factor_data = factor_data2
     md2.factor_types = factor_info
     md2.dataframe = pl.DataFrame(factor_data2, schema=factor_names)
-    md2.get_factors_by_type.side_effect = lambda x: [
-        name for name, info in factor_info.items() if info.factor_type == x
-    ]
 
     doctest_namespace["metadata1"] = md1
     doctest_namespace["metadata2"] = md2

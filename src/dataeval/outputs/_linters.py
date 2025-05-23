@@ -54,7 +54,7 @@ def _reorganize_by_class_and_metric(
     for img, group in result.items():
         for extreme in group:
             metrics.setdefault(extreme, []).append(img)
-            for i, images in enumerate(lstats.image_indices_per_class):
+            for i, images in lstats.image_indices_per_class.items():
                 if img in images:
                     class_wise[lstats.class_names[i]][extreme] = class_wise[lstats.class_names[i]].get(extreme, 0) + 1
 

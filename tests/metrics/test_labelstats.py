@@ -30,11 +30,11 @@ class TestLabelStats:
         metadata = get_metadata(label_array)
         stats = labelstats(metadata)
 
-        assert stats.label_counts_per_class == [8, 3, 2, 1]
+        assert stats.label_counts_per_class == {0: 8, 1: 3, 2: 2, 3: 1}
         assert stats.class_count == 4
         assert stats.label_count == 14
-        assert stats.image_indices_per_class == [[0, 1, 2, 3], [1, 2, 3], [2, 3], [3]]
-        assert stats.image_counts_per_class == [4, 3, 2, 1]
+        assert stats.image_indices_per_class == {0: [0, 1, 2, 3], 1: [1, 2, 3], 2: [2, 3], 3: [3]}
+        assert stats.image_counts_per_class == {0: 4, 1: 3, 2: 2, 3: 1}
         assert stats.label_counts_per_image == [5, 2, 3, 4]
         assert stats.image_count == 4
 
