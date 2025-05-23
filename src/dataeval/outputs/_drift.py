@@ -114,7 +114,7 @@ class DriftMVDCOutput(PerMetricResult):
         import matplotlib.pyplot as plt
 
         fig, ax = plt.subplots(dpi=300)
-        resdf = self.to_df()
+        resdf = self.to_dataframe()
         xticks = np.arange(resdf.shape[0])
         trndf = resdf[resdf["chunk"]["period"] == "reference"]
         tstdf = resdf[resdf["chunk"]["period"] == "analysis"]
