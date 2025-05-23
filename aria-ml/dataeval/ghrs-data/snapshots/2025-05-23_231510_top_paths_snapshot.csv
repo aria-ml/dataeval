@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,96,51
+/aria-ml/dataeval/commits/main,7,1
+/aria-ml/dataeval/tree/main,5,4
+/aria-ml/dataeval/tree/main/src,5,4
+/aria-ml/dataeval/tree/main/docs,3,3
+/aria-ml/dataeval/tree/64e848ca732eff1dde368a047eb1b3c252ceb110,3,1
+/aria-ml/dataeval/tree/64e848ca732eff1dde368a047eb1b3c252ceb110/src/dataeval/detectors,3,1
+/aria-ml/dataeval/blob/main/src/dataeval/detectors/drift/_mmd.py,2,2
+/aria-ml/dataeval/tree/main/src/dataeval,2,2
+/aria-ml/dataeval/blob/main/src/dataeval/detectors/drift/_ks.py,2,1
