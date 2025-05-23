@@ -241,6 +241,7 @@ def doctest_metrics_stats(doctest_namespace: dict[str, Any]) -> None:
     """dataeval.metrics.stats.labelstats.labelstats"""
     """dataeval.metrics.stats.pixelstats.pixelstats"""
     """dataeval.metrics.stats.visualstats.visualstats"""
+    """dataeval.outputs._stats.HashStatsOutput"""
 
     doctest_namespace["dataset"] = to_object_detection_dataset(images, labels, bboxes, None, classes)
 

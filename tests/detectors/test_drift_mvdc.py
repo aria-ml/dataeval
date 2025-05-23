@@ -108,7 +108,7 @@ class TestMVDC:
             dc.fit(trn_data)
         assert dc._calc.result is not None
         results = dc.predict(tst_data)
-        resdf = results.to_df()
+        resdf = results.to_dataframe()
         tstdf = resdf[resdf["chunk"]["period"] == "analysis"]
         tst_auc_vals = tstdf["domain_classifier_auroc"]["value"].values  # type: ignore
         assert np.all(tst_auc_vals > dc.threshold[0])  # type: ignore
@@ -122,21 +122,21 @@ class TestDriftMVDCOutput:
         output = DriftMVDCOutput(result_df)
         df = output.data()
         assert not output.empty
-        assert len(df) == len(output.to_df())
+        assert len(df) == len(output.to_dataframe())
         assert len(output) == len(df)
-        np.testing.assert_equal(df.to_numpy(), output.to_df().to_numpy())
+        np.testing.assert_equal(df.to_numpy(), output.to_dataframe().to_numpy())
 
     def test_output_empty(self):
         output = DriftMVDCOutput(pd.DataFrame([]))
         df = output.data()
         assert output.empty
-        assert len(df) == len(output.to_df())
+        assert len(df) == len(output.to_dataframe())
         assert len(output) == len(df)
 
     def test_output_to_df_multilevel(self, result_df):
         output = DriftMVDCOutput(result_df)
-        ml_df = output.to_df()
-        sl_df = output.to_df(multilevel=False)
+        ml_df = output.to_dataframe()
+        sl_df = output.to_dataframe(multilevel=False)
         for col_name in sl_df:
             assert isinstance(col_name, str)
         assert len(ml_df) == len(sl_df)
@@ -148,7 +148,7 @@ class TestDriftMVDCOutput:
         o_ref = output.filter("reference")
         o_anl = output.filter("analysis")
         assert len(o_all) == len(o_ref) + len(o_anl)
-        assert len(o_all.to_df().keys()) == len(o_ref.to_df().keys()) == len(o_anl.to_df().keys())
+        assert len(o_all.to_dataframe().keys()) == len(o_ref.to_dataframe().keys()) == len(o_anl.to_dataframe().keys())
 
     def test_output_filter_invalid_metric_raises(self, result_df):
         output = DriftMVDCOutput(result_df)
@@ -204,6 +204,6 @@ if __name__ == "__main__":
     results.plot().show()  # fig: DomainClassification.png will be to cwd
 
     # Test domain data frame and classification
-    resdf = results.to_df()
+    resdf = results.to_dataframe()
     tstdf = resdf[resdf["chunk"]["period"] == "analysis"]
     isdrift = tstdf["domain_classifier_auroc"]["alert"].values  # type: ignore
