@@ -3,6 +3,6 @@
 *.{cmd,[cC][mM][dD]} text eol=crlf
 *.{bat,[bB][aA][tT]} text eol=crlf
 *.npz filter=lfs diff=lfs merge=lfs -text
-docs/tutorials/notebooks/models/ae filter=lfs diff=lfs merge=lfs -text
+docs/source/notebooks/models/ae filter=lfs diff=lfs merge=lfs -text
 *.db binary
 docs/** linguist-documentation
