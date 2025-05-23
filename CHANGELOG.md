@@ -1,6 +1,11 @@
-[//]: # (3f3018706e9c5f922bf4c38296ec2bf4670a44fe)
+[//]: # (85cabec5bdb2917a47bdd6acafa0c8faf0dddacc)
 
 # DataEval Change Log
+
+## v0.86.4
+
+👾 **Fixes**
+- `1a7a6ca1` - Fix metadata and labelstats regressions
 
 ## v0.86.3
 
