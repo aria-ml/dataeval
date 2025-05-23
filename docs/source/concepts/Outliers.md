@@ -18,9 +18,9 @@ dataset. Whether you are tasked with trying to find the right dataset to train
 a model or with verifying someone else's stuff, the Outliers class helps you
 gain an understanding of the data.
 
-The [Data Cleaning Guide](../tutorials/EDA_Part1.ipynb) shows how the Outliers
-class can be used in conjunction with other DataEval classes to explore and
-clean a dataset.
+The [Data Cleaning Guide](../notebooks/tt_clean_dataset.ipynb) shows how
+the Outliers class can be used in conjunction with other DataEval classes to
+explore and clean a dataset.
 
 ## Theory behind it
 
@@ -38,7 +38,7 @@ detecting abnormal images:
 The [z score](https://en.wikipedia.org/wiki/Standard_score) method is based on
 determining if the distance between a data point and the dataset mean is above
 a specified threshold. The default threshold value for `zscore` is 3. The
-equation for `zscore` is:  
+equation for `zscore` is:
 
 $$
 \frac{|x_i - \mu|}{\sigma}
@@ -61,7 +61,7 @@ method is based on determining if the distance between a data point and the
 75th quartile or a data point and the 25th quartile is greater than the
 difference between the 75th and 25th quartile multiplied by a specified
 threshold. The default threshold value for `iqr` is 1.5. The equation for `iqr`
-is:  
+is:
 
 $$
 distance > threshold * (Q_3 - Q_1)

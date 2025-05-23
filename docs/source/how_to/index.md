@@ -18,30 +18,30 @@ The guides below exemplify powerful solutions to common problems in ML.
 ```{toctree}
 :hidden:
 
-nbs/h2_cluster_analysis.ipynb
-nbs/h2_deduplicate.ipynb
-LintingTutorial.ipynb
+../notebooks/h2_cluster_analysis.ipynb
+../notebooks/h2_deduplicate.ipynb
+../notebooks/h2_visualize_linting_issues.ipynb
 ```
 
 :::{list-table}
 :widths: 20 60 20
 :header-rows: 0
 
-* * [](nbs/h2_cluster_analysis.ipynb)
-  * Identify outliers and anomalies with clustering algorithms
-  * [![Open In Colab][colab-badge]][clust-colab]
-* * [](nbs/h2_deduplicate.ipynb)
-  * Identify and remove duplicates from a PyTorch Dataset
-  * [![Open In Colab][colab-badge]][dup-colab]
-* * [](LintingTutorial.ipynb)
-  * Find negatively impactful images in multiple backgrounds
-  * [![Open In Colab][colab-badge]][lint-colab]
+- - [](../notebooks/h2_cluster_analysis.ipynb)
+  - Identify outliers and anomalies with clustering algorithms
+  - [![Open In Colab][colab-badge]][clst-colab]
+- - [](../notebooks/h2_deduplicate.ipynb)
+  - Identify and remove duplicates from a PyTorch Dataset
+  - [![Open In Colab][colab-badge]][dupe-colab]
+- - [](../notebooks/h2_visualize_linting_issues.ipynb)
+  - Find negatively impactful images in multiple backgrounds
+  - [![Open In Colab][colab-badge]][lint-colab]
 
 :::
 
-[clust-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/how_to/nbs/h2_cluster_analysis.ipynb
-[dup-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/how_to/nbs/h2_deduplicate.ipynb
-[lint-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/how_to/LintingTutorial.ipynb
+[clst-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/notebooks/h2_cluster_analysis.ipynb
+[dupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/notebooks/h2_deduplicate.ipynb
+[lint-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/notebooks/h2_visualize_linting_issues.ipynb
 
 ## Metrics
 
@@ -52,42 +52,42 @@ The guides below show best practices when solving common ML problems.
 :caption: Metrics
 :hidden:
 
-BayesErrorRateEstimationTutorial.ipynb
-HPDivergenceTutorial.ipynb
-ClassLabelAnalysisTutorial.ipynb
-CoverageTutorial.ipynb
-IntrinsicMetadata.ipynb
+../notebooks/h2_measure_ic_feasibility.ipynb
+../notebooks/h2_measure_divergence.ipynb
+../notebooks/h2_measure_label_independence.ipynb
+../notebooks/h2_detect_undersampling.ipynb
+../notebooks/h2_add_intrinsic_factors.ipynb
 :::
 
 :::{list-table}
 :widths: 20 60 20
 :header-rows: 0
 
-* * [](BayesErrorRateEstimationTutorial.ipynb)
-  * Calculate feasibility of performance requirements on
-  different datasets using {term}`Bayes Error Rate (BER)`
-  * [![Open In Colab][colab-badge]][ber-colab]
-* * [](HPDivergenceTutorial.ipynb)
-  * Display data distributions between 2 datasets
-  * [![Open In Colab][colab-badge]][div-colab]
-* * [](ClassLabelAnalysisTutorial.ipynb)
-  * Compare label distributions between 2 datasets
-  * [![Open In Colab][colab-badge]][lbl-colab]
-* * [](CoverageTutorial.ipynb)
-  * Detect undersampled subsets of datasets
-  * [![Open In Colab][colab-badge]][cov-colab]
-* * [](IntrinsicMetadata.ipynb)
-  * Apply DataEval's statistical outputs to
-  DataEval's {class}`.Metadata` object for bias analysis
-  * [![Open In Colab][colab-badge]][imd-colab]
+- - [](../notebooks/h2_measure_ic_feasibility.ipynb)
+  - Calculate feasibility of performance requirements on
+    different datasets using {term}`Bayes Error Rate (BER)`
+  - [![Open In Colab][colab-badge]][ber-colab]
+- - [](../notebooks/h2_measure_divergence.ipynb)
+  - Display data distributions between 2 datasets
+  - [![Open In Colab][colab-badge]][div-colab]
+- - [](../notebooks/h2_measure_label_independence.ipynb)
+  - Compare label distributions between 2 datasets
+  - [![Open In Colab][colab-badge]][lbl-colab]
+- - [](../notebooks/h2_detect_undersampling.ipynb)
+  - Detect undersampled subsets of datasets
+  - [![Open In Colab][colab-badge]][cov-colab]
+- - [](../notebooks/h2_add_intrinsic_factors.ipynb)
+  - Apply DataEval's statistical outputs to
+    DataEval's {class}`.Metadata` object for bias analysis
+  - [![Open In Colab][colab-badge]][imd-colab]
 
 :::
 
-[ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/how_to/BayesErrorRateEstimationTutorial.ipynb
-[div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/how_to/HPDivergenceTutorial.ipynb
-[lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/how_to/ClassLabelAnalysisTutorial.ipynb
-[cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/how_to/CoverageTutorial.ipynb
-[imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/how_to/IntrinsicMetadata.ipynb
+[ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/notebooks/h2_measure_ic_feasibility.ipynb
+[div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/notebooks/h2_measure_divergence.ipynb
+[lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/notebooks/h2_measure_label_independence.ipynb
+[cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/notebooks/h2_detect_undersampling.ipynb
+[imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/notebooks/h2_add_intrinsic_factors.ipynb
 
 ## Workflows
 
@@ -99,21 +99,21 @@ The guides below help you solve common problems found across machine learning ta
 :caption: Workflows
 :hidden:
 
-ClassLearningCurvesTutorial.ipynb
+../notebooks/h2_measure_ic_sufficiency.ipynb
 :::
 
 :::{list-table}
 :widths: 20 60 20
 :header-rows: 0
 
-* * [](ClassLearningCurvesTutorial.ipynb)
-  * Determine the amount of data needed to meet
-  image classification performance requirements
-  * [![Open In Colab][colab-badge]][suff-colab]
+- - [](../notebooks/h2_measure_ic_sufficiency.ipynb)
+  - Determine the amount of data needed to meet
+    image classification performance requirements
+  - [![Open In Colab][colab-badge]][suff-colab]
 
 :::
 
-[suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/how_to/ClassLearningCurvesTutorial.ipynb
+[suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/notebooks/h2_measure_ic_sufficiency.ipynb
 
 ## Models
 
@@ -124,21 +124,22 @@ The guides below show specific examples on model usage at different levels of ex
 :caption: Models
 :hidden:
 
-AETrainerTutorial.ipynb
+../notebooks/h2_train_ae_embeddings.ipynb
 :::
 
 :::{list-table}
 :widths: 20 60 20
 :header-rows: 0
 
-* * [](AETrainerTutorial.ipynb)
-  * Train and evaluate an autoencoder to generate effective
-  image embeddings for downstream tasks
-  * [![Open In Colab][colab-badge]][ae-colab]
+- - [](../notebooks/h2_train_ae_embeddings.ipynb)
+  - Train and evaluate an autoencoder to generate effective
+    image embeddings for downstream tasks
+  - [![Open In Colab][colab-badge]][ae-colab]
 
 :::
 
-[ae-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/how_to/AETrainerTutorial.ipynb
+[ae-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/notebooks/h2_train_ae_embeddings.ipynb
 
 <!-- Google collab badge icon for all collab links -->
+
 [colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
