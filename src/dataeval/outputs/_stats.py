@@ -272,7 +272,7 @@ class LabelStatsOutput(Output):
     image_counts_per_class : Mapping[int, int]
         Dictionary whose keys are the different label classes and
         values are total counts of each image the class is present in
-    image_indices_per_class : Mapping[int, list]
+    image_indices_per_class : Mapping[int, Sequence[int]]
         Dictionary whose keys are the different label classes and
         values are lists containing the images that have that label
     image_count : int
@@ -284,10 +284,10 @@ class LabelStatsOutput(Output):
     class_names : Sequence[str]
     """
 
-    label_counts_per_class: Sequence[int]
+    label_counts_per_class: Mapping[int, int]
     label_counts_per_image: Sequence[int]
-    image_counts_per_class: Sequence[int]
-    image_indices_per_class: Sequence[Sequence[int]]
+    image_counts_per_class: Mapping[int, int]
+    image_indices_per_class: Mapping[int, Sequence[int]]
     image_count: int
     class_count: int
     label_count: int

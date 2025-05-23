@@ -20,6 +20,10 @@ from dataeval.utils._bin import bin_data, digitize_data
 from dataeval.utils.data.metadata import merge
 
 
+def _binned(name: str) -> str:
+    return f"{name}[]"
+
+
 @dataclass
 class FactorInfo:
     factor_type: Literal["categorical", "continuous", "discrete"] | None = None
@@ -157,13 +161,13 @@ class Metadata:
     def factor_names(self) -> Sequence[str]:
         """Factor names of the metadata."""
         self._structure()
-        return list(self._factors)
+        return list(filter(self._filter, self._factors))
 
     @property
     def factor_info(self) -> Mapping[str, FactorInfo]:
         """Factor types of the metadata."""
         self._bin()
-        return self._factors
+        return dict(filter(self._filter, self._factors.items()))
 
     @property
     def factor_data(self) -> NDArray[Any]:
@@ -195,13 +199,17 @@ class Metadata:
     @property
     def image_count(self) -> int:
         self._bin()
-        return int(self._image_indices.max() + 1)
+        return 0 if self._image_indices.size == 0 else int(self._image_indices.max() + 1)
+
+    def _filter(self, factor: str | tuple[str, Any]) -> bool:
+        factor = factor[0] if isinstance(factor, tuple) else factor
+        return factor in self.include if self.include else factor not in self.exclude
 
     def _reset_bins(self, cols: Iterable[str] | None = None) -> None:
         if self._is_binned:
             columns = self._dataframe.columns
-            for col in (col for col in cols or columns if f"{col}[|]" in columns):
-                self._dataframe.drop_in_place(f"{col}[|]")
+            for col in (col for col in cols or columns if _binned(col) in columns):
+                self._dataframe.drop_in_place(_binned(col))
                 self._factors[col] = FactorInfo()
             self._is_binned = False
 
@@ -244,7 +252,7 @@ class Metadata:
         bboxes = as_numpy(bboxes).astype(np.float32) if is_od else None
         srcidx = as_numpy(srcidx).astype(np.intp) if is_od else None
 
-        index2label = self._dataset.metadata.get("index2label", {})
+        index2label = self._dataset.metadata.get("index2label", {i: str(i) for i in np.unique(labels)})
 
         targets_per_image = None if srcidx is None else np.unique(srcidx, return_counts=True)[1].tolist()
         merged = merge(raw, return_dropped=True, ignore_lists=False, targets_per_image=targets_per_image)
@@ -260,8 +268,9 @@ class Metadata:
         }
 
         self._raw = raw
+        self._index2label = index2label
         self._class_labels = labels
-        self._class_names = [index2label.get(i, str(i)) for i in np.unique(labels)]
+        self._class_names = list(index2label.values())
         self._image_indices = target_dict["image_index"]
         self._factors = dict.fromkeys(factor_dict, FactorInfo())
         self._dataframe = pl.DataFrame({**target_dict, **factor_dict})
@@ -289,10 +298,10 @@ class Metadata:
             )
 
         column_set = set(df.columns)
-        for col in (col for col in self.factor_names if f"{col}[|]" not in column_set):
+        for col in (col for col in self.factor_names if _binned(col) not in column_set):
             # Get data as numpy array for processing
             data = df[col].to_numpy()
-            col_dz = f"{col}[|]"
+            col_dz = _binned(col)
             if col in factor_bins:
                 # User provided binning
                 bins = factor_bins[col]
@@ -325,23 +334,6 @@ class Metadata:
         self._dataframe = df
         self._factors.update(factor_info)
         self._is_binned = True
-
-    def get_factors_by_type(self, factor_type: Literal["categorical", "continuous", "discrete"]) -> Sequence[str]:
-        """
-        Get the names of factors of a specific type.
-
-        Parameters
-        ----------
-        factor_type : Literal["categorical", "continuous", "discrete"]
-            The type of factors to retrieve.
-
-        Returns
-        -------
-        list[str]
-            List of factor names of the specified type.
-        """
-        self._bin()
-        return [name for name, info in self.factor_info.items() if info.factor_type == factor_type]
 
     def add_factors(self, factors: Mapping[str, Array | Sequence[Any]]) -> None:
         """

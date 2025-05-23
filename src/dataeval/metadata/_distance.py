@@ -81,7 +81,7 @@ def metadata_distance(metadata1: Metadata, metadata2: Metadata) -> MetadataDista
     """
 
     _compare_keys(metadata1.factor_names, metadata2.factor_names)
-    cont_fnames = metadata1.get_factors_by_type("continuous")
+    cont_fnames = [name for name, info in metadata1.factor_info.items() if info.factor_type == "continuous"]
 
     if not cont_fnames:
         return MetadataDistanceOutput({})
