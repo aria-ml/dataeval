@@ -99,9 +99,10 @@ def balance(
     factor_types = {"class_label": "categorical"} | {k: v.factor_type for k, v in metadata.factor_info.items()}
     is_discrete = [factor_type != "continuous" for factor_type in factor_types.values()]
     num_factors = len(factor_types)
+    class_labels = metadata.class_labels
 
     mi = np.full((num_factors, num_factors), np.nan, dtype=np.float32)
-    data = np.hstack((metadata.class_labels[:, np.newaxis], data))
+    data = np.hstack((class_labels[:, np.newaxis], data))
 
     for idx, factor_type in enumerate(factor_types.values()):
         if factor_type != "continuous":
@@ -132,12 +133,12 @@ def balance(
     factors = nmi[1:, 1:]
 
     # assume class is a factor
-    num_classes = len(metadata.class_names)
+    u_classes = np.unique(class_labels)
+    num_classes = len(u_classes)
     classwise_mi = np.full((num_classes, num_factors), np.nan, dtype=np.float32)
 
     # classwise targets
-    classes = np.unique(metadata.class_labels)
-    tgt_bin = data[:, 0][:, None] == classes
+    tgt_bin = data[:, 0][:, None] == u_classes
 
     # classification MI for discrete/categorical features
     for idx in range(num_classes):

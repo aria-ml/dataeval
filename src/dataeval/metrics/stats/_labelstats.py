@@ -58,14 +58,14 @@ def labelstats(dataset: Metadata | AnnotatedDataset[Any]) -> LabelStatsOutput:
 
     # Count occurrences of each label across all images
     label_counts_df = metadata_df.group_by("class_label").len()
-    label_counts = label_counts_df.sort("class_label")["len"].to_list()
+    label_counts = dict(zip(label_counts_df["class_label"], label_counts_df["len"]))
 
     # Count unique images per label (how many images contain each label)
     image_counts_df = metadata_df.select(["image_index", "class_label"]).unique().group_by("class_label").len()
-    image_counts = image_counts_df.sort("class_label")["len"].to_list()
+    image_counts = dict(zip(image_counts_df["class_label"], image_counts_df["len"]))
 
     # Create index_location mapping (which images contain each label)
-    index_location: list[list[int]] = [[] for _ in range(len(metadata.class_names))]
+    index_location: dict[int, list[int]] = {}
     for row in metadata_df.group_by("class_label").agg(pl.col("image_index")).to_dicts():
         indices = row["image_index"]
         index_location[row["class_label"]] = sorted(dict.fromkeys(indices)) if isinstance(indices, list) else [indices]
@@ -81,6 +81,6 @@ def labelstats(dataset: Metadata | AnnotatedDataset[Any]) -> LabelStatsOutput:
         image_indices_per_class=index_location,
         image_count=len(label_per_image),
         class_count=len(metadata.class_names),
-        label_count=sum(label_counts),
+        label_count=sum(label_counts.values()),
         class_names=metadata.class_names,
     )

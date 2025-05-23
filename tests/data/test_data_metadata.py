@@ -2,7 +2,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-from dataeval.data._metadata import Metadata
+from dataeval.data._metadata import FactorInfo, Metadata
 from dataeval.utils.datasets._types import ObjectDetectionTarget
 from tests.data.test_data_embeddings import MockDataset
 
@@ -53,6 +53,35 @@ class TestMetadata:
     def test_mismatch_factor_length(self, mock_metadata):
         with pytest.raises(ValueError, match="provided factors have a different length"):
             mock_metadata.add_factors({"a": np.random.random((20,))})
+
+    def test_add_empty_factors(self):
+        md = Metadata(None)  # type: ignore
+        md._dataframe = pl.DataFrame()
+        md._factors = {}
+        md._image_indices = np.array([])
+        md._is_structured = True
+        md.add_factors({})
+        assert md.factor_names == []
+
+    def test_all_factor_types(self, RNG: np.random.Generator):
+        md = Metadata(None)  # type: ignore
+        md_dict = {
+            "cat_str": RNG.choice(["A", "B"], size=100).tolist(),
+            "cat_flt": RNG.choice([0.1, 0.2, 0.4, 0.6, 0.8], size=100).tolist(),
+            "con_flt": RNG.random(size=100).tolist(),
+            "dis_int": np.arange(100).tolist(),
+        }
+        md._dataframe = pl.from_dict(md_dict)
+        md._factors = dict.fromkeys(md_dict, FactorInfo())
+        md._is_structured = True
+
+        md._bin()
+        assert [f.factor_type for f in md.factor_info.values()] == [
+            "categorical",
+            "categorical",
+            "continuous",
+            "discrete",
+        ]
 
     def test_exclude_no_op(self):
         md = Metadata(None, exclude=["a", "b"])  # type: ignore
@@ -164,3 +193,42 @@ class TestMetadata:
         md.auto_bin_method = "clusters"
         assert md._is_binned
         assert md._auto_bin_method == "clusters"
+
+    def test_raw_getter(self):
+        md = Metadata(None)  # type: ignore
+        md._is_structured = True
+        raw_metadata = [{"foo": "bar"}]
+        md._raw = raw_metadata
+        assert md.raw == raw_metadata
+
+    def test_empty_discretized_data(self):
+        md = Metadata(None)  # type: ignore
+        md._is_structured = True
+        md._factors = {"foo": FactorInfo()}
+        md._exclude = {"foo"}
+        assert md.discretized_data.size == 0
+
+    def test_empty_factor_data(self):
+        md = Metadata(None)  # type: ignore
+        md._is_structured = True
+        md._factors = {"foo": FactorInfo()}
+        md._exclude = {"foo"}
+        assert md.factor_data.size == 0
+
+    @pytest.mark.parametrize(
+        "is_binned, exists",
+        [
+            (True, True),
+            (True, False),
+            (False, False),
+        ],
+    )
+    def test_reset_bins(self, is_binned, exists):
+        md = Metadata(None)  # type: ignore
+        md._dataframe = pl.from_dict({"foo": [0], "foo[]": [0]} if exists else {"foo": [0]})
+        md._factors = {"foo": FactorInfo("continuous", "foo[]" if exists else None)}
+        md._is_binned = is_binned
+        md._reset_bins()
+        assert not md._is_binned
+        assert "foo[]" not in md._dataframe.columns
+        assert md._factors["foo"].discretized_col is None
