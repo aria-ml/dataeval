@@ -24,24 +24,24 @@ To run the tutorial interactively in Google Colab, click the
 ```{toctree}
 :hidden:
 
-EDA_Part1.ipynb
-EDA_Part2.ipynb
-EDA_Part3.ipynb
+../notebooks/tt_clean_dataset.ipynb
+../notebooks/tt_assess_data_space.ipynb
+../notebooks/tt_identify_bias.ipynb
 ```
 
 ```{list-table}
 :widths: 20 60 20
 :header-rows: 0
 
-* - [](EDA_Part1.ipynb)
+* - [](../notebooks/tt_clean_dataset.ipynb)
   - Learn about the impacts of unstructured, raw data and how to transform it
     into a reliable, robust dataset.
   - [![Open In Colab][colab-badge]][eda-colab]
-* - [](./EDA_Part2.ipynb)
+* - [](../notebooks/tt_assess_data_space.ipynb)
   - Learn how to fix and prevent gaps in data to develop more reliable and
     robust models.
   - [![Open In Colab][colab-badge]][dataspace-colab]
-* - [](EDA_Part3.ipynb)
+* - [](../notebooks/tt_identify_bias.ipynb)
   - Learn how correlations in your data and metadata can affect model
     performance and what can be done to remove that bias.
   - [![Open In Colab][colab-badge]][bias-colab]
@@ -50,9 +50,11 @@ EDA_Part3.ipynb
 <!-- Ref links -->
 
 <!-- markdownlint-disable MD053 -->
-[eda-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/tutorials/EDA_Part1.ipynb
-[dataspace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/tutorials/EDA_Part2.ipynb
-[bias-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/tutorials/EDA_Part3.ipynb
+
+[eda-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/notebooks/tt_clean_dataset.ipynb
+[dataspace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/notebooks/tt_assess_data_space.ipynb
+[bias-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/notebooks/tt_identify_bias.ipynb
+
 <!-- markdownlint-enable MD053 -->
 
 <!-- END DATA ENGINEERING -->
@@ -63,14 +65,14 @@ EDA_Part3.ipynb
 :hidden:
 :caption: Monitoring
 
-Data_Monitoring.ipynb
+../notebooks/tt_monitor_shift.ipynb
 ```
 
 ```{list-table}
 :widths: 20 60 20
 :header-rows: 0
 
-* - [](Data_Monitoring.ipynb)
+* - [](../notebooks/tt_monitor_shift.ipynb)
   - Learn how to analyze incoming data against training data to ensure deployed
     models stay reliable and robust.
   - [![Open In Colab][colab-badge]][monitoring-colab]
@@ -79,7 +81,9 @@ Data_Monitoring.ipynb
 <!-- ref links -->
 
 <!-- markdownlint-disable MD053 -->
-[monitoring-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/tutorials/Data_Monitoring.ipynb
+
+[monitoring-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.3/docs/source/tutorials/notebooks/tt_monitor_shift.ipynb
+
 <!-- markdownlint-enable MD053 -->
 
 <!-- END MONITORING -->

@@ -164,9 +164,9 @@ def histogram_plot(
     rows = math.ceil(num_metrics / 3)
     cols = min(num_metrics, 3)
     fig, axs = plt.subplots(rows, 3, figsize=(cols * 3 + 1, rows * 3))
-
+    axs_flat = np.asarray(axs).flatten()
     for ax, metric in zip(
-        axs.flat,
+        axs_flat,
         data_dict,
     ):
         # Plot the histogram for the chosen metric
@@ -177,7 +177,7 @@ def histogram_plot(
         ax.set_ylabel(ylabel)
         ax.set_xlabel(xlabel)
 
-    for ax in axs.flat[num_metrics:]:
+    for ax in axs_flat[num_metrics:]:
         ax.axis("off")
         ax.set_visible(False)
 
@@ -222,9 +222,9 @@ def channel_histogram_plot(
     rows = math.ceil(num_metrics / 3)
     cols = min(num_metrics, 3)
     fig, axs = plt.subplots(rows, 3, figsize=(cols * 3 + 1, rows * 3))
-
+    axs_flat = np.asarray(axs).flatten()
     for ax, metric in zip(
-        axs.flat,
+        axs_flat,
         data_keys,
     ):
         # Plot the histogram for the chosen metric
@@ -246,7 +246,7 @@ def channel_histogram_plot(
         ax.set_ylabel(ylabel)
         ax.set_xlabel(xlabel)
 
-    for ax in axs.flat[num_metrics:]:
+    for ax in axs_flat[num_metrics:]:
         ax.axis("off")
         ax.set_visible(False)
 

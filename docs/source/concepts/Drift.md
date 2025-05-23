@@ -224,7 +224,7 @@ DataEval's drift detection classes are:
   model's uncertainty across datasets.
 
 To see how these detectors work in practice, refer to our
-[Monitoring Guide](../tutorials/Data_Monitoring.ipynb),
+[Monitoring Guide](../notebooks/tt_monitor_shift.ipynb),
 where you can explore real-world examples of drift detection using DataEval.
 
 ## References

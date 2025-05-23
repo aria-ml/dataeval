@@ -2,7 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Any, Mapping, TypeVar
+from typing import Any, TypeVar
 
 import polars as pl
 
@@ -12,10 +12,6 @@ from dataeval.outputs._base import set_metadata
 from dataeval.typing import AnnotatedDataset
 
 TValue = TypeVar("TValue")
-
-
-def _sort_to_list(d: Mapping[int, TValue]) -> list[TValue]:
-    return [t[1] for t in sorted(d.items())]
 
 
 @set_metadata

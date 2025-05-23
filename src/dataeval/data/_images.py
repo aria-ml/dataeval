@@ -4,6 +4,8 @@ __all__ = []
 
 from typing import TYPE_CHECKING, Any, Generic, Iterator, Sequence, TypeVar, cast, overload
 
+import numpy as np
+
 from dataeval.typing import Array, ArrayLike, Dataset
 from dataeval.utils._array import as_numpy, channels_first_to_last
 
@@ -58,7 +60,7 @@ class Images(Generic[T]):
         num_images = len(indices)
         num_rows = (num_images + images_per_row - 1) // images_per_row
         fig, axes = plt.subplots(num_rows, images_per_row, figsize=figsize)
-        for i, ax in enumerate(axes.flatten()):
+        for i, ax in enumerate(np.asarray(axes).flatten()):
             image = channels_first_to_last(as_numpy(self[i]))
             ax.imshow(image)
             ax.axis("off")
