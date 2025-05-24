@@ -13,8 +13,8 @@ from multiprocessing import Pool
 from typing import Any, Callable, Generic, Iterable, Iterator, Sequence, TypeVar
 
 import numpy as np
-import tqdm
 from numpy.typing import NDArray
+from tqdm.auto import tqdm
 
 from dataeval.config import get_max_processes
 from dataeval.outputs._stats import BASE_ATTRS, BaseStatsOutput, SourceIndex
@@ -77,7 +77,7 @@ class PoolWrapper:
     """
 
     def __init__(self, processes: int | None) -> None:
-        self.pool = Pool(processes) if processes is not None and processes > 1 else None
+        self.pool = Pool(processes) if processes is None or processes > 1 else None
 
     def imap(self, func: Callable[[_S], _T], iterable: Iterable[_S]) -> Iterator[_T]:
         return map(func, iterable) if self.pool is None else self.pool.imap(func, iterable)
@@ -267,7 +267,7 @@ def run_stats(
     stats_processor_cls = stats_processor_cls if isinstance(stats_processor_cls, Iterable) else [stats_processor_cls]
 
     with PoolWrapper(processes=get_max_processes()) as p:
-        for r in tqdm.tqdm(
+        for r in tqdm(
             p.imap(
                 partial(
                     process_stats_unpack,

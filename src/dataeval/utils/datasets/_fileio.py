@@ -8,7 +8,7 @@ import zipfile
 from pathlib import Path
 
 import requests
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 ARCHIVE_ENDINGS = [".zip", ".tar", ".tgz"]
 COMPRESS_ENDINGS = [".gz", ".bz2"]
