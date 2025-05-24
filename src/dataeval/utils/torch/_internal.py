@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from numpy.typing import NDArray
 from torch.utils.data import DataLoader, TensorDataset
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from dataeval.config import DeviceLike, get_device
 from dataeval.typing import Array
