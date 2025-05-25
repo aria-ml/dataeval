@@ -15,6 +15,7 @@ from dataeval.typing import ArrayLike, Dataset
 
 class PixelStatsProcessor(StatsProcessor[PixelStatsOutput]):
     output_class: type = PixelStatsOutput
+    cache_keys = {"histogram"}
     image_function_map: dict[str, Callable[[StatsProcessor[PixelStatsOutput]], Any]] = {
         "mean": lambda x: np.nanmean(x.scaled),
         "std": lambda x: np.nanstd(x.scaled),

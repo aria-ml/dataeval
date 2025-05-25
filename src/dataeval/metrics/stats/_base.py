@@ -93,7 +93,7 @@ class PoolWrapper:
 
 class StatsProcessor(Generic[TStatsOutput]):
     output_class: type[TStatsOutput]
-    cache_keys: list[str] = []
+    cache_keys: set[str] = set()
     image_function_map: dict[str, Callable[[StatsProcessor[TStatsOutput]], Any]] = {}
     channel_function_map: dict[str, Callable[[StatsProcessor[TStatsOutput]], Any]] = {}
 
