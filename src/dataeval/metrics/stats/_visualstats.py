@@ -17,6 +17,7 @@ QUARTILES = (0, 25, 50, 75, 100)
 
 class VisualStatsProcessor(StatsProcessor[VisualStatsOutput]):
     output_class: type = VisualStatsOutput
+    cache_keys: set[str] = {"percentiles"}
     image_function_map: dict[str, Callable[[StatsProcessor[VisualStatsOutput]], Any]] = {
         "brightness": lambda x: x.get("percentiles")[1],
         "contrast": lambda x: 0
