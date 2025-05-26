@@ -68,7 +68,11 @@ def labelstats(dataset: Metadata | AnnotatedDataset[Any]) -> LabelStatsOutput:
 
     # Count labels per image
     label_per_image_df = metadata_df.group_by("image_index").agg(pl.len().alias("label_count"))
-    label_per_image = label_per_image_df.sort("image_index")["label_count"].to_list()
+
+    # Join with all indices to include missing ones with 0 count
+    all_indices = pl.DataFrame({"image_index": range(metadata.image_count)})
+    complete_label_df = all_indices.join(label_per_image_df, on="image_index", how="left").fill_null(0)
+    label_per_image = complete_label_df.sort("image_index")["label_count"].to_list()
 
     return LabelStatsOutput(
         label_counts_per_class=label_counts,
