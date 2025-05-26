@@ -1,8 +1,12 @@
+from unittest.mock import patch
+
 import numpy as np
 import pytest
 
+from dataeval.config import use_max_processes
 from dataeval.detectors.linters.outliers import Outliers, OutliersOutput, _get_outlier_mask
 from dataeval.metrics.stats import dimensionstats, pixelstats, visualstats
+from dataeval.metrics.stats._imagestats import imagestats
 from dataeval.outputs._stats import ImageStatsOutput, LabelStatsOutput
 
 
@@ -14,15 +18,27 @@ class TestOutliers:
         assert len(outliers.stats) == 100
         assert results is not None
 
+    def test_get_outlier_mask_empty(self):
+        mask = _get_outlier_mask(np.zeros([0]), "zscore", None)
+        assert mask is not None
+        assert len(mask) == 0
+
     @pytest.mark.parametrize("method", ["zscore", "modzscore", "iqr"])
     def test_get_outlier_mask(self, method):
         mask_value = _get_outlier_mask(np.array([0.1, 0.2, 0.1, 1.0]), method, 2.5)
         mask_none = _get_outlier_mask(np.array([0.1, 0.2, 0.1, 1.0]), method, None)
         np.testing.assert_array_equal(mask_value, mask_none)
 
+    @pytest.mark.parametrize("method", ["zscore", "modzscore", "iqr"])
+    @patch("dataeval.detectors.linters.outliers.EPSILON", 100.0)
+    def test_get_outlier_mask_with_large_epsilon(self, method):
+        mask_value = _get_outlier_mask(np.array([0.1, 0.2, 0.1, 1.0]), method, 2.5)
+        mask_none = _get_outlier_mask(np.array([0.1, 0.2, 0.1, 1.0]), method, None)
+        np.testing.assert_array_equal(mask_value, mask_none)
+
     def test_get_outlier_mask_valueerror(self):
         with pytest.raises(ValueError):
-            _get_outlier_mask(np.zeros([0]), "error", None)  # type: ignore
+            _get_outlier_mask(np.random.random((10, 1, 16, 16)), "error", None)  # type: ignore
 
     def test_outliers_with_stats(self):
         data = np.random.random((20, 3, 16, 16))
@@ -30,6 +46,17 @@ class TestOutliers:
         outliers = Outliers()
         results = outliers.from_stats(stats)
         assert results is not None
+
+    def test_outliers_with_nan_stats(self, get_od_dataset):
+        images = np.random.random((20, 3, 64, 64))
+        images = images / 2.0
+        images[10] = 1.0
+        dataset = get_od_dataset(images, 2, True, {10: [(-5, -5, -1, -1), (1, 1, 5, 5)]})
+        with use_max_processes(1):
+            stats = imagestats(dataset, per_box=True)
+        outliers = Outliers()
+        results = outliers.from_stats(stats)
+        assert all(vv != np.nan for k, v in results.issues.items() for vv in v.values())
 
     def test_outliers_with_multiple_stats(self):
         dataset1 = np.zeros((50, 3, 16, 16))

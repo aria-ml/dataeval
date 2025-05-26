@@ -7,6 +7,7 @@ from typing import Any, Literal, Sequence, overload
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval.config import EPSILON
 from dataeval.data._images import Images
 from dataeval.metrics.stats._base import combine_stats, get_dataset_step_from_idx
 from dataeval.metrics.stats._imagestats import imagestats
@@ -18,26 +19,56 @@ from dataeval.typing import ArrayLike, Dataset
 
 
 def _get_outlier_mask(
-    values: NDArray, method: Literal["zscore", "modzscore", "iqr"], threshold: float | None
-) -> NDArray:
+    values: NDArray[Any], method: Literal["zscore", "modzscore", "iqr"], threshold: float | None
+) -> NDArray[np.bool_]:
+    if len(values) == 0:
+        return np.array([], dtype=bool)
+
     values = values.astype(np.float64)
+
+    valid_mask = ~np.isnan(values)
+    outliers = np.full(values.shape, False, dtype=bool)
+
+    if not np.any(valid_mask):
+        return outliers
+
     if method == "zscore":
-        threshold = threshold if threshold else 3.0
-        std = np.std(values)
-        abs_diff = np.abs(values - np.mean(values))
-        return std != 0 and (abs_diff / std) > threshold
-    if method == "modzscore":
-        threshold = threshold if threshold else 3.5
-        abs_diff = np.abs(values - np.median(values))
-        med_abs_diff = np.median(abs_diff) if np.median(abs_diff) != 0 else np.mean(abs_diff)
-        mod_z_score = 0.6745 * abs_diff / med_abs_diff
-        return mod_z_score > threshold
-    if method == "iqr":
-        threshold = threshold if threshold else 1.5
-        qrt = np.percentile(values, q=(25, 75), method="midpoint")
-        iqr = (qrt[1] - qrt[0]) * threshold
-        return (values < (qrt[0] - iqr)) | (values > (qrt[1] + iqr))
-    raise ValueError("Outlier method must be 'zscore' 'modzscore' or 'iqr'.")
+        threshold = threshold if threshold is not None else 3.0
+
+        std_val = np.nanstd(values)
+
+        if std_val > EPSILON:
+            mean_val = np.nanmean(values)
+            abs_diff = np.abs(values - mean_val)
+            outliers = (abs_diff / std_val) > threshold
+
+    elif method == "modzscore":
+        threshold = threshold if threshold is not None else 3.5
+
+        median_val = np.nanmedian(values)
+        abs_diff = np.abs(values - median_val)
+        m_abs_diff = np.nanmedian(abs_diff)
+        m_abs_diff = np.nanmean(abs_diff) if m_abs_diff <= EPSILON else m_abs_diff
+
+        if m_abs_diff > EPSILON:
+            mod_z_score = 0.6745 * abs_diff / m_abs_diff
+            outliers = mod_z_score > threshold
+
+    elif method == "iqr":
+        threshold = threshold if threshold is not None else 1.5
+
+        qrt = np.nanpercentile(values, q=(25, 75), method="midpoint")
+        iqr_val = qrt[1] - qrt[0]
+
+        if iqr_val > EPSILON:
+            iqr_threshold = iqr_val * threshold
+            outliers = (values < (qrt[0] - iqr_threshold)) | (values > (qrt[1] + iqr_threshold))
+
+    else:
+        raise ValueError("Outlier method must be 'zscore' 'modzscore' or 'iqr'.")
+
+    outliers[~valid_mask] = False
+    return outliers
 
 
 class Outliers:
@@ -164,10 +195,10 @@ class Outliers:
         >>> len(results)
         2
         >>> results.issues[0]
-        {10: {'skew': -3.906, 'kurtosis': 13.266, 'entropy': 0.2128}, 12: {'std': 0.00536, 'var': 2.87e-05, 'skew': -3.906, 'kurtosis': 13.266, 'entropy': 0.2128}}
+        {10: {'entropy': 0.2128}, 12: {'std': 0.00536, 'var': 2.87e-05, 'entropy': 0.2128}}
         >>> results.issues[1]
         {}
-        """  # noqa: E501
+        """
         if isinstance(stats, (ImageStatsOutput, DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput)):
             return OutliersOutput(self._get_outliers(stats.data()))
 
@@ -221,7 +252,7 @@ class Outliers:
         >>> list(results.issues)
         [10, 12]
         >>> results.issues[10]
-        {'contrast': 1.25, 'zeros': 0.05493, 'skew': -3.906, 'kurtosis': 13.266, 'entropy': 0.2128}
+        {'contrast': 1.25, 'zeros': 0.05493, 'entropy': 0.2128}
         """
         images = Images(data) if isinstance(data, Dataset) else data
         self.stats = imagestats(images)
