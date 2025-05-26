@@ -39,9 +39,9 @@ The guides below exemplify powerful solutions to common problems in ML.
 
 :::
 
-[clst-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.4/docs/source/notebooks/h2_cluster_analysis.ipynb
-[dupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.4/docs/source/notebooks/h2_deduplicate.ipynb
-[lint-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.4/docs/source/notebooks/h2_visualize_linting_issues.ipynb
+[clst-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.5/docs/source/notebooks/h2_cluster_analysis.ipynb
+[dupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.5/docs/source/notebooks/h2_deduplicate.ipynb
+[lint-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.5/docs/source/notebooks/h2_visualize_linting_issues.ipynb
 
 ## Metrics
 
@@ -83,11 +83,11 @@ The guides below show best practices when solving common ML problems.
 
 :::
 
-[ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.4/docs/source/notebooks/h2_measure_ic_feasibility.ipynb
-[div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.4/docs/source/notebooks/h2_measure_divergence.ipynb
-[lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.4/docs/source/notebooks/h2_measure_label_independence.ipynb
-[cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.4/docs/source/notebooks/h2_detect_undersampling.ipynb
-[imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.4/docs/source/notebooks/h2_add_intrinsic_factors.ipynb
+[ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.5/docs/source/notebooks/h2_measure_ic_feasibility.ipynb
+[div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.5/docs/source/notebooks/h2_measure_divergence.ipynb
+[lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.5/docs/source/notebooks/h2_measure_label_independence.ipynb
+[cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.5/docs/source/notebooks/h2_detect_undersampling.ipynb
+[imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.5/docs/source/notebooks/h2_add_intrinsic_factors.ipynb
 
 ## Workflows
 
@@ -113,7 +113,7 @@ The guides below help you solve common problems found across machine learning ta
 
 :::
 
-[suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.4/docs/source/notebooks/h2_measure_ic_sufficiency.ipynb
+[suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.5/docs/source/notebooks/h2_measure_ic_sufficiency.ipynb
 
 ## Models
 
@@ -138,7 +138,7 @@ The guides below show specific examples on model usage at different levels of ex
 
 :::
 
-[ae-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.4/docs/source/notebooks/h2_train_ae_embeddings.ipynb
+[ae-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.86.5/docs/source/notebooks/h2_train_ae_embeddings.ipynb
 
 <!-- Google collab badge icon for all collab links -->
 
