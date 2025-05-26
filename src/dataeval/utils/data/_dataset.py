@@ -72,9 +72,8 @@ def _listify_metadata(
 
 def _find_max(arr: ArrayLike) -> Any:
     if not isinstance(arr, (bytes, str)) and isinstance(arr, (Iterable, Sequence, Array)):
-        if isinstance(arr[0], (Iterable, Sequence, Array)):
-            return max([_find_max(x) for x in arr])  # type: ignore
-        return max(arr)
+        nested = [x for x in [_find_max(x) for x in arr] if x is not None]
+        return max(nested) if len(nested) > 0 else None
     return arr
 
 
