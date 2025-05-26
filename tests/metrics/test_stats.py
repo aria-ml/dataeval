@@ -137,7 +137,7 @@ class LengthStatsOutput(BaseStatsOutput):
 
 class LengthProcessor(StatsProcessor[LengthStatsOutput]):
     output_class = LengthStatsOutput
-    cache_keys = ["length"]
+    cache_keys = {"length"}
     image_function_map = {
         "neg_length": lambda x: -(x.get("length")),
         "length": lambda x: len(x.image),
