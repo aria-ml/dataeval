@@ -1,6 +1,15 @@
-[//]: # (85cabec5bdb2917a47bdd6acafa0c8faf0dddacc)
+[//]: # (980eee6f190e5517c5ebc902a359889d86771d8c)
 
 # DataEval Change Log
+
+## v0.86.5
+
+🛠️ **Improvements and Enhancements**
+- `a5154294` - Add dataframe format to StatsOutputs
+
+👾 **Fixes**
+- `980eee6f` - Hotfix: Allow for nan values in outliers and account for them correctly
+- `2a484972` - Hotfix: Labelstats do not correctly account for 0 targets on an image
 
 ## v0.86.4
 
