@@ -58,7 +58,7 @@ class TestMetadata:
         md = Metadata(None)  # type: ignore
         md._dataframe = pl.DataFrame()
         md._factors = {}
-        md._image_indices = np.array([])
+        md._count = 0
         md._is_structured = True
         md.add_factors({})
         assert md.factor_names == []

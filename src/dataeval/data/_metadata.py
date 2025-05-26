@@ -4,7 +4,7 @@ __all__ = []
 
 import warnings
 from dataclasses import dataclass
-from typing import Any, Iterable, Literal, Mapping, Sequence
+from typing import Any, Iterable, Literal, Mapping, Sequence, Sized
 
 import numpy as np
 import polars as pl
@@ -69,6 +69,7 @@ class Metadata:
         self._is_binned = False
 
         self._dataset = dataset
+        self._count = len(dataset) if isinstance(dataset, Sized) else 0
         self._continuous_factor_bins = dict(continuous_factor_bins) if continuous_factor_bins else {}
         self._auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = auto_bin_method
 
@@ -198,8 +199,9 @@ class Metadata:
 
     @property
     def image_count(self) -> int:
-        self._bin()
-        return 0 if self._image_indices.size == 0 else int(self._image_indices.max() + 1)
+        if self._count == 0:
+            self._structure()
+        return self._count
 
     def _filter(self, factor: str | tuple[str, Any]) -> bool:
         factor = factor[0] if isinstance(factor, tuple) else factor
