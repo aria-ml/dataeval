@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 import numpy as np
 
+from dataeval.config import EPSILON
 from dataeval.metrics.stats._base import StatsProcessor, run_stats
 from dataeval.outputs import VisualStatsOutput
 from dataeval.outputs._base import set_metadata
@@ -20,21 +21,18 @@ class VisualStatsProcessor(StatsProcessor[VisualStatsOutput]):
     cache_keys: set[str] = {"percentiles"}
     image_function_map: dict[str, Callable[[StatsProcessor[VisualStatsOutput]], Any]] = {
         "brightness": lambda x: x.get("percentiles")[1],
-        "contrast": lambda x: 0
-        if np.mean(x.get("percentiles")) == 0
-        else (np.max(x.get("percentiles")) - np.min(x.get("percentiles"))) / np.mean(x.get("percentiles")),
+        "contrast": lambda x: (np.max(x.get("percentiles")) - np.min(x.get("percentiles")))
+        / (np.mean(x.get("percentiles")) + EPSILON),
         "darkness": lambda x: x.get("percentiles")[-2],
         "missing": lambda x: np.count_nonzero(np.isnan(np.sum(x.image, axis=0))) / np.prod(x.shape[-2:]),
         "sharpness": lambda x: np.nanstd(edge_filter(np.mean(x.image, axis=0))),
-        "zeros": lambda x: np.count_nonzero(np.nansum(x.image, axis=0) == 0) / np.prod(x.shape[-2:]),
+        "zeros": lambda x: np.count_nonzero(np.sum(x.image, axis=0) == 0) / np.prod(x.shape[-2:]),
         "percentiles": lambda x: np.nanpercentile(x.scaled, q=QUARTILES),
     }
     channel_function_map: dict[str, Callable[[StatsProcessor[VisualStatsOutput]], Any]] = {
         "brightness": lambda x: x.get("percentiles")[:, 1],
-        "contrast": lambda x: np.nan_to_num(
-            (np.max(x.get("percentiles"), axis=1) - np.min(x.get("percentiles"), axis=1))
-            / np.mean(x.get("percentiles"), axis=1)
-        ),
+        "contrast": lambda x: (np.max(x.get("percentiles"), axis=1) - np.min(x.get("percentiles"), axis=1))
+        / (np.mean(x.get("percentiles"), axis=1) + EPSILON),
         "darkness": lambda x: x.get("percentiles")[:, -2],
         "missing": lambda x: np.count_nonzero(np.isnan(x.image), axis=(1, 2)) / np.prod(x.shape[-2:]),
         "sharpness": lambda x: np.nanstd(np.vectorize(edge_filter, signature="(m,n)->(m,n)")(x.image), axis=(1, 2)),

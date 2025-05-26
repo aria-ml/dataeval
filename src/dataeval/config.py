@@ -25,7 +25,7 @@ _seed: int | None = None
 
 ### CONSTS ###
 
-EPSILON = 1e-10
+EPSILON = 1e-12
 
 ### TYPES ###
 
