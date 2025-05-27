@@ -40,6 +40,10 @@ class TestOutliers:
         with pytest.raises(ValueError):
             _get_outlier_mask(np.random.random((10, 1, 16, 16)), "error", None)  # type: ignore
 
+    def test_get_outlier_mask_all_nan(self):
+        mask_none = _get_outlier_mask(np.array([np.nan, np.nan, np.nan]), "zscore", None)
+        np.testing.assert_array_equal(mask_none, np.array([False, False, False]))
+
     def test_outliers_with_stats(self):
         data = np.random.random((20, 3, 16, 16))
         stats = pixelstats(data)
