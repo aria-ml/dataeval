@@ -18,57 +18,59 @@ from dataeval.outputs._stats import BASE_ATTRS
 from dataeval.typing import ArrayLike, Dataset
 
 
+def _get_zscore_mask(values: NDArray[np.float64], threshold: float | None) -> NDArray[np.bool_] | None:
+    threshold = threshold if threshold is not None else 3.0
+    std_val = np.nanstd(values)
+    if std_val > EPSILON:
+        mean_val = np.nanmean(values)
+        abs_diff = np.abs(values - mean_val)
+        return (abs_diff / std_val) > threshold
+    return None
+
+
+def _get_modzscore_mask(values: NDArray[np.float64], threshold: float | None) -> NDArray[np.bool_] | None:
+    threshold = threshold if threshold is not None else 3.5
+    median_val = np.nanmedian(values)
+    abs_diff = np.abs(values - median_val)
+    m_abs_diff = np.nanmedian(abs_diff)
+    m_abs_diff = np.nanmean(abs_diff) if m_abs_diff <= EPSILON else m_abs_diff
+    if m_abs_diff > EPSILON:
+        mod_z_score = 0.6745 * abs_diff / m_abs_diff
+        return mod_z_score > threshold
+    return None
+
+
+def _get_iqr_mask(values: NDArray[np.float64], threshold: float | None) -> NDArray[np.bool_] | None:
+    threshold = threshold if threshold is not None else 1.5
+    qrt = np.nanpercentile(values, q=(25, 75), method="midpoint")
+    iqr_val = qrt[1] - qrt[0]
+    if iqr_val > EPSILON:
+        iqr_threshold = iqr_val * threshold
+        return (values < (qrt[0] - iqr_threshold)) | (values > (qrt[1] + iqr_threshold))
+    return None
+
+
 def _get_outlier_mask(
     values: NDArray[Any], method: Literal["zscore", "modzscore", "iqr"], threshold: float | None
 ) -> NDArray[np.bool_]:
     if len(values) == 0:
         return np.array([], dtype=bool)
 
-    values = values.astype(np.float64)
+    nan_mask = np.isnan(values)
 
-    valid_mask = ~np.isnan(values)
-    outliers = np.full(values.shape, False, dtype=bool)
-
-    if not np.any(valid_mask):
-        return outliers
-
-    if method == "zscore":
-        threshold = threshold if threshold is not None else 3.0
-
-        std_val = np.nanstd(values)
-
-        if std_val > EPSILON:
-            mean_val = np.nanmean(values)
-            abs_diff = np.abs(values - mean_val)
-            outliers = (abs_diff / std_val) > threshold
-
+    if np.all(nan_mask):
+        outliers = None
+    elif method == "zscore":
+        outliers = _get_zscore_mask(values.astype(np.float64), threshold)
     elif method == "modzscore":
-        threshold = threshold if threshold is not None else 3.5
-
-        median_val = np.nanmedian(values)
-        abs_diff = np.abs(values - median_val)
-        m_abs_diff = np.nanmedian(abs_diff)
-        m_abs_diff = np.nanmean(abs_diff) if m_abs_diff <= EPSILON else m_abs_diff
-
-        if m_abs_diff > EPSILON:
-            mod_z_score = 0.6745 * abs_diff / m_abs_diff
-            outliers = mod_z_score > threshold
-
+        outliers = _get_modzscore_mask(values.astype(np.float64), threshold)
     elif method == "iqr":
-        threshold = threshold if threshold is not None else 1.5
-
-        qrt = np.nanpercentile(values, q=(25, 75), method="midpoint")
-        iqr_val = qrt[1] - qrt[0]
-
-        if iqr_val > EPSILON:
-            iqr_threshold = iqr_val * threshold
-            outliers = (values < (qrt[0] - iqr_threshold)) | (values > (qrt[1] + iqr_threshold))
-
+        outliers = _get_iqr_mask(values.astype(np.float64), threshold)
     else:
         raise ValueError("Outlier method must be 'zscore' 'modzscore' or 'iqr'.")
 
-    outliers[~valid_mask] = False
-    return outliers
+    # If outliers were found, return the mask with NaN values set to False, otherwise return all False
+    return outliers & ~nan_mask if outliers is not None else np.full(values.shape, False, dtype=bool)
 
 
 class Outliers:
