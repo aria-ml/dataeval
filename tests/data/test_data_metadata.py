@@ -1,8 +1,13 @@
+import copy
+
 import numpy as np
 import polars as pl
 import pytest
 
 from dataeval.data._metadata import FactorInfo, Metadata
+from dataeval.metrics.stats._boxratiostats import boxratiostats
+from dataeval.metrics.stats._imagestats import imagestats
+from dataeval.metrics.stats._labelstats import labelstats
 from dataeval.utils.datasets._types import ObjectDetectionTarget
 from tests.data.test_data_embeddings import MockDataset
 
@@ -49,6 +54,41 @@ class TestMetadata:
         md.add_factors({"a": np.random.random((factors,))})
         assert "a" in md.factor_names
         assert "a" in md.dataframe
+
+    def test_ic_empty_targets(self, mock_ds):
+        mock_ds = copy.deepcopy(mock_ds)
+        mock_ds.targets = list(mock_ds.targets)
+        mock_ds.targets[1] = np.array([])
+        mock_ds.targets[5] = np.array([])
+
+        md = Metadata(mock_ds)
+        assert len(md.class_labels) == 8
+        assert md.image_indices.tolist() == [0, 2, 3, 4, 6, 7, 8, 9]
+
+        stats = labelstats(md)
+        assert stats.label_counts_per_image == [1, 0, 1, 1, 1, 0, 1, 1, 1, 1]
+
+    def test_od_empty_targets(self, get_od_dataset):
+        mock_ds = get_od_dataset(10, 2)
+        for prop in ("_labels", "_bboxes"):
+            _x = list(getattr(mock_ds, prop))
+            _x[1] = []
+            _x[5] = []
+            setattr(mock_ds, prop, _x)
+
+        md = Metadata(mock_ds)
+        assert len(md.class_labels) == 16
+        assert md.image_indices.tolist() == [0, 0, 2, 2, 3, 3, 4, 4, 6, 6, 7, 7, 8, 8, 9, 9]
+
+        stats = labelstats(md)
+        assert stats.label_counts_per_image == [2, 0, 2, 2, 2, 0, 2, 2, 2, 2]
+
+        imgstats = imagestats(mock_ds)
+        boxstats = imagestats(mock_ds, per_box=True)
+        ratiostats = boxratiostats(boxstats, imgstats)
+        assert len(imgstats) == 10
+        assert len(boxstats) == 16
+        assert len(ratiostats) == 16
 
     def test_mismatch_factor_length(self, mock_metadata):
         with pytest.raises(ValueError, match="provided factors have a different length"):
