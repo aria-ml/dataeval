@@ -234,14 +234,17 @@ class Metadata:
             if is_od_target := isinstance(target, ObjectDetectionTarget):
                 target_labels = as_numpy(target.labels)
                 target_len = len(target_labels)
-                labels.extend(target_labels.tolist())
-                bboxes.extend(as_numpy(target.boxes).tolist())
-                scores.extend(as_numpy(target.scores).tolist())
-                srcidx.extend([i] * target_len)
+                if target_len:
+                    labels.extend(target_labels.tolist())
+                    bboxes.extend(as_numpy(target.boxes).tolist())
+                    scores.extend(as_numpy(target.scores).tolist())
+                    srcidx.extend([i] * target_len)
             elif isinstance(target, Array):
-                target_len = 1
-                labels.append(int(np.argmax(as_numpy(target))))
-                scores.append(target)
+                if len(target):
+                    target_len = 1
+                    labels.append(int(np.argmax(as_numpy(target))))
+                    scores.append(target)
+                    srcidx.append(i)
             else:
                 raise TypeError("Encountered unsupported target type in dataset")
 
@@ -252,18 +255,18 @@ class Metadata:
         labels = as_numpy(labels).astype(np.intp)
         scores = as_numpy(scores).astype(np.float32)
         bboxes = as_numpy(bboxes).astype(np.float32) if is_od else None
-        srcidx = as_numpy(srcidx).astype(np.intp) if is_od else None
+        srcidx = as_numpy(srcidx).astype(np.intp)
 
         index2label = self._dataset.metadata.get("index2label", {i: str(i) for i in np.unique(labels)})
 
-        targets_per_image = None if srcidx is None else np.unique(srcidx, return_counts=True)[1].tolist()
+        targets_per_image = np.bincount(srcidx, minlength=len(self._dataset)).tolist() if is_od else None
         merged = merge(raw, return_dropped=True, ignore_lists=False, targets_per_image=targets_per_image)
 
         reserved = ["image_index", "class_label", "score", "box"]
         factor_dict = {f"metadata_{k}" if k in reserved else k: v for k, v in merged[0].items() if k != "_image_index"}
 
         target_dict = {
-            "image_index": srcidx if srcidx is not None else np.arange(len(labels)),
+            "image_index": srcidx,
             "class_label": labels,
             "score": scores,
             "box": bboxes if bboxes is not None else [None] * len(labels),
