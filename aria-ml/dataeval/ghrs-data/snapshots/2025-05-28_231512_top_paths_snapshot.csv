@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,80,41
+/aria-ml/dataeval/tree/main/src/dataeval,8,4
+/aria-ml/dataeval/tree/main/src,7,4
+/aria-ml/dataeval/tree/main,5,4
+/aria-ml/dataeval/tree/main/src/dataeval/detectors/ood,4,1
+/aria-ml/dataeval/tree/main/src/dataeval/utils,3,3
+/aria-ml/dataeval/commit/b47554b44c724441b17c72d224d6e9ad85437f9c,3,1
+/aria-ml/dataeval/tree/576546cda58fd32c9833bc3b1370314a9baa5658,3,1
+/aria-ml/dataeval/tree/main/tests,2,2
+/aria-ml/dataeval/blob/main/src/dataeval/data/_embeddings.py,2,1
