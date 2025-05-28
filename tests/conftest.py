@@ -85,7 +85,7 @@ def DATA_3():
 
 @overload
 def _get_dataset(
-    images: list[np.ndarray] | tuple[int, int | None, int | None] | None,
+    images: list[np.ndarray] | tuple[int, int | None, int | None] | int | None,
     targets_per_image: int,
     as_float: bool = False,
     override: list[BoxLike] | dict[int, list[BoxLike]] | None = None,
@@ -94,7 +94,7 @@ def _get_dataset(
 
 @overload
 def _get_dataset(
-    images: list[np.ndarray] | tuple[int, int | None, int | None] | None,
+    images: list[np.ndarray] | tuple[int, int | None, int | None] | int | None,
     targets_per_image: Literal[None] = None,
     as_float: bool = False,
     override: list[BoxLike] | dict[int, list[BoxLike]] | None = None,
@@ -102,13 +102,13 @@ def _get_dataset(
 
 
 def _get_dataset(
-    images: list[np.ndarray] | tuple[int, int | None, int | None] | None,
+    images: list[np.ndarray] | tuple[int, int | None, int | None] | int | None,
     targets_per_image: int | None = None,
     as_float: bool = False,
     override: list[BoxLike] | dict[int, list[BoxLike]] | None = None,
 ):
-    if images is None:
-        images = (10, 3, 64)
+    if images is None or isinstance(images, int):
+        images = (images or 10, None, None)
     if isinstance(images, tuple):
         images = get_images(images[0], images[1], images[2])
     length = len(images)
@@ -126,7 +126,7 @@ def _get_dataset(
 
 
 def _get_ic_dataset(
-    images: list[np.ndarray] | tuple[int, int | None, int | None] | None,
+    images: list[np.ndarray] | tuple[int, int | None, int | None] | int | None,
     as_float: bool = False,
     override: list[BoxLike] | dict[int, list[BoxLike]] | None = None,
 ) -> ImageClassificationDataset:
@@ -134,7 +134,7 @@ def _get_ic_dataset(
 
 
 def _get_od_dataset(
-    images: list[np.ndarray] | tuple[int, int | None, int | None] | None,
+    images: list[np.ndarray] | tuple[int, int | None, int | None] | int | None,
     targets_per_image: int,
     as_float: bool = False,
     override: list[BoxLike] | dict[int, list[BoxLike]] | None = None,
