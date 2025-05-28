@@ -6,7 +6,6 @@ from typing import Any, Callable
 
 import numpy as np
 
-from dataeval.config import EPSILON
 from dataeval.metrics.stats._base import StatsProcessor, run_stats
 from dataeval.outputs import DimensionStatsOutput
 from dataeval.outputs._base import set_metadata
@@ -23,8 +22,8 @@ class DimensionStatsProcessor(StatsProcessor[DimensionStatsOutput]):
         "height": lambda x: x.box.height,
         "channels": lambda x: x.shape[-3],
         "size": lambda x: x.box.width * x.box.height,
-        "aspect_ratio": lambda x: x.box.width / (x.box.height + EPSILON),
-        "depth": lambda x: get_bitdepth(x.image).depth,
+        "aspect_ratio": lambda x: 0.0 if x.box.height == 0 else x.box.width / x.box.height,
+        "depth": lambda x: get_bitdepth(x.raw).depth,
         "center": lambda x: np.asarray([(x.box.x0 + x.box.x1) / 2, (x.box.y0 + x.box.y1) / 2]),
         "distance_center": lambda x: np.sqrt(
             np.square(((x.box.x0 + x.box.x1) / 2) - (x.raw.shape[-1] / 2))
