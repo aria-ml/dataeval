@@ -1,6 +1,11 @@
-[//]: # (29069a2c51660ba940f4e71a94e1db41dc9f43fd)
+[//]: # (a93ccfa2c6e3122d1d0f886845bc55fb3e147320)
 
 # DataEval Change Log
+
+## v0.86.7
+
+👾 **Fixes**
+- `a93ccfa2` - Hotfix: Address metadata issues for datasets with empty targets
 
 ## v0.86.6
 
