@@ -22,7 +22,7 @@ from dataeval.utils.torch._gmm import GaussianMixtureModelParams, gmm_params
 from dataeval.utils.torch._internal import trainer
 
 
-class OODBase(OODBaseMixin[torch.nn.Module], OODFitMixin[Callable[..., torch.nn.Module], torch.optim.Optimizer]):
+class OODBase(OODBaseMixin[torch.nn.Module], OODFitMixin[Callable[..., torch.Tensor], torch.optim.Optimizer]):
     def __init__(self, model: torch.nn.Module, device: DeviceLike | None = None) -> None:
         self.device: torch.device = get_device(device)
         super().__init__(model)
@@ -31,7 +31,7 @@ class OODBase(OODBaseMixin[torch.nn.Module], OODFitMixin[Callable[..., torch.nn.
         self,
         x_ref: ArrayLike,
         threshold_perc: float,
-        loss_fn: Callable[..., torch.nn.Module] | None,
+        loss_fn: Callable[..., torch.Tensor] | None,
         optimizer: torch.optim.Optimizer | None,
         epochs: int,
         batch_size: int,
@@ -82,7 +82,7 @@ class OODBaseGMM(OODBase, OODGMMMixin[GaussianMixtureModelParams]):
         self,
         x_ref: ArrayLike,
         threshold_perc: float,
-        loss_fn: Callable[..., torch.nn.Module] | None,
+        loss_fn: Callable[..., torch.Tensor] | None,
         optimizer: torch.optim.Optimizer | None,
         epochs: int,
         batch_size: int,

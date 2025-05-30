@@ -10,13 +10,13 @@ from scipy.spatial.distance import pdist, squareform
 
 from dataeval.outputs import CoverageOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.typing import ArrayLike
+from dataeval.typing import Array
 from dataeval.utils._array import ensure_embeddings, flatten
 
 
 @set_metadata
 def coverage(
-    embeddings: ArrayLike,
+    embeddings: Array,
     radius_type: Literal["adaptive", "naive"] = "adaptive",
     num_observations: int = 20,
     percent: float = 0.01,

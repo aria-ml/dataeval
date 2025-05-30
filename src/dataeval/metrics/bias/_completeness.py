@@ -9,11 +9,11 @@ import numpy as np
 
 from dataeval.config import EPSILON
 from dataeval.outputs import CompletenessOutput
-from dataeval.typing import ArrayLike
+from dataeval.typing import Array
 from dataeval.utils._array import ensure_embeddings
 
 
-def completeness(embeddings: ArrayLike, quantiles: int) -> CompletenessOutput:
+def completeness(embeddings: Array, quantiles: int) -> CompletenessOutput:
     """
     Calculate the fraction of boxes in a grid defined by quantiles that
     contain at least one data point.
@@ -21,7 +21,7 @@ def completeness(embeddings: ArrayLike, quantiles: int) -> CompletenessOutput:
 
     Parameters
     ----------
-    embeddings : ArrayLike
+    embeddings : Array
         Embedded dataset (or other low-dimensional data) (nxp)
     quantiles : int
         number of quantile values to use for partitioning each dimension

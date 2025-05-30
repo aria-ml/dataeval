@@ -65,7 +65,7 @@ class OOD_AE(OODBase):
         self,
         x_ref: ArrayLike,
         threshold_perc: float,
-        loss_fn: Callable[..., torch.nn.Module] | None = None,
+        loss_fn: Callable[..., torch.Tensor] | None = None,
         optimizer: torch.optim.Optimizer | None = None,
         epochs: int = 20,
         batch_size: int = 64,

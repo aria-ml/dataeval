@@ -271,7 +271,7 @@ def parity(metadata: Metadata) -> ParityOutput:
         # because scipy.stats.chi2_contingency fails when there are rows containing only zeros.
         contingency_matrix = contingency_matrix[np.any(contingency_matrix, axis=1)]
 
-        chi_scores[i], p_values[i] = chi2_contingency(contingency_matrix)[:2]
+        chi_scores[i], p_values[i] = chi2_contingency(contingency_matrix)[:2]  # type: ignore
 
     if insufficient_data:
         warnings.warn(
