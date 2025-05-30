@@ -47,11 +47,11 @@ class ClustererOutput(Output):
         The strength of the data point belonging to the assigned cluster
     """
 
-    clusters: NDArray[np.int_]
-    mst: NDArray[np.double]
-    linkage_tree: NDArray[np.double]
-    condensed_tree: NDArray[np.double]
-    membership_strengths: NDArray[np.double]
+    clusters: NDArray[np.intp]
+    mst: NDArray[np.float32]
+    linkage_tree: NDArray[np.float32]
+    condensed_tree: NDArray[np.float32]
+    membership_strengths: NDArray[np.float32]
 
     def find_outliers(self) -> NDArray[np.int_]:
         """
@@ -77,7 +77,7 @@ class ClustererOutput(Output):
         # Delay load numba compiled functions
         from dataeval.utils._clusterer import compare_links_to_cluster_std, sorted_union_find
 
-        exact_indices, near_indices = compare_links_to_cluster_std(self.mst, self.clusters)
+        exact_indices, near_indices = compare_links_to_cluster_std(self.mst, self.clusters)  # type: ignore
         exact_dupes = sorted_union_find(exact_indices)
         near_dupes = sorted_union_find(near_indices)
 

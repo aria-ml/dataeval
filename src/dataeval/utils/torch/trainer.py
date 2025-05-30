@@ -172,7 +172,7 @@ class AETrainer:
         for batch in dl:
             imgs = get_images_from_batch(batch)
             imgs = imgs.to(self.device)
-            embeddings = encode_func(imgs).to("cpu")
+            embeddings = encode_func(imgs).to("cpu")  # type: ignore
             encodings = torch.vstack((encodings, embeddings)) if len(encodings) else embeddings
 
         return encodings

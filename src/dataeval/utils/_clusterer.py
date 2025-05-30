@@ -69,12 +69,12 @@ def compare_links_to_cluster_std(
 @dataclass
 class ClusterData:
     clusters: NDArray[np.intp]
-    mst: NDArray[np.double]
-    linkage_tree: NDArray[np.double]
+    mst: NDArray[np.float32]
+    linkage_tree: NDArray[np.float32]
     condensed_tree: CondensedTree
-    membership_strengths: NDArray[np.double]
+    membership_strengths: NDArray[np.float32]
     k_neighbors: NDArray[np.int32]
-    k_distances: NDArray[np.double]
+    k_distances: NDArray[np.float32]
 
 
 def cluster(data: ArrayLike) -> ClusterData:
@@ -95,9 +95,9 @@ def cluster(data: ArrayLike) -> ClusterData:
 
     max_neighbors = min(25, num_samples - 1)
     kneighbors, kdistances = calculate_neighbor_distances(x, max_neighbors)
-    unsorted_mst: NDArray[np.double] = minimum_spanning_tree(x, kneighbors, kdistances)
-    mst: NDArray[np.double] = unsorted_mst[np.argsort(unsorted_mst.T[2])]
-    linkage_tree: NDArray[np.double] = mst_to_linkage_tree(mst)
+    unsorted_mst: NDArray[np.float32] = minimum_spanning_tree(x, kneighbors, kdistances)
+    mst: NDArray[np.float32] = unsorted_mst[np.argsort(unsorted_mst.T[2])]
+    linkage_tree: NDArray[np.float32] = mst_to_linkage_tree(mst).astype(np.float32)
     condensed_tree: CondensedTree = condense_tree(linkage_tree, min_cluster_size, None)
 
     cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)

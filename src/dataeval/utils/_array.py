@@ -19,7 +19,7 @@ _logger = logging.getLogger(__name__)
 
 _MODULE_CACHE = {}
 
-T = TypeVar("T", ArrayLike, np.ndarray, torch.Tensor)
+T = TypeVar("T", Array, np.ndarray, torch.Tensor)
 _np_dtype = TypeVar("_np_dtype", bound=np.generic)
 
 
@@ -71,6 +71,19 @@ def to_numpy_iter(iterable: Iterable[ArrayLike]) -> Iterator[NDArray[Any]]:
     """Yields an iterator of numpy arrays from an ArrayLike"""
     for array in iterable:
         yield to_numpy(array)
+
+
+@overload
+def rescale_array(array: NDArray[_np_dtype]) -> NDArray[_np_dtype]: ...
+@overload
+def rescale_array(array: torch.Tensor) -> torch.Tensor: ...
+def rescale_array(array: Array | NDArray[_np_dtype] | torch.Tensor) -> Array | NDArray[_np_dtype] | torch.Tensor:
+    """Rescale an array to the range [0, 1]"""
+    if isinstance(array, (np.ndarray, torch.Tensor)):
+        arr_min = array.min()
+        arr_max = array.max()
+        return (array - arr_min) / (arr_max - arr_min)
+    raise TypeError(f"Unsupported type: {type(array)}")
 
 
 @overload
@@ -137,14 +150,12 @@ def ensure_embeddings(
     if arr.ndim != 2:
         raise ValueError(f"Expected a 2D array, but got a {arr.ndim}D array.")
 
-    if unit_interval:
-        arr_min, arr_max = arr.min(), arr.max()
-        if arr_min < 0 or arr_max > 1:
-            if unit_interval == "force":
-                warnings.warn("Embeddings are not unit interval [0, 1]. Forcing to unit interval.")
-                arr = (arr - arr_min) / (arr_max - arr_min)
-            else:
-                raise ValueError("Embeddings must be unit interval [0, 1].")
+    if unit_interval and (arr.min() < 0 or arr.max() > 1):
+        if unit_interval == "force":
+            warnings.warn("Embeddings are not unit interval [0, 1]. Forcing to unit interval.")
+            arr = rescale_array(arr)
+        else:
+            raise ValueError("Embeddings must be unit interval [0, 1].")
 
     if dtype is None:
         return embeddings
