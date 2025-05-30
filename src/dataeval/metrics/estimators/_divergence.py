@@ -14,7 +14,7 @@ from numpy.typing import NDArray
 
 from dataeval.outputs import DivergenceOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.typing import ArrayLike
+from dataeval.typing import Array
 from dataeval.utils._array import ensure_embeddings
 from dataeval.utils._method import get_method
 from dataeval.utils._mst import compute_neighbors, minimum_spanning_tree
@@ -65,7 +65,7 @@ _DIVERGENCE_FN_MAP = {"FNN": divergence_fnn, "MST": divergence_mst}
 
 
 @set_metadata
-def divergence(emb_a: ArrayLike, emb_b: ArrayLike, method: Literal["FNN", "MST"] = "FNN") -> DivergenceOutput:
+def divergence(emb_a: Array, emb_b: Array, method: Literal["FNN", "MST"] = "FNN") -> DivergenceOutput:
     """
     Calculates the :term:`divergence` and any errors between the datasets.
 

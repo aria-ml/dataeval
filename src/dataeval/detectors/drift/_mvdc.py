@@ -1,15 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import numpy as np
 import pandas as pd
 from numpy.typing import ArrayLike
-
-if TYPE_CHECKING:
-    from typing import Self
-else:
-    from typing_extensions import Self
 
 from dataeval.detectors.drift._nml._chunk import CountBasedChunker, SizeBasedChunker
 from dataeval.detectors.drift._nml._domainclassifier import DomainClassifierCalculator
@@ -52,7 +45,7 @@ class DriftMVDC:
             threshold=ConstantThreshold(lower=self.threshold[0], upper=self.threshold[1]),
         )
 
-    def fit(self, x_ref: ArrayLike) -> Self:
+    def fit(self, x_ref: ArrayLike) -> DriftMVDC:
         """
         Fit the domain classifier on the training dataframe
 
@@ -63,7 +56,7 @@ class DriftMVDC:
 
         Returns
         -------
-        Self
+        DriftMVDC
 
         """
         # for 1D input, assume that is 1 sample: dim[1,n_features]
