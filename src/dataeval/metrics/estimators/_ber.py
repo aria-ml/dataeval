@@ -22,7 +22,7 @@ from scipy.stats import mode
 from dataeval.config import EPSILON
 from dataeval.outputs import BEROutput
 from dataeval.outputs._base import set_metadata
-from dataeval.typing import ArrayLike
+from dataeval.typing import Array
 from dataeval.utils._array import as_numpy, ensure_embeddings
 from dataeval.utils._method import get_method
 from dataeval.utils._mst import compute_neighbors, minimum_spanning_tree
@@ -105,7 +105,7 @@ _BER_FN_MAP = {"KNN": ber_knn, "MST": ber_mst}
 
 
 @set_metadata
-def ber(embeddings: ArrayLike, labels: ArrayLike, k: int = 1, method: Literal["KNN", "MST"] = "KNN") -> BEROutput:
+def ber(embeddings: Array, labels: Array, k: int = 1, method: Literal["KNN", "MST"] = "KNN") -> BEROutput:
     """
     An estimator for Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` \
     using FR or KNN test statistic basis.

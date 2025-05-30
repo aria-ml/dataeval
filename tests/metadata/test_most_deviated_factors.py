@@ -111,7 +111,7 @@ class TestDeviatedFactors:
     ):
         """Tests ood flags correctly select most deviated metadata factor"""
 
-        ood_mask = np.array([is_ood_0, is_ood_1, is_ood_2], dtype=np.bool)
+        ood_mask = np.array([is_ood_0, is_ood_1, is_ood_2], dtype=np.bool_)
         ood = mock_ood_output(ood_mask)
 
         # 3 samples to reduce unnecessary warnings in pytest logs
