@@ -28,26 +28,28 @@ estimation, bias detection, and dataset linting.
 <!-- end needs -->
 
 <!-- start JATIC interop -->
+
 DataEval is easy to install, supports a wide range of Python versions, and is
 compatible with many of the most popular packages in the scientific and T&E
 communities.
 
 DataEval also has native interoperability between JATIC's suite of tools when
 using MAITE-compliant datasets and models.
+
 <!-- end JATIC interop -->
 
 ## Getting Started
 
 **Python versions:** 3.9 - 3.12
 
-**Supported packages**: *NumPy*, *Pandas*, *Sci-kit learn*, *MAITE*, *NRTK*
+**Supported packages**: _NumPy_, _Pandas_, _Sci-kit learn_, _MAITE_, _NRTK_
 
 Choose your preferred method of installation below or follow our
 [installation guide](https://dataeval.readthedocs.io/en/v0.74.2/installation.html).
 
-* [Installing with pip](#installing-with-pip)
-* [Installing with conda/mamba](#installing-with-conda)
-* [Installing from GitHub](#installing-from-github)
+- [Installing with pip](#installing-with-pip)
+- [Installing with conda/mamba](#installing-with-conda)
+- [Installing from GitHub](#installing-from-github)
 
 ### **Installing with pip**
 
@@ -61,7 +63,7 @@ pip install dataeval[all]
 ### **Installing with conda**
 
 DataEval can be installed in a Conda/Mamba environment using the provided
-`environment.yaml` file.  As some dependencies are installed from the `pytorch`
+`environment.yaml` file. As some dependencies are installed from the `pytorch`
 channel, the channel is specified in the below example.
 
 ```bash
@@ -71,12 +73,10 @@ micromamba create -f environment\environment.yaml -c pytorch
 ### **Installing from GitHub**
 
 To install DataEval from source locally on Ubuntu, you will need `git-lfs` to
-download larger, binary source files and `poetry` for project dependency
-management.
+download larger, binary source files.
 
 ```bash
 sudo apt-get install git-lfs
-pip install poetry
 ```
 
 Pull the source down and change to the DataEval project directory.
@@ -86,26 +86,40 @@ git clone https://github.com/aria-ml/dataeval.git
 cd dataeval
 ```
 
-Install DataEval with optional dependencies for development.
+#### **Using Poetry**
+
+Install DataEval with all extras.
 
 ```bash
-poetry install --all-extras --with dev
+poetry install --extras=all
 ```
 
-Now that DataEval is installed, you can run commands in the poetry virtual
-environment by prefixing shell commands with `poetry run`, or activate the
-virtual environment directly in the shell.
+Enable Poetry's virtual environment.
 
 ```bash
-poetry shell
+poetry env activate
+```
+
+#### **Using uv**
+
+Install DataEval with all extras and dependencies for development.
+
+```bash
+uv sync --extra=all
+```
+
+Enable uv's virtual environment.
+
+```bash
+source .venv/bin/activate
 ```
 
 ## Contact Us
 
 If you have any questions, feel free to reach out to the people below:
 
-* **POC**: Scott Swan @scott.swan
-* **DPOC**: Andrew Weng @aweng
+- **POC**: Scott Swan @scott.swan
+- **DPOC**: Andrew Weng @aweng
 
 ## Acknowledgement
 

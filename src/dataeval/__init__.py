@@ -7,12 +7,19 @@ shifts that impact performance of deployed models.
 
 from __future__ import annotations
 
-__all__ = ["config", "detectors", "log", "metrics", "typing", "utils", "workflows"]
-__version__ = "0.0.0"
+try:
+    from ._version import __version__
+except ImportError:
+    __version__ = "unknown"
+
+# Strongly type for pyright
+__version__ = str(__version__)
+
+__all__ = ["__version__", "config", "detectors", "log", "metrics", "typing", "utils", "workflows"]
 
 import logging
 
-from dataeval import config, detectors, metrics, typing, utils, workflows
+from . import config, detectors, metrics, typing, utils, workflows
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 

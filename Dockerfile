@@ -25,8 +25,6 @@ RUN echo "${USER} ALL=(ALL:ALL) NOPASSWD: ALL" > /etc/sudoers.d/user-nopasswd
 USER ${USER}
 WORKDIR /${USER}
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
-ENV POETRY_DYNAMIC_VERSIONING_BYPASS=0.0.0
-ENV UV_INDEX_STRATEGY=unsafe-best-match
 ENV LANGUAGE=en
 ENV LC_ALL=C.UTF-8
 ENV LANG=en_US.UTF-8
@@ -36,11 +34,9 @@ FROM cuda AS base
 ARG UID
 ARG python_version
 ARG UV_CACHE_DIR=/home/${USER}/.cache/uv
+COPY --chown=${UID} requirements.txt ./
 RUN uv venv -p ${python_version}
-COPY --chown=${UID} environment/requirements.txt environment/
-RUN uv pip install -r environment/requirements.txt
-COPY --chown=${UID} environment/requirements-dev.txt environment/
-RUN uv pip install -r environment/requirements-dev.txt
+RUN uv pip install -r requirements.txt
 ENV PATH=/${USER}/.venv/bin:${PATH}
 
 ######################## docs image ########################
@@ -56,15 +52,14 @@ sys.path.extend(['/${USER}/docs/source', '/${USER}/src']); \
 import data; \
 data.download(); \
 "
-COPY --chown=${UID} pyproject.toml poetry.lock ./
+COPY --chown=${UID} pyproject.toml uv.lock noxfile.py *.md ./
 COPY --chown=${UID} src/ src/
-COPY --chown=${UID} *.md ./
-COPY --chown=${UID} noxfile.py ./
 COPY --chown=${UID} docs/ docs/
 ARG output_dir
 RUN mkdir -p $output_dir
 RUN mkdir -p .nox
 RUN ln -s /dataeval/.venv .nox/docs
+ENV SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0
 ENTRYPOINT ["nox", "-r", "-e", "docs", "--"]
 
 ######################## devcontainer ########################

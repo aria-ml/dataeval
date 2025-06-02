@@ -20,4 +20,5 @@ class TestDevice:
         assert config.get_device() == torch.device("cpu")
         config.set_device(None)
         assert config._device is None
-        assert config.get_device() == torch.get_default_device()
+        if hasattr(torch, "get_default_device"):
+            assert config.get_device() == torch.get_default_device()

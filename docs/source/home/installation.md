@@ -1,4 +1,5 @@
 <!-- markdownlint-disable MD004 -->
+
 # Installation
 
 DataEval is a library that offers powerful metric classes and dataset analysis
@@ -7,7 +8,7 @@ primary backends.
 
 ## Supported Python Versions
 
-We currently support python versions ``3.9`` - ``3.12``
+We currently support python versions `3.9` - `3.12`
 
 ## Installing DataEval
 
@@ -23,7 +24,7 @@ Installing from `pip`
 pip install dataeval
 ```
 
-DataEval also has an installable *extras* `all` that provide access to
+DataEval also has an installable _extras_ `all` that provide access to
 additional output formats and utility functions for analysis of your data.
 
 ```{list-table}
@@ -52,16 +53,16 @@ conda install -c conda-forge dataeval
 
 :::{note}
 
-Conda installs all *extras* automatically
+Conda installs all _extras_ automatically
 
 :::
 
 ::::
 
-::::{tab-item} source
+::::{tab-item} source (poetry)
 
 To install DataEval from source locally on Ubuntu, you will need git-lfs to
-download larger, binary source files and poetry for project dependency
+download larger, binary source files and uv for project dependency
 management.
 
 ```bash
@@ -79,24 +80,49 @@ Pull the source down and change to the DataEval project directory.
 Install DataEval with all extras
 
 ```bash
-    poetry install --all-extras
+    poetry install --extras=all
 ```
 
-(Optional) To install the development environment for DataEval, update
-the lock file and then run the installation command with the `dev` group
-specified.
-
-```bash
-    poetry lock
-    poetry install --all-extras --with=dev
-```
-
-Now that DataEval is installed, you can run commands in the poetry virtual
+Now that DataEval is installed, you can run commands in the Poetry virtual
 environment by prefixing shell commands with poetry run, or activate the
 virtual environment directly in the shell.
 
 ```bash
-    poetry shell
+    poetry env activate
+```
+
+::::
+
+::::{tab-item} source (uv)
+
+To install DataEval from source locally on Ubuntu, you will need git-lfs to
+download larger, binary source files and uv for project dependency
+management.
+
+```bash
+    sudo apt-get install git-lfs
+    pip install uv
+```
+
+Pull the source down and change to the DataEval project directory.
+
+```bash
+    git clone https://github.com/aria-ml/dataeval.git
+    cd dataeval
+```
+
+Install DataEval with all extras for Python 3.X
+
+```bash
+    uv sync -p 3.X --extra=all
+```
+
+Now that DataEval is installed, you can run commands in the uv virtual
+environment by prefixing shell commands with uv run, or activate the
+virtual environment directly in the shell.
+
+```bash
+    source .venv/bin/activate
 ```
 
 ::::
