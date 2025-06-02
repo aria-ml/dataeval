@@ -155,7 +155,7 @@ class TestSufficiencyInverseProject:
         """
         Tests metric projection output can be inversed
         """
-        num_samples = np.arange(20, 80, step=10, dtype=np.uint)
+        num_samples = np.arange(20, 80, step=10, dtype=np.uint32)
         accuracies = num_samples / 100.0
 
         data = SufficiencyOutput(steps=num_samples, measures={"Accuracy": accuracies})
