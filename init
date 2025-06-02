@@ -36,13 +36,10 @@ fi
 
 # Install dataeval environment for each version of python
 echo -n ${versions[*]} | xargs -n1 bash -c '\
+    export UV_PROJECT_ENVIRONMENT=.venv-$0 && \
     echo "Creating python virtual environment for $0..." && \
-    rm -rf .venv-$0 && \
-    uv venv --seed --python $0 .venv-$0 --link-mode symlink && \
-    uv pip install --python .venv-$0 --index-strategy unsafe-best-match --link-mode symlink --no-deps \
-        -e . \
-        -r environment/requirements.txt \
-        -r environment/requirements-dev.txt'
+    rm -rf $UV_PROJECT_ENVIRONMENT && \
+    uv sync -p $0 --extra all'
 echo -n ${versions[*]} | xargs -n1 bash -c '\
     echo "Finished installing dataeval for python $0 to .venv-$0"'
 echo

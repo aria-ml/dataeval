@@ -72,7 +72,7 @@ stages:
     changes:
       paths:
         - pyproject.toml
-        - environment/*
+        - uv.lock
   - if: $CI_COMMIT_BRANCH == 'main'
 
 .on_run_with_code: &on_run_with_code
@@ -83,7 +83,7 @@ stages:
       paths:
         - src/**/*
         - tests/**/*
-        - environment/*
+        - uv.lock
   - if: $CI_COMMIT_BRANCH == 'main'
 
 .on_run_with_docs: &on_run_with_docs
@@ -94,14 +94,14 @@ stages:
       paths:
         - src/**/*
         - docs/**/*
-        - environment/*
+        - uv.lock
         - "*.md"
   - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE != $UPDATE_CACHE_MESSAGE
     changes:
       paths:
         - src/**/*
         - docs/**/*
-        - environment/*
+        - uv.lock
         - "*.md"
     variables:
       DOCS_CLEAN: '--clean'
@@ -129,18 +129,20 @@ stages:
     
 .nox:
   needs: []
+  image: $UV_IMAGE:python$PYTHON_VERSION-$BASE_LAYER
   before_script:
     - uv pip install nox[uv] --system
   cache:
     - key:
         files:
-          - environment/requirements.txt
-          - environment/requirements-dev.txt
+          - uv.lock
       paths:
         - $UV_CACHE_DIR
         - data
   after_script:
     - uv cache prune --ci
+  variables:
+    PYTHON_VERSION: $PYTHON_LATEST_SUPPORTED_VERSION
 
 .nox_all:
   extends: .nox
@@ -154,13 +156,13 @@ stages:
   image: mambaorg/micromamba:2-cuda11.8.0-ubuntu20.04
   before_script:
     - eval "$(micromamba shell hook --shell bash)"
-    - micromamba create -f environment/environment.yaml -n dataeval python=$PYTHON_VERSION
+    - micromamba create -f environment.yaml -n dataeval python=$PYTHON_VERSION
     - micromamba activate dataeval
     - micromamba install pytest pytest-xdist requests
     - pip install -e . --no-deps
     - micromamba list
   variables:
-    POETRY_DYNAMIC_VERSIONING_BYPASS: "0.0.0"
+    SETUPTOOLS_SCM_PRETEND_VERSION: "0.0.0"
 
 .conda_all:
   extends: .conda
@@ -177,9 +179,11 @@ lint:
   rules: *on_run
 
 minimum install:
-  extends: .nox_all
+  extends: .nox
   script:
     - nox -e deps
+  variables:
+    PYTHON_VERSION: "3.9"
   rules: *on_run_with_code
 
 typecheck:

@@ -33,7 +33,6 @@ extensions = [
     "sphinx_tabs.tabs",
     # External extensions
     "autoapi.extension",
-    "enum_tools.autoenum",
     "myst_nb",
     "sphinx_design",
     "sphinx_immaterial",

@@ -77,7 +77,13 @@ def get_device(override: DeviceLike | None = None) -> torch.device:
     """
     if override is None:
         global _device
-        return torch.get_default_device() if _device is None else _device
+        return (
+            torch.get_default_device()
+            if hasattr(torch, "get_default_device")
+            else torch.device("cpu")
+            if _device is None
+            else _device
+        )
     return _todevice(override)
 
 

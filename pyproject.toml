@@ -1,27 +1,23 @@
-[tool.poetry]
+[project]
 name = "dataeval"
-version = "0.0.0" # dynamic
+dynamic = ["version"]
 description = "DataEval provides a simple interface to characterize image data and its impact on model performance across classification and object-detection tasks"
-license = "MIT"
-readme = "README.md"
-homepage = "https://dataeval.ai/"
-repository = "https://github.com/aria-ml/dataeval/"
-documentation = "https://dataeval.readthedocs.io/"
-
 authors = [
-  "Andrew Weng <andrew.weng@ariacoustics.com>",
-  "James Gleeson <james.gleeson@ariacoustics.com>",
-  "Jon Botts <jonathan.botts@ariacoustics.com>",
-  "Max Bright <max.bright@ariacoustics.com>",
-  "Ryan Wood <ryan.wood@ariacoustics.com>",
-  "Scott Swan <scott.swan@ariacoustics.com>",
-  "Shaun Jullens <shaun.jullens@ariacoustics.com>",
-  "Thayer Fisher <thayer.fisher@ariacoustics.com>",
+  { name = "Andrew Weng", email = "andrew.weng@ariacoustics.com" },
+  { name = "Bill Peria", email = "bill.peria@ariacoustics.com" },
+  { name = "Jon Botts", email = "jonathan.botts@ariacoustics.com" },
+  { name = "Jonathan Christian", email = "jonathan.christian@ariacoustics.com" },
+  { name = "Justin McMillan", email = "justin.mcmillan@ariacoustics.com" },
+  { name = "Ryan Wood", email = "ryan.wood@ariacoustics.com" },
+  { name = "Scott Swan", email = "scott.swan@ariacoustics.com" },
+  { name = "Shaun Jullens", email = "shaun.jullens@ariacoustics.com" },
 ]
+requires-python = ">=3.9,<3.13"
+readme = "README.md"
+license = "MIT"
 maintainers = [
-  "ARiA <dataeval@ariacoustics.com>"
+  { name = "ARiA", email = "dataeval@ariacoustics.com" },
 ]
-
 classifiers = [
   "Development Status :: 4 - Beta",
   "Operating System :: OS Independent",
@@ -34,106 +30,164 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering",
 ]
-
-packages = [
-  {include = "dataeval", from = "src"}
+dependencies = [
+  "defusedxml>=0.7.1",
+  "fast_hdbscan==0.2.0",
+  "lightgbm>=4",
+  "numba>=0.59.1",
+  "numpy>=1.24.2",
+  "pandas>=2.0",
+  "pillow>=10.3.0",
+  "polars>=1.0.0",
+  "requests>=2.32.3",
+  "scipy>=1.10",
+  "scikit-learn>=1.5.0",
+  "torch>=2.2.0",
+  "torchvision>=0.17.0",
+  "tqdm>=4.66",
+  "typing-extensions>=4.12 ; python_version ~= '3.9'",
+  "xxhash>=3.3",
 ]
 
-[tool.poetry.dependencies]
-# required
-python = ">=3.9,<3.13"
-defusedxml = {version = ">=0.7.1"}
-fast_hdbscan = {version = "0.2.0"}  # 0.2.1 hits a bug in condense_tree comparing float to none
-lightgbm = {version = ">=4"}
-numba = {version = ">=0.59.1"}
-numpy = {version = ">=1.24.2"}
-pandas = {version = ">=2.0"}
-pillow = {version = ">=10.3.0"}
-polars = {version = ">=1.0.0"}
-requests = {version = "*"}
-scipy = {version = ">=1.10"}
-scikit-learn = {version = ">=1.5.0"}
-torch = {version = ">=2.2.0", source = "pytorch"}
-torchvision = {version = ">=0.17.0", source = "pytorch"}
-tqdm = {version = "*"}
-typing-extensions = {version = ">=4.12", python = "^3.9"}  # ParamSpec
-xxhash = {version = ">=3.3"}
+[project.optional-dependencies]
+cpu = [
+  "torch>=2.2.0",
+  "torchvision>=0.17.0",
+]
+cu118 = [
+  "torch>=2.2.0",
+  "torchvision>=0.17.0",
+]
+cu124 = [
+  "torch>=2.2.0",
+  "torchvision>=0.17.0",
+]
+all = ["matplotlib>=3.7.1"]
 
-# optional
-matplotlib = {version = ">=3.7.1", optional = true}
+[project.urls]
+Homepage = "https://dataeval.ai/"
+Repository = "https://github.com/aria-ml/dataeval/"
+Documentation = "https://dataeval.readthedocs.io/"
 
-[tool.poetry.extras]
-all = ["matplotlib"]
+[dependency-groups]
+base = [
+  "nox[uv]>=2025.5.1",
+  "uv>=0.7.8",
+  "pip>=25",
+]
+lint = [
+  "ruff>=0.11",
+  "codespell[toml]>=2.3",
+]
+test = [
+  "pytest>=8.3",
+  "pytest-cov>=6.1",
+  "pytest-xdist>=3.6.1",
+  "coverage[toml]>=7.6",
+]
+type = [
+  "pyright[nodejs]>=1.1.400",
+]
+docs = [
+  "numpy>=2.0.2",
+  "certifi>=2024.07.04",
+  "ipykernel>=6.26.0",
+  "ipywidgets>=8.1.1",
+  "jinja2>=3.1.6",
+  "jupyter-client>=8.6.0",
+  "jupyter-cache>=1.0",
+  "myst-nb>=1.0",
+  "sphinx-autoapi>=3.6.0",
+  "sphinx-design>=0.6.1",
+  "sphinx-immaterial>=0.12.5",
+  "sphinx-new-tab-link>=0.8.0",
+  "sphinx-tabs>=3.4.7",
+  "Sphinx>=7.2.6",
+  "torchmetrics>=1.0.0",
+  "markupsafe>=3,<3.0.2",
+]
+dev = [
+  { include-group = "base" },
+  { include-group = "lint" },
+  { include-group = "test" },
+  { include-group = "type" },
+  { include-group = "docs" },
+]
 
-[tool.poetry.group.dev]
-optional = true
+[tool.uv]
+conflicts = [
+  [
+    { extra = "cpu" },
+    { extra = "cu118" },
+    { extra = "cu124" },
+  ],
+]
 
-[tool.poetry.group.dev.dependencies]
-nox = {version = "*", extras = ["uv"]}
-uv = {version = "*"}
-poetry = {version = "<2"}
-poetry-lock-groups-plugin = {version = "*"}
-poetry2conda = {version = "*"}
-numpy = {version = ">=2.0.2"}
-# lint
-ruff = {version = "*"}
-codespell = {version = "*", extras = ["toml"]}
-# unit
-pytest = {version = "*"}
-pytest-cov = {version = "*"}
-pytest-xdist = {version = "*"}
-coverage = {version = "*", extras = ["toml"]}
-# type
-pyright = {version = "*", extras = ["nodejs"]}
-# docs
-certifi = {version = ">=2024.07.04"}
-enum_tools = {version = ">=0.12.0", extras = ["sphinx"]}
-ipykernel = {version = ">=6.26.0"}
-ipywidgets = {version = ">=8.1.1"}
-jinja2 = {version = ">=3.1.6"}
-jupyter-client = {version = ">=8.6.0"}
-jupyter-cache = {version = "*"}
-myst-nb = {version = ">=1.0.0"}
-sphinx-autoapi = {version = "*"}
-sphinx-design = {version = "*"}
-sphinx-immaterial = {version = "*"}
-sphinx-new-tab-link = {version = "*"}
-sphinx-tabs = {version = "*"}
-Sphinx = {version = ">=7.2.6"}
-torchmetrics = {version = ">=1.0.0", source = "pytorch"}
-markupsafe = {version = "<3.0.2", optional = true}
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
-[[tool.poetry.source]]
-name = "pytorch"
+[[tool.uv.index]]
+name = "pytorch-cu118"
 url = "https://download.pytorch.org/whl/cu118"
-priority = "explicit"
+explicit = true
 
-[tool.poetry-dynamic-versioning]
-enable = true
-vcs = "git"
-style = "semver"
-pattern = "v(?P<base>\\d+\\.\\d+\\.\\d+)$"
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
 
-[tool.poetry-dynamic-versioning.substitution]
-files = ["src/dataeval/__init__.py"]
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cpu", extra = "cpu" },
+  { index = "pytorch-cu118", extra = "cu118" },
+  { index = "pytorch-cu124", extra = "cu124" },
+]
+torchvision = [
+  { index = "pytorch-cpu", extra = "cpu" },
+  { index = "pytorch-cu118", extra = "cu118" },
+  { index = "pytorch-cu124", extra = "cu124" },
+]
 
-[tool.poetry2conda]
-name = "dataeval"
+[tool.hatch.build.targets.sdist]
+include = ["src/dataeval"]
 
-[tool.poetry2conda.dependencies]
-torch = { name = "pytorch" }
-xxhash = { name = "python-xxhash" }
+[tool.hatch.build.targets.wheel]
+include = ["src/dataeval"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/dataeval" = "dataeval"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/dataeval/_version.py"
+
+[tool.poetry]
+version = "0.0.0"  # unused
+
+[tool.pyproject2conda.dependencies]
+torch = { pip = true }
+torchvision = { pip = true }
+xxhash = { skip = true, packages = "python-xxhash>=3.3" }
 
 [tool.pyright]
 reportMissingImports = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = ["--pythonwarnings=ignore::DeprecationWarning", "--verbose", "--durations=20", "--durations-min=1.0"]
+addopts = [
+  "--pythonwarnings=ignore::DeprecationWarning",
+  "--verbose",
+  "--durations=20",
+  "--durations-min=1.0",
+]
 markers = [
   "required: marks tests for required features",
   "optional: marks tests for optional features",
-  "requires_all: marks tests that require the all extras",
+  "requires_all: marks tests that require matplotlib",
   "cuda: marks tests that require cuda",
   "year: marks tests that need a specified dataset year",
 ]
@@ -143,6 +197,7 @@ source = ["src/dataeval"]
 branch = true
 concurrency = ["multiprocessing"]
 parallel = true
+omit = ["src/dataeval/_version.py"]
 
 [tool.coverage.report]
 exclude_also = [
@@ -158,7 +213,6 @@ omit = [
 ]
 fail_under = 90
 
-# Ruff rules - https://docs.astral.sh/ruff/rules/
 [tool.ruff]
 exclude = [
   ".devcontainer",
@@ -199,9 +253,9 @@ docstring-code-format = true
 docstring-code-line-length = "dynamic"
 
 [tool.codespell]
-skip = './*env*,./output,./docs/build,./docs/source/.jupyter_cache,CHANGELOG.md,poetry.lock,*.html,./docs/source/*/data'
+skip = './*env*,./output,./docs/build,./docs/source/.jupyter_cache,CHANGELOG.md,uv.lock,requirements.txt,*.html,./docs/source/*/data'
 ignore-words-list = ["Hart"]
 
 [build-system]
-requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning"]
-build-backend = "poetry_dynamic_versioning.backend"
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
