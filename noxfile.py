@@ -10,13 +10,10 @@ IS_CI = bool(os.environ.get("CI"))
 nox.options.default_venv_backend = "uv"
 nox.options.sessions = ["test", "type", "deps", "lint", "doctest", "check"]
 
-INSTALL_ARGS = ["--no-deps", "-e", ".", "-r", "environment/requirements.txt", "-r", "environment/requirements-dev.txt"]
-INSTALL_ENVS = {"UV_INDEX_STRATEGY": "unsafe-best-match", "POETRY_DYNAMIC_VERSIONING_BYPASS": "0.0.0"}
 COMMON_ENVS = {"TQDM_DISABLE": "1"}
 DOCS_ENVS = {"LANG": "C", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True", "PYDEVD_DISABLE_FILE_VALIDATION": "1"}
 DOCTEST_ENVS = {"NB_EXECUTION_MODE_OVERRIDE": "off"}
 
-REQUIREMENTS_OPTION_MAP = {"requirements.txt": "--all-extras", "requirements-dev.txt": "--only=dev"}
 SUPPORTED_VERSIONS = ("3.9", "3.10", "3.11", "3.12")
 
 RESTORE_CMD = """
@@ -30,7 +27,9 @@ fi
 """
 
 
-def check_version(version: str) -> str:
+def prep(session: nox.Session) -> str:
+    session.env["UV_PROJECT_ENVIRONMENT"] = session.env["VIRTUAL_ENV"]
+    version = session.name
     pattern = re.compile(r".*(3.\d+)$")
     matches = pattern.match(version)
     version = matches.groups()[0] if matches is not None and len(matches.groups()) > 0 else PYTHON_VERSION
@@ -42,16 +41,17 @@ def check_version(version: str) -> str:
 @nox.session
 def dev(session: nox.Session) -> None:
     """Set up a python development environment at `.venv-{version}`. Specify version using `nox -P {version} -e dev`."""
-    python_version = check_version(session.name)
+    python_version = prep(session)
+    session.env["UV_PROJECT_ENVIRONMENT"] = f".venv-{python_version}"
     session.run("rm", "-rf", f".venv-{python_version}", external=True)
-    session.run("uv", "venv", "--python", python_version, f".venv-{python_version}", "--seed", external=True)
-    session.run("uv", "pip", "install", "--python", f".venv-{python_version}", *INSTALL_ARGS, env=INSTALL_ENVS)
+    session.run("uv", "venv", "-p", python_version, "--seed", external=True)
+    session.run("uv", "sync", "--extra", "all", external=True)
 
 
 @nox.session
 def test(session: nox.Session) -> None:
     """Run unit tests with coverage reporting. Specify version using `nox -P {version} -e test`."""
-    python_version = check_version(session.name)
+    python_version = prep(session)
     pytest_args = ["-m", "not cuda"]
     xdist_args = ["-n4", "--dist", "loadfile"]
     cov_args = ["--cov", f"--junitxml=output/junit.{python_version}.xml"]
@@ -59,7 +59,7 @@ def test(session: nox.Session) -> None:
     cov_xml_args = ["--cov-report", f"xml:output/coverage.{python_version}.xml"]
     cov_html_args = ["--cov-report", f"html:output/htmlcov.{python_version}"]
 
-    session.install(*INSTALL_ARGS, env=INSTALL_ENVS)
+    session.run_install("uv", "sync", "--no-dev", "--extra=all", "--group=test")
     session.run(
         "pytest",
         *pytest_args,
@@ -83,8 +83,8 @@ def unit(session: nox.Session) -> None:
 @nox.session
 def type(session: nox.Session) -> None:  # noqa: A001
     """Run type checks and verify external types. Specify version using `nox -P {version} -e type`."""
-    check_version(session.name)
-    session.install(*INSTALL_ARGS, env=INSTALL_ENVS)
+    prep(session)
+    session.run_install("uv", "sync", "--no-dev", "--extra=all", "--group=type")
     session.run("pyright", "--stats", "src/", "tests/")
     session.run("pyright", "--ignoreexternal", "--verifytypes", "dataeval")
 
@@ -92,17 +92,17 @@ def type(session: nox.Session) -> None:  # noqa: A001
 @nox.session(reuse_venv=False)
 def deps(session: nox.Session) -> None:
     """Run unit tests against standard installation."""
-    check_version(session.name)
-    session.install(".", "pytest", env=INSTALL_ENVS)
+    prep(session)
+    session.run_install("uv", "pip", "install", "pytest")
+    session.run_install("uv", "pip", "install", ".", "--resolution=lowest-direct")
     session.run("pytest", "-m", "not (requires_all or optional)")
 
 
 @nox.session
 def lint(session: nox.Session) -> None:
     """Perform linting and spellcheck."""
-    check_version(session.name)
-
-    session.install("ruff", "codespell[toml]")
+    prep(session)
+    session.run_install("uv", "sync", "--only-group=lint")
     session.run("ruff", "check", "--show-fixes", "--exit-non-zero-on-fix", "--fix")
     session.run("ruff", "format", "--check" if IS_CI else ".")
     session.run("codespell")
@@ -111,9 +111,9 @@ def lint(session: nox.Session) -> None:
 @nox.session
 def doctest(session: nox.Session) -> None:
     """Run docstring tests."""
-    check_version(session.name)
+    prep(session)
     target = session.posargs if session.posargs else ["src/dataeval"]
-    session.install(*INSTALL_ARGS, env=INSTALL_ENVS)
+    session.run_install("uv", "sync", "--no-dev", "--group=test")
     session.run(
         "pytest",
         "--doctest-modules",
@@ -128,8 +128,8 @@ def doctest(session: nox.Session) -> None:
 @nox.session
 def docs(session: nox.Session) -> None:
     """Generate documentation. Clear the jupyter cache by calling `nox -e docs -- clean`."""
-    check_version(session.name)
-    session.install(*INSTALL_ARGS, env=INSTALL_ENVS)
+    prep(session)
+    session.run_install("uv", "sync", "--no-dev", "--extra=all", "--group=docs")
     session.chdir("docs/source")
     session.run("rm", "-rf", "../../output/docs", external=True)
     if "clean" in session.posargs:
@@ -158,34 +158,19 @@ def docs(session: nox.Session) -> None:
 
 @nox.session
 def lock(session: nox.Session) -> None:
-    """Lock dependencies in "poetry.lock" with --no-update. Update dependencies by calling `nox -e lock -- update`."""
-    update_args = [] if "update" in session.posargs else ["--no-update"]
-    session.install("poetry<2", "poetry-lock-groups-plugin", "poetry2conda")
-    session.run("cp", "-f", "environment/poetry.lock", "poetry.lock", external=True)
-    session.run("poetry", "lock", "--with=dev", *update_args)
-    for file, option in REQUIREMENTS_OPTION_MAP.items():
-        session.run("poetry", "export", option, "--without-hashes", "-o", f"environment/{file}")
-    session.run("cp", "-f", "poetry.lock", "environment/poetry.lock", external=True)
-    session.run("poetry", "lock", *update_args)
-    session.run("poetry2conda", "pyproject.toml", "environment/environment.yaml", "-E", "all")
+    """Lock dependencies in "uv.lock". Update dependencies by calling `nox -e lock -- upgrade`."""
+    prep(session)
+    upgrade_args = ["--upgrade"] if "upgrade" in session.posargs else []
+    session.install("uv", "pyproject2conda", "poetry")
+    session.run("uv", "lock", *upgrade_args)
+    session.run("uv", "export", "--extra=all", "--no-emit-project", "-o", "requirements.txt")
+    session.run("poetry", "lock")
+    session.run("p2c", "y", "-f", "pyproject.toml", "-e", "all", "--python-include", "infer", "-o", "environment.yaml")
 
 
 @nox.session
 def check(session: nox.Session) -> None:
     """Validate lock file and exported dependency files are up to date."""
-    session.install("poetry<2")
-    session.run_always("cp", "-f", "poetry.lock", "poetry.tmp", external=True)
-    session.run_always("mkdir", "-p", "output/tmp", external=True)
-
-    session.run("poetry", "config", "warnings.export", "false")
-    session.run("poetry", "check")
-    session.run("cp", "-f", "environment/poetry.lock", "poetry.lock", external=True)
-    session.run("poetry", "check")
-    for file, option in REQUIREMENTS_OPTION_MAP.items():
-        session.run("poetry", "export", option, "--without-hashes", "-o", f"output/tmp/{file}")
-        session.run("diff", f"environment/{file}", f"output/tmp/{file}", external=True)
-        session.run("cmp", "-s", f"environment/{file}", f"output/tmp/{file}", external=True)
-
-    session.run_always("cp", "-f", "poetry.tmp", "poetry.lock", external=True)
-    session.run_always("rm", "-f", "poetry.tmp", external=True)
-    session.run_always("rm", "-rf", "output/tmp", external=True)
+    prep(session)
+    session.install("uv")
+    session.run("uv", "lock", "--check")
