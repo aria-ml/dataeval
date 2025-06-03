@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,81,36
+/aria-ml/dataeval/commits/main,13,3
+/aria-ml/dataeval/tree/main/src/dataeval,12,5
+/aria-ml/dataeval/tree/main/src,11,6
+/aria-ml/dataeval/tree/main/tests,5,3
+/aria-ml/dataeval/tree/main,4,3
+/aria-ml/dataeval/blob/main/src/dataeval/metrics/stats/_labelstats.py,4,2
+/aria-ml/dataeval/tree/576546cda58fd32c9833bc3b1370314a9baa5658,4,1
+/aria-ml/dataeval/tree/main/src/dataeval/detectors/ood,4,1
+/aria-ml/dataeval/tree/main/src/dataeval/outputs,3,3
