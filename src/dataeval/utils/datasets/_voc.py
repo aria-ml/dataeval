@@ -51,7 +51,7 @@ VOCClassStringMap = Literal[
 TVOCClassMap = TypeVar("TVOCClassMap", VOCClassStringMap, int, list[VOCClassStringMap], list[int])
 
 
-class BaseVOCDataset(BaseDataset[_TArray, _TTarget, list[str]]):
+class BaseVOCDataset(BaseDataset[_TArray, _TTarget, list[str], str]):
     _resources = [
         DataLocation(
             url="https://data.brainchip.com/dataset-mirror/voc/VOCtrainval_11-May-2012.tar",
@@ -412,7 +412,7 @@ class BaseVOCDataset(BaseDataset[_TArray, _TTarget, list[str]]):
 
 class VOCDetection(
     BaseVOCDataset[NDArray[Any], ObjectDetectionTarget[NDArray[Any]]],
-    BaseODDataset[NDArray[Any]],
+    BaseODDataset[NDArray[Any], list[str], str],
     BaseDatasetNumpyMixin,
 ):
     """
@@ -467,7 +467,7 @@ class VOCDetection(
 
 class VOCDetectionTorch(
     BaseVOCDataset[torch.Tensor, ObjectDetectionTarget[torch.Tensor]],
-    BaseODDataset[torch.Tensor],
+    BaseODDataset[torch.Tensor, list[str], str],
     BaseDatasetTorchMixin,
 ):
     """

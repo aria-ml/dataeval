@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from dataeval.typing import Transform
 
 
-class MILCO(BaseODDataset[NDArray[Any]], BaseDatasetNumpyMixin):
+class MILCO(BaseODDataset[NDArray[Any], list[str], str], BaseDatasetNumpyMixin):
     """
     A side-scan sonar dataset focused on mine-like object detection.
 

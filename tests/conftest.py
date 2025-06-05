@@ -516,10 +516,18 @@ def voc_fake_test(voc_fake):
 @pytest.fixture(scope="session")
 def antiuav_fake(tmp_path_factory):
     temp = tmp_path_factory.mktemp("data")
-    img_temp = temp / "antiuavdetection" / "train" / "img"
-    img_temp.mkdir(parents=True, exist_ok=True)
-    ann_temp = temp / "antiuavdetection" / "train" / "xml"
-    ann_temp.mkdir(exist_ok=True)
+    train_temp = temp / "antiuavdetection" / "train" / "img"
+    train_temp.mkdir(parents=True, exist_ok=True)
+    val_temp = temp / "antiuavdetection" / "val" / "img"
+    val_temp.mkdir(parents=True, exist_ok=True)
+    test_temp = temp / "antiuavdetection" / "test" / "img"
+    test_temp.mkdir(parents=True, exist_ok=True)
+    train_ann = temp / "antiuavdetection" / "train" / "xml"
+    train_ann.mkdir(exist_ok=True)
+    val_ann = temp / "antiuavdetection" / "val" / "xml"
+    val_ann.mkdir(exist_ok=True)
+    test_ann = temp / "antiuavdetection" / "test" / "xml"
+    test_ann.mkdir(exist_ok=True)
     data = (np.random.random((12, 10, 10, 3)) * 255).astype(np.uint8)
     annotation_str = """
     <annotation>
@@ -564,7 +572,86 @@ def antiuav_fake(tmp_path_factory):
 
     for i in range(len(data)):
         image = Image.fromarray(data[i])
-        image.save(img_temp / f"{i:05}.jpg")
-        with open(ann_temp / f"{i:05}.xml", mode="w") as f:
+        image.save(train_temp / f"{i:05}.jpg")
+        with open(train_ann / f"{i:05}.xml", mode="w") as f:
             f.write(annotation_str)
+        if i < 7:
+            val_image = Image.fromarray(data[i])
+            val_image.save(val_temp / f"{i:05}.jpg")
+            with open(val_ann / f"{i:05}.xml", mode="w") as f:
+                f.write(annotation_str)
+        else:
+            test_image = Image.fromarray(data[i])
+            test_image.save(test_temp / f"{i:05}.jpg")
+            with open(test_ann / f"{i:05}.xml", mode="w") as f:
+                f.write(annotation_str)
+    yield temp
+
+
+@pytest.fixture(scope="session")
+def seadrone_fake(tmp_path_factory):
+    temp = tmp_path_factory.mktemp("data")
+    img_temp = temp / "seadrone" / "images"
+    img_temp.mkdir(parents=True, exist_ok=True)
+    train_temp = img_temp / "train"
+    train_temp.mkdir(exist_ok=True)
+    val_temp = img_temp / "val"
+    val_temp.mkdir(exist_ok=True)
+    test_temp = img_temp / "test"
+    test_temp.mkdir(exist_ok=True)
+    ann_temp = temp / "seadrone" / "annotations"
+    ann_temp.mkdir(exist_ok=True)
+    img = Image.fromarray(np.ones((10, 10, 3), dtype=np.uint8))
+    annotation = {
+        "images": [
+            {
+                "id": 0,
+                "file_name": "0.jpg",
+                "height": 21,
+                "width": 38,
+                "source": {"drone": "mavic", "folder_name": "DJI_0000", "frame_no": 0},
+                "date_time": "2020-08-25T14:16:21",
+                "meta": {"latitude": 47.673596, "longitude": 9.270249},
+            },
+            {"id": 2, "file_name": "2.jpg", "height": 2160, "width": 3840},
+            {
+                "id": 7,
+                "file_name": "0.jpg",
+                "height": 21,
+                "width": 38,
+                "source": {"drone": "mavic", "folder_name": "DJI_0007"},
+                "date_time": "2020-08-25T14:16:21",
+                "meta": {"latitude": 47.96, "longitude": 9.29},
+            },
+            {
+                "id": 36,
+                "file_name": "4.jpg",
+                "height": 21,
+                "width": 38,
+                "frame": "IMG004.jpg",
+                "source": "mavic",
+                "date_time": "2020-08-25T14:16:21",
+                "meta": {"latitude": 47.696, "longitude": 9.249},
+            },
+        ],
+        "annotations": [
+            {"id": 14785, "image_id": 0, "bbox": [3619, 1409, 75, 38], "area": 2850, "category_id": 2},
+            {"id": 14581, "image_id": 2, "bbox": [3524, 1408, 73, 37], "area": 2701, "category_id": 2},
+            {"id": 14583, "image_id": 9, "bbox": [3399, 1406, 71, 36], "area": 2556, "category_id": 4},
+        ],
+    }
+    for i in range(5):
+        train_save = train_temp / f"{i * 4}.jpg"
+        img.save(train_save)
+        if i < 3:
+            val_save = val_temp / f"{(i + 1) * 7}.jpg"
+            img.save(val_save)
+        else:
+            test_save = test_temp / f"{i * 9}.jpg"
+            img.save(test_save)
+    for grp in ["train", "val", "test"]:
+        if grp == "test":
+            grp += "_nogt"
+        with open(ann_temp / f"instances_{grp}.json", mode="w") as f:
+            json.dump(annotation, f)
     yield temp
