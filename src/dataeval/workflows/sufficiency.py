@@ -57,22 +57,29 @@ class Sufficiency(Generic[T]):
     test_ds : torch.Dataset
         Data that will be used for every run's evaluation
     train_fn : Callable[[nn.Module, Dataset, Sequence[int]], None]
-        Function which takes a model (torch.nn.Module), a dataset
-        (torch.utils.data.Dataset), indices to train on and executes model
+        Function which takes a model, a dataset, and indices to train on and then executes model
         training against the data.
     eval_fn : Callable[[nn.Module, Dataset], Mapping[str, float | ArrayLike]]
-        Function which takes a model (torch.nn.Module), a dataset
-        (torch.utils.data.Dataset) and returns a dictionary of metric
-        values (Mapping[str, float]) which is used to assess model performance
+        Function which takes a model, a dataset and returns a dictionary of metric
+        values which is used to assess model performance
         given the model and data.
     runs : int, default 1
-        Number of models to run over all subsets
+        Number of models to train over the entire dataset.
     substeps : int, default 5
-        Total number of dataset partitions that each model will train on
+        The number of steps that each model will be trained and evaluated on.
     train_kwargs : Mapping | None, default None
         Additional arguments required for custom training function
     eval_kwargs : Mapping | None, default None
         Additional arguments required for custom evaluation function
+
+    Warning
+    -------
+    Since each run is trained sequentially, increasing the parameter `runs` can significantly increase runtime.
+
+    Note
+    ----
+    Substeps is overridden by the parameter `eval_at` in :meth:`.Sufficiency.evaluate`
+
     """
 
     def __init__(
@@ -159,13 +166,22 @@ class Sufficiency(Generic[T]):
     @set_metadata(state=["runs", "substeps"])
     def evaluate(self, eval_at: int | Iterable[int] | None = None) -> SufficiencyOutput:
         """
-        Creates data indices, trains models, and returns plotting data
+        Train and evaluate a model over multiple substeps
+
+        This function trains a model up to each step calculated from substeps. The model is then evaluated
+        at that step and trained from 0 to the next step. This repeats for all substeps. Once a model has been
+        trained and evaluated at all substeps, if runs is greater than one, the model weights are reset and
+        the process is repeated.
+
+        During each evaluation, the metrics returned as a dictionary by the given evaluation function are stored
+        and then averaged over when all runs are complete.
 
         Parameters
         ----------
         eval_at : int | Iterable[int] | None, default None
-            Specify this to collect accuracies over a specific set of dataset lengths, rather
-            than letting :term:`sufficiency<Sufficiency>` internally create the lengths to evaluate at.
+            Specify this to collect metrics over a specific set of dataset lengths.
+            If `None`, evaluates at each step is calculated by
+            `np.geomspace` over the length of the dataset for self.substeps
 
         Returns
         -------
@@ -179,6 +195,8 @@ class Sufficiency(Generic[T]):
 
         Examples
         --------
+        Default runs and substeps
+
         >>> suff = Sufficiency(
         ...     model=model,
         ...     train_ds=train_ds,
@@ -190,6 +208,31 @@ class Sufficiency(Generic[T]):
         ... )
         >>> suff.evaluate()
         SufficiencyOutput(steps=array([  1,   3,  10,  31, 100], dtype=uint32), measures={'test': array([1., 1., 1., 1., 1.])}, n_iter=1000)
+
+        Evaluate at a single value
+
+        >>> suff = Sufficiency(
+        ...     model=model,
+        ...     train_ds=train_ds,
+        ...     test_ds=test_ds,
+        ...     train_fn=train_fn,
+        ...     eval_fn=eval_fn,
+        ... )
+        >>> suff.evaluate(eval_at=50)
+        SufficiencyOutput(steps=array([50]), measures={'test': array([1.])}, n_iter=1000)
+
+        Evaluating at linear steps from 0-100 inclusive
+
+        >>> suff = Sufficiency(
+        ...     model=model,
+        ...     train_ds=train_ds,
+        ...     test_ds=test_ds,
+        ...     train_fn=train_fn,
+        ...     eval_fn=eval_fn,
+        ... )
+        >>> suff.evaluate(eval_at=np.arange(0, 101, 20))
+        SufficiencyOutput(steps=array([  0,  20,  40,  60,  80, 100]), measures={'test': array([1., 1., 1., 1., 1., 1.])}, n_iter=1000)
+
         """  # noqa: E501
         if eval_at is not None:
             ranges = np.asarray(list(eval_at) if isinstance(eval_at, Iterable) else [eval_at])
