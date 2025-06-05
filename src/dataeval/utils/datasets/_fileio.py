@@ -128,9 +128,9 @@ def _ensure_exists(
 
     elif not check_path.exists() and not download:
         raise FileNotFoundError(
-            "Data could not be loaded with the provided root directory, ",
-            f"the file path to the file {filename} does not exist, ",
-            "and the download parameter is set to False.",
+            "Data could not be loaded with the provided root directory, "
+            f"the file path to the file {filename} does not exist, "
+            "and the download parameter is set to False."
         )
     else:
         if not _validate_file(check_path, checksum, md5):
