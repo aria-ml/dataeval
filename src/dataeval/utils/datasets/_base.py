@@ -4,7 +4,7 @@ __all__ = []
 
 from abc import abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generic, Iterator, Literal, NamedTuple, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Iterator, Literal, NamedTuple, Sequence, TypeVar, cast
 
 import numpy as np
 
@@ -28,7 +28,8 @@ else:
     _TArray = TypeVar("_TArray")
 
 _TTarget = TypeVar("_TTarget")
-_TRawTarget = TypeVar("_TRawTarget", list[int], list[str])
+_TRawTarget = TypeVar("_TRawTarget", Sequence[int], Sequence[str], Sequence[tuple[list[int], list[list[float]]]])
+_TAnnotation = TypeVar("_TAnnotation", int, str, tuple[list[int], list[list[float]]])
 
 
 class DataLocation(NamedTuple):
@@ -38,7 +39,9 @@ class DataLocation(NamedTuple):
     checksum: str
 
 
-class BaseDataset(AnnotatedDataset[tuple[_TArray, _TTarget, dict[str, Any]]], Generic[_TArray, _TTarget, _TRawTarget]):
+class BaseDataset(
+    AnnotatedDataset[tuple[_TArray, _TTarget, dict[str, Any]]], Generic[_TArray, _TTarget, _TRawTarget, _TAnnotation]
+):
     """
     Base class for internet downloaded datasets.
     """
@@ -144,7 +147,7 @@ class BaseDataset(AnnotatedDataset[tuple[_TArray, _TTarget, dict[str, Any]]], Ge
 
 
 class BaseICDataset(
-    BaseDataset[_TArray, _TArray, list[int]],
+    BaseDataset[_TArray, _TArray, list[int], int],
     BaseDatasetMixin[_TArray],
     ImageClassificationDataset[_TArray],
 ):
@@ -177,7 +180,7 @@ class BaseICDataset(
 
 
 class BaseODDataset(
-    BaseDataset[_TArray, ObjectDetectionTarget[_TArray], list[str]],
+    BaseDataset[_TArray, ObjectDetectionTarget[_TArray], _TRawTarget, _TAnnotation],
     BaseDatasetMixin[_TArray],
     ObjectDetectionDataset[_TArray],
 ):
@@ -200,7 +203,8 @@ class BaseODDataset(
             Image, target, datum_metadata - target.boxes returns boxes in x0, y0, x1, y1 format
         """
         # Grab the bounding boxes and labels from the annotations
-        boxes, labels, additional_metadata = self._read_annotations(self._targets[index])
+        annotation = cast(_TAnnotation, self._targets[index])
+        boxes, labels, additional_metadata = self._read_annotations(annotation)
         # Get the image
         img = self._read_file(self._filepaths[index])
         img_size = img.shape
@@ -217,11 +221,11 @@ class BaseODDataset(
         return img, target, img_metadata
 
     @abstractmethod
-    def _read_annotations(self, annotation: str) -> tuple[list[list[float]], list[int], dict[str, Any]]: ...
+    def _read_annotations(self, annotation: _TAnnotation) -> tuple[list[list[float]], list[int], dict[str, Any]]: ...
 
 
 class BaseSegDataset(
-    BaseDataset[_TArray, SegmentationTarget[_TArray], list[str]],
+    BaseDataset[_TArray, SegmentationTarget[_TArray], list[str], str],
     BaseDatasetMixin[_TArray],
     SegmentationDataset[_TArray],
 ):
