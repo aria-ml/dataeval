@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from dataeval.typing import Transform
 
 
-class AntiUAVDetection(BaseODDataset[NDArray[Any]], BaseDatasetNumpyMixin):
+class AntiUAVDetection(BaseODDataset[NDArray[Any], list[str], str], BaseDatasetNumpyMixin):
     """
     A UAV detection dataset focused on detecting UAVs in natural images against large variation in backgrounds.
 

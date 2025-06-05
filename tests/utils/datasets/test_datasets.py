@@ -8,6 +8,7 @@ from dataeval.utils.datasets._base import DataLocation
 from dataeval.utils.datasets._cifar10 import CIFAR10
 from dataeval.utils.datasets._milco import MILCO
 from dataeval.utils.datasets._mnist import MNIST
+from dataeval.utils.datasets._seadrone import SeaDrone
 from dataeval.utils.datasets._ships import Ships
 from dataeval.utils.datasets._types import ObjectDetectionTarget
 from dataeval.utils.datasets._voc import VOCDetection
@@ -273,6 +274,51 @@ class TestAntiUAVDetection:
             assert "id" in dataset.metadata
             assert len(dataset) == 12
             for i in range(12):
+                img, target, datum_meta = dataset[i]
+                assert img.shape == (3, 10, 10)
+                assert isinstance(target, ObjectDetectionTarget)
+
+    def test_antiuav_base(self, antiuav_fake):
+        "Test AntiUAVDetection dataset initialization"
+        dataset = AntiUAVDetection(root=antiuav_fake, image_set="base")
+        if isinstance(dataset, AntiUAVDetection):
+            assert dataset._resources is not None
+            assert dataset.index2label != {}
+            assert dataset.label2index != {}
+            assert "id" in dataset.metadata
+            assert len(dataset) == 24
+            for i in range(12):
+                img, target, datum_meta = dataset[i]
+                assert img.shape == (3, 10, 10)
+                assert isinstance(target, ObjectDetectionTarget)
+
+
+@pytest.mark.optional
+class TestSeaDrone:
+    def test_seadrone_dataset(self, seadrone_fake):
+        "Test SeaDrone dataset initialization"
+        dataset = SeaDrone(root=seadrone_fake)
+        if isinstance(dataset, SeaDrone):
+            assert dataset._resources is not None
+            assert dataset.index2label != {}
+            assert dataset.label2index != {}
+            assert "id" in dataset.metadata
+            assert len(dataset) == 5
+            for i in range(5):
+                img, target, datum_meta = dataset[i]
+                assert img.shape == (3, 10, 10)
+                assert isinstance(target, ObjectDetectionTarget)
+
+    def test_seadrone_base(self, seadrone_fake):
+        "Test SeaDrone dataset initialization"
+        dataset = SeaDrone(root=seadrone_fake, image_set="base")
+        if isinstance(dataset, SeaDrone):
+            assert dataset._resources is not None
+            assert dataset.index2label != {}
+            assert dataset.label2index != {}
+            assert "id" in dataset.metadata
+            assert len(dataset) == 10
+            for i in range(10):
                 img, target, datum_meta = dataset[i]
                 assert img.shape == (3, 10, 10)
                 assert isinstance(target, ObjectDetectionTarget)
