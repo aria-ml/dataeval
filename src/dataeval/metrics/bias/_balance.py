@@ -73,9 +73,9 @@ def balance(
     Return intra/interfactor balance (mutual information)
 
     >>> bal.factors
-    array([[1.   , 0.017, 0.015],
-           [0.017, 0.445, 0.245],
-           [0.015, 0.245, 1.063]])
+    array([[1.   , 0.   , 0.015],
+           [0.   , 0.08 , 0.011],
+           [0.015, 0.011, 1.063]])
 
     Return classwise balance (mutual information) of factors with individual class_labels
 
@@ -95,32 +95,33 @@ def balance(
 
     num_neighbors = _validate_num_neighbors(num_neighbors)
 
-    data = metadata.discretized_data
     factor_types = {"class_label": "categorical"} | {k: v.factor_type for k, v in metadata.factor_info.items()}
     is_discrete = [factor_type != "continuous" for factor_type in factor_types.values()]
     num_factors = len(factor_types)
     class_labels = metadata.class_labels
 
     mi = np.full((num_factors, num_factors), np.nan, dtype=np.float32)
-    data = np.hstack((class_labels[:, np.newaxis], data))
+
+    # Use numeric data for MI
+    data = np.hstack((class_labels[:, np.newaxis], metadata.digitized_data))
+
+    mutual_info_fn_map = {
+        "categorical": mutual_info_classif,
+        "discrete": mutual_info_classif,
+        "continuous": mutual_info_regression,
+    }
 
     for idx, factor_type in enumerate(factor_types.values()):
-        if factor_type != "continuous":
-            mi[idx, :] = mutual_info_classif(
-                data,
-                data[:, idx],
-                discrete_features=is_discrete,  # type: ignore - sklearn function not typed
-                n_neighbors=num_neighbors,
-                random_state=get_seed(),
-            )
-        else:
-            mi[idx, :] = mutual_info_regression(
-                data,
-                data[:, idx],
-                discrete_features=is_discrete,  # type: ignore - sklearn function not typed
-                n_neighbors=num_neighbors,
-                random_state=get_seed(),
-            )
+        mi[idx, :] = mutual_info_fn_map[factor_type](
+            data,
+            data[:, idx],
+            discrete_features=is_discrete,
+            n_neighbors=num_neighbors,
+            random_state=get_seed(),
+        )
+
+    # Use binned data for classwise MI
+    data = np.hstack((class_labels[:, np.newaxis], metadata.binned_data))
 
     # Normalization via entropy
     bin_cnts = get_counts(data)

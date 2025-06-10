@@ -44,8 +44,7 @@ class TestMDPreprocessingUnit:
         "data_values",
         [
             list(np.random.rand(100)),
-            list(np.random.choice(2000, size=120000) / 1000),
-            list(np.random.rand(100) * 100),
+            list(np.random.randint(0, 1000, 100)),
         ],
     )
     def test_discrete_without_bins(self, data_values):
@@ -84,7 +83,7 @@ class TestMDPreprocessingFunctional:
         labels = [0, 0, 0, 0, 0]
         bincounts = {"data1": 2}
         output = to_metadata(factors, labels, bincounts)
-        disc_factors = output.discretized_data
+        disc_factors = output.binned_data
         assert len(np.unique(disc_factors)) == 2
 
     def test_bin_edges(self):
@@ -92,7 +91,7 @@ class TestMDPreprocessingFunctional:
         bin_edges = {"data1": [-np.inf, 1, np.inf]}
         labels = [0, 0, 0, 0, 0]
         output = to_metadata(factors, labels, bin_edges)
-        disc_factors = output.discretized_data
+        disc_factors = output.binned_data
         assert len(np.unique(disc_factors)) == 2
 
     def test_mix_match(self):
@@ -100,7 +99,7 @@ class TestMDPreprocessingFunctional:
         labels = [0, 1, 2, 0, 1]
         bincounts = {"data1": 3, "data2": [-np.inf, 1, np.inf]}
         output = to_metadata(factors, labels, bincounts)
-        disc_factors = output.discretized_data.T
+        disc_factors = output.binned_data.T
         assert len(np.unique(disc_factors[0])) == 3
         assert len(np.unique(disc_factors[1])) == 2
 
@@ -109,7 +108,7 @@ class TestMDPreprocessingFunctional:
         labels = [0, 0, 0, 0, 0]
         bincounts = {"data1": 1}
         output = to_metadata(factors, labels, bincounts)
-        disc_factors = output.discretized_data
+        disc_factors = output.binned_data
         assert len(np.unique(disc_factors)) == 1
 
     def test_over_specified(self):
@@ -117,5 +116,5 @@ class TestMDPreprocessingFunctional:
         labels = [0, 0, 0, 0, 0]
         bincounts = {"data1": 100}
         output = to_metadata(factors, labels, bincounts)
-        disc_factors = output.discretized_data
+        disc_factors = output.binned_data
         assert len(np.unique(disc_factors)) == 5

@@ -162,7 +162,7 @@ def doctest_metrics_bias_balance_diversity(doctest_namespace: dict[str, Any]) ->
     metadata._class_labels = np.asarray(class_labels)
     metadata._class_names = ["cat", "dog"]
     metadata._dataframe = pl.DataFrame(metadata_dict)
-    metadata._factors = dict.fromkeys(metadata_dict, FactorInfo())
+    metadata._factors = dict.fromkeys(metadata_dict, None)
     metadata._dropped_factors = {}
 
     """dataeval.metrics.bias.balance.balance"""
