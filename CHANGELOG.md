@@ -1,6 +1,11 @@
-[//]: # (34e4ded2dec478bd76687b4addb91727754fb369)
+[//]: # (6e69013200e9367587250eebcc27042480ba0958)
 
 # DataEval Change Log
+
+## v0.86.9
+
+🛠️ **Improvements and Enhancements**
+- `52218096` - Expanded sufficiency docstring with descriptions of parameter default values...
 
 ## v0.86.8
 
