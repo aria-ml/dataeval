@@ -162,12 +162,12 @@ def diversity(
         raise ValueError("No factors found in provided metadata.")
 
     diversity_fn = get_method(_DIVERSITY_FN_MAP, method)
-    discretized_data = metadata.discretized_data
+    binned_data = metadata.binned_data
     factor_names = metadata.factor_names
     class_lbl = metadata.class_labels
 
-    class_labels_with_discretized_data = np.hstack((class_lbl[:, np.newaxis], discretized_data))
-    cnts = get_counts(class_labels_with_discretized_data)
+    class_labels_with_binned_data = np.hstack((class_lbl[:, np.newaxis], binned_data))
+    cnts = get_counts(class_labels_with_binned_data)
     num_bins = np.bincount(np.nonzero(cnts)[1])
     diversity_index = diversity_fn(cnts, num_bins)
 
@@ -176,7 +176,7 @@ def diversity(
     classwise_div = np.full((len(u_classes), num_factors), np.nan)
     for idx, cls in enumerate(u_classes):
         subset_mask = class_lbl == cls
-        cls_cnts = get_counts(discretized_data[subset_mask], min_num_bins=cnts.shape[0])
+        cls_cnts = get_counts(binned_data[subset_mask], min_num_bins=cnts.shape[0])
         classwise_div[idx, :] = diversity_fn(cls_cnts, num_bins[1:])
 
     return DiversityOutput(diversity_index, classwise_div, factor_names, metadata.class_names)

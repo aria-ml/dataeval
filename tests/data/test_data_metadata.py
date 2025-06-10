@@ -4,7 +4,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-from dataeval.data._metadata import FactorInfo, Metadata
+from dataeval.data._metadata import FactorInfo, Metadata, _binned
 from dataeval.metrics.stats._boxratiostats import boxratiostats
 from dataeval.metrics.stats._imagestats import imagestats
 from dataeval.metrics.stats._labelstats import labelstats
@@ -107,19 +107,20 @@ class TestMetadata:
         md = Metadata(None)  # type: ignore
         md_dict = {
             "cat_str": RNG.choice(["A", "B"], size=100).tolist(),
-            "cat_flt": RNG.choice([0.1, 0.2, 0.4, 0.6, 0.8], size=100).tolist(),
             "con_flt": RNG.random(size=100).tolist(),
+            "dis_flt": RNG.choice([0.1, 0.2, 0.4, 0.6, 0.8], size=100).tolist(),
             "dis_int": np.arange(100).tolist(),
         }
         md._dataframe = pl.from_dict(md_dict)
-        md._factors = dict.fromkeys(md_dict, FactorInfo())
+        md._factors = dict.fromkeys(md_dict, None)
         md._is_structured = True
+        md._image_indices = np.arange(100)
 
         md._bin()
         assert [f.factor_type for f in md.factor_info.values()] == [
             "categorical",
-            "categorical",
             "continuous",
+            "discrete",
             "discrete",
         ]
 
@@ -241,17 +242,24 @@ class TestMetadata:
         md._raw = raw_metadata
         assert md.raw == raw_metadata
 
-    def test_empty_discretized_data(self):
+    def test_empty_digitized_data(self):
         md = Metadata(None)  # type: ignore
         md._is_structured = True
-        md._factors = {"foo": FactorInfo()}
+        md._factors = {"foo": None}
         md._exclude = {"foo"}
-        assert md.discretized_data.size == 0
+        assert md.digitized_data.size == 0
+
+    def test_empty_binned_data(self):
+        md = Metadata(None)  # type: ignore
+        md._is_structured = True
+        md._factors = {"foo": None}
+        md._exclude = {"foo"}
+        assert md.binned_data.size == 0
 
     def test_empty_factor_data(self):
         md = Metadata(None)  # type: ignore
         md._is_structured = True
-        md._factors = {"foo": FactorInfo()}
+        md._factors = {"foo": None}
         md._exclude = {"foo"}
         assert md.factor_data.size == 0
 
@@ -265,10 +273,13 @@ class TestMetadata:
     )
     def test_reset_bins(self, is_binned, exists):
         md = Metadata(None)  # type: ignore
-        md._dataframe = pl.from_dict({"foo": [0], "foo[]": [0]} if exists else {"foo": [0]})
-        md._factors = {"foo": FactorInfo("continuous", "foo[]" if exists else None)}
+        col = "foo"
+        col_bn = _binned(col)
+        md._dataframe = pl.from_dict({col: [0], col_bn: [0]} if exists else {col: [0]})
+        md._factors = {col: FactorInfo("continuous", is_binned=exists)}
         md._is_binned = is_binned
         md._reset_bins()
         assert not md._is_binned
-        assert "foo[]" not in md._dataframe.columns
-        assert md._factors["foo"].discretized_col is None
+        assert col_bn not in md._dataframe.columns
+        factor_info = md._factors[col]
+        assert exists if factor_info is None else not factor_info.is_binned
