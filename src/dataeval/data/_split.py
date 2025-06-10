@@ -208,7 +208,7 @@ def get_groups(metadata: Metadata, split_on: Sequence[str] | None) -> NDArray[np
 
     split_set = set(split_on)
     indices = [i for i, name in enumerate(metadata.factor_names) if name in split_set]
-    binned_features = metadata.discretized_data[:, indices]
+    binned_features = metadata.binned_data[:, indices]
     return np.unique(binned_features, axis=0, return_inverse=True)[1]
 
 

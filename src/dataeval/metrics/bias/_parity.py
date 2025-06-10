@@ -245,10 +245,10 @@ def parity(metadata: Metadata) -> ParityOutput:
     if not metadata.factor_names:
         raise ValueError("No factors found in provided metadata.")
 
-    chi_scores = np.zeros(metadata.discretized_data.shape[1])
+    chi_scores = np.zeros(metadata.binned_data.shape[1])
     p_values = np.zeros_like(chi_scores)
     insufficient_data: defaultdict[str, defaultdict[int, dict[str, int]]] = defaultdict(lambda: defaultdict(dict))
-    for i, col_data in enumerate(metadata.discretized_data.T):
+    for i, col_data in enumerate(metadata.binned_data.T):
         # Builds a contingency matrix where entry at index (r,c) represents
         # the frequency of current_factor_name achieving value unique_factor_values[r]
         # at a data point with class c.

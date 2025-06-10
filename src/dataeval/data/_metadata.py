@@ -16,18 +16,31 @@ from dataeval.typing import (
     ObjectDetectionTarget,
 )
 from dataeval.utils._array import as_numpy
-from dataeval.utils._bin import bin_data, digitize_data
+from dataeval.utils._bin import bin_data, digitize_data, is_continuous
 from dataeval.utils.data.metadata import merge
 
 
 def _binned(name: str) -> str:
-    return f"{name}[]"
+    return f"{name}↕"
+
+
+def _digitized(name: str) -> str:
+    return f"{name}#"
 
 
 @dataclass
 class FactorInfo:
-    factor_type: Literal["categorical", "continuous", "discrete"] | None = None
-    discretized_col: str | None = None
+    factor_type: Literal["categorical", "continuous", "discrete"]
+    is_binned: bool = False
+    is_digitized: bool = False
+
+
+def _to_col(name: str, info: FactorInfo, binned: bool = True) -> str:
+    if binned and info.is_binned:
+        return _binned(name)
+    if info.is_digitized:
+        return _digitized(name)
+    return name
 
 
 class Metadata:
@@ -60,7 +73,7 @@ class Metadata:
         self._class_labels: NDArray[np.intp]
         self._class_names: list[str]
         self._image_indices: NDArray[np.intp]
-        self._factors: dict[str, FactorInfo]
+        self._factors: dict[str, FactorInfo | None]
         self._dropped_factors: dict[str, list[str]]
         self._dataframe: pl.DataFrame
         self._raw: Sequence[Mapping[str, Any]]
@@ -146,14 +159,27 @@ class Metadata:
         return self._dropped_factors
 
     @property
-    def discretized_data(self) -> NDArray[np.int64]:
-        """Factor data with continuous data discretized."""
+    def digitized_data(self) -> NDArray[np.int64]:
+        """Factor data with digitized categorical data."""
         if not self.factor_names:
             return np.array([], dtype=np.int64)
 
         self._bin()
         return (
-            self.dataframe.select([info.discretized_col or name for name, info in self.factor_info.items()])
+            self.dataframe.select([_to_col(k, v, False) for k, v in self.factor_info.items()])
+            .to_numpy()
+            .astype(np.int64)
+        )
+
+    @property
+    def binned_data(self) -> NDArray[np.int64]:
+        """Factor data with binned continuous data."""
+        if not self.factor_names:
+            return np.array([], dtype=np.int64)
+
+        self._bin()
+        return (
+            self.dataframe.select([_to_col(k, v, True) for k, v in self.factor_info.items()])
             .to_numpy()
             .astype(np.int64)
         )
@@ -168,7 +194,7 @@ class Metadata:
     def factor_info(self) -> Mapping[str, FactorInfo]:
         """Factor types of the metadata."""
         self._bin()
-        return dict(filter(self._filter, self._factors.items()))
+        return dict(filter(self._filter, ((k, v) for k, v in self._factors.items() if v is not None)))
 
     @property
     def factor_data(self) -> NDArray[Any]:
@@ -194,7 +220,7 @@ class Metadata:
     @property
     def image_indices(self) -> NDArray[np.intp]:
         """Indices of images as a NumPy array."""
-        self._bin()
+        self._structure()
         return self._image_indices
 
     @property
@@ -212,7 +238,7 @@ class Metadata:
             columns = self._dataframe.columns
             for col in (col for col in cols or columns if _binned(col) in columns):
                 self._dataframe.drop_in_place(_binned(col))
-                self._factors[col] = FactorInfo()
+                self._factors[col] = None
             self._is_binned = False
 
     def _structure(self) -> None:
@@ -277,7 +303,7 @@ class Metadata:
         self._class_labels = labels
         self._class_names = list(index2label.values())
         self._image_indices = target_dict["image_index"]
-        self._factors = dict.fromkeys(factor_dict, FactorInfo())
+        self._factors = dict.fromkeys(factor_dict, None)
         self._dataframe = pl.DataFrame({**target_dict, **factor_dict})
         self._dropped_factors = merged[1]
         self._is_structured = True
@@ -303,24 +329,25 @@ class Metadata:
             )
 
         column_set = set(df.columns)
-        for col in (col for col in self.factor_names if _binned(col) not in column_set):
+        for col in (col for col in self.factor_names if not {_binned(col), _digitized(col)} & column_set):
             # Get data as numpy array for processing
             data = df[col].to_numpy()
-            col_dz = _binned(col)
             if col in factor_bins:
                 # User provided binning
                 bins = factor_bins[col]
-                df = df.with_columns(pl.Series(name=col_dz, values=digitize_data(data, bins).astype(np.int64)))
-                factor_info[col] = FactorInfo("continuous", col_dz)
+                col_bn = _binned(col)
+                df = df.with_columns(pl.Series(name=col_bn, values=digitize_data(data, bins).astype(np.int64)))
+                factor_info[col] = FactorInfo("continuous", is_binned=True)
             else:
                 # Check if data is numeric
-                unique, ordinal = np.unique(data, return_inverse=True)
-                if not np.issubdtype(data.dtype, np.number) or unique.size <= max(20, data.size * 0.01):
-                    # Non-numeric data or small number of unique values - convert to categorical
-                    df = df.with_columns(pl.Series(name=col_dz, values=ordinal.astype(np.int64)))
-                    factor_info[col] = FactorInfo("categorical", col_dz)
-                elif data.dtype == float:
-                    # Many unique values - discretize by binning
+                _, ordinal = np.unique(data, return_inverse=True)
+                if not np.issubdtype(data.dtype, np.number):
+                    # Non-numeric data - convert to categorical
+                    col_dg = _digitized(col)
+                    df = df.with_columns(pl.Series(name=col_dg, values=ordinal.astype(np.int64)))
+                    factor_info[col] = FactorInfo("categorical", is_digitized=True)
+                elif is_continuous(data, self.image_indices):
+                    # Continuous values - discretize by binning
                     warnings.warn(
                         f"A user defined binning was not provided for {col}. "
                         f"Using the {self.auto_bin_method} method to discretize the data. "
@@ -330,10 +357,12 @@ class Metadata:
                     )
                     # Create binned version
                     binned_data = bin_data(data, self.auto_bin_method)
-                    df = df.with_columns(pl.Series(name=col_dz, values=binned_data.astype(np.int64)))
-                    factor_info[col] = FactorInfo("continuous", col_dz)
+                    col_bn = _binned(col)
+                    df = df.with_columns(pl.Series(name=col_bn, values=binned_data.astype(np.int64)))
+                    factor_info[col] = FactorInfo("continuous", is_binned=True)
                 else:
-                    factor_info[col] = FactorInfo("discrete", col)
+                    # Non-continuous values - treat as discrete
+                    factor_info[col] = FactorInfo("discrete")
 
         # Store the results
         self._dataframe = df
@@ -367,7 +396,7 @@ class Metadata:
         for k, v in factors.items():
             data = as_numpy(v)[self.image_indices]
             new_columns.append(pl.Series(name=k, values=data))
-            self._factors[k] = FactorInfo()
+            self._factors[k] = None
 
         if new_columns:
             self._dataframe = self.dataframe.with_columns(new_columns)
