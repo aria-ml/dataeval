@@ -3,7 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 from dataclasses import dataclass
-from typing import Any, Generic, TypedDict, TypeVar
+from typing import Generic, TypedDict, TypeVar
 
 from torch.utils.data import Dataset
 from typing_extensions import NotRequired, Required
@@ -13,6 +13,10 @@ class DatasetMetadata(TypedDict):
     id: Required[str]
     index2label: NotRequired[dict[int, str]]
     split: NotRequired[str]
+
+
+class DatumMetadata(TypedDict, total=False):
+    id: Required[str]
 
 
 _TDatum = TypeVar("_TDatum")
@@ -25,7 +29,7 @@ class AnnotatedDataset(Dataset[_TDatum]):
     def __len__(self) -> int: ...
 
 
-class ImageClassificationDataset(AnnotatedDataset[tuple[_TArray, _TArray, dict[str, Any]]]): ...
+class ImageClassificationDataset(AnnotatedDataset[tuple[_TArray, _TArray, DatumMetadata]]): ...
 
 
 @dataclass
@@ -35,7 +39,7 @@ class ObjectDetectionTarget(Generic[_TArray]):
     scores: _TArray
 
 
-class ObjectDetectionDataset(AnnotatedDataset[tuple[_TArray, ObjectDetectionTarget[_TArray], dict[str, Any]]]): ...
+class ObjectDetectionDataset(AnnotatedDataset[tuple[_TArray, ObjectDetectionTarget[_TArray], DatumMetadata]]): ...
 
 
 @dataclass
@@ -45,4 +49,4 @@ class SegmentationTarget(Generic[_TArray]):
     scores: _TArray
 
 
-class SegmentationDataset(AnnotatedDataset[tuple[_TArray, SegmentationTarget[_TArray], dict[str, Any]]]): ...
+class SegmentationDataset(AnnotatedDataset[tuple[_TArray, SegmentationTarget[_TArray], DatumMetadata]]): ...

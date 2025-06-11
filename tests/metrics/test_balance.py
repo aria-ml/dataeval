@@ -1,3 +1,4 @@
+import copy
 from contextlib import nullcontext as does_not_raise
 from unittest.mock import MagicMock
 
@@ -77,13 +78,15 @@ class TestBalanceUnit:
             _validate_num_neighbors(10)
 
     def test_correct_mi_shape_and_dtype(self, metadata_results):
-        num_vars = len(metadata_results.factor_names) + 1
+        metadata = copy.deepcopy(metadata_results)
+        metadata.exclude = []
+        num_vars = len(metadata.factor_names) + 1
         expected_shape = {
             "balance": (num_vars,),
             "factors": (num_vars - 1, num_vars - 1),
             "classwise": (2, num_vars),
             "factor_names": (num_vars),
-            "class_names": (np.unique(metadata_results.class_labels).size),
+            "class_names": (np.unique(metadata.class_labels).size),
         }
         expected_type = {
             "balance": float,
@@ -92,7 +95,7 @@ class TestBalanceUnit:
             "factor_names": list,
             "class_names": list,
         }
-        mi = balance(metadata_results)
+        mi = balance(metadata)
         for k, v in mi.data().items():
             if type(v) is list:
                 assert len(v) == expected_shape[k]
