@@ -9,12 +9,12 @@ from dataeval.data._selection import Select, Selection, SelectionStage
 
 class Indices(Selection[Any]):
     """
-    Selects specific indices from the dataset.
+    Selects only the given indices from the dataset.
 
     Parameters
     ----------
     indices : Sequence[int]
-        The indices to select from the dataset.
+        The specific indices to select.
     """
 
     stage = SelectionStage.FILTER

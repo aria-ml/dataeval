@@ -11,12 +11,13 @@ from dataeval.utils._array import as_numpy
 
 class ClassBalance(Selection[ImageClassificationDatum]):
     """
-    Balance the dataset by class.
+    Select indices of a dataset that will equalize the occurrences of all classes.
 
     Note
     ----
-    The total number of instances of each class will be equalized which may result
+    1. The total number of instances of each class will be equalized which may result
     in a lower total number of instances than specified by the selection limit.
+    2. This selection currently only supports classification tasks
     """
 
     stage = SelectionStage.FILTER
@@ -29,7 +30,7 @@ class ClassBalance(Selection[ImageClassificationDatum]):
                 label = int(np.argmax(as_numpy(target)))
             else:
                 # ObjectDetectionTarget and SegmentationTarget not supported yet
-                raise TypeError("ClassFilter only supports classification targets as an array of confidence scores.")
+                raise TypeError("ClassBalance only supports classification targets as an array of class probabilities.")
             class_indices.setdefault(label, []).append(i)
 
         per_class_limit = min(min(len(c) for c in class_indices.values()), dataset._size_limit // len(class_indices))
