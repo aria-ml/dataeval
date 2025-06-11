@@ -15,12 +15,12 @@ from dataeval.utils._array import as_numpy
 
 class Shuffle(Selection[Any]):
     """
-    Shuffle the dataset using a seed.
+    Select dataset indices in a random order.
 
     Parameters
     ----------
     seed : int, ArrayLike, SeedSequence, BitGenerator, Generator or None, default None
-        Seed for the random number generator.
+        Seed for the random number generator. If None, results are not reproducible.
 
     See Also
     --------
