@@ -10,11 +10,15 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Callable, cast
+from abc import ABC, abstractmethod
+from typing import Any, Callable, cast
 
+import numpy as np
 import torch
+from numpy.typing import NDArray
 
 from dataeval.config import DeviceLike, get_device
+from dataeval.data import Embeddings
 from dataeval.detectors.ood.mixin import OODBaseMixin, OODFitMixin, OODGMMMixin
 from dataeval.typing import ArrayLike
 from dataeval.utils._array import to_numpy
@@ -93,3 +97,36 @@ class OODBaseGMM(OODBase, OODGMMMixin[GaussianMixtureModelParams]):
         # Calculate the GMM parameters
         _, z, gamma = cast(tuple[torch.Tensor, torch.Tensor, torch.Tensor], self.model(x_ref))
         self._gmm_params = gmm_params(z, gamma)
+
+
+class EmbeddingBasedOODBase(OODBaseMixin[Callable[[Any], Any]], ABC):
+    """
+    Base class for embedding-based OOD detection methods.
+
+    These methods work directly on embedding representations,
+    using distance metrics or density estimation in embedding space.
+    Inherits from OODBaseMixin to get automatic thresholding.
+    """
+
+    def __init__(self) -> None:
+        """Initialize embedding-based OOD detector."""
+        # Pass a dummy callable as model since we don't use it
+        super().__init__(lambda x: x)
+
+    def _get_data_info(self, X: NDArray) -> tuple[tuple, type]:
+        """Override to skip [0-1] validation for embeddings."""
+        if not isinstance(X, np.ndarray):
+            raise TypeError("Dataset should of type: `NDArray`.")
+        # Skip the [0-1] range check for embeddings
+        return X.shape[1:], X.dtype.type
+
+    @abstractmethod
+    def fit_embeddings(self, embeddings: Embeddings, threshold_perc: float = 95.0) -> None:
+        """
+        Fit using reference embeddings.
+
+        Args:
+            embeddings: Reference (in-distribution) embeddings
+            threshold_perc: Percentage of reference data considered normal
+        """
+        pass
