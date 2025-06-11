@@ -94,7 +94,7 @@ def bin_data(data: NDArray[Any], bin_method: str) -> NDArray[np.int_]:
     return np.digitize(data, bin_edges)
 
 
-def is_continuous(data: NDArray[np.number[Any]], image_indices: NDArray[np.number[Any]]) -> bool:
+def is_continuous(data: NDArray[np.number[Any]], image_indices: NDArray[np.number[Any]] | None = None) -> bool:
     """
     Determines whether the data is continuous or discrete using the Wasserstein distance.
 
@@ -113,11 +113,12 @@ def is_continuous(data: NDArray[np.number[Any]], image_indices: NDArray[np.numbe
     measured from a uniform distribution is greater or less than 0.054, respectively.
     """
     # Check if the metadata is image specific
-    _, data_indices_unsorted = np.unique(data, return_index=True)
-    if data_indices_unsorted.size == image_indices.size:
-        data_indices = np.sort(data_indices_unsorted)
-        if (data_indices == image_indices).all():
-            data = data[data_indices]
+    if image_indices is not None:
+        _, data_indices_unsorted = np.unique(data, return_index=True)
+        if data_indices_unsorted.size == image_indices.size:
+            data_indices = np.sort(data_indices_unsorted)
+            if (data_indices == image_indices).all():
+                data = data[data_indices]
 
     n_examples = len(data)
 
