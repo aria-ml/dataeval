@@ -134,7 +134,7 @@ class _KMeansComplexitySorter(_KMeansSorter):
 
 class Prioritize(Selection[Any]):
     """
-    Prioritizes the dataset by sort order in the embedding space.
+    Sort the dataset indices in order of highest priority data in the embedding space.
 
     Parameters
     ----------
@@ -146,10 +146,23 @@ class Prioritize(Selection[Any]):
         Device to use for encoding images
     method : Literal["knn", "kmeans_distance", "kmeans_complexity"]
         Method to use for prioritization
-    k : int | None, default None
-        Number of nearest neighbors to use for prioritization (knn only)
-    c : int | None, default None
-        Number of clusters to use for prioritization (kmeans only)
+    k : int or None, default None
+        Number of nearest neighbors to use for prioritization.
+        If None, uses the square_root of the number of samples. Only used for method="knn", ignored otherwise.
+    c : int or None, default None
+        Number of clusters to use for prioritization. If None, uses the square_root of the number of samples.
+        Only used for method="kmeans_*", ignored otherwise.
+
+    Notes
+    -----
+    1. `k` is only used for method ["knn"].
+    2. `c` is only used for methods ["kmeans_distance", "kmeans_complexity"].
+
+    Raises
+    ------
+    ValueError
+        If method not in supported methods
+
     """
 
     stage = SelectionStage.ORDER
@@ -186,7 +199,7 @@ class Prioritize(Selection[Any]):
         k: int | None = None,
         c: int | None = None,
     ) -> None:
-        if method not in ("knn", "kmeans_distance", "kmeans_complexity"):
+        if method not in {"knn", "kmeans_distance", "kmeans_complexity"}:
             raise ValueError(f"Invalid prioritization method: {method}")
         self._model = model
         self._batch_size = batch_size
@@ -230,25 +243,35 @@ class Prioritize(Selection[Any]):
         reference: Embeddings | None = None,
     ) -> Prioritize:
         """
-        Prioritizes the dataset by sort order in the embedding space using existing
-        embeddings and/or reference dataset embeddings.
+        Use precalculated embeddings to sort the dataset indices in order of
+        highest priority data in the embedding space.
 
         Parameters
         ----------
         method : Literal["knn", "kmeans_distance", "kmeans_complexity"]
-            Method to use for prioritization
+            Method to use during prioritization.
         embeddings : Embeddings or None, default None
-            Embeddings to use for prioritization
+            Embeddings to use during prioritization. If None, `reference` must be set.
         reference : Embeddings or None, default None
-            Reference embeddings to prioritize relative to
+            Reference embeddings used to prioritize the calculated dataset embeddings relative to them.
+            If `embeddings` is None, this will be used instead.
         k : int or None, default None
-            Number of nearest neighbors to use for prioritization (knn only)
+            Number of nearest neighbors to use for prioritization.
+            If None, uses the square_root of the number of samples. Only used for method="knn", ignored otherwise.
         c : int or None, default None
-            Number of clusters to use for prioritization (kmeans, cluster only)
+            Number of clusters to use for prioritization. If None, uses the square_root of the number of samples.
+            Only used for method="kmeans_*", ignored otherwise.
 
         Notes
         -----
-        At least one of `embeddings` or `reference` must be provided.
+        1. `k` is only used for method ["knn"].
+        2. `c` is only used for methods ["kmeans_distance", "kmeans_complexity"].
+
+        Raises
+        ------
+        ValueError
+            If both `embeddings` and `reference` are None
+
         """
         emb_params: Embeddings | None = embeddings if embeddings is not None else reference
         if emb_params is None:

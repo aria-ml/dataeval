@@ -14,12 +14,12 @@ from dataeval.utils._array import as_numpy
 
 class ClassFilter(Selection[Any]):
     """
-    Filter the dataset by class.
+    Select dataset indices based on class labels, keeping only those present in `classes`.
 
     Parameters
     ----------
     classes : Sequence[int]
-        The classes to filter by.
+        The sequence of classes to keep.
     filter_detections : bool, default True
         Whether to filter detections from targets for object detection and segmentation datasets.
     """
@@ -41,16 +41,16 @@ class ClassFilter(Selection[Any]):
             if isinstance(target, Array):
                 # Get the label for the image
                 label = int(np.argmax(as_numpy(target)))
-                # Check to see if the label is in the classes to filter for
+                # Check to see if the label is in the classes to keep
                 if label in self.classes:
-                    # Include the image
+                    # Include the image index
                     selection.append(idx)
             elif isinstance(target, (ObjectDetectionTarget, SegmentationTarget)):
                 # Get the set of labels from the target
                 labels = set(target.labels if isinstance(target.labels, Iterable) else [target.labels])
                 # Check to see if any labels are in the classes to filter for
                 if labels.intersection(self.classes):
-                    # Include the image
+                    # Include the image index
                     selection.append(idx)
                     # If we are filtering out other labels and there are other labels, add a subselection filter
                     if self.filter_detections and labels.difference(self.classes):
