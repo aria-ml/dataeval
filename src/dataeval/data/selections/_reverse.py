@@ -9,7 +9,7 @@ from dataeval.data._selection import Select, Selection, SelectionStage
 
 class Reverse(Selection[Any]):
     """
-    Reverse the selection order of the dataset.
+    Select dataset indices in reverse order.
     """
 
     stage = SelectionStage.ORDER
