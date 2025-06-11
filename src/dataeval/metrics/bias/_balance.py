@@ -105,6 +105,12 @@ def balance(
     # Use numeric data for MI
     data = np.hstack((class_labels[:, np.newaxis], metadata.digitized_data))
 
+    # Present discrete features composed of distinct values as continuous for `mutual_info_classif`
+    for i, factor_type in enumerate(factor_types):
+        if len(data) == len(np.unique(data[:, i])):
+            is_discrete[i] = False
+            factor_types[factor_type] = "continuous"
+
     mutual_info_fn_map = {
         "categorical": mutual_info_classif,
         "discrete": mutual_info_classif,
