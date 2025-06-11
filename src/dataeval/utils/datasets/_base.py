@@ -13,6 +13,7 @@ from dataeval.utils.datasets._mixin import BaseDatasetMixin
 from dataeval.utils.datasets._types import (
     AnnotatedDataset,
     DatasetMetadata,
+    DatumMetadata,
     ImageClassificationDataset,
     ObjectDetectionDataset,
     ObjectDetectionTarget,
@@ -32,6 +33,11 @@ _TRawTarget = TypeVar("_TRawTarget", Sequence[int], Sequence[str], Sequence[tupl
 _TAnnotation = TypeVar("_TAnnotation", int, str, tuple[list[int], list[list[float]]])
 
 
+def _to_datum_metadata(index: int, metadata: dict[str, Any]) -> DatumMetadata:
+    _id = metadata.pop("id", index)
+    return DatumMetadata(id=_id, **metadata)
+
+
 class DataLocation(NamedTuple):
     url: str
     filename: str
@@ -40,7 +46,8 @@ class DataLocation(NamedTuple):
 
 
 class BaseDataset(
-    AnnotatedDataset[tuple[_TArray, _TTarget, dict[str, Any]]], Generic[_TArray, _TTarget, _TRawTarget, _TAnnotation]
+    AnnotatedDataset[tuple[_TArray, _TTarget, DatumMetadata]],
+    Generic[_TArray, _TTarget, _TRawTarget, _TAnnotation],
 ):
     """
     Base class for internet downloaded datasets.
@@ -100,7 +107,7 @@ class BaseDataset(
     def label2index(self) -> dict[str, int]:
         return self._label2index
 
-    def __iter__(self) -> Iterator[tuple[_TArray, _TTarget, dict[str, Any]]]:
+    def __iter__(self) -> Iterator[tuple[_TArray, _TTarget, DatumMetadata]]:
         for i in range(len(self)):
             yield self[i]
 
@@ -155,7 +162,7 @@ class BaseICDataset(
     Base class for image classification datasets.
     """
 
-    def __getitem__(self, index: int) -> tuple[_TArray, _TArray, dict[str, Any]]:
+    def __getitem__(self, index: int) -> tuple[_TArray, _TArray, DatumMetadata]:
         """
         Args
         ----
@@ -164,7 +171,7 @@ class BaseICDataset(
 
         Returns
         -------
-        tuple[TArray, TArray, dict[str, Any]]
+        tuple[TArray, TArray, DatumMetadata]
             Image, target, datum_metadata - where target is one-hot encoding of class.
         """
         # Get the associated label and score
@@ -176,7 +183,7 @@ class BaseICDataset(
 
         img_metadata = {key: val[index] for key, val in self._datum_metadata.items()}
 
-        return img, score, img_metadata
+        return img, score, _to_datum_metadata(index, img_metadata)
 
 
 class BaseODDataset(
@@ -190,7 +197,7 @@ class BaseODDataset(
 
     _bboxes_per_size: bool = False
 
-    def __getitem__(self, index: int) -> tuple[_TArray, ObjectDetectionTarget[_TArray], dict[str, Any]]:
+    def __getitem__(self, index: int) -> tuple[_TArray, ObjectDetectionTarget[_TArray], DatumMetadata]:
         """
         Args
         ----
@@ -199,7 +206,7 @@ class BaseODDataset(
 
         Returns
         -------
-        tuple[TArray, ObjectDetectionTarget[TArray], dict[str, Any]]
+        tuple[TArray, ObjectDetectionTarget[TArray], DatumMetadata]
             Image, target, datum_metadata - target.boxes returns boxes in x0, y0, x1, y1 format
         """
         # Grab the bounding boxes and labels from the annotations
@@ -218,7 +225,7 @@ class BaseODDataset(
         img_metadata = {key: val[index] for key, val in self._datum_metadata.items()}
         img_metadata = img_metadata | additional_metadata
 
-        return img, target, img_metadata
+        return img, target, _to_datum_metadata(index, img_metadata)
 
     @abstractmethod
     def _read_annotations(self, annotation: _TAnnotation) -> tuple[list[list[float]], list[int], dict[str, Any]]: ...
@@ -235,7 +242,7 @@ class BaseSegDataset(
 
     _masks: Sequence[str]
 
-    def __getitem__(self, index: int) -> tuple[_TArray, SegmentationTarget[_TArray], dict[str, Any]]:
+    def __getitem__(self, index: int) -> tuple[_TArray, SegmentationTarget[_TArray], DatumMetadata]:
         """
         Args
         ----
@@ -260,7 +267,7 @@ class BaseSegDataset(
         img_metadata = {key: val[index] for key, val in self._datum_metadata.items()}
         img_metadata = img_metadata | additional_metadata
 
-        return img, target, img_metadata
+        return img, target, _to_datum_metadata(index, img_metadata)
 
     @abstractmethod
     def _read_annotations(self, annotation: str) -> tuple[list[list[float]], list[int], dict[str, Any]]: ...
