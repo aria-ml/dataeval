@@ -120,6 +120,11 @@ class TestIsContinuousUnit:
         output = is_continuous(data, image_indices)
         assert output is not True
 
+    def test_is_continuous_no_image_indices(self):
+        data = np.array([0, 4, 3, 5, 6, 8] * 15)
+        output = is_continuous(data)
+        assert output is not True
+
     def test_is_coninuous_warning(self):
         data = np.array([0, 4, 3, 5, 6, 8] * 15)
         repeats = np.array([0, 4, 3, 5, 6, 8] * 15)
