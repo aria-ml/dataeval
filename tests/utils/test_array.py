@@ -5,7 +5,14 @@ import numpy as np
 import pytest
 import torch
 
-from dataeval.utils._array import channels_first_to_last, ensure_embeddings, flatten, to_numpy, to_numpy_iter
+from dataeval.utils._array import (
+    channels_first_to_last,
+    ensure_embeddings,
+    flatten,
+    rescale_array,
+    to_numpy,
+    to_numpy_iter,
+)
 
 
 @pytest.mark.optional
@@ -105,6 +112,28 @@ class TestEnsureEmbeddings:
         assert emb.min() >= 0.0
         assert emb.max() <= 1.0
         assert type(emb) is np.ndarray
+
+
+@pytest.mark.required
+class TestRescaleArray:
+    tt = torch.rand((4, 1, 16, 16)) * 100
+    na = np.random.random((4, 1, 16, 16)) * 100
+
+    def test_rescale_torch(self):
+        rescaled = rescale_array(self.tt)
+        assert rescaled.shape == (4, 1, 16, 16)
+        assert rescaled.min() >= 0.0
+        assert rescaled.max() <= 1.0
+
+    def test_rescale_numpy(self):
+        rescaled = rescale_array(self.na)
+        assert rescaled.shape == (4, 1, 16, 16)
+        assert rescaled.min() >= 0.0
+        assert rescaled.max() <= 1.0
+
+    def test_invalid_input(self):
+        with pytest.raises(TypeError, match="Unsupported type: <class 'str'>"):
+            rescale_array("invalid input")  # type: ignore
 
 
 @pytest.mark.required
