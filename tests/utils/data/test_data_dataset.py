@@ -10,6 +10,7 @@ from dataeval.utils.data._dataset import (
     to_image_classification_dataset,
     to_object_detection_dataset,
 )
+from dataeval.utils.data._validate import validate_dataset
 
 
 @pytest.fixture(scope="module")
@@ -112,6 +113,7 @@ class TestDatasetFactoryFunctions:
         assert len(Images(ds).to_list()) == 10
         assert len(Embeddings(ds, batch_size=10).to_tensor()) == 10
         assert len(Metadata(ds).image_indices) == 10
+        validate_dataset(ds)
 
     def test_to_image_classification_dataset_no_classes(self, images, ic_labels):
         ds = to_image_classification_dataset(images, ic_labels, None, None)
@@ -136,6 +138,7 @@ class TestDatasetFactoryFunctions:
         assert len(Images(ds).to_list()) == 10
         assert len(Embeddings(ds, batch_size=10).to_tensor()) == 10
         assert len(Metadata(ds).image_indices) == 55  # 1 + 2 + 3 + ... + 10
+        validate_dataset(ds)
 
     def test_to_object_detection_dataset_no_classes(self, images, od_labels, bboxes):
         ds = to_object_detection_dataset(images, od_labels, bboxes, None, None)
