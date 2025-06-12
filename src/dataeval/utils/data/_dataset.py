@@ -14,6 +14,10 @@ from dataeval.typing import (
 from dataeval.utils._array import as_numpy
 
 
+def _ensure_id(index: int, metadata: dict[str, Any]) -> dict[str, Any]:
+    return {"id": index, **metadata} if "id" not in metadata else metadata
+
+
 def _validate_data(
     datum_type: Literal["ic", "od"],
     images: Array | Sequence[Array],
@@ -128,16 +132,19 @@ class CustomImageClassificationDataset(BaseAnnotatedDataset[Sequence[int]], Imag
         return (
             self._images[idx],
             as_numpy(one_hot),
-            self._metadata[idx] if self._metadata is not None else {},
+            _ensure_id(idx, self._metadata[idx] if self._metadata is not None else {}),
         )
 
 
 class CustomObjectDetectionDataset(BaseAnnotatedDataset[Sequence[Sequence[int]]], ObjectDetectionDataset):
     class ObjectDetectionTarget:
-        def __init__(self, labels: Sequence[int], bboxes: Sequence[Sequence[float]]) -> None:
+        def __init__(self, labels: Sequence[int], bboxes: Sequence[Sequence[float]], class_count: int) -> None:
             self._labels = labels
             self._bboxes = bboxes
-            self._scores = [1.0] * len(labels)
+            one_hot = [[0.0] * class_count] * len(labels)
+            for i, label in enumerate(labels):
+                one_hot[i][label] = 1.0
+            self._scores = one_hot
 
         @property
         def labels(self) -> Sequence[int]:
@@ -148,7 +155,7 @@ class CustomObjectDetectionDataset(BaseAnnotatedDataset[Sequence[Sequence[int]]]
             return self._bboxes
 
         @property
-        def scores(self) -> Sequence[float]:
+        def scores(self) -> Sequence[Sequence[float]]:
             return self._scores
 
     def __init__(
@@ -180,8 +187,8 @@ class CustomObjectDetectionDataset(BaseAnnotatedDataset[Sequence[Sequence[int]]]
     def __getitem__(self, idx: int, /) -> tuple[Array, ObjectDetectionTarget, dict[str, Any]]:
         return (
             self._images[idx],
-            self.ObjectDetectionTarget(self._labels[idx], self._bboxes[idx]),
-            self._metadata[idx] if self._metadata is not None else {},
+            self.ObjectDetectionTarget(self._labels[idx], self._bboxes[idx], len(self._classes)),
+            _ensure_id(idx, self._metadata[idx] if self._metadata is not None else {}),
         )
 
 
