@@ -1,4 +1,6 @@
 import copy
+from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 import polars as pl
@@ -8,8 +10,14 @@ from dataeval.data._metadata import FactorInfo, Metadata, _binned
 from dataeval.metrics.stats._boxratiostats import boxratiostats
 from dataeval.metrics.stats._imagestats import imagestats
 from dataeval.metrics.stats._labelstats import labelstats
-from dataeval.utils.datasets._types import ObjectDetectionTarget
 from tests.data.test_data_embeddings import MockDataset
+
+
+@dataclass
+class ObjectDetectionTarget:
+    boxes: Any
+    labels: Any
+    scores: Any
 
 
 @pytest.fixture(scope="module")
