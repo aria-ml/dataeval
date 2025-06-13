@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import numpy.testing as npt
 import pytest
@@ -197,3 +199,39 @@ class TestSufficiencyInverseProject:
 
         # assert np.all(np.isclose(projection, predicted_proj, atol=1))
         npt.assert_array_equal(projection, predicted_proj)
+
+    def test_f_inv_out_unachievable_targets(self):
+        """
+        Verifies that f_inv_out handles unachievable targets
+        """
+        num_samples = np.arange(20, 80, step=10, dtype=np.uint32)
+        accuracies = num_samples / 100.0
+        data = SufficiencyOutput(steps=num_samples, measures={"Accuracy": accuracies})
+        # upper bound for these parameters is 0.9369, any desired accuracy above is unachievable
+        data._params = {1000: {"Accuracy": np.array([12.2746, 0.8502, 0.0631])}}
+        desired_accuracies = {"Accuracy": np.array([0.00000001, 0.93689])}
+
+        # ensure there are no warnings for valid input
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            needed_data = data.inv_project(desired_accuracies)["Accuracy"]
+
+        # 0.90 and 0.93 targets achievable, 0.99 above curve upper bound
+        desired_accuracies = {"Accuracy": np.array([0.90, 0.93, 0.99])}
+        # expect warning for 0.99 target
+        with pytest.warns(UserWarning, match="Number of samples could not be determined for target\(s\): \[0\.99\]"):
+            needed_data = data.inv_project(desired_accuracies)["Accuracy"]
+        target_needed_data = np.array([925, 6649, -1])
+        npt.assert_array_equal(needed_data, target_needed_data)
+
+        # all target accuracies unachievable, 0.9368 returns value greater than int64
+        desired_accuracies = {"Accuracy": np.array([0.9369, 1, 1.01])}
+        # expect warning for all targets
+        with pytest.warns(
+            UserWarning,
+            match="Number of samples could not be determined for target\(s\): \[0\.9369, 1\.0, 1\.01\]",
+        ):
+            needed_data = data.inv_project(desired_accuracies)["Accuracy"]
+
+        target_needed_data = np.array([-1, -1, -1])
+        npt.assert_array_equal(needed_data, target_needed_data)
