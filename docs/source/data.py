@@ -18,7 +18,8 @@ def cd(rel_path: str):
 
 
 def download():
-    from dataeval.utils.datasets import CIFAR10, MNIST, VOCDetection
+    from maite_datasets.image_classification import CIFAR10, MNIST
+    from maite_datasets.object_detection import VOCDetection
 
     with cd("notebooks"):
         MNIST(root="./data", download=True, image_set="train", corruption="translate")

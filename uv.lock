@@ -583,7 +583,6 @@ wheels = [
 name = "dataeval"
 source = { editable = "." }
 dependencies = [
-    { name = "defusedxml" },
     { name = "fast-hdbscan" },
     { name = "lightgbm" },
     { name = "numba", version = "0.60.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124')" },
@@ -591,9 +590,7 @@ dependencies = [
     { name = "numpy", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124')" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124')" },
     { name = "pandas" },
-    { name = "pillow" },
     { name = "polars" },
-    { name = "requests" },
     { name = "scikit-learn" },
     { name = "scipy", version = "1.13.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124')" },
     { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124')" },
@@ -647,6 +644,7 @@ dev = [
     { name = "jinja2" },
     { name = "jupyter-cache" },
     { name = "jupyter-client" },
+    { name = "maite-datasets" },
     { name = "markupsafe" },
     { name = "myst-nb" },
     { name = "nox", extra = ["uv"] },
@@ -677,6 +675,7 @@ docs = [
     { name = "jinja2" },
     { name = "jupyter-cache" },
     { name = "jupyter-client" },
+    { name = "maite-datasets" },
     { name = "markupsafe" },
     { name = "myst-nb" },
     { name = "numpy", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124')" },
@@ -708,16 +707,13 @@ type = [
 
 [package.metadata]
 requires-dist = [
-    { name = "defusedxml", specifier = ">=0.7.1" },
     { name = "fast-hdbscan", specifier = "==0.2.0" },
     { name = "lightgbm", specifier = ">=4" },
     { name = "matplotlib", marker = "extra == 'all'", specifier = ">=3.7.1" },
     { name = "numba", specifier = ">=0.59.1" },
     { name = "numpy", specifier = ">=1.24.2" },
     { name = "pandas", specifier = ">=2.0" },
-    { name = "pillow", specifier = ">=10.3.0" },
     { name = "polars", specifier = ">=1.0.0" },
-    { name = "requests", specifier = ">=2.32.3" },
     { name = "scikit-learn", specifier = ">=1.5.0" },
     { name = "scipy", specifier = ">=1.10" },
     { name = "torch", specifier = ">=2.2.0" },
@@ -749,6 +745,7 @@ dev = [
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "jupyter-cache", specifier = ">=1.0" },
     { name = "jupyter-client", specifier = ">=8.6.0" },
+    { name = "maite-datasets", specifier = ">=0.0.1" },
     { name = "markupsafe", specifier = ">=3,<3.0.2" },
     { name = "myst-nb", specifier = ">=1.0" },
     { name = "nox", extras = ["uv"], specifier = ">=2025.5.1" },
@@ -775,6 +772,7 @@ docs = [
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "jupyter-cache", specifier = ">=1.0" },
     { name = "jupyter-client", specifier = ">=8.6.0" },
+    { name = "maite-datasets", specifier = ">=0.0.1" },
     { name = "markupsafe", specifier = ">=3,<3.0.2" },
     { name = "myst-nb", specifier = ">=1.0" },
     { name = "numpy", specifier = ">=2.0.2" },
@@ -1635,6 +1633,23 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/cb/da/8341fd3056419441286c8e26bf436923021005ece0bff5f41906476ae514/llvmlite-0.44.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c0143a5ef336da14deaa8ec26c5449ad5b6a2b564df82fcef4be040b9cacfea9", size = 42361901, upload-time = "2025-01-20T11:13:46.711Z" },
     { url = "https://files.pythonhosted.org/packages/53/ad/d79349dc07b8a395a99153d7ce8b01d6fcdc9f8231355a5df55ded649b61/llvmlite-0.44.0-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:d752f89e31b66db6f8da06df8b39f9b91e78c5feea1bf9e8c1fba1d1c24c065d", size = 41184247, upload-time = "2025-01-20T11:13:56.159Z" },
     { url = "https://files.pythonhosted.org/packages/e2/3b/a9a17366af80127bd09decbe2a54d8974b6d8b274b39bf47fbaedeec6307/llvmlite-0.44.0-cp312-cp312-win_amd64.whl", hash = "sha256:eae7e2d4ca8f88f89d315b48c6b741dcb925d6a1042da694aa16ab3dd4cbd3a1", size = 30332380, upload-time = "2025-01-20T11:14:02.442Z" },
+]
+
+[[package]]
+name = "maite-datasets"
+version = "0.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "defusedxml" },
+    { name = "numpy", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124')" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124')" },
+    { name = "pillow" },
+    { name = "requests" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e8/c5/dfc53caa2ba7eb69ef613f47dd18952d18543357aef6db790e516fa29d6e/maite_datasets-0.0.1.tar.gz", hash = "sha256:8acaf947b132b06646aeecce0dbe5714efbea875a74fa7b78cf99c75392d2b2f", size = 68081, upload-time = "2025-06-12T21:26:22.908Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/27/89/b8aaef28f1a93e719f0c1a7a4fcd12f734885d2f019e545aa4cc9fc9a694/maite_datasets-0.0.1-py3-none-any.whl", hash = "sha256:125bd410a9bf45e8982aceb0a7f966af00b38d5a1cf602719f9943b82fd5379c", size = 80007, upload-time = "2025-06-12T21:26:21.227Z" },
 ]
 
 [[package]]
@@ -4433,7 +4448,6 @@ wheels = [
     { url = "https://download.pytorch.org/whl/cpu/torch-2.7.0%2Bcpu-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:a845b6f3bda3c40f736847dede95d8bfec81fb7e11458cd25973ba13542cf1f6" },
     { url = "https://download.pytorch.org/whl/cpu/torch-2.7.0%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:64123c05615e27368c7a7816f6e39c6d219998693beabde0b0b9cedf91b5ed8b" },
     { url = "https://download.pytorch.org/whl/cpu/torch-2.7.0%2Bcpu-cp312-cp312-win_amd64.whl", hash = "sha256:69e25c973bdd7ea24b0fa9f9792114950afaeb8f819e5723819b923f50989175" },
-    { url = "https://download.pytorch.org/whl/cpu/torch-2.7.0%2Bcpu-cp312-cp312-win_arm64.whl", hash = "sha256:1d7a6f33868276770a657beec7f77c7726b4da9d0739eff1b3ae64cc9a09d8e3" },
     { url = "https://download.pytorch.org/whl/cpu/torch-2.7.0%2Bcpu-cp39-cp39-manylinux_2_28_aarch64.whl", hash = "sha256:7d0a4106bc0fe339295f509900ce46228f45b9ad8646662fe50c7d9e5960c3c1" },
     { url = "https://download.pytorch.org/whl/cpu/torch-2.7.0%2Bcpu-cp39-cp39-manylinux_2_28_x86_64.whl", hash = "sha256:a05f25ef1ebdf2af323141648787e7bea51bd8db90e1adebc14a85d8ba20d16a" },
     { url = "https://download.pytorch.org/whl/cpu/torch-2.7.0%2Bcpu-cp39-cp39-win_amd64.whl", hash = "sha256:58f7cd297f27b2b708b0dc03cc4e5be327ffd5f4f37204068c18e1bd55cd73d8" },
