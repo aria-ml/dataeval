@@ -9,17 +9,14 @@
 #
 dependencies:
   - python>=3.9,<3.13
-  - defusedxml>=0.7.1
   - fast_hdbscan==0.2.0
   - lightgbm>=4
   - matplotlib>=3.7.1
   - numba>=0.59.1
   - numpy>=1.24.2
   - pandas>=2.0
-  - pillow>=10.3.0
   - polars>=1.0.0
   - python-xxhash>=3.3
-  - requests>=2.32.3
   - scikit-learn>=1.5.0
   - scipy>=1.10
   - tqdm>=4.66

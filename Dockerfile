@@ -43,12 +43,11 @@ ENV PATH=/${USER}/.venv/bin:${PATH}
 FROM base AS docs
 ARG UID
 COPY --chown=${UID} docs/source/data.py docs/source/data.py
-COPY --chown=${UID} src/dataeval/utils/datasets/*.py src/dataeval/utils/datasets/
 ARG USER
 RUN python -c "\
 import os; \
 import sys; \
-sys.path.extend(['/${USER}/docs/source', '/${USER}/src']); \
+sys.path.append('/${USER}/docs/source'); \
 import data; \
 data.download(); \
 "
