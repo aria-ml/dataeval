@@ -400,15 +400,3 @@ class TestCastSimplify:
     )
     def test_convert_type(self, value, output):
         assert output == _simplify_type(value)
-
-
-@pytest.mark.skip
-class TestMNISTMetadata:
-    def test_get_mnist_metadata(self):
-        from dataeval.data import Metadata
-        from dataeval.utils.datasets import MNIST
-
-        mnist = MNIST("data")
-        metadata = Metadata(mnist)
-        metadata._structure()
-        assert True  # does not crash

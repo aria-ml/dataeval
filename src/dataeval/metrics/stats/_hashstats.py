@@ -8,8 +8,9 @@ from typing import Any, Callable
 
 import numpy as np
 import xxhash as xxh
-from PIL import Image
+from numpy.typing import NDArray
 from scipy.fftpack import dct
+from scipy.ndimage import zoom
 
 from dataeval.metrics.stats._base import StatsProcessor, run_stats
 from dataeval.outputs import HashStatsOutput
@@ -18,8 +19,24 @@ from dataeval.typing import ArrayLike, Dataset
 from dataeval.utils._array import as_numpy
 from dataeval.utils._image import normalize_image_shape, rescale
 
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
+
 HASH_SIZE = 8
 MAX_FACTOR = 4
+
+
+def _resize(image: NDArray[np.uint8], resize_dim: int, use_pil: bool = True) -> NDArray[np.uint8]:
+    """Resizes a grayscale (HxW) 8-bit image using PIL or scipy.ndimage.zoom."""
+
+    # Use PIL if available, otherwise resize and resample with scipy.ndimage.zoom
+    if use_pil and Image is not None:
+        return np.array(Image.fromarray(image).resize((resize_dim, resize_dim), Image.Resampling.LANCZOS))
+
+    zoom_factors = (resize_dim / image.shape[0], resize_dim / image.shape[1])
+    return np.clip(zoom(image, zoom_factors, order=5, mode="reflect"), 0, 255, dtype=np.uint8)
 
 
 def pchash(image: ArrayLike) -> str:
@@ -59,7 +76,7 @@ def pchash(image: ArrayLike) -> str:
     rescaled = rescale(normalized, 8).astype(np.uint8)
 
     # Resizes the image using the Lanczos algorithm to a square image
-    im = np.array(Image.fromarray(rescaled).resize((resize_dim, resize_dim), Image.Resampling.LANCZOS))
+    im = _resize(rescaled, resize_dim)
 
     # Performs discrete cosine transforms to compress the image information and takes the lowest frequency component
     transform = dct(dct(im.T).T)[:HASH_SIZE, :HASH_SIZE]

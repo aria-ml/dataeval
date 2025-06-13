@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -6,7 +8,13 @@ import torch
 
 from dataeval.data import Embeddings
 from dataeval.typing import DatasetMetadata
-from dataeval.utils.datasets._types import ObjectDetectionTarget
+
+
+@dataclass
+class ObjectDetectionTarget:
+    boxes: Any
+    labels: Any
+    scores: Any
 
 
 class MockDataset:
