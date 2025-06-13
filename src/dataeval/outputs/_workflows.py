@@ -92,7 +92,7 @@ def plot_measure(
     return fig
 
 
-def f_inv_out(y_i: NDArray[Any], x: NDArray[Any]) -> NDArray[np.uint64]:
+def f_inv_out(y_i: NDArray[Any], x: NDArray[Any]) -> NDArray[np.int64]:
     """
     Inverse function for f_out()
 
@@ -106,13 +106,27 @@ def f_inv_out(y_i: NDArray[Any], x: NDArray[Any]) -> NDArray[np.uint64]:
     Returns
     -------
     NDArray
-        Array of sample sizes
+        Sample size or -1 if unachievable for each data point
     """
-    n_i = ((y_i - x[2]) / x[0]) ** (-1 / x[1])
-    return np.asarray(n_i, dtype=np.uint64)
+    with np.errstate(invalid="ignore"):
+        n_i = ((y_i - x[2]) / x[0]) ** (-1 / x[1])
+    unachievable_targets = np.isnan(n_i) | np.any(n_i > np.iinfo(np.int64).max)
+    if any(unachievable_targets):
+        with np.printoptions(suppress=True):
+            warnings.warn(
+                "Number of samples could not be determined for target(s): "
+                f"""{
+                    np.array2string(
+                        1 - y_i[unachievable_targets], separator=", ", formatter={"float": lambda x: f"{x}"}
+                    )
+                }""",
+                UserWarning,
+            )
+        n_i[unachievable_targets] = -1
+    return np.asarray(n_i, dtype=np.int64)
 
 
-def inv_project_steps(params: NDArray[Any], targets: NDArray[Any]) -> NDArray[np.uint64]:
+def inv_project_steps(params: NDArray[Any], targets: NDArray[Any]) -> NDArray[np.int64]:
     """Inverse function for project_steps()
 
     Parameters
@@ -125,10 +139,9 @@ def inv_project_steps(params: NDArray[Any], targets: NDArray[Any]) -> NDArray[np
     Returns
     -------
     NDArray
-        Array of sample sizes, or 0 if overflow
+        Samples required or -1 if unachievable for each target value
     """
     steps = f_inv_out(1 - np.array(targets), params)
-    steps[np.isnan(steps)] = 0
     return np.ceil(steps)
 
 
