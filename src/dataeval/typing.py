@@ -3,11 +3,12 @@ Common type protocols used for interoperability with DataEval.
 """
 
 __all__ = [
+    "AnnotatedDataset",
     "Array",
     "ArrayLike",
     "Dataset",
-    "AnnotatedDataset",
     "DatasetMetadata",
+    "DeviceLike",
     "ImageClassificationDatum",
     "ImageClassificationDataset",
     "ObjectDetectionTarget",
@@ -21,9 +22,10 @@ __all__ = [
 
 
 import sys
-from typing import Any, Generic, Iterator, Mapping, Protocol, TypedDict, TypeVar, runtime_checkable
+from typing import Any, Generic, Iterator, Mapping, Protocol, TypedDict, TypeVar, Union, runtime_checkable
 
 import numpy.typing
+import torch
 from typing_extensions import NotRequired, ReadOnly, Required
 
 if sys.version_info >= (3, 10):
@@ -39,6 +41,16 @@ Type alias for a `Union` representing objects that can be coerced into an array.
 See Also
 --------
 `NumPy ArrayLike <https://numpy.org/doc/stable/reference/typing.html#numpy.typing.ArrayLike>`_
+"""
+
+
+DeviceLike: TypeAlias = Union[int, str, tuple[str, int], torch.device]
+"""
+Type alias for a `Union` representing types that specify a torch.device.
+
+See Also
+--------
+`torch.device <https://pytorch.org/docs/stable/tensor_attributes.html#torch.device>`_
 """
 
 
