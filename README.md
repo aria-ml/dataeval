@@ -72,14 +72,8 @@ micromamba create -f environment\environment.yaml -c pytorch
 
 ### **Installing from GitHub**
 
-To install DataEval from source locally on Ubuntu, you will need `git-lfs` to
-download larger, binary source files.
-
-```bash
-sudo apt-get install git-lfs
-```
-
-Pull the source down and change to the DataEval project directory.
+To install DataEval from source locally on Ubuntu, pull the source down and
+change to the DataEval project directory.
 
 ```bash
 git clone https://github.com/aria-ml/dataeval.git
@@ -116,10 +110,7 @@ source .venv/bin/activate
 
 ## Contact Us
 
-If you have any questions, feel free to reach out to the people below:
-
-- **POC**: Scott Swan @scott.swan
-- **DPOC**: Andrew Weng @aweng
+If you have any questions, feel free to reach out to [us](mailto:dataeval@ariacoustics.com)!
 
 ## Acknowledgement
 

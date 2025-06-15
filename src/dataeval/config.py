@@ -4,18 +4,14 @@ Global configuration settings for DataEval.
 
 from __future__ import annotations
 
-__all__ = ["get_device", "set_device", "get_max_processes", "set_max_processes", "use_max_processes", "DeviceLike"]
+__all__ = ["get_device", "set_device", "get_max_processes", "set_max_processes", "use_max_processes"]
 
-import sys
-from typing import Any, Union
-
-if sys.version_info >= (3, 10):
-    from typing import TypeAlias
-else:
-    from typing_extensions import TypeAlias
+from typing import Any
 
 import numpy as np
 import torch
+
+from dataeval.typing import DeviceLike
 
 ### GLOBALS ###
 
@@ -26,17 +22,6 @@ _seed: int | None = None
 ### CONSTS ###
 
 EPSILON = 1e-12
-
-### TYPES ###
-
-DeviceLike: TypeAlias = Union[int, str, tuple[str, int], torch.device]
-"""
-Type alias for types that are acceptable for specifying a torch.device.
-
-See Also
---------
-`torch.device <https://pytorch.org/docs/stable/tensor_attributes.html#torch.device>`_
-"""
 
 ### FUNCS ###
 
