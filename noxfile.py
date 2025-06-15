@@ -41,11 +41,15 @@ def prep(session: nox.Session) -> str:
 @nox.session
 def dev(session: nox.Session) -> None:
     """Set up a python development environment at `.venv-{version}`. Specify version using `nox -P {version} -e dev`."""
+    arch_extras = {"cpu", "cu118", "cu124"}
+    arch_posargs = arch_extras & set(session.posargs)
+    arch_args = [] if not arch_posargs else [f"--extra={list(arch_posargs)[0]}"]
+
     python_version = prep(session)
     session.env["UV_PROJECT_ENVIRONMENT"] = f".venv-{python_version}"
     session.run("rm", "-rf", f".venv-{python_version}", external=True)
     session.run("uv", "venv", "-p", python_version, "--seed", external=True)
-    session.run("uv", "sync", "--extra", "all", external=True)
+    session.run("uv", "sync", "--extra=all", *arch_args, external=True)
 
 
 @nox.session
@@ -84,7 +88,7 @@ def unit(session: nox.Session) -> None:
 def type(session: nox.Session) -> None:  # noqa: A001
     """Run type checks and verify external types. Specify version using `nox -P {version} -e type`."""
     prep(session)
-    session.run_install("uv", "sync", "--no-dev", "--extra=all", "--group=type")
+    session.run_install("uv", "sync", "--no-dev", "--extra=cpu", "--extra=all", "--group=type")
     session.run("pyright", "--stats", "src/", "tests/")
     session.run("pyright", "--ignoreexternal", "--verifytypes", "dataeval")
 
@@ -113,7 +117,7 @@ def doctest(session: nox.Session) -> None:
     """Run docstring tests."""
     prep(session)
     target = session.posargs if session.posargs else ["src/dataeval"]
-    session.run_install("uv", "sync", "--no-dev", "--group=test")
+    session.run_install("uv", "sync", "--no-dev", "--extra=cpu", "--group=test")
     session.run(
         "pytest",
         "--doctest-modules",
