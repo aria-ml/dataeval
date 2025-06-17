@@ -4,11 +4,12 @@ __all__ = []
 
 import warnings
 from dataclasses import dataclass
-from typing import Any, Iterable, Literal, Mapping, Sequence, Sized
+from typing import Any, Callable, Iterable, Literal, Mapping, Sequence, Sized
 
 import numpy as np
 import polars as pl
 from numpy.typing import NDArray
+from tqdm.auto import tqdm
 
 from dataeval.typing import (
     AnnotatedDataset,
@@ -252,7 +253,7 @@ class Metadata:
         scores = []
         srcidx = []
         is_od = None
-        for i in range(len(self._dataset)):
+        for i in tqdm(range(len(self._dataset))):
             _, target, metadata = self._dataset[i]
 
             raw.append(metadata)
@@ -261,15 +262,15 @@ class Metadata:
                 target_labels = as_numpy(target.labels)
                 target_len = len(target_labels)
                 if target_len:
-                    labels.extend(target_labels.tolist())
-                    bboxes.extend(as_numpy(target.boxes).tolist())
-                    scores.extend(as_numpy(target.scores).tolist())
+                    labels.append(target_labels)
+                    bboxes.append(as_numpy(target.boxes))
+                    scores.append(as_numpy(target.scores))
                     srcidx.extend([i] * target_len)
             elif isinstance(target, Array):
-                if len(target):
-                    target_len = 1
-                    labels.append(int(np.argmax(as_numpy(target))))
-                    scores.append(target)
+                target_scores = as_numpy(target)
+                if len(target_scores):
+                    labels.append([np.argmax(target_scores)])
+                    scores.append([target_scores])
                     srcidx.append(i)
             else:
                 raise TypeError("Encountered unsupported target type in dataset")
@@ -278,10 +279,11 @@ class Metadata:
             if is_od != is_od_target:
                 raise ValueError("Encountered unexpected target type in dataset")
 
-        labels = as_numpy(labels).astype(np.intp)
-        scores = as_numpy(scores).astype(np.float32)
-        bboxes = as_numpy(bboxes).astype(np.float32) if is_od else None
-        srcidx = as_numpy(srcidx).astype(np.intp)
+        np_asarray: Callable[..., np.ndarray] = np.concatenate if srcidx else np.asarray
+        labels = np_asarray(labels, dtype=np.intp)
+        scores = np_asarray(scores, dtype=np.float32)
+        bboxes = np_asarray(bboxes, dtype=np.float32) if is_od else None
+        srcidx = np.asarray(srcidx, dtype=np.intp)
 
         index2label = self._dataset.metadata.get("index2label", {i: str(i) for i in np.unique(labels)})
 
