@@ -1,6 +1,27 @@
-[//]: # (6e69013200e9367587250eebcc27042480ba0958)
+[//]: # (75995b42c800e524553af7e69f412c320eff1d3b)
 
 # DataEval Change Log
+
+## v0.87.0
+
+🌟 **Feature Release**
+- `28e238ed` - New OOD_KNN detector, works with Embeddings class
+
+🚧 **Deprecations and Removals**
+- `808bf568` - Remove utility datasets from the dataeval package
+
+🛠️ **Improvements and Enhancements**
+- `75a22785` - Implement dataset validation function
+- `e83b4c31` - Integrate prioritization re-ranking policies
+- `14eeb978` - Switch to using is_continuous function for metadata binning
+
+👾 **Fixes**
+- `75995b42` - 412 Sufficiency inverse projection does not handle unachievable target
+- `ef7da431` - Fix datasets datum metadata to be MAITE protocol compliant
+- `06a5727d` - Fix balance to treat arrays of discrete distinct values as continuous
+
+📝 **Miscellaneous**
+- `bf8c7ea6` - Improved Selection docstrings
 
 ## v0.86.9
 
