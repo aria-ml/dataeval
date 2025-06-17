@@ -9,7 +9,6 @@ from collections import ChainMap
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
-from multiprocessing import Pool
 from typing import Any, Callable, Generic, Iterable, Iterator, Sequence, TypeVar
 
 import numpy as np
@@ -21,13 +20,11 @@ from dataeval.outputs._stats import BASE_ATTRS, BaseStatsOutput, SourceIndex
 from dataeval.typing import Array, ArrayLike, Dataset, ObjectDetectionTarget
 from dataeval.utils._array import as_numpy, to_numpy
 from dataeval.utils._image import clip_and_pad, clip_box, is_valid_box, normalize_image_shape, rescale
+from dataeval.utils._multiprocessing import PoolWrapper
 
 DTYPE_REGEX = re.compile(r"NDArray\[np\.(.*?)\]")
 
 TStatsOutput = TypeVar("TStatsOutput", bound=BaseStatsOutput, covariant=True)
-
-_S = TypeVar("_S")
-_T = TypeVar("_T")
 
 
 @dataclass
@@ -65,30 +62,6 @@ class BoundingBox:
         x1_int = math.ceil(self.x1)
         y1_int = math.ceil(self.y1)
         return x0_int, y0_int, x1_int, y1_int
-
-
-class PoolWrapper:
-    """
-    Wraps `multiprocessing.Pool` to allow for easy switching between
-    multiprocessing and single-threaded execution.
-
-    This helps with debugging and profiling, as well as usage with Jupyter notebooks
-    in VS Code, which does not support subprocess debugging.
-    """
-
-    def __init__(self, processes: int | None) -> None:
-        self.pool = Pool(processes) if processes is None or processes > 1 else None
-
-    def imap(self, func: Callable[[_S], _T], iterable: Iterable[_S]) -> Iterator[_T]:
-        return map(func, iterable) if self.pool is None else self.pool.imap(func, iterable)
-
-    def __enter__(self, *args: Any, **kwargs: Any) -> PoolWrapper:
-        return self
-
-    def __exit__(self, *args: Any) -> None:
-        if self.pool is not None:
-            self.pool.close()
-            self.pool.join()
 
 
 class StatsProcessor(Generic[TStatsOutput]):
