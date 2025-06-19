@@ -45,21 +45,32 @@ def _to_col(name: str, info: FactorInfo, binned: bool = True) -> str:
 
 
 class Metadata:
-    """
-    Class containing binned metadata using Polars DataFrames.
+    """Collection of binned metadata using Polars DataFrames.
+
+    Processes dataset metadata by automatically binning continuous factors and digitizing
+    categorical factors for analysis and visualization workflows.
 
     Parameters
     ----------
     dataset : ImageClassificationDataset or ObjectDetectionDataset
-        Dataset to access original targets and metadata from.
+        Dataset that provides original targets and metadata for processing.
     continuous_factor_bins : Mapping[str, int | Sequence[float]] | None, default None
-        Mapping from continuous factor name to the number of bins or bin edges
+        Mapping from continuous factor names to bin counts or explicit bin edges.
+        When None, uses automatic discretization.
     auto_bin_method : Literal["uniform_width", "uniform_count", "clusters"], default "uniform_width"
-        Method for automatically determining the number of bins for continuous factors
+        Binning strategy for continuous factors without explicit bins. Default "uniform_width"
+        provides intuitive equal-width intervals for most distributions.
     exclude : Sequence[str] | None, default None
-        Filter metadata factors to exclude the specified factors, cannot be set with `include`
+        Factor names to exclude from processing. Cannot be used with `include` parameter.
+        When None, processes all available factors.
     include : Sequence[str] | None, default None
-        Filter metadata factors to include the specified factors, cannot be set with `exclude`
+        Factor names to include in processing. Cannot be used with `exclude` parameter.
+        When None, processes all available factors.
+
+    Raises
+    ------
+    ValueError
+        When both exclude and include parameters are specified simultaneously.
     """
 
     def __init__(
@@ -95,17 +106,48 @@ class Metadata:
 
     @property
     def raw(self) -> Sequence[Mapping[str, Any]]:
-        """The raw list of metadata dictionaries for the dataset."""
+        """Original metadata dictionaries extracted from the dataset.
+
+        Access the unprocessed metadata as it was provided in the original dataset before
+        any binning, filtering, or transformation operations.
+
+        Returns
+        -------
+        Sequence[Mapping[str, Any]]
+            List of metadata dictionaries, one per dataset item, containing the original key-value
+            pairs as provided in the source data
+
+        Notes
+        -----
+            This property triggers dataset structure analysis on first access.
+        """
         self._structure()
         return self._raw
 
     @property
     def exclude(self) -> set[str]:
-        """Factors to exclude from the metadata."""
+        """Factor names excluded from metadata processing.
+
+        Returns
+        -------
+        set[str]
+            Set of factor names that are filtered out during processing.
+            Empty set when no exclusions are active.
+
+        """
         return self._exclude
 
     @exclude.setter
     def exclude(self, value: Sequence[str]) -> None:
+        """Set factor names to exclude from processing.
+
+        Automatically clears include filter and resets binning state when exclusion list changes.
+
+        Parameters
+        ----------
+        value : Sequence[str]
+            Factor names to exclude from metadata analysis.
+        """
         exclude = set(value)
         if self._exclude != exclude:
             self._exclude = exclude
@@ -114,11 +156,27 @@ class Metadata:
 
     @property
     def include(self) -> set[str]:
-        """Factors to include from the metadata."""
+        """Factor names included in metadata processing.
+
+        Returns
+        -------
+        set[str]
+            Set of factor names that are processed during analysis. Empty set when no inclusion filter is active.
+        """
         return self._include
 
     @include.setter
     def include(self, value: Sequence[str]) -> None:
+        """Set factor names to include in processing.
+
+        Automatically clears exclude filter and resets binning state when
+        inclusion list changes.
+
+        Parameters
+        ----------
+        value : Sequence[str]
+            Factor names to include in metadata analysis.
+        """
         include = set(value)
         if self._include != include:
             self._include = include
@@ -127,41 +185,120 @@ class Metadata:
 
     @property
     def continuous_factor_bins(self) -> Mapping[str, int | Sequence[float]]:
-        """Map of factor names to bin counts or bin edges."""
+        """Binning configuration for continuous factors.
+
+        Returns
+        -------
+        Mapping[str, int | Sequence[float]]
+            Dictionary mapping factor names to either the number of bins
+            (int) or explicit bin edges (sequence of floats).
+        """
         return self._continuous_factor_bins
 
     @continuous_factor_bins.setter
     def continuous_factor_bins(self, bins: Mapping[str, int | Sequence[float]]) -> None:
+        """Update binning configuration for continuous factors.
+
+        Triggers re-binning when configuration changes to ensure data
+        consistency with new bin specifications.
+
+        Parameters
+        ----------
+        bins : Mapping[str, int | Sequence[float]]
+            Dictionary mapping factor names to bin counts or explicit edges.
+        """
         if self._continuous_factor_bins != bins:
             self._continuous_factor_bins = dict(bins)
             self._reset_bins(bins)
 
     @property
     def auto_bin_method(self) -> Literal["uniform_width", "uniform_count", "clusters"]:
-        """Binning method to use when continuous_factor_bins is not defined."""
+        """Automatic binning strategy for continuous factors.
+
+        Returns
+        -------
+        {"uniform_width", "uniform_count", "clusters"}
+            Current method used for automatic discretization of continuous
+            factors that lack explicit bin specifications.
+        """
         return self._auto_bin_method
 
     @auto_bin_method.setter
     def auto_bin_method(self, method: Literal["uniform_width", "uniform_count", "clusters"]) -> None:
+        """Set automatic binning strategy for continuous factors.
+
+        Triggers re-binning with the new method when strategy changes to
+        ensure consistent discretization across all factors.
+
+        Parameters
+        ----------
+        method : {"uniform_width", "uniform_count", "clusters"}
+            Binning strategy to apply for continuous factors without
+            explicit bin configurations.
+        """
         if self._auto_bin_method != method:
             self._auto_bin_method = method
             self._reset_bins()
 
     @property
     def dataframe(self) -> pl.DataFrame:
-        """Dataframe containing target information and metadata factors."""
+        """Processed DataFrame containing targets and metadata factors.
+
+        Access the main data structure with target information (class labels,
+        scores, bounding boxes) and processed metadata factors ready for analysis.
+
+        Returns
+        -------
+        pl.DataFrame
+            DataFrame with columns for image indices, class labels, scores,
+            bounding boxes (when applicable), and all processed metadata factors.
+
+        Notes
+        -----
+        This property triggers dataset structure analysis on first access.
+        Factor binning occurs automatically when accessing factor-related data.
+        """
         self._structure()
         return self._dataframe
 
     @property
     def dropped_factors(self) -> Mapping[str, Sequence[str]]:
-        """Factors that were dropped during preprocessing and the reasons why they were dropped."""
+        """Factors removed during preprocessing with removal reasons.
+
+        Returns
+        -------
+        Mapping[str, Sequence[str]]
+            Dictionary mapping dropped factor names to lists of reasons
+            why they were excluded from the final dataset.
+
+        Notes
+        -----
+        This property triggers dataset structure analysis on first access.
+        Common removal reasons include incompatible data types, excessive
+        missing values, or insufficient variation.
+        """
         self._structure()
         return self._dropped_factors
 
     @property
     def digitized_data(self) -> NDArray[np.int64]:
-        """Factor data with digitized categorical data."""
+        """Factor data with categorical values converted to integer codes.
+
+        Access processed factor data where categorical factors are digitized
+        to integer codes but continuous factors remain in their original form.
+
+        Returns
+        -------
+        NDArray[np.int64]
+            Array with shape (n_samples, n_factors) containing integer-coded
+            categorical data. Returns empty array when no factors are available.
+
+        Notes
+        -----
+        This property triggers factor binning analysis on first access.
+        Use this for algorithms that can handle mixed categorical and
+        continuous data types.
+        """
         if not self.factor_names:
             return np.array([], dtype=np.int64)
 
@@ -174,7 +311,23 @@ class Metadata:
 
     @property
     def binned_data(self) -> NDArray[np.int64]:
-        """Factor data with binned continuous data."""
+        """Factor data with continuous values discretized into bins.
+
+        Access fully processed factor data where both categorical and
+        continuous factors are converted to integer bin indices.
+
+        Returns
+        -------
+        NDArray[np.int64]
+            Array with shape (n_samples, n_factors) containing binned integer
+            data ready for categorical analysis algorithms. Returns empty array
+            when no factors are available.
+
+        Notes
+        -----
+        This property triggers factor binning analysis on first access.
+        Use this for algorithms requiring purely discrete input data.
+        """
         if not self.factor_names:
             return np.array([], dtype=np.int64)
 
@@ -187,19 +340,59 @@ class Metadata:
 
     @property
     def factor_names(self) -> Sequence[str]:
-        """Factor names of the metadata."""
+        """Names of all processed metadata factors.
+
+        Returns
+        -------
+        Sequence[str]
+            List of factor names that passed filtering and preprocessing steps.
+            Order matches columns in factor_data, digitized_data, and binned_data.
+
+        Notes
+        -----
+        This property triggers dataset structure analysis on first access.
+        Factor names respect include/exclude filtering settings.
+        """
         self._structure()
         return list(filter(self._filter, self._factors))
 
     @property
     def factor_info(self) -> Mapping[str, FactorInfo]:
-        """Factor types of the metadata."""
+        """Type information and processing status for each factor.
+
+        Returns
+        -------
+        Mapping[str, FactorInfo]
+            Dictionary mapping factor names to FactorInfo objects containing
+            data type classification and processing flags (binned, digitized).
+
+        Notes
+        -----
+        This property triggers factor binning analysis on first access.
+        Only includes factors that survived preprocessing and filtering.
+        """
         self._bin()
         return dict(filter(self._filter, ((k, v) for k, v in self._factors.items() if v is not None)))
 
     @property
     def factor_data(self) -> NDArray[Any]:
-        """Factor data as a NumPy array."""
+        """Raw factor values before binning or digitization.
+
+        Access unprocessed factor data in its original numeric form before
+        any categorical encoding or binning transformations are applied.
+
+        Returns
+        -------
+        NDArray[Any]
+            Array with shape (n_samples, n_factors) containing original factor
+            values. Returns empty array when no factors are available.
+
+        Notes
+        -----
+        Use this for algorithms that can work with mixed data types or when
+        you need access to original continuous values. For analysis-ready
+        integer data, use binned_data or digitized_data instead.
+        """
         if not self.factor_names:
             return np.array([], dtype=np.float64)
 
@@ -208,24 +401,67 @@ class Metadata:
 
     @property
     def class_labels(self) -> NDArray[np.intp]:
-        """Class labels as a NumPy array."""
+        """Target class labels as integer indices.
+
+        Returns
+        -------
+        NDArray[np.intp]
+            Array of class indices corresponding to dataset targets. For
+            object detection datasets, contains one label per detection.
+
+        Notes
+        -----
+        This property triggers dataset structure analysis on first access.
+        Use class_names property to get human-readable label names.
+        """
         self._structure()
         return self._class_labels
 
     @property
     def class_names(self) -> Sequence[str]:
-        """Class names as a list of strings."""
+        """Human-readable names corresponding to class labels.
+
+        Returns
+        -------
+        Sequence[str]
+            List of class names where index corresponds to class label value.
+            Derived from dataset metadata or auto-generated from label indices.
+
+        Notes
+        -----
+        This property triggers dataset structure analysis on first access.
+        """
         self._structure()
         return self._class_names
 
     @property
     def image_indices(self) -> NDArray[np.intp]:
-        """Indices of images as a NumPy array."""
+        """Dataset indices linking targets back to source images.
+
+        Returns
+        -------
+        NDArray[np.intp]
+            Array mapping each target/detection back to its source image
+            index in the original dataset. Essential for object detection
+            datasets where multiple detections come from single images.
+
+        Notes
+        -----
+        This property triggers dataset structure analysis on first access.
+        """
         self._structure()
         return self._image_indices
 
     @property
     def image_count(self) -> int:
+        """Total number of images in the dataset.
+
+        Returns
+        -------
+        int
+            Count of unique images in the source dataset, regardless of
+            how many targets/detections each image contains.
+        """
         if self._count == 0:
             self._structure()
         return self._count
@@ -372,16 +608,30 @@ class Metadata:
         self._is_binned = True
 
     def add_factors(self, factors: Mapping[str, Array | Sequence[Any]]) -> None:
-        """
-        Add additional factors to the metadata.
+        """Add additional factors to metadata collection.
 
-        The number of measures per factor must match the number of images
-        in the dataset or the number of detections in the dataset.
+        Extend the current metadata with new factors, automatically handling
+        length validation and integration with existing data structures.
 
         Parameters
         ----------
         factors : Mapping[str, Array | Sequence[Any]]
-            Dictionary of factors to add to the metadata.
+            Dictionary mapping factor names to their values. Factor length must
+            match either the number of images or number of detections in the dataset.
+
+        Raises
+        ------
+        ValueError
+            When factor lengths do not match dataset dimensions.
+
+        Examples
+        --------
+        >>> metadata = Metadata(dataset)
+        >>> new_factors = {
+        ...     "brightness": [0.2, 0.8, 0.5, 0.3, 0.4, 0.1, 0.3, 0.2],
+        ...     "contrast": [1.1, 0.9, 1.0, 0.8, 1.2, 1.0, 0.7, 1.3],
+        ... }
+        >>> metadata.add_factors(new_factors)
         """
         self._structure()
 
