@@ -31,14 +31,21 @@ class Subselection(Generic[_TDatum]):
 
 class Select(AnnotatedDataset[_TDatum]):
     """
-    Wraps a dataset and applies selection criteria to it.
+    Dataset wrapper that applies selection criteria for filtering.
+
+    Wraps an existing dataset and applies one or more selection filters to
+    create a subset view without modifying the original dataset. Supports
+    chaining multiple selection criteria for complex filtering operations.
 
     Parameters
     ----------
-    dataset : Dataset
-        The dataset to wrap.
-    selections : Selection or list[Selection], optional
-        The selection criteria to apply to the dataset.
+    dataset : AnnotatedDataset[_TDatum]
+        Source dataset to wrap and filter. Must implement AnnotatedDataset
+        interface with indexed access to data tuples.
+    selections : Selection or Sequence[Selection] or None, default None
+        Selection criteria to apply for filtering the dataset. When None,
+        returns all items from the source dataset. Default None creates
+        unfiltered view for consistent interface.
 
     Examples
     --------
@@ -49,7 +56,7 @@ class Select(AnnotatedDataset[_TDatum]):
     >>> # - f"data_{idx}", one_hot_encoded(idx % class_count), {"id": idx}
     >>> dataset = SampleDataset(size=100, class_count=10)
 
-    >>> # Apply a selection criteria to the dataset
+    >>> # Apply selection criteria to the dataset
     >>> selections = [Limit(size=5), ClassFilter(classes=[0, 2])]
     >>> selected_dataset = Select(dataset, selections=selections)
 
@@ -61,6 +68,12 @@ class Select(AnnotatedDataset[_TDatum]):
     (data_10, 0, {'id': 10})
     (data_12, 2, {'id': 12})
     (data_20, 0, {'id': 20})
+
+    Notes
+    -----
+    Selection criteria are applied in the order provided, allowing for
+    efficient sequential filtering. The wrapper maintains all metadata
+    and interface compatibility with the original dataset.
     """
 
     _dataset: AnnotatedDataset[_TDatum]
@@ -91,6 +104,7 @@ class Select(AnnotatedDataset[_TDatum]):
 
     @property
     def metadata(self) -> DatasetMetadata:
+        """Dataset metadata information including identifier and configuration."""
         return self._metadata
 
     def __str__(self) -> str:
