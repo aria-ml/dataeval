@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 import polars as pl
 import pytest
+from maite_datasets import to_object_detection_dataset
 from numpy.typing import NDArray
 
 from dataeval.config import set_max_processes, use_max_processes
@@ -26,7 +27,6 @@ from dataeval.metrics.stats._imagestats import (
     imagestats,
 )
 from dataeval.outputs._stats import BASE_ATTRS, SOURCE_INDEX, BaseStatsOutput
-from dataeval.utils.data._dataset import to_object_detection_dataset
 
 # do not run stats tests using multiple processing
 set_max_processes(1)

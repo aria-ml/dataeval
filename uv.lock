@@ -484,6 +484,7 @@ lint = [
 ]
 test = [
     { name = "coverage", extra = ["toml"] },
+    { name = "maite-datasets" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-xdist" },
@@ -532,7 +533,7 @@ dev = [
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "jupyter-cache", specifier = ">=1.0" },
     { name = "jupyter-client", specifier = ">=8.6.0" },
-    { name = "maite-datasets", specifier = ">=0.0.1" },
+    { name = "maite-datasets", specifier = ">=0.0.2" },
     { name = "markupsafe", specifier = ">=3,<3.0.2" },
     { name = "myst-nb", specifier = ">=1.0" },
     { name = "nox", extras = ["uv"], specifier = ">=2025.5.1" },
@@ -559,7 +560,7 @@ docs = [
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "jupyter-cache", specifier = ">=1.0" },
     { name = "jupyter-client", specifier = ">=8.6.0" },
-    { name = "maite-datasets", specifier = ">=0.0.1" },
+    { name = "maite-datasets", specifier = ">=0.0.2" },
     { name = "markupsafe", specifier = ">=3,<3.0.2" },
     { name = "myst-nb", specifier = ">=1.0" },
     { name = "numpy", specifier = ">=2.0.2" },
@@ -577,6 +578,7 @@ lint = [
 ]
 test = [
     { name = "coverage", extras = ["toml"], specifier = ">=7.6" },
+    { name = "maite-datasets", specifier = ">=0.0.2" },
     { name = "pytest", specifier = ">=8.3" },
     { name = "pytest-cov", specifier = ">=6.1" },
     { name = "pytest-xdist", specifier = ">=3.6.1" },
@@ -1184,7 +1186,7 @@ wheels = [
 
 [[package]]
 name = "maite-datasets"
-version = "0.0.1"
+version = "0.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "defusedxml" },
@@ -1193,9 +1195,9 @@ dependencies = [
     { name = "requests" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e8/c5/dfc53caa2ba7eb69ef613f47dd18952d18543357aef6db790e516fa29d6e/maite_datasets-0.0.1.tar.gz", hash = "sha256:8acaf947b132b06646aeecce0dbe5714efbea875a74fa7b78cf99c75392d2b2f", size = 68081, upload-time = "2025-06-12T21:26:22.908Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a4/8f/400cc3992b104cac7bfa63f3a6fbba00f1a5fac6fd0862775355054384a5/maite_datasets-0.0.2.tar.gz", hash = "sha256:dc00a024f4b235e31399da87db8c19b5930abedb45447dc0bd75822d51d73884", size = 69890, upload-time = "2025-06-19T17:51:47.252Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/27/89/b8aaef28f1a93e719f0c1a7a4fcd12f734885d2f019e545aa4cc9fc9a694/maite_datasets-0.0.1-py3-none-any.whl", hash = "sha256:125bd410a9bf45e8982aceb0a7f966af00b38d5a1cf602719f9943b82fd5379c", size = 80007, upload-time = "2025-06-12T21:26:21.227Z" },
+    { url = "https://files.pythonhosted.org/packages/99/e6/3af75028550e03f6c0adba149b341e31a5779a1794fc537b4135f04d64c2/maite_datasets-0.0.2-py3-none-any.whl", hash = "sha256:dc6d75615e4e2a4f3e2b5432a187ff8105ab221155230a4f18fd17dd01bd113b", size = 82131, upload-time = "2025-06-19T17:51:45.932Z" },
 ]
 
 [[package]]
