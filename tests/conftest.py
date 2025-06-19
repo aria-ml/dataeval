@@ -5,13 +5,13 @@ from typing import Literal, overload
 
 import numpy as np
 import pytest
+from maite_datasets import to_image_classification_dataset, to_object_detection_dataset
 from numpy.random import randint, random
 from numpy.typing import NDArray
 
 from dataeval.config import set_seed
 from dataeval.data import Metadata
 from dataeval.typing import ImageClassificationDataset, ObjectDetectionDataset
-from dataeval.utils.data._dataset import to_image_classification_dataset, to_object_detection_dataset
 
 BoxLike = (
     NDArray[np.number] | Sequence[int] | Sequence[float] | tuple[int, int, int, int] | tuple[float, float, float, float]

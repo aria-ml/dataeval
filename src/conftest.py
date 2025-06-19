@@ -5,9 +5,10 @@ import sys
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from maite_datasets import to_object_detection_dataset
+
 from dataeval.data._metadata import FactorInfo, Metadata
 from dataeval.outputs._ood import OODOutput
-from dataeval.utils.data._dataset import to_object_detection_dataset
 
 sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute() / "tests" / "detectors"))
 

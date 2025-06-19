@@ -97,8 +97,8 @@ def type(session: nox.Session) -> None:  # noqa: A001
 def deps(session: nox.Session) -> None:
     """Run unit tests against standard installation."""
     prep(session)
-    session.run_install("uv", "pip", "install", "pytest")
     session.run_install("uv", "pip", "install", ".", "--resolution=lowest-direct")
+    session.run_install("uv", "pip", "install", "pytest", "maite-datasets")
     session.run("pytest", "-m", "not (requires_all or optional)")
 
 
