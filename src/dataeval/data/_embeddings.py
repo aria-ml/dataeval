@@ -15,7 +15,14 @@ from torch.utils.data import DataLoader, Subset
 from tqdm import tqdm
 
 from dataeval.config import DeviceLike, get_device
-from dataeval.typing import AnnotatedDataset, AnnotatedModel, Array, ArrayLike, Dataset, Transform
+from dataeval.typing import (
+    AnnotatedDataset,
+    AnnotatedModel,
+    Array,
+    ArrayLike,
+    Dataset,
+    Transform,
+)
 from dataeval.utils._array import as_numpy
 from dataeval.utils.torch.models import SupportsEncode
 
@@ -26,38 +33,41 @@ class Embeddings:
     """
     Collection of image embeddings from a dataset.
 
-    Embeddings are accessed by index or slice and are only loaded on-demand.
+    Embeddings are accessed by index or slice and are loaded on-demand.
 
     Parameters
     ----------
     dataset : ImageClassificationDataset or ObjectDetectionDataset
         Dataset to access original images from.
     batch_size : int
-        Batch size to use when encoding images.
+        Batch size to use when encoding images. When less than 1, automatically sets to 1 for safe processing.
     transforms : Transform or Sequence[Transform] or None, default None
-        Transforms to apply to images before encoding.
+        Image transformationss to apply before encoding. When None, uses raw images without
+        preprocessing.
     model : torch.nn.Module or None, default None
-        Model to use for encoding images.
+        Neural network model that generates embeddings from images. When None, uses Flatten layer for simple
+        baseline compatibility with all DataEval tools without requiring pre-trained weights or GPU resources.
     device : DeviceLike or None, default None
-        The hardware device to use if specified, otherwise uses the DataEval
-        default or torch default.
+        Hardware device for computation. When None, automatically selects DataEval's configured device, falling
+        back to PyTorch's default.
     cache : Path, str, or bool, default False
-        Whether to cache the embeddings to a file or in memory.
-        When a Path or string is provided, embeddings will be cached to disk.
+        When True, caches embeddings in memory for faster repeated access.
+        When Path or string is provided, persists embeddings to disk for reuse across sessions.
+        Default False minimizes memory usage.
     verbose : bool, default False
-        Whether to print progress bar when encoding images.
+        When True, displays a progress bar when encoding images. Default False reduces console output
+        for cleaner automated workflows.
 
     Attributes
     ----------
     batch_size : int
-        Batch size to use when encoding images.
+        Number of images processed per batch during encoding. Minimum value of 1.
     cache : Path or bool
-        The path to cache embeddings to file, or True if caching to memory.
+        Disk path where embeddings are stored, or True when cached in memory.
     device : torch.device
-        The hardware device to use if specified, otherwise uses the DataEval
-        default or torch default.
+        Hardware device used for tensor computations.
     verbose : bool
-        Whether to print progress bar when encoding images.
+        Whether progress information is displayed during operations.
     """
 
     device: torch.device
@@ -66,6 +76,7 @@ class Embeddings:
 
     def __init__(
         self,
+        # Technically more permissive than ImageClassificationDataset or ObjectDetectionDataset
         dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike],
         batch_size: int,
         transforms: Transform[torch.Tensor] | Sequence[Transform[torch.Tensor]] | None = None,
@@ -80,8 +91,8 @@ class Embeddings:
 
         self._embeddings_only: bool = False
         self._dataset = dataset
-        model = torch.nn.Flatten() if model is None else model
         self._transforms = [transforms] if isinstance(transforms, Transform) else transforms
+        model = torch.nn.Flatten() if model is None else model
         self._model = model.to(self.device).eval() if isinstance(model, torch.nn.Module) else model
         self._encoder = model.encode if isinstance(model, SupportsEncode) else model
         self._collate_fn = lambda datum: [torch.as_tensor(d[0] if isinstance(d, tuple) else d) for d in datum]
@@ -127,20 +138,24 @@ class Embeddings:
 
     def to_tensor(self, indices: Sequence[int] | None = None) -> torch.Tensor:
         """
-        Converts dataset to embeddings.
+        Convert dataset items to embedding tensor.
+
+        Process specified dataset indices through the model in batches and
+        return concatenated embeddings as a single tensor.
 
         Parameters
         ----------
         indices : Sequence[int] or None, default None
-            The indices to convert to embeddings
+            Dataset indices to convert to embeddings. When None, processes entire dataset.
 
         Returns
         -------
         torch.Tensor
+            Concatenated embeddings with shape (n_samples, embedding_dim).
 
-        Warning
-        -------
-        Processing large quantities of data can be resource intensive.
+        Warnings
+        --------
+        Processing large datasets can be memory and compute intensive.
         """
         if indices is not None:
             return torch.vstack(list(self._batch(indices))).to(self.device)
@@ -148,35 +163,45 @@ class Embeddings:
 
     def to_numpy(self, indices: Sequence[int] | None = None) -> NDArray[Any]:
         """
-        Converts dataset to embeddings as numpy array.
+        Convert dataset items to embedding array.
 
         Parameters
         ----------
         indices : Sequence[int] or None, default None
-            The indices to convert to embeddings
+            Dataset indices to convert to embeddings. When None, processes entire dataset.
 
         Returns
         -------
         NDArray[Any]
+            Embedding array with shape (n_samples, embedding_dim)
 
         Warning
         -------
-        Processing large quantities of data can be resource intensive.
+        Processing large datasets can be memory and compute intensive.
         """
         return self.to_tensor(indices).cpu().numpy()
 
     def new(self, dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike]) -> Embeddings:
         """
-        Creates a new Embeddings object with the same parameters but a different dataset.
+        Create new Embeddings instance with a different dataset.
+
+        Generate a new Embeddings object using the same model, transforms,
+        and configuration but with a different dataset.
 
         Parameters
         ----------
         dataset : ImageClassificationDataset or ObjectDetectionDataset
-            Dataset to access original images from.
+            Dataset that provides images for the new Embeddings instance.
 
         Returns
         -------
         Embeddings
+            New Embeddings object configured identically to the current instance.
+
+        Raises
+        ------
+        ValueError
+            When called on embeddings-only instance that lacks a model.
         """
         if self._embeddings_only:
             raise ValueError("Embeddings object does not have a model.")
@@ -187,15 +212,15 @@ class Embeddings:
     @classmethod
     def from_array(cls, array: ArrayLike, device: DeviceLike | None = None) -> Embeddings:
         """
-        Instantiates a shallow Embeddings object using an array.
+        Create Embeddings instance from an existing image array.
 
         Parameters
         ----------
         array : ArrayLike
-            The array to convert to embeddings.
+            In-memory image data to wrap in an Embeddings object.
         device : DeviceLike or None, default None
-            The hardware device to use if specified, otherwise uses the DataEval
-            default or torch default.
+            Hardware device for computation. When None, automatically selects DataEval's configured device, falling
+            back to PyTorch's default.
 
         Returns
         -------
@@ -219,12 +244,15 @@ class Embeddings:
 
     def save(self, path: Path | str) -> None:
         """
-        Saves the embeddings to disk.
+        Save embeddings to disk.
+
+        Persist current embeddings to the specified file path for later
+        loading and reuse.
 
         Parameters
         ----------
         path : Path or str
-            The file path to save the embeddings to.
+            File path where embeddings will be saved.
         """
         self._save(self._resolve_path(path), True)
 
@@ -254,10 +282,24 @@ class Embeddings:
         """
         Loads the embeddings from disk.
 
+        Create an Embeddings instance from previously saved embedding data.
+
         Parameters
         ----------
         path : Path or str
-            The file path to load the embeddings from.
+            File path to load embeddings from.
+
+        Returns
+        -------
+        Embeddings
+            Embeddings-only instance containing the loaded data.
+
+        Raises
+        ------
+        FileNotFoundError
+            When the specified file path does not exist.
+        Exception
+            When file loading or parsing fails.
         """
         emb = Embeddings([], 0)
         path = Path(os.path.abspath(path)) if isinstance(path, str) else path

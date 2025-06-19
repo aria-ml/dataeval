@@ -19,12 +19,18 @@ class Images(Generic[T]):
     """
     Collection of image data from a dataset.
 
-    Images are accessed by index or slice and are only loaded on-demand.
+    Images are accessed by index or slice and are loaded on-demand for
+    memory-efficient processing of large datasets.
 
     Parameters
     ----------
     dataset : Dataset[tuple[T, ...]] or Dataset[T]
-        Dataset to access images from.
+        Dataset that provides image data for access and visualization.
+
+    Attributes
+    ----------
+    None
+        All dataset access is handled through indexing operations.
     """
 
     def __init__(
@@ -36,16 +42,20 @@ class Images(Generic[T]):
 
     def to_list(self) -> Sequence[T]:
         """
-        Converts entire dataset to a sequence of images.
+        Convert entire dataset to a sequence of images.
 
-        Warning
-        -------
-        Will load the entire dataset and return the images as a
-        single sequence of images in memory.
+        Load all images from the dataset and return a single sequence
+        in memory for batch processing or analysis.
 
         Returns
         -------
         list[T]
+            Complete sequence of all images in the dataset
+
+        Warnings
+        --------
+        Loading entire dataset into memory can consume significant resources
+        for large image collections.
         """
         return self[:]
 
@@ -55,6 +65,28 @@ class Images(Generic[T]):
         images_per_row: int = 3,
         figsize: tuple[int, int] = (10, 10),
     ) -> Figure:
+        """
+        Display images in a grid layout.
+
+        Create matplotlib figure showing specified images arranged in a
+        grid format for visual inspection and comparison.
+
+        Parameters
+        ----------
+        indices : Sequence[int]
+            Dataset indices of images to display in the plot.
+        images_per_row : int, default 3
+            Number of images displayed per row in the grid. Default 3 provides a balanced layout
+            for most screen sizes.
+        figsize : tuple[int, int], default (10, 10)
+            Figure dimensions as (width, height) in inches. Default (10, 10)
+            accommodates typical grid layouts with readable detail.
+
+        Returns
+        -------
+        Figure
+            Matplotlib figure object containing the image grid display.
+        """
         import matplotlib.pyplot as plt
 
         num_images = len(indices)
