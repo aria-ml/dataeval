@@ -207,7 +207,9 @@ class Sufficiency(Generic[T]):
         ...     substeps=5,
         ... )
         >>> suff.evaluate()
-        SufficiencyOutput(steps=array([  1,   3,  10,  31, 100], dtype=uint32), measures={'test': array([1., 1., 1., 1., 1.])}, n_iter=1000)
+        SufficiencyOutput(steps=array([  1,   3,  10,  31, 100], dtype=uint32), measures={'test': array([[1., 1., 1., 1., 1.],
+               [1., 1., 1., 1., 1.],
+               [1., 1., 1., 1., 1.]])}, averaged_measures={'test': array([1., 1., 1., 1., 1.])}, n_iter=1000)
 
         Evaluate at a single value
 
@@ -219,7 +221,7 @@ class Sufficiency(Generic[T]):
         ...     eval_fn=eval_fn,
         ... )
         >>> suff.evaluate(eval_at=50)
-        SufficiencyOutput(steps=array([50]), measures={'test': array([1.])}, n_iter=1000)
+        SufficiencyOutput(steps=array([50]), measures={'test': array([[1.]])}, averaged_measures={'test': array([1.])}, n_iter=1000)
 
         Evaluating at linear steps from 0-100 inclusive
 
@@ -231,7 +233,7 @@ class Sufficiency(Generic[T]):
         ...     eval_fn=eval_fn,
         ... )
         >>> suff.evaluate(eval_at=np.arange(0, 101, 20))
-        SufficiencyOutput(steps=array([  0,  20,  40,  60,  80, 100]), measures={'test': array([1., 1., 1., 1., 1., 1.])}, n_iter=1000)
+        SufficiencyOutput(steps=array([  0,  20,  40,  60,  80, 100]), measures={'test': array([[1., 1., 1., 1., 1., 1.]])}, averaged_measures={'test': array([1., 1., 1., 1., 1., 1.])}, n_iter=1000)
 
         """  # noqa: E501
         if eval_at is not None:
@@ -249,7 +251,7 @@ class Sufficiency(Generic[T]):
         measures = {}
 
         # Run each model over all indices
-        for _ in range(self.runs):
+        for run in range(self.runs):
             # Create a randomized set of indices to use
             indices = np.random.randint(0, self._length, size=self._length)
             # Reset the network weights to "create" an untrained model
@@ -272,9 +274,10 @@ class Sufficiency(Generic[T]):
                     # Sum result into current substep iteration to be averaged later
                     value = np.array(value).ravel()
                     if name not in measures:
-                        measures[name] = np.zeros(substeps if len(value) == 1 else (substeps, len(value)))
-                    measures[name][iteration] += value
+                        measures[name] = np.zeros(
+                            (self.runs, substeps) if len(value) == 1 else (self.runs, substeps, len(value))
+                        )
 
+                    measures[name][run, iteration] = value
         # The mean for each measure must be calculated before being returned
-        measures = {k: (v / self.runs).T for k, v in measures.items()}
-        return SufficiencyOutput(ranges, measures)
+        return SufficiencyOutput(ranges, measures=measures)
