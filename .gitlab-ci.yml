@@ -160,6 +160,7 @@ stages:
     - micromamba activate dataeval
     - micromamba install pytest pytest-xdist requests
     - pip install -e . --no-deps
+    - pip install maite-datasets
     - micromamba list
   variables:
     SETUPTOOLS_SCM_PRETEND_VERSION: "0.0.0"

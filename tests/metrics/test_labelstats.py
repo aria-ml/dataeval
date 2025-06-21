@@ -3,10 +3,10 @@ from unittest.mock import MagicMock
 import numpy as np
 import polars as pl
 import pytest
+from maite_datasets._builder import _find_max
 
 from dataeval.data._metadata import Metadata
 from dataeval.metrics.stats._labelstats import labelstats
-from dataeval.utils.data._dataset import _find_max
 
 
 def get_metadata(label_array: list[list[int]]) -> Metadata:

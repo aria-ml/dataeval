@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.utils.data.metadata import merge
+from dataeval.utils.data._merge import merge
 from tests.conftest import to_metadata
 
 
