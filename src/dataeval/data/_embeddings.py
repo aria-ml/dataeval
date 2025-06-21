@@ -5,8 +5,9 @@ __all__ = []
 import logging
 import math
 import os
+from collections.abc import Iterator, Sequence
 from pathlib import Path
-from typing import Any, Iterator, Sequence, cast
+from typing import Any, cast
 
 import torch
 import xxhash as xxh
@@ -121,7 +122,7 @@ class Embeddings:
         if isinstance(value, bool) and not value:
             self._cached_idx = set()
             self._embeddings = torch.empty(())
-        elif isinstance(value, (Path, str)):
+        elif isinstance(value, Path | str):
             value = self._resolve_path(value)
 
         if isinstance(value, Path) and value != getattr(self, "_cache", None):

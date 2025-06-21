@@ -2,7 +2,8 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Any, Sequence, overload
+from collections.abc import Sequence
+from typing import Any, overload
 
 from dataeval.data._images import Images
 from dataeval.metrics.stats import hashstats

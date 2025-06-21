@@ -2,7 +2,8 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from dataeval.data._selection import Select, Selection, SelectionStage
 

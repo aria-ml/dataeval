@@ -2,7 +2,8 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 from numpy.random import BitGenerator, Generator, SeedSequence
@@ -33,7 +34,7 @@ class Shuffle(Selection[Any]):
     def __init__(
         self, seed: int | Sequence[int] | Array | SeedSequence | BitGenerator | Generator | None = None
     ) -> None:
-        self.seed = as_numpy(seed) if isinstance(seed, (Sequence, Array)) else seed
+        self.seed = as_numpy(seed) if isinstance(seed, Sequence | Array) else seed
 
     def __call__(self, dataset: Select[Any]) -> None:
         rng = np.random.default_rng(self.seed)

@@ -17,7 +17,7 @@ class MockDistributionDataset:
     # TODO: move defs to init
     def __init__(self, label_dist):
         for label_curr in label_dist:
-            if not isinstance(label_curr, (int, np.integer)):
+            if not isinstance(label_curr, int | np.integer):
                 raise Exception(
                     f"Expected integer in the distribution of labels, got \
                                 {label_curr} with type {type(label_curr)}"

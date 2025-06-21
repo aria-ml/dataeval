@@ -2,8 +2,9 @@ from __future__ import annotations
 
 __all__ = []
 
+from collections.abc import Iterator, Sequence
 from enum import IntEnum
-from typing import Generic, Iterator, Sequence, TypeVar
+from typing import Generic, TypeVar
 
 from dataeval.typing import AnnotatedDataset, DatasetMetadata
 

@@ -13,7 +13,8 @@ import copy
 import logging
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any, Generic, Literal, Sequence, TypeVar, cast
+from collections.abc import Sequence
+from typing import Any, Generic, Literal, TypeVar, cast
 
 import pandas as pd
 from pandas import Index, Period

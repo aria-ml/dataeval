@@ -6,7 +6,8 @@ from __future__ import annotations
 
 __all__ = ["list_collate_fn", "numpy_collate_fn", "torch_collate_fn"]
 
-from typing import Any, Iterable, Sequence, TypeVar
+from collections.abc import Iterable, Sequence
+from typing import Any, TypeVar
 
 import numpy as np
 import torch

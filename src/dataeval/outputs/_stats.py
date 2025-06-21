@@ -2,13 +2,13 @@ from __future__ import annotations
 
 __all__ = []
 
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Iterable, Mapping, NamedTuple, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
 
 import numpy as np
 import polars as pl
 from numpy.typing import NDArray
-from typing_extensions import TypeAlias
 
 from dataeval.outputs._base import Output
 from dataeval.utils._plot import channel_histogram_plot, histogram_plot
@@ -16,7 +16,7 @@ from dataeval.utils._plot import channel_histogram_plot, histogram_plot
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
-OptionalRange: TypeAlias = Optional[Union[int, Iterable[int]]]
+OptionalRange: TypeAlias = int | Iterable[int] | None
 
 SOURCE_INDEX = "source_index"
 OBJECT_COUNT = "object_count"
