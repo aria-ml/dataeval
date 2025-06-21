@@ -3,8 +3,9 @@ from __future__ import annotations
 __all__ = []
 
 import warnings
+from collections.abc import Callable, Iterable, Mapping, Sequence, Sized
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Literal, Mapping, Sequence, Sized
+from typing import Any, Literal
 
 import numpy as np
 import polars as pl

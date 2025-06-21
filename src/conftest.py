@@ -2,7 +2,8 @@
 
 import pathlib
 import sys
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from dataeval.data._metadata import FactorInfo, Metadata
 from dataeval.outputs._ood import OODOutput

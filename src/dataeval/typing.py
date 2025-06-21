@@ -21,18 +21,20 @@ __all__ = [
 ]
 
 
-import sys
-from typing import Any, Generic, Iterator, Mapping, Protocol, TypedDict, TypeVar, Union, runtime_checkable
+from collections.abc import Iterator, Mapping
+from typing import (
+    Any,
+    Generic,
+    Protocol,
+    TypeAlias,
+    TypedDict,
+    TypeVar,
+    runtime_checkable,
+)
 
 import numpy.typing
 import torch
 from typing_extensions import NotRequired, ReadOnly, Required
-
-if sys.version_info >= (3, 10):
-    from typing import TypeAlias
-else:
-    from typing_extensions import TypeAlias
-
 
 ArrayLike: TypeAlias = numpy.typing.ArrayLike
 """
@@ -44,7 +46,7 @@ See Also
 """
 
 
-DeviceLike: TypeAlias = Union[int, str, tuple[str, int], torch.device]
+DeviceLike: TypeAlias = int | str | tuple[str, int] | torch.device
 """
 Type alias for a `Union` representing types that specify a torch.device.
 

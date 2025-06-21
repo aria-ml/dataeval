@@ -2,11 +2,11 @@ from __future__ import annotations
 
 __all__ = []
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Generic, Mapping, Sequence, TypeVar, Union
+from typing import Generic, TypeAlias, TypeVar
 
 import pandas as pd
-from typing_extensions import TypeAlias
 
 from dataeval.outputs._base import Output
 from dataeval.outputs._stats import DimensionStatsOutput, LabelStatsOutput, PixelStatsOutput, VisualStatsOutput
@@ -16,7 +16,7 @@ DatasetDuplicateGroupMap: TypeAlias = Mapping[int, DuplicateGroup]
 TIndexCollection = TypeVar("TIndexCollection", DuplicateGroup, DatasetDuplicateGroupMap)
 
 IndexIssueMap: TypeAlias = Mapping[int, Mapping[str, float]]
-OutlierStatsOutput: TypeAlias = Union[DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput]
+OutlierStatsOutput: TypeAlias = DimensionStatsOutput | PixelStatsOutput | VisualStatsOutput
 TIndexIssueMap = TypeVar("TIndexIssueMap", IndexIssueMap, Sequence[IndexIssueMap])
 
 

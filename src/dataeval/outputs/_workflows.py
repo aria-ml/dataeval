@@ -4,8 +4,9 @@ __all__ = []
 
 import contextlib
 import warnings
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Iterable, Mapping, MutableMapping, Sequence, cast
+from typing import Any, cast
 
 import numpy as np
 from numpy.typing import NDArray

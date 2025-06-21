@@ -12,8 +12,9 @@ __all__ = []
 
 import math
 from abc import abstractmethod
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, Literal, Protocol, TypeVar, runtime_checkable
+from typing import Any, Literal, Protocol, TypeVar, runtime_checkable
 
 import numpy as np
 from numpy.typing import NDArray

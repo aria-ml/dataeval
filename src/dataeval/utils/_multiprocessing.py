@@ -2,8 +2,9 @@ from __future__ import annotations
 
 __all__ = []
 
+from collections.abc import Callable, Iterable, Iterator
 from multiprocessing import Pool
-from typing import Any, Callable, Iterable, Iterator, TypeVar
+from typing import Any, TypeVar
 
 _S = TypeVar("_S")
 _T = TypeVar("_T")

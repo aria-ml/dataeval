@@ -1,5 +1,6 @@
+from collections.abc import Callable, Sequence
 from os import environ, path
-from typing import Any, Callable, Dict, Sequence, Union, cast
+from typing import Any, cast
 
 from requests import JSONDecodeError, Response
 
@@ -53,7 +54,7 @@ class RestWrapper:
         self.timeout = timeout
         set_verbose(verbose)
 
-    def _get_param_str(self, params: Dict[str, Any] | None) -> str:
+    def _get_param_str(self, params: dict[str, Any] | None) -> str:
         if params is None:
             return ""
         return "&".join({f"{k}={v}" for k, v in params.items()})
@@ -61,9 +62,9 @@ class RestWrapper:
     def _request(  # noqa: C901
         self,
         fncall: Callable,
-        resource: Union[str, Sequence[str]],
-        params: Dict[str, Any] | None = None,
-        data: Dict[str, Any] | None = None,
+        resource: str | Sequence[str],
+        params: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
         raw_data: bool = False,
     ) -> Any:
         """
@@ -137,7 +138,7 @@ class RestWrapper:
             elif response.links and len(response.links) > 0:
                 last_page = len(response.links) + 1
             else:
-                if not isinstance(response_json, (dict, list)):
+                if not isinstance(response_json, dict | list):
                     raise TypeError("Response JSON type is not a dict or list")
                 return response_json
 

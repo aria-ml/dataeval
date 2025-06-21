@@ -4,14 +4,13 @@ __all__ = []
 
 import inspect
 import logging
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import partial, wraps
-from typing import Any, Callable, Generic, Iterator, TypeVar, overload
+from typing import Any, Generic, ParamSpec, TypeVar, overload
 
 import numpy as np
-from typing_extensions import ParamSpec
 
 from dataeval import __version__
 

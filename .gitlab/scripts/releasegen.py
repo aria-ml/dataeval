@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from enum import IntEnum
 from os import path, remove, walk
 from shutil import move, rmtree
-from typing import Any, Dict, List, Literal, Tuple
+from typing import Any, Literal
 
 from gitlab import Gitlab
 from rest import verbose
@@ -50,7 +50,7 @@ release_notes_pattern = re.compile(
 )
 
 
-def _get_version_tuple(version: str) -> Tuple[int, int, int] | None:
+def _get_version_tuple(version: str) -> tuple[int, int, int] | None:
     result = version_pattern.match(version)
     groups = None if result is None else result.groups()
     if groups is None or len(groups) != 3:
@@ -112,7 +112,7 @@ class _Category(IntEnum):
 
 
 class _Tag:
-    def __init__(self, response: Dict[str, Any] | None = None, pending: bool | None = None) -> None:
+    def __init__(self, response: dict[str, Any] | None = None, pending: bool | None = None) -> None:
         if response is not None:
             time = response["commit"]["committed_date"]
             self.time: datetime = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S.%f%z")
@@ -151,7 +151,7 @@ class _Merge:
     Extracts elements of merge commits to create the change history contents.
     """
 
-    def __init__(self, response: Dict[str, Any]) -> None:
+    def __init__(self, response: dict[str, Any]) -> None:
         self.time: datetime = datetime.strptime(response["merged_at"][0:19], "%Y-%m-%dT%H:%M:%S").astimezone(UTC)
         self.hash: str = response["merge_commit_sha"]
         self.shorthash: str = response["merge_commit_sha"][0:8]
@@ -184,7 +184,7 @@ class ReleaseGen:
     def __init__(self, gitlab: Gitlab) -> None:
         self.gl = gitlab
 
-    def _read_changelog(self) -> List[str]:
+    def _read_changelog(self) -> list[str]:
         temp = False
         if not path.exists(CHANGELOG_FILE):
             verbose(f"{CHANGELOG_FILE} not found, pulling from Gitlab")
@@ -197,7 +197,7 @@ class ReleaseGen:
             remove(CHANGELOG_FILE)
         return lines
 
-    def _read_doc_file(self, file_name: str) -> None | List[str]:
+    def _read_doc_file(self, file_name: str) -> None | list[str]:
         temp = False
         if not path.exists(file_name):
             verbose(f"{file_name} not found, pulling from Gitlab")
@@ -218,14 +218,14 @@ class ReleaseGen:
         end = line.find(")")
         return line[start:end]
 
-    def _get_entries(self, last_hash: str) -> tuple[_Merge, Dict[_Category, List[_Merge]]]:
+    def _get_entries(self, last_hash: str) -> tuple[_Merge, dict[_Category, list[_Merge]]]:
         # get merges in to develop and main and sort
-        merges: List[_Merge] = [_Merge(m) for m in self.gl.list_merge_requests(state="merged", target_branch="main")]
+        merges: list[_Merge] = [_Merge(m) for m in self.gl.list_merge_requests(state="merged", target_branch="main")]
         merges.sort(reverse=True)
         latest = merges[0]
 
         # populate the categorized merge issues
-        categorized: Dict[_Category, List[_Merge]] = defaultdict(lambda: [])
+        categorized: dict[_Category, list[_Merge]] = defaultdict(lambda: [])
 
         for merge in merges:
             # return early if hash is already present
@@ -238,7 +238,7 @@ class ReleaseGen:
 
         return latest, categorized
 
-    def _generate_version_and_changelog_action(self) -> Tuple[str, Dict[str, str]]:
+    def _generate_version_and_changelog_action(self) -> tuple[str, dict[str, str]]:
         current = self._read_changelog()
         last_hash = self._get_last_hash(current[0]) if current else ""
 
@@ -247,7 +247,7 @@ class ReleaseGen:
         if not entries:
             return "", {}
 
-        lines: List[str] = []
+        lines: list[str] = []
         next_category = _Category.UNKNOWN
 
         categories = sorted(entries)
@@ -290,8 +290,8 @@ class ReleaseGen:
         except Exception:
             return True
 
-    def _generate_actions(self, old_files: List[str], new_files: List[str]) -> List[Dict[str, str]]:
-        actions: List[Dict[str, str]] = []
+    def _generate_actions(self, old_files: list[str], new_files: list[str]) -> list[dict[str, str]]:
+        actions: list[dict[str, str]] = []
         # will need this as an input for permanent solution
         # current_tag = pending_version
 
@@ -339,14 +339,14 @@ class ReleaseGen:
 
         return actions
 
-    def _get_files(self, file_path: str) -> List[str]:
-        file_paths: List[str] = []
+    def _get_files(self, file_path: str) -> list[str]:
+        file_paths: list[str] = []
         for root, _, files in walk(file_path):
             for filename in files:
                 file_paths.append(path.join(root, filename))
         return file_paths
 
-    def _generate_index_markdown_update_action(self, file_name: str, pending_version: str) -> Dict[str, str]:
+    def _generate_index_markdown_update_action(self, file_name: str, pending_version: str) -> dict[str, str]:
         howto_index_file = self._read_doc_file(file_name)
         if howto_index_file:
             pattern = re.compile(r"aria-ml/dataeval/blob/v([0-9]+)\.([0-9]+)\.([0-9]+)/docs")
@@ -365,7 +365,7 @@ class ReleaseGen:
     def _update_cache_file_path(self, file_name: str, current_tag: str) -> None | str:
         search_pattern = r"(%|\!)+(pip install -q dataeval){1}(\[\w+\])*"
         if path.isfile(file_name):
-            new_list: List[str] = []
+            new_list: list[str] = []
             lines = self._read_doc_file(file_name)  # return none if file is unreadable.
             if lines:
                 for line in lines:
@@ -391,11 +391,11 @@ class ReleaseGen:
             content = None
         return content
 
-    def _generate_notebook_update_actions(self, pending_version: str) -> List[Dict[str, str]]:
+    def _generate_notebook_update_actions(self, pending_version: str) -> list[dict[str, str]]:
         # get all the ipynb file from the notebook directory
         # may need to read .jupytercache files and update them instead of the original files.
         file_path = NOTEBOOK_DIRECTORY
-        files: List[str] = []
+        files: list[str] = []
         notebook_files = self._get_files(file_path)
         for f in notebook_files:
             if f.lower().endswith("ipynb"):
@@ -408,7 +408,7 @@ class ReleaseGen:
             if f.lower().endswith("ipynb"):
                 files.append(f)
         current_tag = pending_version
-        action_list: List[Dict[str, str]] = []
+        action_list: list[dict[str, str]] = []
         for file_name in files:
             content = self._update_cache_file_path(file_name, current_tag=current_tag)
             new_action = {
@@ -422,7 +422,7 @@ class ReleaseGen:
         return action_list
 
     # removed pending version. Will need to add back for permanant solution.
-    def _generate_jupyter_cache_actions(self) -> List[Dict[str, str]]:
+    def _generate_jupyter_cache_actions(self) -> list[dict[str, str]]:
         # cannot use 'latest-known-good' because 404 on download - investigate
         ref = "main"
         cache_path = "docs/source/.jupyter_cache"
@@ -439,7 +439,7 @@ class ReleaseGen:
         # removed pending version for now. will need for permanent solution.
         return self._generate_actions(old_files, self._get_files(cache_path))
 
-    def generate(self) -> Tuple[str, List[Dict[str, str]]]:
+    def generate(self) -> tuple[str, list[dict[str, str]]]:
         version, changelog_action = self._generate_version_and_changelog_action()
         if not changelog_action:
             return "", []

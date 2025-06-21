@@ -2,7 +2,8 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Any, Callable, Generic, Iterable, Mapping, Sequence, Sized, TypeVar
+from collections.abc import Callable, Iterable, Mapping, Sequence, Sized
+from typing import Any, Generic, TypeVar
 
 import numpy as np
 import torch

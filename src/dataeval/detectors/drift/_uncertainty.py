@@ -10,7 +10,8 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Literal, Sequence, cast
+from collections.abc import Sequence
+from typing import Literal, cast
 
 import numpy as np
 import torch
