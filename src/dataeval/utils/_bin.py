@@ -3,7 +3,8 @@ from __future__ import annotations
 __all__ = []
 
 import warnings
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray

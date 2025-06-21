@@ -1,6 +1,6 @@
 from os import remove
 from pathlib import Path
-from typing import Any, Dict, List, Literal
+from typing import Any, Literal
 from uuid import uuid4
 from zipfile import ZipFile
 
@@ -39,7 +39,7 @@ class Gitlab(RestWrapper):
         super().__init__(DATAEVAL_PROJECT_URL, DATAEVAL_BUILD_PAT, token, timeout, verbose)
         self.headers = {"PRIVATE-TOKEN": self.token}
 
-    def list_tags(self) -> List[Dict[str, Any]]:
+    def list_tags(self) -> list[dict[str, Any]]:
         """
         List project tags
 
@@ -54,7 +54,7 @@ class Gitlab(RestWrapper):
         """
         return self._request(get, TAGS)
 
-    def add_tag(self, tag_name: str, ref: str = "main", message: str | None = None) -> Dict[str, Any]:
+    def add_tag(self, tag_name: str, ref: str = "main", message: str | None = None) -> dict[str, Any]:
         """
         Create a new tag
 
@@ -107,7 +107,7 @@ class Gitlab(RestWrapper):
             if status_code != 404:
                 raise e
 
-    def get_single_repository_branch(self, branch: str) -> Dict[str, Any]:
+    def get_single_repository_branch(self, branch: str) -> dict[str, Any]:
         """
         Get a single repository branch
 
@@ -127,7 +127,7 @@ class Gitlab(RestWrapper):
         """
         return self._request(get, f"{BRANCHES}/{branch}")
 
-    def create_repository_branch(self, branch: str, ref: str) -> Dict[str, Any]:
+    def create_repository_branch(self, branch: str, ref: str) -> dict[str, Any]:
         """
         Create a repository branch
 
@@ -154,7 +154,7 @@ class Gitlab(RestWrapper):
         source_branch: str | None = None,
         search_title: str | None = None,
         order_by: Literal["created_at", "title", "merged_at", "updated_at"] | None = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         List merge requests
 
@@ -186,7 +186,7 @@ class Gitlab(RestWrapper):
         description: str,
         source_branch: str = "develop",
         target_branch: str = "main",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Create a merge request
 
@@ -222,7 +222,7 @@ class Gitlab(RestWrapper):
             },
         )
 
-    def update_merge_request(self, mr_iid: int, title: str, description: str) -> Dict[str, Any]:
+    def update_merge_request(self, mr_iid: int, title: str, description: str) -> dict[str, Any]:
         """
         Updates a merge request
 
@@ -272,7 +272,7 @@ class Gitlab(RestWrapper):
         with open(dest, "wb") as f:
             f.write(r.content)
 
-    def get_file_info(self, filepath: str, ref: str = "develop") -> Dict[str, Any]:
+    def get_file_info(self, filepath: str, ref: str = "develop") -> dict[str, Any]:
         """
         Gets the file information from the repository
 
@@ -294,7 +294,7 @@ class Gitlab(RestWrapper):
         """
         return self._request(get, [FILES, filepath], {"ref": ref})
 
-    def push_file(self, filepath: str, branch: str, commit_message: str, content: str) -> Dict[str, Any]:
+    def push_file(self, filepath: str, branch: str, commit_message: str, content: str) -> dict[str, Any]:
         """
         Update a file in the repository
 
@@ -329,7 +329,7 @@ class Gitlab(RestWrapper):
             },
         )
 
-    def cherry_pick(self, sha: str, branch: str = "main") -> Dict[str, Any]:
+    def cherry_pick(self, sha: str, branch: str = "main") -> dict[str, Any]:
         """
         Cherry pick a commit
 
@@ -377,7 +377,7 @@ class Gitlab(RestWrapper):
             z.extractall(dest)
         remove(temp_file)
 
-    def commit(self, branch: str, commit_message: str, actions: List[Dict[str, str]]):
+    def commit(self, branch: str, commit_message: str, actions: list[dict[str, str]]):
         """
         Commits the specified actions to the repository at the branch specified
 

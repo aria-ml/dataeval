@@ -3,8 +3,9 @@ from __future__ import annotations
 __all__ = []
 
 import contextlib
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
-from typing import Any, Mapping, Sequence, TypeVar
+from typing import Any, TypeVar
 
 import numpy as np
 import pandas as pd

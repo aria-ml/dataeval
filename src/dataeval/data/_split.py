@@ -4,7 +4,8 @@ __all__ = []
 
 import logging
 import warnings
-from typing import Any, Iterator, Protocol, Sequence
+from collections.abc import Iterator, Sequence
+from typing import Any, Protocol
 
 import numpy as np
 from numpy.typing import NDArray

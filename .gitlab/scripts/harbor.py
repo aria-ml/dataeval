@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any
 
 from requests import delete, get
 from rest import RestWrapper
@@ -25,7 +25,7 @@ class Harbor(RestWrapper):
         super().__init__(DATAEVAL_PROJECT_URL, DATAEVAL_HARBOR_TOKEN, token, timeout, verbose)
         self.headers = {"Authorization": f"Basic {self.token}"}
 
-    def list_artifacts(self, repository_name: str, tag_filter: str | None = None) -> List[Dict[str, Any]]:
+    def list_artifacts(self, repository_name: str, tag_filter: str | None = None) -> list[dict[str, Any]]:
         """
         List artifacts
 

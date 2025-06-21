@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import copy
 from abc import ABC, abstractmethod
-from typing import NamedTuple, Sequence
+from collections.abc import Sequence
+from typing import NamedTuple
 
 import pandas as pd
 from typing_extensions import Self
@@ -52,7 +53,7 @@ class AbstractResult(GenericOutput[pd.DataFrame]):
 
     def filter(self, period: str = "all", metrics: str | Sequence[str] | None = None) -> Self:
         """Returns filtered result metric data."""
-        if metrics and not isinstance(metrics, (str, Sequence)):
+        if metrics and not isinstance(metrics, str | Sequence):
             raise ValueError("metrics value provided is not a valid metric or sequence of metrics")
         if isinstance(metrics, str):
             metrics = [metrics]

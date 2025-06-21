@@ -149,7 +149,7 @@ stages:
   image: $UV_IMAGE:python$PYTHON_VERSION-$BASE_LAYER
   parallel:
     matrix:
-      - PYTHON_VERSION: ["3.9", "3.10", "3.11", "3.12"]
+      - PYTHON_VERSION: ["3.10", "3.11", "3.12"]
 
 .conda:
   needs: []
@@ -168,7 +168,7 @@ stages:
   extends: .conda
   parallel:
     matrix:
-      - PYTHON_VERSION: ["3.9", "3.10", "3.11", "3.12"]  
+      - PYTHON_VERSION: ["3.10", "3.11", "3.12"]  
 
 ### TEST ###
 
@@ -183,7 +183,7 @@ minimum install:
   script:
     - nox -e deps
   variables:
-    PYTHON_VERSION: "3.9"
+    PYTHON_VERSION: "3.10"
   rules: *on_run_with_code
 
 typecheck:

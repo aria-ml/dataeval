@@ -2,7 +2,8 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Any, Literal, Sequence, Sized
+from collections.abc import Sequence, Sized
+from typing import Any, Literal
 
 from dataeval.config import EPSILON
 from dataeval.typing import Array, ObjectDetectionTarget

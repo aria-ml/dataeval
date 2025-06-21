@@ -16,7 +16,7 @@ from dataeval.utils._bin import get_counts
 
 
 def _validate_num_neighbors(num_neighbors: int) -> int:
-    if not isinstance(num_neighbors, (int, float)):
+    if not isinstance(num_neighbors, int | float):
         raise TypeError(
             f"Variable {num_neighbors} is not real-valued numeric type."
             "num_neighbors should be an int, greater than 0 and less than"

@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Callable, ClassVar
+from collections.abc import Callable
+from typing import Any, ClassVar
 
 import numpy as np
 
@@ -169,10 +170,10 @@ class ConstantThreshold(Threshold, threshold_type="constant"):
 
     @staticmethod
     def _validate_inputs(lower: float | int | None = None, upper: float | int | None = None) -> None:
-        if lower is not None and not isinstance(lower, (float, int)) or isinstance(lower, bool):
+        if lower is not None and not isinstance(lower, float | int) or isinstance(lower, bool):
             raise ValueError(f"expected type of 'lower' to be 'float', 'int' or None but got '{type(lower).__name__}'")
 
-        if upper is not None and not isinstance(upper, (float, int)) or isinstance(upper, bool):
+        if upper is not None and not isinstance(upper, float | int) or isinstance(upper, bool):
             raise ValueError(f"expected type of 'upper' to be 'float', 'int' or None but got '{type(upper).__name__}'")
 
         # explicit None check is required due to special interpretation of the value 0.0 as False
@@ -244,7 +245,7 @@ class StandardDeviationThreshold(Threshold, threshold_type="standard_deviation")
     ) -> None:
         if (
             std_lower_multiplier is not None
-            and not isinstance(std_lower_multiplier, (float, int))
+            and not isinstance(std_lower_multiplier, float | int)
             or isinstance(std_lower_multiplier, bool)
         ):
             raise ValueError(
@@ -257,7 +258,7 @@ class StandardDeviationThreshold(Threshold, threshold_type="standard_deviation")
 
         if (
             std_upper_multiplier is not None
-            and not isinstance(std_upper_multiplier, (float, int))
+            and not isinstance(std_upper_multiplier, float | int)
             or isinstance(std_upper_multiplier, bool)
         ):
             raise ValueError(

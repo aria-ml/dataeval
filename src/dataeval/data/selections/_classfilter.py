@@ -2,7 +2,8 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Any, Generic, Iterable, Mapping, Sequence, Sized, TypeVar, cast
+from collections.abc import Iterable, Mapping, Sequence, Sized
+from typing import Any, Generic, TypeVar, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -45,7 +46,7 @@ class ClassFilter(Selection[Any]):
                 if label in self.classes:
                     # Include the image index
                     selection.append(idx)
-            elif isinstance(target, (ObjectDetectionTarget, SegmentationTarget)):
+            elif isinstance(target, ObjectDetectionTarget | SegmentationTarget):
                 # Get the set of labels from the target
                 labels = set(target.labels if isinstance(target.labels, Iterable) else [target.labels])
                 # Check to see if any labels are in the classes to filter for
@@ -68,7 +69,7 @@ _TTarget = TypeVar("_TTarget", ObjectDetectionTarget, SegmentationTarget)
 
 
 def _try_mask_object(obj: _T, mask: NDArray[np.bool_]) -> _T:
-    if not isinstance(obj, (str, bytes, bytearray)) and isinstance(obj, (Sequence, Array)) and len(obj) == len(mask):
+    if not isinstance(obj, str | bytes | bytearray) and isinstance(obj, Sequence | Array) and len(obj) == len(mask):
         return obj[mask] if isinstance(obj, Array) else cast(_T, [item for i, item in enumerate(obj) if mask[i]])
     return obj
 
