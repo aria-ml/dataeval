@@ -23,30 +23,80 @@ np.random.seed(0)
 
 
 @pytest.fixture(scope="module")
-def so_single() -> SufficiencyOutput:
+def so_single_averaged_inputs() -> SufficiencyOutput:
     output = SufficiencyOutput(
-        steps=np.array([10, 100, 1000]),
-        measures={"test1": np.array([0.2, 0.6, 0.9])},
+        steps=np.array([10, 100, 1000]), averaged_measures={"test1": np.array([0.2, 0.6, 0.9])}, measures={}
     )
     output._params = {1000: {"test1": np.array([-0.1, -1.0, 1.0])}}
     return output
 
 
 @pytest.fixture(scope="module")
-def so_multi() -> SufficiencyOutput:
+def so_single_unaveraged_inputs() -> SufficiencyOutput:
     output = SufficiencyOutput(
         steps=np.array([10, 100, 1000]),
-        measures={"test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]])},
+        measures={"test1": np.array([[0.1, 0.5, 0.9], [0.2, 0.6, 0.9], [0.3, 0.7, 0.9]])},
+    )
+    output._params = {1000: {"test1": np.array([-0.1, -1.0, 1.0])}}
+    return output
+
+
+@pytest.fixture(scope="module")
+def so_multi_averaged_inputs() -> SufficiencyOutput:
+    output = SufficiencyOutput(
+        steps=np.array([10, 100, 1000]),
+        averaged_measures={"test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]])},
+        measures={},
     )
     output._params = {1000: {"test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 1.0]])}}
     return output
 
 
 @pytest.fixture(scope="module")
-def so_mixed() -> SufficiencyOutput:
+def so_multi_unaveraged_inputs() -> SufficiencyOutput:
     output = SufficiencyOutput(
         steps=np.array([10, 100, 1000]),
-        measures={"test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]]), "test2": np.array([0.2, 0.6, 0.9])},
+        measures={
+            "test1": np.array(
+                [
+                    [[0.2, 0.1], [0.5, 0.4], [0.9, 0.7]],
+                    [[0.1, 0.3], [0.6, 0.4], [0.9, 0.8]],
+                    [[0.3, 0.5], [0.7, 0.4], [0.9, 0.9]],
+                ]
+            )
+        },
+    )
+    output._params = {1000: {"test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 1.0]])}}
+    return output
+
+
+@pytest.fixture(scope="module")
+def so_mixed_averaged_inputs() -> SufficiencyOutput:
+    output = SufficiencyOutput(
+        steps=np.array([10, 100, 1000]),
+        averaged_measures={"test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]]), "test2": np.array([0.2, 0.6, 0.9])},
+        measures={},
+    )
+    output._params = {
+        1000: {"test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 1.0]]), "test2": np.array([-0.1, -1.0, 1.0])}
+    }
+    return output
+
+
+@pytest.fixture(scope="module")
+def so_mixed_unaveraged_inputs() -> SufficiencyOutput:
+    output = SufficiencyOutput(
+        steps=np.array([10, 100, 1000]),
+        measures={
+            "test1": np.array(
+                [
+                    [[0.2, 0.1], [0.5, 0.4], [0.9, 0.7]],
+                    [[0.1, 0.3], [0.6, 0.4], [0.9, 0.8]],
+                    [[0.3, 0.5], [0.7, 0.4], [0.9, 0.9]],
+                ]
+            ),
+            "test2": np.array([[0.1, 0.5, 0.9], [0.2, 0.6, 0.9], [0.3, 0.7, 0.9]]),
+        },
     )
     output._params = {
         1000: {"test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 1.0]]), "test2": np.array([-0.1, -1.0, 1.0])}
@@ -57,42 +107,74 @@ def so_mixed() -> SufficiencyOutput:
 @pytest.mark.requires_all
 @pytest.mark.required
 class TestSufficiencyPlot:
-    def test_plot(self, so_single):
+    def test_plot(self, so_single_averaged_inputs):
         """Tests that a plot is generated"""
         # Only needed for plotting test
-        result = so_single.plot()
+        result = so_single_averaged_inputs.plot()
         assert len(result) == 1
         assert isinstance(result[0], Figure)
 
-    def test_multiplot(self, so_mixed):
+    def test_unaveraged_inputs_plot(self, so_single_unaveraged_inputs):
+        """Tests that a plot is generated"""
+        # Only needed for plotting test
+        result = so_single_unaveraged_inputs.plot()
+        assert len(result) == 1
+        assert isinstance(result[0], Figure)
+
+    def test_multiplot(self, so_mixed_averaged_inputs):
         """ """
-        result = so_mixed.plot()
+        result = so_mixed_averaged_inputs.plot()
         assert len(result) == 3
         assert isinstance(result[0], Figure)
 
-    def test_multiplot_classwise(self, so_multi):
-        result = so_multi.plot()
+    def test_unaveraged_inputs_multiplot(self, so_mixed_unaveraged_inputs):
+        """ """
+        result = so_mixed_unaveraged_inputs.plot()
+        assert len(result) == 3
+        assert isinstance(result[0], Figure)
+
+    def test_multiplot_classwise(self, so_multi_averaged_inputs):
+        result = so_multi_averaged_inputs.plot()
         assert len(result) == 2
         assert isinstance(result[0], Figure)
 
-    def test_multiplot_classwise_invalid_names(self, so_multi):
-        with pytest.raises(IndexError):
-            so_multi.plot(["A", "B", "C"])
+    def test_unaveraged_inputs_multiplot_classwise(self, so_multi_unaveraged_inputs):
+        result = so_multi_unaveraged_inputs.plot()
+        assert len(result) == 2
+        assert isinstance(result[0], Figure)
 
-    def test_multiplot_classwise_with_names(self, so_multi):
-        result = so_multi.plot(["A", "B"])
+    def test_multiplot_classwise_invalid_names(self, so_multi_averaged_inputs):
+        with pytest.raises(IndexError):
+            so_multi_averaged_inputs.plot(["A", "B", "C"])
+
+    def test_unaveraged_inputs_multiplot_classwise_invalid_names(self, so_multi_unaveraged_inputs):
+        with pytest.raises(IndexError):
+            so_multi_unaveraged_inputs.plot(["A", "B", "C"])
+
+    def test_multiplot_classwise_with_names(self, so_multi_averaged_inputs):
+        result = so_multi_averaged_inputs.plot(["A", "B"])
         assert result[0].axes[0].get_title().startswith("test1_A")
 
-    def test_multiplot_classwise_without_names(self, so_multi):
-        result = so_multi.plot()
+    def test_unaveraged_inputs_multiplot_classwise_with_names(self, so_multi_unaveraged_inputs):
+        result = so_multi_unaveraged_inputs.plot(["A", "B"])
+        assert result[0].axes[0].get_title().startswith("test1_A")
+
+    def test_unaveraged_inputs_multiplot_classwise_without_names(self, so_multi_unaveraged_inputs):
+        result = so_multi_unaveraged_inputs.plot()
         assert result[0].axes[0].get_title().startswith("test1_0")
 
-    def test_multiplot_mixed(self, so_mixed):
-        result = so_mixed.plot()
+    def test_multiplot_mixed(self, so_mixed_averaged_inputs):
+        result = so_mixed_averaged_inputs.plot()
         assert len(result) == 3
         assert result[0].axes[0].get_title().startswith("test1_0")
         assert result[1].axes[0].get_title().startswith("test1_1")
         assert result[2].axes[0].get_title().startswith("test2")
+
+    def test_unaveraged_inputs_multiplot_mixed(self, so_mixed_unaveraged_inputs):
+        result = so_mixed_unaveraged_inputs.plot()
+        assert len(result) == 3
+        assert result[0].axes[0].get_title().startswith("test1_0")
+        assert result[1].axes[0].get_title().startswith("test1_1")
 
 
 @pytest.mark.required
@@ -100,45 +182,90 @@ class TestSufficiencyProject:
     def test_measure_length_invalid(self):
         with pytest.raises(ValueError):
             SufficiencyOutput(
+                steps=np.array([10, 100]), averaged_measures={"test1": np.array([0.2, 0.6, 0.9])}, measures={}
+            )
+
+    def test_unaveraged_inputs_measure_length_invalid(self):
+        with pytest.raises(ValueError):
+            SufficiencyOutput(
                 steps=np.array([10, 100]),
-                measures={"test1": np.array([0.2, 0.6, 0.9])},
+                measures={"test1": np.array([[0.2, 0.6, 0.9], [0.2, 0.6, 0.9], [0.2, 0.6, 0.9]])},
             )
 
     @pytest.mark.parametrize("steps", [100.0, 100, [100], np.array([100])])
-    def test_project(self, steps, so_single):
-        result = so_single.project(steps)
-        npt.assert_almost_equal(result.measures["test1"], [10.0], decimal=4)
+    def test_input_project(self, steps, so_single_averaged_inputs):
+        result = so_single_averaged_inputs.project(steps)
+        npt.assert_almost_equal(result.averaged_measures["test1"], [10.0], decimal=4)
 
-    def test_project_invalid_steps(self, so_single):
+    def test_project_invalid_steps(self, so_single_averaged_inputs):
         with pytest.raises(ValueError):
-            so_single.project("not a number")  # type: ignore
+            so_single_averaged_inputs.project("not a number")  # type: ignore
 
-    def test_project_classwise(self, so_multi):
-        assert so_multi.measures["test1"].shape == (2, 3)
-        result = so_multi.project([1000, 2000, 4000, 8000])
-        assert len(result.measures) == 1
-        assert result.measures["test1"].shape == (2, 4)
+    def test_project_classwise(self, so_multi_averaged_inputs):
+        assert so_multi_averaged_inputs.averaged_measures["test1"].shape == (2, 3)
+        result = so_multi_averaged_inputs.project([1000, 2000, 4000, 8000])
+        assert len(result.averaged_measures) == 1
+        assert result.averaged_measures["test1"].shape == (2, 4)
 
-    def test_project_mixed(self, so_mixed):
-        assert so_mixed.measures["test1"].shape == (2, 3)
-        assert so_mixed.measures["test2"].shape == (3,)
-        result = so_mixed.project([1000, 2000, 4000, 8000])
-        assert len(result.measures) == 2
-        assert result.measures["test1"].shape == (2, 4)
-        assert result.measures["test2"].shape == (4,)
+    def test_unaveraged_inputs_project_classwise(self, so_multi_unaveraged_inputs):
+        assert so_multi_unaveraged_inputs.averaged_measures["test1"].shape == (2, 3)
+        assert so_multi_unaveraged_inputs.measures["test1"].shape == (3, 3, 2)
+        test = np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]])
+        assert np.allclose(
+            so_multi_unaveraged_inputs.averaged_measures["test1"],
+            test,
+            rtol=0,
+            atol=1e-12,
+        )
 
-    def test_inv_project_mixed(self, so_mixed):
+        result = so_multi_unaveraged_inputs.project([1000, 2000, 4000, 8000])
+        assert len(result.averaged_measures) == 1
+        assert result.averaged_measures["test1"].shape == (2, 4)
+
+    def test_project_mixed(self, so_mixed_averaged_inputs):
+        assert so_mixed_averaged_inputs.averaged_measures["test1"].shape == (2, 3)
+        assert so_mixed_averaged_inputs.averaged_measures["test2"].shape == (3,)
+        result = so_mixed_averaged_inputs.project([1000, 2000, 4000, 8000])
+        assert len(result.averaged_measures) == 2
+        assert result.averaged_measures["test1"].shape == (2, 4)
+        assert result.averaged_measures["test2"].shape == (4,)
+
+    def test_unaveraged_inputs_project_mixed(self, so_mixed_unaveraged_inputs):
+        assert so_mixed_unaveraged_inputs.measures["test1"].shape == (3, 3, 2)
+        assert so_mixed_unaveraged_inputs.measures["test2"].shape == (3, 3)
+        assert so_mixed_unaveraged_inputs.averaged_measures["test1"].shape == (2, 3)
+        assert so_mixed_unaveraged_inputs.averaged_measures["test2"].shape == (3,)
+        result = so_mixed_unaveraged_inputs.project([1000, 2000, 4000, 8000])
+        assert len(result.averaged_measures) == 2
+        assert result.averaged_measures["test1"].shape == (2, 4)
+        assert result.averaged_measures["test2"].shape == (4,)
+        test = np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]])
+        assert np.allclose(
+            so_mixed_unaveraged_inputs.averaged_measures["test1"],
+            test,
+            rtol=0,
+            atol=1e-12,
+        )
+        test = np.array([[0.2, 0.6, 0.9]])
+        assert np.allclose(
+            so_mixed_unaveraged_inputs.averaged_measures["test2"],
+            test,
+            rtol=0,
+            atol=1e-12,
+        )
+
+    def test_inv_project_mixed(self, so_mixed_averaged_inputs):
         targets = {"test1": np.array([0.6, 0.7, 0.8, 0.9]), "test2": np.array([0.6, 0.7, 0.8, 0.9])}
 
-        result = so_mixed.inv_project(targets)
+        result = so_mixed_averaged_inputs.inv_project(targets)
         assert len(result.keys()) == 2
         assert result["test1"].shape == (2, 4)
         assert result["test2"].shape == (4,)
 
-    def test_inv_project_ignore_unknown_measure(self, so_multi):
+    def test_inv_project_ignore_unknown_measure(self, so_multi_averaged_inputs):
         targets = {"test1": np.array([0.6, 0.7, 0.8, 0.9]), "test2": np.array([0.6, 0.7, 0.8, 0.9])}
 
-        result = so_multi.inv_project(targets)
+        result = so_multi_averaged_inputs.inv_project(targets)
         assert len(result.keys()) == 1
         assert result["test1"].shape == (2, 4)
 
@@ -148,6 +275,14 @@ class TestSufficiencyInverseProject:
     def test_empty_data(self):
         """
         Verifies that inv_project returns empty data when fed empty data
+        """
+        data = SufficiencyOutput(np.array([]), averaged_measures={}, measures={})
+        desired_accuracies = {}
+        assert len(data.inv_project(desired_accuracies)) == 0
+
+    def test_unaveraged_inputs_empty_data(self):
+        """
+        Verifies that inv_project returns empty data when fed empty data and initialized with unaveraged measures
         """
         data = SufficiencyOutput(np.array([]), measures={})
         desired_accuracies = {}
@@ -160,6 +295,27 @@ class TestSufficiencyInverseProject:
         num_samples = np.arange(20, 80, step=10, dtype=np.uint32)
         accuracies = num_samples / 100.0
 
+        data = SufficiencyOutput(steps=num_samples, measures={}, averaged_measures={"Accuracy": accuracies})
+        data._params = {1000: {"Accuracy": np.array([-0.01, -1.0, 1.0])}}
+
+        desired_accuracies = {"Accuracy": np.array([0.4, 0.6])}
+        needed_data = data.inv_project(desired_accuracies)["Accuracy"]
+
+        target_needed_data = np.array([40, 60])
+        npt.assert_array_equal(needed_data, target_needed_data)
+
+    def test_unaveraged_inputs_can_invert_sufficiency(self):
+        """
+        Tests metric projection output can be inversed
+        """
+        accuracies = np.array(
+            [
+                np.arange(10, 70, step=10, dtype=np.uint32) / 100,
+                np.arange(20, 80, step=10, dtype=np.uint32) / 100,
+                np.arange(30, 90, step=10, dtype=np.uint32) / 100,
+            ]
+        )
+        num_samples = accuracies[1] * 100
         data = SufficiencyOutput(steps=num_samples, measures={"Accuracy": accuracies})
         data._params = {1000: {"Accuracy": np.array([-0.01, -1.0, 1.0])}}
 
@@ -206,7 +362,7 @@ class TestSufficiencyInverseProject:
         """
         num_samples = np.arange(20, 80, step=10, dtype=np.uint32)
         accuracies = num_samples / 100.0
-        data = SufficiencyOutput(steps=num_samples, measures={"Accuracy": accuracies})
+        data = SufficiencyOutput(steps=num_samples, averaged_measures={"Accuracy": accuracies}, measures={})
         # upper bound for these parameters is 0.9369, any desired accuracy above is unachievable
         data._params = {1000: {"Accuracy": np.array([12.2746, 0.8502, 0.0631])}}
         desired_accuracies = {"Accuracy": np.array([0.00000001, 0.93689])}
@@ -219,7 +375,7 @@ class TestSufficiencyInverseProject:
         # 0.90 and 0.93 targets achievable, 0.99 above curve upper bound
         desired_accuracies = {"Accuracy": np.array([0.90, 0.93, 0.99])}
         # expect warning for 0.99 target
-        with pytest.warns(UserWarning, match="Number of samples could not be determined for target\(s\): \[0\.99\]"):
+        with pytest.warns(UserWarning, match=r"Number of samples could not be determined for target\(s\): \[0\.99\]"):
             needed_data = data.inv_project(desired_accuracies)["Accuracy"]
         target_needed_data = np.array([925, 6649, -1])
         npt.assert_array_equal(needed_data, target_needed_data)
@@ -229,7 +385,7 @@ class TestSufficiencyInverseProject:
         # expect warning for all targets
         with pytest.warns(
             UserWarning,
-            match="Number of samples could not be determined for target\(s\): \[0\.9369, 1\.0, 1\.01\]",
+            match=r"Number of samples could not be determined for target\(s\): \[0\.9369, 1\.0, 1\.01\]",
         ):
             needed_data = data.inv_project(desired_accuracies)["Accuracy"]
 
