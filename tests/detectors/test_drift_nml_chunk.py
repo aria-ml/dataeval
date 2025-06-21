@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import math
 from typing import Any
 
@@ -5,7 +7,6 @@ import numpy as np
 import pandas as pd
 import pytest
 from pandas import Period
-from typing_extensions import Self
 
 from dataeval.detectors.drift._nml._chunk import (
     Chunk,
@@ -21,10 +22,10 @@ rng = np.random.default_rng()
 
 
 class MockChunk(Chunk):
-    def __lt__(self, other: Self) -> bool:
+    def __lt__(self, other: MockChunk) -> bool:
         return True
 
-    def __add__(self, other: Self) -> Self:
+    def __add__(self, other: MockChunk) -> MockChunk:
         return other
 
     def dict(self) -> dict[str, Any]:

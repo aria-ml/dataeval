@@ -4,9 +4,10 @@ __all__ = []
 
 import logging
 import warnings
+from collections.abc import Iterable, Iterator
 from importlib import import_module
 from types import ModuleType
-from typing import Any, Iterable, Iterator, Literal, TypeVar, overload
+from typing import Any, Literal, TypeVar, overload
 
 import numpy as np
 import torch
@@ -79,7 +80,7 @@ def rescale_array(array: NDArray[_np_dtype]) -> NDArray[_np_dtype]: ...
 def rescale_array(array: torch.Tensor) -> torch.Tensor: ...
 def rescale_array(array: Array | NDArray[_np_dtype] | torch.Tensor) -> Array | NDArray[_np_dtype] | torch.Tensor:
     """Rescale an array to the range [0, 1]"""
-    if isinstance(array, (np.ndarray, torch.Tensor)):
+    if isinstance(array, np.ndarray | torch.Tensor):
         arr_min = array.min()
         arr_max = array.max()
         return (array - arr_min) / (arr_max - arr_min)

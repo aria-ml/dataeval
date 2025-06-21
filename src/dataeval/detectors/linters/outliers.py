@@ -2,7 +2,8 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Any, Literal, Sequence, overload
+from collections.abc import Sequence
+from typing import Any, Literal, overload
 
 import numpy as np
 from numpy.typing import NDArray
@@ -201,7 +202,7 @@ class Outliers:
         >>> results.issues[1]
         {}
         """
-        if isinstance(stats, (ImageStatsOutput, DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput)):
+        if isinstance(stats, ImageStatsOutput | DimensionStatsOutput | PixelStatsOutput | VisualStatsOutput):
             return OutliersOutput(self._get_outliers(stats.data()))
 
         if not isinstance(stats, Sequence):
@@ -212,7 +213,7 @@ class Outliers:
         stats_map: dict[type, list[int]] = {}
         for i, stats_output in enumerate(stats):
             if not isinstance(
-                stats_output, (ImageStatsOutput, DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput)
+                stats_output, ImageStatsOutput | DimensionStatsOutput | PixelStatsOutput | VisualStatsOutput
             ):
                 raise TypeError(
                     "Invalid stats output type; only use output from dimensionstats, pixelstats or visualstats."

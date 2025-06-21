@@ -2,7 +2,8 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import TYPE_CHECKING, Any, Generic, Iterator, Sequence, TypeVar, cast, overload
+from collections.abc import Iterator, Sequence
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast, overload
 
 import numpy as np
 

@@ -3,7 +3,8 @@ from __future__ import annotations
 __all__ = []
 
 import copy
-from typing import Any, Callable, Generic, TypeVar, cast
+from collections.abc import Callable
+from typing import Any, Generic, TypeVar, cast
 
 import numpy as np
 from numpy.typing import NDArray

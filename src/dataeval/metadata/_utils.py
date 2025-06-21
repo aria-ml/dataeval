@@ -1,6 +1,6 @@
 __all__ = []
 
-from typing import Sequence
+from collections.abc import Sequence
 
 from numpy.typing import NDArray
 

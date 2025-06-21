@@ -2,7 +2,8 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Any, Generic, Iterable, Literal, Sequence, SupportsFloat, SupportsInt, TypeVar, cast
+from collections.abc import Iterable, Sequence
+from typing import Any, Generic, Literal, SupportsFloat, SupportsInt, TypeVar, cast
 
 from dataeval.typing import (
     Array,
@@ -28,7 +29,7 @@ def _validate_data(
     # Validate inputs
     dataset_len = len(images)
 
-    if not isinstance(images, (Sequence, Array)) or len(images[0].shape) != 3:
+    if not isinstance(images, Sequence | Array) or len(images[0].shape) != 3:
         raise ValueError("Images must be a sequence or array of 3 dimensional arrays (H, W, C).")
     if len(labels) != dataset_len:
         raise ValueError(f"Number of labels ({len(labels)}) does not match number of images ({dataset_len}).")
@@ -44,21 +45,21 @@ def _validate_data(
         raise ValueError(f"Number of metadata ({len(metadata)}) does not match number of images ({dataset_len}).")
 
     if datum_type == "ic":
-        if not isinstance(labels, (Sequence, Array)) or not isinstance(labels[0], (int, SupportsInt)):
+        if not isinstance(labels, Sequence | Array) or not isinstance(labels[0], int | SupportsInt):
             raise TypeError("Labels must be a sequence of integers for image classification.")
     elif datum_type == "od":
         if (
-            not isinstance(labels, (Sequence, Array))
-            or not isinstance(labels[0], (Sequence, Array))
-            or not isinstance(cast(Sequence[Any], labels[0])[0], (int, SupportsInt))
+            not isinstance(labels, Sequence | Array)
+            or not isinstance(labels[0], Sequence | Array)
+            or not isinstance(cast(Sequence[Any], labels[0])[0], int | SupportsInt)
         ):
             raise TypeError("Labels must be a sequence of sequences of integers for object detection.")
         if (
             bboxes is None
-            or not isinstance(bboxes, (Sequence, Array))
-            or not isinstance(bboxes[0], (Sequence, Array))
-            or not isinstance(bboxes[0][0], (Sequence, Array))
-            or not isinstance(bboxes[0][0][0], (float, SupportsFloat))
+            or not isinstance(bboxes, Sequence | Array)
+            or not isinstance(bboxes[0], Sequence | Array)
+            or not isinstance(bboxes[0][0], Sequence | Array)
+            or not isinstance(bboxes[0][0][0], float | SupportsFloat)
             or not len(bboxes[0][0]) == 4
         ):
             raise TypeError("Boxes must be a sequence of sequences of (x0, y0, x1, y1) for object detection.")
@@ -75,7 +76,7 @@ def _listify_metadata(
 
 
 def _find_max(arr: ArrayLike) -> Any:
-    if not isinstance(arr, (bytes, str)) and isinstance(arr, (Iterable, Sequence, Array)):
+    if not isinstance(arr, bytes | str) and isinstance(arr, Iterable | Sequence | Array):
         nested = [x for x in [_find_max(x) for x in arr] if x is not None]
         return max(nested) if len(nested) > 0 else None
     return arr

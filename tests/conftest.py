@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Literal, Sequence, Union, overload
+from collections.abc import Sequence
+from typing import Literal, overload
 
 import numpy as np
 import pytest
@@ -12,13 +13,9 @@ from dataeval.data import Metadata
 from dataeval.typing import ImageClassificationDataset, ObjectDetectionDataset
 from dataeval.utils.data._dataset import to_image_classification_dataset, to_object_detection_dataset
 
-BoxLike = Union[
-    NDArray[np.number],
-    Sequence[int],
-    Sequence[float],
-    tuple[int, int, int, int],
-    tuple[float, float, float, float],
-]
+BoxLike = (
+    NDArray[np.number] | Sequence[int] | Sequence[float] | tuple[int, int, int, int] | tuple[float, float, float, float]
+)
 
 TEMP_CONTENTS = "ABCDEF1234567890"
 

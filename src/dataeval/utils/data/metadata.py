@@ -7,8 +7,9 @@ from __future__ import annotations
 __all__ = ["merge", "flatten"]
 
 import warnings
+from collections.abc import Iterable, Mapping, Sequence
 from enum import Enum
-from typing import Any, Iterable, Literal, Mapping, Sequence, overload
+from typing import Any, Literal, overload
 
 import numpy as np
 from numpy.typing import NDArray
@@ -132,7 +133,7 @@ def _flatten_dict_inner(
         if isinstance(v, dict):
             fd, size = _flatten_dict_inner(v, dropped, new_keys, size=size, nested=nested)
             items.update(fd)
-        elif isinstance(v, (list, tuple)):
+        elif isinstance(v, list | tuple):
             if nested:
                 dropped.setdefault(parent_keys + (k,), set()).add(DropReason.NESTED_LIST)
             elif size is not None and size != len(v):

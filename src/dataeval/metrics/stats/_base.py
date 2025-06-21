@@ -6,10 +6,11 @@ import math
 import re
 import warnings
 from collections import ChainMap
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Callable, Generic, Iterable, Iterator, Sequence, TypeVar
+from typing import Any, Generic, TypeVar
 
 import numpy as np
 from numpy.typing import NDArray

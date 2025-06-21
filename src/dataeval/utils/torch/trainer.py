@@ -16,7 +16,7 @@ from dataeval.config import DeviceLike, get_device
 
 def get_images_from_batch(batch: Any) -> Any:
     """Extracts images from a batch of collated data by DataLoader"""
-    return batch[0] if isinstance(batch, (list, tuple)) else batch
+    return batch[0] if isinstance(batch, list | tuple) else batch
 
 
 class AETrainer:

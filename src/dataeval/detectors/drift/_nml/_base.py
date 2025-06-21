@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from logging import Logger
-from typing import Sequence
 
 import pandas as pd
 from typing_extensions import Self
