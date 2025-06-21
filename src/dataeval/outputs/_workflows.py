@@ -4,8 +4,8 @@ __all__ = []
 
 import contextlib
 import warnings
-from dataclasses import dataclass
-from typing import Any, Iterable, Mapping, Sequence, cast
+from dataclasses import dataclass, field
+from typing import Any, Iterable, Mapping, MutableMapping, Sequence, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -76,10 +76,8 @@ def plot_measure(
     ax.set_title(f"{name} Sufficiency")
     ax.set_ylabel(f"{name}")
     ax.set_xlabel("Steps")
-
     # Plot measure over each step
     ax.scatter(steps, measure, label=f"Model Results ({name})", s=15, c="black")
-
     # Plot extrapolation
     ax.plot(
         projection,
@@ -145,7 +143,7 @@ def inv_project_steps(params: NDArray[Any], targets: NDArray[Any]) -> NDArray[np
     return np.ceil(steps)
 
 
-def calc_params(p_i: NDArray[Any], n_i: NDArray[Any], niter: int) -> NDArray[Any]:
+def calc_params(p_i: NDArray[Any], n_i: NDArray[Any], niter: int) -> NDArray[np.float64]:
     """
     Retrieves the inverse power curve coefficients for the line of best fit.
     Global minimization is done via basin hopping. More info on this algorithm
@@ -191,11 +189,11 @@ def calc_params(p_i: NDArray[Any], n_i: NDArray[Any], niter: int) -> NDArray[Any
 
 
 def get_curve_params(
-    measures: Mapping[str, NDArray[Any]], ranges: NDArray[Any], niter: int
-) -> Mapping[str, NDArray[Any]]:
+    averaged_measures: MutableMapping[str, NDArray[Any]], ranges: NDArray[Any], niter: int
+) -> Mapping[str, NDArray[np.float64]]:
     """Calculates and aggregates parameters for both single and multi-class metrics"""
     output = {}
-    for name, measure in measures.items():
+    for name, measure in averaged_measures.items():
         measure = cast(np.ndarray, measure)
         if measure.ndim > 1:
             result = []
@@ -216,19 +214,25 @@ class SufficiencyOutput(Output):
     ----------
     steps : NDArray
         Array of sample sizes
-    measures : Dict[str, NDArray]
-        Average of values observed for each sample size step for each measure
+    measures : dict[str, NDArray]
+        3D array [runs, substep, classes] of values for all runs observed for each sample size step for each measure
+    averaged_measures : dict[str, NDArray]
+        Average of values for all runs observed for each sample size step for each measure
     n_iter : int, default 1000
         Number of iterations to perform in the basin-hopping curve-fit process
     """
 
     steps: NDArray[np.uint32]
-    measures: Mapping[str, NDArray[np.float64]]
+    measures: Mapping[str, NDArray[Any]]
+    averaged_measures: MutableMapping[str, NDArray[Any]] = field(default_factory=lambda: {})
     n_iter: int = 1000
 
     def __post_init__(self) -> None:
+        if len(self.averaged_measures) == 0:
+            for metric, values in self.measures.items():
+                self.averaged_measures[metric] = np.asarray(np.mean(values, axis=0)).T
         c = len(self.steps)
-        for m, v in self.measures.items():
+        for m, v in self.averaged_measures.items():
             c_v = v.shape[1] if v.ndim > 1 else len(v)
             if c != c_v:
                 raise ValueError(f"{m} does not contain the expected number ({c}) of data points.")
@@ -239,7 +243,7 @@ class SufficiencyOutput(Output):
         if self._params is None:
             self._params = {}
         if self.n_iter not in self._params:
-            self._params[self.n_iter] = get_curve_params(self.measures, self.steps, self.n_iter)
+            self._params[self.n_iter] = get_curve_params(self.averaged_measures, self.steps, self.n_iter)
         return self._params[self.n_iter]
 
     @set_metadata
@@ -272,16 +276,16 @@ class SufficiencyOutput(Output):
             raise ValueError("'projection' must consist of numerical values")
 
         output = {}
-        for name, measures in self.measures.items():
-            if measures.ndim > 1:
+        for name, averaged_measures in self.averaged_measures.items():
+            if averaged_measures.ndim > 1:
                 result = []
-                for i in range(len(measures)):
+                for i in range(len(averaged_measures)):
                     projected = project_steps(self.params[name][i], projection)
                     result.append(projected)
                 output[name] = np.array(result)
             else:
                 output[name] = project_steps(self.params[name], projection)
-        proj = SufficiencyOutput(projection, output, self.n_iter)
+        proj = SufficiencyOutput(projection, measures=self.measures, averaged_measures=output, n_iter=self.n_iter)
         proj._params = self._params
         return proj
 
@@ -317,11 +321,11 @@ class SufficiencyOutput(Output):
         plots = []
 
         # Create a plot for each measure on one figure
-        for name, measures in self.measures.items():
-            if measures.ndim > 1:
-                if class_names is not None and len(measures) != len(class_names):
+        for name, averaged_measures in self.averaged_measures.items():
+            if averaged_measures.ndim > 1:
+                if class_names is not None and len(averaged_measures) != len(class_names):
                     raise IndexError("Class name count does not align with measures")
-                for i, measure in enumerate(measures):
+                for i, measure in enumerate(averaged_measures):
                     class_name = str(i) if class_names is None else class_names[i]
                     fig = plot_measure(
                         f"{name}_{class_name}",
@@ -333,7 +337,7 @@ class SufficiencyOutput(Output):
                     plots.append(fig)
 
             else:
-                fig = plot_measure(name, self.steps, measures, self.params[name], extrapolated)
+                fig = plot_measure(name, self.steps, averaged_measures, self.params[name], extrapolated)
                 plots.append(fig)
 
         return plots
@@ -363,10 +367,10 @@ class SufficiencyOutput(Output):
 
         for name, target in targets.items():
             tarray = as_numpy(target)
-            if name not in self.measures:
+            if name not in self.averaged_measures:
                 continue
 
-            measure = self.measures[name]
+            measure = self.averaged_measures[name]
             if measure.ndim > 1:
                 projection[name] = np.zeros((len(measure), len(tarray)))
                 for i in range(len(measure)):

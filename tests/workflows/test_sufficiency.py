@@ -140,6 +140,30 @@ class TestSufficiency:
         with pytest.raises(ValueError):
             suff.evaluate("hello world")  # type: ignore
 
+    def test_multiple_runs_multiple_metrics(self) -> None:
+        eval_fn = MagicMock()
+        eval_fn.return_value = {"Accuracy": 1.0, "Precision": np.array([1.0, 2.0])}
+        patch("torch.utils.data.DataLoader").start()
+
+        suff = Sufficiency(
+            model=MagicMock(),
+            train_ds=mock_ds(2),
+            test_ds=mock_ds(2),
+            train_fn=MagicMock(),
+            eval_fn=eval_fn,
+            runs=5,
+            substeps=2,
+        )
+        output = suff.evaluate()
+        assert len(output.params) == 2
+        assert len(output.measures) == 2
+        assert len(output.averaged_measures) == 2
+        assert output.measures["Accuracy"].shape == (5, 2)
+        assert output.averaged_measures["Accuracy"].shape == (2,)
+        assert output.measures["Accuracy"].shape != output.averaged_measures["Accuracy"].shape
+        assert output.measures["Precision"].shape == (5, 2, 2)
+        assert output.averaged_measures["Precision"].shape == (2, 2)
+
     def test_run_multiple_metrics(self) -> None:
         eval_fn = MagicMock()
         eval_fn.return_value = {"Accuracy": 1.0, "Precision": 1.0}
@@ -158,6 +182,12 @@ class TestSufficiency:
         output = suff.evaluate()
         assert len(output.params) == 2
         assert len(output.measures) == 2
+        assert len(output.averaged_measures) == 2
+        assert output.measures["Accuracy"].shape == (1, 2)
+        assert output.averaged_measures["Accuracy"].shape == (2,)
+        assert output.measures["Accuracy"].shape != output.averaged_measures["Accuracy"].shape
+        assert output.measures["Precision"].shape == (1, 2)
+        assert output.averaged_measures["Precision"].shape == (2,)
 
     def test_run_classwise(self) -> None:
         eval_fn = MagicMock()
@@ -177,6 +207,7 @@ class TestSufficiency:
         output = suff.evaluate()
         assert output.params["Accuracy"].shape == (4, 3)
         assert len(output.measures) == 1
+        assert len(output.averaged_measures) == 1
 
     @pytest.mark.parametrize(
         "train_ds_len, test_ds_len, expected_error",
