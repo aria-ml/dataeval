@@ -19,7 +19,7 @@ from dataeval.typing import (
 )
 from dataeval.utils._array import as_numpy
 from dataeval.utils._bin import bin_data, digitize_data, is_continuous
-from dataeval.utils.data.metadata import merge
+from dataeval.utils.data._merge import merge
 
 
 def _binned(name: str) -> str:

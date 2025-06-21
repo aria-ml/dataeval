@@ -76,10 +76,11 @@ lint = [
   "codespell[toml]>=2.3",
 ]
 test = [
+  "coverage[toml]>=7.6",
   "pytest>=8.3",
   "pytest-cov>=6.1",
   "pytest-xdist>=3.6.1",
-  "coverage[toml]>=7.6",
+  "maite-datasets>=0.0.2",
 ]
 type = [
   "pyright[nodejs]>=1.1.400",
@@ -92,7 +93,7 @@ docs = [
   "jinja2>=3.1.6",
   "jupyter-client>=8.6.0",
   "jupyter-cache>=1.0",
-  "maite-datasets>=0.0.1",
+  "maite-datasets>=0.0.2",
   "myst-nb>=1.0",
   "sphinx-autoapi>=3.6.0",
   "sphinx-design>=0.6.1",

@@ -15,12 +15,12 @@ import numpy as np
 import pytest
 import torch
 import torch.nn as nn
+from maite_datasets import to_image_classification_dataset
 
 from dataeval.config import get_device
 from dataeval.data._embeddings import Embeddings
 from dataeval.detectors.drift._mmd import DriftMMD, GaussianRBF, _squared_pairwise_distance, mmd2_from_kernel_matrix
 from dataeval.detectors.drift.updates import LastSeenUpdate, ReservoirSamplingUpdate
-from dataeval.utils.data._dataset import to_image_classification_dataset
 
 
 class HiddenOutput(nn.Module):
