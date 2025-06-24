@@ -1,6 +1,18 @@
-[//]: # (75995b42c800e524553af7e69f412c320eff1d3b)
+[//]: # (1e86ffb863cd99a24625fa459eeba2dd4c0713fa)
 
 # DataEval Change Log
+
+## v0.88.0
+
+🚧 **Deprecations and Removals**
+- `1e86ffb8` - Remove dataset builders and update min python target for the project
+- `6d11a131` - Remove Python 3.9 support
+
+🛠️ **Improvements and Enhancements**
+- `fdc9b015` - 947 Sufficiency: Return data from all runs
+
+📝 **Miscellaneous**
+- `95446290` - Update docstrings to be imperative and include all methods, attributes, and properties
 
 ## v0.87.0
 
