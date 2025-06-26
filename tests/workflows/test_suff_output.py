@@ -10,7 +10,6 @@ try:
     from matplotlib.figure import Figure
 except ImportError:
     Figure = type(None)
-
 from dataeval.outputs._workflows import (
     SufficiencyOutput,
     f_inv_out,
@@ -35,9 +34,17 @@ def so_single_averaged_inputs() -> SufficiencyOutput:
 def so_single_unaveraged_inputs() -> SufficiencyOutput:
     output = SufficiencyOutput(
         steps=np.array([10, 100, 1000]),
-        measures={"test1": np.array([[0.1, 0.5, 0.9], [0.2, 0.6, 0.9], [0.3, 0.7, 0.9]])},
+        measures={
+            "test1": np.array(
+                [
+                    [0.2, 0.5, 0.9],
+                    [0.1, 0.6, 0.9],
+                    [0.3, 0.7, 0.9],
+                ]
+            )
+        },
     )
-    output._params = {1000: {"test1": np.array([-0.1, -1.0, 1.0])}}
+    output._params = {1000: {"test1": np.array([-0.1, -1.0, 0.02])}}
     return output
 
 
@@ -45,8 +52,8 @@ def so_single_unaveraged_inputs() -> SufficiencyOutput:
 def so_multi_averaged_inputs() -> SufficiencyOutput:
     output = SufficiencyOutput(
         steps=np.array([10, 100, 1000]),
-        averaged_measures={"test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]])},
         measures={},
+        averaged_measures={"test1": np.array([[0.2, 0.6, 0.9], [0.3, 0.4, 0.8]])},
     )
     output._params = {1000: {"test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 1.0]])}}
     return output
@@ -66,7 +73,7 @@ def so_multi_unaveraged_inputs() -> SufficiencyOutput:
             )
         },
     )
-    output._params = {1000: {"test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 1.0]])}}
+    output._params = {1000: {"test1": np.array([[-0.1, -1.0, 0.5], [-0.1, -1.0, 1.0]])}}
     return output
 
 
@@ -99,69 +106,256 @@ def so_mixed_unaveraged_inputs() -> SufficiencyOutput:
         },
     )
     output._params = {
-        1000: {"test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 1.0]]), "test2": np.array([-0.1, -1.0, 1.0])}
+        1000: {"test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 0.5]]), "test2": np.array([-0.1, -1.0, 1.0])}
     }
     return output
+
+
+def find_horizontal_line(ax):
+    """Find and return horizontal asymptote y value"""
+
+    for line in ax.lines:
+        ydata = line.get_ydata()
+        if all(abs(y - ydata[0]) == 0 for y in ydata):
+            return ydata[0]
+    return None
+
+
+def find_error_bars(ax, mcoll):
+    """Return plotted error for each point"""
+    err = []
+    for coll in ax.collections:
+        if isinstance(coll, mcoll.LineCollection):
+            segments = coll.get_segments()
+            for seg in segments:
+                y0, y1 = seg[0][1], seg[1][1]
+                if abs(y0 - y1) > 0:
+                    # Get error from bar height
+                    err.append((y1 - y0) / 2)
+    err = np.array(err)
+    err = err[~np.isclose(err, 0)]
+    return err
 
 
 @pytest.mark.requires_all
 @pytest.mark.required
 class TestSufficiencyPlot:
+    def setup_method(self):
+        import matplotlib.collections as mcoll
+        import matplotlib.pyplot as plt
+
+        self.mcoll = mcoll
+        self.plt = plt
+
     def test_plot(self, so_single_averaged_inputs):
         """Tests that a plot is generated"""
-        # Only needed for plotting test
         result = so_single_averaged_inputs.plot()
         assert len(result) == 1
         assert isinstance(result[0], Figure)
+        self.plt.close(result[0])
 
     def test_unaveraged_inputs_plot(self, so_single_unaveraged_inputs):
         """Tests that a plot is generated"""
-        # Only needed for plotting test
         result = so_single_unaveraged_inputs.plot()
         assert len(result) == 1
         assert isinstance(result[0], Figure)
+        self.plt.close(result[0])
+
+    def test_single_plot_asymptote(self, so_single_averaged_inputs):
+        """Tests that asymptote is plotted"""
+        result = so_single_averaged_inputs.plot()
+        y = find_horizontal_line(result[0].axes[0])
+        assert y is None
+        with pytest.warns(UserWarning, match=r"Error bars cannot be plotted without full, unaveraged data"):
+            result = so_single_averaged_inputs.plot(error_bars=True)
+        y = find_horizontal_line(result[0].axes[0])
+        assert y is None
+        result = so_single_averaged_inputs.plot(asymptote=True)
+        y = find_horizontal_line(result[0].axes[0])
+        assert y == 1 - so_single_averaged_inputs._params[so_single_averaged_inputs.n_iter]["test1"][2]
+        self.plt.close(result[0])
+
+    def test_single_plot_error_bars(self, so_single_unaveraged_inputs):
+        """Tests that error bars are plotted"""
+        result = so_single_unaveraged_inputs.plot(error_bars=False)
+        y = find_error_bars(result[0].axes[0], self.mcoll)
+        assert len(y) == 0
+        result = so_single_unaveraged_inputs.plot(error_bars=True)
+        y = find_error_bars(result[0].axes[0], self.mcoll)
+        assert len(y) == 2
+        calculated_error = np.std(so_single_unaveraged_inputs.measures["test1"], axis=0)
+        calculated_error = calculated_error[~np.isclose(calculated_error, 0)]
+        assert np.allclose(
+            y,
+            calculated_error,
+            rtol=0,
+            atol=1e-16,
+        )
+        self.plt.close(result[0])
 
     def test_multiplot(self, so_mixed_averaged_inputs):
-        """ """
+        """Tests that the plot is generated for multiple classes"""
         result = so_mixed_averaged_inputs.plot()
         assert len(result) == 3
         assert isinstance(result[0], Figure)
+        self.plt.close("all")
+
+    def test_averaged_inputs_error_bars(self, so_mixed_averaged_inputs):
+        """Tests that user is warned for plotting error bars without full, unaveraged data"""
+        with pytest.warns(UserWarning, match=r"Error bars cannot be plotted without full, unaveraged data"):
+            result = so_mixed_averaged_inputs.plot(error_bars=True)
+        assert len(result) == 3
+        assert isinstance(result[0], Figure)
+        self.plt.close("all")
 
     def test_unaveraged_inputs_multiplot(self, so_mixed_unaveraged_inputs):
-        """ """
+        """Tests that the plot is generated"""
         result = so_mixed_unaveraged_inputs.plot()
         assert len(result) == 3
         assert isinstance(result[0], Figure)
+        self.plt.close("all")
+
+    def test_multiplot_asymptote(self, so_mixed_unaveraged_inputs):
+        """Tests that asymptote is generated for each figure and class"""
+        result = so_mixed_unaveraged_inputs.plot()
+        y = find_horizontal_line(result[0].axes[0])
+        assert y is None
+        result = so_mixed_unaveraged_inputs.plot(error_bars=True)
+        y = find_horizontal_line(result[0].axes[0])
+        assert y is None
+        result = so_mixed_unaveraged_inputs.plot(asymptote=True)
+        y = find_horizontal_line(result[0].axes[0])
+        assert y == 1 - so_mixed_unaveraged_inputs._params[so_mixed_unaveraged_inputs.n_iter]["test1"][0][2]
+        self.plt.close("all")
+        result = so_mixed_unaveraged_inputs.plot()
+        y = find_horizontal_line(result[1].axes[0])
+        assert y is None
+        result = so_mixed_unaveraged_inputs.plot(error_bars=True)
+        y = find_horizontal_line(result[1].axes[0])
+        assert y is None
+        result = so_mixed_unaveraged_inputs.plot(asymptote=True)
+        y = find_horizontal_line(result[1].axes[0])
+        assert y == 1 - so_mixed_unaveraged_inputs._params[so_mixed_unaveraged_inputs.n_iter]["test1"][1][2]
+        self.plt.close("all")
+        result = so_mixed_unaveraged_inputs.plot()
+        y = find_horizontal_line(result[2].axes[0])
+        assert y is None
+        result = so_mixed_unaveraged_inputs.plot(error_bars=True)
+        y = find_horizontal_line(result[2].axes[0])
+        assert y is None
+        result = so_mixed_unaveraged_inputs.plot(asymptote=True)
+        y = find_horizontal_line(result[2].axes[0])
+        assert y == 1 - so_mixed_unaveraged_inputs._params[so_mixed_unaveraged_inputs.n_iter]["test2"][2]
+        self.plt.close("all")
+
+    def test_multiplot_error_bars(self, so_mixed_unaveraged_inputs):
+        """Tests that error bars are plotted for each figure and class"""
+        result = so_mixed_unaveraged_inputs.plot(error_bars=False)
+        y = find_error_bars(result[0].axes[0], self.mcoll)
+        assert len(y) == 0
+        result = so_mixed_unaveraged_inputs.plot(error_bars=True)
+        y = find_error_bars(result[0].axes[0], self.mcoll)
+        assert len(y) == 2
+        calculated_error = np.std(so_mixed_unaveraged_inputs.measures["test1"][:, :, 0], axis=0)
+        calculated_error = calculated_error[~np.isclose(calculated_error, 0)]
+        assert np.allclose(
+            y,
+            calculated_error,
+            rtol=0,
+            atol=1e-16,
+        )
+        y = find_error_bars(result[1].axes[0], self.mcoll)
+        assert len(y) == 2
+        calculated_error = np.std(so_mixed_unaveraged_inputs.measures["test1"][:, :, 1], axis=0)
+        calculated_error = calculated_error[~np.isclose(calculated_error, 0)]
+
+        assert np.allclose(
+            y,
+            calculated_error,
+            rtol=0,
+            atol=1e-16,
+        )
+        y = find_error_bars(result[2].axes[0], self.mcoll)
+        assert len(y) == 2
+        calculated_error = np.std(so_mixed_unaveraged_inputs.measures["test2"], axis=0)
+        calculated_error = calculated_error[~np.isclose(calculated_error, 0)]
+        assert np.allclose(
+            y,
+            calculated_error,
+            rtol=0,
+            atol=1e-16,
+        )
+        self.plt.close("all")
 
     def test_multiplot_classwise(self, so_multi_averaged_inputs):
         result = so_multi_averaged_inputs.plot()
         assert len(result) == 2
         assert isinstance(result[0], Figure)
+        self.plt.close("all")
 
     def test_unaveraged_inputs_multiplot_classwise(self, so_multi_unaveraged_inputs):
         result = so_multi_unaveraged_inputs.plot()
         assert len(result) == 2
         assert isinstance(result[0], Figure)
+        self.plt.close("all")
+
+    def test_multiplot_classwise_asymptote(self, so_multi_unaveraged_inputs):
+        """Tests that asymptote is generated for each class"""
+        for i in range(2):
+            result = so_multi_unaveraged_inputs.plot()
+            y = find_horizontal_line(result[i].axes[0])
+            assert y is None
+            result = so_multi_unaveraged_inputs.plot(error_bars=True)
+            y = find_horizontal_line(result[i].axes[0])
+            assert y is None
+            result = so_multi_unaveraged_inputs.plot(asymptote=True)
+            y = find_horizontal_line(result[i].axes[0])
+            assert y == 1 - so_multi_unaveraged_inputs._params[so_multi_unaveraged_inputs.n_iter]["test1"][i][2]
+        self.plt.close("all")
+
+    def test_multiplot_classwise_error_bars(self, so_multi_unaveraged_inputs):
+        """Tests that error bars are plotted for each class"""
+        for i in range(2):
+            result = so_multi_unaveraged_inputs.plot(error_bars=False)
+            y = find_error_bars(result[i].axes[0], self.mcoll)
+            assert len(y) == 0
+            result = so_multi_unaveraged_inputs.plot(error_bars=True)
+            y = find_error_bars(result[i].axes[0], self.mcoll)
+            assert len(y) == 2
+            calculated_error = np.std(so_multi_unaveraged_inputs.measures["test1"][:, :, i], axis=0)
+            calculated_error = calculated_error[~np.isclose(calculated_error, 0)]
+            assert np.allclose(
+                y,
+                calculated_error,
+                rtol=0,
+                atol=1e-16,
+            )
+        self.plt.close("all")
 
     def test_multiplot_classwise_invalid_names(self, so_multi_averaged_inputs):
         with pytest.raises(IndexError):
             so_multi_averaged_inputs.plot(["A", "B", "C"])
+        self.plt.close("all")
 
     def test_unaveraged_inputs_multiplot_classwise_invalid_names(self, so_multi_unaveraged_inputs):
         with pytest.raises(IndexError):
             so_multi_unaveraged_inputs.plot(["A", "B", "C"])
+        self.plt.close("all")
 
     def test_multiplot_classwise_with_names(self, so_multi_averaged_inputs):
         result = so_multi_averaged_inputs.plot(["A", "B"])
         assert result[0].axes[0].get_title().startswith("test1_A")
+        self.plt.close("all")
 
     def test_unaveraged_inputs_multiplot_classwise_with_names(self, so_multi_unaveraged_inputs):
         result = so_multi_unaveraged_inputs.plot(["A", "B"])
         assert result[0].axes[0].get_title().startswith("test1_A")
+        self.plt.close("all")
 
     def test_unaveraged_inputs_multiplot_classwise_without_names(self, so_multi_unaveraged_inputs):
         result = so_multi_unaveraged_inputs.plot()
         assert result[0].axes[0].get_title().startswith("test1_0")
+        self.plt.close("all")
 
     def test_multiplot_mixed(self, so_mixed_averaged_inputs):
         result = so_mixed_averaged_inputs.plot()
@@ -169,12 +363,14 @@ class TestSufficiencyPlot:
         assert result[0].axes[0].get_title().startswith("test1_0")
         assert result[1].axes[0].get_title().startswith("test1_1")
         assert result[2].axes[0].get_title().startswith("test2")
+        self.plt.close("all")
 
     def test_unaveraged_inputs_multiplot_mixed(self, so_mixed_unaveraged_inputs):
         result = so_mixed_unaveraged_inputs.plot()
         assert len(result) == 3
         assert result[0].axes[0].get_title().startswith("test1_0")
         assert result[1].axes[0].get_title().startswith("test1_1")
+        self.plt.close("all")
 
 
 @pytest.mark.required
@@ -276,7 +472,7 @@ class TestSufficiencyInverseProject:
         """
         Verifies that inv_project returns empty data when fed empty data
         """
-        data = SufficiencyOutput(np.array([]), averaged_measures={}, measures={})
+        data = SufficiencyOutput(np.array([]), measures={}, averaged_measures={})
         desired_accuracies = {}
         assert len(data.inv_project(desired_accuracies)) == 0
 
@@ -362,7 +558,7 @@ class TestSufficiencyInverseProject:
         """
         num_samples = np.arange(20, 80, step=10, dtype=np.uint32)
         accuracies = num_samples / 100.0
-        data = SufficiencyOutput(steps=num_samples, averaged_measures={"Accuracy": accuracies}, measures={})
+        data = SufficiencyOutput(steps=num_samples, measures={}, averaged_measures={"Accuracy": accuracies})
         # upper bound for these parameters is 0.9369, any desired accuracy above is unachievable
         data._params = {1000: {"Accuracy": np.array([12.2746, 0.8502, 0.0631])}}
         desired_accuracies = {"Accuracy": np.array([0.00000001, 0.93689])}
