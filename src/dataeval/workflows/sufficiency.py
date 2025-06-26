@@ -280,5 +280,4 @@ class Sufficiency(Generic[T]):
                         )
 
                     measures[name][run, iteration] = value
-        # The mean for each measure must be calculated before being returned
-        return SufficiencyOutput(ranges, measures=measures)
+        return SufficiencyOutput(ranges, measures)
