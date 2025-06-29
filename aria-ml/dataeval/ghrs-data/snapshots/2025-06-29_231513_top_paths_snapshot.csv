@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,52,28
+/aria-ml/dataeval/tree/main/tests,19,4
+/aria-ml/dataeval/tree/main/src/dataeval/utils,8,1
+/aria-ml/dataeval/tree/main/src,7,3
+/aria-ml/dataeval/tree/main/src/dataeval,7,2
+/aria-ml/dataeval/tree/main/tests/detectors,6,1
+/aria-ml/dataeval/pulse,5,3
+/aria-ml/dataeval/tree/main/tests/workflows,5,2
+/aria-ml/dataeval/pulls,4,2
+/aria-ml/dataeval/tree/main/src/dataeval/detectors,4,2
