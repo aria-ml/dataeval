@@ -1,6 +1,12 @@
-[//]: # (1e86ffb863cd99a24625fa459eeba2dd4c0713fa)
+[//]: # (b3e258d3a898b3936e6fd4c4d3b99ae03525cd50)
 
 # DataEval Change Log
+
+## v0.88.1
+
+🛠️ **Improvements and Enhancements**
+- `b3e258d3` - Sufficiency: Adjust measure plots
+- `ca707ba6` - Blended metadata exploration tools into Metadata concept page.
 
 ## v0.88.0
 
