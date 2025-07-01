@@ -34,6 +34,7 @@ features.
 - [Out-of-Distribution Data](OOD.md)
 - [Outliers](Outliers.md)
 - [Parity](Parity.md)
+- [Prioritization](Prioritization.md)
 - [Statistical Analysis](Stats.md)
 - [Sufficiency of Data](Sufficiency.md)
 - [Upperbound on Average Precision](UAP.md)
@@ -57,6 +58,7 @@ ModelTraining.md
 OOD.md
 Outliers.md
 Parity.md
+Prioritization.md
 Stats.md
 Sufficiency.md
 UAP.md
