@@ -55,6 +55,42 @@ def update_strategy(fn: Callable[..., R]) -> Callable[..., R]:
 
 
 class BaseDrift:
+    """Base class for drift detection algorithms.
+
+    Provides common functionality for drift detectors including reference data
+    management, encoding of input data, and statistical correction methods.
+    Subclasses implement specific drift detection algorithms.
+
+    Parameters
+    ----------
+    data : Embeddings or Array
+        Reference dataset used as baseline for drift detection.
+        Can be image embeddings or raw arrays.
+    p_val : float, default 0.05
+        Significance threshold for drift detection, between 0 and 1.
+        Default 0.05 limits false drift alerts to 5% when no drift exists (Type I error rate).
+    update_strategy : UpdateStrategy or None, default None
+        Strategy for updating reference data when new data arrives.
+        When None, reference data remains fixed throughout detection.
+        Default None maintains stable baseline for consistent comparison.
+    correction : {"bonferroni", "fdr"}, default "bonferroni"
+        Multiple testing correction method for multivariate drift detection.
+        "bonferroni" provides conservative family-wise error control.
+        "fdr" (False Discovery Rate) offers less conservative control.
+        Default "bonferroni" minimizes false positive drift detections.
+
+    Attributes
+    ----------
+    p_val : float
+        Significance threshold for statistical tests.
+    update_strategy : UpdateStrategy or None
+        Reference data update strategy.
+    correction : {"bonferroni", "fdr"}
+        Multiple testing correction method.
+    n : int
+        Number of samples in the reference dataset.
+    """
+
     p_val: float
     update_strategy: UpdateStrategy | None
     correction: Literal["bonferroni", "fdr"]
@@ -83,19 +119,43 @@ class BaseDrift:
 
     @property
     def x_ref(self) -> NDArray[np.float32]:
-        """
-        Retrieve the reference data of the drift detector.
+        """Reference data for drift detection.
+
+        Lazily encodes the reference dataset on first access.
+        Data is flattened and converted to 32-bit floating point for
+        consistent numerical processing across different input types.
 
         Returns
         -------
         NDArray[np.float32]
-            The reference data as a 32-bit floating point numpy array.
+            Reference data as flattened 32-bit floating point array.
+            Shape is (n_samples, n_features_flattened).
+
+        Notes
+        -----
+        Data is cached after first access to avoid repeated encoding overhead.
         """
         if self._x_ref is None:
             self._x_ref = self._encode(self._data)
         return self._x_ref
 
     def _encode(self, data: Embeddings | Array) -> NDArray[np.float32]:
+        """
+        Encode input data to consistent numpy format.
+
+        Handles different input types (Embeddings, Arrays) and converts
+        them to flattened 32-bit floating point arrays for drift detection.
+
+        Parameters
+        ----------
+        data : Embeddings or Array
+            Input data to encode.
+
+        Returns
+        -------
+        NDArray[np.float32]
+            Encoded data as flattened 32-bit floating point array.
+        """
         array = (
             data.to_numpy().astype(np.float32)
             if isinstance(data, Embeddings)
@@ -107,6 +167,46 @@ class BaseDrift:
 
 
 class BaseDriftUnivariate(BaseDrift):
+    """
+    Base class for univariate drift detection algorithms.
+
+    Extends BaseDrift with feature-wise drift detection capabilities.
+    Applies statistical tests independently to each feature (pixel) and
+    uses multiple testing correction to control false discovery rates.
+
+    Parameters
+    ----------
+    data : Embeddings or Array
+        Reference dataset used as baseline for drift detection.
+    p_val : float, default 0.05
+        Significance threshold for drift detection, between 0 and 1.
+        Default 0.05 limits false drift alerts to 5% when no drift exists (Type I error rate).
+    update_strategy : UpdateStrategy or None, default None
+        Strategy for updating reference data when new data arrives.
+        When None, reference data remains fixed throughout detection.
+        Default None maintains stable baseline for consistent comparison.
+    correction : {"bonferroni", "fdr"}, default "bonferroni"
+        Multiple testing correction method for controlling false positives
+        across multiple features. "bonferroni" divides significance level
+        by number of features. "fdr" uses Benjamini-Hochberg procedure.
+        Default "bonferroni" provides conservative family-wise error control.
+    n_features : int or None, default None
+        Number of features to analyze. When None, automatically inferred
+        from the first sample's flattened shape. Default None enables
+        automatic feature detection for flexible input handling.
+
+    Attributes
+    ----------
+    p_val : float
+        Significance threshold for statistical tests.
+    update_strategy : UpdateStrategy or None
+        Reference data update strategy.
+    correction : {"bonferroni", "fdr"}
+        Multiple testing correction method.
+    n : int
+        Number of samples in the reference dataset.
+    """
+
     def __init__(
         self,
         data: Embeddings | Array,
@@ -121,16 +221,22 @@ class BaseDriftUnivariate(BaseDrift):
 
     @property
     def n_features(self) -> int:
-        """
-        Get the number of features in the reference data.
+        """Number of features in the reference data.
 
-        If the number of features is not provided during initialization, it will be inferred
-        from the reference data (``x_ref``).
+        Lazily computes the number of features from the first data sample
+        if not provided during initialization. Features correspond to the
+        flattened dimensionality of the input data (e.g., pixels for images).
 
         Returns
         -------
         int
-            Number of features in the reference data.
+            Number of features (flattened dimensions) in the reference data.
+            Always > 0 for valid datasets.
+
+        Notes
+        -----
+        For image data, this equals C x H x W.
+        Computed once and cached for efficiency.
         """
         # lazy process n_features as needed
         if self._n_features is None:
@@ -139,18 +245,27 @@ class BaseDriftUnivariate(BaseDrift):
         return self._n_features
 
     def score(self, data: Embeddings | Array) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
-        """
-        Calculates p-values and test statistics per feature.
+        """Calculate feature-wise p-values and test statistics.
+
+        Applies the detector's statistical test independently to each feature,
+        comparing the distribution of each feature between reference and test data.
 
         Parameters
         ----------
         data : Embeddings or Array
-            Batch of instances to score.
+            Test dataset to compare against reference data.
 
         Returns
         -------
-        tuple[NDArray, NDArray]
-            Feature level p-values and test statistics
+        tuple[NDArray[np.float32], NDArray[np.float32]]
+            First array contains p-values for each feature (all between 0 and 1).
+            Second array contains test statistics for each feature (all >= 0).
+            Both arrays have shape (n_features,).
+
+        Notes
+        -----
+        Lower p-values indicate stronger evidence of drift for that feature.
+        Higher test statistics indicate greater distributional differences.
         """
         x_np = self._encode(data)
         p_val = np.zeros(self.n_features, dtype=np.float32)
@@ -164,22 +279,29 @@ class BaseDriftUnivariate(BaseDrift):
 
     def _apply_correction(self, p_vals: NDArray[np.float32]) -> tuple[bool, float]:
         """
-        Apply the specified correction method (Bonferroni or FDR) to the p-values.
+        Apply multiple testing correction to feature-wise p-values.
 
-        If the correction method is Bonferroni, the threshold for detecting :term:`drift<Drift>`
-        is divided by the number of features. For FDR, the correction is applied
-        using the Benjamini-Hochberg procedure.
+        Corrects for multiple comparisons across features to control
+        false positive rates. Bonferroni correction divides the significance
+        threshold by the number of features. FDR correction uses the
+        Benjamini-Hochberg procedure for less conservative control.
 
         Parameters
         ----------
-        p_vals : NDArray
-            Array of p-values from the univariate tests for each feature.
+        p_vals : NDArray[np.float32]
+            Array of p-values from univariate tests for each feature.
+            All values should be between 0 and 1.
 
         Returns
         -------
         tuple[bool, float]
-            A tuple containing a boolean indicating if drift was detected and the
-            threshold after correction.
+            Boolean indicating whether drift was detected after correction.
+            Float is the effective threshold used for detection.
+
+        Notes
+        -----
+        Bonferroni correction: threshold = p_val / n_features
+        FDR correction: Uses Benjamini-Hochberg step-up procedure
         """
         if self.correction == "bonferroni":
             threshold = self.p_val / self.n_features
@@ -201,21 +323,24 @@ class BaseDriftUnivariate(BaseDrift):
     @set_metadata
     @update_strategy
     def predict(self, data: Embeddings | Array) -> DriftOutput:
-        """
-        Predict whether a batch of data has drifted from the reference data and update
-        reference data using specified update strategy.
+        """Predict drift and update reference data using specified strategy.
+
+        Performs feature-wise drift detection, applies multiple testing
+        correction, and optionally updates the reference dataset based
+        on the configured update strategy.
 
         Parameters
         ----------
         data : Embeddings or Array
-            Batch of instances to predict drift on.
+            Test dataset to analyze for drift against reference data.
 
         Returns
         -------
         DriftOutput
-            Dictionary containing the :term:`drift<Drift>` prediction and optionally the feature level
-            p-values, threshold after multivariate correction if needed and test :term:`statistics<Statistics>`.
+            Complete drift detection results including overall :term:`drift<Drift>` prediction,
+            corrected thresholds, feature-level analysis, and summary :term:`statistics<Statistics>`.
         """
+
         # compute drift scores
         p_vals, dist = self.score(data)
 
