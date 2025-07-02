@@ -22,49 +22,77 @@ from dataeval.typing import Array
 
 
 class DriftKS(BaseDriftUnivariate):
-    """
-    :term:`Drift` detector employing the :term:`Kolmogorov-Smirnov (KS) \
+    """:term:`Drift` detector employing the :term:`Kolmogorov-Smirnov (KS) \
     distribution<Kolmogorov-Smirnov (K-S) test>` test.
 
-    The KS test detects changes in the maximum distance between two data
-    distributions with Bonferroni or :term:`False Discovery Rate (FDR)` correction
-    for multivariate data.
+    Detects distributional changes by measuring the maximum distance between
+    empirical cumulative distribution functions of reference and test datasets.
+    For multivariate data, applies KS test independently to each feature
+    and aggregates results using multiple testing correction.
+
+    The Kolmogorov-Smirnov test is particularly sensitive to differences in
+    the middle portions of distributions but has reduced power in the tails
+    where cumulative distribution functions are constrained near 0 and 1.
 
     Parameters
     ----------
     data : Embeddings or Array
-        Data used as reference distribution.
-    p_val : float or None, default 0.05
-        :term:`p-value<P-Value>` used for significance of the statistical test for each feature.
-        If the FDR correction method is used, this corresponds to the acceptable
-        q-value.
+        Reference dataset used as baseline distribution for drift detection.
+        Should represent the expected data distribution.
+    p_val : float, default 0.05
+        Significance threshold for drift detection, between 0 and 1. 
+        Default 0.05 limits false drift alerts to 5% when no drift exists (Type I error rate).
     update_strategy : UpdateStrategy or None, default None
-        Reference data can optionally be updated using an UpdateStrategy class. Update
-        using the last n instances seen by the detector with LastSeenUpdateStrategy
-        or via reservoir sampling with ReservoirSamplingUpdateStrategy.
+        Strategy for updating reference data when new data arrives.
+        When None, reference data remains fixed throughout detection.
     correction : "bonferroni" or "fdr", default "bonferroni"
-        Correction type for multivariate data. Either 'bonferroni' or 'fdr' (False
-        Discovery Rate).
+        Multiple testing correction method for multivariate drift detection.
+        "bonferroni" provides conservative family-wise error control by
+        dividing significance threshold by number of features.
+        "fdr" uses Benjamini-Hochberg procedure for less conservative control.
+        Default "bonferroni" minimizes false positive drift detections.
     alternative : "two-sided", "less" or "greater", default "two-sided"
-        Defines the alternative hypothesis. Options are 'two-sided', 'less' or
-        'greater'.
+        Alternative hypothesis for the statistical test. "two-sided" detects
+        any distributional difference. "less" tests if test distribution is
+        stochastically smaller. "greater" tests if test distribution is
+        stochastically larger. Default "two-sided" provides most general
+        drift detection without directional assumptions.
     n_features : int | None, default None
-        Number of features used in the univariate drift tests. If not provided, it will
-        be inferred from the data.
+        Number of features to analyze in univariate tests.
+        When None, automatically inferred from the flattened shape of first data sample.
 
     Example
     -------
+    Basic drift detection with image embeddings:
+
     >>> from dataeval.data import Embeddings
-
-    Use Embeddings to encode images before testing for drift
-
     >>> train_emb = Embeddings(train_images, model=encoder, batch_size=64)
-    >>> drift = DriftKS(train_emb)
+    >>> drift_detector = DriftKS(train_emb)
+    
+    Test incoming images for distributional drift
+    
+    >>> result = drift_detector.predict(test_images)
+    >>> print(f"Drift detected: {result.drifted}")
+    Drift detected: True
 
-    Test incoming images for drift
+    >>> print(f"Mean KS statistic: {result.distance:.4f}")
+    Mean KS statistic: 0.8750
+    
+    Detect if test data has systematically higher values
+    
+    >>> drift_greater = DriftKS(train_emb, alternative="greater")
+    >>> result = drift_greater.predict(test_images)
+    
+    Using different correction methods
 
-    >>> drift.predict(test_images).drifted
-    True
+    >>> drift_fdr = DriftKS(train_emb, correction="fdr", p_val=0.1)
+    >>> result = drift_fdr.predict(test_images)
+    
+    Access feature-level results
+    
+    >>> n_features = result.feature_drift
+    >>> print(f"Features showing drift: {n_features.sum()} / {len(n_features)}")
+    Features showing drift: 576 / 576
     """
 
     def __init__(
