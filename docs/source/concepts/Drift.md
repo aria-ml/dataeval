@@ -129,7 +129,7 @@ digests should be analyzed for drift.
 
 ### _Cramér-von Mises_
 
-The {term}`Cramér-von Mises<Cramér-von Mises (CVM) Drift Detection>` test is a
+The {term}`Cramér-von Mises<Cramér-von Mises (CVM) Test>` is a
 non-parametric method used for detecting drift by comparing two
 empirical distributions. For two distributions $F(z)$ and $F_{ref}(z)$, the CVM
 test statistic is calculated as:

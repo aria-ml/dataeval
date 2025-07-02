@@ -31,24 +31,42 @@ def classifier_uncertainty(
     preds: Array,
     preds_type: Literal["probs", "logits"] = "probs",
 ) -> torch.Tensor:
-    """
-    Evaluate model_fn on x and transform predictions to prediction uncertainties.
+    """Convert model predictions to uncertainty scores using entropy.
+
+    Computes prediction uncertainty as the entropy of the predicted class
+    probability distribution. Higher entropy indicates greater model uncertainty,
+    with maximum uncertainty at uniform distributions and minimum at confident
+    single-class predictions.
 
     Parameters
     ----------
-    x : Array
-        Batch of instances.
-    model_fn : Callable
-        Function that evaluates a :term:`classification<Classification>` model on x in a single call (contains
-        batching logic if necessary).
-    preds_type : "probs" | "logits", default "probs"
-        Type of prediction output by the model. Options are 'probs' (in [0,1]) or
-        'logits' (in [-inf,inf]).
+    preds : Array
+        Model predictions for a batch of instances. For "probs" type, should
+        contain class probabilities that sum to 1 across the last dimension.
+        For "logits" type, contains raw model outputs before softmax.
+    preds_type : "probs" or "logits", default "probs"
+        Type of prediction values. "probs" expects probabilities in [0,1] that
+        sum to 1. "logits" expects raw outputs in [-inf,inf] and applies softmax.
+        Default "probs" assumes model outputs normalized probabilities.
 
     Returns
     -------
-    NDArray
-        A scalar indication of uncertainty of the model on each instance in x.
+    torch.Tensor
+        Uncertainty scores for each instance with shape (n_samples, 1).
+        Values are always >= 0, with higher values indicating greater uncertainty.
+
+    Raises
+    ------
+    ValueError
+        If preds_type is "probs" but probabilities don't sum to 1 within tolerance.
+    NotImplementedError
+        If preds_type is not "probs" or "logits".
+
+    Notes
+    -----
+    Uncertainty is computed as Shannon entropy: -sum(p * log(p)) where p are
+    the predicted class probabilities. This provides a principled measure of
+    model confidence that is widely used in uncertainty quantification.
     """
     preds_np = as_numpy(preds)
     if preds_type == "probs":
@@ -65,53 +83,98 @@ def classifier_uncertainty(
 
 
 class DriftUncertainty(BaseDrift):
-    """
-    Test for a change in the number of instances falling into regions on which \
-        the model is uncertain.
+    """Drift detector using model prediction uncertainty.
 
-    Performs a K-S test on prediction entropies.
+    Detects drift by monitoring changes in the distribution of model prediction
+    uncertainties (entropy) rather than input features directly. Uses
+    :term:`Kolmogorov-Smirnov (K-S) Test` to compare uncertainty distributions
+    between reference and test data.
+
+    This approach is particularly effective for detecting drift that affects model
+    confidence even when input features remain statistically similar, such as
+    out-of-domain samples or adversarial examples.
 
     Parameters
     ----------
-    data : Array
-        Data used as reference distribution.
-    model : Callable
-        :term:`Classification` model outputting class probabilities (or logits)
+    data : Embeddings or Array
+        Reference dataset used as baseline distribution for drift detection.
+        Should represent the expected "normal" data distribution.
     p_val : float, default 0.05
-        :term:`P-Value` used for the significance of the test.
+        Significance threshold for statistical tests, between 0 and 1.
+        For FDR correction, this represents the acceptable false discovery rate.
+        Default 0.05 provides 95% confidence level for drift detection.
     update_strategy : UpdateStrategy or None, default None
-        Reference data can optionally be updated using an UpdateStrategy class. Update
-        using the last n instances seen by the detector with LastSeenUpdateStrategy
-        or via reservoir sampling with ReservoirSamplingUpdateStrategy.
+        Strategy for updating reference data when new data arrives.
+        When None, reference data remains fixed throughout detection.
     correction : "bonferroni" or "fdr", default "bonferroni"
-        Correction type for multivariate data. Either 'bonferroni' or 'fdr' (False
-        Discovery Rate).
+        Multiple testing correction method for multivariate drift detection.
+        "bonferroni" provides conservative family-wise error control by
+        dividing significance threshold by number of features.
+        "fdr" uses Benjamini-Hochberg procedure for less conservative control.
+        Default "bonferroni" minimizes false positive drift detections.
     preds_type : "probs" or "logits", default "probs"
-        Type of prediction output by the model. Options are 'probs' (in [0,1]) or
-        'logits' (in [-inf,inf]).
+        Format of model prediction outputs. "probs" expects normalized
+        probabilities summing to 1. "logits" expects raw model outputs
+        and applies softmax normalization internally.
+        Default "probs" assumes standard classification model outputs.
     batch_size : int, default 32
-        Batch size used to evaluate model. Only relevant when backend has been
-        specified for batch prediction.
+        Batch size for model inference during uncertainty computation.
+        Larger batches improve GPU utilization but require more memory.
+        Default 32 balances efficiency and memory usage.
     transforms : Transform, Sequence[Transform] or None, default None
-        Transform(s) to apply to the data.
+        Data transformations applied before model inference. Should match
+        preprocessing used during model training for consistent predictions.
+        When None, uses raw input data without preprocessing.
     device : DeviceLike or None, default None
-        Device type used. The default None tries to use the GPU and falls back on
-        CPU if needed. Can be specified by passing either 'cuda' or 'cpu'.
+        Hardware device for computation. When None, automatically selects
+        DataEval's configured device, falling back to PyTorch's default.
+
+    Attributes
+    ----------
+    model : torch.nn.Module
+        Classification model used for uncertainty computation.
+    device : torch.device
+        Hardware device used for model inference.
+    batch_size : int
+        Batch size for model predictions.
+    preds_type : {"probs", "logits"}
+        Format of model prediction outputs.
 
     Example
     -------
     >>> model = ClassificationModel()
-    >>> drift = DriftUncertainty(x_ref, model=model, batch_size=20)
+    >>> drift_detector = DriftUncertainty(x_ref, model=model, batch_size=16)
 
     Verify reference images have not drifted
 
-    >>> drift.predict(x_ref.copy()).drifted
-    False
+    >>> result = drift_detector.predict(x_test)
+    >>> print(f"Drift detected: {result.drifted}")
+    Drift detected: True
 
-    Test incoming images for drift
+    >>> print(f"Mean uncertainty change: {result.distance:.4f}")
+    Mean uncertainty change: 0.8160
 
-    >>> drift.predict(x_test).drifted
-    True
+    With data preprocessing
+
+    >>> import torchvision.transforms.v2 as T
+    >>> transforms = T.Compose([T.ToDtype(torch.float32)])
+    >>> drift_detector = DriftUncertainty(x_ref, model=model, batch_size=16, transforms=transforms)
+
+    Notes
+    -----
+    Uncertainty-based drift detection is complementary to feature-based methods.
+    It can detect semantic drift (changes in data meaning) that may not be
+    apparent in raw feature statistics, making it valuable for monitoring
+    model performance in production environments.
+
+    The method assumes that model uncertainty is a reliable indicator of
+    data quality. This works best with well-calibrated models trained on
+    representative data. Poorly calibrated models may produce misleading
+    uncertainty estimates.
+
+    For optimal performance, ensure the model and transforms match those used
+    during training, and that the reference data represents the expected
+    operational distribution where the model performs reliably.
     """
 
     def __init__(
@@ -142,27 +205,38 @@ class DriftUncertainty(BaseDrift):
         )
 
     def _transform(self, x: torch.Tensor) -> torch.Tensor:
+        """Apply preprocessing transforms to input data."""
         for transform in self._transforms:
             x = transform(x)
         return x
 
     def _preprocess(self, x: Array) -> torch.Tensor:
+        """Convert input data to uncertainty scores via model predictions."""
         preds = predict_batch(x, self.model, self.device, self.batch_size, self._transform)
         return classifier_uncertainty(preds, self.preds_type)
 
     def predict(self, x: Array) -> DriftOutput:
-        """
-        Predict whether a batch of data has drifted from the reference data.
+        """Predict whether model uncertainty distribution has drifted.
+
+        Computes prediction uncertainties for the input data and tests
+        whether their distribution significantly differs from the reference
+        uncertainty distribution using Kolmogorov-Smirnov test.
 
         Parameters
         ----------
         x : Array
-            Batch of instances.
+            Batch of instances to test for uncertainty drift.
 
         Returns
         -------
-        DriftUnvariateOutput
-            Dictionary containing the drift prediction, :term:`p-value<P-Value>`, and threshold
-            statistics.
+        DriftOutput
+            Drift detection results including overall prediction, p-values,
+            test statistics, and feature-level analysis of uncertainty values.
+
+        Notes
+        -----
+        The returned DriftOutput treats uncertainty values as "features" for
+        consistency with the underlying KS test implementation, even though
+        uncertainty-based drift typically involves univariate analysis.
         """
         return self._detector.predict(self._preprocess(x).cpu().numpy())

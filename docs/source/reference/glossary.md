@@ -132,8 +132,8 @@ Convolutional Neural Network (CNN)
 Coverage
     A measure of the distribution of the images in a dataset. A covered dataset has at least one image for every distinguishing property of the data set.
 
-Cramér-von Mises (CVM) Drift Detection
-    The Cramér-von Mises algorithm tests the {term}`null hypothesis<Null Hypothesis>` that a data sample (i.e. operational dataset), comes from a pre-specified population distribution or a family of such distributions with the idea that if the operational dataset does not come from the same distribution or family of distributions as the training dataset then data drift may have occurred. It is similar to the {term}`Kolmogorov-Smirnov test<Kolmogorov-Smirnov (K-S) Test>`.
+Cramér-von Mises (CVM) Test
+    The Cramér-von Mises algorithm tests the {term}`null hypothesis<Null Hypothesis>` that a data sample (i.e. operational dataset) comes from a pre-specified population distribution or a family of such distributions with the idea that if the operational dataset does not come from the same distribution or family of distributions as the training dataset then data drift may have occurred. It is similar to the {term}`Kolmogorov-Smirnov test<Kolmogorov-Smirnov (K-S) Test>`.
 ```
 
 ## D
