@@ -18,8 +18,28 @@ from dataeval.outputs._base import Output
 
 @dataclass(frozen=True)
 class DriftBaseOutput(Output):
-    """
-    Base output class for Drift Detector classes
+    """Base output class for drift detector classes.
+
+    Provides common fields returned by all drift detection methods, containing
+    instance-level drift predictions and summary statistics. Subclasses extend
+    this with detector-specific additional fields.
+
+    Attributes
+    ----------
+    drifted : bool
+        Whether drift was detected in the analyzed data. True indicates
+        significant drift from reference distribution.
+    threshold : float
+        Significance threshold used for drift detection, typically between 0 and 1.
+        For multivariate methods, this is the corrected threshold after
+        Bonferroni or FDR correction.
+    p_val : float
+        Instance-level p-value from statistical test, between 0 and 1.
+        For univariate methods, this is the mean p-value across all features.
+    distance : float
+        Instance-level test statistic or distance metric, always >= 0.
+        For univariate methods, this is the mean distance across all features.
+        Higher values indicate greater deviation from reference distribution.
     """
 
     drifted: bool
@@ -31,58 +51,76 @@ class DriftBaseOutput(Output):
 @dataclass(frozen=True)
 class DriftMMDOutput(DriftBaseOutput):
     """
-    Output class for :class:`.DriftMMD` :term:`drift<Drift>` detector.
+    Output class for :class:`.DriftMMD` (Maximum Mean Discrepancy) drift detector.
+
+    Extends :class:`.DriftBaseOutput` with MMD-specific distance threshold information.
+    Used by MMD-based drift detectors that compare kernel embeddings between
+    reference and test distributions.
 
     Attributes
     ----------
     drifted : bool
-        Drift prediction for the images
+        Whether drift was detected based on MMD permutation test.
     threshold : float
-        :term:`P-Value` used for significance of the permutation test
+        P-value threshold used for significance of the permutation test.
     p_val : float
-        P-value obtained from the permutation test
+        P-value obtained from the MMD permutation test, between 0 and 1.
     distance : float
-        MMD^2 between the reference and test set
+        Squared Maximum Mean Discrepancy between reference and test set.
+        Always >= 0, with higher values indicating greater distributional difference.
     distance_threshold : float
-        MMD^2 threshold above which drift is flagged
+        Squared Maximum Mean Discrepancy threshold above which drift is flagged, always >= 0.
+        Determined from permutation test at specified significance level.
+
+    Notes
+    -----
+    MMD uses kernel methods to compare distributions in reproducing kernel
+    Hilbert spaces, making it effective for high-dimensional data like images.
     """
 
-    # drifted: bool
-    # threshold: float
-    # p_val: float
-    # distance: float
     distance_threshold: float
 
 
 @dataclass(frozen=True)
 class DriftOutput(DriftBaseOutput):
-    """
-    Output class for :class:`.DriftCVM`, :class:`.DriftKS`, and :class:`.DriftUncertainty` drift detectors.
+    """Output class for univariate drift detectors.
+
+    Extends :class:`.DriftBaseOutput` with feature-level (per-pixel) drift information.
+    Used by Kolmogorov-Smirnov, Cramér-von Mises, and uncertainty-based
+    drift detectors that analyze each feature independently.
 
     Attributes
     ----------
     drifted : bool
-        :term:`Drift` prediction for the images
+        Overall drift prediction after multivariate correction.
     threshold : float
-        Threshold after multivariate correction if needed
+        Corrected threshold after Bonferroni or FDR correction for multiple testing.
     p_val : float
-        Instance-level p-value
+        Mean p-value across all features, between 0 and 1.
+        For descriptive purposes only; individual feature p-values are used
+        for drift detection decisions. Can appear high even when drifted=True
+        if only a subset of features show drift.
     distance : float
-        Instance-level distance
-    feature_drift : NDArray
-        Feature-level array of images detected to have drifted
+        Mean test statistic across all features, always >= 0.
+    feature_drift : NDArray[bool]
+        Boolean array indicating which features (pixels) show drift.
+        Shape matches the number of features in the input data.
     feature_threshold : float
-        Feature-level threshold to determine drift
-    p_vals : NDArray
-        Feature-level p-values
-    distances : NDArray
-        Feature-level distances
+        Uncorrected p-value threshold used for individual feature testing.
+        Typically the original p_val before multivariate correction.
+    p_vals : NDArray[np.float32]
+        P-values for each feature, all values between 0 and 1.
+        Shape matches the number of features in the input data.
+    distances : NDArray[np.float32]
+        Test statistics for each feature, all values >= 0.
+        Shape matches the number of features in the input data.
+
+    Notes
+    -----
+    Feature-level analysis enables identification of specific pixels or regions
+    that contribute most to detected drift, useful for interpretability.
     """
 
-    # drifted: bool
-    # threshold: float
-    # p_val: float
-    # distance: float
     feature_drift: NDArray[np.bool_]
     feature_threshold: float
     p_vals: NDArray[np.float32]

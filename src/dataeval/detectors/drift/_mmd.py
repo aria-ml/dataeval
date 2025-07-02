@@ -24,31 +24,57 @@ from dataeval.typing import Array
 
 
 class DriftMMD(BaseDrift):
-    """
-    :term:`Maximum Mean Discrepancy (MMD) Drift Detection` algorithm \
-    using a permutation test.
+    """Drift detector using :term:`Maximum Mean Discrepancy (MMD) Drift Detection` with permutation test.
+
+    Detects distributional differences by comparing kernel embeddings of reference
+    and test datasets in a reproducing kernel Hilbert space (RKHS). Uses permutation
+    testing to assess statistical significance of the observed MMD^2 statistic.
+
+    MMD is particularly effective for high-dimensional data like images as it can
+    capture complex distributional differences that univariate tests might miss.
+    The kernel-based approach enables detection of both marginal and dependency
+    changes between features.
 
     Parameters
     ----------
     data : Embeddings or Array
-        Data used as reference distribution.
-    p_val : float or None, default 0.05
-        :term:`P-value` used for significance of the statistical test for each feature.
-        If the FDR correction method is used, this corresponds to the acceptable
-        q-value.
+        Reference dataset used as baseline distribution for drift detection.
+        Should represent the expected data distribution.
+    p_val : float, default 0.05
+        Significance threshold for statistical tests, between 0 and 1.
+        For FDR correction, this represents the acceptable false discovery rate.
+        Default 0.05 provides 95% confidence level for drift detection.
     update_strategy : UpdateStrategy or None, default None
-        Reference data can optionally be updated using an UpdateStrategy class. Update
-        using the last n instances seen by the detector with LastSeenUpdateStrategy
-        or via reservoir sampling with ReservoirSamplingUpdateStrategy.
+        Strategy for updating reference data when new data arrives.
+        When None, reference data remains fixed throughout detection.
     sigma : Array or None, default None
-        Optionally set the internal GaussianRBF kernel bandwidth. Can also pass multiple
-        bandwidth values as an array. The kernel evaluation is then averaged over
-        those bandwidths.
+        Bandwidth parameter(s) for the Gaussian RBF kernel. Controls the
+        kernel's sensitivity to distance between data points. When None,
+        automatically selects bandwidth using median heuristic. Can provide
+        multiple values as array to average over different scales.
     n_permutations : int, default 100
-        Number of permutations used in the permutation test.
+        Number of random permutations used in the permutation test to estimate
+        the null distribution of MMD² under no drift. Higher values provide
+        more accurate p-value estimates but increase computation time.
+        Default 100 balances statistical accuracy with computational efficiency.
     device : DeviceLike or None, default None
-        The hardware device to use if specified, otherwise uses the DataEval
-        default or torch default.
+        Hardware device for computation. When None, automatically selects
+        DataEval's configured device, falling back to PyTorch's default.
+
+    Attributes
+    ----------
+    p_val : float
+        Significance threshold for statistical tests.
+    update_strategy : UpdateStrategy or None
+        Reference data update strategy.
+    n : int
+        Number of samples in the reference dataset.
+    sigma : Array or None
+        Gaussian RBF kernel bandwidth parameter(s).
+    n_permutations : int
+        Number of permutations for statistical testing.
+    device : torch.device
+        Hardware device used for computations.
 
     Example
     -------
@@ -56,7 +82,7 @@ class DriftMMD(BaseDrift):
 
     Use Embeddings to encode images before testing for drift
 
-    >>> train_emb = Embeddings(train_images, model=encoder, batch_size=64)
+    >>> train_emb = Embeddings(train_images, model=encoder, batch_size=16)
     >>> drift = DriftMMD(train_emb)
 
     Test incoming images for drift
