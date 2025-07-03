@@ -108,7 +108,13 @@ def plot_measure(
                 zorder=3,
             )
     else:
-        ax.scatter(steps, averaged_measure, label=f"Model Results ({name})", zorder=3, c="black")
+        ax.scatter(
+            steps,
+            averaged_measure,
+            label=f"Model Results ({name})",
+            zorder=3,
+            c="black",
+        )
     # Plot extrapolation
     ax.plot(
         projection,
@@ -149,7 +155,9 @@ def f_inv_out(y_i: NDArray[Any], x: NDArray[Any]) -> NDArray[np.int64]:
                 "Number of samples could not be determined for target(s): "
                 f"""{
                     np.array2string(
-                        1 - y_i[unachievable_targets], separator=", ", formatter={"float": lambda x: f"{x}"}
+                        1 - y_i[unachievable_targets],
+                        separator=", ",
+                        formatter={"float": lambda x: f"{x}"},
                     )
                 }""",
                 UserWarning,
@@ -223,7 +231,9 @@ def calc_params(p_i: NDArray[Any], n_i: NDArray[Any], niter: int) -> NDArray[np.
 
 
 def get_curve_params(
-    averaged_measures: MutableMapping[str, NDArray[Any]], ranges: NDArray[Any], niter: int
+    averaged_measures: MutableMapping[str, NDArray[Any]],
+    ranges: NDArray[Any],
+    niter: int,
 ) -> Mapping[str, NDArray[np.float64]]:
     """Calculates and aggregates parameters for both single and multi-class metrics"""
     output = {}
@@ -324,7 +334,10 @@ class SufficiencyOutput(Output):
         return proj
 
     def plot(
-        self, class_names: Sequence[str] | None = None, error_bars: bool = False, asymptote: bool = False
+        self,
+        class_names: Sequence[str] | None = None,
+        error_bars: bool = False,
+        asymptote: bool = False,
     ) -> Sequence[Figure]:
         """
         Plotting function for data :term:`sufficience<Sufficiency>` tasks.
@@ -426,7 +439,8 @@ class SufficiencyOutput(Output):
                 projection[name] = np.zeros((len(measure), len(tarray)))
                 for i in range(len(measure)):
                     projection[name][i] = inv_project_steps(
-                        self.params[name][i], tarray[i] if tarray.ndim == measure.ndim else tarray
+                        self.params[name][i],
+                        tarray[i] if tarray.ndim == measure.ndim else tarray,
                     )
             else:
                 projection[name] = inv_project_steps(self.params[name], tarray)

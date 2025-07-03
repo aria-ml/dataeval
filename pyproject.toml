@@ -252,7 +252,7 @@ docstring-code-line-length = "dynamic"
 
 [tool.codespell]
 skip = './*env*,./output,./docs/build,./docs/source/.jupyter_cache,CHANGELOG.md,uv.lock,requirements.txt,*.html,./docs/source/*/data'
-ignore-words-list = ["Hart"]
+ignore-words-list = ["Hart","FPR"]
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
