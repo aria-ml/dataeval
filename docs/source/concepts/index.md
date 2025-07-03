@@ -28,6 +28,7 @@ features.
 - [Divergence](Divergence.md)
 - [Diversity](Diversity.md)
 - [Drift](Drift.md)
+- [Embeddings](Embeddings.md)
 - [Label Parity](LabelParity.md)
 - [Metadata](Metadata.md)
 - [Model Training](ModelTraining.md)
@@ -52,6 +53,7 @@ DataCleaning.md
 Divergence.md
 Diversity.md
 Drift.md
+Embeddings.md
 LabelParity.md
 Metadata.md
 ModelTraining.md
