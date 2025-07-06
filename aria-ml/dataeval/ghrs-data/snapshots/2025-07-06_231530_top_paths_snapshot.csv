@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,51,33
+/aria-ml/dataeval/tree/main/tests,21,4
+/aria-ml/dataeval/tree/main/src/dataeval,10,2
+/aria-ml/dataeval/tree/main/src/dataeval/utils,8,1
+/aria-ml/dataeval/tree/v0.86.8/src/dataeval,8,1
+/aria-ml/dataeval/tree/main/tests/detectors,7,2
+/aria-ml/dataeval/blob/main/src/dataeval/metrics/estimators/_uap.py,6,2
+/aria-ml/dataeval/tree/main/src/dataeval/metrics/estimators,6,2
+/aria-ml/dataeval/blob/main/src/dataeval/outputs/_workflows.py,5,2
+/aria-ml/dataeval/tree/main/src/dataeval/metrics,5,2
