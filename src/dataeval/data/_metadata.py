@@ -15,6 +15,7 @@ from tqdm.auto import tqdm
 from dataeval.typing import (
     AnnotatedDataset,
     Array,
+    DatumMetadata,
     ObjectDetectionTarget,
 )
 from dataeval.utils._array import as_numpy
@@ -76,7 +77,7 @@ class Metadata:
 
     def __init__(
         self,
-        dataset: AnnotatedDataset[tuple[Any, Any, Mapping[str, Any]]],
+        dataset: AnnotatedDataset[tuple[Any, Any, DatumMetadata]],
         *,
         continuous_factor_bins: Mapping[str, int | Sequence[float]] | None = None,
         auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
