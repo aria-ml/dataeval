@@ -5,7 +5,7 @@ __all__ = []
 import logging
 import math
 import os
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
 from typing import Any, cast
 
@@ -80,7 +80,7 @@ class Embeddings:
         # Technically more permissive than ImageClassificationDataset or ObjectDetectionDataset
         dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike],
         batch_size: int,
-        transforms: Transform[torch.Tensor] | Sequence[Transform[torch.Tensor]] | None = None,
+        transforms: Transform[torch.Tensor] | Iterable[Transform[torch.Tensor]] | None = None,
         model: torch.nn.Module | None = None,
         device: DeviceLike | None = None,
         cache: Path | str | bool = False,
