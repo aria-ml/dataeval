@@ -7,7 +7,7 @@ import pytest
 import torch
 
 from dataeval.data import Embeddings
-from dataeval.typing import DatasetMetadata
+from dataeval.typing import Array, DatasetMetadata, DatumMetadata
 
 
 @dataclass
@@ -25,7 +25,7 @@ class MockDataset:
         self.targets = targets
         self.datum_metadata = metadata
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> tuple[Array, Any, DatumMetadata]:
         return self.data[idx], self.targets[idx], self.datum_metadata[idx] if self.datum_metadata else {"id": idx}
 
     def __len__(self) -> int:

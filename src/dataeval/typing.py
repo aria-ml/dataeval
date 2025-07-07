@@ -21,7 +21,7 @@ __all__ = [
 ]
 
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator
 from typing import (
     Any,
     Generic,
@@ -94,6 +94,7 @@ class Array(Protocol):
 
 _T = TypeVar("_T")
 _T_co = TypeVar("_T_co", covariant=True)
+_T_cn = TypeVar("_T_cn", contravariant=True)
 
 
 class DatasetMetadata(TypedDict, total=False):
@@ -126,6 +127,19 @@ class ModelMetadata(TypedDict, total=False):
 
     id: Required[ReadOnly[str]]
     index2label: NotRequired[ReadOnly[dict[int, str]]]
+
+
+class DatumMetadata(TypedDict, total=False):
+    """
+    Datum level metadata required for all `AnnotatedDataset` classes.
+
+    Attributes
+    ----------
+    id : Required[str]
+        A unique identifier for the datum
+    """
+
+    id: Required[ReadOnly[str]]
 
 
 @runtime_checkable
@@ -173,7 +187,7 @@ class AnnotatedDataset(Dataset[_T_co], Generic[_T_co], Protocol):
 # ========== IMAGE CLASSIFICATION DATASETS ==========
 
 
-ImageClassificationDatum: TypeAlias = tuple[ArrayLike, ArrayLike, Mapping[str, Any]]
+ImageClassificationDatum: TypeAlias = tuple[ArrayLike, ArrayLike, DatumMetadata]
 """
 Type alias for an image classification datum tuple.
 
@@ -213,7 +227,7 @@ class ObjectDetectionTarget(Protocol):
     def scores(self) -> ArrayLike: ...
 
 
-ObjectDetectionDatum: TypeAlias = tuple[ArrayLike, ObjectDetectionTarget, Mapping[str, Any]]
+ObjectDetectionDatum: TypeAlias = tuple[ArrayLike, ObjectDetectionTarget, DatumMetadata]
 """
 Type alias for an object detection datum tuple.
 
@@ -254,7 +268,7 @@ class SegmentationTarget(Protocol):
     def scores(self) -> ArrayLike: ...
 
 
-SegmentationDatum: TypeAlias = tuple[ArrayLike, SegmentationTarget, Mapping[str, Any]]
+SegmentationDatum: TypeAlias = tuple[ArrayLike, SegmentationTarget, DatumMetadata]
 """
 Type alias for an image classification datum tuple.
 
@@ -311,3 +325,8 @@ class Transform(Generic[_T], Protocol):
     """
 
     def __call__(self, data: _T, /) -> _T: ...
+
+
+@runtime_checkable
+class Action(Generic[_T_cn, _T_co], Protocol):
+    def __call__(self, evaluator: _T_cn) -> _T_co: ...
