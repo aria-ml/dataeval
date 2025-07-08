@@ -1,6 +1,18 @@
-[//]: # (b3e258d3a898b3936e6fd4c4d3b99ae03525cd50)
+[//]: # (e4f7ad82b02be0213b5f479d9781d008ded9d18c)
 
 # DataEval Change Log
+
+## v0.89.0
+
+🌟 **Feature Release**
+- `08984b1a` - Embeddings Concept page
+
+🛠️ **Improvements and Enhancements**
+- `356052b6` - Sufficiency: explicitly implement for operational metrics
+- `3ca1b01a` - pruning concept page
+
+📝 **Miscellaneous**
+- `7ed52bd9` - Drift docstring update
 
 ## v0.88.1
 
