@@ -82,8 +82,14 @@ data leakage
 - **Drift monitoring**: Detecting when production data differs systematically
 from training data
 
-DataEval cannot work directly with raw image data. You must first convert your
-images to embeddings using DataEval's {class}`.Embeddings` class, which handles
+Although DataEval can work with raw image data, it is inadvisable to do so.
+DataEval treats embeddings geometrically as vectors in a high-dimensional
+space. Raw image data treated as vectors have much higher dimensionality, and
+furthermore their geometric properties do not map cleanly to perceptual
+properties. Imperceptible differences in pixel data-- from e.g. a 1 pixel
+shift, or a slight rescaling or rotation--can result in large measured
+distances. Therefore we strongly recommend that you first convert your images
+to embeddings using DataEval's {class}`.Embeddings` class, which handles
 the transformation from pixels to vectors.
 
 ## Creating embeddings
