@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from dataeval.outputs._workflows import calc_params, f_out
+from dataeval.outputs._workflows import Constraints, calc_params, f_out, linear_initialization
 from dataeval.workflows.sufficiency import reset_parameters
 
 np.random.seed(0)
@@ -31,6 +31,21 @@ class Net(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
+
+
+def linear_fit_manual(x, y):
+    """
+    Basic helper for linear regression
+    """
+    n = len(x)
+    sum_x = np.sum(x)
+    sum_y = np.sum(y)
+    sum_xy = np.sum(x * y)
+    sum_x_squared = np.sum(x**2)
+
+    m = (n * sum_xy - sum_x * sum_y) / (n * sum_x_squared - sum_x**2)
+    b = (sum_y - m * sum_x) / n
+    return m, b
 
 
 @pytest.mark.required
@@ -92,8 +107,7 @@ class TestSufficiencyUtils:
         )
         n_i = np.geomspace(30, 3000, 20).astype(np.intp)
         answer = [3.2633, 0.4160, 0.0053]
-
-        output = calc_params(p_i, n_i, 100)
+        output = calc_params(p_i, n_i, 100, True)
 
         npt.assert_almost_equal(output, answer, decimal=3)
 
@@ -113,3 +127,115 @@ class TestSufficiencyUtils:
 
         # Confirm reset_parameters changed the original parameters
         assert str(state_dict) != str(reset_state_dict)
+
+    def test_linear_initialization_increasing(self):
+        """
+        Tests linear initialization for increasing power law curve
+        """
+        metric = np.array([0.8, 0.6, 0.4, 0.2, 0.0])
+        steps = np.array([20, 200, 2000, 2500, 3000])
+        bounds = Constraints(scale=(None, None), negative_exponent=(0, None), asymptote=(None, None))
+        x0 = linear_initialization(metric, steps, bounds)
+        assert x0[2] == -0.001  # did not apply bounds
+        m_log = np.log(metric - (-0.001))
+        s_log = np.log(steps)
+        m, b = linear_fit_manual(s_log, m_log)
+        test = np.array([np.exp(b), -m, -0.001])
+        assert np.allclose(
+            x0,
+            test,
+            rtol=0,
+            atol=1e-8,
+        )
+        # test values that produce a slope of 1, asymptote of 0, and coefficient of np.exp(-1.90776)
+        metric = np.exp([-2.90776, -3.90776, -4.90776, -5.90776, -6.90776])
+        steps = np.exp([1, 2, 3, 4, 5])
+        x0 = linear_initialization(metric, steps, bounds)
+        npt.assert_almost_equal(x0[0], np.exp(-1.90776), decimal=5)
+        npt.assert_almost_equal(x0[1], 1, decimal=5)
+        npt.assert_almost_equal(x0[2], 0, decimal=5)
+
+    def test_linear_initialization_increasing_bounded(self):
+        """
+        Tests linear initialization for increasing power law curve with c0 bounded [0,1]
+        """
+        metric = np.array([0.8, 0.6, 0.4, 0.2, 0.0])
+        steps = np.array([20, 200, 2000, 2500, 3000])
+        bounds = Constraints(scale=(None, None), negative_exponent=(0, None), asymptote=(0, 1))
+        x0 = linear_initialization(metric, steps, bounds)
+        assert x0[2] == 0  # applied bounds
+        # apply y offset
+        m_log = np.log(metric - (-0.001))
+        s_log = np.log(steps)
+        m, b = linear_fit_manual(s_log, m_log)
+        test = np.array([np.exp(b), -m, 0])
+        assert np.allclose(
+            x0,
+            test,
+            rtol=0,
+            atol=1e-8,
+        )
+
+    def test_linear_initialization_decreasing(self):
+        """
+        Tests linear initialization for decreasing power law curve
+        """
+        metric = np.array([0.2, 0.4, 0.6, 0.8, 1.0])
+        steps = np.array([20, 200, 2000, 2500, 3000])
+        bounds = Constraints(scale=(None, None), negative_exponent=(0, None), asymptote=(None, None))
+        x0 = linear_initialization(metric, steps, bounds)
+        assert x0[2] == 1.001  # did not apply bounds
+        # apply y offset
+        m_log = np.log((1.001) - metric)
+        s_log = np.log(steps)
+        # apply manual fit to linearized points for comparison
+        m, b = linear_fit_manual(s_log, m_log)
+        test = np.array([-np.exp(b), -m, 1.001])
+        assert np.allclose(
+            x0,
+            test,
+            rtol=0,
+            atol=1e-8,
+        )
+        # test values that produce a slope of ~0, asymptote of 1, and coefficient of -(c_hat - exp(-0.00100050038))
+        metric = np.exp([-0.00100050037, -0.00100050036, -0.00100050035, -0.00100050034, -0.00100050033])
+        steps = np.exp([1, 2, 3, 4, 5])
+        x0 = linear_initialization(metric, steps, bounds)
+        npt.assert_almost_equal(x0[0], -(1 - (np.exp(-0.00100050038))), decimal=5)
+        npt.assert_almost_equal(x0[1], 0, decimal=5)
+        npt.assert_almost_equal(x0[2], 1, decimal=5)
+
+    def test_linear_initialization_decreasing_unbounded(self):
+        """
+        Tests linear initialization for decreasing power law curve with c0 bounded [0,1]
+        """
+        metric = np.array([0.2, 0.4, 0.6, 0.8, 1.0])
+        steps = np.array([20, 200, 2000, 2500, 3000])
+        bounds = Constraints(scale=(None, None), negative_exponent=(0, None), asymptote=(0, 1))
+        x0 = linear_initialization(metric, steps, bounds)
+        assert x0[2] == 1.000  # applied bounds
+        m_log = np.log((1.001) - metric)
+        s_log = np.log(steps)
+        m, b = linear_fit_manual(s_log, m_log)
+        test = np.array([-np.exp(b), -m, 1.000])
+        assert np.allclose(
+            x0,
+            test,
+            rtol=0,
+            atol=1e-8,
+        )
+
+    def test_linear_initialization_default(self):
+        """
+        Tests that with initialization failure, initial guess defaults to [0.5,0.5,1]
+        """
+        metric = np.array([0, 0.2, 0.4, 0.6, 0.8])
+        steps = np.array([0, 200, 2000, 2500, 3000])
+        bounds = Constraints(scale=(None, None), negative_exponent=(0, None), asymptote=(0, 1))
+        with pytest.warns(
+            UserWarning,
+            match=r"Error applying linear initialization for initial guess\,"
+            " using default",
+        ):
+            x0 = linear_initialization(metric, steps, bounds)
+        assert all(x0 == np.array([0.5, 0.5, 1]))
