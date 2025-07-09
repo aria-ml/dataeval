@@ -72,6 +72,9 @@ class Sufficiency(Generic[T]):
         Additional arguments required for custom training function
     eval_kwargs : Mapping | None, default None
         Additional arguments required for custom evaluation function
+    unit_interval : bool, default True
+        Constrains the power law to the interval [0, 1]. Set True (default) for metrics such as accuracy, precision,
+        and recall which are defined to take values on [0,1]. Set False for metrics not on the unit interval.
 
     Warning
     -------
@@ -94,6 +97,7 @@ class Sufficiency(Generic[T]):
         substeps: int = 5,
         train_kwargs: Mapping[str, Any] | None = None,
         eval_kwargs: Mapping[str, Any] | None = None,
+        unit_interval: bool = True,
     ) -> None:
         self.model = model
         self.train_ds = train_ds
@@ -104,6 +108,7 @@ class Sufficiency(Generic[T]):
         self.substeps = substeps
         self.train_kwargs = train_kwargs
         self.eval_kwargs = eval_kwargs
+        self.unit_interval = unit_interval
 
     @property
     def train_ds(self) -> Dataset[T]:
@@ -210,7 +215,7 @@ class Sufficiency(Generic[T]):
         >>> suff.evaluate()
         SufficiencyOutput(steps=array([  1,   3,  10,  31, 100], dtype=uint32), measures={'test': array([[1., 1., 1., 1., 1.],
                [1., 1., 1., 1., 1.],
-               [1., 1., 1., 1., 1.]])}, averaged_measures={'test': array([1., 1., 1., 1., 1.])}, n_iter=1000)
+               [1., 1., 1., 1., 1.]])}, averaged_measures={'test': array([1., 1., 1., 1., 1.])}, n_iter=1000, unit_interval=True)
 
         Evaluate at a single value
 
@@ -222,7 +227,7 @@ class Sufficiency(Generic[T]):
         ...     eval_fn=eval_fn,
         ... )
         >>> suff.evaluate(eval_at=50)
-        SufficiencyOutput(steps=array([50]), measures={'test': array([[1.]])}, averaged_measures={'test': array([1.])}, n_iter=1000)
+        SufficiencyOutput(steps=array([50]), measures={'test': array([[1.]])}, averaged_measures={'test': array([1.])}, n_iter=1000, unit_interval=True)
 
         Evaluating at linear steps from 0-100 inclusive
 
@@ -234,7 +239,7 @@ class Sufficiency(Generic[T]):
         ...     eval_fn=eval_fn,
         ... )
         >>> suff.evaluate(eval_at=np.arange(0, 101, 20))
-        SufficiencyOutput(steps=array([  0,  20,  40,  60,  80, 100]), measures={'test': array([[1., 1., 1., 1., 1., 1.]])}, averaged_measures={'test': array([1., 1., 1., 1., 1., 1.])}, n_iter=1000)
+        SufficiencyOutput(steps=array([  0,  20,  40,  60,  80, 100]), measures={'test': array([[1., 1., 1., 1., 1., 1.]])}, averaged_measures={'test': array([1., 1., 1., 1., 1., 1.])}, n_iter=1000, unit_interval=True)
 
         """  # noqa: E501
         if eval_at is not None:
@@ -280,4 +285,4 @@ class Sufficiency(Generic[T]):
                         )
 
                     measures[name][run, iteration] = value
-        return SufficiencyOutput(ranges, measures)
+        return SufficiencyOutput(ranges, measures, unit_interval=self.unit_interval)
