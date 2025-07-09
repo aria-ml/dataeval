@@ -1722,9 +1722,9 @@ files = [
 all = ["matplotlib"]
 cpu = ["torch", "torchvision"]
 cu118 = ["torch", "torchvision"]
-cu124 = ["torch", "torchvision"]
+cu126 = ["torch", "torchvision"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "93280ec47b9f7a75043cb341e8ef4cb6e6113cb910463a728a1e2cc0afc668a6"
+content-hash = "7da798a36430eaac93eb7f23895b3d9af98584a7b51627f85b3bf7f6fa50528d"
