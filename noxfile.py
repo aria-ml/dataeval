@@ -41,7 +41,7 @@ def prep(session: nox.Session) -> str:
 @nox.session
 def dev(session: nox.Session) -> None:
     """Set up a python development environment at `.venv-{version}`. Specify version using `nox -P {version} -e dev`."""
-    arch_extras = {"cpu", "cu118", "cu124"}
+    arch_extras = {"cpu", "cu118", "cu126"}
     arch_posargs = arch_extras & set(session.posargs)
     arch_args = [] if not arch_posargs else [f"--extra={list(arch_posargs)[0]}"]
 
