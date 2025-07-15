@@ -1,6 +1,16 @@
-[//]: # (e4f7ad82b02be0213b5f479d9781d008ded9d18c)
+[//]: # (ecbf11bbb4e2a87f944e086b998657c04cb0fe83)
 
 # DataEval Change Log
+
+## v0.89.1
+
+🛠️ **Improvements and Enhancements**
+- `9e0b441b` - Additional clarification to Embeddings Concept page
+- `1567f818` - Sufficiency: Improve Global Minimization
+
+📝 **Miscellaneous**
+- `ecbf11bb` - Update Duplicates docstring
+- `59f56fd1` - Address security vulnerabilities found in lock file
 
 ## v0.89.0
 
