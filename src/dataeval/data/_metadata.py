@@ -12,6 +12,9 @@ import polars as pl
 from numpy.typing import NDArray
 from tqdm.auto import tqdm
 
+from dataeval.functional._feature_distance import feature_distance
+from dataeval.outputs._base import set_metadata
+from dataeval.outputs._metadata import MetadataDistanceOutput, MetadataDistanceValues
 from dataeval.typing import (
     AnnotatedDataset,
     Array,
@@ -283,35 +286,6 @@ class Metadata:
         return self._dropped_factors
 
     @property
-    def digitized_data(self) -> NDArray[np.int64]:
-        """Factor data with categorical values converted to integer codes.
-
-        Access processed factor data where categorical factors are digitized
-        to integer codes but continuous factors remain in their original form.
-
-        Returns
-        -------
-        NDArray[np.int64]
-            Array with shape (n_samples, n_factors) containing integer-coded
-            categorical data. Returns empty array when no factors are available.
-
-        Notes
-        -----
-        This property triggers factor binning analysis on first access.
-        Use this for algorithms that can handle mixed categorical and
-        continuous data types.
-        """
-        if not self.factor_names:
-            return np.array([], dtype=np.int64)
-
-        self._bin()
-        return (
-            self.dataframe.select([_to_col(k, v, False) for k, v in self.factor_info.items()])
-            .to_numpy()
-            .astype(np.int64)
-        )
-
-    @property
     def binned_data(self) -> NDArray[np.int64]:
         """Factor data with continuous values discretized into bins.
 
@@ -348,7 +322,7 @@ class Metadata:
         -------
         Sequence[str]
             List of factor names that passed filtering and preprocessing steps.
-            Order matches columns in factor_data, digitized_data, and binned_data.
+            Order matches columns in factor_data, numeric_data, and binned_data.
 
         Notes
         -----
@@ -393,7 +367,7 @@ class Metadata:
         -----
         Use this for algorithms that can work with mixed data types or when
         you need access to original continuous values. For analysis-ready
-        integer data, use binned_data or digitized_data instead.
+        numeric data, use binned_data or numeric_data instead.
         """
         if not self.factor_names:
             return np.array([], dtype=np.float64)
@@ -435,6 +409,11 @@ class Metadata:
         """
         self._structure()
         return self._class_names
+
+    @property
+    def index2label(self) -> Mapping[int, str]:
+        self._structure()
+        return self._index2label
 
     @property
     def image_indices(self) -> NDArray[np.intp]:
@@ -655,3 +634,66 @@ class Metadata:
         if new_columns:
             self._dataframe = self.dataframe.with_columns(new_columns)
             self._is_binned = False
+
+    def filter_by_factor(self, condition: Callable[[str, FactorInfo], bool]) -> NDArray[np.float64]:
+        """Filters metadata factors by factor name or FactorInfo.
+
+        Parameters
+        ----------
+        condition : Callable[[str, FactorInfo], bool]
+            A condition to include the factor in the output.
+
+        Returns
+        -------
+        NDArray[np.float64]
+            Array with shape (n_samples, n_factors) where the factors
+            are filtered by the user provided condition.
+        """
+        if not self.factor_names:
+            return np.array([], dtype=np.float64)
+
+        self._bin()
+        filtered = [name for name, info in self.factor_info.items() if condition(name, info)]
+        return self.dataframe[filtered].to_numpy().astype(np.float64)
+
+    @set_metadata
+    def calculate_distance(self, other: Metadata) -> MetadataDistanceOutput:
+        """Measures the feature-wise distance between two continuous metadata distributions and
+        computes a p-value to evaluate its significance.
+
+        Uses the Earth Mover's Distance and the Kolmogorov-Smirnov two-sample test, featurewise.
+
+        Parameters
+        ----------
+        other : Metadata
+            Class containing continuous factor names and values to be compared
+
+        Returns
+        -------
+        MetadataDistanceOutput
+            A mapping with keys corresponding to metadata feature names, and values that are KstestResult objects, as
+            defined by scipy.stats.ks_2samp.
+
+        See Also
+        --------
+        Earth mover's distance
+        Kolmogorov-Smirnov two-sample test
+
+        Note
+        ----
+        This function only applies to the continuous data
+
+        Examples
+        --------
+        >>> output = metadata1.calculate_distance(metadata2)
+        >>> list(output)
+        ['time', 'altitude']
+        >>> output["time"]
+        MetadataDistanceValues(statistic=1.0, location=0.44354838709677413, dist=2.7, pvalue=0.0)
+        """
+        if set(self.factor_names) != set(other.factor_names):
+            raise ValueError(f"Metadata keys must be identical, got {self.factor_names} and {other.factor_names}")
+        c1 = self.filter_by_factor(lambda _, fi: fi.factor_type == "continuous")
+        c2 = other.filter_by_factor(lambda _, fi: fi.factor_type == "continuous")
+        distance = feature_distance(c1, c2)
+        return MetadataDistanceOutput(dict(zip(self.factor_names, (MetadataDistanceValues(*d) for d in distance))))

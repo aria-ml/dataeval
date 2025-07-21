@@ -250,13 +250,6 @@ class TestMetadata:
         md._raw = raw_metadata
         assert md.raw == raw_metadata
 
-    def test_empty_digitized_data(self):
-        md = Metadata(None)  # type: ignore
-        md._is_structured = True
-        md._factors = {"foo": None}
-        md._exclude = {"foo"}
-        assert md.digitized_data.size == 0
-
     def test_empty_binned_data(self):
         md = Metadata(None)  # type: ignore
         md._is_structured = True

@@ -193,9 +193,9 @@ def get_groups(metadata: Metadata, split_on: Sequence[str] | None) -> NDArray[np
 
     Parameters
     ----------
-    metadata : dict
+    metadata : Metadata
         dictionary containing all metadata
-    groupnames : list
+    split_on : Sequence[str] or None
         which groups from the metadata dictionary to consider for dataset grouping
 
     Returns

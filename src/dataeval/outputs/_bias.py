@@ -78,14 +78,14 @@ class LabelParityOutput(ToDataFrameMixin, Output):
 
     Attributes
     ----------
-    score : np.float64
+    score : float
         chi-squared score(s) of the test
-    p_value : np.float64
+    p_value : float
         p-value(s) of the test
     """
 
-    score: np.float64
-    p_value: np.float64
+    score: float
+    p_value: float
 
 
 @dataclass(frozen=True)
@@ -170,12 +170,12 @@ class CompletenessOutput(Output):
     ----------
     fraction_filled : float
         Fraction of boxes that contain at least one data point
-    empty_box_centers : List[np.ndarray]
+    empty_box_centers : Sequence[tuple[float, float]]
         List of coordinates for centers of empty boxes
     """
 
     fraction_filled: float
-    empty_box_centers: NDArray[np.float64]
+    empty_box_centers: Sequence[tuple[float, float]]
 
 
 @dataclass(frozen=True)
