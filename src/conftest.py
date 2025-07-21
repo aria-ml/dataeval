@@ -36,6 +36,8 @@ if np.__version__[0] == "2":
     # >>> np.int32(16)
     # 16
     np.set_printoptions(legacy="1.25", precision=3)  # type: ignore
+else:
+    np.set_printoptions(precision=3)
 
 
 # Set manual seeds
@@ -43,7 +45,7 @@ set_seed(0, all_generators=True)
 
 
 def generate_random_metadata(
-    labels: Sequence[str], factors: Mapping[str, Sequence[str]], length: int, random_seed: int
+    labels: Sequence[str], factors: Mapping[str, Sequence[str | int]], length: int, random_seed: int
 ) -> Metadata:
     rng = np.random.default_rng(random_seed)
     labels_arr = rng.choice(range(len(labels)), (length))
@@ -52,11 +54,13 @@ def generate_random_metadata(
     metadata._raw = [{} for _ in range(len(labels))]
     metadata._class_labels = labels_arr
     metadata._class_names = list(labels)
+    metadata._image_indices = np.arange(len(labels))
+    metadata._index2label = dict(enumerate(labels))
     metadata._dataframe = pl.DataFrame(metadata_dict)
     metadata._factors = dict.fromkeys(factors, FactorInfo("discrete"))
     metadata._dropped_factors = {}
     metadata._is_structured = True
-    metadata._is_binned = True
+    metadata._bin()
     return metadata
 
 
@@ -86,11 +90,15 @@ def doctest_metadata_explanatory_funcs(doctest_namespace: dict[str, Any]) -> Non
     md1.factor_data = factor_data1
     md1.factor_info = factor_info
     md1.dataframe = pl.DataFrame(factor_data1, schema=factor_names)
+    md1.filter_by_factor = lambda _: factor_data1
+    md1.calculate_distance = lambda x: Metadata.calculate_distance(md1, x)
 
     md2.factor_names = factor_names
     md2.factor_data = factor_data2
     md2.factor_types = factor_info
     md2.dataframe = pl.DataFrame(factor_data2, schema=factor_names)
+    md2.filter_by_factor = lambda _: factor_data2
+    md2.calculate_distance = lambda x: Metadata.calculate_distance(md2, x)
 
     doctest_namespace["metadata1"] = md1
     doctest_namespace["metadata2"] = md2
@@ -148,29 +156,6 @@ def doctest_detectors_drift_uncertainty(doctest_namespace: dict[str, Any]) -> No
     doctest_namespace["ClassificationModel"] = ClassificationModel
     doctest_namespace["x_ref"] = x_ref
     doctest_namespace["x_test"] = x_test
-
-
-@pytest.fixture(autouse=True, scope="session")
-def doctest_metrics_bias_balance_diversity(doctest_namespace: dict[str, Any]) -> None:
-    str_vals = ["b", "b", "b", "b", "b", "a", "a", "b", "a", "b", "b", "a"]
-    class_labels = [1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0]
-    cnt_vals = [-0.54, -0.32, 0.41, 1.04, -0.13, 1.37, -0.67, 0.35, 0.90, 0.09, -0.74, -0.92]
-    cat_vals = [1.1, 1.1, 0, 0, 1.1, 0, 1.1, 0, 0, 1.1, 1.1, 0]
-    metadata_dict = {"var_cat": str_vals, "var_cnt": cnt_vals, "var_float_cat": cat_vals}
-    continuous_factor_bincounts = {"var_cnt": 5, "var_float_cat": 2}
-    metadata = Metadata(None, continuous_factor_bins=continuous_factor_bincounts)  # type: ignore
-    metadata._is_structured = True
-    metadata._raw = [{} for _ in range(len(class_labels))]
-    metadata._class_labels = np.asarray(class_labels)
-    metadata._class_names = ["cat", "dog"]
-    metadata._dataframe = pl.DataFrame(metadata_dict)
-    metadata._factors = dict.fromkeys(metadata_dict, None)
-    metadata._dropped_factors = {}
-
-    """dataeval.metrics.bias.balance.balance"""
-    """dataeval.metrics.bias.diversity.diversity"""
-
-    doctest_namespace["metadata"] = metadata
 
 
 @pytest.fixture(autouse=True, scope="session")

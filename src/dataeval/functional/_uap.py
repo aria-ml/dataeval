@@ -9,14 +9,13 @@ from __future__ import annotations
 __all__ = []
 
 
-from dataeval.functional._uap import uap as _uap
-from dataeval.outputs import UAPOutput
-from dataeval.outputs._base import set_metadata
+from sklearn.metrics import average_precision_score
+
 from dataeval.typing import ArrayLike
+from dataeval.utils._array import as_numpy
 
 
-@set_metadata
-def uap(labels: ArrayLike, scores: ArrayLike) -> UAPOutput:
+def uap(labels: ArrayLike, scores: ArrayLike) -> float:
     """
     FR Test Statistic based estimate of the empirical mean precision for the \
     upperbound average precision.
@@ -30,8 +29,8 @@ def uap(labels: ArrayLike, scores: ArrayLike) -> UAPOutput:
 
     Returns
     -------
-    UAPOutput
-        The empirical mean precision estimate, float
+    float
+        The empirical mean precision estimat
 
     Raises
     ------
@@ -48,7 +47,7 @@ def uap(labels: ArrayLike, scores: ArrayLike) -> UAPOutput:
     >>> y_true = np.array([0, 0, 1, 1])
     >>> y_scores = np.array([0.1, 0.4, 0.35, 0.8])
     >>> uap(y_true, y_scores)
-    UAPOutput(uap=0.8333333333333333)
+    0.8333333333333333
 
     >>> y_true = np.array([0, 0, 1, 1, 2, 2])
     >>> y_scores = np.array(
@@ -62,7 +61,7 @@ def uap(labels: ArrayLike, scores: ArrayLike) -> UAPOutput:
     ...     ]
     ... )
     >>> uap(y_true, y_scores)
-    UAPOutput(uap=0.7777777777777777)
+    0.7777777777777777
     """
 
-    return UAPOutput(_uap(labels, scores))
+    return float(average_precision_score(as_numpy(labels), as_numpy(scores), average="weighted"))

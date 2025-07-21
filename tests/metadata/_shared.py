@@ -39,4 +39,7 @@ def mock_metadata(
     m.factor_info = _factors
     m.dataframe = pl.DataFrame(m.factor_data, schema=m.factor_names)
 
+    m.filter_by_factor = lambda x: Metadata.filter_by_factor(m, x)
+    m.calculate_distance = lambda x: Metadata.calculate_distance(m, x)
+
     return m
