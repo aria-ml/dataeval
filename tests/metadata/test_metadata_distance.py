@@ -2,9 +2,7 @@ import numpy as np
 import pytest
 from numpy.random import Generator
 
-from dataeval.metadata import metadata_distance
-from dataeval.metadata._distance import _calculate_drift
-from dataeval.outputs import MetadataDistanceValues
+from dataeval.functional._feature_distance import _calculate_drift, feature_distance
 from tests.metadata._shared import mock_metadata
 
 
@@ -27,7 +25,7 @@ class TestMetadataDistance:
         m2 = mock_metadata(continuous_names=factors, continuous_data=RNG.random(shape2))
 
         with pytest.warns(UserWarning):
-            result = metadata_distance(m1, m2)
+            result = m1.calculate_distance(m2)
 
         assert len(result) == len(factors)
         assert all(factor in result for factor in factors)
@@ -36,13 +34,13 @@ class TestMetadataDistance:
     def test_no_warn_on_many_samples(self, RNG: Generator):
         """Solving the equation where N==M brings the sample count to 32 to make a valid solution"""
 
-        m1 = mock_metadata(continuous_names=["a"], continuous_data=RNG.random((32, 1)))
-        m2 = mock_metadata(continuous_names=["a"], continuous_data=RNG.random((32, 1)))
+        c1 = RNG.random((32, 1))
+        c2 = RNG.random((32, 1))
 
         import warnings
 
         with warnings.catch_warnings():
-            metadata_distance(m1, m2)
+            feature_distance(c1, c2)
 
     def test_empty_inputs(self):
         """
@@ -52,20 +50,20 @@ class TestMetadataDistance:
         length of 1, rather than 0
         """
 
-        m1 = mock_metadata(continuous_names=[], continuous_data=np.array([]))
-        m2 = mock_metadata(continuous_names=[], continuous_data=np.array([]))
+        c1 = np.array([])
+        c2 = np.array([])
 
-        assert metadata_distance(m1, m2) == {}
+        assert feature_distance(c1, c2) == []
 
     def test_min_equals_max(self):
         """Test that any factors that have no deviation return an empty MetadataDistanceValues"""
 
-        m1 = mock_metadata(continuous_names=["a"], continuous_data=np.ones((32, 1)))
-        m2 = mock_metadata(continuous_names=["a"], continuous_data=np.ones((32, 1)))
+        c1 = np.ones((32, 1))
+        c2 = np.ones((32, 1))
 
-        result = metadata_distance(m1, m2)
+        result = feature_distance(c1, c2)
 
-        assert result == {"a": MetadataDistanceValues(0.0, 0.0, 0.0, 1.0)}
+        assert result == [(0.0, 0.0, 0.0, 1.0)]
 
 
 @pytest.mark.required

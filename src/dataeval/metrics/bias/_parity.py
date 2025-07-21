@@ -1,99 +1,16 @@
 from __future__ import annotations
 
+import warnings
+
 __all__ = []
 
-import warnings
-from collections import defaultdict
-from typing import Any
-
-import numpy as np
-from numpy.typing import NDArray
-from scipy.stats import chisquare
-from scipy.stats.contingency import chi2_contingency, crosstab
 
 from dataeval.data import Metadata
+from dataeval.functional._label_parity import label_parity as _label_parity
+from dataeval.functional._parity import parity as _parity
 from dataeval.outputs import LabelParityOutput, ParityOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike
-from dataeval.utils._array import as_numpy
-
-
-def normalize_expected_dist(expected_dist: NDArray[Any], observed_dist: NDArray[Any]) -> NDArray[Any]:
-    """
-    Normalize the expected label distribution to match the total number of labels in the observed distribution.
-
-    This function adjusts the expected distribution so that its sum equals the sum of the observed distribution.
-    If the expected distribution is all zeros, an error is raised.
-
-    Parameters
-    ----------
-    expected_dist : NDArray
-        The expected label distribution. This array represents the anticipated distribution of labels.
-    observed_dist : NDArray
-        The observed label distribution. This array represents the actual distribution of labels in the dataset.
-
-    Returns
-    -------
-    NDArray
-        The normalized expected distribution, scaled to have the same sum as the observed distribution.
-
-    Raises
-    ------
-    ValueError
-        If the expected distribution is all zeros.
-
-    Note
-    ----
-    The function ensures that the total number of labels in the expected distribution matches the total
-    number of labels in the observed distribution by scaling the expected distribution.
-    """
-
-    exp_sum = np.sum(expected_dist)
-    obs_sum = np.sum(observed_dist)
-
-    if exp_sum == 0:
-        raise ValueError(
-            f"Expected label distribution {expected_dist} is all zeros. "
-            "Ensure that Parity.expected_dist is set to a list "
-            "with at least one nonzero element"
-        )
-
-    # Renormalize expected distribution to have the same total number of labels as the observed dataset
-    if exp_sum != obs_sum:
-        expected_dist = expected_dist * obs_sum / exp_sum
-
-    return expected_dist
-
-
-def validate_dist(label_dist: NDArray[Any], label_name: str) -> None:
-    """
-    Verifies that the given label distribution has labels and checks if
-    any labels have frequencies less than 5.
-
-    Parameters
-    ----------
-    label_dist : NDArray
-        Array representing label distributions
-    label_name : str
-        String representing label name
-
-    Raises
-    ------
-    ValueError
-        If label_dist is empty
-    Warning
-        If any elements of label_dist are less than 5
-    """
-
-    if not len(label_dist):
-        raise ValueError(f"No labels found in the {label_name} dataset")
-    if np.any(label_dist < 5):
-        warnings.warn(
-            f"Labels {np.where(label_dist < 5)[0]} in {label_name}"
-            " dataset have frequencies less than 5. This may lead"
-            " to invalid chi-squared evaluation.",
-            UserWarning,
-        )
 
 
 @set_metadata
@@ -153,36 +70,7 @@ def label_parity(
     >>> label_parity(expected_labels, observed_labels)
     LabelParityOutput(score=14.007374204742625, p_value=0.0072715574616218)
     """
-
-    # Calculate
-    if not num_classes:
-        num_classes = 0
-
-    # Calculate the class frequencies associated with the datasets
-    observed_dist = np.bincount(as_numpy(observed_labels), minlength=num_classes)
-    expected_dist = np.bincount(as_numpy(expected_labels), minlength=num_classes)
-
-    # Validate
-    validate_dist(observed_dist, "observed")
-
-    # Normalize
-    expected_dist = normalize_expected_dist(expected_dist, observed_dist)
-
-    # Validate normalized expected distribution
-    validate_dist(expected_dist, f"expected for {np.sum(observed_dist)} observations")
-
-    if len(observed_dist) != len(expected_dist):
-        raise ValueError(
-            f"Found {len(observed_dist)} unique classes in observed label distribution, "
-            f"but found {len(expected_dist)} unique classes in expected label distribution. "
-            "This can happen when some class ids have zero instances in one dataset but "
-            "not in the other. When initializing Parity, try setting the num_classes "
-            "parameter to the known number of unique class ids, so that classes with "
-            "zero instances are still included in the distributions."
-        )
-
-    cs, p = chisquare(f_obs=observed_dist, f_exp=expected_dist)
-    return LabelParityOutput(cs, p)
+    return LabelParityOutput(*_label_parity(expected_labels, observed_labels, num_classes=num_classes))
 
 
 @set_metadata
@@ -238,40 +126,22 @@ def parity(metadata: Metadata) -> ParityOutput:
     ...         "gender": ["M", "F"]},
     ...     length=100,
     ...     random_seed=175)
-    >>> metadata.continuous_factor_bins = {"age": 4, "income": 3}
+
     >>> parity(metadata)
-    ParityOutput(score=array([7.357, 5.467, 0.515]), p_value=array([0.289, 0.243, 0.773]), factor_names=['age', 'income', 'gender'], insufficient_data={'age': {3: {'artist': 4}, 4: {'artist': 4, 'teacher': 3}}, 'income': {1: {'artist': 3}}})
+    ParityOutput(score=array([7.357, 5.467, 0.515]), p_value=array([0.289, 0.243, 0.773]), factor_names=['age', 'income', 'gender'], insufficient_data={'age': {35: {'artist': 4}, 45: {'artist': 4, 'teacher': 3}}, 'income': {50000: {'artist': 3}}})
     """  # noqa: E501
-    if not metadata.factor_names:
+    factor_names = metadata.factor_names
+    index2label = metadata.index2label
+
+    if not factor_names:
         raise ValueError("No factors found in provided metadata.")
 
-    chi_scores = np.zeros(metadata.binned_data.shape[1])
-    p_values = np.zeros_like(chi_scores)
-    insufficient_data: defaultdict[str, defaultdict[int, dict[str, int]]] = defaultdict(lambda: defaultdict(dict))
-    for i, col_data in enumerate(metadata.binned_data.T):
-        # Builds a contingency matrix where entry at index (r,c) represents
-        # the frequency of current_factor_name achieving value unique_factor_values[r]
-        # at a data point with class c.
-        results = crosstab(col_data, metadata.class_labels)
-        contingency_matrix = as_numpy(results.count)  # type: ignore
+    output = _parity(metadata.binned_data, metadata.class_labels.tolist(), return_insufficient_data=True)
 
-        # Determines if any frequencies are too low
-        counts = np.nonzero(contingency_matrix < 5)
-        unique_factor_values = np.unique(col_data)
-        current_factor_name = metadata.factor_names[i]
-        for _factor, _class in zip(counts[0], counts[1]):
-            int_factor, int_class = int(_factor), int(_class)
-            if contingency_matrix[int_factor, int_class] > 0:
-                factor_category = unique_factor_values[int_factor].item()
-                class_name = metadata.class_names[int_class]
-                class_count = contingency_matrix[int_factor, int_class].item()
-                insufficient_data[current_factor_name][factor_category][class_name] = class_count
-
-        # This deletes rows containing only zeros,
-        # because scipy.stats.chi2_contingency fails when there are rows containing only zeros.
-        contingency_matrix = contingency_matrix[np.any(contingency_matrix, axis=1)]
-
-        chi_scores[i], p_values[i] = chi2_contingency(contingency_matrix)[:2]  # type: ignore
+    insufficient_data = {
+        factor_names[k]: {vk: {index2label[vvk]: vvv for vvk, vvv in vv.items()} for vk, vv in v.items()}
+        for k, v in output[2].items()
+    }
 
     if insufficient_data:
         warnings.warn(
@@ -280,8 +150,8 @@ def parity(metadata: Metadata) -> ParityOutput:
         )
 
     return ParityOutput(
-        score=chi_scores,
-        p_value=p_values,
+        score=output[0],
+        p_value=output[1],
         factor_names=metadata.factor_names,
-        insufficient_data={k: dict(v) for k, v in insufficient_data.items()},
+        insufficient_data=insufficient_data,
     )

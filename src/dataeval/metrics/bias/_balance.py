@@ -4,15 +4,10 @@ __all__ = []
 
 import warnings
 
-import numpy as np
-import scipy as sp
-from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
-
-from dataeval.config import EPSILON, get_seed
 from dataeval.data import Metadata
+from dataeval.functional import _balance
 from dataeval.outputs import BalanceOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.utils._bin import get_counts
 
 
 def _validate_num_neighbors(num_neighbors: int) -> int:
@@ -66,22 +61,32 @@ def balance(
     -------
     Return balance (mutual information) of factors with class_labels
 
+    >>> metadata = generate_random_metadata(
+    ...     labels=["doctor", "artist", "teacher"],
+    ...     factors={
+    ...         "age": [25, 30, 35, 45],
+    ...         "income": [50000, 65000, 80000],
+    ...         "gender": ["M", "F"]},
+    ...     length=100,
+    ...     random_seed=175)
+
     >>> bal = balance(metadata)
     >>> bal.balance
-    array([1.   , 0.134, 0.   , 0.   ])
+    array([1.017, 0.034, 0.   , 0.028])
 
     Return intra/interfactor balance (mutual information)
 
     >>> bal.factors
-    array([[1.   , 0.   , 0.015],
-           [0.   , 0.08 , 0.011],
-           [0.015, 0.011, 1.063]])
+    array([[1.   , 0.015, 0.038],
+           [0.015, 1.   , 0.008],
+           [0.038, 0.008, 1.   ]])
 
     Return classwise balance (mutual information) of factors with individual class_labels
 
     >>> bal.classwise
-    array([[1.   , 0.134, 0.   , 0.   ],
-           [1.   , 0.134, 0.   , 0.   ]])
+    array([[7.818e-01, 1.388e-02, 1.803e-03, 7.282e-04],
+           [7.084e-01, 2.934e-02, 1.744e-02, 3.996e-03],
+           [7.295e-01, 1.157e-02, 2.799e-02, 9.451e-04]])
 
 
     See Also
@@ -93,77 +98,24 @@ def balance(
     if not metadata.factor_names:
         raise ValueError("No factors found in provided metadata.")
 
-    num_neighbors = _validate_num_neighbors(num_neighbors)
-
-    factor_types = {"class_label": "categorical"} | {k: v.factor_type for k, v in metadata.factor_info.items()}
+    factor_types = {k: v.factor_type for k, v in metadata.factor_info.items()}
     is_discrete = [factor_type != "continuous" for factor_type in factor_types.values()]
-    num_factors = len(factor_types)
-    class_labels = metadata.class_labels
 
-    mi = np.full((num_factors, num_factors), np.nan, dtype=np.float32)
-
-    # Use numeric data for MI
-    data = np.hstack((class_labels[:, np.newaxis], metadata.digitized_data))
-
-    # Present discrete features composed of distinct values as continuous for `mutual_info_classif`
-    for i, factor_type in enumerate(factor_types):
-        if len(data) == len(np.unique(data[:, i])):
-            is_discrete[i] = False
-            factor_types[factor_type] = "continuous"
-
-    mutual_info_fn_map = {
-        "categorical": mutual_info_classif,
-        "discrete": mutual_info_classif,
-        "continuous": mutual_info_regression,
-    }
-
-    for idx, factor_type in enumerate(factor_types.values()):
-        mi[idx, :] = mutual_info_fn_map[factor_type](
-            data,
-            data[:, idx],
-            discrete_features=is_discrete,
-            n_neighbors=num_neighbors,
-            random_state=get_seed(),
-        )
-
-    # Use binned data for classwise MI
-    data = np.hstack((class_labels[:, np.newaxis], metadata.binned_data))
-
-    # Normalization via entropy
-    bin_cnts = get_counts(data)
-    ent_factor = sp.stats.entropy(bin_cnts, axis=0)
-    norm_factor = 0.5 * np.add.outer(ent_factor, ent_factor) + EPSILON
-
-    # in principle MI should be symmetric, but it is not in practice.
-    nmi = 0.5 * (mi + mi.T) / norm_factor
+    nmi = _balance.balance(
+        metadata.class_labels,
+        metadata.binned_data,
+        is_discrete,
+        num_neighbors,
+    )
     balance = nmi[0]
     factors = nmi[1:, 1:]
 
-    # assume class is a factor
-    u_classes = np.unique(class_labels)
-    num_classes = len(u_classes)
-    classwise_mi = np.full((num_classes, num_factors), np.nan, dtype=np.float32)
-
-    # classwise targets
-    tgt_bin = data[:, 0][:, None] == u_classes
-
-    # classification MI for discrete/categorical features
-    for idx in range(num_classes):
-        # units: nat
-        classwise_mi[idx, :] = mutual_info_classif(
-            data,
-            tgt_bin[:, idx],
-            discrete_features=is_discrete,  # type: ignore - sklearn function not typed
-            n_neighbors=num_neighbors,
-            random_state=get_seed(),
-        )
-
-    # Classwise normalization via entropy
-    classwise_bin_cnts = get_counts(tgt_bin)
-    ent_tgt_bin = sp.stats.entropy(classwise_bin_cnts, axis=0)
-    norm_factor = 0.5 * np.add.outer(ent_tgt_bin, ent_factor) + EPSILON
-    classwise = classwise_mi / norm_factor
-
+    classwise = _balance.balance_classwise(
+        metadata.class_labels,
+        metadata.binned_data,
+        is_discrete,
+        num_neighbors,
+    )
     # Grabbing factor names for plotting function
     factor_names = ["class_label"] + list(metadata.factor_names)
 
