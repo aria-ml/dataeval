@@ -316,7 +316,7 @@ def get_curve_params(
 @dataclass
 class Constraints:
     """
-    Dataclass containing constraints for the coefficiencients of the power law: f[n] = c * n**(-m) + c0
+    Dataclass containing constraints for the coefficients of the power law: f[n] = c * n**(-m) + c0
 
     Attributes
     ----------
