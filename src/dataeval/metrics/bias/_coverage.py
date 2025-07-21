@@ -2,16 +2,12 @@ from __future__ import annotations
 
 __all__ = []
 
-import math
 from typing import Literal
 
-import numpy as np
-from scipy.spatial.distance import pdist, squareform
-
+from dataeval.functional._coverage import coverage_adaptive, coverage_naive
 from dataeval.outputs import CoverageOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.typing import Array
-from dataeval.utils._array import ensure_embeddings, flatten
 
 
 @set_metadata
@@ -71,28 +67,9 @@ def coverage(
     """
 
     # Calculate distance matrix, look at the (num_observations + 1)th farthest neighbor for each image.
-    embeddings = ensure_embeddings(embeddings, dtype=np.float64, unit_interval=True)
-    len_embeddings = len(embeddings)
-    if len_embeddings <= num_observations:
-        raise ValueError(
-            f"Length of embeddings ({len_embeddings}) is less than or equal to the specified number of \
-                observations ({num_observations})."
-        )
-    embeddings_matrix = squareform(pdist(flatten(embeddings))).astype(np.float64)
-    sorted_dists = np.sort(embeddings_matrix, axis=1)
-    critical_value_radii = sorted_dists[:, num_observations + 1]
-
-    d = embeddings.shape[1]
     if radius_type == "naive":
-        coverage_radius = (1 / math.sqrt(math.pi)) * (
-            (2 * num_observations * math.gamma(d / 2 + 1)) / (len_embeddings)
-        ) ** (1 / d)
-        uncovered_indices = np.where(critical_value_radii > coverage_radius)[0]
-    elif radius_type == "adaptive":
-        # Use data adaptive cutoff as coverage_radius
-        selection = int(max(len_embeddings * percent, 1))
-        uncovered_indices = np.argsort(critical_value_radii)[::-1][:selection]
-        coverage_radius = float(np.mean(np.sort(critical_value_radii)[::-1][selection - 1 : selection + 1]))
-    else:
-        raise ValueError(f"{radius_type} is an invalid radius type. Expected 'adaptive' or 'naive'")
-    return CoverageOutput(uncovered_indices, critical_value_radii, coverage_radius)
+        return CoverageOutput(*coverage_naive(embeddings, num_observations))
+    if radius_type == "adaptive":
+        return CoverageOutput(*coverage_adaptive(embeddings, num_observations, percent))
+
+    raise ValueError(f"{radius_type} is an invalid radius type. Expected 'adaptive' or 'naive'")

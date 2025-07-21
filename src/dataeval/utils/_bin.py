@@ -14,7 +14,7 @@ DISCRETE_MIN_WD = 0.054
 CONTINUOUS_MIN_SAMPLE_SIZE = 20
 
 
-def get_counts(data: NDArray[np.int_], min_num_bins: int | None = None) -> NDArray[np.int_]:
+def get_counts(data: NDArray[np.intp], min_num_bins: int | None = None) -> NDArray[np.intp]:
     """
     Returns columnwise unique counts for discrete data.
 

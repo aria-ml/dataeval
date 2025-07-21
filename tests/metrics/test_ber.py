@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
 
-from dataeval.metrics.estimators._ber import ber, ber_knn, ber_mst, get_classes_counts, knn_lowerbound
+from dataeval.functional._ber import _get_classes_counts, _knn_lowerbound, ber_knn, ber_mst
+from dataeval.metrics.estimators._ber import ber
 from dataeval.outputs._estimators import BEROutput
 
 
@@ -41,7 +42,7 @@ class TestFunctionalBER:
     )
     def test_knn_lower_bound_2_classes(self, value, classes, k, expected):
         """All logical pathways are correctly calculated"""
-        result = knn_lowerbound(value, classes, k)
+        result = _knn_lowerbound(value, classes, k)
         assert result == expected
 
     @pytest.mark.parametrize(
@@ -83,4 +84,4 @@ class TestAPIBER:
 
     def test_class_min(self):
         with pytest.raises(ValueError):
-            get_classes_counts(np.ones(1, dtype=np.int_))
+            _get_classes_counts(np.ones(1, dtype=np.int_))
