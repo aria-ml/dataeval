@@ -113,3 +113,20 @@ class UAPOutput(Output):
     """
 
     uap: float
+
+
+@dataclass(frozen=True)
+class NullModelMetricsOutput(Output):
+    """
+    Output class NullModelMetrics
+
+    Attributes
+    ----------
+    results_by_metric : dict
+        Null model metrics mapped by metric
+    results_by_model : dict
+        Null model metrics mapped by model
+    """
+
+    results_by_metric: dict[str, dict[str, np.float64]]
+    results_by_model: dict[str, dict[str, np.float64]]
