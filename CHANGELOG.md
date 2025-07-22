@@ -1,6 +1,15 @@
-[//]: # (ecbf11bbb4e2a87f944e086b998657c04cb0fe83)
+[//]: # (512a638585f0b23d10e6d392ba611e648e2e26be)
 
 # DataEval Change Log
+
+## v0.90.0
+
+🌟 **Feature Release**
+- `7581907a` - Integrate null model metrics
+
+📝 **Miscellaneous**
+- `512a6385` - Refactor and move functions to new `functional` submodule to prepare for new API
+- `0cd25665` - Minor changes to notebooks
 
 ## v0.89.1
 
