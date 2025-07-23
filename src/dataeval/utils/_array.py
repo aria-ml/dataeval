@@ -46,7 +46,7 @@ def as_numpy(array: ArrayLike | None) -> NDArray[Any]:
 def to_numpy(array: ArrayLike | None, copy: bool = True) -> NDArray[Any]:
     """Converts an ArrayLike to new Numpy array"""
     if array is None:
-        return np.ndarray([])
+        return np.array([])
 
     if isinstance(array, np.ndarray):
         return array.copy() if copy else array
