@@ -67,7 +67,9 @@ class TestInteropArrayLike:
         ),
     )
     def test_to_numpy(self, param, expected):
-        np.testing.assert_equal(to_numpy(param), expected)
+        actual = to_numpy(param)
+        np.testing.assert_equal(actual, expected)
+        assert len(actual) == len(expected)
 
 
 @pytest.mark.required
