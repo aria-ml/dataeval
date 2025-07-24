@@ -116,17 +116,46 @@ class UAPOutput(Output):
 
 
 @dataclass(frozen=True)
-class NullModelMetricsOutput(Output):
+class NullModelMetrics:
     """
-    Output class NullModelMetrics
+    Per-model results for null-model metrics
 
     Attributes
     ----------
-    results_by_metric : dict
-        Null model metrics mapped by metric
-    results_by_model : dict
-        Null model metrics mapped by model
+    precision_macro : float
+    precision_micro : float
+    recall_macro : float
+    recall_micro : float
+    false_positive_rate_macro : float
+    false_positive_rate_micro : float
+    accuracy_macro : float or None
+    accuracy_micro : float or None
+    multiclass_accuracy : float or None
     """
 
-    results_by_metric: dict[str, dict[str, np.float64]]
-    results_by_model: dict[str, dict[str, np.float64]]
+    precision_macro: float
+    precision_micro: float
+    recall_macro: float
+    recall_micro: float
+    false_positive_rate_macro: float
+    false_positive_rate_micro: float
+    accuracy_macro: float | None = None
+    accuracy_micro: float | None = None
+    multiclass_accuracy: float | None = None
+
+
+@dataclass(frozen=True)
+class NullModelMetricsOutput(Output):
+    """
+    Output class for null-model metrics
+
+    Attributes
+    ----------
+    uniform_random : NullModelMetrics
+    dominant_class : NullModelMetrics or None
+    proportional_random : NullModelMetrics or None
+    """
+
+    uniform_random: NullModelMetrics
+    dominant_class: NullModelMetrics | None = None
+    proportional_random: NullModelMetrics | None = None

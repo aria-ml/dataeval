@@ -299,7 +299,7 @@ def calc_params(p_i: NDArray[Any], n_i: NDArray[Any], niter: int, unit_interval:
 def get_curve_params(
     averaged_measures: MutableMapping[str, NDArray[Any]], ranges: NDArray[Any], niter: int, unit_interval: bool
 ) -> Mapping[str, NDArray[np.float64]]:
-    """Calculates and aggregates parameters for both single and multi-class metrics"""
+    """Calculates and aggregates parameters for both single and multiclass metrics"""
     output = {}
     for name, measure in averaged_measures.items():
         measure = cast(np.ndarray, measure)
