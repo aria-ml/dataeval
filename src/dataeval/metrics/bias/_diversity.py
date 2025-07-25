@@ -6,8 +6,8 @@ from typing import Literal
 
 import numpy as np
 
+from dataeval.core._diversity import diversity_shannon, diversity_simpson
 from dataeval.data import Metadata
-from dataeval.functional._diversity import diversity_shannon, diversity_simpson
 from dataeval.outputs import DiversityOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.utils._bin import get_counts

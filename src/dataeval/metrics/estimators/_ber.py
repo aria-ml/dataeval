@@ -16,7 +16,7 @@ from typing import Literal
 
 import numpy as np
 
-from dataeval.functional._ber import ber_knn, ber_mst
+from dataeval.core._ber import ber_knn, ber_mst
 from dataeval.outputs import BEROutput
 from dataeval.outputs._base import set_metadata
 from dataeval.typing import Array

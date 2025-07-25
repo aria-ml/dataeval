@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.functional._nullmodel import (
+from dataeval.core._nullmodel import (
     estimate_accuracy,
     estimate_false_positive_rate,
     estimate_multiclass_accuracy,

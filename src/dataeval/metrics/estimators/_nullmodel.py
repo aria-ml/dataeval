@@ -7,7 +7,7 @@ from collections.abc import Callable, Sequence
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.functional._nullmodel import (
+from dataeval.core._nullmodel import (
     BinaryClassMetricFunction,
     ConfusionMatrix,
     estimate_accuracy,
