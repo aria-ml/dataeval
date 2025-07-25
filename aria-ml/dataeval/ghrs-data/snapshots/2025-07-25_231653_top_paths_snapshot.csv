@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,96,71
+/aria-ml/dataeval/commits/main,9,2
+/aria-ml/dataeval/commit/b9a86ec6b6494f63b1e8de091f03604e615f2f36,4,2
+/aria-ml/dataeval/tree/main,3,3
+/aria-ml/dataeval/tree/main/docs,3,3
+/aria-ml/dataeval/tree/main/src,2,2
+/aria-ml/dataeval/commit/0cd25665f50dc201e8354d554814331f874b7e6b,2,1
+/aria-ml/dataeval/commit/2f71be851a5dfcc0c7273718e546df3ed52a5c0e,2,1
+/aria-ml/dataeval/blob/451d218db60b34996affd834e5d665c388e9b4fb/.gitlab-ci.yml,1,1
+/aria-ml/dataeval/blob/4aa39eab7b233542dbe98526a1561b07d72e5828/.gitlab-ci.yml,1,1
