@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.functional._divergence import divergence_fnn, divergence_mst
+from dataeval.core._divergence import divergence_fnn, divergence_mst
 from dataeval.metrics.estimators._divergence import divergence
 
 np.random.seed(0)

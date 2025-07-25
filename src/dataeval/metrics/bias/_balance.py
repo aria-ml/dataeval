@@ -4,8 +4,8 @@ __all__ = []
 
 import warnings
 
+from dataeval.core import _balance
 from dataeval.data import Metadata
-from dataeval.functional import _balance
 from dataeval.outputs import BalanceOutput
 from dataeval.outputs._base import set_metadata
 

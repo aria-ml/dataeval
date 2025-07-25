@@ -11,7 +11,7 @@ from typing import Literal
 
 import numpy as np
 
-from dataeval.functional._divergence import divergence_fnn, divergence_mst
+from dataeval.core._divergence import divergence_fnn, divergence_mst
 from dataeval.outputs import DivergenceOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.typing import Array

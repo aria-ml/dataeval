@@ -9,7 +9,7 @@ from __future__ import annotations
 __all__ = []
 
 
-from dataeval.functional._uap import uap as _uap
+from dataeval.core._uap import uap as _uap
 from dataeval.outputs import UAPOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike

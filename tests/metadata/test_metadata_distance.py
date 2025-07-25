@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from numpy.random import Generator
 
-from dataeval.functional._feature_distance import _calculate_drift, feature_distance
+from dataeval.core._feature_distance import _calculate_drift, feature_distance
 from tests.metadata._shared import mock_metadata
 
 

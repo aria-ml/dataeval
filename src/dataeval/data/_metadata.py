@@ -12,7 +12,7 @@ import polars as pl
 from numpy.typing import NDArray
 from tqdm.auto import tqdm
 
-from dataeval.functional._feature_distance import feature_distance
+from dataeval.core._feature_distance import feature_distance
 from dataeval.outputs._base import set_metadata
 from dataeval.outputs._metadata import MetadataDistanceOutput, MetadataDistanceValues
 from dataeval.typing import (
