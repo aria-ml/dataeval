@@ -74,16 +74,39 @@ class TestCoveragePlot:
 
 @pytest.mark.optional
 class TestCoverageFunctional:
+    def test_naive_answer_edge(self):
+        embs = np.zeros((101, 2))
+        embs[-1] = 1
+        result = coverage(embs, "naive", num_observations=100)
+        # all indices should be uncovered
+        assert len(result.uncovered_indices) == 101
+        assert result.uncovered_indices[-1] == 100
+        assert result.critical_value_radii[0] == pytest.approx(1.41421356)
+        assert result.critical_value_radii[100] == pytest.approx(1.41421356)
+
+    def test_adaptive_answer_edge(self):
+        embs = np.zeros((101, 2))
+        embs[-1] = 1
+        result = coverage(embs, "adaptive", num_observations=100)
+        # because the adaptive only returns the top k percent of results
+        # and the default is 1% only one indice is uncovered even though
+        # all indices have the same value and the 100 index is returned
+        # based on the way the values are sorted
+        assert len(result.uncovered_indices) == 1
+        assert result.uncovered_indices[0] == 100
+        assert result.critical_value_radii[0] == pytest.approx(1.41421356)
+        assert result.critical_value_radii[100] == pytest.approx(1.41421356)
+
     def test_naive_answer(self):
-        embs = np.zeros((100, 2))
-        embs = np.concatenate((embs, np.ones((1, 2))))
+        embs = np.zeros((101, 2))
+        embs[-1] = 1
         result = coverage(embs, "naive", num_observations=20)
         assert result.uncovered_indices[0] == 100
         assert result.critical_value_radii[100] == pytest.approx(1.41421356)
 
     def test_adaptive_answer(self):
-        embs = np.zeros((100, 2))
-        embs = np.concatenate((embs, np.ones((1, 2))))
+        embs = np.zeros((101, 2))
+        embs[-1] = 1
         result = coverage(embs, "adaptive", num_observations=20)
         assert result.uncovered_indices[0] == 100
         assert result.critical_value_radii[100] == pytest.approx(1.41421356)
