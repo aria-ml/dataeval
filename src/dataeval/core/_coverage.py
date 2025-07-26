@@ -25,7 +25,7 @@ def _validate_inputs(embeddings: Array, num_observations: int) -> Array:
 def _calculate_critical_value_radii(embeddings: Array, num_observations: int) -> NDArray[np.float64]:
     embeddings_matrix = squareform(pdist(flatten(embeddings))).astype(np.float64)
     sorted_dists = np.sort(embeddings_matrix, axis=1)
-    return sorted_dists[:, num_observations + 1]
+    return sorted_dists[:, num_observations]
 
 
 def coverage_naive(
