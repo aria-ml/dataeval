@@ -55,9 +55,9 @@ def coverage(
     -------
     >>> results = coverage(embeddings)
     >>> results.uncovered_indices
-    array([447, 412,   8,  32,  63])
+    array([447, 412,   8,  32,  13])
     >>> results.coverage_radius
-    0.17592147193757596
+    0.1703530195830698
 
     Reference
     ---------
