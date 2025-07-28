@@ -196,7 +196,11 @@ def calculate_neighbor_distances(data: np.ndarray, k: int = 10) -> tuple[NDArray
         )
         neighbors, distances = index.neighbor_graph
     except ImportError:
-        distances, neighbors = NearestNeighbors(n_neighbors=k + 1, algorithm="brute").fit(data).kneighbors(data)
+        # Note that k is the number of neighbors sought, excluding self. However, NearestNeighbors includes self.
+        # That is why the n_neighbors keyword is defined the way it is.
+        distances, neighbors = (
+            NearestNeighbors(n_neighbors=min(k + 1, data.shape[0]), algorithm="brute").fit(data).kneighbors(data)
+        )
 
     neighbors = np.array(neighbors[:, 1 : k + 1], dtype=np.int32)
     distances = np.array(distances[:, 1 : k + 1], dtype=np.float32)

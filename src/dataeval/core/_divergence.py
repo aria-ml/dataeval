@@ -11,12 +11,13 @@ __all__ = []
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.utils._mst import compute_neighbors, minimum_spanning_tree
+from dataeval.utils._mst import compute_neighbors, minimum_spanning_tree_fast
 
 
 def divergence_mst(data: NDArray[np.float64], labels: NDArray[np.int_]) -> int:
     """
-    Calculates the estimated label errors based on the minimum spanning tree
+    Counts the number of cross-label edges in the minimum spanning tree of
+    data.
 
     Parameters
     ----------
@@ -28,16 +29,16 @@ def divergence_mst(data: NDArray[np.float64], labels: NDArray[np.int_]) -> int:
     Returns
     -------
     int
-        Number of label errors when creating the minimum spanning tree
+        Number of cross-label edges in the minimum spanning tree of input data
     """
-    mst = minimum_spanning_tree(data).toarray()
-    edgelist = np.transpose(np.nonzero(mst))
-    return np.sum(labels[edgelist[:, 0]] != labels[edgelist[:, 1]])
+
+    rows, cols = minimum_spanning_tree_fast(data)  # get rows and cols directly
+    return np.sum(labels[rows] != labels[cols])
 
 
 def divergence_fnn(data: NDArray[np.float64], labels: NDArray[np.int_]) -> int:
     """
-    Calculates the estimated label errors based on their nearest neighbors.
+    Counts label disagreements between nearest neighbors in data.
 
     Parameters
     ----------
@@ -49,7 +50,7 @@ def divergence_fnn(data: NDArray[np.float64], labels: NDArray[np.int_]) -> int:
     Returns
     -------
     int
-        Number of label errors when finding nearest neighbors
+        Number of label disagreements between nearest neighbors
     """
     nn_indices = compute_neighbors(data, data)
-    return np.sum(np.abs(labels[nn_indices] - labels))
+    return np.sum(labels[nn_indices] != labels)
