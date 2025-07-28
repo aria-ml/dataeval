@@ -12,8 +12,8 @@ class TestDivergence:
     @pytest.mark.parametrize(
         "method, output",
         [
-            ("MST", {"divergence": 0.9819993519766712, "errors": 9}),
-            ("FNN", {"divergence": 1.0, "errors": 0.0}),
+            ("MST", {"divergence": 0.9899996399870395, "errors": 5}),
+            ("FNN", {"divergence": 1.0, "errors": 0}),
         ],
     )
     def test_divergence_mock_data(self, method, output):
@@ -36,8 +36,8 @@ class TestDivergence:
     @pytest.mark.parametrize(
         "method, expected_errors",
         [
-            (divergence_mst, 9),
-            (divergence_fnn, 45),
+            (divergence_mst, 9),  # all 9 edges of MST will connect different labels
+            (divergence_fnn, 9),  # FNN gets the whole MST in this case.
         ],
     )
     def test_divergence_funcs(self, method, expected_errors):

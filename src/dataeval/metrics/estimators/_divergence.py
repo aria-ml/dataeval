@@ -24,7 +24,8 @@ _DIVERGENCE_FN_MAP = {"FNN": divergence_fnn, "MST": divergence_mst}
 @set_metadata
 def divergence(emb_a: Array, emb_b: Array, method: Literal["FNN", "MST"] = "FNN") -> DivergenceOutput:
     """
-    Calculates the :term:`divergence` and any errors between the datasets.
+    Calculates the :term:`divergence` by counting the number of "between dataset" edges in the
+    minimum spanning tree.
 
     Parameters
     ----------
@@ -46,15 +47,6 @@ def divergence(emb_a: Array, emb_b: Array, method: Literal["FNN", "MST"] = "FNN"
     ----
     The divergence value indicates how similar the 2 datasets are
     with 0 indicating approximately identical data distributions.
-
-    Warning
-    -------
-        MST is very slow in this implementation, this is unlike matlab where
-        they have comparable speeds
-        Overall, MST takes ~25x LONGER!!
-        Source of slowdown:
-        conversion to and from CSR format adds ~10% of the time diff between
-        1nn and scipy mst function the remaining 90%
 
     References
     ----------
