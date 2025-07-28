@@ -2,32 +2,11 @@ from __future__ import annotations
 
 __all__ = []
 
-import warnings
 
 from dataeval.core import _balance
 from dataeval.data import Metadata
 from dataeval.outputs import BalanceOutput
 from dataeval.outputs._base import set_metadata
-
-
-def _validate_num_neighbors(num_neighbors: int) -> int:
-    if not isinstance(num_neighbors, int | float):
-        raise TypeError(
-            f"Variable {num_neighbors} is not real-valued numeric type."
-            "num_neighbors should be an int, greater than 0 and less than"
-            "the number of samples in the dataset"
-        )
-    if num_neighbors < 1:
-        raise ValueError(
-            f"Invalid value for {num_neighbors}."
-            "Choose a value greater than 0 and less than number of samples"
-            "in the dataset."
-        )
-    if isinstance(num_neighbors, float):
-        num_neighbors = int(num_neighbors)
-        warnings.warn(f"Variable {num_neighbors} is currently type float and will be truncated to type int.")
-
-    return num_neighbors
 
 
 @set_metadata
