@@ -5,18 +5,14 @@ __all__ = []
 from typing import Any, Literal
 
 from numpy.typing import NDArray
-from scipy.sparse import csr_matrix
-from scipy.sparse.csgraph import minimum_spanning_tree as mst
-from scipy.spatial.distance import pdist, squareform
 from sklearn.neighbors import NearestNeighbors
 
-from dataeval.config import EPSILON
 from dataeval.utils._array import flatten
 from dataeval.utils._fast_mst import calculate_neighbor_distances
 from dataeval.utils._fast_mst import minimum_spanning_tree as fast_mst
 
 
-def minimum_spanning_tree_fast(X: NDArray[Any], k: int = 15) -> Any:
+def minimum_spanning_tree(X: NDArray[Any], k: int = 15) -> Any:
     X = flatten(X)
 
     # Get k-nearest neighbors and build MST
@@ -27,29 +23,6 @@ def minimum_spanning_tree_fast(X: NDArray[Any], k: int = 15) -> Any:
     cols = mst_edges[:, 1].astype(int)
 
     return rows, cols
-
-
-def minimum_spanning_tree(X: NDArray[Any]) -> Any:
-    """
-    Returns the minimum spanning tree from a :term:`NumPy` image array.
-
-    Parameters
-    ----------
-    X : NDArray
-        Numpy image array
-
-    Returns
-    -------
-        Data representing the minimum spanning tree
-    """
-    # All features belong on second dimension
-    X = flatten(X)
-    # We add a small constant to the distance matrix to ensure scipy interprets
-    # the input graph as fully-connected.
-    dense_eudist = squareform(pdist(X)) + EPSILON
-    eudist_csr = csr_matrix(dense_eudist)
-
-    return mst(eudist_csr)
 
 
 def compute_neighbors(
