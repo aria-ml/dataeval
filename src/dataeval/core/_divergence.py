@@ -11,7 +11,7 @@ __all__ = []
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.utils._mst import compute_neighbors, minimum_spanning_tree_fast
+from dataeval.utils._mst import compute_neighbors, minimum_spanning_tree
 
 
 def divergence_mst(data: NDArray[np.float64], labels: NDArray[np.int_]) -> int:
@@ -32,7 +32,7 @@ def divergence_mst(data: NDArray[np.float64], labels: NDArray[np.int_]) -> int:
         Number of cross-label edges in the minimum spanning tree of input data
     """
 
-    rows, cols = minimum_spanning_tree_fast(data)  # get rows and cols directly
+    rows, cols = minimum_spanning_tree(data)  # get rows and cols directly
     return np.sum(labels[rows] != labels[cols])
 
 

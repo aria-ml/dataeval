@@ -5,19 +5,18 @@ __all__ = []
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.sparse import coo_matrix
 from scipy.stats import mode
 
 from dataeval.config import EPSILON
 from dataeval.utils._mst import compute_neighbors, minimum_spanning_tree
 
 
-def ber_mst(images: NDArray[np.float64], labels: NDArray[np.int_], k: int = 1) -> tuple[float, float]:
+def ber_mst(data: NDArray[np.float64], labels: NDArray[np.int_], k: int = 1) -> tuple[float, float]:
     M, N = _get_classes_counts(labels)
 
-    tree = coo_matrix(minimum_spanning_tree(images))
-    matches = np.sum([labels[tree.row[i]] != labels[tree.col[i]] for i in range(N - 1)])
-    deltas = matches / (2 * N)
+    rows, cols = minimum_spanning_tree(data)  # get rows and cols directly
+    mismatches = np.sum(labels[rows] != labels[cols])
+    deltas = mismatches / (2 * N)
     upper = 2 * deltas
     lower = ((M - 1) / (M)) * (1 - max(1 - 2 * ((M) / (M - 1)) * deltas, 0) ** 0.5)
     return upper, lower
