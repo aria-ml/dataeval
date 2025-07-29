@@ -1,6 +1,17 @@
-[//]: # (512a638585f0b23d10e6d392ba611e648e2e26be)
+[//]: # (789fb41aaf2c3f52b3e8a8b9b171724077c91417)
 
 # DataEval Change Log
+
+## v0.90.1
+
+🛠️ **Improvements and Enhancements**
+- `789fb41a` - Speedup for MST option in Divergence
+
+👾 **Fixes**
+- `a4802a52` - Issue #922 Indexing Bug Fix
+
+📝 **Miscellaneous**
+- `2a94dfa4` - Refactor NullModelMetrics for typing and encapsulation
 
 ## v0.90.0
 
