@@ -24,4 +24,4 @@ def download():
     with cd("notebooks"):
         MNIST(root="./data", download=True, image_set="train", corruption="translate")
         CIFAR10(root="./data", download=True, image_set="test")
-        VOCDetection("./data", download=True, image_set="train", year="2011")
+        VOCDetection("./data", download=True, image_set="train", year="2012")
