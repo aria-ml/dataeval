@@ -12,7 +12,8 @@ try:
 except ImportError:
     Figure = type(None)
 
-from dataeval.metrics.bias._balance import _validate_num_neighbors, balance
+from dataeval.core._balance import _validate_num_neighbors
+from dataeval.metrics.bias._balance import balance
 from tests.conftest import to_metadata
 
 
