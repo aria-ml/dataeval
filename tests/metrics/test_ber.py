@@ -13,11 +13,11 @@ class TestFunctionalBER:
     @pytest.mark.parametrize(
         "method, k, expected",
         [
-            ("MST", None, (0.009, 0.004511306604042031)),
+            ("MST", None, (0.005, 0.0025034819009044917)),
             ("KNN", 1, (0.0, 0.0)),
             ("KNN", 10, (0.0, 0.0)),
         ],
-    )
+    )  #             ("MST", None, (0.009, 0.004511306604042031)),
     def test_ber_on_mock_data(self, method, k, expected):
         """Methods correctly calculate BER with given params"""
         rng = np.random.default_rng(3)

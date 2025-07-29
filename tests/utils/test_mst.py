@@ -10,7 +10,8 @@ from dataeval.utils._mst import compute_neighbors, minimum_spanning_tree
 class TestMst:
     def test_mst(self):
         images = np.ones((10, 3, 3))
-        assert minimum_spanning_tree(images).shape == (10, 10)
+        rows, cols = minimum_spanning_tree(images)
+        assert (rows == [0, 1, 2, 4, 5, 6, 7, 8, 9]).all() and (cols == [3, 3, 3, 3, 3, 3, 3, 3, 3]).all()
 
     def test_compute_neighbors(self):
         images_0 = np.zeros((10, 3, 3))
