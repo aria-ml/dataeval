@@ -84,4 +84,4 @@ class TestAPIBER:
 
     def test_class_min(self):
         with pytest.raises(ValueError):
-            _get_classes_counts(np.ones(1, dtype=np.int_))
+            _get_classes_counts(np.ones(1, dtype=np.intp))

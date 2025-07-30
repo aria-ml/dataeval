@@ -31,7 +31,7 @@ def get_counts(data: NDArray[np.intp], min_num_bins: int | None = None) -> NDArr
         Bin counts per column of data.
     """
     max_value = data.max() + 1 if min_num_bins is None else min_num_bins
-    cnt_array = np.zeros((max_value, data.shape[1]), dtype=np.int_)
+    cnt_array = np.zeros((max_value, data.shape[1]), dtype=np.intp)
     for idx in range(data.shape[1]):
         cnt_array[:, idx] = np.bincount(data[:, idx], minlength=max_value)
 
@@ -69,12 +69,12 @@ def digitize_data(data: list[Any] | NDArray[Any], bins: int | Iterable[float]) -
     return np.digitize(data, bin_edges)
 
 
-def bin_data(data: NDArray[Any], bin_method: str) -> NDArray[np.int_]:
+def bin_data(data: NDArray[Any], bin_method: str) -> NDArray[np.intp]:
     """
     Bins continuous data through either equal width bins, equal amounts in each bin, or by clusters.
     """
     if bin_method == "clusters":
-        bin_edges = bin_by_clusters(data)
+        bin_edges = _bin_by_clusters(data)
 
     else:
         counts, bin_edges = np.histogram(data, bins="auto")
@@ -149,13 +149,13 @@ def is_continuous(data: NDArray[np.number[Any]], image_indices: NDArray[np.numbe
     return shift < DISCRETE_MIN_WD  # if NNN is close enough to uniform, consider the sample continuous.
 
 
-def bin_by_clusters(data: NDArray[np.number[Any]]) -> NDArray[np.float64]:
+def _bin_by_clusters(data: NDArray[np.number[Any]]) -> NDArray[np.float64]:
     """
     Bins continuous data by using the Clusterer to identify clusters
     and incorporates outliers by adding them to the nearest bin.
     """
     # Delay load numba compiled functions
-    from dataeval.utils._clusterer import cluster
+    from dataeval.core._clusterer import cluster
 
     # Create initial clusters
     c = cluster(data)

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.utils._clusterer import cluster
+from dataeval.core._clusterer import cluster
 
 
 @pytest.mark.required

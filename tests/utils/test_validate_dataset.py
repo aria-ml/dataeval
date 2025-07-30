@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from dataeval.typing import Array
-from dataeval.utils.data._validate import (
+from dataeval.utils._validate import (
     ValidationMessages,
     _detect_target_type,
     _validate_dataset_metadata,

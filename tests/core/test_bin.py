@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.utils._bin import CONTINUOUS_MIN_SAMPLE_SIZE, bin_data, digitize_data, is_continuous
+from dataeval.core._bin import CONTINUOUS_MIN_SAMPLE_SIZE, bin_data, digitize_data, is_continuous
 
 
 @pytest.mark.required

@@ -53,7 +53,7 @@ class ClustererOutput(Output):
     condensed_tree: NDArray[np.float32]
     membership_strengths: NDArray[np.float32]
 
-    def find_outliers(self) -> NDArray[np.int_]:
+    def find_outliers(self) -> NDArray[np.intp]:
         """
         Retrieves Outliers based on when the sample was added to the cluster
         and how far it was from the cluster when it was added
@@ -75,7 +75,7 @@ class ClustererOutput(Output):
             The exact :term:`duplicates<Duplicates>` and near duplicates as lists of related indices
         """
         # Delay load numba compiled functions
-        from dataeval.utils._clusterer import compare_links_to_cluster_std, sorted_union_find
+        from dataeval.core._clusterer import compare_links_to_cluster_std, sorted_union_find
 
         exact_indices, near_indices = compare_links_to_cluster_std(self.mst, self.clusters)  # type: ignore
         exact_dupes = sorted_union_find(exact_indices)
