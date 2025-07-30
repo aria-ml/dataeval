@@ -207,7 +207,7 @@ include = ["*/src/dataeval/*"]
 omit = [
   "*/torch/_blocks.py",
   "*/_clusterer.py",
-  "*/_fast_mst.py",
+  "*/_mst.py",
 ]
 fail_under = 90
 

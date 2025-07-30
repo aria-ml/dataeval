@@ -309,7 +309,7 @@ class BaseDriftUnivariate(BaseDrift):
             return drift_pred, threshold
         if self.correction == "fdr":
             n = p_vals.shape[0]
-            i = np.arange(n) + np.int_(1)
+            i = np.arange(n) + np.intp(1)
             p_sorted = np.sort(p_vals)
             q_threshold = self.p_val * i / n
             below_threshold = p_sorted < q_threshold

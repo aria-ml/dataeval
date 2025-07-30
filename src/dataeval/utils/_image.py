@@ -7,7 +7,14 @@ from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
+from scipy.ndimage import zoom
 from scipy.signal import convolve2d
+
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
+
 
 EDGE_KERNEL = np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]], dtype=np.int8)
 BIT_DEPTH = (1, 8, 12, 16, 32)
@@ -125,3 +132,14 @@ def clip_and_pad(image: NDArray[Any], box: Box) -> NDArray[Any]:
         output[:, y0:y1, x0:x1] = image[:, sbox[1] : sbox[3], sbox[0] : sbox[2]]
 
     return output
+
+
+def resize(image: NDArray[np.uint8], resize_dim: int, use_pil: bool = True) -> NDArray[np.uint8]:
+    """Resizes a grayscale (HxW) 8-bit image using PIL or scipy.ndimage.zoom."""
+
+    # Use PIL if available, otherwise resize and resample with scipy.ndimage.zoom
+    if use_pil and Image is not None:
+        return np.array(Image.fromarray(image).resize((resize_dim, resize_dim), Image.Resampling.LANCZOS))
+
+    zoom_factors = (resize_dim / image.shape[0], resize_dim / image.shape[1])
+    return np.clip(zoom(image, zoom_factors, order=5, mode="reflect"), 0, 255, dtype=np.uint8)

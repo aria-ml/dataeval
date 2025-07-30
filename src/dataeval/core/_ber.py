@@ -8,10 +8,10 @@ from numpy.typing import NDArray
 from scipy.stats import mode
 
 from dataeval.config import EPSILON
-from dataeval.utils._mst import compute_neighbors, minimum_spanning_tree
+from dataeval.core._mst import compute_neighbors, minimum_spanning_tree
 
 
-def ber_mst(data: NDArray[np.float64], labels: NDArray[np.int_], k: int = 1) -> tuple[float, float]:
+def ber_mst(data: NDArray[np.float64], labels: NDArray[np.intp], k: int = 1) -> tuple[float, float]:
     M, N = _get_classes_counts(labels)
 
     rows, cols = minimum_spanning_tree(data)  # get rows and cols directly
@@ -22,7 +22,7 @@ def ber_mst(data: NDArray[np.float64], labels: NDArray[np.int_], k: int = 1) -> 
     return upper, lower
 
 
-def ber_knn(images: NDArray[np.float64], labels: NDArray[np.int_], k: int) -> tuple[float, float]:
+def ber_knn(images: NDArray[np.float64], labels: NDArray[np.intp], k: int) -> tuple[float, float]:
     M, N = _get_classes_counts(labels)
     nn_indices = compute_neighbors(images, images, k=k)
     nn_indices = np.expand_dims(nn_indices, axis=1) if nn_indices.ndim == 1 else nn_indices
@@ -52,7 +52,7 @@ def _knn_lowerbound(value: float, classes: int, k: int) -> float:
     return ((classes - 1) / classes) * (1 - np.sqrt(max(0, 1 - ((classes / (classes - 1)) * value))))
 
 
-def _get_classes_counts(labels: NDArray[np.int_]) -> tuple[int, int]:
+def _get_classes_counts(labels: NDArray[np.intp]) -> tuple[int, int]:
     classes, counts = np.unique(labels, return_counts=True)
     M = len(classes)
     if M < 2:

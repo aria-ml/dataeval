@@ -6,7 +6,7 @@
 __all__ = []
 
 import warnings
-from typing import Any
+from typing import Any, Literal
 
 import numba
 import numpy as np
@@ -16,6 +16,8 @@ from sklearn.neighbors import NearestNeighbors
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", category=FutureWarning)
     from fast_hdbscan.disjoint_set import ds_find, ds_rank_create
+
+from dataeval.utils._array import flatten
 
 
 @numba.njit()
@@ -119,7 +121,7 @@ def _compute_nn(dataA: NDArray[Any], dataB: NDArray[Any], k: int) -> tuple[NDArr
     return neighbors, distances
 
 
-def _calculate_cluster_neighbors(
+def _compute_cluster_neighbors(
     data: NDArray[Any], groups: list[NDArray[np.intp]], point_array: NDArray[Any]
 ) -> tuple[NDArray[np.uint32], NDArray[np.float32]]:
     """Rerun nearest neighbor based on clusters"""
@@ -138,7 +140,7 @@ def _calculate_cluster_neighbors(
     return cluster_neighbors, cluster_nbr_distances
 
 
-def minimum_spanning_tree(
+def minimum_spanning_tree_edges(
     data: NDArray[Any], neighbors: NDArray[np.int32], distances: NDArray[np.float32]
 ) -> NDArray[np.float32]:
     # Transpose arrays to get number of samples along a row
@@ -169,7 +171,7 @@ def minimum_spanning_tree(
         edge_points = _cluster_edges(merge_tracker[last_idx], last_idx, k_distances)
 
         # Run nearest neighbor again between clusters to reach single cluster
-        additional_neighbors, additional_distances = _calculate_cluster_neighbors(
+        additional_neighbors, additional_distances = _compute_cluster_neighbors(
             data, edge_points, merge_tracker[last_idx]
         )
 
@@ -182,7 +184,20 @@ def minimum_spanning_tree(
     return tree
 
 
-def calculate_neighbor_distances(data: np.ndarray, k: int = 10) -> tuple[NDArray[np.int32], NDArray[np.float32]]:
+def minimum_spanning_tree(X: NDArray[Any], k: int = 15) -> tuple[NDArray[np.intp], NDArray[np.intp]]:
+    X = flatten(X)
+
+    # Get k-nearest neighbors and build MST
+    neighbors, distances = compute_neighbor_distances(X, k=k)
+    mst_edges = minimum_spanning_tree_edges(X, neighbors, distances)
+
+    rows = mst_edges[:, 0].astype(np.intp)
+    cols = mst_edges[:, 1].astype(np.intp)
+
+    return rows, cols
+
+
+def compute_neighbor_distances(data: np.ndarray, k: int = 10) -> tuple[NDArray[np.int32], NDArray[np.float32]]:
     # Have the potential to add in other distance calculations - supported calculations:
     # https://github.com/lmcinnes/pynndescent/blob/master/pynndescent/pynndescent_.py#L524
     try:
@@ -205,3 +220,53 @@ def calculate_neighbor_distances(data: np.ndarray, k: int = 10) -> tuple[NDArray
     neighbors = np.array(neighbors[:, 1 : k + 1], dtype=np.int32)
     distances = np.array(distances[:, 1 : k + 1], dtype=np.float32)
     return neighbors, distances
+
+
+def compute_neighbors(
+    A: NDArray[Any],
+    B: NDArray[Any],
+    k: int = 1,
+    algorithm: Literal["auto", "ball_tree", "kd_tree"] = "auto",
+) -> NDArray[Any]:
+    """
+    For each sample in A, compute the nearest neighbor in B
+
+    Parameters
+    ----------
+    A, B : NDArray
+        The n_samples and n_features respectively
+    k : int
+        The number of neighbors to find
+    algorithm : Literal
+        Tree method for nearest neighbor (auto, ball_tree or kd_tree)
+
+    Note
+    ----
+        Do not use kd_tree if n_features > 20
+
+    Returns
+    -------
+    List:
+        Closest points to each point in A and B
+
+    Raises
+    ------
+    ValueError
+        If algorithm is not "auto", "ball_tree", or "kd_tree"
+
+    See Also
+    --------
+    sklearn.neighbors.NearestNeighbors
+    """
+
+    if k < 1:
+        raise ValueError("k must be >= 1")
+    if algorithm not in ["auto", "ball_tree", "kd_tree"]:
+        raise ValueError("Algorithm must be 'auto', 'ball_tree', or 'kd_tree'")
+
+    A = flatten(A)
+    B = flatten(B)
+
+    nbrs = NearestNeighbors(n_neighbors=k + 1, algorithm=algorithm).fit(B)
+    nns = nbrs.kneighbors(A)[1]
+    return nns[:, 1:].squeeze()

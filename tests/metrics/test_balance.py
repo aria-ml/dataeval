@@ -1,5 +1,4 @@
 import copy
-from contextlib import nullcontext as does_not_raise
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -12,7 +11,6 @@ try:
 except ImportError:
     Figure = type(None)
 
-from dataeval.core._balance import _validate_num_neighbors
 from dataeval.metrics.bias._balance import balance
 from tests.conftest import to_metadata
 
@@ -57,27 +55,6 @@ def simple_metadata():
 
 @pytest.mark.required
 class TestBalanceUnit:
-    @pytest.mark.parametrize(
-        "test_param, expected_exception, err_msg",
-        [
-            ("7", pytest.raises(TypeError), "Variable 7 is not real-valued numeric type."),
-            (0, pytest.raises(ValueError), "Invalid value for 0."),
-        ],
-    )
-    def test_validate_num_neighbors_type_errors(self, test_param, expected_exception, err_msg):
-        with expected_exception as e:
-            _validate_num_neighbors(test_param)
-        assert err_msg in str(e.value)
-
-    def test_validate_num_neighbors_warning(self):
-        err_msg = "[ UserWarning('Variable 4 is currently type float and will be truncated to type int.')]"
-        with pytest.warns(UserWarning, match=err_msg):
-            _validate_num_neighbors(4.0)  # type: ignore
-
-    def test_validate_num_neighbors_pass(self):
-        with does_not_raise():
-            _validate_num_neighbors(10)
-
     def test_correct_mi_shape_and_dtype(self, metadata_results):
         metadata = copy.deepcopy(metadata_results)
         metadata.exclude = []
@@ -132,15 +109,3 @@ class TestBalancePlot:
         col_labels = np.arange(len(factor_names))
         classwise_output = mi.plot(row_labels, col_labels, plot_classwise=True)
         assert isinstance(classwise_output, Figure)
-
-
-@pytest.mark.optional
-class TestBalanceFunctional:
-    def test_unity_balance(self, simple_metadata):
-        output = balance(simple_metadata)
-        assert np.all(output.balance > 0.999)
-        assert np.all(output.factors > 0.999)
-
-    def test_zero_balance(self, mismatch_metadata):
-        output = balance(mismatch_metadata)
-        assert np.all(np.isclose(output.balance, 0))

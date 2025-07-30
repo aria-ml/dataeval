@@ -59,7 +59,7 @@ def check_sample_leakage(splits: SplitDatasetOutput):
         assert len(test_inds) + len(train_inds) + len(val_inds) == 100
 
 
-def check_stratification(labels: NDArray[np.int_], splits: SplitDatasetOutput, tolerance: float):
+def check_stratification(labels: NDArray[np.intp], splits: SplitDatasetOutput, tolerance: float):
     """Checks that all folds and optional test split have all labels and tolerable label frequencies"""
     unique_labels, class_counts = np.unique(labels, return_counts=True)
     class_freqs = class_counts / np.sum(class_counts)
