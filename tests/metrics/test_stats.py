@@ -92,7 +92,7 @@ class TestBaseStats:
     @pytest.mark.parametrize("as_float", [False, True])
     @pytest.mark.parametrize("per_channel", [False, True])
     def test_process_stats_unpack(self, get_od_dataset, as_float, per_channel):
-        results_list: list[dict[str, NDArray[np.int_]]] = []
+        results_list: list[dict[str, NDArray[np.intp]]] = []
         dataset = get_od_dataset(DATA_3, targets_per_image=1, as_float=as_float)
         partial_fn = partial(
             process_stats_unpack,

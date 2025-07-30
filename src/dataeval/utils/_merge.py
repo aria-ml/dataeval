@@ -265,7 +265,7 @@ def _merge(
     merged: dict[str, list[Any]] = {}
     isect: set[str] = set()
     union: set[str] = set()
-    image_repeats = np.zeros(len(dicts), dtype=np.int_)
+    image_repeats = np.zeros(len(dicts), dtype=np.intp)
     dropped: dict[str, set[DropReason]] = {}
     for i, d in enumerate(dicts):
         targets = None if targets_per_image is None else targets_per_image[i]
@@ -285,7 +285,7 @@ def _merge(
     else:
         image_ids = np.arange(image_repeats.size)
         image_data = np.concatenate(
-            [np.repeat(image_ids[i], image_repeats[i]) for i in range(image_ids.size)], dtype=np.int_
+            [np.repeat(image_ids[i], image_repeats[i]) for i in range(image_ids.size)], dtype=np.intp
         )
         _, image_unsorted = np.unique(image_data, return_inverse=True)
         image_indices = np.sort(image_unsorted)

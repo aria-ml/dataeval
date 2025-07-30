@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from dataeval.utils._mst import compute_neighbors, minimum_spanning_tree
+from dataeval.core._mst import compute_neighbors, minimum_spanning_tree
 
 
 @pytest.mark.required

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.metrics.stats._hashstats import _resize, pchash, xxhash
+from dataeval.core._hash import pchash, resize, xxhash
 
 
 @pytest.mark.required
@@ -48,12 +48,12 @@ class TestPcHash:
 
     def test_resize_pil(self):
         img = np.random.randint(255, size=(28, 28), dtype=np.uint8)
-        resized = _resize(img, 16)
+        resized = resize(img, 16)
         assert resized.shape == (16, 16)
 
     def test_resize_scipy(self):
         img = np.random.randint(255, size=(28, 28), dtype=np.uint8)
-        resized = _resize(img, 16, False)
+        resized = resize(img, 16, False)
         assert resized.shape == (16, 16)
 
     def test_resize_method_comparison(self):
@@ -62,6 +62,6 @@ class TestPcHash:
         for i in range(dim):
             for j in range(dim):
                 img[i, j] = (i + j) / (2 * (dim - 1))
-        pil_resized = _resize(img, 16)
-        scipy_resized = _resize(img, 16, False)
+        pil_resized = resize(img, 16)
+        scipy_resized = resize(img, 16, False)
         np.testing.assert_equal(pil_resized, scipy_resized)

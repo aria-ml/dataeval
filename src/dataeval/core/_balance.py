@@ -11,7 +11,7 @@ from scipy.stats import entropy
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 
 from dataeval.config import EPSILON, get_max_processes, get_seed
-from dataeval.utils._bin import get_counts, is_continuous
+from dataeval.core._bin import get_counts, is_continuous
 
 
 def _validate_num_neighbors(num_neighbors: int) -> int:

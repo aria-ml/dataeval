@@ -9,8 +9,8 @@ from numpy.typing import NDArray
 
 
 def diversity_shannon(
-    counts: NDArray[np.int_],
-    num_bins: NDArray[np.int_],
+    counts: NDArray[np.intp],
+    num_bins: NDArray[np.intp],
 ) -> NDArray[np.double]:
     """
     Compute :term:`diversity<Diversity>` for discrete/categorical variables and, through standard
@@ -23,9 +23,9 @@ def diversity_shannon(
 
     Parameters
     ----------
-    counts : NDArray[np.int_]
+    counts : NDArray[np.intp]
         Array containing bin counts for each factor
-    num_bins : NDArray[np.int_]
+    num_bins : NDArray[np.intp]
         Number of bins with values for each factor
 
     Returns
@@ -45,8 +45,8 @@ def diversity_shannon(
 
 
 def diversity_simpson(
-    counts: NDArray[np.int_],
-    num_bins: NDArray[np.int_],
+    counts: NDArray[np.intp],
+    num_bins: NDArray[np.intp],
 ) -> NDArray[np.double]:
     """
     Compute :term:`diversity<Diversity>` for discrete/categorical variables and, through standard
@@ -59,9 +59,9 @@ def diversity_simpson(
 
     Parameters
     ----------
-    counts : NDArray[np.int_]
+    counts : NDArray[np.intp]
         Array containing bin counts for each factor
-    num_bins : NDArray[np.int_]
+    num_bins : NDArray[np.intp]
         Number of bins with values for each factor
 
     Note

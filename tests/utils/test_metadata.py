@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.utils.data._merge import _simplify_type, flatten, merge
+from dataeval.utils._merge import _simplify_type, flatten, merge
 
 
 @pytest.mark.required
