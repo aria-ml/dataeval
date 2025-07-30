@@ -37,7 +37,7 @@ def clusterer(data: ArrayLike) -> ClustererOutput:
             4,  2,  0,  0,  1,  2,  0,  1,  3,  0,  3,  3,  4,  0,  0,  3,  0,
             3, -1,  0,  0,  2,  4,  3,  4,  0,  1,  0, -1,  3,  0,  0,  0])
     """
-    from dataeval.core._clusterer import clusterer as _clusterer
+    from dataeval.core._clusterer import cluster
 
-    c = _clusterer(data)
+    c = cluster(data)
     return ClustererOutput(c.clusters, c.mst, c.linkage_tree, as_numpy(c.condensed_tree), c.membership_strengths)

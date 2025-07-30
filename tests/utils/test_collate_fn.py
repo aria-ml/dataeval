@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from dataeval.utils.data.collate import list_collate_fn, numpy_collate_fn, torch_collate_fn
+from dataeval.utils.collate import list_collate_fn, numpy_collate_fn, torch_collate_fn
 
 
 class TestCollateFn:

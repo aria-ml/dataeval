@@ -12,6 +12,7 @@ import polars as pl
 from numpy.typing import NDArray
 from tqdm.auto import tqdm
 
+from dataeval.core._bin import bin_data, digitize_data, is_continuous
 from dataeval.core._feature_distance import feature_distance
 from dataeval.outputs._base import set_metadata
 from dataeval.outputs._metadata import MetadataDistanceOutput, MetadataDistanceValues
@@ -22,8 +23,7 @@ from dataeval.typing import (
     ObjectDetectionTarget,
 )
 from dataeval.utils._array import as_numpy
-from dataeval.utils._bin import bin_data, digitize_data, is_continuous
-from dataeval.utils.data._merge import merge
+from dataeval.utils._merge import merge
 
 
 def _binned(name: str) -> str:
