@@ -4,13 +4,7 @@ in setting up data and architectures that are guaranteed to work with applicable
 DataEval metrics.
 """
 
-from dataeval.utils import collate
+from dataeval.utils import torch
 from dataeval.utils._merge import flatten, merge
-from dataeval.utils._validate import validate_dataset
 
-__all__ = [
-    "collate",
-    "flatten",
-    "merge",
-    "validate_dataset",
-]
+__all__ = ["flatten", "merge", "torch"]
