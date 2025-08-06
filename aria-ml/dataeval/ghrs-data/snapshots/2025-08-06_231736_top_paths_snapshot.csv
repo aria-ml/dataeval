@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,27,24
+/aria-ml/dataeval/tree/main/src/dataeval,9,2
+/aria-ml/dataeval/tree/main/src,6,3
+/aria-ml/dataeval/tree/main/src/dataeval/core,6,1
+/aria-ml/dataeval/tree/main/src/dataeval/utils,4,2
+/aria-ml/dataeval/tree/main/docs/source/notebooks,3,3
+/aria-ml/dataeval/tree/main,2,2
+/aria-ml/dataeval/blob/main/src/dataeval/core/_divergence.py,2,1
+/aria-ml/dataeval/tree/main/src/dataeval/metrics,2,1
+/aria-ml/dataeval/blob/main/src/conftest.py,1,1
