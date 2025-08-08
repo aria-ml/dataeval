@@ -25,18 +25,18 @@ features.
 - [Coverage](Coverage.md)
 - [Completeness](Completeness.md)
 - [Dataset Cleaning](DataCleaning.md)
+- [Dataset Prioritization](Prioritization.md)
 - [Divergence](Divergence.md)
 - [Diversity](Diversity.md)
 - [Drift](Drift.md)
 - [Embeddings](Embeddings.md)
+- [Image Statistical Analysis](ImageStats.md)
 - [Label Parity](LabelParity.md)
 - [Metadata](Metadata.md)
 - [Model Training](ModelTraining.md)
 - [Out-of-Distribution Data](OOD.md)
 - [Outliers](Outliers.md)
 - [Parity](Parity.md)
-- [Prioritization](Prioritization.md)
-- [Statistical Analysis](Stats.md)
 - [Sufficiency of Data](Sufficiency.md)
 - [Upperbound on Average Precision](UAP.md)
 
@@ -50,18 +50,18 @@ Clustering.md
 Coverage.md
 Completeness.md
 DataCleaning.md
+Prioritization.md
 Divergence.md
 Diversity.md
 Drift.md
 Embeddings.md
+ImageStats.md
 LabelParity.md
 Metadata.md
 ModelTraining.md
 OOD.md
 Outliers.md
 Parity.md
-Prioritization.md
-Stats.md
 Sufficiency.md
 UAP.md
 :::

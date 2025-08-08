@@ -2,39 +2,13 @@ from __future__ import annotations
 
 __all__ = []
 
-from collections.abc import Callable
 from typing import Any
 
-import numpy as np
-from scipy.stats import entropy, kurtosis, skew
-
-from dataeval.metrics.stats._base import StatsProcessor, run_stats
+from dataeval.core._imagestats import PixelPerChannelStatsProcessor, PixelStatsProcessor, process
+from dataeval.metrics.stats._base import convert_output, unzip_dataset
 from dataeval.outputs import PixelStatsOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike, Dataset
-
-
-class PixelStatsProcessor(StatsProcessor[PixelStatsOutput]):
-    output_class: type = PixelStatsOutput
-    cache_keys = {"histogram"}
-    image_function_map: dict[str, Callable[[StatsProcessor[PixelStatsOutput]], Any]] = {
-        "mean": lambda x: np.nanmean(x.scaled),
-        "std": lambda x: np.nanstd(x.scaled),
-        "var": lambda x: np.nanvar(x.scaled),
-        "skew": lambda x: skew(x.scaled.ravel(), nan_policy="omit"),
-        "kurtosis": lambda x: kurtosis(x.scaled.ravel(), nan_policy="omit"),
-        "histogram": lambda x: np.histogram(x.scaled, 256, (0, 1))[0],
-        "entropy": lambda x: entropy(x.get("histogram")),
-    }
-    channel_function_map: dict[str, Callable[[StatsProcessor[PixelStatsOutput]], Any]] = {
-        "mean": lambda x: np.nanmean(x.scaled, axis=1),
-        "std": lambda x: np.nanstd(x.scaled, axis=1),
-        "var": lambda x: np.nanvar(x.scaled, axis=1),
-        "skew": lambda x: skew(x.scaled, axis=1, nan_policy="omit"),
-        "kurtosis": lambda x: kurtosis(x.scaled, axis=1, nan_policy="omit"),
-        "histogram": lambda x: np.apply_along_axis(lambda y: np.histogram(y, 256, (0, 1))[0], 1, x.scaled),
-        "entropy": lambda x: entropy(x.get("histogram"), axis=1),
-    }
 
 
 @set_metadata
@@ -74,6 +48,7 @@ def pixelstats(
     ----
     - All metrics are scaled based on the perceived bit depth (which is derived from the largest pixel value)
       to allow for better comparison between images stored in different formats and different resolutions.
+    - `zeros` and `missing` are presented as a percentage of total pixel counts
 
     Examples
     --------
@@ -85,4 +60,6 @@ def pixelstats(
     >>> print(results.entropy)
     [4.527 1.883 0.811 1.883 0.298 1.883 1.883 1.883]
     """
-    return run_stats(dataset, per_box, per_channel, [PixelStatsProcessor])[0]
+    processor = PixelPerChannelStatsProcessor if per_channel else PixelStatsProcessor
+    stats = process(*unzip_dataset(dataset, per_box), processor)
+    return convert_output(PixelStatsOutput, stats)

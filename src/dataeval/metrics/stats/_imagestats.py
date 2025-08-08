@@ -2,33 +2,19 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Any, Literal, overload
+from typing import Any
 
-from dataeval.metrics.stats._base import run_stats
-from dataeval.metrics.stats._dimensionstats import DimensionStatsProcessor
-from dataeval.metrics.stats._pixelstats import PixelStatsProcessor
-from dataeval.metrics.stats._visualstats import VisualStatsProcessor
-from dataeval.outputs import ChannelStatsOutput, ImageStatsOutput
+from dataeval.core._imagestats import (
+    PixelPerChannelStatsProcessor,
+    PixelStatsProcessor,
+    VisualPerChannelStatsProcessor,
+    VisualStatsProcessor,
+    process,
+)
+from dataeval.metrics.stats._base import convert_output, unzip_dataset
+from dataeval.outputs import ImageStatsOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike, Dataset
-
-
-@overload
-def imagestats(
-    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
-    *,
-    per_box: bool = False,
-    per_channel: Literal[True],
-) -> ChannelStatsOutput: ...
-
-
-@overload
-def imagestats(
-    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
-    *,
-    per_box: bool = False,
-    per_channel: Literal[False] = False,
-) -> ImageStatsOutput: ...
 
 
 @set_metadata
@@ -37,13 +23,12 @@ def imagestats(
     *,
     per_box: bool = False,
     per_channel: bool = False,
-) -> ImageStatsOutput | ChannelStatsOutput:
+) -> ImageStatsOutput:
     """
     Calculates various :term:`statistics<Statistics>` for each image.
 
-    This function computes dimension, pixel and visual metrics
-    on the images or individual bounding boxes for each image. If
-    performing calculations per channel dimension stats are excluded.
+    This function computes pixel and visual metrics on the images or
+    individual bounding boxes for each image.
 
     Parameters
     ----------
@@ -56,12 +41,8 @@ def imagestats(
 
     Returns
     -------
-    ImageStatsOutput or ChannelStatsOutput
+    ImageStatsOutput
         Output class containing the outputs of various stats functions
-
-    See Also
-    --------
-    dimensionstats, pixelstats, visualstats
 
     Examples
     --------
@@ -69,8 +50,8 @@ def imagestats(
     images.
 
     >>> stats = imagestats(dataset)
-    >>> print(stats.aspect_ratio)
-    [1.    1.    1.333 1.    0.667 1.    1.    1.   ]
+    >>> print(stats.mean)
+    [0.181 0.132 0.248 0.373 0.464 0.613 0.734 0.854]
 
     >>> print(stats.sharpness)
     [20.23 20.23 23.33 20.23 77.06 20.23 20.23 20.23]
@@ -83,12 +64,10 @@ def imagestats(
     [0.027 0.152 0.277 0.127 0.135 0.142 0.259 0.377 0.385 0.392 0.508 0.626
      0.634 0.642 0.751 0.759 0.767 0.876 0.884 0.892]
     """
-    if per_channel:
-        processors = [PixelStatsProcessor, VisualStatsProcessor]
-        output_cls = ChannelStatsOutput
-    else:
-        processors = [DimensionStatsProcessor, PixelStatsProcessor, VisualStatsProcessor]
-        output_cls = ImageStatsOutput
-
-    outputs = run_stats(dataset, per_box, per_channel, processors)
-    return output_cls(**{k: v for d in outputs for k, v in d.data().items()})
+    processors = (
+        [PixelPerChannelStatsProcessor, VisualPerChannelStatsProcessor]
+        if per_channel
+        else [PixelStatsProcessor, VisualStatsProcessor]
+    )
+    stats = process(*unzip_dataset(dataset, per_box), processors=processors)
+    return convert_output(ImageStatsOutput, stats)

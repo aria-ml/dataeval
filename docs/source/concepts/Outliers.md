@@ -5,7 +5,7 @@
 The Outliers class is a data cleaning class used to identify images that are
 reducing the quality or integrity of the dataset. It identifies the images by
 calculating the statistical outliers of a dataset using various statistical
-tests applied to each metric from the [imagestats](Stats.md) function.
+tests applied to each metric from the [imagestats](ImageStats.md) function.
 
 Because the statistical tests rely on a data distribution, the results are
 based on the data evaluated. This means that changing the data either through
@@ -24,7 +24,7 @@ explore and clean a dataset.
 
 ## Theory behind it
 
-The Outliers class relies upon the [stat functions](Stats.md) to create a data
+The Outliers class relies upon the [stat functions](ImageStats.md) to create a data
 distribution for specific metrics. The class then analyzes the distribution
 through a statistical test.
 
@@ -79,7 +79,7 @@ functionality. The user has the option to specify:
 - the threshold the Outliers should compare with for identifying outliers
 
 For more information on the algorithms/methods used to create the data
-distribution, see the [Stats](Stats.md) concept page.
+distribution, see the [Image Stats](ImageStats.md) concept page.
 
 ## Class Output
 

@@ -1,31 +1,22 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from functools import partial
 from typing import Any
 
 import numpy as np
 import polars as pl
 import pytest
 from maite_datasets import to_object_detection_dataset
-from numpy.typing import NDArray
 
 from dataeval.config import set_max_processes, use_max_processes
-from dataeval.metrics.stats import dimensionstats, hashstats, pixelstats, visualstats
+from dataeval.metrics.stats import dimensionstats, hashstats, imagestats, pixelstats, visualstats
 from dataeval.metrics.stats._base import (
-    BoundingBox,
-    StatsProcessor,
-    _enumerate,
     add_stats,
     combine_stats,
     get_dataset_step_from_idx,
-    process_stats,
-    process_stats_unpack,
 )
 from dataeval.metrics.stats._boxratiostats import boxratiostats, calculate_ratios
-from dataeval.metrics.stats._imagestats import (
-    imagestats,
-)
 from dataeval.outputs._stats import BASE_ATTRS, SOURCE_INDEX, BaseStatsOutput
 
 # do not run stats tests using multiple processing
@@ -34,103 +25,34 @@ set_max_processes(1)
 DATA_1 = [np.random.random((1, 64, 64)) for _ in range(10)]
 DATA_3 = [np.random.random((3, 64, 64)) for _ in range(10)]
 
-STATS_ATTRS: dict[str, set[str]] = {
-    "pixelstats": {"mean", "std", "var", "skew", "kurtosis", "entropy", "histogram"},
-    "visualstats": {"brightness", "contrast", "darkness", "missing", "sharpness", "zeros", "percentiles"},
-    "dimensionstats": {
-        "offset_x",
-        "offset_y",
-        "width",
-        "height",
-        "channels",
-        "size",
-        "aspect_ratio",
-        "depth",
-        "center",
-        "distance_center",
-        "distance_edge",
-    },
-    "hashstats": {"xxhash", "pchash"},
+PIXELSTATS_ATTRS = {"mean", "std", "var", "skew", "kurtosis", "entropy", "histogram", "missing", "zeros"}
+VISUALSTATS_ATTRS = {"brightness", "contrast", "darkness", "sharpness", "percentiles"}
+DIMENSIONSTATS_ATTRS = {
+    "offset_x",
+    "offset_y",
+    "width",
+    "height",
+    "channels",
+    "size",
+    "aspect_ratio",
+    "depth",
+    "center",
+    "distance_center",
+    "distance_edge",
+    "invalid_box",
+}
+
+HASHSTATS_ATTRS = {"xxhash", "pchash"}
+
+STATS_ATTRS: dict[Callable, set[str]] = {
+    pixelstats: PIXELSTATS_ATTRS,
+    visualstats: VISUALSTATS_ATTRS,
+    dimensionstats: DIMENSIONSTATS_ATTRS,
+    hashstats: HASHSTATS_ATTRS,
+    imagestats: PIXELSTATS_ATTRS | VISUALSTATS_ATTRS,
 }
 
 STATS_2D_ATTRS: set[str] = {"histogram", "percentiles", "center"}
-
-
-@pytest.fixture
-def stats_attrs(request):
-    """Returns set of attributes for a specific StatsOutput class as defined in STATS_ATTRS"""
-    p: str = request.param
-
-    if p == "imagestats":
-        return set.union(*(STATS_ATTRS[k] for k in ("pixelstats", "visualstats", "dimensionstats")))
-    if p == "channelstats":
-        return set.union(*(STATS_ATTRS[k] for k in ("pixelstats", "visualstats")))
-    return STATS_ATTRS[p]
-
-
-class LengthStatsOutput(BaseStatsOutput):
-    length: int
-
-
-class LengthProcessor(StatsProcessor[LengthStatsOutput]):
-    output_class = LengthStatsOutput
-    cache_keys = {"length"}
-    image_function_map = {
-        "neg_length": lambda x: -(x.get("length")),
-        "length": lambda x: len(x.image),
-        "shape": lambda x: len(x.shape),
-        "scaled": lambda x: len(x.scaled),
-        "neg_length2": lambda x: x.get("neg_length"),
-        "length2": lambda x: x.get("length"),
-        "shape2": lambda x: len(x.shape),
-        "scaled2": lambda x: len(x.scaled),
-    }
-
-
-@pytest.mark.required
-class TestBaseStats:
-    @pytest.mark.parametrize("as_float", [False, True])
-    @pytest.mark.parametrize("per_channel", [False, True])
-    def test_process_stats_unpack(self, get_od_dataset, as_float, per_channel):
-        results_list: list[dict[str, NDArray[np.intp]]] = []
-        dataset = get_od_dataset(DATA_3, targets_per_image=1, as_float=as_float)
-        partial_fn = partial(
-            process_stats_unpack,
-            per_channel=per_channel,
-            stats_processor_cls=[LengthProcessor],
-        )
-        for i in range(len(dataset)):
-            r = partial_fn((i, dataset[i][0], None))
-            results_list.extend(r.results)
-        assert len(results_list) == len(DATA_3)
-
-    @pytest.mark.parametrize("box", [np.array([0, 0, 16, 16]), None])
-    @pytest.mark.parametrize("per_channel", [False, True])
-    def test_stats_processor_properties(self, box, per_channel):
-        image = (DATA_3[0] * 255).astype(np.int32)
-        processor = LengthProcessor(image, box, per_channel=per_channel)
-        shape = (3, 64, 64) if box is None else (3, 16, 16)
-        scaled_shape = (shape[0], shape[1] * shape[2]) if per_channel else shape
-
-        assert processor.shape == shape
-        assert processor.image.shape == shape
-        assert np.max(processor.image) > 1
-        assert processor.scaled.shape == scaled_shape
-        assert np.max(processor.scaled) <= 1
-
-    @pytest.mark.parametrize("per_box", [False, True])
-    def test_enumerate(self, get_od_dataset, per_box):
-        dataset = get_od_dataset(DATA_3, targets_per_image=1, as_float=True)
-        for i, image, boxes in _enumerate(dataset, per_box):
-            assert np.asarray(image).shape == (3, 64, 64)
-            assert isinstance(boxes, list) if per_box else boxes is None
-
-    def test_process_stats_out_of_bounds(self):
-        invalid_box = BoundingBox(-5.0, -5.0, -1.0, -1.0)
-        expected_warning = f"Bounding box [0][0]: {invalid_box} for image shape (3, 16, 16) is invalid."
-        output = process_stats(0, np.random.random((3, 16, 16)), [invalid_box], False, [LengthProcessor])
-        assert len(output.warnings_list) == 1
-        assert output.warnings_list[0] == expected_warning
 
 
 @pytest.mark.required
@@ -153,7 +75,7 @@ class TestStats:
             [visualstats, DATA_1, True, "sharpness", 10],
             [visualstats, DATA_3, False, "contrast", 10],
             [visualstats, DATA_3, True, "darkness", 10 * 3],
-            [visualstats, DATA_1 + DATA_3, False, "missing", 10 + 10],
+            [visualstats, DATA_1 + DATA_3, False, "brightness", 10 + 10],
             [visualstats, DATA_1 + DATA_3, True, "percentiles", 10 * 3 + 10],
         ],
     )
@@ -176,14 +98,14 @@ class TestStats:
         assert sum(1 for b in mask if b) == 10 + 10
 
     def test_stats_len_with_no_annotations(self):
-        output = BaseStatsOutput([], np.array([]), 0)
+        output = BaseStatsOutput([], [], [], 0)
         object.__setattr__(output, "__annotations__", {})
         assert len(output) == 0
 
     def test_boxratio_only_imagestats(self, get_od_dataset):
-        imagestats = dimensionstats(get_od_dataset(DATA_3, 4, True))
+        imgstats = dimensionstats(get_od_dataset(DATA_3, 4, True))
         with pytest.raises(ValueError, match="Input for boxstats must contain box information."):
-            boxratiostats(imagestats, imagestats)
+            boxratiostats(imgstats, imgstats)
 
     def test_boxratio_only_boxstats(self, get_od_dataset):
         boxes = [np.array([[0, 0, 1, 1], [0, 0, 100, 100]])]
@@ -200,8 +122,8 @@ class TestStats:
 
     def test_boxratio_channel_mismatch(self, get_od_dataset):
         boxes = [np.array([[0, 0, 1, 1], [0, 0, 100, 100]])]
-        imgstats = pixelstats(get_od_dataset(DATA_1, 2, False, boxes), per_box=False, per_channel=True)
-        boxstats = pixelstats(get_od_dataset(DATA_1, 2, False, boxes), per_box=True)
+        imgstats = pixelstats(get_od_dataset(DATA_3, 2, False, boxes), per_box=False, per_channel=True)
+        boxstats = pixelstats(get_od_dataset(DATA_3, 2, False, boxes), per_box=True)
         with pytest.raises(ValueError, match="Input for boxstats and imgstats must have matching channel information."):
             boxratiostats(boxstats, imgstats)
 
@@ -283,38 +205,38 @@ class TestBBoxStats:
 
     def test_boxratio_dimensionstats_both_datasets(self, get_od_dataset, as_float):
         boxstats = dimensionstats(get_od_dataset(DATA_3, 4, as_float), per_box=True)
-        imagestats = dimensionstats(get_od_dataset(DATA_3, 4, as_float), per_box=False)
-        ratiostats = boxratiostats(boxstats, imagestats)
+        imgstats = dimensionstats(get_od_dataset(DATA_3, 4, as_float), per_box=False)
+        ratiostats = boxratiostats(boxstats, imgstats)
         assert ratiostats is not None
 
     def test_boxratio_dimensionstats(self, get_od_dataset, as_float):
         boxstats = dimensionstats(get_od_dataset(DATA_3, 4, as_float), per_box=True)
-        imagestats = dimensionstats(DATA_3)
-        ratiostats = boxratiostats(boxstats, imagestats)
+        imgstats = dimensionstats(DATA_3)
+        ratiostats = boxratiostats(boxstats, imgstats)
         assert ratiostats is not None
 
     def test_boxratio_pixelstats(self, get_od_dataset, as_float):
         boxstats = pixelstats(get_od_dataset(DATA_3, 4, as_float), per_box=True)
-        imagestats = pixelstats(DATA_3)
-        ratiostats = boxratiostats(boxstats, imagestats)
+        imgstats = pixelstats(DATA_3)
+        ratiostats = boxratiostats(boxstats, imgstats)
         assert ratiostats is not None
 
     def test_boxratio_pixelstats_per_channel(self, get_od_dataset, as_float):
         boxstats = pixelstats(get_od_dataset(DATA_3, 4, as_float), per_box=True, per_channel=True)
-        imagestats = pixelstats(DATA_3, per_channel=True)
-        ratiostats = boxratiostats(boxstats, imagestats)
+        imgstats = pixelstats(DATA_3, per_channel=True)
+        ratiostats = boxratiostats(boxstats, imgstats)
         assert ratiostats is not None
 
     def test_boxratio_visualstats(self, get_od_dataset, as_float):
         boxstats = visualstats(get_od_dataset(DATA_3, 4, as_float), per_box=True)
-        imagestats = visualstats(DATA_3)
-        ratiostats = boxratiostats(boxstats, imagestats)
+        imgstats = visualstats(DATA_3)
+        ratiostats = boxratiostats(boxstats, imgstats)
         assert ratiostats is not None
 
     def test_boxratio_visualstats_per_channel(self, get_od_dataset, as_float):
         boxstats = pixelstats(get_od_dataset(DATA_3, 4, as_float), per_box=True, per_channel=True)
-        imagestats = pixelstats(DATA_3, per_channel=True)
-        ratiostats = boxratiostats(boxstats, imagestats)
+        imgstats = pixelstats(DATA_3, per_channel=True)
+        ratiostats = boxratiostats(boxstats, imgstats)
         assert ratiostats is not None
 
     def test_boxratio_only_boxstats(self, get_od_dataset, as_float):
@@ -324,15 +246,15 @@ class TestBBoxStats:
 
     def test_boxratio_mismatch_stats_type(self, get_od_dataset, as_float):
         boxstats = visualstats(get_od_dataset(DATA_3, 4, as_float), per_box=True)
-        imagestats = dimensionstats(DATA_3)
+        imgstats = dimensionstats(DATA_3)
         with pytest.raises(TypeError):
-            boxratiostats(boxstats, imagestats)
+            boxratiostats(boxstats, imgstats)
 
     def test_boxratio_mismatch_stats_source(self, get_od_dataset, as_float):
         boxstats = dimensionstats(get_od_dataset(DATA_3, 4, as_float), per_box=True)
-        imagestats = dimensionstats(DATA_1 + DATA_1)
+        imgstats = dimensionstats(DATA_1 + DATA_1)
         with pytest.raises(ValueError):
-            boxratiostats(boxstats, imagestats)
+            boxratiostats(boxstats, imgstats)
 
     def test_stats_source_index_with_boxes_no_channels(self, get_od_dataset, as_float):
         stats = pixelstats(get_od_dataset(DATA_3, 2, as_float), per_box=True)
@@ -346,9 +268,9 @@ class TestBBoxStats:
 
     def test_boxratiostats_channel_mismatch(self, get_od_dataset, as_float):
         boxstats = pixelstats(get_od_dataset(DATA_3, 4, as_float), per_channel=False)
-        imagestats = pixelstats(DATA_3, per_channel=True)
+        imgstats = pixelstats(DATA_3, per_channel=True)
         with pytest.raises(ValueError):
-            boxratiostats(boxstats, imagestats)
+            boxratiostats(boxstats, imgstats)
 
     def test_stats_div_by_zero(self, get_od_dataset, as_float):
         images = [np.zeros((1, 64, 64)) for _ in range(10)]
@@ -392,7 +314,8 @@ class TestBaseStatsOutput:
                 foo=[1, 2, 3, 4],
                 bar=["a", "b", "c"],
                 source_index=[1, 2, 3, 4],  # type: ignore
-                object_count=np.array([1, 2, 3, 4]),
+                object_count=[1, 2, 3, 4],
+                invalid_box_count=[0, 0, 0, 0],
                 image_count=4,
             )
 
@@ -407,7 +330,8 @@ class TestBaseStatsOutput:
                 foo=[1, 2, 3, 4],
                 bar=["a", "b", "c", "d"],
                 source_index=[1, 2, 3, 4],  # type: ignore
-                object_count=np.array([1, 2, 3, 4]),
+                object_count=[1, 2, 3, 4],
+                invalid_box_count=[0, 0, 0, 0],
                 image_count=3,
             )
 
@@ -632,18 +556,11 @@ class TestOffImageBoxes:
 
 @pytest.mark.required
 @pytest.mark.parametrize(
-    "stats_fn, stats_attrs",
-    (
-        [pixelstats, "pixelstats"],
-        [visualstats, "visualstats"],
-        [dimensionstats, "dimensionstats"],
-        [imagestats, "imagestats"],
-        [hashstats, "hashstats"],
-    ),
-    indirect=["stats_attrs"],  # Only sends the string to fixture
+    "stats_fn",
+    (pixelstats, visualstats, dimensionstats, imagestats, hashstats),
 )
 class TestStatsDataFormats:
-    def test_stats_data(self, get_ic_dataset, stats_fn, stats_attrs: set):
+    def test_stats_data(self, get_ic_dataset, stats_fn):
         """
         Test for *StatsOutput class has unique and BaseStatsOutput attributes
         """
@@ -657,11 +574,11 @@ class TestStatsDataFormats:
         # Expects all attributes, including Base and 2-D attributes
         self._check_keys(
             keys=set(data),
-            expected_attrs=(stats_attrs | set(BASE_ATTRS)),
+            expected_attrs=(STATS_ATTRS[stats_fn] | set(BASE_ATTRS)),
             invalid_attrs=set(),
         )  # Empty set has no overlap
 
-    def test_stats_factors(self, get_ic_dataset, stats_fn, stats_attrs: set):
+    def test_stats_factors(self, get_ic_dataset, stats_fn):
         """
         Test for *StatsOutput class has unique 1-D attributes and no BaseStatsOutput attributes
 
@@ -677,11 +594,11 @@ class TestStatsDataFormats:
         assert isinstance(factors, dict)
         self._check_keys(
             keys=set(factors),
-            expected_attrs=(stats_attrs - STATS_2D_ATTRS),
+            expected_attrs=(STATS_ATTRS[stats_fn] - STATS_2D_ATTRS),
             invalid_attrs=(set(BASE_ATTRS) | STATS_2D_ATTRS),
         )
 
-    def test_stats_to_df(self, get_ic_dataset, stats_fn, stats_attrs: set):
+    def test_stats_to_df(self, get_ic_dataset, stats_fn):
         """
         Test for *StatsOutput class has unique 1-D attributes and no BaseStatsOutput attributes
         as columns in the dataframe
@@ -699,13 +616,13 @@ class TestStatsDataFormats:
 
         self._check_keys(
             keys=set(dataframe.columns),
-            expected_attrs=(stats_attrs - STATS_2D_ATTRS),
+            expected_attrs=(STATS_ATTRS[stats_fn] - STATS_2D_ATTRS),
             invalid_attrs=(set(BASE_ATTRS) | STATS_2D_ATTRS),
         )
 
         # Test final shape follows keys and homogeneous lengths
         rows = len(DATA_1)
-        cols = len(stats_attrs - STATS_2D_ATTRS)
+        cols = len(STATS_ATTRS[stats_fn] - STATS_2D_ATTRS)
         assert dataframe.shape == (rows, cols)
 
     def _check_keys(self, keys: set, expected_attrs: set, invalid_attrs: set):
