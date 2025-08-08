@@ -146,3 +146,14 @@ class Select(AnnotatedDataset[_TDatum]):
 
     def __len__(self) -> int:
         return len(self._selection)
+
+    def resolve_indices(self) -> list[int]:
+        """
+        Return the list of dataset indices after all selections have been applied.
+
+        Returns
+        -------
+        list[int]
+            The list of selected indices from the original dataset.
+        """
+        return self._selection.copy()
