@@ -384,6 +384,10 @@ class TestUtilsMetadata:
         merged = merge([{"a": {"b": 1, "c": 2, "foo": 0}}], image_index_key="foo")
         assert merged["foo"] == [0]
 
+    def test_merge_drop_no_targets(self):
+        merged = merge([{"a": 1}, {"a": 2}, {"a": 3}], targets_per_image=[1, 0, 1])
+        assert merged["a"] == [1, 3]
+
 
 @pytest.mark.required
 class TestCastSimplify:
