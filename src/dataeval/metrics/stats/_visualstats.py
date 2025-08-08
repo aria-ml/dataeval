@@ -2,44 +2,13 @@ from __future__ import annotations
 
 __all__ = []
 
-from collections.abc import Callable
 from typing import Any
 
-import numpy as np
-
-from dataeval.config import EPSILON
-from dataeval.metrics.stats._base import StatsProcessor, run_stats
+from dataeval.core._imagestats import VisualPerChannelStatsProcessor, VisualStatsProcessor, process
+from dataeval.metrics.stats._base import convert_output, unzip_dataset
 from dataeval.outputs import VisualStatsOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike, Dataset
-from dataeval.utils._image import edge_filter
-
-QUARTILES = (0, 25, 50, 75, 100)
-
-
-class VisualStatsProcessor(StatsProcessor[VisualStatsOutput]):
-    output_class: type = VisualStatsOutput
-    cache_keys: set[str] = {"percentiles"}
-    image_function_map: dict[str, Callable[[StatsProcessor[VisualStatsOutput]], Any]] = {
-        "brightness": lambda x: x.get("percentiles")[1],
-        "contrast": lambda x: (np.max(x.get("percentiles")) - np.min(x.get("percentiles")))
-        / (np.mean(x.get("percentiles")) + EPSILON),
-        "darkness": lambda x: x.get("percentiles")[-2],
-        "missing": lambda x: np.count_nonzero(np.isnan(np.sum(x.image, axis=0))) / np.prod(x.shape[-2:]),
-        "sharpness": lambda x: np.nanstd(edge_filter(np.mean(x.image, axis=0))),
-        "zeros": lambda x: np.count_nonzero(np.sum(x.image, axis=0) == 0) / np.prod(x.shape[-2:]),
-        "percentiles": lambda x: np.nanpercentile(x.scaled, q=QUARTILES),
-    }
-    channel_function_map: dict[str, Callable[[StatsProcessor[VisualStatsOutput]], Any]] = {
-        "brightness": lambda x: x.get("percentiles")[:, 1],
-        "contrast": lambda x: (np.max(x.get("percentiles"), axis=1) - np.min(x.get("percentiles"), axis=1))
-        / (np.mean(x.get("percentiles"), axis=1) + EPSILON),
-        "darkness": lambda x: x.get("percentiles")[:, -2],
-        "missing": lambda x: np.count_nonzero(np.isnan(x.image), axis=(1, 2)) / np.prod(x.shape[-2:]),
-        "sharpness": lambda x: np.nanstd(np.vectorize(edge_filter, signature="(m,n)->(m,n)")(x.image), axis=(1, 2)),
-        "zeros": lambda x: np.count_nonzero(x.image == 0, axis=(1, 2)) / np.prod(x.shape[-2:]),
-        "percentiles": lambda x: np.nanpercentile(x.scaled, q=QUARTILES, axis=1).T,
-    }
 
 
 @set_metadata
@@ -75,10 +44,6 @@ def visualstats(
     --------
     dimensionstats, pixelstats, Outliers
 
-    Note
-    ----
-    - `zeros` and `missing` are presented as a percentage of total pixel counts
-
     Examples
     --------
     Calculate the visual statistics of a dataset of 8 images, whose shape is (C, H, W).
@@ -89,4 +54,6 @@ def visualstats(
     >>> print(results.contrast)
     [2.04  1.331 1.261 1.279 1.253 1.268 1.265 1.263]
     """
-    return run_stats(dataset, per_box, per_channel, [VisualStatsProcessor])[0]
+    processor = VisualPerChannelStatsProcessor if per_channel else VisualStatsProcessor
+    stats = process(*unzip_dataset(dataset, per_box), processor)
+    return convert_output(VisualStatsOutput, stats)

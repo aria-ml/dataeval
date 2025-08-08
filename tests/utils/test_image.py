@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dataeval.metrics.stats._base import BoundingBox
+from dataeval.utils._boundingbox import BoundingBox
 from dataeval.utils._image import (
     BitDepth,
     clip_and_pad,
@@ -87,18 +87,18 @@ class TestImageUtils:
 @pytest.mark.parametrize("image", [np.arange(25).reshape(1, 5, 5), np.arange(75).reshape(3, 5, 5)])
 class TestClipAndPad:
     def test_inside(self, image):
-        result = clip_and_pad(image, BoundingBox(1.2, 1.0, 3.9, 3.1).to_int())
+        result = clip_and_pad(image, BoundingBox(1.2, 1.0, 3.9, 3.1).xyxy_int)
         assert not np.isnan(result).any()
 
     def test_outside_right_bottom(self, image):
-        result = clip_and_pad(image, BoundingBox(2.5, 2.1, 7.2, 6.7).to_int())
+        result = clip_and_pad(image, BoundingBox(2.5, 2.1, 7.2, 6.7).xyxy_int)
         print(result)
         assert np.isnan(result).any()
 
     def test_outside_left_top(self, image):
-        result = clip_and_pad(image, BoundingBox(-2.3, -1.8, 3.0, 2.2).to_int())
+        result = clip_and_pad(image, BoundingBox(-2.3, -1.8, 3.0, 2.2).xyxy_int)
         assert np.isnan(result).any()
 
     def test_outside(self, image):
-        result = clip_and_pad(image, BoundingBox(-5.5, -5.4, -2.1, -2.6).to_int())
+        result = clip_and_pad(image, BoundingBox(-5.5, -5.4, -2.1, -2.6).xyxy_int)
         assert np.isnan(result).all()

@@ -9,14 +9,16 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.config import EPSILON
+from dataeval.core._imagestats import DimensionStatsProcessor, PixelStatsProcessor, VisualStatsProcessor, process
 from dataeval.data._images import Images
 from dataeval.metrics.stats._base import combine_stats, get_dataset_step_from_idx
-from dataeval.metrics.stats._imagestats import imagestats
 from dataeval.outputs import DimensionStatsOutput, ImageStatsOutput, OutliersOutput, PixelStatsOutput, VisualStatsOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.outputs._linters import IndexIssueMap, OutlierStatsOutput
+from dataeval.outputs._linters import IndexIssueMap
 from dataeval.outputs._stats import BASE_ATTRS
 from dataeval.typing import ArrayLike, Dataset
+
+OutlierStatsOutput = DimensionStatsOutput | PixelStatsOutput | VisualStatsOutput
 
 
 def _get_zscore_mask(values: NDArray[np.float64], threshold: float | None) -> NDArray[np.bool_] | None:
@@ -80,11 +82,17 @@ class Outliers:
 
     Parameters
     ----------
+    use_dimension : bool, default True
+        If True, use dimension statistics to identify outliers
+    use_pixel : bool, default True
+        If True, use pixel statistics to identify outliers
+    use_visual : bool, default True
+        If True, use visual statistics to identify outliers
     outlier_method : ["modzscore" | "zscore" | "iqr"], optional - default "modzscore"
         Statistical method used to identify outliers
     outlier_threshold : float, optional - default None
-        Threshold value for the given ``outlier_method``, above which data is considered an outlier.
-        Uses method specific default if `None`
+        Threshold value for the given ``outlier_method``, above which data is considered an
+        outlier - uses method specific default if `None`
 
     Attributes
     ----------
@@ -138,7 +146,7 @@ class Outliers:
         outlier_method: Literal["zscore", "modzscore", "iqr"] = "modzscore",
         outlier_threshold: float | None = None,
     ) -> None:
-        self.stats: ImageStatsOutput
+        self.stats: dict[str, list[Any]]
         self.use_dimension = use_dimension
         self.use_pixel = use_pixel
         self.use_visual = use_visual
@@ -148,25 +156,26 @@ class Outliers:
     def _get_outliers(self, stats: dict) -> dict[int, dict[str, float]]:
         flagged_images: dict[int, dict[str, float]] = {}
         for stat, values in stats.items():
+            values = np.asarray(values)
             if stat in BASE_ATTRS:
                 continue
             if values.ndim == 1:
                 mask = _get_outlier_mask(values.astype(np.float64), self.outlier_method, self.outlier_threshold)
                 indices = np.flatnonzero(mask)
                 for i, value in zip(indices, values[mask]):
-                    flagged_images.setdefault(int(i), {}).update({stat: value})
+                    flagged_images.setdefault(int(i), {})[stat] = value
 
-        return dict(sorted(flagged_images.items()))
+        return {k: dict(sorted(v.items())) for k, v in sorted(flagged_images.items())}
 
     @overload
-    def from_stats(self, stats: OutlierStatsOutput | ImageStatsOutput) -> OutliersOutput[IndexIssueMap]: ...
+    def from_stats(self, stats: OutlierStatsOutput) -> OutliersOutput[IndexIssueMap]: ...
 
     @overload
     def from_stats(self, stats: Sequence[OutlierStatsOutput]) -> OutliersOutput[list[IndexIssueMap]]: ...
 
     @set_metadata(state=["outlier_method", "outlier_threshold"])
     def from_stats(
-        self, stats: OutlierStatsOutput | ImageStatsOutput | Sequence[OutlierStatsOutput]
+        self, stats: OutlierStatsOutput | Sequence[OutlierStatsOutput]
     ) -> OutliersOutput[IndexIssueMap] | OutliersOutput[list[IndexIssueMap]]:
         """
         Returns indices of Outliers with the issues identified for each.
@@ -198,10 +207,10 @@ class Outliers:
         >>> len(results)
         2
         >>> results.issues[0]
-        {10: {'entropy': 0.2128}, 12: {'std': 0.00536, 'var': 2.87e-05, 'entropy': 0.2128}}
+        {10: {'entropy': 0.2128, 'zeros': 0.05493}, 12: {'entropy': 0.2128, 'std': 0.00536, 'var': 2.87e-05, 'zeros': 0.05493}}
         >>> results.issues[1]
         {}
-        """
+        """  # noqa: E501
         if isinstance(stats, ImageStatsOutput | DimensionStatsOutput | PixelStatsOutput | VisualStatsOutput):
             return OutliersOutput(self._get_outliers(stats.data()))
 
@@ -255,9 +264,21 @@ class Outliers:
         >>> list(results.issues)
         [10, 12]
         >>> results.issues[10]
-        {'contrast': 1.25, 'zeros': 0.05493, 'entropy': 0.2128}
+        {'contrast': 1.2499999999203126, 'entropy': 0.21278774841317422, 'zeros': 0.054931640625}
         """
+        if not (self.use_dimension or self.use_pixel or self.use_visual):
+            raise ValueError("At least one of use_dimension, use_pixel or use_visual must be True.")
+
+        processors = []
+        if self.use_dimension:
+            processors.append(DimensionStatsProcessor)
+        if self.use_pixel:
+            processors.append(PixelStatsProcessor)
+        if self.use_visual:
+            processors.append(VisualStatsProcessor)
+
         images = Images(data) if isinstance(data, Dataset) else data
-        self.stats = imagestats(images)
-        outliers = self._get_outliers(self.stats.data())
+
+        self.stats = process(images, None, processors)
+        outliers = self._get_outliers(self.stats)
         return OutliersOutput(outliers)

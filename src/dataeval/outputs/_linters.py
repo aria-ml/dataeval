@@ -9,14 +9,13 @@ from typing import Generic, TypeAlias, TypeVar
 import pandas as pd
 
 from dataeval.outputs._base import Output
-from dataeval.outputs._stats import DimensionStatsOutput, LabelStatsOutput, PixelStatsOutput, VisualStatsOutput
+from dataeval.outputs._stats import LabelStatsOutput
 
 DuplicateGroup: TypeAlias = Sequence[int]
 DatasetDuplicateGroupMap: TypeAlias = Mapping[int, DuplicateGroup]
 TIndexCollection = TypeVar("TIndexCollection", DuplicateGroup, DatasetDuplicateGroupMap)
 
 IndexIssueMap: TypeAlias = Mapping[int, Mapping[str, float]]
-OutlierStatsOutput: TypeAlias = DimensionStatsOutput | PixelStatsOutput | VisualStatsOutput
 TIndexIssueMap = TypeVar("TIndexIssueMap", IndexIssueMap, Sequence[IndexIssueMap])
 
 
@@ -63,24 +62,42 @@ def _reorganize_by_class_and_metric(
 
 def _create_table(metrics: Mapping[str, Sequence[int]], class_wise: Mapping[str, Mapping[str, int]]) -> Sequence[str]:
     """Create table for displaying the results"""
-    max_class_length = max(len(str(label)) for label in class_wise) + 2
-    max_total = max(len(metrics[group]) for group in metrics) + 2
+    max_class_length = max(len(str(label)) for label in class_wise)
+    max_class_length = max(max_class_length, len("Class"), 5)
+
+    # Calculate actual totals to determine proper column width
+    totals = []
+    for class_cat, results in class_wise.items():
+        total = sum(results.get(group, 0) for group in metrics)
+        totals.append(total)
+
+    # Single width calculation for both header and content
+    max_total_width = max(len("Total"), max(len(str(total)) for total in totals), 5)
+
+    # Calculate group column widths (single width for both header and content)
+    group_widths = {}
+    for group in sorted(metrics):
+        # Find max width needed for this group's data
+        max_data_width = max(len(str(results.get(group, 0))) for results in class_wise.values())
+        base_width = max(len(str(group)), max_data_width)
+        group_widths[group] = max(base_width, 5)
 
     table_header = " | ".join(
         [f"{'Class':>{max_class_length}}"]
-        + [f"{group:^{max(5, len(str(group))) + 2}}" for group in sorted(metrics.keys())]
-        + [f"{'Total':<{max_total}}"]
+        + [f"{group:^{group_widths[group]}}" for group in sorted(metrics)]
+        + [f"{'Total':^{max_total_width}}"]
     )
+
     table_rows: Sequence[str] = []
 
     for class_cat, results in class_wise.items():
         table_value = [f"{class_cat:>{max_class_length}}"]
         total = 0
-        for group in sorted(metrics.keys()):
+        for group in sorted(metrics):
             count = results.get(group, 0)
-            table_value.append(f"{count:^{max(5, len(str(group))) + 2}}")
+            table_value.append(f"{count:^{group_widths[group]}}")
             total += count
-        table_value.append(f"{total:^{max_total}}")
+        table_value.append(f"{total:^{max_total_width}}")
         table_rows.append(" | ".join(table_value))
 
     return [table_header] + table_rows

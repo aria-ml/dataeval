@@ -25,6 +25,9 @@ class PoolWrapper:
     def imap(self, func: Callable[[_S], _T], iterable: Iterable[_S]) -> Iterator[_T]:
         return map(func, iterable) if self.pool is None else self.pool.imap(func, iterable)
 
+    def imap_unordered(self, func: Callable[[_S], _T], iterable: Iterable[_S]) -> Iterator[_T]:
+        return map(func, iterable) if self.pool is None else self.pool.imap_unordered(func, iterable)
+
     def __enter__(self, *args: Any, **kwargs: Any) -> PoolWrapper:
         return self
 

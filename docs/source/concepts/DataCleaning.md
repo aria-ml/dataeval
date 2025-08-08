@@ -104,7 +104,7 @@ output will be unreliable, regardless of the sophistication of the analysis.
 
 ## Data Cleaning Metrics
 
-DataEval's data cleaning functions and classes are:
+DataEval's data cleaning functions and classes:
 
 ```{list-table}
 :widths: 20 80
@@ -119,14 +119,14 @@ DataEval's data cleaning functions and classes are:
 * - {func}`hashstats <.hashstats>`
   - Creates hex-encoded image hashes on a per image basis.
 * - {func}`imagestats <.imagestats>`
-  - Runs `dimensionstats`, `pixelstats`, `visualstats`, and `labelstats`
+  - Creates pixel and visual statistics on a per image or per channel basis.
     functions on a given dataset.
 * - {func}`labelstats <.labelstats>`
   - Creates dataset statistics on the labels.
 * - {func}`pixelstats <.pixelstats>`
-  - Creates dataset statistics on a per image per channel basis.
+  - Creates pixel statistics on a per image or per channel basis.
 * - {func}`visualstats <.visualstats>`
-  - Creates dataset statistics on a per image per channel basis.
+  - Creates visual statistics on a per image or per channel basis.
 * - {func}`.clusterer`
   - Clusters the data and identifies data points which do not fit.
 * - {class}`.Duplicates`
@@ -139,7 +139,7 @@ DataEval's data cleaning functions and classes are:
 To see data cleaning in action using DataEval, check out our
 [Data Cleaning Guide](../notebooks/tt_clean_dataset.ipynb).
 
-See the [Stats](Stats.md) concept page to learn more about the
+See the [Image Stats](ImageStats.md) concept page to learn more about the
 algorithms/methods used by the functions above.
 
 See the [Clusterer](Clustering.md) and [Outliers](Outliers.md) concept pages to

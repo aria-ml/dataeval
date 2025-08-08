@@ -20,9 +20,10 @@ OptionalRange: TypeAlias = int | Iterable[int] | None
 
 SOURCE_INDEX = "source_index"
 OBJECT_COUNT = "object_count"
+INVALID_BOX_COUNT = "invalid_box_count"
 IMAGE_COUNT = "image_count"
 
-BASE_ATTRS = [SOURCE_INDEX, OBJECT_COUNT, IMAGE_COUNT]
+BASE_ATTRS = [SOURCE_INDEX, OBJECT_COUNT, INVALID_BOX_COUNT, IMAGE_COUNT]
 
 
 class SourceIndex(NamedTuple):
@@ -62,7 +63,8 @@ class BaseStatsOutput(Output):
     """
 
     source_index: Sequence[SourceIndex]
-    object_count: NDArray[np.uint16]
+    object_count: Sequence[int]
+    invalid_box_count: Sequence[int]
     image_count: int
 
     def __post_init__(self) -> None:
@@ -237,6 +239,8 @@ class DimensionStatsOutput(BaseStatsOutput):
         Distance in pixels from center
     distance_edge : NDArray[np.uint32]
         Distance in pixels from nearest edge
+    invalid_box: NDArray[bool]
+        True if the bounding box is invalid
     """
 
     offset_x: NDArray[np.int32]
@@ -250,6 +254,7 @@ class DimensionStatsOutput(BaseStatsOutput):
     center: NDArray[np.int32]
     distance_center: NDArray[np.float32]
     distance_edge: NDArray[np.uint32]
+    invalid_box: NDArray[np.bool_]
 
 
 @dataclass(frozen=True)
@@ -291,14 +296,14 @@ class HashStatsOutput(BaseStatsOutput):
         │ ---              ┆ ---              │
         │ str              ┆ str              │
         ╞══════════════════╪══════════════════╡
-        │ 69b50a5f06af238c ┆ e666999999266666 │
-        │ 5a861d7a23d1afe7 ┆ e666999999266666 │
+        │ 66a93f556577c086 ┆ e666999999266666 │
+        │ d8b686fb405c4105 ┆ e666999999266666 │
         │ 7ffdb4990ad44ac6 ┆ e666999966666299 │
-        │ 4f0c366a3298ceac ┆ e666999999266666 │
+        │ 42cd4c34c80f6006 ┆ e666999999266666 │
         │ c5519e36ac1f8839 ┆ 96e91656e91616e9 │
-        │ e7e92346159a4567 ┆ e666999999266666 │
-        │ 9a538f797a5ba8ee ┆ e666999999266666 │
-        │ 1a658bd2a1baee25 ┆ e666999999266666 │
+        │ 39b4af4ffd1cba71 ┆ e666999999266666 │
+        │ d2f4564b9d21dcf5 ┆ e666999999266666 │
+        │ c7616bc627a12ddc ┆ e666999999266666 │
         └──────────────────┴──────────────────┘
         """
         data = {"xxhash": self.xxhash, "pchash": self.pchash}
@@ -410,23 +415,29 @@ class PixelStatsOutput(BaseStatsOutput):
         Standard deviation of the pixel values of the images
     var : NDArray[np.float16]
         :term:`Variance` of the pixel values of the images
+    missing : NDArray[np.float16]
+        Percentage of the images with missing pixels
+    zeros : NDArray[np.float16]
+        Percentage of the images with zero value pixels
     skew : NDArray[np.float16]
         Skew of the pixel values of the images
     kurtosis : NDArray[np.float16]
         Kurtosis of the pixel values of the images
-    histogram : NDArray[np.uint32]
-        Histogram of the pixel values of the images across 256 bins scaled between 0 and 1
     entropy : NDArray[np.float16]
         Entropy of the pixel values of the images
+    histogram : NDArray[np.uint32]
+        Histogram of the pixel values of the images across 256 bins scaled between 0 and 1
     """
 
     mean: NDArray[np.float16]
     std: NDArray[np.float16]
     var: NDArray[np.float16]
+    missing: NDArray[np.float16]
+    zeros: NDArray[np.float16]
     skew: NDArray[np.float16]
     kurtosis: NDArray[np.float16]
-    histogram: NDArray[np.uint32]
     entropy: NDArray[np.float16]
+    histogram: NDArray[np.uint32]
 
 
 @dataclass(frozen=True)
@@ -442,12 +453,8 @@ class VisualStatsOutput(BaseStatsOutput):
         Image contrast ratio
     darkness : NDArray[np.float16]
         Darkness of the images
-    missing : NDArray[np.float16]
-        Percentage of the images with missing pixels
     sharpness : NDArray[np.float16]
         Sharpness of the images
-    zeros : NDArray[np.float16]
-        Percentage of the images with zero value pixels
     percentiles : NDArray[np.float16]
         Percentiles of the pixel values of the images with quartiles of (0, 25, 50, 75, 100)
     """
@@ -455,34 +462,17 @@ class VisualStatsOutput(BaseStatsOutput):
     brightness: NDArray[np.float16]
     contrast: NDArray[np.float16]
     darkness: NDArray[np.float16]
-    missing: NDArray[np.float16]
     sharpness: NDArray[np.float16]
-    zeros: NDArray[np.float16]
     percentiles: NDArray[np.float16]
 
 
 @dataclass(frozen=True)
-class ImageStatsOutput(DimensionStatsOutput, PixelStatsOutput, VisualStatsOutput):
+class ImageStatsOutput(PixelStatsOutput, VisualStatsOutput):
     """
-    Output class for :func:`.imagestats` stats metric with `per_channel=False`.
+    Output class for :func:`.imagestats` stats metric.
 
     This class represents the combined outputs of various stats functions against a
     single dataset, such that each index across all stat outputs are representative
-    of the same source image. Modifying or mixing outputs will result in inaccurate
-    outlier calculations if not created correctly.
-
-    The attributes and methods are a superset of :class:`.DimensionStatsOutput`,
-    :class:`.PixelStatsOutput` and :class:`.VisualStatsOutput`.
-    """
-
-
-@dataclass(frozen=True)
-class ChannelStatsOutput(PixelStatsOutput, VisualStatsOutput):
-    """
-    Output class for :func:`.imagestats` stats metric with `per_channel=True`.
-
-    This class represents the outputs of various per-channel stats functions against
-    a single dataset, such that each index across all stat outputs are representative
     of the same source image. Modifying or mixing outputs will result in inaccurate
     outlier calculations if not created correctly.
 
