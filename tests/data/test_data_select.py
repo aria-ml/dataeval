@@ -111,3 +111,18 @@ class TestSelect:
                 assert labels == [0, 0, 1]
             else:
                 assert data.startswith("data_")
+
+    def test_resolve_indices_returns_selection(self):
+        s = Select(MockDataset())  # type: ignore
+        expected = list(range(len(s)))
+        assert s.resolve_indices() == expected
+
+    def test_resolve_indices_after_selection(self):
+        class FilterEven(Selection):
+            stage = SelectionStage.FILTER
+
+            def __call__(self, dataset):
+                dataset._selection = [i for i in dataset._selection if i % 2 == 0]
+
+        s = Select(MockDataset(), selections=[FilterEven()])  # type: ignore
+        assert s.resolve_indices() == [0, 2, 4]
