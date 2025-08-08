@@ -269,6 +269,8 @@ def _merge(
     dropped: dict[str, set[DropReason]] = {}
     for i, d in enumerate(dicts):
         targets = None if targets_per_image is None else targets_per_image[i]
+        if targets == 0:
+            continue
         flattened, image_repeats[i], dropped_inner = _flatten_for_merge(d, ignore_lists, fully_qualified, targets)
         isect = isect.intersection(flattened.keys()) if isect else set(flattened.keys())
         union.update(flattened.keys())
