@@ -15,7 +15,8 @@ class TestOutliers:
     def test_outliers(self):
         outliers = Outliers()
         results = outliers.evaluate(np.random.random((100, 3, 16, 16)))
-        assert len(outliers.stats) == 100
+        assert len(outliers.stats) == 30
+        assert len(outliers.stats["source_index"]) == 100
         assert results is not None
 
     def test_get_outlier_mask_empty(self):
@@ -77,11 +78,10 @@ class TestOutliers:
         dataset1 = np.zeros((50, 3, 16, 16))
         dataset2 = np.zeros((50, 3, 16, 16))
         dataset2[0] = 1
-        stats3 = visualstats(dataset1)
-        stats2 = pixelstats(dataset2)
-        stats1 = dimensionstats(dataset1)
+        stats2 = visualstats(dataset1)
+        stats1 = pixelstats(dataset2)
         outliers = Outliers()
-        stats = ImageStatsOutput(**{k: v for d in (stats1, stats2, stats3) for k, v in d.data().items()})
+        stats = ImageStatsOutput(**{k: v for d in (stats1, stats2) for k, v in d.data().items()})
         results = outliers.from_stats(stats)
         assert results is not None
 
@@ -121,15 +121,14 @@ class TestOutliersOutput:
         assert len(output) == 3
         table_result = output.to_table(self.lstat)
         assert isinstance(table_result, str)
-        assert table_result[:35] == "  Class |    a    |    b    | Total"
+        assert table_result.splitlines()[0] == "Class |   a   |   b   | Total"
 
     def test_to_table_list(self):
         output = OutliersOutput([self.outlier2, self.outlier])
         assert len(output) == 6
         table_result = output.to_table(self.lstat)
         assert isinstance(table_result, str)
-        print(table_result)
-        assert table_result[:45] == "  Class |    a    |    c    |    d    | Total"
+        assert table_result.splitlines()[0] == "Class |   a   |   c   |   d   | Total"
 
     def test_to_dataframe_list(self):
         output = OutliersOutput([self.outlier2, self.outlier])
