@@ -18,7 +18,6 @@ from ._linters import DuplicatesOutput, OutliersOutput
 from ._metadata import MetadataDistanceOutput, MetadataDistanceValues, MostDeviatedFactorsOutput, OODPredictorOutput
 from ._ood import OODOutput, OODScoreOutput
 from ._stats import (
-    ChannelStatsOutput,
     DimensionStatsOutput,
     HashStatsOutput,
     ImageStatsOutput,
@@ -33,7 +32,6 @@ from ._workflows import SufficiencyOutput
 __all__ = [
     "BEROutput",
     "BalanceOutput",
-    "ChannelStatsOutput",
     "ClustererOutput",
     "CoverageOutput",
     "CompletenessOutput",

@@ -2,38 +2,13 @@ from __future__ import annotations
 
 __all__ = []
 
-from collections.abc import Callable
 from typing import Any
 
-import numpy as np
-
-from dataeval.metrics.stats._base import StatsProcessor, run_stats
+from dataeval.core._imagestats import DimensionStatsProcessor, process
+from dataeval.metrics.stats._base import convert_output, unzip_dataset
 from dataeval.outputs import DimensionStatsOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike, Dataset
-from dataeval.utils._image import get_bitdepth
-
-
-class DimensionStatsProcessor(StatsProcessor[DimensionStatsOutput]):
-    output_class: type = DimensionStatsOutput
-    image_function_map: dict[str, Callable[[StatsProcessor[DimensionStatsOutput]], Any]] = {
-        "offset_x": lambda x: x.box.x0,
-        "offset_y": lambda x: x.box.y0,
-        "width": lambda x: x.box.width,
-        "height": lambda x: x.box.height,
-        "channels": lambda x: x.shape[-3],
-        "size": lambda x: x.box.width * x.box.height,
-        "aspect_ratio": lambda x: 0.0 if x.box.height == 0 else x.box.width / x.box.height,
-        "depth": lambda x: get_bitdepth(x.raw).depth,
-        "center": lambda x: np.asarray([(x.box.x0 + x.box.x1) / 2, (x.box.y0 + x.box.y1) / 2]),
-        "distance_center": lambda x: np.sqrt(
-            np.square(((x.box.x0 + x.box.x1) / 2) - (x.raw.shape[-1] / 2))
-            + np.square(((x.box.y0 + x.box.y1) / 2) - (x.raw.shape[-2] / 2))
-        ),
-        "distance_edge": lambda x: np.min(
-            [np.abs(x.box.x0), np.abs(x.box.y0), np.abs(x.box.x1 - x.raw.shape[-1]), np.abs(x.box.y1 - x.raw.shape[-2])]
-        ),
-    }
 
 
 @set_metadata
@@ -64,7 +39,7 @@ def dimensionstats(
 
     See Also
     --------
-    pixelstats, visualstats, Outliers
+    imagestats, Outliers
 
     Examples
     --------
@@ -76,4 +51,5 @@ def dimensionstats(
     >>> print(results.channels)
     [3 3 1 3 1 3 3 3]
     """
-    return run_stats(dataset, per_box, False, [DimensionStatsProcessor])[0]
+    stats = process(*unzip_dataset(dataset, per_box), DimensionStatsProcessor)
+    return convert_output(DimensionStatsOutput, stats)

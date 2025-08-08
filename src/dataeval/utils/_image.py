@@ -15,12 +15,10 @@ try:
 except ImportError:
     Image = None
 
+from dataeval.utils._boundingbox import Box, clip_box, is_valid_box, to_int_box
 
 EDGE_KERNEL = np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]], dtype=np.int8)
 BIT_DEPTH = (1, 8, 12, 16, 32)
-
-Box = tuple[int, int, int, int]
-"""Bounding box as tuple of integers in x0, y0, x1, y1 format."""
 
 
 @dataclass
@@ -80,23 +78,6 @@ def edge_filter(image: NDArray[Any], offset: float = 0.5) -> NDArray[np.uint8]:
     return edges
 
 
-def clip_box(image: NDArray[Any], box: Box) -> Box:
-    """
-    Clip the box to inside the provided image dimensions.
-    """
-    x0, y0, x1, y1 = box
-    h, w = image.shape[-2:]
-
-    return max(0, x0), max(0, y0), min(w, x1), min(h, y1)
-
-
-def is_valid_box(box: Box) -> bool:
-    """
-    Check if the box dimensions provided are a valid image.
-    """
-    return box[2] > box[0] and box[3] > box[1]
-
-
 def clip_and_pad(image: NDArray[Any], box: Box) -> NDArray[Any]:
     """
     Extract a region from an image based on a bounding box, clipping to image boundaries
@@ -116,12 +97,13 @@ def clip_and_pad(image: NDArray[Any], box: Box) -> NDArray[Any]:
     """
 
     # Create output array filled with NaN with a minimum size of 1x1
+    box = to_int_box(box)
     bw, bh = max(1, box[2] - box[0]), max(1, box[3] - box[1])
 
     output = np.full((image.shape[-3] if image.ndim > 2 else 1, bh, bw), np.nan)
 
     # Calculate source box
-    sbox = clip_box(image, box)
+    sbox = clip_box(image.shape, box)
 
     # Calculate destination box
     x0, y0 = sbox[0] - box[0], sbox[1] - box[1]

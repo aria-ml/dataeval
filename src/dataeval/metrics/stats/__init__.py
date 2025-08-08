@@ -4,7 +4,6 @@ and label statistics against the images and labels of a dataset.
 """
 
 __all__ = [
-    "ChannelStatsOutput",
     "ImageStatsOutput",
     "DimensionStatsOutput",
     "HashStatsOutput",
@@ -28,7 +27,6 @@ from dataeval.metrics.stats._labelstats import labelstats
 from dataeval.metrics.stats._pixelstats import pixelstats
 from dataeval.metrics.stats._visualstats import visualstats
 from dataeval.outputs._stats import (
-    ChannelStatsOutput,
     DimensionStatsOutput,
     HashStatsOutput,
     ImageStatsOutput,
