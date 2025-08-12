@@ -7,7 +7,7 @@ from tests.metadata._shared import mock_metadata
 
 
 @pytest.mark.required
-class TestMetadataDistance:
+class TestFeatureDistance:
     """Tests valid combinations of input metadata run without errors"""
 
     @pytest.mark.parametrize(
@@ -64,6 +64,14 @@ class TestMetadataDistance:
         result = feature_distance(c1, c2)
 
         assert result == [(0.0, 0.0, 0.0, 1.0)]
+
+    def test_inconsistent_features(self):
+        """Test that value error is raised with inconsistent number of features"""
+        c1 = np.ones((32, 1))
+        c2 = np.ones((32, 2))
+
+        with pytest.raises(ValueError):
+            feature_distance(c1, c2)
 
 
 @pytest.mark.required
