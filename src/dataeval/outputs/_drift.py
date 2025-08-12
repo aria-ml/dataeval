@@ -12,8 +12,8 @@ from numpy.typing import NDArray
 with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure
 
-from dataeval.detectors.drift._nml._result import Metric, PerMetricResult
 from dataeval.outputs._base import Output
+from dataeval.outputs._result import Metric, PerMetricResult
 
 
 @dataclass(frozen=True)
