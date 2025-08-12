@@ -4,7 +4,6 @@ in setting up data and architectures that are guaranteed to work with applicable
 DataEval metrics.
 """
 
-from dataeval.utils import torch
 from dataeval.utils._merge import flatten, merge
 
-__all__ = ["flatten", "merge", "torch"]
+__all__ = ["flatten", "merge"]

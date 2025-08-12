@@ -22,9 +22,6 @@ class PoolWrapper:
     def __init__(self, processes: int | None) -> None:
         self.pool = Pool(processes) if processes is None or processes > 1 else None
 
-    def imap(self, func: Callable[[_S], _T], iterable: Iterable[_S]) -> Iterator[_T]:
-        return map(func, iterable) if self.pool is None else self.pool.imap(func, iterable)
-
     def imap_unordered(self, func: Callable[[_S], _T], iterable: Iterable[_S]) -> Iterator[_T]:
         return map(func, iterable) if self.pool is None else self.pool.imap_unordered(func, iterable)
 
