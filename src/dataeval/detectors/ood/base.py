@@ -130,4 +130,3 @@ class EmbeddingBasedOODBase(OODBaseMixin[Callable[[Any], Any]], ABC):
             embeddings: Reference (in-distribution) embeddings
             threshold_perc: Percentage of reference data considered normal
         """
-        pass

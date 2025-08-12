@@ -16,7 +16,10 @@ from dataeval.utils._array import as_numpy
 
 @overload
 def parity(
-    binned_data: NDArray[np.intp], class_labels: Sequence[int]
+    binned_data: NDArray[np.intp],
+    class_labels: Sequence[int],
+    *,
+    return_insufficient_data: Literal[False] = False,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]: ...
 
 

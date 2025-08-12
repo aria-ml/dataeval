@@ -5,22 +5,24 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from dataeval.detectors.ood.base import OODBaseGMM
+from dataeval.data._embeddings import Embeddings
+from dataeval.detectors.ood.base import EmbeddingBasedOODBase, OODBaseGMM
 from dataeval.detectors.ood.mixin import OODBaseMixin, OODGMMMixin
 from dataeval.outputs._ood import OODScoreOutput
 
 image_shape = (32, 32, 1)
 model = MagicMock()
+ood_output = OODScoreOutput(np.array([0.0]), np.array([0.0]))
 
 
 class MockOOD(OODGMMMixin, OODBaseMixin[Callable]):
     def _score(self, X: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput:
-        return OODScoreOutput(np.array([0.0]), np.array([0.0]))
+        return ood_output
 
 
 class MockOODGMM(OODBaseGMM):
     def _score(self, X: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput:
-        return OODScoreOutput(np.array([0.0]), np.array([0.0]))
+        return ood_output
 
 
 @pytest.mark.required
@@ -73,3 +75,16 @@ def test_ood_unit_interval():
     outlier = MockOOD(lambda _: (1, 1, 1))  # type: ignore
     with pytest.raises(ValueError):
         outlier._get_data_info(data)
+
+
+def test_embedding_based_ood_base():
+    class MockEmbeddingBasedOOD(EmbeddingBasedOODBase):
+        def _score(self, X: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput:
+            return ood_output
+
+        def fit_embeddings(self, embeddings: Embeddings, threshold_perc: float = 95) -> None:
+            pass
+
+    mock = MockEmbeddingBasedOOD()
+    with pytest.raises(TypeError):
+        mock._get_data_info("invalid")  # type: ignore

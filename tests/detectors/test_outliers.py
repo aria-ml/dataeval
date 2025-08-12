@@ -92,6 +92,25 @@ class TestOutliers:
         with pytest.raises(TypeError):
             outliers.from_stats([1234])  # type: ignore
 
+    def test_outliers_all_false(self):
+        outliers = Outliers(False, False, False)
+        with pytest.raises(ValueError):
+            outliers.evaluate(np.zeros([]))
+
+    @pytest.mark.parametrize(
+        "params, expected, not_expected",
+        (
+            ((True, False, False), "width", {"mean", "brightness"}),
+            ((False, True, False), "mean", {"width", "brightness"}),
+            ((False, False, True), "brightness", {"width", "mean"}),
+        ),
+    )
+    def test_outliers_use_flags(self, params, expected, not_expected):
+        outliers = Outliers(*params)
+        outliers.evaluate(np.zeros((50, 1, 16, 16)))
+        assert expected in outliers.stats
+        assert not not_expected & set(outliers.stats)
+
 
 @pytest.mark.required
 class TestOutliersOutput:
