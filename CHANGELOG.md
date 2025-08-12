@@ -1,6 +1,21 @@
-[//]: # (789fb41aaf2c3f52b3e8a8b9b171724077c91417)
+[//]: # (e6a3f2d32f0f28227bf6f1771c93b8edac031e7a)
 
 # DataEval Change Log
+
+## v0.91.0
+
+🚧 **Deprecations and Removals**
+- `a37019ff` - Remove MAITE dataset helpers
+
+🛠️ **Improvements and Enhancements**
+- `e6a3f2d3` - added resolve_indices() and related unit tests
+- `e8a32098` - Refactor stats to core module and remove dimensionstats from imagestats
+
+👾 **Fixes**
+- `dd8f1cf5` - Connect BER to MST implementation in _fast_mst.py
+
+📝 **Miscellaneous**
+- `6609e929` - Refactor core functionality to dataeval.core submodule
 
 ## v0.90.1
 
