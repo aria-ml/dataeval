@@ -7,7 +7,7 @@ import math
 import os
 from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import torch
 import xxhash as xxh
@@ -28,6 +28,23 @@ from dataeval.utils._array import as_numpy
 from dataeval.utils.torch.models import SupportsEncode
 
 _logger = logging.getLogger(__name__)
+
+
+class _TorchDatasetWrapper(torch.utils.data.Dataset[torch.Tensor]):
+    """Wrapper for dataset to convert to PyTorch and apply transforms."""
+
+    def __init__(
+        self, dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike], transforms: Iterable[Transform]
+    ) -> None:
+        self._dataset = dataset
+        self._transforms = transforms
+
+    def __getitem__(self, index: int) -> torch.Tensor:
+        item = self._dataset[index]
+        image = torch.as_tensor(item[0] if isinstance(item, tuple) else item)
+        for transform in self._transforms:
+            image = transform(image)
+        return image
 
 
 class Embeddings:
@@ -92,11 +109,12 @@ class Embeddings:
 
         self._embeddings_only: bool = False
         self._dataset = dataset
-        self._transforms = [transforms] if isinstance(transforms, Transform) else transforms
+        self._transforms = (
+            [transforms] if isinstance(transforms, Transform) else [] if transforms is None else list(transforms)
+        )
         model = torch.nn.Flatten() if model is None else model
         self._model = model.to(self.device).eval() if isinstance(model, torch.nn.Module) else model
         self._encoder = model.encode if isinstance(model, SupportsEncode) else model
-        self._collate_fn = lambda datum: [torch.as_tensor(d[0] if isinstance(d, tuple) else d) for d in datum]
         self._cached_idx: set[int] = set()
         self._embeddings: torch.Tensor = torch.empty(())
 
@@ -108,7 +126,7 @@ class Embeddings:
         else:
             did = self._dataset.metadata["id"] if isinstance(self._dataset, AnnotatedDataset) else str(self._dataset)
             mid = self._model.metadata["id"] if isinstance(self._model, AnnotatedModel) else str(self._model)
-            tid = str.join("|", [str(t) for t in self._transforms or []])
+            tid = str.join("|", [str(t) for t in self._transforms])
             bid = f"{did}{mid}{tid}".encode()
 
         return int(xxh.xxh3_64_hexdigest(bid), 16)
@@ -321,24 +339,21 @@ class Embeddings:
         return emb
 
     def _encode(self, images: list[torch.Tensor]) -> torch.Tensor:
-        if self._transforms:
-            images = [transform(image) for transform in self._transforms for image in images]
         return self._encoder(torch.stack(images).to(self.device))
 
     @torch.no_grad()  # Reduce overhead cost by not tracking tensor gradients
     def _batch(self, indices: Sequence[int]) -> Iterator[torch.Tensor]:
-        dataset = cast(torch.utils.data.Dataset, self._dataset)
+        dataset = _TorchDatasetWrapper(self._dataset, self._transforms)
         total_batches = math.ceil(len(indices) / self.batch_size)
 
         # If not caching, process all indices normally
         if not self.cache:
-            for images in tqdm(
-                DataLoader(Subset(dataset, indices), self.batch_size, collate_fn=self._collate_fn),
+            yield from tqdm(
+                DataLoader(Subset(dataset, indices), self.batch_size, collate_fn=self._encode),
                 total=total_batches,
                 desc="Batch embedding",
                 disable=not self.verbose,
-            ):
-                yield self._encode(images)
+            )
             return
 
         # If caching, process each batch of indices at a time, preserving original order
@@ -348,9 +363,7 @@ class Embeddings:
 
             if uncached:
                 # Process uncached indices as as single batch
-                for images in DataLoader(Subset(dataset, uncached), len(uncached), collate_fn=self._collate_fn):
-                    embeddings = self._encode(images)
-
+                for embeddings in DataLoader(Subset(dataset, uncached), len(uncached), collate_fn=self._encode):
                     if not self._embeddings.shape:
                         full_shape = (len(self), *embeddings.shape[1:])
                         self._embeddings = torch.empty(full_shape, dtype=embeddings.dtype, device=self.device)
