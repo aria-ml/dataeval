@@ -8,7 +8,7 @@ from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.stats import wasserstein_distance as wd
+from scipy.stats import wasserstein_distance
 
 DISCRETE_MIN_WD = 0.054
 CONTINUOUS_MIN_SAMPLE_SIZE = 20
@@ -144,9 +144,9 @@ def is_continuous(data: NDArray[np.number[Any]], image_indices: NDArray[np.numbe
 
     dx[gtz] = (Xs[1:-1] - X0)[gtz] / (X1 - X0)[gtz]  # the core idea: dx is NNN samples.
 
-    shift = wd(dx, np.linspace(0, 1, dx.size))  # how far is dx from uniform, for this feature?
+    shift = wasserstein_distance(dx, np.linspace(0, 1, dx.size))  # how far is dx from uniform, for this feature?
 
-    return shift < DISCRETE_MIN_WD  # if NNN is close enough to uniform, consider the sample continuous.
+    return bool(shift < DISCRETE_MIN_WD)  # if NNN is close enough to uniform, consider the sample continuous.
 
 
 def _bin_by_clusters(data: NDArray[np.number[Any]]) -> NDArray[np.float64]:
