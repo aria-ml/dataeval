@@ -20,13 +20,7 @@ from dataeval.core._hash import pchash, xxhash
 from dataeval.outputs._stats import SourceIndex
 from dataeval.typing import ArrayLike
 from dataeval.utils._boundingbox import BoundingBox, BoxLike
-from dataeval.utils._image import (
-    clip_and_pad,
-    edge_filter,
-    get_bitdepth,
-    normalize_image_shape,
-    rescale,
-)
+from dataeval.utils._image import clip_and_pad, edge_filter, get_bitdepth, normalize_image_shape, rescale
 from dataeval.utils._multiprocessing import PoolWrapper
 
 QUARTILES = (0, 25, 50, 75, 100)
@@ -36,11 +30,8 @@ QUARTILES = (0, 25, 50, 75, 100)
 class ProcessorResult:
     """Result from processing a single image/box combination."""
 
+    source_indices: list[SourceIndex]
     stats: dict[str, list[Any]]
-    image_indices: list[int]
-    box_indices: list[int | None]
-    channel_indices: list[int | None]
-    warning: str | None = None
 
 
 @dataclass
@@ -295,19 +286,10 @@ def _process_single(
         reconciled_stats = _reconcile_stats(processor_stats, sorted_channels)
 
         # Build index lists
-        num_entries = len(sorted_channels)
-        image_indices = [i] * num_entries
-        box_indices = [i_b if box is not None else None] * num_entries
         channel_indices = sorted_channels
+        source = [SourceIndex(i, i_b if box is not None else None, c) for c in channel_indices]
 
-        results.append(
-            ProcessorResult(
-                stats=reconciled_stats,
-                image_indices=image_indices,
-                box_indices=box_indices,
-                channel_indices=channel_indices,
-            )
-        )
+        results.append(ProcessorResult(source_indices=source, stats=reconciled_stats))
 
     return StatsProcessorOutput(results, box_count, invalid_box_count, warnings_list)
 
@@ -335,56 +317,48 @@ def _enumerate(
             yield i, np_image, bboxes
 
 
-def _aggregate(
-    results: list[ProcessorResult],
-) -> tuple[list[int], list[int | None], list[int | None], dict[str, list[Any]]]:
-    """Extract indices and aggregate results from ProcessorResult objects."""
-    image_indices: list[int] = []
-    box_indices: list[int | None] = []
-    channel_indices: list[int | None] = []
-    aggregated_stats: dict[str, list[Any]] = {}
-
-    for result in results:
-        image_indices.extend(result.image_indices)
-        box_indices.extend(result.box_indices)
-        channel_indices.extend(result.channel_indices)
-
-        for stat_name, stat_values in result.stats.items():
-            aggregated_stats.setdefault(stat_name, []).extend(stat_values)
-
-    return image_indices, box_indices, channel_indices, aggregated_stats
-
-
-def _sort_results(
-    image_indices: list[int],
-    box_indices: list[int | None],
-    channel_indices: list[int | None],
+def _sort(
+    source_indices: list[SourceIndex],
     aggregated_stats: dict[str, list[Any]],
 ) -> tuple[list[SourceIndex], dict[str, list[Any]]]:
     """Sort results by (image_index, box_index, channel_index) with None < 0."""
     sort_indices = sorted(
-        range(len(image_indices)),
+        range(len(source_indices)),
         key=lambda i: (
-            image_indices[i],
-            -1 if box_indices[i] is None else box_indices[i],
-            -1 if channel_indices[i] is None else channel_indices[i],
+            source_indices[i].image,
+            -1 if source_indices[i].box is None else source_indices[i].box,
+            -1 if source_indices[i].channel is None else source_indices[i].channel,
         ),
     )
 
-    # Apply sorting to all parallel arrays
-    sorted_image_indices = [image_indices[i] for i in sort_indices]
-    sorted_box_indices = [box_indices[i] for i in sort_indices]
-    sorted_channel_indices = [channel_indices[i] for i in sort_indices]
-
+    sorted_source_indices: list[SourceIndex] = [source_indices[i] for i in sort_indices]
     sorted_aggregated_stats: dict[str, list[Any]] = {}
     for stat_name, stat_values in aggregated_stats.items():
         sorted_aggregated_stats[stat_name] = [stat_values[i] for i in sort_indices]
 
-    sorted_source_indices = [
-        SourceIndex(ii, bi, ci) for ii, bi, ci in zip(sorted_image_indices, sorted_box_indices, sorted_channel_indices)
-    ]
-
     return sorted_source_indices, sorted_aggregated_stats
+
+
+def _aggregate(
+    result: StatsProcessorOutput,
+    source_indices: list[SourceIndex],
+    aggregated_stats: dict[str, list[Any]],
+    object_count: dict[int, int],
+    invalid_box_count: dict[int, int],
+    warning_list: list[str],
+) -> None:
+    """Extract and aggregate results from a single StatsProcessorOutput."""
+    for r in result.results:
+        source_indices.extend(r.source_indices)
+        for stat_name, stat_values in r.stats.items():
+            aggregated_stats.setdefault(stat_name, []).extend(stat_values)
+
+    if result.results and result.results[0].source_indices:
+        img_idx = result.results[0].source_indices[0].image
+        object_count[img_idx] = result.object_count
+        invalid_box_count[img_idx] = result.invalid_box_count
+
+    warning_list.extend(result.warnings_list)
 
 
 def process(
@@ -419,9 +393,7 @@ def process(
         Output is sorted by (image_index, box_index, channel_index) ascending,
         with None values appearing before 0.
     """
-    image_indices: list[int] = []
-    box_indices: list[int | None] = []
-    channel_indices: list[int | None] = []
+    source_indices: list[SourceIndex] = []
     aggregated_stats: dict[str, list[Any]] = {}
     object_count: dict[int, int] = {}
     invalid_box_count: dict[int, int] = {}
@@ -439,28 +411,13 @@ def process(
             total=len(images) if isinstance(images, Sized) else None,
             desc=f"Processing images for {', '.join([p.__name__.removesuffix('Processor') for p in processors])}",
         ):
-            aggregated_results = _aggregate(result.results)
-
-            image_indices.extend(aggregated_results[0])
-            box_indices.extend(aggregated_results[1])
-            channel_indices.extend(aggregated_results[2])
-            for stat_name, stat_values in aggregated_results[3].items():
-                aggregated_stats.setdefault(stat_name, []).extend(stat_values)
-
-            if result.results:
-                img_idx = result.results[0].image_indices[0]
-                object_count[img_idx] = result.object_count
-                invalid_box_count[img_idx] = result.invalid_box_count
-                warning_list.extend(result.warnings_list)
-
+            _aggregate(result, source_indices, aggregated_stats, object_count, invalid_box_count, warning_list)
             image_count += 1
 
     for w in warning_list:
         warnings.warn(w, UserWarning)
 
-    sorted_source_indices, sorted_aggregated_stats = _sort_results(
-        image_indices, box_indices, channel_indices, aggregated_stats
-    )
+    sorted_source_indices, sorted_aggregated_stats = _sort(source_indices, aggregated_stats)
 
     return sorted_aggregated_stats | {
         "source_index": sorted_source_indices,
