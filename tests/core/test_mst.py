@@ -38,7 +38,7 @@ class TestMst:
         # Disabling test until fix is in
         # assert (total == 14.0)  # 14-Aug-2025, picking wrong long edge and getting 15.0
 
-    def test_compute_neighbors(self, ll_computer_neighbors):
+    def test_compute_neighbors(self):
         from dataeval.core._mst import compute_neighbors
 
         images_0 = np.zeros((10, 3, 3))
@@ -46,7 +46,7 @@ class TestMst:
 
         assert compute_neighbors(images_0, images_1).shape == (10,)
 
-    def test_compute_neighbors_k0(self, ll_computer_neighbors):
+    def test_compute_neighbors_k0(self):
         from dataeval.core._mst import compute_neighbors
 
         images_0 = np.zeros((10, 3, 3))
@@ -55,7 +55,7 @@ class TestMst:
         with pytest.raises(ValueError):
             compute_neighbors(images_0, images_1, k=0).shape
 
-    def test_compute_neighbors_k2(self, ll_computer_neighbors):
+    def test_compute_neighbors_k2(self):
         from dataeval.core._mst import compute_neighbors
 
         images_0 = np.zeros((10, 3, 3))
