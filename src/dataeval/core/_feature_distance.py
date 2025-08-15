@@ -8,8 +8,7 @@ from typing import NamedTuple, cast
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.stats import iqr, ks_2samp
-from scipy.stats import wasserstein_distance as emd
+from scipy.stats import iqr, ks_2samp, wasserstein_distance
 
 from dataeval.typing import ArrayLike
 
@@ -25,7 +24,7 @@ class KSType(NamedTuple):
 def _calculate_drift(x1: ArrayLike, x2: ArrayLike) -> float:
     """Calculates the shift magnitude between x1 and x2 scaled by x1"""
 
-    distance = emd(x1, x2)
+    distance = wasserstein_distance(x1, x2)
 
     X = iqr(x1)
 

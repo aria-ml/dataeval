@@ -17,6 +17,7 @@ with warnings.catch_warnings():
     warnings.simplefilter("ignore", category=FutureWarning)
     from fast_hdbscan.disjoint_set import ds_find, ds_rank_create
 
+from dataeval.config import get_max_processes
 from dataeval.utils._array import flatten
 
 
@@ -115,7 +116,9 @@ def _cluster_edges(tracker: NDArray[Any], last_idx: int, cluster_distances: NDAr
 
 
 def _compute_nn(dataA: NDArray[Any], dataB: NDArray[Any], k: int) -> tuple[NDArray[np.int32], NDArray[np.float32]]:
-    distances, neighbors = NearestNeighbors(n_neighbors=k + 1, algorithm="brute").fit(dataA).kneighbors(dataB)
+    distances, neighbors = (
+        NearestNeighbors(n_neighbors=k + 1, algorithm="brute", n_jobs=get_max_processes()).fit(dataA).kneighbors(dataB)
+    )
     neighbors = np.array(neighbors[:, 1 : k + 1], dtype=np.int32)
     distances = np.array(distances[:, 1 : k + 1], dtype=np.float32)
     return neighbors, distances
@@ -214,7 +217,9 @@ def compute_neighbor_distances(data: np.ndarray, k: int = 10) -> tuple[NDArray[n
         # Note that k is the number of neighbors sought, excluding self. However, NearestNeighbors includes self.
         # That is why the n_neighbors keyword is defined the way it is.
         distances, neighbors = (
-            NearestNeighbors(n_neighbors=min(k + 1, data.shape[0]), algorithm="brute").fit(data).kneighbors(data)
+            NearestNeighbors(n_neighbors=min(k + 1, data.shape[0]), algorithm="brute", n_jobs=get_max_processes())
+            .fit(data)
+            .kneighbors(data)
         )
 
     neighbors = np.array(neighbors[:, 1 : k + 1], dtype=np.int32)
@@ -267,6 +272,6 @@ def compute_neighbors(
     A = flatten(A)
     B = flatten(B)
 
-    nbrs = NearestNeighbors(n_neighbors=k + 1, algorithm=algorithm).fit(B)
+    nbrs = NearestNeighbors(n_neighbors=k + 1, algorithm=algorithm, n_jobs=get_max_processes()).fit(B)
     nns = nbrs.kneighbors(A)[1]
     return nns[:, 1:].squeeze()
