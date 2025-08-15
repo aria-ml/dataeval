@@ -98,7 +98,7 @@ def cluster(data: ArrayLike) -> ClusterData:
     unsorted_mst: NDArray[np.float32] = minimum_spanning_tree_edges(x, kneighbors, kdistances)
     mst: NDArray[np.float32] = unsorted_mst[np.argsort(unsorted_mst.T[2])]
     linkage_tree: NDArray[np.float32] = mst_to_linkage_tree(mst).astype(np.float32)
-    condensed_tree: CondensedTree = condense_tree(linkage_tree, min_cluster_size, None)
+    condensed_tree: CondensedTree = condense_tree(linkage_tree, min_cluster_size)
 
     cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
 

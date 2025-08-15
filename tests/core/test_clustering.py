@@ -1,8 +1,6 @@
 import numpy as np
 import pytest
 
-from dataeval.core._clusterer import cluster
-
 
 @pytest.mark.required
 class TestMatrixOps:
@@ -18,6 +16,9 @@ class TestMatrixOps:
     )
     def test_matrices(self, shape):
         """Sample size (rows), feature size (cols) and non-uniform shapes can create matrix"""
+        # import on runtime to minimize load times
+        from dataeval.core._clusterer import cluster
+
         rows, cols = shape
         rand_arr = np.random.random(size=(rows, cols))
         dup_arr = np.ones(shape=(rows, cols))
@@ -55,10 +56,16 @@ class TestClustererValidate:
         ],
     )
     def test_invalid(self, data, error, error_msg):
+        # import on runtime to minimize load times
+        from dataeval.core._clusterer import cluster
+
         with pytest.raises(error) as e:
             cluster(data)
         assert e.value.args[0] == error_msg
 
     def test_valid(self):
+        # import on runtime to minimize load times
+        from dataeval.core._clusterer import cluster
+
         data = np.ones((2, 1, 2, 3, 4))
         cluster(data.reshape((2, -1)))
