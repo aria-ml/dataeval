@@ -3,6 +3,7 @@ from typing import Literal
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 
+from dataeval.config import get_max_processes
 from dataeval.data import Embeddings
 from dataeval.detectors.ood.base import EmbeddingBasedOODBase
 from dataeval.outputs._ood import OODScoreOutput
@@ -63,6 +64,7 @@ class OOD_KNN(EmbeddingBasedOODBase):
             n_neighbors=self.k,
             metric=self.distance_metric,
             algorithm="auto",  # Let sklearn choose the best algorithm
+            n_jobs=get_max_processes(),
         )
         self._nn_model.fit(self.reference_embeddings)
 

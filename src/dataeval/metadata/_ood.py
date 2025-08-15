@@ -8,7 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 from sklearn.feature_selection import mutual_info_classif
 
-from dataeval.config import get_seed
+from dataeval.config import get_max_processes, get_seed
 from dataeval.data import Metadata
 from dataeval.metadata._utils import _compare_keys, _validate_factors_and_data
 from dataeval.outputs import MostDeviatedFactorsOutput, OODOutput, OODPredictorOutput
@@ -237,6 +237,7 @@ def find_ood_predictors(
             y=ood_mask,
             discrete_features=discrete_features,  # type: ignore - sklearn function not typed
             random_state=get_seed(),
+            n_jobs=get_max_processes(),  # type: ignore
         )
         * _NATS2BITS
     )

@@ -4,8 +4,8 @@ __all__ = []
 
 
 import numpy as np
-import scipy as sp
 from numpy.typing import NDArray
+from scipy.stats import entropy
 
 
 def diversity_shannon(
@@ -37,7 +37,7 @@ def diversity_shannon(
     --------
     scipy.stats.entropy
     """
-    raw_entropy = sp.stats.entropy(counts, axis=0)
+    raw_entropy = np.asarray(entropy(counts, axis=0))
     ent_norm = np.empty(raw_entropy.shape)
     ent_norm[num_bins != 1] = raw_entropy[num_bins != 1] / np.log(num_bins[num_bins != 1])
     ent_norm[num_bins == 1] = 0
