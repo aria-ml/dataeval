@@ -12,18 +12,14 @@ from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.stats import entropy, kurtosis, skew
 from tqdm.auto import tqdm
 
-from dataeval.config import EPSILON, get_max_processes
-from dataeval.core._hash import pchash, xxhash
+from dataeval.config import get_max_processes
 from dataeval.outputs._stats import SourceIndex
 from dataeval.typing import ArrayLike
 from dataeval.utils._boundingbox import BoundingBox, BoxLike
-from dataeval.utils._image import clip_and_pad, edge_filter, get_bitdepth, normalize_image_shape, rescale
+from dataeval.utils._image import clip_and_pad, normalize_image_shape, rescale
 from dataeval.utils._multiprocessing import PoolWrapper
-
-QUARTILES = (0, 25, 50, 75, 100)
 
 
 @dataclass
@@ -35,7 +31,7 @@ class ProcessorResult:
 
 
 @dataclass
-class StatsProcessorOutput:
+class ProcessorOutput:
     """Output from processing multiple images."""
 
     results: list[ProcessorResult]
@@ -68,126 +64,6 @@ class BaseProcessor:
     @cached_property
     def per_channel(self) -> NDArray[Any]:
         return self.scaled.reshape(self.image.shape[0], -1)
-
-
-class PixelStatsProcessor(BaseProcessor):
-    @cached_property
-    def histogram(self) -> NDArray[np.float64]:
-        return np.histogram(self.scaled, bins=256, range=(0, 1))[0]
-
-    def process(self) -> dict[str, list[Any]]:
-        return {
-            "mean": [float(np.nanmean(self.scaled))],
-            "std": [float(np.nanstd(self.scaled))],
-            "var": [float(np.nanvar(self.scaled))],
-            "skew": [float(skew(self.scaled.ravel(), nan_policy="omit"))],
-            "kurtosis": [float(kurtosis(self.scaled.ravel(), nan_policy="omit"))],
-            "entropy": [float(entropy(self.histogram))],
-            "missing": [float(np.count_nonzero(np.isnan(self.image)) / np.prod(self.shape[-2:]))],
-            "zeros": [float(np.count_nonzero(np.sum(self.image, axis=0) == 0) / np.prod(self.shape[-2:]))],
-            "histogram": [self.histogram.tolist()],
-        }
-
-
-class VisualStatsProcessor(BaseProcessor):
-    @cached_property
-    def percentiles(self) -> NDArray[np.float64]:
-        return np.nanpercentile(self.scaled, q=QUARTILES).astype(np.float64)
-
-    def process(self) -> dict[str, list[Any]]:
-        return {
-            "brightness": [float(self.percentiles[1])],
-            "contrast": [
-                float(np.max(self.percentiles) - np.min(self.percentiles)) / float(np.mean(self.percentiles) + EPSILON)
-            ],
-            "darkness": [float(self.percentiles[-2])],
-            "sharpness": [float(np.nanstd(edge_filter(np.mean(self.image, axis=0))))],
-            "percentiles": [self.percentiles.tolist()],
-        }
-
-
-class PixelPerChannelStatsProcessor(BaseProcessor):
-    @cached_property
-    def histogram(self) -> NDArray[np.float64]:
-        return np.apply_along_axis(lambda y: np.histogram(y, bins=256, range=(0, 1))[0], 1, self.per_channel)
-
-    def process(self) -> dict[str, list[Any]]:
-        return {
-            "mean": np.nanmean(self.per_channel, axis=1).tolist(),
-            "std": np.nanstd(self.per_channel, axis=1).tolist(),
-            "var": np.nanvar(self.per_channel, axis=1).tolist(),
-            "skew": skew(self.per_channel, axis=1, nan_policy="omit").tolist(),
-            "kurtosis": kurtosis(self.per_channel, axis=1, nan_policy="omit").tolist(),
-            "entropy": np.asarray(entropy(self.histogram, axis=1)).tolist(),
-            "missing": (np.count_nonzero(np.isnan(self.image), axis=(1, 2)) / np.prod(self.shape[-2:])).tolist(),
-            "zeros": (np.count_nonzero(self.image == 0, axis=(1, 2)) / np.prod(self.shape[-2:])).tolist(),
-            "histogram": self.histogram.tolist(),
-        }
-
-
-class VisualPerChannelStatsProcessor(BaseProcessor):
-    @cached_property
-    def percentiles(self) -> NDArray[np.float64]:
-        return np.nanpercentile(self.per_channel, q=QUARTILES, axis=1).T.astype(np.float64)
-
-    def process(self) -> dict[str, list[Any]]:
-        return {
-            "brightness": self.percentiles[:, 1].tolist(),
-            "contrast": (
-                (np.max(self.percentiles, axis=1) - np.min(self.percentiles, axis=1))
-                / (np.mean(self.percentiles, axis=1) + EPSILON)
-            ).tolist(),
-            "darkness": self.percentiles[:, -2].tolist(),
-            "missing": (np.count_nonzero(np.isnan(self.image), axis=(1, 2)) / np.prod(self.shape[-2:])).tolist(),
-            "sharpness": np.nanstd(
-                np.vectorize(edge_filter, signature="(m,n)->(m,n)")(self.image), axis=(1, 2)
-            ).tolist(),
-            "percentiles": self.percentiles.tolist(),
-        }
-
-
-class DimensionStatsProcessor(BaseProcessor):
-    def process(self) -> dict[str, list[Any]]:
-        return {
-            "offset_x": [self.box.x0],
-            "offset_y": [self.box.y0],
-            "width": [self.box.width],
-            "height": [self.box.height],
-            "channels": [self.shape[-3]],
-            "size": [self.box.width * self.box.height],
-            "aspect_ratio": [0.0 if self.box.height == 0 else self.box.width / self.box.height],
-            "depth": [get_bitdepth(self.raw).depth],
-            "center": [[(self.box.x0 + self.box.x1) / 2, (self.box.y0 + self.box.y1) / 2]],
-            "distance_center": [
-                float(
-                    np.sqrt(
-                        np.square(((self.box.x0 + self.box.x1) / 2) - (self.raw.shape[-1] / 2))
-                        + np.square(((self.box.y0 + self.box.y1) / 2) - (self.raw.shape[-2] / 2))
-                    )
-                )
-            ],
-            "distance_edge": [
-                float(
-                    np.min(
-                        [
-                            np.abs(self.box.x0),
-                            np.abs(self.box.y0),
-                            np.abs(self.box.x1 - self.raw.shape[-1]),
-                            np.abs(self.box.y1 - self.raw.shape[-2]),
-                        ]
-                    )
-                )
-            ],
-            "invalid_box": [not self.box.is_valid()],
-        }
-
-
-class HashStatsProcessor(BaseProcessor):
-    def process(self) -> dict[str, list[Any]]:
-        return {
-            "xxhash": [xxhash(self.raw)],
-            "pchash": [pchash(self.raw)],
-        }
 
 
 def _collect_processor_stats(
@@ -260,7 +136,7 @@ def _process_single(
     image: NDArray[Any],
     boxes: list[BoundingBox] | None,
     processors: Iterable[type[BaseProcessor]],
-) -> StatsProcessorOutput:
+) -> ProcessorOutput:
     results: list[ProcessorResult] = []
     box_count = 0
     invalid_box_count = 0
@@ -291,13 +167,13 @@ def _process_single(
 
         results.append(ProcessorResult(source_indices=source, stats=reconciled_stats))
 
-    return StatsProcessorOutput(results, box_count, invalid_box_count, warnings_list)
+    return ProcessorOutput(results, box_count, invalid_box_count, warnings_list)
 
 
 def _unpack(
     args: tuple[int, NDArray[Any], list[BoundingBox] | None],
     processors: Iterable[type[BaseProcessor]],
-) -> StatsProcessorOutput:
+) -> ProcessorOutput:
     return _process_single(*args, processors)
 
 
@@ -340,7 +216,7 @@ def _sort(
 
 
 def _aggregate(
-    result: StatsProcessorOutput,
+    result: ProcessorOutput,
     source_indices: list[SourceIndex],
     aggregated_stats: dict[str, list[Any]],
     object_count: dict[int, int],

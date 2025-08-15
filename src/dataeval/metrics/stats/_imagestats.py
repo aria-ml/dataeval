@@ -4,13 +4,9 @@ __all__ = []
 
 from typing import Any
 
-from dataeval.core._imagestats import (
-    PixelPerChannelStatsProcessor,
-    PixelStatsProcessor,
-    VisualPerChannelStatsProcessor,
-    VisualStatsProcessor,
-    process,
-)
+from dataeval.core._processor import process
+from dataeval.core.processors._pixelstats import PixelStatsPerChannelProcessor, PixelStatsProcessor
+from dataeval.core.processors._visualstats import VisualStatsPerChannelProcessor, VisualStatsProcessor
 from dataeval.metrics.stats._base import convert_output, unzip_dataset
 from dataeval.outputs import ImageStatsOutput
 from dataeval.outputs._base import set_metadata
@@ -65,7 +61,7 @@ def imagestats(
      0.634 0.642 0.751 0.759 0.767 0.876 0.884 0.892]
     """
     processors = (
-        [PixelPerChannelStatsProcessor, VisualPerChannelStatsProcessor]
+        [PixelStatsPerChannelProcessor, VisualStatsPerChannelProcessor]
         if per_channel
         else [PixelStatsProcessor, VisualStatsProcessor]
     )
