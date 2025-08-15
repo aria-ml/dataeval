@@ -8,10 +8,11 @@ from numpy.typing import NDArray
 from scipy.stats import mode
 
 from dataeval.config import EPSILON
-from dataeval.core._mst import compute_neighbors, minimum_spanning_tree
 
 
 def ber_mst(data: NDArray[np.float64], labels: NDArray[np.intp], k: int = 1) -> tuple[float, float]:
+    from dataeval.core._mst import minimum_spanning_tree
+
     M, N = _get_classes_counts(labels)
 
     rows, cols = minimum_spanning_tree(data)  # get rows and cols directly
@@ -23,6 +24,8 @@ def ber_mst(data: NDArray[np.float64], labels: NDArray[np.intp], k: int = 1) -> 
 
 
 def ber_knn(images: NDArray[np.float64], labels: NDArray[np.intp], k: int) -> tuple[float, float]:
+    from dataeval.core._mst import compute_neighbors
+
     M, N = _get_classes_counts(labels)
     nn_indices = compute_neighbors(images, images, k=k)
     nn_indices = np.expand_dims(nn_indices, axis=1) if nn_indices.ndim == 1 else nn_indices
