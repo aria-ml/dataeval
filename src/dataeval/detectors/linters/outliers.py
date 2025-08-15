@@ -9,7 +9,10 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.config import EPSILON
-from dataeval.core._imagestats import DimensionStatsProcessor, PixelStatsProcessor, VisualStatsProcessor, process
+from dataeval.core._processor import process
+from dataeval.core.processors._dimensionstats import DimensionStatsProcessor
+from dataeval.core.processors._pixelstats import PixelStatsProcessor
+from dataeval.core.processors._visualstats import VisualStatsProcessor
 from dataeval.data._images import Images
 from dataeval.metrics.stats._base import combine_stats, get_dataset_step_from_idx
 from dataeval.outputs import DimensionStatsOutput, ImageStatsOutput, OutliersOutput, PixelStatsOutput, VisualStatsOutput

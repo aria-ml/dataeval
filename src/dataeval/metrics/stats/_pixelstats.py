@@ -4,7 +4,8 @@ __all__ = []
 
 from typing import Any
 
-from dataeval.core._imagestats import PixelPerChannelStatsProcessor, PixelStatsProcessor, process
+from dataeval.core._processor import process
+from dataeval.core.processors._pixelstats import PixelStatsPerChannelProcessor, PixelStatsProcessor
 from dataeval.metrics.stats._base import convert_output, unzip_dataset
 from dataeval.outputs import PixelStatsOutput
 from dataeval.outputs._base import set_metadata
@@ -60,6 +61,6 @@ def pixelstats(
     >>> print(results.entropy)
     [4.527 1.883 0.811 1.883 0.298 1.883 1.883 1.883]
     """
-    processor = PixelPerChannelStatsProcessor if per_channel else PixelStatsProcessor
+    processor = PixelStatsPerChannelProcessor if per_channel else PixelStatsProcessor
     stats = process(*unzip_dataset(dataset, per_box), processor)
     return convert_output(PixelStatsOutput, stats)

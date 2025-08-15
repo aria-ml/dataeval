@@ -4,7 +4,8 @@ __all__ = []
 
 from typing import Any
 
-from dataeval.core._imagestats import DimensionStatsProcessor, process
+from dataeval.core._processor import process
+from dataeval.core.processors._dimensionstats import DimensionStatsProcessor
 from dataeval.metrics.stats._base import convert_output, unzip_dataset
 from dataeval.outputs import DimensionStatsOutput
 from dataeval.outputs._base import set_metadata

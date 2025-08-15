@@ -4,7 +4,8 @@ __all__ = []
 
 from typing import Any
 
-from dataeval.core._imagestats import HashStatsProcessor, process
+from dataeval.core._processor import process
+from dataeval.core.processors._hashstats import HashStatsProcessor
 from dataeval.metrics.stats._base import convert_output, unzip_dataset
 from dataeval.outputs import HashStatsOutput
 from dataeval.outputs._base import set_metadata
