@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,38,27
+/aria-ml/dataeval/tree/main/docs/source/notebooks,5,4
+/aria-ml/dataeval/tree/main/docs/source,4,2
+/aria-ml/dataeval/tree/main/docs,3,3
+/aria-ml/dataeval/blob/main/docs/source/concepts/AlgorithmSummary.md,2,1
+/aria-ml/dataeval/blob/main/docs/source/concepts/ModelTraining.md,2,1
+/aria-ml/dataeval/blob/main/docs/source/concepts/Stats.md,2,1
+/aria-ml/dataeval/blob/main/docs/source/concepts/Sufficiency.md,2,1
+/aria-ml/dataeval/blob/main/docs/source/concepts/UAP.md,2,1
+/aria-ml/dataeval/blob/main/docs/source/_static/images/reference/UMAP.png,2,1
