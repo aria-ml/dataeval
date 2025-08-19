@@ -1,6 +1,14 @@
-[//]: # (e6a3f2d32f0f28227bf6f1771c93b8edac031e7a)
+[//]: # (696ef5bfb66f4db3128eaf89322752d85f70e2c8)
 
 # DataEval Change Log
+
+## v0.91.1
+
+🛠️ **Improvements and Enhancements**
+- `5a00001d` - [impr] Remove torch dataset requirement from Embeddings class
+
+👾 **Fixes**
+- `696ef5bf` - New test_simple_nodes() unit test for core.mst.minimum_spanning_tree()
 
 ## v0.91.0
 
