@@ -3,118 +3,19 @@
 # Adapted for DataEval by Ryan Wood
 # License: BSD 2-Clause
 
+from __future__ import annotations
+
 __all__ = []
 
 import warnings
 from typing import Any, Literal
 
-import numba
 import numpy as np
 from numpy.typing import NDArray
 from sklearn.neighbors import NearestNeighbors
 
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore", category=FutureWarning)
-    from fast_hdbscan.disjoint_set import ds_find, ds_rank_create
-
 from dataeval.config import get_max_processes
 from dataeval.utils._array import flatten
-
-
-@numba.njit()
-def _ds_union_by_rank(disjoint_set: tuple[NDArray[np.int32], NDArray[np.int32]], point: int, nbr: int) -> int:
-    y = ds_find(disjoint_set, point)
-    x = ds_find(disjoint_set, nbr)
-
-    if x == y:
-        return 0
-
-    if disjoint_set[1][x] < disjoint_set[1][y]:
-        x, y = y, x
-
-    disjoint_set[0][y] = x
-    if disjoint_set[1][x] == disjoint_set[1][y]:
-        disjoint_set[1][x] += 1
-    return 1
-
-
-@numba.njit(locals={"i": numba.types.uint32, "nbr": numba.types.uint32, "dist": numba.types.float32})
-def _init_tree(
-    n_neighbors: NDArray[np.intp], n_distance: NDArray[np.float32]
-) -> tuple[NDArray[np.float32], int, tuple[NDArray[np.int32], NDArray[np.int32]], NDArray[np.uint32]]:
-    # Initial graph to hold tree connections
-    tree = np.zeros((n_neighbors.size - 1, 3), dtype=np.float32)
-    disjoint_set = ds_rank_create(n_neighbors.size)
-    cluster_points = np.empty(n_neighbors.size, dtype=np.uint32)
-
-    int_tree = 0
-    for i in range(n_neighbors.size):
-        nbr = n_neighbors[i]
-        connect = _ds_union_by_rank(disjoint_set, i, nbr)
-        if connect == 1:
-            dist = n_distance[i]
-            tree[int_tree] = (np.float32(i), np.float32(nbr), dist)
-            int_tree += 1
-
-    for i in range(cluster_points.size):
-        cluster_points[i] = ds_find(disjoint_set, i)
-
-    return tree, int_tree, disjoint_set, cluster_points
-
-
-@numba.njit(locals={"i": numba.types.uint32, "nbr": numba.types.uint32})
-def _update_tree_by_distance(
-    tree: NDArray[np.float32],
-    int_tree: int,
-    disjoint_set: tuple[NDArray[np.int32], NDArray[np.int32]],
-    n_neighbors: NDArray[np.uint32],
-    n_distance: NDArray[np.float32],
-) -> tuple[NDArray[np.float32], int, tuple[NDArray[np.int32], NDArray[np.int32]], NDArray[np.uint32]]:
-    cluster_points = np.empty(n_neighbors.size, dtype=np.uint32)
-    sort_dist = np.argsort(n_distance)
-    dist_sorted = n_distance[sort_dist]
-    nbrs_sorted = n_neighbors[sort_dist]
-    points = np.arange(n_neighbors.size)
-    point_sorted = points[sort_dist]
-
-    for i in range(n_neighbors.size):
-        point = point_sorted[i]
-        nbr = nbrs_sorted[i]
-        connect = _ds_union_by_rank(disjoint_set, point, nbr)
-        if connect == 1:
-            dist = dist_sorted[i]
-            tree[int_tree] = (np.float32(point), np.float32(nbr), dist)
-            int_tree += 1
-
-    for i in range(cluster_points.size):
-        cluster_points[i] = ds_find(disjoint_set, i)
-
-    return tree, int_tree, disjoint_set, cluster_points
-
-
-@numba.njit(locals={"i": numba.types.uint32})
-def _cluster_edges(
-    tracker: NDArray[Any], final_merge_idx: int, cluster_distances: NDArray[Any]
-) -> list[NDArray[np.intp]]:
-    cluster_ids = np.unique(tracker)
-    edge_points: list[NDArray[np.intp]] = []
-    for idx in range(cluster_ids.size):
-        cluster_points = np.nonzero(tracker == cluster_ids[idx])[0]
-        cluster_size = cluster_points.size
-        cluster_mean = cluster_distances[: final_merge_idx + 1, cluster_points].mean()
-        cluster_std = cluster_distances[: final_merge_idx + 1, cluster_points].std()
-        threshold = cluster_mean + cluster_std
-        points_mean = np.empty_like(cluster_points, dtype=np.float32)
-        for i in range(cluster_size):
-            points_mean[i] = cluster_distances[: final_merge_idx + 1, cluster_points[i]].mean()
-        pts_to_add = cluster_points[np.nonzero(points_mean > threshold)[0]]
-        threshold = int(cluster_size * 0.01) if np.floor(np.log10(cluster_size)) > 2 else int(cluster_size * 0.1)
-        threshold = max(10, threshold)
-        if pts_to_add.size > threshold:
-            edge_points.append(pts_to_add)
-        else:
-            edge_points.append(cluster_points)
-    return edge_points
 
 
 def _compute_nn(dataA: NDArray[Any], dataB: NDArray[Any], k: int) -> tuple[NDArray[np.int32], NDArray[np.float32]]:
@@ -148,6 +49,9 @@ def _compute_cluster_neighbors(
 def minimum_spanning_tree_edges(
     data: NDArray[Any], neighbors: NDArray[np.int32], distances: NDArray[np.float32]
 ) -> NDArray[np.float32]:
+    # Delay load numba compiled functions
+    from dataeval.core._numba import _cluster_edges, _init_tree, _update_tree_by_distance
+
     # Transpose arrays to get number of samples along a row
     k_neighbors = neighbors.T.astype(np.uint32).copy()
     k_distances = distances.T.astype(np.float32).copy()
@@ -215,26 +119,13 @@ def minimum_spanning_tree(X: NDArray[Any], k: int = 15) -> tuple[NDArray[np.intp
 
 
 def compute_neighbor_distances(data: np.ndarray, k: int = 10) -> tuple[NDArray[np.int32], NDArray[np.float32]]:
-    # Have the potential to add in other distance calculations - supported calculations:
-    # https://github.com/lmcinnes/pynndescent/blob/master/pynndescent/pynndescent_.py#L524
-    try:
-        from pynndescent import NNDescent
-
-        max_descent = 30 if k <= 20 else k + 16
-        index = NNDescent(
-            data,
-            metric="euclidean",
-            n_neighbors=max_descent,
-        )
-        neighbors, distances = index.neighbor_graph
-    except ImportError:
-        # Note that k is the number of neighbors sought, excluding self. However, NearestNeighbors includes self.
-        # That is why the n_neighbors keyword is defined the way it is.
-        distances, neighbors = (
-            NearestNeighbors(n_neighbors=min(k + 1, data.shape[0]), algorithm="brute", n_jobs=get_max_processes())
-            .fit(data)
-            .kneighbors(data)
-        )
+    # Note that k is the number of neighbors sought, excluding self. However, NearestNeighbors includes self.
+    # That is why the n_neighbors keyword is defined the way it is.
+    distances, neighbors = (
+        NearestNeighbors(n_neighbors=min(k + 1, data.shape[0]), algorithm="brute", n_jobs=get_max_processes())
+        .fit(data)
+        .kneighbors(data)
+    )
 
     neighbors = np.array(neighbors[:, 1 : k + 1], dtype=np.int32)
     distances = np.array(distances[:, 1 : k + 1], dtype=np.float32)
