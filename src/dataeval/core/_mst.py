@@ -93,18 +93,20 @@ def _update_tree_by_distance(
 
 
 @numba.njit(locals={"i": numba.types.uint32})
-def _cluster_edges(tracker: NDArray[Any], last_idx: int, cluster_distances: NDArray[Any]) -> list[NDArray[np.intp]]:
+def _cluster_edges(
+    tracker: NDArray[Any], final_merge_idx: int, cluster_distances: NDArray[Any]
+) -> list[NDArray[np.intp]]:
     cluster_ids = np.unique(tracker)
     edge_points: list[NDArray[np.intp]] = []
     for idx in range(cluster_ids.size):
         cluster_points = np.nonzero(tracker == cluster_ids[idx])[0]
         cluster_size = cluster_points.size
-        cluster_mean = cluster_distances[: last_idx + 1, cluster_points].mean()
-        cluster_std = cluster_distances[: last_idx + 1, cluster_points].std()
+        cluster_mean = cluster_distances[: final_merge_idx + 1, cluster_points].mean()
+        cluster_std = cluster_distances[: final_merge_idx + 1, cluster_points].std()
         threshold = cluster_mean + cluster_std
         points_mean = np.empty_like(cluster_points, dtype=np.float32)
         for i in range(cluster_size):
-            points_mean[i] = cluster_distances[: last_idx + 1, cluster_points[i]].mean()
+            points_mean[i] = cluster_distances[: final_merge_idx + 1, cluster_points[i]].mean()
         pts_to_add = cluster_points[np.nonzero(points_mean > threshold)[0]]
         threshold = int(cluster_size * 0.01) if np.floor(np.log10(cluster_size)) > 2 else int(cluster_size * 0.1)
         threshold = max(10, threshold)
@@ -157,30 +159,42 @@ def minimum_spanning_tree_edges(
     tree, int_tree, tree_disjoint_set, merge_tracker[0] = _init_tree(k_neighbors[0], k_distances[0])
 
     # Loop through all of the neighbors, updating the tree
-    last_idx = 0
-    for i in range(1, k_neighbors.shape[0]):
-        tree, int_tree, tree_disjoint_set, merge_tracker[i] = _update_tree_by_distance(
-            tree, int_tree, tree_disjoint_set, k_neighbors[i], k_distances[i]
+    k_max = k_neighbors.shape[0]
+    k_now = 0  # to catch k_neighbors.shape[0] == 1 edge case
+    for k_now in range(1, k_max):
+        tree, int_tree, tree_disjoint_set, merge_tracker[k_now] = _update_tree_by_distance(
+            tree, int_tree, tree_disjoint_set, k_neighbors[k_now], k_distances[k_now]
         )
-        last_idx = i
-        if (merge_tracker[i] == merge_tracker[i - 1]).all():
-            last_idx -= 1
+
+        time_to_stop = len(np.unique(merge_tracker[k_now])) == 1
+
+        if time_to_stop:
             break
+    else:
+        # Exhausted k-nearest neighbors without achieving connectivity
+        warnings.warn(
+            f"Exhausted k-nearest neighbors (k={k_neighbors.shape[0] - 1}) "
+            f"before finding connected spanning tree. "
+            f"Consider increasing k parameter. "
+            f"Falling back to inter-cluster connection heuristics.",
+            RuntimeWarning,
+        )
+    final_merge_idx = k_now
 
     # Identify final clusters
-    cluster_ids = np.unique(merge_tracker[last_idx])
+    cluster_ids = np.unique(merge_tracker[final_merge_idx])
     if cluster_ids.size > 1:
         # Determining the edge points
-        edge_points = _cluster_edges(merge_tracker[last_idx], last_idx, k_distances)
+        edge_points = _cluster_edges(merge_tracker[final_merge_idx], final_merge_idx, k_distances)
 
         # Run nearest neighbor again between clusters to reach single cluster
         additional_neighbors, additional_distances = _compute_cluster_neighbors(
-            data, edge_points, merge_tracker[last_idx]
+            data, edge_points, merge_tracker[final_merge_idx]
         )
 
         # Update clusters
-        last_idx += 1
-        tree, int_tree, tree_disjoint_set, merge_tracker[last_idx] = _update_tree_by_distance(
+        next_merge_idx = final_merge_idx + 1
+        tree, int_tree, tree_disjoint_set, merge_tracker[next_merge_idx] = _update_tree_by_distance(
             tree, int_tree, tree_disjoint_set, additional_neighbors, additional_distances
         )
 
