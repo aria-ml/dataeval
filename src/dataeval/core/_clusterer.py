@@ -4,66 +4,23 @@ __all__ = []
 
 import warnings
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, NamedTuple
 
-import numba
 import numpy as np
 from numpy.typing import NDArray
-
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore", category=FutureWarning)
-    from fast_hdbscan.cluster_trees import (
-        CondensedTree,
-        cluster_tree_from_condensed_tree,
-        condense_tree,
-        ds_find,
-        ds_rank_create,
-        ds_union_by_rank,
-        extract_eom_clusters,
-        get_cluster_label_vector,
-        get_point_membership_strength_vector,
-        mst_to_linkage_tree,
-    )
 
 from dataeval.core._mst import compute_neighbor_distances, minimum_spanning_tree_edges
 from dataeval.typing import ArrayLike
 from dataeval.utils._array import flatten, to_numpy
 
 
-@numba.njit(parallel=True, locals={"i": numba.types.int32})
-def compare_links_to_cluster_std(
-    mst: NDArray[np.float32], clusters: NDArray[np.intp]
-) -> tuple[NDArray[np.int32], NDArray[np.int32]]:
-    cluster_ids = np.unique(clusters)
-    cluster_grouping = np.full(mst.shape[0], -1, dtype=np.int16)
+class CondensedTree(NamedTuple):
+    """Derived from fast_hdbscan.cluster_trees.CondensedTree"""
 
-    for i in numba.prange(mst.shape[0]):
-        cluster_id = clusters[np.int32(mst[i, 0])]
-        if cluster_id == clusters[np.int32(mst[i, 1])]:
-            cluster_grouping[i] = np.int16(cluster_id)
-
-    overall_mean = mst.T[2].mean()
-    order_mag = np.floor(np.log10(overall_mean)) if overall_mean > 0 else 0
-    compare_mag = -3 if order_mag >= 0 else order_mag - 3
-
-    exact_dup = np.full((mst.shape[0], 2), -1, dtype=np.int32)
-    exact_dups_index = np.nonzero(mst[:, 2] < 10**compare_mag)[0]
-    exact_dup[exact_dups_index] = mst[exact_dups_index, :2]
-
-    near_dup = np.full((mst.shape[0], 2), -1, dtype=np.int32)
-    for i in range(cluster_ids.size):
-        cluster_links = np.nonzero(cluster_grouping == cluster_ids[i])[0]
-        cluster_std = mst[cluster_links, 2].std()
-
-        near_dups = np.nonzero(mst[cluster_links, 2] < cluster_std)[0]
-        near_dups_index = cluster_links[near_dups]
-        near_dup[near_dups_index] = mst[near_dups_index, :2]
-
-    exact_idx = np.nonzero(exact_dup.T[0] != -1)[0]
-    near_dup[exact_idx] = np.full((exact_idx.size, 2), -1, dtype=np.int32)
-    near_idx = np.nonzero(near_dup.T[0] != -1)[0]
-
-    return exact_dup[exact_idx], near_dup[near_idx]
+    parent: NDArray[np.int64]
+    child: NDArray[np.int64]
+    lambda_val: NDArray[np.float32]
+    child_size: NDArray[np.float32]
 
 
 @dataclass
@@ -78,6 +35,18 @@ class ClusterData:
 
 
 def cluster(data: ArrayLike) -> ClusterData:
+    # Delay load fast_hdbscan functions
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=FutureWarning)
+        from fast_hdbscan.cluster_trees import (
+            cluster_tree_from_condensed_tree,
+            condense_tree,
+            extract_eom_clusters,
+            get_cluster_label_vector,
+            get_point_membership_strength_vector,
+            mst_to_linkage_tree,
+        )
+
     single_cluster = False
     cluster_selection_epsilon = 0.0
     # cluster_selection_method = "eom"
@@ -98,7 +67,7 @@ def cluster(data: ArrayLike) -> ClusterData:
     unsorted_mst: NDArray[np.float32] = minimum_spanning_tree_edges(x, kneighbors, kdistances)
     mst: NDArray[np.float32] = unsorted_mst[np.argsort(unsorted_mst.T[2])]
     linkage_tree: NDArray[np.float32] = mst_to_linkage_tree(mst).astype(np.float32)
-    condensed_tree: CondensedTree = condense_tree(linkage_tree, min_cluster_size)
+    condensed_tree: CondensedTree = CondensedTree(*condense_tree(linkage_tree, min_cluster_size))
 
     cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
 
@@ -130,6 +99,15 @@ def cluster(data: ArrayLike) -> ClusterData:
 
 def sorted_union_find(index_groups: NDArray[np.int32]) -> list[list[np.int32]]:
     """Merges and sorts groups of indices that share any common index"""
+    # Delay load fast_hdbscan functions
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=FutureWarning)
+        from fast_hdbscan.cluster_trees import (
+            ds_find,
+            ds_rank_create,
+            ds_union_by_rank,
+        )
+
     groups: list[list[np.int32]] = [[np.int32(x) for x in range(0)] for y in range(0)]
     uniques, inverse = np.unique(index_groups, return_inverse=True)
     inverse = inverse.flatten()
