@@ -207,8 +207,7 @@ exclude_also = [
 include = ["*/src/dataeval/*"]
 omit = [
   "*/torch/_blocks.py",
-  "*/_clusterer.py",
-  "*/_mst.py",
+  "*/_numba.py",
 ]
 fail_under = 90
 

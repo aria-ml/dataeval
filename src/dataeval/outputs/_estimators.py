@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval.core._clusterer import sorted_union_find
 from dataeval.outputs._base import Output
 
 
@@ -75,7 +76,7 @@ class ClustererOutput(Output):
             The exact :term:`duplicates<Duplicates>` and near duplicates as lists of related indices
         """
         # Delay load numba compiled functions
-        from dataeval.core._clusterer import compare_links_to_cluster_std, sorted_union_find
+        from dataeval.core._numba import compare_links_to_cluster_std
 
         exact_indices, near_indices = compare_links_to_cluster_std(self.mst, self.clusters)  # type: ignore
         exact_dupes = sorted_union_find(exact_indices)
