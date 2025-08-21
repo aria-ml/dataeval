@@ -103,13 +103,13 @@ class DatasetMetadata(TypedDict, total=False):
 
     Attributes
     ----------
-    id : Required[str]
+    id : Required[int | str]
         A unique identifier for the dataset
     index2label : NotRequired[dict[int, str]]
         A lookup table converting label value to class name
     """
 
-    id: Required[ReadOnly[str]]
+    id: Required[ReadOnly[int | str]]
     index2label: NotRequired[ReadOnly[dict[int, str]]]
 
 
@@ -135,11 +135,11 @@ class DatumMetadata(TypedDict, total=False):
 
     Attributes
     ----------
-    id : Required[str]
+    id : Required[int | str]
         A unique identifier for the datum
     """
 
-    id: Required[ReadOnly[str]]
+    id: Required[ReadOnly[int | str]]
 
 
 @runtime_checkable
