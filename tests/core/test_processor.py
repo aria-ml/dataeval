@@ -1,5 +1,5 @@
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -292,3 +292,14 @@ class TestProcessMain:
             result = process(images, None, MockFooStatsProcessor)
 
         assert result["image_count"] == 0
+
+    def test_process_progress_callback(self):
+        """Test main process function with progress callback."""
+        images = [np.random.rand(3, 50, 50)]
+
+        callback = MagicMock()
+
+        with patch("dataeval.core._processor.get_max_processes", return_value=1):
+            process(images, None, MockFooStatsProcessor, progress_callback=callback)
+
+        assert callback.called
