@@ -1,6 +1,14 @@
-[//]: # (696ef5bfb66f4db3128eaf89322752d85f70e2c8)
+[//]: # (8d852612ac41aa6c60f38a75c67ce637be726f30)
 
 # DataEval Change Log
+
+## v0.91.2
+
+👾 **Fixes**
+- `a6382915` - Changed stopping criterion when stepping trhough kNN graph and forming clusters.
+
+📝 **Miscellaneous**
+- `56ad8657` - [misc] Remove unused code and clean up delay loaded module imports
 
 ## v0.91.1
 
