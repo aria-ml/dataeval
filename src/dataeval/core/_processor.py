@@ -255,6 +255,8 @@ def process(
         Optional bounding boxes for each image. If None, processes entire images.
     processors : Iterable[type[BaseProcessor]]
         An iterable of processor classes that calculate statistics.
+    progress_callback: Callable[[int, int | None], None] | None
+        Optional callback for progress updates.
 
     Returns
     -------
