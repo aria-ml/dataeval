@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,6,5
+/aria-ml/dataeval/tree/main/src/dataeval/metrics/stats,2,1
+/aria-ml/dataeval/blob/main/src/dataeval/metrics/stats/_base.py,1,1
+/aria-ml/dataeval/blob/main/src/dataeval/metrics/stats/_pixelstats.py,1,1
+/aria-ml/dataeval/projects,1,1
+/aria-ml/dataeval/tree/main/docs,1,1
+/aria-ml/dataeval/tree/main/docs/source,1,1
+/aria-ml/dataeval/tree/main/src,1,1
+/aria-ml/dataeval/tree/main/src/dataeval,1,1
+/aria-ml/dataeval/tree/main/src/dataeval/metrics,1,1
