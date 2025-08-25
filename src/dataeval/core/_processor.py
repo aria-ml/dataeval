@@ -4,7 +4,7 @@ __all__ = []
 
 import warnings
 from abc import abstractmethod
-from collections.abc import Iterable, Iterator, Sized
+from collections.abc import Callable, Iterable, Iterator, Sized
 from dataclasses import dataclass
 from functools import cached_property, partial
 from itertools import zip_longest
@@ -241,6 +241,8 @@ def process(
     images: Iterable[ArrayLike],
     boxes: Iterable[Iterable[BoxLike] | None] | None,
     processors: type[BaseProcessor] | Iterable[type[BaseProcessor]],
+    *,
+    progress_callback: Callable[[int, int | None], None] | None = None,
 ) -> dict[str, Any]:
     """
     Compute specified statistics on a set of images.
@@ -277,6 +279,7 @@ def process(
     warning_list: list[str] = []
 
     processors = processors if isinstance(processors, Iterable) else (processors,)
+    total_images = len(images) if isinstance(images, Sized) else None
 
     with PoolWrapper(processes=get_max_processes()) as p:
         for result in tqdm(
@@ -284,11 +287,14 @@ def process(
                 partial(_unpack, processors=processors),
                 _enumerate(images, boxes),
             ),
-            total=len(images) if isinstance(images, Sized) else None,
+            total=total_images,
             desc=f"Processing images for {', '.join([p.__name__.removesuffix('Processor') for p in processors])}",
         ):
             _aggregate(result, source_indices, aggregated_stats, object_count, invalid_box_count, warning_list)
             image_count += 1
+
+            if progress_callback:
+                progress_callback(image_count, total_images)
 
     for w in warning_list:
         warnings.warn(w, UserWarning)
