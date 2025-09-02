@@ -104,7 +104,7 @@ stages:
         - uv.lock
         - "*.md"
     variables:
-      DOCS_CLEAN: '--clean'
+      DOCS_CLEAN: '-- clean'
   - if: $CI_COMMIT_BRANCH == 'main'
 
 .on_merge_request_only: &on_merge_request_only
@@ -220,12 +220,12 @@ verify lock:
 
 docs:
   stage: docs
-  extends: .harbor
+  extends: .nox
   needs: []
   tags:
     - $DOCS_RUNNER_TAG
   script:
-    - ./docs/docker_build --push --gpu $DOCS_CLEAN
+    - nox -e docs $DOCS_CLEAN
   artifacts:
     paths:
       - output/docs/.jupyter_cache/
