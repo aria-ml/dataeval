@@ -60,7 +60,7 @@ exclude_patterns = [
 # Default autoapi templates are at {pyenv}/lib/python{ver}/site-packages/autoapi/templates
 templates_path = ["_templates", "_templates/autoapi"]
 
-suppress_warnings = ["ref.python"]
+suppress_warnings = ["ref.python", "autoapi.python_import_resolution"]
 
 # ---------------------------------------------------------------------------------
 # Autoapi settings including templates

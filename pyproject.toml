@@ -41,7 +41,6 @@ dependencies = [
   "scikit-learn>=1.5.0",
   "torch>=2.2.0",
   "torchvision>=0.17.0",
-  "tqdm>=4.66",
   "typing-extensions>=4.12",
   "xxhash>=3.3",
 ]
@@ -59,7 +58,12 @@ cu126 = [
   "torch>=2.2.0",
   "torchvision>=0.17.0",
 ]
-all = ["matplotlib>=3.7.1"]
+matplotlib = ["matplotlib>=3.7.1"]
+tqdm = ["tqdm>=4.66"]
+all = [
+  "matplotlib>=3.7.1",
+  "tqdm>=4.66",
+]
 
 [project.urls]
 Homepage = "https://dataeval.ai/"
@@ -71,6 +75,8 @@ base = [
   "nox[uv]>=2025.5.1",
   "uv>=0.7.8",
   "pip>=25",
+  "matplotlib>=3.7.1",
+  "tqdm>=4.66",
 ]
 lint = [
   "ruff>=0.11",
