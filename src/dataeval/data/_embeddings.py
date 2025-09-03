@@ -13,7 +13,6 @@ import torch
 import xxhash as xxh
 from numpy.typing import NDArray
 from torch.utils.data import DataLoader, Subset
-from tqdm import tqdm
 
 from dataeval.config import DeviceLike, get_device
 from dataeval.typing import (
@@ -25,6 +24,7 @@ from dataeval.typing import (
     Transform,
 )
 from dataeval.utils._array import as_numpy
+from dataeval.utils._tqdm import tqdm
 from dataeval.utils.torch.models import SupportsEncode
 
 _logger = logging.getLogger(__name__)

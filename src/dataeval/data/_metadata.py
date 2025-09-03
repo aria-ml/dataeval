@@ -10,7 +10,6 @@ from typing import Any, Literal
 import numpy as np
 import polars as pl
 from numpy.typing import NDArray
-from tqdm.auto import tqdm
 
 from dataeval.core._bin import bin_data, digitize_data, is_continuous
 from dataeval.core._feature_distance import feature_distance
@@ -24,6 +23,7 @@ from dataeval.typing import (
 )
 from dataeval.utils._array import as_numpy
 from dataeval.utils._merge import merge
+from dataeval.utils._tqdm import tqdm
 
 
 def _binned(name: str) -> str:
@@ -470,7 +470,7 @@ class Metadata:
         scores = []
         srcidx = []
         is_od = None
-        for i in tqdm(range(len(self._dataset))):
+        for i in tqdm(range(len(self._dataset)), desc="Processing datum metadata"):
             _, target, metadata = self._dataset[i]
 
             raw.append(metadata)

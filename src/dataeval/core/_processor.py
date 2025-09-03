@@ -12,7 +12,6 @@ from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
-from tqdm.auto import tqdm
 
 from dataeval.config import get_max_processes
 from dataeval.outputs._stats import SourceIndex
@@ -20,6 +19,7 @@ from dataeval.typing import ArrayLike
 from dataeval.utils._boundingbox import BoundingBox, BoxLike
 from dataeval.utils._image import clip_and_pad, normalize_image_shape, rescale
 from dataeval.utils._multiprocessing import PoolWrapper
+from dataeval.utils._tqdm import tqdm
 
 
 @dataclass
