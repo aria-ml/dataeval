@@ -13,6 +13,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 with contextlib.suppress(ImportError):
+    from matplotlib.axes import Axes
     from matplotlib.figure import Figure
 
 from scipy.optimize import basinhopping
@@ -62,32 +63,133 @@ def project_steps(params: NDArray[Any], projection: NDArray[Any]) -> NDArray[Any
     return 1 - f_out(projection, params)
 
 
-def plot_measure(
+def _plot_multiclass(
     name: str,
     steps: NDArray[Any],
     averaged_measure: NDArray[Any],
     measures: NDArray[Any] | None,
     params: NDArray[Any],
     projection: NDArray[Any],
-    error_bars: bool,
-    asymptote: bool,
-) -> Figure:
-    import matplotlib.pyplot
+    show_error_bars: bool,
+    show_asymptote: bool,
+    plots: list[Figure],
+    reference_outputs: Sequence[SufficiencyOutput],
+    class_names: Sequence[str] | None = None,
+) -> None:
+    from matplotlib import pyplot as plt
 
-    fig = matplotlib.pyplot.figure()
-    fig = cast(Figure, fig)
-    fig.tight_layout()
-    ax = fig.add_subplot(111)
-    ax.set_title(f"{name} Sufficiency")
+    if class_names is not None and len(averaged_measure) != len(class_names):
+        raise IndexError("Class name count does not align with measures")
+    for i, values in enumerate(averaged_measure):
+        # Create a plot for each class
+        fig, ax = plt.subplots()
+        class_name = str(i) if class_names is None else class_names[i]
+        ax.set_ylabel(f"{name}")
+        _plot_measure(
+            f"{name}_{class_name}",
+            steps,
+            values,
+            None if measures is None else measures[:, :, i],
+            params[i],
+            projection,
+            show_error_bars,
+            show_asymptote,
+            ax,
+        )
+        # Iterate through each reference output to plot similar class
+        for index, output in enumerate(reference_outputs):
+            if (
+                name in output.averaged_measures
+                and output.averaged_measures[name].ndim > 1
+                and i <= len(output.averaged_measures[name])
+            ):
+                _plot_measure(
+                    f"{name}_{class_name} Output {index + 2}",
+                    output.steps,
+                    output.averaged_measures[name][i],
+                    output.measures[name][:, :, i] if len(output.measures) else None,
+                    output.params[name][i],
+                    projection,
+                    show_error_bars,
+                    show_asymptote,
+                    ax,
+                )
+        ax.set_xscale("log")
+        ax.legend(loc="best")
+        plots.append(fig)
+
+
+def _plot_single_class(
+    name: str,
+    steps: NDArray[Any],
+    averaged_measure: NDArray[Any],
+    measures: NDArray[Any] | None,
+    params: NDArray[Any],
+    projection: NDArray[Any],
+    show_error_bars: bool,
+    show_asymptote: bool,
+    plots: list[Figure],
+    reference_outputs: Sequence[SufficiencyOutput],
+) -> None:
+    from matplotlib import pyplot as plt
+
+    fig, ax = plt.subplots()
     ax.set_ylabel(f"{name}")
+    _plot_measure(
+        name,
+        steps,
+        averaged_measure,
+        measures,
+        params,
+        projection,
+        show_error_bars,
+        show_asymptote,
+        ax,
+    )
+    # Plot metric for each provided reference output
+    for index, output in enumerate(reference_outputs):
+        if name in output.averaged_measures:
+            _plot_measure(
+                f"{name} Output {index + 2}",
+                output.steps,
+                output.averaged_measures[name],
+                output.measures.get(name),
+                output.params[name],
+                projection,
+                show_error_bars,
+                show_asymptote,
+                ax,
+            )
+    ax.set_xscale("log")
+    ax.legend(loc="best")
+    plots.append(fig)
+
+
+def _plot_measure(
+    name: str,
+    steps: NDArray[Any],
+    averaged_measure: NDArray[Any],
+    measures: NDArray[Any] | None,
+    params: NDArray[Any],
+    projection: NDArray[Any],
+    show_error_bars: bool,
+    show_asymptote: bool,
+    ax: Axes,
+) -> None:
+    ax.set_title(f"{name} Sufficiency")
     ax.set_xlabel("Steps")
-    # Plot asymptote
-    if asymptote:
-        bound = 1 - params[2]
-        ax.axhline(y=bound, color="r", label=f"Asymptote: {bound:.4g}", zorder=1)
+    projection_curve = ax.plot(
+        projection,
+        project_steps(params, projection),
+        linestyle="solid",
+        label=f"Potential Model Results ({name})",
+        linewidth=2,
+        zorder=2,
+    )
+    projection_color = projection_curve[0].get_color()
     # Calculate error bars
     # Plot measure over each step with associated error
-    if error_bars:
+    if show_error_bars:
         if measures is None:
             warnings.warn(
                 "Error bars cannot be plotted without full, unaveraged data",
@@ -98,6 +200,8 @@ def plot_measure(
             ax.errorbar(
                 steps,
                 averaged_measure,
+                ecolor=projection_color,
+                color=projection_color,
                 yerr=error,
                 capsize=7,
                 capthick=1.5,
@@ -105,26 +209,16 @@ def plot_measure(
                 fmt="o",
                 label=f"Model Results ({name})",
                 markersize=5,
-                color="black",
-                ecolor="orange",
                 zorder=3,
             )
     else:
-        ax.scatter(steps, averaged_measure, label=f"Model Results ({name})", zorder=3, c="black")
-
-    # Plot extrapolation
-    ax.plot(
-        projection,
-        project_steps(params, projection),
-        linestyle="dashed",
-        label=f"Potential Model Results ({name})",
-        linewidth=2,
-        zorder=2,
-    )
-    ax.set_xscale("log")
-
-    ax.legend(loc="best")
-    return fig
+        ax.scatter(steps, averaged_measure, color=projection_color, label=f"Model Results ({name})", zorder=3)
+    # Plot asymptote
+    if show_asymptote:
+        bound = 1 - params[2]
+        ax.axhline(
+            y=bound, linestyle="dashed", color=projection_color, label=f"Asymptote: {bound:.4g} ({name})", zorder=1
+        )
 
 
 def f_inv_out(y_i: NDArray[Any], x: NDArray[Any]) -> NDArray[np.int64]:
@@ -426,7 +520,11 @@ class SufficiencyOutput(Output):
         return proj
 
     def plot(
-        self, class_names: Sequence[str] | None = None, error_bars: bool = True, asymptote: bool = True
+        self,
+        class_names: Sequence[str] | None = None,
+        show_error_bars: bool = True,
+        show_asymptote: bool = True,
+        reference_outputs: Sequence[SufficiencyOutput] | SufficiencyOutput | None = None,
     ) -> Sequence[Figure]:
         """
         Plotting function for data :term:`sufficience<Sufficiency>` tasks.
@@ -435,11 +533,12 @@ class SufficiencyOutput(Output):
         ----------
         class_names : Sequence[str] | None, default None
             List of class names
-        error_bars : bool, default True
+        show_error_bars : bool, default True
             True if error bars should be plotted, False if not
-        asymptote : bool, default True
+        show_asymptote : bool, default True
             True if asymptote should be plotted, False if not
-
+        reference_outputs : Sequence[SufficiencyOutput] | SufficiencyOutput, default []
+            Singular or multiple SufficiencyOutput objects to include in plots
         Returns
         -------
         Sequence[Figure]
@@ -453,6 +552,8 @@ class SufficiencyOutput(Output):
         Notes
         -----
         This method requires `matplotlib <https://matplotlib.org/>`_ to be installed.
+        When plotting multiple SufficiencyOutput, multi-class metrics will be plotted according to index,
+        ensure classes are aligned between SufficiencyOutput classes prior to plotting.
         """
         # Extrapolation parameters
         last_X = self.steps[-1]
@@ -461,38 +562,42 @@ class SufficiencyOutput(Output):
 
         # Stores all plots
         plots = []
-        # Create a plot for each measure on one figure
+
+        # Wrap reference
+        if reference_outputs is None:
+            reference_outputs = []
+        if isinstance(reference_outputs, SufficiencyOutput):
+            reference_outputs = [reference_outputs]
+
+        # Iterate through measures
         for name, measures in self.averaged_measures.items():
             if measures.ndim > 1:
-                if class_names is not None and len(measures) != len(class_names):
-                    raise IndexError("Class name count does not align with measures")
-                for i, values in enumerate(measures):
-                    class_name = str(i) if class_names is None else class_names[i]
-                    fig = plot_measure(
-                        f"{name}_{class_name}",
-                        self.steps,
-                        values,
-                        self.measures[name][:, :, i] if len(self.measures) else None,
-                        self.params[name][i],
-                        extrapolated,
-                        error_bars,
-                        asymptote,
-                    )
-                    plots.append(fig)
-
-            else:
-                fig = plot_measure(
+                _plot_multiclass(
                     name,
                     self.steps,
                     measures,
                     self.measures.get(name),
                     self.params[name],
                     extrapolated,
-                    error_bars,
-                    asymptote,
+                    show_error_bars,
+                    show_asymptote,
+                    plots,
+                    reference_outputs,
+                    class_names,
                 )
-                plots.append(fig)
-
+            else:
+                _plot_single_class(
+                    name,
+                    self.steps,
+                    measures,
+                    self.measures.get(name),
+                    self.params[name],
+                    extrapolated,
+                    show_error_bars,
+                    show_asymptote,
+                    plots,
+                    reference_outputs,
+                )
         return plots
 
     def inv_project(
