@@ -1,0 +1,26 @@
+### SECURITY STAGE JOBS ###
+
+include:
+  - template: Security/Secret-Detection.gitlab-ci.yml
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
+  - template: Security/SAST.gitlab-ci.yml
+
+.mr_only: &mr_only
+  - if: $CREATE_NEW_RELEASE || $CI_COMMIT_BRANCH == 'main'
+    when: never
+  - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+
+secret_detection:
+  stage: security
+  needs: []
+  rules: *mr_only
+
+gemnasium-python-dependency_scanning:
+  stage: security
+  needs: []
+  rules: *mr_only
+
+semgrep-sast:
+  stage: security
+  needs: []
+  rules: *mr_only
