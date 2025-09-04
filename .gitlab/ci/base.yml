@@ -63,9 +63,9 @@ stages:
   image: docker:25.0.5-git
   before_script:
     - apk add --no-cache bash util-linux
-    - echo ${DATAEVAL_HARBOR_TOKEN} | docker login harbor.jatic.net -u 'robot$dataeval+dataeval-build' --password-stdin || echo 'Failed to login to Harbor...'
+    - echo ${DATAEVAL_HARBOR_TOKEN} | docker login harbor.jatic.net -u "robot$dataeval+dataeval-build" --password-stdin || echo "Failed to login to Harbor..."
   after_script:
-    - docker logout harbor.jatic.net|| echo 'Failed to logout from Harbor...'
+    - docker logout harbor.jatic.net|| echo "Failed to logout from Harbor..."
 
 .nox:
   needs: []
@@ -93,7 +93,7 @@ stages:
   needs: []
   image: mambaorg/micromamba:2-cuda11.8.0-ubuntu20.04
   before_script:
-    - eval '$(micromamba shell hook --shell bash)'
+    - eval "$(micromamba shell hook --shell bash)"
     - micromamba create -f environment.yaml -n dataeval python=$PYTHON_VERSION
     - micromamba activate dataeval
     - micromamba install pytest pytest-xdist requests
@@ -101,7 +101,7 @@ stages:
     - pip install maite-datasets
     - micromamba list
   variables:
-    SETUPTOOLS_SCM_PRETEND_VERSION: "0.0.0"
+    SETUPTOOLS_SCM_PRETEND_VERSION: '0.0.0'
 
 .conda_all:
   extends: .conda
