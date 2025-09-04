@@ -14,7 +14,7 @@ COMMON_ENVS = {"TQDM_DISABLE": "1"}
 DOCS_ENVS = {"LANG": "C", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True", "PYDEVD_DISABLE_FILE_VALIDATION": "1"}
 DOCTEST_ENVS = {"NB_EXECUTION_MODE_OVERRIDE": "off"}
 
-SUPPORTED_VERSIONS = ("3.10", "3.11", "3.12")
+SUPPORTED_VERSIONS = ("3.10", "3.11", "3.12", "3.13")
 
 RESTORE_CMD = """
 if (which git) > /dev/null; then

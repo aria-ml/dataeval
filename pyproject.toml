@@ -12,7 +12,7 @@ authors = [
   { name = "Scott Swan", email = "scott.swan@ariacoustics.com" },
   { name = "Shaun Jullens", email = "shaun.jullens@ariacoustics.com" },
 ]
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10,<3.14"
 readme = "README.md"
 license = "MIT"
 maintainers = [
@@ -27,6 +27,7 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Topic :: Scientific/Engineering",
 ]
 dependencies = [

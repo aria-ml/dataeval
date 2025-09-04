@@ -8,7 +8,7 @@
 # Instead edit the corresponding pyproject.toml file.
 #
 dependencies:
-  - python>=3.10,<3.13
+  - python>=3.10,<3.14
   - fast_hdbscan==0.2.0
   - lightgbm>=4
   - matplotlib>=3.7.1
