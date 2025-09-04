@@ -1,0 +1,70 @@
+### DOCS STAGE JOBS ###
+
+docs:
+  stage: docs
+  extends: 
+    - .nox
+    - .rules_main_mr_docs
+  needs: []
+  tags:
+    - $DOCS_RUNNER_TAG
+  script:
+    - nox -e docs $DOCS_CLEAN
+  artifacts:
+    paths:
+      - output/docs/.jupyter_cache/
+      - output/docs/html/
+    when: always
+
+doctest:
+  stage: docs
+  extends: 
+    - .nox
+    - .rules_main_mr_docs
+  script:
+    - nox -e doctest
+
+linkchecker:
+  stage: docs
+  extends: .rules_main_mr_docs
+  needs: []
+  image:
+    name: ghcr.io/tcort/markdown-link-check:stable
+    entrypoint: ['/bin/sh', '-c']
+  script:
+    - markdown-link-check *.md
+    - markdown-link-check ./docs/source
+
+markdownlint:
+  stage: docs
+  extends: .rules_main_mr_docs
+  needs: []
+  image:
+    name: davidanson/markdownlint-cli2
+    entrypoint: ['']
+  script: |
+    markdownlint-cli2 README.md || FAIL=1
+    markdownlint-cli2 CONTRIBUTING.md || FAIL=1
+    markdownlint-cli2 'docs/**/*.md' '#node_modules' || FAIL=1
+    exit $FAIL
+
+update cache:
+  stage: docs
+  extends: .rules_docs_except_main_cache_update
+  needs:
+    - job: docs
+      artifacts: true
+  script: |
+    apt-get update && apt-get install git-lfs
+    git fetch --all --depth 1
+    git switch --force ${CI_COMMIT_BRANCH}${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}
+    rm -rf docs/source/.jupyter_cache
+    mkdir -p docs/source/.jupyter_cache
+    cp -R output/docs/.jupyter_cache/* docs/source/.jupyter_cache
+    if [[ ! $(git status --porcelain | tee /dev/stderr | grep docs/source/.jupyter_cache | grep --invert-match global.db) ]]; then echo "No cache changes"; exit 0; fi
+    git add docs/source/.jupyter_cache/*
+    git config --global http.postBuffer 100m
+    git config --global user.email "${GITLAB_USER_EMAIL}"
+    git config --global user.name "${GITLAB_USER_NAME}"
+    git commit --message "${UPDATE_CACHE_MESSAGE}"
+    git push https://dataeval-bot:${DATAEVAL_BUILD_PAT}@gitlab.jatic.net/jatic/aria/dataeval.git
