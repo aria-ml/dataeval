@@ -40,7 +40,7 @@ using MAITE-compliant datasets and models.
 
 ## Getting Started
 
-**Python versions:** 3.10 - 3.12
+**Python versions:** 3.10 - 3.13
 
 **Supported packages**: _NumPy_, _Pandas_, _Sci-kit learn_, _MAITE_, _NRTK_
 
