@@ -1,5 +1,5 @@
 variables:
-  PYTHON_LATEST_SUPPORTED_VERSION: '3.12'
+  PYTHON_LATEST_SUPPORTED_VERSION: '3.13'
   SAST_EXCLUDED_PATHS: spec,test,tests,tmp,.nox,output
   DOCS_RUNNER_TAG: single-gpu
   UV_CACHE_DIR: .uv-cache
@@ -11,7 +11,7 @@ variables:
   ENV_AUTO_STOP_IN: '1 week'
 
 .python_versions: &python_versions
-  - PYTHON_VERSION: ['3.10', '3.11', '3.12']
+  - PYTHON_VERSION: ['3.10', '3.11', '3.12', '3.13']
 
 workflow:
   # Allows jobs in this workflow to be interrupted:

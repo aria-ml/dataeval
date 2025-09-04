@@ -8,7 +8,7 @@ primary backends.
 
 ## Supported Python Versions
 
-We currently support python versions `3.9` - `3.12`
+We currently support python versions `3.9` - `3.13`
 
 ## Installing DataEval
 
