@@ -1,0 +1,207 @@
+variables:
+  PYTHON_LATEST_SUPPORTED_VERSION: '3.12'
+  SAST_EXCLUDED_PATHS: spec,test,tests,tmp,.nox,output
+  DOCS_RUNNER_TAG: single-gpu
+  UV_CACHE_DIR: .uv-cache
+  UV_LINK_MODE: copy
+  UV_IMAGE: ghcr.io/astral-sh/uv
+  UV_BASE_LAYER: bookworm
+  FORCE_COLOR: '1'
+  UPDATE_CACHE_MESSAGE: 'Update documentation jupyter-cache'
+  ENV_AUTO_STOP_IN: '1 week'
+
+.python_versions: &python_versions
+  - PYTHON_VERSION: ['3.10', '3.11', '3.12']
+
+workflow:
+  # Allows jobs in this workflow to be interrupted:
+  # https://gitlab.jatic.net/help/ci/yaml/index.md#workflowauto_cancelon_new_commit
+  auto_cancel:
+    on_new_commit: interruptible
+  rules:
+    # Release Workflow
+    - if: $CI_PIPELINE_SOURCE == 'schedule' && $CREATE_NEW_RELEASE
+    # Merge Request Workflow
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      variables:
+        ENV_PREFIX: '$CI_MERGE_REQUEST_IID/'
+    # Skip CHANGELOG.md updates
+    - if: $CI_COMMIT_BRANCH == 'main'
+      changes: ['CHANGELOG.md']
+      when: never
+    # Gitlab web UI trigger
+    - if: $CI_PIPELINE_SOURCE == 'web'
+    # Commit Main Branch Workflow
+    - if: $CI_COMMIT_BRANCH == 'main'
+      variables:
+        DOCS_RUNNER_TAG: 'multi-gpu'
+        ENV_AUTO_STOP_IN: 'never'
+    # Set main branch docs to run with -- clean flag
+    - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE != $UPDATE_CACHE_MESSAGE
+      variables:
+        DOCS_CLEAN: '-- clean'
+
+default:
+  # This should allow pipelines to auto-cancel when redundant:
+  # https://gitlab.jatic.net/help/ci/pipelines/settings.md#auto-cancel-redundant-pipelines
+  # https://gitlab.jatic.net/help/ci/yaml/index.md#interruptible
+  interruptible: true
+  tags:
+    - autoscaler
+
+image: $UV_IMAGE:python$PYTHON_LATEST_SUPPORTED_VERSION-$UV_BASE_LAYER
+
+stages:
+  - test
+  - docs
+  - release
+  - security
+
+### SHARED JOB TEMPLATES ###
+
+.harbor:
+  image: docker:25.0.5-git
+  before_script:
+    - apk add --no-cache bash util-linux
+    - echo ${DATAEVAL_HARBOR_TOKEN} | docker login harbor.jatic.net -u 'robot$dataeval+dataeval-build' --password-stdin || echo 'Failed to login to Harbor...'
+  after_script:
+    - docker logout harbor.jatic.net|| echo 'Failed to logout from Harbor...'
+
+.nox:
+  needs: []
+  image: $UV_IMAGE:python$PYTHON_VERSION-$UV_BASE_LAYER
+  before_script:
+    - uv pip install nox[uv] --system
+  cache:
+    - key:
+        files:
+          - uv.lock
+      paths:
+        - $UV_CACHE_DIR
+        - data
+  after_script:
+    - uv cache prune --ci
+  variables:
+    PYTHON_VERSION: $PYTHON_LATEST_SUPPORTED_VERSION
+
+.nox_all:
+  extends: .nox
+  parallel:
+    matrix: *python_versions
+
+.conda:
+  needs: []
+  image: mambaorg/micromamba:2-cuda11.8.0-ubuntu20.04
+  before_script:
+    - eval '$(micromamba shell hook --shell bash)'
+    - micromamba create -f environment.yaml -n dataeval python=$PYTHON_VERSION
+    - micromamba activate dataeval
+    - micromamba install pytest pytest-xdist requests
+    - pip install -e . --no-deps
+    - pip install maite-datasets
+    - micromamba list
+  variables:
+    SETUPTOOLS_SCM_PRETEND_VERSION: "0.0.0"
+
+.conda_all:
+  extends: .conda
+  parallel:
+    matrix: *python_versions
+
+.publish_merge_request_env:
+  stage: release
+  artifacts:
+    paths:
+      - public/
+  environment:
+    name: '$ENV_PREFIX$ENV_JOB'
+    url: 'https://jatic.pages.jatic.net/-/aria/$CI_PROJECT_NAME/-/jobs/$CI_JOB_ID/artifacts/public/index.html'
+    auto_stop_in: '$ENV_AUTO_STOP_IN'
+
+### SHARED RULE TEMPLATES ###
+
+.rules_main_mr:
+  rules:
+    - if: $CREATE_NEW_RELEASE
+      when: never
+    - if: $CI_COMMIT_BRANCH == 'main'
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+
+.rules_main_mr_code:
+  rules:
+    - if: $CREATE_NEW_RELEASE
+      when: never
+    - if: $CI_COMMIT_BRANCH == 'main'
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      changes:
+        paths:
+          - src/**/*
+          - tests/**/*
+          - uv.lock
+
+.rules_main_mr_deps:
+  rules:
+    - if: $CREATE_NEW_RELEASE
+      when: never
+    - if: $CI_COMMIT_BRANCH == 'main'
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      changes:
+        paths:
+          - pyproject.toml
+          - uv.lock
+
+.rules_main_mr_docs:
+  rules:
+    - if: $CREATE_NEW_RELEASE
+      when: never
+    - if: $CI_COMMIT_BRANCH == 'main'
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      changes:
+        paths:
+          - src/**/*
+          - docs/**/*
+          - uv.lock
+          - '*.md'
+
+.rules_mr_docs:
+  rules:
+    - if: $CREATE_NEW_RELEASE || $CI_COMMIT_BRANCH == 'main'
+      when: never
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      changes:
+        paths:
+          - src/**/*
+          - docs/**/*
+          - uv.lock
+          - '*.md'
+
+.rules_mr_only:
+  rules:
+    - if: $CREATE_NEW_RELEASE || $CI_COMMIT_BRANCH == 'main'
+      when: never
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+
+.rules_main_only:
+  rules:
+    - if: $CREATE_NEW_RELEASE
+      when: never
+    - if: $CI_COMMIT_BRANCH == 'main'
+
+.rules_release_only:
+  rules:
+    - if: $CREATE_NEW_RELEASE
+
+.rules_docs_except_main_cache_update:
+  rules:
+    - if: $CREATE_NEW_RELEASE
+      when: never
+    - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE == $UPDATE_CACHE_MESSAGE
+      when: never
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      changes:
+        paths:
+          - src/**/*
+          - docs/**/*
+          - uv.lock
+          - '*.md'
+    - if: $CI_COMMIT_BRANCH == 'main'
