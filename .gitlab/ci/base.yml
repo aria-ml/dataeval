@@ -36,10 +36,6 @@ workflow:
       variables:
         DOCS_RUNNER_TAG: 'multi-gpu'
         ENV_AUTO_STOP_IN: 'never'
-    # Set main branch docs to run with -- clean flag
-    - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE != $UPDATE_CACHE_MESSAGE
-      variables:
-        DOCS_CLEAN: '-- clean'
 
 default:
   # This should allow pipelines to auto-cancel when redundant:
@@ -154,6 +150,9 @@ stages:
   rules:
     - if: $CREATE_NEW_RELEASE
       when: never
+    - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE != $UPDATE_CACHE_MESSAGE
+      variables:
+        DOCS_CLEAN: '-- clean'
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
       changes:
