@@ -1,0 +1,109 @@
+### RELEASE STAGE JOBS ###
+
+coverage:
+  extends: 
+    - .publish_merge_request_env
+    - .rules_main_mr_code
+  needs: [test]
+  before_script:
+    - uv pip install coverage --system
+  script:
+    - cp --recursive $(pwd) /dataeval
+    - coverage combine ./output
+    - coverage report -m --skip-empty --precision=2
+    - coverage xml --skip-empty
+    - coverage html --skip-empty
+    - mv htmlcov/ ./public/
+  coverage: "/(?i)total.*? (100(?:\\.0+)?\\%|[1-9]?\\d(?:\\.\\d+)?\\%)$/"
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - coverage.xml
+      - public/
+  variables:
+    ENV_JOB: coverage
+
+pages preview:
+  extends: 
+    - .publish_merge_request_env
+    - .rules_mr_docs
+  needs:
+    - job: docs
+      artifacts: true
+  script:
+    - mv output/docs/html/ ./public/
+  variables:
+    ENV_JOB: docs
+
+pages:
+  stage: release
+  extends: .rules_main_only
+  needs:
+    - job: docs
+      artifacts: true
+  script:
+    - mv output/docs/html/ ./public/
+  artifacts:
+    paths:
+      - public
+  
+validate release label:
+  stage: release
+  extends: .rules_mr_only
+  needs: []
+  script:
+    - .gitlab/scripts/validate_release_label.py
+
+# This job will only run if all previous stages have succeeded,
+# and it creates a tag that signifies that all testing has passed.
+tag release candidate:
+  stage: release
+  extends: .rules_main_only
+  before_script:
+    - uv pip install requests --system
+  script:
+    - .gitlab/scripts/update_latest_known_good.py
+
+# This job cleans up the image tags from the harbor registry
+# associated with the last merged branch.
+remove image tags:
+  stage: release
+  extends: .rules_main_only
+  needs: []
+  before_script:
+    - uv pip install requests --system
+  script:
+    - .gitlab/scripts/remove_image_tags.py
+  allow_failure: true
+
+# This job updates the changelog and tags the commit hash with a
+# new version tag, which gets picked up and published from a GitHub
+# action defined in .github/workflows/publish.yml
+create release:
+  stage: release
+  extends: .rules_release_only
+  needs: []
+  before_script:
+    - uv pip install requests --system
+  script:
+    - .gitlab/scripts/create_release.py
+
+export-merged-sbom:
+  stage: release
+  extends: .rules_release_only
+  image: docker:stable
+  before_script:
+    - apk add --update jq curl
+  script:
+    - >
+      curl --header "Authorization: Bearer $PRIVATE_TOKEN"
+      --output export.sh --url "https://gitlab.jatic.net/api/v4/snippets/7/raw"
+    - /bin/sh export.sh
+  artifacts:
+    paths:
+      - "gl-sbom-merged-*.cdx.json"
+  variables:
+    PRIVATE_TOKEN: $DATAEVAL_BUILD_PAT
