@@ -5,8 +5,6 @@ from unittest.mock import MagicMock, NonCallableMagicMock, patch
 import numpy as np
 import pytest
 import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
 
 try:
     from matplotlib.figure import Figure
@@ -17,36 +15,9 @@ from dataeval.outputs._workflows import (
     SufficiencyOutput,
 )
 from dataeval.workflows import Sufficiency
-from tests.mock.data import DataEvalDataset
 
 np.random.seed(0)
 torch.manual_seed(0)
-
-
-def load_cls_dataset() -> tuple[DataEvalDataset, DataEvalDataset]:
-    images = np.ones(shape=(1, 32, 32, 3))
-    labels = np.ones(shape=(1, 1))
-
-    train_ds = DataEvalDataset(images, labels)
-    test_ds = DataEvalDataset(images, labels)
-
-    return train_ds, test_ds
-
-
-def load_od_dataset() -> tuple[DataEvalDataset, DataEvalDataset]:
-    images = np.ones(shape=(1, 32, 32, 3))
-    labels = np.ones(shape=(1, 1))
-    boxes = np.ones(shape=(1, 1, 4))
-
-    train_ds = DataEvalDataset(images, labels, boxes)
-    test_ds = DataEvalDataset(images, labels, boxes)
-
-    return train_ds, test_ds
-
-
-def eval_100(model: nn.Module, dl: DataLoader) -> dict[str, float]:
-    """Eval should always return a float, and error if not"""
-    return {"eval": 1.0}
 
 
 def mock_ds(length: int | None):

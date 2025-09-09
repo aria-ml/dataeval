@@ -33,7 +33,6 @@ features.
 - [Image Statistical Analysis](ImageStats.md)
 - [Label Parity](LabelParity.md)
 - [Metadata](Metadata.md)
-- [Model Training](ModelTraining.md)
 - [Out-of-Distribution Data](OOD.md)
 - [Outliers](Outliers.md)
 - [Parity](Parity.md)
@@ -58,7 +57,6 @@ Embeddings.md
 ImageStats.md
 LabelParity.md
 Metadata.md
-ModelTraining.md
 OOD.md
 Outliers.md
 Parity.md

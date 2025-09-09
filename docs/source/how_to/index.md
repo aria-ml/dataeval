@@ -115,31 +115,6 @@ The guides below help you solve common problems found across machine learning ta
 
 [suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.91.3/docs/source/notebooks/h2_measure_ic_sufficiency.ipynb
 
-## Models
-
-DataEval uses models during all stages of the ML Lifecycle.
-The guides below show specific examples on model usage at different levels of expertise.
-
-:::{toctree}
-:caption: Models
-:hidden:
-
-../notebooks/h2_train_ae_embeddings.ipynb
-:::
-
-:::{list-table}
-:widths: 20 60 20
-:header-rows: 0
-
-- - [](../notebooks/h2_train_ae_embeddings.ipynb)
-  - Train and evaluate an autoencoder to generate effective
-    image embeddings for downstream tasks
-  - [![Open In Colab][colab-badge]][ae-colab]
-
-:::
-
-[ae-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.91.3/docs/source/notebooks/h2_train_ae_embeddings.ipynb
-
 <!-- Google collab badge icon for all collab links -->
 
 [colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
