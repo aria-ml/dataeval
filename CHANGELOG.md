@@ -1,6 +1,20 @@
-[//]: # (8d852612ac41aa6c60f38a75c67ce637be726f30)
+[//]: # (33350af3ef3611f701bb7ed58d58512784bba662)
 
 # DataEval Change Log
+
+## v0.91.3
+
+🛠️ **Improvements and Enhancements**
+- `33350af3` - [deps] Add support for python 3.13
+- `cd713751` - Sufficiency multiple model plots
+
+👾 **Fixes**
+- `5682073c` - [fix] Restore missing submodules for documention
+
+📝 **Miscellaneous**
+- `e8e54816` - [misc] clean up yaml anchors
+- `dc86b10f` - Remove tqdm dependency
+- `2acb629d` - [misc] build docs directly on runner
 
 ## v0.91.2
 
