@@ -73,17 +73,27 @@ Documentation = "https://dataeval.readthedocs.io/"
 
 [dependency-groups]
 base = [
-  "nox[uv]>=2025.5.1",
-  "uv>=0.7.8",
-  "pip>=25",
+  "nox>=2025.5.1",
+  "nox-uv>=0.6.2",
+  "uv>0.8.5",
+]
+plus = [
   "matplotlib>=3.7.1",
   "tqdm>=4.66",
 ]
+lock = [
+  { include-group = "base" },
+  "pyproject2conda>=0.22",
+  "poetry>=2",
+]
 lint = [
+  { include-group = "base" },
   "ruff>=0.11",
   "codespell[toml]>=2.3",
 ]
 test = [
+  { include-group = "base" },
+  { include-group = "plus" },
   "coverage[toml]>=7.6",
   "pytest>=8.3",
   "pytest-cov>=6.1",
@@ -91,9 +101,12 @@ test = [
   "maite-datasets>=0.0.2",
 ]
 type = [
+  { include-group = "base" },
   "pyright[nodejs]>=1.1.400",
 ]
 docs = [
+  { include-group = "base" },
+  { include-group = "plus" },
   "numpy>=2.0.2",
   "certifi>=2024.07.04",
   "ipykernel>=6.26.0",
@@ -114,10 +127,12 @@ docs = [
 ]
 dev = [
   { include-group = "base" },
+  { include-group = "plus" },
   { include-group = "lint" },
   { include-group = "test" },
   { include-group = "type" },
   { include-group = "docs" },
+  "pip>=25",  # just in case
 ]
 
 [tool.uv]
