@@ -151,7 +151,7 @@ def doctest_detectors_ood_drift(doctest_namespace: dict[str, Any]) -> None:
 
 @pytest.fixture(autouse=True, scope="session")
 def doctest_detectors_drift_uncertainty(doctest_namespace: dict[str, Any]) -> None:
-    x_ref = np.random.randn(*(500, 16)).astype(np.float32)
+    x_ref = np.random.random((500, 16)).astype(np.float32)
     x_test = np.ones_like(x_ref)
     doctest_namespace["ClassificationModel"] = ClassificationModel
     doctest_namespace["x_ref"] = x_ref
