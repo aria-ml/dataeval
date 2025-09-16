@@ -1,6 +1,11 @@
-[//]: # (33350af3ef3611f701bb7ed58d58512784bba662)
+[//]: # (be23ab85ed5e877af624790379dcdc5f7e45f86a)
 
 # DataEval Change Log
+
+## v0.92.0
+
+🚧 **Deprecations and Removals**
+- `36790e59` - [depr] Remove AE Trainer and DataEvalDataset helper class
 
 ## v0.91.3
 
