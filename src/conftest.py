@@ -5,8 +5,6 @@ import sys
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from maite_datasets import to_object_detection_dataset
-
 from dataeval.data._metadata import FactorInfo, Metadata
 from dataeval.outputs._ood import OODOutput
 
@@ -62,6 +60,25 @@ def generate_random_metadata(
     metadata._is_structured = True
     metadata._bin()
     return metadata
+
+
+def get_one_hot(class_count: int, sub_labels: Sequence[int]) -> list[list[float]]:
+    one_hot = [[0.0] * class_count] * len(sub_labels)
+    for i, label in enumerate(sub_labels):
+        one_hot[i][label] = 1.0
+    return one_hot
+
+
+def get_object_detection_target(idx: int, det_data_mm: MagicMock) -> MagicMock:
+    obj_det_mm = MagicMock(
+        _labels=det_data_mm._labels[idx],
+        _bboxes=det_data_mm._bboxes[idx],
+        _scores=get_one_hot(len(det_data_mm._classes), det_data_mm._labels[idx]),
+        labels=det_data_mm._labels[idx],
+        boxes=det_data_mm._bboxes[idx],
+    )
+    obj_det_mm.scores = obj_det_mm._scores
+    return obj_det_mm
 
 
 class ClassificationModel(PtModel):
@@ -230,7 +247,33 @@ def doctest_metrics_stats(doctest_namespace: dict[str, Any]) -> None:
     """dataeval.metrics.stats.visualstats.visualstats"""
     """dataeval.outputs._stats.HashStatsOutput"""
 
-    doctest_namespace["dataset"] = to_object_detection_dataset(images, labels, bboxes, None, classes)
+    index2label = dict(enumerate(classes))
+    obj_det_dataset_mm = MagicMock(
+        _labels=labels,
+        _bboxes=bboxes,
+        _images=images,
+        _classes=classes,
+        _index2label=index2label,
+        _metadata=None,
+        _id=f"{len(images)}_image_{len(index2label)}_class_od_dataset",
+    )
+    obj_det_dataset_mm.__len__.return_value = len(obj_det_dataset_mm._images)
+    obj_det_dataset_mm.metadata = {"id": obj_det_dataset_mm._id, "index2label": obj_det_dataset_mm._index2label}
+
+    obj_det_dataset_getitem_side_effect = [
+        (
+            obj_det_dataset_mm._images[idx],
+            get_object_detection_target(idx, obj_det_dataset_mm),
+            {"id": idx},
+        )
+        for idx in range(len(obj_det_dataset_mm._images))
+    ]
+
+    def _mock_getitem(key: int) -> tuple[Any, MagicMock, dict[str, Any]] | None:
+        return obj_det_dataset_getitem_side_effect[key]
+
+    obj_det_dataset_mm.__getitem__.side_effect = _mock_getitem
+    doctest_namespace["dataset"] = obj_det_dataset_mm
 
 
 @pytest.fixture(autouse=True, scope="session")
