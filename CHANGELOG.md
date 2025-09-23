@@ -1,6 +1,8 @@
-[//]: # (be23ab85ed5e877af624790379dcdc5f7e45f86a)
+[//]: # (e27a947b9eaa74f19dccb81aa39827f2a2b46a4d)
 
 # DataEval Change Log
+
+## v0.92.1
 
 ## v0.92.0
 
