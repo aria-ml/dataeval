@@ -459,7 +459,11 @@ class Metadata:
                 self._factors[col] = None
             self._is_binned = False
 
-    def _structure(self) -> None:
+    def _structure(
+        self,
+        *,
+        progress_callback: Callable[[int, int | None], None] | None = None,
+    ) -> None:
         if self._is_structured:
             return
 
@@ -470,7 +474,8 @@ class Metadata:
         scores = []
         srcidx = []
         is_od = None
-        for i in tqdm(range(len(self._dataset)), desc="Processing datum metadata"):
+        datum_count = len(self._dataset)
+        for i in tqdm(range(datum_count), desc="Processing datum metadata"):
             _, target, metadata = self._dataset[i]
 
             raw.append(metadata)
@@ -495,6 +500,9 @@ class Metadata:
             is_od = is_od_target if is_od is None else is_od
             if is_od != is_od_target:
                 raise ValueError("Encountered unexpected target type in dataset")
+
+            if progress_callback:
+                progress_callback(i, datum_count)
 
         np_asarray: Callable[..., np.ndarray] = np.concatenate if srcidx else np.asarray
         labels = np_asarray(labels, dtype=np.intp)
@@ -527,7 +535,11 @@ class Metadata:
         self._dropped_factors = merged[1]
         self._is_structured = True
 
-    def _bin(self) -> None:
+    def _bin(
+        self,
+        *,
+        progress_callback: Callable[[int, int | None], None] | None = None,
+    ) -> None:
         """Populate factor info and bin non-categorical factors."""
         if self._is_binned:
             return
@@ -548,7 +560,10 @@ class Metadata:
             )
 
         column_set = set(df.columns)
-        for col in (col for col in self.factor_names if not {_binned(col), _digitized(col)} & column_set):
+        factors_to_process = [col for col in self.factor_names if not {_binned(col), _digitized(col)} & column_set]
+        total_factors = len(factors_to_process)
+
+        for i, col in enumerate(factors_to_process):
             # Get data as numpy array for processing
             data = df[col].to_numpy()
             if col in factor_bins:
@@ -582,6 +597,9 @@ class Metadata:
                 else:
                     # Non-continuous values - treat as discrete
                     factor_info[col] = FactorInfo("discrete")
+
+            if progress_callback:
+                progress_callback(i + 1, total_factors)
 
         # Store the results
         self._dataframe = df
