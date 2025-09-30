@@ -35,7 +35,7 @@ dependencies = [
   "numba>=0.59.1",
   "fast_hdbscan==0.2.0",
   "lightgbm>=4",
-  "numpy>=1.24.2",
+  "numpy>=1.24.2,<2.3",
   "pandas>=2.0",
   "polars>=1.0.0",
   "scipy>=1.10",
@@ -107,7 +107,7 @@ type = [
 docs = [
   { include-group = "base" },
   { include-group = "plus" },
-  "numpy>=2.0.2",
+  "numpy>=2.0.2,<2.3",
   "certifi>=2024.07.04",
   "ipykernel>=6.26.0",
   "ipywidgets>=8.1.1",
