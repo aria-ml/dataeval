@@ -284,3 +284,40 @@ class TestMetadata:
         assert col_bn not in md._dataframe.columns
         factor_info = md._factors[col]
         assert exists if factor_info is None else not factor_info.is_binned
+
+    def test_structure_progress_callback(self, mock_ds):
+        """Test that _structure calls progress_callback with correct values"""
+        from unittest.mock import Mock
+
+        md = Metadata(mock_ds)
+        callback = Mock()
+        md._structure(progress_callback=callback)
+
+        # Verify callback was called for each datum
+        assert callback.call_count == len(mock_ds)
+        # Check that the last call has the correct final values
+        callback.assert_called_with(len(mock_ds) - 1, len(mock_ds))
+
+    def test_bin_progress_callback(self, RNG: np.random.Generator):
+        """Test that _bin calls progress_callback with correct values"""
+        from unittest.mock import Mock
+
+        md = Metadata(None)  # type: ignore
+        md_dict = {
+            "cat_str": RNG.choice(["A", "B"], size=100).tolist(),
+            "con_flt": RNG.random(size=100).tolist(),
+            "dis_int": np.arange(100).tolist(),
+        }
+        md._dataframe = pl.from_dict(md_dict)
+        md._factors = dict.fromkeys(md_dict, None)
+        md._is_structured = True
+        md._image_indices = np.arange(100)
+
+        callback = Mock()
+        md._bin(progress_callback=callback)
+
+        # Verify callback was called for each factor
+        expected_calls = len(md_dict)
+        assert callback.call_count == expected_calls
+        # Check that the last call has the correct final values
+        callback.assert_called_with(expected_calls, expected_calls)
