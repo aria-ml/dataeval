@@ -155,6 +155,7 @@ class TestPrioritizeSelection:
         assert p._get_sorter(1000) is not None
         dataset = self.get_dataset()
         p(dataset)
+
         assert any(i != j for i, j in zip(dataset._selection, range(1000)))
 
     def test_prioritize_invalid_method_raises_valueerror(self):

@@ -25,7 +25,6 @@ from dataeval.typing import (
 )
 from dataeval.utils._array import as_numpy
 from dataeval.utils._tqdm import tqdm
-from dataeval.utils.torch.models import SupportsEncode
 
 _logger = logging.getLogger(__name__)
 
@@ -65,6 +64,13 @@ class Embeddings:
     model : torch.nn.Module or None, default None
         Neural network model that generates embeddings from images. When None, uses Flatten layer for simple
         baseline compatibility with all DataEval tools without requiring pre-trained weights or GPU resources.
+    layer_name : str or None, default None
+        Network layer from which to extract embeddings. When None, uses model output. If specified, extracts
+        either the input or output tensors from this layer depending on the value of `use_output`
+    use_output : bool, default True
+         The relative location to extract intermediate tensors in the model. If true, captures the output
+         tensors from `layer_name`. If False, captures the input tensors to `layer_name`. Ignored if `layer_name`
+         is None.
     device : DeviceLike or None, default None
         Hardware device for computation. When None, automatically selects DataEval's configured device, falling
         back to PyTorch's default.
@@ -99,6 +105,8 @@ class Embeddings:
         batch_size: int,
         transforms: Transform[torch.Tensor] | Iterable[Transform[torch.Tensor]] | None = None,
         model: torch.nn.Module | None = None,
+        layer_name: str | None = None,
+        use_output: bool = True,
         device: DeviceLike | None = None,
         cache: Path | str | bool = False,
         verbose: bool = False,
@@ -107,18 +115,55 @@ class Embeddings:
         self.batch_size = batch_size if batch_size > 0 else 1
         self.verbose = verbose
 
-        self._embeddings_only: bool = False
         self._dataset = dataset
         self._transforms = (
             [transforms] if isinstance(transforms, Transform) else [] if transforms is None else list(transforms)
         )
+        self._embeddings_only: bool = False
+
         model = torch.nn.Flatten() if model is None else model
+
+        self.layer_name = layer_name  # needed when calling self._encode()
+        self.use_output = use_output  # and self.new()
+        if layer_name is not None:
+            self.captured_output: Any = None
+
+            target_layer = self._get_valid_layer_selection(layer_name, model)
+            self._use_output = bool(use_output)
+
+            target_layer.register_forward_hook(self._hook_fn)
+
+            if verbose:
+                _logger.log(
+                    logging.DEBUG, f"Capturing {'output' if use_output else 'input'} data from layer {layer_name}."
+                )
+
         self._model = model.to(self.device).eval() if isinstance(model, torch.nn.Module) else model
-        self._encoder = model.encode if isinstance(model, SupportsEncode) else model
+
         self._cached_idx: set[int] = set()
         self._embeddings: torch.Tensor = torch.empty(())
 
         self._cache = cache if isinstance(cache, bool) else self._resolve_path(cache)
+
+    def _hook_fn(self, _module: torch.nn.Module, inputs: tuple[torch.Tensor], output: torch.Tensor) -> None:
+        # Copy the output to avoid computation graph issues
+        if self._use_output:
+            self.captured_output = output.detach().clone()
+        else:
+            self.captured_output = inputs[0].detach().clone()
+
+    def _get_valid_layer_selection(self, layer_name: str, model: torch.nn.Module) -> torch.nn.Module:
+        if not isinstance(model, torch.nn.Module):  # model must be Pytorch if we are selecting a layer.
+            raise TypeError(f"Expected PyTorch model (torch.nn.Module), got {type(model).__name__}")
+
+        modules_dict = dict(model.named_modules())
+
+        # # Check if layer exists
+        if layer_name not in modules_dict:
+            formatted_layers = "\n".join(f"  {layer}" for layer in modules_dict)
+            raise ValueError(f"Invalid layer '{layer_name}'. Available layers are:\n{formatted_layers}")
+
+        return modules_dict[layer_name]
 
     def __hash__(self) -> int:
         if self._embeddings_only:
@@ -225,7 +270,15 @@ class Embeddings:
         if self._embeddings_only:
             raise ValueError("Embeddings object does not have a model.")
         return Embeddings(
-            dataset, self.batch_size, self._transforms, self._model, self.device, bool(self.cache), self.verbose
+            dataset,
+            self.batch_size,
+            self._transforms,
+            self._model,
+            self.layer_name,
+            self.use_output,
+            self.device,
+            bool(self.cache),
+            self.verbose,
         )
 
     @classmethod
@@ -254,7 +307,8 @@ class Embeddings:
         >>> print(embeddings.to_tensor().shape)
         torch.Size([100, 3, 224, 224])
         """
-        embeddings = Embeddings([], 0, None, None, device, True, False)
+        embeddings = Embeddings([], 0, None, None, None, False, device, True, False)
+
         array = array if isinstance(array, Array) else as_numpy(array)
         embeddings._cached_idx = set(range(len(array)))
         embeddings._embeddings = torch.as_tensor(array).to(get_device(device))
@@ -339,7 +393,12 @@ class Embeddings:
         return emb
 
     def _encode(self, images: list[torch.Tensor]) -> torch.Tensor:
-        return self._encoder(torch.stack(images).to(self.device))
+        input_tensor = torch.stack(images).to(self.device)
+
+        if self.layer_name:
+            _ = self._model(input_tensor)  # Triggers hook
+            return self.captured_output  # Return hooked embeddings
+        return self._model(input_tensor)  # Return normal output
 
     @torch.no_grad()  # Reduce overhead cost by not tracking tensor gradients
     def _batch(self, indices: Sequence[int]) -> Iterator[torch.Tensor]:
