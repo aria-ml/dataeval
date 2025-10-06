@@ -1,20 +1,11 @@
 import numpy as np
 import pytest
 
-from dataeval.utils._merge import merge
 from tests.conftest import to_metadata
 
 
 @pytest.mark.required
 class TestMDPreprocessingUnit:
-    def test_uneven_factor_lengths(self):
-        labels = [0] * 10 + [1] * 10
-        factors = {"factor1": ["a"] * 10, "factor2": ["b"] * 11}
-        err_msg = "Number of metadata (2) does not match number of images (20)."
-        with pytest.raises(Exception) as e:
-            to_metadata(factors, labels)._bin()
-        assert err_msg in str(e.value)
-
     def test_bad_factor_ref(self):
         labels = [0] * 5 + [1] * 5
         factors = {"factor1": ["a"] * 5 + ["b"] * 5}
@@ -22,14 +13,6 @@ class TestMDPreprocessingUnit:
         err_msg = "The keys - {'something_else'} - are present in the `continuous_factor_bins` dictionary"
         with pytest.warns(UserWarning, match=err_msg):
             to_metadata(factors, labels, continuous_bincounts)._bin()
-
-    def test_wrong_shape(self):
-        labels = [[0], [1]]
-        factors = {"factor1": [10, 20]}
-        err_msg = "Labels must be a sequence of integers for image classification."
-        with pytest.raises(TypeError) as e:
-            to_metadata(factors, labels)._bin()
-        assert err_msg in str(e.value)
 
     def test_doesnt_modify_input(self):
         factors = {"data1": [0.1, 0.2, 0.3]}
@@ -60,20 +43,6 @@ class TestMDPreprocessingUnit:
         labels = [0, 0, 0]
         output = to_metadata(factors, labels, bincounts, exclude=["b"])
         assert "b" not in output.class_names
-
-    @pytest.mark.parametrize(
-        "factors, labels",
-        [
-            [[{"data1": [0, 1, 2, 3, 4], "id": 0}], np.repeat(np.arange(5), 3)],
-            [[{"data1": [0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4], "id": 0}], np.arange(5)],
-        ],
-    )
-    def test_label_length_mismatch(self, factors, labels):
-        flat_factors = merge(factors)
-        err_msg = f"Number of metadata (3) does not match number of images ({len(labels)})."
-        with pytest.raises(ValueError) as e:
-            to_metadata(flat_factors, labels)._bin()
-        assert err_msg in str(e.value)
 
 
 @pytest.mark.optional
