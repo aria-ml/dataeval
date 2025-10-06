@@ -9,14 +9,15 @@ Licensed under Apache Software License (Apache 2.0)
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from itertools import product
 
 import numpy as np
 import pytest
 import torch
 import torch.nn as nn
-from maite_datasets import to_image_classification_dataset
 
+# from maite_datasets import to_image_classification_dataset
 from dataeval.config import get_device
 from dataeval.data._embeddings import Embeddings
 from dataeval.detectors.drift._mmd import DriftMMD, GaussianRBF, _squared_pairwise_distance, mmd2_from_kernel_matrix
@@ -52,9 +53,11 @@ class MyModel(nn.Module):
         return self.dense2(x)
 
 
-def get_embeddings(n: int, n_shape: tuple[int, int, int], n_classes: int, model: nn.Module) -> Embeddings:
+def get_embeddings(
+    n: int, n_shape: tuple[int, int, int], n_classes: int, model: nn.Module, get_mock_ic_dataset: Callable
+) -> Embeddings:
     images = np.random.randn(n * math.prod(n_shape)).reshape(n, *n_shape).astype(np.float32)
-    dataset = to_image_classification_dataset(images, np.random.randint(n_classes, size=n).tolist(), None, None)
+    dataset = get_mock_ic_dataset(images, np.random.randint(n_classes, size=n).tolist())
     return Embeddings(dataset=dataset, model=model, batch_size=n, device="cpu")
 
 
@@ -74,12 +77,12 @@ class TestMMDDrift:
         return self.tests_mmddrift[request.param]
 
     @pytest.mark.parametrize("mmd_params", list(range(n_tests)), indirect=True)
-    def test_mmd(self, mmd_params):
+    def test_mmd(self, mmd_params, get_mock_ic_dataset):
         model, n_permutations, update_strategy, sigma = mmd_params
 
         np.random.seed(0)
         torch.manual_seed(0)
-        x_ref = get_embeddings(self.n, self.n_shape, self.n_classes, model)
+        x_ref = get_embeddings(self.n, self.n_shape, self.n_classes, model, get_mock_ic_dataset)
         cd = DriftMMD(
             data=x_ref,
             p_val=0.05,
@@ -95,7 +98,7 @@ class TestMMDDrift:
             assert cd.n == self.n + self.n
             assert cd._data.shape[0] == min(update_strategy[k], self.n + self.n)  # type: ignore
 
-        preds = cd.predict(get_embeddings(self.n, self.n_shape, self.n_classes, model))
+        preds = cd.predict(get_embeddings(self.n, self.n_shape, self.n_classes, model, get_mock_ic_dataset))
         if preds.drifted:
             assert preds.p_val < preds.threshold == cd.p_val
             assert preds.distance > preds.distance_threshold

@@ -7,7 +7,6 @@ from typing import Any
 import numpy as np
 import polars as pl
 import pytest
-from maite_datasets import to_object_detection_dataset
 
 from dataeval.config import set_max_processes, use_max_processes
 from dataeval.metrics.stats import dimensionstats, hashstats, imagestats, pixelstats, visualstats
@@ -452,12 +451,12 @@ class TestOffImageBoxes:
     classes = [str(i) for i in range(CLASS_COUNT)]
 
     @pytest.mark.parametrize("box", [(-10.0, -10.0, 20.0, 20.0), (20.0, 20.0, 50.0, 0.0)])
-    def test_off_image_boxes_no_nan(self, box: tuple[float, float, float, float]):
+    def test_off_image_boxes_no_nan(self, box: tuple[float, float, float, float], get_mock_od_dataset):
         # set 2 boxes out of bounds
         boxes = self.boxes.copy()
         boxes[0][0] = box
 
-        dataset = to_object_detection_dataset(
+        dataset = get_mock_od_dataset(
             self.images,
             self.labels,
             boxes,
@@ -475,11 +474,11 @@ class TestOffImageBoxes:
                 assert not np.any(np.isinf(v)), f"Inf value found in {k}"
 
     @pytest.mark.parametrize("box", [(10, 9, 8, 7), (5, 9, 8, 7), (10, 5, 8, 7)])
-    def test_invalid_bounding_box(self, box: tuple[int, int, int, int]):
+    def test_invalid_bounding_box(self, box: tuple[int, int, int, int], get_mock_od_dataset):
         boxes = self.boxes.copy()
         boxes[0][0] = box
 
-        dataset = to_object_detection_dataset(
+        dataset = get_mock_od_dataset(
             self.images,
             self.labels,
             boxes,
@@ -491,11 +490,11 @@ class TestOffImageBoxes:
             imagestats(dataset, per_box=True)
 
     @pytest.mark.parametrize("box", [(0, 0, 0, 0), (5, 6, 5, 10), (5, 6, 10, 6)])
-    def test_zero_area_bounding_box(self, box: tuple[int, int, int, int]):
+    def test_zero_area_bounding_box(self, box: tuple[int, int, int, int], get_mock_od_dataset):
         boxes = self.boxes.copy()
         boxes[0][0] = box
 
-        dataset = to_object_detection_dataset(
+        dataset = get_mock_od_dataset(
             self.images,
             self.labels,
             boxes,
@@ -506,11 +505,11 @@ class TestOffImageBoxes:
         output = imagestats(dataset, per_box=True)
         assert np.isnan(output.mean[0])
 
-    def test_empty_bounding_box(self):
+    def test_empty_bounding_box(self, get_mock_od_dataset):
         boxes = self.boxes.copy()
         boxes[-1][0] = []
 
-        dataset = to_object_detection_dataset(
+        dataset = get_mock_od_dataset(
             self.images,
             self.labels,
             boxes,
@@ -521,11 +520,11 @@ class TestOffImageBoxes:
         with pytest.raises(ValueError, match="Invalid bounding box format"):
             imagestats(dataset, per_box=True)
 
-    def test_no_bounding_box(self):
+    def test_no_bounding_box(self, get_mock_od_dataset):
         boxes = self.boxes.copy()
         boxes[-1].clear()
 
-        dataset = to_object_detection_dataset(
+        dataset = get_mock_od_dataset(
             self.images,
             self.labels,
             boxes,
@@ -536,11 +535,11 @@ class TestOffImageBoxes:
         stats = imagestats(dataset, per_box=True)
         assert stats.source_index[-1].image == 8
 
-    def test_no_bounding_box_boxratio(self):
+    def test_no_bounding_box_boxratio(self, get_mock_od_dataset):
         boxes = self.boxes.copy()
         boxes[-1].clear()
 
-        dataset = to_object_detection_dataset(
+        dataset = get_mock_od_dataset(
             self.images,
             self.labels,
             boxes,
