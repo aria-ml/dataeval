@@ -98,7 +98,6 @@ test = [
   "pytest>=8.3",
   "pytest-cov>=6.1",
   "pytest-xdist>=3.6.1",
-  "maite-datasets>=0.0.2",
 ]
 type = [
   { include-group = "base" },
