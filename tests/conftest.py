@@ -98,6 +98,7 @@ class MockODDataset(MockDataset):
         labels: Sequence[Sequence[int]],
         bboxes: NDArray | Sequence[NDArray] | Sequence[Sequence[NDArray]] | Sequence[Sequence[Sequence[float]]],
         classes: Sequence[str] | None = None,
+        metadata: Sequence[dict[str, Any]] | None = None,
     ):
         super().__init__("od", images, labels, classes)
 
@@ -105,7 +106,7 @@ class MockODDataset(MockDataset):
         self._bboxes = [
             [np.asarray(box).tolist() if not isinstance(box, list) else box for box in bbox] for bbox in bboxes
         ]
-        self._metadata = None
+        self._metadata = metadata
 
     def _get_mock_od_target(self, labels: Sequence[int], bboxes: Sequence[Sequence[float]], class_count: int):
         return_mock = Mock()
@@ -214,9 +215,36 @@ def _get_dataset(
         return MockICDataset(images, labels)
 
 
+def _get_mock_ic_dataset(
+    images: NDArray | Sequence[NDArray],
+    labels: Sequence[int],
+):
+    return MockICDataset(images, labels)
+
+
+@pytest.fixture
+def get_mock_ic_dataset():
+    return _get_mock_ic_dataset
+
+
 @pytest.fixture
 def get_ic_dataset():
     return _get_dataset
+
+
+def _get_mock_od_dataset(
+    images: NDArray | Sequence[NDArray],
+    labels: Sequence[Sequence[int]],
+    bboxes: NDArray | Sequence[NDArray] | Sequence[Sequence[NDArray]] | Sequence[Sequence[Sequence[float]]],
+    metadata: Sequence[dict[str, Any]] | None = None,
+    classes: Sequence[str] | None = None,
+):
+    return MockODDataset(images, labels, bboxes, classes, metadata)
+
+
+@pytest.fixture
+def get_mock_od_dataset():
+    return _get_mock_od_dataset
 
 
 @pytest.fixture
