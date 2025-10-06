@@ -82,7 +82,7 @@ class DriftMMD(BaseDrift):
 
     Use Embeddings to encode images before testing for drift
 
-    >>> train_emb = Embeddings(train_images, model=encoder, batch_size=16)
+    >>> train_emb = Embeddings(train_images, model=encoder, layer_name="encoder", use_output=True, batch_size=16)
     >>> drift = DriftMMD(train_emb)
 
     Test incoming images for drift

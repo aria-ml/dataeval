@@ -66,7 +66,7 @@ class DriftKS(BaseDriftUnivariate):
     Basic drift detection with image embeddings:
 
     >>> from dataeval.data import Embeddings
-    >>> train_emb = Embeddings(train_images, model=encoder, batch_size=64)
+    >>> train_emb = Embeddings(train_images, model=encoder, layer_name='encoder', use_output=True, batch_size=64)
     >>> drift_detector = DriftKS(train_emb)
     
     Test incoming images for distributional drift
