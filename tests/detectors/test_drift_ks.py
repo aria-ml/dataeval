@@ -35,11 +35,11 @@ class TestKSDrift:
     n_tests = len(tests_ksdrift)
 
     def get_embeddings(self, n: int = 100, n_features: int = 10) -> Embeddings:
-        mock = MagicMock(sepc=Embeddings)
+        mock = MagicMock(spec=Embeddings)
         mock._data = np.random.randn(n * n_features).reshape(n, n_features).astype(np.float32)
-        mock.to_numpy.return_value = mock._data
         mock.__getitem__.side_effect = lambda idx: mock._data[idx]
         mock.__len__.return_value = n
+        mock.__array__.return_value = mock._data
         setattr(mock, "__class__", Embeddings)
         return mock
 
@@ -77,9 +77,9 @@ class TestKSDrift:
         X_randn = np.random.randn(self.n * n_features).reshape(self.n, n_features).astype("float32")
         mu, sigma = 5, 5
         X_low = MagicMock(spec=Embeddings)
-        X_low.to_numpy.return_value = sigma * X_randn - mu
+        X_low.__array__.return_value = sigma * X_randn - mu
         X_high = MagicMock(spec=Embeddings)
-        X_high.to_numpy.return_value = sigma * X_randn + mu
+        X_high.__array__.return_value = sigma * X_randn + mu
 
         preds_high = cd.predict(X_high)
         if alternative != "less":

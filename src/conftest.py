@@ -163,7 +163,7 @@ def doctest_detectors_ood_drift(doctest_namespace: dict[str, Any]) -> None:
 
     doctest_namespace["train_images"] = train_images
     doctest_namespace["test_images"] = test_images
-    doctest_namespace["encoder"] = Autoencoder(1)
+    doctest_namespace["encoder"] = Autoencoder(1).encoder
 
 
 @pytest.fixture(autouse=True, scope="session")

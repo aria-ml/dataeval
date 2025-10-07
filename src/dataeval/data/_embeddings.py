@@ -46,7 +46,7 @@ class _TorchDatasetWrapper(torch.utils.data.Dataset[torch.Tensor]):
         return image
 
 
-class Embeddings:
+class Embeddings(Array):
     """
     Collection of image embeddings from a dataset.
 
@@ -144,6 +144,17 @@ class Embeddings:
         self._embeddings: torch.Tensor = torch.empty(())
 
         self._cache = cache if isinstance(cache, bool) else self._resolve_path(cache)
+        self._shape: tuple[int, ...] | None = None
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        if self._shape is None:
+            embedding_shape = self[list(self._cached_idx)[0]].shape if self._cached_idx else self[0].shape
+            self._shape = tuple([len(self)] + [*embedding_shape])
+        return self._shape
+
+    def __array__(self, dtype: Any = None, copy: Any = None) -> Any:
+        return self.to_numpy().astype(dtype=dtype, copy=bool(copy))
 
     def _hook_fn(self, _module: torch.nn.Module, inputs: tuple[torch.Tensor], output: torch.Tensor) -> None:
         # Copy the output to avoid computation graph issues

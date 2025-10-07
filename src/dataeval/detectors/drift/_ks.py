@@ -16,7 +16,6 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.stats import ks_2samp
 
-from dataeval.data._embeddings import Embeddings
 from dataeval.detectors.drift._base import BaseDriftUnivariate, UpdateStrategy
 from dataeval.typing import Array
 
@@ -36,7 +35,7 @@ class DriftKS(BaseDriftUnivariate):
 
     Parameters
     ----------
-    data : Embeddings or Array
+    data : Array
         Reference dataset used as baseline distribution for drift detection.
         Should represent the expected data distribution.
     p_val : float, default 0.05
@@ -66,12 +65,13 @@ class DriftKS(BaseDriftUnivariate):
     Basic drift detection with image embeddings:
 
     >>> from dataeval.data import Embeddings
-    >>> train_emb = Embeddings(train_images, model=encoder, layer_name='encoder', use_output=True, batch_size=64)
+    >>> train_emb = Embeddings(train_images, model=encoder, batch_size=64)
     >>> drift_detector = DriftKS(train_emb)
     
     Test incoming images for distributional drift
     
-    >>> result = drift_detector.predict(test_images)
+    >>> test_emb = Embeddings(test_images, model=encoder, batch_size=64)
+    >>> result = drift_detector.predict(test_emb)
     >>> print(f"Drift detected: {result.drifted}")
     Drift detected: True
 
@@ -81,12 +81,12 @@ class DriftKS(BaseDriftUnivariate):
     Detect if test data has systematically higher values
     
     >>> drift_greater = DriftKS(train_emb, alternative="greater")
-    >>> result = drift_greater.predict(test_images)
+    >>> result = drift_greater.predict(test_emb)
     
     Using different correction methods
 
     >>> drift_fdr = DriftKS(train_emb, correction="fdr", p_val=0.1)
-    >>> result = drift_fdr.predict(test_images)
+    >>> result = drift_fdr.predict(test_emb)
     
     Access feature-level results
     
@@ -97,7 +97,7 @@ class DriftKS(BaseDriftUnivariate):
 
     def __init__(
         self,
-        data: Embeddings | Array,
+        data: Array,
         p_val: float = 0.05,
         update_strategy: UpdateStrategy | None = None,
         correction: Literal["bonferroni", "fdr"] = "bonferroni",
