@@ -5,10 +5,10 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from dataeval.data._embeddings import Embeddings
 from dataeval.detectors.ood.base import EmbeddingBasedOODBase, OODBaseGMM
 from dataeval.detectors.ood.mixin import OODBaseMixin, OODGMMMixin
 from dataeval.outputs._ood import OODScoreOutput
+from dataeval.typing import Array
 
 image_shape = (32, 32, 1)
 model = MagicMock()
@@ -82,7 +82,7 @@ def test_embedding_based_ood_base():
         def _score(self, X: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput:
             return ood_output
 
-        def fit_embeddings(self, embeddings: Embeddings, threshold_perc: float = 95) -> None:
+        def fit_embeddings(self, embeddings: Array, threshold_perc: float = 95) -> None:
             pass
 
     mock = MockEmbeddingBasedOOD()

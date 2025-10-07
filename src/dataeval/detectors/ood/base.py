@@ -19,9 +19,8 @@ import torch
 from numpy.typing import NDArray
 
 from dataeval.config import DeviceLike, get_device
-from dataeval.data import Embeddings
 from dataeval.detectors.ood.mixin import OODBaseMixin, OODFitMixin, OODGMMMixin
-from dataeval.typing import ArrayLike
+from dataeval.typing import Array, ArrayLike
 from dataeval.utils._array import to_numpy
 from dataeval.utils.torch._gmm import GaussianMixtureModelParams, gmm_params
 from dataeval.utils.torch._internal import trainer
@@ -122,7 +121,7 @@ class EmbeddingBasedOODBase(OODBaseMixin[Callable[[Any], Any]], ABC):
         return X.shape[1:], X.dtype.type
 
     @abstractmethod
-    def fit_embeddings(self, embeddings: Embeddings, threshold_perc: float = 95.0) -> None:
+    def fit_embeddings(self, embeddings: Array, threshold_perc: float = 95.0) -> None:
         """
         Fit using reference embeddings.
 

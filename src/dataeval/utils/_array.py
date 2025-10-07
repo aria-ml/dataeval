@@ -182,12 +182,13 @@ def flatten(array: ArrayLike) -> NDArray[Any] | torch.Tensor:
     -------
     np.ndarray or torch.Tensor, shape: (N, -1)
     """
-    if isinstance(array, np.ndarray):
-        nparr = as_numpy(array)
-        return nparr.reshape((nparr.shape[0], -1))
     if isinstance(array, torch.Tensor):
         return torch.flatten(array, start_dim=1)
-    raise TypeError(f"Unsupported array type {type(array)}.")
+    try:
+        nparr = as_numpy(array)
+        return nparr.reshape((nparr.shape[0], -1))
+    except Exception as e:
+        raise TypeError(f"Unsupported array type {type(array)}: {e}.")
 
 
 _TArray = TypeVar("_TArray", bound=Array)

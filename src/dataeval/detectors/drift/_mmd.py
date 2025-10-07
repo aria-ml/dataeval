@@ -16,7 +16,6 @@ from typing import Any
 import torch
 
 from dataeval.config import DeviceLike, get_device
-from dataeval.data._embeddings import Embeddings
 from dataeval.detectors.drift._base import BaseDrift, UpdateStrategy, update_strategy
 from dataeval.outputs import DriftMMDOutput
 from dataeval.outputs._base import set_metadata
@@ -37,7 +36,7 @@ class DriftMMD(BaseDrift):
 
     Parameters
     ----------
-    data : Embeddings or Array
+    data : Array
         Reference dataset used as baseline distribution for drift detection.
         Should represent the expected data distribution.
     p_val : float, default 0.05
@@ -82,18 +81,19 @@ class DriftMMD(BaseDrift):
 
     Use Embeddings to encode images before testing for drift
 
-    >>> train_emb = Embeddings(train_images, model=encoder, layer_name="encoder", use_output=True, batch_size=16)
+    >>> train_emb = Embeddings(train_images, model=encoder, batch_size=16)
     >>> drift = DriftMMD(train_emb)
 
     Test incoming images for drift
 
-    >>> drift.predict(test_images).drifted
+    >>> test_emb = Embeddings(test_images, model=encoder, batch_size=16)
+    >>> drift.predict(test_emb).drifted
     True
     """
 
     def __init__(
         self,
-        data: Embeddings | Array,
+        data: Array,
         p_val: float = 0.05,
         update_strategy: UpdateStrategy | None = None,
         sigma: Array | None = None,
@@ -124,7 +124,7 @@ class DriftMMD(BaseDrift):
         k_yy = self._kernel(y, y)
         return torch.cat([torch.cat([k_xx, k_xy], 1), torch.cat([k_xy.T, k_yy], 1)], 0)
 
-    def score(self, data: Embeddings | Array) -> tuple[float, float, float]:
+    def score(self, data: Array) -> tuple[float, float, float]:
         """
         Compute the :term:`p-value<P-Value>` resulting from a permutation test using the maximum mean
         discrepancy as a distance measure between the reference data and the data to
@@ -132,7 +132,7 @@ class DriftMMD(BaseDrift):
 
         Parameters
         ----------
-        data : Embeddings or Array
+        data : Array
             Batch of instances to score.
 
         Returns
@@ -158,14 +158,14 @@ class DriftMMD(BaseDrift):
 
     @set_metadata
     @update_strategy
-    def predict(self, data: Embeddings | Array) -> DriftMMDOutput:
+    def predict(self, data: Array) -> DriftMMDOutput:
         """
         Predict whether a batch of data has drifted from the reference data and then
         updates reference data using specified strategy.
 
         Parameters
         ----------
-        data : Embeddings or Array
+        data : Array
             Batch of instances to predict drift on.
 
         Returns

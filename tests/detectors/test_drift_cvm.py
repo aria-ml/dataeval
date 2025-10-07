@@ -32,7 +32,7 @@ class TestCVMDrift:
         mock = MagicMock(spec=Embeddings)
         mock.__getitem__.side_effect = lambda idx: arr[idx]
         mock.__len__.return_value = n
-        mock.to_numpy.return_value = arr
+        mock.__array__.return_value = arr
         return mock
 
     def test_cvmdrift(self):
