@@ -1,13 +1,13 @@
 from typing import Literal
 
 import numpy as np
+from numpy.typing import NDArray
 from sklearn.neighbors import NearestNeighbors
 
 from dataeval.config import get_max_processes
-from dataeval.data import Embeddings
 from dataeval.detectors.ood.base import EmbeddingBasedOODBase
 from dataeval.outputs._ood import OODScoreOutput
-from dataeval.typing import ArrayLike
+from dataeval.typing import Array
 
 
 class OOD_KNN(EmbeddingBasedOODBase):
@@ -39,9 +39,9 @@ class OOD_KNN(EmbeddingBasedOODBase):
         self.k = k
         self.distance_metric = distance_metric
         self._nn_model: NearestNeighbors
-        self.reference_embeddings: ArrayLike
+        self.reference_embeddings: NDArray[np.float32]
 
-    def fit_embeddings(self, embeddings: Embeddings, threshold_perc: float = 95.0) -> None:
+    def fit_embeddings(self, embeddings: Array, threshold_perc: float = 95.0) -> None:
         """
         Fit the detector using reference (in-distribution) embeddings.
 
@@ -52,7 +52,7 @@ class OOD_KNN(EmbeddingBasedOODBase):
             embeddings: Reference embeddings from in-distribution data
             threshold_perc: Percentage of reference data considered normal
         """
-        self.reference_embeddings = embeddings.to_numpy()
+        self.reference_embeddings = np.asarray(embeddings, dtype=np.float32)
 
         if self.k >= len(self.reference_embeddings):
             raise ValueError(

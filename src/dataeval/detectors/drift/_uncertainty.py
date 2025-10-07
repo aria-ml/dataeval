@@ -96,7 +96,7 @@ class DriftUncertainty(BaseDrift):
 
     Parameters
     ----------
-    data : Embeddings or Array
+    data : Array
         Reference dataset used as baseline distribution for drift detection.
         Should represent the expected "normal" data distribution.
     p_val : float, default 0.05
@@ -151,8 +151,8 @@ class DriftUncertainty(BaseDrift):
     >>> print(f"Drift detected: {result.drifted}")
     Drift detected: True
 
-    >>> print(f"Mean uncertainty change: {result.distance:.4f}")
-    Mean uncertainty change: 0.8500
+    >>> print(f"Mean uncertainty change: {result.distance:.2f}")
+    Mean uncertainty change: 0.96
 
     With data preprocessing
 
