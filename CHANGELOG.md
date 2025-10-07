@@ -1,6 +1,11 @@
-[//]: # (e27a947b9eaa74f19dccb81aa39827f2a2b46a4d)
+[//]: # (568800104eca54ec07c374b7d7594942ae07a433)
 
 # DataEval Change Log
+
+## v0.92.2
+
+🛠️ **Improvements and Enhancements**
+- `52b9c6da` - Added layer_name keyword to Embeddings
 
 ## v0.92.1
 
