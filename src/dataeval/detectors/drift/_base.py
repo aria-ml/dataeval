@@ -19,11 +19,10 @@ from typing import Any, Literal, Protocol, TypeVar, runtime_checkable
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.data import Embeddings
 from dataeval.outputs import DriftOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.typing import Array
-from dataeval.utils._array import as_numpy, flatten
+from dataeval.utils._array import flatten
 
 R = TypeVar("R")
 
@@ -41,7 +40,7 @@ def update_strategy(fn: Callable[..., R]) -> Callable[..., R]:
     """Decorator to update x_ref with x using selected update methodology"""
 
     @wraps(fn)
-    def _(self: BaseDrift, data: Embeddings | Array, *args: tuple[Any, ...], **kwargs: dict[str, Any]) -> R:
+    def _(self: BaseDrift, data: Array, *args: tuple[Any, ...], **kwargs: dict[str, Any]) -> R:
         output = fn(self, data, *args, **kwargs)
 
         # update reference dataset
@@ -63,7 +62,7 @@ class BaseDrift:
 
     Parameters
     ----------
-    data : Embeddings or Array
+    data : Array
         Reference dataset used as baseline for drift detection.
         Can be image embeddings or raw arrays.
     p_val : float, default 0.05
@@ -98,7 +97,7 @@ class BaseDrift:
 
     def __init__(
         self,
-        data: Embeddings | Array,
+        data: Array,
         p_val: float = 0.05,
         update_strategy: UpdateStrategy | None = None,
         correction: Literal["bonferroni", "fdr"] = "bonferroni",
@@ -139,16 +138,15 @@ class BaseDrift:
             self._x_ref = self._encode(self._data)
         return self._x_ref
 
-    def _encode(self, data: Embeddings | Array) -> NDArray[np.float32]:
+    def _encode(self, data: Array) -> NDArray[np.float32]:
         """
         Encode input data to consistent numpy format.
 
-        Handles different input types (Embeddings, Arrays) and converts
-        them to flattened 32-bit floating point arrays for drift detection.
+        Converts input array to flattened 32-bit floating point arrays for drift detection.
 
         Parameters
         ----------
-        data : Embeddings or Array
+        data : Array
             Input data to encode.
 
         Returns
@@ -156,14 +154,7 @@ class BaseDrift:
         NDArray[np.float32]
             Encoded data as flattened 32-bit floating point array.
         """
-        array = (
-            data.to_numpy().astype(np.float32)
-            if isinstance(data, Embeddings)
-            else self._data.new(data).to_numpy().astype(np.float32)
-            if isinstance(self._data, Embeddings)
-            else as_numpy(data).astype(np.float32)
-        )
-        return flatten(array)
+        return flatten(np.asarray(data, dtype=np.float32))
 
 
 class BaseDriftUnivariate(BaseDrift):
@@ -176,7 +167,7 @@ class BaseDriftUnivariate(BaseDrift):
 
     Parameters
     ----------
-    data : Embeddings or Array
+    data : Array
         Reference dataset used as baseline for drift detection.
     p_val : float, default 0.05
         Significance threshold for drift detection, between 0 and 1.
@@ -209,7 +200,7 @@ class BaseDriftUnivariate(BaseDrift):
 
     def __init__(
         self,
-        data: Embeddings | Array,
+        data: Array,
         p_val: float = 0.05,
         update_strategy: UpdateStrategy | None = None,
         correction: Literal["bonferroni", "fdr"] = "bonferroni",
@@ -244,7 +235,7 @@ class BaseDriftUnivariate(BaseDrift):
 
         return self._n_features
 
-    def score(self, data: Embeddings | Array) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
+    def score(self, data: Array) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         """Calculate feature-wise p-values and test statistics.
 
         Applies the detector's statistical test independently to each feature,
@@ -252,7 +243,7 @@ class BaseDriftUnivariate(BaseDrift):
 
         Parameters
         ----------
-        data : Embeddings or Array
+        data : Array
             Test dataset to compare against reference data.
 
         Returns
@@ -322,7 +313,7 @@ class BaseDriftUnivariate(BaseDrift):
 
     @set_metadata
     @update_strategy
-    def predict(self, data: Embeddings | Array) -> DriftOutput:
+    def predict(self, data: Array) -> DriftOutput:
         """Predict drift and update reference data using specified strategy.
 
         Performs feature-wise drift detection, applies multiple testing
@@ -331,7 +322,7 @@ class BaseDriftUnivariate(BaseDrift):
 
         Parameters
         ----------
-        data : Embeddings or Array
+        data : Array
             Test dataset to analyze for drift against reference data.
 
         Returns
