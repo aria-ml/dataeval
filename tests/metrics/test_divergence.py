@@ -7,7 +7,6 @@ from dataeval.metrics.estimators._divergence import divergence
 np.random.seed(0)
 
 
-@pytest.mark.required
 class TestDivergence:
     @pytest.mark.parametrize(
         "method, output",
@@ -16,6 +15,7 @@ class TestDivergence:
             ("FNN", {"divergence": 1.0, "errors": 0}),
         ],
     )
+    @pytest.mark.optional
     def test_divergence_mock_data(self, method, output):
         """Unit testing of Divergence"""
         rng = np.random.default_rng(3)
@@ -40,6 +40,7 @@ class TestDivergence:
             (divergence_fnn, 9),  # FNN gets the whole MST in this case.
         ],
     )
+    @pytest.mark.required
     def test_divergence_funcs(self, method, expected_errors):
         """Test math funcs give deterministic error outputs"""
         images = np.ones((10, 3, 3))
@@ -54,6 +55,7 @@ class TestDivergence:
             divergence_fnn,
         ],
     )
+    @pytest.mark.required
     def test_div_func_flatten(self, method):
         """3x3 is equal to 9x1 when flattened, so errors should be equal as well"""
         images = np.random.random(size=(10, 3, 3))

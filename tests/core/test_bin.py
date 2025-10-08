@@ -68,7 +68,7 @@ class TestDigitizeDataFunctional:
         assert np.all(hist == [1, 2, 3])
 
 
-@pytest.mark.required
+@pytest.mark.optional
 class TestBinDataFunctional:
     @pytest.mark.parametrize(
         "method, data, expected_result",

@@ -31,14 +31,17 @@ classifiers = [
   "Topic :: Scientific/Engineering",
 ]
 dependencies = [
-  "tbb>=2021.6",
-  "numba>=0.59.1",
+  "numba>=0.61.0",
   "fast_hdbscan==0.2.0",
   "lightgbm>=4",
-  "numpy>=1.24.2,<2.3",
-  "pandas>=2.0",
+  "numpy>=1.24.2,<2.3; python_version<'3.12'",
+  "numpy>=1.26.2,<2.3; python_version>='3.12'",
+  "pandas>=2.0.0; python_version<'3.13'",
+  "pandas>=2.2.3; python_version>='3.13'",
   "polars>=1.0.0",
-  "scipy>=1.10",
+  "scipy>=1.10.0; python_version<'3.12'",
+  "scipy>=1.11.2; python_version>='3.12,<3.13'",
+  "scipy>=1.14.1; python_version>='3.13'",
   "scikit-learn>=1.5.0",
   "torch>=2.2.0",
   "torchvision>=0.17.0",
@@ -75,9 +78,10 @@ Documentation = "https://dataeval.readthedocs.io/"
 base = [
   "nox>=2025.5.1",
   "nox-uv>=0.6.2",
-  "uv>0.8.5",
+  "uv>=0.8.0",
 ]
 plus = [
+  "pip>=25",
   "matplotlib>=3.7.1",
   "tqdm>=4.66",
 ]
@@ -106,7 +110,7 @@ type = [
 docs = [
   { include-group = "base" },
   { include-group = "plus" },
-  "numpy>=2.0.2,<2.3",
+  "numpy>=2.0.2",
   "certifi>=2024.07.04",
   "ipykernel>=6.26.0",
   "ipywidgets>=8.1.1",
@@ -169,6 +173,9 @@ torchvision = [
   { index = "pytorch-cu118", extra = "cu118" },
   { index = "pytorch-cu126", extra = "cu126" },
 ]
+
+[tool.uv.extra-build-dependencies]
+numba = ["tbb>=2021.6"]
 
 [tool.hatch.build.targets.sdist]
 include = ["src/dataeval"]
