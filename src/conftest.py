@@ -4,12 +4,6 @@ import pathlib
 import sys
 from collections.abc import Mapping, Sequence
 from typing import Any
-
-from dataeval.data._metadata import FactorInfo, Metadata
-from dataeval.outputs._ood import OODOutput
-
-sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute() / "tests" / "detectors"))
-
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -17,11 +11,16 @@ import polars as pl
 import pytest
 import sklearn.datasets as dsets
 import torch
-from test_drift_uncertainty import PtModel
 
 from dataeval.config import set_seed
+from dataeval.data._metadata import FactorInfo, Metadata
 from dataeval.metrics.stats import hashstats, pixelstats
+from dataeval.outputs._ood import OODOutput
 from dataeval.utils.torch.models import Autoencoder
+
+# Manually add the import path for test_drift_uncertainty
+sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute() / "tests" / "detectors"))
+from test_drift_uncertainty import PtModel
 
 # Set numpy print option to legacy 1.25 so native numpy types
 # are not printed with dtype information.

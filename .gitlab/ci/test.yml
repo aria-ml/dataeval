@@ -9,12 +9,10 @@ lint:
 
 minimum install:
   extends: 
-    - .nox
+    - .nox_all
     - .rules_main_mr_code
   script:
     - nox -e deps
-  variables:
-    PYTHON_VERSION: '3.10'
 
 typecheck:
   extends: 
