@@ -2,12 +2,13 @@
 
 This page explains the role and importance of embeddings in vision tasks and
 guides you through understanding how to work with them using our tools. For
-implementation details, see our [tutorials](../tutorials/index.md).
+curated examples using embeddings, see our
+[tutorials](../tutorials/index.md).
 
 ## What are they
 
 Embeddings are high-dimensional vector representations of images that capture
-meaningful visual and semantic features in a dense, numerical format. Instead
+meaningful visual and semantic features in a dense numerical format. Instead
 of working with raw pixel values, machine learning systems use embeddings as
 compressed representations that preserve what matters most about image content.
 
@@ -16,8 +17,8 @@ typically 128 to 2048 numbers. The dimensionality of these vectors affects
 their capabilities: higher-dimensional embeddings can capture more nuanced
 visual and semantic distinctions, while lower-dimensional embeddings are more
 efficient to compute and visualize but may lose subtle details. These vectors
-encode what the image contains in a way that similar vectors represent
-meaningfully similar images.
+encode image content such that similar vectors represent *meaningfully* similar
+images.
 
 ## Why are they important
 
@@ -89,38 +90,33 @@ furthermore their geometric properties do not map cleanly to perceptual
 properties. Imperceptible differences in pixel data-- from e.g. a 1 pixel
 shift, or a slight rescaling or rotation--can result in large measured
 distances. Therefore we strongly recommend that you first convert your images
-to embeddings using DataEval's {class}`.Embeddings` class, which handles
-the transformation from pixels to vectors.
+to embeddings.
 
 ## Creating embeddings
 
-Embeddings are created by neural network models trained on large image
-datasets using various objectives. The training objective fundamentally shapes
-what patterns the resulting embeddings capture. Models trained with supervised
-classification learn to emphasize features that distinguish between labeled
-categories. Contrastive learning approaches train models to recognize similar
-and dissimilar image pairs, creating embeddings optimized for similarity
-comparisons. Self-supervised methods learn representations by solving tasks
-like image reconstruction.
+Embeddings can be created using DataEval's {class}`.Embeddings` class. The
+Embeddings class takes a neural network as input, and that network handles the
+actual transformation from pixels to vectors.
 
-DataEval supports custom embedding models that you can train for your
-specific domain. When choosing an embedding model, consider what task it was
-originally trained for. Classification-based embeddings excel at capturing
-category-level distinctions, while detection-based embeddings may better
-represent spatial relationships and localized features.
+If you already had a model trained for your specific task, the best embeddings
+would of course come directly from that model. The {class}`.Embeddings` class
+allows you to specify the appropriate layer from which to extract embeddings
+during inference. These will be well-suited to your domain and task—after all,
+your model has already learned exactly the patterns that matter in your data.
 
-For object detection scenarios, additional considerations apply. When target
-objects are small relative to the overall image, their visual information can
-be overwhelmed by background textures and context. In these cases, specialized
-training approaches that emphasize object-level features may be necessary to
-create embeddings where small targets remain detectable and distinguishable.
+But you most likely won't yet have a trained model when you first want to
+make embeddings. Instead, you'll choose from a set of pre-trained embedding
+models, selecting ones that were trained for tasks most similar to what you
+set out to accomplish. Such a neural network model will already have been
+trained on large image datasets using one of various possible objectives, and
+the training objective fundamentally shapes what patterns the resulting
+embeddings capture. The table below shows examples of appropriate models for a
+variety of metrics and tasks.
 
-Understanding your model's training objective helps predict how it will
-represent your images and what types of patterns DataEval's analysis tools
-will be able to detect. Different analysis tasks may benefit from different
-embedding approaches—some metrics require embeddings that clearly separate
-different classes, while others work well with embeddings that primarily
-capture visual similarity. Two concrete examples: {doc}`BER` should be trained
-with a classification objective so that class overlap can be evaluated, while
-{doc}`Drift` or {doc}`Prioritization` may perform well enough using a
-self-supervised embedding that captures only visual features.
+| Model Type | Example Models | Best for These Metrics | Why |
+|------------|----------------|----------------------|-----|
+| **Image Classification** | ResNet, EfficientNet, Vision Transformer | BER, Class Balance, Outlier Detection | Embeddings emphasize features that distinguish between labeled categories, making class boundaries clear |
+| **Object Detection** | YOLO, R-CNN variants, DETR | Spatial Drift, Localization Quality | Embeddings capture spatial relationships and localized features, ideal when object position matters |
+| **Self-Supervised** | DINO, MAE, SimCLR | Drift, Prioritization, Duplicate Detection | Embeddings capture general visual patterns without class bias, good for broad visual similarity |
+| **Contrastive Learning** | CLIP, SwAV, MoCo | Similarity Search, Nearest Neighbor Analysis | Embeddings optimized for distinguishing similar vs. dissimilar pairs, excellent for comparison tasks |
+| **Segmentation** | U-Net, Mask R-CNN, DeepLab | Fine-grained Analysis, Pixel-level Quality | Embeddings understand detailed spatial structure and boundaries within images |
