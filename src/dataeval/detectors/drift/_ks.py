@@ -10,7 +10,7 @@ from __future__ import annotations
 
 __all__ = []
 
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 from numpy.typing import NDArray
@@ -97,7 +97,7 @@ class DriftKS(BaseDriftUnivariate):
 
     def __init__(
         self,
-        data: Array,
+        data: Array[Any],
         p_val: float = 0.05,
         update_strategy: UpdateStrategy | None = None,
         correction: Literal["bonferroni", "fdr"] = "bonferroni",
