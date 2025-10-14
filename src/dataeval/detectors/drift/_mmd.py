@@ -78,7 +78,7 @@ class DriftMMD(BaseDrift):
     Example
     -------
     >>> from dataeval.data import Embeddings
-    >>> from dataeval.utils.torch.models import Encoder
+    >>> from dataeval.utils.models import Encoder
 
     Use Embeddings to encode images before testing for drift
 

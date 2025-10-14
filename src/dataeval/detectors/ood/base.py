@@ -22,8 +22,8 @@ from dataeval.config import DeviceLike, get_device
 from dataeval.detectors.ood.mixin import OODBaseMixin, OODFitMixin, OODGMMMixin
 from dataeval.typing import Array, ArrayLike
 from dataeval.utils._array import to_numpy
-from dataeval.utils.torch._gmm import GaussianMixtureModelParams, gmm_params
-from dataeval.utils.torch._internal import trainer
+from dataeval.utils._gmm import GaussianMixtureModelParams, gmm_params
+from dataeval.utils._train import train
 
 
 class OODBase(OODBaseMixin[torch.nn.Module], OODFitMixin[Callable[..., torch.Tensor], torch.optim.Optimizer]):
@@ -63,7 +63,7 @@ class OODBase(OODBaseMixin[torch.nn.Module], OODFitMixin[Callable[..., torch.Ten
         """
 
         # Train the model
-        trainer(
+        train(
             model=self.model,
             x_train=to_numpy(x_ref),
             y_train=None,

@@ -65,7 +65,7 @@ class DriftKS(BaseDriftUnivariate):
     Basic drift detection with image embeddings:
 
     >>> from dataeval.data import Embeddings
-    >>> from dataeval.utils.torch.models import Encoder
+    >>> from dataeval.utils.models import Encoder
 
     >>> encoder = Encoder(train_images[0].shape, 128)
     >>> train_emb = Embeddings(train_images, model=encoder, batch_size=64)

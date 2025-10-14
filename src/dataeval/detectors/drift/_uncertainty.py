@@ -24,7 +24,7 @@ from dataeval.detectors.drift._ks import DriftKS
 from dataeval.outputs import DriftOutput
 from dataeval.typing import Array, Transform
 from dataeval.utils._array import as_numpy
-from dataeval.utils.torch._internal import predict_batch
+from dataeval.utils._predict import predict
 
 
 def classifier_uncertainty(
@@ -212,7 +212,7 @@ class DriftUncertainty(BaseDrift):
 
     def _preprocess(self, x: Array) -> torch.Tensor:
         """Convert input data to uncertainty scores via model predictions."""
-        preds = predict_batch(x, self.model, self.device, self.batch_size, self._transform)
+        preds = predict(x, self.model, self.device, self.batch_size, self._transform)
         return classifier_uncertainty(preds, self.preds_type)
 
     def predict(self, x: Array[Any]) -> DriftOutput:
