@@ -22,7 +22,7 @@ from dataeval.config import DeviceLike
 from dataeval.detectors.ood.base import OODBase
 from dataeval.outputs import OODScoreOutput
 from dataeval.typing import ArrayLike
-from dataeval.utils.torch._internal import predict_batch
+from dataeval.utils._predict import predict
 
 
 class OOD_AE(OODBase):
@@ -42,7 +42,7 @@ class OOD_AE(OODBase):
     -------
     Perform out-of-distribution detection on test data.
 
-    >>> from dataeval.utils.torch.models import Autoencoder
+    >>> from dataeval.utils.models import Autoencoder
 
     >>> input_shape = train_images[0].shape
     >>> ood = OOD_AE(Autoencoder(input_shape))
@@ -81,7 +81,7 @@ class OOD_AE(OODBase):
 
     def _score(self, X: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput:
         # reconstruct instances
-        X_recon = predict_batch(X, self.model, batch_size=batch_size).detach().cpu().numpy()
+        X_recon = predict(X, self.model, batch_size=batch_size).detach().cpu().numpy()
 
         # compute feature and instance level scores
         fscore = np.power(X - X_recon, 2)

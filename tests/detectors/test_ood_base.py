@@ -61,11 +61,11 @@ def test_validate_state_additional_attrs():
 @pytest.mark.required
 def test_oodbasegmm_fit():
     outlier = MockOODGMM(lambda _: (1, 1, 1))  # type: ignore
-    mock_trainer = patch("dataeval.detectors.ood.base.trainer").start()
+    mock_train = patch("dataeval.detectors.ood.base.train").start()
     mock_gmm_params = patch("dataeval.detectors.ood.base.gmm_params").start()
     outlier.fit(np.zeros((10, 3, 64, 64)), 0.5, None, None, 1, 1, False)
 
-    assert mock_trainer.called
+    assert mock_train.called
     assert mock_gmm_params.called
 
 

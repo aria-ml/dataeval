@@ -13,7 +13,7 @@ import pytest
 from sklearn.datasets import load_digits
 
 from dataeval.detectors.ood.ae import OOD_AE
-from dataeval.utils.torch.models import Autoencoder
+from dataeval.utils.models import Autoencoder
 
 input_shape = (1, 8, 8)
 

@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from dataeval.utils.torch.models import Autoencoder
+from dataeval.utils.models import Autoencoder
 
 
 @pytest.mark.required

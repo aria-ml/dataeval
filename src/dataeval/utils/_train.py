@@ -5,64 +5,16 @@ __all__ = []
 from collections.abc import Callable
 from typing import Any
 
-import numpy as np
 import torch
 from numpy.typing import NDArray
 from torch.utils.data import DataLoader, TensorDataset
 
-from dataeval.config import DeviceLike, get_device
-from dataeval.typing import Array
+from dataeval.config import get_device
+from dataeval.typing import DeviceLike
 from dataeval.utils._tqdm import tqdm
 
 
-def predict_batch(
-    x: Array,
-    model: torch.nn.Module,
-    device: DeviceLike | None = None,
-    batch_size: int = int(1e10),
-    preprocess_fn: Callable[[torch.Tensor], torch.Tensor] | None = None,
-) -> torch.Tensor:
-    """
-    Make batch predictions on a model.
-
-    Parameters
-    ----------
-    x : np.ndarray | torch.Tensor
-        Batch of instances.
-    model : nn.Module
-        PyTorch model.
-    device : DeviceLike or None, default None
-        The hardware device to use if specified, otherwise uses the DataEval
-        default or torch default.
-    batch_size : int, default 1e10
-        Batch size used during prediction.
-    preprocess_fn : Callable | None, default None
-        Optional preprocessing function for each batch.
-
-    Returns
-    -------
-    torch.Tensor
-        PyTorch tensor with model outputs.
-    """
-    device = get_device(device)
-    if isinstance(model, torch.nn.Module):
-        model = model.to(device).eval()
-    x = torch.tensor(x, device=device)
-    n = len(x)
-    n_minibatch = int(np.ceil(n / batch_size))
-    preds_array = []
-    with torch.no_grad():
-        for i in range(n_minibatch):
-            istart, istop = i * batch_size, min((i + 1) * batch_size, n)
-            x_batch = x[istart:istop]
-            if isinstance(preprocess_fn, Callable):
-                x_batch = preprocess_fn(x_batch)
-            preds_array.append(model(x_batch.to(dtype=torch.float32)).cpu())
-
-    return torch.cat(preds_array, dim=0)
-
-
-def trainer(
+def train(
     model: torch.nn.Module,
     x_train: NDArray[Any],
     y_train: NDArray[Any] | None,
@@ -71,8 +23,8 @@ def trainer(
     preprocess_fn: Callable[[torch.Tensor], torch.Tensor] | None,
     epochs: int,
     batch_size: int,
-    device: torch.device,
-    verbose: bool,
+    device: DeviceLike | None = None,
+    verbose: bool = False,
 ) -> None:
     """
     Train Pytorch model.
@@ -114,7 +66,7 @@ def trainer(
         dataset = TensorDataset(torch.tensor(x_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.float32))
 
     loader = DataLoader(dataset=dataset, batch_size=batch_size)
-
+    device = get_device(device)
     model = model.to(device)
 
     # iterate over epochs
