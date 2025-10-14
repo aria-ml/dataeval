@@ -13,7 +13,7 @@ import pytest
 from sklearn.datasets import load_digits
 
 from dataeval.detectors.ood.ae import OOD_AE
-from dataeval.utils.torch.models import AE
+from dataeval.utils.torch.models import Autoencoder
 
 input_shape = (1, 8, 8)
 
@@ -35,7 +35,7 @@ def test_ae(ood_type, x_ref):
     threshold_perc = 90.0
 
     # init OutlierAE
-    ae = OOD_AE(AE(input_shape=input_shape))
+    ae = OOD_AE(Autoencoder(input_shape=input_shape))
 
     # fit OutlierAE, infer threshold and compute scores
     ae.fit(x_ref, threshold_perc=threshold_perc, epochs=1, verbose=True)
@@ -63,7 +63,7 @@ def test_ae(ood_type, x_ref):
 @patch("dataeval.detectors.ood.ae.OODBase.fit")
 def test_custom_loss_fn(mock_fit, x_ref):
     mock_loss_fn = MagicMock()
-    ae = OOD_AE(AE(input_shape=input_shape))
+    ae = OOD_AE(Autoencoder(input_shape=input_shape))
     ae.fit(x_ref, 0.0, mock_loss_fn)
     assert isinstance(mock_fit.call_args_list[0][0][2], MagicMock)
 
@@ -72,6 +72,6 @@ def test_custom_loss_fn(mock_fit, x_ref):
 @patch("dataeval.detectors.ood.ae.OODBase.fit")
 def test_custom_optimizer(mock_fit, x_ref):
     mock_opt = MagicMock()
-    ae = OOD_AE(AE(input_shape=input_shape))
+    ae = OOD_AE(Autoencoder(input_shape=input_shape))
     ae.fit(x_ref, 0.0, None, mock_opt)
     assert isinstance(mock_fit.call_args_list[0][0][3], MagicMock)

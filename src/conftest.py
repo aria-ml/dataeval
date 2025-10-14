@@ -16,7 +16,6 @@ from dataeval.config import set_seed
 from dataeval.data._metadata import FactorInfo, Metadata
 from dataeval.metrics.stats import hashstats, pixelstats
 from dataeval.outputs._ood import OODOutput
-from dataeval.utils.torch.models import Autoencoder
 
 # Manually add the import path for test_drift_uncertainty
 sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute() / "tests" / "detectors"))
@@ -82,7 +81,7 @@ def get_object_detection_target(idx: int, det_data_mm: MagicMock) -> MagicMock:
 
 class ClassificationModel(PtModel):
     def __init__(self) -> None:
-        super().__init__(16, 3, True)
+        super().__init__(16, 3, softmax=True, dropout=False)
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -162,7 +161,6 @@ def doctest_detectors_ood_drift(doctest_namespace: dict[str, Any]) -> None:
 
     doctest_namespace["train_images"] = train_images
     doctest_namespace["test_images"] = test_images
-    doctest_namespace["encoder"] = Autoencoder(1).encoder
 
 
 @pytest.fixture(autouse=True, scope="session")

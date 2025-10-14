@@ -42,10 +42,10 @@ class OOD_AE(OODBase):
     -------
     Perform out-of-distribution detection on test data.
 
-    >>> from dataeval.utils.torch.models import AE
+    >>> from dataeval.utils.torch.models import Autoencoder
 
     >>> input_shape = train_images[0].shape
-    >>> ood = OOD_AE(AE(input_shape))
+    >>> ood = OOD_AE(Autoencoder(input_shape))
 
     Train the autoencoder using the training data.
 

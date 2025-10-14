@@ -152,7 +152,7 @@ class DriftUncertainty(BaseDrift):
     Drift detected: True
 
     >>> print(f"Mean uncertainty change: {result.distance:.2f}")
-    Mean uncertainty change: 0.96
+    Mean uncertainty change: 0.98
 
     With data preprocessing
 

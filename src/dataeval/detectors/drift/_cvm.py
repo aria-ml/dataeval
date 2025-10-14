@@ -59,6 +59,9 @@ class DriftCVM(BaseDriftUnivariate):
     Basic drift detection with image embeddings
 
     >>> from dataeval.data import Embeddings
+    >>> from dataeval.utils.torch.models import Encoder
+
+    >>> encoder = Encoder(train_images[0].shape, 128)
     >>> train_emb = Embeddings(train_images, model=encoder, batch_size=64)
     >>> drift_detector = DriftCVM(train_emb)
 
@@ -70,7 +73,7 @@ class DriftCVM(BaseDriftUnivariate):
     Drift detected: True
 
     >>> print(f"Mean CVM statistic: {result.distance:.4f}")
-    Mean CVM statistic: 24.1325
+    Mean CVM statistic: 24.1273
 
     Using different correction methods
 
@@ -81,7 +84,7 @@ class DriftCVM(BaseDriftUnivariate):
 
     >>> n_features = result.feature_drift
     >>> print(f"Features showing drift: {n_features.sum()} / {len(n_features)}")
-    Features showing drift: 576 / 576
+    Features showing drift: 128 / 128
     """
 
     def __init__(
