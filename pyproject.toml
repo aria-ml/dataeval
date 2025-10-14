@@ -119,6 +119,7 @@ docs = [
   "jupyter-cache>=1.0",
   "maite-datasets>=0.0.2",
   "myst-nb>=1.0",
+  "plotly>=6.2.0",
   "sphinx-autoapi>=3.6.0",
   "sphinx-design>=0.6.1",
   "sphinx-immaterial>=0.12.5",

@@ -116,6 +116,25 @@ def doctest(session: nox.Session) -> None:
 @nox_uv.session(uv_groups=["docs"], uv_extras=["matplotlib"])
 def docs(session: nox.Session) -> None:
     """Generate documentation. Clear the jupyter cache by calling `nox -e docs -- clean`."""
+    if {"chart", "charts"} | set(session.posargs):
+        try:
+            session.run(
+                "python",
+                "docs/generate_charts.py",
+                "--data-file",
+                "docs/charts.json",
+                "--output-dir",
+                "docs/source/_static/charts",
+                "--include-js",
+                "cdn",
+                "--quiet",  # Suppress verbose output in automated builds
+                external=False,  # Run with session's Python environment
+            )
+            session.log("✅ Charts generated successfully")
+        except Exception as e:
+            session.warn(f"⚠️  Chart generation failed: {e}")
+            session.log("Continuing with documentation build...")
+
     session.chdir("docs/source")
     session.run("rm", "-rf", "../../output/docs", external=True)
     if "clean" in session.posargs:

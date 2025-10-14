@@ -258,3 +258,98 @@ In regards to the per-channel plot, the only insight is that there
 is very little difference across the channels for each metric.
 Therefore, there are no additional concerns beyond those from the
 `imagestats` plot.
+
+## Performance Overview
+
+The following performance data was collected using both small images
+(CIFAR-10, 3x32x32) and medium images (VOCDetection2012, ~3x375x500)
+across different computational configurations.
+
+### Metrics Included
+
+- **dimensionstats**: Image dimension analysis
+- **hashstats**: Hash-based similarity detection
+- **visualstats**: Visual properties analysis (brightness, contrast, etc.)
+- **pixelstats**: Pixel-level statistical analysis (mean, std, histograms)
+- **imagestats**: Comprehensive image statistics (combined metrics)
+- **imagestats (per channel)**: Per-channel analysis with additional overhead
+
+## Small Images Performance (CIFAR-10)
+
+The following chart shows execution times for processing CIFAR-10 images with 16
+processes across different dataset sizes (10K, 30K, 50K images).
+
+```{raw} html
+:file: ../_static/charts/small_images_16_processes.html
+```
+
+Key observations:
+
+- Excellent linear scaling with image count for most metrics
+- **dimensionstats** and **hashstats** show the best performance and efficiency
+- **visualstats** provides good performance for comprehensive visual analysis
+- **pixelstats** has moderate computational cost for detailed pixel analysis
+- **imagestats (per channel)** shows expected overhead for per-channel breakdowns
+
+## Medium Images Performance (VOC Detection 2012)
+
+Performance characteristics change significantly with larger images, as shown
+below for VOCDetection (2012) dataset processing (1K, 3K, 5K images).
+
+```{raw} html
+:file: ../_static/charts/medium_images_16_processes.html
+```
+
+Notable differences:
+
+- **pixelstats** shows higher computational cost with larger images due to
+  increased pixel data
+- **hashstats** and **dimensionstats** remain relatively efficient regardless of
+  image size
+- **imagestats (per channel)** demonstrates significant overhead scaling with
+  image complexity
+- **visualstats** maintains good performance characteristics across image sizes
+
+## Process Scaling Analysis
+
+### Small Images Process Scaling
+
+```{raw} html
+:file: ../_static/charts/small_images_process_scaling.html
+```
+
+### Medium Images Process Scaling
+
+```{raw} html
+:file: ../_static/charts/medium_images_process_scaling.html
+```
+
+## Performance Recommendations
+
+Based on the benchmark results:
+
+1. **For fast dataset profiling**: Use **dimensionstats** and **hashstats** for
+   rapid analysis
+2. **For visual quality assessment**: **visualstats** provides good
+   performance-to-insight ratio
+3. **For detailed analysis**: **pixelstats** offers comprehensive metrics with
+   moderate overhead
+4. **For complete analysis**: Combined metrics offer an efficient approach
+5. **Memory-constrained environments**: Avoid per-channel analysis for large datasets
+6. **Process scaling**: Multi-processing provides optimal performance for most workloads
+
+## Key Performance Insights
+
+- **Diminishing returns**: Increasing process count offers diminishing returns
+- **Metric selection**: Choose the minimal set of metrics needed for your analysis
+- **Per-channel overhead**: Only use when channel-specific insights are required
+- **Linear scaling**: All metrics scale linearly with count, size and processes
+
+## Technical Notes
+
+- Benchmarks conducted using multiprocessing with shared memory optimization
+- Times measured include I/O overhead and result aggregation
+- Process scaling shows diminishing returns beyond optimal core count
+- Memory usage scales proportionally with per-channel analysis depth
+- Tests performed on an Intel Core i9-14900HX w/ 64GB DDR5 on Windows 11/Ubuntu
+  22.04 (WSL2) with dataset loaded on local storage
