@@ -1,6 +1,14 @@
-[//]: # (568800104eca54ec07c374b7d7594942ae07a433)
+[//]: # (51da23012b2c933581478acf2536e1550f7c8eb8)
 
 # DataEval Change Log
+
+## v0.92.3
+
+🛠️ **Improvements and Enhancements**
+- `bf50c042` - Remove Embeddings from input parameters and replace with Array
+
+📝 **Miscellaneous**
+- `369fcb22` - Additional clarifications to Embeddings concept page
 
 ## v0.92.2
 
