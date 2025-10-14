@@ -20,6 +20,7 @@ from dataeval.typing import (
     Array,
     DatumMetadata,
     ObjectDetectionTarget,
+    _1DArray,
 )
 from dataeval.utils._array import as_numpy
 from dataeval.utils._merge import merge
@@ -606,7 +607,7 @@ class Metadata:
         self._factors.update(factor_info)
         self._is_binned = True
 
-    def add_factors(self, factors: Mapping[str, Array | Sequence[Any]]) -> None:
+    def add_factors(self, factors: Mapping[str, _1DArray[Any]]) -> None:
         """Add additional factors to metadata collection.
 
         Extend the current metadata with new factors, automatically handling
@@ -614,7 +615,7 @@ class Metadata:
 
         Parameters
         ----------
-        factors : Mapping[str, Array | Sequence[Any]]
+        factors : Mapping[str, _1DArray[Any]]
             Dictionary mapping factor names to their values. Factor length must
             match either the number of images or number of detections in the dataset.
 

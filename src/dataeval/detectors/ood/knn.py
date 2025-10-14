@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 from numpy.typing import NDArray
@@ -31,9 +31,12 @@ class OOD_KNN(EmbeddingBasedOODBase):
         """
         Initialize KNN OOD detector.
 
-        Args:
-            k: Number of nearest neighbors to consider (default: 10)
-            distance_metric: Distance metric to use ('cosine' or 'euclidean')
+        Parameters
+        ----------
+        k : int, default 10
+            Number of nearest neighbors to consider
+        distance_metric : "cosine", "euclidean", default "cosine"
+            Distance metric to use
         """
         super().__init__()
         self.k = k
@@ -41,16 +44,19 @@ class OOD_KNN(EmbeddingBasedOODBase):
         self._nn_model: NearestNeighbors
         self.reference_embeddings: NDArray[np.float32]
 
-    def fit_embeddings(self, embeddings: Array, threshold_perc: float = 95.0) -> None:
+    def fit_embeddings(self, embeddings: Array[Any], threshold_perc: float = 95.0) -> None:
         """
         Fit the detector using reference (in-distribution) embeddings.
 
         Builds a k-NN index for efficient nearest neighbor search and
         computes reference scores for automatic thresholding.
 
-        Args:
-            embeddings: Reference embeddings from in-distribution data
-            threshold_perc: Percentage of reference data considered normal
+        Parameters
+        ----------
+        embeddings : Array
+            Reference (in-distribution) embeddings
+        threshold_perc : float, default 95.0
+            Percentage of reference data considered normal
         """
         self.reference_embeddings = np.asarray(embeddings, dtype=np.float32)
 

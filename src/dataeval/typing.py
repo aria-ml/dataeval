@@ -21,7 +21,7 @@ __all__ = [
 ]
 
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from typing import (
     Any,
     Generic,
@@ -34,6 +34,7 @@ from typing import (
 
 import numpy.typing
 import torch
+from numpy.typing import NDArray
 from typing_extensions import NotRequired, ReadOnly, Required
 
 ArrayLike: TypeAlias = numpy.typing.ArrayLike
@@ -45,7 +46,6 @@ See Also
 `NumPy ArrayLike <https://numpy.org/doc/stable/reference/typing.html#numpy.typing.ArrayLike>`_
 """
 
-
 DeviceLike: TypeAlias = int | str | tuple[str, int] | torch.device
 """
 Type alias for a `Union` representing types that specify a torch.device.
@@ -55,9 +55,11 @@ See Also
 `torch.device <https://pytorch.org/docs/stable/tensor_attributes.html#torch.device>`_
 """
 
+DType = TypeVar("DType", covariant=True)
+
 
 @runtime_checkable
-class Array(Protocol):
+class Array(Protocol[DType]):
     """
     Protocol for array objects providing interoperability with DataEval.
 
@@ -86,11 +88,19 @@ class Array(Protocol):
 
     @property
     def shape(self) -> tuple[int, ...]: ...
-    def __array__(self) -> Any: ...
+    def __array__(self) -> NDArray[Any]: ...
     def __getitem__(self, key: Any, /) -> Any: ...
     def __iter__(self) -> Iterator[Any]: ...
     def __len__(self) -> int: ...
 
+
+_1DArray: TypeAlias = Sequence[DType] | Array[DType]
+_2DArray: TypeAlias = Sequence[Sequence[DType]] | Array[DType]
+_3DArray: TypeAlias = Sequence[Sequence[Sequence[DType]]] | Array[DType]
+_4DArray: TypeAlias = Sequence[Sequence[Sequence[Sequence[DType]]]] | Array[DType]
+_5DArray: TypeAlias = Sequence[Sequence[Sequence[Sequence[Sequence[DType]]]]] | Array[DType]
+_6DArray: TypeAlias = Sequence[Sequence[Sequence[Sequence[Sequence[Sequence[DType]]]]]] | Array[DType]
+_NDArray: TypeAlias = _1DArray | _2DArray | _3DArray | _4DArray | _5DArray | _6DArray
 
 _T = TypeVar("_T")
 _T_co = TypeVar("_T_co", covariant=True)
