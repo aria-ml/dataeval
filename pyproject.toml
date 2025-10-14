@@ -235,7 +235,6 @@ exclude_also = [
 ]
 include = ["*/src/dataeval/*"]
 omit = [
-  "*/torch/_blocks.py",
   "*/_numba.py",
 ]
 fail_under = 90
