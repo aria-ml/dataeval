@@ -93,10 +93,10 @@ class DriftMMD(BaseDrift):
 
     def __init__(
         self,
-        data: Array,
+        data: Array[Any],
         p_val: float = 0.05,
         update_strategy: UpdateStrategy | None = None,
-        sigma: Array | None = None,
+        sigma: Array[Any] | None = None,
         n_permutations: int = 100,
         device: DeviceLike | None = None,
     ) -> None:
@@ -124,7 +124,7 @@ class DriftMMD(BaseDrift):
         k_yy = self._kernel(y, y)
         return torch.cat([torch.cat([k_xx, k_xy], 1), torch.cat([k_xy.T, k_yy], 1)], 0)
 
-    def score(self, data: Array) -> tuple[float, float, float]:
+    def score(self, data: Array[Any]) -> tuple[float, float, float]:
         """
         Compute the :term:`p-value<P-Value>` resulting from a permutation test using the maximum mean
         discrepancy as a distance measure between the reference data and the data to

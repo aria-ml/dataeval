@@ -46,7 +46,7 @@ class _TorchDatasetWrapper(torch.utils.data.Dataset[torch.Tensor]):
         return image
 
 
-class Embeddings(Array):
+class Embeddings(Array[torch.Tensor]):
     """
     Collection of image embeddings from a dataset.
 
@@ -153,7 +153,7 @@ class Embeddings(Array):
             self._shape = tuple([len(self)] + [*embedding_shape])
         return self._shape
 
-    def __array__(self, dtype: Any = None, copy: Any = None) -> Any:
+    def __array__(self, dtype: Any = None, copy: Any = None) -> NDArray[Any]:
         return self.to_numpy().astype(dtype=dtype, copy=bool(copy))
 
     def _hook_fn(self, _module: torch.nn.Module, inputs: tuple[torch.Tensor], output: torch.Tensor) -> None:

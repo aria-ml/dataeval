@@ -97,7 +97,7 @@ class BaseDrift:
 
     def __init__(
         self,
-        data: Array,
+        data: Array[Any],
         p_val: float = 0.05,
         update_strategy: UpdateStrategy | None = None,
         correction: Literal["bonferroni", "fdr"] = "bonferroni",
@@ -200,7 +200,7 @@ class BaseDriftUnivariate(BaseDrift):
 
     def __init__(
         self,
-        data: Array,
+        data: Array[Any],
         p_val: float = 0.05,
         update_strategy: UpdateStrategy | None = None,
         correction: Literal["bonferroni", "fdr"] = "bonferroni",
@@ -235,7 +235,7 @@ class BaseDriftUnivariate(BaseDrift):
 
         return self._n_features
 
-    def score(self, data: Array) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
+    def score(self, data: Array[Any]) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
         """Calculate feature-wise p-values and test statistics.
 
         Applies the detector's statistical test independently to each feature,
