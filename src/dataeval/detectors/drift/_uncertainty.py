@@ -70,7 +70,7 @@ def classifier_uncertainty(
     """
     preds_np = as_numpy(preds)
     if preds_type == "probs":
-        if np.abs(1 - np.sum(preds_np, axis=-1)).mean() > 1e-6:
+        if np.abs(1 - np.nan_to_num(np.nansum(preds_np, axis=-1))).mean() > 1e-6:
             raise ValueError("Probabilities across labels should sum to 1")
         probs = preds_np
     elif preds_type == "logits":
