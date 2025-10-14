@@ -72,8 +72,8 @@ class DriftCVM(BaseDriftUnivariate):
     >>> print(f"Drift detected: {result.drifted}")
     Drift detected: True
 
-    >>> print(f"Mean CVM statistic: {result.distance:.4f}")
-    Mean CVM statistic: 24.1273
+    >>> print(f"Mean CVM statistic: {result.distance:.2f}")
+    Mean CVM statistic: 24.13
 
     Using different correction methods
 

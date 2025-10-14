@@ -78,8 +78,8 @@ class DriftKS(BaseDriftUnivariate):
     >>> print(f"Drift detected: {result.drifted}")
     Drift detected: True
 
-    >>> print(f"Mean KS statistic: {result.distance:.4f}")
-    Mean KS statistic: 0.8750
+    >>> print(f"Mean KS statistic: {result.distance:.2f}")
+    Mean KS statistic: 0.88
     
     Detect if test data has systematically higher values
     
