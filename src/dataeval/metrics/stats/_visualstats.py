@@ -4,8 +4,8 @@ __all__ = []
 
 from typing import Any
 
-from dataeval.core._processor import process
-from dataeval.core.processors._visualstats import VisualStatsPerChannelProcessor, VisualStatsProcessor
+from dataeval.core._calculate import calculate
+from dataeval.core.flags import ImageStats
 from dataeval.metrics.stats._base import convert_output, unzip_dataset
 from dataeval.outputs import VisualStatsOutput
 from dataeval.outputs._base import set_metadata
@@ -55,6 +55,5 @@ def visualstats(
     >>> print(results.contrast)
     [2.04  1.331 1.261 1.279 1.253 1.268 1.265 1.263]
     """
-    processor = VisualStatsPerChannelProcessor if per_channel else VisualStatsProcessor
-    stats = process(*unzip_dataset(dataset, per_box), processor)
+    stats = calculate(*unzip_dataset(dataset, per_box), stats=ImageStats.VISUAL, per_channel=per_channel)
     return convert_output(VisualStatsOutput, stats)

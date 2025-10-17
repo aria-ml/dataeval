@@ -64,8 +64,8 @@ def diversity_simpson(
     num_bins : NDArray[np.intp]
         Number of bins with values for each factor
 
-    Note
-    ----
+    Notes
+    -----
     If there is only one category, the diversity index takes a value of 0.
 
     Returns

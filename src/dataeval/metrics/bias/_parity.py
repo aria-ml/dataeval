@@ -5,12 +5,15 @@ import warnings
 __all__ = []
 
 
+import numpy as np
+
 from dataeval.core._label_parity import label_parity as _label_parity
 from dataeval.core._parity import parity as _parity
 from dataeval.data import Metadata
 from dataeval.outputs import LabelParityOutput, ParityOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike
+from dataeval.utils._array import as_numpy
 
 
 @set_metadata
@@ -49,8 +52,8 @@ def label_parity(
         of unique classes between the observed and expected distributions.
 
 
-    Note
-    ----
+    Notes
+    -----
     - Providing ``num_classes`` can be helpful if there are classes with zero instances in one of the distributions.
     - The function first validates the observed distribution and normalizes the expected distribution so that it
       has the same total number of labels as the observed distribution.
@@ -70,7 +73,9 @@ def label_parity(
     >>> label_parity(expected_labels, observed_labels)
     LabelParityOutput(score=14.007374204742625, p_value=0.0072715574616218)
     """
-    return LabelParityOutput(*_label_parity(expected_labels, observed_labels, num_classes=num_classes))
+    exp_np = as_numpy(expected_labels).astype(np.intp)
+    obs_np = as_numpy(observed_labels).astype(np.intp)
+    return LabelParityOutput(*_label_parity(exp_np, obs_np, num_classes=num_classes))
 
 
 @set_metadata
@@ -102,8 +107,8 @@ def parity(metadata: Metadata) -> ParityOutput:
         lead to inaccurate chi-square calculations. It is recommended to ensure that each label co-occurs with
         factor values either 0 times or at least 5 times.
 
-    Note
-    ----
+    Notes
+    -----
     - A high score with a low p-value suggests that a metadata factor is strongly correlated with a class label.
     - The function creates a contingency matrix for each factor, where each entry represents the frequency of a
       specific factor value co-occurring with a particular class label.

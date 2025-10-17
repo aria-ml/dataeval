@@ -14,14 +14,13 @@ from numpy.typing import NDArray
 
 def divergence_mst(data: NDArray[np.float64], labels: NDArray[np.intp]) -> int:
     """
-    Counts the number of cross-label edges in the minimum spanning tree of
-    data.
+    Counts the number of cross-label edges in the minimum spanning tree of data.
 
     Parameters
     ----------
-    data : NDArray, shape - (N, ... )
+    data : NDArray[np.float64]
         Input images to be grouped
-    labels : NDArray
+    labels : NDArray[np.intp]
         Corresponding labels for each data point
 
     Returns
@@ -41,9 +40,9 @@ def divergence_fnn(data: NDArray[np.float64], labels: NDArray[np.intp]) -> int:
 
     Parameters
     ----------
-    data : NDArray, shape - (N, ... )
+    data : NDArray[np.float64]
         Input images to be grouped
-    labels : NDArray
+    labels : NDArray[np.intp]
         Corresponding labels for each data point
 
     Returns

@@ -120,8 +120,8 @@ def boxratiostats(
     --------
     dimensionstats, pixelstats, visualstats
 
-    Note
-    ----
+    Notes
+    -----
     DimensionStatsOutput values for channels, depth and distances are the original values
     provided by the box outputs
 

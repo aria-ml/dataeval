@@ -10,14 +10,14 @@ from numpy.typing import NDArray
 from dataeval.core._nullmodel import (
     BinaryClassMetricFunction,
     ConfusionMatrix,
-    estimate_accuracy,
-    estimate_false_positive_rate,
-    estimate_multiclass_accuracy,
-    estimate_precision,
-    estimate_true_positive_rate,
-    get_confusion_matrix,
-    reduce_macro,
-    reduce_micro,
+    _calculate_accuracy,
+    _calculate_fpr,
+    _calculate_multiclass_accuracy,
+    _calculate_precision,
+    _calculate_recall,
+    _reduce_macro,
+    _reduce_micro,
+    _to_confusion_matrix,
 )
 from dataeval.outputs._base import set_metadata
 from dataeval.outputs._estimators import NullModelMetrics, NullModelMetricsOutput
@@ -25,18 +25,18 @@ from dataeval.typing import ArrayLike
 from dataeval.utils._array import as_numpy
 
 BASE_METRICS: dict[str, BinaryClassMetricFunction] = {
-    "precision": estimate_precision,
-    "recall": estimate_true_positive_rate,
-    "false_positive_rate": estimate_false_positive_rate,
+    "precision": _calculate_precision,
+    "recall": _calculate_recall,
+    "false_positive_rate": _calculate_fpr,
 }
 
 BINARY_ONLY_METRICS: dict[str, BinaryClassMetricFunction] = {
-    "accuracy": estimate_accuracy,
+    "accuracy": _calculate_accuracy,
 }
 
 AVERAGES: dict[str, Callable[[BinaryClassMetricFunction, Sequence[ConfusionMatrix]], np.float64]] = {
-    "micro": reduce_micro,
-    "macro": reduce_macro,
+    "micro": _reduce_micro,
+    "macro": _reduce_macro,
 }
 
 
@@ -101,7 +101,7 @@ class NullModelMetricsCalculator:
         for class_idx in self.classes:
             pred_1vr = np.array([prediction_probs[class_idx], 1 - prediction_probs[class_idx]])
             test_1vr = np.array([self.test_probs[class_idx], 1 - self.test_probs[class_idx]])
-            confusion_matrices.append(get_confusion_matrix(test_1vr, pred_1vr))
+            confusion_matrices.append(_to_confusion_matrix(test_1vr, pred_1vr))
 
         # Calculate binary metrics
         metrics: dict[str, float] = {}
@@ -109,11 +109,11 @@ class NullModelMetricsCalculator:
 
         for metric_name, metric_fn in metric_map.items():
             for avg_name, avg_fn in AVERAGES.items():
-                metrics[f"{metric_name}_{avg_name}"] = avg_fn(metric_fn, confusion_matrices)
+                metrics[f"{metric_name}_{avg_name}"] = float(avg_fn(metric_fn, confusion_matrices))
 
         # Add multiclass specific metrics
         if self.is_multiclass:
-            metrics["multiclass_accuracy"] = estimate_multiclass_accuracy(self.test_probs, prediction_probs)
+            metrics["multiclass_accuracy"] = float(_calculate_multiclass_accuracy(self.test_probs, prediction_probs))
 
         return NullModelMetrics(**metrics)
 

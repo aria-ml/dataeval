@@ -27,7 +27,7 @@ def pchash(image: NDArray[Any]) -> str:
 
     Parameters
     ----------
-    image : NDArray[Any]
+    image : NDArray
         An image as a numpy array in CxHxW format
 
     Returns
@@ -39,7 +39,7 @@ def pchash(image: NDArray[Any]) -> str:
     # Verify that the image is at least larger than an 8x8 image
     min_dim = min(image.shape[-2:])
     if min_dim < HASH_SIZE + 1:
-        warnings.warn(f"Image must be larger than {HASH_SIZE}x{HASH_SIZE} for fuzzy hashing.")
+        warnings.warn(f"Image must be larger than {HASH_SIZE}x{HASH_SIZE} for perceptual hashing.")
         return ""
 
     # Calculates the dimensions of the resized square image
@@ -77,8 +77,8 @@ def xxhash(image: NDArray[Any]) -> str:
 
     Parameters
     ----------
-    image : NDArray[Any]
-        An image as a numpy array
+    image : NDArray
+        An image as a numpy array in CxHxW format
 
     Returns
     -------

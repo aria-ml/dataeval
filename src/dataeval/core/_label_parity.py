@@ -9,9 +9,6 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.stats import chisquare
 
-from dataeval.typing import ArrayLike
-from dataeval.utils._array import as_numpy
-
 
 def _normalize_expected_dist(expected_dist: NDArray[Any], observed_dist: NDArray[Any]) -> NDArray[Any]:
     """
@@ -37,8 +34,8 @@ def _normalize_expected_dist(expected_dist: NDArray[Any], observed_dist: NDArray
     ValueError
         If the expected distribution is all zeros.
 
-    Note
-    ----
+    Notes
+    -----
     The function ensures that the total number of labels in the expected distribution matches the total
     number of labels in the observed distribution by scaling the expected distribution.
     """
@@ -92,8 +89,8 @@ def _validate_dist(label_dist: NDArray[Any], label_name: str) -> None:
 
 
 def label_parity(
-    expected_labels: ArrayLike,
-    observed_labels: ArrayLike,
+    expected_labels: NDArray[np.intp],
+    observed_labels: NDArray[np.intp],
     *,
     num_classes: int | None = None,
 ) -> tuple[float, float]:
@@ -107,9 +104,9 @@ def label_parity(
 
     Parameters
     ----------
-    expected_labels : ArrayLike
+    expected_labels : NDArray[np.intp]
         List of class labels in the expected dataset
-    observed_labels : ArrayLike
+    observed_labels : NDArray[np.intp]
         List of class labels in the observed dataset
     num_classes : int or None, default None
         The number of unique classes in the datasets. If not provided, the function will infer it
@@ -127,8 +124,8 @@ def label_parity(
         of unique classes between the observed and expected distributions.
 
 
-    Note
-    ----
+    Notes
+    -----
     - Providing ``num_classes`` can be helpful if there are classes with zero instances in one of the distributions.
     - The function first validates the observed distribution and normalizes the expected distribution so that it
       has the same total number of labels as the observed distribution.
@@ -154,8 +151,8 @@ def label_parity(
         num_classes = 0
 
     # Calculate the class frequencies associated with the datasets
-    observed_dist = np.bincount(as_numpy(observed_labels), minlength=num_classes)
-    expected_dist = np.bincount(as_numpy(expected_labels), minlength=num_classes)
+    observed_dist = np.bincount(observed_labels, minlength=num_classes)
+    expected_dist = np.bincount(expected_labels, minlength=num_classes)
 
     # Validate
     _validate_dist(observed_dist, "observed")

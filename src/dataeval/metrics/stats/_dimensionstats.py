@@ -4,8 +4,8 @@ __all__ = []
 
 from typing import Any
 
-from dataeval.core._processor import process
-from dataeval.core.processors._dimensionstats import DimensionStatsProcessor
+from dataeval.core import calculate
+from dataeval.core.flags import ImageStats
 from dataeval.metrics.stats._base import convert_output, unzip_dataset
 from dataeval.outputs import DimensionStatsOutput
 from dataeval.outputs._base import set_metadata
@@ -52,5 +52,5 @@ def dimensionstats(
     >>> print(results.channels)
     [3 3 1 3 1 3 3 3]
     """
-    stats = process(*unzip_dataset(dataset, per_box), DimensionStatsProcessor)
+    stats = calculate(*unzip_dataset(dataset, per_box), stats=ImageStats.DIMENSION)
     return convert_output(DimensionStatsOutput, stats)

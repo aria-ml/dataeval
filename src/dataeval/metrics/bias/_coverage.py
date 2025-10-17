@@ -47,8 +47,8 @@ def coverage(
     ValueError
         If radius_type is unknown
 
-    Note
-    ----
+    Notes
+    -----
     Embeddings should be on the unit interval [0-1].
 
     Example
