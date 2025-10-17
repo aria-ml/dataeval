@@ -43,8 +43,8 @@ def divergence(emb_a: Array, emb_b: Array, method: Literal["FNN", "MST"] = "FNN"
     DivergenceOutput
         The divergence value (0.0..1.0) and the number of differing edges between the datasets
 
-    Note
-    ----
+    Notes
+    -----
     The divergence value indicates how similar the 2 datasets are
     with 0 indicating approximately identical data distributions.
 

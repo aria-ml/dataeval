@@ -391,8 +391,8 @@ def merge(
     dict[str, list[str]], Optional
         Dictionary containing dropped keys and reason(s) for dropping
 
-    Note
-    ----
+    Notes
+    -----
     Nested lists of values and inconsistent keys are dropped in the merged
     metadata dictionary
 

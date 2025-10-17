@@ -14,7 +14,7 @@ class TestParity:
     def test_basic_functionality(self):
         """Test basic parity calculation with valid inputs."""
         binned_data = np.array([[0, 1], [1, 0], [0, 1], [1, 0]], dtype=np.intp)
-        class_labels = [0, 0, 1, 1]
+        class_labels = np.array([0, 0, 1, 1], dtype=np.intp)
 
         chi_scores, p_values = parity(binned_data, class_labels)
 
@@ -28,7 +28,7 @@ class TestParity:
     def test_single_factor(self):
         """Test with single factor column."""
         binned_data = np.array([[0], [1], [0], [1]], dtype=np.intp)
-        class_labels = [0, 0, 1, 1]
+        class_labels = np.array([0, 0, 1, 1], dtype=np.intp)
 
         chi_scores, p_values = parity(binned_data, class_labels)
 
@@ -39,7 +39,7 @@ class TestParity:
         """Test with perfectly correlated factor and labels."""
         data = [0] * 5 + [1] * 5
         binned_data = np.array([data], dtype=np.intp).T
-        class_labels = data
+        class_labels = np.array(data, dtype=np.intp)
 
         chi_scores, p_values = parity(binned_data, class_labels)
 
@@ -49,7 +49,7 @@ class TestParity:
     def test_no_correlation(self):
         """Test with uncorrelated factor and labels."""
         binned_data = np.array([[0], [0], [0], [0]], dtype=np.intp)
-        class_labels = [0, 0, 1, 1]
+        class_labels = np.array([0, 0, 1, 1], dtype=np.intp)
 
         chi_scores, p_values = parity(binned_data, class_labels)
 
@@ -59,7 +59,7 @@ class TestParity:
     def test_return_insufficient_data_false(self):
         """Test return type when return_insufficient_data=False."""
         binned_data = np.array([[0], [1]], dtype=np.intp)
-        class_labels = [0, 1]
+        class_labels = np.array([0, 1], dtype=np.intp)
 
         result = parity(binned_data, class_labels, return_insufficient_data=False)
 
@@ -70,7 +70,7 @@ class TestParity:
     def test_return_insufficient_data_true(self):
         """Test return type when return_insufficient_data=True."""
         binned_data = np.array([[0], [1]], dtype=np.intp)
-        class_labels = [0, 1]
+        class_labels = np.array([0, 1], dtype=np.intp)
 
         result = parity(binned_data, class_labels, return_insufficient_data=True)
 
@@ -83,7 +83,7 @@ class TestParity:
     def test_insufficient_data_detection(self):
         """Test detection of cells with counts < 5."""
         binned_data = np.array([[0], [1], [0]], dtype=np.intp)
-        class_labels = [0, 1, 0]
+        class_labels = np.array([0, 1, 0], dtype=np.intp)
 
         _, _, insufficient_data = parity(binned_data, class_labels, return_insufficient_data=True)
 
@@ -93,7 +93,7 @@ class TestParity:
     def test_multiple_factors(self):
         """Test with multiple factors."""
         binned_data = np.array([[0, 0, 1], [1, 1, 0], [0, 1, 1], [1, 0, 0]], dtype=np.intp)
-        class_labels = [0, 1, 0, 1]
+        class_labels = np.array([0, 1, 0, 1], dtype=np.intp)
 
         chi_scores, p_values = parity(binned_data, class_labels)
 
@@ -104,7 +104,7 @@ class TestParity:
         """Test that zero-only rows are properly handled."""
         # Create data where one factor value never appears
         binned_data = np.array([[0], [0], [0], [0]], dtype=np.intp)
-        class_labels = [0, 0, 1, 1]
+        class_labels = np.array([0, 0, 1, 1], dtype=np.intp)
 
         chi_scores, p_values = parity(binned_data, class_labels)
 
@@ -115,7 +115,7 @@ class TestParity:
     def test_single_class(self):
         """Test with only one class label."""
         binned_data = np.array([[0], [1], [0], [1]], dtype=np.intp)
-        class_labels = [0, 0, 0, 0]
+        class_labels = np.array([0, 0, 0, 0], dtype=np.intp)
 
         chi_scores, p_values = parity(binned_data, class_labels)
 
@@ -125,7 +125,7 @@ class TestParity:
     def test_empty_arrays(self):
         """Test behavior with empty arrays."""
         binned_data = np.array([], dtype=np.intp).reshape(0, 1)
-        class_labels = []
+        class_labels = np.array([], dtype=np.intp)
 
         with pytest.raises((ValueError, IndexError)):
             parity(binned_data, class_labels)
@@ -133,7 +133,7 @@ class TestParity:
     def test_mismatched_lengths(self):
         """Test error handling for mismatched input lengths."""
         binned_data = np.array([[0], [1]], dtype=np.intp)
-        class_labels = [0, 1, 2]  # Different length
+        class_labels = np.array([0, 1, 2], dtype=np.intp)  # Different length
 
         with pytest.raises((ValueError, IndexError)):
             parity(binned_data, class_labels)
@@ -141,7 +141,7 @@ class TestParity:
     def test_large_factor_values(self):
         """Test with large factor values."""
         binned_data = np.array([[100], [200], [100], [200]], dtype=np.intp)
-        class_labels = [0, 1, 0, 1]
+        class_labels = np.array([0, 1, 0, 1], dtype=np.intp)
 
         chi_scores, p_values = parity(binned_data, class_labels)
 
@@ -151,7 +151,7 @@ class TestParity:
     def test_dtype_consistency(self):
         """Test that output arrays have correct dtypes."""
         binned_data = np.array([[0], [1]], dtype=np.intp)
-        class_labels = [0, 1]
+        class_labels = np.array([0, 1], dtype=np.intp)
 
         chi_scores, p_values = parity(binned_data, class_labels)
 
@@ -163,13 +163,13 @@ class TestParity:
         binned_data = np.array([[0], [1]], dtype=np.intp)
 
         # Test with list
-        chi1, p1 = parity(binned_data, [0, 1])
+        chi1, p1 = parity(binned_data, [0, 1])  # type: ignore
 
         # Test with tuple
-        chi2, p2 = parity(binned_data, (0, 1))
+        chi2, p2 = parity(binned_data, (0, 1))  # type: ignore
 
         # Test with numpy array
-        chi3, p3 = parity(binned_data, np.array([0, 1]))  # type: ignore
+        chi3, p3 = parity(binned_data, np.array([0, 1]))
 
         assert_array_almost_equal(chi1, chi2)
         assert_array_almost_equal(chi2, chi3)

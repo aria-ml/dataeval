@@ -277,8 +277,8 @@ class HashStatsOutput(BaseStatsOutput):
         """
         Returns a polars dataframe for the xxhash and pchash attributes of each sample
 
-        Note
-        ----
+        Notes
+        -----
         xxhash and pchash do not follow the normal definition of factors but are
         helpful attributes of the data
 

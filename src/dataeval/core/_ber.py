@@ -10,7 +10,36 @@ from scipy.stats import mode
 from dataeval.config import EPSILON
 
 
-def ber_mst(data: NDArray[np.float64], labels: NDArray[np.intp], k: int = 1) -> tuple[float, float]:
+def ber_mst(data: NDArray[np.float64], labels: NDArray[np.intp]) -> tuple[float, float]:
+    """
+    An estimator for Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` \
+    using FR with a minimum spanning tree (MST) test statistic basis.
+
+    Parameters
+    ----------
+    data : NDArray[np.float64]
+        Array of image :term:`embeddings<Embeddings>`
+    labels : NDArray[np.intp]
+        Array of labels for each image
+
+    Returns
+    -------
+    tuple[float, float]
+        The upper and lower bounds, respectively, of the Bayes Error Rate
+
+    References
+    ----------
+    [1] `Learning to Bound the Multi-class Bayes Error (Th. 3 and Th. 4) <https://arxiv.org/abs/1811.06419>`_
+
+    Examples
+    --------
+    >>> import sklearn.datasets as dsets
+    >>> from dataeval.core._ber import ber_mst
+
+    >>> images, labels = dsets.make_blobs(n_samples=50, centers=2, n_features=2, random_state=0)
+    >>> ber_mst(images, labels)
+    (0.04, 0.020416847668728033)
+    """
     from dataeval.core._mst import minimum_spanning_tree
 
     M, N = _get_classes_counts(labels)
@@ -18,16 +47,47 @@ def ber_mst(data: NDArray[np.float64], labels: NDArray[np.intp], k: int = 1) -> 
     rows, cols = minimum_spanning_tree(data)  # get rows and cols directly
     mismatches = np.sum(labels[rows] != labels[cols])
     deltas = mismatches / (2 * N)
-    upper = 2 * deltas
-    lower = ((M - 1) / (M)) * (1 - max(1 - 2 * ((M) / (M - 1)) * deltas, 0) ** 0.5)
+    upper = float(2 * deltas)
+    lower = float(((M - 1) / (M)) * (1 - max(1 - 2 * ((M) / (M - 1)) * deltas, 0) ** 0.5))
     return upper, lower
 
 
-def ber_knn(images: NDArray[np.float64], labels: NDArray[np.intp], k: int) -> tuple[float, float]:
+def ber_knn(data: NDArray[np.float64], labels: NDArray[np.intp], k: int) -> tuple[float, float]:
+    """
+    An estimator for Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` \
+    using KNN test statistic basis.
+
+    Parameters
+    ----------
+    data : NDArray[np.float64]
+        Array of image :term:`embeddings<Embeddings>`
+    labels : NDArray[np.intp]
+        Array of labels for each image
+    k : int
+        Number of nearest neighbors for KNN estimator
+
+    Returns
+    -------
+    tuple[float, float]
+        The upper and lower bounds, respectively, of the Bayes Error Rate
+
+    References
+    ----------
+    [1] `Learning to Bound the Multi-class Bayes Error (Th. 3 and Th. 4) <https://arxiv.org/abs/1811.06419>`_
+
+    Examples
+    --------
+    >>> import sklearn.datasets as dsets
+    >>> from dataeval.core._ber import ber_knn
+
+    >>> images, labels = dsets.make_blobs(n_samples=50, centers=2, n_features=2, random_state=0)
+    >>> ber_knn(images, labels, 1)
+    (0.04, 0.020416847668728033)
+    """
     from dataeval.core._mst import compute_neighbors
 
     M, N = _get_classes_counts(labels)
-    nn_indices = compute_neighbors(images, images, k=k)
+    nn_indices = compute_neighbors(data, data, k=k)
     nn_indices = np.expand_dims(nn_indices, axis=1) if nn_indices.ndim == 1 else nn_indices
     modal_class = mode(labels[nn_indices], axis=1, keepdims=True).mode.squeeze()
     upper = float(np.count_nonzero(modal_class - labels) / N)
@@ -52,7 +112,7 @@ def _knn_lowerbound(value: float, classes: int, k: int) -> float:
         # k == 2:
         return value / 2
 
-    return ((classes - 1) / classes) * (1 - np.sqrt(max(0, 1 - ((classes / (classes - 1)) * value))))
+    return float(((classes - 1) / classes) * (1 - np.sqrt(max(0, 1 - ((classes / (classes - 1)) * value)))))
 
 
 def _get_classes_counts(labels: NDArray[np.intp]) -> tuple[int, int]:

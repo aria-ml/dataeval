@@ -45,8 +45,8 @@ def diversity(
         Diversity index per column of self.data or each factor in self.names and
         classwise diversity [n_class x n_factor]
 
-    Note
-    ----
+    Notes
+    -----
     - The expression is undefined for q=1, but it approaches the Shannon entropy in the limit.
     - If there is only one category, the diversity index takes a value of 0.
 

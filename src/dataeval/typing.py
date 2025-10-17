@@ -6,6 +6,8 @@ __all__ = [
     "AnnotatedDataset",
     "Array",
     "ArrayLike",
+    "ClusterData",
+    "CondensedTree",
     "Dataset",
     "DatasetMetadata",
     "DeviceLike",
@@ -22,9 +24,11 @@ __all__ = [
 
 
 from collections.abc import Iterator, Sequence
+from dataclasses import dataclass
 from typing import (
     Any,
     Generic,
+    NamedTuple,
     Protocol,
     TypeAlias,
     TypedDict,
@@ -32,12 +36,12 @@ from typing import (
     runtime_checkable,
 )
 
-import numpy.typing
+import numpy as np
 import torch
 from numpy.typing import NDArray
 from typing_extensions import NotRequired, ReadOnly, Required
 
-ArrayLike: TypeAlias = numpy.typing.ArrayLike
+ArrayLike: TypeAlias = np.typing.ArrayLike
 """
 Type alias for a `Union` representing objects that can be coerced into an array.
 
@@ -342,3 +346,56 @@ class Transform(Generic[_T], Protocol):
 @runtime_checkable
 class Action(Generic[_T_cn, _T_co], Protocol):
     def __call__(self, evaluator: _T_cn) -> _T_co: ...
+
+
+# ========== DATA CLASSES ==========
+
+
+class CondensedTree(NamedTuple):
+    """
+    Derived from fast_hdbscan.cluster_trees.CondensedTree
+
+    Attributes
+    ----------
+    parent : NDArray[np.int64]
+    child : NDArray[np.int64]
+    lambda_val : NDArray[np.float32]
+    child_size : NDArray[np.float32]
+    """
+
+    parent: NDArray[np.int64]
+    child: NDArray[np.int64]
+    lambda_val: NDArray[np.float32]
+    child_size: NDArray[np.float32]
+
+
+@dataclass
+class ClusterData:
+    """
+    Output class for :func:`.cluster`.
+
+    Attributes
+    ----------
+    clusters : NDArray[np.intp]
+        Assigned clusters
+    mst : NDArray[np.float32]
+        The minimum spanning tree of the data
+    linkage_tree : NDArray[np.float32]
+        The linkage array of the data
+    condensed_tree : CondensedTree
+        The condensed tree of the data
+    membership_strengths : NDArray[np.float32]
+        The strength of the data point belonging to the assigned cluster
+    k_neighbors : NDArray[np.int32]
+        Indices of the nearest points in the population matrix.
+    k_distances : NDArray[np.float32]
+        Array representing the lengths to points.
+    """
+
+    clusters: NDArray[np.intp]
+    mst: NDArray[np.float32]
+    linkage_tree: NDArray[np.float32]
+    condensed_tree: CondensedTree
+    membership_strengths: NDArray[np.float32]
+    k_neighbors: NDArray[np.int32]
+    k_distances: NDArray[np.float32]

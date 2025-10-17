@@ -3,9 +3,9 @@ from __future__ import annotations
 __all__ = []
 
 import warnings
-from abc import abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Sized
 from dataclasses import dataclass
+from enum import Flag
 from functools import cached_property, partial
 from itertools import zip_longest
 from typing import Any
@@ -13,7 +13,11 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+# Import calculators to trigger auto-registration
+import dataeval.core._calculators._imagestats  # noqa: F401
 from dataeval.config import get_max_processes
+from dataeval.core._calculators._registry import CalculatorRegistry
+from dataeval.core.flags import ImageStats, resolve_dependencies
 from dataeval.outputs._stats import SourceIndex
 from dataeval.typing import ArrayLike
 from dataeval.utils._boundingbox import BoundingBox, BoxLike
@@ -23,7 +27,7 @@ from dataeval.utils._tqdm import tqdm
 
 
 @dataclass
-class ProcessorResult:
+class CalculatorResult:
     """Result from processing a single image/box combination."""
 
     source_indices: list[SourceIndex]
@@ -31,27 +35,33 @@ class ProcessorResult:
 
 
 @dataclass
-class ProcessorOutput:
+class CalculatorOutput:
     """Output from processing multiple images."""
 
-    results: list[ProcessorResult]
+    results: list[CalculatorResult]
     object_count: int
     invalid_box_count: int
     warnings_list: list[str]
 
 
-class BaseProcessor:
-    def __init__(self, image: NDArray[Any], box: BoundingBox | None) -> None:
-        self.raw = image
-        self.width: int = image.shape[-1]
-        self.height: int = image.shape[-2]
-        self.shape: tuple[int, ...] = image.shape
+class CalculatorCache:
+    """
+    A calculator cache for a single datum (image, text, etc.).
+
+    Provides preprocessing and cached transformations of the raw datum.
+    This class adapts based on the data type passed in.
+    """
+
+    def __init__(self, datum: Any, box: BoundingBox | None = None, per_channel: bool = False) -> None:
+        self.raw = datum
+        # Assume image data for now (will be generic in future)
+        self.width: int = datum.shape[-1]
+        self.height: int = datum.shape[-2]
+        self.shape: tuple[int, ...] = datum.shape
+        self.per_channel_mode = per_channel
 
         # Ensure bounding box
-        self.box = BoundingBox(0, 0, self.width, self.height, image_shape=image.shape) if box is None else box
-
-    @abstractmethod
-    def process(self) -> dict[str, list[Any]]: ...
+        self.box = BoundingBox(0, 0, self.width, self.height, image_shape=datum.shape) if box is None else box
 
     @cached_property
     def image(self) -> NDArray[Any]:
@@ -66,24 +76,28 @@ class BaseProcessor:
         return self.scaled.reshape(self.image.shape[0], -1)
 
 
-def _collect_processor_stats(
-    processors: Iterable[type[BaseProcessor]], image: NDArray[Any], box: BoundingBox | None
+def _collect_calculator_stats(
+    calculators: Iterable[tuple[type[Any], Flag]],
+    datum: NDArray[Any],
+    box: BoundingBox | None,
+    per_channel: bool,
 ) -> list[dict[str, list[Any]]]:
-    """Collect stats from all processors."""
+    """Collect stats from all calculators."""
     stats_list = []
-    for p in processors:
-        processor = p(image, box)
-        stats_list.append(processor.process())
-        del processor
+    processor = CalculatorCache(datum, box, per_channel)
+    for calculator_cls, flags in calculators:
+        calculator = calculator_cls(datum, processor, per_channel)
+        stats_list.append(calculator.compute(flags))
+        del calculator
     return stats_list
 
 
-def _determine_channel_indices(processor_stats: list[dict[str, list[Any]]], num_channels: int) -> list[int | None]:
+def _determine_channel_indices(calculator_output: list[dict[str, list[Any]]], num_channels: int) -> list[int | None]:
     """Determine what channel indices are needed based on processor outputs."""
     channel_indices_needed: set[int | None] = set()
 
-    for stats in processor_stats:
-        first_stat_values = next(iter(stats.values()))
+    for output in calculator_output:
+        first_stat_values = next(iter(output.values()))
         num_elements = len(first_stat_values)
 
         if num_elements == 1:
@@ -104,17 +118,17 @@ def _determine_channel_indices(processor_stats: list[dict[str, list[Any]]], num_
 
 
 def _reconcile_stats(
-    processor_stats: list[dict[str, list[Any]]], sorted_channels: list[int | None]
+    calculator_output: list[dict[str, list[Any]]], sorted_channels: list[int | None]
 ) -> dict[str, list[Any]]:
     """Reconcile stats from different processors into a unified structure."""
     num_entries = len(sorted_channels)
     reconciled_stats: dict[str, list[Any]] = {}
 
-    for stats in processor_stats:
-        first_stat_values = next(iter(stats.values()))
+    for output in calculator_output:
+        first_stat_values = next(iter(output.values()))
         num_elements = len(first_stat_values)
 
-        for stat_name, stat_values in stats.items():
+        for stat_name, stat_values in output.items():
             if stat_name not in reconciled_stats:
                 reconciled_stats[stat_name] = [None] * num_entries
 
@@ -131,50 +145,52 @@ def _reconcile_stats(
     return reconciled_stats
 
 
-def _process_single(
+def _calculate_datum(
     i: int,
-    image: NDArray[Any],
+    datum: NDArray[Any],
     boxes: list[BoundingBox] | None,
-    processors: Iterable[type[BaseProcessor]],
-) -> ProcessorOutput:
-    results: list[ProcessorResult] = []
+    calculators: Iterable[tuple[type[Any], Flag]],
+    per_channel: bool,
+) -> CalculatorOutput:
+    results: list[CalculatorResult] = []
     box_count = 0
     invalid_box_count = 0
     warnings_list: list[str] = []
 
-    # Determine the number of channels from the image shape
-    num_channels = image.shape[-3] if len(image.shape) >= 3 else 1
+    # Determine the number of channels from the datum shape
+    num_channels = datum.shape[-3] if len(datum.shape) >= 3 else 1
 
     for i_b, box in [(None, None)] if boxes is None else enumerate(boxes):
         if box is not None:
             box_count += 1
             if not box.is_clippable():
                 invalid_box_count += 1
-                warnings_list.append(f"Bounding box [{i}][{i_b}]: {box} for image shape {image.shape} is invalid.")
+                warnings_list.append(f"Bounding box [{i}][{i_b}]: {box} for datum shape {datum.shape} is invalid.")
 
-        # Collect stats from all processors
-        processor_stats = _collect_processor_stats(processors, image, box)
+        # Collect stats from all calculators
+        calculator_stats = _collect_calculator_stats(calculators, datum, box, per_channel)
 
         # Determine what channel indices are needed
-        sorted_channels = _determine_channel_indices(processor_stats, num_channels)
+        sorted_channels = _determine_channel_indices(calculator_stats, num_channels)
 
         # Reconcile stats into unified structure
-        reconciled_stats = _reconcile_stats(processor_stats, sorted_channels)
+        reconciled_stats = _reconcile_stats(calculator_stats, sorted_channels)
 
         # Build index lists
         channel_indices = sorted_channels
         source = [SourceIndex(i, i_b if box is not None else None, c) for c in channel_indices]
 
-        results.append(ProcessorResult(source_indices=source, stats=reconciled_stats))
+        results.append(CalculatorResult(source_indices=source, stats=reconciled_stats))
 
-    return ProcessorOutput(results, box_count, invalid_box_count, warnings_list)
+    return CalculatorOutput(results, box_count, invalid_box_count, warnings_list)
 
 
 def _unpack(
     args: tuple[int, NDArray[Any], list[BoundingBox] | None],
-    processors: Iterable[type[BaseProcessor]],
-) -> ProcessorOutput:
-    return _process_single(*args, processors)
+    calculators: Iterable[tuple[type[Any], Flag]],
+    per_channel: bool,
+) -> CalculatorOutput:
+    return _calculate_datum(*args, calculators, per_channel)
 
 
 def _enumerate(
@@ -216,7 +232,7 @@ def _sort(
 
 
 def _aggregate(
-    result: ProcessorOutput,
+    result: CalculatorOutput,
     source_indices: list[SourceIndex],
     aggregated_stats: dict[str, list[Any]],
     object_count: dict[int, int],
@@ -237,11 +253,12 @@ def _aggregate(
     warning_list.extend(result.warnings_list)
 
 
-def process(
+def calculate(
     images: Iterable[ArrayLike],
     boxes: Iterable[Iterable[BoxLike] | None] | None,
-    processors: type[BaseProcessor] | Iterable[type[BaseProcessor]],
+    stats: Flag = ImageStats.ALL,
     *,
+    per_channel: bool = False,
     progress_callback: Callable[[int, int | None], None] | None = None,
 ) -> dict[str, Any]:
     """
@@ -249,13 +266,16 @@ def process(
 
     Parameters
     ----------
-    images : Iterable[NDArray[Any]]
+    images : Iterable[ArrayLike]
         An iterable of images to compute statistics on.
     boxes : Iterable[Iterable[BoxLike] | None] | None
         Optional bounding boxes for each image. If None, processes entire images.
-    processors : Iterable[type[BaseProcessor]]
-        An iterable of processor classes that calculate statistics.
-    progress_callback: Callable[[int, int | None], None] | None
+    stats : ImageStats, default ImageStats.ALL
+        Flags indicating which statistics to compute. Can combine multiple flags
+        using bitwise OR (|). Dependencies are resolved automatically.
+    per_channel : bool, default False
+        If True, compute per-channel statistics where applicable.
+    progress_callback : Callable[[int, int | None], None] | None
         Optional callback for progress updates.
 
     Returns
@@ -263,15 +283,29 @@ def process(
     dict[str, Any]
         Dictionary containing computed statistics and metadata including:
         - Individual statistics as computed by processors
-        - 'image_index': List of image indices
-        - 'box_index': List of box indices (None for full images)
-        - 'channel_index': List of channel indices (None for single-channel stats)
+        - 'source_index': List of SourceIndex objects with image/box/channel info
         - 'object_count': List of object counts per image
         - 'invalid_box_count': List of invalid box counts per image
         - 'image_count': Total number of images processed
 
         Output is sorted by (image_index, box_index, channel_index) ascending,
         with None values appearing before 0.
+
+    Examples
+    --------
+    Compute all statistics:
+
+    >>> from dataeval.core.flags import ImageStats
+    >>> stats = calculate(images, boxes)
+
+    Compute specific statistics:
+
+    >>> stats = calculate(images, boxes, stats=ImageStats.PIXEL_MEAN | ImageStats.VISUAL_BRIGHTNESS)
+
+    Use convenience groups:
+
+    >>> stats = calculate(images, boxes, stats=ImageStats.PIXEL | ImageStats.VISUAL)
+    >>> stats = calculate(images, boxes, stats=ImageStats.PIXEL_BASIC, per_channel=True)
     """
     source_indices: list[SourceIndex] = []
     aggregated_stats: dict[str, list[Any]] = {}
@@ -280,17 +314,26 @@ def process(
     image_count: int = 0
     warning_list: list[str] = []
 
-    processors = processors if isinstance(processors, Iterable) else (processors,)
+    # Resolve dependencies
+    stats = resolve_dependencies(stats)
+
+    # Get calculators from registry based on flags
+    calculators = CalculatorRegistry.get_calculators(stats)
+
     total_images = len(images) if isinstance(images, Sized) else None
+
+    # Build description for progress bar
+    calculator_names = [c[0].__name__.removesuffix("Calculator") for c in calculators]
+    desc = f"Processing images for {', '.join(calculator_names)}"
 
     with PoolWrapper(processes=get_max_processes()) as p:
         for result in tqdm(
             p.imap_unordered(
-                partial(_unpack, processors=processors),
+                partial(_unpack, calculators=calculators, per_channel=per_channel),
                 _enumerate(images, boxes),
             ),
             total=total_images,
-            desc=f"Processing images for {', '.join([p.__name__.removesuffix('Processor') for p in processors])}",
+            desc=desc,
         ):
             _aggregate(result, source_indices, aggregated_stats, object_count, invalid_box_count, warning_list)
             image_count += 1

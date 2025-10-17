@@ -32,8 +32,8 @@ def _calc_median_deviations(reference: NDArray, test: NDArray) -> NDArray:
     NDArray
         Scaled positive and negative deviations of the test data from the reference.
 
-    Note
-    ----
+    Notes
+    -----
     All return values are in the range [0, pos_inf]
     """
 
@@ -176,8 +176,8 @@ def find_ood_predictors(
     out of distribution. In other words, it finds which metadata factors most likely correlate to an
     out of distribution sample.
 
-    Note
-    ----
+    Notes
+    -----
     A high mutual information between a factor and ood samples is an indication of correlation, but not causation.
     Additional analysis should be done to determine how to handle factors with a high mutual information.
 

@@ -698,8 +698,8 @@ class Metadata:
         Earth mover's distance
         Kolmogorov-Smirnov two-sample test
 
-        Note
-        ----
+        Notes
+        -----
         This function only applies to the continuous data
 
         Examples
