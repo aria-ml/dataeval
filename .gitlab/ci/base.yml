@@ -190,12 +190,11 @@ stages:
   rules:
     - if: $CREATE_NEW_RELEASE
 
-.rules_docs_except_main_cache_update:
+.rules_docs_nightly_cache_update:
   rules:
     - if: $CREATE_NEW_RELEASE
       when: never
-    - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE == $UPDATE_CACHE_MESSAGE
-      when: never
+    - if: $CI_COMMIT_BRANCH == 'main' && $DOCS_NIGHTLY
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
       changes:
         paths:
@@ -203,4 +202,3 @@ stages:
           - docs/**/*
           - uv.lock
           - '*.md'
-    - if: $CI_COMMIT_BRANCH == 'main'

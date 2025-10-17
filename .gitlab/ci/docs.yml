@@ -51,7 +51,7 @@ markdownlint:
 
 update cache:
   stage: docs
-  extends: .rules_docs_except_main_cache_update
+  extends: .rules_docs_nightly_cache_update
   needs:
     - job: docs
       artifacts: true
