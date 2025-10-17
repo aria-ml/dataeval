@@ -11,7 +11,7 @@ from __future__ import annotations
 __all__ = []
 
 from collections.abc import Sequence
-from typing import Any, Literal, cast
+from typing import Literal, cast
 
 import numpy as np
 import torch
@@ -181,7 +181,7 @@ class DriftUncertainty(BaseDrift):
 
     def __init__(
         self,
-        data: Array[Any],
+        data: Array,
         model: torch.nn.Module,
         p_val: float = 0.05,
         update_strategy: UpdateStrategy | None = None,
@@ -217,7 +217,7 @@ class DriftUncertainty(BaseDrift):
         preds = predict(x, self.model, self.device, self.batch_size, self._transform)
         return classifier_uncertainty(preds, self.preds_type)
 
-    def predict(self, x: Array[Any]) -> DriftOutput:
+    def predict(self, x: Array) -> DriftOutput:
         """Predict whether model uncertainty distribution has drifted.
 
         Computes prediction uncertainties for the input data and tests

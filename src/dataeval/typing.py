@@ -55,11 +55,9 @@ See Also
 `torch.device <https://pytorch.org/docs/stable/tensor_attributes.html#torch.device>`_
 """
 
-DType = TypeVar("DType", covariant=True)
-
 
 @runtime_checkable
-class Array(Protocol[DType]):
+class Array(Protocol):
     """
     Protocol for array objects providing interoperability with DataEval.
 
@@ -94,12 +92,16 @@ class Array(Protocol[DType]):
     def __len__(self) -> int: ...
 
 
-_1DArray: TypeAlias = Sequence[DType] | Array[DType]
-_2DArray: TypeAlias = Sequence[Sequence[DType]] | Array[DType]
-_3DArray: TypeAlias = Sequence[Sequence[Sequence[DType]]] | Array[DType]
-_4DArray: TypeAlias = Sequence[Sequence[Sequence[Sequence[DType]]]] | Array[DType]
-_5DArray: TypeAlias = Sequence[Sequence[Sequence[Sequence[Sequence[DType]]]]] | Array[DType]
-_6DArray: TypeAlias = Sequence[Sequence[Sequence[Sequence[Sequence[Sequence[DType]]]]]] | Array[DType]
+# Generic Type Alias Syntax only available in Python 3.12+
+# type _1DArray[DType] = Sequence[DType] | Array
+
+DType = TypeVar("DType", covariant=True)
+_1DArray: TypeAlias = Sequence[DType] | Array
+_2DArray: TypeAlias = Sequence[Sequence[DType]] | Array
+_3DArray: TypeAlias = Sequence[Sequence[Sequence[DType]]] | Array
+_4DArray: TypeAlias = Sequence[Sequence[Sequence[Sequence[DType]]]] | Array
+_5DArray: TypeAlias = Sequence[Sequence[Sequence[Sequence[Sequence[DType]]]]] | Array
+_6DArray: TypeAlias = Sequence[Sequence[Sequence[Sequence[Sequence[Sequence[DType]]]]]] | Array
 _NDArray: TypeAlias = _1DArray | _2DArray | _3DArray | _4DArray | _5DArray | _6DArray
 
 _T = TypeVar("_T")
