@@ -85,6 +85,12 @@ class ClassificationModel(PtModel):
 
 
 @pytest.fixture(autouse=True, scope="session")
+def add_tmp_path(doctest_namespace: dict[str, Any], tmp_path_factory: pytest.TempPathFactory) -> None:
+    tmp_path = tmp_path_factory.mktemp("dataeval_doctest")
+    doctest_namespace["tmp_path"] = tmp_path
+
+
+@pytest.fixture(autouse=True, scope="session")
 def add_all(doctest_namespace: dict[str, Any]) -> None:
     doctest_namespace["np"] = np
     doctest_namespace["generate_random_metadata"] = generate_random_metadata

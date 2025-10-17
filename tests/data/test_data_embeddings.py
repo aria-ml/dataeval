@@ -148,10 +148,10 @@ class TestEmbeddings:
         assert len(em) == len(ds)
 
         for i in range(len(ds)):
-            assert torch.allclose(em[i], data[i])
+            np.testing.assert_allclose(em[i], data[i])
 
         for idx, e in enumerate(em):
-            torch.allclose(ds[idx][0], e)
+            np.testing.assert_allclose(ds[idx][0], e)
 
     def test_embeddings(self):
         embs = Embeddings(get_dataset(), 10, model=torch.nn.Identity(), transforms=lambda x: x + 1)
@@ -161,65 +161,15 @@ class TestEmbeddings:
         assert isinstance(embs_tt, torch.Tensor)
         assert len(embs_tt) == len(embs)
 
-        embs_np = embs.to_numpy()
+        embs_np = np.asarray(embs)
         assert isinstance(embs_np, np.ndarray)
         assert len(embs_np) == len(embs)
 
         for emb in embs:
-            assert np.array_equal(emb.cpu().numpy(), np.ones((3, 16, 16)))
+            assert np.array_equal(emb, np.ones((3, 16, 16)))
 
         with pytest.raises(TypeError):
             embs["string"]  # type: ignore
-
-    def test_embeddings_cache(self):
-        mock_dataset = MagicMock()
-        mock_dataset.__len__.return_value = 10
-        mock_dataset.__getitem__.side_effect = lambda _: (np.zeros((3, 16, 16)), [], {})
-
-        embs = Embeddings(mock_dataset, 10, model=torch.nn.Identity(), transforms=lambda x: x + 1, cache=True)
-        assert not embs._embeddings.shape
-
-        # instantiate mixed embeddings
-        part1 = embs[0:4]
-        assert isinstance(part1, torch.Tensor)
-        assert part1.shape == (4, 3, 16, 16)
-
-        assert isinstance(embs._embeddings, torch.Tensor)
-        assert len(embs._embeddings) == 10
-        assert embs._cached_idx == {0, 1, 2, 3}
-        assert np.array_equal(embs._embeddings[0:4], np.ones((4, 3, 16, 16)))
-
-        # zero out remaining uninitialized embeddings
-        embs._embeddings[4:10] = 0
-
-        part2 = embs[2:7]
-        assert isinstance(part2, torch.Tensor)
-        assert part2.shape == (5, 3, 16, 16)
-        assert np.array_equal(embs._embeddings[2:7], np.ones((5, 3, 16, 16)))
-        assert embs._cached_idx == {0, 1, 2, 3, 4, 5, 6}
-
-        part3 = embs[9]
-        assert isinstance(part3, torch.Tensor)
-        assert part3.shape == (3, 16, 16)
-        assert np.array_equal(embs._embeddings[9], np.ones((3, 16, 16)))
-        assert embs._cached_idx == {0, 1, 2, 3, 4, 5, 6, 9}
-
-        assert np.array_equal(embs._embeddings[7:9], np.zeros((2, 3, 16, 16)))
-
-    def test_embeddings_cache_hit(self):
-        mock_dataset = MagicMock()
-        mock_dataset.__len__.return_value = 10
-        mock_dataset.__getitem__.side_effect = lambda _: (np.zeros((3, 16, 16)), [], {})
-
-        embs = Embeddings(mock_dataset, 10, model=torch.nn.Identity(), transforms=lambda x: x + 1, cache=True)
-        t1 = embs.to_tensor()
-        assert isinstance(t1, torch.Tensor)
-        assert len(t1) == 10
-        assert np.array_equal(t1, np.ones((10, 3, 16, 16)))
-
-        embs._embeddings[0:10] = 0
-        t2 = embs.to_tensor()
-        assert np.array_equal(t2, np.zeros((10, 3, 16, 16)))
 
     def test_embeddings_from_array(self):
         arr = np.array([[1, 2], [3, 4], [5, 6]])
@@ -234,79 +184,6 @@ class TestEmbeddings:
         with pytest.raises(ValueError):
             embs[0]
 
-    def test_embeddings_set_cache_bool(self, torch_ic_ds):
-        embs = Embeddings(torch_ic_ds, batch_size=64, model=IdentityModel(), device="cpu", cache=True)
-        embs[:2]
-        assert len(embs._cached_idx) == 2
-        embs.cache = False
-        embs[:2]
-        assert len(embs._cached_idx) == 0
-        embs.cache = True
-        embs[:2]
-        assert len(embs._cached_idx) == 2
-
-    def test_embeddings_set_cache_path(self, torch_ic_ds, tmp_path):
-        embs = Embeddings(torch_ic_ds, batch_size=64, model=IdentityModel(), device="cpu")
-        embs[:2]
-        assert len(embs._cached_idx) == 0
-        file = tmp_path / "test.pt"
-        embs.cache = file
-        embs[:2]
-        assert file.exists()
-        assert len(embs._cached_idx) == 2
-        path = tmp_path
-        embs.cache = str(path)
-        embs[:2]
-        assert (path / f"emb-{hash(embs)}.pt").exists()
-        assert len(embs._cached_idx) == 2
-
-    def test_embeddings_cache_embeddings_only_to_disk(self, tmp_path):
-        arr = np.array([[1, 2], [3, 4], [5, 6]])
-        embs = Embeddings.from_array(arr)
-        embs.cache = tmp_path
-        assert hash(embs)
-        assert (tmp_path / f"emb-{hash(embs)}.pt").exists()
-
-    def test_embeddings_cache_to_disk(self, torch_ic_ds, tmp_path):
-        original = Embeddings(torch_ic_ds, batch_size=64, model=IdentityModel(), device="cpu", cache=tmp_path)
-        original_values = original.to_numpy()
-        digest = hash(original)
-        file = tmp_path / f"emb-{digest}.pt"
-        assert file.exists()
-
-        from_file = Embeddings.load(file)
-        assert np.array_equal(original_values, from_file.to_numpy())
-
-    def test_embeddings_partial_cache_to_disk(self, torch_ic_ds, tmp_path):
-        original = Embeddings(torch_ic_ds, batch_size=64, model=IdentityModel(), device="cpu", cache=tmp_path)
-        original_values = original[:5].numpy()
-        digest = hash(original)
-        file = tmp_path / f"emb-{digest}.pt"
-        assert file.exists()
-
-        from_file = Embeddings.load(file)
-        assert np.array_equal(original_values, from_file[:5].numpy())
-        with pytest.raises(ValueError):
-            from_file[5:]
-        with pytest.raises(ValueError):
-            from_file.to_tensor()
-
-    def test_embeddings_save_and_load(self, torch_ic_ds, tmp_path):
-        original = Embeddings(torch_ic_ds, batch_size=64, model=IdentityModel(), device="cpu")
-        file = tmp_path / "file.pt"
-        original.save(file)
-        assert file.exists()
-        original_values = original.to_numpy()
-        from_file = Embeddings.load(file)
-        assert np.array_equal(original_values, from_file.to_numpy())
-
-    def test_embeddings_load_file_not_found(self, tmp_path):
-        bad_file = tmp_path / "non_existant.pt"
-        with pytest.raises(FileNotFoundError):
-            Embeddings.load(bad_file)
-        with pytest.raises(FileNotFoundError):
-            Embeddings.load(str(bad_file))
-
     def test_embeddings_new(self, torch_ic_ds):
         embs = Embeddings(torch_ic_ds, batch_size=64, model=IdentityModel(), device="cpu", transforms=lambda x: x + 1)
         mini_ds = TorchDataset(torch.ones((5, 1, 3, 3)), torch.nn.functional.one_hot(torch.arange(5)))
@@ -318,20 +195,13 @@ class TestEmbeddings:
         assert mini_embs._transforms == embs._transforms
         assert mini_embs._model == embs._model
 
-    @patch("dataeval.data._embeddings.torch.load", side_effect=OSError())
-    def test_embeddings_load_failure(self, tmp_path):
-        test_path = tmp_path / "mock.pt"
-        test_path.touch()
-        with pytest.raises(OSError):
-            Embeddings.load(tmp_path)
-
     def test_embeddings_new_embeddings_only_raises(self):
         arr = np.array([[1, 2], [3, 4], [5, 6]])
         embs = Embeddings.from_array(arr)
         with pytest.raises(ValueError):
             embs.new([])
 
-    @patch("dataeval.data._embeddings.torch.save", side_effect=OSError())
+    @patch("dataeval.data._embeddings.np.save", side_effect=OSError())
     def test_embeddings_save_failure(self, tmp_path):
         arr = np.array([[1, 2], [3, 4], [5, 6]])
         embs = Embeddings.from_array(arr)
@@ -348,7 +218,7 @@ class TestEmbeddings:
 
         # The flatten layer should output a 1D tensor with 36 elements (4 channels * 3*3 spatial)
         assert result.shape == (36,)
-        assert isinstance(result, torch.Tensor)
+        assert isinstance(result, np.ndarray)
 
     def test_embeddings_layer_name_not_found(self, torch_ic_ds, sequential_model):
         """Test that layer_name raises ValueError when layer doesn't exist"""
@@ -370,7 +240,7 @@ class TestEmbeddings:
         assert normal_result.shape != layer_result.shape
         assert normal_result.shape == (10,)  # Final linear layer output
         assert layer_result.shape == (36,)  # Flatten layer output
-        assert not torch.allclose(normal_result, layer_result[:10])  # Different values
+        assert not np.allclose(normal_result, layer_result[:10])  # Different values
 
     def test_embeddings_use_output_parameter(self, torch_ic_ds, sequential_model):
         """Test that use_output parameter correctly captures input vs output of layer"""
@@ -393,7 +263,7 @@ class TestEmbeddings:
         assert input_result.shape == (4, 3, 3)
 
         # Verify they contain the same data, just in different shapes
-        assert torch.allclose(output_result, input_result.flatten())
+        assert np.allclose(output_result, input_result.flatten())
 
     def test_hook_fn_captures_output(self, torch_ic_ds, sequential_model):
         """Test that _hook_fn correctly captures output when use_output=True"""
@@ -476,7 +346,7 @@ class TestEmbeddings:
 
         # Should be output of final linear layer
         assert result.shape == (2, 5)
-        assert isinstance(result, torch.Tensor)
+        assert isinstance(result, np.ndarray)
 
     def test_encode_with_layer_name(self, torch_ic_ds, sequential_model):
         """Test that _encode returns hooked output when layer_name is set"""
@@ -492,7 +362,7 @@ class TestEmbeddings:
 
         # Should be output of flatten layer (layer "2"), not final linear layer
         assert result.shape == (2, 36)  # Flattened: 4 channels * 3 * 3
-        assert isinstance(result, torch.Tensor)
+        assert isinstance(result, np.ndarray)
 
         # Verify captured_output was populated
         assert embs.captured_output is not None
@@ -593,3 +463,176 @@ class TestEmbeddings:
             )
 
             assert "Capturing" not in caplog.text
+
+    def test_empty_dataset_shape(self):
+        """Test that shape property handles empty dataset (line 149)"""
+        empty_ds = MockDataset([], [], [])
+        embs = Embeddings(empty_ds, batch_size=1, model=IdentityModel(), device="cpu")
+
+        # Shape should be (0,) for empty dataset
+        assert embs.shape == (0,)
+
+    def test_hash_embeddings_only(self):
+        """Test __hash__ for embeddings-only instance (lines 225-227)"""
+        arr = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+        embs = Embeddings.from_array(arr)
+
+        # Should hash based on embeddings array data
+        hash1 = hash(embs)
+        assert isinstance(hash1, int)
+
+        # Same data should give same hash
+        embs2 = Embeddings.from_array(arr.copy())
+        hash2 = hash(embs2)
+        assert hash1 == hash2
+
+        # Different data should give different hash
+        arr_different = np.array([[7.0, 8.0], [9.0, 10.0], [11.0, 12.0]])
+        embs3 = Embeddings.from_array(arr_different)
+        hash3 = hash(embs3)
+        assert hash1 != hash3
+
+    def test_hash_with_dataset_model_transforms(self, torch_ic_ds):
+        """Test __hash__ for regular embeddings with dataset, model, and transforms (lines 228-231)"""
+        model = IdentityModel()
+
+        def transform(x):
+            return x + 1
+
+        embs = Embeddings(torch_ic_ds, batch_size=64, model=model, transforms=transform, device="cpu")
+
+        # Should hash based on dataset, model, and transforms
+        hash1 = hash(embs)
+        assert isinstance(hash1, int)
+
+        # Same configuration should give same hash
+        embs2 = Embeddings(torch_ic_ds, batch_size=64, model=model, transforms=transform, device="cpu")
+        hash2 = hash(embs2)
+        assert hash1 == hash2
+
+    def test_hash_different_transforms(self, torch_ic_ds):
+        """Test __hash__ with different transforms produces different hash"""
+        model = IdentityModel()
+
+        embs1 = Embeddings(torch_ic_ds, batch_size=64, model=model, transforms=lambda x: x + 1, device="cpu")
+        embs2 = Embeddings(torch_ic_ds, batch_size=64, model=model, transforms=lambda x: x + 2, device="cpu")
+
+        hash1 = hash(embs1)
+        hash2 = hash(embs2)
+
+        # Different transforms should produce different hashes
+        assert hash1 != hash2
+
+
+class TestPathProperty:
+    """Test suite for path property getter and setter"""
+
+    def test_path_getter(self, tmp_path):
+        """Test path property getter (line 237)"""
+        from pathlib import Path
+
+        path = tmp_path / "test_embeddings.npy"
+        ds = get_dataset(10)
+        embs = Embeddings(ds, batch_size=1, path=path, device="cpu")
+
+        # Path property should return the configured path
+        assert embs.path == path
+        assert isinstance(embs.path, Path)
+
+    def test_path_getter_none(self):
+        """Test path property getter when path is None"""
+        ds = get_dataset(10)
+        embs = Embeddings(ds, batch_size=1, path=None, device="cpu")
+
+        # Path property should return None
+        assert embs.path is None
+
+    def test_path_setter_none_converts_memmap_to_array(self, tmp_path):
+        """Test path setter with None converts memmap to in-memory array (lines 241-247)"""
+        path = tmp_path / "test.npy"
+        arr = np.random.randn(100, 128).astype(np.float32)
+        np.save(path, arr)
+
+        # Load as memmap
+        loaded = np.load(path, mmap_mode="r+")
+        embs = Embeddings.from_array(loaded)
+        assert isinstance(embs._embeddings, np.memmap)
+
+        # Set path to None
+        embs.path = None
+
+        # Should convert to regular array
+        assert not isinstance(embs._embeddings, np.memmap)
+        assert isinstance(embs._embeddings, np.ndarray)
+        assert embs._use_memmap is False
+        np.testing.assert_array_equal(embs._embeddings, arr)
+
+    def test_path_setter_new_path_saves_embeddings(self, tmp_path):
+        """Test path setter with new path saves current embeddings (lines 248-254)"""
+        old_path = tmp_path / "old.npy"
+        new_path = tmp_path / "new.npy"
+
+        # Create embeddings with old path and compute
+        ds = get_dataset(10)
+        embs = Embeddings(ds, batch_size=2, path=old_path, device="cpu")
+        embs.compute()
+
+        # Set new path
+        embs.path = new_path
+
+        # New path should be set and file should exist
+        assert embs.path == new_path
+        assert new_path.exists()
+
+    def test_path_setter_same_path_no_save(self, tmp_path):
+        """Test path setter with same path doesn't trigger save"""
+        path = tmp_path / "test.npy"
+
+        ds = get_dataset(10)
+        embs = Embeddings(ds, batch_size=2, path=path, device="cpu")
+
+        # Set same path (should be no-op)
+        embs.path = path
+
+        assert embs.path == path
+
+
+class TestResolvePath:
+    """Test suite for _resolve_path method"""
+
+    def test_resolve_path_string_to_path(self, tmp_path):
+        """Test _resolve_path converts string to absolute Path (line 257-258)"""
+        ds = get_dataset(10)
+        embs = Embeddings(ds, batch_size=1, device="cpu")
+
+        str_path = str(tmp_path / "test.npy")
+        resolved = embs._resolve_path(str_path)
+
+        assert isinstance(resolved, type(tmp_path))  # Path type
+        assert resolved.is_absolute()
+
+    def test_resolve_path_directory_adds_filename(self, tmp_path):
+        """Test _resolve_path adds filename for directory path (lines 259-260)"""
+        ds = TorchDataset(torch.ones((10, 1, 3, 3)), torch.nn.functional.one_hot(torch.arange(10)))
+        embs = Embeddings(ds, batch_size=1, device="cpu")
+
+        # Pass directory path
+        resolved = embs._resolve_path(tmp_path)
+
+        # Should add filename based on hash
+        assert resolved.parent == tmp_path
+        assert resolved.suffix == ".npy"
+        assert "emb-" in resolved.name
+
+    def test_resolve_path_no_suffix_adds_filename(self, tmp_path):
+        """Test _resolve_path adds filename for path without suffix (line 259-260)"""
+        ds = get_dataset(10)
+        embs = Embeddings(ds, batch_size=1, device="cpu")
+
+        path_no_suffix = tmp_path / "embeddings"
+        resolved = embs._resolve_path(path_no_suffix)
+
+        # Should add filename based on hash
+        assert resolved.parent == path_no_suffix
+        assert resolved.suffix == ".npy"
+        assert "emb-" in resolved.name
