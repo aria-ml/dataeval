@@ -77,20 +77,21 @@ class DriftMMD(BaseDrift):
 
     Example
     -------
-    >>> from dataeval.data import Embeddings
-    >>> from dataeval.utils.models import Encoder
+    Initialize with image embeddings
 
-    Use Embeddings to encode images before testing for drift
-
-    >>> encoder = Encoder(train_images[0].shape, 128)
-    >>> train_emb = Embeddings(train_images, model=encoder, batch_size=16)
+    >>> train_emb = np.ones((100, 128), dtype=np.float32)
     >>> drift = DriftMMD(train_emb)
 
     Test incoming images for drift
 
-    >>> test_emb = Embeddings(test_images, model=encoder, batch_size=16)
-    >>> drift.predict(test_emb).drifted
-    True
+    >>> test_emb = np.zeros((20, 128), dtype=np.float32)
+    >>> result = drift.predict(test_emb)
+
+    >>> print(f"Drift detected: {result.drifted}")
+    Drift detected: True
+
+    >>> print(f"Mean MMD statistic: {result.distance:.2f}")
+    Mean MMD statistic: 1.26
     """
 
     def __init__(

@@ -143,16 +143,18 @@ class DriftUncertainty(BaseDrift):
     Example
     -------
     >>> model = ClassificationModel()
-    >>> drift_detector = DriftUncertainty(x_ref, model=model, batch_size=16)
+    >>> train_images = np.ones((100, 16), dtype=np.float32)
+    >>> drift_detector = DriftUncertainty(train_images, model=model, batch_size=16)
 
     Verify reference images have not drifted
 
-    >>> result = drift_detector.predict(x_test)
+    >>> test_images = np.zeros((20, 16), dtype=np.float32)
+    >>> result = drift_detector.predict(test_images)
     >>> print(f"Drift detected: {result.drifted}")
     Drift detected: True
 
     >>> print(f"Mean uncertainty change: {result.distance:.2f}")
-    Mean uncertainty change: 0.98
+    Mean uncertainty change: 1.00
 
     With data preprocessing
 

@@ -149,21 +149,6 @@ def doctest_detectors_linters_outliers(doctest_namespace: dict[str, Any]) -> Non
 
 
 @pytest.fixture(autouse=True, scope="session")
-def doctest_detectors_ood_drift(doctest_namespace: dict[str, Any]) -> None:
-    train_images = np.zeros((50, 1, 16, 16), dtype=np.float32)
-    test_images = np.ones((8, 1, 16, 16), dtype=np.float32)
-    test_images[2] = 0
-
-    """dataeval.detectors.ood.OOD_AE"""
-    """dataeval.detectors.drift.DriftKS"""
-    """dataeval.detectors.drift.DriftCVM"""
-    """dataeval.detectors.drift.DriftMMD"""
-
-    doctest_namespace["train_images"] = train_images
-    doctest_namespace["test_images"] = test_images
-
-
-@pytest.fixture(autouse=True, scope="session")
 def doctest_detectors_drift_uncertainty(doctest_namespace: dict[str, Any]) -> None:
     x_ref = np.random.random((500, 16)).astype(np.float32)
     x_test = np.ones_like(x_ref)

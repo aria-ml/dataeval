@@ -58,22 +58,18 @@ class DriftCVM(BaseDriftUnivariate):
     -------
     Basic drift detection with image embeddings
 
-    >>> from dataeval.data import Embeddings
-    >>> from dataeval.utils.models import Encoder
-
-    >>> encoder = Encoder(train_images[0].shape, 128)
-    >>> train_emb = Embeddings(train_images, model=encoder, batch_size=64)
+    >>> train_emb = np.ones((100, 128), dtype=np.float32)
     >>> drift_detector = DriftCVM(train_emb)
 
     Test incoming images for distributional drift
 
-    >>> test_emb = Embeddings(test_images, model=encoder, batch_size=64)
+    >>> test_emb = np.zeros((20, 128), dtype=np.float32)
     >>> result = drift_detector.predict(test_emb)
     >>> print(f"Drift detected: {result.drifted}")
     Drift detected: True
 
     >>> print(f"Mean CVM statistic: {result.distance:.2f}")
-    Mean CVM statistic: 24.13
+    Mean CVM statistic: 40.33
 
     Using different correction methods
 
