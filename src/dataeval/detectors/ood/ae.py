@@ -44,6 +44,7 @@ class OOD_AE(OODBase):
 
     >>> from dataeval.utils.models import Autoencoder
 
+    >>> train_images = np.ones((50, 1, 16, 16), dtype=np.float32)
     >>> input_shape = train_images[0].shape
     >>> ood = OOD_AE(Autoencoder(input_shape))
 
@@ -53,6 +54,8 @@ class OOD_AE(OODBase):
 
     Test for out-of-distribution samples on the test data.
 
+    >>> test_images = np.zeros((8, 1, 16, 16), dtype=np.float32)
+    >>> test_images[2] = 1.0
     >>> output = ood.predict(test_images)
     >>> output.is_ood
     array([ True,  True, False,  True,  True,  True,  True,  True])
