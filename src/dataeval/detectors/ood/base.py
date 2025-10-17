@@ -121,7 +121,7 @@ class EmbeddingBasedOODBase(OODBaseMixin[Callable[[Any], Any]], ABC):
         return X.shape[1:], X.dtype.type
 
     @abstractmethod
-    def fit_embeddings(self, embeddings: Array[Any], threshold_perc: float = 95.0) -> None:
+    def fit_embeddings(self, embeddings: Array, threshold_perc: float = 95.0) -> None:
         """
         Fit using reference embeddings.
 

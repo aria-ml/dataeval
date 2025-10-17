@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Literal
 
 import numpy as np
 from numpy.typing import NDArray
@@ -44,7 +44,7 @@ class OOD_KNN(EmbeddingBasedOODBase):
         self._nn_model: NearestNeighbors
         self.reference_embeddings: NDArray[np.float32]
 
-    def fit_embeddings(self, embeddings: Array[Any], threshold_perc: float = 95.0) -> None:
+    def fit_embeddings(self, embeddings: Array, threshold_perc: float = 95.0) -> None:
         """
         Fit the detector using reference (in-distribution) embeddings.
 

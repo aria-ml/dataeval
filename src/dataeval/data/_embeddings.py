@@ -46,7 +46,7 @@ class _TorchDatasetWrapper(torch.utils.data.Dataset[torch.Tensor]):
         return image
 
 
-class Embeddings(Array[torch.Tensor]):
+class Embeddings(Array):
     """
     Collection of image embeddings from a dataset.
 
