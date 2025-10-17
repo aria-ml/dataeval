@@ -178,7 +178,7 @@ stages:
   rules:
     - if: $CREATE_NEW_RELEASE || $CI_COMMIT_BRANCH == 'main'
       when: never
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
 
 .rules_main_only:
   rules:

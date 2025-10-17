@@ -8,7 +8,6 @@ from ._bias import BalanceOutput, CompletenessOutput, CoverageOutput, DiversityO
 from ._drift import DriftMMDOutput, DriftMVDCOutput, DriftOutput
 from ._estimators import (
     BEROutput,
-    ClustererOutput,
     DivergenceOutput,
     NullModelMetrics,
     NullModelMetricsOutput,
@@ -32,7 +31,6 @@ from ._workflows import SufficiencyOutput
 __all__ = [
     "BEROutput",
     "BalanceOutput",
-    "ClustererOutput",
     "CoverageOutput",
     "CompletenessOutput",
     "DimensionStatsOutput",

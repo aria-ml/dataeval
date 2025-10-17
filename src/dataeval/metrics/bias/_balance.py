@@ -30,8 +30,8 @@ def balance(
         (num_factors+1) x (num_factors+1) estimate of mutual information \
             between num_factors metadata factors and class label. Symmetry is enforced.
 
-    Note
-    ----
+    Notes
+    -----
     We use `mutual_info_classif` from sklearn since class label is categorical.
     `mutual_info_classif` outputs are consistent up to O(1e-4) and depend on a random
     seed. MI is computed differently for categorical and continuous variables.

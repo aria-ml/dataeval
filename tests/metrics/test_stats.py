@@ -581,8 +581,8 @@ class TestStatsDataFormats:
         """
         Test for *StatsOutput class has unique 1-D attributes and no BaseStatsOutput attributes
 
-        Note
-        ----
+        Notes
+        -----
         2-D attributes like histogram are not expected
         """
 
@@ -602,8 +602,8 @@ class TestStatsDataFormats:
         Test for *StatsOutput class has unique 1-D attributes and no BaseStatsOutput attributes
         as columns in the dataframe
 
-        Note
-        ----
+        Notes
+        -----
         2-D attributes like histogram are not expected
         """
 

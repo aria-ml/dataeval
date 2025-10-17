@@ -234,6 +234,7 @@ def doctest_metrics_stats(doctest_namespace: dict[str, Any]) -> None:
     """dataeval.metrics.stats.pixelstats.pixelstats"""
     """dataeval.metrics.stats.visualstats.visualstats"""
     """dataeval.outputs._stats.HashStatsOutput"""
+    """dataeval.core.calculate"""
 
     index2label = dict(enumerate(classes))
     obj_det_dataset_mm = MagicMock(
@@ -262,6 +263,8 @@ def doctest_metrics_stats(doctest_namespace: dict[str, Any]) -> None:
 
     obj_det_dataset_mm.__getitem__.side_effect = _mock_getitem
     doctest_namespace["dataset"] = obj_det_dataset_mm
+    doctest_namespace["images"] = images
+    doctest_namespace["boxes"] = bboxes
 
 
 @pytest.fixture(autouse=True, scope="session")

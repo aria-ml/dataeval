@@ -4,8 +4,8 @@ __all__ = []
 
 from typing import Any
 
-from dataeval.core._processor import process
-from dataeval.core.processors._hashstats import HashStatsProcessor
+from dataeval.core._calculate import calculate
+from dataeval.core.flags import ImageStats
 from dataeval.metrics.stats._base import convert_output, unzip_dataset
 from dataeval.outputs import HashStatsOutput
 from dataeval.outputs._base import set_metadata
@@ -50,5 +50,5 @@ def hashstats(
     >>> print(results.pchash[:5])
     ['e666999999266666', 'e666999999266666', 'e666999966666299', 'e666999999266666', '96e91656e91616e9']
     """
-    stats = process(*unzip_dataset(dataset, per_box), HashStatsProcessor)
+    stats = calculate(*unzip_dataset(dataset, per_box), stats=ImageStats.HASH)
     return convert_output(HashStatsOutput, stats)

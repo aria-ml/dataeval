@@ -80,8 +80,8 @@ class Sufficiency(Generic[T]):
     -------
     Since each run is trained sequentially, increasing the parameter `runs` can significantly increase runtime.
 
-    Note
-    ----
+    Notes
+    -----
     Substeps is overridden by the parameter `eval_at` in :meth:`.Sufficiency.evaluate`
 
     """

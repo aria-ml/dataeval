@@ -8,11 +8,12 @@ from __future__ import annotations
 
 __all__ = []
 
+from sklearn.metrics import average_precision_score
 
-from dataeval.core._uap import uap as _uap
 from dataeval.outputs import UAPOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.typing import ArrayLike
+from dataeval.utils._array import as_numpy
 
 
 @set_metadata
@@ -24,7 +25,7 @@ def uap(labels: ArrayLike, scores: ArrayLike) -> UAPOutput:
     Parameters
     ----------
     labels : ArrayLike
-        A term:`NumPy` array of n_samples of class labels with M unique classes.
+        A 2D array of n_samples of class labels with M unique classes.
     scores : ArrayLike
         A 2D array of class probabilities per image
 
@@ -38,8 +39,8 @@ def uap(labels: ArrayLike, scores: ArrayLike) -> UAPOutput:
     ValueError
         If unique classes M < 2
 
-    Note
-    ----
+    Notes
+    -----
     This function calculates the empirical mean precision using the
     ``average_precision_score`` from scikit-learn, weighted by the class distribution.
 
@@ -65,4 +66,5 @@ def uap(labels: ArrayLike, scores: ArrayLike) -> UAPOutput:
     UAPOutput(uap=0.7777777777777777)
     """
 
-    return UAPOutput(_uap(labels, scores))
+    avg_precision = float(average_precision_score(as_numpy(labels), as_numpy(scores), average="weighted"))
+    return UAPOutput(avg_precision)

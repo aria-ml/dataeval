@@ -4,8 +4,8 @@ __all__ = []
 
 from typing import Any
 
-from dataeval.core._processor import process
-from dataeval.core.processors._pixelstats import PixelStatsPerChannelProcessor, PixelStatsProcessor
+from dataeval.core._calculate import calculate
+from dataeval.core.flags import ImageStats
 from dataeval.metrics.stats._base import convert_output, unzip_dataset
 from dataeval.outputs import PixelStatsOutput
 from dataeval.outputs._base import set_metadata
@@ -45,8 +45,8 @@ def pixelstats(
     --------
     dimensionstats, visualstats, Outliers
 
-    Note
-    ----
+    Notes
+    -----
     - All metrics are scaled based on the perceived bit depth (which is derived from the largest pixel value)
       to allow for better comparison between images stored in different formats and different resolutions.
     - `zeros` and `missing` are presented as a percentage of total pixel counts
@@ -61,6 +61,5 @@ def pixelstats(
     >>> print(results.entropy)
     [4.527 1.883 0.811 1.883 0.298 1.883 1.883 1.883]
     """
-    processor = PixelStatsPerChannelProcessor if per_channel else PixelStatsProcessor
-    stats = process(*unzip_dataset(dataset, per_box), processor)
+    stats = calculate(*unzip_dataset(dataset, per_box), stats=ImageStats.PIXEL, per_channel=per_channel)
     return convert_output(PixelStatsOutput, stats)
