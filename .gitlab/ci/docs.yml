@@ -9,6 +9,7 @@ docs:
   tags:
     - $DOCS_RUNNER_TAG
   script:
+    - apt update && apt install graphviz -y
     - nox -e docs $DOCS_CLEAN
   artifacts:
     paths:

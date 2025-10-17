@@ -145,8 +145,6 @@ def docs(session: nox.Session) -> None:
         "--keep-going",
         "--fresh-env",
         "--show-traceback",
-        "--jobs",
-        "4",
         "--builder",
         "html",
         "--doctree-dir",
