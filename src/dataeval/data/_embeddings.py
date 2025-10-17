@@ -3,12 +3,13 @@ from __future__ import annotations
 __all__ = []
 
 import logging
-import math
 import os
 from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
+import numpy as np
+import psutil
 import torch
 import xxhash as xxh
 from numpy.typing import NDArray
@@ -29,28 +30,13 @@ from dataeval.utils._tqdm import tqdm
 _logger = logging.getLogger(__name__)
 
 
-class _TorchDatasetWrapper(torch.utils.data.Dataset[torch.Tensor]):
-    """Wrapper for dataset to convert to PyTorch and apply transforms."""
-
-    def __init__(
-        self, dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike], transforms: Iterable[Transform]
-    ) -> None:
-        self._dataset = dataset
-        self._transforms = transforms
-
-    def __getitem__(self, index: int) -> torch.Tensor:
-        item = self._dataset[index]
-        image = torch.as_tensor(item[0] if isinstance(item, tuple) else item)
-        for transform in self._transforms:
-            image = transform(image)
-        return image
-
-
 class Embeddings(Array):
     """
     Collection of image embeddings from a dataset.
 
-    Embeddings are accessed by index or slice and are loaded on-demand.
+    Embeddings are accessed by index or slice and are loaded on-demand. For large
+    datasets, embeddings are automatically memory-mapped to disk to avoid exceeding
+    available memory.
 
     Parameters
     ----------
@@ -59,7 +45,7 @@ class Embeddings(Array):
     batch_size : int
         Batch size to use when encoding images. When less than 1, automatically sets to 1 for safe processing.
     transforms : Transform or Sequence[Transform] or None, default None
-        Image transformationss to apply before encoding. When None, uses raw images without
+        Image transformations to apply before encoding. When None, uses raw images without
         preprocessing.
     model : torch.nn.Module or None, default None
         Neural network model that generates embeddings from images. When None, uses Flatten layer for simple
@@ -74,10 +60,14 @@ class Embeddings(Array):
     device : DeviceLike or None, default None
         Hardware device for computation. When None, automatically selects DataEval's configured device, falling
         back to PyTorch's default.
-    cache : Path, str, or bool, default False
-        When True, caches embeddings in memory for faster repeated access.
-        When Path or string is provided, persists embeddings to disk for reuse across sessions.
-        Default False minimizes memory usage.
+    path : Path, str, or None, default None
+        File path for memory-mapped storage. When None, caches embeddings in memory only.
+        When Path or string is provided, uses memory-mapped storage for large embeddings
+        (automatic based on memory_threshold).
+    memory_threshold : float, default 0.8
+        Fraction of available memory (0-1) that triggers memory-mapped storage. When estimated
+        embedding size exceeds this threshold, uses disk-backed memmap instead of in-memory arrays.
+        Only applies when path is provided.
     verbose : bool, default False
         When True, displays a progress bar when encoding images. Default False reduces console output
         for cleaner automated workflows.
@@ -86,16 +76,17 @@ class Embeddings(Array):
     ----------
     batch_size : int
         Number of images processed per batch during encoding. Minimum value of 1.
-    cache : Path or bool
-        Disk path where embeddings are stored, or True when cached in memory.
     device : torch.device
         Hardware device used for tensor computations.
+    memory_threshold : float
+        Fraction of available memory (0-1) that triggers memory-mapped storage.
     verbose : bool
         Whether progress information is displayed during operations.
     """
 
     device: torch.device
     batch_size: int
+    memory_threshold: float
     verbose: bool
 
     def __init__(
@@ -108,12 +99,14 @@ class Embeddings(Array):
         layer_name: str | None = None,
         use_output: bool = True,
         device: DeviceLike | None = None,
-        cache: Path | str | bool = False,
+        path: Path | str | None = None,
+        memory_threshold: float = 0.8,
         verbose: bool = False,
     ) -> None:
         self.device = get_device(device)
         self.batch_size = batch_size if batch_size > 0 else 1
         self.verbose = verbose
+        self.memory_threshold = max(0.0, min(1.0, memory_threshold))
 
         self._dataset = dataset
         self._transforms = (
@@ -123,8 +116,8 @@ class Embeddings(Array):
 
         model = torch.nn.Flatten() if model is None else model
 
-        self.layer_name = layer_name  # needed when calling self._encode()
-        self.use_output = use_output  # and self.new()
+        self.layer_name = layer_name
+        self.use_output = use_output
         if layer_name is not None:
             self.captured_output: Any = None
 
@@ -141,20 +134,73 @@ class Embeddings(Array):
         self._model = model.to(self.device).eval() if isinstance(model, torch.nn.Module) else model
 
         self._cached_idx: set[int] = set()
-        self._embeddings: torch.Tensor = torch.empty(())
+        self._embeddings: np.ndarray | np.memmap = np.empty((0,))
+        self._use_memmap: bool = False
 
-        self._cache = cache if isinstance(cache, bool) else self._resolve_path(cache)
+        self._path = self._resolve_path(path) if path is not None else None
         self._shape: tuple[int, ...] | None = None
 
     @property
     def shape(self) -> tuple[int, ...]:
         if self._shape is None:
-            embedding_shape = self[list(self._cached_idx)[0]].shape if self._cached_idx else self[0].shape
-            self._shape = tuple([len(self)] + [*embedding_shape])
+            if self._embeddings_only:
+                self._shape = tuple(self._embeddings.shape)
+            elif len(self._dataset) == 0:
+                self._shape = (0,)
+            elif self._cached_idx:
+                embedding_shape = self[list(self._cached_idx)[0]].shape
+                self._shape = tuple([len(self)] + [*embedding_shape])
+            else:
+                embedding_shape = self[0].shape
+                self._shape = tuple([len(self)] + [*embedding_shape])
         return self._shape
 
     def __array__(self, dtype: Any = None, copy: Any = None) -> NDArray[Any]:
-        return self.to_numpy().astype(dtype=dtype, copy=bool(copy))
+        """
+        Implement numpy array protocol while preserving memory-mapped storage.
+
+        This method is called by numpy when converting to array (e.g., np.asarray()).
+        For lazy embeddings, this triggers computation of all embeddings.
+
+        Parameters
+        ----------
+        dtype : data-type or None
+            Desired data type. If None or matches existing dtype, preserves memmap.
+        copy : bool or None
+            - None: No requirement (preserves memmap)
+            - False: Must NOT copy (returns view, preserves memmap)
+            - True: Must copy (loads memmap into memory)
+
+        Returns
+        -------
+        NDArray[Any]
+            Array view preserving memmap when possible, or in-memory copy when required.
+
+        Raises
+        ------
+        ValueError
+            When copy=False but dtype conversion is requested (unavoidable copy).
+        """
+        # Trigger computation for lazy embeddings
+        # Always compute if not embeddings-only (handles both empty cache and no-cache scenarios)
+        arr = self[:] if not self._embeddings_only else self._embeddings
+
+        # Check if dtype conversion is needed
+        needs_conversion = dtype is not None and np.dtype(dtype) != arr.dtype
+
+        if needs_conversion:
+            # Dtype conversion always creates a new array (loads memmap into memory)
+            if copy is False:
+                raise ValueError(f"Cannot avoid copy when converting dtype from {arr.dtype} to {dtype}")
+            return arr.astype(dtype)
+
+        # No dtype conversion needed - handle copy parameter
+        if copy is True:
+            # Explicitly requested copy (loads memmap into memory)
+            return np.array(arr, copy=True)
+
+        # copy is False or None - return original (preserves memmap)
+        return arr
 
     def _hook_fn(self, _module: torch.nn.Module, inputs: tuple[torch.Tensor], output: torch.Tensor) -> None:
         # Copy the output to avoid computation graph issues
@@ -164,12 +210,11 @@ class Embeddings(Array):
             self.captured_output = inputs[0].detach().clone()
 
     def _get_valid_layer_selection(self, layer_name: str, model: torch.nn.Module) -> torch.nn.Module:
-        if not isinstance(model, torch.nn.Module):  # model must be Pytorch if we are selecting a layer.
+        if not isinstance(model, torch.nn.Module):
             raise TypeError(f"Expected PyTorch model (torch.nn.Module), got {type(model).__name__}")
 
         modules_dict = dict(model.named_modules())
 
-        # # Check if layer exists
         if layer_name not in modules_dict:
             formatted_layers = "\n".join(f"  {layer}" for layer in modules_dict)
             raise ValueError(f"Invalid layer '{layer_name}'. Available layers are:\n{formatted_layers}")
@@ -178,7 +223,7 @@ class Embeddings(Array):
 
     def __hash__(self) -> int:
         if self._embeddings_only:
-            bid = as_numpy(self._embeddings).ravel().tobytes()
+            bid = self._embeddings.ravel().tobytes()
         else:
             did = self._dataset.metadata["id"] if isinstance(self._dataset, AnnotatedDataset) else str(self._dataset)
             mid = self._model.metadata["id"] if isinstance(self._model, AnnotatedModel) else str(self._model)
@@ -188,35 +233,83 @@ class Embeddings(Array):
         return int(xxh.xxh3_64_hexdigest(bid), 16)
 
     @property
-    def cache(self) -> Path | bool:
-        return self._cache
+    def path(self) -> Path | None:
+        return self._path
 
-    @cache.setter
-    def cache(self, value: Path | str | bool) -> None:
-        if isinstance(value, bool) and not value:
-            self._cached_idx = set()
-            self._embeddings = torch.empty(())
-        elif isinstance(value, Path | str):
-            value = self._resolve_path(value)
-
-        if isinstance(value, Path) and value != getattr(self, "_cache", None):
-            self._save(value)
-
-        self._cache = value
+    @path.setter
+    def path(self, value: Path | str | None) -> None:
+        if value is None:
+            # Clear path, but keep in-memory embeddings
+            self._path = None
+            if isinstance(self._embeddings, np.memmap):
+                # Convert memmap to in-memory array
+                self._embeddings = np.array(self._embeddings)
+                self._use_memmap = False
+        else:
+            new_path = self._resolve_path(value)
+            if new_path != self._path:
+                self._path = new_path
+                # Save current embeddings to new path
+                if self._embeddings.size > 0:
+                    self.save(new_path)
 
     def _resolve_path(self, path: Path | str) -> Path:
         if isinstance(path, str):
             path = Path(os.path.abspath(path))
         if isinstance(path, Path) and (path.is_dir() or not path.suffix):
-            path = path / f"emb-{hash(self)}.pt"
+            path = path / f"emb-{hash(self)}.npy"
         return path
+
+    def _should_use_memmap(self, embedding_shape: tuple[int, ...]) -> bool:
+        """Determine if memmap should be used based on estimated size."""
+        if self._path is None:
+            return False
+
+        n_samples = len(self._dataset)
+        bytes_per_element = np.dtype(np.float32).itemsize  # Assume float32
+        estimated_bytes = n_samples * np.prod(embedding_shape) * bytes_per_element
+
+        available_memory = psutil.virtual_memory().available
+        threshold_bytes = available_memory * self.memory_threshold
+
+        use_memmap = bool(estimated_bytes > threshold_bytes)
+
+        if use_memmap and self.verbose:
+            _logger.info(
+                f"Using memory-mapped storage: estimated size {estimated_bytes / 1e9:.2f}GB "
+                f"exceeds {self.memory_threshold * 100:.0f}% of available memory "
+                f"({available_memory / 1e9:.2f}GB)"
+            )
+
+        return use_memmap
+
+    def _initialize_storage(self, sample_embedding: NDArray[Any]) -> None:
+        """Initialize storage backend (in-memory or memmap) based on size."""
+        n_samples = len(self._dataset)
+        embedding_shape = sample_embedding.shape
+        full_shape = (n_samples, *embedding_shape)
+        dtype = sample_embedding.dtype
+
+        if self._path is not None:
+            self._use_memmap = self._should_use_memmap(embedding_shape)
+
+            if self._use_memmap:
+                # Create memory-mapped file
+                self._path.parent.mkdir(parents=True, exist_ok=True)
+                self._embeddings = np.memmap(self._path, dtype=dtype, mode="w+", shape=full_shape)
+            else:
+                # Use in-memory array
+                self._embeddings = np.empty(full_shape, dtype=dtype)
+        else:
+            # In-memory only
+            self._embeddings = np.empty(full_shape, dtype=dtype)
 
     def to_tensor(self, indices: Sequence[int] | None = None) -> torch.Tensor:
         """
-        Convert dataset items to embedding tensor.
+        Convert embeddings to PyTorch tensor.
 
         Process specified dataset indices through the model in batches and
-        return concatenated embeddings as a single tensor.
+        return concatenated embeddings as a single tensor on the configured device.
 
         Parameters
         ----------
@@ -226,35 +319,15 @@ class Embeddings(Array):
         Returns
         -------
         torch.Tensor
-            Concatenated embeddings with shape (n_samples, embedding_dim).
+            Concatenated embeddings with shape (n_samples, embedding_dim) on configured device.
 
         Warnings
         --------
-        Processing large datasets can be memory and compute intensive.
+        Processing large datasets can be memory and compute intensive. Consider using
+        numpy arrays via `__getitem__` for memory efficiency.
         """
-        if indices is not None:
-            return torch.vstack(list(self._batch(indices))).to(self.device)
-        return self[:]
-
-    def to_numpy(self, indices: Sequence[int] | None = None) -> NDArray[Any]:
-        """
-        Convert dataset items to embedding array.
-
-        Parameters
-        ----------
-        indices : Sequence[int] or None, default None
-            Dataset indices to convert to embeddings. When None, processes entire dataset.
-
-        Returns
-        -------
-        NDArray[Any]
-            Embedding array with shape (n_samples, embedding_dim)
-
-        Warning
-        -------
-        Processing large datasets can be memory and compute intensive.
-        """
-        return self.to_tensor(indices).cpu().numpy()
+        arr = np.vstack([self[i] for i in indices]) if indices is not None else self[:]
+        return torch.from_numpy(arr).to(self.device)
 
     def new(self, dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike]) -> Embeddings:
         """
@@ -288,184 +361,285 @@ class Embeddings(Array):
             self.layer_name,
             self.use_output,
             self.device,
-            bool(self.cache),
+            self._path,
+            self.memory_threshold,
             self.verbose,
         )
 
     @classmethod
-    def from_array(cls, array: ArrayLike, device: DeviceLike | None = None) -> Embeddings:
+    def from_array(cls, array: ArrayLike) -> Embeddings:
         """
-        Create Embeddings instance from an existing image array.
+        Create Embeddings instance from an existing array.
 
         Parameters
         ----------
         array : ArrayLike
-            In-memory image data to wrap in an Embeddings object.
-        device : DeviceLike or None, default None
-            Hardware device for computation. When None, automatically selects DataEval's configured device, falling
-            back to PyTorch's default.
+            In-memory data to wrap in an Embeddings object. Can be a numpy array,
+            memmap, or the result of np.load(). Memmap arrays are preserved as-is.
 
         Returns
         -------
         Embeddings
+            Embeddings-only instance containing the provided data.
 
         Example
         -------
         >>> import numpy as np
         >>> from dataeval.data import Embeddings
-        >>> array = np.random.randn(100, 3, 224, 224)
+        >>> # From in-memory array
+        >>> array = np.random.randn(100, 512)
         >>> embeddings = Embeddings.from_array(array)
-        >>> print(embeddings.to_tensor().shape)
-        torch.Size([100, 3, 224, 224])
+        >>> tmp_file = tmp_path / "embeddings.npy"
+        >>> # From saved file (preserves memmap)
+        >>> np.save(tmp_file, array)
+        >>> loaded = np.load(tmp_file, mmap_mode="r")
+        >>> embeddings = Embeddings.from_array(loaded)
+        >>> print(embeddings.shape)
+        (100, 512)
         """
-        embeddings = Embeddings([], 0, None, None, None, False, device, True, False)
-
-        array = array if isinstance(array, Array) else as_numpy(array)
-        embeddings._cached_idx = set(range(len(array)))
-        embeddings._embeddings = torch.as_tensor(array).to(get_device(device))
+        embeddings = Embeddings([], 0, None, None, None, False, None, None, 0.8, False)
+        embeddings._embeddings = array if isinstance(array, np.ndarray) else as_numpy(array)
+        embeddings._cached_idx = set(range(len(embeddings._embeddings)))
         embeddings._embeddings_only = True
         return embeddings
 
-    def save(self, path: Path | str) -> None:
-        """
-        Save embeddings to disk.
-
-        Persist current embeddings to the specified file path for later
-        loading and reuse.
-
-        Parameters
-        ----------
-        path : Path or str
-            File path where embeddings will be saved.
-        """
-        self._save(self._resolve_path(path), True)
-
-    def _save(self, path: Path, force: bool = False) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-
-        if self._embeddings_only or self.cache and not force:
-            embeddings = self._embeddings
-            cached_idx = self._cached_idx
-        else:
-            embeddings = self.to_tensor()
-            cached_idx = list(range(len(self)))
-        try:
-            cache_data = {
-                "embeddings": embeddings,
-                "cached_indices": cached_idx,
-                "device": self.device,
-            }
-            torch.save(cache_data, path)
-            _logger.log(logging.DEBUG, f"Saved embeddings cache from {path}")
-        except Exception as e:
-            _logger.log(logging.ERROR, f"Failed to save embeddings cache: {e}")
-            raise e
-
     @classmethod
-    def load(cls, path: Path | str) -> Embeddings:
+    def load(cls, path: Path | str, mmap_mode: Literal["r", "r+", "w+", "c"] | None = None) -> Embeddings:
         """
-        Loads the embeddings from disk.
-
-        Create an Embeddings instance from previously saved embedding data.
+        Load embeddings from a saved .npy file.
 
         Parameters
         ----------
         path : Path or str
-            File path to load embeddings from.
+            File path to the saved .npy file containing embeddings.
+        mmap_mode : str or None, default None
+            Mode for memory-mapping the file. When None, loads the entire array
+            into memory as an ndarray. When specified, uses memory-mapping which
+            is more efficient for large files. Valid modes are:
+            - 'r': Open existing file for reading only
+            - 'r+': Open existing file for reading and writing
+            - 'w+' : Open existing file and overwrite
+            - 'c': Copy-on-write mode without updating file
+            See numpy.load documentation for more details.
 
         Returns
         -------
         Embeddings
             Embeddings-only instance containing the loaded data.
 
+        Example
+        -------
+        >>> import numpy as np
+        >>> from dataeval.data import Embeddings
+        >>> # Save some embeddings
+        >>> array = np.random.randn(100, 512)
+        >>> tmp_file = tmp_path / "embeddings.npy"
+        >>> np.save(tmp_file, array)
+        >>> # Load as in-memory array
+        >>> embeddings = Embeddings.load(tmp_file)
+        >>> # Load as memmap for large files
+        >>> embeddings_mmap = Embeddings.load(tmp_file, mmap_mode="r")
+        >>> print(embeddings.shape)
+        (100, 512)
+        """
+        file_path = Path(path) if isinstance(path, str) else path
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        array = np.load(file_path, mmap_mode=mmap_mode)
+        return cls.from_array(array)
+
+    def save(self, path: Path | str | None = None) -> None:
+        """
+        Compute all embeddings and save to disk.
+
+        Forces computation of all embeddings if not already computed, then
+        saves to the specified file path.
+
+        Parameters
+        ----------
+        path : Path, str, or None, default None
+            File path where embeddings will be saved. When None, uses the
+            configured path from initialization. Raises ValueError if no
+            path is available.
+
         Raises
         ------
-        FileNotFoundError
-            When the specified file path does not exist.
-        Exception
-            When file loading or parsing fails.
+        ValueError
+            When no path is specified and instance has no configured path.
         """
-        emb = Embeddings([], 0)
-        path = Path(os.path.abspath(path)) if isinstance(path, str) else path
-        if path.exists() and path.is_file():
-            try:
-                cache_data = torch.load(path, weights_only=False)
-                emb._embeddings_only = True
-                emb._embeddings = cache_data["embeddings"]
-                emb._cached_idx = cache_data["cached_indices"]
-                emb.device = cache_data["device"]
-                _logger.log(logging.DEBUG, f"Loaded embeddings cache from {path}")
-            except Exception as e:
-                _logger.log(logging.ERROR, f"Failed to load embeddings cache: {e}")
-                raise e
+        # Determine target path
+        if path is not None:
+            target_path = self._resolve_path(path)
+        elif self._path is not None:
+            target_path = self._path
         else:
-            raise FileNotFoundError(f"Specified cache file {path} was not found.")
+            raise ValueError("No path specified. Provide a path or initialize Embeddings with a path.")
 
-        return emb
+        # Ensure all embeddings are computed
+        if not self._embeddings_only:
+            self.compute()
 
-    def _encode(self, images: list[torch.Tensor]) -> torch.Tensor:
+        # Save to disk
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if isinstance(self._embeddings, np.memmap):
+            # Memmap is already on disk, just flush
+            self._embeddings.flush()
+            if self.verbose:
+                _logger.debug(f"Flushed memmap embeddings to {target_path}")
+        else:
+            # Save in-memory array to disk
+            np.save(target_path, self._embeddings)
+            if self.verbose:
+                _logger.debug(f"Saved embeddings to {target_path}")
+
+    def compute(self, force: bool = False) -> Embeddings:
+        """
+        Compute and cache all embeddings.
+
+        Forces evaluation of all lazy embeddings, storing them in memory or
+        memmap according to the configured storage strategy.
+
+        Parameters
+        ----------
+        force : bool, default False
+            If True, recomputes all embeddings even if already cached.
+            If False, only computes uncached embeddings.
+
+        Returns
+        -------
+        Embeddings
+            Returns self for method chaining.
+        """
+        if self._embeddings_only:
+            return self  # No-op for already-computed embeddings
+
+        if force:
+            self._cached_idx.clear()
+            self._embeddings = np.empty((0,))
+
+        # Trigger computation of all embeddings via __getitem__
+        _ = self[:]
+
+        return self
+
+    def _encode(self, images: list[torch.Tensor]) -> NDArray[Any]:
+        """Encode images to embeddings using the model."""
         input_tensor = torch.stack(images).to(self.device)
 
-        if self.layer_name:
-            _ = self._model(input_tensor)  # Triggers hook
-            return self.captured_output  # Return hooked embeddings
-        return self._model(input_tensor)  # Return normal output
+        with torch.no_grad():
+            if self.layer_name:
+                _ = self._model(input_tensor)  # Triggers hook
+                output = self.captured_output
+            else:
+                output = self._model(input_tensor)
 
-    @torch.no_grad()  # Reduce overhead cost by not tracking tensor gradients
-    def _batch(self, indices: Sequence[int]) -> Iterator[torch.Tensor]:
-        dataset = _TorchDatasetWrapper(self._dataset, self._transforms)
-        total_batches = math.ceil(len(indices) / self.batch_size)
+        return output.cpu().numpy()
 
-        # If not caching, process all indices normally
-        if not self.cache:
-            yield from tqdm(
-                DataLoader(Subset(dataset, indices), self.batch_size, collate_fn=self._encode),
-                total=total_batches,
-                desc="Batch embedding",
-                disable=not self.verbose,
-            )
-            return
+    class _TorchDatasetWrapper(torch.utils.data.Dataset[torch.Tensor]):
+        """Wrapper for dataset to convert to PyTorch and apply transforms."""
 
-        # If caching, process each batch of indices at a time, preserving original order
+        def __init__(
+            self, dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike], transforms: Iterable[Transform]
+        ) -> None:
+            self._dataset = dataset
+            self._transforms = transforms
+
+        def __getitem__(self, index: int) -> torch.Tensor:
+            item = self._dataset[index]
+            image = torch.as_tensor(item[0] if isinstance(item, tuple) else item)
+            for transform in self._transforms:
+                image = transform(image)
+            return image
+
+    def _batch(self, indices: Sequence[int]) -> Iterator[NDArray[Any]]:
+        """Process indices in batches, yielding numpy arrays."""
+        dataset = self._TorchDatasetWrapper(self._dataset, self._transforms)
+
+        # Process all indices in batches
         for i in tqdm(range(0, len(indices), self.batch_size), desc="Batch embedding", disable=not self.verbose):
             batch = indices[i : i + self.batch_size]
             uncached = [idx for idx in batch if idx not in self._cached_idx]
 
             if uncached:
-                # Process uncached indices as as single batch
-                for embeddings in DataLoader(Subset(dataset, uncached), len(uncached), collate_fn=self._encode):
-                    if not self._embeddings.shape:
-                        full_shape = (len(self), *embeddings.shape[1:])
-                        self._embeddings = torch.empty(full_shape, dtype=embeddings.dtype, device=self.device)
+                out_of_range = set(uncached) - set(range(len(self._dataset)))
+                if out_of_range:
+                    raise IndexError(
+                        f"Indices {sorted(out_of_range)} are out of range for dataset of size {len(self._dataset)}"
+                    )
+                # Process uncached indices
+                loader = DataLoader(Subset(dataset, uncached), len(uncached), collate_fn=self._encode)
+                for embeddings in loader:
+                    # Initialize storage on first batch
+                    if self._embeddings.size == 0:
+                        self._initialize_storage(embeddings[0])
 
                     self._embeddings[uncached] = embeddings
                     self._cached_idx.update(uncached)
 
-                if isinstance(self.cache, Path):
-                    self._save(self.cache)
+                    # Flush memmap writes (cheap operation)
+                    if isinstance(self._embeddings, np.memmap):
+                        self._embeddings.flush()
 
             yield self._embeddings[batch]
 
-    def __getitem__(self, key: int | slice, /) -> torch.Tensor:
-        if not isinstance(key, slice) and not hasattr(key, "__int__"):
+    def __getitem__(self, key: int | Sequence[int] | slice, /) -> NDArray[Any]:
+        """
+        Access embeddings by index or slice.
+
+        Parameters
+        ----------
+        key : int, Sequence[int], or slice
+            Index, indices or slice to retrieve embeddings.
+
+        Returns
+        -------
+        NDArray
+            Embedding array for the requested indices.
+
+        Raises
+        ------
+        TypeError
+            When key is not an integer or slice.
+        ValueError
+            When trying to generate new embeddings from an embeddings-only instance.
+        """
+        if not isinstance(key, int | Sequence | slice) and not hasattr(key, "__int__"):
             raise TypeError("Invalid argument type.")
 
-        indices = list(range(len(self))[key]) if isinstance(key, slice) else [int(key)]
+        # Validate and listify Sequence of indices
+        if isinstance(key, Sequence):
+            listified: list[int] = []
+            for k in key:
+                if not isinstance(k, int) and not hasattr(k, "__int__"):
+                    raise TypeError(f"All indices in the sequence must be integers. Found: {k}")
+                listified.append(int(k))
+            key = listified
+
+            if any(not isinstance(k, int) and not hasattr(k, "__int__") for k in key):
+                raise TypeError("All indices in the sequence must be integers.")
+
+        indices = list(range(len(self))[key]) if isinstance(key, slice) else [int(key)] if isinstance(key, int) else key
 
         if self._embeddings_only:
-            if not self._embeddings.shape:
+            if self._embeddings.size == 0:
                 raise ValueError("Embeddings not initialized.")
             if not set(indices).issubset(self._cached_idx):
                 raise ValueError("Unable to generate new embeddings from a shallow instance.")
             return self._embeddings[key]
 
-        result = torch.vstack(list(self._batch(indices))).to(self.device)
-        return result.squeeze(0) if len(indices) == 1 else result
+        if not indices:
+            return np.empty((0,), dtype=np.float32)
 
-    def __iter__(self) -> Iterator[torch.Tensor]:
-        # process in batches while yielding individual embeddings
+        result = np.vstack(list(self._batch(indices)))
+        return result[0] if isinstance(key, int) else result
+
+    def __iter__(self) -> Iterator[NDArray[Any]]:
+        """Iterate over individual embeddings."""
         for batch in self._batch(range(len(self))):
             yield from batch
 
     def __len__(self) -> int:
+        """Return number of embeddings."""
         return len(self._embeddings) if self._embeddings_only else len(self._dataset)
