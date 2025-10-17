@@ -67,14 +67,14 @@ def test_knn(ood_type, k, distance_metric, reference_embeddings, query_embedding
     assert threshold_perc + 5 > perc_score > threshold_perc - 5
 
     # make and check predictions on query data
-    query_array = query_embeddings.to_numpy()
+    query_array = query_embeddings
     od_preds = knn.predict(query_array, ood_type=ood_type)
     scores = knn._threshold_score(ood_type)
 
     # Check instance-level predictions
-    assert od_preds.is_ood.shape == (query_embeddings.to_numpy().shape[0],)
+    assert od_preds.is_ood.shape == (query_embeddings.shape[0],)
     assert od_preds.is_ood.sum() == (od_preds.instance_score > scores).sum()
-    assert od_preds.instance_score.shape == (query_embeddings.to_numpy().shape[0],)
+    assert od_preds.instance_score.shape == (query_embeddings.shape[0],)
 
     # KNN doesn't provide feature-level scores
     assert od_preds.feature_score is None
@@ -109,7 +109,7 @@ def test_knn_predict_validation(reference_embeddings, query_embeddings):
     knn = OOD_KNN(k=10)
 
     # Test prediction before fitting
-    query_array = query_embeddings.to_numpy()
+    query_array = query_embeddings
     with pytest.raises(RuntimeError, match="Metric needs to be `fit` before method call"):
         knn.predict(query_array)
 
@@ -128,7 +128,7 @@ def test_knn_score_computation(reference_embeddings, query_embeddings):
     knn.fit_embeddings(reference_embeddings)
 
     # Get scores
-    query_array = query_embeddings.to_numpy()
+    query_array = query_embeddings
     score_output = knn.score(query_array)
 
     # Check score properties
@@ -141,7 +141,7 @@ def test_knn_score_computation(reference_embeddings, query_embeddings):
 @pytest.mark.required
 def test_knn_different_distance_metrics(reference_embeddings, query_embeddings):
     """Test that different distance metrics produce different results."""
-    query_array = query_embeddings.to_numpy()
+    query_array = query_embeddings
 
     # Test cosine distance
     knn_cosine = OOD_KNN(k=10, distance_metric="cosine")

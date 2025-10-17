@@ -488,7 +488,7 @@ class Prioritize(Selection[Any]):
         return indices[::-1].astype(np.intp)
 
     def _to_normalized_ndarray(self, embeddings: Embeddings, selection: list[int] | None = None) -> NDArray[Any]:
-        emb: NDArray[Any] = embeddings.to_numpy(selection)
+        emb: NDArray[Any] = np.asarray(embeddings) if selection is None else embeddings[selection]
         emb /= max(np.max(np.linalg.norm(emb, axis=1)), EPSILON)
         return emb
 
