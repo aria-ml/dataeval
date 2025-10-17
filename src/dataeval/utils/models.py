@@ -182,9 +182,8 @@ class ResNet18(nn.Module):
     """
     A wrapper class for the torchvision.models.resnet18 model
 
-
-    Note
-    ----
+    Notes
+    -----
     This class is provided for the use of DataEval documentation and excludes many features
     of the torchvision implementation.
 

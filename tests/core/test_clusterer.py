@@ -2,8 +2,76 @@ import numpy as np
 import pytest
 import sklearn.datasets as dsets
 
-from dataeval.metrics.estimators import clusterer
-from dataeval.outputs._estimators import ClustererOutput
+from dataeval.core._clusterer import ClusterData, CondensedTree, _find_duplicates, _find_outliers
+
+
+@pytest.mark.required
+class TestMatrixOps:
+    @pytest.mark.parametrize(
+        "shape",
+        (
+            (2, 1),  # Minimum size
+            (4, 4),  # Square small
+            (100, 2),  # High sample, low features
+            (2, 100),  # Low samples, high features
+            (100, 100),  # Square large
+        ),
+    )
+    def test_matrices(self, shape):
+        """Sample size (rows), feature size (cols) and non-uniform shapes can create matrix"""
+        # import on runtime to minimize load times
+        from dataeval.core._clusterer import cluster
+
+        rows, cols = shape
+        rand_arr = np.random.random(size=(rows, cols))
+        dup_arr = np.ones(shape=(rows, cols))
+
+        test_sets = (rand_arr, dup_arr)
+
+        for test_set in test_sets:
+            c = cluster(test_set)
+
+            # Distance matrix
+            assert not np.any(np.isnan(c.k_distances))  # Should contain no NaN
+            assert (c.k_distances >= 0).all()  # Distances are always positive or 0 (same data point)
+
+            # Minimum spanning tree
+            assert not np.any(np.isnan(c.mst))  # Should contain no NaN
+            print(c.mst)
+
+            # Linkage arr
+            assert not np.any(np.isnan(c.linkage_tree))  # Should contain no NaN
+            print(c.linkage_tree)
+
+
+@pytest.mark.required
+class TestClustererValidate:
+    @pytest.mark.parametrize(
+        "data, error, error_msg",
+        [
+            (
+                np.array([[[0]]]),
+                ValueError,
+                "Data should have at least 2 samples; got 1",
+            ),
+            (np.array([[1]]), ValueError, "Data should have at least 2 samples; got 1"),  # samples < 2
+            (np.array([[], []]), ValueError, "Samples should have at least 1 feature; got 0"),  # features < 1
+        ],
+    )
+    def test_invalid(self, data, error, error_msg):
+        # import on runtime to minimize load times
+        from dataeval.core._clusterer import cluster
+
+        with pytest.raises(error) as e:
+            cluster(data)
+        assert e.value.args[0] == error_msg
+
+    def test_valid(self):
+        # import on runtime to minimize load times
+        from dataeval.core._clusterer import cluster
+
+        data = np.ones((2, 1, 2, 3, 4))
+        cluster(data.reshape((2, -1)))
 
 
 def get_blobs(std=0.3):
@@ -53,8 +121,10 @@ class TestClusterer:
         3. Distances are all positive
         4. All samples have a cluster
         """
+        from dataeval.core._clusterer import cluster
+
         dataset = request.getfixturevalue(data_func)
-        cl = clusterer(dataset)
+        cl = cluster(dataset)
 
         # clusters are counting numbers >= -1
         assert (cl.clusters >= -1).all()
@@ -62,12 +132,14 @@ class TestClusterer:
 
     def test_functional(self, functional_data):
         """The results of evaluate are equivalent to the known outputs"""
-        cl = clusterer(functional_data)
+        from dataeval.core._clusterer import cluster
 
-        outliers = cl.find_outliers()
+        cl = cluster(functional_data)
+
+        outliers = _find_outliers(cl.clusters)
         assert len(outliers) == 0
 
-        duplicates, potential_duplicates = cl.find_duplicates()
+        duplicates, potential_duplicates = _find_duplicates(cl.mst, cl.clusters)
         assert duplicates == [[24, 79], [58, 63]]
         assert potential_duplicates == [
             [0, 13, 15, 22, 30, 57, 67, 87, 95],
@@ -125,10 +197,11 @@ class TestClusterOutliers:
     )
     def test_find_outliers(self, clusters, outs):
         """Specified outliers are added to lists"""
+        null_inputs = [np.array([]) for _ in range(4)]
+        ct = CondensedTree(*null_inputs)
+        cl = ClusterData(clusters, np.array([]), np.array([]), ct, *null_inputs[:3])
 
-        cl = ClustererOutput(clusters, np.array([]), np.array([]), np.array([]), np.array([]))
-
-        outliers = cl.find_outliers()
+        outliers = _find_outliers(cl.clusters)
 
         assert outliers.tolist() == outs
 
@@ -142,10 +215,12 @@ class TestClusterOutliers:
     )
     def test_outliers(self, indices):
         """Integration test: `Clusterer` finds outlier data"""
+        from dataeval.core._clusterer import cluster
+
         data = get_blobs(0.1)
         data[indices] *= 10.0
-        cl = clusterer(np.array(data))
-        outliers = cl.find_outliers()
+        cl = cluster(np.array(data))
+        outliers = _find_outliers(cl.clusters)
 
         # Only need to check specified outliers in results, but there might be other outliers
         assert all(x in outliers for x in indices)
@@ -157,8 +232,10 @@ class TestClusterDuplicates:
 
     def test_duplicates(self, duplicate_data):
         """`Clusterer` finds duplicate data during evaluate"""
-        cl = clusterer(duplicate_data)
-        duplicates, potential_duplicates = cl.find_duplicates()
+        from dataeval.core._clusterer import cluster
+
+        cl = cluster(duplicate_data)
+        duplicates, potential_duplicates = _find_duplicates(cl.mst, cl.clusters)
 
         # Only 1 set (all dupes) in list of sets
         assert len(duplicates[0]) == len(duplicate_data)
@@ -166,9 +243,11 @@ class TestClusterDuplicates:
 
     def test_no_duplicates(self):
         """`Clusterer` finds no :term:`duplicates<Duplicates>` during evaluate"""
+        from dataeval.core._clusterer import cluster
+
         data = np.array([[0, 0], [1, 1], [2, 2]])
-        cl = clusterer(data)
-        duplicates, potential_duplicates = cl.find_duplicates()
+        cl = cluster(data)
+        duplicates, potential_duplicates = _find_duplicates(cl.mst, cl.clusters)
 
         assert not len(duplicates)
         assert not len(potential_duplicates)

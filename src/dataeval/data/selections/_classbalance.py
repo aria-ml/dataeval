@@ -13,8 +13,8 @@ class ClassBalance(Selection[ImageClassificationDatum]):
     """
     Select indices of a dataset that will equalize the occurrences of all classes.
 
-    Note
-    ----
+    Notes
+    -----
     1. The total number of instances of each class will be equalized which may result
     in a lower total number of instances than specified by the selection limit.
     2. This selection currently only supports classification tasks

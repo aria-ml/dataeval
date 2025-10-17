@@ -5,7 +5,7 @@ from typing import Literal, overload
 __all__ = []
 
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 
 import numpy as np
 from numpy.typing import NDArray
@@ -17,7 +17,7 @@ from dataeval.utils._array import as_numpy
 @overload
 def parity(
     binned_data: NDArray[np.intp],
-    class_labels: Sequence[int],
+    class_labels: NDArray[np.intp],
     *,
     return_insufficient_data: Literal[False] = False,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]: ...
@@ -26,7 +26,7 @@ def parity(
 @overload
 def parity(
     binned_data: NDArray[np.intp],
-    class_labels: Sequence[int],
+    class_labels: NDArray[np.intp],
     *,
     return_insufficient_data: Literal[True],
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], Mapping[int, Mapping[int, Mapping[int, int]]]]: ...
@@ -34,7 +34,7 @@ def parity(
 
 def parity(
     binned_data: NDArray[np.intp],
-    class_labels: Sequence[int],
+    class_labels: NDArray[np.intp],
     *,
     return_insufficient_data: bool = False,
 ) -> (
@@ -53,7 +53,7 @@ def parity(
     ----------
     binned_data: NDArray[np.intp]
         Binned metadata factor values
-    class_labels: Sequence[int]
+    class_labels: NDArray[np.intp]
         Observed class labels
 
     Returns
@@ -70,8 +70,8 @@ def parity(
         lead to inaccurate chi-square calculations. It is recommended to ensure that each label co-occurs with
         factor values either 0 times or at least 5 times.
 
-    Note
-    ----
+    Notes
+    -----
     - A high score with a low p-value suggests that a metadata factor is strongly correlated with a class label.
     - The function creates a contingency matrix for each factor, where each entry represents the frequency of a
       specific factor value co-occurring with a particular class label.

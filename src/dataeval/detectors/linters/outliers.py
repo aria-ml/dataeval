@@ -9,10 +9,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.config import EPSILON
-from dataeval.core._processor import process
-from dataeval.core.processors._dimensionstats import DimensionStatsProcessor
-from dataeval.core.processors._pixelstats import PixelStatsProcessor
-from dataeval.core.processors._visualstats import VisualStatsProcessor
+from dataeval.core._calculate import calculate
+from dataeval.core.flags import ImageStats
 from dataeval.data._images import Images
 from dataeval.metrics.stats._base import combine_stats, get_dataset_step_from_idx
 from dataeval.outputs import DimensionStatsOutput, ImageStatsOutput, OutliersOutput, PixelStatsOutput, VisualStatsOutput
@@ -106,8 +104,8 @@ class Outliers:
     --------
     :term:`Duplicates`
 
-    Note
-    ----
+    Notes
+    -----
     There are 3 different statistical methods:
 
     - zscore
@@ -272,16 +270,17 @@ class Outliers:
         if not (self.use_dimension or self.use_pixel or self.use_visual):
             raise ValueError("At least one of use_dimension, use_pixel or use_visual must be True.")
 
-        processors = []
+        # Build flags for requested statistics
+        flags = ImageStats(0)  # Start with no flags
         if self.use_dimension:
-            processors.append(DimensionStatsProcessor)
+            flags |= ImageStats.DIMENSION
         if self.use_pixel:
-            processors.append(PixelStatsProcessor)
+            flags |= ImageStats.PIXEL
         if self.use_visual:
-            processors.append(VisualStatsProcessor)
+            flags |= ImageStats.VISUAL
 
         images = Images(data) if isinstance(data, Dataset) else data
 
-        self.stats = process(images, None, processors)
+        self.stats = calculate(images, None, flags)
         outliers = self._get_outliers(self.stats)
         return OutliersOutput(outliers)
