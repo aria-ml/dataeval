@@ -96,6 +96,13 @@ lint = [
   "ruff>=0.11",
   "codespell[toml]>=2.3",
 ]
+doclint = [
+  { include-group = "base" },
+  { include-group = "docs"},
+  "nbconvert>=7.0",
+  "ruff>=0.11",
+  "pyright[nodejs]>=1.1.400",
+]
 test = [
   { include-group = "base" },
   { include-group = "plus" },
