@@ -17,6 +17,14 @@ docs:
       - output/docs/html/
     when: always
 
+doclint:
+  stage: docs
+  extends: 
+    - .nox
+    - .rules_main_mr_docs
+  script:
+    - nox -e doclint
+
 doctest:
   stage: docs
   extends: 

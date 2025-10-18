@@ -1,5 +1,8 @@
+import glob
 import os
 import re
+import shutil
+from pathlib import Path
 from sys import version_info
 
 import nox
@@ -167,6 +170,94 @@ def lock(session: nox.Session) -> None:
     session.run("uv", "export", "--extra=all", "--no-emit-project", "-o", "requirements.txt")
     session.run("poetry", "lock")
     session.run("p2c", "y", "-f", "pyproject.toml", "-e", "all", "--python-include", "infer", "-o", "environment.yaml")
+
+
+def _clean_notebook_script(script_path: str) -> None:
+    """Remove IPython magics and markdown from converted notebook script."""
+    script = Path(script_path)
+    if not script.exists():
+        return
+
+    content = script.read_text()
+    lines = content.split("\n")
+    cleaned_lines = []
+
+    for line in lines:
+        # Skip IPython magic commands
+        if line.strip().startswith("%") or line.strip().startswith("!"):
+            continue
+        if line.strip().startswith("get_ipython()"):
+            continue
+        # Skip markdown comment blocks
+        if line.strip().startswith("# ##") or line.strip().startswith("# %%"):
+            continue
+        cleaned_lines.append(line)
+
+    script.write_text("\n".join(cleaned_lines))
+
+
+def _run_doclint_tests(session: nox.Session, output_dir: str, scripts: list) -> list:
+    """Run all lint tests and return list of failures."""
+    test_failures = []
+
+    # Run ruff check (lint)
+    session.log("Running ruff check on generated scripts...")
+    try:
+        session.run("ruff", "check", "--ignore=E501,I001,RUF100,SIM105,UP009", output_dir)
+    except Exception as e:
+        test_failures.append(("ruff", str(e)))
+
+    # Run pyright (typecheck)
+    session.log("Running pyright on generated scripts...")
+    try:
+        session.run("pyright", output_dir)
+    except Exception as e:
+        test_failures.append(("pyright", str(e)))
+
+    return test_failures
+
+
+@nox_uv.session(uv_only_groups=["doclint"])
+def doclint(session: nox.Session) -> None:
+    """Extract scripts from notebooks in docs and run lint, typecheck, and compile tests."""
+    # Setup output directory - clear it first
+    output_dir = Path("output/nb_scripts")
+    if output_dir.exists():
+        session.log(f"Clearing existing output directory: {output_dir}")
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Find all notebooks in docs/source
+    notebooks = glob.glob("docs/source/**/*.ipynb", recursive=True)
+    if not notebooks:
+        session.warn("No notebooks found in docs/source/")
+        return
+
+    session.log(f"Found {len(notebooks)} notebooks to process")
+
+    # Convert notebooks to Python scripts
+    for notebook in notebooks:
+        nb_path = Path(notebook)
+        output_script = output_dir / f"{nb_path.stem}.py"
+        session.log(f"Converting {nb_path.name} -> {output_script.name}")
+        session.run("jupyter", "nbconvert", "--to", "script", "--output-dir", str(output_dir), str(nb_path))
+        _clean_notebook_script(str(output_script))
+
+    # Get all generated Python scripts
+    scripts = list(output_dir.glob("*.py"))
+    if not scripts:
+        session.warn("No Python scripts were generated")
+        return
+
+    # Run all tests and collect failures
+    test_failures = _run_doclint_tests(session, str(output_dir), scripts)
+
+    # Report results
+    if test_failures:
+        session.error(
+            f"Doclint failed with {len(test_failures)} test failure(s):\n"
+            + "\n  - ".join(f"{test_name}: {error}" for test_name, error in test_failures)
+        )
 
 
 @nox_uv.session(uv_only_groups=["base"])
