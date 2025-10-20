@@ -52,5 +52,10 @@ def dimensionstats(
     >>> print(results.channels)
     [3 3 1 3 1 3 3 3]
     """
-    stats = calculate(*unzip_dataset(dataset, per_box), stats=ImageStats.DIMENSION)
+    stats = calculate(
+        *unzip_dataset(dataset, per_box),
+        stats=ImageStats.DIMENSION,
+        per_image=not per_box,
+        per_box=per_box,
+    )
     return convert_output(DimensionStatsOutput, stats)
