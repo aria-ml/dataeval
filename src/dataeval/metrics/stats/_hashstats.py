@@ -50,5 +50,10 @@ def hashstats(
     >>> print(results.pchash[:5])
     ['e666999999266666', 'e666999999266666', 'e666999966666299', 'e666999999266666', '96e91656e91616e9']
     """
-    stats = calculate(*unzip_dataset(dataset, per_box), stats=ImageStats.HASH)
+    stats = calculate(
+        *unzip_dataset(dataset, per_box),
+        stats=ImageStats.HASH,
+        per_image=not per_box,
+        per_box=per_box,
+    )
     return convert_output(HashStatsOutput, stats)
