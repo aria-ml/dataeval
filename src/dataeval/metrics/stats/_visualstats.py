@@ -55,5 +55,11 @@ def visualstats(
     >>> print(results.contrast)
     [2.04  1.331 1.261 1.279 1.253 1.268 1.265 1.263]
     """
-    stats = calculate(*unzip_dataset(dataset, per_box), stats=ImageStats.VISUAL, per_channel=per_channel)
+    stats = calculate(
+        *unzip_dataset(dataset, per_box),
+        stats=ImageStats.VISUAL,
+        per_image=not per_box,
+        per_box=per_box,
+        per_channel=per_channel,
+    )
     return convert_output(VisualStatsOutput, stats)

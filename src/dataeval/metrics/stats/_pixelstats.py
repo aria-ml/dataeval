@@ -61,5 +61,11 @@ def pixelstats(
     >>> print(results.entropy)
     [4.527 1.883 0.811 1.883 0.298 1.883 1.883 1.883]
     """
-    stats = calculate(*unzip_dataset(dataset, per_box), stats=ImageStats.PIXEL, per_channel=per_channel)
+    stats = calculate(
+        *unzip_dataset(dataset, per_box),
+        stats=ImageStats.PIXEL,
+        per_image=not per_box,
+        per_box=per_box,
+        per_channel=per_channel,
+    )
     return convert_output(PixelStatsOutput, stats)
