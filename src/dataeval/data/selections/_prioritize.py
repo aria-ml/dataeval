@@ -8,7 +8,6 @@ from abc import ABC, abstractmethod
 from typing import Any, Literal, overload
 
 import numpy as np
-import torch
 from numpy.typing import NDArray
 from sklearn.cluster import KMeans
 from sklearn.metrics import pairwise_distances
@@ -16,6 +15,7 @@ from sklearn.metrics import pairwise_distances
 from dataeval.config import EPSILON, DeviceLike, get_seed
 from dataeval.data import Embeddings, Select
 from dataeval.data._selection import Selection, SelectionStage
+from dataeval.typing import EmbeddingModel
 
 _logger = logging.getLogger(__name__)
 
@@ -142,7 +142,7 @@ class Prioritize(Selection[Any]):
 
     Parameters
     ----------
-    model : torch.nn.Module | None
+    model : EmbeddingModel | None
         Model to use for encoding images
     batch_size : int
         Batch size to use when encoding images
@@ -174,7 +174,7 @@ class Prioritize(Selection[Any]):
     @overload
     def __init__(
         self,
-        model: torch.nn.Module | None,
+        model: EmbeddingModel | None,
         batch_size: int,
         device: DeviceLike | None,
         method: Literal["knn"],
@@ -187,7 +187,7 @@ class Prioritize(Selection[Any]):
     @overload
     def __init__(
         self,
-        model: torch.nn.Module | None,
+        model: EmbeddingModel | None,
         batch_size: int,
         device: DeviceLike | None,
         method: Literal["kmeans_distance", "kmeans_complexity"],
@@ -200,7 +200,7 @@ class Prioritize(Selection[Any]):
     @overload
     def __init__(
         self,
-        model: torch.nn.Module | None,
+        model: EmbeddingModel | None,
         batch_size: int,
         device: DeviceLike | None,
         method: Literal["knn", "kmeans_distance", "kmeans_complexity"],
@@ -214,7 +214,7 @@ class Prioritize(Selection[Any]):
     @overload
     def __init__(
         self,
-        model: torch.nn.Module | None,
+        model: EmbeddingModel | None,
         batch_size: int,
         device: DeviceLike | None,
         method: Literal["knn", "kmeans_distance", "kmeans_complexity"],
@@ -227,7 +227,7 @@ class Prioritize(Selection[Any]):
 
     def __init__(
         self,
-        model: torch.nn.Module | None,
+        model: EmbeddingModel | None,
         batch_size: int,
         device: DeviceLike | None,
         method: Literal["knn", "kmeans_distance", "kmeans_complexity"],

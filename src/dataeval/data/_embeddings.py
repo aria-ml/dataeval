@@ -22,9 +22,10 @@ from dataeval.typing import (
     Array,
     ArrayLike,
     Dataset,
+    EmbeddingModel,
     Transform,
 )
-from dataeval.utils._array import as_numpy
+from dataeval.utils._array import as_numpy, flatten
 from dataeval.utils._tqdm import tqdm
 
 _logger = logging.getLogger(__name__)
@@ -47,9 +48,10 @@ class Embeddings(Array):
     transforms : Transform or Sequence[Transform] or None, default None
         Image transformations to apply before encoding. When None, uses raw images without
         preprocessing.
-    model : torch.nn.Module or None, default None
-        Neural network model that generates embeddings from images. When None, uses Flatten layer for simple
-        baseline compatibility with all DataEval tools without requiring pre-trained weights or GPU resources.
+    model : EmbeddingModel or None, default None
+        A model such as a PyTorch neural network model that generates embeddings from images. When None, uses
+        Flatten layer for simple baseline compatibility with all DataEval tools without requiring pre-trained
+        weights or GPU resources.
     layer_name : str or None, default None
         Network layer from which to extract embeddings. When None, uses model output. If specified, extracts
         either the input or output tensors from this layer depending on the value of `use_output`
@@ -95,7 +97,7 @@ class Embeddings(Array):
         dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike],
         batch_size: int,
         transforms: Transform[torch.Tensor] | Iterable[Transform[torch.Tensor]] | None = None,
-        model: torch.nn.Module | None = None,
+        model: EmbeddingModel | None = None,
         layer_name: str | None = None,
         use_output: bool = True,
         device: DeviceLike | None = None,
@@ -114,11 +116,9 @@ class Embeddings(Array):
         )
         self._embeddings_only: bool = False
 
-        model = torch.nn.Flatten() if model is None else model
-
         self.layer_name = layer_name
         self.use_output = use_output
-        if layer_name is not None:
+        if isinstance(model, torch.nn.Module) and layer_name is not None:
             self.captured_output: Any = None
 
             target_layer = self._get_valid_layer_selection(layer_name, model)
@@ -131,7 +131,7 @@ class Embeddings(Array):
                     logging.DEBUG, f"Capturing {'output' if use_output else 'input'} data from layer {layer_name}."
                 )
 
-        self._model = model.to(self.device).eval() if isinstance(model, torch.nn.Module) else model
+        self._model = model.to(self.device).eval() if isinstance(model, torch.nn.Module) else flatten
 
         self._cached_idx: set[int] = set()
         self._embeddings: np.ndarray | np.memmap = np.empty((0,))
