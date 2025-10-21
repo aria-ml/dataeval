@@ -9,6 +9,7 @@ variables:
   FORCE_COLOR: '1'
   UPDATE_CACHE_MESSAGE: 'Update documentation jupyter-cache'
   ENV_AUTO_STOP_IN: '1 week'
+  RELEASE_BRANCH_PATTERN: '/^release\/v.*/'
 
 .python_versions: &python_versions
   - PYTHON_VERSION: ['3.10', '3.11', '3.12', '3.13']
@@ -31,6 +32,10 @@ workflow:
     - if: $CI_COMMIT_BRANCH == 'main'
       changes: ['CHANGELOG.md']
       when: never
+    # Skip CHANGELOG.md updates on release branches (prevents cyclic loop from create_patch_release.py)
+    - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
+      changes: ['CHANGELOG.md']
+      when: never
     # Gitlab web UI trigger
     - if: $CI_PIPELINE_SOURCE == 'web'
     # Commit Main Branch Workflow
@@ -38,6 +43,8 @@ workflow:
       variables:
         DOCS_RUNNER_TAG: 'multi-gpu'
         ENV_AUTO_STOP_IN: 'never'
+    # Commit Release Branch Workflow
+    - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
 
 default:
   # This should allow pipelines to auto-cancel when redundant:
@@ -191,6 +198,10 @@ stages:
 .rules_release_only:
   rules:
     - if: $CREATE_NEW_RELEASE
+
+.rules_release_branch_only:
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
 
 .rules_docs_nightly_cache_update:
   rules:

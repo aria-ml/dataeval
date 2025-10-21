@@ -107,3 +107,14 @@ export-merged-sbom:
       - "gl-sbom-merged-*.cdx.json"
   variables:
     PRIVATE_TOKEN: $DATAEVAL_BUILD_PAT
+
+# This job runs automatically on commits to release/v* branches
+# and creates patch releases by updating changelog and tagging
+create patch release:
+  stage: release
+  extends: .rules_release_branch_only
+  needs: []
+  before_script:
+    - uv pip install requests --system
+  script:
+    - .gitlab/scripts/create_patch_release.py
