@@ -9,7 +9,7 @@ from dataeval.core.flags import ImageStats
 from dataeval.metrics.stats._base import convert_output, unzip_dataset
 from dataeval.outputs import HashStatsOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.typing import ArrayLike, Dataset
+from dataeval.protocols import ArrayLike, Dataset
 
 
 @set_metadata

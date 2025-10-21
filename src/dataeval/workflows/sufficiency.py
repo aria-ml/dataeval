@@ -12,7 +12,7 @@ from torch.utils.data import Dataset
 
 from dataeval.outputs import SufficiencyOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.typing import ArrayLike
+from dataeval.protocols import ArrayLike
 
 
 def reset_parameters(model: nn.Module) -> nn.Module:

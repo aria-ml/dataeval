@@ -10,7 +10,7 @@ from numpy.typing import NDArray
 from torch.utils.data import DataLoader, TensorDataset
 
 from dataeval.config import get_device
-from dataeval.typing import DeviceLike
+from dataeval.protocols import DeviceLike
 from dataeval.utils._tqdm import tqdm
 
 

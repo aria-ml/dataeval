@@ -22,7 +22,7 @@ from dataeval.config import DeviceLike, get_device
 from dataeval.detectors.drift._base import BaseDrift, UpdateStrategy
 from dataeval.detectors.drift._ks import DriftKS
 from dataeval.outputs import DriftOutput
-from dataeval.typing import Array, Transform
+from dataeval.protocols import Array, Transform
 from dataeval.utils._array import as_numpy
 from dataeval.utils._predict import predict
 

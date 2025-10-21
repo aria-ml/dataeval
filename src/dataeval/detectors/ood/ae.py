@@ -21,7 +21,7 @@ from numpy.typing import NDArray
 from dataeval.config import DeviceLike
 from dataeval.detectors.ood.base import OODBase
 from dataeval.outputs import OODScoreOutput
-from dataeval.typing import ArrayLike
+from dataeval.protocols import ArrayLike
 from dataeval.utils._predict import predict
 
 

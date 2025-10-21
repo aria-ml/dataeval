@@ -19,7 +19,7 @@ from dataeval.config import get_max_processes
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.core.flags import ImageStats, resolve_dependencies
 from dataeval.outputs._stats import SourceIndex
-from dataeval.typing import ArrayLike
+from dataeval.protocols import ArrayLike
 from dataeval.utils._boundingbox import BoundingBox, BoxLike
 from dataeval.utils._image import clip_and_pad, normalize_image_shape, rescale
 from dataeval.utils._multiprocessing import PoolWrapper

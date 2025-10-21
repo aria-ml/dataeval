@@ -16,7 +16,7 @@ with contextlib.suppress(ImportError):
 
 from dataeval.data._images import Images
 from dataeval.outputs._base import Output
-from dataeval.typing import ArrayLike, Dataset
+from dataeval.protocols import ArrayLike, Dataset
 from dataeval.utils._array import as_numpy, channels_first_to_last
 from dataeval.utils._plot import heatmap
 

@@ -12,7 +12,7 @@ from sklearn.metrics import average_precision_score
 
 from dataeval.outputs import UAPOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.typing import ArrayLike
+from dataeval.protocols import ArrayLike
 from dataeval.utils._array import as_numpy
 
 

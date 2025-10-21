@@ -21,7 +21,7 @@ from numpy.typing import NDArray
 
 from dataeval.outputs import DriftOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.typing import Array
+from dataeval.protocols import Array
 from dataeval.utils._array import flatten
 
 R = TypeVar("R")
