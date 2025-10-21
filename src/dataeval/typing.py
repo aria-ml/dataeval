@@ -23,7 +23,7 @@ __all__ = [
 ]
 
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from typing import (
     Any,
@@ -346,6 +346,18 @@ class Transform(Generic[_T], Protocol):
 @runtime_checkable
 class Action(Generic[_T_cn, _T_co], Protocol):
     def __call__(self, evaluator: _T_cn) -> _T_co: ...
+
+
+# ========== MODEL ==========
+
+
+EmbeddingModel: TypeAlias = Callable[[Array], Array] | Callable[[Iterable[Array]], Iterable[Array]]
+"""
+Type alias for a callable embedding model.
+
+Embedding models should take an input array or a batch of arrays and return an output
+representing the input data in a lower dimensional space.
+"""
 
 
 # ========== DATA CLASSES ==========
