@@ -7,7 +7,7 @@ from sklearn.neighbors import NearestNeighbors
 from dataeval.config import get_max_processes
 from dataeval.detectors.ood.base import EmbeddingBasedOODBase
 from dataeval.outputs._ood import OODScoreOutput
-from dataeval.typing import Array
+from dataeval.protocols import Array
 
 
 class OOD_KNN(EmbeddingBasedOODBase):

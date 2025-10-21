@@ -21,7 +21,7 @@ from dataeval.core._nullmodel import (
 )
 from dataeval.outputs._base import set_metadata
 from dataeval.outputs._estimators import NullModelMetrics, NullModelMetricsOutput
-from dataeval.typing import ArrayLike
+from dataeval.protocols import ArrayLike
 from dataeval.utils._array import as_numpy
 
 BASE_METRICS: dict[str, BinaryClassMetricFunction] = {

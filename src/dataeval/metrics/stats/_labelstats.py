@@ -9,7 +9,7 @@ import polars as pl
 from dataeval.data._metadata import Metadata
 from dataeval.outputs import LabelStatsOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.typing import AnnotatedDataset
+from dataeval.protocols import AnnotatedDataset
 
 TValue = TypeVar("TValue")
 

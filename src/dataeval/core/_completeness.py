@@ -8,7 +8,7 @@ from collections.abc import Sequence
 import numpy as np
 
 from dataeval.config import EPSILON
-from dataeval.typing import Array
+from dataeval.protocols import Array
 from dataeval.utils._array import ensure_embeddings
 
 

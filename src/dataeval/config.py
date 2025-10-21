@@ -11,7 +11,7 @@ from typing import Any
 import numpy as np
 import torch
 
-from dataeval.typing import DeviceLike
+from dataeval.protocols import DeviceLike
 
 ### GLOBALS ###
 

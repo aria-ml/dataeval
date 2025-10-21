@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 
 from dataeval.outputs import OODOutput, OODScoreOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.typing import ArrayLike
+from dataeval.protocols import ArrayLike
 from dataeval.utils._array import as_numpy, to_numpy
 
 TGMMParams = TypeVar("TGMMParams")

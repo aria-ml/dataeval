@@ -9,7 +9,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.data._selection import Select, Selection, SelectionStage, Subselection
-from dataeval.typing import Array, ObjectDetectionDatum, ObjectDetectionTarget, SegmentationDatum, SegmentationTarget
+from dataeval.protocols import Array, ObjectDetectionDatum, ObjectDetectionTarget, SegmentationDatum, SegmentationTarget
 from dataeval.utils._array import as_numpy
 
 

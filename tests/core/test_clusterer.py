@@ -2,7 +2,8 @@ import numpy as np
 import pytest
 import sklearn.datasets as dsets
 
-from dataeval.core._clusterer import ClusterData, CondensedTree, _find_duplicates, _find_outliers
+from dataeval.core._clusterer import _find_duplicates, _find_outliers
+from dataeval.types import ClusterData, CondensedTree
 
 
 @pytest.mark.required
