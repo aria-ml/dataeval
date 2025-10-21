@@ -17,7 +17,7 @@ from numpy.typing import NDArray
 from scipy.stats import cramervonmises_2samp
 
 from dataeval.detectors.drift._base import BaseDriftUnivariate, UpdateStrategy
-from dataeval.typing import Array
+from dataeval.protocols import Array
 
 
 class DriftCVM(BaseDriftUnivariate):

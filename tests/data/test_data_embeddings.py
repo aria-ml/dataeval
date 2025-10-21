@@ -8,7 +8,7 @@ import pytest
 import torch
 
 from dataeval.data import Embeddings
-from dataeval.typing import Array, DatasetMetadata, DatumMetadata
+from dataeval.protocols import Array, DatasetMetadata, DatumMetadata
 
 
 @dataclass

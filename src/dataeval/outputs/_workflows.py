@@ -19,7 +19,7 @@ with contextlib.suppress(ImportError):
 from scipy.optimize import basinhopping
 
 from dataeval.outputs._base import Output, set_metadata
-from dataeval.typing import ArrayLike
+from dataeval.protocols import ArrayLike
 from dataeval.utils._array import as_numpy
 
 _logger = logging.getLogger(__name__)

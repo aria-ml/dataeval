@@ -16,7 +16,7 @@ from dataeval.config import EPSILON
 from dataeval.data._metadata import Metadata
 from dataeval.outputs._base import set_metadata
 from dataeval.outputs._utils import SplitDatasetOutput, TrainValSplit
-from dataeval.typing import AnnotatedDataset
+from dataeval.protocols import AnnotatedDataset
 
 _logger = logging.getLogger(__name__)
 

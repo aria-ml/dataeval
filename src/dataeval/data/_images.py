@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast, overload
 
 import numpy as np
 
-from dataeval.typing import Array, ArrayLike, Dataset
+from dataeval.protocols import Array, ArrayLike, Dataset
 from dataeval.utils._array import as_numpy, channels_first_to_last
 
 if TYPE_CHECKING:

@@ -7,7 +7,7 @@ from typing import Literal
 from dataeval.core._coverage import coverage_adaptive, coverage_naive
 from dataeval.outputs import CoverageOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.typing import Array
+from dataeval.protocols import Array
 
 
 @set_metadata

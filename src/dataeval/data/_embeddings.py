@@ -16,7 +16,7 @@ from numpy.typing import NDArray
 from torch.utils.data import DataLoader, Subset
 
 from dataeval.config import DeviceLike, get_device
-from dataeval.typing import (
+from dataeval.protocols import (
     AnnotatedDataset,
     AnnotatedModel,
     Array,

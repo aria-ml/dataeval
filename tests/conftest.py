@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 
 from dataeval.config import set_seed
 from dataeval.data import Metadata
-from dataeval.typing import ObjectDetectionTarget
+from dataeval.protocols import ObjectDetectionTarget
 
 BoxLike = (
     NDArray[np.number] | Sequence[int] | Sequence[float] | tuple[int, int, int, int] | tuple[float, float, float, float]

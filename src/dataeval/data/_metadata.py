@@ -15,7 +15,7 @@ from dataeval.core._bin import bin_data, digitize_data, is_continuous
 from dataeval.core._feature_distance import feature_distance
 from dataeval.outputs._base import set_metadata
 from dataeval.outputs._metadata import MetadataDistanceOutput, MetadataDistanceValues
-from dataeval.typing import (
+from dataeval.protocols import (
     AnnotatedDataset,
     Array,
     DatumMetadata,

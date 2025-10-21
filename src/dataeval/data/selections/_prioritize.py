@@ -15,7 +15,7 @@ from sklearn.metrics import pairwise_distances
 from dataeval.config import EPSILON, DeviceLike, get_seed
 from dataeval.data import Embeddings, Select
 from dataeval.data._selection import Selection, SelectionStage
-from dataeval.typing import EmbeddingModel
+from dataeval.protocols import EmbeddingModel
 
 _logger = logging.getLogger(__name__)
 
