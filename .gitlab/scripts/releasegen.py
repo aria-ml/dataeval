@@ -105,10 +105,8 @@ class _Category(IntEnum):
         match value:
             case _Category.MAJOR:
                 return "MAJOR"
-            case _Category.FEATURE | _Category.DEPRECATION:
-                return "MINOR"
             case _:
-                return "PATCH"
+                return "MINOR"
 
 
 class _Tag:
