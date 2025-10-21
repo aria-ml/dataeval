@@ -5,7 +5,7 @@ __all__ = []
 import numpy as np
 
 from dataeval.data._selection import Select, Selection, SelectionStage
-from dataeval.typing import Array, ImageClassificationDatum
+from dataeval.protocols import Array, ImageClassificationDatum
 from dataeval.utils._array import as_numpy
 
 

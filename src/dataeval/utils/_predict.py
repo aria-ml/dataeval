@@ -8,7 +8,7 @@ import numpy as np
 import torch
 
 from dataeval.config import DeviceLike, get_device
-from dataeval.typing import Array
+from dataeval.protocols import Array
 
 
 def predict(

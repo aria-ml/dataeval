@@ -13,7 +13,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.outputs._stats import BaseStatsOutput
-from dataeval.typing import Array, ArrayLike, Dataset, ObjectDetectionTarget
+from dataeval.protocols import Array, ArrayLike, Dataset, ObjectDetectionTarget
 from dataeval.utils._array import as_numpy
 from dataeval.utils._boundingbox import BoundingBox
 

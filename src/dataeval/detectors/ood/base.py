@@ -20,7 +20,7 @@ from numpy.typing import NDArray
 
 from dataeval.config import DeviceLike, get_device
 from dataeval.detectors.ood.mixin import OODBaseMixin, OODFitMixin, OODGMMMixin
-from dataeval.typing import Array, ArrayLike
+from dataeval.protocols import Array, ArrayLike
 from dataeval.utils._array import to_numpy
 from dataeval.utils._gmm import GaussianMixtureModelParams, gmm_params
 from dataeval.utils._train import train

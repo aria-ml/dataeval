@@ -6,7 +6,7 @@ from collections.abc import Iterator, Sequence
 from enum import IntEnum
 from typing import Generic, TypeVar
 
-from dataeval.typing import AnnotatedDataset, DatasetMetadata
+from dataeval.protocols import AnnotatedDataset, DatasetMetadata
 
 _TDatum = TypeVar("_TDatum")
 

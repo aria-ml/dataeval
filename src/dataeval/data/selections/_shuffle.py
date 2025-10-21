@@ -10,7 +10,7 @@ from numpy.random import BitGenerator, Generator, SeedSequence
 from numpy.typing import NDArray
 
 from dataeval.data._selection import Select, Selection, SelectionStage
-from dataeval.typing import Array
+from dataeval.protocols import Array
 from dataeval.utils._array import as_numpy
 
 

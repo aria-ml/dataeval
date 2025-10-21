@@ -17,7 +17,7 @@ from dataeval.outputs import DimensionStatsOutput, ImageStatsOutput, OutliersOut
 from dataeval.outputs._base import set_metadata
 from dataeval.outputs._linters import IndexIssueMap
 from dataeval.outputs._stats import BASE_ATTRS
-from dataeval.typing import ArrayLike, Dataset
+from dataeval.protocols import ArrayLike, Dataset
 
 OutlierStatsOutput = DimensionStatsOutput | PixelStatsOutput | VisualStatsOutput
 

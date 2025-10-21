@@ -11,7 +11,7 @@ from dataeval.metrics.stats._base import combine_stats, get_dataset_step_from_id
 from dataeval.outputs import DuplicatesOutput, HashStatsOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.outputs._linters import DatasetDuplicateGroupMap, DuplicateGroup
-from dataeval.typing import ArrayLike, Dataset
+from dataeval.protocols import ArrayLike, Dataset
 
 
 class Duplicates:

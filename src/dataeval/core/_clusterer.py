@@ -10,7 +10,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.core._mst import compute_neighbor_distances, minimum_spanning_tree_edges
-from dataeval.typing import ArrayLike, ClusterData, CondensedTree
+from dataeval.protocols import ArrayLike
+from dataeval.types import ClusterData, CondensedTree
 from dataeval.utils._array import flatten, to_numpy
 
 

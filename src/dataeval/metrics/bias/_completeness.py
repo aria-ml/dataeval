@@ -6,7 +6,7 @@ __all__ = []
 from dataeval.core._completeness import completeness as _completeness
 from dataeval.outputs import CompletenessOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.typing import Array
+from dataeval.protocols import Array
 
 
 @set_metadata

@@ -10,7 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.stats import iqr, ks_2samp, wasserstein_distance
 
-from dataeval.typing import ArrayLike
+from dataeval.protocols import ArrayLike
 
 
 class KSType(NamedTuple):

@@ -9,7 +9,7 @@ from typing import Any
 
 import numpy as np
 
-from dataeval.typing import ArrayLike
+from dataeval.protocols import ArrayLike
 from dataeval.utils._array import to_numpy
 
 with contextlib.suppress(ImportError):
