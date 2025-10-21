@@ -21,6 +21,8 @@ workflow:
   rules:
     # Release Workflow
     - if: $CI_PIPELINE_SOURCE == 'schedule' && $CREATE_NEW_RELEASE
+    # Nightly Docs Cache Update Workflow
+    - if: $CI_PIPELINE_SOURCE == 'schedule' && $DOCS_NIGHTLY
     # Merge Request Workflow
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
       variables:
