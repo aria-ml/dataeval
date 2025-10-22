@@ -38,8 +38,7 @@ if __name__ == "__main__":
     # Check if this is a merge commit by seeing if it has 2 parents
     try:
         parents_output = subprocess.check_output(
-            ["git", "rev-list", "--parents", "-n", "1", commit_sha],
-            text=True
+            ["git", "rev-list", "--parents", "-n", "1", commit_sha], text=True
         ).strip()
         parent_count = len(parents_output.split()) - 1  # First element is the commit itself
 
