@@ -48,7 +48,7 @@ def to_numpy(array: ArrayLike | None, copy: bool = True) -> NDArray[Any]:
     if array is None:
         return np.array([])
 
-    if isinstance(array, np.ndarray):
+    if isinstance(array, np.ndarray | np.memmap):
         return array.copy() if copy else array
 
     if array.__class__.__module__.startswith("tensorflow"):  # pragma: no cover - removed tf from deps
