@@ -25,6 +25,8 @@ if __name__ == "__main__":
 
     # Get the commit SHA that triggered this pipeline
     commit_sha = os.getenv("CI_COMMIT_SHA", "")
+    commit_before_sha = os.getenv("CI_COMMIT_BEFORE_SHA", "")
+
     if not commit_sha:
         print("ERROR: CI_COMMIT_SHA environment variable not set")
         sys.exit(1)
@@ -33,9 +35,26 @@ if __name__ == "__main__":
 
     gl = Gitlab(verbose=True)
 
+    # Check if this is a merge commit by seeing if it has 2 parents
+    try:
+        parents_output = subprocess.check_output(
+            ["git", "rev-list", "--parents", "-n", "1", commit_sha],
+            text=True
+        ).strip()
+        parent_count = len(parents_output.split()) - 1  # First element is the commit itself
+
+        if parent_count < 2:
+            print(f"INFO: Commit {commit_sha[:8]} is not a merge commit (has {parent_count} parent(s))")
+            print("Skipping cherry-pick automation (only runs on merge commits)")
+            sys.exit(0)
+
+        print(f"✓ Commit {commit_sha[:8]} is a merge commit with {parent_count} parents")
+    except subprocess.CalledProcessError as e:
+        print(f"WARNING: Could not check commit parents: {e}")
+
     # Find the merge request associated with this commit
     # We need to check if this commit was part of an MR with release::fix label
-    print(f"\nSearching for merge requests that introduced commit {commit_sha[:8]}...")
+    print(f"\nSearching for merge request that created merge commit {commit_sha[:8]}...")
 
     # Get all recently merged MRs to main
     recent_mrs = gl.list_merge_requests(state="merged", target_branch="main", order_by="merged_at")
@@ -44,13 +63,14 @@ if __name__ == "__main__":
     target_mr: dict[str, Any] | None = None
 
     for mr in recent_mrs[:20]:  # Check the last 20 merged MRs
-        if mr.get("merge_commit_sha") == commit_sha or mr.get("sha") == commit_sha:
+        # Only check merge_commit_sha (not regular sha) since we verified this is a merge commit
+        if mr.get("merge_commit_sha") == commit_sha:
             target_mr = mr
             break
 
     if not target_mr:
-        print(f"INFO: No merge request found for commit {commit_sha[:8]}")
-        print("This might be a direct commit to main. Checking labels is not possible.")
+        print(f"INFO: No merge request found for merge commit {commit_sha[:8]}")
+        print("This might be a direct push to main or a fast-forward merge.")
         sys.exit(0)
 
     print(f"Found MR !{target_mr['iid']}: {target_mr['title']}")
