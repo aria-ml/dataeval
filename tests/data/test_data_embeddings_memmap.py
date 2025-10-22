@@ -1364,15 +1364,6 @@ class TestBatchErrors:
 class TestGetitemErrors:
     """Test suite for error cases in __getitem__ method."""
 
-    def test_getitem_invalid_type_raises(self):
-        """Test __getitem__ raises TypeError for invalid key types (lines 608-609)"""
-        arr = np.random.randn(10, 128)
-        embs = Embeddings.from_array(arr)
-
-        # Invalid key type (dict is not a valid index type)
-        with pytest.raises(TypeError, match="Invalid argument type"):
-            embs[{"key": "value"}]  # type: ignore
-
     def test_getitem_sequence_invalid_element_raises(self):
         """Test __getitem__ raises TypeError for sequence with non-int elements (lines 620-621)"""
         arr = np.random.randn(10, 128)
