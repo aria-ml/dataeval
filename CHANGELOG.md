@@ -1,6 +1,11 @@
-[//]: # (880070f74fccefce92f632808c42ec176ec671e7)
+[//]: # (73757ec37d218ae8ab146ee899a2a386591ab30a)
 
 # DataEval Change Log
+
+## v0.93.1
+
+👾 **Fixes**
+- `73757ec3` - [hotfix] Preserve memmap on `as_numpy` and `to_numpy` conversion
 
 ## v0.93.0
 
