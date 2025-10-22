@@ -118,3 +118,15 @@ create patch release:
     - uv pip install requests --system
   script:
     - .gitlab/scripts/create_patch_release.py
+
+# This job runs automatically on commits to main branch
+# and cherry-picks release::fix labeled commits to all active release branches
+cherry-pick fixes to releases:
+  stage: release
+  extends: .rules_main_only
+  needs: []
+  before_script:
+    - uv pip install requests --system
+  script:
+    - .gitlab/scripts/cherry_pick_fixes_to_releases.py
+  allow_failure: true
