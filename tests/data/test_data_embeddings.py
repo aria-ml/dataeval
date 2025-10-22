@@ -171,6 +171,26 @@ class TestEmbeddings:
         with pytest.raises(TypeError):
             embs["string"]  # type: ignore
 
+    def test_embeddings_getitem_types(self):
+        embs = Embeddings(get_dataset(), 10, model=torch.nn.Identity(), transforms=lambda x: x + 1)
+        assert len(embs[0])
+        assert len(embs[0:2]) == 2
+        assert len(embs[[0, 1]]) == 2
+        assert len(embs[range(2)]) == 2
+        assert len(embs[(i for i in [0, 1])]) == 2
+        assert len(embs[np.array([0, 1])]) == 2
+
+    def test_embeddings_getitem_types_raises(self):
+        embs = Embeddings(get_dataset(), 10, model=torch.nn.Identity(), transforms=lambda x: x + 1)
+        with pytest.raises(TypeError):
+            embs["1"]  # type: ignore
+        with pytest.raises(TypeError):
+            embs["str"]  # type: ignore
+        with pytest.raises(TypeError):
+            embs[[[0, 1]]]  # type: ignore
+        with pytest.raises(TypeError):
+            embs[np.array([[0, 1]])]
+
     def test_embeddings_from_array(self):
         arr = np.array([[1, 2], [3, 4], [5, 6]])
         embs = Embeddings.from_array(arr)
