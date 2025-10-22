@@ -19,7 +19,9 @@
     },
   },
   "markdownlint.config": {
-        "MD013": true
+        "MD013": {
+            "line_length": 120
+        }
     },
 
   "[markdown]": {
