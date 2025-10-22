@@ -1,6 +1,21 @@
-[//]: # (51da23012b2c933581478acf2536e1550f7c8eb8)
+[//]: # (880070f74fccefce92f632808c42ec176ec671e7)
 
 # DataEval Change Log
+
+## v0.93.0
+
+🚧 **Deprecations and Removals**
+- `12b102e3` - Remove unused modules and duplicate/deprecated model architectures
+
+🛠️ **Improvements and Enhancements**
+- `ed01aed2` - Add ability for stats calculator to specify per_image and per_box
+- `3f6116b0` - Expose dataeval core stateless functions
+- `ef5f07ed` - Change embeddings to be numpy backed with memmap caching
+
+📝 **Miscellaneous**
+- `880070f7` - Split responsibility of `typing` into `protocols` and `types` for SRP
+- `737453db` - Make embeddings typing a Callable to allow for generic non-torch models
+- `e1a7dfd9` - Add generic typing to Array Protocol and add typing support for native python data structures
 
 ## v0.92.3
 
