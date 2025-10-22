@@ -584,13 +584,13 @@ class Embeddings(Array):
 
             yield self._embeddings[batch]
 
-    def __getitem__(self, key: int | Sequence[int] | slice, /) -> NDArray[Any]:
+    def __getitem__(self, key: int | Iterable[int] | slice, /) -> NDArray[Any]:
         """
-        Access embeddings by index or slice.
+        Access embeddings by index, indices or slice.
 
         Parameters
         ----------
-        key : int, Sequence[int], or slice
+        key : int, Iterable[int], or slice
             Index, indices or slice to retrieve embeddings.
 
         Returns
@@ -601,15 +601,15 @@ class Embeddings(Array):
         Raises
         ------
         TypeError
-            When key is not an integer or slice.
+            When key is not an integer, Iterable[int] or slice.
         ValueError
             When trying to generate new embeddings from an embeddings-only instance.
         """
-        if not isinstance(key, int | Sequence | slice) and not hasattr(key, "__int__"):
+        if not isinstance(key, int | Iterable | slice) and not hasattr(key, "__int__"):
             raise TypeError("Invalid argument type.")
 
-        # Validate and listify Sequence of indices
-        if isinstance(key, Sequence):
+        # Validate and listify Iterable of indices
+        if isinstance(key, Iterable):
             listified: list[int] = []
             for k in key:
                 if not isinstance(k, int) and not hasattr(k, "__int__"):
