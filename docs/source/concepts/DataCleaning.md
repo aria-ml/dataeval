@@ -60,7 +60,7 @@ but there are specific times when it becomes particularly crucial:
    known population dynamics to ensure that the data is representative. For
    images, the data cleaning process should include verifying image properties
    (like size and metadata) as well as the visual aspects of the image (like
-   {term}`brigtness<Brightness>` and {term}`blurriness<Blur>`). This ensures that
+   {term}`brightness<Brightness>` and {term}`blurriness<Blur>`). This ensures that
    your results are based on accurate and relevant information.
 
 ## Inaccurate, Incomplete and/or Irrelevant Data

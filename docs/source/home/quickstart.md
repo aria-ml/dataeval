@@ -17,10 +17,10 @@ part of Diataxis -->
 Jump in and try out DataEval for yourself.
 :::
 
-:::{grid-item-card} [Algorithm Summary](../concepts/AlgorithmSummary.md){.font-title}
+:::{grid-item-card} [Algorithm Summary](../concepts/FunctionalOverview.md){.font-title}
 :margin: 4 0 auto auto
 :text-align: center
-:link: ../concepts/AlgorithmSummary
+:link: ../concepts/FunctionalOverview
 :link-type: doc
 :link-alt: "DataEval Algorithm Summary Tables"
 

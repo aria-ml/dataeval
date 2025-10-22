@@ -4,13 +4,13 @@
 :hidden:
 :maxdepth: 1
 
-AlgorithmSummary.md
+Functional Overview <FunctionalOverview.md>
 :::
 
-## Algorithm Summary
+## Functional Overview
 
-For a quick reference of each algorithm's functionality and requirements, see
-the [Algorithm Summary](AlgorithmSummary.md) page.
+For a quick reference of each algorithm's task specific functionality and input requirements, see
+the [Functional Overview](FunctionalOverview.md) page.
 
 (concepts)=
 
