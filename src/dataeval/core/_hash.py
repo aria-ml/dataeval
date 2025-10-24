@@ -34,8 +34,13 @@ def pchash(image: NDArray[Any]) -> str:
     -------
     str
         The hex string hash of the image using perceptual hashing, or empty
-        string if the image is too small to be hashed
+        string if the image is too small to be hashed or is not spatial data
     """
+    # Perceptual hashing only works on spatial data (2D or higher)
+    if image.ndim < 2:
+        warnings.warn("Perceptual hashing requires spatial data (2D or higher dimensions).")
+        return ""
+
     # Verify that the image is at least larger than an 8x8 image
     min_dim = min(image.shape[-2:])
     if min_dim < HASH_SIZE + 1:

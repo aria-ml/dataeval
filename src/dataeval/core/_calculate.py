@@ -14,7 +14,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 # Import calculators to trigger auto-registration
-import dataeval.core._calculators._imagestats  # noqa: F401
+import dataeval.core._calculators._register  # noqa: F401
 from dataeval.config import get_max_processes
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.core.flags import ImageStats, resolve_dependencies
@@ -53,19 +53,29 @@ class CalculatorCache:
     """
 
     def __init__(self, datum: Any, box: BoundingBox | None = None, per_channel: bool = False) -> None:
+        is_spatial = len(datum.shape) >= 2
         self.raw = datum
         # Assume image data for now (will be generic in future)
-        self.width: int = datum.shape[-1]
-        self.height: int = datum.shape[-2]
+        self.width: int = datum.shape[-1] if is_spatial else 0
+        self.height: int = datum.shape[-2] if is_spatial else 0
         self.shape: tuple[int, ...] = datum.shape
         self.per_channel_mode = per_channel
+        self.has_box = box is not None
 
         # Ensure bounding box
         self.box = BoundingBox(0, 0, self.width, self.height, image_shape=datum.shape) if box is None else box
 
     @cached_property
     def image(self) -> NDArray[Any]:
-        return clip_and_pad(normalize_image_shape(self.raw), self.box.xyxy_int)
+        # Only normalize image shape if we have bounding boxes, since only image/video data
+        # will have bounding box concepts. Otherwise, we cannot assume dimensionality >= 3.
+        if self.has_box:
+            return clip_and_pad(normalize_image_shape(self.raw), self.box.xyxy_int)
+        # For non-image data or data without boxes, return as-is after ensuring minimum shape
+        if self.raw.ndim >= 3:
+            return clip_and_pad(normalize_image_shape(self.raw), self.box.xyxy_int)
+        # For data with < 3 dimensions, don't normalize or clip
+        return self.raw
 
     @cached_property
     def scaled(self) -> NDArray[Any]:
@@ -73,7 +83,12 @@ class CalculatorCache:
 
     @cached_property
     def per_channel(self) -> NDArray[Any]:
-        return self.scaled.reshape(self.image.shape[0], -1)
+        # For data with >= 3 dimensions, reshape as (channels, -1)
+        # For data with < 3 dimensions, treat as single channel
+        if self.image.ndim >= 3:
+            return self.scaled.reshape(self.image.shape[0], -1)
+        # For lower-dimensional data, add a channel dimension
+        return self.scaled.reshape(1, -1)
 
 
 def _collect_calculator_stats(
