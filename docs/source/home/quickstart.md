@@ -1,4 +1,4 @@
-# QuickStart Guide
+# Getting Started
 
 <!-- SECTION START | Quick, beginner friendly guides as eye catchers. Not a
 part of Diataxis -->
@@ -17,18 +17,18 @@ part of Diataxis -->
 Jump in and try out DataEval for yourself.
 :::
 
-:::{grid-item-card} [Algorithm Summary](../concepts/FunctionalOverview.md){.font-title}
+:::{grid-item-card} [Functional Overview](../concepts/FunctionalOverview.md){.font-title}
 :margin: 4 0 auto auto
 :text-align: center
 :link: ../concepts/FunctionalOverview
 :link-type: doc
-:link-alt: "DataEval Algorithm Summary Tables"
+:link-alt: "DataEval Functional Overview Tables"
 
 Quick overview detailing each algorithm's functionality and requirements.
 :::
 ::::
 
-## Get Started
+## QuickStart
 
 We are proud of our tools, so we highlighted some simple but powerful
 functionality that you can try yourself!
@@ -128,11 +128,11 @@ Click through these focused guides on the research, implementation, and
 tradeoffs we used to better suit your needs.
 :::
 
-:::{grid-item-card} [Workflows](../concepts/index.md#workflows){.font-title}
+:::{grid-item-card} [Roles](../concepts/users/index.md){.font-title}
 :text-align: center
-:link: workflows
-:link-type: ref
-:link-alt: "Workflows Link"
+:link: ../concepts/users/index
+:link-type: doc
+:link-alt: "Users Link"
 
 Want in-depth understanding with no-code explanations?
 

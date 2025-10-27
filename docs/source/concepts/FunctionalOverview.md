@@ -1,4 +1,4 @@
-# Functionality Overview
+# Functional Overview
 
 The following tables summarize the advised use cases and technical
 requirements for the algorithms provided by the DataEval library.

@@ -6,18 +6,26 @@
     color: red;
 }
 
-.bd-sidebar-primary {
+:root .graphviz a:hover > text {
+  text-decoration: underline;
+}
+
+.md-grid {
+    max-width: 80rem;
+}
+
+.md-sidebar--primary{
     width: 16rem;
 }
 
-html {
-    --pst-sidebar-secondary: 14rem;
+.md-sidebar--primary .md-sidebar__inner{
+    padding-right: 1.5rem;
 }
 
-.bd-main .bd-content .bd-article-container {
-    max-width: 70em;
+.md-sidebar--secondary{
+    width: 14rem
 }
 
-.bd-page-width {
-    max-width: 90rem;
+.md-sidebar--secondary .md-sidebar__inner{
+    padding-right: 1.5rem;
 }
