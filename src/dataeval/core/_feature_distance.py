@@ -7,10 +7,10 @@ from collections.abc import Sequence
 from typing import NamedTuple, cast
 
 import numpy as np
-from numpy.typing import NDArray
 from scipy.stats import iqr, ks_2samp, wasserstein_distance
 
-from dataeval.protocols import ArrayLike
+from dataeval.protocols import _1DArray, _2DArray
+from dataeval.utils._array import as_numpy
 
 
 class KSType(NamedTuple):
@@ -21,7 +21,7 @@ class KSType(NamedTuple):
     pvalue: float
 
 
-def _calculate_drift(x1: ArrayLike, x2: ArrayLike) -> float:
+def _calculate_drift(x1: _1DArray[float] | _2DArray[float], x2: _1DArray[float] | _2DArray[float]) -> float:
     """Calculates the shift magnitude between x1 and x2 scaled by x1"""
 
     distance = wasserstein_distance(x1, x2)
@@ -33,13 +33,13 @@ def _calculate_drift(x1: ArrayLike, x2: ArrayLike) -> float:
         return distance / X
 
     # Return if single-valued, else scale
-    xmin, xmax = np.min(x1), np.max(x1)
+    xmin, xmax = np.min(as_numpy(x1)), np.max(as_numpy(x1))
     return distance if xmin == xmax else distance / (xmax - xmin)
 
 
 def feature_distance(
-    continuous_data_1: NDArray[np.float64],
-    continuous_data_2: NDArray[np.float64],
+    continuous_data_1: _1DArray[float] | _2DArray[float],
+    continuous_data_2: _1DArray[float] | _2DArray[float],
 ) -> Sequence[tuple[float, float, float, float]]:
     """
     Measures the feature-wise distance between two continuous distributions and computes a
@@ -49,10 +49,10 @@ def feature_distance(
 
     Parameters
     ----------
-    continuous_data_1 : NDArray[np.float64]
-        Array of values to be used as reference.
-    continuous_data_2 : NDArray[np.float64]
-        Array of values to be compare with the reference.
+    continuous_data_1 : _1DArray[float] | _2DArray[float]
+        Array of values to be used as reference. Can be a 1D or 2D list, or array-like object.
+    continuous_data_2 : _1DArray[float] | _2DArray[float]
+        Array of values to be compare with the reference. Can be a 1D or 2D list, or array-like object.
 
     Returns
     -------
@@ -65,9 +65,8 @@ def feature_distance(
 
     Kolmogorov-Smirnov two-sample test
     """
-
-    cont1 = np.atleast_2d(continuous_data_1)  # (S, F)
-    cont2 = np.atleast_2d(continuous_data_2)  # (S, F)
+    cont1 = np.atleast_2d(as_numpy(continuous_data_1, dtype=np.float64))  # (S, F)
+    cont2 = np.atleast_2d(as_numpy(continuous_data_2, dtype=np.float64))  # (S, F)
 
     if len(cont1.T) != len(cont2.T):
         raise ValueError(f"Data must have the same numbers of features. ({len(cont1.T)} != {len(cont2.T)})")

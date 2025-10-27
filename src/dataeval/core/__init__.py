@@ -9,7 +9,6 @@ __all__ = [
     "ber_mst",
     "calculate",
     "cluster",
-    "compute_neighbor_distances",
     "compute_neighbors",
     "coverage_adaptive",
     "coverage_naive",
@@ -38,7 +37,7 @@ from dataeval.core._divergence import divergence_fnn, divergence_mst
 from dataeval.core._feature_distance import feature_distance
 from dataeval.core._hash import pchash, xxhash
 from dataeval.core._label_parity import label_parity
-from dataeval.core._mst import compute_neighbor_distances, compute_neighbors, minimum_spanning_tree
+from dataeval.core._mst import compute_neighbors, minimum_spanning_tree
 from dataeval.core._nullmodel import (
     nullmodel_accuracy,
     nullmodel_fpr,

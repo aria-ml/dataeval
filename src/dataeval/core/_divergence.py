@@ -9,19 +9,20 @@ __all__ = []
 
 
 import numpy as np
-from numpy.typing import NDArray
+
+from dataeval.protocols import _1DArray, _2DArray
 
 
-def divergence_mst(data: NDArray[np.float64], labels: NDArray[np.intp]) -> int:
+def divergence_mst(embeddings: _2DArray[float], class_labels: _1DArray[int]) -> int:
     """
     Counts the number of cross-label edges in the minimum spanning tree of data.
 
     Parameters
     ----------
-    data : NDArray[np.float64]
-        Input images to be grouped
-    labels : NDArray[np.intp]
-        Corresponding labels for each data point
+    embeddings : _2DArray[float]
+        Input images/embeddings to be grouped. Can be a 2D list, or array-like object.
+    class_labels : _1DArray[int]
+        Corresponding class labels for each data point. Can be a 1D list, or array-like object.
 
     Returns
     -------
@@ -30,20 +31,20 @@ def divergence_mst(data: NDArray[np.float64], labels: NDArray[np.intp]) -> int:
     """
     from dataeval.core._mst import minimum_spanning_tree
 
-    rows, cols = minimum_spanning_tree(data)  # get rows and cols directly
-    return np.sum(labels[rows] != labels[cols])
+    rows, cols = minimum_spanning_tree(embeddings)  # get rows and cols directly
+    return np.sum(class_labels[rows] != class_labels[cols])
 
 
-def divergence_fnn(data: NDArray[np.float64], labels: NDArray[np.intp]) -> int:
+def divergence_fnn(embeddings: _2DArray[float], class_labels: _1DArray[int]) -> int:
     """
     Counts label disagreements between nearest neighbors in data.
 
     Parameters
     ----------
-    data : NDArray[np.float64]
-        Input images to be grouped
-    labels : NDArray[np.intp]
-        Corresponding labels for each data point
+    embeddings : _2DArray[float]
+        Input images/embeddings to be grouped. Can be a 2D list, or array-like object.
+    class_labels : _1DArray[int]
+        Corresponding class labels for each data point. Can be a 1D list, or array-like object.
 
     Returns
     -------
@@ -52,5 +53,5 @@ def divergence_fnn(data: NDArray[np.float64], labels: NDArray[np.intp]) -> int:
     """
     from dataeval.core._mst import compute_neighbors
 
-    nn_indices = compute_neighbors(data, data)
-    return np.sum(labels[nn_indices] != labels)
+    nn_indices = compute_neighbors(embeddings, embeddings)
+    return np.sum(class_labels[nn_indices] != class_labels)

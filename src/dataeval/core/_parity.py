@@ -11,13 +11,14 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.stats.contingency import chi2_contingency, crosstab
 
+from dataeval.protocols import _1DArray, _2DArray
 from dataeval.utils._array import as_numpy
 
 
 @overload
 def parity(
-    binned_data: NDArray[np.intp],
-    class_labels: NDArray[np.intp],
+    factor_data: _2DArray[int],
+    class_labels: _1DArray[int],
     *,
     return_insufficient_data: Literal[False] = False,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]: ...
@@ -25,16 +26,16 @@ def parity(
 
 @overload
 def parity(
-    binned_data: NDArray[np.intp],
-    class_labels: NDArray[np.intp],
+    factor_data: _2DArray[int],
+    class_labels: _1DArray[int],
     *,
     return_insufficient_data: Literal[True],
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], Mapping[int, Mapping[int, Mapping[int, int]]]]: ...
 
 
 def parity(
-    binned_data: NDArray[np.intp],
-    class_labels: NDArray[np.intp],
+    factor_data: _2DArray[int],
+    class_labels: _1DArray[int],
     *,
     return_insufficient_data: bool = False,
 ) -> (
@@ -51,10 +52,10 @@ def parity(
 
     Parameters
     ----------
-    binned_data: NDArray[np.intp]
-        Binned metadata factor values
-    class_labels: NDArray[np.intp]
-        Observed class labels
+    factor_data: _2DArray[int]
+        Binned metadata factor values. Can be a 2D list, or array-like object.
+    class_labels: _1DArray[int]
+        Observed class labels. Can be a 1D list, or array-like object.
 
     Returns
     -------
@@ -82,10 +83,11 @@ def parity(
     --------
     balance
     """
-    chi_scores = np.zeros(binned_data.shape[1])
+    factor_data_np = as_numpy(factor_data, dtype=np.intp)
+    chi_scores = np.zeros(factor_data_np.shape[1])
     p_values = np.zeros_like(chi_scores)
     insufficient_data: defaultdict[int, defaultdict[int, dict[int, int]]] = defaultdict(lambda: defaultdict(dict))
-    for i, col_data in enumerate(binned_data.T):
+    for i, col_data in enumerate(factor_data_np.T):
         # Builds a contingency matrix where entry at index (r,c) represents
         # the frequency of current_factor_name achieving value unique_factor_values[r]
         # at a data point with class c.
