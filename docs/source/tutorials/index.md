@@ -5,7 +5,7 @@ as a machine learning testing and evaluation engineer through easy-to-follow
 examples that are handcrafted to give you the best experience possible.
 
 The tutorials are split into sections based on which stage they fall under in
-the [machine learning life cycle](../concepts/workflows/ML_Lifecycle.md).
+the [machine learning life cycle](../concepts/users/ML_Lifecycle.md).
 Currently, there are tutorials for the following stages:
 
 1. [Data engineering](#data-engineering)
@@ -66,6 +66,7 @@ To run the tutorial interactively in Google Colab, click the
 :caption: Monitoring
 
 ../notebooks/tt_monitor_shift.ipynb
+../notebooks/tt_error_analysis.ipynb
 ```
 
 ```{list-table}

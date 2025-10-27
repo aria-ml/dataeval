@@ -100,6 +100,7 @@ The guides below help you solve common problems found across machine learning ta
 :hidden:
 
 ../notebooks/h2_measure_ic_sufficiency.ipynb
+../notebooks/h2_dataset_splits.ipynb
 :::
 
 :::{list-table}
