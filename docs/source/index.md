@@ -58,7 +58,7 @@ for accuracy and reliability:
 - Responsive metrics: Optimize evaluation with tailored guidance for error
   assessment and retraining.
 
-📖 [Learn more about tools for Test & Evaluation Engineers.](./concepts/workflows/TE_engineer_workflow.md)
+📖 [Learn more about tools for Test & Evaluation Engineers.](./concepts/users/te_engineer.md)
 
 :::
 
@@ -73,7 +73,7 @@ Accelerate model development with powerful insights for training and deployment:
 - Drift Detection: Rapidly diagnose model degradation under
   {term}`Operational Drift` to maintain model accuracy and stability.
 
-📖 [Learn more about tools for Machine Learning Engineers.](./concepts/workflows/ML_engineer_workflow.md)
+📖 [Learn more about tools for Machine Learning Engineers.](./concepts/users/ml_engineer.md)
 
 :::
 
@@ -92,7 +92,7 @@ complexities:
   [Covariate Shift](./concepts/Drift.md#covariate-shift), {term}`Label Shift`,
   and {term}`Concept Drift` before they impact your model.
 
-📖 [Learn more about tools for Data Scientists.](./concepts/workflows/data_scientist_workflow.md)
+📖 [Learn more about tools for Data Scientists.](./concepts/users/data_scientist.md)
 
 :::
 
@@ -114,10 +114,16 @@ complexities:
 :hidden:
 
 Welcome <self>
-QuickStart <home/quickstart.md>
 home/installation.md
 home/contributing.md
 Change Log <home/changelog.md>
+:::
+
+:::{toctree}
+:caption: Getting Started
+:hidden:
+
+Overview <home/quickstart.md>
 :::
 
 :::{toctree}
