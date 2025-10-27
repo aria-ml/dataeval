@@ -1,6 +1,4 @@
-# Machine-Learning Lifecycle and Workflows
-
-## Operational Machine-Learning Lifecycle
+# Operational Machine-Learning Lifecycle
 
 Unlike a competition lifecycle of model development, the operational lifecycle
 is an iterative process and has workflows and metrics associated with each
