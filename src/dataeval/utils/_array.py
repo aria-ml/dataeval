@@ -38,36 +38,56 @@ def _try_import(module_name: str) -> ModuleType | None:
     return module
 
 
-def as_numpy(array: ArrayLike | SequenceLike[Any] | None, *, dtype: type[_np_dtype] | None = None) -> NDArray[Any]:
+def as_numpy(
+    array: ArrayLike | SequenceLike[Any] | None,
+    *,
+    dtype: type[_np_dtype] | None = None,
+    required_ndim: int | None = None,
+    required_shape: tuple[int, ...] | None = None,
+) -> NDArray[_np_dtype]:
     """Converts an ArrayLike to Numpy array without copying (if possible)"""
-    return to_numpy(array, dtype=dtype, copy=False)
+    return to_numpy(array, dtype=dtype, required_ndim=required_ndim, required_shape=required_shape, copy=False)
 
 
 def to_numpy(
-    array: ArrayLike | SequenceLike[Any] | None, *, dtype: type[_np_dtype] | None = None, copy: bool = True
-) -> NDArray[Any]:
+    array: ArrayLike | SequenceLike[Any] | None,
+    *,
+    dtype: type[_np_dtype] | None = None,
+    required_ndim: int | None = None,
+    required_shape: tuple[int, ...] | None = None,
+    copy: bool = True,
+) -> NDArray[_np_dtype]:
     """Converts an ArrayLike to new Numpy array"""
+    _array: NDArray[_np_dtype] | None = None
+
     if array is None:
-        return np.array([], dtype=dtype)
-
-    if isinstance(array, np.ndarray | np.memmap):
-        return array.copy().astype(dtype) if copy else array
-
-    if array.__class__.__module__.startswith("tensorflow"):  # pragma: no cover - removed tf from deps
+        _array = np.array([], dtype=dtype)
+    elif isinstance(array, np.ndarray | np.memmap):
+        _array = array.copy().astype(dtype) if copy else array
+    elif array.__class__.__module__.startswith("tensorflow"):  # pragma: no cover - removed tf from deps
         tf = _try_import("tensorflow")
         if tf and tf.is_tensor(array):
             _logger.log(logging.INFO, "Converting Tensorflow array to NumPy array.")
-            return array.numpy().copy().astype(dtype) if copy else array.numpy().astype(dtype)  # type: ignore
-
-    if array.__class__.__module__.startswith("torch"):
+            _array = array.numpy().copy().astype(dtype) if copy else array.numpy().astype(dtype)  # type: ignore
+    elif array.__class__.__module__.startswith("torch"):
         torch = _try_import("torch")
         if torch and isinstance(array, torch.Tensor):
             _logger.log(logging.INFO, "Converting PyTorch array to NumPy array.")
             numpy = array.detach().cpu().numpy().copy() if copy else array.detach().cpu().numpy()  # type: ignore
             _logger.log(logging.DEBUG, LogMessage(lambda: f"{str(array)} -> {str(numpy)}"))
-            return numpy.astype(dtype)
+            _array = numpy.astype(dtype)
 
-    return np.array(array, dtype=dtype) if copy else np.asarray(array, dtype=dtype)
+    # If the array was not converted yet, let numpy create the array directly
+    if _array is None:
+        _array = np.array(array, dtype=dtype) if copy else np.asarray(array, dtype=dtype)
+
+    if required_ndim is not None and _array.ndim != required_ndim:
+        raise ValueError(f"Array has {_array.ndim} dimensions, expected {required_ndim}.")
+
+    if required_shape is not None and _array.shape != required_shape:
+        raise ValueError(f"Array has shape {_array.shape}, expected {required_shape}.")
+
+    return _array
 
 
 def to_numpy_iter(iterable: Iterable[ArrayLike]) -> Iterator[NDArray[Any]]:
