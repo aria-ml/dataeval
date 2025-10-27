@@ -8,11 +8,11 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.spatial.distance import pdist, squareform
 
-from dataeval.protocols import Array
-from dataeval.utils._array import ensure_embeddings, flatten
+from dataeval.protocols import _2DArray
+from dataeval.utils._array import as_numpy, ensure_embeddings, flatten
 
 
-def _validate_inputs(embeddings: Array, num_observations: int) -> Array:
+def _validate_inputs(embeddings: NDArray[np.float64], num_observations: int) -> NDArray[np.float64]:
     embeddings = ensure_embeddings(embeddings, dtype=np.float64, unit_interval=True)
     if len(embeddings) <= num_observations:
         raise ValueError(
@@ -22,14 +22,14 @@ def _validate_inputs(embeddings: Array, num_observations: int) -> Array:
     return embeddings
 
 
-def _calculate_critical_value_radii(embeddings: Array, num_observations: int) -> NDArray[np.float64]:
+def _calculate_critical_value_radii(embeddings: NDArray[np.float64], num_observations: int) -> NDArray[np.float64]:
     embeddings_matrix = squareform(pdist(flatten(embeddings))).astype(np.float64)
     sorted_dists = np.sort(embeddings_matrix, axis=1)
     return sorted_dists[:, num_observations]
 
 
 def coverage_naive(
-    embeddings: Array,
+    embeddings: _2DArray[float],
     num_observations: int,
 ) -> tuple[NDArray[np.intp], NDArray[np.float64], float]:
     """
@@ -40,9 +40,10 @@ def coverage_naive(
 
     Parameters
     ----------
-    embeddings : Array
-        Dataset image embeddings as unit interval [0, 1].
-        Function expects the data to have 2 dimensions, N number of observations in a P-dimensional space.
+    embeddings : _2DArray[float]
+        Dataset image embeddings as unit interval [0, 1]. Can be a 2D list, array-like
+        object, or tensor. Function expects the data to have 2 dimensions, N number of
+        observations in a P-dimensional space.
     num_observations : int
         Number of observations required in order to be covered.
         [1] suggests that a minimum of 20-50 samples is necessary.
@@ -76,21 +77,21 @@ def coverage_naive(
 
     [1] Seymour Sudman. 1976. Applied sampling. Academic Press New York (1976).
     """
-    embeddings = _validate_inputs(embeddings, num_observations)
-    critical_value_radii = _calculate_critical_value_radii(embeddings, num_observations)
+    embeddings_np = _validate_inputs(as_numpy(embeddings, dtype=np.float64), num_observations)
+    critical_value_radii = _calculate_critical_value_radii(embeddings_np, num_observations)
 
     # Calculate distance matrix, look at the (num_observations + 1)th farthest neighbor for each image.
     coverage_radius = float(
         (1 / math.sqrt(math.pi))
-        * ((2 * num_observations * math.gamma(embeddings.shape[1] / 2 + 1)) / (len(embeddings)))
-        ** (1 / embeddings.shape[1])
+        * ((2 * num_observations * math.gamma(embeddings_np.shape[1] / 2 + 1)) / (len(embeddings_np)))
+        ** (1 / embeddings_np.shape[1])
     )
     uncovered_indices = np.where(critical_value_radii > coverage_radius)[0]
     return uncovered_indices, critical_value_radii, coverage_radius
 
 
 def coverage_adaptive(
-    embeddings: Array,
+    embeddings: _2DArray[float],
     num_observations: int,
     percent: float,
 ) -> tuple[NDArray[np.intp], NDArray[np.float64], float]:
@@ -102,9 +103,10 @@ def coverage_adaptive(
 
     Parameters
     ----------
-    embeddings : Array
-        Dataset embeddings as unit interval [0, 1].
-        Function expects the data to have 2 dimensions, N number of observations in a P-dimensional space.
+    embeddings : _2DArray[float]
+        Dataset embeddings as unit interval [0, 1]. Can be a 2D list, array-like object,
+        or tensor. Function expects the data to have 2 dimensions, N number of
+        observations in a P-dimensional space.
     num_observations : int
         Number of observations required in order to be covered.
         [1] suggests that a minimum of 20-50 samples is necessary.
@@ -141,7 +143,7 @@ def coverage_adaptive(
 
     [1] Seymour Sudman. 1976. Applied sampling. Academic Press New York (1976).
     """
-    embeddings = _validate_inputs(embeddings, num_observations)
+    embeddings = _validate_inputs(as_numpy(embeddings, dtype=np.float64), num_observations)
     critical_value_radii = _calculate_critical_value_radii(embeddings, num_observations)
 
     # Use data adaptive cutoff as coverage_radius

@@ -12,6 +12,8 @@ from sklearn.feature_selection import mutual_info_classif, mutual_info_regressio
 
 from dataeval.config import EPSILON, get_max_processes, get_seed
 from dataeval.core._bin import get_counts, is_continuous
+from dataeval.protocols import _1DArray
+from dataeval.utils._array import as_numpy
 
 
 def _validate_num_neighbors(num_neighbors: int) -> int:
@@ -52,9 +54,9 @@ def _merge_labels_and_factors(
 
 
 def balance(
-    class_labels: NDArray[np.intp],
-    factor_data: NDArray[np.intp],
-    discrete_features: Iterable[bool] | None = None,
+    class_labels: _1DArray[int],
+    factor_data: _1DArray[int],
+    discrete_features: _1DArray[bool] | None = None,
     num_neighbors: int = 5,
 ) -> NDArray[np.float64]:
     """
@@ -62,12 +64,12 @@ def balance(
 
     Parameters
     ----------
-    class_labels : NDArray[np.intp]
-        Target class labels as integer indices.
-    factor_data : NDArray[np.intp]
-        Factor values after binning or digitization.
-    discrete_features : Iterable[bool] | None = None
-        Boolean array or iterable defining whether or not the feature set is discretized.
+    class_labels : _1DArray[int]
+        Target class labels as integer indices. Can be a 1D list, or array-like object.
+    factor_data : _1DArray[int]
+        Factor values after binning or digitization. Can be a 1D list, or array-like object.
+    discrete_features : _1DArray[bool] | None = None
+        Boolean array defining whether or not the feature set is discretized. Can be a 1D list, or array-like object.
     num_neighbors : int = 5
         Number of points to consider as neighbors.
 
@@ -115,8 +117,11 @@ def balance(
     sklearn.feature_selection.mutual_info_regression
     sklearn.metrics.mutual_info_score
     """
+    class_labels_np = as_numpy(class_labels, dtype=np.intp)
+    factor_data_np = as_numpy(factor_data, dtype=np.intp)
+
     num_neighbors = _validate_num_neighbors(num_neighbors)
-    data, discrete_features = _merge_labels_and_factors(class_labels, factor_data, discrete_features)
+    data, discrete_features = _merge_labels_and_factors(class_labels_np, factor_data_np, discrete_features)
     num_factors = len(discrete_features)
 
     # initialize output matrix
@@ -140,9 +145,9 @@ def balance(
 
 
 def balance_classwise(
-    class_labels: NDArray[np.intp],
-    factor_data: NDArray[np.intp],
-    discrete_features: Iterable[bool] | None = None,
+    class_labels: _1DArray[int],
+    factor_data: _1DArray[int],
+    discrete_features: _1DArray[bool] | None = None,
     num_neighbors: int = 5,
 ) -> NDArray[np.float64]:
     """
@@ -150,12 +155,13 @@ def balance_classwise(
 
     Parameters
     ----------
-    class_labels : NDArray[np.intp]
-        Target class labels as integer indices.
-    factor_data : NDArray[np.intp]
-        Factor values after binning or digitization.
-    discrete_features : Iterable[bool] | None = None
+    class_labels : _1DArray[int]
+        Target class labels as integer indices. Can be a 1D list, or array-like object.
+    factor_data : _1DArray[int]
+        Factor values after binning or digitization. Can be a 1D list, or array-like object.
+    discrete_features : _1DArray[bool] | None = None
         Boolean array or iterable defining whether or not the feature set is discretized.
+        Can be a 1D list, or array-like object.
     num_neighbors : int = 5
         Number of points to consider as neighbors.
 
@@ -202,10 +208,13 @@ def balance_classwise(
     sklearn.feature_selection.mutual_info_regression
     sklearn.metrics.mutual_info_score
     """
+    class_labels_np = as_numpy(class_labels, dtype=np.intp)
+    factor_data_np = as_numpy(factor_data, dtype=np.intp)
+
     num_neighbors = _validate_num_neighbors(num_neighbors)
-    data, discrete_features = _merge_labels_and_factors(class_labels, factor_data, discrete_features)
+    data, discrete_features = _merge_labels_and_factors(class_labels_np, factor_data_np, discrete_features)
     num_factors = len(discrete_features)
-    u_classes = np.unique(class_labels)
+    u_classes = np.unique(class_labels_np)
     num_classes = len(u_classes)
 
     # initialize output matrix

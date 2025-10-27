@@ -6,24 +6,26 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 import numpy as np
-from numpy.typing import NDArray
+
+from dataeval.protocols import _1DArray
+from dataeval.utils._array import as_numpy
 
 ConfusionMatrix = tuple[np.floating[Any], np.floating[Any], np.floating[Any], np.floating[Any]]
 BinaryClassMetricFunction = Callable[[ConfusionMatrix], np.float64]
 
 
 def nullmodel_accuracy(
-    class_prob: NDArray[np.floating[Any]], model_prob: NDArray[np.floating[Any]], *, multiclass: bool = False
+    class_prob: _1DArray[float], model_prob: _1DArray[float], *, multiclass: bool = False
 ) -> np.float64:
     """
     Calculates accuracy from binary classification results.
 
     Parameters
     ----------
-    class_prob : NDArray[np.floating]
-        Class-wise probabilities for the test set
-    model_prob : NDArray[np.floating]
-        Probability distribution for given null model
+    class_prob : _1DArray[float]
+        Class-wise probabilities for the test set. Can be a 1D list, or array-like object.
+    model_prob : _1DArray[float]
+        Probability distribution for given null model. Can be a 1D list, or array-like object.
     multiclass : bool, default False
         Whether to calculate multiclass accuracy
 
@@ -44,22 +46,20 @@ def _calculate_accuracy(counts: ConfusionMatrix) -> np.float64:
     return np.float64(tp + tn) / np.sum(counts, dtype=np.float64) if tp + fn > 0 else np.float64(0)
 
 
-def _calculate_multiclass_accuracy(
-    class_prob: NDArray[np.floating[Any]], model_prob: NDArray[np.floating[Any]]
-) -> np.float64:
-    return np.dot(model_prob, class_prob)
+def _calculate_multiclass_accuracy(class_prob: _1DArray[float], model_prob: _1DArray[float]) -> np.float64:
+    return np.dot(as_numpy(model_prob), as_numpy(class_prob))
 
 
-def nullmodel_precision(class_prob: NDArray[np.floating[Any]], model_prob: NDArray[np.floating[Any]]) -> np.float64:
+def nullmodel_precision(class_prob: _1DArray[float], model_prob: _1DArray[float]) -> np.float64:
     """
     Calculates precision from binary classification results.
 
     Parameters
     ----------
-    class_prob : NDArray[np.floating]
-        Class-wise probabilities for the test set
-    model_prob : NDArray[np.floating]
-        Probability distribution for given null model
+    class_prob : _1DArray[float]
+        Class-wise probabilities for the test set. Can be a 1D list, or array-like object.
+    model_prob : _1DArray[float]
+        Probability distribution for given null model. Can be a 1D list, or array-like object.
 
     Returns
     -------
@@ -78,16 +78,16 @@ def _calculate_precision(counts: ConfusionMatrix) -> np.float64:
     return np.float64(tp / (tp + fp))
 
 
-def nullmodel_recall(class_prob: NDArray[np.floating[Any]], model_prob: NDArray[np.floating[Any]]) -> np.float64:
+def nullmodel_recall(class_prob: _1DArray[float], model_prob: _1DArray[float]) -> np.float64:
     """
     Calculates recall (True Positive Rate) from binary classification results.
 
     Parameters
     ----------
-    class_prob : NDArray[np.floating]
-        Class-wise probabilities for the test set
-    model_prob : NDArray[np.floating]
-        Probability distribution for given null model
+    class_prob : _1DArray[float]
+        Class-wise probabilities for the test set. Can be a 1D list, or array-like object.
+    model_prob : _1DArray[float]
+        Probability distribution for given null model. Can be a 1D list, or array-like object.
 
     Returns
     -------
@@ -106,16 +106,16 @@ def _calculate_recall(counts: ConfusionMatrix) -> np.float64:
     return np.float64(tp / (tp + fn))
 
 
-def nullmodel_fpr(class_prob: NDArray[np.floating[Any]], model_prob: NDArray[np.floating[Any]]) -> np.float64:
+def nullmodel_fpr(class_prob: _1DArray[float], model_prob: _1DArray[float]) -> np.float64:
     """
     Calculates FPR (False Positive Rate) from binary classification results.
 
     Parameters
     ----------
-    class_prob : NDArray[np.floating]
-        Class-wise probabilities for the test set
-    model_prob : NDArray[np.floating]
-        Probability distribution for given null model
+    class_prob : _1DArray[float]
+        Class-wise probabilities for the test set. Can be a 1D list, or array-like object.
+    model_prob : _1DArray[float]
+        Probability distribution for given null model. Can be a 1D list, or array-like object.
 
     Returns
     -------
@@ -130,17 +130,15 @@ def _calculate_fpr(counts: ConfusionMatrix) -> np.float64:
     return np.float64(fp / (fp + tn)) if fp > 0 else np.float64(0)
 
 
-def _to_confusion_matrix(
-    class_prob: NDArray[np.floating[Any]], pred_prob: NDArray[np.floating[Any]]
-) -> ConfusionMatrix:
+def _to_confusion_matrix(class_prob: _1DArray[float], pred_prob: _1DArray[float]) -> ConfusionMatrix:
     """
     Calculates confusion matrix values from class probabilities and null model probabilities.
 
     Parameters
     ----------
-    class_prob : NDArray[np.floating]
+    class_prob : _1DArray[float]
         A "One-vs-Rest" array [1x2] representation of class probabilities, and its complement
-    pred_prob : NDArray[np.floating]
+    pred_prob : _1DArray[float]
         A "One-vs-Rest" array [1x2] representation of given null model probabilities, and its complement
 
     Returns
@@ -148,7 +146,7 @@ def _to_confusion_matrix(
     ConfusionMatrix
         Calculated confusion matrix values [True Positive, False Positive, True Negative, False Negative]
     """
-    confusion_matrix = np.outer(class_prob, pred_prob)
+    confusion_matrix = np.outer(as_numpy(class_prob), as_numpy(pred_prob))
     return confusion_matrix[0, 0], confusion_matrix[1, 0], confusion_matrix[1, 1], confusion_matrix[0, 1]
 
 

@@ -10,7 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.core._mst import compute_neighbor_distances, minimum_spanning_tree_edges
-from dataeval.protocols import ArrayLike
+from dataeval.protocols import _NDArray
 from dataeval.types import ClusterData, CondensedTree
 from dataeval.utils._array import flatten, to_numpy
 
@@ -77,17 +77,17 @@ def _sorted_union_find(index_groups: NDArray[np.int32]) -> list[list[np.int32]]:
     return sorted(groups)
 
 
-def cluster(data: ArrayLike) -> ClusterData:
+def cluster(embeddings: _NDArray[Any]) -> ClusterData:
     """
     Uses hierarchical clustering on the flattened data and returns clustering
     information.
 
     Parameters
     ----------
-    data : ArrayLike, shape - (N, ...)
-        A dataset in an ArrayLike format. Function expects the data to have 2
-        or more dimensions which will flatten to (N, P) where N number of
-        observations in a P-dimensional space.
+    embeddings : _NDArray, shape - (N, ...)
+        A dataset that can be a list, or array-like object. Function expects
+        the data to have 2 or more dimensions which will flatten to (N, P) where N is
+        the number of observations in a P-dimensional space.
 
     Returns
     -------
@@ -121,7 +121,7 @@ def cluster(data: ArrayLike) -> ClusterData:
     cluster_selection_epsilon = 0.0
     # cluster_selection_method = "eom"
 
-    x: NDArray[Any] = flatten(to_numpy(data))
+    x: NDArray[Any] = flatten(to_numpy(embeddings))
     samples, features = x.shape  # Due to flatten(), we know shape has a length of 2
     if samples < 2:
         raise ValueError(f"Data should have at least 2 samples; got {samples}")

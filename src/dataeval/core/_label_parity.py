@@ -9,6 +9,9 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.stats import chisquare
 
+from dataeval.protocols import _1DArray
+from dataeval.utils._array import as_numpy
+
 
 def _normalize_expected_dist(expected_dist: NDArray[Any], observed_dist: NDArray[Any]) -> NDArray[Any]:
     """
@@ -89,8 +92,8 @@ def _validate_dist(label_dist: NDArray[Any], label_name: str) -> None:
 
 
 def label_parity(
-    expected_labels: NDArray[np.intp],
-    observed_labels: NDArray[np.intp],
+    expected_labels: _1DArray[int],
+    observed_labels: _1DArray[int],
     *,
     num_classes: int | None = None,
 ) -> tuple[float, float]:
@@ -104,10 +107,10 @@ def label_parity(
 
     Parameters
     ----------
-    expected_labels : NDArray[np.intp]
-        List of class labels in the expected dataset
-    observed_labels : NDArray[np.intp]
-        List of class labels in the observed dataset
+    expected_labels : _1DArray[int]
+        List of class labels in the expected dataset. Can be a 1D list, or array-like object.
+    observed_labels : _1DArray[int]
+        List of class labels in the observed dataset. Can be a 1D list, or array-like object.
     num_classes : int or None, default None
         The number of unique classes in the datasets. If not provided, the function will infer it
         from the set of unique labels in expected_labels and observed_labels
@@ -151,8 +154,8 @@ def label_parity(
         num_classes = 0
 
     # Calculate the class frequencies associated with the datasets
-    observed_dist = np.bincount(observed_labels, minlength=num_classes)
-    expected_dist = np.bincount(expected_labels, minlength=num_classes)
+    observed_dist = np.bincount(as_numpy(observed_labels), minlength=num_classes)
+    expected_dist = np.bincount(as_numpy(expected_labels), minlength=num_classes)
 
     # Validate
     _validate_dist(observed_dist, "observed")
