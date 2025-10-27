@@ -14,7 +14,7 @@ import torch
 from numpy.typing import NDArray
 
 from dataeval._log import LogMessage
-from dataeval.protocols import Array, ArrayLike
+from dataeval.protocols import Array, ArrayLike, SequenceLike
 
 _logger = logging.getLogger(__name__)
 
@@ -38,24 +38,26 @@ def _try_import(module_name: str) -> ModuleType | None:
     return module
 
 
-def as_numpy(array: ArrayLike | None) -> NDArray[Any]:
+def as_numpy(array: ArrayLike | SequenceLike[Any] | None, *, dtype: type[_np_dtype] | None = None) -> NDArray[Any]:
     """Converts an ArrayLike to Numpy array without copying (if possible)"""
-    return to_numpy(array, copy=False)
+    return to_numpy(array, dtype=dtype, copy=False)
 
 
-def to_numpy(array: ArrayLike | None, copy: bool = True) -> NDArray[Any]:
+def to_numpy(
+    array: ArrayLike | SequenceLike[Any] | None, *, dtype: type[_np_dtype] | None = None, copy: bool = True
+) -> NDArray[Any]:
     """Converts an ArrayLike to new Numpy array"""
     if array is None:
-        return np.array([])
+        return np.array([], dtype=dtype)
 
-    if isinstance(array, np.ndarray):
-        return array.copy() if copy else array
+    if isinstance(array, np.ndarray | np.memmap):
+        return array.copy().astype(dtype) if copy else array
 
     if array.__class__.__module__.startswith("tensorflow"):  # pragma: no cover - removed tf from deps
         tf = _try_import("tensorflow")
         if tf and tf.is_tensor(array):
             _logger.log(logging.INFO, "Converting Tensorflow array to NumPy array.")
-            return array.numpy().copy() if copy else array.numpy()  # type: ignore
+            return array.numpy().copy().astype(dtype) if copy else array.numpy().astype(dtype)  # type: ignore
 
     if array.__class__.__module__.startswith("torch"):
         torch = _try_import("torch")
@@ -63,9 +65,9 @@ def to_numpy(array: ArrayLike | None, copy: bool = True) -> NDArray[Any]:
             _logger.log(logging.INFO, "Converting PyTorch array to NumPy array.")
             numpy = array.detach().cpu().numpy().copy() if copy else array.detach().cpu().numpy()  # type: ignore
             _logger.log(logging.DEBUG, LogMessage(lambda: f"{str(array)} -> {str(numpy)}"))
-            return numpy
+            return numpy.astype(dtype)
 
-    return np.array(array) if copy else np.asarray(array)
+    return np.array(array, dtype=dtype) if copy else np.asarray(array, dtype=dtype)
 
 
 def to_numpy_iter(iterable: Iterable[ArrayLike]) -> Iterator[NDArray[Any]]:
@@ -166,10 +168,10 @@ def ensure_embeddings(
 @overload
 def flatten(array: torch.Tensor) -> torch.Tensor: ...
 @overload
-def flatten(array: ArrayLike) -> NDArray[Any]: ...
+def flatten(array: SequenceLike[Any]) -> NDArray[Any]: ...
 
 
-def flatten(array: ArrayLike) -> NDArray[Any] | torch.Tensor:
+def flatten(array: SequenceLike[Any] | torch.Tensor) -> NDArray[Any] | torch.Tensor:
     """
     Flattens input array from (N, ... ) to (N, -1) where all samples N have all data in their last dimension
 

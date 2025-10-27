@@ -63,7 +63,7 @@ def ber(embeddings: Array, labels: Array, k: int = 1, method: Literal["KNN", "MS
     BEROutput(ber=0.04, ber_lower=0.020416847668728033)
     """
     ber_fn = get_method(_BER_FN_MAP, method)
-    kwargs = {"data": ensure_embeddings(embeddings, dtype=np.float64), "labels": as_numpy(labels)}
+    kwargs = {"embeddings": ensure_embeddings(embeddings, dtype=np.float64), "class_labels": as_numpy(labels)}
     if method == "KNN":
         kwargs.update({"k": k})
 

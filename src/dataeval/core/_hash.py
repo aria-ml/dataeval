@@ -7,16 +7,17 @@ from typing import Any
 
 import numpy as np
 import xxhash as xxh
-from numpy.typing import NDArray
 from scipy.fftpack import dct
 
+from dataeval.protocols import _3DArray
+from dataeval.utils._array import as_numpy
 from dataeval.utils._image import normalize_image_shape, rescale, resize
 
 HASH_SIZE = 8
 MAX_FACTOR = 4
 
 
-def pchash(image: NDArray[Any]) -> str:
+def pchash(image: _3DArray[Any]) -> str:
     """
     Performs a perceptual hash on an image by resizing to a square NxN image
     using the Lanczos algorithm where N is 32x32 or the largest multiple of
@@ -27,8 +28,8 @@ def pchash(image: NDArray[Any]) -> str:
 
     Parameters
     ----------
-    image : NDArray
-        An image as a numpy array in CxHxW format
+    image : _3DArray
+        An image in CxHxW format. Can be a 3D list, or array-like object.
 
     Returns
     -------
@@ -36,13 +37,15 @@ def pchash(image: NDArray[Any]) -> str:
         The hex string hash of the image using perceptual hashing, or empty
         string if the image is too small to be hashed or is not spatial data
     """
+    image_np = as_numpy(image)
+
     # Perceptual hashing only works on spatial data (2D or higher)
-    if image.ndim < 2:
+    if image_np.ndim < 2:
         warnings.warn("Perceptual hashing requires spatial data (2D or higher dimensions).")
         return ""
 
     # Verify that the image is at least larger than an 8x8 image
-    min_dim = min(image.shape[-2:])
+    min_dim = min(image_np.shape[-2:])
     if min_dim < HASH_SIZE + 1:
         warnings.warn(f"Image must be larger than {HASH_SIZE}x{HASH_SIZE} for perceptual hashing.")
         return ""
@@ -51,7 +54,7 @@ def pchash(image: NDArray[Any]) -> str:
     resize_dim = HASH_SIZE * min((min_dim - 1) // HASH_SIZE, MAX_FACTOR)
 
     # Normalizes the image to CxHxW and takes the mean over all the channels
-    normalized = np.mean(normalize_image_shape(image), axis=0).squeeze()
+    normalized = np.mean(normalize_image_shape(image_np), axis=0).squeeze()
 
     # Rescales the pixel values to an 8-bit 0-255 image
     rescaled = rescale(normalized, 8).astype(np.uint8)
@@ -74,7 +77,7 @@ def pchash(image: NDArray[Any]) -> str:
     return hash_hex if hash_hex else "0"
 
 
-def xxhash(image: NDArray[Any]) -> str:
+def xxhash(image: _3DArray[Any]) -> str:
     """
     Performs a fast non-cryptographic hash using the xxhash algorithm
     (xxhash.com) against the image as a flattened bytearray. The hash
@@ -82,12 +85,12 @@ def xxhash(image: NDArray[Any]) -> str:
 
     Parameters
     ----------
-    image : NDArray
-        An image as a numpy array in CxHxW format
+    image : _3DArray
+        An image in CxHxW format. Can be a 3D list, or array-like object.
 
     Returns
     -------
     str
         The hex string hash of the image using the xxHash algorithm
     """
-    return xxh.xxh3_64_hexdigest(image.ravel().tobytes())
+    return xxh.xxh3_64_hexdigest(as_numpy(image).ravel().tobytes())
