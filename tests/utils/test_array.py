@@ -174,3 +174,109 @@ class TestChannelsFirstToLast:
     def test_invalid_input(self):
         with pytest.raises(TypeError):
             channels_first_to_last("invalid input")  # type: ignore
+
+
+@pytest.mark.required
+class TestRequiredNdim:
+    def test_validate_ndim_1d(self):
+        arr = [1, 2, 3]
+        result = to_numpy(arr, required_ndim=1)
+        assert result.ndim == 1
+
+    def test_validate_ndim_2d(self):
+        arr = [[1, 2], [3, 4]]
+        result = to_numpy(arr, required_ndim=2)
+        assert result.ndim == 2
+
+    def test_validate_ndim_3d(self):
+        arr = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
+        result = to_numpy(arr, required_ndim=3)
+        assert result.ndim == 3
+
+    def test_validate_ndim_mismatch(self):
+        arr = [[1, 2], [3, 4]]
+        with pytest.raises(ValueError, match="Array has 2 dimensions, expected 1"):
+            to_numpy(arr, required_ndim=1)
+
+    def test_validate_ndim_mismatch_3d_to_2d(self):
+        arr = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
+        with pytest.raises(ValueError, match="Array has 3 dimensions, expected 2"):
+            to_numpy(arr, required_ndim=2)
+
+    @pytest.mark.optional
+    def test_validate_ndim_torch_tensor(self):
+        arr = torch.tensor([[1, 2], [3, 4]])
+        result = to_numpy(arr, required_ndim=2)
+        assert result.ndim == 2
+
+    @pytest.mark.optional
+    def test_validate_ndim_torch_tensor_mismatch(self):
+        arr = torch.tensor([1, 2, 3])
+        with pytest.raises(ValueError, match="Array has 1 dimensions, expected 2"):
+            to_numpy(arr, required_ndim=2)
+
+
+@pytest.mark.required
+class TestRequiredShape:
+    def test_validate_shape_1d(self):
+        arr = [1, 2, 3]
+        result = to_numpy(arr, required_shape=(3,))
+        assert result.shape == (3,)
+
+    def test_validate_shape_2d(self):
+        arr = [[1, 2, 3], [4, 5, 6]]
+        result = to_numpy(arr, required_shape=(2, 3))
+        assert result.shape == (2, 3)
+
+    def test_validate_shape_3d(self):
+        arr = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
+        result = to_numpy(arr, required_shape=(2, 2, 2))
+        assert result.shape == (2, 2, 2)
+
+    def test_validate_shape_mismatch(self):
+        arr = [[1, 2], [3, 4]]
+        with pytest.raises(ValueError, match=r"Array has shape \(2, 2\), expected \(3, 3\)"):
+            to_numpy(arr, required_shape=(3, 3))
+
+    def test_validate_shape_mismatch_dimensions(self):
+        arr = [1, 2, 3]
+        with pytest.raises(ValueError, match=r"Array has shape \(3,\), expected \(1, 3\)"):
+            to_numpy(arr, required_shape=(1, 3))
+
+    @pytest.mark.optional
+    def test_validate_shape_torch_tensor(self):
+        arr = torch.tensor([[1, 2], [3, 4], [5, 6]])
+        result = to_numpy(arr, required_shape=(3, 2))
+        assert result.shape == (3, 2)
+
+    @pytest.mark.optional
+    def test_validate_shape_torch_tensor_mismatch(self):
+        arr = torch.tensor([[1, 2], [3, 4]])
+        with pytest.raises(ValueError, match=r"Array has shape \(2, 2\), expected \(2, 3\)"):
+            to_numpy(arr, required_shape=(2, 3))
+
+
+@pytest.mark.required
+class TestRequiredNdimAndShape:
+    def test_validate_both_correct(self):
+        arr = [[1, 2, 3], [4, 5, 6]]
+        result = to_numpy(arr, required_ndim=2, required_shape=(2, 3))
+        assert result.ndim == 2
+        assert result.shape == (2, 3)
+
+    def test_validate_both_ndim_fails(self):
+        arr = [1, 2, 3]
+        with pytest.raises(ValueError, match="Array has 1 dimensions, expected 2"):
+            to_numpy(arr, required_ndim=2, required_shape=(2, 3))
+
+    def test_validate_both_shape_fails(self):
+        arr = [[1, 2], [3, 4]]
+        with pytest.raises(ValueError, match=r"Array has shape \(2, 2\), expected \(2, 3\)"):
+            to_numpy(arr, required_ndim=2, required_shape=(2, 3))
+
+    @pytest.mark.optional
+    def test_validate_both_torch_correct(self):
+        arr = torch.tensor([[[1, 2], [3, 4]], [[5, 6], [7, 8]]])
+        result = to_numpy(arr, required_ndim=3, required_shape=(2, 2, 2))
+        assert result.ndim == 3
+        assert result.shape == (2, 2, 2)
