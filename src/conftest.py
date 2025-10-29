@@ -285,6 +285,8 @@ def doctest_workflows_sufficiency(doctest_namespace: dict[str, Any]) -> None:
     doctest_namespace["test_ds"] = test_ds
     doctest_namespace["train_fn"] = train_fn
     doctest_namespace["eval_fn"] = eval_fn
+    doctest_namespace["CustomTrainingStrategy"] = MagicMock()
+    doctest_namespace["CustomEvaluationStrategy"] = MagicMock()
 
 
 @pytest.fixture(autouse=True, scope="session")

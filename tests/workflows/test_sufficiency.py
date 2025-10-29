@@ -215,7 +215,7 @@ class TestSufficiency:
                 test_ds=mock_ds(1),
                 train_fn=NonCallableMagicMock(),
                 eval_fn=MagicMock(),
-            )
+            ).train_fn(MagicMock(), MagicMock(), MagicMock())
 
     def test_eval_fn_is_non_callable(self):
         with pytest.raises(TypeError):
@@ -225,4 +225,4 @@ class TestSufficiency:
                 test_ds=mock_ds(1),
                 train_fn=MagicMock(),
                 eval_fn=NonCallableMagicMock(),
-            )
+            ).eval_fn(MagicMock(), MagicMock())
