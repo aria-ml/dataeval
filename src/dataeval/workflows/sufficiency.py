@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 __all__ = []
 
 from collections.abc import Callable, Iterable, Mapping, Sequence, Sized
@@ -8,11 +10,79 @@ from typing import Any, Generic, TypeVar
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset
 
+# from torch.utils.data import Dataset
 from dataeval.outputs import SufficiencyOutput
 from dataeval.outputs._base import set_metadata
-from dataeval.protocols import ArrayLike
+from dataeval.protocols import ArrayLike, Dataset, EvaluationStrategy, TrainingStrategy
+
+T = TypeVar("T")
+
+
+@dataclass(frozen=True)
+class SufficiencyConfig(Generic[T]):
+    """
+    Configuration for sufficiency analysis execution.
+
+    Parameters
+    ----------
+    training_strategy : TrainingStrategy
+        Strategy for training models on dataset subsets. Must implement
+        the `train(model, dataset, indices)` method.
+    evaluation_strategy : EvaluationStrategy
+        Strategy for evaluating trained models. Must implement the
+        `evaluate(model, dataset)` method returning metrics.
+    runs : int, default 1
+        Number of independent training runs to perform. Each run trains
+        a fresh model from scratch.
+    substeps : int, default 5
+        Number of evaluation steps per run. Used for default geometric
+        schedule if no custom schedule is provided.
+    unit_interval : bool, default True
+        Whether metrics are constrained to [0, 1]. Set True for metrics
+        like accuracy, precision, recall. Set False for unbounded metrics
+        like loss or error.
+
+    Raises
+    ------
+    ValueError
+        If runs or substeps is not greater than 1
+
+    Examples
+    --------
+    Basic configuration:
+
+    >>> training = CustomTrainingStrategy(learning_rate=0.001, epochs=10)
+    >>> evaluation = CustomEvaluationStrategy(batch_size=32)
+    >>> config = SufficiencyConfig(training, evaluation, runs=3, substeps=5)
+
+    Configuration for unbounded metrics (e.g., loss):
+
+    >>> config = SufficiencyConfig(
+    ...     training,
+    ...     evaluation,
+    ...     runs=5,
+    ...     unit_interval=False,  # For loss metrics
+    ... )
+
+    Notes
+    -----
+    This class is immutable (frozen=True) to ensure configuration
+    cannot be accidentally modified during analysis.
+    """
+
+    training_strategy: TrainingStrategy[T]
+    evaluation_strategy: EvaluationStrategy[T]
+    runs: int = 1
+    substeps: int = 5
+    unit_interval: bool = True
+
+    def __post_init__(self) -> None:
+        """Validate configuration parameters."""
+        if self.runs <= 0:
+            raise ValueError(f"runs must be positive, got {self.runs}")
+        if self.substeps <= 0:
+            raise ValueError(f"substeps must be positive, got {self.substeps}")
 
 
 def reset_parameters(model: nn.Module) -> nn.Module:
@@ -42,9 +112,6 @@ def validate_dataset_len(dataset: Dataset[Any]) -> int:
     return length
 
 
-T = TypeVar("T")
-
-
 class Sufficiency(Generic[T]):
     """
     Project dataset :term:`sufficiency<Sufficiency>` using given a model and evaluation criteria.
@@ -57,23 +124,27 @@ class Sufficiency(Generic[T]):
         Full training data that will be split for each run
     test_ds : torch.Dataset
         Data that will be used for every run's evaluation
+    config : SufficiencyConfig or None
+        Configuration object containing training/evaluation strategies and parameters.
+        If not provided, must use legacy parameters (train_fn, eval_fn, etc.)
     train_fn : Callable[[nn.Module, Dataset, Sequence[int]], None]
-        Function which takes a model, a dataset, and indices to train on and then executes model
+        DEPRECATED Function which takes a model, a dataset, and indices to train on and then executes model
         training against the data.
     eval_fn : Callable[[nn.Module, Dataset], Mapping[str, float | ArrayLike]]
-        Function which takes a model, a dataset and returns a dictionary of metric
+        DEPRECATED Function which takes a model, a dataset and returns a dictionary of metric
         values which is used to assess model performance
         given the model and data.
     runs : int, default 1
-        Number of models to train over the entire dataset.
+        DEPRECATED Number of models to train over the entire dataset.
     substeps : int, default 5
-        The number of steps that each model will be trained and evaluated on.
+        DEPRECATED The number of steps that each model will be trained and evaluated on.
     train_kwargs : Mapping | None, default None
-        Additional arguments required for custom training function
+        DEPRECATED Additional arguments required for custom training function
     eval_kwargs : Mapping | None, default None
-        Additional arguments required for custom evaluation function
+        DEPRECATED Additional arguments required for custom evaluation function
     unit_interval : bool, default True
-        Constrains the power law to the interval [0, 1]. Set True (default) for metrics such as accuracy, precision,
+        DEPRECATED Constrains the power law to the interval [0, 1].
+        Set True (default) for metrics such as accuracy, precision,
         and recall which are defined to take values on [0,1]. Set False for metrics not on the unit interval.
 
     Warning
@@ -84,6 +155,15 @@ class Sufficiency(Generic[T]):
     -----
     Substeps is overridden by the parameter `eval_at` in :meth:`.Sufficiency.evaluate`
 
+    The constructor supports two signatures during transition:
+
+    NEW (recommended):
+        Sufficiency(model, train_ds, test_ds, config)
+
+    OLD (deprecated):
+        Sufficiency(model, train_ds, test_ds, train_fn, eval_fn, ...)
+
+    The old signature will be removed in a future version.
     """
 
     def __init__(
@@ -91,24 +171,50 @@ class Sufficiency(Generic[T]):
         model: nn.Module,
         train_ds: Dataset[T],
         test_ds: Dataset[T],
-        train_fn: Callable[[nn.Module, Dataset[T], Sequence[int]], None],
-        eval_fn: Callable[[nn.Module, Dataset[T]], Mapping[str, float] | Mapping[str, ArrayLike]],
+        config: SufficiencyConfig[T] | None = None,
+        train_fn: Callable[[nn.Module, Dataset[T], Sequence[int]], None] | None = None,
+        eval_fn: Callable[[nn.Module, Dataset[T]], Mapping[str, float] | Mapping[str, ArrayLike]] | None = None,
         runs: int = 1,
         substeps: int = 5,
         train_kwargs: Mapping[str, Any] | None = None,
         eval_kwargs: Mapping[str, Any] | None = None,
         unit_interval: bool = True,
     ) -> None:
+        # Detect which signature is being used
+        using_new_api: bool = config is not None
+        using_old_api = train_fn is not None or eval_fn is not None
+
+        # Validate signature usage
+        if using_new_api and using_old_api:
+            raise ValueError(
+                "Cannot provide both config and legacy parameters (train_fn/eval_fn). "
+                "Use either the new API with SufficiencyConfig or the old API, not both."
+            )
+
+        if not using_new_api and not using_old_api:
+            raise ValueError(
+                "Must provide either config (new API) or train_fn/eval_fn (old API). "
+                "Recommended: use SufficiencyConfig for new code."
+            )
+
         self.model = model
         self.train_ds = train_ds
         self.test_ds = test_ds
-        self.train_fn = train_fn
-        self.eval_fn = eval_fn
-        self.runs = runs
-        self.substeps = substeps
-        self.train_kwargs = train_kwargs
-        self.eval_kwargs = eval_kwargs
-        self.unit_interval = unit_interval
+
+        if using_new_api:
+            self.config: SufficiencyConfig[T] = config
+        # Adapts old API parameters into new config API
+        else:
+            training_strategy = _FunctionTrainingStrategy[T](train_fn, train_kwargs)  # pyright: ignore[reportArgumentType]
+            evaluation_strategy = _FunctionEvaluationStrategy[T](eval_fn, eval_kwargs)  # pyright: ignore[reportArgumentType]
+
+            self.config: SufficiencyConfig[T] = SufficiencyConfig(
+                training_strategy=training_strategy,
+                evaluation_strategy=evaluation_strategy,
+                runs=runs,
+                substeps=substeps,
+                unit_interval=unit_interval,
+            )
 
     @property
     def train_ds(self) -> Dataset[T]:
@@ -130,44 +236,79 @@ class Sufficiency(Generic[T]):
 
     @property
     def train_fn(self) -> Callable[[nn.Module, Dataset[T], Sequence[int]], None]:
-        return self._train_fn
+        """
+        Access training function
 
-    @train_fn.setter
-    def train_fn(self, value: Callable[[nn.Module, Dataset[T], Sequence[int]], None]) -> None:
-        if not callable(value):
-            raise TypeError("Must provide a callable for train_fn.")
-        self._train_fn = value
+        DEPRECATED: Use config.training_strategy instead
+
+        Returns the underlying training function if using old API, or raises AttributeError
+        if using the new API with strategy objects
+        """
+        # Unwrap the original function if using adapter
+        if isinstance(self.config.training_strategy, _FunctionTrainingStrategy):
+            return self.config.training_strategy._train_fn
+
+        raise AttributeError(
+            "train_fn property only available when using legacy API. Use config.training_strategy instead."
+        )
 
     @property
     def eval_fn(
         self,
     ) -> Callable[[nn.Module, Dataset[T]], Mapping[str, float] | Mapping[str, ArrayLike]]:
-        return self._eval_fn
+        """
+        Access evaluation function
 
-    @eval_fn.setter
-    def eval_fn(
-        self,
-        value: Callable[[nn.Module, Dataset[T]], Mapping[str, float] | Mapping[str, ArrayLike]],
-    ) -> None:
-        if not callable(value):
-            raise TypeError("Must provide a callable for eval_fn.")
-        self._eval_fn = value
+        DEPRECATED: Use config.evaluation_strategy instead
+
+        Returns the underlying evaluation function if using old API, or raises AttributeError
+        if using the new API with strategy objects
+        """
+        # Unwrap the original function if using adapter
+        if isinstance(self.config.evaluation_strategy, _FunctionEvaluationStrategy):
+            return self.config.evaluation_strategy._eval_fn
+
+        raise AttributeError(
+            "eval_fn property only available when using legacy API. Use config.evaluation_strategy instead."
+        )
 
     @property
     def train_kwargs(self) -> Mapping[str, Any]:
-        return self._train_kwargs
+        """
+        Access training kwargs.
 
-    @train_kwargs.setter
-    def train_kwargs(self, value: Mapping[str, Any] | None) -> None:
-        self._train_kwargs = {} if value is None else value
+        DEPRECATED: Specify parameters in your TrainingStrategy implementation.
+
+        Returns kwargs if using old API, empty dict if using new API.
+        """
+        if isinstance(self.config.training_strategy, _FunctionTrainingStrategy):
+            return self.config.training_strategy._kwargs
+        return {}
 
     @property
     def eval_kwargs(self) -> Mapping[str, Any]:
-        return self._eval_kwargs
+        """
+        Access evaluation kwargs.
 
-    @eval_kwargs.setter
-    def eval_kwargs(self, value: Mapping[str, Any] | None) -> None:
-        self._eval_kwargs = {} if value is None else value
+        DEPRECATED: Specify parameters in your EvaluationStrategy implementation.
+
+        Returns kwargs if using old API, empty dict if using new API.
+        """
+        if isinstance(self.config.evaluation_strategy, _FunctionEvaluationStrategy):
+            return self.config.evaluation_strategy._kwargs
+        return {}
+
+    @property
+    def runs(self) -> int:
+        return self.config.runs
+
+    @property
+    def substeps(self) -> int:
+        return self.config.substeps
+
+    @property
+    def unit_interval(self) -> bool:
+        return self.config.unit_interval
 
     @set_metadata(state=["runs", "substeps"])
     def evaluate(self, eval_at: int | Iterable[int] | None = None) -> SufficiencyOutput:
@@ -286,3 +427,43 @@ class Sufficiency(Generic[T]):
 
                     measures[name][run, iteration] = value
         return SufficiencyOutput(ranges, measures, unit_interval=self.unit_interval)
+
+
+class _FunctionTrainingStrategy(Generic[T]):
+    """
+    Internal adapter that wraps legacy training functions.
+
+    Allows old train_fn + train_kwargs to work with new Strategy interface.
+    """
+
+    def __init__(
+        self,
+        train_fn: Callable[[nn.Module, Dataset[T], Sequence[int]], None],
+        kwargs: Mapping[str, Any] | None = None,
+    ) -> None:
+        self._train_fn = train_fn
+        self._kwargs = kwargs if kwargs is not None else {}
+
+    def train(self, model: nn.Module, dataset: Dataset[T], indices: Sequence[int]) -> None:
+        """Delegate to wrapped function with kwargs."""
+        self._train_fn(model, dataset, indices, **self._kwargs)
+
+
+class _FunctionEvaluationStrategy(Generic[T]):
+    """
+    Internal adapter that wraps legacy evaluation functions.
+
+    Allows old eval_fn + eval_kwargs to work with new Strategy interface.
+    """
+
+    def __init__(
+        self,
+        eval_fn: Callable[[nn.Module, Dataset[T]], Mapping[str, float | ArrayLike]],
+        kwargs: Mapping[str, Any] | None = None,
+    ) -> None:
+        self._eval_fn = eval_fn
+        self._kwargs = kwargs if kwargs is not None else {}
+
+    def evaluate(self, model: nn.Module, dataset: Dataset[T]) -> Mapping[str, float | ArrayLike]:
+        """Delegate to wrapped function with kwargs."""
+        return self._eval_fn(model, dataset, **self._kwargs)
