@@ -125,6 +125,12 @@ stages:
 
 ### SHARED RULE TEMPLATES ###
 
+# Common skip rule for cache update commits (applies to both main and MRs)
+.rules_skip_on_cache_update:
+  rules:
+    - if: $CI_COMMIT_TITLE == $UPDATE_CACHE_MESSAGE
+      when: never
+
 .rules_main_mr:
   rules:
     - if: $CREATE_NEW_RELEASE
@@ -134,18 +140,13 @@ stages:
 
 .rules_main_mr_skip_cache_update:
   rules:
-    - if: $CREATE_NEW_RELEASE
-      when: never
-    - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE == $UPDATE_CACHE_MESSAGE
-      when: never
-    - if: $CI_COMMIT_BRANCH == 'main'
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - !reference [.rules_skip_on_cache_update, rules]
+    - !reference [.rules_main_mr, rules]
 
 .rules_main_mr_code:
   rules:
+    - !reference [.rules_skip_on_cache_update, rules]
     - if: $CREATE_NEW_RELEASE
-      when: never
-    - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE == $UPDATE_CACHE_MESSAGE
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
@@ -157,9 +158,8 @@ stages:
 
 .rules_main_mr_deps:
   rules:
+    - !reference [.rules_skip_on_cache_update, rules]
     - if: $CREATE_NEW_RELEASE
-      when: never
-    - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE == $UPDATE_CACHE_MESSAGE
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
@@ -198,9 +198,8 @@ stages:
 
 .rules_main_mr_docs_skip_cache_update:
   rules:
+    - !reference [.rules_skip_on_cache_update, rules]
     - if: $CREATE_NEW_RELEASE
-      when: never
-    - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE == $UPDATE_CACHE_MESSAGE
       when: never
     - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE != $UPDATE_CACHE_MESSAGE
       variables:
