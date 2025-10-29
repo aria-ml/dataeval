@@ -17,6 +17,7 @@ __all__ = [
     "feature_distance",
     "flags",
     "label_parity",
+    "label_stats",
     "minimum_spanning_tree",
     "nullmodel_accuracy",
     "nullmodel_fpr",
@@ -37,6 +38,7 @@ from dataeval.core._divergence import divergence_fnn, divergence_mst
 from dataeval.core._feature_distance import feature_distance
 from dataeval.core._hash import pchash, xxhash
 from dataeval.core._label_parity import label_parity
+from dataeval.core._label_stats import label_stats
 from dataeval.core._mst import compute_neighbors, minimum_spanning_tree
 from dataeval.core._nullmodel import (
     nullmodel_accuracy,

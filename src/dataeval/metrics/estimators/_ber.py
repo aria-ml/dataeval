@@ -67,5 +67,5 @@ def ber(embeddings: Array, labels: Array, k: int = 1, method: Literal["KNN", "MS
     if method == "KNN":
         kwargs.update({"k": k})
 
-    upper, lower = ber_fn(**kwargs)
-    return BEROutput(upper, lower)
+    ber_dict = ber_fn(**kwargs)
+    return BEROutput(ber_dict["upper_bound"], ber_dict["lower_bound"])

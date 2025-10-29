@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, overload
+from typing import Literal, TypedDict, overload
 
 __all__ = []
 
@@ -15,13 +15,48 @@ from dataeval.protocols import _1DArray, _2DArray
 from dataeval.utils._array import as_numpy
 
 
+class ParityDict(TypedDict):
+    """
+    Type definition for parity output.
+
+    Attributes
+    ----------
+    chi_scores : NDArray[np.float64]
+        Array of chi-squared statistics for each factor
+    p_values : NDArray[np.float64]
+        Array of p-values for each factor
+    """
+
+    chi_scores: NDArray[np.float64]
+    p_values: NDArray[np.float64]
+
+
+class ParityWithInsufficientDataDict(TypedDict):
+    """
+    Type definition for parity output with insufficient data information.
+
+    Attributes
+    ----------
+    chi_scores : NDArray[np.float64]
+        Array of chi-squared statistics for each factor
+    p_values : NDArray[np.float64]
+        Array of p-values for each factor
+    insufficient_data : Mapping[int, Mapping[int, Mapping[int, int]]]
+        Mapping of factors to categories to classes with insufficient data counts
+    """
+
+    chi_scores: NDArray[np.float64]
+    p_values: NDArray[np.float64]
+    insufficient_data: Mapping[int, Mapping[int, Mapping[int, int]]]
+
+
 @overload
 def parity(
     factor_data: _2DArray[int],
     class_labels: _1DArray[int],
     *,
     return_insufficient_data: Literal[False] = False,
-) -> tuple[NDArray[np.float64], NDArray[np.float64]]: ...
+) -> ParityDict: ...
 
 
 @overload
@@ -30,7 +65,7 @@ def parity(
     class_labels: _1DArray[int],
     *,
     return_insufficient_data: Literal[True],
-) -> tuple[NDArray[np.float64], NDArray[np.float64], Mapping[int, Mapping[int, Mapping[int, int]]]]: ...
+) -> ParityWithInsufficientDataDict: ...
 
 
 def parity(
@@ -38,10 +73,7 @@ def parity(
     class_labels: _1DArray[int],
     *,
     return_insufficient_data: bool = False,
-) -> (
-    tuple[NDArray[np.float64], NDArray[np.float64]]
-    | tuple[NDArray[np.float64], NDArray[np.float64], Mapping[int, Mapping[int, Mapping[int, int]]]]
-):
+) -> ParityDict | ParityWithInsufficientDataDict:
     """
     Calculate chi-square statistics to assess the linear relationship \
     between multiple factors and class labels.
@@ -59,10 +91,12 @@ def parity(
 
     Returns
     -------
-    ParityOutput[NDArray[np.float64]]
-        Arrays of length (num_factors) whose (i)th element corresponds to the
-        chi-square score and :term:`p-value<P-Value>` for the relationship between factor i and
-        the class labels in the dataset.
+    dict
+        Dictionary with keys:
+        - chi_scores : NDArray[np.float64] - Array of chi-squared statistics for each factor
+        - p_values : NDArray[np.float64] - Array of p-values for each factor
+        - insufficient_data : Mapping[int, Mapping[int, Mapping[int, int]]] - (only if return_insufficient_data=True)
+        Mapping of factors to categories to classes with insufficient data counts
 
     Raises
     ------
@@ -111,6 +145,6 @@ def parity(
         chi_scores[i], p_values[i] = chi2_contingency(contingency_matrix)[:2]  # type: ignore
 
     if return_insufficient_data:
-        return chi_scores, p_values, insufficient_data
+        return {"chi_scores": chi_scores, "p_values": p_values, "insufficient_data": insufficient_data}
 
-    return chi_scores, p_values
+    return {"chi_scores": chi_scores, "p_values": p_values}
