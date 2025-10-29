@@ -93,29 +93,6 @@ class Array(Protocol):
     def __len__(self) -> int: ...
 
 
-# Generic Type Alias Syntax only available in Python 3.12+
-# type _1DArray[DType] = SequenceLike[DType] | Array
-
-DType = TypeVar("DType", covariant=True)
-
-
-@runtime_checkable
-class SequenceLike(Protocol[DType]):
-    def __getitem__(self, key: Any, /) -> DType | SequenceLike[DType]: ...
-    def __iter__(self) -> Iterator[DType]: ...
-    def __len__(self) -> int: ...
-
-
-_1DArray: TypeAlias = SequenceLike[DType] | Array
-_2DArray: TypeAlias = SequenceLike[SequenceLike[DType]] | Array
-_3DArray: TypeAlias = SequenceLike[SequenceLike[SequenceLike[DType]]] | Array
-_4DArray: TypeAlias = SequenceLike[SequenceLike[SequenceLike[SequenceLike[DType]]]] | Array
-_5DArray: TypeAlias = SequenceLike[SequenceLike[SequenceLike[SequenceLike[SequenceLike[DType]]]]] | Array
-_6DArray: TypeAlias = SequenceLike[SequenceLike[SequenceLike[SequenceLike[SequenceLike[SequenceLike[DType]]]]]] | Array
-_NDArray: TypeAlias = (
-    _1DArray[DType] | _2DArray[DType] | _3DArray[DType] | _4DArray[DType] | _5DArray[DType] | _6DArray[DType]
-)
-
 _T = TypeVar("_T")
 _T_co = TypeVar("_T_co", covariant=True)
 _T_cn = TypeVar("_T_cn", contravariant=True)

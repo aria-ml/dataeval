@@ -10,18 +10,19 @@ __all__ = []
 
 import numpy as np
 
-from dataeval.protocols import _1DArray, _2DArray
+from dataeval.types import Array1D, ArrayND
+from dataeval.utils._array import as_numpy
 
 
-def divergence_mst(embeddings: _2DArray[float], class_labels: _1DArray[int]) -> int:
+def divergence_mst(embeddings: ArrayND[float], class_labels: Array1D[int]) -> int:
     """
     Counts the number of cross-label edges in the minimum spanning tree of data.
 
     Parameters
     ----------
-    embeddings : _2DArray[float]
-        Input images/embeddings to be grouped. Can be a 2D list, or array-like object.
-    class_labels : _1DArray[int]
+    embeddings : ArrayND[float]
+        Input images/embeddings to be grouped. Can be an N dimensional list, or array-like object.
+    class_labels : Array1D[int]
         Corresponding class labels for each data point. Can be a 1D list, or array-like object.
 
     Returns
@@ -36,15 +37,15 @@ def divergence_mst(embeddings: _2DArray[float], class_labels: _1DArray[int]) -> 
     return np.sum(class_labels[source] != class_labels[target])
 
 
-def divergence_fnn(embeddings: _2DArray[float], class_labels: _1DArray[int]) -> int:
+def divergence_fnn(embeddings: ArrayND[float], class_labels: Array1D[int]) -> int:
     """
     Counts label disagreements between nearest neighbors in data.
 
     Parameters
     ----------
-    embeddings : _2DArray[float]
-        Input images/embeddings to be grouped. Can be a 2D list, or array-like object.
-    class_labels : _1DArray[int]
+    embeddings : ArrayND[float]
+        Input images/embeddings to be grouped. Can be an N dimensional list, or array-like object.
+    class_labels : Array1D[int]
         Corresponding class labels for each data point. Can be a 1D list, or array-like object.
 
     Returns
@@ -54,5 +55,8 @@ def divergence_fnn(embeddings: _2DArray[float], class_labels: _1DArray[int]) -> 
     """
     from dataeval.core._mst import compute_neighbors
 
-    nn_indices = compute_neighbors(embeddings, embeddings)
-    return np.sum(class_labels[nn_indices] != class_labels)
+    embeddings_np = as_numpy(embeddings)
+    class_labels_np = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
+
+    nn_indices = compute_neighbors(embeddings_np, embeddings_np)
+    return np.sum(class_labels_np[nn_indices] != class_labels_np)
