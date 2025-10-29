@@ -11,10 +11,11 @@ from typing import Any, Literal, TypeVar, overload
 
 import numpy as np
 import torch
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 
 from dataeval._log import LogMessage
-from dataeval.protocols import Array, ArrayLike, SequenceLike
+from dataeval.protocols import Array
+from dataeval.types import SequenceLike
 
 _logger = logging.getLogger(__name__)
 
@@ -38,11 +39,36 @@ def _try_import(module_name: str) -> ModuleType | None:
     return module
 
 
+def opt_as_numpy(
+    array: ArrayLike | SequenceLike[Any] | None,
+    *,
+    dtype: type[_np_dtype] | None = None,
+    required_ndim: int | Iterable[int] | None = None,
+    required_shape: tuple[int, ...] | None = None,
+) -> NDArray[_np_dtype] | None:
+    return opt_to_numpy(array, dtype=dtype, required_ndim=required_ndim, required_shape=required_shape, copy=False)
+
+
+def opt_to_numpy(
+    array: ArrayLike | SequenceLike[Any] | None,
+    *,
+    dtype: type[_np_dtype] | None = None,
+    required_ndim: int | Iterable[int] | None = None,
+    required_shape: tuple[int, ...] | None = None,
+    copy: bool = True,
+) -> NDArray[_np_dtype] | None:
+    return (
+        None
+        if array is None
+        else to_numpy(array, dtype=dtype, required_ndim=required_ndim, required_shape=required_shape, copy=copy)
+    )
+
+
 def as_numpy(
     array: ArrayLike | SequenceLike[Any] | None,
     *,
     dtype: type[_np_dtype] | None = None,
-    required_ndim: int | None = None,
+    required_ndim: int | Iterable[int] | None = None,
     required_shape: tuple[int, ...] | None = None,
 ) -> NDArray[_np_dtype]:
     """Converts an ArrayLike to Numpy array without copying (if possible)"""
@@ -53,7 +79,7 @@ def to_numpy(
     array: ArrayLike | SequenceLike[Any] | None,
     *,
     dtype: type[_np_dtype] | None = None,
-    required_ndim: int | None = None,
+    required_ndim: int | Iterable[int] | None = None,
     required_shape: tuple[int, ...] | None = None,
     copy: bool = True,
 ) -> NDArray[_np_dtype]:
@@ -81,7 +107,8 @@ def to_numpy(
     if _array is None:
         _array = np.array(array, dtype=dtype) if copy else np.asarray(array, dtype=dtype)
 
-    if required_ndim is not None and _array.ndim != required_ndim:
+    required_ndims = (required_ndim,) if isinstance(required_ndim, int) else required_ndim
+    if required_ndims is not None and _array.ndim not in required_ndims:
         raise ValueError(f"Array has {_array.ndim} dimensions, expected {required_ndim}.")
 
     if required_shape is not None and _array.shape != required_shape:

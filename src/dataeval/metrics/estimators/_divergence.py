@@ -67,7 +67,8 @@ def divergence(emb_a: Array, emb_b: Array, method: Literal["FNN", "MST"] = "FNN"
     M = b.shape[0]
 
     stacked_data = np.vstack((a, b))
-    labels = np.vstack([np.zeros([N, 1], dtype=np.intp), np.ones([M, 1], dtype=np.intp)])
+    labels = np.zeros((N + M,), dtype=np.intp)
+    labels[N:] = 1
 
     errors = div_fn(stacked_data, labels)
     dp = max(0.0, 1 - ((M + N) / (2 * M * N)) * errors)

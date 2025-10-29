@@ -15,7 +15,7 @@ from numpy.typing import NDArray
 from sklearn.neighbors import NearestNeighbors
 
 from dataeval.config import get_max_processes
-from dataeval.protocols import _2DArray
+from dataeval.types import ArrayND
 from dataeval.utils._array import as_numpy, flatten
 
 
@@ -278,7 +278,7 @@ def minimum_spanning_tree_edges(
     return tree
 
 
-def minimum_spanning_tree(embeddings: _2DArray[float], k: int = 15) -> MSTDict:
+def minimum_spanning_tree(embeddings: ArrayND[float], k: int = 15) -> MSTDict:
     """
     Compute the minimum spanning tree of a dataset.
 
@@ -287,7 +287,7 @@ def minimum_spanning_tree(embeddings: _2DArray[float], k: int = 15) -> MSTDict:
 
     Parameters
     ----------
-    embeddings : _2DArray[float]
+    embeddings : Array2D[float]
         Input data with shape (n_samples, n_features). Can be a 2D list, array-like
         object, or tensor that will be flattened if necessary.
     k : int, default=15
@@ -334,15 +334,15 @@ def minimum_spanning_tree(embeddings: _2DArray[float], k: int = 15) -> MSTDict:
 
 
 def compute_neighbor_distances(
-    embeddings: _2DArray[float], k: int = 10
+    embeddings: ArrayND[float], k: int = 10
 ) -> tuple[NDArray[np.int32], NDArray[np.float32]]:
     """
     Compute k nearest neighbors for each point in data (self-query, excluding self).
 
     Parameters
     ----------
-    embeddings : _2DArray[float]
-        Input data array with shape (n_samples, n_features). Can be a 2D list,
+    embeddings : ArrayND[float]
+        Input data array with shape (n_samples, n_features). Can be an N dimensional list,
         or array-like object.
     k : int, default=10
         Number of neighbors to find (excluding self)
@@ -358,15 +358,15 @@ def compute_neighbor_distances(
     --------
     compute_neighbors : For querying neighbors between two different datasets
     """
-    embeddings_np = as_numpy(embeddings)
+    embeddings_np = as_numpy(embeddings, required_ndim=2)
     return _compute_nearest_neighbors(
         embeddings_np, None, k, algorithm="brute", exclude_self=True, return_distances=True
     )
 
 
 def compute_neighbors(
-    data_fit: _2DArray[float],
-    data_query: _2DArray[float],
+    data_fit: ArrayND[float],
+    data_query: ArrayND[float],
     k: int = 1,
     algorithm: Literal["auto", "ball_tree", "kd_tree"] = "auto",
 ) -> NDArray[np.int32]:
@@ -375,13 +375,13 @@ def compute_neighbors(
 
     Parameters
     ----------
-    data_fit : _2DArray[float]
+    data_fit : ArrayND[float]
         Reference points to search with shape (n_samples_fit, n_features).
-        Can be a 2D list, or array-like object. This is the dataset
+        Can be an N dimensional list, or array-like object. This is the dataset
         that will be indexed for neighbor search.
-    data_query : _2DArray[float]
+    data_query : ArrayND[float]
         Query points with shape (n_samples_query, n_features).
-        Can be a 2D list, or array-like object. For each of these
+        Can be an N dimensional list, or array-like object. For each of these
         points, find k nearest neighbors in data_fit.
     k : int, default=1
         The number of neighbors to find
