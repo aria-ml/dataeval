@@ -132,9 +132,20 @@ stages:
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
+.rules_main_mr_skip_cache_update:
+  rules:
+    - if: $CREATE_NEW_RELEASE
+      when: never
+    - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE == $UPDATE_CACHE_MESSAGE
+      when: never
+    - if: $CI_COMMIT_BRANCH == 'main'
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+
 .rules_main_mr_code:
   rules:
     - if: $CREATE_NEW_RELEASE
+      when: never
+    - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE == $UPDATE_CACHE_MESSAGE
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
@@ -147,6 +158,8 @@ stages:
 .rules_main_mr_deps:
   rules:
     - if: $CREATE_NEW_RELEASE
+      when: never
+    - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE == $UPDATE_CACHE_MESSAGE
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
@@ -175,6 +188,23 @@ stages:
   rules:
     - if: $CREATE_NEW_RELEASE || $CI_COMMIT_BRANCH == 'main'
       when: never
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      changes:
+        paths:
+          - src/**/*
+          - docs/**/*
+          - uv.lock
+          - '*.md'
+
+.rules_main_mr_docs_skip_cache_update:
+  rules:
+    - if: $CREATE_NEW_RELEASE
+      when: never
+    - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE == $UPDATE_CACHE_MESSAGE
+      when: never
+    - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE != $UPDATE_CACHE_MESSAGE
+      variables:
+        DOCS_CLEAN: '-- clean'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
       changes:
         paths:
