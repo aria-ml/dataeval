@@ -8,7 +8,7 @@ from __future__ import annotations
 __all__ = []
 
 import warnings
-from typing import Any, Literal, overload
+from typing import Any, Literal, TypedDict, overload
 
 import numpy as np
 from numpy.typing import NDArray
@@ -17,6 +17,22 @@ from sklearn.neighbors import NearestNeighbors
 from dataeval.config import get_max_processes
 from dataeval.protocols import _2DArray
 from dataeval.utils._array import as_numpy, flatten
+
+
+class MSTDict(TypedDict):
+    """
+    Type definition for minimum spanning tree output.
+
+    Attributes
+    ----------
+    source : NDArray[np.intp]
+        Source node indices for each edge in the MST
+    target : NDArray[np.intp]
+        Target node indices for each edge in the MST
+    """
+
+    source: NDArray[np.intp]
+    target: NDArray[np.intp]
 
 
 @overload
@@ -262,7 +278,7 @@ def minimum_spanning_tree_edges(
     return tree
 
 
-def minimum_spanning_tree(embeddings: _2DArray[float], k: int = 15) -> tuple[NDArray[np.intp], NDArray[np.intp]]:
+def minimum_spanning_tree(embeddings: _2DArray[float], k: int = 15) -> MSTDict:
     """
     Compute the minimum spanning tree of a dataset.
 
@@ -281,14 +297,14 @@ def minimum_spanning_tree(embeddings: _2DArray[float], k: int = 15) -> tuple[NDA
 
     Returns
     -------
-    rows : NDArray[np.intp]
-        Source node indices for each edge in the MST with shape (n_samples - 1,)
-    cols : NDArray[np.intp]
-        Target node indices for each edge in the MST with shape (n_samples - 1,)
+    dict
+        Dictionary with keys:
+        - source : NDArray[np.intp] - Source node indices for each edge in the MST with shape (n_samples - 1,)
+        - target : NDArray[np.intp] - Target node indices for each edge in the MST with shape (n_samples - 1,)
 
     Notes
     -----
-    The MST is represented as two arrays (rows, cols) defining edges.
+    The MST is represented as two arrays (source, target) defining edges.
     Together they form n_samples - 1 edges connecting all points.
 
     Examples
@@ -296,8 +312,8 @@ def minimum_spanning_tree(embeddings: _2DArray[float], k: int = 15) -> tuple[NDA
     >>> import numpy as np
     >>> from dataeval.core._mst import minimum_spanning_tree
     >>> data = np.random.rand(100, 10)
-    >>> rows, cols = minimum_spanning_tree(data, k=15)
-    >>> len(rows)  # Should be n_samples - 1
+    >>> mst = minimum_spanning_tree(data, k=15)
+    >>> len(mst["source"])  # Should be n_samples - 1
     99
 
     See Also
@@ -311,10 +327,10 @@ def minimum_spanning_tree(embeddings: _2DArray[float], k: int = 15) -> tuple[NDA
     neighbors, distances = compute_neighbor_distances(embeddings_np, k=k)
     mst_edges = minimum_spanning_tree_edges(embeddings_np, neighbors, distances)
 
-    rows = mst_edges[:, 0].astype(np.intp)
-    cols = mst_edges[:, 1].astype(np.intp)
+    source = mst_edges[:, 0].astype(np.intp)
+    target = mst_edges[:, 1].astype(np.intp)
 
-    return rows, cols
+    return {"source": source, "target": target}
 
 
 def compute_neighbor_distances(

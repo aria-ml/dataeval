@@ -31,14 +31,14 @@ class MetadataDistanceValues(NamedTuple):
         to the median of the reference distribution.
     dist : float
         The Earth Mover's Distance normalized by the interquartile range (IQR) of the reference
-    pvalue : float
+    p_value : float
         The p-value from the KS two-sample test
     """
 
     statistic: float
     location: float
     dist: float
-    pvalue: float
+    p_value: float
 
 
 class MetadataDistanceOutput(MappingOutput[str, MetadataDistanceValues]):
@@ -50,7 +50,7 @@ class MetadataDistanceOutput(MappingOutput[str, MetadataDistanceValues]):
     key : str
         Metadata feature names
     value : :class:`.MetadataDistanceValues`
-        Output per feature name containing the statistic, statistic location, distance, and pvalue.
+        Output per feature name containing the statistic, statistic location, distance, and p-value.
     """
 
 

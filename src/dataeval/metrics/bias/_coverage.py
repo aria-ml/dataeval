@@ -68,8 +68,8 @@ def coverage(
 
     # Calculate distance matrix, look at the (num_observations + 1)th farthest neighbor for each image.
     if radius_type == "naive":
-        return CoverageOutput(*coverage_naive(embeddings, num_observations))
+        return CoverageOutput(**coverage_naive(embeddings, num_observations))
     if radius_type == "adaptive":
-        return CoverageOutput(*coverage_adaptive(embeddings, num_observations, percent))
+        return CoverageOutput(**coverage_adaptive(embeddings, num_observations, percent))
 
     raise ValueError(f"{radius_type} is an invalid radius type. Expected 'adaptive' or 'naive'")
