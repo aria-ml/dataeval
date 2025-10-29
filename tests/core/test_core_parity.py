@@ -16,7 +16,9 @@ class TestParity:
         binned_data = np.array([[0, 1], [1, 0], [0, 1], [1, 0]], dtype=np.intp)
         class_labels = np.array([0, 0, 1, 1], dtype=np.intp)
 
-        chi_scores, p_values = parity(binned_data, class_labels)
+        result = parity(binned_data, class_labels)
+        chi_scores = result["chi_scores"]
+        p_values = result["p_values"]
 
         assert isinstance(chi_scores, np.ndarray)
         assert isinstance(p_values, np.ndarray)
@@ -30,10 +32,10 @@ class TestParity:
         binned_data = np.array([[0], [1], [0], [1]], dtype=np.intp)
         class_labels = np.array([0, 0, 1, 1], dtype=np.intp)
 
-        chi_scores, p_values = parity(binned_data, class_labels)
+        result = parity(binned_data, class_labels)
 
-        assert chi_scores.shape == (1,)
-        assert p_values.shape == (1,)
+        assert result["chi_scores"].shape == (1,)
+        assert result["p_values"].shape == (1,)
 
     def test_perfect_correlation(self):
         """Test with perfectly correlated factor and labels."""
@@ -41,20 +43,20 @@ class TestParity:
         binned_data = np.array([data], dtype=np.intp).T
         class_labels = np.array(data, dtype=np.intp)
 
-        chi_scores, p_values = parity(binned_data, class_labels)
+        result = parity(binned_data, class_labels)
 
-        assert chi_scores[0] > 0
-        assert p_values[0] < 0.05
+        assert result["chi_scores"][0] > 0
+        assert result["p_values"][0] < 0.05
 
     def test_no_correlation(self):
         """Test with uncorrelated factor and labels."""
         binned_data = np.array([[0], [0], [0], [0]], dtype=np.intp)
         class_labels = np.array([0, 0, 1, 1], dtype=np.intp)
 
-        chi_scores, p_values = parity(binned_data, class_labels)
+        result = parity(binned_data, class_labels)
 
-        assert_array_almost_equal(chi_scores, [0.0])
-        assert_array_almost_equal(p_values, [1.0])
+        assert_array_almost_equal(result["chi_scores"], [0.0])
+        assert_array_almost_equal(result["p_values"], [1.0])
 
     def test_return_insufficient_data_false(self):
         """Test return type when return_insufficient_data=False."""
@@ -64,8 +66,8 @@ class TestParity:
         result = parity(binned_data, class_labels, return_insufficient_data=False)
 
         assert len(result) == 2
-        assert isinstance(result[0], np.ndarray)
-        assert isinstance(result[1], np.ndarray)
+        assert isinstance(result["chi_scores"], np.ndarray)
+        assert isinstance(result["p_values"], np.ndarray)
 
     def test_return_insufficient_data_true(self):
         """Test return type when return_insufficient_data=True."""
@@ -75,7 +77,9 @@ class TestParity:
         result = parity(binned_data, class_labels, return_insufficient_data=True)
 
         assert len(result) == 3
-        chi_scores, p_values, insufficient_data = result
+        chi_scores = result["chi_scores"]
+        p_values = result["p_values"]
+        insufficient_data = result["insufficient_data"]
         assert isinstance(chi_scores, np.ndarray)
         assert isinstance(p_values, np.ndarray)
         assert isinstance(insufficient_data, dict)
@@ -85,7 +89,8 @@ class TestParity:
         binned_data = np.array([[0], [1], [0]], dtype=np.intp)
         class_labels = np.array([0, 1, 0], dtype=np.intp)
 
-        _, _, insufficient_data = parity(binned_data, class_labels, return_insufficient_data=True)
+        result = parity(binned_data, class_labels, return_insufficient_data=True)
+        insufficient_data = result["insufficient_data"]
 
         assert 0 in insufficient_data
         assert len(insufficient_data[0]) > 0
@@ -95,10 +100,10 @@ class TestParity:
         binned_data = np.array([[0, 0, 1], [1, 1, 0], [0, 1, 1], [1, 0, 0]], dtype=np.intp)
         class_labels = np.array([0, 1, 0, 1], dtype=np.intp)
 
-        chi_scores, p_values = parity(binned_data, class_labels)
+        result = parity(binned_data, class_labels)
 
-        assert chi_scores.shape == (3,)
-        assert p_values.shape == (3,)
+        assert result["chi_scores"].shape == (3,)
+        assert result["p_values"].shape == (3,)
 
     def test_zero_row_removal(self):
         """Test that zero-only rows are properly handled."""
@@ -106,21 +111,21 @@ class TestParity:
         binned_data = np.array([[0], [0], [0], [0]], dtype=np.intp)
         class_labels = np.array([0, 0, 1, 1], dtype=np.intp)
 
-        chi_scores, p_values = parity(binned_data, class_labels)
+        result = parity(binned_data, class_labels)
 
         # Should not raise error despite having only one factor value
-        assert len(chi_scores) == 1
-        assert len(p_values) == 1
+        assert len(result["chi_scores"]) == 1
+        assert len(result["p_values"]) == 1
 
     def test_single_class(self):
         """Test with only one class label."""
         binned_data = np.array([[0], [1], [0], [1]], dtype=np.intp)
         class_labels = np.array([0, 0, 0, 0], dtype=np.intp)
 
-        chi_scores, p_values = parity(binned_data, class_labels)
+        result = parity(binned_data, class_labels)
 
-        assert_array_almost_equal(chi_scores, [0.0])
-        assert_array_almost_equal(p_values, [1.0])
+        assert_array_almost_equal(result["chi_scores"], [0.0])
+        assert_array_almost_equal(result["p_values"], [1.0])
 
     def test_empty_arrays(self):
         """Test behavior with empty arrays."""
@@ -143,35 +148,35 @@ class TestParity:
         binned_data = np.array([[100], [200], [100], [200]], dtype=np.intp)
         class_labels = np.array([0, 1, 0, 1], dtype=np.intp)
 
-        chi_scores, p_values = parity(binned_data, class_labels)
+        result = parity(binned_data, class_labels)
 
-        assert chi_scores[0] > 0
-        assert 0 <= p_values[0] <= 1
+        assert result["chi_scores"][0] > 0
+        assert 0 <= result["p_values"][0] <= 1
 
     def test_dtype_consistency(self):
         """Test that output arrays have correct dtypes."""
         binned_data = np.array([[0], [1]], dtype=np.intp)
         class_labels = np.array([0, 1], dtype=np.intp)
 
-        chi_scores, p_values = parity(binned_data, class_labels)
+        result = parity(binned_data, class_labels)
 
-        assert chi_scores.dtype == np.float64
-        assert p_values.dtype == np.float64
+        assert result["chi_scores"].dtype == np.float64
+        assert result["p_values"].dtype == np.float64
 
     def test_class_labels_as_list(self):
         """Test with class_labels as different sequence types."""
         binned_data = np.array([[0], [1]], dtype=np.intp)
 
         # Test with list
-        chi1, p1 = parity(binned_data, [0, 1])  # type: ignore
+        result1 = parity(binned_data, [0, 1])  # type: ignore
 
         # Test with tuple
-        chi2, p2 = parity(binned_data, (0, 1))  # type: ignore
+        result2 = parity(binned_data, (0, 1))  # type: ignore
 
         # Test with numpy array
-        chi3, p3 = parity(binned_data, np.array([0, 1]))
+        result3 = parity(binned_data, np.array([0, 1]))
 
-        assert_array_almost_equal(chi1, chi2)
-        assert_array_almost_equal(chi2, chi3)
-        assert_array_almost_equal(p1, p2)
-        assert_array_almost_equal(p2, p3)
+        assert_array_almost_equal(result1["chi_scores"], result2["chi_scores"])
+        assert_array_almost_equal(result2["chi_scores"], result3["chi_scores"])
+        assert_array_almost_equal(result1["p_values"], result2["p_values"])
+        assert_array_almost_equal(result2["p_values"], result3["p_values"])

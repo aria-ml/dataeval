@@ -75,7 +75,8 @@ def label_parity(
     """
     exp_np = as_numpy(expected_labels).astype(np.intp)
     obs_np = as_numpy(observed_labels).astype(np.intp)
-    return LabelParityOutput(*_label_parity(exp_np, obs_np, num_classes=num_classes))
+    result = _label_parity(exp_np, obs_np, num_classes=num_classes)
+    return LabelParityOutput(score=result["chi_squared"], p_value=result["p_value"])
 
 
 @set_metadata
@@ -145,7 +146,7 @@ def parity(metadata: Metadata) -> ParityOutput:
 
     insufficient_data = {
         factor_names[k]: {vk: {index2label[vvk]: vvv for vvk, vvv in vv.items()} for vk, vv in v.items()}
-        for k, v in output[2].items()
+        for k, v in output["insufficient_data"].items()
     }
 
     if insufficient_data:
@@ -155,8 +156,8 @@ def parity(metadata: Metadata) -> ParityOutput:
         )
 
     return ParityOutput(
-        score=output[0],
-        p_value=output[1],
+        score=output["chi_scores"],
+        p_value=output["p_values"],
         factor_names=metadata.factor_names,
         insufficient_data=insufficient_data,
     )

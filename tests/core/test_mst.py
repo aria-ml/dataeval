@@ -11,8 +11,9 @@ class TestMst:
         from dataeval.core._mst import minimum_spanning_tree
 
         images = np.ones((10, 3, 3))
-        rows, cols = minimum_spanning_tree(images)
-        assert (rows == [0, 1, 2, 4, 5, 6, 7, 8, 9]).all() and (cols == [3, 3, 3, 3, 3, 3, 3, 3, 3]).all()
+        mst = minimum_spanning_tree(images)
+        assert (mst["source"] == [0, 1, 2, 4, 5, 6, 7, 8, 9]).all()
+        assert (mst["target"] == [3, 3, 3, 3, 3, 3, 3, 3, 3]).all()
 
     def test_simple_nodes(self):
         from dataeval.core._mst import minimum_spanning_tree
@@ -28,12 +29,12 @@ class TestMst:
                 [10, 1],
             ]
         ).astype(np.float64)
-        rows, cols = minimum_spanning_tree(X)
+        mst = minimum_spanning_tree(X)
 
         total = 0.0
-        for i in range(len(rows)):
-            x0, y0 = X[rows[i]]
-            x1, y1 = X[cols[i]]
+        for i in range(len(mst["source"])):
+            x0, y0 = X[mst["source"][i]]
+            x1, y1 = X[mst["target"][i]]
             total += np.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
 
         # Disabling test until fix is in
@@ -97,19 +98,19 @@ class TestMst:
         # Test with k=5 (insufficient: each cluster has 9 other points, so inter-cluster edges at rank 10+)
         with warnings.catch_warnings(record=True) as warning_list:
             warnings.simplefilter("always")
-            rows, cols = minimum_spanning_tree(X, k=5)
+            mst = minimum_spanning_tree(X, k=5)
 
             # Should trigger KNN exhaustion warning
             knn_warnings = [w for w in warning_list if "k-nearest neighbors" in str(w.message).lower()]
             assert len(knn_warnings) > 0, "Expected KNN exhaustion warning with insufficient k"
 
         # Should still produce spanning tree (19 edges for 20 points)
-        assert len(rows) == 19
+        assert len(mst["source"]) == 19
 
         # Test with k=15 (sufficient: should NOT warn)
         with warnings.catch_warnings(record=True) as warning_list:
             warnings.simplefilter("always")
-            rows, cols = minimum_spanning_tree(X, k=15)
+            mst = minimum_spanning_tree(X, k=15)
 
             knn_warnings = [w for w in warning_list if "k-nearest neighbors" in str(w.message).lower()]
             assert len(knn_warnings) == 0, "Unexpected warning with sufficient k"

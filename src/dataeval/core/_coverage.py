@@ -3,6 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 import math
+from typing import TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
@@ -10,6 +11,25 @@ from scipy.spatial.distance import pdist, squareform
 
 from dataeval.protocols import _2DArray
 from dataeval.utils._array import as_numpy, ensure_embeddings, flatten
+
+
+class CoverageDict(TypedDict):
+    """
+    Type definition for coverage output.
+
+    Attributes
+    ----------
+    uncovered_indices : NDArray[np.intp]
+        Array of indices for uncovered observations
+    critical_value_radii : NDArray[np.float64]
+        Array of critical value radii for each observation
+    coverage_radius : float
+        The radius threshold for coverage
+    """
+
+    uncovered_indices: NDArray[np.intp]
+    critical_value_radii: NDArray[np.float64]
+    coverage_radius: float
 
 
 def _validate_inputs(embeddings: NDArray[np.float64], num_observations: int) -> NDArray[np.float64]:
@@ -31,7 +51,7 @@ def _calculate_critical_value_radii(embeddings: NDArray[np.float64], num_observa
 def coverage_naive(
     embeddings: _2DArray[float],
     num_observations: int,
-) -> tuple[NDArray[np.intp], NDArray[np.float64], float]:
+) -> CoverageDict:
     """
     Evaluate :term:`coverage<Coverage>` using a naive radius calculation method.
 
@@ -50,11 +70,11 @@ def coverage_naive(
 
     Returns
     -------
-    tuple[NDArray[np.intp], NDArray[np.float64], float]
-        A tuple containing:
-        - uncovered_indices : Array of indices for uncovered observations
-        - critical_value_radii : Array of critical value radii for each observation
-        - coverage_radius : The radius threshold for coverage
+    dict
+        Dictionary with keys:
+        - uncovered_indices : NDArray[np.intp] - Array of indices for uncovered observations
+        - critical_value_radii : NDArray[np.float64] - Array of critical value radii for each observation
+        - coverage_radius : float - The radius threshold for coverage
 
     Raises
     ------
@@ -87,14 +107,18 @@ def coverage_naive(
         ** (1 / embeddings_np.shape[1])
     )
     uncovered_indices = np.where(critical_value_radii > coverage_radius)[0]
-    return uncovered_indices, critical_value_radii, coverage_radius
+    return {
+        "uncovered_indices": uncovered_indices,
+        "critical_value_radii": critical_value_radii,
+        "coverage_radius": coverage_radius,
+    }
 
 
 def coverage_adaptive(
     embeddings: _2DArray[float],
     num_observations: int,
     percent: float,
-) -> tuple[NDArray[np.intp], NDArray[np.float64], float]:
+) -> CoverageDict:
     """
     Evaluate :term:`coverage<Coverage>` using an adaptive radius calculation method.
 
@@ -115,11 +139,11 @@ def coverage_adaptive(
 
     Returns
     -------
-    tuple[NDArray[np.intp], NDArray[np.float64], float]
-        A tuple containing:
-        - uncovered_indices : Array of indices for uncovered observations
-        - critical_value_radii : Array of critical value radii for each observation
-        - coverage_radius : The adaptive radius threshold for coverage
+    dict
+        Dictionary with keys:
+        - uncovered_indices : NDArray[np.intp] - Array of indices for uncovered observations
+        - critical_value_radii : NDArray[np.float64] - Array of critical value radii for each observation
+        - coverage_radius : float - The adaptive radius threshold for coverage
 
     Raises
     ------
@@ -151,4 +175,8 @@ def coverage_adaptive(
     uncovered_indices = np.argsort(critical_value_radii)[::-1][:selection]
     coverage_radius = float(np.mean(np.sort(critical_value_radii)[::-1][selection - 1 : selection + 1]))
 
-    return uncovered_indices, critical_value_radii, coverage_radius
+    return {
+        "uncovered_indices": uncovered_indices,
+        "critical_value_radii": critical_value_radii,
+        "coverage_radius": coverage_radius,
+    }
