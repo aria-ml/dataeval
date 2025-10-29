@@ -19,23 +19,23 @@ docs:
 
 doclint:
   stage: docs
-  extends: 
+  extends:
     - .nox
-    - .rules_main_mr_docs
+    - .rules_main_mr_docs_skip_cache_update
   script:
     - nox -e doclint
 
 doctest:
   stage: docs
-  extends: 
+  extends:
     - .nox
-    - .rules_main_mr_docs
+    - .rules_main_mr_docs_skip_cache_update
   script:
     - nox -e doctest
 
 linkchecker:
   stage: docs
-  extends: .rules_main_mr_docs
+  extends: .rules_main_mr_docs_skip_cache_update
   needs: []
   image:
     name: ghcr.io/tcort/markdown-link-check:stable
@@ -46,7 +46,7 @@ linkchecker:
 
 markdownlint:
   stage: docs
-  extends: .rules_main_mr_docs
+  extends: .rules_main_mr_docs_skip_cache_update
   needs: []
   image:
     name: davidanson/markdownlint-cli2

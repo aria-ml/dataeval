@@ -1,9 +1,9 @@
 ### RELEASE STAGE JOBS ###
 
 coverage:
-  extends: 
+  extends:
     - .publish_merge_request_env
-    - .rules_main_mr_code
+    - .rules_main_mr
   needs: [test]
   before_script:
     - uv pip install coverage --system
