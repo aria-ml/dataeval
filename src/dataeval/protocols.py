@@ -23,10 +23,9 @@ __all__ = [
 ]
 
 
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from typing import (
     Any,
-    Generic,
     Protocol,
     TypeAlias,
     TypedDict,
@@ -121,6 +120,8 @@ _T = TypeVar("_T")
 _T_co = TypeVar("_T_co", covariant=True)
 _T_cn = TypeVar("_T_cn", contravariant=True)
 
+# ========== METADATA ==========
+
 
 class DatasetMetadata(TypedDict, total=False):
     """
@@ -167,8 +168,11 @@ class DatumMetadata(TypedDict, total=False):
     id: Required[ReadOnly[int | str]]
 
 
+# ========== DATASETS ==========
+
+
 @runtime_checkable
-class Dataset(Generic[_T_co], Protocol):
+class Dataset(Protocol[_T_co]):
     """
     Protocol for a generic `Dataset`.
 
@@ -185,7 +189,7 @@ class Dataset(Generic[_T_co], Protocol):
 
 
 @runtime_checkable
-class AnnotatedDataset(Dataset[_T_co], Generic[_T_co], Protocol):
+class AnnotatedDataset(Dataset[_T_co], Protocol[_T_co]):
     """
     Protocol for a generic `AnnotatedDataset`.
 
@@ -307,24 +311,12 @@ SegmentationDataset: TypeAlias = AnnotatedDataset[SegmentationDatum]
 Type alias for an :class:`AnnotatedDataset` of :class:`SegmentationDatum` elements.
 """
 
-# ========== MODEL ==========
-
-
-@runtime_checkable
-class AnnotatedModel(Protocol):
-    """
-    Protocol for an annotated model.
-    """
-
-    @property
-    def metadata(self) -> ModelMetadata: ...
-
 
 # ========== TRANSFORM ==========
 
 
 @runtime_checkable
-class Transform(Generic[_T], Protocol):
+class Transform(Protocol[_T]):
     """
     Protocol defining a transform function.
 
@@ -355,6 +347,16 @@ class Transform(Generic[_T], Protocol):
 # ========== MODEL ==========
 
 
+@runtime_checkable
+class AnnotatedModel(Protocol):
+    """
+    Protocol for an annotated model.
+    """
+
+    @property
+    def metadata(self) -> ModelMetadata: ...
+
+
 EmbeddingModel: TypeAlias = Callable[[Array], Array] | Callable[[Iterable[Array]], Iterable[Array]]
 """
 Type alias for a callable embedding model.
@@ -362,3 +364,128 @@ Type alias for a callable embedding model.
 Embedding models should take an input array or a batch of arrays and return an output
 representing the input data in a lower dimensional space.
 """
+
+# ========== SUFFICIENCY STRATEGIES ==========
+
+
+@runtime_checkable
+class TrainingStrategy(Protocol[_T_cn]):
+    """
+    Protocol defining the interface for training a model on a dataset subset.
+
+    Implementations must provide a `train` method with this signature.
+    Uses structural typing - no explicit inheritance required.
+
+    The @runtime_checkable decorator allows isinstance() checks if needed,
+    though structural typing works without it at type-check time.
+
+    Examples
+    --------
+    Creating a custom training strategy:
+
+    >>> class MyTraining:
+    ...     def __init__(self, learning_rate: float, epochs: int):
+    ...         self.learning_rate = learning_rate
+    ...         self.epochs = epochs
+    ...
+    ...     def train(self, model: torch.nn.Module, dataset: Dataset, indices: Sequence[int]) -> None:
+    ...         # Custom training implementation
+    ...         optimizer = torch.optim.Adam(model.parameters(), lr=self.learning_rate)
+    ...         for epoch in range(self.epochs):
+    ...             # Training loop using specified indices
+    ...             ...
+    """
+
+    def train(self, model: torch.nn.Module, dataset: Dataset[_T_cn], indices: Sequence[int]) -> None:
+        """
+        Train the model using the specified indices from the dataset.
+
+        Parameters
+        ----------
+        model : nn.Module
+            The model to train. Training should modify the model in-place.
+        dataset : Dataset[T]
+            The full dataset. Only samples at the specified indices should
+            be used for training.
+        indices : Sequence[int]
+            Indices indicating which samples from the dataset to use for
+            training this step. These allow the same model to be trained
+            incrementally on growing subsets.
+
+        Returns
+        -------
+        None
+            Training modifies the model in-place.
+
+        Notes
+        -----
+        Implementations should:
+        - Only use samples at the specified indices
+        - Modify the model parameters in-place
+        - Handle their own loss computation and optimization
+        - Be deterministic or set seeds internally for reproducibility
+        """
+        ...
+
+
+@runtime_checkable
+class EvaluationStrategy(Protocol[_T_cn]):
+    """
+    Protocol defining the interface for evaluating a trained model.
+
+    Implementations must provide an `evaluate` method with this signature.
+    Uses structural typing - no explicit inheritance required.
+
+    The @runtime_checkable decorator allows isinstance() checks if needed,
+    though structural typing works without it at type-check time.
+
+    Examples
+    --------
+    Creating a custom evaluation strategy:
+
+    >>> class MyEvaluation:
+    ...     def __init__(self, batch_size: int, metrics: list[str]):
+    ...         self.batch_size = batch_size
+    ...         self.metrics = metrics
+    ...
+    ...     def evaluate(self, model: torch.nn.Module, dataset: Dataset) -> Mapping[str, float | np.ndarray]:
+    ...         # Custom evaluation implementation
+    ...         model.eval()
+    ...         with torch.no_grad():
+    ...             # Compute metrics
+    ...             ...
+    ...         return {"accuracy": 0.95, "f1": 0.93}
+    """
+
+    def evaluate(self, model: torch.nn.Module, dataset: Dataset[_T_cn]) -> Mapping[str, float | ArrayLike]:
+        """
+        Evaluate the model on the dataset and return performance metrics.
+
+        Parameters
+        ----------
+        model : nn.Module
+            The trained model to evaluate
+        dataset : Dataset[T]
+            The dataset to evaluate on (typically a test/validation set)
+
+        Returns
+        -------
+        Mapping[str, float | ArrayLike]
+            Dictionary of metric names to values. Each value is either:
+            - A scalar (float) for single-class metrics
+            - An array (np.ndarray) for per-class or per-sample metrics
+
+            Examples:
+            - {"accuracy": 0.95}  # Single metric
+            - {"accuracy": 0.95, "precision": 0.93, "recall": 0.94}  # Multiple metrics
+            - {"accuracy": np.array([0.9, 0.85, 0.92])}  # Per-class metrics
+
+        Notes
+        -----
+        Implementations should:
+        - Set model to eval mode if needed
+        - Return consistent metric names across calls
+        - Handle both single-class and multi-class scenarios
+        - Use the entire dataset (unlike training which uses subsets)
+        """
+        ...
