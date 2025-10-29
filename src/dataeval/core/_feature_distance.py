@@ -4,7 +4,7 @@ __all__ = []
 
 import warnings
 from collections.abc import Sequence
-from typing import NamedTuple, cast
+from typing import NamedTuple, TypedDict, cast
 
 import numpy as np
 from scipy.stats import iqr, ks_2samp, wasserstein_distance
@@ -19,6 +19,28 @@ class KSType(NamedTuple):
     statistic: float
     statistic_location: float
     pvalue: float
+
+
+class FeatureDistanceResultDict(TypedDict):
+    """
+    Type definition for a single feature distance test result.
+
+    Attributes
+    ----------
+    statistic : float
+        The Kolmogorov-Smirnov test statistic
+    location : float
+        The normalized location where the KS statistic was achieved
+    dist : float
+        The Earth Mover's Distance (Wasserstein distance) between distributions
+    p_value : float
+        The p-value from the KS test
+    """
+
+    statistic: float
+    location: float
+    dist: float
+    p_value: float
 
 
 def _calculate_drift(x1: _1DArray[float] | _2DArray[float], x2: _1DArray[float] | _2DArray[float]) -> float:
@@ -40,7 +62,7 @@ def _calculate_drift(x1: _1DArray[float] | _2DArray[float], x2: _1DArray[float] 
 def feature_distance(
     continuous_data_1: _1DArray[float] | _2DArray[float],
     continuous_data_2: _1DArray[float] | _2DArray[float],
-) -> Sequence[tuple[float, float, float, float]]:
+) -> Sequence[FeatureDistanceResultDict]:
     """
     Measures the feature-wise distance between two continuous distributions and computes a
     p-value to evaluate its significance.
@@ -56,8 +78,12 @@ def feature_distance(
 
     Returns
     -------
-    Sequence[tuple[float, float, float, float]]
-        A sequence of KSTestResult tuples as defined by scipy.stats.ks_2samp.
+    list[dict]
+        List of dictionaries, one per feature, each with keys:
+        - statistic : float - The Kolmogorov-Smirnov test statistic
+        - location : float - The normalized location where the KS statistic was achieved
+        - dist : float - The Earth Mover's Distance between distributions
+        - p_value : float - The p-value from the KS test
 
     See Also
     --------
@@ -83,7 +109,7 @@ def feature_distance(
         )
 
     # Set default for statistic, location, and magnitude to zero and pvalue to one
-    results: list[tuple[float, float, float, float]] = []
+    results: list[FeatureDistanceResultDict] = []
 
     # Per factor
     for i in range(len(cont1.T)):
@@ -96,7 +122,7 @@ def feature_distance(
 
         # Default case
         if xmin == xmax:
-            results.append((0.0, 0.0, 0.0, 1.0))
+            results.append({"statistic": 0.0, "location": 0.0, "dist": 0.0, "p_value": 1.0})
             continue
 
         ks_result = cast(KSType, ks_2samp(fdata1, fdata2, method="asymp"))
@@ -106,6 +132,6 @@ def feature_distance(
 
         drift = _calculate_drift(fdata1, fdata2)
 
-        results.append((ks_result.statistic, loc, drift, ks_result.pvalue))
+        results.append({"statistic": ks_result.statistic, "location": loc, "dist": drift, "p_value": ks_result.pvalue})
 
     return results

@@ -63,7 +63,7 @@ class TestFeatureDistance:
 
         result = feature_distance(c1, c2)
 
-        assert result == [(0.0, 0.0, 0.0, 1.0)]
+        assert list(result[0].values()) == [0.0, 0.0, 0.0, 1.0]
 
     def test_inconsistent_features(self):
         """Test that value error is raised with inconsistent number of features"""

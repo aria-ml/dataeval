@@ -708,11 +708,11 @@ class Metadata:
         >>> list(output)
         ['time', 'altitude']
         >>> output["time"]
-        MetadataDistanceValues(statistic=1.0, location=0.44354838709677413, dist=2.7, pvalue=0.0)
+        MetadataDistanceValues(statistic=1.0, location=0.44354838709677413, dist=2.7, p_value=0.0)
         """
         if set(self.factor_names) != set(other.factor_names):
             raise ValueError(f"Metadata keys must be identical, got {self.factor_names} and {other.factor_names}")
         c1 = self.filter_by_factor(lambda _, fi: fi.factor_type == "continuous")
         c2 = other.filter_by_factor(lambda _, fi: fi.factor_type == "continuous")
         distance = feature_distance(c1, c2)
-        return MetadataDistanceOutput(dict(zip(self.factor_names, (MetadataDistanceValues(*d) for d in distance))))
+        return MetadataDistanceOutput(dict(zip(self.factor_names, (MetadataDistanceValues(**d) for d in distance))))

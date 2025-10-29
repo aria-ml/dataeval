@@ -3,7 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 import warnings
-from typing import Any
+from typing import Any, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
@@ -11,6 +11,22 @@ from scipy.stats import chisquare
 
 from dataeval.protocols import _1DArray
 from dataeval.utils._array import as_numpy
+
+
+class LabelParityDict(TypedDict):
+    """
+    Type definition for label parity output.
+
+    Attributes
+    ----------
+    chi_squared : float
+        The chi-squared test statistic
+    p_value : float
+        The p-value from the chi-squared test
+    """
+
+    chi_squared: float
+    p_value: float
 
 
 def _normalize_expected_dist(expected_dist: NDArray[Any], observed_dist: NDArray[Any]) -> NDArray[Any]:
@@ -96,7 +112,7 @@ def label_parity(
     observed_labels: _1DArray[int],
     *,
     num_classes: int | None = None,
-) -> tuple[float, float]:
+) -> LabelParityDict:
     """
     Calculate the chi-square statistic to assess the :term:`parity<Parity>` \
     between expected and observed label distributions.
@@ -117,8 +133,10 @@ def label_parity(
 
     Returns
     -------
-    LabelParityOutput
-        chi-squared score and :term`P-Value` of the test
+    dict
+        Dictionary with keys:
+        - chi_squared : float - The chi-squared test statistic
+        - p_value : float - The p-value from the chi-squared test
 
     Raises
     ------
@@ -146,7 +164,7 @@ def label_parity(
     >>> expected_labels = rng.choice([0, 1, 2, 3, 4], (100))
     >>> observed_labels = rng.choice([2, 3, 0, 4, 1], (100))
     >>> label_parity(expected_labels, observed_labels)
-    (14.007374204742625, 0.0072715574616218)
+    {'chi_squared': 14.007374204742625, 'p_value': 0.0072715574616218}
     """
 
     # Calculate
@@ -177,4 +195,4 @@ def label_parity(
         )
 
     cs, p = chisquare(f_obs=observed_dist, f_exp=expected_dist)
-    return cs, p
+    return {"chi_squared": float(cs), "p_value": float(p)}

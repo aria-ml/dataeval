@@ -31,8 +31,9 @@ def divergence_mst(embeddings: _2DArray[float], class_labels: _1DArray[int]) -> 
     """
     from dataeval.core._mst import minimum_spanning_tree
 
-    rows, cols = minimum_spanning_tree(embeddings)  # get rows and cols directly
-    return np.sum(class_labels[rows] != class_labels[cols])
+    mst_result = minimum_spanning_tree(embeddings)
+    source, target = mst_result["source"], mst_result["target"]
+    return np.sum(class_labels[source] != class_labels[target])
 
 
 def divergence_fnn(embeddings: _2DArray[float], class_labels: _1DArray[int]) -> int:

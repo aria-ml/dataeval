@@ -2,6 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
+from typing import TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
@@ -12,7 +13,23 @@ from dataeval.protocols import _1DArray, _2DArray
 from dataeval.utils._array import as_numpy
 
 
-def ber_mst(embeddings: _2DArray[float], class_labels: _1DArray[int]) -> tuple[float, float]:
+class BERDict(TypedDict):
+    """
+    Type definition for Bayes Error Rate bounds output.
+
+    Attributes
+    ----------
+    upper_bound : float
+        The upper bound of the Bayes Error Rate
+    lower_bound : float
+        The lower bound of the Bayes Error Rate
+    """
+
+    upper_bound: float
+    lower_bound: float
+
+
+def ber_mst(embeddings: _2DArray[float], class_labels: _1DArray[int]) -> BERDict:
     """
     An estimator for Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` \
     using FR with a minimum spanning tree (MST) test statistic basis.
@@ -26,8 +43,10 @@ def ber_mst(embeddings: _2DArray[float], class_labels: _1DArray[int]) -> tuple[f
 
     Returns
     -------
-    tuple[float, float]
-        The upper and lower bounds, respectively, of the Bayes Error Rate
+    dict
+        Dictionary with keys:
+        - upper_bound : float - The upper bound of the Bayes Error Rate
+        - lower_bound : float - The lower bound of the Bayes Error Rate
 
     References
     ----------
@@ -38,9 +57,9 @@ def ber_mst(embeddings: _2DArray[float], class_labels: _1DArray[int]) -> tuple[f
     >>> import sklearn.datasets as dsets
     >>> from dataeval.core._ber import ber_mst
 
-    >>> images, class_labels = dsets.make_blobs(n_samples=50, centers=2, n_features=2, random_state=0)
-    >>> ber_mst(images, class_labels)
-    (0.04, 0.020416847668728033)
+    >>> images, labels = dsets.make_blobs(n_samples=50, centers=2, n_features=2, random_state=0)
+    >>> ber_mst(images, labels)
+    {'upper_bound': 0.04, 'lower_bound': 0.020416847668728033}
     """
     from dataeval.core._mst import minimum_spanning_tree
 
@@ -49,15 +68,16 @@ def ber_mst(embeddings: _2DArray[float], class_labels: _1DArray[int]) -> tuple[f
 
     M, N = _get_classes_counts(labels_np)
 
-    rows, cols = minimum_spanning_tree(data_np)  # get rows and cols directly
-    mismatches = np.sum(class_labels[rows] != class_labels[cols])
+    mst_result = minimum_spanning_tree(data_np)
+    source, target = mst_result["source"], mst_result["target"]
+    mismatches = np.sum(labels_np[source] != labels_np[target])
     deltas = mismatches / (2 * N)
     upper = float(2 * deltas)
     lower = float(((M - 1) / (M)) * (1 - max(1 - 2 * ((M) / (M - 1)) * deltas, 0) ** 0.5))
-    return upper, lower
+    return {"upper_bound": upper, "lower_bound": lower}
 
 
-def ber_knn(embeddings: _2DArray[float], class_labels: _1DArray[int], k: int) -> tuple[float, float]:
+def ber_knn(embeddings: _2DArray[float], class_labels: _1DArray[int], k: int) -> BERDict:
     """
     An estimator for Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` \
     using KNN test statistic basis.
@@ -73,8 +93,10 @@ def ber_knn(embeddings: _2DArray[float], class_labels: _1DArray[int], k: int) ->
 
     Returns
     -------
-    tuple[float, float]
-        The upper and lower bounds, respectively, of the Bayes Error Rate
+    dict
+        Dictionary with keys:
+        - upper_bound : float - The upper bound of the Bayes Error Rate
+        - lower_bound : float - The lower bound of the Bayes Error Rate
 
     References
     ----------
@@ -85,9 +107,9 @@ def ber_knn(embeddings: _2DArray[float], class_labels: _1DArray[int], k: int) ->
     >>> import sklearn.datasets as dsets
     >>> from dataeval.core._ber import ber_knn
 
-    >>> images, class_labels = dsets.make_blobs(n_samples=50, centers=2, n_features=2, random_state=0)
-    >>> ber_knn(images, class_labels, 1)
-    (0.04, 0.020416847668728033)
+    >>> images, labels = dsets.make_blobs(n_samples=50, centers=2, n_features=2, random_state=0)
+    >>> ber_knn(images, labels, 1)
+    {'upper_bound': 0.04, 'lower_bound': 0.020416847668728033}
     """
     from dataeval.core._mst import compute_neighbors
 
@@ -100,7 +122,7 @@ def ber_knn(embeddings: _2DArray[float], class_labels: _1DArray[int], k: int) ->
     modal_class = mode(class_labels[nn_indices], axis=1, keepdims=True).mode.squeeze()
     upper = float(np.count_nonzero(modal_class - class_labels) / N)
     lower = _knn_lowerbound(upper, M, k)
-    return upper, lower
+    return {"upper_bound": upper, "lower_bound": lower}
 
 
 def _knn_lowerbound(value: float, classes: int, k: int) -> float:
