@@ -11,7 +11,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.stats.contingency import chi2_contingency, crosstab
 
-from dataeval.protocols import _1DArray, _2DArray
+from dataeval.types import Array1D, Array2D
 from dataeval.utils._array import as_numpy
 
 
@@ -52,8 +52,8 @@ class ParityWithInsufficientDataDict(TypedDict):
 
 @overload
 def parity(
-    factor_data: _2DArray[int],
-    class_labels: _1DArray[int],
+    factor_data: Array2D[int],
+    class_labels: Array1D[int],
     *,
     return_insufficient_data: Literal[False] = False,
 ) -> ParityDict: ...
@@ -61,16 +61,16 @@ def parity(
 
 @overload
 def parity(
-    factor_data: _2DArray[int],
-    class_labels: _1DArray[int],
+    factor_data: Array2D[int],
+    class_labels: Array1D[int],
     *,
     return_insufficient_data: Literal[True],
 ) -> ParityWithInsufficientDataDict: ...
 
 
 def parity(
-    factor_data: _2DArray[int],
-    class_labels: _1DArray[int],
+    factor_data: Array2D[int],
+    class_labels: Array1D[int],
     *,
     return_insufficient_data: bool = False,
 ) -> ParityDict | ParityWithInsufficientDataDict:
@@ -84,9 +84,9 @@ def parity(
 
     Parameters
     ----------
-    factor_data: _2DArray[int]
+    factor_data: Array2D[int]
         Binned metadata factor values. Can be a 2D list, or array-like object.
-    class_labels: _1DArray[int]
+    class_labels: Array1D[int]
         Observed class labels. Can be a 1D list, or array-like object.
 
     Returns
@@ -117,7 +117,8 @@ def parity(
     --------
     balance
     """
-    factor_data_np = as_numpy(factor_data, dtype=np.intp)
+    factor_data_np = as_numpy(factor_data, dtype=np.intp, required_ndim=2)
+    class_labels_np = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
     chi_scores = np.zeros(factor_data_np.shape[1])
     p_values = np.zeros_like(chi_scores)
     insufficient_data: defaultdict[int, defaultdict[int, dict[int, int]]] = defaultdict(lambda: defaultdict(dict))
@@ -125,7 +126,7 @@ def parity(
         # Builds a contingency matrix where entry at index (r,c) represents
         # the frequency of current_factor_name achieving value unique_factor_values[r]
         # at a data point with class c.
-        results = crosstab(col_data, class_labels)
+        results = crosstab(col_data, class_labels_np)
         contingency_matrix = as_numpy(results.count)  # type: ignore
 
         # Determines if any frequencies are too low

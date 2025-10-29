@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TypedDict
 
-from dataeval.protocols import _1DArray, _2DArray
+from dataeval.types import Array1D, Array2D
 
 
 class LabelStatsDict(TypedDict):
@@ -44,7 +44,7 @@ class LabelStatsDict(TypedDict):
 
 
 def label_stats(
-    labels: _1DArray[int] | _2DArray[int],
+    labels: Array1D[int] | Array2D[int],
     index2label: Mapping[int, str] | None = None,
 ) -> LabelStatsDict:
     """

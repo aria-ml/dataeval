@@ -15,13 +15,8 @@ from dataeval.core._bin import bin_data, digitize_data, is_continuous
 from dataeval.core._feature_distance import feature_distance
 from dataeval.outputs._base import set_metadata
 from dataeval.outputs._metadata import MetadataDistanceOutput, MetadataDistanceValues
-from dataeval.protocols import (
-    AnnotatedDataset,
-    Array,
-    DatumMetadata,
-    ObjectDetectionTarget,
-    _1DArray,
-)
+from dataeval.protocols import AnnotatedDataset, Array, DatumMetadata, ObjectDetectionTarget
+from dataeval.types import Array1D
 from dataeval.utils._array import as_numpy
 from dataeval.utils._merge import merge
 from dataeval.utils._tqdm import tqdm
@@ -607,7 +602,7 @@ class Metadata:
         self._factors.update(factor_info)
         self._is_binned = True
 
-    def add_factors(self, factors: Mapping[str, _1DArray[Any]]) -> None:
+    def add_factors(self, factors: Mapping[str, Array1D[Any]]) -> None:
         """Add additional factors to metadata collection.
 
         Extend the current metadata with new factors, automatically handling

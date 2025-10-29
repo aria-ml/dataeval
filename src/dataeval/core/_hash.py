@@ -9,7 +9,7 @@ import numpy as np
 import xxhash as xxh
 from scipy.fftpack import dct
 
-from dataeval.protocols import _3DArray
+from dataeval.types import Array3D
 from dataeval.utils._array import as_numpy
 from dataeval.utils._image import normalize_image_shape, rescale, resize
 
@@ -17,7 +17,7 @@ HASH_SIZE = 8
 MAX_FACTOR = 4
 
 
-def pchash(image: _3DArray[Any]) -> str:
+def pchash(image: Array3D[Any]) -> str:
     """
     Performs a perceptual hash on an image by resizing to a square NxN image
     using the Lanczos algorithm where N is 32x32 or the largest multiple of
@@ -28,7 +28,7 @@ def pchash(image: _3DArray[Any]) -> str:
 
     Parameters
     ----------
-    image : _3DArray
+    image : Array3D
         An image in CxHxW format. Can be a 3D list, or array-like object.
 
     Returns
@@ -77,7 +77,7 @@ def pchash(image: _3DArray[Any]) -> str:
     return hash_hex if hash_hex else "0"
 
 
-def xxhash(image: _3DArray[Any]) -> str:
+def xxhash(image: Array3D[Any]) -> str:
     """
     Performs a fast non-cryptographic hash using the xxhash algorithm
     (xxhash.com) against the image as a flattened bytearray. The hash
@@ -85,7 +85,7 @@ def xxhash(image: _3DArray[Any]) -> str:
 
     Parameters
     ----------
-    image : _3DArray
+    image : Array3D
         An image in CxHxW format. Can be a 3D list, or array-like object.
 
     Returns
