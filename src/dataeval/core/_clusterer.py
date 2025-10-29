@@ -10,8 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.core._mst import compute_neighbor_distances, minimum_spanning_tree_edges
-from dataeval.protocols import _NDArray
-from dataeval.types import ClusterData, CondensedTree
+from dataeval.types import ArrayND, ClusterData, CondensedTree
 from dataeval.utils._array import flatten, to_numpy
 
 
@@ -77,14 +76,14 @@ def _sorted_union_find(index_groups: NDArray[np.int32]) -> list[list[np.int32]]:
     return sorted(groups)
 
 
-def cluster(embeddings: _NDArray[Any]) -> ClusterData:
+def cluster(embeddings: ArrayND[float]) -> ClusterData:
     """
     Uses hierarchical clustering on the flattened data and returns clustering
     information.
 
     Parameters
     ----------
-    embeddings : _NDArray, shape - (N, ...)
+    embeddings : ArrayND, shape - (N, ...)
         A dataset that can be a list, or array-like object. Function expects
         the data to have 2 or more dimensions which will flatten to (N, P) where N is
         the number of observations in a P-dimensional space.

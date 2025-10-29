@@ -9,7 +9,7 @@ from typing import NamedTuple, TypedDict, cast
 import numpy as np
 from scipy.stats import iqr, ks_2samp, wasserstein_distance
 
-from dataeval.protocols import _1DArray, _2DArray
+from dataeval.types import Array1D, Array2D
 from dataeval.utils._array import as_numpy
 
 
@@ -43,7 +43,7 @@ class FeatureDistanceResultDict(TypedDict):
     p_value: float
 
 
-def _calculate_drift(x1: _1DArray[float] | _2DArray[float], x2: _1DArray[float] | _2DArray[float]) -> float:
+def _calculate_drift(x1: Array1D[float] | Array2D[float], x2: Array1D[float] | Array2D[float]) -> float:
     """Calculates the shift magnitude between x1 and x2 scaled by x1"""
 
     distance = wasserstein_distance(x1, x2)
@@ -60,8 +60,8 @@ def _calculate_drift(x1: _1DArray[float] | _2DArray[float], x2: _1DArray[float] 
 
 
 def feature_distance(
-    continuous_data_1: _1DArray[float] | _2DArray[float],
-    continuous_data_2: _1DArray[float] | _2DArray[float],
+    continuous_data_1: Array1D[float] | Array2D[float],
+    continuous_data_2: Array1D[float] | Array2D[float],
 ) -> Sequence[FeatureDistanceResultDict]:
     """
     Measures the feature-wise distance between two continuous distributions and computes a
@@ -71,9 +71,9 @@ def feature_distance(
 
     Parameters
     ----------
-    continuous_data_1 : _1DArray[float] | _2DArray[float]
+    continuous_data_1 : Array1D[float] | Array2D[float]
         Array of values to be used as reference. Can be a 1D or 2D list, or array-like object.
-    continuous_data_2 : _1DArray[float] | _2DArray[float]
+    continuous_data_2 : Array1D[float] | Array2D[float]
         Array of values to be compare with the reference. Can be a 1D or 2D list, or array-like object.
 
     Returns
@@ -91,8 +91,8 @@ def feature_distance(
 
     Kolmogorov-Smirnov two-sample test
     """
-    cont1 = np.atleast_2d(as_numpy(continuous_data_1, dtype=np.float64))  # (S, F)
-    cont2 = np.atleast_2d(as_numpy(continuous_data_2, dtype=np.float64))  # (S, F)
+    cont1 = np.atleast_2d(as_numpy(continuous_data_1, dtype=np.float64, required_ndim=(1, 2)))  # (S, F)
+    cont2 = np.atleast_2d(as_numpy(continuous_data_2, dtype=np.float64, required_ndim=(1, 2)))  # (S, F)
 
     if len(cont1.T) != len(cont2.T):
         raise ValueError(f"Data must have the same numbers of features. ({len(cont1.T)} != {len(cont2.T)})")

@@ -12,8 +12,8 @@ from sklearn.feature_selection import mutual_info_classif, mutual_info_regressio
 
 from dataeval.config import EPSILON, get_max_processes, get_seed
 from dataeval.core._bin import get_counts, is_continuous
-from dataeval.protocols import _1DArray
-from dataeval.utils._array import as_numpy
+from dataeval.types import Array1D, Array2D
+from dataeval.utils._array import as_numpy, opt_as_numpy
 
 
 def _validate_num_neighbors(num_neighbors: int) -> int:
@@ -54,9 +54,9 @@ def _merge_labels_and_factors(
 
 
 def balance(
-    class_labels: _1DArray[int],
-    factor_data: _1DArray[int],
-    discrete_features: _1DArray[bool] | None = None,
+    class_labels: Array1D[int],
+    factor_data: Array2D[int | float],
+    discrete_features: Array1D[bool] | None = None,
     num_neighbors: int = 5,
 ) -> NDArray[np.float64]:
     """
@@ -64,11 +64,11 @@ def balance(
 
     Parameters
     ----------
-    class_labels : _1DArray[int]
+    class_labels : Array1D[int]
         Target class labels as integer indices. Can be a 1D list, or array-like object.
-    factor_data : _1DArray[int]
-        Factor values after binning or digitization. Can be a 1D list, or array-like object.
-    discrete_features : _1DArray[bool] | None = None
+    factor_data : Array2D[int | float]
+        Factor values after binning or digitization. Can be a 2D list, or array-like object.
+    discrete_features : Array1D[bool] | None = None
         Boolean array defining whether or not the feature set is discretized. Can be a 1D list, or array-like object.
     num_neighbors : int = 5
         Number of points to consider as neighbors.
@@ -117,21 +117,22 @@ def balance(
     sklearn.feature_selection.mutual_info_regression
     sklearn.metrics.mutual_info_score
     """
-    class_labels_np = as_numpy(class_labels, dtype=np.intp)
-    factor_data_np = as_numpy(factor_data, dtype=np.intp)
+    class_labels_np = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
+    factor_data_np = as_numpy(factor_data, required_ndim=2)
+    discrete_feat_np = opt_as_numpy(discrete_features, dtype=np.bool_, required_ndim=1)
 
     num_neighbors = _validate_num_neighbors(num_neighbors)
-    data, discrete_features = _merge_labels_and_factors(class_labels_np, factor_data_np, discrete_features)
-    num_factors = len(discrete_features)
+    data, discrete_list = _merge_labels_and_factors(class_labels_np, factor_data_np, discrete_feat_np)
+    num_factors = len(discrete_list)
 
     # initialize output matrix
     mi = np.full((num_factors, num_factors), np.nan, dtype=np.float32)
 
-    for idx, is_discrete in enumerate(discrete_features):
+    for idx, is_discrete in enumerate(discrete_list):
         mi[idx, :] = (mutual_info_classif if is_discrete else mutual_info_regression)(
             data,
             data[:, idx],
-            discrete_features=discrete_features,  # type: ignore - sklearn function not typed
+            discrete_features=discrete_list,  # type: ignore - sklearn function not typed
             n_neighbors=num_neighbors,
             random_state=get_seed(),
             n_jobs=get_max_processes(),  # type: ignore - added in 1.5
@@ -145,9 +146,9 @@ def balance(
 
 
 def balance_classwise(
-    class_labels: _1DArray[int],
-    factor_data: _1DArray[int],
-    discrete_features: _1DArray[bool] | None = None,
+    class_labels: Array1D[int],
+    factor_data: Array2D[int],
+    discrete_features: Array1D[bool] | None = None,
     num_neighbors: int = 5,
 ) -> NDArray[np.float64]:
     """
@@ -155,11 +156,11 @@ def balance_classwise(
 
     Parameters
     ----------
-    class_labels : _1DArray[int]
+    class_labels : Array1D[int]
         Target class labels as integer indices. Can be a 1D list, or array-like object.
-    factor_data : _1DArray[int]
+    factor_data : Array2D[int]
         Factor values after binning or digitization. Can be a 1D list, or array-like object.
-    discrete_features : _1DArray[bool] | None = None
+    discrete_features : Array1D[bool] | None = None
         Boolean array or iterable defining whether or not the feature set is discretized.
         Can be a 1D list, or array-like object.
     num_neighbors : int = 5
@@ -208,12 +209,13 @@ def balance_classwise(
     sklearn.feature_selection.mutual_info_regression
     sklearn.metrics.mutual_info_score
     """
-    class_labels_np = as_numpy(class_labels, dtype=np.intp)
-    factor_data_np = as_numpy(factor_data, dtype=np.intp)
+    class_labels_np = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
+    factor_data_np = as_numpy(factor_data, dtype=np.intp, required_ndim=2)
+    discrete_feat_np = opt_as_numpy(discrete_features, dtype=np.bool_, required_ndim=1)
 
     num_neighbors = _validate_num_neighbors(num_neighbors)
-    data, discrete_features = _merge_labels_and_factors(class_labels_np, factor_data_np, discrete_features)
-    num_factors = len(discrete_features)
+    data, discrete_list = _merge_labels_and_factors(class_labels_np, factor_data_np, discrete_feat_np)
+    num_factors = len(discrete_list)
     u_classes = np.unique(class_labels_np)
     num_classes = len(u_classes)
 
@@ -228,7 +230,7 @@ def balance_classwise(
         classwise_mi[idx, :] = mutual_info_classif(
             data,
             tgt_bin[:, idx],
-            discrete_features=discrete_features,  # type: ignore - sklearn function not typed
+            discrete_features=discrete_list,  # type: ignore - sklearn function not typed
             n_neighbors=num_neighbors,
             random_state=get_seed(),
             n_jobs=get_max_processes(),  # type: ignore - added in 1.5

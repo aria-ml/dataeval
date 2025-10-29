@@ -9,7 +9,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.spatial.distance import pdist, squareform
 
-from dataeval.protocols import _2DArray
+from dataeval.types import Array2D
 from dataeval.utils._array import as_numpy, ensure_embeddings, flatten
 
 
@@ -49,7 +49,7 @@ def _calculate_critical_value_radii(embeddings: NDArray[np.float64], num_observa
 
 
 def coverage_naive(
-    embeddings: _2DArray[float],
+    embeddings: Array2D[float],
     num_observations: int,
 ) -> CoverageDict:
     """
@@ -60,7 +60,7 @@ def coverage_naive(
 
     Parameters
     ----------
-    embeddings : _2DArray[float]
+    embeddings : Array2D[float]
         Dataset image embeddings as unit interval [0, 1]. Can be a 2D list, array-like
         object, or tensor. Function expects the data to have 2 dimensions, N number of
         observations in a P-dimensional space.
@@ -97,7 +97,7 @@ def coverage_naive(
 
     [1] Seymour Sudman. 1976. Applied sampling. Academic Press New York (1976).
     """
-    embeddings_np = _validate_inputs(as_numpy(embeddings, dtype=np.float64), num_observations)
+    embeddings_np = _validate_inputs(as_numpy(embeddings, dtype=np.float64, required_ndim=2), num_observations)
     critical_value_radii = _calculate_critical_value_radii(embeddings_np, num_observations)
 
     # Calculate distance matrix, look at the (num_observations + 1)th farthest neighbor for each image.
@@ -115,7 +115,7 @@ def coverage_naive(
 
 
 def coverage_adaptive(
-    embeddings: _2DArray[float],
+    embeddings: Array2D[float],
     num_observations: int,
     percent: float,
 ) -> CoverageDict:
@@ -127,7 +127,7 @@ def coverage_adaptive(
 
     Parameters
     ----------
-    embeddings : _2DArray[float]
+    embeddings : Array2D[float]
         Dataset embeddings as unit interval [0, 1]. Can be a 2D list, array-like object,
         or tensor. Function expects the data to have 2 dimensions, N number of
         observations in a P-dimensional space.
@@ -167,7 +167,7 @@ def coverage_adaptive(
 
     [1] Seymour Sudman. 1976. Applied sampling. Academic Press New York (1976).
     """
-    embeddings = _validate_inputs(as_numpy(embeddings, dtype=np.float64), num_observations)
+    embeddings = _validate_inputs(as_numpy(embeddings, dtype=np.float64, required_ndim=2), num_observations)
     critical_value_radii = _calculate_critical_value_radii(embeddings, num_observations)
 
     # Use data adaptive cutoff as coverage_radius

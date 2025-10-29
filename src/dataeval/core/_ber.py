@@ -9,7 +9,7 @@ from numpy.typing import NDArray
 from scipy.stats import mode
 
 from dataeval.config import EPSILON
-from dataeval.protocols import _1DArray, _2DArray
+from dataeval.types import Array1D, ArrayND
 from dataeval.utils._array import as_numpy
 
 
@@ -29,16 +29,16 @@ class BERDict(TypedDict):
     lower_bound: float
 
 
-def ber_mst(embeddings: _2DArray[float], class_labels: _1DArray[int]) -> BERDict:
+def ber_mst(embeddings: ArrayND[float], class_labels: Array1D[int]) -> BERDict:
     """
     An estimator for Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` \
     using FR with a minimum spanning tree (MST) test statistic basis.
 
     Parameters
     ----------
-    embeddings : _2DArray[float]
-        Array of image :term:`embeddings<Embeddings>`. Can be a 2D list, or array-like object.
-    class_labels : _1DArray[int]
+    embeddings : ArrayND[float]
+        Array of image :term:`embeddings<Embeddings>`. Can be an N dimensional list, or array-like object.
+    class_labels : Array1D[int]
         Array of class labels for each image. Can be a 1D list, or array-like object.
 
     Returns
@@ -64,7 +64,7 @@ def ber_mst(embeddings: _2DArray[float], class_labels: _1DArray[int]) -> BERDict
     from dataeval.core._mst import minimum_spanning_tree
 
     data_np = as_numpy(embeddings, dtype=np.float32)
-    labels_np = as_numpy(class_labels, dtype=np.intp)
+    labels_np = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
 
     M, N = _get_classes_counts(labels_np)
 
@@ -77,16 +77,16 @@ def ber_mst(embeddings: _2DArray[float], class_labels: _1DArray[int]) -> BERDict
     return {"upper_bound": upper, "lower_bound": lower}
 
 
-def ber_knn(embeddings: _2DArray[float], class_labels: _1DArray[int], k: int) -> BERDict:
+def ber_knn(embeddings: ArrayND[float], class_labels: Array1D[int], k: int) -> BERDict:
     """
     An estimator for Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` \
     using KNN test statistic basis.
 
     Parameters
     ----------
-    embeddings : _2DArray[float]
-        Array of image :term:`embeddings<Embeddings>`. Can be a 2D list, or array-like object.
-    class_labels : _1DArray[int]
+    embeddings : ArrayND[float]
+        Array of image :term:`embeddings<Embeddings>`. Can be an N dimensional list, or array-like object.
+    class_labels : Array1D[int]
         Array of class labels for each image. Can be a 1D list, or array-like object.
     k : int
         Number of nearest neighbors for KNN estimator
@@ -114,7 +114,7 @@ def ber_knn(embeddings: _2DArray[float], class_labels: _1DArray[int], k: int) ->
     from dataeval.core._mst import compute_neighbors
 
     data_np = as_numpy(embeddings, dtype=np.float32)
-    labels_np = as_numpy(class_labels, dtype=np.intp)
+    labels_np = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
 
     M, N = _get_classes_counts(labels_np)
     nn_indices = compute_neighbors(data_np, data_np, k=k)
