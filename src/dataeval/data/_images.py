@@ -93,8 +93,12 @@ class Images(Generic[T]):
         num_images = len(indices)
         num_rows = (num_images + images_per_row - 1) // images_per_row
         fig, axes = plt.subplots(num_rows, images_per_row, figsize=figsize)
+        fig.axes[0]
         for i, ax in enumerate(np.asarray(axes).flatten()):
-            image = channels_first_to_last(as_numpy(self[i]))
+            if i >= num_images:
+                ax.set_visible(False)
+                continue
+            image = channels_first_to_last(as_numpy(self[indices[i]]))
             ax.imshow(image)
             ax.axis("off")
         plt.tight_layout()
