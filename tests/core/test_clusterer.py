@@ -2,8 +2,7 @@ import numpy as np
 import pytest
 import sklearn.datasets as dsets
 
-from dataeval.core._clusterer import _find_duplicates, _find_outliers
-from dataeval.types import ClusterData, CondensedTree
+from dataeval.core._clusterer import ClusterResult, CondensedTree, _find_duplicates, _find_outliers
 
 
 @pytest.mark.required
@@ -33,16 +32,16 @@ class TestMatrixOps:
             c = cluster(test_set)
 
             # Distance matrix
-            assert not np.any(np.isnan(c.k_distances))  # Should contain no NaN
-            assert (c.k_distances >= 0).all()  # Distances are always positive or 0 (same data point)
+            assert not np.any(np.isnan(c["k_distances"]))  # Should contain no NaN
+            assert (c["k_distances"] >= 0).all()  # Distances are always positive or 0 (same data point)
 
             # Minimum spanning tree
-            assert not np.any(np.isnan(c.mst))  # Should contain no NaN
-            print(c.mst)
+            assert not np.any(np.isnan(c["mst"]))  # Should contain no NaN
+            print(c["mst"])
 
             # Linkage arr
-            assert not np.any(np.isnan(c.linkage_tree))  # Should contain no NaN
-            print(c.linkage_tree)
+            assert not np.any(np.isnan(c["linkage_tree"]))  # Should contain no NaN
+            print(c["linkage_tree"])
 
 
 @pytest.mark.required
@@ -128,8 +127,8 @@ class TestClusterer:
         cl = cluster(dataset)
 
         # clusters are counting numbers >= -1
-        assert (cl.clusters >= -1).all()
-        assert np.issubdtype(cl.clusters.dtype, np.integer)
+        assert (cl["clusters"] >= -1).all()
+        assert np.issubdtype(cl["clusters"].dtype, np.integer)
 
     def test_functional(self, functional_data):
         """The results of evaluate are equivalent to the known outputs"""
@@ -137,10 +136,10 @@ class TestClusterer:
 
         cl = cluster(functional_data)
 
-        outliers = _find_outliers(cl.clusters)
+        outliers = _find_outliers(cl["clusters"])
         assert len(outliers) == 0
 
-        duplicates, potential_duplicates = _find_duplicates(cl.mst, cl.clusters)
+        duplicates, potential_duplicates = _find_duplicates(cl["mst"], cl["clusters"])
         assert duplicates == [[24, 79], [58, 63]]
         assert potential_duplicates == [
             [0, 13, 15, 22, 30, 57, 67, 87, 95],
@@ -161,19 +160,19 @@ class TestClusterer:
             [82, 97],
         ]
 
-        assert cl.mst is not None
-        assert cl.linkage_tree is not None
-        assert cl.condensed_tree is not None
+        assert cl["mst"] is not None
+        assert cl["linkage_tree"] is not None
+        assert cl["condensed_tree"] is not None
 
         # fmt: off
-        # assert cl.clusters.tolist() == [
+        # assert cl["clusters"].tolist() == [
         #     1,0,1,1,1,3,3,4,4,0,3,1,4,1,2,1,1,4,3,4,0,3,1,2,1,
         #     2,3,4,0,4,1,2,4,4,2,3,1,3,2,4,2,2,3,2,3,3,1,4,3,2,
         #     4,4,4,3,2,4,0,1,0,2,3,3,2,0,4,3,1,1,2,0,4,0,2,3,4,
         #     4,4,0,0,1,0,0,0,0,2,0,2,1,2,2,3,0,4,0,4,1,2,0,0,1,
         # ]
 
-        assert cl.clusters.tolist() == [
+        assert cl["clusters"].tolist() == [
             2, 0, 2, 2, 2, 3, 3, 4, 4, 0, 3, 2, 4, 2, 1, 2, 2, 4, 3, 4, 0, 3,
             2, 1, 2, 1, 3, 4, 0, 4, 2, 1, 4, 4, 1, 3, 2, 3, 1, 4, 1, 1, 3, 1,
             3, 3, 2, 4, 3, 1, 4, 4, 4, 3, 1, 4, 0, 2, 0, 1, 3, 3, 1, 0, 4, 3,
@@ -198,11 +197,18 @@ class TestClusterOutliers:
     )
     def test_find_outliers(self, clusters, outs):
         """Specified outliers are added to lists"""
-        null_inputs = [np.array([]) for _ in range(4)]
-        ct = CondensedTree(*null_inputs)
-        cl = ClusterData(clusters, np.array([]), np.array([]), ct, *null_inputs[:3])
+        ct = CondensedTree(parent=np.array([]), child=np.array([]), lambda_val=np.array([]), child_size=np.array([]))
+        cl = ClusterResult(
+            clusters=clusters,
+            mst=np.array([]),
+            linkage_tree=np.array([]),
+            condensed_tree=ct,
+            membership_strengths=np.array([]),
+            k_neighbors=np.array([]),
+            k_distances=np.array([]),
+        )
 
-        outliers = _find_outliers(cl.clusters)
+        outliers = _find_outliers(cl["clusters"])
 
         assert outliers.tolist() == outs
 
@@ -221,7 +227,7 @@ class TestClusterOutliers:
         data = get_blobs(0.1)
         data[indices] *= 10.0
         cl = cluster(np.array(data))
-        outliers = _find_outliers(cl.clusters)
+        outliers = _find_outliers(cl["clusters"])
 
         # Only need to check specified outliers in results, but there might be other outliers
         assert all(x in outliers for x in indices)
@@ -236,7 +242,7 @@ class TestClusterDuplicates:
         from dataeval.core._clusterer import cluster
 
         cl = cluster(duplicate_data)
-        duplicates, potential_duplicates = _find_duplicates(cl.mst, cl.clusters)
+        duplicates, potential_duplicates = _find_duplicates(cl["mst"], cl["clusters"])
 
         # Only 1 set (all dupes) in list of sets
         assert len(duplicates[0]) == len(duplicate_data)
@@ -248,7 +254,7 @@ class TestClusterDuplicates:
 
         data = np.array([[0, 0], [1, 1], [2, 2]])
         cl = cluster(data)
-        duplicates, potential_duplicates = _find_duplicates(cl.mst, cl.clusters)
+        duplicates, potential_duplicates = _find_duplicates(cl["mst"], cl["clusters"])
 
         assert not len(duplicates)
         assert not len(potential_duplicates)

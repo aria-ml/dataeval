@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -211,20 +211,21 @@ class TestBinByClustersUnit:
     def test_basic_clustering_and_binning(self, mock_cluster):
         """Test basic clustering and bin edge creation."""
         # Mock cluster result
-        mock_cluster_result = MagicMock()
-        mock_cluster_result.clusters = np.array([0, 0, 1, 1, 2, 2, -1, -1])  # 3 clusters + outliers
-        mock_cluster_result.k_neighbors = np.array(
-            [
-                [1, 2, 3],
-                [0, 2, 3],
-                [1, 3, 4],
-                [2, 4, 5],  # non-outliers
-                [5, 6, 7],
-                [4, 6, 7],
-                [0, 1, 4],
-                [1, 5, 6],  # outliers (indices 6, 7)
-            ]
-        )
+        mock_cluster_result = {
+            "clusters": np.array([0, 0, 1, 1, 2, 2, -1, -1]),  # 3 clusters + outliers
+            "k_neighbors": np.array(
+                [
+                    [1, 2, 3],
+                    [0, 2, 3],
+                    [1, 3, 4],
+                    [2, 4, 5],  # non-outliers
+                    [5, 6, 7],
+                    [4, 6, 7],
+                    [0, 1, 4],
+                    [1, 5, 6],  # outliers (indices 6, 7)
+                ]
+            ),
+        }
         mock_cluster.return_value = mock_cluster_result
 
         data = np.array([1.0, 1.1, 5.0, 5.2, 10.0, 10.1, 15.0, 15.5])
@@ -239,20 +240,21 @@ class TestBinByClustersUnit:
     @patch("dataeval.core._clusterer.cluster")
     def test_outlier_handling_with_sufficient_count(self, mock_cluster):
         """Test outlier handling when there are >= 4 outliers with same neighbor."""
-        mock_cluster_result = MagicMock()
-        mock_cluster_result.clusters = np.array([0, 0, 1, 1, -1, -1, -1, -1])  # 4 outliers
-        mock_cluster_result.k_neighbors = np.array(
-            [
-                [1, 2, 3],
-                [0, 2, 3],
-                [1, 3, 4],
-                [2, 4, 5],  # non-outliers
-                [0, 1, 2],
-                [0, 1, 2],
-                [0, 1, 2],
-                [0, 1, 2],  # all outliers point to same neighbor
-            ]
-        )
+        mock_cluster_result = {
+            "clusters": np.array([0, 0, 1, 1, -1, -1, -1, -1]),
+            "k_neighbors": np.array(  # 4 outliers
+                [
+                    [1, 2, 3],
+                    [0, 2, 3],
+                    [1, 3, 4],
+                    [2, 4, 5],  # non-outliers
+                    [0, 1, 2],
+                    [0, 1, 2],
+                    [0, 1, 2],
+                    [0, 1, 2],  # all outliers point to same neighbor
+                ]
+            ),
+        }
         mock_cluster.return_value = mock_cluster_result
 
         data = np.array([1.0, 1.1, 5.0, 5.2, 0.1, 0.2, 0.3, 0.4])  # outliers are smaller
@@ -265,18 +267,19 @@ class TestBinByClustersUnit:
     @patch("dataeval.core._clusterer.cluster")
     def test_outlier_handling_with_insufficient_count(self, mock_cluster):
         """Test outlier handling when there are < 4 outliers with same neighbor."""
-        mock_cluster_result = MagicMock()
-        mock_cluster_result.clusters = np.array([0, 0, 1, 1, -1, -1])  # 2 outliers
-        mock_cluster_result.k_neighbors = np.array(
-            [
-                [1, 2, 3],
-                [0, 2, 3],
-                [1, 3, 4],
-                [2, 4, 5],  # non-outliers
-                [0, 1, 2],
-                [0, 1, 2],  # outliers point to same neighbor
-            ]
-        )
+        mock_cluster_result = {
+            "clusters": np.array([0, 0, 1, 1, -1, -1]),  # 2 outliers
+            "k_neighbors": np.array(
+                [
+                    [1, 2, 3],
+                    [0, 2, 3],
+                    [1, 3, 4],
+                    [2, 4, 5],  # non-outliers
+                    [0, 1, 2],
+                    [0, 1, 2],  # outliers point to same neighbor
+                ]
+            ),
+        }
         mock_cluster.return_value = mock_cluster_result
 
         data = np.array([1.0, 1.1, 5.0, 5.2, 0.5, 0.6])  # outliers smaller than neighbor
@@ -289,9 +292,10 @@ class TestBinByClustersUnit:
     @patch("dataeval.core._clusterer.cluster")
     def test_no_outliers(self, mock_cluster):
         """Test behavior when there are no outliers."""
-        mock_cluster_result = MagicMock()
-        mock_cluster_result.clusters = np.array([0, 0, 1, 1, 2, 2])  # No -1 values
-        mock_cluster_result.k_neighbors = np.array([[1, 2, 3], [0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 4, 5], [4, 5, 0]])
+        mock_cluster_result = {
+            "clusters": np.array([0, 0, 1, 1, 2, 2]),  # No -1 values
+            "k_neighbors": np.array([[1, 2, 3], [0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 4, 5], [4, 5, 0]]),
+        }
         mock_cluster.return_value = mock_cluster_result
 
         data = np.array([1.0, 1.1, 5.0, 5.2, 10.0, 10.1])
@@ -304,16 +308,17 @@ class TestBinByClustersUnit:
     @patch("dataeval.core._clusterer.cluster")
     def test_outliers_with_no_valid_neighbors(self, mock_cluster):
         """Test outliers that have no non-outlier neighbors."""
-        mock_cluster_result = MagicMock()
-        mock_cluster_result.clusters = np.array([0, 0, -1, -1])  # 2 outliers
-        mock_cluster_result.k_neighbors = np.array(
-            [
-                [1, 2, 3],
-                [0, 2, 3],  # non-outliers
-                [2, 3, 0],
-                [2, 3, 1],  # outliers pointing to other outliers and non-outliers
-            ]
-        )
+        mock_cluster_result = {
+            "clusters": np.array([0, 0, -1, -1]),  # 2 outliers
+            "k_neighbors": np.array(
+                [
+                    [1, 2, 3],
+                    [0, 2, 3],  # non-outliers
+                    [2, 3, 0],
+                    [2, 3, 1],  # outliers pointing to other outliers and non-outliers
+                ]
+            ),
+        }
         mock_cluster.return_value = mock_cluster_result
 
         data = np.array([1.0, 1.1, 15.0, 15.5])

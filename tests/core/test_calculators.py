@@ -20,26 +20,26 @@ class TestPixelStats:
 
         result = calculate(images, None, stats=ImageStats.PIXEL, per_channel=False)
 
-        assert "mean" in result
-        assert "std" in result
-        assert "var" in result
-        assert "skew" in result
-        assert "kurtosis" in result
-        assert "entropy" in result
-        assert "missing" in result
-        assert "zeros" in result
-        assert "histogram" in result
+        assert "mean" in result["stats"]
+        assert "std" in result["stats"]
+        assert "var" in result["stats"]
+        assert "skew" in result["stats"]
+        assert "kurtosis" in result["stats"]
+        assert "entropy" in result["stats"]
+        assert "missing" in result["stats"]
+        assert "zeros" in result["stats"]
+        assert "histogram" in result["stats"]
 
-        assert len(result["mean"]) == 1
-        assert type(result["mean"][0]) is float
-        assert len(result["histogram"][0]) == 256
+        assert len(result["stats"]["mean"]) == 1
+        assert type(result["stats"]["mean"][0]) is float
+        assert len(result["stats"]["histogram"][0]) == 256
 
     def test_process_with_nans(self):
         """Test pixel statistics with NaN values."""
         images = [np.array([[[np.nan, 0.5], [0.5, 0.5]]])]
 
         result = calculate(images, None, stats=ImageStats.PIXEL, per_channel=False)
-        assert result["missing"][0] > 0
+        assert result["stats"]["missing"][0] > 0
 
 
 class TestVisualStats:
@@ -50,15 +50,15 @@ class TestVisualStats:
 
         result = calculate(images, None, stats=ImageStats.VISUAL, per_channel=False)
 
-        assert "brightness" in result
-        assert "contrast" in result
-        assert "darkness" in result
-        assert "sharpness" in result
-        assert "percentiles" in result
+        assert "brightness" in result["stats"]
+        assert "contrast" in result["stats"]
+        assert "darkness" in result["stats"]
+        assert "sharpness" in result["stats"]
+        assert "percentiles" in result["stats"]
 
-        assert len(result["brightness"]) == 1
-        assert type(result["brightness"][0]) is float
-        assert len(result["percentiles"][0]) == 5  # QUARTILES length
+        assert len(result["stats"]["brightness"]) == 1
+        assert type(result["stats"]["brightness"][0]) is float
+        assert len(result["stats"]["percentiles"][0]) == 5  # QUARTILES length
 
 
 class TestPixelStatsPerChannel:
@@ -69,10 +69,10 @@ class TestPixelStatsPerChannel:
 
         result = calculate(images, None, stats=ImageStats.PIXEL, per_channel=True)
 
-        assert len(result["mean"]) == n_channels
-        assert len(result["std"]) == n_channels
-        assert len(result["histogram"]) == n_channels
-        assert len(result["histogram"][0]) == 256
+        assert len(result["stats"]["mean"]) == n_channels
+        assert len(result["stats"]["std"]) == n_channels
+        assert len(result["stats"]["histogram"]) == n_channels
+        assert len(result["stats"]["histogram"][0]) == 256
 
 
 class TestVisualStatsPerChannel:
@@ -83,10 +83,10 @@ class TestVisualStatsPerChannel:
 
         result = calculate(images, None, stats=ImageStats.VISUAL, per_channel=True)
 
-        assert len(result["brightness"]) == n_channels
-        assert len(result["contrast"]) == n_channels
-        assert len(result["percentiles"]) == n_channels
-        assert len(result["percentiles"][0]) == 5
+        assert len(result["stats"]["brightness"]) == n_channels
+        assert len(result["stats"]["contrast"]) == n_channels
+        assert len(result["stats"]["percentiles"]) == n_channels
+        assert len(result["stats"]["percentiles"][0]) == 5
 
 
 class TestDimensionStatsCalculator:
@@ -147,7 +147,7 @@ class TestPerImagePerBox:
         result = calculate(images, None, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=False)
 
         # Should have 1 result (full image)
-        assert len(result["mean"]) == 1
+        assert len(result["stats"]["mean"]) == 1
         assert len(result["source_index"]) == 1
         assert result["source_index"][0].image == 0
         assert result["source_index"][0].box is None
@@ -166,7 +166,7 @@ class TestPerImagePerBox:
         result = calculate(images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=False)
 
         # Should have 3 results: full image + 2 boxes
-        assert len(result["mean"]) == 3
+        assert len(result["stats"]["mean"]) == 3
         assert len(result["source_index"]) == 3
 
         # First should be full image
@@ -192,7 +192,7 @@ class TestPerImagePerBox:
         result = calculate(images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=False, per_box=True, per_channel=False)
 
         # Should have 2 results: only boxes
-        assert len(result["mean"]) == 2
+        assert len(result["stats"]["mean"]) == 2
         assert len(result["source_index"]) == 2
 
         # Both should be boxes (no full image)
@@ -214,7 +214,7 @@ class TestPerImagePerBox:
         result = calculate(images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=False, per_channel=False)
 
         # Should have 1 result: only full image (boxes ignored)
-        assert len(result["mean"]) == 1
+        assert len(result["stats"]["mean"]) == 1
         assert len(result["source_index"]) == 1
 
         # Should be full image
@@ -229,7 +229,7 @@ class TestPerImagePerBox:
         result = calculate(images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=True)
 
         # Should have 6 results: (full image + 1 box) × 3 channels = 6
-        assert len(result["mean"]) == 6
+        assert len(result["stats"]["mean"]) == 6
         assert len(result["source_index"]) == 6
 
         # Check structure: full image channels first, then box channels
@@ -273,7 +273,7 @@ class TestPerImagePerBox:
         result = calculate(images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=False)
 
         # Should have 5 results: image0 (1 full + 1 box) + image1 (1 full + 2 boxes)
-        assert len(result["mean"]) == 5
+        assert len(result["stats"]["mean"]) == 5
         assert len(result["source_index"]) == 5
 
         # Image 0: full image
@@ -330,19 +330,19 @@ class TestLowerDimensionalPixelStats:
 
         result = calculate(data, None, stats=ImageStats.PIXEL, per_channel=False)
 
-        assert "mean" in result
-        assert "std" in result
-        assert "var" in result
-        assert "skew" in result
-        assert "kurtosis" in result
-        assert "entropy" in result
-        assert "missing" in result
-        assert "zeros" in result
-        assert "histogram" in result
+        assert "mean" in result["stats"]
+        assert "std" in result["stats"]
+        assert "var" in result["stats"]
+        assert "skew" in result["stats"]
+        assert "kurtosis" in result["stats"]
+        assert "entropy" in result["stats"]
+        assert "missing" in result["stats"]
+        assert "zeros" in result["stats"]
+        assert "histogram" in result["stats"]
 
-        assert len(result["mean"]) == 1
-        assert type(result["mean"][0]) is float
-        assert len(result["histogram"][0]) == 256
+        assert len(result["stats"]["mean"]) == 1
+        assert type(result["stats"]["mean"][0]) is float
+        assert len(result["stats"]["histogram"][0]) == 256
 
     def test_2d_data_pixel_stats(self):
         """Test pixel statistics calculation with 2D data (single channel image)."""
@@ -351,26 +351,26 @@ class TestLowerDimensionalPixelStats:
 
         result = calculate(data, None, stats=ImageStats.PIXEL, per_channel=False)
 
-        assert "mean" in result
-        assert "std" in result
-        assert "var" in result
-        assert "skew" in result
-        assert "kurtosis" in result
-        assert "entropy" in result
-        assert "missing" in result
-        assert "zeros" in result
-        assert "histogram" in result
+        assert "mean" in result["stats"]
+        assert "std" in result["stats"]
+        assert "var" in result["stats"]
+        assert "skew" in result["stats"]
+        assert "kurtosis" in result["stats"]
+        assert "entropy" in result["stats"]
+        assert "missing" in result["stats"]
+        assert "zeros" in result["stats"]
+        assert "histogram" in result["stats"]
 
-        assert len(result["mean"]) == 1
-        assert type(result["mean"][0]) is float
-        assert len(result["histogram"][0]) == 256
+        assert len(result["stats"]["mean"]) == 1
+        assert type(result["stats"]["mean"][0]) is float
+        assert len(result["stats"]["histogram"][0]) == 256
 
     def test_1d_data_with_nans(self):
         """Test pixel statistics with 1D data containing NaN values."""
         data = [np.array([np.nan, 0.5, 0.5, 0.5, np.nan])]
 
         result = calculate(data, None, stats=ImageStats.PIXEL, per_channel=False)
-        assert result["missing"][0] > 0
+        assert result["stats"]["missing"][0] > 0
 
     def test_1d_data_per_channel(self):
         """Test that 1D data is treated as single channel when per_channel=True."""
@@ -379,9 +379,9 @@ class TestLowerDimensionalPixelStats:
         result = calculate(data, None, stats=ImageStats.PIXEL, per_channel=True)
 
         # Should be treated as 1 channel
-        assert len(result["mean"]) == 1
-        assert len(result["std"]) == 1
-        assert len(result["histogram"]) == 1
+        assert len(result["stats"]["mean"]) == 1
+        assert len(result["stats"]["std"]) == 1
+        assert len(result["stats"]["histogram"]) == 1
 
     def test_2d_data_per_channel(self):
         """Test that 2D data is treated as single channel when per_channel=True."""
@@ -390,9 +390,9 @@ class TestLowerDimensionalPixelStats:
         result = calculate(data, None, stats=ImageStats.PIXEL, per_channel=True)
 
         # Should be treated as 1 channel
-        assert len(result["mean"]) == 1
-        assert len(result["std"]) == 1
-        assert len(result["histogram"]) == 1
+        assert len(result["stats"]["mean"]) == 1
+        assert len(result["stats"]["std"]) == 1
+        assert len(result["stats"]["histogram"]) == 1
 
 
 class TestLowerDimensionalVisualStats:
@@ -404,17 +404,17 @@ class TestLowerDimensionalVisualStats:
 
         result = calculate(data, None, stats=ImageStats.VISUAL, per_channel=False)
 
-        assert "brightness" in result
-        assert "contrast" in result
-        assert "darkness" in result
-        assert "sharpness" in result
-        assert "percentiles" in result
+        assert "brightness" in result["stats"]
+        assert "contrast" in result["stats"]
+        assert "darkness" in result["stats"]
+        assert "sharpness" in result["stats"]
+        assert "percentiles" in result["stats"]
 
-        assert len(result["brightness"]) == 1
-        assert type(result["brightness"][0]) is float
-        assert len(result["percentiles"][0]) == 5  # QUARTILES length
+        assert len(result["stats"]["brightness"]) == 1
+        assert type(result["stats"]["brightness"][0]) is float
+        assert len(result["stats"]["percentiles"][0]) == 5  # QUARTILES length
         # Sharpness should be NaN for 1D data
-        assert np.isnan(result["sharpness"][0])
+        assert np.isnan(result["stats"]["sharpness"][0])
 
     def test_2d_data_visual_stats(self):
         """Test visual statistics calculation with 2D data."""
@@ -422,18 +422,18 @@ class TestLowerDimensionalVisualStats:
 
         result = calculate(data, None, stats=ImageStats.VISUAL, per_channel=False)
 
-        assert "brightness" in result
-        assert "contrast" in result
-        assert "darkness" in result
-        assert "sharpness" in result
-        assert "percentiles" in result
+        assert "brightness" in result["stats"]
+        assert "contrast" in result["stats"]
+        assert "darkness" in result["stats"]
+        assert "sharpness" in result["stats"]
+        assert "percentiles" in result["stats"]
 
-        assert len(result["brightness"]) == 1
-        assert type(result["brightness"][0]) is float
-        assert len(result["percentiles"][0]) == 5
+        assert len(result["stats"]["brightness"]) == 1
+        assert type(result["stats"]["brightness"][0]) is float
+        assert len(result["stats"]["percentiles"][0]) == 5
         # Sharpness should be computed for 2D data
-        assert type(result["sharpness"][0]) is float
-        assert not np.isnan(result["sharpness"][0])
+        assert type(result["stats"]["sharpness"][0]) is float
+        assert not np.isnan(result["stats"]["sharpness"][0])
 
     def test_1d_data_visual_stats_per_channel(self):
         """Test visual statistics with 1D data and per_channel=True."""
@@ -442,11 +442,11 @@ class TestLowerDimensionalVisualStats:
         result = calculate(data, None, stats=ImageStats.VISUAL, per_channel=True)
 
         # Should be treated as 1 channel
-        assert len(result["brightness"]) == 1
-        assert len(result["contrast"]) == 1
-        assert len(result["sharpness"]) == 1
+        assert len(result["stats"]["brightness"]) == 1
+        assert len(result["stats"]["contrast"]) == 1
+        assert len(result["stats"]["sharpness"]) == 1
         # Sharpness should be NaN for 1D data
-        assert np.isnan(result["sharpness"][0])
+        assert np.isnan(result["stats"]["sharpness"][0])
 
     def test_2d_data_visual_stats_per_channel(self):
         """Test visual statistics with 2D data and per_channel=True."""
@@ -455,10 +455,10 @@ class TestLowerDimensionalVisualStats:
         result = calculate(data, None, stats=ImageStats.VISUAL, per_channel=True)
 
         # Should be treated as 1 channel
-        assert len(result["brightness"]) == 1
-        assert len(result["contrast"]) == 1
-        assert len(result["sharpness"]) == 1
-        assert len(result["percentiles"]) == 1
+        assert len(result["stats"]["brightness"]) == 1
+        assert len(result["stats"]["contrast"]) == 1
+        assert len(result["stats"]["sharpness"]) == 1
+        assert len(result["stats"]["percentiles"]) == 1
 
 
 class TestLowerDimensionalDimensionStats:
@@ -539,15 +539,15 @@ class TestLowerDimensionalDimensionStats:
 
         result = calculate(data, None, stats=ImageStats.DIMENSION, per_channel=False)
 
-        assert "width" in result
-        assert "height" in result
-        assert "channels" in result
-        assert "size" in result
+        assert "width" in result["stats"]
+        assert "height" in result["stats"]
+        assert "channels" in result["stats"]
+        assert "size" in result["stats"]
 
-        assert result["width"][0] == 100
-        assert np.isnan(result["height"][0])
-        assert result["channels"][0] == 1
-        assert result["size"][0] == 100
+        assert result["stats"]["width"][0] == 100
+        assert np.isnan(result["stats"]["height"][0])
+        assert result["stats"]["channels"][0] == 1
+        assert result["stats"]["size"][0] == 100
 
     def test_calculate_2d_dimension_stats(self):
         """Test dimension statistics via calculate() with 2D data."""
@@ -555,15 +555,15 @@ class TestLowerDimensionalDimensionStats:
 
         result = calculate(data, None, stats=ImageStats.DIMENSION, per_channel=False)
 
-        assert "width" in result
-        assert "height" in result
-        assert "channels" in result
-        assert "size" in result
+        assert "width" in result["stats"]
+        assert "height" in result["stats"]
+        assert "channels" in result["stats"]
+        assert "size" in result["stats"]
 
-        assert result["width"][0] == 20
-        assert result["height"][0] == 10
-        assert result["channels"][0] == 1
-        assert result["size"][0] == 200
+        assert result["stats"]["width"][0] == 20
+        assert result["stats"]["height"][0] == 10
+        assert result["stats"]["channels"][0] == 1
+        assert result["stats"]["size"][0] == 200
 
 
 class TestLowerDimensionalHashStats:
@@ -612,10 +612,10 @@ class TestLowerDimensionalHashStats:
 
         result = calculate(data, None, stats=ImageStats.HASH, per_channel=False)
 
-        assert "xxhash" in result
-        assert "pchash" in result
-        assert result["xxhash"][0] == "xxhash_calc_result"
-        assert result["pchash"][0] == "pchash_calc_result"
+        assert "xxhash" in result["stats"]
+        assert "pchash" in result["stats"]
+        assert result["stats"]["xxhash"][0] == "xxhash_calc_result"
+        assert result["stats"]["pchash"][0] == "pchash_calc_result"
 
     def test_1d_data_pchash_warning(self):
         """Test that pchash emits a warning for 1D data."""
@@ -642,9 +642,9 @@ class TestLowerDimensionalHashStats:
         result = calculate(data, None, stats=ImageStats.HASH, per_channel=False)
 
         # pchash should return empty string for 1D data
-        assert result["pchash"][0] == ""
+        assert result["stats"]["pchash"][0] == ""
         # xxhash should still work
-        assert result["xxhash"][0] != ""
+        assert result["stats"]["xxhash"][0] != ""
 
     def test_2d_small_image_pchash_warning(self):
         """Test that pchash emits a warning for images smaller than 9x9."""

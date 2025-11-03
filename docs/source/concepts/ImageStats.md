@@ -85,15 +85,15 @@ Duplicates class in order to identify duplicate images.
 The {func}`.labelstats` function provides summary statistics across classes
 and labels:
 
-| Metric                  | Description                                     |
-| ----------------------- | ----------------------------------------------- |
-| label_counts_per_class  | Total number of labels for each class           |
-| label_counts_per_image  | Total number of labels for each image           |
-| image_counts_per_label  | Total number of images for each label           |
-| image_indices_per_label | Dictionary tracking image number for each label |
-| image_count             | Total number of images                          |
-| label_count             | Total number of labels                          |
-| class_count             | Total number of class                           |
+| Metric                  | Description                                  |
+| ----------------------- | -------------------------------------------- |
+| label_counts_per_class  | Total number of labels for each class        |
+| label_counts_per_image  | Total number of labels for each image        |
+| image_counts_per_label  | Total number of images for each label        |
+| image_indices_per_label | Mapping tracking image number for each label |
+| image_count             | Total number of images                       |
+| label_count             | Total number of labels                       |
+| class_count             | Total number of class                        |
 
 ### pixelstats
 

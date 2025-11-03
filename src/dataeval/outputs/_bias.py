@@ -61,8 +61,8 @@ class ParityOutput(ToDataFrameMixin, Output):
         p-value(s) of the test
     factor_names : Sequence[str]
         Names of each metadata factor
-    insufficient_data: dict
-        Dictionary of metadata factors with less than 5 class occurrences per value
+    insufficient_data: Mapping[str, Mapping[int, Mapping[str, int]]]
+        Mapping of metadata factors with less than 5 class occurrences per value
     """
 
     score: NDArray[np.float64]

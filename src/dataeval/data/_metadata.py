@@ -191,7 +191,7 @@ class Metadata:
         Returns
         -------
         Mapping[str, int | Sequence[float]]
-            Dictionary mapping factor names to either the number of bins
+            Mapping of factor names to either the number of bins
             (int) or explicit bin edges (sequence of floats).
         """
         return self._continuous_factor_bins
@@ -206,7 +206,7 @@ class Metadata:
         Parameters
         ----------
         bins : Mapping[str, int | Sequence[float]]
-            Dictionary mapping factor names to bin counts or explicit edges.
+            Mapping of factor names to bin counts or explicit edges.
         """
         if self._continuous_factor_bins != bins:
             self._continuous_factor_bins = dict(bins)
@@ -269,7 +269,7 @@ class Metadata:
         Returns
         -------
         Mapping[str, Sequence[str]]
-            Dictionary mapping dropped factor names to lists of reasons
+            Mapping of dropped factor names to lists of reasons
             why they were excluded from the final dataset.
 
         Notes
@@ -335,7 +335,7 @@ class Metadata:
         Returns
         -------
         Mapping[str, FactorInfo]
-            Dictionary mapping factor names to FactorInfo objects containing
+            Mapping of factor names to FactorInfo objects containing
             data type classification and processing flags (binned, digitized).
 
         Notes
@@ -611,7 +611,7 @@ class Metadata:
         Parameters
         ----------
         factors : Mapping[str, _1DArray[Any]]
-            Dictionary mapping factor names to their values. Factor length must
+            Mapping of factor names to their values. Factor length must
             match either the number of images or number of detections in the dataset.
 
         Raises

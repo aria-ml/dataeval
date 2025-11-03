@@ -13,7 +13,7 @@ from dataeval.types import Array1D
 from dataeval.utils._array import as_numpy
 
 
-class LabelParityDict(TypedDict):
+class LabelParityResult(TypedDict):
     """
     Type definition for label parity output.
 
@@ -112,7 +112,7 @@ def label_parity(
     observed_labels: Array1D[int],
     *,
     num_classes: int | None = None,
-) -> LabelParityDict:
+) -> LabelParityResult:
     """
     Calculate the chi-square statistic to assess the :term:`parity<Parity>` \
     between expected and observed label distributions.
@@ -133,8 +133,8 @@ def label_parity(
 
     Returns
     -------
-    dict
-        Dictionary with keys:
+    LabelParityResult
+        Mapping with keys:
         - chi_squared : float - The chi-squared test statistic
         - p_value : float - The p-value from the chi-squared test
 

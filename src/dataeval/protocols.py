@@ -448,7 +448,7 @@ class EvaluationStrategy(Protocol[_T_cn]):
         Returns
         -------
         Mapping[str, float | ArrayLike]
-            Dictionary of metric names to values. Each value is either:
+            Mapping of metric names to values. Each value is either:
             - A scalar (float) for single-class metrics
             - An array (np.ndarray) for per-class or per-sample metrics
 
