@@ -1,4 +1,4 @@
-"""Data structures used in DataEval."""
+"""Data types used in DataEval."""
 
 from __future__ import annotations
 
@@ -13,16 +13,10 @@ __all__ = [
     "Array8D",
     "Array9D",
     "ArrayND",
-    "ClusterData",
-    "CondensedTree",
 ]
 
 from collections.abc import Iterator
-from dataclasses import dataclass
-from typing import Any, NamedTuple, Protocol, TypeAlias, TypeVar
-
-import numpy as np
-from numpy.typing import NDArray
+from typing import Any, Protocol, TypeAlias, TypeVar
 
 from dataeval.protocols import Array
 
@@ -58,53 +52,3 @@ ArrayND: TypeAlias = (
     | Array8D[DType]
     | Array9D[DType]
 )
-
-
-class CondensedTree(NamedTuple):
-    """
-    Derived from fast_hdbscan.cluster_trees.CondensedTree
-
-    Attributes
-    ----------
-    parent : NDArray[np.int64]
-    child : NDArray[np.int64]
-    lambda_val : NDArray[np.float32]
-    child_size : NDArray[np.float32]
-    """
-
-    parent: NDArray[np.int64]
-    child: NDArray[np.int64]
-    lambda_val: NDArray[np.float32]
-    child_size: NDArray[np.float32]
-
-
-@dataclass
-class ClusterData:
-    """
-    Cluster output data structure.
-
-    Attributes
-    ----------
-    clusters : NDArray[np.intp]
-        Assigned clusters
-    mst : NDArray[np.float32]
-        The minimum spanning tree of the data
-    linkage_tree : NDArray[np.float32]
-        The linkage array of the data
-    condensed_tree : CondensedTree
-        The condensed tree of the data
-    membership_strengths : NDArray[np.float32]
-        The strength of the data point belonging to the assigned cluster
-    k_neighbors : NDArray[np.int32]
-        Indices of the nearest points in the population matrix.
-    k_distances : NDArray[np.float32]
-        Array representing the lengths to points.
-    """
-
-    clusters: NDArray[np.intp]
-    mst: NDArray[np.float32]
-    linkage_tree: NDArray[np.float32]
-    condensed_tree: CondensedTree
-    membership_strengths: NDArray[np.float32]
-    k_neighbors: NDArray[np.int32]
-    k_distances: NDArray[np.float32]

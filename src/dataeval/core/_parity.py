@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, TypedDict, overload
+from typing import TypedDict
 
 __all__ = []
 
@@ -15,25 +15,9 @@ from dataeval.types import Array1D, Array2D
 from dataeval.utils._array import as_numpy
 
 
-class ParityDict(TypedDict):
+class ParityResult(TypedDict):
     """
     Type definition for parity output.
-
-    Attributes
-    ----------
-    chi_scores : NDArray[np.float64]
-        Array of chi-squared statistics for each factor
-    p_values : NDArray[np.float64]
-        Array of p-values for each factor
-    """
-
-    chi_scores: NDArray[np.float64]
-    p_values: NDArray[np.float64]
-
-
-class ParityWithInsufficientDataDict(TypedDict):
-    """
-    Type definition for parity output with insufficient data information.
 
     Attributes
     ----------
@@ -50,30 +34,12 @@ class ParityWithInsufficientDataDict(TypedDict):
     insufficient_data: Mapping[int, Mapping[int, Mapping[int, int]]]
 
 
-@overload
-def parity(
-    factor_data: Array2D[int],
-    class_labels: Array1D[int],
-    *,
-    return_insufficient_data: Literal[False] = False,
-) -> ParityDict: ...
-
-
-@overload
-def parity(
-    factor_data: Array2D[int],
-    class_labels: Array1D[int],
-    *,
-    return_insufficient_data: Literal[True],
-) -> ParityWithInsufficientDataDict: ...
-
-
 def parity(
     factor_data: Array2D[int],
     class_labels: Array1D[int],
     *,
     return_insufficient_data: bool = False,
-) -> ParityDict | ParityWithInsufficientDataDict:
+) -> ParityResult:
     """
     Calculate chi-square statistics to assess the linear relationship \
     between multiple factors and class labels.
@@ -91,12 +57,12 @@ def parity(
 
     Returns
     -------
-    dict
-        Dictionary with keys:
+    ParityResult
+        Mapping with keys:
         - chi_scores : NDArray[np.float64] - Array of chi-squared statistics for each factor
         - p_values : NDArray[np.float64] - Array of p-values for each factor
-        - insufficient_data : Mapping[int, Mapping[int, Mapping[int, int]]] - (only if return_insufficient_data=True)
-        Mapping of factors to categories to classes with insufficient data counts
+        - insufficient_data : Mapping[int, Mapping[int, Mapping[int, int]]] - Mapping of factors to categories to
+        classes with insufficient data counts
 
     Raises
     ------
@@ -121,7 +87,7 @@ def parity(
     class_labels_np = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
     chi_scores = np.zeros(factor_data_np.shape[1])
     p_values = np.zeros_like(chi_scores)
-    insufficient_data: defaultdict[int, defaultdict[int, dict[int, int]]] = defaultdict(lambda: defaultdict(dict))
+    insufficient_ddict: defaultdict[int, defaultdict[int, dict[int, int]]] = defaultdict(lambda: defaultdict(dict))
     for i, col_data in enumerate(factor_data_np.T):
         # Builds a contingency matrix where entry at index (r,c) represents
         # the frequency of current_factor_name achieving value unique_factor_values[r]
@@ -137,7 +103,7 @@ def parity(
             if contingency_matrix[int_factor, int_class] > 0:
                 factor_category = unique_factor_values[int_factor].item()
                 class_count = contingency_matrix[int_factor, int_class].item()
-                insufficient_data[i][factor_category][int_class] = class_count
+                insufficient_ddict[i][factor_category][int_class] = class_count
 
         # This deletes rows containing only zeros,
         # because scipy.stats.chi2_contingency fails when there are rows containing only zeros.
@@ -145,7 +111,6 @@ def parity(
 
         chi_scores[i], p_values[i] = chi2_contingency(contingency_matrix)[:2]  # type: ignore
 
-    if return_insufficient_data:
-        return {"chi_scores": chi_scores, "p_values": p_values, "insufficient_data": insufficient_data}
+    insufficient_data = {k: dict(v) for k, v in insufficient_ddict.items()}
 
-    return {"chi_scores": chi_scores, "p_values": p_values}
+    return ParityResult(chi_scores=chi_scores, p_values=p_values, insufficient_data=insufficient_data)
