@@ -13,7 +13,7 @@ from dataeval.types import Array1D, ArrayND
 from dataeval.utils._array import as_numpy
 
 
-class BERDict(TypedDict):
+class BERResult(TypedDict):
     """
     Type definition for Bayes Error Rate bounds output.
 
@@ -29,7 +29,7 @@ class BERDict(TypedDict):
     lower_bound: float
 
 
-def ber_mst(embeddings: ArrayND[float], class_labels: Array1D[int]) -> BERDict:
+def ber_mst(embeddings: ArrayND[float], class_labels: Array1D[int]) -> BERResult:
     """
     An estimator for Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` \
     using FR with a minimum spanning tree (MST) test statistic basis.
@@ -43,8 +43,8 @@ def ber_mst(embeddings: ArrayND[float], class_labels: Array1D[int]) -> BERDict:
 
     Returns
     -------
-    dict
-        Dictionary with keys:
+    BERResult
+        Mapping with keys:
         - upper_bound : float - The upper bound of the Bayes Error Rate
         - lower_bound : float - The lower bound of the Bayes Error Rate
 
@@ -77,7 +77,7 @@ def ber_mst(embeddings: ArrayND[float], class_labels: Array1D[int]) -> BERDict:
     return {"upper_bound": upper, "lower_bound": lower}
 
 
-def ber_knn(embeddings: ArrayND[float], class_labels: Array1D[int], k: int) -> BERDict:
+def ber_knn(embeddings: ArrayND[float], class_labels: Array1D[int], k: int) -> BERResult:
     """
     An estimator for Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` \
     using KNN test statistic basis.
@@ -93,8 +93,8 @@ def ber_knn(embeddings: ArrayND[float], class_labels: Array1D[int], k: int) -> B
 
     Returns
     -------
-    dict
-        Dictionary with keys:
+    BERResult
+        Mapping with keys:
         - upper_bound : float - The upper bound of the Bayes Error Rate
         - lower_bound : float - The lower bound of the Bayes Error Rate
 

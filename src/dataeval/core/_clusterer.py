@@ -4,14 +4,63 @@ __all__ = []
 
 import warnings
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.core._mst import compute_neighbor_distances, minimum_spanning_tree_edges
-from dataeval.types import ArrayND, ClusterData, CondensedTree
+from dataeval.types import ArrayND
 from dataeval.utils._array import flatten, to_numpy
+
+
+class CondensedTree(TypedDict):
+    """
+    Derived from fast_hdbscan.cluster_trees.CondensedTree
+
+    Attributes
+    ----------
+    parent : NDArray[np.int64]
+    child : NDArray[np.int64]
+    lambda_val : NDArray[np.float32]
+    child_size : NDArray[np.float32]
+    """
+
+    parent: NDArray[np.int64]
+    child: NDArray[np.int64]
+    lambda_val: NDArray[np.float32]
+    child_size: NDArray[np.float32]
+
+
+class ClusterResult(TypedDict):
+    """
+    Cluster output data structure.
+
+    Attributes
+    ----------
+    clusters : NDArray[np.intp]
+        Assigned clusters
+    mst : NDArray[np.float32]
+        The minimum spanning tree of the data
+    linkage_tree : NDArray[np.float32]
+        The linkage array of the data
+    condensed_tree : CondensedTree
+        The condensed tree of the data
+    membership_strengths : NDArray[np.float32]
+        The strength of the data point belonging to the assigned cluster
+    k_neighbors : NDArray[np.int32]
+        Indices of the nearest points in the population matrix
+    k_distances : NDArray[np.float32]
+        Array representing the lengths to points
+    """
+
+    clusters: NDArray[np.intp]
+    mst: NDArray[np.float32]
+    linkage_tree: NDArray[np.float32]
+    condensed_tree: CondensedTree
+    membership_strengths: NDArray[np.float32]
+    k_neighbors: NDArray[np.int32]
+    k_distances: NDArray[np.float32]
 
 
 def _find_outliers(clusters: NDArray[np.intp]) -> NDArray[np.intp]:
@@ -76,7 +125,7 @@ def _sorted_union_find(index_groups: NDArray[np.int32]) -> list[list[np.int32]]:
     return sorted(groups)
 
 
-def cluster(embeddings: ArrayND[float]) -> ClusterData:
+def cluster(embeddings: ArrayND[float]) -> ClusterResult:
     """
     Uses hierarchical clustering on the flattened data and returns clustering
     information.
@@ -90,7 +139,15 @@ def cluster(embeddings: ArrayND[float]) -> ClusterData:
 
     Returns
     -------
-    :class:`.ClusterData`
+    ClusterResult
+        Mapping with keys:
+        - clusters : NDArray[np.intp] - Assigned clusters
+        - mst : NDArray[np.float32] - The minimum spanning tree of the data
+        - linkage_tree : NDArray[np.float32] - The linkage array of the data
+        - condensed_tree : CondensedTree(Mapping) - Derived from fast_hdbscan.cluster_trees.CondensedTree
+        - membership_strengths : NDArray[np.float32] - The strength of the data point belonging to the assigned cluster
+        - k_neighbors : NDArray[np.int32] - Indices of the nearest points in the population matrix
+        - k_distances : NDArray[np.float32] - Array representing the lengths to points
 
     Notes
     -----
@@ -100,7 +157,7 @@ def cluster(embeddings: ArrayND[float]) -> ClusterData:
 
     Example
     -------
-    >>> cluster(clusterer_images).clusters
+    >>> cluster(clusterer_images)["clusters"]
     array([ 2,  0,  0,  0,  0,  0,  4,  0,  3,  1,  1,  0,  2,  0,  0,  0,  0,
             4,  2,  0,  0,  1,  2,  0,  1,  3,  0,  3,  3,  4,  0,  0,  3,  0,
             3, -1,  0,  0,  2,  4,  3,  4,  0,  1,  0, -1,  3,  0,  0,  0])
@@ -136,8 +193,7 @@ def cluster(embeddings: ArrayND[float]) -> ClusterData:
     unsorted_mst: NDArray[np.float32] = minimum_spanning_tree_edges(x, kneighbors, kdistances)
     mst: NDArray[np.float32] = unsorted_mst[np.argsort(unsorted_mst.T[2])]
     linkage_tree: NDArray[np.float32] = mst_to_linkage_tree(mst).astype(np.float32)
-    condensed_tree: CondensedTree = CondensedTree(*condense_tree(linkage_tree, min_cluster_size))
-
+    condensed_tree = condense_tree(linkage_tree, min_cluster_size)
     cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
 
     selected_clusters = extract_eom_clusters(condensed_tree, cluster_tree, allow_single_cluster=single_cluster)
@@ -154,13 +210,25 @@ def cluster(embeddings: ArrayND[float]) -> ClusterData:
     #         min_persistence=cluster_selection_epsilon,
     #     )
 
-    clusters = get_cluster_label_vector(
+    clusters: NDArray[np.intp] = get_cluster_label_vector(
         condensed_tree,
         selected_clusters,
         cluster_selection_epsilon,
         n_samples=x.shape[0],
     )
 
-    membership_strengths = get_point_membership_strength_vector(condensed_tree, selected_clusters, clusters)
+    membership_strengths: NDArray[np.float32] = get_point_membership_strength_vector(
+        condensed_tree,
+        selected_clusters,
+        clusters,
+    )
 
-    return ClusterData(clusters, mst, linkage_tree, condensed_tree, membership_strengths, kneighbors, kdistances)
+    return ClusterResult(
+        clusters=clusters,
+        mst=mst,
+        linkage_tree=linkage_tree,
+        condensed_tree=CondensedTree(**condensed_tree._asdict()),
+        membership_strengths=membership_strengths,
+        k_neighbors=kneighbors,
+        k_distances=kdistances,
+    )

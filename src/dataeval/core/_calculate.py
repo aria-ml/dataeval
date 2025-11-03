@@ -3,12 +3,12 @@ from __future__ import annotations
 __all__ = []
 
 import warnings
-from collections.abc import Callable, Iterable, Iterator, Sized
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Sized
 from dataclasses import dataclass
 from enum import Flag
 from functools import cached_property, partial
 from itertools import zip_longest
-from typing import Any
+from typing import Any, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
@@ -18,12 +18,39 @@ import dataeval.core._calculators._register  # noqa: F401
 from dataeval.config import get_max_processes
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.core.flags import ImageStats, resolve_dependencies
-from dataeval.outputs._stats import SourceIndex
+from dataeval.outputs import SourceIndex
 from dataeval.protocols import ArrayLike
 from dataeval.utils._boundingbox import BoundingBox, BoxLike
 from dataeval.utils._image import clip_and_pad, normalize_image_shape, rescale
 from dataeval.utils._multiprocessing import PoolWrapper
 from dataeval.utils._tqdm import tqdm
+
+
+class CalculationResult(TypedDict):
+    """
+    Type definition for calculation output.
+
+    Attributes
+    ----------
+    source_index : Sequence[SourceIndex]
+        Sequence of SourceIndex objects with image/box/channel info.
+    object_count : Sequence[int]
+        Sequence of object counts per image.
+    invalid_box_count : Sequence[int]
+        Sequence of invalid box counts per image.
+    image_count : int
+        Total number of images processed.
+    stats : Mapping[str, Sequence[Any]]
+        Mapping of statistic names to sequences of computed values.
+        Keys are the names of statistics requested (e.g., 'mean', 'std', 'brightness').
+        Values are sequences where each element corresponds to a source_index entry.
+    """
+
+    source_index: Sequence[SourceIndex]
+    object_count: Sequence[int]
+    invalid_box_count: Sequence[int]
+    image_count: int
+    stats: Mapping[str, Sequence[Any]]
 
 
 @dataclass
@@ -310,7 +337,7 @@ def calculate(
     per_box: bool = True,
     per_channel: bool = False,
     progress_callback: Callable[[int, int | None], None] | None = None,
-) -> dict[str, Any]:
+) -> CalculationResult:
     """
     Compute specified statistics on a set of images.
 
@@ -339,13 +366,13 @@ def calculate(
 
     Returns
     -------
-    dict[str, Any]
-        Dictionary containing computed statistics and metadata including:
-        - Individual statistics as computed by processors
-        - 'source_index': List of SourceIndex objects with image/box/channel info
-        - 'object_count': List of object counts per image
-        - 'invalid_box_count': List of invalid box counts per image
+    CalculationResult
+        Mapping containing computed statistics and metadata:
+        - 'source_index': Sequence of SourceIndex objects with image/box/channel info
+        - 'object_count': Sequence of object counts per image
+        - 'invalid_box_count': Sequence of invalid box counts per image
         - 'image_count': Total number of images processed
+        - 'stats': Mapping of statistic names to sequences of computed values
 
         Output is sorted by (image_index, box_index, channel_index) ascending,
         with None values appearing before 0.
@@ -430,9 +457,10 @@ def calculate(
 
     sorted_source_indices, sorted_aggregated_stats = _sort(source_indices, aggregated_stats)
 
-    return sorted_aggregated_stats | {
-        "source_index": sorted_source_indices,
-        "object_count": [object_count.get(i, 0) for i in range(image_count)],
-        "invalid_box_count": [invalid_box_count.get(i, 0) for i in range(image_count)],
-        "image_count": image_count,
-    }
+    return CalculationResult(
+        source_index=sorted_source_indices,
+        object_count=[object_count.get(i, 0) for i in range(image_count)],
+        invalid_box_count=[invalid_box_count.get(i, 0) for i in range(image_count)],
+        image_count=image_count,
+        stats=sorted_aggregated_stats,
+    )

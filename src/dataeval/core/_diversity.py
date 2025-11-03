@@ -30,7 +30,7 @@ def diversity_shannon(
 
     Returns
     -------
-    diversity_index : NDArray[np.double]
+    NDArray[np.double]
         Diversity index per column of X
 
     See Also
@@ -70,7 +70,7 @@ def diversity_simpson(
 
     Returns
     -------
-    diversity_index : NDArray[np.double]
+    NDArray[np.double]
         Diversity index per column of X
     """
     ev_index = np.empty(counts.shape[1])

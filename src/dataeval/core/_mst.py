@@ -19,7 +19,7 @@ from dataeval.types import ArrayND
 from dataeval.utils._array import as_numpy, flatten
 
 
-class MSTDict(TypedDict):
+class MSTResult(TypedDict):
     """
     Type definition for minimum spanning tree output.
 
@@ -278,7 +278,7 @@ def minimum_spanning_tree_edges(
     return tree
 
 
-def minimum_spanning_tree(embeddings: ArrayND[float], k: int = 15) -> MSTDict:
+def minimum_spanning_tree(embeddings: ArrayND[float], k: int = 15) -> MSTResult:
     """
     Compute the minimum spanning tree of a dataset.
 
@@ -297,8 +297,8 @@ def minimum_spanning_tree(embeddings: ArrayND[float], k: int = 15) -> MSTDict:
 
     Returns
     -------
-    dict
-        Dictionary with keys:
+    MSTResult
+        Mapping with keys:
         - source : NDArray[np.intp] - Source node indices for each edge in the MST with shape (n_samples - 1,)
         - target : NDArray[np.intp] - Target node indices for each edge in the MST with shape (n_samples - 1,)
 
