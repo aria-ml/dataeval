@@ -58,19 +58,8 @@ class TestParity:
         assert_array_almost_equal(result["chi_scores"], [0.0])
         assert_array_almost_equal(result["p_values"], [1.0])
 
-    def test_return_insufficient_data_false(self):
-        """Test return type when return_insufficient_data=False."""
-        binned_data = np.array([[0], [1]], dtype=np.intp)
-        class_labels = np.array([0, 1], dtype=np.intp)
-
-        result = parity(binned_data, class_labels, return_insufficient_data=False)
-
-        assert len(result) == 2
-        assert isinstance(result["chi_scores"], np.ndarray)
-        assert isinstance(result["p_values"], np.ndarray)
-
-    def test_return_insufficient_data_true(self):
-        """Test return type when return_insufficient_data=True."""
+    def test_return_types(self):
+        """Test return types."""
         binned_data = np.array([[0], [1]], dtype=np.intp)
         class_labels = np.array([0, 1], dtype=np.intp)
 

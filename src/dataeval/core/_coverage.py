@@ -13,7 +13,7 @@ from dataeval.types import Array2D
 from dataeval.utils._array import as_numpy, ensure_embeddings, flatten
 
 
-class CoverageDict(TypedDict):
+class CoverageResult(TypedDict):
     """
     Type definition for coverage output.
 
@@ -51,7 +51,7 @@ def _calculate_critical_value_radii(embeddings: NDArray[np.float64], num_observa
 def coverage_naive(
     embeddings: Array2D[float],
     num_observations: int,
-) -> CoverageDict:
+) -> CoverageResult:
     """
     Evaluate :term:`coverage<Coverage>` using a naive radius calculation method.
 
@@ -71,7 +71,7 @@ def coverage_naive(
     Returns
     -------
     dict
-        Dictionary with keys:
+        Mapping with keys:
         - uncovered_indices : NDArray[np.intp] - Array of indices for uncovered observations
         - critical_value_radii : NDArray[np.float64] - Array of critical value radii for each observation
         - coverage_radius : float - The radius threshold for coverage
@@ -118,7 +118,7 @@ def coverage_adaptive(
     embeddings: Array2D[float],
     num_observations: int,
     percent: float,
-) -> CoverageDict:
+) -> CoverageResult:
     """
     Evaluate :term:`coverage<Coverage>` using an adaptive radius calculation method.
 
@@ -139,8 +139,8 @@ def coverage_adaptive(
 
     Returns
     -------
-    dict
-        Dictionary with keys:
+    CoverageResult
+        Mapping with keys:
         - uncovered_indices : NDArray[np.intp] - Array of indices for uncovered observations
         - critical_value_radii : NDArray[np.float64] - Array of critical value radii for each observation
         - coverage_radius : float - The adaptive radius threshold for coverage

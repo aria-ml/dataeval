@@ -9,20 +9,20 @@ from typing import TypedDict
 from dataeval.types import Array1D, Array2D
 
 
-class LabelStatsDict(TypedDict):
+class LabelStatsResult(TypedDict):
     """
     Type definition for label statistics output.
 
     Attributes
     ----------
     label_counts_per_class : Mapping[int, int]
-        Dictionary mapping class labels to their total occurrence count
+        Mapping of class labels to their total occurrence count
     label_counts_per_image : Sequence[int]
         List containing the number of labels in each image
     image_counts_per_class : Mapping[int, int]
-        Dictionary mapping class labels to the number of images containing that class
+        Mapping of class labels to the number of images containing that class
     image_indices_per_class : Mapping[int, Sequence[int]]
-        Dictionary mapping class labels to lists of image indices containing that class
+        Mapping of class labels to sequences of image indices containing that class
     image_count : int
         Total number of images in the dataset
     class_count : int
@@ -46,7 +46,7 @@ class LabelStatsDict(TypedDict):
 def label_stats(
     labels: Array1D[int] | Array2D[int],
     index2label: Mapping[int, str] | None = None,
-) -> LabelStatsDict:
+) -> LabelStatsResult:
     """
     Calculates statistics for data labels.
 
@@ -68,8 +68,8 @@ def label_stats(
 
     Returns
     -------
-    dict
-        A dictionary containing the computed counting metrics for the labels with keys:
+    LabelStatsResult
+        A mapping containing the computed counting metrics for the labels with keys:
         - label_counts_per_class: Mapping[int, int] - Total count of each class
         - label_counts_per_image: Sequence[int] - Number of labels per image
         - image_counts_per_class: Mapping[int, int] - How many images contain each label

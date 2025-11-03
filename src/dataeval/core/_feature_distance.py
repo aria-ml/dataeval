@@ -21,7 +21,7 @@ class KSType(NamedTuple):
     pvalue: float
 
 
-class FeatureDistanceResultDict(TypedDict):
+class FeatureDistanceResult(TypedDict):
     """
     Type definition for a single feature distance test result.
 
@@ -62,7 +62,7 @@ def _calculate_drift(x1: Array1D[float] | Array2D[float], x2: Array1D[float] | A
 def feature_distance(
     continuous_data_1: Array1D[float] | Array2D[float],
     continuous_data_2: Array1D[float] | Array2D[float],
-) -> Sequence[FeatureDistanceResultDict]:
+) -> Sequence[FeatureDistanceResult]:
     """
     Measures the feature-wise distance between two continuous distributions and computes a
     p-value to evaluate its significance.
@@ -78,8 +78,8 @@ def feature_distance(
 
     Returns
     -------
-    list[dict]
-        List of dictionaries, one per feature, each with keys:
+    Sequence[FeatureDistanceResult]
+        Sequence of mappings, one per feature, each with keys:
         - statistic : float - The Kolmogorov-Smirnov test statistic
         - location : float - The normalized location where the KS statistic was achieved
         - dist : float - The Earth Mover's Distance between distributions
@@ -109,7 +109,7 @@ def feature_distance(
         )
 
     # Set default for statistic, location, and magnitude to zero and pvalue to one
-    results: list[FeatureDistanceResultDict] = []
+    results: list[FeatureDistanceResult] = []
 
     # Per factor
     for i in range(len(cont1.T)):

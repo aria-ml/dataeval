@@ -12,6 +12,7 @@ from typing import Any, Generic, TypeVar
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval.core._calculate import CalculationResult
 from dataeval.outputs._stats import BaseStatsOutput
 from dataeval.protocols import Array, ArrayLike, Dataset, ObjectDetectionTarget
 from dataeval.utils._array import as_numpy
@@ -40,18 +41,23 @@ class SizedIterator(Generic[T]):
 
 def convert_output(
     output_cls: type[TStatsOutput],
-    output_dict: dict[str, Any],
+    output_dict: CalculationResult,
 ) -> TStatsOutput:
     output: dict[str, Any] = {}
     attrs = dict(ChainMap(*(getattr(c, "__annotations__", {}) for c in output_cls.__mro__)))
-    for key in (key for key in output_dict if key in attrs):
+
+    # Merge stats field into the main dict for processing
+    stats_dict = output_dict["stats"]
+    combined_dict = {**output_dict, **stats_dict}
+
+    for key in (key for key in combined_dict if key in attrs):
         stat_type: str = attrs[key]
         dtype_match = re.match(DTYPE_REGEX, stat_type)
         if dtype_match is not None:
-            output[key] = np.asarray(output_dict[key], dtype=np.dtype(dtype_match.group(1)))
+            output[key] = np.asarray(combined_dict[key], dtype=np.dtype(dtype_match.group(1)))
         else:
-            output[key] = output_dict[key]
-    return output_cls(**output)  # , **base_attrs)
+            output[key] = combined_dict[key]
+    return output_cls(**output)
 
 
 def unzip_dataset(

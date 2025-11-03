@@ -13,7 +13,13 @@ from dataeval.core._calculate import calculate
 from dataeval.core.flags import ImageStats
 from dataeval.data._images import Images
 from dataeval.metrics.stats._base import combine_stats, get_dataset_step_from_idx
-from dataeval.outputs import DimensionStatsOutput, ImageStatsOutput, OutliersOutput, PixelStatsOutput, VisualStatsOutput
+from dataeval.outputs import (
+    DimensionStatsOutput,
+    ImageStatsOutput,
+    OutliersOutput,
+    PixelStatsOutput,
+    VisualStatsOutput,
+)
 from dataeval.outputs._base import set_metadata
 from dataeval.outputs._linters import IndexIssueMap
 from dataeval.outputs._stats import BASE_ATTRS
@@ -147,7 +153,6 @@ class Outliers:
         outlier_method: Literal["zscore", "modzscore", "iqr"] = "modzscore",
         outlier_threshold: float | None = None,
     ) -> None:
-        self.stats: dict[str, list[Any]]
         self.use_dimension = use_dimension
         self.use_pixel = use_pixel
         self.use_visual = use_visual
@@ -281,6 +286,9 @@ class Outliers:
 
         images = Images(data) if isinstance(data, Dataset) else data
 
-        self.stats = calculate(images, None, flags)
+        calc_result = calculate(images, None, flags)
+        self.stats: dict[str, Any] = {**{k: v for k, v in calc_result.items() if k != "stats"}} | dict(
+            calc_result["stats"]
+        )
         outliers = self._get_outliers(self.stats)
         return OutliersOutput(outliers)
