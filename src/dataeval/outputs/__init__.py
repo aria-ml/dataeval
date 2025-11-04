@@ -22,7 +22,6 @@ from ._stats import (
     ImageStatsOutput,
     LabelStatsOutput,
     PixelStatsOutput,
-    SourceIndex,
     VisualStatsOutput,
 )
 from ._utils import SplitDatasetOutput, TrainValSplit
@@ -56,7 +55,6 @@ __all__ = [
     "OutliersOutput",
     "ParityOutput",
     "PixelStatsOutput",
-    "SourceIndex",
     "SplitDatasetOutput",
     "SufficiencyOutput",
     "TrainValSplit",

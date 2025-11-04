@@ -18,8 +18,8 @@ import dataeval.core._calculators._register  # noqa: F401
 from dataeval.config import get_max_processes
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.core.flags import ImageStats, resolve_dependencies
-from dataeval.outputs import SourceIndex
 from dataeval.protocols import ArrayLike
+from dataeval.types import SequenceLike, SourceIndex
 from dataeval.utils._boundingbox import BoundingBox, BoxLike
 from dataeval.utils._image import clip_and_pad, normalize_image_shape, rescale
 from dataeval.utils._multiprocessing import PoolWrapper
@@ -40,7 +40,7 @@ class CalculationResult(TypedDict):
         Sequence of invalid box counts per image.
     image_count : int
         Total number of images processed.
-    stats : Mapping[str, Sequence[Any]]
+    stats : Mapping[str, SequenceLike[Any]]
         Mapping of statistic names to sequences of computed values.
         Keys are the names of statistics requested (e.g., 'mean', 'std', 'brightness').
         Values are sequences where each element corresponds to a source_index entry.
@@ -50,7 +50,7 @@ class CalculationResult(TypedDict):
     object_count: Sequence[int]
     invalid_box_count: Sequence[int]
     image_count: int
-    stats: Mapping[str, Sequence[Any]]
+    stats: Mapping[str, SequenceLike[Any]]
 
 
 @dataclass
