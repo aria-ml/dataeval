@@ -5,6 +5,10 @@ __all__ = []
 from collections.abc import Sequence
 from typing import Any, overload
 
+import numpy as np
+from numpy.typing import NDArray
+
+from dataeval.core._clusterer import ClusterResult
 from dataeval.data._images import Images
 from dataeval.metrics.stats import hashstats
 from dataeval.metrics.stats._base import combine_stats, get_dataset_step_from_idx
@@ -163,6 +167,120 @@ class Duplicates:
             duplicates[dup_type] = dup_list_dict
 
         return DuplicatesOutput(**duplicates)
+
+    @set_metadata(state=["only_exact"])
+    def from_clusters(
+        self,
+        cluster_result: ClusterResult,
+    ) -> DuplicatesOutput[DuplicateGroup]:
+        """
+        Find duplicates using cluster-based detection from minimum spanning tree.
+
+        Analyzes the minimum spanning tree and cluster assignments to identify
+        exact and near duplicates based on distance relationships within clusters.
+        This method is particularly effective for finding semantic or visual
+        duplicates in image embeddings.
+
+        Parameters
+        ----------
+        cluster_result : ClusterResult
+            Clustering results from the cluster() function, containing the
+            minimum spanning tree (mst) and cluster assignments needed for
+            duplicate detection.
+
+        Returns
+        -------
+        DuplicatesOutput[DuplicateGroup]
+            Duplicate detection results with exact and near duplicate groups
+            as lists of image indices. Format matches the output of from_stats()
+            and evaluate() methods.
+
+        See Also
+        --------
+        dataeval.core.cluster : Function to compute clusters from embeddings
+        from_stats : Find duplicates from pre-computed hash statistics
+        evaluate : Find duplicates by computing hashes from images
+
+        Notes
+        -----
+        This method uses cluster distance standards to identify duplicates:
+        - **Exact duplicates**: Points at zero distance in the MST
+        - **Near duplicates**: Points within cluster-specific distance thresholds
+
+        Unlike hash-based duplicate detection (from_stats/evaluate), cluster-based
+        detection identifies duplicates in embedding space, which can capture
+        semantic or visual similarity rather than pixel-level equality.
+
+        The `only_exact` parameter set during initialization controls whether
+        near duplicates are computed. Set `only_exact=True` for faster processing
+        when only exact duplicates are needed.
+        """
+        # Find duplicates using MST and cluster assignments
+        exact_duplicates, near_duplicates = self._find_duplicates(
+            mst=cluster_result["mst"],
+            clusters=cluster_result["clusters"],
+        )
+
+        return DuplicatesOutput(
+            exact=exact_duplicates,
+            near=near_duplicates,
+        )
+
+    def _find_duplicates(
+        self,
+        mst: NDArray[np.float32],
+        clusters: NDArray[np.intp],
+    ) -> tuple[Sequence[Sequence[int]], Sequence[Sequence[int]]]:
+        """
+        Finds duplicate and near duplicate data based on cluster average distance.
+
+        Parameters
+        ----------
+        mst : NDArray[np.float32]
+            Minimum spanning tree from cluster() output
+        clusters : NDArray[np.intp]
+            Cluster labels from cluster() output
+
+        Returns
+        -------
+        Tuple[List[List[int]], List[List[int]]]
+            The exact duplicates and near duplicates as lists of related indices
+        """
+        # Delay load numba compiled functions
+        from dataeval.core._numba import compare_links_to_cluster_std
+
+        exact_indices, near_indices = compare_links_to_cluster_std(mst, clusters)  # type: ignore
+        exact_dupes = self._sorted_union_find(exact_indices)
+        near_dupes = self._sorted_union_find(near_indices) if not self.only_exact else []
+
+        return [[int(ii) for ii in il] for il in exact_dupes], [[int(ii) for ii in il] for il in near_dupes]
+
+    def _sorted_union_find(self, index_groups: Any) -> list[list[Any]]:
+        """Merges and sorts groups of indices that share any common index"""
+        import warnings
+
+        import numpy as np
+
+        # Delay load fast_hdbscan functions
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=FutureWarning)
+            from fast_hdbscan.cluster_trees import ds_find, ds_rank_create, ds_union_by_rank
+
+        groups: list[list[np.int32]] = [[np.int32(x) for x in range(0)] for y in range(0)]
+        uniques, inverse = np.unique(index_groups, return_inverse=True)
+        inverse = inverse.flatten()
+        disjoint_set = ds_rank_create(uniques.size)
+        cluster_points = np.empty(uniques.size, dtype=np.uint32)
+        for i in range(index_groups.shape[0]):
+            point, nbr = np.int32(inverse[i * 2]), np.int32(inverse[i * 2 + 1])
+            ds_union_by_rank(disjoint_set, point, nbr)
+        for i in range(uniques.size):
+            cluster_points[i] = ds_find(disjoint_set, i)
+        for i in range(uniques.size):
+            dups = np.nonzero(cluster_points == i)[0]
+            if dups.size > 0:
+                groups.append(uniques[dups].tolist())
+        return sorted(groups)
 
     @set_metadata(state=["only_exact"])
     def evaluate(

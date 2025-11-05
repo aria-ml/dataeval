@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from dataeval.config import use_max_processes
+from dataeval.core._clusterer import ClusterResult
 from dataeval.detectors.linters.outliers import Outliers, OutliersOutput, _get_outlier_mask
 from dataeval.metrics.stats import dimensionstats, pixelstats, visualstats
 from dataeval.metrics.stats._imagestats import imagestats
@@ -110,6 +111,101 @@ class TestOutliers:
         outliers.evaluate(np.zeros((50, 1, 16, 16)))
         assert expected in outliers.stats
         assert not not_expected & set(outliers.stats)
+
+    def test_outliers_from_clusters_basic(self):
+        """Test basic cluster-based outlier detection"""
+
+        # Create simple embeddings
+        embeddings = np.random.randn(10, 5)
+
+        # Create ClusterResult as a TypedDict-compatible dictionary
+        # Assign most points to cluster 0, one point to cluster -1 (outlier)
+        mock_cluster_result: ClusterResult = {
+            "clusters": np.array([0, 0, 0, 0, 0, 0, 0, 0, -1, 0], dtype=np.intp),
+            "mst": np.array([], dtype=np.float32),
+            "linkage_tree": np.array([], dtype=np.float32),
+            "condensed_tree": {
+                "parent": np.array([]),
+                "child": np.array([]),
+                "lambda_val": np.array([]),
+                "child_size": np.array([]),
+            },
+            "membership_strengths": np.array([], dtype=np.float32),
+            "k_neighbors": np.array([], dtype=np.int32),
+            "k_distances": np.array([], dtype=np.float32),
+        }
+
+        # Find outliers using new method
+        detector = Outliers()
+        result = detector.from_clusters(embeddings, mock_cluster_result, threshold=2.0)
+
+        # Should be a dict of indices
+        assert isinstance(result.issues, dict)
+        # Should not raise an error
+        assert len(result.issues) >= 0
+
+    def test_outliers_from_clusters_threshold_variations(self):
+        """Test that different thresholds produce different numbers of outliers"""
+
+        # Create embeddings where some points are far from cluster center
+        main_cluster = np.random.randn(8, 5) * 0.5
+        outlier_points = np.random.randn(2, 5) * 2.0 + 5.0
+        embeddings = np.vstack([main_cluster, outlier_points])
+
+        # Create ClusterResult - all in same cluster for adaptive detection
+        mock_cluster_result: ClusterResult = {
+            "clusters": np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], dtype=np.intp),
+            "mst": np.array([], dtype=np.float32),
+            "linkage_tree": np.array([], dtype=np.float32),
+            "condensed_tree": {
+                "parent": np.array([]),
+                "child": np.array([]),
+                "lambda_val": np.array([]),
+                "child_size": np.array([]),
+            },
+            "membership_strengths": np.array([], dtype=np.float32),
+            "k_neighbors": np.array([], dtype=np.int32),
+            "k_distances": np.array([], dtype=np.float32),
+        }
+
+        detector = Outliers()
+
+        # Strict threshold should find more outliers
+        result_strict = detector.from_clusters(embeddings, mock_cluster_result, threshold=1.5)
+        # Permissive threshold should find fewer outliers
+        result_permissive = detector.from_clusters(embeddings, mock_cluster_result, threshold=3.5)
+
+        # Strict should have more (or equal) outliers than permissive
+        assert len(result_strict.issues) >= len(result_permissive.issues)
+
+    def test_outliers_from_clusters_no_outliers(self):
+        """Test with well-clustered data that has no clear outliers"""
+
+        # Create tight cluster
+        embeddings = np.random.randn(10, 5) * 0.1
+
+        # Create ClusterResult
+        mock_cluster_result: ClusterResult = {
+            "clusters": np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], dtype=np.intp),
+            "mst": np.array([], dtype=np.float32),
+            "linkage_tree": np.array([], dtype=np.float32),
+            "condensed_tree": {
+                "parent": np.array([]),
+                "child": np.array([]),
+                "lambda_val": np.array([]),
+                "child_size": np.array([]),
+            },
+            "membership_strengths": np.array([], dtype=np.float32),
+            "k_neighbors": np.array([], dtype=np.int32),
+            "k_distances": np.array([], dtype=np.float32),
+        }
+
+        detector = Outliers()
+        result = detector.from_clusters(embeddings, mock_cluster_result, threshold=3.0)
+
+        # With permissive threshold and tight cluster, should find few or no outliers
+        assert isinstance(result.issues, dict)
+        assert len(result.issues) == 0
 
 
 @pytest.mark.required

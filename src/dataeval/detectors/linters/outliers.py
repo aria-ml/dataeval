@@ -10,6 +10,7 @@ from numpy.typing import NDArray
 
 from dataeval.config import EPSILON
 from dataeval.core._calculate import calculate
+from dataeval.core._clusterer import ClusterResult, ClusterStats, compute_cluster_stats
 from dataeval.core.flags import ImageStats
 from dataeval.data._images import Images
 from dataeval.metrics.stats._base import combine_stats, get_dataset_step_from_idx
@@ -24,6 +25,8 @@ from dataeval.outputs._base import set_metadata
 from dataeval.outputs._linters import IndexIssueMap
 from dataeval.outputs._stats import BASE_ATTRS
 from dataeval.protocols import ArrayLike, Dataset
+from dataeval.types import ArrayND
+from dataeval.utils._array import flatten, to_numpy
 
 OutlierStatsOutput = DimensionStatsOutput | PixelStatsOutput | VisualStatsOutput
 
@@ -244,6 +247,143 @@ class Outliers:
                 output_list[indices[k]][v] = issue
 
         return OutliersOutput(output_list)
+
+    @set_metadata(state=["outlier_threshold"])
+    def from_clusters(
+        self,
+        embeddings: ArrayND[float],
+        cluster_result: ClusterResult,
+        threshold: float | None = None,
+    ) -> OutliersOutput[IndexIssueMap]:
+        """
+        Find outliers using cluster-based adaptive distance detection.
+
+        Identifies outliers based on their distance from cluster centers in
+        embedding space. Points that are unusually far from their nearest
+        cluster center are flagged as outliers. This method is particularly
+        effective for finding semantic or visual outliers in image embeddings.
+
+        Parameters
+        ----------
+        embeddings : ArrayND[float]
+            The embedding vectors used for clustering, shape (n_samples, n_features).
+            Should be the same embeddings passed to the cluster() function.
+        cluster_result : ClusterResult
+            Clustering results from the cluster() function, containing cluster
+            assignments and related metadata.
+        threshold : float, default=2.5
+            Number of standard deviations beyond cluster mean to use for outlier
+            threshold. Higher values are more permissive (fewer outliers), lower
+            values are stricter (more outliers). Typical range: 1.5-3.5.
+
+        Returns
+        -------
+        OutliersOutput[IndexIssueMap]
+            Output containing outlier indices and their issue details. Each outlier
+            includes:
+            - 'cluster_distance': the distance from the cluster mean
+            - 'std_devs': the number of standard deviations from the mean
+
+        See Also
+        --------
+        dataeval.core.cluster : Function to compute clusters from embeddings
+        dataeval.core.compute_cluster_stats : Computes statistics for adaptive detection
+        from_stats : Find outliers from pre-computed image statistics
+        evaluate : Find outliers by computing statistics from images
+
+        Notes
+        -----
+        This method uses adaptive distance-based outlier detection that accounts
+        for varying cluster densities. It significantly reduces false outliers
+        compared to using HDBSCAN's binary -1 labels, especially for image
+        embeddings with varying density distributions.
+
+        The threshold parameter allows experimentation with different sensitivity
+        levels without recomputing clusters. Recommended values:
+        - 1.5-2.0: Very strict (many outliers)
+        - 2.5: Balanced (default)
+        - 3.0-3.5: Permissive (fewer outliers)
+        """
+        # Convert embeddings to numpy array and flatten if needed
+        embeddings_array = flatten(to_numpy(embeddings))
+
+        # Compute cluster statistics
+        cluster_stats = compute_cluster_stats(
+            embeddings=embeddings_array,
+            clusters=cluster_result["clusters"],
+        )
+
+        # Find outliers using adaptive method
+        outlier_issues = self._find_outliers_adaptive(
+            cluster_stats=cluster_stats,
+            threshold_std=threshold or self.outlier_threshold or 2.5,
+        )
+
+        return OutliersOutput(outlier_issues)
+
+    def _find_outliers_adaptive(
+        self,
+        cluster_stats: ClusterStats,
+        threshold_std: float,
+    ) -> dict[int, dict[str, float]]:
+        """
+        Find outliers using pre-calculated cluster statistics.
+
+        This method uses pre-calculated cluster centers and distance statistics to identify
+        outliers. Points are considered outliers if they are further than the
+        threshold distance from their nearest cluster center.
+
+        Parameters
+        ----------
+        cluster_stats : dict
+            Pre-calculated cluster centers, distance statistics, and nearest cluster indices.
+            Should contain keys: 'distances', 'nearest_cluster_idx', 'cluster_distances_mean',
+            'cluster_distances_std'.
+        threshold_std : float
+            Number of standard deviations beyond cluster mean to use for threshold.
+            Higher values are more permissive (fewer outliers), lower values are
+            stricter (more outliers).
+
+        Returns
+        -------
+        dict[int, dict[str, float]]
+            Dictionary mapping outlier indices to their issue details.
+            Each issue dict contains:
+            - 'cluster_distance': distance in std dev from cluster mean
+        """
+        # Get pre-calculated distances and nearest cluster indices
+        min_distances = cluster_stats["distances"]
+        nearest_cluster_idx = cluster_stats["nearest_cluster_idx"]
+        cluster_distances_mean = cluster_stats["cluster_distances_mean"]
+        cluster_distances_std = cluster_stats["cluster_distances_std"]
+
+        # Compute thresholds on-the-fly based on the provided threshold_std
+        thresholds = cluster_distances_mean + threshold_std * cluster_distances_std
+
+        # Get the threshold for each point's nearest cluster
+        nearest_thresholds = thresholds[nearest_cluster_idx]
+
+        # Points are outliers if their distance exceeds the threshold of their nearest cluster
+        is_outlier = min_distances > nearest_thresholds
+
+        # Build the result dictionary with issue details
+        outlier_indices = np.nonzero(is_outlier)[0]
+        flagged_images: dict[int, dict[str, float]] = {}
+
+        for idx in outlier_indices:
+            cluster_idx = nearest_cluster_idx[idx]
+            distance = float(min_distances[idx])
+            mean = float(cluster_distances_mean[cluster_idx])
+            std = float(cluster_distances_std[cluster_idx])
+
+            # Calculate number of standard deviations from mean
+            std_devs = (distance - mean) / std if std > EPSILON else 0.0
+
+            flagged_images[int(idx)] = {
+                "cluster_distance": std_devs,
+            }
+
+        return flagged_images
 
     @set_metadata(state=["use_dimension", "use_pixel", "use_visual", "outlier_method", "outlier_threshold"])
     def evaluate(self, data: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]]) -> OutliersOutput[IndexIssueMap]:

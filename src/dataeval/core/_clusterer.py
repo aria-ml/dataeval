@@ -3,7 +3,6 @@ from __future__ import annotations
 __all__ = []
 
 import warnings
-from collections.abc import Sequence
 from typing import Any, TypedDict
 
 import numpy as np
@@ -63,69 +62,107 @@ class ClusterResult(TypedDict):
     k_distances: NDArray[np.float32]
 
 
-def _find_outliers(clusters: NDArray[np.intp]) -> NDArray[np.intp]:
+class ClusterStats(TypedDict):
     """
-    Retrieves Outliers based on when the sample was added to the cluster
-    and how far it was from the cluster when it was added
+    Pre-calculated statistics for adaptive outlier detection.
+
+    Attributes
+    ----------
+    cluster_ids : NDArray[np.intp]
+        Array of unique cluster IDs (excluding -1)
+    centers : NDArray[np.floating]
+        Cluster centers, shape (n_clusters, n_features)
+    cluster_distances_mean : NDArray[np.floating]
+        Mean distance from points to their cluster center, shape (n_clusters,)
+    cluster_distances_std : NDArray[np.floating]
+        Standard deviation of distances within each cluster, shape (n_clusters,)
+    distances : NDArray[np.floating]
+        Distance from each point to its nearest cluster center, shape (n_samples,)
+    nearest_cluster_idx : NDArray[np.intp]
+        Index of nearest cluster center for each point, shape (n_samples,)
+    """
+
+    cluster_ids: NDArray[np.intp]
+    centers: NDArray[np.floating]
+    cluster_distances_mean: NDArray[np.floating]
+    cluster_distances_std: NDArray[np.floating]
+    distances: NDArray[np.floating]
+    nearest_cluster_idx: NDArray[np.intp]
+
+
+def compute_cluster_stats(
+    embeddings: NDArray[np.floating],
+    clusters: NDArray[np.intp],
+) -> ClusterStats:
+    """
+    Compute cluster centers and distance statistics for adaptive outlier detection.
+
+    Parameters
+    ----------
+    embeddings : NDArray[np.floating]
+        The embedding vectors, shape (n_samples, n_features)
+    clusters : NDArray[np.intp]
+        Cluster labels from HDBSCAN (-1 for HDBSCAN outliers)
 
     Returns
     -------
-    NDArray[int]
-        A numpy array of the outlier indices
+    ClusterStats
+        Pre-calculated statistics with empty arrays if no valid clusters found
     """
-    return np.nonzero(clusters == -1)[0]
+    # Get unique clusters (excluding -1)
+    unique_clusters = np.unique(clusters[clusters >= 0])
+    n_samples = len(embeddings)
 
-
-def _find_duplicates(
-    mst: NDArray[np.float32], clusters: NDArray[np.intp]
-) -> tuple[Sequence[Sequence[int]], Sequence[Sequence[int]]]:
-    """
-    Finds duplicate and near duplicate data based on cluster average distance
-
-    Returns
-    -------
-    Tuple[List[List[int]], List[List[int]]]
-        The exact :term:`duplicates<Duplicates>` and near duplicates as lists of related indices
-    """
-    # Delay load numba compiled functions
-    from dataeval.core._numba import compare_links_to_cluster_std
-
-    exact_indices, near_indices = compare_links_to_cluster_std(mst, clusters)  # type: ignore
-    exact_dupes = _sorted_union_find(exact_indices)
-    near_dupes = _sorted_union_find(near_indices)
-
-    return [[int(ii) for ii in il] for il in exact_dupes], [[int(ii) for ii in il] for il in near_dupes]
-
-
-def _sorted_union_find(index_groups: NDArray[np.int32]) -> list[list[np.int32]]:
-    """Merges and sorts groups of indices that share any common index"""
-    # Delay load fast_hdbscan functions
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=FutureWarning)
-        from fast_hdbscan.cluster_trees import (
-            ds_find,
-            ds_rank_create,
-            ds_union_by_rank,
+    if len(unique_clusters) == 0:
+        return ClusterStats(
+            cluster_ids=np.array([], dtype=np.intp),
+            centers=np.array([], dtype=embeddings.dtype),
+            cluster_distances_mean=np.array([], dtype=embeddings.dtype),
+            cluster_distances_std=np.array([], dtype=embeddings.dtype),
+            distances=np.full(n_samples, np.inf, dtype=embeddings.dtype),
+            nearest_cluster_idx=np.full(n_samples, -1, dtype=np.intp),
         )
 
-    groups: list[list[np.int32]] = [[np.int32(x) for x in range(0)] for y in range(0)]
-    uniques, inverse = np.unique(index_groups, return_inverse=True)
-    inverse = inverse.flatten()
-    disjoint_set = ds_rank_create(uniques.size)
-    cluster_points = np.empty(uniques.size, dtype=np.uint32)
-    for i in range(index_groups.shape[0]):
-        point, nbr = np.int32(inverse[i * 2]), np.int32(inverse[i * 2 + 1])
-        ds_union_by_rank(disjoint_set, point, nbr)
-    for i in range(uniques.size):
-        cluster_points[i] = ds_find(disjoint_set, i)
-    for i in range(uniques.size):
-        dups = np.nonzero(cluster_points == i)[0]
-        if dups.size > 0:
-            groups.append(uniques[dups].tolist())
-    return sorted(groups)
+    n_clusters = len(unique_clusters)
+    n_features = embeddings.shape[1]
+
+    centers = np.zeros((n_clusters, n_features), dtype=embeddings.dtype)
+    cluster_distances_mean = np.zeros(n_clusters, dtype=embeddings.dtype)
+    cluster_distances_std = np.zeros(n_clusters, dtype=embeddings.dtype)
+
+    for i, cluster_id in enumerate(unique_clusters):
+        cluster_mask = clusters == cluster_id
+        cluster_points = embeddings[cluster_mask]
+        cluster_center = cluster_points.mean(axis=0)
+
+        # Calculate distances from center
+        distances = np.linalg.norm(cluster_points - cluster_center, axis=1)
+
+        centers[i] = cluster_center
+        cluster_distances_mean[i] = distances.mean()
+        cluster_distances_std[i] = distances.std()
+
+    # Pre-calculate distance from each point to its nearest cluster center
+    # Shape: (n_samples, n_clusters)
+    all_distances = np.linalg.norm(embeddings[:, np.newaxis, :] - centers[np.newaxis, :, :], axis=2)
+    # Get minimum distance and nearest cluster index for each point
+    nearest_cluster_idx = np.argmin(all_distances, axis=1)
+    min_distances = all_distances[np.arange(n_samples), nearest_cluster_idx]
+
+    return ClusterStats(
+        cluster_ids=unique_clusters,
+        centers=centers,
+        cluster_distances_mean=cluster_distances_mean,
+        cluster_distances_std=cluster_distances_std,
+        distances=min_distances,
+        nearest_cluster_idx=nearest_cluster_idx,
+    )
 
 
-def cluster(embeddings: ArrayND[float]) -> ClusterResult:
+def cluster(
+    embeddings: ArrayND[float],
+    n_expected_clusters: int | None = None,
+) -> ClusterResult:
     """
     Uses hierarchical clustering on the flattened data and returns clustering
     information.
@@ -136,6 +173,11 @@ def cluster(embeddings: ArrayND[float]) -> ClusterResult:
         A dataset that can be a list, or array-like object. Function expects
         the data to have 2 or more dimensions which will flatten to (N, P) where N is
         the number of observations in a P-dimensional space.
+    n_expected_clusters : int, optional
+        Hint for the expected number of clusters (e.g., number of classes in dataset).
+        If provided, adaptively adjusts min_cluster_size to encourage finding
+        approximately this many clusters. Useful when you have domain knowledge
+        about the data structure.
 
     Returns
     -------
@@ -155,9 +197,10 @@ def cluster(embeddings: ArrayND[float]) -> ClusterResult:
     P, is less than 500. If flattening a CxHxW image results in a dimension
     larger than 500, then it is recommended to reduce the dimensions.
 
-    Example
-    -------
-    >>> cluster(clusterer_images)["clusters"]
+    Examples
+    --------
+    >>> output = cluster(clusterer_images)
+    >>> output.clusters
     array([ 2,  0,  0,  0,  0,  0,  4,  0,  3,  1,  1,  0,  2,  0,  0,  0,  0,
             4,  2,  0,  0,  1,  2,  0,  1,  3,  0,  3,  3,  4,  0,  0,  3,  0,
             3, -1,  0,  0,  2,  4,  3,  4,  0,  1,  0, -1,  3,  0,  0,  0])
@@ -173,7 +216,7 @@ def cluster(embeddings: ArrayND[float]) -> ClusterResult:
             mst_to_linkage_tree,
         )
 
-    single_cluster = False
+    single_cluster = True
     cluster_selection_epsilon = 0.0
     # cluster_selection_method = "eom"
 
@@ -185,8 +228,16 @@ def cluster(embeddings: ArrayND[float]) -> ClusterResult:
         raise ValueError(f"Samples should have at least 1 feature; got {features}")
 
     num_samples = len(x)
-    min_num = int(num_samples * 0.05)
-    min_cluster_size: int = min(max(5, min_num), 100)
+
+    # Adaptive min_cluster_size based on expected clusters hint
+    if n_expected_clusters is not None:
+        # Encourage finding approximately n_expected_clusters
+        # Divide by 3 to allow smaller, more granular clusters
+        min_cluster_size = max(5, num_samples // (n_expected_clusters * 3))
+    else:
+        # Default behavior: use 5% but cap at 100
+        min_num = int(num_samples * 0.05)
+        min_cluster_size = min(max(5, min_num), 100)
 
     max_neighbors = min(25, num_samples - 1)
     kneighbors, kdistances = compute_neighbor_distances(x, max_neighbors)
