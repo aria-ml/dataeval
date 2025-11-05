@@ -37,6 +37,13 @@ class HashStatCalculator(Calculator):
 
         return [pchash(self.cache.raw)]
 
+    def get_empty_values(self) -> dict[str, Any]:
+        """Return empty values for hash statistics."""
+        return {
+            "xxhash": "",  # Empty string for hash
+            "pchash": "",  # Empty string for hash
+        }
+
     def get_handlers(self) -> dict[ImageStats, tuple[str, Callable[[], list[Any]]]]:
         """Return mapping of flags to (stat_name, handler_function)."""
         return {

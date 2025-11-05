@@ -60,6 +60,31 @@ class Calculator(Generic[TFlag], ABC):
             - handler (Callable): A function that computes and returns the statistic as a list.
         """
 
+    def get_empty_values(self) -> dict[str, Any]:
+        """
+        Return empty values for statistics when they don't apply to certain channels.
+
+        By default, all statistics use np.nan as the empty value. Override this method
+        to provide custom empty values for specific statistics (e.g., arrays, strings).
+
+        Returns
+        -------
+        dict[str, Any]
+            A dictionary mapping stat names to their empty values.
+            If a stat is not in this dict, np.nan is used as the default.
+
+        Examples
+        --------
+        For a calculator with array-valued statistics:
+
+        >>> def get_empty_values(self) -> dict[str, Any]:
+        ...     return {
+        ...         "center": [np.nan, np.nan],
+        ...         "histogram": [np.nan] * 256,
+        ...     }
+        """
+        return {}
+
     def compute(self, flags: TFlag) -> dict[str, list[Any]]:
         """
         Compute statistics for the requested flags.

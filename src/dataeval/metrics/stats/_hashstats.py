@@ -45,10 +45,10 @@ def hashstats(
     Calculate the hashes of a dataset of images, whose shape is (C, H, W)
 
     >>> results = hashstats(dataset)
-    >>> print(results.xxhash[:5])
-    ['66a93f556577c086', 'd8b686fb405c4105', '7ffdb4990ad44ac6', '42cd4c34c80f6006', 'c5519e36ac1f8839']
-    >>> print(results.pchash[:5])
-    ['e666999999266666', 'e666999999266666', 'e666999966666299', 'e666999999266666', '96e91656e91616e9']
+    >>> print(results.xxhash[:3])
+    ['66a93f556577c086' 'd8b686fb405c4105' '7ffdb4990ad44ac6']
+    >>> print(results.pchash[:3])
+    ['e666999999266666' 'e666999999266666' 'e666999966666299']
     """
     stats = calculate(
         *unzip_dataset(dataset, per_box),
