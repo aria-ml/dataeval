@@ -8,25 +8,9 @@ import torch
 from numpy.typing import NDArray
 
 from dataeval.data import Embeddings
+from tests.conftest import SimpleDataset
 
 NP_MAJOR_VERSION = tuple(int(x) for x in np.__version__.split("."))[0]
-
-
-class SimpleDataset:
-    """Simple dataset that returns random images for testing."""
-
-    def __init__(self, size: int, image_shape: tuple[int, ...] = (3, 32, 32)):
-        self.size = size
-        self.image_shape = image_shape
-        # Pre-generate data for consistency
-        self.data = [np.random.randn(*image_shape).astype(np.float32) for _ in range(size)]
-
-    def __len__(self):
-        return self.size
-
-    def __getitem__(self, idx):
-        # Return as tuple to match expected dataset format
-        return (self.data[idx], 0, {})  # (image, label, metadata)
 
 
 class IdentityModel(torch.nn.Module):
@@ -48,12 +32,6 @@ class IdentityModel(torch.nn.Module):
             torch.nn.init.xavier_uniform_(self.proj.weight)
             torch.nn.init.zeros_(self.proj.bias)
         return self.proj(flat)
-
-
-@pytest.fixture
-def simple_dataset() -> SimpleDataset:
-    """Create a simple dataset for testing."""
-    return SimpleDataset(size=50, image_shape=(3, 32, 32))
 
 
 @pytest.fixture
