@@ -21,6 +21,7 @@ The guides below exemplify powerful solutions to common problems in ML.
 ../notebooks/h2_cluster_analysis.ipynb
 ../notebooks/h2_deduplicate.ipynb
 ../notebooks/h2_visualize_linting_issues.ipynb
+../notebooks/h2_custom_image_stats_object_detection.ipynb
 ```
 
 :::{list-table}
@@ -36,12 +37,16 @@ The guides below exemplify powerful solutions to common problems in ML.
 - - [](../notebooks/h2_visualize_linting_issues.ipynb)
   - Find negatively impactful images in multiple backgrounds
   - [![Open In Colab][colab-badge]][lint-colab]
+- - [](../notebooks/h2_custom_image_stats_object_detection.ipynb)
+  - Customize calculation of image stats on an object detection dataset
+  - [![Open In Colab][colab-badge]][calc-colab]
 
 :::
 
 [clst-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_cluster_analysis.ipynb
 [dupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_deduplicate.ipynb
 [lint-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_visualize_linting_issues.ipynb
+[calc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_custom_image_stats_object_detection.ipynb
 
 ## Metrics
 

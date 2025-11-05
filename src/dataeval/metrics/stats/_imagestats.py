@@ -6,10 +6,11 @@ from typing import Any
 
 from dataeval.core._calculate import calculate
 from dataeval.core.flags import ImageStats
-from dataeval.metrics.stats._base import convert_output, unzip_dataset
+from dataeval.metrics.stats._base import convert_output
 from dataeval.outputs import ImageStatsOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.protocols import ArrayLike, Dataset
+from dataeval.utils import unzip_dataset
 
 
 @set_metadata

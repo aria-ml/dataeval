@@ -4,39 +4,19 @@ __all__ = []
 
 import re
 from collections import ChainMap
-from collections.abc import Iterator, Sequence
+from collections.abc import Sequence
 from copy import deepcopy
-from itertools import tee
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 import numpy as np
-from numpy.typing import NDArray
 
 from dataeval.core._calculate import CalculationResult
 from dataeval.outputs._stats import BaseStatsOutput
-from dataeval.protocols import Array, ArrayLike, Dataset, ObjectDetectionTarget
-from dataeval.utils._array import as_numpy
-from dataeval.utils._boundingbox import BoundingBox
+from dataeval.protocols import Array
 
 DTYPE_REGEX = re.compile(r"NDArray\[np\.(.*?)\]")
 
 TStatsOutput = TypeVar("TStatsOutput", bound=BaseStatsOutput, covariant=True)
-T = TypeVar("T")
-
-
-class SizedIterator(Generic[T]):
-    def __init__(self, iterator: Iterator[T], length: int) -> None:
-        self._iterator = iterator
-        self._length = length
-
-    def __iter__(self) -> Iterator[T]:
-        return self._iterator
-
-    def __next__(self) -> T:
-        return next(self._iterator)
-
-    def __len__(self) -> int:
-        return self._length
 
 
 def convert_output(
@@ -58,33 +38,6 @@ def convert_output(
         else:
             output[key] = combined_dict[key]
     return output_cls(**output)
-
-
-def unzip_dataset(
-    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]], per_box: bool
-) -> tuple[Iterator[NDArray[Any]], Iterator[list[BoundingBox] | None] | None]:
-    def _generate_pairs() -> Iterator[tuple[NDArray[Any], list[BoundingBox] | None]]:
-        for i in range(len(dataset)):
-            d = dataset[i]
-            image = np.asarray(d[0] if isinstance(d, tuple) else d)
-            if per_box and isinstance(d, tuple) and isinstance(d[1], ObjectDetectionTarget):
-                try:
-                    boxes = d[1].boxes if isinstance(d[1].boxes, Array) else as_numpy(d[1].boxes)
-                    target = [BoundingBox(box[0], box[1], box[2], box[3], image_shape=image.shape) for box in boxes]
-                except (ValueError, IndexError):
-                    raise ValueError(f"Invalid bounding box format for image {i}: {d[1].boxes}")
-            else:
-                target = None
-            yield image, target
-
-    # Create two independent iterators from the generator
-    iter1, iter2 = tee(_generate_pairs(), 2)
-
-    # Extract images and targets separately
-    images_iter = SizedIterator((pair[0] for pair in iter1), len(dataset))
-    targets_iter = (pair[1] for pair in iter2) if per_box else None
-
-    return images_iter, targets_iter
 
 
 def add_stats(a: TStatsOutput, b: TStatsOutput) -> TStatsOutput:

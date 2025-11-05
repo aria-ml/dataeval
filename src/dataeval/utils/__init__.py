@@ -6,5 +6,6 @@ DataEval metrics.
 
 from dataeval.utils import models
 from dataeval.utils._merge import flatten, merge
+from dataeval.utils._unzip_dataset import unzip_dataset
 
-__all__ = ["flatten", "merge", "models"]
+__all__ = ["flatten", "merge", "models", "unzip_dataset"]
