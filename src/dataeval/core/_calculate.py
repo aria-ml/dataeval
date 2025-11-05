@@ -19,7 +19,7 @@ from dataeval.config import get_max_processes
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.core.flags import ImageStats, resolve_dependencies
 from dataeval.protocols import ArrayLike
-from dataeval.types import SequenceLike, SourceIndex
+from dataeval.types import SourceIndex
 from dataeval.utils._boundingbox import BoundingBox, BoxLike
 from dataeval.utils._image import clip_and_pad, normalize_image_shape, rescale
 from dataeval.utils._multiprocessing import PoolWrapper
@@ -40,17 +40,18 @@ class CalculationResult(TypedDict):
         Sequence of invalid box counts per image.
     image_count : int
         Total number of images processed.
-    stats : Mapping[str, SequenceLike[Any]]
-        Mapping of statistic names to sequences of computed values.
+    stats : Mapping[str, NDArray[Any]]
+        Mapping of statistic names to NumPy arrays of computed values.
         Keys are the names of statistics requested (e.g., 'mean', 'std', 'brightness').
-        Values are sequences where each element corresponds to a source_index entry.
+        Values are NumPy arrays where each element corresponds to a source_index entry.
+        String values (e.g., hashes) are stored as object dtype arrays.
     """
 
     source_index: Sequence[SourceIndex]
     object_count: Sequence[int]
     invalid_box_count: Sequence[int]
     image_count: int
-    stats: Mapping[str, SequenceLike[Any]]
+    stats: Mapping[str, NDArray[Any]]
 
 
 @dataclass
@@ -123,15 +124,27 @@ def _collect_calculator_stats(
     datum: NDArray[Any],
     box: BoundingBox | None,
     per_channel: bool,
-) -> list[dict[str, list[Any]]]:
-    """Collect stats from all calculators."""
+) -> tuple[list[dict[str, list[Any]]], dict[str, Any]]:
+    """
+    Collect stats from all calculators.
+
+    Returns
+    -------
+    tuple[list[dict[str, list[Any]]], dict[str, Any]]
+        A tuple of (stats_list, empty_values_map) where:
+        - stats_list: List of computed stats from each calculator
+        - empty_values_map: Mapping of stat names to their empty values (defaults to np.nan)
+    """
     stats_list = []
+    empty_values_map: dict[str, Any] = {}
     processor = CalculatorCache(datum, box, per_channel)
     for calculator_cls, flags in calculators:
         calculator = calculator_cls(datum, processor, per_channel)
         stats_list.append(calculator.compute(flags))
+        # Collect empty values from this calculator
+        empty_values_map.update(calculator.get_empty_values())
         del calculator
-    return stats_list
+    return stats_list, empty_values_map
 
 
 def _determine_channel_indices(calculator_output: list[dict[str, list[Any]]], num_channels: int) -> list[int | None]:
@@ -160,9 +173,16 @@ def _determine_channel_indices(calculator_output: list[dict[str, list[Any]]], nu
 
 
 def _reconcile_stats(
-    calculator_output: list[dict[str, list[Any]]], sorted_channels: list[int | None]
+    calculator_output: list[dict[str, list[Any]]],
+    sorted_channels: list[int | None],
+    empty_values_map: dict[str, Any],
 ) -> dict[str, list[Any]]:
-    """Reconcile stats from different processors into a unified structure."""
+    """
+    Reconcile stats from different processors into a unified structure.
+
+    Uses empty values from empty_values_map for stats that don't apply to certain channels.
+    Defaults to np.nan if a stat is not in the empty_values_map.
+    """
     num_entries = len(sorted_channels)
     reconciled_stats: dict[str, list[Any]] = {}
 
@@ -172,7 +192,9 @@ def _reconcile_stats(
 
         for stat_name, stat_values in output.items():
             if stat_name not in reconciled_stats:
-                reconciled_stats[stat_name] = [None] * num_entries
+                # Use the appropriate empty value for this stat (default to np.nan)
+                empty_value = empty_values_map.get(stat_name, np.nan)
+                reconciled_stats[stat_name] = [empty_value] * num_entries
 
             if num_elements == 1:
                 # Single value goes to channel=None position
@@ -241,13 +263,13 @@ def _calculate_datum(
                 warnings_list.append(f"Bounding box [{i}][{i_b}]: {box} for datum shape {datum.shape} is invalid.")
 
         # Collect stats from all calculators
-        calculator_stats = _collect_calculator_stats(calculators, datum, box, per_channel)
+        calculator_stats, empty_values_map = _collect_calculator_stats(calculators, datum, box, per_channel)
 
         # Determine what channel indices are needed
         sorted_channels = _determine_channel_indices(calculator_stats, num_channels)
 
         # Reconcile stats into unified structure
-        reconciled_stats = _reconcile_stats(calculator_stats, sorted_channels)
+        reconciled_stats = _reconcile_stats(calculator_stats, sorted_channels, empty_values_map)
 
         # Build index lists
         channel_indices = sorted_channels
@@ -287,8 +309,8 @@ def _enumerate(
 def _sort(
     source_indices: list[SourceIndex],
     aggregated_stats: dict[str, list[Any]],
-) -> tuple[list[SourceIndex], dict[str, list[Any]]]:
-    """Sort results by (image_index, box_index, channel_index) with None < 0."""
+) -> tuple[list[SourceIndex], dict[str, NDArray[Any]]]:
+    """Sort results by (image_index, box_index, channel_index) with None < 0 and convert to numpy arrays."""
     sort_indices = sorted(
         range(len(source_indices)),
         key=lambda i: (
@@ -299,9 +321,11 @@ def _sort(
     )
 
     sorted_source_indices: list[SourceIndex] = [source_indices[i] for i in sort_indices]
-    sorted_aggregated_stats: dict[str, list[Any]] = {}
+    sorted_aggregated_stats: dict[str, NDArray[Any]] = {}
     for stat_name, stat_values in aggregated_stats.items():
-        sorted_aggregated_stats[stat_name] = [stat_values[i] for i in sort_indices]
+        # Sort the values and convert to numpy array
+        sorted_values = [stat_values[i] for i in sort_indices]
+        sorted_aggregated_stats[stat_name] = np.array(sorted_values)
 
     return sorted_source_indices, sorted_aggregated_stats
 

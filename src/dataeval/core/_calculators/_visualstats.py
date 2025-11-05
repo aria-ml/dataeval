@@ -77,6 +77,12 @@ class VisualStatCalculator(Calculator[ImageStats]):
             return self.percentiles.tolist()
         return [self.percentiles.tolist()]
 
+    def get_empty_values(self) -> dict[str, Any]:
+        """Return empty values for visual statistics."""
+        return {
+            "percentiles": [np.nan] * 5,  # 5 percentiles: 0, 25, 50, 75, 100
+        }
+
     def get_handlers(self) -> dict[ImageStats, tuple[str, Callable[[], list[Any]]]]:
         """Return mapping of flags to (stat_name, handler_function)."""
         return {

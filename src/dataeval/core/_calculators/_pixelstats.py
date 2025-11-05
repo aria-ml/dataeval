@@ -84,6 +84,12 @@ class PixelStatCalculator(Calculator[ImageStats]):
             return self.histogram.tolist()
         return [self.histogram.tolist()]
 
+    def get_empty_values(self) -> dict[str, Any]:
+        """Return empty values for pixel statistics."""
+        return {
+            "histogram": [np.nan] * 256,  # Histogram with 256 bins
+        }
+
     def get_handlers(self) -> dict[ImageStats, tuple[str, Callable[[], list[Any]]]]:
         """Return mapping of flags to (stat_name, handler_function)."""
         return {

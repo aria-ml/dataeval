@@ -118,6 +118,12 @@ class DimensionStatCalculator(Calculator[ImageStats]):
     def _invalid_box(self) -> list[bool]:
         return [not self.cache.box.is_valid()]
 
+    def get_empty_values(self) -> dict[str, Any]:
+        """Return empty values for dimension statistics."""
+        return {
+            "center": [np.nan, np.nan],  # 2D coordinate array
+        }
+
     def get_handlers(self) -> dict[ImageStats, tuple[str, Callable[[], list[Any]]]]:
         """Return mapping of flags to (stat_name, handler_function)."""
         return {

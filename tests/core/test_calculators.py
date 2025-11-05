@@ -31,7 +31,7 @@ class TestPixelStats:
         assert "histogram" in result["stats"]
 
         assert len(result["stats"]["mean"]) == 1
-        assert type(result["stats"]["mean"][0]) is float
+        assert isinstance(result["stats"]["mean"][0], float)
         assert len(result["stats"]["histogram"][0]) == 256
 
     def test_process_with_nans(self):
@@ -57,7 +57,7 @@ class TestVisualStats:
         assert "percentiles" in result["stats"]
 
         assert len(result["stats"]["brightness"]) == 1
-        assert type(result["stats"]["brightness"][0]) is float
+        assert isinstance(result["stats"]["brightness"][0], float)
         assert len(result["stats"]["percentiles"][0]) == 5  # QUARTILES length
 
 
@@ -341,7 +341,7 @@ class TestLowerDimensionalPixelStats:
         assert "histogram" in result["stats"]
 
         assert len(result["stats"]["mean"]) == 1
-        assert type(result["stats"]["mean"][0]) is float
+        assert isinstance(result["stats"]["mean"][0], float)
         assert len(result["stats"]["histogram"][0]) == 256
 
     def test_2d_data_pixel_stats(self):
@@ -362,7 +362,7 @@ class TestLowerDimensionalPixelStats:
         assert "histogram" in result["stats"]
 
         assert len(result["stats"]["mean"]) == 1
-        assert type(result["stats"]["mean"][0]) is float
+        assert isinstance(result["stats"]["mean"][0], float)
         assert len(result["stats"]["histogram"][0]) == 256
 
     def test_1d_data_with_nans(self):
@@ -411,7 +411,7 @@ class TestLowerDimensionalVisualStats:
         assert "percentiles" in result["stats"]
 
         assert len(result["stats"]["brightness"]) == 1
-        assert type(result["stats"]["brightness"][0]) is float
+        assert isinstance(result["stats"]["brightness"][0], float)
         assert len(result["stats"]["percentiles"][0]) == 5  # QUARTILES length
         # Sharpness should be NaN for 1D data
         assert np.isnan(result["stats"]["sharpness"][0])
@@ -429,10 +429,10 @@ class TestLowerDimensionalVisualStats:
         assert "percentiles" in result["stats"]
 
         assert len(result["stats"]["brightness"]) == 1
-        assert type(result["stats"]["brightness"][0]) is float
+        assert isinstance(result["stats"]["brightness"][0], float)
         assert len(result["stats"]["percentiles"][0]) == 5
         # Sharpness should be computed for 2D data
-        assert type(result["stats"]["sharpness"][0]) is float
+        assert isinstance(result["stats"]["sharpness"][0], float)
         assert not np.isnan(result["stats"]["sharpness"][0])
 
     def test_1d_data_visual_stats_per_channel(self):
