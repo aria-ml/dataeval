@@ -640,8 +640,11 @@ class Metadata:
 
         new_columns = []
         for k, v in factors.items():
-            data = as_numpy(v)[self.item_indices]
-            new_columns.append(pl.Series(name=k, values=data))
+            data = as_numpy(v)
+            if data.ndim != 1:
+                continue
+            selected_data = data[self.item_indices]
+            new_columns.append(pl.Series(name=k, values=selected_data))
             self._factors[k] = None
 
         if new_columns:
