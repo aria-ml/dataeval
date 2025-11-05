@@ -10,6 +10,7 @@ __all__ = [
     "calculate",
     "calculate_ratios",
     "cluster",
+    "compute_cluster_stats",
     "compute_neighbors",
     "coverage_adaptive",
     "coverage_naive",
@@ -34,7 +35,7 @@ from dataeval.core._balance import balance, balance_classwise
 from dataeval.core._ber import ber_knn, ber_mst
 from dataeval.core._calculate import calculate
 from dataeval.core._calculate_ratios import calculate_ratios
-from dataeval.core._clusterer import cluster
+from dataeval.core._clusterer import cluster, compute_cluster_stats
 from dataeval.core._coverage import coverage_adaptive, coverage_naive
 from dataeval.core._divergence import divergence_fnn, divergence_mst
 from dataeval.core._feature_distance import feature_distance
