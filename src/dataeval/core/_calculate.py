@@ -18,12 +18,19 @@ import dataeval.core._calculators._register  # noqa: F401
 from dataeval.config import get_max_processes
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.core.flags import ImageStats, resolve_dependencies
-from dataeval.protocols import ArrayLike
-from dataeval.types import SourceIndex
+from dataeval.protocols import (
+    AnnotatedDataset,
+    ArrayLike,
+    ImageClassificationDataset,
+    ObjectDetectionDataset,
+    ObjectDetectionTarget,
+)
+from dataeval.types import SequenceLike, SourceIndex
 from dataeval.utils._boundingbox import BoundingBox, BoxLike
 from dataeval.utils._image import clip_and_pad, normalize_image_shape, rescale
 from dataeval.utils._multiprocessing import PoolWrapper
 from dataeval.utils._tqdm import tqdm
+from dataeval.utils._unzip_dataset import unzip_dataset
 
 
 class CalculationResult(TypedDict):
@@ -353,8 +360,8 @@ def _aggregate(
 
 
 def calculate(
-    images: Iterable[ArrayLike],
-    boxes: Iterable[Iterable[BoxLike] | None] | None,
+    data: Iterable[ArrayLike] | ImageClassificationDataset | ObjectDetectionDataset,
+    boxes: Iterable[Iterable[BoxLike] | None] | None = None,
     stats: Flag = ImageStats.ALL,
     *,
     per_image: bool = True,
@@ -363,14 +370,14 @@ def calculate(
     progress_callback: Callable[[int, int | None], None] | None = None,
 ) -> CalculationResult:
     """
-    Compute specified statistics on a set of images.
+    Compute specified statistics on a set of images, optionally within bounding boxes.
 
     Parameters
     ----------
-    images : Iterable[ArrayLike]
-        An iterable of images to compute statistics on.
+    data : Iterable[ArrayLike] | ImageClassificationDataset | ObjectDetectionDataset
+        An iterable of images or a Dataset to compute statistics on.
     boxes : Iterable[Iterable[BoxLike] | None] | None
-        Optional bounding boxes for each image. If None, processes entire images.
+        Optional bounding boxes for each image. If None, defers to the data provided.
     stats : ImageStats, default ImageStats.ALL
         Flags indicating which statistics to compute. Can combine multiple flags
         using bitwise OR (|). Dependencies are resolved automatically.
@@ -436,8 +443,17 @@ def calculate(
     image_count: int = 0
     warning_list: list[str] = []
 
-    # `per_box` is True only if boxes are provided
-    per_box = per_box and boxes is not None
+    isObjectDetectionDataset: bool = False
+
+    if isinstance(data, AnnotatedDataset) and isinstance(data[0], tuple) and len(data[0]) == 3:
+        for datum in data:
+            if not isinstance(datum[1], SequenceLike | ObjectDetectionTarget):
+                continue
+            isObjectDetectionDataset = isinstance(datum[1], ObjectDetectionTarget)
+            break
+
+    # `per_box` is True only if boxes are provided or data is an ObjectDetectionDataset
+    per_box = per_box and (isObjectDetectionDataset or boxes is not None)
 
     # Validate parameters
     if not per_image and not per_box:
@@ -449,7 +465,15 @@ def calculate(
     # Get calculators from registry based on flags
     calculators = CalculatorRegistry.get_calculators(stats)
 
-    total_images = len(images) if isinstance(images, Sized) else None
+    total_images = len(data) if isinstance(data, Sized) else None
+
+    images, boxes = (
+        (data, boxes)
+        if not isinstance(data, AnnotatedDataset)
+        else (unzip_dataset(data, per_box=False)[0], boxes)
+        if boxes is not None
+        else unzip_dataset(data, per_box=per_box)
+    )
 
     # Build description for progress bar
     calculator_names = [c[0].__name__.removesuffix("Calculator") for c in calculators]

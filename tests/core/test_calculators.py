@@ -660,3 +660,332 @@ class TestLowerDimensionalHashStats:
         assert stats["pchash"][0] == ""
         # xxhash should still work
         assert stats["xxhash"][0] != ""
+
+
+class TestImageClassificationDataset:
+    """Test calculate() with ImageClassificationDataset input."""
+
+    def test_ic_dataset_without_boxes(self, get_mock_ic_dataset):
+        """Test ImageClassificationDataset processing without boxes."""
+        images = [np.random.random((3, 100, 100)) for _ in range(3)]
+        labels = [0, 1, 0]
+
+        dataset = get_mock_ic_dataset(images, labels)
+
+        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=False)
+
+        # Should process 3 images without boxes
+        assert len(result["stats"]["mean"]) == 3
+        assert len(result["source_index"]) == 3
+        assert result["image_count"] == 3
+
+        # All should be full images (box=None)
+        for i in range(3):
+            assert result["source_index"][i].image == i
+            assert result["source_index"][i].box is None
+            assert result["source_index"][i].channel is None
+
+    def test_ic_dataset_with_explicit_boxes_param(self, get_mock_ic_dataset):
+        """Test ImageClassificationDataset with explicit boxes parameter (should be ignored)."""
+        images = [np.random.random((3, 100, 100)) for _ in range(2)]
+        labels = [0, 1]
+
+        dataset = get_mock_ic_dataset(images, labels)
+
+        # Even though boxes are provided, they should be ignored since dataset is IC
+        from dataeval.utils._boundingbox import BoundingBox
+
+        boxes = [
+            [BoundingBox(0, 0, 50, 50, image_shape=(3, 100, 100))],
+            [BoundingBox(25, 25, 75, 75, image_shape=(3, 100, 100))],
+        ]
+
+        result = calculate(
+            dataset, boxes=boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=False
+        )
+
+        # Should process boxes since they are explicitly provided
+        assert len(result["stats"]["mean"]) == 4  # 2 images + 2 boxes
+        assert len(result["source_index"]) == 4
+        assert result["image_count"] == 2
+
+    def test_ic_dataset_per_channel(self, get_mock_ic_dataset):
+        """Test ImageClassificationDataset with per_channel=True."""
+        images = [np.random.random((3, 50, 50)) for _ in range(2)]
+        labels = [0, 1]
+
+        dataset = get_mock_ic_dataset(images, labels)
+
+        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=True)
+
+        # Should have 6 results: 2 images × 3 channels
+        assert len(result["stats"]["mean"]) == 6
+        assert len(result["source_index"]) == 6
+
+        # Check channel ordering for first image
+        assert result["source_index"][0].image == 0
+        assert result["source_index"][0].box is None
+        assert result["source_index"][0].channel == 0
+
+        assert result["source_index"][1].image == 0
+        assert result["source_index"][1].box is None
+        assert result["source_index"][1].channel == 1
+
+        assert result["source_index"][2].image == 0
+        assert result["source_index"][2].box is None
+        assert result["source_index"][2].channel == 2
+
+    def test_ic_dataset_multiple_stats(self, get_mock_ic_dataset):
+        """Test ImageClassificationDataset with multiple statistics."""
+        images = [np.random.random((3, 100, 100)) for _ in range(2)]
+        labels = [0, 1]
+
+        dataset = get_mock_ic_dataset(images, labels)
+
+        result = calculate(dataset, stats=ImageStats.PIXEL | ImageStats.VISUAL, per_image=True, per_channel=False)
+        stats = result["stats"]
+
+        # Check pixel stats
+        assert "mean" in stats
+        assert "std" in stats
+        assert "var" in stats
+
+        # Check visual stats
+        assert "brightness" in stats
+        assert "contrast" in stats
+        assert "sharpness" in stats
+
+        assert len(stats["mean"]) == 2
+        assert result["image_count"] == 2
+
+
+class TestObjectDetectionDataset:
+    """Test calculate() with ObjectDetectionDataset input."""
+
+    def test_od_dataset_with_boxes(self, get_mock_od_dataset):
+        """Test ObjectDetectionDataset automatically processes boxes."""
+        images = [np.random.random((3, 100, 100)) for _ in range(2)]
+        labels = [[0, 1], [1]]
+        bboxes = [
+            [[10, 10, 50, 50], [60, 60, 90, 90]],
+            [[20, 20, 70, 70]],
+        ]
+
+        dataset = get_mock_od_dataset(images, labels, bboxes)
+
+        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=False)
+
+        # Should have: image0 (1 full + 2 boxes) + image1 (1 full + 1 box) = 5 results
+        assert len(result["stats"]["mean"]) == 5
+        assert len(result["source_index"]) == 5
+        assert result["image_count"] == 2
+
+        # Check object counts
+        assert result["object_count"][0] == 2
+        assert result["object_count"][1] == 1
+
+        # Image 0: full image
+        assert result["source_index"][0].image == 0
+        assert result["source_index"][0].box is None
+
+        # Image 0: box 0
+        assert result["source_index"][1].image == 0
+        assert result["source_index"][1].box == 0
+
+        # Image 0: box 1
+        assert result["source_index"][2].image == 0
+        assert result["source_index"][2].box == 1
+
+        # Image 1: full image
+        assert result["source_index"][3].image == 1
+        assert result["source_index"][3].box is None
+
+        # Image 1: box 0
+        assert result["source_index"][4].image == 1
+        assert result["source_index"][4].box == 0
+
+    def test_od_dataset_per_box_only(self, get_mock_od_dataset):
+        """Test ObjectDetectionDataset with per_image=False, per_box=True."""
+        images = [np.random.random((3, 100, 100)) for _ in range(2)]
+        labels = [[0], [1, 0]]
+        bboxes = [
+            [[10, 10, 50, 50]],
+            [[20, 20, 60, 60], [70, 70, 95, 95]],
+        ]
+
+        dataset = get_mock_od_dataset(images, labels, bboxes)
+
+        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=False, per_box=True, per_channel=False)
+
+        # Should have only boxes: 1 + 2 = 3 results (no full images)
+        assert len(result["stats"]["mean"]) == 3
+        assert len(result["source_index"]) == 3
+
+        # All should be boxes (no full images)
+        assert result["source_index"][0].image == 0
+        assert result["source_index"][0].box == 0
+
+        assert result["source_index"][1].image == 1
+        assert result["source_index"][1].box == 0
+
+        assert result["source_index"][2].image == 1
+        assert result["source_index"][2].box == 1
+
+    def test_od_dataset_per_image_only(self, get_mock_od_dataset):
+        """Test ObjectDetectionDataset with per_image=True, per_box=False."""
+        images = [np.random.random((3, 100, 100)) for _ in range(2)]
+        labels = [[0, 1], [1]]
+        bboxes = [
+            [[10, 10, 50, 50], [60, 60, 90, 90]],
+            [[20, 20, 70, 70]],
+        ]
+
+        dataset = get_mock_od_dataset(images, labels, bboxes)
+
+        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=False, per_channel=False)
+
+        # Should have only full images: 2 results (no boxes)
+        assert len(result["stats"]["mean"]) == 2
+        assert len(result["source_index"]) == 2
+
+        # All should be full images
+        assert result["source_index"][0].image == 0
+        assert result["source_index"][0].box is None
+
+        assert result["source_index"][1].image == 1
+        assert result["source_index"][1].box is None
+
+    def test_od_dataset_with_per_channel(self, get_mock_od_dataset):
+        """Test ObjectDetectionDataset with per_channel=True."""
+        images = [np.random.random((3, 100, 100))]
+        labels = [[0]]
+        bboxes = [[[10, 10, 50, 50]]]
+
+        dataset = get_mock_od_dataset(images, labels, bboxes)
+
+        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=True)
+
+        # Should have 6 results: (1 full image + 1 box) × 3 channels
+        assert len(result["stats"]["mean"]) == 6
+        assert len(result["source_index"]) == 6
+
+        # Full image - channels 0, 1, 2
+        assert result["source_index"][0].image == 0
+        assert result["source_index"][0].box is None
+        assert result["source_index"][0].channel == 0
+
+        assert result["source_index"][1].image == 0
+        assert result["source_index"][1].box is None
+        assert result["source_index"][1].channel == 1
+
+        assert result["source_index"][2].image == 0
+        assert result["source_index"][2].box is None
+        assert result["source_index"][2].channel == 2
+
+        # Box - channels 0, 1, 2
+        assert result["source_index"][3].image == 0
+        assert result["source_index"][3].box == 0
+        assert result["source_index"][3].channel == 0
+
+    def test_od_dataset_with_dimension_stats(self, get_mock_od_dataset):
+        """Test ObjectDetectionDataset with dimension statistics for boxes."""
+        images = [np.random.random((3, 100, 100))]
+        labels = [[0]]
+        bboxes = [[[10, 20, 60, 80]]]  # x0=10, y0=20, x1=60, y1=80
+
+        dataset = get_mock_od_dataset(images, labels, bboxes)
+
+        result = calculate(dataset, stats=ImageStats.DIMENSION, per_image=False, per_box=True, per_channel=False)
+
+        # Should have 1 result (just the box)
+        assert len(result["source_index"]) == 1
+
+        # Check box dimensions
+        assert result["stats"]["offset_x"][0] == 10
+        assert result["stats"]["offset_y"][0] == 20
+        assert result["stats"]["width"][0] == 50
+        assert result["stats"]["height"][0] == 60
+
+    def test_od_dataset_override_with_boxes_param(self, get_mock_od_dataset):
+        """Test ObjectDetectionDataset with boxes parameter override."""
+        images = [np.random.random((3, 100, 100)) for _ in range(2)]
+        labels = [[0], [1]]
+        bboxes_dataset = [
+            [[10, 10, 50, 50]],
+            [[20, 20, 70, 70]],
+        ]
+
+        dataset = get_mock_od_dataset(images, labels, bboxes_dataset)
+
+        # Override with different boxes via parameter
+        from dataeval.utils._boundingbox import BoundingBox
+
+        boxes_override = [
+            [BoundingBox(5, 5, 25, 25, image_shape=(3, 100, 100))],
+            [BoundingBox(30, 30, 80, 80, image_shape=(3, 100, 100))],
+        ]
+
+        result = calculate(
+            dataset, boxes=boxes_override, stats=ImageStats.DIMENSION, per_image=False, per_box=True, per_channel=False
+        )
+
+        # Should use override boxes
+        assert len(result["source_index"]) == 2
+
+        # Check first box dimensions from override
+        assert result["stats"]["offset_x"][0] == 5
+        assert result["stats"]["offset_y"][0] == 5
+        assert result["stats"]["width"][0] == 20
+        assert result["stats"]["height"][0] == 20
+
+    def test_od_dataset_empty_boxes(self, get_mock_od_dataset):
+        """Test ObjectDetectionDataset with images that have no boxes."""
+        images = [np.random.random((3, 100, 100)) for _ in range(2)]
+        labels = [[], [0]]
+        bboxes = [[], [[10, 10, 50, 50]]]
+
+        dataset = get_mock_od_dataset(images, labels, bboxes)
+
+        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=False)
+
+        # Should have: image0 (1 full + 0 boxes) + image1 (1 full + 1 box) = 3 results
+        assert len(result["stats"]["mean"]) == 3
+        assert len(result["source_index"]) == 3
+
+        # Check object counts
+        assert result["object_count"][0] == 0
+        assert result["object_count"][1] == 1
+
+    def test_od_dataset_multiple_stats(self, get_mock_od_dataset):
+        """Test ObjectDetectionDataset with multiple statistics."""
+        images = [np.random.random((3, 100, 100))]
+        labels = [[0]]
+        bboxes = [[[10, 10, 50, 50]]]
+
+        dataset = get_mock_od_dataset(images, labels, bboxes)
+
+        result = calculate(
+            dataset,
+            stats=ImageStats.PIXEL | ImageStats.VISUAL | ImageStats.DIMENSION,
+            per_image=True,
+            per_box=True,
+            per_channel=False,
+        )
+
+        # Check pixel stats
+        stats = result["stats"]
+        assert "mean" in stats
+        assert "std" in stats
+
+        # Check visual stats
+        assert "brightness" in stats
+        assert "contrast" in stats
+
+        # Check dimension stats
+        assert "width" in stats
+        assert "height" in stats
+        assert "offset_x" in stats
+        assert "offset_y" in stats
+
+        # Should have 2 results: full image + 1 box
+        assert len(stats["mean"]) == 2
