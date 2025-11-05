@@ -21,9 +21,27 @@ _TLabels = TypeVar("_TLabels", Sequence[int], Sequence[Sequence[int]])
 
 TEMP_CONTENTS = "ABCDEF1234567890"
 
-pytest_plugins = ["tests.fixtures.metadata"]
+# Custom fixtures specific to functionality
+pytest_plugins = ["tests.fixtures.metadata", "tests.fixtures.models", "tests.fixtures.sufficiency"]
 
 set_seed(0, all_generators=True)
+
+
+class SimpleDataset:
+    """Simple dataset that returns random images for testing."""
+
+    def __init__(self, size: int, image_shape: tuple[int, ...] = (3, 32, 32)):
+        self.size = size
+        self.image_shape = image_shape
+        # Pre-generate data for consistency
+        self.data = [np.random.randn(*image_shape).astype(np.float32) for _ in range(size)]
+
+    def __len__(self):
+        return self.size
+
+    def __getitem__(self, idx):
+        # Return as tuple to match expected dataset format
+        return (self.data[idx], 0, {})  # (image, label, metadata)
 
 
 class MockDataset:
@@ -250,6 +268,12 @@ def get_mock_od_dataset():
 @pytest.fixture
 def get_od_dataset():
     return _get_dataset
+
+
+@pytest.fixture(scope="session")
+def simple_dataset() -> SimpleDataset:
+    """Create a simple dataset for testing."""
+    return SimpleDataset(size=50, image_shape=(3, 32, 32))
 
 
 @pytest.fixture(scope="session")

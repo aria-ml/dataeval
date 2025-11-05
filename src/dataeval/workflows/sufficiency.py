@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 __all__ = []
 
 from collections.abc import Callable, Iterable, Mapping, Sequence, Sized
+from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
 import numpy as np
 import torch
 import torch.nn as nn
 
-# from torch.utils.data import Dataset
 from dataeval.outputs import SufficiencyOutput
 from dataeval.outputs._base import set_metadata
 from dataeval.protocols import ArrayLike, Dataset, EvaluationStrategy, TrainingStrategy
@@ -405,16 +403,14 @@ class Sufficiency(Generic[T]):
             model = reset_parameters(self.model)
             # Run the model with each substep of data
             for iteration, substep in enumerate(ranges):
-                # train on subset of train data
-                self.train_fn(
+                self.config.training_strategy.train(
                     model,
                     self.train_ds,
                     indices[: int(substep)].tolist(),
-                    **self.train_kwargs,
                 )
 
                 # evaluate on test data
-                measure = self.eval_fn(model, self.test_ds, **self.eval_kwargs)
+                measure = self.config.evaluation_strategy.evaluate(model, self.test_ds)
 
                 # Keep track of each measures values
                 for name, value in measure.items():
