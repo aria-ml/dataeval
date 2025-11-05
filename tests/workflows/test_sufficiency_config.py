@@ -13,60 +13,38 @@ from dataeval.protocols import EvaluationStrategy, TrainingStrategy
 from dataeval.workflows.sufficiency import SufficiencyConfig
 
 
-class MockTrainingStrategy:
-    """Simple training strategy for testing."""
-
-    def train(self, model, dataset, indices):
-        pass
-
-
-class MockEvaluationStrategy:
-    """Simple evaluation strategy for testing."""
-
-    def evaluate(self, model, dataset):
-        return {"accuracy": 0.95}
-
-
 class TestSufficiencyConfigConstruction:
     """Test SufficiencyConfig construction and initialization."""
 
-    def test_config_stores_strategies(self):
+    def test_config_stores_strategies(self, mock_training_strategy, mock_evaluation_strategy):
         """Verify config correctly stores strategy objects."""
-        training = MockTrainingStrategy()
-        evaluation = MockEvaluationStrategy()
 
-        config = SufficiencyConfig(training, evaluation)
+        config = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy)
 
-        assert config.training_strategy is training
-        assert config.evaluation_strategy is evaluation
+        assert config.training_strategy is mock_training_strategy
+        assert config.evaluation_strategy is mock_evaluation_strategy
 
-    def test_config_stores_run_parameters(self):
+    def test_config_stores_run_parameters(self, mock_training_strategy, mock_evaluation_strategy):
         """Verify config stores runs and substeps."""
-        training = MockTrainingStrategy()
-        evaluation = MockEvaluationStrategy()
 
-        config = SufficiencyConfig(training, evaluation, runs=5, substeps=10)
+        config = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy, runs=5, substeps=10)
 
         assert config.runs == 5
         assert config.substeps == 10
 
-    def test_config_default_values(self):
+    def test_config_default_values(self, mock_training_strategy, mock_evaluation_strategy):
         """Verify config applies correct default values."""
-        training = MockTrainingStrategy()
-        evaluation = MockEvaluationStrategy()
 
-        config = SufficiencyConfig(training, evaluation)
+        config = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy)
 
         assert config.runs == 1
         assert config.substeps == 5
         assert config.unit_interval
 
-    def test_config_with_custom_unit_interval(self):
+    def test_config_with_custom_unit_interval(self, mock_training_strategy, mock_evaluation_strategy):
         """Verify config accepts custom unit_interval value."""
-        training = MockTrainingStrategy()
-        evaluation = MockEvaluationStrategy()
 
-        config = SufficiencyConfig(training, evaluation, unit_interval=False)
+        config = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy, unit_interval=False)
 
         assert not config.unit_interval
 
@@ -74,45 +52,23 @@ class TestSufficiencyConfigConstruction:
 class TestSufficiencyConfigValidation:
     """Test SufficiencyConfig validation logic."""
 
-    def test_config_rejects_negative_runs(self):
+    @pytest.mark.parametrize("runs", [-1, 0])
+    def test_config_rejects_negative_runs(self, mock_training_strategy, mock_evaluation_strategy, runs):
         """Verify config validates runs is positive."""
-        training = MockTrainingStrategy()
-        evaluation = MockEvaluationStrategy()
 
         with pytest.raises(ValueError, match="runs must be positive"):
-            SufficiencyConfig(training, evaluation, runs=-1)
+            SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy, runs=runs)
 
-    def test_config_rejects_zero_runs(self):
-        """Verify config validates runs is greater than zero."""
-        training = MockTrainingStrategy()
-        evaluation = MockEvaluationStrategy()
-
-        with pytest.raises(ValueError, match="runs must be positive"):
-            SufficiencyConfig(training, evaluation, runs=0)
-
-    def test_config_rejects_negative_substeps(self):
+    @pytest.mark.parametrize("substeps", [-1, 0])
+    def test_config_rejects_negative_substeps(self, mock_training_strategy, mock_evaluation_strategy, substeps):
         """Verify config validates substeps is positive."""
-        training = MockTrainingStrategy()
-        evaluation = MockEvaluationStrategy()
-
         with pytest.raises(ValueError, match="substeps must be positive"):
-            SufficiencyConfig(training, evaluation, substeps=-1)
+            SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy, substeps=substeps)
 
-    def test_config_rejects_zero_substeps(self):
-        """Verify config validates substeps is greater than zero."""
-        training = MockTrainingStrategy()
-        evaluation = MockEvaluationStrategy()
-
-        with pytest.raises(ValueError, match="substeps must be positive"):
-            SufficiencyConfig(training, evaluation, substeps=0)
-
-    def test_config_accepts_positive_values(self):
+    def test_config_accepts_positive_values(self, mock_training_strategy, mock_evaluation_strategy):
         """Verify config accepts valid positive values."""
-        training = MockTrainingStrategy()
-        evaluation = MockEvaluationStrategy()
 
-        # Should not raise
-        config = SufficiencyConfig(training, evaluation, runs=10, substeps=20)
+        config = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy, runs=10, substeps=20)
 
         assert config.runs == 10
         assert config.substeps == 20
@@ -121,35 +77,29 @@ class TestSufficiencyConfigValidation:
 class TestSufficiencyConfigImmutability:
     """Test that SufficiencyConfig is immutable (frozen)."""
 
-    def test_config_is_frozen(self):
+    def test_config_is_frozen(self, mock_training_strategy, mock_evaluation_strategy):
         """Verify config cannot be modified after creation."""
-        training = MockTrainingStrategy()
-        evaluation = MockEvaluationStrategy()
 
-        config = SufficiencyConfig(training, evaluation, runs=3)
+        config = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy, runs=3)
 
         with pytest.raises(FrozenInstanceError):
             config.runs = 5  # pyright: ignore[reportAttributeAccessIssue] --> This is what we are testing
 
-    def test_config_training_strategy_is_frozen(self):
+    def test_config_training_strategy_is_frozen(self, mock_training_strategy, mock_evaluation_strategy):
         """Verify training_strategy field cannot be modified."""
-        training = MockTrainingStrategy()
-        evaluation = MockEvaluationStrategy()
 
-        config = SufficiencyConfig(training, evaluation)
+        config = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy)
 
-        new_training = MockTrainingStrategy()
+        new_training = mock_training_strategy
         with pytest.raises(FrozenInstanceError):
             config.training_strategy = new_training  # pyright: ignore[reportAttributeAccessIssue] --> This is what we are testing
 
-    def test_config_evaluation_strategy_is_frozen(self):
+    def test_config_evaluation_strategy_is_frozen(self, mock_training_strategy, mock_evaluation_strategy):
         """Verify evaluation_strategy field cannot be modified."""
-        training = MockTrainingStrategy()
-        evaluation = MockEvaluationStrategy()
 
-        config = SufficiencyConfig(training, evaluation)
+        config = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy)
 
-        new_evaluation = MockEvaluationStrategy()
+        new_evaluation = mock_evaluation_strategy
         with pytest.raises(FrozenInstanceError):
             config.evaluation_strategy = new_evaluation  # pyright: ignore[reportAttributeAccessIssue] --> This is what we are testing
 
@@ -157,23 +107,19 @@ class TestSufficiencyConfigImmutability:
 class TestSufficiencyConfigTypeChecking:
     """Test that config enforces protocol conformance."""
 
-    def test_config_accepts_training_strategy(self):
+    def test_config_accepts_training_strategy(self, mock_training_strategy, mock_evaluation_strategy):
         """Verify config accepts objects conforming to TrainingStrategy."""
-        training = MockTrainingStrategy()
-        evaluation = MockEvaluationStrategy()
 
         # Should not raise
-        config = SufficiencyConfig(training, evaluation)
+        config = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy)
 
         assert isinstance(config.training_strategy, TrainingStrategy)
 
-    def test_config_accepts_evaluation_strategy(self):
+    def test_config_accepts_evaluation_strategy(self, mock_training_strategy, mock_evaluation_strategy):
         """Verify config accepts objects conforming to EvaluationStrategy."""
-        training = MockTrainingStrategy()
-        evaluation = MockEvaluationStrategy()
 
         # Should not raise
-        config = SufficiencyConfig(training, evaluation)
+        config = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy)
 
         assert isinstance(config.evaluation_strategy, EvaluationStrategy)
 
@@ -181,33 +127,27 @@ class TestSufficiencyConfigTypeChecking:
 class TestSufficiencyConfigEquality:
     """Test SufficiencyConfig equality and hashing."""
 
-    def test_config_equality_with_same_values(self):
+    def test_config_equality_with_same_values(self, mock_training_strategy, mock_evaluation_strategy):
         """Verify configs with same values are equal."""
-        training = MockTrainingStrategy()
-        evaluation = MockEvaluationStrategy()
 
-        config1 = SufficiencyConfig(training, evaluation, runs=3, substeps=5)
-        config2 = SufficiencyConfig(training, evaluation, runs=3, substeps=5)
+        config1 = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy, runs=3, substeps=5)
+        config2 = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy, runs=3, substeps=5)
 
         # Note: They use the same strategy instances
         assert config1 == config2
 
-    def test_config_inequality_with_different_runs(self):
+    def test_config_inequality_with_different_runs(self, mock_training_strategy, mock_evaluation_strategy):
         """Verify configs with different runs are not equal."""
-        training = MockTrainingStrategy()
-        evaluation = MockEvaluationStrategy()
 
-        config1 = SufficiencyConfig(training, evaluation, runs=3)
-        config2 = SufficiencyConfig(training, evaluation, runs=5)
+        config1 = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy, runs=3)
+        config2 = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy, runs=5)
 
         assert config1 != config2
 
-    def test_config_repr(self):
+    def test_config_repr(self, mock_training_strategy, mock_evaluation_strategy):
         """Verify config has useful string representation."""
-        training = MockTrainingStrategy()
-        evaluation = MockEvaluationStrategy()
 
-        config = SufficiencyConfig(training, evaluation, runs=3, substeps=10)
+        config = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy, runs=3, substeps=10)
         repr_str = repr(config)
 
         # Should contain class name and key parameters
