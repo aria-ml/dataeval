@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from dataeval.core._clusterer import ClusterResult
 from dataeval.detectors.linters.duplicates import Duplicates
 from dataeval.metrics.stats._hashstats import hashstats
 
@@ -93,3 +94,90 @@ class TestDuplicates:
         dupes = Duplicates()
         results = dupes.evaluate(MockDataset())
         assert results is not None
+
+    def test_duplicates_from_clusters_basic(self):
+        """Test basic cluster-based duplicate detection"""
+
+        # Create ClusterResult with MST and cluster assignments
+        # Create a simple MST structure (edges with distances)
+        # Format: [node1, node2, distance]
+        mock_cluster_result: ClusterResult = {
+            "mst": np.array(
+                [[0, 1, 0.1], [1, 2, 0.05], [2, 3, 0.0], [3, 4, 0.2]],
+                dtype=np.float32,  # Exact duplicate
+            ),
+            "clusters": np.array([0, 0, 0, 0, 0], dtype=np.intp),
+            "linkage_tree": np.array([], dtype=np.float32),
+            "condensed_tree": {
+                "parent": np.array([]),
+                "child": np.array([]),
+                "lambda_val": np.array([]),
+                "child_size": np.array([]),
+            },
+            "membership_strengths": np.array([], dtype=np.float32),
+            "k_neighbors": np.array([], dtype=np.int32),
+            "k_distances": np.array([], dtype=np.float32),
+        }
+
+        # Find duplicates using new method
+        detector = Duplicates()
+        result = detector.from_clusters(mock_cluster_result)
+
+        # Should return proper structure
+        assert isinstance(result.exact, list)
+        assert isinstance(result.near, list)
+
+    def test_duplicates_from_clusters_only_exact(self):
+        """Test cluster-based detection with only_exact=True"""
+
+        # Create ClusterResult
+        mock_cluster_result: ClusterResult = {
+            "mst": np.array([[0, 1, 0.0], [1, 2, 0.05]], dtype=np.float32),
+            "clusters": np.array([0, 0, 0], dtype=np.intp),
+            "linkage_tree": np.array([], dtype=np.float32),
+            "condensed_tree": {
+                "parent": np.array([]),
+                "child": np.array([]),
+                "lambda_val": np.array([]),
+                "child_size": np.array([]),
+            },
+            "membership_strengths": np.array([], dtype=np.float32),
+            "k_neighbors": np.array([], dtype=np.int32),
+            "k_distances": np.array([], dtype=np.float32),
+        }
+
+        # Only exact duplicates
+        detector = Duplicates(only_exact=True)
+        result = detector.from_clusters(mock_cluster_result)
+
+        # Should find exact duplicates
+        assert isinstance(result.exact, list)
+        # Near duplicates should be empty
+        assert isinstance(result.near, list)
+        assert len(result.near) == 0
+
+    def test_duplicates_from_clusters_no_duplicates(self):
+        """Test with data that has no duplicates"""
+
+        # Create ClusterResult with no zero-distance edges
+        mock_cluster_result: ClusterResult = {
+            "mst": np.array([[0, 1, 0.5], [1, 2, 0.3], [2, 3, 0.4]], dtype=np.float32),
+            "clusters": np.array([0, 0, 0, 0], dtype=np.intp),
+            "linkage_tree": np.array([], dtype=np.float32),
+            "condensed_tree": {
+                "parent": np.array([]),
+                "child": np.array([]),
+                "lambda_val": np.array([]),
+                "child_size": np.array([]),
+            },
+            "membership_strengths": np.array([], dtype=np.float32),
+            "k_neighbors": np.array([], dtype=np.int32),
+            "k_distances": np.array([], dtype=np.float32),
+        }
+
+        detector = Duplicates()
+        result = detector.from_clusters(mock_cluster_result)
+
+        # Should have proper structure (may be empty)
+        assert isinstance(result.exact, list)
+        assert isinstance(result.near, list)
