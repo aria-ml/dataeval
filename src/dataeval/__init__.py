@@ -17,6 +17,11 @@ __version__ = str(__version__)
 
 __all__ = ["__version__", "config", "log", "protocols", "types"]
 
+# Not required for PEP420 but due to existing __init__.py functionality we use legacy pkgutil method
+import pkgutil
+
+__path__ = pkgutil.extend_path(__path__, __name__)
+
 import logging
 
 from . import config, protocols, types
