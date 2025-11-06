@@ -613,7 +613,6 @@ wheels = [
 name = "dataeval"
 source = { editable = "." }
 dependencies = [
-    { name = "fast-hdbscan" },
     { name = "lightgbm" },
     { name = "numba" },
     { name = "numpy" },
@@ -799,7 +798,6 @@ type = [
 
 [package.metadata]
 requires-dist = [
-    { name = "fast-hdbscan", specifier = "==0.2.0" },
     { name = "lightgbm", specifier = ">=4" },
     { name = "matplotlib", marker = "extra == 'all'", specifier = ">=3.7.1" },
     { name = "matplotlib", marker = "extra == 'matplotlib'", specifier = ">=3.7.1" },
@@ -1109,20 +1107,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/91/50/a9d80c47ff289c611ff12e63f7c5d13942c65d68125160cefd768c73e6e4/executing-2.2.0.tar.gz", hash = "sha256:5d108c028108fe2551d1a7b2e8b713341e2cb4fc0aa7dcf966fa4327a5226755", size = 978693, upload-time = "2025-01-22T15:41:29.403Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7b/8f/c4d9bafc34ad7ad5d8dc16dd1347ee0e507a52c3adb6bfa8887e1c6a26ba/executing-2.2.0-py2.py3-none-any.whl", hash = "sha256:11387150cad388d62750327a53d3339fad4888b39a6fe233c3afbb54ecffd3aa", size = 26702, upload-time = "2025-01-22T15:41:25.929Z" },
-]
-
-[[package]]
-name = "fast-hdbscan"
-version = "0.2.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numba" },
-    { name = "numpy" },
-    { name = "scikit-learn" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e5/57/7f9f311bf2ba48f8718952a8a4cf491aaee4b906220295fe1cf213359b4e/fast_hdbscan-0.2.0.tar.gz", hash = "sha256:002966c2adbac5170a6627ea2f685cdedcd2a1c2cb077401fba6748f0fbc39f0", size = 17876, upload-time = "2024-10-01T02:22:31.592Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/0f/49/3593953dbe9b3826fe937b3741641fe3ecd4587f53bd5e5961406e1f4642/fast_hdbscan-0.2.0-py3-none-any.whl", hash = "sha256:7315af09f5b19a4f1a8d6113b90eb4e98813d3bc0d55f05c0f24984252e164f2", size = 17743, upload-time = "2024-10-01T02:22:29.912Z" },
 ]
 
 [[package]]

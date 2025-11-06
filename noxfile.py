@@ -14,6 +14,12 @@ PYTHON_RE_PATTERN = re.compile(r"\d\.\d{1,2}")
 IS_CI = bool(os.environ.get("CI"))
 
 os.environ["TQDM_DISABLE"] = "1"
+
+# Configure Numba disk caching for faster test execution
+# This caches JIT-compiled functions to avoid recompilation across test workers
+os.environ.setdefault("NUMBA_CACHE_DIR", os.path.expanduser("~/.cache/numba"))
+os.environ.setdefault("NUMBA_ENABLE_CACHING", "1")
+
 nox.options.default_venv_backend = "uv"
 nox.options.sessions = ["test", "type", "deps", "lint", "doctest", "check"]
 
@@ -51,14 +57,40 @@ def dev(session: nox.Session) -> None:
 
 @nox_uv.session(uv_groups=["test"], uv_extras=["cpu", "all"])
 def test(session: nox.Session) -> None:
-    """Run unit tests with coverage reporting. Specify version using `nox -P {version} -e test`."""
+    """Run unit tests with coverage reporting. Specify version using `nox -P {version} -e test`.
+
+    Pass 'clear-cache' to clear the Numba cache before running tests: `nox -e test -- clear-cache`
+    """
     python_version = get_python_version(session)
+
+    # Handle clear-cache argument
+    if "clear-cache" in session.posargs:
+        numba_cache_dir = Path(os.environ.get("NUMBA_CACHE_DIR", os.path.expanduser("~/.cache/numba")))
+        if numba_cache_dir.exists():
+            session.log(f"Clearing Numba cache at {numba_cache_dir}...")
+            session.run("rm", "-rf", str(numba_cache_dir), external=True)
+        # Remove 'clear-cache' from posargs so it doesn't get passed to pytest
+        remaining_posargs = [arg for arg in session.posargs if arg != "clear-cache"]
+    else:
+        remaining_posargs = list(session.posargs)
+
+    # Standard pytest configuration
     pytest_args = ["-m", "not cuda"]
     xdist_args = ["-n4", "--dist", "loadfile"]
     cov_args = ["--cov", f"--junitxml=output/junit.{python_version}.xml"]
     cov_term_args = ["--cov-report", "term"]
     cov_xml_args = ["--cov-report", f"xml:output/coverage.{python_version}.xml"]
     cov_html_args = ["--cov-report", f"html:output/htmlcov.{python_version}"]
+
+    # Pre-warm Numba JIT cache only if cache doesn't exist or is empty
+    numba_cache_dir = Path(os.environ.get("NUMBA_CACHE_DIR", os.path.expanduser("~/.cache/numba")))
+    cache_exists = numba_cache_dir.exists() and any(numba_cache_dir.iterdir())
+
+    if not cache_exists:
+        session.log("Pre-warming Numba JIT compilation cache (no cache found)...")
+        session.run("python", "-m", "dataeval._warm_cache")
+    else:
+        session.log("Skipping cache pre-warm (cache already exists)")
 
     session.run(
         "pytest",
@@ -68,7 +100,7 @@ def test(session: nox.Session) -> None:
         *cov_term_args,
         *cov_xml_args,
         *cov_html_args,
-        *session.posargs,
+        *remaining_posargs,
     )
     session.run("mv", ".coverage", f"output/.coverage.{python_version}", external=True)
 
