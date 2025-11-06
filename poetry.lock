@@ -109,23 +109,6 @@ docs = ["ipython", "matplotlib", "numpydoc", "sphinx"]
 tests = ["pytest", "pytest-cov", "pytest-xdist"]
 
 [[package]]
-name = "fast-hdbscan"
-version = "0.2.0"
-description = "A fast multicore version of hdbscan for low dimensional euclidean spaces"
-optional = false
-python-versions = ">=3.9"
-groups = ["main"]
-files = [
-    {file = "fast_hdbscan-0.2.0-py3-none-any.whl", hash = "sha256:7315af09f5b19a4f1a8d6113b90eb4e98813d3bc0d55f05c0f24984252e164f2"},
-    {file = "fast_hdbscan-0.2.0.tar.gz", hash = "sha256:002966c2adbac5170a6627ea2f685cdedcd2a1c2cb077401fba6748f0fbc39f0"},
-]
-
-[package.dependencies]
-numba = ">=0.56"
-numpy = ">=1.21"
-scikit-learn = ">=1.1"
-
-[[package]]
 name = "filelock"
 version = "3.18.0"
 description = "A platform independent file lock."
@@ -1753,4 +1736,4 @@ tqdm = ["tqdm"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.14"
-content-hash = "8a5395bc5687aa3b66ce5d893ae1c59dcc3f10b5793c662b6c12a575896e4014"
+content-hash = "f92c14c2c468c010681d9a0ff4404e54f7fd4f486da8db97dbc68209d8ae9bf4"

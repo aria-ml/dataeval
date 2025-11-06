@@ -355,10 +355,6 @@ executing==2.2.0 \
     --hash=sha256:11387150cad388d62750327a53d3339fad4888b39a6fe233c3afbb54ecffd3aa \
     --hash=sha256:5d108c028108fe2551d1a7b2e8b713341e2cb4fc0aa7dcf966fa4327a5226755
     # via stack-data
-fast-hdbscan==0.2.0 \
-    --hash=sha256:002966c2adbac5170a6627ea2f685cdedcd2a1c2cb077401fba6748f0fbc39f0 \
-    --hash=sha256:7315af09f5b19a4f1a8d6113b90eb4e98813d3bc0d55f05c0f24984252e164f2
-    # via dataeval
 fastjsonschema==2.21.1 \
     --hash=sha256:794d4f0a58f848961ba16af7b9c85a3e88cd360df008c59aac6fc5ae9323b5d4 \
     --hash=sha256:c9e5b7e908310918cf494a434eeb31384dd84a98b57a30bcb1f535015b554667
@@ -863,9 +859,7 @@ numba==0.61.2 \
     --hash=sha256:cf9f9fc00d6eca0c23fc840817ce9f439b9f03c8f03d6246c0e7f0cb15b7162a \
     --hash=sha256:ea0247617edcb5dd61f6106a56255baab031acc4257bddaeddb3a1003b4ca3fd \
     --hash=sha256:efd3db391df53aaa5cfbee189b6c910a5b471488749fd6606c3f33fc984c2ae2
-    # via
-    #   dataeval
-    #   fast-hdbscan
+    # via dataeval
 numpy==2.2.6 \
     --hash=sha256:038613e9fb8c72b0a41f025a7e4c3f0b7a1b5d768ece4796b674c8f3fe13efff \
     --hash=sha256:0678000bb9ac1475cd454c6b8c799206af8107e310843532b04d49649c717a47 \
@@ -925,7 +919,6 @@ numpy==2.2.6 \
     # via
     #   contourpy
     #   dataeval
-    #   fast-hdbscan
     #   lightgbm
     #   maite
     #   maite-datasets
@@ -1625,9 +1618,7 @@ scikit-learn==1.6.1 \
     --hash=sha256:dc5cf3d68c5a20ad6d571584c0750ec641cc46aeef1c1507be51300e6003a7e1 \
     --hash=sha256:e8ca8cb270fee8f1f76fa9bfd5c3507d60c6438bbee5687f81042e2bb98e5a97 \
     --hash=sha256:fa909b1a36e000a03c382aade0bd2063fd5680ff8b8e501660c0f59f021a6415
-    # via
-    #   dataeval
-    #   fast-hdbscan
+    # via dataeval
 scipy==1.15.3 \
     --hash=sha256:05dc6abcd105e1a29f95eada46d4a3f251743cfd7d3ae8ddb4088047f24ea477 \
     --hash=sha256:06efcba926324df1696931a57a176c80848ccd67ce6ad020c810736bfd58eb1c \
