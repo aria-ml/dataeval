@@ -247,7 +247,7 @@ class Duplicates:
             The exact duplicates and near duplicates as lists of related indices
         """
         # Delay load numba compiled functions
-        from dataeval.core._numba import compare_links_to_cluster_std
+        from dataeval.core._fast_hdbscan._mst import compare_links_to_cluster_std
 
         exact_indices, near_indices = compare_links_to_cluster_std(mst, clusters)  # type: ignore
         exact_dupes = self._sorted_union_find(exact_indices)
@@ -257,14 +257,10 @@ class Duplicates:
 
     def _sorted_union_find(self, index_groups: Any) -> list[list[Any]]:
         """Merges and sorts groups of indices that share any common index"""
-        import warnings
-
         import numpy as np
 
-        # Delay load fast_hdbscan functions
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", category=FutureWarning)
-            from fast_hdbscan.cluster_trees import ds_find, ds_rank_create, ds_union_by_rank
+        # Import disjoint set functions from our cached implementation
+        from dataeval.core._fast_hdbscan._disjoint_set import ds_find, ds_rank_create, ds_union_by_rank
 
         groups: list[list[np.int32]] = [[np.int32(x) for x in range(0)] for y in range(0)]
         uniques, inverse = np.unique(index_groups, return_inverse=True)
@@ -272,10 +268,10 @@ class Duplicates:
         disjoint_set = ds_rank_create(uniques.size)
         cluster_points = np.empty(uniques.size, dtype=np.uint32)
         for i in range(index_groups.shape[0]):
-            point, nbr = np.int32(inverse[i * 2]), np.int32(inverse[i * 2 + 1])
+            point, nbr = np.intp(inverse[i * 2]), np.intp(inverse[i * 2 + 1])
             ds_union_by_rank(disjoint_set, point, nbr)
         for i in range(uniques.size):
-            cluster_points[i] = ds_find(disjoint_set, i)
+            cluster_points[i] = ds_find(disjoint_set, np.intp(i))
         for i in range(uniques.size):
             dups = np.nonzero(cluster_points == i)[0]
             if dups.size > 0:

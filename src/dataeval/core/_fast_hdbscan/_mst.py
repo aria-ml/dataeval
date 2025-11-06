@@ -14,26 +14,23 @@ Algorithm Overview
 Functions work together in the following pipeline:
     _init_tree -> _update_tree_by_distance -> _cluster_edges -> compare_links_to_cluster_std
 
-Adapted from fast_hdbscan python module
-Original Authors: Leland McInnes <https://github.com/TutteInstitute/fast_hdbscan>
 Adapted for DataEval by Ryan Wood
-License: BSD 2-Clause
+
+Adapted from fast_hdbscan python module:
+    https://github.com/TutteInstitute/fast_hdbscan
+    Copyright (c) 2020, Leland McInnes
+    License: BSD 2-Clause
 """
 
 from __future__ import annotations
 
 __all__ = []
 
-import warnings
-
 import numba
 import numpy as np
-
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore", category=FutureWarning)
-    from fast_hdbscan.disjoint_set import ds_find, ds_rank_create
-
 from numpy.typing import NDArray
+
+from dataeval.core._fast_hdbscan._disjoint_set import ds_find, ds_rank_create, ds_union_by_rank
 
 # Constants for cluster edge detection thresholds
 CLUSTER_SIZE_LOG_THRESHOLD = 2  # Threshold for large vs small clusters (10^2 = 100 samples)
@@ -46,54 +43,7 @@ EXACT_DUPLICATE_MAGNITUDE_OFFSET = -3  # Orders of magnitude below mean to consi
 EXACT_DUPLICATE_FALLBACK_OFFSET = 3  # Additional offset when mean is very small
 
 
-@numba.njit()
-def _ds_union_by_rank(disjoint_set: tuple[NDArray[np.int32], NDArray[np.int32]], point: int, nbr: int) -> int:
-    """
-    Perform union-by-rank on two points in a disjoint set data structure.
-
-    This operation merges the sets containing 'point' and 'nbr' using the union-by-rank
-    heuristic for efficiency. The smaller rank tree is attached under the root of the
-    larger rank tree.
-
-    Parameters
-    ----------
-    disjoint_set : tuple[NDArray[np.int32], NDArray[np.int32]]
-        Tuple of (parent, rank) arrays representing the disjoint set forest.
-        parent[i] gives the parent of node i, rank[i] gives the rank (depth bound) of node i.
-    point : int
-        Index of the first point to union
-    nbr : int
-        Index of the second point (neighbor) to union
-
-    Returns
-    -------
-    int
-        1 if the union was successful (sets were different), 0 if points were already
-        in the same set (no union performed)
-
-    Notes
-    -----
-    This function modifies disjoint_set in-place. The union-by-rank optimization
-    ensures the tree depth remains logarithmic, giving nearly constant-time operations.
-    """
-    y = ds_find(disjoint_set, point)
-    x = ds_find(disjoint_set, nbr)
-
-    # Already in same set
-    if x == y:
-        return 0
-
-    # Union by rank: attach smaller rank tree under root of larger rank tree
-    if disjoint_set[1][x] < disjoint_set[1][y]:
-        x, y = y, x
-
-    disjoint_set[0][y] = x
-    if disjoint_set[1][x] == disjoint_set[1][y]:
-        disjoint_set[1][x] += 1
-    return 1
-
-
-@numba.njit(locals={"i": numba.types.uint32, "nbr": numba.types.uint32, "dist": numba.types.float32})
+@numba.njit(locals={"i": numba.types.intp, "nbr": numba.types.intp, "dist": numba.types.float32}, cache=True)
 def _init_tree(
     n_neighbors: NDArray[np.intp], n_distance: NDArray[np.float32]
 ) -> tuple[NDArray[np.float32], int, tuple[NDArray[np.int32], NDArray[np.int32]], NDArray[np.uint32]]:
@@ -131,15 +81,14 @@ def _init_tree(
     """
     # Pre-allocate tree to hold maximum possible edges (n_samples - 1)
     tree = np.zeros((n_neighbors.size - 1, 3), dtype=np.float32)
-    disjoint_set = ds_rank_create(n_neighbors.size)
+    disjoint_set = ds_rank_create(np.int32(n_neighbors.size))
     cluster_points = np.empty(n_neighbors.size, dtype=np.uint32)
 
     # int_tree tracks current number of edges added to the tree
     int_tree = 0
     for i in range(n_neighbors.size):
         nbr = n_neighbors[i]
-        connect = _ds_union_by_rank(disjoint_set, i, nbr)
-        if connect == 1:
+        if ds_union_by_rank(disjoint_set, np.intp(i), np.intp(nbr)):
             dist = n_distance[i]
             # Store edge as (point_i, neighbor, distance)
             # Note: Storing indices as float32 for array homogeneity with distances
@@ -148,12 +97,12 @@ def _init_tree(
 
     # Determine cluster membership for each point
     for i in range(cluster_points.size):
-        cluster_points[i] = ds_find(disjoint_set, i)
+        cluster_points[i] = ds_find(disjoint_set, np.intp(i))
 
     return tree, int_tree, disjoint_set, cluster_points
 
 
-@numba.njit(locals={"i": numba.types.uint32, "nbr": numba.types.uint32})
+@numba.njit(locals={"i": numba.types.uint32, "nbr": numba.types.uint32}, cache=True)
 def _update_tree_by_distance(
     tree: NDArray[np.float32],
     int_tree: int,
@@ -210,8 +159,7 @@ def _update_tree_by_distance(
     for i in range(n_neighbors.size):
         point = point_sorted[i]
         nbr = nbrs_sorted[i]
-        connect = _ds_union_by_rank(disjoint_set, point, nbr)
-        if connect == 1:
+        if ds_union_by_rank(disjoint_set, point, nbr):
             dist = dist_sorted[i]
             # Add edge to tree (storing indices as float32)
             tree[int_tree] = (np.float32(point), np.float32(nbr), dist)
@@ -219,12 +167,12 @@ def _update_tree_by_distance(
 
     # Update cluster assignments
     for i in range(cluster_points.size):
-        cluster_points[i] = ds_find(disjoint_set, i)
+        cluster_points[i] = ds_find(disjoint_set, np.intp(i))
 
     return tree, int_tree, disjoint_set, cluster_points
 
 
-@numba.njit(locals={"i": numba.types.uint32})
+@numba.njit(locals={"i": numba.types.uint32}, cache=True)
 def _cluster_edges(
     tracker: NDArray[np.int32], final_merge_idx: int, cluster_distances: NDArray[np.float32]
 ) -> list[NDArray[np.intp]]:
@@ -293,7 +241,7 @@ def _cluster_edges(
     return edge_points
 
 
-@numba.njit(locals={"i": numba.types.int32})
+@numba.njit(locals={"i": numba.types.int32}, cache=True)
 def compare_links_to_cluster_std(
     mst: NDArray[np.float32], clusters: NDArray[np.intp]
 ) -> tuple[NDArray[np.int32], NDArray[np.int32]]:

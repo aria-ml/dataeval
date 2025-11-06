@@ -2,7 +2,6 @@ from __future__ import annotations
 
 __all__ = []
 
-import warnings
 from typing import Any, TypedDict
 
 import numpy as np
@@ -205,16 +204,15 @@ def cluster(
             4,  2,  0,  0,  1,  2,  0,  1,  3,  0,  3,  3,  4,  0,  0,  3,  0,
             3, -1,  0,  0,  2,  4,  3,  4,  0,  1,  0, -1,  3,  0,  0,  0])
     """
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=FutureWarning)
-        from fast_hdbscan.cluster_trees import (
-            cluster_tree_from_condensed_tree,
-            condense_tree,
-            extract_eom_clusters,
-            get_cluster_label_vector,
-            get_point_membership_strength_vector,
-            mst_to_linkage_tree,
-        )
+    # Import from our cached cluster_trees implementation
+    from dataeval.core._fast_hdbscan._cluster_trees import (
+        cluster_tree_from_condensed_tree,
+        condense_tree,
+        extract_eom_clusters,
+        get_cluster_label_vector,
+        get_point_membership_strength_vector,
+        mst_to_linkage_tree,
+    )
 
     single_cluster = True
     cluster_selection_epsilon = 0.0

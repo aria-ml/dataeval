@@ -223,7 +223,7 @@ def minimum_spanning_tree_edges(
     minimum_spanning_tree : Higher-level interface that also computes k-NN
     """
     # Delay load numba compiled functions
-    from dataeval.core._numba import _cluster_edges, _init_tree, _update_tree_by_distance
+    from dataeval.core._fast_hdbscan._mst import _cluster_edges, _init_tree, _update_tree_by_distance
 
     # Transpose arrays to get number of samples along a row
     k_neighbors = neighbors.T.astype(np.uint32).copy()
