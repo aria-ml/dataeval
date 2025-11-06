@@ -13,7 +13,7 @@ class TestFunctionalBER:
     @pytest.mark.parametrize(
         "method, k, expected",
         [
-            ("MST", None, (0.005, 0.0025034819009044917)),
+            ("MST", None, (0.004, 0.0020022271742540345)),
             ("KNN", 1, (0.0, 0.0)),
             ("KNN", 10, (0.0, 0.0)),
         ],

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Iterable, Sequence
 from typing import Any, Literal, TypeVar
 from unittest.mock import Mock
@@ -12,6 +13,33 @@ from numpy.typing import NDArray
 from dataeval.config import set_seed
 from dataeval.data import Metadata
 from dataeval.protocols import ObjectDetectionTarget
+
+
+def pytest_configure(config):
+    """Pre-import cached Numba modules at worker startup for consistent test timing.
+
+    This runs once per worker process. The cache warming script (run by nox before
+    pytest) compiles all JIT functions and writes them to disk. This hook loads
+    those cached functions in each worker, avoiding redundant compilation.
+
+    Import timing with disk cache:
+    - dataeval.core._fast_hdbscan._mst: ~0.1s (load from cache)
+    - dataeval.core._fast_hdbscan._cluster_trees: ~0.3s (load from cache)
+
+    Without this hook: The first test using these modules would pay the load cost,
+    appearing slower than others and creating timing variance.
+
+    With this hook: All workers load the cache upfront during initialization,
+    making all test times consistent and predictable.
+    """
+    with contextlib.suppress(Exception):
+        # Load our cached disjoint set functions
+        # Load cached cluster_trees functions
+        from dataeval.core._fast_hdbscan import (
+            _cluster_trees,  # noqa: F401
+            _mst,  # noqa: F401
+        )
+
 
 BoxLike = (
     NDArray[np.number] | Sequence[int] | Sequence[float] | tuple[int, int, int, int] | tuple[float, float, float, float]
