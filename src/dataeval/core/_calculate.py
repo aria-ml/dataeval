@@ -317,11 +317,11 @@ def _sort(
     source_indices: list[SourceIndex],
     aggregated_stats: dict[str, list[Any]],
 ) -> tuple[list[SourceIndex], dict[str, NDArray[Any]]]:
-    """Sort results by (image_index, box_index, channel_index) with None < 0 and convert to numpy arrays."""
+    """Sort results by (item_index, box_index, channel_index) with None < 0 and convert to numpy arrays."""
     sort_indices = sorted(
         range(len(source_indices)),
         key=lambda i: (
-            source_indices[i].image,
+            source_indices[i].item,
             -1 if source_indices[i].target is None else source_indices[i].target,
             -1 if source_indices[i].channel is None else source_indices[i].channel,
         ),
@@ -352,7 +352,7 @@ def _aggregate(
             aggregated_stats.setdefault(stat_name, []).extend(stat_values)
 
     if result.results and result.results[0].source_indices:
-        img_idx = result.results[0].source_indices[0].image
+        img_idx = result.results[0].source_indices[0].item
         object_count[img_idx] = result.object_count
         invalid_box_count[img_idx] = result.invalid_box_count
 
@@ -405,7 +405,7 @@ def calculate(
         - 'image_count': Total number of images processed
         - 'stats': Mapping of statistic names to sequences of computed values
 
-        Output is sorted by (image_index, box_index, channel_index) ascending,
+        Output is sorted by (item_index, box_index, channel_index) ascending,
         with None values appearing before 0.
 
     Examples

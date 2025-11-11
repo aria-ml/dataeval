@@ -151,7 +151,7 @@ class TestPerImagePerBox:
         # Should have 1 result (full image)
         assert len(result["stats"]["mean"]) == 1
         assert len(result["source_index"]) == 1
-        assert result["source_index"][0].image == 0
+        assert result["source_index"][0].item == 0
         assert result["source_index"][0].target is None
         assert result["source_index"][0].channel is None
 
@@ -174,13 +174,13 @@ class TestPerImagePerBox:
         assert len(result["source_index"]) == 3
 
         # First should be full image
-        assert result["source_index"][0].image == 0
+        assert result["source_index"][0].item == 0
         assert result["source_index"][0].target is None
 
         # Next two should be boxes
-        assert result["source_index"][1].image == 0
+        assert result["source_index"][1].item == 0
         assert result["source_index"][1].target == 0
-        assert result["source_index"][2].image == 0
+        assert result["source_index"][2].item == 0
         assert result["source_index"][2].target == 1
 
     def test_per_target_only_with_boxes(self):
@@ -202,9 +202,9 @@ class TestPerImagePerBox:
         assert len(result["source_index"]) == 2
 
         # Both should be boxes (no full image)
-        assert result["source_index"][0].image == 0
+        assert result["source_index"][0].item == 0
         assert result["source_index"][0].target == 0
-        assert result["source_index"][1].image == 0
+        assert result["source_index"][1].item == 0
         assert result["source_index"][1].target == 1
 
     def test_per_image_only_with_boxes_ignored(self):
@@ -226,7 +226,7 @@ class TestPerImagePerBox:
         assert len(result["source_index"]) == 1
 
         # Should be full image
-        assert result["source_index"][0].image == 0
+        assert result["source_index"][0].item == 0
         assert result["source_index"][0].target is None
 
     def test_per_image_and_per_target_with_per_channel(self):
@@ -244,28 +244,28 @@ class TestPerImagePerBox:
 
         # Check structure: full image channels first, then box channels
         # Full image - channel 0, 1, 2
-        assert result["source_index"][0].image == 0
+        assert result["source_index"][0].item == 0
         assert result["source_index"][0].target is None
         assert result["source_index"][0].channel == 0
 
-        assert result["source_index"][1].image == 0
+        assert result["source_index"][1].item == 0
         assert result["source_index"][1].target is None
         assert result["source_index"][1].channel == 1
 
-        assert result["source_index"][2].image == 0
+        assert result["source_index"][2].item == 0
         assert result["source_index"][2].target is None
         assert result["source_index"][2].channel == 2
 
         # Box - channel 0, 1, 2
-        assert result["source_index"][3].image == 0
+        assert result["source_index"][3].item == 0
         assert result["source_index"][3].target == 0
         assert result["source_index"][3].channel == 0
 
-        assert result["source_index"][4].image == 0
+        assert result["source_index"][4].item == 0
         assert result["source_index"][4].target == 0
         assert result["source_index"][4].channel == 1
 
-        assert result["source_index"][5].image == 0
+        assert result["source_index"][5].item == 0
         assert result["source_index"][5].target == 0
         assert result["source_index"][5].channel == 2
 
@@ -289,23 +289,23 @@ class TestPerImagePerBox:
         assert len(result["source_index"]) == 5
 
         # Image 0: full image
-        assert result["source_index"][0].image == 0
+        assert result["source_index"][0].item == 0
         assert result["source_index"][0].target is None
 
         # Image 0: box 0
-        assert result["source_index"][1].image == 0
+        assert result["source_index"][1].item == 0
         assert result["source_index"][1].target == 0
 
         # Image 1: full image
-        assert result["source_index"][2].image == 1
+        assert result["source_index"][2].item == 1
         assert result["source_index"][2].target is None
 
         # Image 1: box 0
-        assert result["source_index"][3].image == 1
+        assert result["source_index"][3].item == 1
         assert result["source_index"][3].target == 0
 
         # Image 1: box 1
-        assert result["source_index"][4].image == 1
+        assert result["source_index"][4].item == 1
         assert result["source_index"][4].target == 1
 
     def test_invalid_both_false_raises_error(self):
@@ -695,7 +695,7 @@ class TestImageClassificationDataset:
 
         # All should be full images (box=None)
         for i in range(3):
-            assert result["source_index"][i].image == i
+            assert result["source_index"][i].item == i
             assert result["source_index"][i].target is None
             assert result["source_index"][i].channel is None
 
@@ -737,15 +737,15 @@ class TestImageClassificationDataset:
         assert len(result["source_index"]) == 6
 
         # Check channel ordering for first image
-        assert result["source_index"][0].image == 0
+        assert result["source_index"][0].item == 0
         assert result["source_index"][0].target is None
         assert result["source_index"][0].channel == 0
 
-        assert result["source_index"][1].image == 0
+        assert result["source_index"][1].item == 0
         assert result["source_index"][1].target is None
         assert result["source_index"][1].channel == 1
 
-        assert result["source_index"][2].image == 0
+        assert result["source_index"][2].item == 0
         assert result["source_index"][2].target is None
         assert result["source_index"][2].channel == 2
 
@@ -799,23 +799,23 @@ class TestObjectDetectionDataset:
         assert result["object_count"][1] == 1
 
         # Image 0: full image
-        assert result["source_index"][0].image == 0
+        assert result["source_index"][0].item == 0
         assert result["source_index"][0].target is None
 
         # Image 0: box 0
-        assert result["source_index"][1].image == 0
+        assert result["source_index"][1].item == 0
         assert result["source_index"][1].target == 0
 
         # Image 0: box 1
-        assert result["source_index"][2].image == 0
+        assert result["source_index"][2].item == 0
         assert result["source_index"][2].target == 1
 
         # Image 1: full image
-        assert result["source_index"][3].image == 1
+        assert result["source_index"][3].item == 1
         assert result["source_index"][3].target is None
 
         # Image 1: box 0
-        assert result["source_index"][4].image == 1
+        assert result["source_index"][4].item == 1
         assert result["source_index"][4].target == 0
 
     def test_od_dataset_per_target_only(self, get_mock_od_dataset):
@@ -836,13 +836,13 @@ class TestObjectDetectionDataset:
         assert len(result["source_index"]) == 3
 
         # All should be boxes (no full images)
-        assert result["source_index"][0].image == 0
+        assert result["source_index"][0].item == 0
         assert result["source_index"][0].target == 0
 
-        assert result["source_index"][1].image == 1
+        assert result["source_index"][1].item == 1
         assert result["source_index"][1].target == 0
 
-        assert result["source_index"][2].image == 1
+        assert result["source_index"][2].item == 1
         assert result["source_index"][2].target == 1
 
     def test_od_dataset_per_image_only(self, get_mock_od_dataset):
@@ -863,10 +863,10 @@ class TestObjectDetectionDataset:
         assert len(result["source_index"]) == 2
 
         # All should be full images
-        assert result["source_index"][0].image == 0
+        assert result["source_index"][0].item == 0
         assert result["source_index"][0].target is None
 
-        assert result["source_index"][1].image == 1
+        assert result["source_index"][1].item == 1
         assert result["source_index"][1].target is None
 
     def test_od_dataset_with_per_channel(self, get_mock_od_dataset):
@@ -884,20 +884,20 @@ class TestObjectDetectionDataset:
         assert len(result["source_index"]) == 6
 
         # Full image - channels 0, 1, 2
-        assert result["source_index"][0].image == 0
+        assert result["source_index"][0].item == 0
         assert result["source_index"][0].target is None
         assert result["source_index"][0].channel == 0
 
-        assert result["source_index"][1].image == 0
+        assert result["source_index"][1].item == 0
         assert result["source_index"][1].target is None
         assert result["source_index"][1].channel == 1
 
-        assert result["source_index"][2].image == 0
+        assert result["source_index"][2].item == 0
         assert result["source_index"][2].target is None
         assert result["source_index"][2].channel == 2
 
         # Box - channels 0, 1, 2
-        assert result["source_index"][3].image == 0
+        assert result["source_index"][3].item == 0
         assert result["source_index"][3].target == 0
         assert result["source_index"][3].channel == 0
 

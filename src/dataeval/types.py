@@ -60,21 +60,21 @@ ArrayND: TypeAlias = (
 
 class SourceIndex(NamedTuple):
     """
-    The indices of the source image, target and channel.
+    The indices of the source item, target and channel.
 
     Attributes
     ----------
-    image: int
-        Index of the source image
+    item: int
+        Index of the source item
     target : int | None
-        Index of the box/target within the source image.
-        - None: References image-level data
-        - int: References a specific target/detection within the image (0-indexed per image)
+        Index of the box/target within the source item.
+        - None: References item-level data
+        - int: References a specific target/detection within the item (0-indexed per item)
         For Object Detection datasets, this maps to the target_index in Metadata.
     channel : int | None
         Index of the channel of the source image (if applicable)
     """
 
-    image: int
+    item: int
     target: int | None
     channel: int | None

@@ -51,9 +51,9 @@ def labelstats(dataset: Metadata | AnnotatedDataset[Any]) -> LabelStatsOutput:
 
     # Extract labels grouped by image from the metadata
     # Build a list of lists where each inner list contains the labels for one image
-    labels: list[list[int]] = [[] for _ in range(metadata.image_count)]
-    for class_label, image_index in zip(metadata.class_labels, metadata.image_indices):
-        labels[image_index].append(int(class_label))
+    labels: list[list[int]] = [[] for _ in range(metadata.item_count)]
+    for class_label, item_index in zip(metadata.class_labels, metadata.item_indices):
+        labels[item_index].append(int(class_label))
 
     # Create index2label mapping from class_names
     # Assumes class_names are ordered by class index

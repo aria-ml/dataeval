@@ -50,7 +50,7 @@ def generate_random_metadata(
     metadata._raw = [{} for _ in range(len(labels))]
     metadata._class_labels = labels_arr
     metadata._class_names = list(labels)
-    metadata._image_indices = np.arange(len(labels))
+    metadata._item_indices = np.arange(len(labels))
     metadata._index2label = dict(enumerate(labels))
     metadata._dataframe = pl.DataFrame(metadata_dict)
     metadata._factors = dict.fromkeys(factors, FactorInfo("discrete"))

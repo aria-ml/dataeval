@@ -69,7 +69,7 @@ def _default_ratio_map() -> OverrideFunctionMap:
 
 def _build_image_lookup(source_indices: Sequence[SourceIndex]) -> dict[tuple[int, int | None], int]:
     """
-    Build a lookup table mapping (image_index, channel_index) to array index.
+    Build a lookup table mapping (item_index, channel_index) to array index.
 
     Parameters
     ----------
@@ -81,14 +81,14 @@ def _build_image_lookup(source_indices: Sequence[SourceIndex]) -> dict[tuple[int
     Returns
     -------
     dict[tuple[int, int | None], int]
-        Lookup table where key is (image_index, channel_index) and value is the array index
+        Lookup table where key is (item_index, channel_index) and value is the array index
     """
     lookup: dict[tuple[int, int | None], int] = {}
 
     for idx, source_idx in enumerate(source_indices):
         # Only process image-level entries (box=None)
         if source_idx.target is None:
-            key = (source_idx.image, source_idx.channel)
+            key = (source_idx.item, source_idx.channel)
             lookup[key] = idx
 
     return lookup
@@ -367,10 +367,10 @@ def calculate_ratios(
             continue
 
         # Find corresponding image entry
-        img_key = (source_idx.image, source_idx.channel)
+        img_key = (source_idx.item, source_idx.channel)
         if img_key not in img_lookup:
             raise ValueError(
-                f"Cannot find image-level stats for box at image={source_idx.image}, "
+                f"Cannot find image-level stats for box at image={source_idx.item}, "
                 f"channel={source_idx.channel}. Ensure both stats_output and box_stats_output "
                 f"were computed on the same dataset with matching per_channel settings."
             )
