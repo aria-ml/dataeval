@@ -10,6 +10,7 @@ from dataeval.data.selections._indices import Indices
 from dataeval.data.selections._limit import Limit
 from dataeval.data.selections._reverse import Reverse
 from dataeval.data.selections._shuffle import Shuffle
+from dataeval.types import SourceIndex
 
 
 def one_hot(label: int):
@@ -175,3 +176,209 @@ class TestSelectionClasses:
         assert select._selection == [6, 4, 2, 0]
         assert "ClassFilter(classes=[0, 1]" in str(select_cf)
         assert "Indices(indices=[12, 10, 8, 6, 4, 2, 0])" in str(select)
+
+
+@pytest.mark.required
+class TestResolveIndices:
+    """Test suite for the resolve_indices method with new SourceIndex functionality."""
+
+    def test_resolve_indices_none_returns_all_selections(self, mock_dataset):
+        """Test that passing None returns all selected indices (original behavior)."""
+        select = Select(mock_dataset)
+        resolved = select.resolve_indices(None)
+        assert resolved == list(range(10))
+        # Ensure we get a copy, not the original list
+        assert resolved is not select._selection
+
+    def test_resolve_indices_no_args_returns_all_selections(self, mock_dataset):
+        """Test that calling without arguments returns all selected indices."""
+        select = Select(mock_dataset)
+        resolved = select.resolve_indices()
+        assert resolved == list(range(10))
+
+    def test_resolve_indices_with_single_int(self, mock_dataset):
+        """Test resolving a single integer index."""
+        select = Select(mock_dataset)
+        resolved = select.resolve_indices(5)
+        assert resolved == [5]
+
+    def test_resolve_indices_with_single_sourceindex(self, mock_dataset):
+        """Test resolving a single SourceIndex."""
+        select = Select(mock_dataset)
+        source_idx = SourceIndex(item=3, target=None, channel=None)
+        resolved = select.resolve_indices(source_idx)
+        assert resolved == [3]
+
+    def test_resolve_indices_with_sourceindex_with_box_and_channel(self, mock_dataset):
+        """Test that SourceIndex with target and channel uses only the item index."""
+        select = Select(mock_dataset)
+        source_idx = SourceIndex(item=7, target=2, channel=1)
+        resolved = select.resolve_indices(source_idx)
+        assert resolved == [7]
+
+    def test_resolve_indices_with_sequence_of_ints(self, mock_dataset):
+        """Test resolving a sequence of integer indices."""
+        select = Select(mock_dataset)
+        resolved = select.resolve_indices([1, 3, 5, 7])
+        assert resolved == [1, 3, 5, 7]
+
+    def test_resolve_indices_with_sequence_of_sourceindices(self, mock_dataset):
+        """Test resolving a sequence of SourceIndex objects."""
+        select = Select(mock_dataset)
+        source_indices = [
+            SourceIndex(item=0, target=None, channel=None),
+            SourceIndex(item=2, target=1, channel=None),
+            SourceIndex(item=4, target=None, channel=2),
+            SourceIndex(item=6, target=3, channel=1),
+        ]
+        resolved = select.resolve_indices(source_indices)
+        assert resolved == [0, 2, 4, 6]
+
+    def test_resolve_indices_with_mixed_sequence(self, mock_dataset):
+        """Test resolving a sequence with both ints and SourceIndex objects."""
+        select = Select(mock_dataset)
+        mixed_indices = [
+            1,
+            SourceIndex(item=3, target=None, channel=None),
+            5,
+            SourceIndex(item=7, target=2, channel=1),
+        ]
+        resolved = select.resolve_indices(mixed_indices)
+        assert resolved == [1, 3, 5, 7]
+
+    def test_resolve_indices_with_selections_applied(self, mock_dataset):
+        """Test that resolve_indices respects selections applied to the dataset."""
+        # Apply a limit selection
+        limit = Limit(size=5)
+        select = Select(mock_dataset, selections=[limit])
+
+        # Resolving without args should return the limited selection
+        resolved = select.resolve_indices()
+        assert resolved == [0, 1, 2, 3, 4]
+        assert len(resolved) == 5
+
+    def test_resolve_indices_with_reverse_selection(self, mock_dataset):
+        """Test resolve_indices with a reverse selection applied."""
+        reverse = Reverse()
+        select = Select(mock_dataset, selections=[reverse])
+
+        # The internal selection should be reversed
+        resolved = select.resolve_indices()
+        assert resolved == [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
+
+    def test_resolve_indices_with_classfilter_selection(self, mock_dataset):
+        """Test resolve_indices with a class filter selection applied."""
+        class_filter = ClassFilter(classes=[0, 1])
+        select = Select(mock_dataset, selections=[class_filter])
+
+        # Should only include indices where class is 0 or 1
+        resolved = select.resolve_indices()
+        assert len(resolved) == 7
+        # Classes: 0,1,2,0,1,2,0,1,2,0 -> indices 0,1,3,4,6,7,9
+        assert resolved == [0, 1, 3, 4, 6, 7, 9]
+
+    def test_resolve_indices_after_selections_single_int(self, mock_dataset):
+        """Test resolving single int after selections have been applied."""
+        limit = Limit(size=5)
+        select = Select(mock_dataset, selections=[limit])
+
+        # Index 2 in the selected dataset maps to index 2 in original
+        resolved = select.resolve_indices(2)
+        assert resolved == [2]
+
+    def test_resolve_indices_after_selections_sequence(self, mock_dataset):
+        """Test resolving sequence of indices after selections have been applied."""
+        limit = Limit(size=5)
+        select = Select(mock_dataset, selections=[limit])
+
+        # Indices in selected dataset map to same indices in original (for this case)
+        resolved = select.resolve_indices([0, 2, 4])
+        assert resolved == [0, 2, 4]
+
+    def test_resolve_indices_out_of_range_negative(self, mock_dataset):
+        """Test that negative indices raise IndexError."""
+        select = Select(mock_dataset)
+
+        with pytest.raises(IndexError, match="Index -1 out of range"):
+            select.resolve_indices(-1)
+
+    def test_resolve_indices_out_of_range_too_large(self, mock_dataset):
+        """Test that indices beyond dataset size raise IndexError."""
+        select = Select(mock_dataset)
+
+        with pytest.raises(IndexError, match="Index 10 out of range"):
+            select.resolve_indices(10)
+
+    def test_resolve_indices_sourceindex_out_of_range(self, mock_dataset):
+        """Test that SourceIndex with out-of-range item raises IndexError."""
+        select = Select(mock_dataset)
+        source_idx = SourceIndex(item=15, target=None, channel=None)
+
+        with pytest.raises(IndexError, match="Index 15 out of range"):
+            select.resolve_indices(source_idx)
+
+    def test_resolve_indices_sequence_with_invalid_index(self, mock_dataset):
+        """Test that sequence with one invalid index raises IndexError."""
+        select = Select(mock_dataset)
+
+        with pytest.raises(IndexError, match="out of range"):
+            select.resolve_indices([1, 3, 20, 5])
+
+    def test_resolve_indices_empty_sequence(self, mock_dataset):
+        """Test resolving an empty sequence returns an empty list."""
+        select = Select(mock_dataset)
+        resolved = select.resolve_indices([])
+        assert resolved == []
+
+    def test_resolve_indices_duplicate_indices(self, mock_dataset):
+        """Test that duplicate indices in input are preserved in output."""
+        select = Select(mock_dataset)
+        resolved = select.resolve_indices([1, 1, 3, 3, 1])
+        assert resolved == [1, 1, 3, 3, 1]
+
+    def test_resolve_indices_duplicate_sourceindices(self, mock_dataset):
+        """Test that duplicate SourceIndices are preserved in output."""
+        select = Select(mock_dataset)
+        source_indices = [
+            SourceIndex(item=2, target=None, channel=None),
+            SourceIndex(item=2, target=1, channel=None),
+            SourceIndex(item=5, target=None, channel=None),
+            SourceIndex(item=2, target=None, channel=2),
+        ]
+        resolved = select.resolve_indices(source_indices)
+        assert resolved == [2, 2, 5, 2]
+
+    def test_resolve_indices_with_limit_mixed_valid_invalid(self, mock_dataset):
+        """Test resolve_indices with Limit where some indices are valid and some invalid."""
+        limit = Limit(size=5)
+        select = Select(mock_dataset, selections=[limit])
+
+        # With limit=5, only indices 0-4 are valid in the selection
+        # Index 6 from original dataset is now out of range
+        resolved_valid = select.resolve_indices([0, 3])
+        assert resolved_valid == [0, 3]
+
+        # Index 6 is out of range after applying Limit(5)
+        with pytest.raises(IndexError, match="Index 6 out of range"):
+            select.resolve_indices([0, 3, 6])
+
+    def test_resolve_indices_empty_dataset(self):
+        """Test resolve_indices with an empty dataset."""
+        empty_dataset = MagicMock()
+        empty_dataset.__len__.return_value = 0
+        empty_dataset.__getitem__.side_effect = lambda idx: (idx, one_hot(idx % 3), {"id": idx})
+
+        select = Select(empty_dataset)
+
+        # Resolving without arguments should return empty list
+        resolved = select.resolve_indices()
+        assert resolved == []
+        assert len(resolved) == 0
+
+        # Any index should raise IndexError
+        with pytest.raises(IndexError, match="Index 0 out of range"):
+            select.resolve_indices(0)
+
+        # Empty sequence should return empty list
+        resolved_empty = select.resolve_indices([])
+        assert resolved_empty == []
