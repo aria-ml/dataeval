@@ -6,14 +6,14 @@ import pytest
 from numpy.typing import NDArray
 
 from dataeval.data._metadata import Metadata
-from dataeval.data._split import (
+from dataeval.utils._split_dataset import (
+    DatasetSplits,
     calculate_validation_fraction,
     split_dataset,
     validate_groupable,
     validate_labels,
     validate_stratifiable,
 )
-from dataeval.outputs._utils import SplitDatasetOutput
 
 
 @pytest.fixture(scope="module")
@@ -45,7 +45,7 @@ def get_metadata(labels, groups=None) -> Metadata:
     return metadata
 
 
-def check_sample_leakage(splits: SplitDatasetOutput):
+def check_sample_leakage(splits: DatasetSplits):
     test_inds = set(splits.test)
 
     print("\nChecking for Sample Leakage")
@@ -59,7 +59,7 @@ def check_sample_leakage(splits: SplitDatasetOutput):
         assert len(test_inds) + len(train_inds) + len(val_inds) == 100
 
 
-def check_stratification(labels: NDArray[np.intp], splits: SplitDatasetOutput, tolerance: float):
+def check_stratification(labels: NDArray[np.intp], splits: DatasetSplits, tolerance: float):
     """Checks that all folds and optional test split have all labels and tolerable label frequencies"""
     unique_labels, class_counts = np.unique(labels, return_counts=True)
     class_freqs = class_counts / np.sum(class_counts)
@@ -82,7 +82,7 @@ def check_stratification(labels: NDArray[np.intp], splits: SplitDatasetOutput, t
         check_tolerance(labels[fold.train])
 
 
-def check_group_leakage(splits: SplitDatasetOutput, metadata: dict[str, NDArray], split_on: list[str]):
+def check_group_leakage(splits: DatasetSplits, metadata: dict[str, NDArray], split_on: list[str]):
     relevant_metadata = np.stack([metadata[key] for key in split_on], axis=1)
     _, groups = np.unique(relevant_metadata, axis=0, return_inverse=True)
     test_groups = set(groups[splits.test])
