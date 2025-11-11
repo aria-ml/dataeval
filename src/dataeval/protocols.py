@@ -30,6 +30,7 @@ from typing import (
     TypeAlias,
     TypedDict,
     TypeVar,
+    overload,
     runtime_checkable,
 )
 
@@ -96,6 +97,19 @@ class Array(Protocol):
 _T = TypeVar("_T")
 _T_co = TypeVar("_T_co", covariant=True)
 _T_cn = TypeVar("_T_cn", contravariant=True)
+
+
+@runtime_checkable
+class SequenceLike(Protocol[_T_co]):
+    """Protocol for sequence-like objects that can be indexed and iterated."""
+
+    @overload
+    def __getitem__(self, key: int, /) -> _T_co: ...
+    @overload
+    def __getitem__(self, key: Any, /) -> _T_co | SequenceLike[_T_co]: ...
+    def __iter__(self) -> Iterator[_T_co]: ...
+    def __len__(self) -> int: ...
+
 
 # ========== METADATA ==========
 

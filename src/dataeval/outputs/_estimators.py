@@ -4,11 +4,11 @@ __all__ = []
 
 from dataclasses import dataclass
 
-from dataeval.outputs._base import Output
+from dataeval.types import DictOutput
 
 
 @dataclass(frozen=True)
-class BEROutput(Output):
+class BEROutput(DictOutput):
     """
     Output class for :func:`.ber` estimator metric.
 
@@ -25,7 +25,7 @@ class BEROutput(Output):
 
 
 @dataclass(frozen=True)
-class DivergenceOutput(Output):
+class DivergenceOutput(DictOutput):
     """
     Output class for :func:`.divergence` estimator metric.
 
@@ -42,7 +42,7 @@ class DivergenceOutput(Output):
 
 
 @dataclass(frozen=True)
-class UAPOutput(Output):
+class UAPOutput(DictOutput):
     """
     Output class for :func:`.uap` estimator metric.
 
@@ -85,7 +85,7 @@ class NullModelMetrics:
 
 
 @dataclass(frozen=True)
-class NullModelMetricsOutput(Output):
+class NullModelMetricsOutput(DictOutput):
     """
     Output class for null-model metrics
 

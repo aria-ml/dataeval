@@ -8,11 +8,11 @@ from typing import Literal
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.outputs._base import Output
+from dataeval.types import DictOutput
 
 
 @dataclass(frozen=True)
-class OODScoreOutput(Output):
+class OODScoreOutput(DictOutput):
     """
     Output class for instance and feature scores from out-of-distribution detectors.
 
@@ -44,7 +44,7 @@ class OODScoreOutput(Output):
 
 
 @dataclass(frozen=True)
-class OODOutput(Output):
+class OODOutput(DictOutput):
     """
     Output class for predictions from out-of-distribution detectors.
 

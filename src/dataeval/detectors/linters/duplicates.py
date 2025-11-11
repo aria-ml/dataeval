@@ -13,9 +13,9 @@ from dataeval.data._images import Images
 from dataeval.metrics.stats import hashstats
 from dataeval.metrics.stats._base import combine_stats, get_dataset_step_from_idx
 from dataeval.outputs import DuplicatesOutput, HashStatsOutput
-from dataeval.outputs._base import set_metadata
 from dataeval.outputs._linters import DatasetDuplicateGroupMap, DuplicateGroup
 from dataeval.protocols import ArrayLike, Dataset
+from dataeval.types import set_metadata
 
 
 class Duplicates:

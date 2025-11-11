@@ -11,8 +11,8 @@ from dataeval.core._label_parity import label_parity as _label_parity
 from dataeval.core._parity import parity as _parity
 from dataeval.data import Metadata
 from dataeval.outputs import LabelParityOutput, ParityOutput
-from dataeval.outputs._base import set_metadata
 from dataeval.protocols import ArrayLike
+from dataeval.types import set_metadata
 from dataeval.utils._array import as_numpy
 
 

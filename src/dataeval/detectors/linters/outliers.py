@@ -21,11 +21,10 @@ from dataeval.outputs import (
     PixelStatsOutput,
     VisualStatsOutput,
 )
-from dataeval.outputs._base import set_metadata
 from dataeval.outputs._linters import IndexIssueMap
 from dataeval.outputs._stats import BASE_ATTRS
 from dataeval.protocols import ArrayLike, Dataset
-from dataeval.types import ArrayND
+from dataeval.types import ArrayND, set_metadata
 from dataeval.utils._array import flatten, to_numpy
 
 OutlierStatsOutput = DimensionStatsOutput | PixelStatsOutput | VisualStatsOutput

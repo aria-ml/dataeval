@@ -8,8 +8,8 @@ from typing import Generic, TypeAlias, TypeVar
 
 import pandas as pd
 
-from dataeval.outputs._base import Output
 from dataeval.outputs._stats import LabelStatsOutput
+from dataeval.types import DictOutput
 
 DuplicateGroup: TypeAlias = Sequence[int]
 DatasetDuplicateGroupMap: TypeAlias = Mapping[int, DuplicateGroup]
@@ -20,7 +20,7 @@ TIndexIssueMap = TypeVar("TIndexIssueMap", IndexIssueMap, Sequence[IndexIssueMap
 
 
 @dataclass(frozen=True)
-class DuplicatesOutput(Output, Generic[TIndexCollection]):
+class DuplicatesOutput(DictOutput, Generic[TIndexCollection]):
     """
     Output class for :class:`.Duplicates` lint detector.
 
@@ -116,7 +116,7 @@ def _create_pandas_dataframe(class_wise: Mapping[str, Mapping[str, int]]) -> Seq
 
 
 @dataclass(frozen=True)
-class OutliersOutput(Output, Generic[TIndexIssueMap]):
+class OutliersOutput(DictOutput, Generic[TIndexIssueMap]):
     """
     Output class for :class:`.Outliers` lint detector.
 

@@ -7,8 +7,8 @@ from typing import Any
 from dataeval.core import label_stats
 from dataeval.data._metadata import Metadata
 from dataeval.outputs import LabelStatsOutput
-from dataeval.outputs._base import set_metadata
 from dataeval.protocols import AnnotatedDataset
+from dataeval.types import set_metadata
 
 
 @set_metadata

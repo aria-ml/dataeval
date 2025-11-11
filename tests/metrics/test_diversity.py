@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from dataeval.data._metadata import Metadata
-from dataeval.outputs._base import ExecutionMetadata
+from dataeval.types import ExecutionMetadata
 
 try:
     from matplotlib.figure import Figure

@@ -10,8 +10,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.config import EPSILON
-from dataeval.outputs._base import set_metadata
 from dataeval.outputs._stats import BASE_ATTRS, BaseStatsOutput
+from dataeval.types import set_metadata
 
 TStatOutput = TypeVar("TStatOutput", bound=BaseStatsOutput, contravariant=True)
 ArraySlice = tuple[int, int]

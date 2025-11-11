@@ -10,8 +10,7 @@ import numpy as np
 import polars as pl
 from numpy.typing import NDArray
 
-from dataeval.outputs._base import Output
-from dataeval.types import SourceIndex
+from dataeval.types import DictOutput, SourceIndex
 from dataeval.utils._plot import channel_histogram_plot, histogram_plot
 
 if TYPE_CHECKING:
@@ -34,7 +33,7 @@ def matches(index: int | None, opt_range: OptionalRange) -> bool:
 
 
 @dataclass(frozen=True)
-class BaseStatsOutput(Output):
+class BaseStatsOutput(DictOutput):
     """
     Attributes
     ----------
@@ -294,7 +293,7 @@ class HashStatsOutput(BaseStatsOutput):
 
 
 @dataclass(frozen=True)
-class LabelStatsOutput(Output):
+class LabelStatsOutput(DictOutput):
     """
     Output class for :func:`.labelstats` stats metric.
 

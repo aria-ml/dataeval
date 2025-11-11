@@ -11,8 +11,8 @@ __all__ = []
 from sklearn.metrics import average_precision_score
 
 from dataeval.outputs import UAPOutput
-from dataeval.outputs._base import set_metadata
 from dataeval.protocols import ArrayLike
+from dataeval.types import set_metadata
 from dataeval.utils._array import as_numpy
 
 
