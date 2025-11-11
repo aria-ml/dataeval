@@ -17,6 +17,8 @@ __all__ = [
     "divergence_fnn",
     "divergence_mst",
     "feature_distance",
+    "factor_deviation",
+    "factor_predictors",
     "flags",
     "label_parity",
     "label_stats",
@@ -42,11 +44,7 @@ from dataeval.core._feature_distance import feature_distance
 from dataeval.core._hash import pchash, xxhash
 from dataeval.core._label_parity import label_parity
 from dataeval.core._label_stats import label_stats
+from dataeval.core._metadata_insights import factor_deviation, factor_predictors
 from dataeval.core._mst import compute_neighbors, minimum_spanning_tree
-from dataeval.core._nullmodel import (
-    nullmodel_accuracy,
-    nullmodel_fpr,
-    nullmodel_precision,
-    nullmodel_recall,
-)
+from dataeval.core._nullmodel import nullmodel_accuracy, nullmodel_fpr, nullmodel_precision, nullmodel_recall
 from dataeval.core._parity import parity
