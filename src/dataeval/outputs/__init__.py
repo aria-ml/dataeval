@@ -23,7 +23,6 @@ from ._stats import (
     PixelStatsOutput,
     VisualStatsOutput,
 )
-from ._utils import SplitDatasetOutput, TrainValSplit
 from ._workflows import SufficiencyOutput
 
 __all__ = [
@@ -53,9 +52,7 @@ __all__ = [
     "OutliersOutput",
     "ParityOutput",
     "PixelStatsOutput",
-    "SplitDatasetOutput",
     "SufficiencyOutput",
-    "TrainValSplit",
     "UAPOutput",
     "VisualStatsOutput",
 ]

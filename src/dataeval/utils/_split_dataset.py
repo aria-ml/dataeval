@@ -5,6 +5,7 @@ __all__ = []
 import logging
 import warnings
 from collections.abc import Iterator, Sequence
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 import numpy as np
@@ -14,11 +15,43 @@ from sklearn.utils.multiclass import type_of_target
 
 from dataeval.config import EPSILON
 from dataeval.data._metadata import Metadata
-from dataeval.outputs._utils import SplitDatasetOutput, TrainValSplit
 from dataeval.protocols import AnnotatedDataset
-from dataeval.types import set_metadata
 
 _logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class TrainValSplit:
+    """
+    Dataclass containing train and validation indices.
+
+    Attributes
+    ----------
+    train: NDArray[np.intp]
+        Indices for the training set
+    val: NDArray[np.intp]
+        Indices for the validation set
+    """
+
+    train: NDArray[np.intp]
+    val: NDArray[np.intp]
+
+
+@dataclass(frozen=True)
+class DatasetSplits:
+    """
+    Output class containing test indices and a list of TrainValSplits.
+
+    Attributes
+    ----------
+    test: NDArray[np.intp]
+        Indices for the test set
+    folds: Sequence[TrainValSplit]
+        List of train and validation split indices
+    """
+
+    test: NDArray[np.intp]
+    folds: Sequence[TrainValSplit]
 
 
 class KFoldSplitter(Protocol):
@@ -370,7 +403,6 @@ def single_split(
     return find_best_split(labels, split_candidates, stratified, split_frac)
 
 
-@set_metadata
 def split_dataset(
     dataset: AnnotatedDataset[Any] | Metadata,
     num_folds: int = 1,
@@ -378,7 +410,7 @@ def split_dataset(
     split_on: Sequence[str] | None = None,
     test_frac: float = 0.0,
     val_frac: float = 0.0,
-) -> SplitDatasetOutput:
+) -> DatasetSplits:
     """
     Dataset splitting function. Returns a dataclass containing a list of train and validation indices.
 
@@ -403,7 +435,7 @@ def split_dataset(
 
     Returns
     -------
-    split_defs : SplitDatasetOutput
+    split_defs : DatasetSplits
         Output class containing a list of indices of training
         and validation data for each fold and optional test indices
 
@@ -446,4 +478,4 @@ def split_dataset(
 
     folds: list[TrainValSplit] = [TrainValSplit(tvs.train[split.train], tvs.train[split.val]) for split in tv_splits]
 
-    return SplitDatasetOutput(tvs.val, folds)
+    return DatasetSplits(tvs.val, folds)
