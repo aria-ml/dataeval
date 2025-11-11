@@ -138,23 +138,25 @@ class TestHashStatsCalculator:
 
 
 class TestPerImagePerBox:
-    """Test per_image and per_box parameter combinations."""
+    """Test per_image and per_target parameter combinations."""
 
     def test_per_image_only_no_boxes(self):
         """Test per_image=True with no boxes provided."""
         images = [np.random.random((3, 10, 10))]
 
-        result = calculate(images, None, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=False)
+        result = calculate(
+            images, None, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=False
+        )
 
         # Should have 1 result (full image)
         assert len(result["stats"]["mean"]) == 1
         assert len(result["source_index"]) == 1
         assert result["source_index"][0].image == 0
-        assert result["source_index"][0].box is None
+        assert result["source_index"][0].target is None
         assert result["source_index"][0].channel is None
 
-    def test_per_image_and_per_box_with_boxes(self):
-        """Test per_image=True and per_box=True with boxes provided."""
+    def test_per_image_and_per_target_with_boxes(self):
+        """Test per_image=True and per_target=True with boxes provided."""
         images = [np.random.random((3, 100, 100))]
         boxes = [
             [
@@ -163,7 +165,9 @@ class TestPerImagePerBox:
             ]
         ]
 
-        result = calculate(images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=False)
+        result = calculate(
+            images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=False
+        )
 
         # Should have 3 results: full image + 2 boxes
         assert len(result["stats"]["mean"]) == 3
@@ -171,16 +175,16 @@ class TestPerImagePerBox:
 
         # First should be full image
         assert result["source_index"][0].image == 0
-        assert result["source_index"][0].box is None
+        assert result["source_index"][0].target is None
 
         # Next two should be boxes
         assert result["source_index"][1].image == 0
-        assert result["source_index"][1].box == 0
+        assert result["source_index"][1].target == 0
         assert result["source_index"][2].image == 0
-        assert result["source_index"][2].box == 1
+        assert result["source_index"][2].target == 1
 
-    def test_per_box_only_with_boxes(self):
-        """Test per_image=False and per_box=True with boxes provided."""
+    def test_per_target_only_with_boxes(self):
+        """Test per_image=False and per_target=True with boxes provided."""
         images = [np.random.random((3, 100, 100))]
         boxes = [
             [
@@ -189,7 +193,9 @@ class TestPerImagePerBox:
             ]
         ]
 
-        result = calculate(images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=False, per_box=True, per_channel=False)
+        result = calculate(
+            images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=False, per_target=True, per_channel=False
+        )
 
         # Should have 2 results: only boxes
         assert len(result["stats"]["mean"]) == 2
@@ -197,12 +203,12 @@ class TestPerImagePerBox:
 
         # Both should be boxes (no full image)
         assert result["source_index"][0].image == 0
-        assert result["source_index"][0].box == 0
+        assert result["source_index"][0].target == 0
         assert result["source_index"][1].image == 0
-        assert result["source_index"][1].box == 1
+        assert result["source_index"][1].target == 1
 
     def test_per_image_only_with_boxes_ignored(self):
-        """Test per_image=True and per_box=False with boxes provided (boxes ignored)."""
+        """Test per_image=True and per_target=False with boxes provided (boxes ignored)."""
         images = [np.random.random((3, 100, 100))]
         boxes = [
             [
@@ -211,7 +217,9 @@ class TestPerImagePerBox:
             ]
         ]
 
-        result = calculate(images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=False, per_channel=False)
+        result = calculate(
+            images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=False, per_channel=False
+        )
 
         # Should have 1 result: only full image (boxes ignored)
         assert len(result["stats"]["mean"]) == 1
@@ -219,14 +227,16 @@ class TestPerImagePerBox:
 
         # Should be full image
         assert result["source_index"][0].image == 0
-        assert result["source_index"][0].box is None
+        assert result["source_index"][0].target is None
 
-    def test_per_image_and_per_box_with_per_channel(self):
-        """Test per_image=True, per_box=True, and per_channel=True."""
+    def test_per_image_and_per_target_with_per_channel(self):
+        """Test per_image=True, per_target=True, and per_channel=True."""
         images = [np.random.random((3, 100, 100))]
         boxes = [[BoundingBox(0, 0, 50, 50, image_shape=(3, 100, 100))]]
 
-        result = calculate(images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=True)
+        result = calculate(
+            images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=True
+        )
 
         # Should have 6 results: (full image + 1 box) × 3 channels = 6
         assert len(result["stats"]["mean"]) == 6
@@ -235,32 +245,32 @@ class TestPerImagePerBox:
         # Check structure: full image channels first, then box channels
         # Full image - channel 0, 1, 2
         assert result["source_index"][0].image == 0
-        assert result["source_index"][0].box is None
+        assert result["source_index"][0].target is None
         assert result["source_index"][0].channel == 0
 
         assert result["source_index"][1].image == 0
-        assert result["source_index"][1].box is None
+        assert result["source_index"][1].target is None
         assert result["source_index"][1].channel == 1
 
         assert result["source_index"][2].image == 0
-        assert result["source_index"][2].box is None
+        assert result["source_index"][2].target is None
         assert result["source_index"][2].channel == 2
 
         # Box - channel 0, 1, 2
         assert result["source_index"][3].image == 0
-        assert result["source_index"][3].box == 0
+        assert result["source_index"][3].target == 0
         assert result["source_index"][3].channel == 0
 
         assert result["source_index"][4].image == 0
-        assert result["source_index"][4].box == 0
+        assert result["source_index"][4].target == 0
         assert result["source_index"][4].channel == 1
 
         assert result["source_index"][5].image == 0
-        assert result["source_index"][5].box == 0
+        assert result["source_index"][5].target == 0
         assert result["source_index"][5].channel == 2
 
-    def test_multiple_images_per_image_and_per_box(self):
-        """Test multiple images with per_image=True and per_box=True."""
+    def test_multiple_images_per_image_and_per_target(self):
+        """Test multiple images with per_image=True and per_target=True."""
         images = [np.random.random((3, 100, 100)), np.random.random((3, 100, 100))]
         boxes = [
             [BoundingBox(0, 0, 50, 50, image_shape=(3, 100, 100))],
@@ -270,7 +280,9 @@ class TestPerImagePerBox:
             ],
         ]
 
-        result = calculate(images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=False)
+        result = calculate(
+            images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=False
+        )
 
         # Should have 5 results: image0 (1 full + 1 box) + image1 (1 full + 2 boxes)
         assert len(result["stats"]["mean"]) == 5
@@ -278,33 +290,33 @@ class TestPerImagePerBox:
 
         # Image 0: full image
         assert result["source_index"][0].image == 0
-        assert result["source_index"][0].box is None
+        assert result["source_index"][0].target is None
 
         # Image 0: box 0
         assert result["source_index"][1].image == 0
-        assert result["source_index"][1].box == 0
+        assert result["source_index"][1].target == 0
 
         # Image 1: full image
         assert result["source_index"][2].image == 1
-        assert result["source_index"][2].box is None
+        assert result["source_index"][2].target is None
 
         # Image 1: box 0
         assert result["source_index"][3].image == 1
-        assert result["source_index"][3].box == 0
+        assert result["source_index"][3].target == 0
 
         # Image 1: box 1
         assert result["source_index"][4].image == 1
-        assert result["source_index"][4].box == 1
+        assert result["source_index"][4].target == 1
 
     def test_invalid_both_false_raises_error(self):
-        """Test that per_image=False and per_box=False raises ValueError."""
+        """Test that per_image=False and per_target=False raises ValueError."""
         images = [np.random.random((3, 10, 10))]
 
-        with pytest.raises(ValueError, match="At least one of 'per_image' or 'per_box' must be True"):
-            calculate(images, None, stats=ImageStats.PIXEL_MEAN, per_image=False, per_box=False, per_channel=False)
+        with pytest.raises(ValueError, match="At least one of 'per_image' or 'per_target' must be True"):
+            calculate(images, None, stats=ImageStats.PIXEL_MEAN, per_image=False, per_target=False, per_channel=False)
 
     def test_object_count_tracking(self):
-        """Test that object_count is correctly tracked with per_image and per_box."""
+        """Test that object_count is correctly tracked with per_image and per_target."""
         images = [np.random.random((3, 100, 100))]
         boxes = [
             [
@@ -313,7 +325,9 @@ class TestPerImagePerBox:
             ]
         ]
 
-        result = calculate(images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=False)
+        result = calculate(
+            images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=False
+        )
 
         # Object count should be 2 (number of boxes)
         assert result["object_count"][0] == 2
@@ -672,7 +686,7 @@ class TestImageClassificationDataset:
 
         dataset = get_mock_ic_dataset(images, labels)
 
-        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=False)
+        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=False)
 
         # Should process 3 images without boxes
         assert len(result["stats"]["mean"]) == 3
@@ -682,7 +696,7 @@ class TestImageClassificationDataset:
         # All should be full images (box=None)
         for i in range(3):
             assert result["source_index"][i].image == i
-            assert result["source_index"][i].box is None
+            assert result["source_index"][i].target is None
             assert result["source_index"][i].channel is None
 
     def test_ic_dataset_with_explicit_boxes_param(self, get_mock_ic_dataset):
@@ -701,7 +715,7 @@ class TestImageClassificationDataset:
         ]
 
         result = calculate(
-            dataset, boxes=boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=False
+            dataset, boxes=boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=False
         )
 
         # Should process boxes since they are explicitly provided
@@ -716,7 +730,7 @@ class TestImageClassificationDataset:
 
         dataset = get_mock_ic_dataset(images, labels)
 
-        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=True)
+        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=True)
 
         # Should have 6 results: 2 images × 3 channels
         assert len(result["stats"]["mean"]) == 6
@@ -724,15 +738,15 @@ class TestImageClassificationDataset:
 
         # Check channel ordering for first image
         assert result["source_index"][0].image == 0
-        assert result["source_index"][0].box is None
+        assert result["source_index"][0].target is None
         assert result["source_index"][0].channel == 0
 
         assert result["source_index"][1].image == 0
-        assert result["source_index"][1].box is None
+        assert result["source_index"][1].target is None
         assert result["source_index"][1].channel == 1
 
         assert result["source_index"][2].image == 0
-        assert result["source_index"][2].box is None
+        assert result["source_index"][2].target is None
         assert result["source_index"][2].channel == 2
 
     def test_ic_dataset_multiple_stats(self, get_mock_ic_dataset):
@@ -773,7 +787,7 @@ class TestObjectDetectionDataset:
 
         dataset = get_mock_od_dataset(images, labels, bboxes)
 
-        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=False)
+        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=False)
 
         # Should have: image0 (1 full + 2 boxes) + image1 (1 full + 1 box) = 5 results
         assert len(result["stats"]["mean"]) == 5
@@ -786,26 +800,26 @@ class TestObjectDetectionDataset:
 
         # Image 0: full image
         assert result["source_index"][0].image == 0
-        assert result["source_index"][0].box is None
+        assert result["source_index"][0].target is None
 
         # Image 0: box 0
         assert result["source_index"][1].image == 0
-        assert result["source_index"][1].box == 0
+        assert result["source_index"][1].target == 0
 
         # Image 0: box 1
         assert result["source_index"][2].image == 0
-        assert result["source_index"][2].box == 1
+        assert result["source_index"][2].target == 1
 
         # Image 1: full image
         assert result["source_index"][3].image == 1
-        assert result["source_index"][3].box is None
+        assert result["source_index"][3].target is None
 
         # Image 1: box 0
         assert result["source_index"][4].image == 1
-        assert result["source_index"][4].box == 0
+        assert result["source_index"][4].target == 0
 
-    def test_od_dataset_per_box_only(self, get_mock_od_dataset):
-        """Test ObjectDetectionDataset with per_image=False, per_box=True."""
+    def test_od_dataset_per_target_only(self, get_mock_od_dataset):
+        """Test ObjectDetectionDataset with per_image=False, per_target=True."""
         images = [np.random.random((3, 100, 100)) for _ in range(2)]
         labels = [[0], [1, 0]]
         bboxes = [
@@ -815,7 +829,7 @@ class TestObjectDetectionDataset:
 
         dataset = get_mock_od_dataset(images, labels, bboxes)
 
-        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=False, per_box=True, per_channel=False)
+        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=False, per_target=True, per_channel=False)
 
         # Should have only boxes: 1 + 2 = 3 results (no full images)
         assert len(result["stats"]["mean"]) == 3
@@ -823,16 +837,16 @@ class TestObjectDetectionDataset:
 
         # All should be boxes (no full images)
         assert result["source_index"][0].image == 0
-        assert result["source_index"][0].box == 0
+        assert result["source_index"][0].target == 0
 
         assert result["source_index"][1].image == 1
-        assert result["source_index"][1].box == 0
+        assert result["source_index"][1].target == 0
 
         assert result["source_index"][2].image == 1
-        assert result["source_index"][2].box == 1
+        assert result["source_index"][2].target == 1
 
     def test_od_dataset_per_image_only(self, get_mock_od_dataset):
-        """Test ObjectDetectionDataset with per_image=True, per_box=False."""
+        """Test ObjectDetectionDataset with per_image=True, per_target=False."""
         images = [np.random.random((3, 100, 100)) for _ in range(2)]
         labels = [[0, 1], [1]]
         bboxes = [
@@ -842,7 +856,7 @@ class TestObjectDetectionDataset:
 
         dataset = get_mock_od_dataset(images, labels, bboxes)
 
-        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=False, per_channel=False)
+        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=False, per_channel=False)
 
         # Should have only full images: 2 results (no boxes)
         assert len(result["stats"]["mean"]) == 2
@@ -850,10 +864,10 @@ class TestObjectDetectionDataset:
 
         # All should be full images
         assert result["source_index"][0].image == 0
-        assert result["source_index"][0].box is None
+        assert result["source_index"][0].target is None
 
         assert result["source_index"][1].image == 1
-        assert result["source_index"][1].box is None
+        assert result["source_index"][1].target is None
 
     def test_od_dataset_with_per_channel(self, get_mock_od_dataset):
         """Test ObjectDetectionDataset with per_channel=True."""
@@ -863,7 +877,7 @@ class TestObjectDetectionDataset:
 
         dataset = get_mock_od_dataset(images, labels, bboxes)
 
-        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=True)
+        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=True)
 
         # Should have 6 results: (1 full image + 1 box) × 3 channels
         assert len(result["stats"]["mean"]) == 6
@@ -871,20 +885,20 @@ class TestObjectDetectionDataset:
 
         # Full image - channels 0, 1, 2
         assert result["source_index"][0].image == 0
-        assert result["source_index"][0].box is None
+        assert result["source_index"][0].target is None
         assert result["source_index"][0].channel == 0
 
         assert result["source_index"][1].image == 0
-        assert result["source_index"][1].box is None
+        assert result["source_index"][1].target is None
         assert result["source_index"][1].channel == 1
 
         assert result["source_index"][2].image == 0
-        assert result["source_index"][2].box is None
+        assert result["source_index"][2].target is None
         assert result["source_index"][2].channel == 2
 
         # Box - channels 0, 1, 2
         assert result["source_index"][3].image == 0
-        assert result["source_index"][3].box == 0
+        assert result["source_index"][3].target == 0
         assert result["source_index"][3].channel == 0
 
     def test_od_dataset_with_dimension_stats(self, get_mock_od_dataset):
@@ -895,7 +909,7 @@ class TestObjectDetectionDataset:
 
         dataset = get_mock_od_dataset(images, labels, bboxes)
 
-        result = calculate(dataset, stats=ImageStats.DIMENSION, per_image=False, per_box=True, per_channel=False)
+        result = calculate(dataset, stats=ImageStats.DIMENSION, per_image=False, per_target=True, per_channel=False)
 
         # Should have 1 result (just the box)
         assert len(result["source_index"]) == 1
@@ -926,7 +940,12 @@ class TestObjectDetectionDataset:
         ]
 
         result = calculate(
-            dataset, boxes=boxes_override, stats=ImageStats.DIMENSION, per_image=False, per_box=True, per_channel=False
+            dataset,
+            boxes=boxes_override,
+            stats=ImageStats.DIMENSION,
+            per_image=False,
+            per_target=True,
+            per_channel=False,
         )
 
         # Should use override boxes
@@ -946,7 +965,7 @@ class TestObjectDetectionDataset:
 
         dataset = get_mock_od_dataset(images, labels, bboxes)
 
-        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_box=True, per_channel=False)
+        result = calculate(dataset, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=False)
 
         # Should have: image0 (1 full + 0 boxes) + image1 (1 full + 1 box) = 3 results
         assert len(result["stats"]["mean"]) == 3
@@ -968,7 +987,7 @@ class TestObjectDetectionDataset:
             dataset,
             stats=ImageStats.PIXEL | ImageStats.VISUAL | ImageStats.DIMENSION,
             per_image=True,
-            per_box=True,
+            per_target=True,
             per_channel=False,
         )
 

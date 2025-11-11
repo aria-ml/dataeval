@@ -32,7 +32,7 @@ class SizedIterator(Generic[T]):
 
 
 def unzip_dataset(
-    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]], per_box: bool
+    dataset: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]], per_target: bool
 ) -> tuple[Iterator[NDArray[Any]], Iterator[list[BoundingBox] | None] | None]:
     """
     Unzips a dataset into separate generators for images and targets.
@@ -43,7 +43,7 @@ def unzip_dataset(
     ----------
     dataset : Dataset
         The dataset to unzip, which may contain images and optional targets.
-    per_box : bool
+    per_target : bool
         If True, extract bounding box targets from the dataset.
 
     Returns
@@ -56,7 +56,7 @@ def unzip_dataset(
         for i in range(len(dataset)):
             d = dataset[i]
             image = np.asarray(d[0] if isinstance(d, tuple) else d)
-            if per_box and isinstance(d, tuple) and isinstance(d[1], ObjectDetectionTarget):
+            if per_target and isinstance(d, tuple) and isinstance(d[1], ObjectDetectionTarget):
                 try:
                     boxes = d[1].boxes if isinstance(d[1].boxes, Array) else as_numpy(d[1].boxes)
                     target = [BoundingBox(box[0], box[1], box[2], box[3], image_shape=image.shape) for box in boxes]
@@ -71,6 +71,6 @@ def unzip_dataset(
 
     # Extract images and targets separately
     images_iter = SizedIterator((pair[0] for pair in iter1), len(dataset))
-    targets_iter = (pair[1] for pair in iter2) if per_box else None
+    targets_iter = (pair[1] for pair in iter2) if per_target else None
 
     return images_iter, targets_iter

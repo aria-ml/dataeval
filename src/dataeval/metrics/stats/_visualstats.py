@@ -60,7 +60,7 @@ def visualstats(
         *unzip_dataset(dataset, per_box),
         stats=ImageStats.VISUAL,
         per_image=not per_box,
-        per_box=per_box,
+        per_target=per_box,
         per_channel=per_channel,
     )
     return convert_output(VisualStatsOutput, stats)
