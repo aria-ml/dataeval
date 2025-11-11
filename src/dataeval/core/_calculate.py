@@ -219,9 +219,9 @@ def _reconcile_stats(
 def _get_items(
     boxes: list[BoundingBox] | None,
     per_image: bool,
-    per_box: bool,
+    per_target: bool,
 ) -> list[tuple[int | None, BoundingBox | None]]:
-    """Determine what to process based on per_image and per_box flags."""
+    """Determine what to process based on per_image and per_target flags."""
     process_items: list[tuple[int | None, BoundingBox | None]] = []
 
     if boxes is None or len(boxes) == 0:
@@ -234,7 +234,7 @@ def _get_items(
             # Add full image processing
             process_items.append((None, None))
 
-        if per_box:
+        if per_target:
             # Add per-box processing
             process_items.extend((i_b, box) for i_b, box in enumerate(boxes))
 
@@ -247,7 +247,7 @@ def _calculate_datum(
     boxes: list[BoundingBox] | None,
     calculators: Iterable[tuple[type[Any], Flag]],
     per_image: bool,
-    per_box: bool,
+    per_target: bool,
     per_channel: bool,
 ) -> CalculatorOutput:
     results: list[CalculatorResult] = []
@@ -258,8 +258,8 @@ def _calculate_datum(
     # Determine the number of channels from the datum shape
     num_channels = datum.shape[-3] if len(datum.shape) >= 3 else 1
 
-    # Determine what to process based on per_image and per_box flags
-    items = _get_items(boxes, per_image, per_box)
+    # Determine what to process based on per_image and per_target flags
+    items = _get_items(boxes, per_image, per_target)
 
     # Process each item (full image and/or boxes)
     for i_b, box in items:
@@ -291,10 +291,10 @@ def _unpack(
     args: tuple[int, NDArray[Any], list[BoundingBox] | None],
     calculators: Iterable[tuple[type[Any], Flag]],
     per_image: bool,
-    per_box: bool,
+    per_target: bool,
     per_channel: bool,
 ) -> CalculatorOutput:
-    return _calculate_datum(*args, calculators, per_image, per_box, per_channel)
+    return _calculate_datum(*args, calculators, per_image, per_target, per_channel)
 
 
 def _enumerate(
@@ -322,7 +322,7 @@ def _sort(
         range(len(source_indices)),
         key=lambda i: (
             source_indices[i].image,
-            -1 if source_indices[i].box is None else source_indices[i].box,
+            -1 if source_indices[i].target is None else source_indices[i].target,
             -1 if source_indices[i].channel is None else source_indices[i].channel,
         ),
     )
@@ -365,7 +365,7 @@ def calculate(
     stats: Flag = ImageStats.ALL,
     *,
     per_image: bool = True,
-    per_box: bool = True,
+    per_target: bool = True,
     per_channel: bool = False,
     progress_callback: Callable[[int, int | None], None] | None = None,
 ) -> CalculationResult:
@@ -384,10 +384,10 @@ def calculate(
     per_image : bool, default True
         If True, compute statistics for entire images. When boxes are provided
         and per_image=True, statistics are computed for both the full image and
-        each box (if per_box=True).
-    per_box : bool, default True
+        each box (if per_target=True).
+    per_target : bool, default True
         If True and boxes are provided, compute statistics for each bounding box.
-        Has no effect when boxes is None. At least one of per_image or per_box
+        Has no effect when boxes is None. At least one of per_image or per_target
         must be True.
     per_channel : bool, default False
         If True, compute per-channel statistics. If False, statistics are
@@ -426,15 +426,15 @@ def calculate(
 
     Compute statistics only for bounding boxes (not full images):
 
-    >>> stats = calculate(images, boxes, per_image=False, per_box=True)
+    >>> stats = calculate(images, boxes, per_image=False, per_target=True)
 
     Compute statistics for full images only (ignore boxes):
 
-    >>> stats = calculate(images, boxes, per_image=True, per_box=False)
+    >>> stats = calculate(images, boxes, per_image=True, per_target=False)
 
     Compute statistics for both full images and boxes with per-channel breakdown:
 
-    >>> stats = calculate(images, boxes, per_image=True, per_box=True, per_channel=True)
+    >>> stats = calculate(images, boxes, per_image=True, per_target=True, per_channel=True)
     """
     source_indices: list[SourceIndex] = []
     aggregated_stats: dict[str, list[Any]] = {}
@@ -452,12 +452,12 @@ def calculate(
             isObjectDetectionDataset = isinstance(datum[1], ObjectDetectionTarget)
             break
 
-    # `per_box` is True only if boxes are provided or data is an ObjectDetectionDataset
-    per_box = per_box and (isObjectDetectionDataset or boxes is not None)
+    # `per_target` is True only if boxes are provided or data is an ObjectDetectionDataset
+    per_target = per_target and (isObjectDetectionDataset or boxes is not None)
 
     # Validate parameters
-    if not per_image and not per_box:
-        raise ValueError("At least one of 'per_image' or 'per_box' must be True")
+    if not per_image and not per_target:
+        raise ValueError("At least one of 'per_image' or 'per_target' must be True")
 
     # Resolve dependencies
     stats = resolve_dependencies(stats)
@@ -470,9 +470,9 @@ def calculate(
     images, boxes = (
         (data, boxes)
         if not isinstance(data, AnnotatedDataset)
-        else (unzip_dataset(data, per_box=False)[0], boxes)
+        else (unzip_dataset(data, per_target=False)[0], boxes)
         if boxes is not None
-        else unzip_dataset(data, per_box=per_box)
+        else unzip_dataset(data, per_target=per_target)
     )
 
     # Build description for progress bar
@@ -486,7 +486,7 @@ def calculate(
                     _unpack,
                     calculators=calculators,
                     per_image=per_image,
-                    per_box=per_box,
+                    per_target=per_target,
                     per_channel=per_channel,
                 ),
                 _enumerate(images, boxes),

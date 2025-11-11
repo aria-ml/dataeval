@@ -57,6 +57,6 @@ def dimensionstats(
         *unzip_dataset(dataset, per_box),
         stats=ImageStats.DIMENSION,
         per_image=not per_box,
-        per_box=per_box,
+        per_target=per_box,
     )
     return convert_output(DimensionStatsOutput, stats)

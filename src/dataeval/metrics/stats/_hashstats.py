@@ -55,6 +55,6 @@ def hashstats(
         *unzip_dataset(dataset, per_box),
         stats=ImageStats.HASH,
         per_image=not per_box,
-        per_box=per_box,
+        per_target=per_box,
     )
     return convert_output(HashStatsOutput, stats)
