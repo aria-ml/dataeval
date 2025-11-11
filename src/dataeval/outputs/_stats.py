@@ -4,13 +4,14 @@ __all__ = []
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 import numpy as np
 import polars as pl
 from numpy.typing import NDArray
 
 from dataeval.outputs._base import Output
+from dataeval.types import SourceIndex
 from dataeval.utils._plot import channel_histogram_plot, histogram_plot
 
 if TYPE_CHECKING:
@@ -24,25 +25,6 @@ INVALID_BOX_COUNT = "invalid_box_count"
 IMAGE_COUNT = "image_count"
 
 BASE_ATTRS = [SOURCE_INDEX, OBJECT_COUNT, INVALID_BOX_COUNT, IMAGE_COUNT]
-
-
-class SourceIndex(NamedTuple):
-    """
-    The indices of the source image, box and channel.
-
-    Attributes
-    ----------
-    image: int
-        Index of the source image
-    box : int | None
-        Index of the box of the source image (if applicable)
-    channel : int | None
-        Index of the channel of the source image (if applicable)
-    """
-
-    image: int
-    box: int | None
-    channel: int | None
 
 
 def matches(index: int | None, opt_range: OptionalRange) -> bool:

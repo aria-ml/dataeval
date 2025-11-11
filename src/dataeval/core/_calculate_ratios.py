@@ -87,7 +87,7 @@ def _build_image_lookup(source_indices: Sequence[SourceIndex]) -> dict[tuple[int
 
     for idx, source_idx in enumerate(source_indices):
         # Only process image-level entries (box=None)
-        if source_idx.box is None:
+        if source_idx.target is None:
             key = (source_idx.image, source_idx.channel)
             lookup[key] = idx
 
@@ -170,20 +170,20 @@ def _validate_separate_inputs(
 
     # Validate that stats_output has only image entries
     img_source_indices: Sequence[SourceIndex] = stats_output[SOURCE_INDEX_KEY]
-    if any(si.box is not None for si in img_source_indices):
+    if any(si.target is not None for si in img_source_indices):
         raise ValueError(
             "When using box_stats_output parameter, stats_output should contain only "
-            "image-level statistics (per_image=True, per_box=False). "
-            f"Found {sum(1 for si in img_source_indices if si.box is not None)} box entries."
+            "image-level statistics (per_image=True, per_target=False). "
+            f"Found {sum(1 for si in img_source_indices if si.target is not None)} box entries."
         )
 
     # Validate that box_stats_output has only box entries
     box_source_indices: Sequence[SourceIndex] = box_stats_output[SOURCE_INDEX_KEY]
-    if any(si.box is None for si in box_source_indices):
+    if any(si.target is None for si in box_source_indices):
         raise ValueError(
             "When using box_stats_output parameter, it should contain only "
-            "box-level statistics (per_image=False, per_box=True). "
-            f"Found {sum(1 for si in box_source_indices if si.box is None)} image entries."
+            "box-level statistics (per_image=False, per_target=True). "
+            f"Found {sum(1 for si in box_source_indices if si.target is None)} image entries."
         )
 
     # Validate channel compatibility
@@ -213,8 +213,8 @@ def _validate_separate_inputs(
 
 def _validate_unified_input(source_indices: Sequence[SourceIndex]) -> None:
     """Validate that unified stats output contains both image and box entries."""
-    has_image_entries = any(si.box is None for si in source_indices)
-    has_box_entries = any(si.box is not None for si in source_indices)
+    has_image_entries = any(si.target is None for si in source_indices)
+    has_target_entries = any(si.target is not None for si in source_indices)
 
     if not has_image_entries:
         raise ValueError(
@@ -222,10 +222,10 @@ def _validate_unified_input(source_indices: Sequence[SourceIndex]) -> None:
             "Ensure per_image=True when calling calculate(), or provide box_stats_output parameter."
         )
 
-    if not has_box_entries:
+    if not has_target_entries:
         raise ValueError(
             "stats_output must contain box-level statistics (entries with box!=None). "
-            "Ensure per_box=True and boxes are provided when calling calculate(), "
+            "Ensure per_target=True and boxes are provided when calling calculate(), "
             "or provide box_stats_output parameter."
         )
 
@@ -233,7 +233,7 @@ def _validate_unified_input(source_indices: Sequence[SourceIndex]) -> None:
 def calculate_ratios(
     stats_output: CalculationResult,
     *,
-    box_stats_output: CalculationResult | None = None,
+    target_stats_output: CalculationResult | None = None,
     override_map: OverrideFunctionMap | None = None,
 ) -> CalculationResult:
     """
@@ -242,7 +242,7 @@ def calculate_ratios(
     This function supports two usage patterns:
 
     1. **Unified input**: Pass a single stats_output containing both
-    image and box statistics (from calculate() with per_image=True, per_box=True).
+    image and box statistics (from calculate() with per_image=True, per_target=True).
 
     2. **Separate inputs**: Pass image stats as stats_output and box
     stats as box_stats_output (useful when migrating from boxratiostats()).
@@ -251,10 +251,10 @@ def calculate_ratios(
     ----------
     stats_output : CalculationResult
         Either:
-        - Output from calculate() with both per_image=True and per_box=True (unified), OR
-        - Output from calculate() with per_image=True, per_box=False (if box_stats_output provided)
-    box_stats_output : CalculationResult | None, optional
-        Output from calculate() with per_image=False and per_box=True.
+        - Output from calculate() with both per_image=True and per_target=True (unified), OR
+        - Output from calculate() with per_image=True, per_target=False (if box_stats_output provided)
+    target_stats_output : CalculationResult | None, optional
+        Output from calculate() with per_image=False and per_target=True.
         When provided, stats_output is treated as image-only stats.
         Default is None (use unified input from stats_output).
     override_map : OverrideFunctionMap | None, optional
@@ -295,8 +295,8 @@ def calculate_ratios(
     >>> from dataeval.core import calculate, calculate_ratios
     >>> from dataeval.core.flags import ImageStats
     >>>
-    >>> # Single call gets both image and box stats
-    >>> stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_box=True)
+    >>> # Single call gets both image and target stats
+    >>> stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=True)
     >>> ratios = calculate_ratios(stats)
     >>> width_ratios = ratios["stats"]["width"]
     >>> print(["%.2f" % ratio for ratio in width_ratios])  # Box widths as fraction of image width
@@ -305,9 +305,9 @@ def calculate_ratios(
     **Pattern 2: Separate inputs (backward compatibility)**
 
     >>> # Separate calls for image and box stats
-    >>> img_stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_box=False)
-    >>> box_stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=False, per_box=True)
-    >>> ratios = calculate_ratios(img_stats, box_stats_output=box_stats)
+    >>> img_stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=False)
+    >>> tgt_stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=False, per_target=True)
+    >>> ratios = calculate_ratios(img_stats, target_stats_output=tgt_stats)
 
     **Custom override map:**
 
@@ -318,7 +318,7 @@ def calculate_ratios(
 
     **Per-channel statistics:**
 
-    >>> stats = calculate(images, boxes, stats=ImageStats.PIXEL, per_image=True, per_box=True, per_channel=True)
+    >>> stats = calculate(images, boxes, stats=ImageStats.PIXEL, per_image=True, per_target=True, per_channel=True)
     >>> ratios = calculate_ratios(stats)
     >>> # Ratios are calculated per-channel automatically
     """  # noqa: E501
@@ -327,16 +327,16 @@ def calculate_ratios(
         raise KeyError(f"stats_output must contain '{SOURCE_INDEX_KEY}' key from calculate() output")
 
     # Determine which pattern we're using and validate
-    if box_stats_output is not None:
+    if target_stats_output is not None:
         # Pattern 2: Separate image and box stats
-        if SOURCE_INDEX_KEY not in box_stats_output:
-            raise KeyError(f"box_stats_output must contain '{SOURCE_INDEX_KEY}' key from calculate() output")
+        if SOURCE_INDEX_KEY not in target_stats_output:
+            raise KeyError(f"target_stats_output must contain '{SOURCE_INDEX_KEY}' key from calculate() output")
 
-        img_source_indices, box_source_indices = _validate_separate_inputs(stats_output, box_stats_output)
+        img_source_indices, box_source_indices = _validate_separate_inputs(stats_output, target_stats_output)
         source_indices_for_lookup = img_source_indices
         source_indices_for_boxes = box_source_indices
         img_calc_result = stats_output
-        box_calc_result = box_stats_output
+        box_calc_result = target_stats_output
     else:
         # Pattern 1: Unified input
         source_indices: Sequence[SourceIndex] = stats_output[SOURCE_INDEX_KEY]
@@ -363,7 +363,7 @@ def calculate_ratios(
 
     for box_idx, source_idx in enumerate(source_indices_for_boxes):
         # Only process box entries
-        if source_idx.box is None:
+        if source_idx.target is None:
             continue
 
         # Find corresponding image entry

@@ -305,3 +305,77 @@ def doctest_sampledataset(doctest_namespace: dict[str, Any]) -> None:
             return self._size
 
     doctest_namespace["SampleDataset"] = SampleDataset
+
+
+@pytest.fixture(autouse=True, scope="session")
+def doctest_metadata_object(doctest_namespace: dict[str, Any]) -> None:
+    """Create metadata object and od_dataset for Metadata doctests."""
+    # Create a simple OD dataset with metadata for testing
+    # 3 images with varying numbers of detections
+    images = [
+        np.ones((3, 64, 64), dtype=np.uint8) * 100,  # Image 0
+        np.ones((3, 64, 64), dtype=np.uint8) * 150,  # Image 1
+        np.ones((3, 64, 64), dtype=np.uint8) * 200,  # Image 2
+    ]
+
+    # Labels for each image (per detection)
+    labels = [
+        [0, 1],  # Image 0: 2 detections
+        [1, 2, 0],  # Image 1: 3 detections
+        [],  # Image 2: no detections
+    ]
+
+    # Bounding boxes for each detection
+    bboxes = [
+        [[10, 10, 20, 20], [30, 30, 40, 40]],  # Image 0
+        [[5, 5, 15, 15], [25, 25, 35, 35], [45, 45, 55, 55]],  # Image 1
+        [],  # Image 2
+    ]
+
+    # Image-level metadata (varies per image)
+    image_metadata = [
+        {"temp": 72.5, "time": "morning", "loc": "urban"},
+        {"temp": 65.3, "time": "afternoon", "loc": "rural"},
+        {"temp": 68.1, "time": "evening", "loc": "suburban"},
+    ]
+
+    classes = ["car", "person", "bike"]
+
+    # Create mock OD dataset
+    od_dataset_mm = MagicMock()
+    od_dataset_mm._labels = labels
+    od_dataset_mm._bboxes = bboxes
+    od_dataset_mm._images = images
+    od_dataset_mm._classes = classes
+    od_dataset_mm._metadata = image_metadata
+
+    index2label = dict(enumerate(classes))
+    od_dataset_mm.__len__.return_value = len(images)
+    od_dataset_mm.metadata = {"index2label": index2label}
+
+    def get_od_target(idx: int) -> MagicMock:
+        target_mm = MagicMock()
+        target_labels = labels[idx]
+        target_bboxes = bboxes[idx]
+
+        # Create one-hot scores
+        scores = [[0.0] * len(classes) for _ in target_labels]
+        for i, label in enumerate(target_labels):
+            scores[i][label] = 1.0
+
+        target_mm.labels = np.array(target_labels, dtype=np.intp)
+        target_mm.boxes = np.array(target_bboxes, dtype=np.float32)
+        target_mm.scores = np.array(scores, dtype=np.float32)
+        return target_mm
+
+    def getitem_side_effect(idx: int) -> tuple[Any, MagicMock, dict[str, Any]]:
+        return (images[idx], get_od_target(idx), image_metadata[idx])
+
+    od_dataset_mm.__getitem__.side_effect = getitem_side_effect
+
+    # Create Metadata object
+    metadata_obj = Metadata(od_dataset_mm)
+
+    # Add to doctest namespace
+    doctest_namespace["od_dataset"] = od_dataset_mm
+    doctest_namespace["metadata"] = metadata_obj
