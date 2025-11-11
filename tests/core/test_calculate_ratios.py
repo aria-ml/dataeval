@@ -30,7 +30,7 @@ class TestCalculateRatios:
             boxes,
             stats=ImageStats.DIMENSION,
             per_image=True,
-            per_box=True,
+            per_target=True,
             per_channel=False,
         )
 
@@ -38,7 +38,7 @@ class TestCalculateRatios:
         ratios = calculate_ratios(stats)
 
         # Verify we only have box entries (no image entries)
-        assert all(si.box is not None for si in ratios[SOURCE_INDEX])
+        assert all(si.target is not None for si in ratios[SOURCE_INDEX])
 
         # Verify we have 4 box entries (2 boxes per image, 2 images)
         assert len(ratios[SOURCE_INDEX]) == 4
@@ -67,7 +67,7 @@ class TestCalculateRatios:
             boxes,
             stats=ImageStats.PIXEL,
             per_image=True,
-            per_box=True,
+            per_target=True,
             per_channel=False,
         )
 
@@ -95,7 +95,7 @@ class TestCalculateRatios:
             boxes,
             stats=ImageStats.PIXEL,
             per_image=True,
-            per_box=True,
+            per_target=True,
             per_channel=True,
         )
 
@@ -109,8 +109,8 @@ class TestCalculateRatios:
         assert channels_seen == {0, 1, 2}
 
         # Verify each box has entries for all 3 channels
-        box_0_channels = [si.channel for si in ratios[SOURCE_INDEX] if si.box == 0]
-        box_1_channels = [si.channel for si in ratios[SOURCE_INDEX] if si.box == 1]
+        box_0_channels = [si.channel for si in ratios[SOURCE_INDEX] if si.target == 0]
+        box_1_channels = [si.channel for si in ratios[SOURCE_INDEX] if si.target == 1]
         assert set(box_0_channels) == {0, 1, 2}
         assert set(box_1_channels) == {0, 1, 2}
 
@@ -128,7 +128,7 @@ class TestCalculateRatios:
             boxes,
             stats=ImageStats.VISUAL,
             per_image=True,
-            per_box=True,
+            per_target=True,
             per_channel=False,
         )
 
@@ -154,7 +154,7 @@ class TestCalculateRatios:
             boxes,
             stats=ImageStats.DIMENSION,
             per_image=True,
-            per_box=True,
+            per_target=True,
             per_channel=False,
         )
 
@@ -182,7 +182,7 @@ class TestCalculateRatios:
             boxes,
             stats=ImageStats.DIMENSION,
             per_image=True,
-            per_box=True,
+            per_target=True,
             per_channel=False,
         )
 
@@ -208,7 +208,7 @@ class TestCalculateRatios:
             boxes,
             stats=ImageStats.PIXEL,
             per_image=True,
-            per_box=True,
+            per_target=True,
             per_channel=False,
         )
 
@@ -236,14 +236,14 @@ class TestCalculateRatios:
             boxes,
             stats=ImageStats.DIMENSION,
             per_image=False,
-            per_box=True,
+            per_target=True,
             per_channel=False,
         )
 
         with pytest.raises(ValueError, match="must contain image-level statistics"):
             calculate_ratios(stats)
 
-    def test_missing_box_stats_raises_error(self):
+    def test_missing_tgt_stats_raises_error(self):
         """Test that error is raised if no box-level stats present."""
         images = [np.random.random((3, 50, 50))]
 
@@ -253,7 +253,7 @@ class TestCalculateRatios:
             None,
             stats=ImageStats.DIMENSION,
             per_image=True,
-            per_box=False,
+            per_target=False,
             per_channel=False,
         )
 
@@ -286,7 +286,7 @@ class TestCalculateRatios:
             boxes,
             stats=ImageStats.DIMENSION,
             per_image=True,
-            per_box=True,
+            per_target=True,
             per_channel=False,
         )
 
@@ -321,7 +321,7 @@ class TestCalculateRatios:
             boxes,
             stats=ImageStats.DIMENSION,
             per_image=True,
-            per_box=True,
+            per_target=True,
             per_channel=False,
         )
 
@@ -335,7 +335,7 @@ class TestCalculateRatios:
         assert image_indices == [0, 1, 1, 2, 2, 2]
 
         # Verify box indices are correct
-        box_indices = [si.box for si in ratios[SOURCE_INDEX]]
+        box_indices = [si.target for si in ratios[SOURCE_INDEX]]
         assert box_indices == [0, 0, 1, 0, 1, 2]
 
     def test_divide_by_zero_handling(self):
@@ -353,7 +353,7 @@ class TestCalculateRatios:
             boxes,
             stats=ImageStats.PIXEL,
             per_image=True,
-            per_box=True,
+            per_target=True,
             per_channel=False,
         )
 
@@ -380,7 +380,7 @@ class TestCalculateRatios:
             boxes,
             stats=ImageStats.DIMENSION,
             per_image=True,
-            per_box=True,
+            per_target=True,
             per_channel=False,
         )
 
@@ -390,8 +390,8 @@ class TestCalculateRatios:
         for si in ratios[SOURCE_INDEX]:
             assert isinstance(si, SourceIndex)
             assert isinstance(si.image, int)
-            assert isinstance(si.box, int)
-            assert si.box is not None  # All entries should be boxes
+            assert isinstance(si.target, int)
+            assert si.target is not None  # All entries should be boxes
             assert si.channel is None or isinstance(si.channel, int)
 
     def test_hash_stats_ratios(self):
@@ -404,7 +404,7 @@ class TestCalculateRatios:
             boxes,
             stats=ImageStats.HASH,
             per_image=True,
-            per_box=True,
+            per_target=True,
             per_channel=False,
         )
 
@@ -424,7 +424,7 @@ class TestCalculateRatios:
             boxes,
             stats=ImageStats.ALL,
             per_image=True,
-            per_box=True,
+            per_target=True,
             per_channel=False,
         )
 
@@ -446,7 +446,7 @@ class TestCalculateRatios:
             boxes,
             stats=ImageStats.DIMENSION,
             per_image=True,
-            per_box=True,
+            per_target=True,
             per_channel=False,
         )
 
@@ -477,19 +477,19 @@ class TestCalculateRatiosSeparateInputs:
             boxes,
             stats=ImageStats.DIMENSION,
             per_image=True,
-            per_box=False,
+            per_target=False,
         )
 
-        box_stats = calculate(
+        tgt_stats = calculate(
             images,
             boxes,
             stats=ImageStats.DIMENSION,
             per_image=False,
-            per_box=True,
+            per_target=True,
         )
 
         # Calculate ratios using separate inputs
-        ratios = calculate_ratios(img_stats, box_stats_output=box_stats)
+        ratios = calculate_ratios(img_stats, target_stats_output=tgt_stats)
 
         # Should have 1 box entry
         assert len(ratios[SOURCE_INDEX]) == 1
@@ -508,10 +508,10 @@ class TestCalculateRatiosSeparateInputs:
             [[20, 20, 80, 80], [30, 30, 90, 90]],  # 2 boxes in image 1
         ]
 
-        img_stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_box=False)
-        box_stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=False, per_box=True)
+        img_stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=False)
+        tgt_stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=False, per_target=True)
 
-        ratios = calculate_ratios(img_stats, box_stats_output=box_stats)
+        ratios = calculate_ratios(img_stats, target_stats_output=tgt_stats)
 
         # Should have 3 box entries total
         assert len(ratios[SOURCE_INDEX]) == 3
@@ -521,10 +521,10 @@ class TestCalculateRatiosSeparateInputs:
         images = [np.random.random((3, 50, 50))]
         boxes = [[[10, 10, 30, 30]]]
 
-        img_stats = calculate(images, boxes, stats=ImageStats.PIXEL, per_image=True, per_box=False, per_channel=True)
-        box_stats = calculate(images, boxes, stats=ImageStats.PIXEL, per_image=False, per_box=True, per_channel=True)
+        img_stats = calculate(images, boxes, stats=ImageStats.PIXEL, per_image=True, per_target=False, per_channel=True)
+        tgt_stats = calculate(images, boxes, stats=ImageStats.PIXEL, per_image=False, per_target=True, per_channel=True)
 
-        ratios = calculate_ratios(img_stats, box_stats_output=box_stats)
+        ratios = calculate_ratios(img_stats, target_stats_output=tgt_stats)
 
         # Should have 3 entries (1 box * 3 channels)
         assert len(ratios[SOURCE_INDEX]) == 3
@@ -535,22 +535,26 @@ class TestCalculateRatiosSeparateInputs:
         images2 = [np.random.random((3, 50, 50)), np.random.random((3, 50, 50))]
         boxes = [[[10, 10, 30, 30]]]
 
-        img_stats = calculate(images1, None, stats=ImageStats.DIMENSION, per_image=True, per_box=False)
-        box_stats = calculate(images2, [boxes[0], boxes[0]], stats=ImageStats.DIMENSION, per_image=False, per_box=True)
+        img_stats = calculate(images1, None, stats=ImageStats.DIMENSION, per_image=True, per_target=False)
+        tgt_stats = calculate(
+            images2, [boxes[0], boxes[0]], stats=ImageStats.DIMENSION, per_image=False, per_target=True
+        )
 
         with pytest.raises(ValueError, match="Image count mismatch"):
-            calculate_ratios(img_stats, box_stats_output=box_stats)
+            calculate_ratios(img_stats, target_stats_output=tgt_stats)
 
     def test_separate_inputs_channel_mismatch(self):
         """Test that error is raised when per_channel settings don't match."""
         images = [np.random.random((3, 50, 50))]
         boxes = [[[10, 10, 30, 30]]]
 
-        img_stats = calculate(images, boxes, stats=ImageStats.PIXEL, per_image=True, per_box=False, per_channel=True)
-        box_stats = calculate(images, boxes, stats=ImageStats.PIXEL, per_image=False, per_box=True, per_channel=False)
+        img_stats = calculate(images, boxes, stats=ImageStats.PIXEL, per_image=True, per_target=False, per_channel=True)
+        tgt_stats = calculate(
+            images, boxes, stats=ImageStats.PIXEL, per_image=False, per_target=True, per_channel=False
+        )
 
         with pytest.raises(ValueError, match="Channel mismatch"):
-            calculate_ratios(img_stats, box_stats_output=box_stats)
+            calculate_ratios(img_stats, target_stats_output=tgt_stats)
 
     def test_separate_inputs_with_box_in_img_stats(self):
         """Test error when stats_output contains box entries."""
@@ -558,23 +562,23 @@ class TestCalculateRatiosSeparateInputs:
         boxes = [[[10, 10, 30, 30]]]
 
         # This has both image and box stats
-        mixed_stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_box=True)
-        box_stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=False, per_box=True)
+        mixed_stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=True)
+        tgt_stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=False, per_target=True)
 
         with pytest.raises(ValueError, match="should contain only image-level statistics"):
-            calculate_ratios(mixed_stats, box_stats_output=box_stats)
+            calculate_ratios(mixed_stats, target_stats_output=tgt_stats)
 
-    def test_separate_inputs_with_img_in_box_stats(self):
-        """Test error when box_stats_output contains image entries."""
+    def test_separate_inputs_with_img_in_tgt_stats(self):
+        """Test error when tgt_stats_output contains image entries."""
         images = [np.random.random((3, 50, 50))]
         boxes = [[[10, 10, 30, 30]]]
 
-        img_stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_box=False)
+        img_stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=False)
         # This has both image and box stats
-        mixed_stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_box=True)
+        mixed_stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=True)
 
         with pytest.raises(ValueError, match="should contain only box-level statistics"):
-            calculate_ratios(img_stats, box_stats_output=mixed_stats)
+            calculate_ratios(img_stats, target_stats_output=mixed_stats)
 
 
 class TestCalculateRatiosEdgeCases:
@@ -590,7 +594,7 @@ class TestCalculateRatiosEdgeCases:
             boxes,
             stats=ImageStats.DIMENSION,
             per_image=True,
-            per_box=True,
+            per_target=True,
             per_channel=False,
         )
 
@@ -610,7 +614,7 @@ class TestCalculateRatiosEdgeCases:
             boxes,
             stats=ImageStats.DIMENSION,
             per_image=True,
-            per_box=True,
+            per_target=True,
             per_channel=False,
         )
 
@@ -630,7 +634,7 @@ class TestCalculateRatiosEdgeCases:
             boxes,
             stats=ImageStats.DIMENSION,
             per_image=True,
-            per_box=True,
+            per_target=True,
             per_channel=False,
         )
 

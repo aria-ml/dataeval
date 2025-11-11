@@ -146,9 +146,9 @@ def boxratiostats(
         raise TypeError("Must provide stats outputs of the same type.")
     if boxstats.image_count != imgstats.image_count:
         raise ValueError("Stats image count length mismatch. Check if the correct box and image stats were provided.")
-    if any(src_idx.box is None for src_idx in boxstats.source_index):
+    if any(src_idx.target is None for src_idx in boxstats.source_index):
         raise ValueError("Input for boxstats must contain box information.")
-    if any(src_idx.box is not None for src_idx in imgstats.source_index):
+    if any(src_idx.target is not None for src_idx in imgstats.source_index):
         raise ValueError("Input for imgstats must not contain box information.")
     boxstats_has_channels = any(si.channel is None for si in boxstats.source_index)
     imgstats_has_channels = any(si.channel is None for si in imgstats.source_index)
