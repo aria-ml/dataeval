@@ -85,7 +85,7 @@ class Metadata:
     ) -> None:
         self._class_labels: NDArray[np.intp]
         self._class_names: list[str]
-        self._image_indices: NDArray[np.intp]
+        self._item_indices: NDArray[np.intp]
         self._factors: dict[str, FactorInfo | None]
         self._dropped_factors: dict[str, list[str]]
         self._dataframe: pl.DataFrame
@@ -251,7 +251,7 @@ class Metadata:
         Returns
         -------
         pl.DataFrame
-            DataFrame with columns for image indices, class labels, scores,
+            DataFrame with columns for item indices, class labels, scores,
             bounding boxes (when applicable), and all processed metadata factors.
 
         Notes
@@ -412,32 +412,32 @@ class Metadata:
         return self._index2label
 
     @property
-    def image_indices(self) -> NDArray[np.intp]:
-        """Dataset indices linking targets back to source images.
+    def item_indices(self) -> NDArray[np.intp]:
+        """Dataset indices linking targets back to source item.
 
         Returns
         -------
         NDArray[np.intp]
-            Array mapping each target/detection back to its source image
+            Array mapping each target/detection back to its source item
             index in the original dataset. Essential for object detection
-            datasets where multiple detections come from single images.
+            datasets where multiple detections come from a single item.
 
         Notes
         -----
         This property triggers dataset structure analysis on first access.
         """
         self._structure()
-        return self._image_indices
+        return self._item_indices
 
     @property
-    def image_count(self) -> int:
-        """Total number of images in the dataset.
+    def item_count(self) -> int:
+        """Total number of items in the dataset.
 
         Returns
         -------
         int
-            Count of unique images in the source dataset, regardless of
-            how many targets/detections each image contains.
+            Count of unique items in the source dataset, regardless of
+            how many targets/detections each item contains.
         """
         if self._count == 0:
             self._structure()
@@ -468,7 +468,7 @@ class Metadata:
         labels = []
         bboxes = []
         scores = []
-        srcidx = []
+        itmidx = []
         is_od = None
         datum_count = len(self._dataset)
         for i in tqdm(range(datum_count), desc="Processing datum metadata"):
@@ -483,13 +483,13 @@ class Metadata:
                     labels.append(target_labels)
                     bboxes.append(as_numpy(target.boxes))
                     scores.append(as_numpy(target.scores))
-                    srcidx.extend([i] * target_len)
+                    itmidx.extend([i] * target_len)
             elif isinstance(target, Array):
                 target_scores = as_numpy(target)
                 if len(target_scores):
                     labels.append([np.argmax(target_scores)])
                     scores.append([target_scores])
-                    srcidx.append(i)
+                    itmidx.append(i)
             else:
                 raise TypeError("Encountered unsupported target type in dataset")
 
@@ -500,22 +500,22 @@ class Metadata:
             if progress_callback:
                 progress_callback(i, datum_count)
 
-        np_asarray: Callable[..., np.ndarray] = np.concatenate if srcidx else np.asarray
+        np_asarray: Callable[..., np.ndarray] = np.concatenate if itmidx else np.asarray
         labels = np_asarray(labels, dtype=np.intp)
         scores = np_asarray(scores, dtype=np.float32)
         bboxes = np_asarray(bboxes, dtype=np.float32) if is_od else None
-        srcidx = np.asarray(srcidx, dtype=np.intp)
+        itmidx = np.asarray(itmidx, dtype=np.intp)
 
         index2label = self._dataset.metadata.get("index2label", {i: str(i) for i in np.unique(labels)})
 
-        targets_per_image = np.bincount(srcidx, minlength=len(self._dataset)).tolist() if is_od else None
+        targets_per_image = np.bincount(itmidx, minlength=len(self._dataset)).tolist() if is_od else None
         merged = merge(raw, return_dropped=True, ignore_lists=False, targets_per_image=targets_per_image)
 
-        reserved = ["image_index", "class_label", "score", "box"]
+        reserved = ["item_index", "class_label", "score", "box"]
         factor_dict = {f"metadata_{k}" if k in reserved else k: v for k, v in merged[0].items() if k != "_image_index"}
 
         target_dict = {
-            "image_index": srcidx,
+            "item_index": itmidx,
             "class_label": labels,
             "score": scores,
             "box": bboxes if bboxes is not None else [None] * len(labels),
@@ -525,7 +525,7 @@ class Metadata:
         self._index2label = index2label
         self._class_labels = labels
         self._class_names = list(index2label.values())
-        self._image_indices = target_dict["image_index"]
+        self._item_indices = target_dict["item_index"]
         self._factors = dict.fromkeys(factor_dict, None)
         self._dataframe = pl.DataFrame({**target_dict, **factor_dict})
         self._dropped_factors = merged[1]
@@ -576,7 +576,7 @@ class Metadata:
                     col_dg = _digitized(col)
                     df = df.with_columns(pl.Series(name=col_dg, values=ordinal.astype(np.int64)))
                     factor_info[col] = FactorInfo("categorical", is_digitized=True)
-                elif is_continuous(data, self.image_indices):
+                elif is_continuous(data, self.item_indices):
                     # Continuous values - discretize by binning
                     warnings.warn(
                         f"A user defined binning was not provided for {col}. "
@@ -631,7 +631,7 @@ class Metadata:
         self._structure()
 
         targets = len(self.dataframe)
-        images = self.image_count
+        images = self.item_count
         targets_match = all(len(v) == targets for v in factors.values())
         images_match = targets_match if images == targets else all(len(v) == images for v in factors.values())
         if not targets_match and not images_match:
@@ -641,7 +641,7 @@ class Metadata:
 
         new_columns = []
         for k, v in factors.items():
-            data = as_numpy(v)[self.image_indices]
+            data = as_numpy(v)[self.item_indices]
             new_columns.append(pl.Series(name=k, values=data))
             self._factors[k] = None
 

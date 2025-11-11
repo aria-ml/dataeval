@@ -63,9 +63,9 @@ def get_index_map(stats: BaseStatsOutput) -> list[int]:
     index_map: list[int] = []
     cur_index = -1
     for i, s in enumerate(stats.source_index):
-        if s.image > cur_index:
+        if s.item > cur_index:
             index_map.append(i)
-            cur_index = s.image
+            cur_index = s.item
     return index_map
 
 

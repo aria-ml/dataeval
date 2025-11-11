@@ -12,17 +12,17 @@ def get_metadata(label_array: list[list[int]]) -> Metadata:
     mock = MagicMock(spec=Metadata)
     index2label = {}
     class_labels = []
-    image_indices = []
+    item_indices = []
     for i, labels in enumerate(label_array):
         class_labels.extend(labels)
-        image_indices.extend([i] * len(labels))
+        item_indices.extend([i] * len(labels))
         for label in labels:
             if label not in index2label:
                 index2label[label] = str(label)
-    mock.dataframe = pl.from_dict({"image_index": image_indices, "class_label": class_labels})
+    mock.dataframe = pl.from_dict({"item_index": item_indices, "class_label": class_labels})
     mock.class_labels = np.asarray(class_labels)
-    mock.image_indices = np.asarray(image_indices)
-    mock.image_count = len(label_array)
+    mock.item_indices = np.asarray(item_indices)
+    mock.item_count = len(label_array)
     mock.class_names = sorted(index2label.values())
     return mock
 

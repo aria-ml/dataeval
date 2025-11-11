@@ -71,7 +71,7 @@ class TestMetadata:
 
         md = Metadata(mock_ds)
         assert len(md.class_labels) == 8
-        assert md.image_indices.tolist() == [0, 2, 3, 4, 6, 7, 8, 9]
+        assert md.item_indices.tolist() == [0, 2, 3, 4, 6, 7, 8, 9]
 
         stats = labelstats(md)
         assert stats.label_counts_per_image == [1, 0, 1, 1, 1, 0, 1, 1, 1, 1]
@@ -86,7 +86,7 @@ class TestMetadata:
 
         md = Metadata(mock_ds)
         assert len(md.class_labels) == 16
-        assert md.image_indices.tolist() == [0, 0, 2, 2, 3, 3, 4, 4, 6, 6, 7, 7, 8, 8, 9, 9]
+        assert md.item_indices.tolist() == [0, 0, 2, 2, 3, 3, 4, 4, 6, 6, 7, 7, 8, 8, 9, 9]
 
         stats = labelstats(md)
         assert stats.label_counts_per_image == [2, 0, 2, 2, 2, 0, 2, 2, 2, 2]
@@ -122,7 +122,7 @@ class TestMetadata:
         md._dataframe = pl.from_dict(md_dict)
         md._factors = dict.fromkeys(md_dict, None)
         md._is_structured = True
-        md._image_indices = np.arange(100)
+        md._item_indices = np.arange(100)
 
         md._bin()
         assert [f.factor_type for f in md.factor_info.values()] == [
@@ -311,7 +311,7 @@ class TestMetadata:
         md._dataframe = pl.from_dict(md_dict)
         md._factors = dict.fromkeys(md_dict, None)
         md._is_structured = True
-        md._image_indices = np.arange(100)
+        md._item_indices = np.arange(100)
 
         callback = Mock()
         md._bin(progress_callback=callback)

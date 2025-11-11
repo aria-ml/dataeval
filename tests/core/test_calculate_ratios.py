@@ -331,7 +331,7 @@ class TestCalculateRatios:
         assert len(ratios[SOURCE_INDEX]) == 6
 
         # Verify image indices are correct
-        image_indices = [si.image for si in ratios[SOURCE_INDEX]]
+        image_indices = [si.item for si in ratios[SOURCE_INDEX]]
         assert image_indices == [0, 1, 1, 2, 2, 2]
 
         # Verify box indices are correct
@@ -389,7 +389,7 @@ class TestCalculateRatios:
         # Check SourceIndex structure
         for si in ratios[SOURCE_INDEX]:
             assert isinstance(si, SourceIndex)
-            assert isinstance(si.image, int)
+            assert isinstance(si.item, int)
             assert isinstance(si.target, int)
             assert si.target is not None  # All entries should be boxes
             assert si.channel is None or isinstance(si.channel, int)

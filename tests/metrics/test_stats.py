@@ -533,7 +533,7 @@ class TestOffImageBoxes:
         )
 
         stats = imagestats(dataset, per_box=True)
-        assert stats.source_index[-1].image == 8
+        assert stats.source_index[-1].item == 8
 
     def test_no_bounding_box_boxratio(self, get_mock_od_dataset):
         boxes = self.boxes.copy()
