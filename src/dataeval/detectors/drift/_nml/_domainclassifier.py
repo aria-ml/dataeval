@@ -21,8 +21,8 @@ from dataeval.config import get_max_processes, get_seed
 from dataeval.detectors.drift._nml._base import AbstractCalculator, _create_multilevel_index
 from dataeval.detectors.drift._nml._chunk import Chunk, Chunker
 from dataeval.detectors.drift._nml._thresholds import ConstantThreshold, Threshold
-from dataeval.outputs._base import set_metadata
 from dataeval.outputs._drift import DriftMVDCOutput
+from dataeval.types import set_metadata
 
 logger = logging.getLogger(__name__)
 

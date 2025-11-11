@@ -8,8 +8,8 @@ from dataeval.core._calculate import calculate
 from dataeval.core.flags import ImageStats
 from dataeval.metrics.stats._base import convert_output
 from dataeval.outputs import HashStatsOutput
-from dataeval.outputs._base import set_metadata
 from dataeval.protocols import ArrayLike, Dataset
+from dataeval.types import set_metadata
 from dataeval.utils import unzip_dataset
 
 

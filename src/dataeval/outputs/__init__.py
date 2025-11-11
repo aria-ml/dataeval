@@ -3,7 +3,6 @@ Output classes for DataEval to store function and method outputs
 as well as runtime metadata for reproducibility and logging.
 """
 
-from ._base import ExecutionMetadata
 from ._bias import BalanceOutput, CompletenessOutput, CoverageOutput, DiversityOutput, LabelParityOutput, ParityOutput
 from ._drift import DriftMMDOutput, DriftMVDCOutput, DriftOutput
 from ._estimators import (
@@ -39,7 +38,6 @@ __all__ = [
     "DriftMVDCOutput",
     "DriftOutput",
     "DuplicatesOutput",
-    "ExecutionMetadata",
     "HashStatsOutput",
     "ImageStatsOutput",
     "LabelParityOutput",

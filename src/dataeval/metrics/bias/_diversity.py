@@ -10,7 +10,7 @@ from dataeval.core._bin import get_counts
 from dataeval.core._diversity import diversity_shannon, diversity_simpson
 from dataeval.data import Metadata
 from dataeval.outputs import DiversityOutput
-from dataeval.outputs._base import set_metadata
+from dataeval.types import set_metadata
 from dataeval.utils._method import get_method
 
 _DIVERSITY_FN_MAP = {"simpson": diversity_simpson, "shannon": diversity_shannon}

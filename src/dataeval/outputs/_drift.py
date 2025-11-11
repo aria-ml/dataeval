@@ -12,12 +12,12 @@ from numpy.typing import NDArray
 with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure
 
-from dataeval.outputs._base import Output
 from dataeval.outputs._result import Metric, PerMetricResult
+from dataeval.types import DictOutput
 
 
 @dataclass(frozen=True)
-class DriftBaseOutput(Output):
+class DriftBaseOutput(DictOutput):
     """Base output class for drift detector classes.
 
     Provides common fields returned by all drift detection methods, containing

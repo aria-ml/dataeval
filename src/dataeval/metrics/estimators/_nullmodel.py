@@ -19,9 +19,9 @@ from dataeval.core._nullmodel import (
     _reduce_micro,
     _to_confusion_matrix,
 )
-from dataeval.outputs._base import set_metadata
 from dataeval.outputs._estimators import NullModelMetrics, NullModelMetricsOutput
 from dataeval.protocols import ArrayLike
+from dataeval.types import set_metadata
 from dataeval.utils._array import as_numpy
 
 BASE_METRICS: dict[str, BinaryClassMetricFunction] = {

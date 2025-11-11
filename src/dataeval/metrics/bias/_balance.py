@@ -6,7 +6,7 @@ __all__ = []
 from dataeval.core import _balance
 from dataeval.data import Metadata
 from dataeval.outputs import BalanceOutput
-from dataeval.outputs._base import set_metadata
+from dataeval.types import set_metadata
 
 
 @set_metadata

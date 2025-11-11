@@ -17,7 +17,7 @@ from typing import NamedTuple
 import pandas as pd
 from typing_extensions import Self
 
-from dataeval.outputs._base import GenericOutput
+from dataeval.types import Output
 
 
 class Metric(NamedTuple):
@@ -25,7 +25,7 @@ class Metric(NamedTuple):
     column_name: str
 
 
-class AbstractResult(GenericOutput[pd.DataFrame]):
+class AbstractResult(Output[pd.DataFrame]):
     def __init__(self, results_data: pd.DataFrame) -> None:
         self._data = results_data.copy(deep=True)
 

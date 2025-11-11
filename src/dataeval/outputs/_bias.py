@@ -15,8 +15,8 @@ with contextlib.suppress(ImportError):
     from matplotlib.figure import Figure
 
 from dataeval.data._images import Images
-from dataeval.outputs._base import Output
 from dataeval.protocols import ArrayLike, Dataset
+from dataeval.types import DictOutput
 from dataeval.utils._array import as_numpy, channels_first_to_last
 from dataeval.utils._plot import heatmap
 
@@ -49,7 +49,7 @@ class ToDataFrameMixin:
 
 
 @dataclass(frozen=True)
-class ParityOutput(ToDataFrameMixin, Output):
+class ParityOutput(ToDataFrameMixin, DictOutput):
     """
     Output class for :func:`.parity` :term:`bias<Bias>` metrics.
 
@@ -72,7 +72,7 @@ class ParityOutput(ToDataFrameMixin, Output):
 
 
 @dataclass(frozen=True)
-class LabelParityOutput(ToDataFrameMixin, Output):
+class LabelParityOutput(ToDataFrameMixin, DictOutput):
     """
     Output class for :func:`.label_parity` :term:`bias<Bias>` metrics.
 
@@ -89,7 +89,7 @@ class LabelParityOutput(ToDataFrameMixin, Output):
 
 
 @dataclass(frozen=True)
-class CoverageOutput(Output):
+class CoverageOutput(DictOutput):
     """
     Output class for :func:`.coverage` :term:`bias<Bias>` metric.
 
@@ -162,7 +162,7 @@ class CoverageOutput(Output):
 
 
 @dataclass(frozen=True)
-class CompletenessOutput(Output):
+class CompletenessOutput(DictOutput):
     """
     Output from the completeness function.
 
@@ -179,7 +179,7 @@ class CompletenessOutput(Output):
 
 
 @dataclass(frozen=True)
-class BalanceOutput(Output):
+class BalanceOutput(DictOutput):
     """
     Output class for :func:`.balance` :term:`bias<Bias>` metric.
 
@@ -270,7 +270,7 @@ class BalanceOutput(Output):
 
 
 @dataclass(frozen=True)
-class DiversityOutput(Output):
+class DiversityOutput(DictOutput):
     """
     Output class for :func:`.diversity` :term:`bias<Bias>` metric.
 

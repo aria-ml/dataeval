@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from dataeval.types import MappingOutput
+
 __all__ = []
 
 from typing import NamedTuple
 
-from dataeval.outputs._base import MappingOutput, SequenceOutput
+from dataeval.types import SequenceOutput
 
 
 class MostDeviatedFactorsOutput(SequenceOutput[tuple[str, float]]):

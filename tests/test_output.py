@@ -4,11 +4,11 @@ from dataclasses import dataclass
 import numpy as np
 import pytest
 
-from dataeval.outputs._base import ExecutionMetadata, MappingOutput, Output, SequenceOutput, set_metadata
+from dataeval.types import DictOutput, ExecutionMetadata, MappingOutput, SequenceOutput, set_metadata
 
 
 @dataclass
-class MockOutput(Output):
+class MockOutput(DictOutput):
     test1: int
     test2: bool
     test3: str

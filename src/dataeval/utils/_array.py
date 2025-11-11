@@ -14,8 +14,7 @@ import torch
 from numpy.typing import ArrayLike, NDArray
 
 from dataeval._log import LogMessage
-from dataeval.protocols import Array
-from dataeval.types import SequenceLike
+from dataeval.protocols import Array, SequenceLike
 
 _logger = logging.getLogger(__name__)
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataeval.types import DictOutput
+
 __all__ = []
 
 import contextlib
@@ -18,8 +20,8 @@ with contextlib.suppress(ImportError):
 
 from scipy.optimize import basinhopping
 
-from dataeval.outputs._base import Output, set_metadata
 from dataeval.protocols import ArrayLike
+from dataeval.types import set_metadata
 from dataeval.utils._array import as_numpy
 
 _logger = logging.getLogger(__name__)
@@ -434,7 +436,7 @@ class Constraints:
 
 
 @dataclass
-class SufficiencyOutput(Output):
+class SufficiencyOutput(DictOutput):
     """
     Output class for :class:`.Sufficiency` workflow.
 

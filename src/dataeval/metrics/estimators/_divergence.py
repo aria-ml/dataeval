@@ -13,8 +13,8 @@ import numpy as np
 
 from dataeval.core._divergence import divergence_fnn, divergence_mst
 from dataeval.outputs import DivergenceOutput
-from dataeval.outputs._base import set_metadata
 from dataeval.protocols import Array
+from dataeval.types import set_metadata
 from dataeval.utils._array import ensure_embeddings
 from dataeval.utils._method import get_method
 

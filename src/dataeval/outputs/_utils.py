@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.outputs._base import Output
+from dataeval.types import DictOutput
 
 
 @dataclass(frozen=True)
@@ -29,7 +29,7 @@ class TrainValSplit:
 
 
 @dataclass(frozen=True)
-class SplitDatasetOutput(Output):
+class SplitDatasetOutput(DictOutput):
     """
     Output class containing test indices and a list of TrainValSplits.
 

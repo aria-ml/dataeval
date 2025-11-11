@@ -11,8 +11,8 @@ import torch
 import torch.nn as nn
 
 from dataeval.outputs import SufficiencyOutput
-from dataeval.outputs._base import set_metadata
 from dataeval.protocols import ArrayLike, Dataset, EvaluationStrategy, TrainingStrategy
+from dataeval.types import set_metadata
 
 T = TypeVar("T")
 

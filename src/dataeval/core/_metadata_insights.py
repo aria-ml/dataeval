@@ -13,7 +13,7 @@ from numpy.typing import NDArray
 from sklearn.feature_selection import mutual_info_classif
 
 from dataeval.config import get_max_processes, get_seed
-from dataeval.types import SequenceLike
+from dataeval.protocols import SequenceLike
 
 _NATS2BITS = 1.442695
 """

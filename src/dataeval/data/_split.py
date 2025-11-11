@@ -14,9 +14,9 @@ from sklearn.utils.multiclass import type_of_target
 
 from dataeval.config import EPSILON
 from dataeval.data._metadata import Metadata
-from dataeval.outputs._base import set_metadata
 from dataeval.outputs._utils import SplitDatasetOutput, TrainValSplit
 from dataeval.protocols import AnnotatedDataset
+from dataeval.types import set_metadata
 
 _logger = logging.getLogger(__name__)
 

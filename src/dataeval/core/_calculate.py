@@ -24,8 +24,9 @@ from dataeval.protocols import (
     ImageClassificationDataset,
     ObjectDetectionDataset,
     ObjectDetectionTarget,
+    SequenceLike,
 )
-from dataeval.types import SequenceLike, SourceIndex
+from dataeval.types import SourceIndex
 from dataeval.utils._boundingbox import BoundingBox, BoxLike
 from dataeval.utils._image import clip_and_pad, normalize_image_shape, rescale
 from dataeval.utils._multiprocessing import PoolWrapper
