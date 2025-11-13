@@ -114,7 +114,7 @@ embeddings capture. The table below shows examples of appropriate models for a
 variety of metrics and tasks.
 
 | Model Type | Example Models | Best for These Metrics | Why |
-|------------|----------------|----------------------|-----|
+| ---------- | -------------- | ---------------------- | --- |
 | **Image Classification** | ResNet, EfficientNet, Vision Transformer | BER, Class Balance, Outlier Detection | Embeddings emphasize features that distinguish between labeled categories, making class boundaries clear |
 | **Object Detection** | YOLO, R-CNN variants, DETR | Spatial Drift, Localization Quality | Embeddings capture spatial relationships and localized features, ideal when object position matters |
 | **Self-Supervised** | DINO, MAE, SimCLR | Drift, Prioritization, Duplicate Detection | Embeddings capture general visual patterns without class bias, good for broad visual similarity |
