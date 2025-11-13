@@ -142,7 +142,7 @@ the two candidate models. They begin by analyzing the [divergence](../../noteboo
 of the data distributions between the test set and the train and validation sets.
 After the test set is adequately divergent from both the train and validation sets,
 the T&E Engineer focuses on identifying the edge cases in the dataset. They use
-a combination of [imagestats](../../notebooks/h2_visualize_linting_issues.ipynb),
+a combination of [imagestats](../../notebooks/h2_visualize_cleaning_issues.ipynb),
 {func}`.labelstats`, [coverage](../Coverage.md) and the
 [out-of-distribution (OOD) detectors](../OOD.md). After identifying the edge cases,
 they test both models on the entire test set, noting the performance of each model

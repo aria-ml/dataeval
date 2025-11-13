@@ -23,7 +23,7 @@ engineer. Throughout all stages of the machine learning lifecycle, DataEval
 supports model development, data analysis, and monitoring with state-of-the-art
 algorithms to help you solve difficult problems. With a focus on computer
 vision tasks, DataEval provides simple, but effective metrics for performance
-estimation, bias detection, and dataset linting.
+estimation, bias detection, and dataset cleaning.
 
 <!-- end needs -->
 
