@@ -126,7 +126,7 @@ developers for a better metric in a Kaggle-style AI competition.
 ```
 
 * develop data pipelines
-  * data linting
+  * data cleaning
 * develop labeling protocols and pipelines
   * label-error detection
 * formulate sampling protocols

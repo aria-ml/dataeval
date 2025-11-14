@@ -20,7 +20,7 @@ The guides below exemplify powerful solutions to common problems in ML.
 
 ../notebooks/h2_cluster_analysis.ipynb
 ../notebooks/h2_deduplicate.ipynb
-../notebooks/h2_visualize_linting_issues.ipynb
+../notebooks/h2_visualize_cleaning_issues.ipynb
 ../notebooks/h2_custom_image_stats_object_detection.ipynb
 ```
 
@@ -34,9 +34,9 @@ The guides below exemplify powerful solutions to common problems in ML.
 - - [](../notebooks/h2_deduplicate.ipynb)
   - Identify and remove duplicates from a PyTorch Dataset
   - [![Open In Colab][colab-badge]][dupe-colab]
-- - [](../notebooks/h2_visualize_linting_issues.ipynb)
+- - [](../notebooks/h2_visualize_cleaning_issues.ipynb)
   - Find negatively impactful images in multiple backgrounds
-  - [![Open In Colab][colab-badge]][lint-colab]
+  - [![Open In Colab][colab-badge]][clean-colab]
 - - [](../notebooks/h2_custom_image_stats_object_detection.ipynb)
   - Customize calculation of image stats on an object detection dataset
   - [![Open In Colab][colab-badge]][calc-colab]
@@ -45,7 +45,7 @@ The guides below exemplify powerful solutions to common problems in ML.
 
 [clst-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_cluster_analysis.ipynb
 [dupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_deduplicate.ipynb
-[lint-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_visualize_linting_issues.ipynb
+[clean-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_visualize_cleaning_issues.ipynb
 [calc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_custom_image_stats_object_detection.ipynb
 
 ## Metrics
