@@ -108,7 +108,7 @@ that can make an object invisible to the detector).
 
 While DataEval does not address [adversarial robustness](https://github.com/Trusted-AI/adversarial-robustness-toolbox)
 or [natural robustness](https://github.com/Kitware/nrtk), it does contain a
-{class}`.linter` class to identify visual anomalies and a {func}`.cluster`
+{class}`.Outliers` class to identify visual anomalies and a {func}`.cluster`
 function which can help identify edge cases.
 
 ### Monitor model performance
