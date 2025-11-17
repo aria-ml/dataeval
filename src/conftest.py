@@ -274,19 +274,26 @@ def doctest_workflows_sufficiency(doctest_namespace: dict[str, Any]) -> None:
     train_ds.__len__.return_value = 100
     test_ds = MagicMock()
     test_ds.__len__.return_value = 10
-    train_fn = MagicMock()
-    eval_fn = MagicMock()
-    eval_fn.return_value = {"test": 1.0}
+    # train_fn = MagicMock()
+    # eval_fn = MagicMock()
+    # eval_fn.return_value = {"test": 1.0}
+
+    class EStrategy:
+        def __init__(self, batch_size: int = 16) -> None:
+            self.batch_size = batch_size
+
+        def evaluate(self, model, dataset) -> dict:  # noqa
+            return {"test": 1.0}
 
     """dataeval.workflows.sufficiency.Sufficiency"""
 
     doctest_namespace["model"] = model
     doctest_namespace["train_ds"] = train_ds
     doctest_namespace["test_ds"] = test_ds
-    doctest_namespace["train_fn"] = train_fn
-    doctest_namespace["eval_fn"] = eval_fn
+    # doctest_namespace["train_fn"] = train_fn
+    # doctest_namespace["eval_fn"] = eval_fn
     doctest_namespace["CustomTrainingStrategy"] = MagicMock()
-    doctest_namespace["CustomEvaluationStrategy"] = MagicMock()
+    doctest_namespace["CustomEvaluationStrategy"] = EStrategy
 
 
 @pytest.fixture(autouse=True, scope="session")
