@@ -1,20 +1,16 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock, NonCallableMagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 import torch
 
-try:
-    from matplotlib.figure import Figure
-except ImportError:
-    Figure = type(None)
-
 from dataeval.outputs._workflows import (
     SufficiencyOutput,
 )
 from dataeval.workflows import Sufficiency
+from dataeval.workflows.sufficiency import SufficiencyConfig
 
 np.random.seed(0)
 torch.manual_seed(0)
@@ -31,154 +27,147 @@ def mock_ds(length: int | None):
 
 @pytest.mark.required
 class TestSufficiency:
-    def test_mock_run(self) -> None:
-        eval_fn = MagicMock()
-        eval_fn.return_value = {"test": 1.0}
-        patch("torch.utils.data.DataLoader").start()
+    def test_mock_run(self, basic_config, simple_dataset) -> None:
+        """Verify return value of evaluate is the correct output type"""
 
         suff = Sufficiency(
             model=MagicMock(),
-            train_ds=mock_ds(2),
-            test_ds=mock_ds(2),
-            train_fn=MagicMock(),
-            eval_fn=eval_fn,
-            runs=1,
-            substeps=2,
+            train_ds=simple_dataset,
+            test_ds=simple_dataset,
+            config=basic_config,
         )
 
         results = suff.evaluate()
         assert isinstance(results, SufficiencyOutput)
 
-    def test_mock_run_at_value(self) -> None:
-        eval_fn = MagicMock()
-        eval_fn.return_value = {"test": 1.0}
-        patch("torch.utils.data.DataLoader").start()
+    def test_mock_run_at_value(self, basic_config, simple_dataset) -> None:
+        """Verify return value of evaluate is the correct output type when run at a specific substep"""
 
-        suff = Sufficiency(
-            model=MagicMock(),
-            train_ds=mock_ds(2),
-            test_ds=mock_ds(2),
-            train_fn=MagicMock(),
-            eval_fn=eval_fn,
-            runs=1,
-            substeps=2,
-        )
+        suff = Sufficiency(model=MagicMock(), train_ds=simple_dataset, test_ds=simple_dataset, config=basic_config)
 
         results = suff.evaluate(np.array([1]))
         assert isinstance(results, SufficiencyOutput)
 
-    def test_mock_run_with_kwargs(self) -> None:
-        train_fn = MagicMock()
-        eval_fn = MagicMock()
-        eval_fn.return_value = {"test": 1.0}
-        train_kwargs = {"train": 1}
-        eval_kwargs = {"eval": 1}
-        patch("torch.utils.data.DataLoader").start()
-
-        suff = Sufficiency(
-            model=MagicMock(),
-            train_ds=mock_ds(2),
-            test_ds=mock_ds(2),
-            train_fn=train_fn,
-            eval_fn=eval_fn,
-            runs=1,
-            substeps=2,
-            train_kwargs=train_kwargs,
-            eval_kwargs=eval_kwargs,
-        )
-
-        results = suff.evaluate()
-
-        assert train_fn.call_count == 2
-        assert train_kwargs == train_fn.call_args.kwargs
-
-        assert eval_fn.call_count == 2
-        assert eval_kwargs == eval_fn.call_args.kwargs
-
-        assert isinstance(results, SufficiencyOutput)
-
-    def test_run_with_invalid_eval_at(self) -> None:
-        suff = Sufficiency(
-            model=MagicMock(),
-            train_ds=mock_ds(2),
-            test_ds=mock_ds(2),
-            train_fn=MagicMock(),
-            eval_fn=MagicMock(),
-            runs=1,
-            substeps=2,
-        )
+    def test_run_with_invalid_eval_at(self, basic_config, simple_dataset) -> None:
+        suff = Sufficiency(model=MagicMock(), train_ds=simple_dataset, test_ds=simple_dataset, config=basic_config)
 
         with pytest.raises(ValueError):
             suff.evaluate("hello world")  # type: ignore
 
-    def test_multiple_runs_multiple_metrics(self) -> None:
-        eval_fn = MagicMock()
-        eval_fn.return_value = {"Accuracy": 1.0, "Precision": np.array([1.0, 2.0])}
+    def test_multiple_runs_multiple_metrics(
+        self,
+        simple_dataset,
+        mock_training_strategy,
+        mock_eval_mixed_metric_strategy,
+    ) -> None:
+        """Verifies multiple runs, multiple steps, and multiple mixed metrics have the proper output shape"""
         patch("torch.utils.data.DataLoader").start()
+
+        RUNS = 5
+        SUBSTEPS = 3
+        METRIC_COUNT = 2  # Accuracy (scalar) + Precision (array)
+        CLASSES = 2  # Precision has 2 classes
+
+        multi_metric_config = SufficiencyConfig(
+            mock_training_strategy,
+            mock_eval_mixed_metric_strategy,
+            runs=RUNS,
+            substeps=SUBSTEPS,
+        )
 
         suff = Sufficiency(
             model=MagicMock(),
-            train_ds=mock_ds(2),
-            test_ds=mock_ds(2),
-            train_fn=MagicMock(),
-            eval_fn=eval_fn,
-            runs=5,
-            substeps=2,
+            train_ds=simple_dataset,
+            test_ds=simple_dataset,
+            config=multi_metric_config,
         )
         output = suff.evaluate()
-        assert len(output.params) == 2
-        assert len(output.measures) == 2
-        assert len(output.averaged_measures) == 2
-        assert output.measures["Accuracy"].shape == (5, 2)
-        assert output.averaged_measures["Accuracy"].shape == (2,)
-        assert output.measures["Accuracy"].shape != output.averaged_measures["Accuracy"].shape
-        assert output.measures["Precision"].shape == (5, 2, 2)
-        assert output.averaged_measures["Precision"].shape == (2, 2)
 
-    def test_run_multiple_metrics(self) -> None:
-        eval_fn = MagicMock()
-        eval_fn.return_value = {"Accuracy": 1.0, "Precision": 1.0}
+        assert isinstance(output, SufficiencyOutput)
+        assert len(output.params) == METRIC_COUNT
+        assert len(output.measures) == METRIC_COUNT
+        assert len(output.averaged_measures) == METRIC_COUNT
+
+        # Scalar metrics: Accuracy
+        assert output.measures["Accuracy"].shape == (RUNS, SUBSTEPS)
+        assert output.averaged_measures["Accuracy"].shape == (SUBSTEPS,)
+
+        # Array metric: Precision (per-class)
+        assert output.measures["Precision"].shape == (RUNS, SUBSTEPS, CLASSES)
+        assert output.averaged_measures["Precision"].shape == (CLASSES, SUBSTEPS)
+
+    def test_run_multiple_scalar_metrics(
+        self,
+        simple_dataset,
+        mock_training_strategy,
+        mock_eval_scalar_metrics_strategy,
+    ) -> None:
+        """Verifies single run with multiple scalar runs has proper output shape"""
         patch("torch.utils.data.DataLoader").start()
+
+        RUNS = 1
+        SUBSTEPS = 2
+        METRIC_COUNT = 2  # Accuracy + Precision (scalars)
+
+        config = SufficiencyConfig(
+            mock_training_strategy,
+            mock_eval_scalar_metrics_strategy,
+            runs=RUNS,
+            substeps=SUBSTEPS,
+        )
 
         suff = Sufficiency(
             model=MagicMock(),
-            train_ds=mock_ds(2),
-            test_ds=mock_ds(2),
-            train_fn=MagicMock(),
-            eval_fn=eval_fn,
-            runs=1,
-            substeps=2,
+            train_ds=simple_dataset,
+            test_ds=simple_dataset,
+            config=config,
         )
 
         output = suff.evaluate()
-        assert len(output.params) == 2
-        assert len(output.measures) == 2
-        assert len(output.averaged_measures) == 2
-        assert output.measures["Accuracy"].shape == (1, 2)
-        assert output.averaged_measures["Accuracy"].shape == (2,)
-        assert output.measures["Accuracy"].shape != output.averaged_measures["Accuracy"].shape
-        assert output.measures["Precision"].shape == (1, 2)
-        assert output.averaged_measures["Precision"].shape == (2,)
 
-    def test_run_classwise(self) -> None:
-        eval_fn = MagicMock()
-        eval_fn.return_value = {"Accuracy": np.array([0.2, 0.4, 0.6, 0.8])}
+        assert len(output.params) == METRIC_COUNT
+        assert len(output.measures) == METRIC_COUNT
+        assert len(output.averaged_measures) == METRIC_COUNT
+
+        # Both scalar metrics
+        assert output.measures["Accuracy"].shape == (RUNS, SUBSTEPS)
+        assert output.averaged_measures["Accuracy"].shape == (SUBSTEPS,)
+        assert output.measures["Precision"].shape == (RUNS, SUBSTEPS)
+        assert output.averaged_measures["Precision"].shape == (SUBSTEPS,)
+
+    def test_run_classwise(self, simple_dataset, mock_training_strategy, mock_eval_classwise_strategy) -> None:
+        """Verifies single run with classwise array metric has proper shape"""
         patch("torch.utils.data.DataLoader").start()
+
+        RUNS = 1
+        SUBSTEPS = 2
+        CLASSES = 4  # Accuracy returns 4-element array
+        METRIC_COUNT = 1  # Accuracy
+
+        config = SufficiencyConfig(
+            mock_training_strategy,
+            mock_eval_classwise_strategy,
+            runs=RUNS,
+            substeps=SUBSTEPS,
+        )
 
         suff = Sufficiency(
             model=MagicMock(),
-            train_ds=mock_ds(2),
-            test_ds=mock_ds(2),
-            train_fn=MagicMock(),
-            eval_fn=eval_fn,
-            runs=1,
-            substeps=2,
+            train_ds=simple_dataset,
+            test_ds=simple_dataset,
+            config=config,
         )
 
         output = suff.evaluate()
-        assert output.params["Accuracy"].shape == (4, 3)
-        assert len(output.measures) == 1
-        assert len(output.averaged_measures) == 1
+
+        assert isinstance(output, SufficiencyOutput)
+        assert len(output.measures) == METRIC_COUNT
+        assert len(output.averaged_measures) == METRIC_COUNT
+
+        # Classwise metric has additional dimension
+        assert output.params["Accuracy"].shape == (CLASSES, 3)  # 3 curve params per class
+        assert output.measures["Accuracy"].shape == (RUNS, SUBSTEPS, CLASSES)
+        assert output.averaged_measures["Accuracy"].shape == (CLASSES, SUBSTEPS)
 
     @pytest.mark.parametrize(
         "train_ds_len, test_ds_len, expected_error",
@@ -190,14 +179,10 @@ class TestSufficiency:
             (1, 1, None),
         ],
     )
-    def test_dataset_len(self, train_ds_len, test_ds_len, expected_error):
+    def test_dataset_len(self, basic_config, train_ds_len, test_ds_len, expected_error):
         def call_suff(train_ds_len, test_ds_len):
             Sufficiency(
-                model=MagicMock(),
-                train_ds=mock_ds(train_ds_len),
-                test_ds=mock_ds(test_ds_len),
-                train_fn=MagicMock(),
-                eval_fn=MagicMock(),
+                model=MagicMock(), train_ds=mock_ds(train_ds_len), test_ds=mock_ds(test_ds_len), config=basic_config
             )
 
         if expected_error is None:
@@ -206,23 +191,3 @@ class TestSufficiency:
 
         with pytest.raises(expected_error):
             call_suff(train_ds_len, test_ds_len)
-
-    def test_train_fn_is_non_callable(self):
-        with pytest.raises(TypeError):
-            Sufficiency(
-                model=MagicMock(),
-                train_ds=mock_ds(1),
-                test_ds=mock_ds(1),
-                train_fn=NonCallableMagicMock(),
-                eval_fn=MagicMock(),
-            ).train_fn(MagicMock(), MagicMock(), MagicMock())
-
-    def test_eval_fn_is_non_callable(self):
-        with pytest.raises(TypeError):
-            Sufficiency(
-                model=MagicMock(),
-                train_ds=mock_ds(1),
-                test_ds=mock_ds(1),
-                train_fn=MagicMock(),
-                eval_fn=NonCallableMagicMock(),
-            ).eval_fn(MagicMock(), MagicMock())
