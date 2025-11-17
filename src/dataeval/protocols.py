@@ -11,6 +11,7 @@ __all__ = [
     "Dataset",
     "DatasetMetadata",
     "DeviceLike",
+    "EvaluationStrategy",
     "ImageClassificationDatum",
     "ImageClassificationDataset",
     "ObjectDetectionTarget",
@@ -19,6 +20,7 @@ __all__ = [
     "SegmentationTarget",
     "SegmentationDatum",
     "SegmentationDataset",
+    "TrainingStrategy",
     "Transform",
 ]
 
