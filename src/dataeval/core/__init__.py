@@ -26,10 +26,12 @@ __all__ = [
     "nullmodel_accuracy",
     "nullmodel_fpr",
     "nullmodel_precision",
+    "nullmodel_metrics",
     "nullmodel_recall",
     "parity",
     "pchash",
     "xxhash",
+    "uap",
 ]
 
 from dataeval.core import flags
@@ -46,5 +48,12 @@ from dataeval.core._label_parity import label_parity
 from dataeval.core._label_stats import label_stats
 from dataeval.core._metadata_insights import factor_deviation, factor_predictors
 from dataeval.core._mst import compute_neighbors, minimum_spanning_tree
-from dataeval.core._nullmodel import nullmodel_accuracy, nullmodel_fpr, nullmodel_precision, nullmodel_recall
+from dataeval.core._nullmodel import (
+    nullmodel_accuracy,
+    nullmodel_fpr,
+    nullmodel_metrics,
+    nullmodel_precision,
+    nullmodel_recall,
+)
 from dataeval.core._parity import parity
+from dataeval.core._uap import uap

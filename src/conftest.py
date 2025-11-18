@@ -181,7 +181,7 @@ def doctest_metrics_estimators_clusterer(doctest_namespace: dict[str, Any]) -> N
     images[9] = images[24]
     images[23] = images[48] + 1e-5
 
-    """dataeval.metrics.estimators.clusterer"""
+    """dataeval.core.cluster"""
     doctest_namespace["clusterer_images"] = images
 
 
@@ -190,7 +190,7 @@ def doctest_metrics_estimators_divergence(doctest_namespace: dict[str, Any]) -> 
     a = dsets.make_blobs(n_samples=50, centers=np.array([(-1, -1), (1, 1)]), cluster_std=0.3, random_state=712)[0]
     b = dsets.make_blobs(n_samples=50, centers=np.array([(-0.5, -0.5), (1, 1)]), cluster_std=0.3, random_state=712)[0]
 
-    """dataeval.metrics.estimators.divergence.divergence"""
+    """dataeval.core.divergence"""
 
     doctest_namespace["datasetA"] = a
     doctest_namespace["datasetB"] = b
