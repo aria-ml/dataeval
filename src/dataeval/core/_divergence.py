@@ -7,56 +7,116 @@ from __future__ import annotations
 
 __all__ = []
 
+from collections.abc import Callable
+from typing import TypedDict
 
 import numpy as np
 
-from dataeval.types import Array1D, ArrayND
+from dataeval.types import ArrayND
 from dataeval.utils._array import as_numpy
 
 
-def divergence_mst(embeddings: ArrayND[float], class_labels: Array1D[int]) -> int:
+class DivergenceResult(TypedDict):
     """
-    Counts the number of cross-label edges in the minimum spanning tree of data.
+    Result mapping for :func:`.divergence` estimator metric.
 
-    Parameters
+    Attributes
     ----------
-    embeddings : ArrayND[float]
-        Input images/embeddings to be grouped. Can be an N dimensional list, or array-like object.
-    class_labels : Array1D[int]
-        Corresponding class labels for each data point. Can be a 1D list, or array-like object.
-
-    Returns
-    -------
-    int
-        Number of cross-label edges in the minimum spanning tree of input data
+    divergence : float
+        :term:`Divergence` value calculated between 2 datasets ranging between 0.0 and 1.0
+    errors : int
+        The number of errors between the datasets
     """
+
+    divergence: float
+    errors: int
+
+
+def _compute_divergence(
+    emb_a: ArrayND[float],
+    emb_b: ArrayND[float],
+    error_fn: Callable[[ArrayND[float], ArrayND[int]], int],
+) -> DivergenceResult:
+    """Generic divergence computation using a custom error function."""
+    a = as_numpy(emb_a, dtype=np.float64)
+    b = as_numpy(emb_b, dtype=np.float64)
+    N = a.shape[0]
+    M = b.shape[0]
+
+    stacked_data = np.vstack((a, b))
+    labels = np.zeros((N + M,), dtype=np.intp)
+    labels[N:] = 1
+
+    errors = error_fn(stacked_data, labels)
+    dp = max(0.0, 1 - ((N + M) / (2 * N * M)) * errors)
+
+    return DivergenceResult(divergence=dp, errors=errors)
+
+
+def _compute_mst_errors(embeddings: ArrayND[float], labels: ArrayND[int]) -> int:
     from dataeval.core._mst import minimum_spanning_tree
 
     mst_result = minimum_spanning_tree(embeddings)
     source, target = mst_result["source"], mst_result["target"]
-    return np.sum(class_labels[source] != class_labels[target])
+    return np.sum(labels[source] != labels[target])
 
 
-def divergence_fnn(embeddings: ArrayND[float], class_labels: Array1D[int]) -> int:
+def _compute_fnn_errors(embeddings: ArrayND[float], labels: ArrayND[int]) -> int:
+    from dataeval.core._mst import compute_neighbors
+
+    nn_indices = compute_neighbors(embeddings, embeddings)
+    return np.sum(labels[nn_indices] != labels)
+
+
+def divergence_mst(emb_a: ArrayND[float], emb_b: ArrayND[float]) -> DivergenceResult:
     """
-    Counts label disagreements between nearest neighbors in data.
+    Calculates the :term:`divergence` by counting the number of "between dataset" edges in the
+    minimum spanning tree.
 
     Parameters
     ----------
-    embeddings : ArrayND[float]
-        Input images/embeddings to be grouped. Can be an N dimensional list, or array-like object.
-    class_labels : Array1D[int]
-        Corresponding class labels for each data point. Can be a 1D list, or array-like object.
+    emb_a : ArrayLike, shape - (N, P)
+        Image embeddings in an ArrayLike format to compare.
+        Function expects the data to have 2 dimensions, N number of observations in a P-dimensional space.
+    emb_b : ArrayLike, shape - (N, P)
+        Image embeddings in an ArrayLike format to compare.
+        Function expects the data to have 2 dimensions, N number of observations in a P-dimensional space.
 
     Returns
     -------
-    int
-        Number of label disagreements between nearest neighbors
+    DivergenceResult
+        Dictionary containing 'divergence' and 'errors' (number of cross-label edges)
+
+    Examples
+    --------
+    >>> divergence_mst(datasetA, datasetB)
+    {'divergence': 0.0, 'errors': 50}
     """
-    from dataeval.core._mst import compute_neighbors
+    return _compute_divergence(emb_a, emb_b, _compute_mst_errors)
 
-    embeddings_np = as_numpy(embeddings)
-    class_labels_np = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
 
-    nn_indices = compute_neighbors(embeddings_np, embeddings_np)
-    return np.sum(class_labels_np[nn_indices] != class_labels_np)
+def divergence_fnn(emb_a: ArrayND[float], emb_b: ArrayND[float]) -> DivergenceResult:
+    """
+    Calculates the :term:`divergence` by counting the label disagreements between nearest neighbors
+    in the datasets.
+
+    Parameters
+    ----------
+    emb_a : ArrayLike, shape - (N, P)
+        Image embeddings in an ArrayLike format to compare.
+        Function expects the data to have 2 dimensions, N number of observations in a P-dimensional space.
+    emb_b : ArrayLike, shape - (N, P)
+        Image embeddings in an ArrayLike format to compare.
+        Function expects the data to have 2 dimensions, N number of observations in a P-dimensional space.
+
+    Returns
+    -------
+    DivergenceResult
+        Dictionary containing 'divergence' and 'errors' (number of label disagreements)
+
+    Examples
+    --------
+    >>> divergence_fnn(datasetA, datasetB)
+    {'divergence': 0.28, 'errors': 36}
+    """
+    return _compute_divergence(emb_a, emb_b, _compute_fnn_errors)

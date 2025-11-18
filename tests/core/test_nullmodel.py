@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 import numpy as np
 import pytest
 
@@ -10,6 +12,7 @@ from dataeval.core._nullmodel import (
     _reduce_macro,
     _reduce_micro,
     _to_confusion_matrix,
+    nullmodel_metrics,
 )
 
 
@@ -132,3 +135,58 @@ class TestReducers:
     def test_macro_reducer(self, method, counts, expected_value):
         """Tests macro reducer with each callable estimator"""
         assert _reduce_macro(method, counts) == expected_value
+
+
+@pytest.mark.required
+class TestNullModelMetrics:
+    @pytest.mark.parametrize(
+        "test_labels, train_labels, expected_models, expected_metrics",
+        [
+            # binary, no train set
+            (np.random.randint(1, 3, size=100), None, 1, 8),
+            # binary, train set
+            (np.random.randint(4, 6, size=100), np.random.randint(0, 2, size=100), 3, 8),
+            # multiclass, no train set
+            (np.random.randint(0, 5, size=100), None, 1, 7),
+            # multiclass, train set
+            (np.random.randint(20, 25, size=100), np.random.randint(0, 5, size=100), 3, 7),
+            # multiclass test set, binary train set
+            (
+                np.random.randint(0, 5, size=100),
+                np.random.randint(0, 2, size=100),
+                3,
+                7,
+            ),
+            # multiclass train set, binary test set
+            (
+                np.random.randint(0, 2, size=100),
+                np.random.randint(0, 5, size=100),
+                3,
+                7,
+            ),
+        ],
+    )
+    def test_null_model_inputs(self, test_labels, train_labels, expected_models, expected_metrics):
+        """Tests expected models and expected metrics for binary and multiclass label sets"""
+        output = nullmodel_metrics(test_labels, train_labels)
+        # Count only the models that are present in the output
+        assert len(output) == expected_models
+        # Check each model's metrics
+        for metrics in output.values():
+            # Count non-None values in the metrics dict
+            assert isinstance(metrics, Mapping)
+            metrics_count = len([v for v in metrics.values() if v is not None])
+            assert metrics_count == expected_metrics
+
+    def test_invalid_inputs(self):
+        """Tests that invalid data properly raises exceptions"""
+        test_labels = []
+        with pytest.raises(ValueError, match="Empty or null test labels provided"):
+            output = nullmodel_metrics(test_labels)
+        test_labels = None
+        with pytest.raises(ValueError, match="Empty or null test labels provided"):
+            output = nullmodel_metrics(test_labels)  # type: ignore
+        test_labels = np.random.randint(0, 5, size=100)
+        train_labels = []
+        output = nullmodel_metrics(test_labels, train_labels)
+        assert output is not None
