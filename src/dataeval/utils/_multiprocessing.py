@@ -4,6 +4,7 @@ __all__ = []
 
 from collections.abc import Callable, Iterable, Iterator
 from multiprocessing import Pool
+from os import cpu_count
 from typing import Any, TypeVar
 
 _S = TypeVar("_S")
@@ -20,7 +21,8 @@ class PoolWrapper:
     """
 
     def __init__(self, processes: int | None) -> None:
-        self.pool = Pool(processes) if processes is None or processes > 1 else None
+        procs = 1 if processes is None else max(1, (cpu_count() or 1) + processes + 1) if processes < 0 else processes
+        self.pool = Pool(procs) if procs > 1 else None
 
     def imap_unordered(self, func: Callable[[_S], _T], iterable: Iterable[_S]) -> Iterator[_T]:
         return map(func, iterable) if self.pool is None else self.pool.imap_unordered(func, iterable)
