@@ -8,14 +8,14 @@ from typing import Any, overload
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval.core._calculate import CalculationResult, calculate
 from dataeval.core._clusterer import ClusterResult
+from dataeval.core.flags import ImageStats
 from dataeval.data._images import Images
-from dataeval.metrics.stats import hashstats
-from dataeval.metrics.stats._base import combine_stats, get_dataset_step_from_idx
-from dataeval.outputs import DuplicatesOutput, HashStatsOutput
-from dataeval.outputs._linters import DatasetDuplicateGroupMap, DuplicateGroup
+from dataeval.outputs._linters import DatasetDuplicateGroupMap, DuplicateGroup, DuplicatesOutput
 from dataeval.protocols import ArrayLike, Dataset
 from dataeval.types import set_metadata
+from dataeval.utils._stats import StatsMap, combine_results, get_dataset_step_from_idx
 
 
 class Duplicates:
@@ -40,7 +40,7 @@ class Duplicates:
 
     Attributes
     ----------
-    stats : HashStatsOutput
+    stats : CalculationResult
         Hash statistics computed during the last evaluate() call.
         Contains xxhash and pchash values for all processed images.
     only_exact : bool
@@ -54,7 +54,7 @@ class Duplicates:
     >>> detector = Duplicates()
     >>> result = detector.evaluate(dataset)
 
-    Reuse pre-computed hashes for efficiency
+    Reuse pre-computed statistics for efficiency
 
     >>> result = detector.from_stats(hashes1)
 
@@ -66,10 +66,10 @@ class Duplicates:
     """
 
     def __init__(self, only_exact: bool = False) -> None:
-        self.stats: HashStatsOutput
+        self.stats: CalculationResult
         self.only_exact = only_exact
 
-    def _get_duplicates(self, stats: dict) -> dict[str, list[list[int]]]:
+    def _get_duplicates(self, stats: StatsMap) -> dict[str, list[list[int]]]:
         """Extract duplicate groups from hash statistics."""
         exact_dict: dict[int, list] = {}
         for i, value in enumerate(stats["xxhash"]):
@@ -91,14 +91,14 @@ class Duplicates:
         }
 
     @overload
-    def from_stats(self, hashes: HashStatsOutput) -> DuplicatesOutput[DuplicateGroup]: ...
+    def from_stats(self, stats: CalculationResult) -> DuplicatesOutput[DuplicateGroup]: ...
 
     @overload
-    def from_stats(self, hashes: Sequence[HashStatsOutput]) -> DuplicatesOutput[DatasetDuplicateGroupMap]: ...
+    def from_stats(self, stats: Sequence[CalculationResult]) -> DuplicatesOutput[DatasetDuplicateGroupMap]: ...
 
     @set_metadata(state=["only_exact"])
     def from_stats(
-        self, hashes: HashStatsOutput | Sequence[HashStatsOutput]
+        self, stats: CalculationResult | Sequence[CalculationResult]
     ) -> DuplicatesOutput[DuplicateGroup] | DuplicatesOutput[DatasetDuplicateGroupMap]:
         """Find duplicates from pre-computed hash statistics.
 
@@ -108,23 +108,18 @@ class Duplicates:
 
         Parameters
         ----------
-        hashes : HashStatsOutput or Sequence[HashStatsOutput]
-            Hash statistics from hashstats function. Single HashStatsOutput
+        stats : CalculationResult or Sequence[CalculationResult]
+            Hash statistics from calculate() with ImageStats.HASH. Single CalculationResult
             for within-dataset duplicates, or sequence for cross-dataset analysis.
 
         Returns
         -------
         DuplicatesOutput[DuplicateGroup]
-            When single HashStatsOutput provided. Contains exact and near
+            When single CalculationResult provided. Contains exact and near
             duplicate groups as lists of image indices within the dataset.
         DuplicatesOutput[DatasetDuplicateGroupMap]
             When sequence provided. Groups map dataset indices to lists of
             image indices, enabling cross-dataset duplicate identification.
-
-        Raises
-        ------
-        TypeError
-            If hashes is not HashStatsOutput or Sequence[HashStatsOutput].
 
         Examples
         --------
@@ -145,28 +140,26 @@ class Duplicates:
         Exact duplicates: [{0: [3, 20]}, {0: [16], 1: [12]}]
 
         """
+        combined_stats, dataset_steps = combine_results(stats)
 
-        if isinstance(hashes, HashStatsOutput):
-            return DuplicatesOutput(**self._get_duplicates(hashes.data()))
+        duplicates = self._get_duplicates(combined_stats)
 
-        if not isinstance(hashes, Sequence):
-            raise TypeError("Invalid stats output type; only use output from hashstats.")
-
-        combined, dataset_steps = combine_stats(hashes)
-        duplicates = self._get_duplicates(combined.data())
+        if not isinstance(stats, Sequence):
+            return DuplicatesOutput(**duplicates)
 
         # split up results from combined dataset into individual dataset buckets
+        dataset_dupes: dict[str, list[dict[int, list[int]]]] = {}
         for dup_type, dup_list in duplicates.items():
-            dup_list_dict = []
+            dup_list_dict: list[dict[int, list[int]]] = []
             for idxs in dup_list:
-                dup_dict = {}
+                dup_dict: dict[int, list[int]] = {}
                 for idx in idxs:
                     k, v = get_dataset_step_from_idx(idx, dataset_steps)
                     dup_dict.setdefault(k, []).append(v)
                 dup_list_dict.append(dup_dict)
-            duplicates[dup_type] = dup_list_dict
+            dataset_dupes[dup_type] = dup_list_dict
 
-        return DuplicatesOutput(**duplicates)
+        return DuplicatesOutput(**dataset_dupes)
 
     @set_metadata(state=["only_exact"])
     def from_clusters(
@@ -320,6 +313,6 @@ class Duplicates:
 
         """
         images = Images(data) if isinstance(data, Dataset) else data
-        self.stats = hashstats(images)
-        duplicates = self._get_duplicates(self.stats.data())
+        self.stats = calculate(images, None, ImageStats.HASH)
+        duplicates = self._get_duplicates(self.stats["stats"])
         return DuplicatesOutput(**duplicates)

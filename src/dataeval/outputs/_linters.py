@@ -8,7 +8,7 @@ from typing import Generic, TypeAlias, TypeVar
 
 import pandas as pd
 
-from dataeval.outputs._stats import LabelStatsOutput
+from dataeval.core._label_stats import LabelStatsResult
 from dataeval.types import DictOutput
 
 DuplicateGroup: TypeAlias = Sequence[int]
@@ -43,19 +43,20 @@ class DuplicatesOutput(DictOutput, Generic[TIndexCollection]):
 
 
 def _reorganize_by_class_and_metric(
-    result: IndexIssueMap, lstats: LabelStatsOutput
+    result: IndexIssueMap, lstats: LabelStatsResult
 ) -> tuple[Mapping[str, Sequence[int]], Mapping[str, Mapping[str, int]]]:
     """Flip result from grouping by image to grouping by class and metric"""
     metrics: dict[str, list[int]] = {}
-    class_wise: dict[str, dict[str, int]] = {label: {} for label in lstats.class_names}
+    class_wise: dict[str, dict[str, int]] = {label: {} for label in lstats["class_names"]}
 
     # Group metrics and calculate class-wise counts
     for img, group in result.items():
         for extreme in group:
             metrics.setdefault(extreme, []).append(img)
-            for i, images in lstats.image_indices_per_class.items():
+            for i, images in lstats["image_indices_per_class"].items():
                 if img in images:
-                    class_wise[lstats.class_names[i]][extreme] = class_wise[lstats.class_names[i]].get(extreme, 0) + 1
+                    class_name = lstats["class_names"][i]
+                    class_wise[class_name][extreme] = class_wise[class_name].get(extreme, 0) + 1
 
     return metrics, class_wise
 
@@ -138,14 +139,14 @@ class OutliersOutput(DictOutput, Generic[TIndexIssueMap]):
             return len(self.issues)
         return sum(len(d) for d in self.issues)
 
-    def to_table(self, labelstats: LabelStatsOutput) -> str:
+    def to_table(self, labelstats: LabelStatsResult) -> str:
         """
         Formats the outlier output results as a table.
 
         Parameters
         ----------
-        labelstats : LabelStatsOutput
-            Output of :func:`.labelstats`
+        labelstats : LabelStatsResult
+            Output of :func:`dataeval.core.label_stats`
 
         Returns
         -------
@@ -165,14 +166,14 @@ class OutliersOutput(DictOutput, Generic[TIndexIssueMap]):
             table = "\n\n".join(outertable)
         return table
 
-    def to_dataframe(self, labelstats: LabelStatsOutput) -> pd.DataFrame:
+    def to_dataframe(self, labelstats: LabelStatsResult) -> pd.DataFrame:
         """
         Exports the outliers output results to a pandas DataFrame.
 
         Parameters
         ----------
-        labelstats : LabelStatsOutput
-            Output of :func:`.labelstats`
+        labelstats : LabelStatsResult
+            Output of :func:`dataeval.core.label_stats`
 
         Returns
         -------

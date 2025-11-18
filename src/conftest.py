@@ -13,8 +13,9 @@ import sklearn.datasets as dsets
 import torch
 
 from dataeval.config import set_seed
+from dataeval.core import calculate
+from dataeval.core.flags import ImageStats
 from dataeval.data._metadata import FactorInfo, Metadata
-from dataeval.metrics.stats import hashstats, pixelstats
 from dataeval.outputs._ood import OODOutput
 
 # Manually add the import path for test_drift_uncertainty
@@ -136,8 +137,8 @@ def doctest_detectors_linters_duplicates(doctest_namespace: dict[str, Any]) -> N
     """dataeval.detectors.linters.Duplicates"""
 
     doctest_namespace["duplicate_images"] = images
-    doctest_namespace["hashes1"] = hashstats(images[:24])
-    doctest_namespace["hashes2"] = hashstats(images[25:])
+    doctest_namespace["hashes1"] = calculate(images[:24], None, ImageStats.HASH)
+    doctest_namespace["hashes2"] = calculate(images[25:], None, ImageStats.HASH)
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -150,8 +151,8 @@ def doctest_detectors_linters_outliers(doctest_namespace: dict[str, Any]) -> Non
     """dataeval.detectors.linters.Outliers"""
 
     doctest_namespace["outlier_images"] = images
-    doctest_namespace["stats1"] = pixelstats(images[:14])
-    doctest_namespace["stats2"] = pixelstats(images[15:])
+    doctest_namespace["stats1"] = calculate(images[:14], None, ImageStats.PIXEL)
+    doctest_namespace["stats2"] = calculate(images[15:], None, ImageStats.PIXEL)
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -226,14 +227,6 @@ def doctest_metrics_stats(doctest_namespace: dict[str, Any]) -> None:
 
     classes = ["horse", "cow", "sheep", "pig", "chicken"]
 
-    """dataeval.metrics.stats.boxratiostats.boxratiostats"""
-    """dataeval.metrics.stats.imagestats.imagestats"""
-    """dataeval.metrics.stats.dimensionstats.dimensionstats"""
-    """dataeval.metrics.stats.hashstats.hashstats"""
-    """dataeval.metrics.stats.labelstats.labelstats"""
-    """dataeval.metrics.stats.pixelstats.pixelstats"""
-    """dataeval.metrics.stats.visualstats.visualstats"""
-    """dataeval.outputs._stats.HashStatsOutput"""
     """dataeval.core.calculate"""
 
     index2label = dict(enumerate(classes))
