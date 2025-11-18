@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 
 from dataeval.core import calculate, calculate_ratios
+from dataeval.core._calculate import SOURCE_INDEX
 from dataeval.core.flags import ImageStats
-from dataeval.outputs._stats import SOURCE_INDEX
 from dataeval.types import SourceIndex
 
 

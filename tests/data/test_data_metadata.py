@@ -6,10 +6,12 @@ import numpy as np
 import polars as pl
 import pytest
 
+from dataeval.core import calculate
+from dataeval.core._calculate_ratios import calculate_ratios
+from dataeval.core._label_stats import label_stats
+from dataeval.core.flags import ImageStats
 from dataeval.data._metadata import FactorInfo, Metadata, _binned
-from dataeval.metrics.stats._boxratiostats import boxratiostats
-from dataeval.metrics.stats._imagestats import imagestats
-from dataeval.metrics.stats._labelstats import labelstats
+from dataeval.utils import unzip_dataset
 from tests.data.test_data_embeddings import MockDataset
 
 
@@ -73,8 +75,14 @@ class TestMetadata:
         assert len(md.class_labels) == 8
         assert md.item_indices.tolist() == [0, 2, 3, 4, 6, 7, 8, 9]
 
-        stats = labelstats(md)
-        assert stats.label_counts_per_image == [1, 0, 1, 1, 1, 0, 1, 1, 1, 1]
+        # Extract labels from metadata
+        labels: list[list[int]] = [[] for _ in range(md.item_count)]
+        for class_label, item_index in zip(md.class_labels, md.item_indices):
+            labels[item_index].append(int(class_label))
+        index2label = dict(enumerate(md.class_names))
+        stats = label_stats(labels, index2label)
+
+        assert stats["label_counts_per_image"] == [1, 0, 1, 1, 1, 0, 1, 1, 1, 1]
 
     def test_od_empty_targets(self, get_od_dataset):
         mock_ds = get_od_dataset(10, 2)
@@ -88,15 +96,25 @@ class TestMetadata:
         assert len(md.class_labels) == 16
         assert md.item_indices.tolist() == [0, 0, 2, 2, 3, 3, 4, 4, 6, 6, 7, 7, 8, 8, 9, 9]
 
-        stats = labelstats(md)
-        assert stats.label_counts_per_image == [2, 0, 2, 2, 2, 0, 2, 2, 2, 2]
+        # Extract labels from metadata
+        labels: list[list[int]] = [[] for _ in range(md.item_count)]
+        for class_label, item_index in zip(md.class_labels, md.item_indices):
+            labels[item_index].append(int(class_label))
+        index2label = dict(enumerate(md.class_names))
+        stats = label_stats(labels, index2label)
 
-        imgstats = imagestats(mock_ds)
-        boxstats = imagestats(mock_ds, per_box=True)
-        ratiostats = boxratiostats(boxstats, imgstats)
-        assert len(imgstats) == 10
-        assert len(boxstats) == 16
-        assert len(ratiostats) == 16
+        assert stats["label_counts_per_image"] == [2, 0, 2, 2, 2, 0, 2, 2, 2, 2]
+
+        imgstats = calculate(
+            *unzip_dataset(mock_ds, False), stats=ImageStats.PIXEL | ImageStats.VISUAL, per_image=True, per_target=False
+        )
+        boxstats = calculate(
+            *unzip_dataset(mock_ds, True), stats=ImageStats.PIXEL | ImageStats.VISUAL, per_image=False, per_target=True
+        )
+        ratiostats = calculate_ratios(imgstats, target_stats_output=boxstats)
+        assert len(imgstats["source_index"]) == 10
+        assert len(boxstats["source_index"]) == 16
+        assert len(ratiostats["source_index"]) == 16
 
     def test_mismatch_factor_length(self, mock_metadata):
         with pytest.raises(ValueError, match="provided factors have a different length"):
