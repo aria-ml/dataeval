@@ -10,6 +10,29 @@ features for more advanced users.
 In addition to viewing them in our documentation, these notebooks can also be
 opened in Google Colab to be used interactively!
 
+## General Usage
+
+These guides will provide quick examples of how to configure DataEval for your environment.
+
+```{toctree}
+:hidden:
+
+../notebooks/h2_configure_hardware_settings.ipynb
+```
+
+:::{list-table}
+:widths: 30 50 20
+:header-rows: 0
+:align: center
+
+- - [](../notebooks/h2_configure_hardware_settings.ipynb)
+  - Configure global hardware settings used in DataEval
+  - [![Open In Colab][colab-badge]][hdw-colab]
+
+:::
+
+[hdw-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_configure_hardware_settings.ipynb
+
 ## Detectors
 
 The purpose of these tools is to identify or detect issues within a dataset.
@@ -25,8 +48,9 @@ The guides below exemplify powerful solutions to common problems in ML.
 ```
 
 :::{list-table}
-:widths: 20 60 20
+:widths: 30 50 20
 :header-rows: 0
+:align: center
 
 - - [](../notebooks/h2_cluster_analysis.ipynb)
   - Identify outliers and anomalies with clustering algorithms
@@ -65,8 +89,9 @@ The guides below show best practices when solving common ML problems.
 :::
 
 :::{list-table}
-:widths: 20 60 20
+:widths: 30 50 20
 :header-rows: 0
+:align: center
 
 - - [](../notebooks/h2_measure_ic_feasibility.ipynb)
   - Calculate feasibility of performance requirements on
@@ -109,8 +134,9 @@ The guides below help you solve common problems found across machine learning ta
 :::
 
 :::{list-table}
-:widths: 20 60 20
+:widths: 30 50 20
 :header-rows: 0
+:align: center
 
 - - [](../notebooks/h2_measure_ic_sufficiency.ipynb)
   - Determine the amount of data needed to meet

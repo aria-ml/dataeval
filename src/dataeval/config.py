@@ -63,11 +63,11 @@ def get_device(override: DeviceLike | None = None) -> torch.device:
     if override is None:
         global _device
         return (
-            torch.get_default_device()
+            _device
+            if _device is not None
+            else torch.get_default_device()
             if hasattr(torch, "get_default_device")
             else torch.device("cpu")
-            if _device is None
-            else _device
         )
     return _todevice(override)
 
@@ -79,10 +79,23 @@ def set_max_processes(processes: int | None) -> None:
     Parameters
     ----------
     processes : int or None
-        The maximum number of worker processes to use, or None to use
-        `os.process_cpu_count <https://docs.python.org/3/library/os.html#os.process_cpu_count>`_
-        to determine the number of worker processes.
+        The maximum number of worker processes to use, or -1 to use
+        `os.cpu_count <https://docs.python.org/3/library/os.html#os.cpu_count>`_
+        to determine the number of worker processes. For negative values less than -1,
+        the number of worker processes will be set to `max(1, cpu_count + processes + 1)`.
+        None is unset, and defaults to 1 process.
+
+    Raises
+    ------
+    ValueError
+        If `processes` is zero.
+
+    See Also
+    --------
+    `n_jobs` (scikit-learn): https://scikit-learn.org/stable/glossary.html#term-n_jobs
     """
+    if processes == 0:
+        raise ValueError("processes cannot be zero; use None to default to CPU count.")
     global _processes
     _processes = processes
 
@@ -94,9 +107,11 @@ def get_max_processes() -> int | None:
     Returns
     -------
     int or None
-        The maximum number of worker processes to use, or None to use
-        `os.process_cpu_count <https://docs.python.org/3/library/os.html#os.process_cpu_count>`_
-        to determine the number of worker processes.
+        The maximum number of worker processes to use. None is unset, and defaults to 1 process.
+
+    See Also
+    --------
+    `n_jobs` (scikit-learn): https://scikit-learn.org/stable/glossary.html#term-n_jobs
     """
     global _processes
     return _processes
