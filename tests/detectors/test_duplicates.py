@@ -1,9 +1,10 @@
 import numpy as np
 import pytest
 
+from dataeval.core._calculate import calculate
 from dataeval.core._clusterer import ClusterResult
+from dataeval.core.flags import ImageStats
 from dataeval.detectors.linters.duplicates import Duplicates
-from dataeval.metrics.stats._hashstats import hashstats
 
 
 class MockDataset:
@@ -44,7 +45,7 @@ class TestDuplicates:
     def test_duplicates_with_stats(self):
         data = np.random.random((20, 3, 16, 16))
         data = np.concatenate((data, data, data + 0.001))
-        stats = hashstats(data)
+        stats = calculate(data, None, ImageStats.HASH)
         dupes = Duplicates(only_exact=True)
         results = dupes.from_stats(stats)
         assert len(results.exact) == 20
@@ -56,9 +57,9 @@ class TestDuplicates:
         data1 = np.concatenate((ones, zeros, ones, zeros, ones))
         data2 = np.concatenate((zeros, ones, zeros))
         data3 = np.concatenate((zeros + 0.001, ones - 0.001))
-        dupes1 = hashstats(data1)
-        dupes2 = hashstats(data2)
-        dupes3 = hashstats(data3)
+        dupes1 = calculate(data1, None, ImageStats.HASH)
+        dupes2 = calculate(data2, None, ImageStats.HASH)
+        dupes3 = calculate(data3, None, ImageStats.HASH)
 
         dupes = Duplicates()
         results = dupes.from_stats((dupes1, dupes2, dupes3))

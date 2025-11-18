@@ -75,8 +75,8 @@ class SourceIndex(NamedTuple):
     """
 
     item: int
-    target: int | None
-    channel: int | None
+    target: int | None = None
+    channel: int | None = None
 
 
 @dataclass(frozen=True)

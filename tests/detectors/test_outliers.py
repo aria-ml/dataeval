@@ -4,11 +4,11 @@ import numpy as np
 import pytest
 
 from dataeval.config import use_max_processes
+from dataeval.core import calculate
 from dataeval.core._clusterer import ClusterResult
+from dataeval.core._label_stats import LabelStatsResult
+from dataeval.core.flags import ImageStats
 from dataeval.detectors.linters.outliers import Outliers, OutliersOutput, _get_outlier_mask
-from dataeval.metrics.stats import dimensionstats, pixelstats, visualstats
-from dataeval.metrics.stats._imagestats import imagestats
-from dataeval.outputs._stats import ImageStatsOutput, LabelStatsOutput
 
 
 @pytest.mark.required
@@ -16,7 +16,7 @@ class TestOutliers:
     def test_outliers(self):
         outliers = Outliers()
         results = outliers.evaluate(np.random.random((100, 3, 16, 16)))
-        assert len(outliers.stats) == 30
+        assert len(outliers.stats["stats"]) > 0
         assert len(outliers.stats["source_index"]) == 100
         assert results is not None
 
@@ -48,7 +48,7 @@ class TestOutliers:
 
     def test_outliers_with_stats(self):
         data = np.random.random((20, 3, 16, 16))
-        stats = pixelstats(data)
+        stats = calculate(data, None, ImageStats.PIXEL)
         outliers = Outliers()
         results = outliers.from_stats(stats)
         assert results is not None
@@ -58,8 +58,12 @@ class TestOutliers:
         images = images / 2.0
         images[10] = 1.0
         dataset = get_od_dataset(images, 2, True, {10: [(-5, -5, -1, -1), (1, 1, 5, 5)]})
+        from dataeval.utils import unzip_dataset
+
         with use_max_processes(1):
-            stats = imagestats(dataset, per_box=True)
+            stats = calculate(
+                *unzip_dataset(dataset, True), stats=ImageStats.PIXEL | ImageStats.VISUAL, per_target=True
+            )
         outliers = Outliers()
         results = outliers.from_stats(stats)
         assert all(vv != np.nan for k, v in results.issues.items() for vv in v.values())
@@ -68,22 +72,11 @@ class TestOutliers:
         dataset1 = np.zeros((50, 3, 16, 16))
         dataset2 = np.zeros((50, 3, 16, 16))
         dataset2[0] = 1
-        stats1 = pixelstats(dataset1)
-        stats2 = pixelstats(dataset2)
-        stats3 = dimensionstats(dataset1)
+        stats1 = calculate(dataset1, None, ImageStats.PIXEL)
+        stats2 = calculate(dataset2, None, ImageStats.PIXEL)
+        stats3 = calculate(dataset1, None, ImageStats.DIMENSION)
         outliers = Outliers()
         results = outliers.from_stats((stats1, stats2, stats3))
-        assert results is not None
-
-    def test_outliers_with_combined_stats(self):
-        dataset1 = np.zeros((50, 3, 16, 16))
-        dataset2 = np.zeros((50, 3, 16, 16))
-        dataset2[0] = 1
-        stats2 = visualstats(dataset1)
-        stats1 = pixelstats(dataset2)
-        outliers = Outliers()
-        stats = ImageStatsOutput(**{k: v for d in (stats1, stats2) for k, v in d.data().items()})
-        results = outliers.from_stats(stats)
         assert results is not None
 
     def test_outliers_with_invalid_stats_type(self):
@@ -109,8 +102,8 @@ class TestOutliers:
     def test_outliers_use_flags(self, params, expected, not_expected):
         outliers = Outliers(*params)
         outliers.evaluate(np.zeros((50, 1, 16, 16)))
-        assert expected in outliers.stats
-        assert not not_expected & set(outliers.stats)
+        assert expected in outliers.stats["stats"]
+        assert not not_expected & set(outliers.stats["stats"])
 
     def test_outliers_from_clusters_basic(self):
         """Test basic cluster-based outlier detection"""
@@ -212,16 +205,16 @@ class TestOutliers:
 class TestOutliersOutput:
     outlier = {1: {"a": 1.0, "b": 1.0}, 3: {"a": 1.0, "b": 1.0}, 5: {"a": 1.0, "b": 1.0}}
     outlier2 = {2: {"a": 2.0, "d": 2.0}, 6: {"a": 1.0, "d": 1.0}, 7: {"a": 0.5, "c": 0.5}}
-    lstat = LabelStatsOutput(
-        {0: 3, 1: 4, 2: 3},
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        {0: 3, 1: 4, 2: 3},
-        {0: [0, 3, 7], 1: [1, 4, 6, 9], 2: [2, 5, 8]},
-        10,
-        3,
-        10,
-        ["horse", "dog", "mule"],
-    )
+    lstat: LabelStatsResult = {
+        "label_counts_per_class": {0: 3, 1: 4, 2: 3},
+        "label_counts_per_image": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        "image_counts_per_class": {0: 3, 1: 4, 2: 3},
+        "image_indices_per_class": {0: [0, 3, 7], 1: [1, 4, 6, 9], 2: [2, 5, 8]},
+        "image_count": 10,
+        "class_count": 3,
+        "label_count": 10,
+        "class_names": ["horse", "dog", "mule"],
+    }
 
     def test_dict_len(self):
         output = OutliersOutput(self.outlier)

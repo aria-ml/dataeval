@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from enum import Flag
 from functools import cached_property, partial
 from itertools import zip_longest
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast, get_type_hints
 
 import numpy as np
 from numpy.typing import NDArray
@@ -32,6 +32,8 @@ from dataeval.utils._image import clip_and_pad, normalize_image_shape, rescale
 from dataeval.utils._multiprocessing import PoolWrapper
 from dataeval.utils._tqdm import tqdm
 from dataeval.utils._unzip_dataset import unzip_dataset
+
+SOURCE_INDEX = "source_index"
 
 
 class CalculationResult(TypedDict):
@@ -60,6 +62,21 @@ class CalculationResult(TypedDict):
     invalid_box_count: Sequence[int]
     image_count: int
     stats: Mapping[str, NDArray[Any]]
+
+
+def as_calculation_result(obj: dict[str, Any]) -> CalculationResult | None:
+    if not isinstance(obj, dict):
+        return None
+
+    type_hints = get_type_hints(CalculationResult)
+
+    for key, expected_type in type_hints.items():
+        if key not in obj:
+            return None
+        if not isinstance(obj[key], expected_type):
+            return None
+
+    return cast(CalculationResult, obj)
 
 
 @dataclass
