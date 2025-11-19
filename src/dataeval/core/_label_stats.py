@@ -6,8 +6,6 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TypedDict
 
-from dataeval.types import Array1D, Array2D
-
 
 class LabelStatsResult(TypedDict):
     """
@@ -44,7 +42,7 @@ class LabelStatsResult(TypedDict):
 
 
 def label_stats(
-    labels: Array1D[int] | Array2D[int],
+    labels: Iterable[int] | Iterable[Iterable[int]],
     index2label: Mapping[int, str] | None = None,
 ) -> LabelStatsResult:
     """
@@ -112,14 +110,16 @@ def label_stats(
     label_counts_per_image: list[int] = []
 
     # Single pass through the data
+    img_idx = -1
     for img_idx, img_labels in enumerate(labels):
-        # Count labels in this image
-        label_counts_per_image.append(len(img_labels))
-
         # Track which classes appear in this image (for image_counts)
         classes_in_image = set()
 
-        for label in img_labels if isinstance(img_labels, Iterable) else [img_labels]:
+        label_count = -1
+        for label_count, label in enumerate(img_labels if isinstance(img_labels, Iterable) else [img_labels]):
+            # Ensure label is always native int type
+            label = int(label)
+
             # Count total occurrences of each label
             label_counts[label] += 1
 
@@ -127,6 +127,8 @@ def label_stats(
             if label not in classes_in_image:
                 classes_in_image.add(label)
                 image_indices_per_class[label].append(img_idx)
+
+        label_counts_per_image.append(label_count + 1)
 
     # Count images per class
     for label, indices in image_indices_per_class.items():
@@ -147,7 +149,7 @@ def label_stats(
         "label_counts_per_image": label_counts_per_image,
         "image_counts_per_class": dict(image_counts),
         "image_indices_per_class": dict(image_indices_per_class),
-        "image_count": len(labels),
+        "image_count": img_idx + 1,
         "class_count": len(unique_classes),
         "label_count": total_labels,
         "class_names": class_names,
