@@ -454,7 +454,7 @@ Our strategy is based on **GitLab Flow (Release Branches)** with enhancements:
 
 ## References
 
-- [GitLab Flow Documentation](https://docs.gitlab.com/ee/topics/gitlab_flow.html)
+- [GitLab Flow Documentation](https://about.gitlab.com/topics/version-control/what-is-gitlab-flow/)
 - [Semantic Versioning 2.0.0](https://semver.org/)
 - [Git Branching Model Comparison](https://www.flagship.io/git-branching-strategies/)
 - Project CI/CD Configuration: [`.gitlab-ci.yml`](.gitlab-ci.yml)
