@@ -41,8 +41,8 @@ linkchecker:
     name: ghcr.io/tcort/markdown-link-check:stable
     entrypoint: ['/bin/sh', '-c']
   script:
-    - markdown-link-check *.md
-    - markdown-link-check ./docs/source
+    - markdown-link-check --config docs/.markdown-link-check.json *.md
+    - markdown-link-check --config docs/.markdown-link-check.json ./docs/source
 
 markdownlint:
   stage: docs
