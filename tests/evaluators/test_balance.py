@@ -1,0 +1,111 @@
+import copy
+from unittest.mock import MagicMock
+
+import numpy as np
+import pytest
+
+from dataeval.data._metadata import Metadata
+
+try:
+    from matplotlib.figure import Figure
+except ImportError:
+    Figure = type(None)
+
+from dataeval.evaluators.bias._balance import balance
+from tests.conftest import to_metadata
+
+
+@pytest.fixture(scope="module")
+def metadata_results():
+    str_vals = ["b", "b", "b", "b", "b", "a", "a", "b", "a", "b", "b", "a"]
+    cnt_vals = [
+        -0.54425898,
+        -0.31630016,
+        0.41163054,
+        1.04251337,
+        -0.12853466,
+        1.36646347,
+        -0.66519467,
+        0.35151007,
+        0.90347018,
+        0.0940123,
+        -0.74349925,
+        -0.92172538,
+    ]
+    cat_vals = [1.1, 1.1, 0.1, 0.1, 1.1, 0.1, 1.1, 0.1, 0.1, 1.1, 1.1, 0.1]
+    class_labels = ["dog", "dog", "dog", "cat", "dog", "cat", "dog", "dog", "dog", "cat", "cat", "cat"]
+    md = {"var_cat": str_vals, "var_cnt": cnt_vals, "var_float_cat": cat_vals}
+    return to_metadata(md, class_labels, {"var_cnt": 3, "var_float_cat": 2})
+
+
+@pytest.fixture(scope="module")
+def mismatch_metadata():
+    raw_metadata = {"factor1": list(range(10)), "factor2": list(range(10)), "factor3": list(range(10))}
+    class_labels = [1] * 10
+    continuous_bins = {"factor1": 5, "factor2": 5, "factor3": 5}
+    return to_metadata(raw_metadata, class_labels, continuous_bins)
+
+
+@pytest.fixture(scope="module")
+def simple_metadata():
+    raw_metadata = {"factor1": [1] * 100 + [2] * 100, "factor2": [1] * 100 + [2] * 100}
+    class_labels = [1] * 100 + [2] * 100
+    return to_metadata(raw_metadata, class_labels)
+
+
+@pytest.mark.required
+class TestBalanceUnit:
+    def test_correct_mi_shape_and_dtype(self, metadata_results):
+        metadata = copy.deepcopy(metadata_results)
+        metadata.exclude = []
+        num_vars = len(metadata.factor_names) + 1
+        expected_shape = {
+            "balance": (num_vars,),
+            "factors": (num_vars - 1, num_vars - 1),
+            "classwise": (2, num_vars),
+            "factor_names": (num_vars),
+            "class_names": (np.unique(metadata.class_labels).size),
+        }
+        expected_type = {
+            "balance": float,
+            "factors": float,
+            "classwise": float,
+            "factor_names": list,
+            "class_names": list,
+        }
+        mi = balance(metadata)
+        for k, v in mi.data().items():
+            if type(v) is list:
+                assert len(v) == expected_shape[k]
+            else:
+                assert v.shape == expected_shape[k]
+                if k in expected_type:
+                    assert v.dtype == expected_type[k]
+
+    def test_empty_metadata(self):
+        mock_metadata = MagicMock(spec=Metadata)
+        mock_metadata.factor_names = []
+        with pytest.raises(ValueError):
+            balance(mock_metadata)
+
+
+@pytest.mark.requires_all
+@pytest.mark.required
+class TestBalancePlot:
+    def test_base_plotting(self, metadata_results):
+        mi = balance(metadata_results)
+        output = mi.plot()
+        assert isinstance(output, Figure)
+        classwise_output = mi.plot(plot_classwise=True)
+        assert isinstance(classwise_output, Figure)
+
+    def test_plotting_vars(self, metadata_results):
+        mi = balance(metadata_results)
+        factor_names = mi.factor_names
+        heat_labels = np.arange(len(factor_names))
+        output = mi.plot(heat_labels[:-1], heat_labels[1:], plot_classwise=False)
+        assert isinstance(output, Figure)
+        _, row_labels = np.unique(mi.class_names, return_inverse=True)
+        col_labels = np.arange(len(factor_names))
+        classwise_output = mi.plot(row_labels, col_labels, plot_classwise=True)
+        assert isinstance(classwise_output, Figure)

@@ -10,9 +10,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from dataeval.outputs import SufficiencyOutput
 from dataeval.protocols import Dataset, EvaluationStrategy, TrainingStrategy
 from dataeval.types import set_metadata
+from dataeval.workflows._output import SufficiencyOutput
 
 T = TypeVar("T")
 

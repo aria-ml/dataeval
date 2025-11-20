@@ -3,8 +3,6 @@ Core stateless functions for performing dataset, metadata and model evaluation.
 """
 
 __all__ = [
-    "balance",
-    "balance_classwise",
     "ber_knn",
     "ber_mst",
     "calculate",
@@ -23,6 +21,8 @@ __all__ = [
     "label_parity",
     "label_stats",
     "minimum_spanning_tree",
+    "mutual_info",
+    "mutual_info_classwise",
     "nullmodel_accuracy",
     "nullmodel_fpr",
     "nullmodel_precision",
@@ -35,7 +35,6 @@ __all__ = [
 ]
 
 from dataeval.core import flags
-from dataeval.core._balance import balance, balance_classwise
 from dataeval.core._ber import ber_knn, ber_mst
 from dataeval.core._calculate import calculate
 from dataeval.core._calculate_ratios import calculate_ratios
@@ -48,6 +47,7 @@ from dataeval.core._label_parity import label_parity
 from dataeval.core._label_stats import label_stats
 from dataeval.core._metadata_insights import factor_deviation, factor_predictors
 from dataeval.core._mst import compute_neighbors, minimum_spanning_tree
+from dataeval.core._mutual_info import mutual_info, mutual_info_classwise
 from dataeval.core._nullmodel import (
     nullmodel_accuracy,
     nullmodel_fpr,
