@@ -10,7 +10,7 @@ try:
     from matplotlib.figure import Figure
 except ImportError:
     Figure = type(None)
-from dataeval.outputs._workflows import (
+from dataeval.workflows._output import (
     SufficiencyOutput,
     f_inv_out,
     f_out,

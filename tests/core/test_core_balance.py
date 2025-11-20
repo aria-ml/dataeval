@@ -1,7 +1,11 @@
 import numpy as np
 import pytest
 
-from dataeval.core._balance import _merge_labels_and_factors, _validate_num_neighbors, balance, balance_classwise
+from dataeval.core._mutual_info import (
+    _merge_labels_and_factors,
+    _validate_num_neighbors,
+    mutual_info,
+)
 
 CLASS_LABELS = np.array([0, 0, 1, 1, 0, 1, 0, 1, 0, 1])
 FACTOR_DATA = np.array(
@@ -71,28 +75,33 @@ class TestBalanceMergeLabelsAndFactors:
 @pytest.mark.required
 class TestBalanceFunctional:
     def test_balance(self):
-        output = balance(CLASS_LABELS, FACTOR_DATA)
+        """Test the balance function with TypedDict return."""
+        result = mutual_info(CLASS_LABELS, FACTOR_DATA)
+
+        # Test that result is a dict with the expected keys
+        assert "class_to_factor" in result
+        assert "interfactor" in result
+
+        # Test factors array
+        assert result["class_to_factor"].ndim == 1
+        assert len(result["class_to_factor"]) == FACTOR_DATA.shape[1] + 1
         np.testing.assert_allclose(
-            output,
-            np.array(
-                [
-                    [0.115358, 0.045411, 0.0, 0.006385],
-                    [0.045411, 1.0, 0.481648, 0.538835],
-                    [0.0, 0.481648, 1.0, 0.331053],
-                    [0.006385, 0.538835, 0.331053, 0.205118],
-                ]
-            ),
+            result["class_to_factor"],
+            np.array([0.115358, 0.045411, 0.0, 0.006385]),
             atol=1e-6,
         )
 
-    def test_balance_classwise(self):
-        output = balance_classwise(CLASS_LABELS, FACTOR_DATA)
+        # Test interfactor matrix
+        assert result["interfactor"].ndim == 2
+        assert result["interfactor"].shape == (FACTOR_DATA.shape[1], FACTOR_DATA.shape[1])
+        np.testing.assert_allclose(result["interfactor"], result["interfactor"].T, atol=1e-6)
         np.testing.assert_allclose(
-            output,
+            result["interfactor"],
             np.array(
                 [
-                    [2.32606, 0.240824, 0.029049, 0.0],
-                    [2.32606, 0.240824, 0.029049, 0.0],
+                    [1.0, 0.481648, 0.538835],
+                    [0.481648, 1.0, 0.331053],
+                    [0.538835, 0.331053, 0.205118],
                 ]
             ),
             atol=1e-6,
