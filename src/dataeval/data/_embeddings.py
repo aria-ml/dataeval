@@ -15,13 +15,14 @@ import xxhash as xxh
 from numpy.typing import NDArray
 from torch.utils.data import DataLoader, Subset
 
-from dataeval.config import DeviceLike, get_device
+from dataeval.config import get_device
 from dataeval.protocols import (
     AnnotatedDataset,
     AnnotatedModel,
     Array,
     ArrayLike,
     Dataset,
+    DeviceLike,
     EmbeddingModel,
     Transform,
 )

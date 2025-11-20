@@ -16,10 +16,10 @@ from dataeval.config import set_seed
 from dataeval.core import calculate
 from dataeval.core.flags import ImageStats
 from dataeval.data._metadata import FactorInfo, Metadata
-from dataeval.outputs._ood import OODOutput
+from dataeval.evaluators.ood.base import OODOutput
 
 # Manually add the import path for test_drift_uncertainty
-sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute() / "tests" / "detectors"))
+sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute() / "tests" / "evaluators"))
 from test_drift_uncertainty import PtModel
 
 # Set numpy print option to legacy 1.25 so native numpy types
@@ -61,6 +61,13 @@ def generate_random_metadata(
     return metadata
 
 
+def generate_random_class_labels_and_binned_data(
+    labels: Sequence[str], factors: dict[str, Sequence[str | int]], length: int, random_seed: int
+) -> tuple[np.typing.NDArray[np.intp], np.typing.NDArray[np.intp]]:
+    metadata = generate_random_metadata(labels=labels, factors=factors, length=length, random_seed=random_seed)
+    return metadata.class_labels, metadata.binned_data
+
+
 def get_one_hot(class_count: int, sub_labels: Sequence[int]) -> list[list[float]]:
     one_hot = [[0.0] * class_count] * len(sub_labels)
     for i, label in enumerate(sub_labels):
@@ -95,6 +102,7 @@ def add_tmp_path(doctest_namespace: dict[str, Any], tmp_path_factory: pytest.Tem
 def add_all(doctest_namespace: dict[str, Any]) -> None:
     doctest_namespace["np"] = np
     doctest_namespace["generate_random_metadata"] = generate_random_metadata
+    doctest_namespace["generate_random_class_labels_and_binned_data"] = generate_random_class_labels_and_binned_data
     doctest_namespace["OODOutput"] = OODOutput
 
 
@@ -134,7 +142,7 @@ def doctest_detectors_linters_duplicates(doctest_namespace: dict[str, Any]) -> N
     images[16] = images[37]
     images[3] = images[20]
 
-    """dataeval.detectors.linters.Duplicates"""
+    """dataeval.evaluators.linters.Duplicates"""
 
     doctest_namespace["duplicate_images"] = images
     doctest_namespace["hashes1"] = calculate(images[:24], None, ImageStats.HASH)
@@ -148,7 +156,7 @@ def doctest_detectors_linters_outliers(doctest_namespace: dict[str, Any]) -> Non
     images[10:13, :, 50:80, 50:80] = 0
     images[[7, 11, 18, 25]] = 512
 
-    """dataeval.detectors.linters.Outliers"""
+    """dataeval.evaluators.linters.Outliers"""
 
     doctest_namespace["outlier_images"] = images
     doctest_namespace["stats1"] = calculate(images[:14], None, ImageStats.PIXEL)
@@ -171,7 +179,7 @@ def doctest_metrics_bias_coverage(doctest_namespace: dict[str, Any]) -> None:
     blobs = blobs - np.min(blobs)
     blobs = blobs / np.max(blobs)
 
-    """dataeval.metrics.bias.coverage.coverage"""
+    """dataeval.evaluators.bias.coverage.coverage"""
     doctest_namespace["embeddings"] = blobs
 
 

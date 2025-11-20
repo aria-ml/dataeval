@@ -1,0 +1,102 @@
+from typing import Literal
+
+import numpy as np
+from numpy.typing import NDArray
+from sklearn.neighbors import NearestNeighbors
+
+from dataeval.config import get_max_processes
+from dataeval.evaluators.ood.base import EmbeddingBasedOODBase, OODScoreOutput
+from dataeval.protocols import Array
+
+
+class OOD_KNN(EmbeddingBasedOODBase):
+    """
+    K-Nearest Neighbors Out-of-Distribution detector.
+
+    Uses average cosine distance to k nearest neighbors in embedding space to detect OOD samples.
+    Samples with larger average distances to their k nearest neighbors in the
+    reference (in-distribution) set are considered more likely to be OOD.
+
+    Based on the methodology from:
+    "Back to the Basics: Revisiting Out-of-Distribution Detection Baselines"
+    (Kuan & Mueller, 2022)
+
+    As referenced in:
+    "Safe AI for coral reefs: Benchmarking out-of-distribution detection
+    algorithms for coral reef image surveys"
+    """
+
+    def __init__(self, k: int = 10, distance_metric: Literal["cosine", "euclidean"] = "cosine") -> None:
+        """
+        Initialize KNN OOD detector.
+
+        Parameters
+        ----------
+        k : int, default 10
+            Number of nearest neighbors to consider
+        distance_metric : "cosine", "euclidean", default "cosine"
+            Distance metric to use
+        """
+        super().__init__()
+        self.k = k
+        self.distance_metric = distance_metric
+        self._nn_model: NearestNeighbors
+        self.reference_embeddings: NDArray[np.float32]
+
+    def fit_embeddings(self, embeddings: Array, threshold_perc: float = 95.0) -> None:
+        """
+        Fit the detector using reference (in-distribution) embeddings.
+
+        Builds a k-NN index for efficient nearest neighbor search and
+        computes reference scores for automatic thresholding.
+
+        Parameters
+        ----------
+        embeddings : Array
+            Reference (in-distribution) embeddings
+        threshold_perc : float, default 95.0
+            Percentage of reference data considered normal
+        """
+        self.reference_embeddings = np.asarray(embeddings, dtype=np.float32)
+
+        if self.k >= len(self.reference_embeddings):
+            raise ValueError(
+                f"k ({self.k}) must be less than number of reference embeddings ({len(self.reference_embeddings)})"
+            )
+
+        # Build k-NN index using sklearn
+        self._nn_model = NearestNeighbors(
+            n_neighbors=self.k,
+            metric=self.distance_metric,
+            algorithm="auto",  # Let sklearn choose the best algorithm
+            n_jobs=get_max_processes(),
+        )
+        self._nn_model.fit(self.reference_embeddings)
+
+        # efficiently compute reference scores for automatic thresholding
+        ref_scores = self._compute_reference_scores()
+        self._ref_score = OODScoreOutput(instance_score=ref_scores)
+        self._threshold_perc = threshold_perc
+        self._data_info = self._get_data_info(self.reference_embeddings)
+
+    def _compute_reference_scores(self) -> np.ndarray:
+        """Efficiently compute reference scores by excluding self-matches."""
+        # Find k+1 neighbors (including self) for reference points
+        distances, _ = self._nn_model.kneighbors(self.reference_embeddings, n_neighbors=self.k + 1)
+        # Skip first neighbor (self with distance 0) and average the rest
+        return np.mean(distances[:, 1:], axis=1)
+
+    def _score(self, X: np.ndarray, batch_size: int = int(1e10)) -> OODScoreOutput:
+        """
+        Compute OOD scores for input embeddings.
+
+        Args:
+            X: Input embeddings to score
+            batch_size: Batch size (not used, kept for interface compatibility)
+
+        Returns:
+            OODScoreOutput containing instance-level scores
+        """
+        # Compute OOD scores using sklearn's efficient k-NN search
+        distances, _ = self._nn_model.kneighbors(X)
+        return OODScoreOutput(instance_score=np.mean(distances, axis=1))
