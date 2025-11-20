@@ -6,10 +6,10 @@ import numpy as np
 import pytest
 import torch
 
-from dataeval.outputs._workflows import (
+from dataeval.workflows import Sufficiency
+from dataeval.workflows._output import (
     SufficiencyOutput,
 )
-from dataeval.workflows import Sufficiency
 from dataeval.workflows.sufficiency import SufficiencyConfig
 
 np.random.seed(0)

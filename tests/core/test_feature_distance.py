@@ -71,7 +71,7 @@ class TestFeatureDistance:
 
         assert len(result) == len(factors)
         assert all(factor in result for factor in factors)
-        assert isinstance(result[factors[0]].statistic, float)
+        assert isinstance(result[factors[0]]["statistic"], float)
 
     def test_no_warn_on_many_samples(self, RNG: Generator):
         """Solving the equation where N==M brings the sample count to 32 to make a valid solution"""

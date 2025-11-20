@@ -12,10 +12,9 @@ import polars as pl
 from numpy.typing import NDArray
 
 from dataeval.core._bin import bin_data, digitize_data, is_continuous
-from dataeval.core._feature_distance import feature_distance
-from dataeval.outputs._metadata import MetadataDistanceOutput, MetadataDistanceValues
+from dataeval.core._feature_distance import FeatureDistanceResult, feature_distance
 from dataeval.protocols import AnnotatedDataset, Array, DatumMetadata, ObjectDetectionTarget
-from dataeval.types import Array1D, set_metadata
+from dataeval.types import Array1D
 from dataeval.utils._array import as_numpy
 from dataeval.utils._merge import merge
 from dataeval.utils._tqdm import tqdm
@@ -362,7 +361,7 @@ class Metadata:
         -----
         Use this for algorithms that can work with mixed data types or when
         you need access to original continuous values. For analysis-ready
-        numeric data, use binned_data or numeric_data instead.
+        numeric data, use `binned_data`.
         """
         if not self.factor_names:
             return np.array([], dtype=np.float64)
@@ -672,8 +671,7 @@ class Metadata:
         filtered = [name for name, info in self.factor_info.items() if condition(name, info)]
         return self.dataframe[filtered].to_numpy().astype(np.float64)
 
-    @set_metadata
-    def calculate_distance(self, other: Metadata) -> MetadataDistanceOutput:
+    def calculate_distance(self, other: Metadata) -> Mapping[str, FeatureDistanceResult]:
         """Measures the feature-wise distance between two continuous metadata distributions and
         computes a p-value to evaluate its significance.
 
@@ -705,11 +703,11 @@ class Metadata:
         >>> list(output)
         ['time', 'altitude']
         >>> output["time"]
-        MetadataDistanceValues(statistic=1.0, location=0.44354838709677413, dist=2.7, p_value=0.0)
+        {'statistic': 1.0, 'location': 0.44354838709677413, 'dist': 2.7, 'p_value': 0.0}
         """
         if set(self.factor_names) != set(other.factor_names):
             raise ValueError(f"Metadata keys must be identical, got {self.factor_names} and {other.factor_names}")
         c1 = self.filter_by_factor(lambda _, fi: fi.factor_type == "continuous")
         c2 = other.filter_by_factor(lambda _, fi: fi.factor_type == "continuous")
         distance = feature_distance(c1, c2)
-        return MetadataDistanceOutput(dict(zip(self.factor_names, (MetadataDistanceValues(**d) for d in distance))))
+        return dict(zip(self.factor_names, distance))
