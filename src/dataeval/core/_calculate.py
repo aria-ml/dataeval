@@ -350,7 +350,11 @@ def _sort(
     for stat_name, stat_values in aggregated_stats.items():
         # Sort the values and convert to numpy array
         sorted_values = [stat_values[i] for i in sort_indices]
-        sorted_aggregated_stats[stat_name] = np.array(sorted_values)
+        np_array = np.array(sorted_values)
+        # If the values are floats, convert to dtype float16 for efficiency
+        if np.issubdtype(np_array.dtype, np.floating):
+            np_array = np_array.astype(np.float16)
+        sorted_aggregated_stats[stat_name] = np_array
 
     return sorted_source_indices, sorted_aggregated_stats
 

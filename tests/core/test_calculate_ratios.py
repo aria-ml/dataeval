@@ -48,10 +48,10 @@ class TestCalculateRatios:
         # Image 0: box 1 width = 50, image width = 200, ratio = 0.25
         # Image 1: box 0 width = 20, image width = 100, ratio = 0.2
         # Image 1: box 1 width = 30, image width = 100, ratio = 0.3
-        assert ratios["stats"]["width"][0] == pytest.approx(40.0 / 200.0, abs=1e-6)
-        assert ratios["stats"]["width"][1] == pytest.approx(50.0 / 200.0, abs=1e-6)
-        assert ratios["stats"]["width"][2] == pytest.approx(20.0 / 100.0, abs=1e-6)
-        assert ratios["stats"]["width"][3] == pytest.approx(30.0 / 100.0, abs=1e-6)
+        assert ratios["stats"]["width"][0] == pytest.approx(40.0 / 200.0, abs=1e-3)
+        assert ratios["stats"]["width"][1] == pytest.approx(50.0 / 200.0, abs=1e-3)
+        assert ratios["stats"]["width"][2] == pytest.approx(20.0 / 100.0, abs=1e-3)
+        assert ratios["stats"]["width"][3] == pytest.approx(30.0 / 100.0, abs=1e-3)
 
     def test_pixel_ratios(self):
         """Test pixel statistics ratio calculations."""
@@ -162,11 +162,11 @@ class TestCalculateRatios:
 
         # offset_x should be normalized by image width (200)
         # offset_x = 50, image width = 200, ratio = 0.25
-        assert ratios["stats"]["offset_x"][0] == pytest.approx(50.0 / 200.0, abs=1e-6)
+        assert ratios["stats"]["offset_x"][0] == pytest.approx(50.0 / 200.0, abs=1e-3)
 
         # offset_y should be normalized by image height (100)
         # offset_y = 25, image height = 100, ratio = 0.25
-        assert ratios["stats"]["offset_y"][0] == pytest.approx(25.0 / 100.0, abs=1e-6)
+        assert ratios["stats"]["offset_y"][0] == pytest.approx(25.0 / 100.0, abs=1e-3)
 
     def test_channels_depth_override(self):
         """Test that channels and depth are preserved from box stats (not divided)."""
@@ -495,7 +495,7 @@ class TestCalculateRatiosSeparateInputs:
         assert len(ratios[SOURCE_INDEX]) == 1
 
         # Check width ratio: 40 / 200 = 0.2
-        assert ratios["stats"]["width"][0] == pytest.approx(40.0 / 200.0, abs=1e-6)
+        assert ratios["stats"]["width"][0] == pytest.approx(40.0 / 200.0, abs=1e-3)
 
     def test_separate_inputs_multiple_images(self):
         """Test separate inputs with multiple images."""
@@ -601,8 +601,8 @@ class TestCalculateRatiosEdgeCases:
         ratios = calculate_ratios(stats)
 
         assert len(ratios[SOURCE_INDEX]) == 1
-        assert ratios["stats"]["width"][0] == pytest.approx(1.0 / 50.0, abs=1e-6)
-        assert ratios["stats"]["height"][0] == pytest.approx(1.0 / 50.0, abs=1e-6)
+        assert ratios["stats"]["width"][0] == pytest.approx(1.0 / 50.0, abs=1e-3)
+        assert ratios["stats"]["height"][0] == pytest.approx(1.0 / 50.0, abs=1e-3)
 
     def test_box_equals_image(self):
         """Test when box covers entire image."""
@@ -621,8 +621,8 @@ class TestCalculateRatiosEdgeCases:
         ratios = calculate_ratios(stats)
 
         # Width and height ratios should be 1.0
-        assert ratios["stats"]["width"][0] == pytest.approx(1.0, abs=1e-6)
-        assert ratios["stats"]["height"][0] == pytest.approx(1.0, abs=1e-6)
+        assert ratios["stats"]["width"][0] == pytest.approx(1.0, abs=1e-3)
+        assert ratios["stats"]["height"][0] == pytest.approx(1.0, abs=1e-3)
 
     def test_single_channel_image(self):
         """Test with single-channel (grayscale) images."""
