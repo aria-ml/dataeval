@@ -208,7 +208,7 @@ class Outliers:
         >>> len(results)
         2
         >>> results.issues[0]
-        {10: {'entropy': 0.21278774841317422, 'zeros': 0.054931640625}, 12: {'entropy': 0.21278774841317422, 'std': 0.005361100722760435, 'var': 2.8741400959582466e-05, 'zeros': 0.054931640625}}
+        {10: {'entropy': 0.2128, 'zeros': 0.05493}, 12: {'entropy': 0.2128, 'std': 0.00536, 'var': 2.87e-05, 'zeros': 0.05493}}
         >>> results.issues[1]
         {}
         """  # noqa: E501
@@ -394,7 +394,7 @@ class Outliers:
         >>> list(results.issues)
         [10, 12]
         >>> results.issues[10]
-        {'contrast': 1.2499999999203126, 'entropy': 0.21278774841317422, 'zeros': 0.054931640625}
+        {'contrast': 1.25, 'entropy': 0.2128, 'zeros': 0.05493}
 
         Access computed statistics for reuse:
 

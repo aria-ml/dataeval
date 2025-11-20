@@ -65,11 +65,13 @@ class DimensionStatCalculator(Calculator[ImageStats]):
         return [self.cache.box.width * self.cache.box.height]
 
     def _aspect_ratio(self) -> list[float]:
-        # Aspect ratio only makes sense for spatial data
+        # Normalized aspect ratio only makes sense for spatial data
         if not self.is_spatial:
             return [np.nan]
         box = self.cache.box
-        return [0.0 if box.height == 0 else box.width / box.height]
+        # Wide is positive - tall is negative
+        mult, divisor, dividend = (-1, box.width, box.height) if box.height > box.width else (1, box.height, box.width)
+        return [float("nan") if dividend == 0 else mult * (1 - (divisor / dividend))]
 
     def _depth(self) -> list[int]:
         return [get_bitdepth(self.cache.raw).depth]
