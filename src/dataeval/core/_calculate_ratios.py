@@ -45,6 +45,7 @@ def _default_ratio_map() -> OverrideFunctionMap:
         "offset_x": lambda box, img: box["offset_x"] / (img["width"] + EPSILON),
         "offset_y": lambda box, img: box["offset_y"] / (img["height"] + EPSILON),
         # Keep these values unchanged from box stats
+        "aspect_ratio": lambda box, img: box["aspect_ratio"],
         "channels": lambda box, img: box["channels"],
         "depth": lambda box, img: box["depth"],
         # Hash stats should be kept as-is (they're strings, not numeric)
@@ -139,7 +140,11 @@ def _calculate_ratio_for_stat(
                 # For non-numeric types, just return box value
                 return box_value
 
-            result = box_arr / (img_arr + EPSILON)
+            # Upscale to float64 for calculation to avoid precision issues
+            result = box_arr.astype(np.float64) / (img_arr.astype(np.float64) + EPSILON)
+            if np.issubdtype(result.dtype, np.floating):
+                result = result.astype(np.float16)
+
             # Convert numpy scalars to native Python types for consistency
             if isinstance(result, np.ndarray) and result.ndim == 0:
                 return result.item()
@@ -298,9 +303,9 @@ def calculate_ratios(
     >>> # Single call gets both image and target stats
     >>> stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=True)
     >>> ratios = calculate_ratios(stats)
-    >>> width_ratios = ratios["stats"]["width"]
-    >>> print(["%.2f" % ratio for ratio in width_ratios])  # Box widths as fraction of image width
-    ['0.15', '0.08', '0.12', '0.12', '0.17', '0.05', '0.08', '0.36', '0.20', '0.08', '0.03', '0.07', '0.09', '0.12', '0.18']
+    >>> ratios["stats"]["width"]
+    array([0.148, 0.078, 0.125, 0.125, 0.172, 0.055, 0.078, 0.359, 0.203,
+           0.078, 0.031, 0.07 , 0.094, 0.117, 0.18 ], dtype=float16)
 
     **Pattern 2: Separate inputs (backward compatibility)**
 
@@ -321,7 +326,7 @@ def calculate_ratios(
     >>> stats = calculate(images, boxes, stats=ImageStats.PIXEL, per_image=True, per_target=True, per_channel=True)
     >>> ratios = calculate_ratios(stats)
     >>> # Ratios are calculated per-channel automatically
-    """  # noqa: E501
+    """
     # Validate input
     if SOURCE_INDEX_KEY not in stats_output:
         raise KeyError(f"stats_output must contain '{SOURCE_INDEX_KEY}' key from calculate() output")
@@ -346,9 +351,8 @@ def calculate_ratios(
         img_calc_result = stats_output
         box_calc_result = stats_output
 
-    # Use default override map if none provided
-    if override_map is None:
-        override_map = _default_ratio_map()
+    ratio_map = dict(_default_ratio_map())
+    ratio_map.update(override_map or {})
 
     # Build lookup table for image stats (maps (image_idx, channel_idx) -> array index)
     img_lookup = _build_image_lookup(source_indices_for_lookup)
@@ -396,7 +400,7 @@ def calculate_ratios(
                 stat_name,
                 box_stat_values[box_idx],
                 img_stat_values[img_idx],
-                override_map,
+                ratio_map,
                 box_stats,
                 img_stats,
             )

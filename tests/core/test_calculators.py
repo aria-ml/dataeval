@@ -31,7 +31,7 @@ class TestPixelStats:
         assert "histogram" in result["stats"]
 
         assert len(result["stats"]["mean"]) == 1
-        assert isinstance(result["stats"]["mean"][0], float)
+        assert result["stats"]["mean"].dtype == np.float16
         assert len(result["stats"]["histogram"][0]) == 256
 
     def test_process_with_nans(self):
@@ -57,7 +57,7 @@ class TestVisualStats:
         assert "percentiles" in result["stats"]
 
         assert len(result["stats"]["brightness"]) == 1
-        assert isinstance(result["stats"]["brightness"][0], float)
+        assert result["stats"]["brightness"].dtype == np.float16
         assert len(result["stats"]["percentiles"][0]) == 5  # QUARTILES length
 
 
@@ -105,7 +105,7 @@ class TestDimensionStatsCalculator:
         assert stats["height"][0] == 60
         assert stats["channels"][0] == 3
         assert stats["size"][0] == 3000
-        assert stats["aspect_ratio"][0] == pytest.approx(50 / 60)
+        assert stats["aspect_ratio"][0] == pytest.approx(-1 + (50 / 60))
         assert len(stats["center"][0]) == 2
 
     def test_process_invalid_box(self):
@@ -117,6 +117,119 @@ class TestDimensionStatsCalculator:
         stats = calculator.compute(ImageStats.DIMENSION)
 
         assert stats["invalid_box"][0] is True
+
+    def test_aspect_ratio_square(self):
+        """Test normalized aspect ratio for square images (should be 0)."""
+        image = np.random.rand(3, 100, 100)
+        box = BoundingBox(10, 10, 60, 60, image_shape=image.shape)  # 50x50 square
+        datum_calculator = CalculatorCache(image, box)
+        calculator = DimensionStatCalculator(image, datum_calculator)
+
+        result = calculator._aspect_ratio()
+
+        # Square should have normalized aspect ratio of 0
+        assert result[0] == pytest.approx(0.0)
+
+    def test_aspect_ratio_wide(self):
+        """Test normalized aspect ratio for wide images (width > height)."""
+        image = np.random.rand(3, 100, 200)
+        box = BoundingBox(10, 20, 110, 70, image_shape=image.shape)  # width=100, height=50
+        datum_calculator = CalculatorCache(image, box)
+        calculator = DimensionStatCalculator(image, datum_calculator)
+
+        result = calculator._aspect_ratio()
+
+        # Wide image should be positive: 1 - (50/100) = 0.5
+        assert result[0] == pytest.approx(0.5)
+        assert result[0] > 0
+
+    def test_aspect_ratio_tall(self):
+        """Test normalized aspect ratio for tall images (height > width)."""
+        image = np.random.rand(3, 200, 100)
+        box = BoundingBox(10, 20, 60, 120, image_shape=image.shape)  # width=50, height=100
+        datum_calculator = CalculatorCache(image, box)
+        calculator = DimensionStatCalculator(image, datum_calculator)
+
+        result = calculator._aspect_ratio()
+
+        # Tall image should be negative: -1 * (1 - (50/100)) = -0.5
+        assert result[0] == pytest.approx(-0.5)
+        assert result[0] < 0
+
+    def test_aspect_ratio_very_wide(self):
+        """Test normalized aspect ratio for very wide images."""
+        image = np.random.rand(3, 50, 400)
+        box = BoundingBox(0, 0, 400, 50, image_shape=image.shape)  # width=400, height=50
+        datum_calculator = CalculatorCache(image, box)
+        calculator = DimensionStatCalculator(image, datum_calculator)
+
+        result = calculator._aspect_ratio()
+
+        # Very wide: 1 - (50/400) = 0.875
+        assert result[0] == pytest.approx(0.875)
+        assert result[0] > 0
+
+    def test_aspect_ratio_very_tall(self):
+        """Test normalized aspect ratio for very tall images."""
+        image = np.random.rand(3, 400, 50)
+        box = BoundingBox(0, 0, 50, 400, image_shape=image.shape)  # width=50, height=400
+        datum_calculator = CalculatorCache(image, box)
+        calculator = DimensionStatCalculator(image, datum_calculator)
+
+        result = calculator._aspect_ratio()
+
+        # Very tall: -1 * (1 - (50/400)) = -0.875
+        assert result[0] == pytest.approx(-0.875)
+        assert result[0] < 0
+
+    def test_aspect_ratio_zero_width(self):
+        """Test normalized aspect ratio with zero width (edge case)."""
+        image = np.random.rand(3, 100, 100)
+        box = BoundingBox(50, 10, 50, 60, image_shape=image.shape)  # width=0, height=50
+        datum_calculator = CalculatorCache(image, box)
+        calculator = DimensionStatCalculator(image, datum_calculator)
+
+        result = calculator._aspect_ratio()
+
+        # Zero width means infinitely tall: -1 * (1 - 0/50) = -1.0
+        assert result[0] == pytest.approx(-1.0)
+        assert result[0] < 0
+
+    def test_aspect_ratio_zero_height(self):
+        """Test normalized aspect ratio with zero height (edge case)."""
+        image = np.random.rand(3, 100, 100)
+        box = BoundingBox(10, 50, 60, 50, image_shape=image.shape)  # width=50, height=0
+        datum_calculator = CalculatorCache(image, box)
+        calculator = DimensionStatCalculator(image, datum_calculator)
+
+        result = calculator._aspect_ratio()
+
+        # Zero height means infinitely wide: 1 * (1 - 0/50) = 1.0
+        assert result[0] == pytest.approx(1.0)
+        assert result[0] > 0
+
+    def test_aspect_ratio_both_zero(self):
+        """Test normalized aspect ratio with both dimensions zero (edge case)."""
+        image = np.random.rand(3, 100, 100)
+        box = BoundingBox(50, 50, 50, 50, image_shape=image.shape)  # width=0, height=0
+        datum_calculator = CalculatorCache(image, box)
+        calculator = DimensionStatCalculator(image, datum_calculator)
+
+        result = calculator._aspect_ratio()
+
+        # Both zero should return NaN (division by zero)
+        assert np.isnan(result[0])
+
+    def test_aspect_ratio_non_spatial(self):
+        """Test normalized aspect ratio for non-spatial (1D) data."""
+        data = np.random.rand(100)
+        datum_calculator = CalculatorCache(data, None)
+        calculator = DimensionStatCalculator(data, datum_calculator)
+
+        result = calculator._aspect_ratio()
+
+        # Non-spatial data should return NaN
+        assert np.isnan(result[0])
 
 
 class TestHashStatsCalculator:
@@ -355,7 +468,7 @@ class TestLowerDimensionalPixelStats:
         assert "histogram" in result["stats"]
 
         assert len(result["stats"]["mean"]) == 1
-        assert isinstance(result["stats"]["mean"][0], float)
+        assert result["stats"]["mean"].dtype == np.float16
         assert len(result["stats"]["histogram"][0]) == 256
 
     def test_2d_data_pixel_stats(self):
@@ -376,7 +489,7 @@ class TestLowerDimensionalPixelStats:
         assert "histogram" in result["stats"]
 
         assert len(result["stats"]["mean"]) == 1
-        assert isinstance(result["stats"]["mean"][0], float)
+        assert result["stats"]["mean"].dtype == np.float16
         assert len(result["stats"]["histogram"][0]) == 256
 
     def test_1d_data_with_nans(self):
@@ -425,7 +538,7 @@ class TestLowerDimensionalVisualStats:
         assert "percentiles" in result["stats"]
 
         assert len(result["stats"]["brightness"]) == 1
-        assert isinstance(result["stats"]["brightness"][0], float)
+        assert result["stats"]["brightness"].dtype == np.float16
         assert len(result["stats"]["percentiles"][0]) == 5  # QUARTILES length
         # Sharpness should be NaN for 1D data
         assert np.isnan(result["stats"]["sharpness"][0])
@@ -443,10 +556,10 @@ class TestLowerDimensionalVisualStats:
         assert "percentiles" in result["stats"]
 
         assert len(result["stats"]["brightness"]) == 1
-        assert isinstance(result["stats"]["brightness"][0], float)
+        assert result["stats"]["brightness"].dtype == np.float16
         assert len(result["stats"]["percentiles"][0]) == 5
         # Sharpness should be computed for 2D data
-        assert isinstance(result["stats"]["sharpness"][0], float)
+        assert result["stats"]["sharpness"].dtype == np.float16
         assert not np.isnan(result["stats"]["sharpness"][0])
 
     def test_1d_data_visual_stats_per_channel(self):
@@ -515,7 +628,7 @@ class TestLowerDimensionalDimensionStats:
         assert stats["height"][0] == 60
         assert stats["channels"][0] == 1  # Single channel for 2D data
         assert stats["size"][0] == 3000
-        assert stats["aspect_ratio"][0] == pytest.approx(50 / 60)
+        assert stats["aspect_ratio"][0] == pytest.approx(-1 + (50 / 60))
         assert len(stats["center"][0]) == 2
 
     def test_1d_data_without_box(self):

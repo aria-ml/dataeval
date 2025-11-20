@@ -45,7 +45,7 @@ class ImageStats(Flag):
     - `DIMENSION_HEIGHT` : Height of image/box
     - `DIMENSION_CHANNELS` : Number of color channels
     - `DIMENSION_SIZE` : Total pixel count
-    - `DIMENSION_ASPECT_RATIO` : Width/height ratio
+    - `DIMENSION_ASPECT_RATIO` : Normalized aspect ratio between -1 (vertical) and 1 (horizontal)
     - `DIMENSION_DEPTH` : Bit depth of image
     - `DIMENSION_CENTER` : Center coordinates [x, y]
     - `DIMENSION_DISTANCE_CENTER` : Distance from box center to image center
@@ -169,7 +169,7 @@ class ImageStats(Flag):
 
     VISUAL_BASIC = VISUAL_BRIGHTNESS | VISUAL_CONTRAST | VISUAL_SHARPNESS
 
-    DIMENSION_BASIC = DIMENSION_WIDTH | DIMENSION_HEIGHT | DIMENSION_CHANNELS
+    DIMENSION_BASIC = DIMENSION_WIDTH | DIMENSION_HEIGHT | DIMENSION_CHANNELS | DIMENSION_ASPECT_RATIO
     DIMENSION_OFFSET = DIMENSION_OFFSET_X | DIMENSION_OFFSET_Y
     DIMENSION_POSITION = DIMENSION_CENTER | DIMENSION_DISTANCE_CENTER | DIMENSION_DISTANCE_EDGE
 
