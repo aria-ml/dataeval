@@ -2,82 +2,126 @@ from __future__ import annotations
 
 __all__ = []
 
-import itertools
 from collections.abc import Sequence
+from typing import TypedDict
 
 import numpy as np
+from sklearn.neighbors import NearestNeighbors
 
-from dataeval.config import EPSILON
 from dataeval.protocols import Array
 from dataeval.utils._array import ensure_embeddings
 
 
-def completeness(embeddings: Array, quantiles: int) -> tuple[float, Sequence[tuple[float, float]]]:
+class CompletenessResult(TypedDict):
+    """
+    Result mapping for :func:`.completeness` metric.
+
+    Attributes
+    ----------
+    completeness : float
+        Completeness score between 0 and 1, measuring dimensional utilization
+    nearest_neighbor_pairs : Sequence[tuple[int, int]]
+        Sequence of tuples (i, j) representing point indices and their nearest neighbors,
+        sorted by decreasing nearest neighbor distance. Each pair appears only once.
+    """
+
+    completeness: float
+    nearest_neighbor_pairs: Sequence[tuple[int, int]]
+
+
+def completeness(embeddings: Array) -> CompletenessResult:
+    """
+    Measures the dimensional utilization of embeddings - how effectively the data
+    explores all available dimensions in its embedding space.
+
+    This implementation uses a directional diversity approach based on eigenvalue entropy,
+    which is more robust for high-dimensional data than traditional box-counting or
+    neighbor-distance-based methods.
+
+    Parameters
+    ----------
+    embeddings : Array
+        Array of embedding vectors, shape (n_samples, n_dimensions)
+
+    Returns
+    -------
+    dict
+        Mapping with keys:
+        - completeness : float - Completeness score between 0 and 1
+        - nearest_neighbor_pairs : Sequence[tuple[int, int]] - Sequence of tuples (i, j)
+          representing point indices and their nearest neighbors, sorted by decreasing
+          nearest neighbor distance. Each pair appears only once.
+    """
     # Ensure proper data format
     embeddings = ensure_embeddings(embeddings, dtype=np.float64, unit_interval=False)
 
     # Get data dimensions
-    n, p = embeddings.shape
-    if quantiles > 2 or quantiles <= 0:
-        raise ValueError(
-            f"Number of quantiles ({quantiles}) is greater than 2 or is nonpositive. \
-            The metric scales exponentially in this value. Please 1 or 2 quantiles."
+    n, D = embeddings.shape
+
+    # Get normed ranks from 1/2n to (1-1/2n), then center them
+    centered_normed_ranks = (np.argsort(np.argsort(embeddings, axis=0), axis=0) + 0.5) / n - 0.5
+
+    # Use SVD directly on the centered normalized ranks
+    # We only need singular values, not the full U and V matrices
+    _, s, _ = np.linalg.svd(centered_normed_ranks, full_matrices=False)
+
+    # Convert singular values to eigenvalues of the covariance matrix
+    # The eigenvalues of the covariance matrix are related to singular values by: eigenvalues = s^2/(n-1)
+    eigenvalues = (s**2) / (n - 1)
+
+    # Filter negligible eigenvalues
+    eigenvalues = eigenvalues[eigenvalues > 1e-10]
+    eigenvalues = np.sort(eigenvalues)[::-1]
+
+    # Calculate entropy of normalized eigenvalues
+    normalized_eigs = eigenvalues / np.sum(eigenvalues)
+    entropy = -np.sum(normalized_eigs * np.log(normalized_eigs))
+
+    # Calculate effective dimensionality
+    effective_dim = np.exp(entropy)
+
+    # Calculate completeness as ratio of effective to total dimensions
+    # This is equivalent to the Nth root of the "occupied fraction" in traditional approaches
+    completeness_score = effective_dim / D
+
+    # Compute nearest neighbor pairs using sklearn
+    if n <= 1:
+        return CompletenessResult(
+            completeness=float(completeness_score),
+            nearest_neighbor_pairs=[],
         )
-    if p > 10:
-        raise ValueError(
-            f"Dimension of embeddings ({p}) is greater than 10. \
-            The metric scales exponentially in this value. Please reduce the embedding dimension."
-        )
-    if n == 0 or p == 0:
-        raise ValueError("Your provided embeddings do not contain any data!")
-    # n+2 edges partition the embedding dimension (e.g. [0,0.5,1] for quantiles = 1)
-    quantile_vec = np.linspace(0, 1, quantiles + 2)
 
-    # Calculate the bin edges for each dimension based on quantiles
-    bin_edges = []
-    for dim in range(p):
-        # Calculate the quantile values for this feature
-        edges = np.array(np.quantile(embeddings[:, dim], quantile_vec))
-        # Make sure the last bin contains all the remaining points
-        edges[-1] += EPSILON
-        bin_edges.append(edges)
-    # Convert each data point into its corresponding grid cell indices
-    grid_indices = []
-    for dim in range(p):
-        # For each dimension, find which bin each data point belongs to
-        # Digitize is 1 indexed so we subtract 1
-        indices = np.digitize(embeddings[:, dim], bin_edges[dim]) - 1
-        grid_indices.append(indices)
+    # Fit nearest neighbors model (k=2 because first neighbor is always the point itself)
+    nn_model = NearestNeighbors(n_neighbors=2, algorithm="auto")
+    nn_model.fit(embeddings)
 
-    # Make the rows the data point and the column the grid index
-    grid_coords = np.array(grid_indices).T
+    # Get distances and indices for nearest neighbors
+    distances, indices = nn_model.kneighbors(embeddings)
 
-    # Use set to find unique tuple of grid coordinates
-    occupied_cells = set(map(tuple, grid_coords))
+    # Extract the actual nearest neighbor (second column, index 1)
+    nearest_neighbors = indices[:, 1]
+    nearest_distances = distances[:, 1]
 
-    # For the fraction
-    num_occupied_cells = len(occupied_cells)
+    # Create pairs, deduplicating so each pair appears only once
+    seen_pairs = set()
+    pairs_with_distances = []
 
-    # Calculate total possible cells in the grid
-    num_bins_per_dim = [len(edges) - 1 for edges in bin_edges]
-    total_possible_cells = np.prod(num_bins_per_dim)
+    for i in range(n):
+        j = nearest_neighbors[i]
+        dist = nearest_distances[i]
 
-    # Generate all possible grid cells
-    all_cells = set(itertools.product(*[range(bins) for bins in num_bins_per_dim]))
+        # Create canonical pair representation for deduplication (smaller index first)
+        pair_key = tuple(sorted([i, j]))
 
-    # Find the empty cells (cells with no data points)
-    empty_cells = all_cells - occupied_cells
+        if pair_key not in seen_pairs:
+            seen_pairs.add(pair_key)
+            pairs_with_distances.append((i, j, dist))
 
-    # Calculate center points of empty boxes
-    empty_box_centers = []
-    for cell in empty_cells:
-        center_coords = []
-        for dim, idx in enumerate(cell):
-            # Calculate center of the bin as midpoint between edges
-            center = (bin_edges[dim][idx] + bin_edges[dim][idx + 1]) / 2
-            center_coords.append(center)
-        empty_box_centers.append(center_coords)
+    # Sort by distance descending and extract just the index pairs
+    pairs_with_distances.sort(key=lambda x: x[2], reverse=True)
+    nearest_neighbor_pairs = [(i, j) for i, j, _ in pairs_with_distances]
 
-    # Calculate the fraction
-    fraction = float(num_occupied_cells / total_possible_cells)
-    return fraction, empty_box_centers
+    return CompletenessResult(
+        completeness=float(completeness_score),
+        nearest_neighbor_pairs=nearest_neighbor_pairs,
+    )

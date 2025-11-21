@@ -199,6 +199,9 @@ def ensure_embeddings(
     if arr.ndim != 2:
         raise ValueError(f"Expected a 2D array, but got a {arr.ndim}D array.")
 
+    if np.prod(arr.shape) == 0:
+        raise ValueError(f"Array has at least one zero dimension: {arr.shape}.")
+
     if unit_interval and (arr.min() < 0 or arr.max() > 1):
         if unit_interval == "force":
             warnings.warn("Embeddings are not unit interval [0, 1]. Forcing to unit interval.")
