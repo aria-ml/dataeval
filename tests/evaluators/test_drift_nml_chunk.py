@@ -170,13 +170,17 @@ def test_chunk_len_should_return_0_for_empty_chunk():
 
 
 def test_chunker_should_log_warning_when_less_than_6_chunks(sample_chunk_data, caplog):
+    import logging
+
     class SimpleChunker(Chunker[MockChunk]):
         def _split(self, data: pd.DataFrame) -> list[MockChunk]:
             return [MockChunk(data=data)]
 
     c = SimpleChunker()
-    with pytest.warns(UserWarning, match="The resulting number of chunks is too low."):
+    with caplog.at_level(logging.WARNING):
         _ = c.split(sample_chunk_data)
+
+    assert "The resulting number of chunks is too low." in caplog.text
 
 
 def test_chunker_should_set_index_boundaries(sample_chunk_data):

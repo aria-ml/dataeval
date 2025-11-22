@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 import pytest
 
@@ -38,10 +40,11 @@ class TestBalanceValidateNumNeighbors:
             _validate_num_neighbors(test_param)
         assert err_msg in str(e.value)
 
-    def test_validate_num_neighbors_warning(self):
-        err_msg = "[ UserWarning('Variable 4 is currently type float and will be truncated to type int.')]"
-        with pytest.warns(UserWarning, match=err_msg):
+    def test_validate_num_neighbors_warning(self, caplog):
+        err_msg = "Variable 4 is currently type float and will be truncated to type int."
+        with caplog.at_level(logging.WARNING):
             _validate_num_neighbors(4.0)  # type: ignore
+        assert err_msg in caplog.text
 
     def test_validate_num_neighbors_pass(self):
         _validate_num_neighbors(10)

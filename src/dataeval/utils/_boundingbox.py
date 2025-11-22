@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import logging
 import math
-import warnings
 from collections.abc import Iterable
 from enum import Enum
+
+_logger = logging.getLogger(__name__)
 
 
 class BoundingBoxFormat(Enum):
@@ -46,7 +48,7 @@ class BoundingBox:
         # Convert input to internal XYXY format
         if bbox_format == BoundingBoxFormat.XYXY:
             if v1 > v3 or v2 > v4:
-                warnings.warn(f"Invalid bounding box coordinates: {(v1, v2, v3, v4)} - swapping invalid coordinates.")
+                _logger.warning(f"Invalid bounding box coordinates: {(v1, v2, v3, v4)} - swapping invalid coordinates.")
             self._x0 = min(v1, v3)
             self._y0 = min(v2, v4)
             self._x1 = max(v1, v3)
@@ -184,7 +186,7 @@ class BoundingBox:
             if isinstance(image_shape, tuple) and len(image_shape) > 2:
                 return BoundingBox(0, 0, image_shape[-2], image_shape[-1], image_shape=image_shape)
         except (TypeError, ValueError):
-            warnings.warn(
+            _logger.warning(
                 f"Invalid bounding box format: {boxlike}. Expected a BoundingBox or a tuple/list of 4 numbers."
             )
 

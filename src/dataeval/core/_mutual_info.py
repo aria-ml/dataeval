@@ -2,7 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
-import warnings
+import logging
 from collections.abc import Iterable
 from typing import TypedDict
 
@@ -15,6 +15,8 @@ from dataeval.config import EPSILON, get_max_processes, get_seed
 from dataeval.core._bin import get_counts, is_continuous
 from dataeval.types import Array1D, Array2D
 from dataeval.utils._array import as_numpy, opt_as_numpy
+
+_logger = logging.getLogger(__name__)
 
 
 class MutualInfoResult(TypedDict):
@@ -50,7 +52,7 @@ def _validate_num_neighbors(num_neighbors: int) -> int:
         )
     if isinstance(num_neighbors, float):
         num_neighbors = int(num_neighbors)
-        warnings.warn(f"Variable {num_neighbors} is currently type float and will be truncated to type int.")
+        _logger.warning(f"Variable {num_neighbors} is currently type float and will be truncated to type int.")
 
     return num_neighbors
 
@@ -130,13 +132,19 @@ def mutual_info(
     sklearn.feature_selection.mutual_info_regression
     sklearn.metrics.mutual_info_score
     """
+    _logger.info("Starting mutual_info calculation with num_neighbors=%d", num_neighbors)
+
     class_labels_np = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
     factor_data_np = as_numpy(factor_data, required_ndim=2)
     discrete_feat_np = opt_as_numpy(discrete_features, dtype=np.bool_, required_ndim=1)
 
+    _logger.debug("Input shapes: class_labels=%s, factor_data=%s", class_labels_np.shape, factor_data_np.shape)
+
     num_neighbors = _validate_num_neighbors(num_neighbors)
     data, discrete_list = _merge_labels_and_factors(class_labels_np, factor_data_np, discrete_feat_np)
     num_factors = len(discrete_list)
+
+    _logger.debug("Computing MI for %d factors (%d discrete)", num_factors, sum(discrete_list))
 
     # initialize output matrix
     mi = np.full((num_factors, num_factors), np.nan, dtype=np.float32)
@@ -156,6 +164,12 @@ def mutual_info(
     ent_factor = entropy(bin_cnts, axis=0)
     norm_factor = 0.5 * np.add.outer(ent_factor, ent_factor) + EPSILON
     full_matrix = 0.5 * (mi + mi.T) / norm_factor
+
+    _logger.info(
+        "Mutual info calculation complete: %d factors, mean class_to_factor MI=%.4f",
+        num_factors - 1,
+        np.mean(full_matrix[0, 1:]),
+    )
 
     return MutualInfoResult(
         class_to_factor=full_matrix[0, :],
@@ -222,6 +236,8 @@ def mutual_info_classwise(
     sklearn.feature_selection.mutual_info_regression
     sklearn.metrics.mutual_info_score
     """
+    _logger.info("Starting mutual_info_classwise calculation with num_neighbors=%d", num_neighbors)
+
     class_labels_np = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
     factor_data_np = as_numpy(factor_data, dtype=np.intp, required_ndim=2)
     discrete_feat_np = opt_as_numpy(discrete_features, dtype=np.bool_, required_ndim=1)
@@ -231,6 +247,8 @@ def mutual_info_classwise(
     num_factors = len(discrete_list)
     u_classes = np.unique(class_labels_np)
     num_classes = len(u_classes)
+
+    _logger.debug("Computing classwise MI for %d classes and %d factors", num_classes, num_factors)
 
     # initialize output matrix
     classwise_mi = np.full((num_classes, num_factors), np.nan, dtype=np.float32)
@@ -255,4 +273,8 @@ def mutual_info_classwise(
     classwise_bin_cnts = get_counts(tgt_bin)
     ent_tgt_bin = entropy(classwise_bin_cnts, axis=0)
     norm_factor = 0.5 * np.add.outer(ent_tgt_bin, ent_factor) + EPSILON
-    return classwise_mi / norm_factor
+    result = classwise_mi / norm_factor
+
+    _logger.info("Mutual info classwise calculation complete: %d classes x %d factors", num_classes, num_factors)
+
+    return result
