@@ -8,12 +8,15 @@ from __future__ import annotations
 
 __all__ = []
 
+import logging
 from typing import TypedDict
 
 from sklearn.metrics import average_precision_score
 
 from dataeval.types import Array2D
 from dataeval.utils._array import as_numpy
+
+_logger = logging.getLogger(__name__)
 
 
 class UAPResult(TypedDict):
@@ -77,6 +80,15 @@ def uap(labels: Array2D[int], scores: Array2D[float]) -> UAPResult:
     >>> uap(y_true, y_scores)
     {'uap': 0.7777777777777777}
     """
+    _logger.info("Starting UAP calculation")
 
-    avg_precision = float(average_precision_score(as_numpy(labels), as_numpy(scores), average="weighted"))
+    labels_np = as_numpy(labels)
+    scores_np = as_numpy(scores)
+
+    _logger.debug("Labels shape: %s, Scores shape: %s", labels_np.shape, scores_np.shape)
+
+    avg_precision = float(average_precision_score(labels_np, scores_np, average="weighted"))
+
+    _logger.info("UAP calculation complete: uap=%.4f", avg_precision)
+
     return UAPResult(uap=avg_precision)

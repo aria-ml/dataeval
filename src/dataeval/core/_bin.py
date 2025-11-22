@@ -2,13 +2,15 @@ from __future__ import annotations
 
 __all__ = []
 
-import warnings
+import logging
 from collections.abc import Iterable
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 from scipy.stats import wasserstein_distance
+
+_logger = logging.getLogger(__name__)
 
 DISCRETE_MIN_WD = 0.054
 CONTINUOUS_MIN_SAMPLE_SIZE = 20
@@ -124,9 +126,7 @@ def is_continuous(data: NDArray[np.number[Any]], image_indices: NDArray[np.numbe
     n_examples = len(data)
 
     if n_examples < CONTINUOUS_MIN_SAMPLE_SIZE:
-        warnings.warn(
-            f"All samples look discrete with so few data points (< {CONTINUOUS_MIN_SAMPLE_SIZE})", UserWarning
-        )
+        _logger.warning(f"All samples look discrete with so few data points (< {CONTINUOUS_MIN_SAMPLE_SIZE})")
         return False
 
     # Require at least 3 unique values before bothering with NNN

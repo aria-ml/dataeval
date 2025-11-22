@@ -3,7 +3,6 @@ from __future__ import annotations
 __all__ = []
 
 import logging
-import warnings
 from collections.abc import Iterable, Iterator
 from importlib import import_module
 from types import ModuleType
@@ -204,7 +203,7 @@ def ensure_embeddings(
 
     if unit_interval and (arr.min() < 0 or arr.max() > 1):
         if unit_interval == "force":
-            warnings.warn("Embeddings are not unit interval [0, 1]. Forcing to unit interval.")
+            _logger.warning("Embeddings are not unit interval [0, 1]. Forcing to unit interval.")
             arr = rescale_array(arr)
         else:
             raise ValueError("Embeddings must be unit interval [0, 1].")

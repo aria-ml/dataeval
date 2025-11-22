@@ -2,7 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
-import warnings
+import logging
 from typing import Any
 
 import numpy as np
@@ -12,6 +12,8 @@ from scipy.fftpack import dct
 from dataeval.types import Array3D
 from dataeval.utils._array import as_numpy
 from dataeval.utils._image import normalize_image_shape, rescale, resize
+
+_logger = logging.getLogger(__name__)
 
 HASH_SIZE = 8
 MAX_FACTOR = 4
@@ -38,16 +40,17 @@ def pchash(image: Array3D[Any]) -> str:
         string if the image is too small to be hashed or is not spatial data
     """
     image_np = as_numpy(image)
+    _logger.debug("Computing perceptual hash for image with shape: %s", image_np.shape)
 
     # Perceptual hashing only works on spatial data (2D or higher)
     if image_np.ndim < 2:
-        warnings.warn("Perceptual hashing requires spatial data (2D or higher dimensions).")
+        _logger.warning("Perceptual hashing requires spatial data (2D or higher dimensions)")
         return ""
 
     # Verify that the image is at least larger than an 8x8 image
     min_dim = min(image_np.shape[-2:])
     if min_dim < HASH_SIZE + 1:
-        warnings.warn(f"Image must be larger than {HASH_SIZE}x{HASH_SIZE} for perceptual hashing.")
+        _logger.warning("Image too small for perceptual hashing: min_dim=%d", min_dim)
         return ""
 
     # Calculates the dimensions of the resized square image
@@ -74,7 +77,9 @@ def pchash(image: Array3D[Any]) -> str:
 
     # Converts the bit array to a hex string and strips leading 0s
     hash_hex = np.packbits(padded).tobytes().hex().lstrip("0")
-    return hash_hex if hash_hex else "0"
+    result = hash_hex if hash_hex else "0"
+    _logger.debug("Perceptual hash computed: %s", result[:16] + "..." if len(result) > 16 else result)
+    return result
 
 
 def xxhash(image: Array3D[Any]) -> str:
@@ -93,4 +98,8 @@ def xxhash(image: Array3D[Any]) -> str:
     str
         The hex string hash of the image using the xxHash algorithm
     """
-    return xxh.xxh3_64_hexdigest(as_numpy(image).ravel().tobytes())
+    image_np = as_numpy(image)
+    _logger.debug("Computing xxhash for image with shape: %s", image_np.shape)
+    hash_result = xxh.xxh3_64_hexdigest(image_np.ravel().tobytes())
+    _logger.debug("xxhash computed: %s", hash_result)
+    return hash_result

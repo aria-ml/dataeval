@@ -744,14 +744,18 @@ class TestLowerDimensionalHashStats:
         assert result["stats"]["xxhash"][0] == "xxhash_calc_result"
         assert result["stats"]["pchash"][0] == "pchash_calc_result"
 
-    def test_1d_data_pchash_warning(self):
+    def test_1d_data_pchash_warning(self, caplog):
         """Test that pchash emits a warning for 1D data."""
+        import logging
+
         data = np.random.rand(50)
         datum_calculator = CalculatorCache(data, None)
         calculator = HashStatCalculator(data, datum_calculator)
 
-        with pytest.warns(UserWarning, match="Perceptual hashing requires spatial data"):
+        with caplog.at_level(logging.WARNING):
             stats = calculator.compute(ImageStats.HASH)
+
+        assert "Perceptual hashing requires spatial data" in caplog.text
 
         # pchash should return empty string for 1D data
         assert stats["pchash"][0] == ""
@@ -773,15 +777,19 @@ class TestLowerDimensionalHashStats:
         # xxhash should still work
         assert result["stats"]["xxhash"][0] != ""
 
-    def test_2d_small_image_pchash_warning(self):
+    def test_2d_small_image_pchash_warning(self, caplog):
         """Test that pchash emits a warning for images smaller than 9x9."""
+        import logging
+
         # Create a 5x5 image (smaller than required 9x9)
         data = np.random.rand(5, 5)
         datum_calculator = CalculatorCache(data, None)
         calculator = HashStatCalculator(data, datum_calculator)
 
-        with pytest.warns(UserWarning, match="Image must be larger than 8x8"):
+        with caplog.at_level(logging.WARNING):
             stats = calculator.compute(ImageStats.HASH)
+
+        assert "Image too small for perceptual hashing" in caplog.text
 
         # pchash should return empty string for small images
         assert stats["pchash"][0] == ""

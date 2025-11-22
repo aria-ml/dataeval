@@ -2,6 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
+import logging
 from typing import TypedDict
 
 import numpy as np
@@ -11,6 +12,8 @@ from scipy.stats import mode
 from dataeval.config import EPSILON
 from dataeval.types import Array1D, ArrayND
 from dataeval.utils._array import as_numpy
+
+_logger = logging.getLogger(__name__)
 
 
 class BERResult(TypedDict):
@@ -27,6 +30,49 @@ class BERResult(TypedDict):
 
     upper_bound: float
     lower_bound: float
+
+
+def _validate_inputs(
+    embeddings: ArrayND[float], class_labels: Array1D[int]
+) -> tuple[NDArray[np.float32], NDArray[np.intp]]:
+    embeddings = as_numpy(embeddings, dtype=np.float32)
+    class_labels = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
+
+    if len(embeddings) != len(class_labels):
+        raise ValueError(
+            f"Length of embeddings ({len(embeddings)}) does not match length of class_labels ({len(class_labels)})."
+        )
+
+    return embeddings, class_labels
+
+
+def _knn_lowerbound(value: float, classes: int, k: int) -> float:
+    """Several cases for computing the BER lower bound"""
+    if value <= EPSILON:
+        return 0.0
+
+    if classes == 2 and k != 1:
+        if k > 5:
+            # Property 2 (Devroye, 1981) cited in Snoopy paper, not in snoopy repo
+            alpha = 0.3399
+            beta = 0.9749
+            a_k = alpha * np.sqrt(k) / (k - 3.25) * (1 + beta / (np.sqrt(k - 3)))
+            return value / (1 + a_k)
+        if k > 2:
+            return value / (1 + (1 / np.sqrt(k)))
+        # k == 2:
+        return value / 2
+
+    return float(((classes - 1) / classes) * (1 - np.sqrt(max(0, 1 - ((classes / (classes - 1)) * value)))))
+
+
+def _get_classes_counts(labels: NDArray[np.intp]) -> tuple[int, int]:
+    classes, counts = np.unique(labels, return_counts=True)
+    M = len(classes)
+    if M < 2:
+        raise ValueError("Label vector contains less than 2 classes!")
+    N = int(np.sum(counts))
+    return M, N
 
 
 def ber_mst(embeddings: ArrayND[float], class_labels: Array1D[int]) -> BERResult:
@@ -61,12 +107,14 @@ def ber_mst(embeddings: ArrayND[float], class_labels: Array1D[int]) -> BERResult
     >>> ber_mst(images, labels)
     {'upper_bound': 0.04, 'lower_bound': 0.020416847668728033}
     """
+    _logger.info("Starting ber_mst calculation")
+
     from dataeval.core._mst import minimum_spanning_tree
 
-    data_np = as_numpy(embeddings, dtype=np.float32)
-    labels_np = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
+    data_np, labels_np = _validate_inputs(embeddings, class_labels)
 
     M, N = _get_classes_counts(labels_np)
+    _logger.debug("Number of classes: %d, Number of samples: %d", M, N)
 
     mst_result = minimum_spanning_tree(data_np)
     source, target = mst_result["source"], mst_result["target"]
@@ -74,6 +122,9 @@ def ber_mst(embeddings: ArrayND[float], class_labels: Array1D[int]) -> BERResult
     deltas = mismatches / (2 * N)
     upper = float(2 * deltas)
     lower = float(((M - 1) / (M)) * (1 - max(1 - 2 * ((M) / (M - 1)) * deltas, 0) ** 0.5))
+
+    _logger.info("BER_mst complete: upper_bound=%.4f, lower_bound=%.4f, mismatches=%d", upper, lower, mismatches)
+
     return {"upper_bound": upper, "lower_bound": lower}
 
 
@@ -111,44 +162,22 @@ def ber_knn(embeddings: ArrayND[float], class_labels: Array1D[int], k: int) -> B
     >>> ber_knn(images, labels, 1)
     {'upper_bound': 0.04, 'lower_bound': 0.020416847668728033}
     """
+    _logger.info("Starting ber_knn calculation with k=%d", k)
+
     from dataeval.core._mst import compute_neighbors
 
-    data_np = as_numpy(embeddings, dtype=np.float32)
-    labels_np = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
+    data_np, labels_np = _validate_inputs(embeddings, class_labels)
 
     M, N = _get_classes_counts(labels_np)
+    _logger.debug("Number of classes: %d, Number of samples: %d", M, N)
+
     nn_indices = compute_neighbors(data_np, data_np, k=k)
     nn_indices = np.expand_dims(nn_indices, axis=1) if nn_indices.ndim == 1 else nn_indices
     modal_class = mode(class_labels[nn_indices], axis=1, keepdims=True).mode.squeeze()
-    upper = float(np.count_nonzero(modal_class - class_labels) / N)
+    misclassified = np.count_nonzero(modal_class - class_labels)
+    upper = float(misclassified / N)
     lower = _knn_lowerbound(upper, M, k)
+
+    _logger.info("BER_knn complete: upper_bound=%.4f, lower_bound=%.4f, misclassified=%d", upper, lower, misclassified)
+
     return {"upper_bound": upper, "lower_bound": lower}
-
-
-def _knn_lowerbound(value: float, classes: int, k: int) -> float:
-    """Several cases for computing the BER lower bound"""
-    if value <= EPSILON:
-        return 0.0
-
-    if classes == 2 and k != 1:
-        if k > 5:
-            # Property 2 (Devroye, 1981) cited in Snoopy paper, not in snoopy repo
-            alpha = 0.3399
-            beta = 0.9749
-            a_k = alpha * np.sqrt(k) / (k - 3.25) * (1 + beta / (np.sqrt(k - 3)))
-            return value / (1 + a_k)
-        if k > 2:
-            return value / (1 + (1 / np.sqrt(k)))
-        # k == 2:
-        return value / 2
-
-    return float(((classes - 1) / classes) * (1 - np.sqrt(max(0, 1 - ((classes / (classes - 1)) * value)))))
-
-
-def _get_classes_counts(labels: NDArray[np.intp]) -> tuple[int, int]:
-    classes, counts = np.unique(labels, return_counts=True)
-    M = len(classes)
-    if M < 2:
-        raise ValueError("Label vector contains less than 2 classes!")
-    N = int(np.sum(counts))
-    return M, N

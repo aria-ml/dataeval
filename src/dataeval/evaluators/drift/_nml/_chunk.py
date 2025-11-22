@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import copy
 import logging
-import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Any, Generic, Literal, TypeVar, cast
@@ -20,7 +19,7 @@ import pandas as pd
 from pandas import Index, Period
 from typing_extensions import Self
 
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 class Chunk(ABC):
@@ -184,7 +183,7 @@ class Chunker(Generic[TChunk]):
 
         if len(chunks) < 6:
             # TODO wording
-            warnings.warn(
+            _logger.warning(
                 "The resulting number of chunks is too low. "
                 "Please consider splitting your data in a different way or continue at your own risk."
             )

@@ -1,3 +1,4 @@
+import logging
 import warnings
 
 import numpy as np
@@ -65,7 +66,7 @@ class TestLabelIndependenceUnit:
             warnings.simplefilter("ignore")
             label_parity(labels_expected, labels_observed)
 
-    def test_warns_with_not_enough_frequency(self):
+    def test_warns_with_not_enough_frequency(self, caplog):
         f_exp = [1, 1]
         f_obs = [1, 4]
         f_exp = [1, 1]
@@ -74,18 +75,20 @@ class TestLabelIndependenceUnit:
         labels_expected = MockDistributionDataset(f_exp).labels
         labels_observed = MockDistributionDataset(f_obs).labels
 
-        with pytest.warns():
+        with caplog.at_level(logging.WARNING):
             label_parity(labels_expected, labels_observed)
+        assert len(caplog.text) > 0
 
-    def test_warns_with_not_enough_frequency_rescaled_exp(self):
+    def test_warns_with_not_enough_frequency_rescaled_exp(self, caplog):
         f_exp = [10, 10000]
         f_obs = [100, 400]
 
         labels_expected = MockDistributionDataset(f_exp).labels
         labels_observed = MockDistributionDataset(f_obs).labels
 
-        with pytest.warns():
+        with caplog.at_level(logging.WARNING):
             label_parity(labels_expected, labels_observed)
+        assert len(caplog.text) > 0
 
     def test_passes_with_enough_frequency(self):
         f_exp = [10, 10]
