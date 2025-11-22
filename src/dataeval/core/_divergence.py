@@ -7,6 +7,7 @@ from __future__ import annotations
 
 __all__ = []
 
+import logging
 from collections.abc import Callable
 from typing import TypedDict
 
@@ -14,6 +15,8 @@ import numpy as np
 
 from dataeval.types import ArrayND
 from dataeval.utils._array import as_numpy
+
+_logger = logging.getLogger(__name__)
 
 
 class DivergenceResult(TypedDict):
@@ -38,10 +41,14 @@ def _compute_divergence(
     error_fn: Callable[[ArrayND[float], ArrayND[int]], int],
 ) -> DivergenceResult:
     """Generic divergence computation using a custom error function."""
+    _logger.debug("Computing divergence using error function: %s", error_fn.__name__)
+
     a = as_numpy(emb_a, dtype=np.float64)
     b = as_numpy(emb_b, dtype=np.float64)
     N = a.shape[0]
     M = b.shape[0]
+
+    _logger.debug("Dataset A shape: %s, Dataset B shape: %s", a.shape, b.shape)
 
     stacked_data = np.vstack((a, b))
     labels = np.zeros((N + M,), dtype=np.intp)
@@ -49,6 +56,8 @@ def _compute_divergence(
 
     errors = error_fn(stacked_data, labels)
     dp = max(0.0, 1 - ((N + M) / (2 * N * M)) * errors)
+
+    _logger.info("Divergence computation complete: divergence=%.4f, errors=%d", dp, errors)
 
     return DivergenceResult(divergence=dp, errors=errors)
 
@@ -92,6 +101,7 @@ def divergence_mst(emb_a: ArrayND[float], emb_b: ArrayND[float]) -> DivergenceRe
     >>> divergence_mst(datasetA, datasetB)
     {'divergence': 0.0, 'errors': 50}
     """
+    _logger.info("Starting divergence_mst calculation")
     return _compute_divergence(emb_a, emb_b, _compute_mst_errors)
 
 
@@ -119,4 +129,5 @@ def divergence_fnn(emb_a: ArrayND[float], emb_b: ArrayND[float]) -> DivergenceRe
     >>> divergence_fnn(datasetA, datasetB)
     {'divergence': 0.28, 'errors': 36}
     """
+    _logger.info("Starting divergence_fnn calculation")
     return _compute_divergence(emb_a, emb_b, _compute_fnn_errors)

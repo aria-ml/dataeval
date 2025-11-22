@@ -2,10 +2,13 @@ from __future__ import annotations
 
 __all__ = []
 
+import logging
 
 import numpy as np
 from numpy.typing import NDArray
 from scipy.stats import entropy
+
+_logger = logging.getLogger(__name__)
 
 
 def diversity_shannon(
@@ -37,10 +40,12 @@ def diversity_shannon(
     --------
     scipy.stats.entropy
     """
+    _logger.debug("Computing Shannon diversity for %d factors", counts.shape[1] if counts.ndim > 1 else 1)
     raw_entropy = np.asarray(entropy(counts, axis=0))
     ent_norm = np.empty(raw_entropy.shape)
     ent_norm[num_bins != 1] = raw_entropy[num_bins != 1] / np.log(num_bins[num_bins != 1])
     ent_norm[num_bins == 1] = 0
+    _logger.debug("Shannon diversity computed: mean=%.4f", np.mean(ent_norm))
     return ent_norm
 
 
@@ -73,6 +78,7 @@ def diversity_simpson(
     NDArray[np.double]
         Diversity index per column of X
     """
+    _logger.debug("Computing Simpson diversity for %d factors", counts.shape[1])
     ev_index = np.empty(counts.shape[1])
     # loop over columns for convenience
     for col, cnts in enumerate(counts.T):
@@ -85,4 +91,5 @@ def diversity_simpson(
         else:
             # normalized by number of bins
             ev_index[col] = (s_0 - 1) / (num_bins[col] - 1)
+    _logger.debug("Simpson diversity computed: mean=%.4f", np.mean(ev_index))
     return ev_index

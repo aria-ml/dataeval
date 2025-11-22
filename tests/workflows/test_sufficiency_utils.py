@@ -1,3 +1,4 @@
+import logging
 from copy import deepcopy
 
 import numpy as np
@@ -225,17 +226,15 @@ class TestSufficiencyUtils:
             atol=1e-8,
         )
 
-    def test_linear_initialization_default(self):
+    def test_linear_initialization_default(self, caplog):
         """
         Tests that with initialization failure, initial guess defaults to [0.5,0.5,1]
         """
         metric = np.array([0, 0.2, 0.4, 0.6, 0.8])
         steps = np.array([0, 200, 2000, 2500, 3000])
         bounds = Constraints(scale=(None, None), negative_exponent=(0, None), asymptote=(0, 1))
-        with pytest.warns(
-            UserWarning,
-            match=r"Error applying linear initialization for initial guess\,"
-            " using default",
-        ):
+        err_msg = "Error applying linear initialization for initial guess, using default"
+        with caplog.at_level(logging.WARNING):
             x0 = linear_initialization(metric, steps, bounds)
+        assert err_msg in caplog.text
         assert all(x0 == np.array([0.5, 0.5, 1]))

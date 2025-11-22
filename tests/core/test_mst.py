@@ -1,4 +1,3 @@
-import warnings
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -86,8 +85,10 @@ class TestMst:
         with pytest.raises(ValueError):
             compute_neighbors(MagicMock(), MagicMock(), algorithm="brute")  # type: ignore #
 
-    def test_knn_exhaustion_warning(self):
+    def test_knn_exhaustion_warning(self, caplog):
         """Test that algorithm warns when k-nearest neighbor graph is exhausted."""
+        import logging
+
         from dataeval.core._mst import minimum_spanning_tree
 
         # Create two distant clusters: insufficient k will trigger warning
@@ -96,21 +97,21 @@ class TestMst:
         X = np.vstack([cluster1, cluster2]).astype(np.float64)
 
         # Test with k=5 (insufficient: each cluster has 9 other points, so inter-cluster edges at rank 10+)
-        with warnings.catch_warnings(record=True) as warning_list:
-            warnings.simplefilter("always")
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
             mst = minimum_spanning_tree(X, k=5)
 
-            # Should trigger KNN exhaustion warning
-            knn_warnings = [w for w in warning_list if "k-nearest neighbors" in str(w.message).lower()]
-            assert len(knn_warnings) > 0, "Expected KNN exhaustion warning with insufficient k"
+        # Should trigger KNN exhaustion warning
+        knn_warnings = [rec for rec in caplog.records if "k-nearest neighbors" in rec.message.lower()]
+        assert len(knn_warnings) > 0, "Expected KNN exhaustion warning with insufficient k"
 
         # Should still produce spanning tree (19 edges for 20 points)
         assert len(mst["source"]) == 19
 
         # Test with k=15 (sufficient: should NOT warn)
-        with warnings.catch_warnings(record=True) as warning_list:
-            warnings.simplefilter("always")
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
             mst = minimum_spanning_tree(X, k=15)
 
-            knn_warnings = [w for w in warning_list if "k-nearest neighbors" in str(w.message).lower()]
-            assert len(knn_warnings) == 0, "Unexpected warning with sufficient k"
+        knn_warnings = [rec for rec in caplog.records if "k-nearest neighbors" in rec.message.lower()]
+        assert len(knn_warnings) == 0, "Unexpected warning with sufficient k"

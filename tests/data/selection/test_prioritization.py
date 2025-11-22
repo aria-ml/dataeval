@@ -62,9 +62,12 @@ class TestPrioritizeSorters:
         with pytest.raises(ValueError):
             _KNNSorter(k=10, samples=10)
 
-    def test_knn_sorter_with_k_greater_than_recommended_warns(self):
-        with pytest.warns(UserWarning):
+    def test_knn_sorter_with_k_greater_than_recommended_warns(self, caplog):
+        import logging
+
+        with caplog.at_level(logging.WARNING):
             _KNNSorter(k=9, samples=10)
+        assert len(caplog.records) >= 1
 
     def test_kmeans_distance_sorter(self):
         sorter = _KMeansDistanceSorter(c=2, samples=len(self.embeddings))

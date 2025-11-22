@@ -3,7 +3,6 @@ from __future__ import annotations
 __all__ = []
 
 import logging
-import warnings
 from abc import ABC, abstractmethod
 from typing import Any, Literal, overload
 
@@ -89,7 +88,7 @@ class _KNNSorter(_Sorter):
         elif k >= samples:
             raise ValueError(f"k={k} should be less than dataset size ({samples})")
         elif k >= samples / 10 and k > np.sqrt(samples):
-            warnings.warn(
+            _logger.warning(
                 f"Variable k={k} is large with respect to dataset size but valid; "
                 + f"a nominal recommendation is k={int(np.sqrt(samples))}"
             )

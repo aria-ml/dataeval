@@ -2,9 +2,12 @@ from __future__ import annotations
 
 __all__ = []
 
+import logging
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from typing import TypedDict
+
+_logger = logging.getLogger(__name__)
 
 
 class LabelStatsResult(TypedDict):
@@ -103,6 +106,8 @@ def label_stats(
     >>> stats["class_names"]
     ['cat', 'dog', 'bird']
     """
+    _logger.info("Starting label_stats calculation")
+
     # Initialize counters
     label_counts: dict[int, int] = defaultdict(int)
     image_counts: dict[int, int] = defaultdict(int)
@@ -143,6 +148,14 @@ def label_stats(
 
     # Calculate total label count
     total_labels = sum(label_counts.values())
+
+    _logger.info(
+        "Label stats calculation complete: %d images, %d classes, %d total labels",
+        img_idx + 1,
+        len(unique_classes),
+        total_labels,
+    )
+    _logger.debug("Class distribution: %s", dict(label_counts))
 
     return {
         "label_counts_per_class": dict(label_counts),

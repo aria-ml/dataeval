@@ -161,13 +161,16 @@ class TestSufficiencyPlot:
         assert isinstance(result[0], Figure)
         self.plt.close(result[0])
 
-    def test_single_plot_asymptote(self, so_single_averaged_inputs):
+    def test_single_plot_asymptote(self, so_single_averaged_inputs, caplog):
         """Tests that asymptote is plotted"""
+        import logging
+
         result = so_single_averaged_inputs.plot(show_asymptote=False, show_error_bars=False)
         y = find_horizontal_line(result[0].axes[0])
         assert y is None
-        with pytest.warns(UserWarning, match=r"Error bars cannot be plotted without full, unaveraged data"):
+        with caplog.at_level(logging.WARNING):
             result = so_single_averaged_inputs.plot(show_asymptote=False)
+        assert "Error bars cannot be plotted without full, unaveraged data" in caplog.text
         y = find_horizontal_line(result[0].axes[0])
         assert y is None
         result = so_single_averaged_inputs.plot(show_error_bars=False)
@@ -200,10 +203,13 @@ class TestSufficiencyPlot:
         assert isinstance(result[0], Figure)
         self.plt.close("all")
 
-    def test_averaged_inputs_error_bars(self, so_mixed_averaged_inputs):
+    def test_averaged_inputs_error_bars(self, so_mixed_averaged_inputs, caplog):
         """Tests that user is warned for plotting error bars without full, unaveraged data"""
-        with pytest.warns(UserWarning, match=r"Error bars cannot be plotted without full, unaveraged data"):
+        import logging
+
+        with caplog.at_level(logging.WARNING):
             result = so_mixed_averaged_inputs.plot(show_error_bars=True)
+        assert "Error bars cannot be plotted without full, unaveraged data" in caplog.text
         assert len(result) == 3
         assert isinstance(result[0], Figure)
         self.plt.close("all")
@@ -640,10 +646,12 @@ class TestSufficiencyInverseProject:
         # assert np.all(np.isclose(projection, predicted_proj, atol=1))
         npt.assert_array_equal(projection, predicted_proj)
 
-    def test_f_inv_out_unachievable_targets(self):
+    def test_f_inv_out_unachievable_targets(self, caplog):
         """
         Verifies that f_inv_out handles unachievable targets
         """
+        import logging
+
         num_samples = np.arange(20, 80, step=10, dtype=np.uint32)
         accuracies = num_samples / 100.0
         data = SufficiencyOutput(steps=num_samples, measures={}, averaged_measures={"Accuracy": accuracies})
@@ -659,22 +667,20 @@ class TestSufficiencyInverseProject:
         # 0.90 and 0.93 targets achievable, 0.99 above curve upper bound
         desired_accuracies = {"Accuracy": np.array([0.90, 0.93, 0.99])}
         # expect warning for 0.99 target
-        with pytest.warns(
-            UserWarning,
-            match=r"Number of samples could not be determined for target\(s\): \[0\.99\] with asymptote of 0\.9369",
-        ):
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
             needed_data = data.inv_project(desired_accuracies)["Accuracy"]
+        assert "Number of samples could not be determined for target(s): [0.99] with asymptote of 0.9369" in caplog.text
         target_needed_data = np.array([925, 6649, -1])
         npt.assert_array_equal(needed_data, target_needed_data)
 
         # all target accuracies unachievable, 0.9368 returns value greater than int64
         desired_accuracies = {"Accuracy": np.array([0.9369, 1, 1.01])}
         # expect warning for all targets
-        with pytest.warns(
-            UserWarning,
-            match=r"Number of samples could not be determined for target\(s\): \[0\.9369, 1\.0, 1\.01\]",
-        ):
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
             needed_data = data.inv_project(desired_accuracies)["Accuracy"]
+        assert "Number of samples could not be determined for target(s): [0.9369, 1.0, 1.01]" in caplog.text
 
         target_needed_data = np.array([-1, -1, -1])
         npt.assert_array_equal(needed_data, target_needed_data)

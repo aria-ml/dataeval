@@ -2,6 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
+import logging
 import math
 from typing import TypedDict
 
@@ -11,6 +12,8 @@ from scipy.spatial.distance import pdist, squareform
 
 from dataeval.types import Array2D
 from dataeval.utils._array import as_numpy, ensure_embeddings, flatten
+
+_logger = logging.getLogger(__name__)
 
 
 class CoverageResult(TypedDict):
@@ -97,7 +100,11 @@ def coverage_naive(
 
     [1] Seymour Sudman. 1976. Applied sampling. Academic Press New York (1976).
     """
+    _logger.info("Starting coverage_naive calculation with num_observations=%d", num_observations)
+
     embeddings_np = _validate_inputs(as_numpy(embeddings, dtype=np.float64, required_ndim=2), num_observations)
+    _logger.debug("Embeddings shape: %s", embeddings_np.shape)
+
     critical_value_radii = _calculate_critical_value_radii(embeddings_np, num_observations)
 
     # Calculate distance matrix, look at the (num_observations + 1)th farthest neighbor for each image.
@@ -107,6 +114,14 @@ def coverage_naive(
         ** (1 / embeddings_np.shape[1])
     )
     uncovered_indices = np.where(critical_value_radii > coverage_radius)[0]
+
+    _logger.info(
+        "Coverage_naive complete: radius=%.4f, %d uncovered (%.1f%%)",
+        coverage_radius,
+        len(uncovered_indices),
+        100 * len(uncovered_indices) / len(embeddings_np),
+    )
+
     return {
         "uncovered_indices": uncovered_indices,
         "critical_value_radii": critical_value_radii,
@@ -167,13 +182,26 @@ def coverage_adaptive(
 
     [1] Seymour Sudman. 1976. Applied sampling. Academic Press New York (1976).
     """
+    _logger.info(
+        "Starting coverage_adaptive calculation with num_observations=%d, percent=%.2f", num_observations, percent
+    )
+
     embeddings = _validate_inputs(as_numpy(embeddings, dtype=np.float64, required_ndim=2), num_observations)
+    _logger.debug("Embeddings shape: %s", embeddings.shape)
+
     critical_value_radii = _calculate_critical_value_radii(embeddings, num_observations)
 
     # Use data adaptive cutoff as coverage_radius
     selection = int(max(len(embeddings) * percent, 1))
     uncovered_indices = np.argsort(critical_value_radii)[::-1][:selection]
     coverage_radius = float(np.mean(np.sort(critical_value_radii)[::-1][selection - 1 : selection + 1]))
+
+    _logger.info(
+        "Coverage_adaptive complete: radius=%.4f, %d uncovered (%.1f%%)",
+        coverage_radius,
+        len(uncovered_indices),
+        100 * len(uncovered_indices) / len(embeddings),
+    )
 
     return {
         "uncovered_indices": uncovered_indices,

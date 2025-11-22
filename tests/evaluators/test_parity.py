@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -10,12 +11,13 @@ from tests.conftest import to_metadata
 
 @pytest.mark.required
 class TestMDParityUnit:
-    def test_warns_with_not_enough_frequency(self):
+    def test_warns_with_not_enough_frequency(self, caplog):
         labels = [0, 1]
         factors = {"factor1": [10, 20]}
         metadata = to_metadata(factors, labels)
-        with pytest.warns(UserWarning):
+        with caplog.at_level(logging.WARNING):
             parity(metadata)
+        assert len(caplog.text) > 0
 
     def test_passes_with_enough_frequency(self):
         labels = [0] * 5 + [1] * 5
@@ -101,7 +103,7 @@ class TestMDParityFunctional:
         assert np.isclose(result.score[0], 0)
         assert np.isclose(result.p_value[0], 1)
 
-    def test_underquantized_has_low_freqs(self):
+    def test_underquantized_has_low_freqs(self, caplog):
         """
         This quantizes factor1 such that there are large regions with bins
         that contain a small number of points.
@@ -112,10 +114,11 @@ class TestMDParityFunctional:
         metadata = to_metadata(factors, labels, continuous_bincounts)
 
         # Looks for a warning that there are (class,factor1) pairs with too low frequency
-        with pytest.warns(UserWarning):
+        with caplog.at_level(logging.WARNING):
             parity(metadata)
+        assert len(caplog.text) > 0
 
-    def test_underquantized_has_repeated_low_freqs(self):
+    def test_underquantized_has_repeated_low_freqs(self, caplog):
         """
         This quantizes factor1 such that there are large regions with bins
         that contain a small number of points.
@@ -126,5 +129,6 @@ class TestMDParityFunctional:
         metadata = to_metadata(factors, labels, continuous_bincounts)
 
         # Looks for a warning that there are (class,factor1) pairs with too low frequency
-        with pytest.warns(UserWarning):
+        with caplog.at_level(logging.WARNING):
             parity(metadata)
+        assert len(caplog.text) > 0

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
-import warnings
+import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
@@ -13,6 +13,8 @@ from numpy.typing import NDArray
 from dataeval.core._parity import parity as _parity
 from dataeval.data import Metadata
 from dataeval.types import DictOutput, set_metadata
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -120,7 +122,7 @@ def parity(metadata: Metadata) -> ParityOutput:
     }
 
     if insufficient_data:
-        warnings.warn(
+        _logger.warning(
             f"Factors {list(insufficient_data)} did not meet the recommended "
             "5 occurrences for each value-label combination."
         )

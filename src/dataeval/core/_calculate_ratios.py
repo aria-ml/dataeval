@@ -2,6 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
+import logging
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, TypeAlias
 
@@ -11,6 +12,8 @@ from numpy.typing import NDArray
 from dataeval.config import EPSILON
 from dataeval.core._calculate import CalculationResult
 from dataeval.types import SourceIndex
+
+_logger = logging.getLogger(__name__)
 
 SOURCE_INDEX_KEY = "source_index"
 
@@ -327,6 +330,11 @@ def calculate_ratios(
     >>> ratios = calculate_ratios(stats)
     >>> # Ratios are calculated per-channel automatically
     """
+    _logger.info(
+        "Starting calculate_ratios with %s input pattern",
+        "separate" if target_stats_output is not None else "unified",
+    )
+
     # Validate input
     if SOURCE_INDEX_KEY not in stats_output:
         raise KeyError(f"stats_output must contain '{SOURCE_INDEX_KEY}' key from calculate() output")
@@ -338,6 +346,11 @@ def calculate_ratios(
             raise KeyError(f"target_stats_output must contain '{SOURCE_INDEX_KEY}' key from calculate() output")
 
         img_source_indices, box_source_indices = _validate_separate_inputs(stats_output, target_stats_output)
+        _logger.debug(
+            "Using separate inputs: %d image entries, %d box entries",
+            len(img_source_indices),
+            len(box_source_indices),
+        )
         source_indices_for_lookup = img_source_indices
         source_indices_for_boxes = box_source_indices
         img_calc_result = stats_output
@@ -346,6 +359,7 @@ def calculate_ratios(
         # Pattern 1: Unified input
         source_indices: Sequence[SourceIndex] = stats_output[SOURCE_INDEX_KEY]
         _validate_unified_input(source_indices)
+        _logger.debug("Using unified input: %d total entries", len(source_indices))
         source_indices_for_lookup = source_indices
         source_indices_for_boxes = source_indices
         img_calc_result = stats_output
@@ -359,6 +373,7 @@ def calculate_ratios(
 
     # Calculate overlapping stats keys for ratio calculation
     overlapping_keys = set(img_calc_result["stats"]) & set(box_calc_result["stats"])
+    _logger.debug("Computing ratios for %d overlapping stats: %s", len(overlapping_keys), sorted(overlapping_keys))
 
     # Find all box indices and their corresponding image indices
     box_indices: list[int] = []
@@ -417,5 +432,11 @@ def calculate_ratios(
         "image_count": box_calc_result["image_count"],
         "stats": ratio_stats,
     }
+
+    _logger.info(
+        "Calculate_ratios complete: %d ratio entries calculated for %d images",
+        len(ratio_source_indices),
+        box_calc_result["image_count"],
+    )
 
     return result

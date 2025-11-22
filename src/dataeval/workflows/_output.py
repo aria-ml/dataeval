@@ -193,10 +193,7 @@ def _plot_measure(
     # Plot measure over each step with associated error
     if show_error_bars:
         if measures is None:
-            warnings.warn(
-                "Error bars cannot be plotted without full, unaveraged data",
-                UserWarning,
-            )
+            _logger.warning("Error bars cannot be plotted without full, unaveraged data")
         else:
             error = np.std(measures, axis=0)
             ax.errorbar(
@@ -244,7 +241,7 @@ def f_inv_out(y_i: NDArray[Any], x: NDArray[Any]) -> NDArray[np.int64]:
     unachievable_targets = np.isnan(n_i) | np.any(n_i > np.iinfo(np.int64).max)
     if any(unachievable_targets):
         with np.printoptions(suppress=True):
-            warnings.warn(
+            _logger.warning(
                 "Number of samples could not be determined for target(s): "
                 f"""{
                     np.array2string(
@@ -254,7 +251,6 @@ def f_inv_out(y_i: NDArray[Any], x: NDArray[Any]) -> NDArray[np.int64]:
                     )
                 }"""
                 " with asymptote of " + str(1 - x[2]),
-                UserWarning,
             )
         n_i[unachievable_targets] = -1
     return np.asarray(n_i, dtype=np.int64)
@@ -314,10 +310,7 @@ def linear_initialization(metric: NDArray[Any], sizes: NDArray[Any], bounds: Con
                 asymptote = max(0, min(asymptote, 1))
         except (ArithmeticError, ValueError, RuntimeWarning):
             # encountering error in linear initialization will default to hardcoded guess
-            warnings.warn(
-                "Error applying linear initialization for initial guess, using default",
-                UserWarning,
-            )
+            _logger.warning("Error applying linear initialization for initial guess, using default")
             scale = 0.5
             negative_exponent = -0.5
             asymptote = 1

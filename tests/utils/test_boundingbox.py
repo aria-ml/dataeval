@@ -1,4 +1,3 @@
-import warnings
 from unittest.mock import patch
 
 import pytest
@@ -27,13 +26,13 @@ class TestBoundingBox:
         bbox = BoundingBox(10, 20, 30, 40)
         assert bbox.xyxy == (10, 20, 30, 40)
 
-    def test_init_xyxy_invalid_coordinates_warning(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+    def test_init_xyxy_invalid_coordinates_warning(self, caplog):
+        import logging
+
+        with caplog.at_level(logging.WARNING):
             bbox = BoundingBox(30, 40, 10, 20)
-            assert len(w) == 1
-            assert "Invalid bounding box coordinates" in str(w[0].message)
-            assert bbox.xyxy == (10, 20, 30, 40)  # Should swap coordinates
+        assert len([rec for rec in caplog.records if "Invalid bounding box coordinates" in rec.message]) == 1
+        assert bbox.xyxy == (10, 20, 30, 40)  # Should swap coordinates
 
     def test_init_xywh(self):
         bbox = BoundingBox(10, 20, 15, 25, bbox_format=BoundingBoxFormat.XYWH)
@@ -177,13 +176,13 @@ class TestBoundingBox:
         result = BoundingBox.from_boxlike(None, image_shape=(3, 100, 200))
         assert result.xyxy == (0, 0, 100, 200)
 
-    def test_from_boxlike_invalid_with_warning(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+    def test_from_boxlike_invalid_with_warning(self, caplog):
+        import logging
+
+        with caplog.at_level(logging.WARNING):
             result = BoundingBox.from_boxlike("invalid")  # type: ignore
-            assert len(w) == 1
-            assert "Invalid bounding box format" in str(w[0].message)
-            assert result.xyxy == (0, 0, 0, 0)
+        assert len([rec for rec in caplog.records if "Invalid bounding box format" in rec.message]) == 1
+        assert result.xyxy == (0, 0, 0, 0)
 
 
 @pytest.mark.required

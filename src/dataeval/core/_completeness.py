@@ -2,6 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
+import logging
 from collections.abc import Sequence
 from typing import TypedDict
 
@@ -10,6 +11,8 @@ from sklearn.neighbors import NearestNeighbors
 
 from dataeval.protocols import Array
 from dataeval.utils._array import ensure_embeddings
+
+_logger = logging.getLogger(__name__)
 
 
 class CompletenessResult(TypedDict):
@@ -52,11 +55,14 @@ def completeness(embeddings: Array) -> CompletenessResult:
           representing point indices and their nearest neighbors, sorted by decreasing
           nearest neighbor distance. Each pair appears only once.
     """
+    _logger.info("Starting completeness calculation")
+
     # Ensure proper data format
     embeddings = ensure_embeddings(embeddings, dtype=np.float64, unit_interval=False)
 
     # Get data dimensions
     n, D = embeddings.shape
+    _logger.debug("Embeddings shape: (%d samples, %d dimensions)", n, D)
 
     # Get normed ranks from 1/2n to (1-1/2n), then center them
     centered_normed_ranks = (np.argsort(np.argsort(embeddings, axis=0), axis=0) + 0.5) / n - 0.5
@@ -84,8 +90,11 @@ def completeness(embeddings: Array) -> CompletenessResult:
     # This is equivalent to the Nth root of the "occupied fraction" in traditional approaches
     completeness_score = effective_dim / D
 
+    _logger.debug("Effective dimensionality: %.2f, Completeness score: %.4f", effective_dim, completeness_score)
+
     # Compute nearest neighbor pairs using sklearn
     if n <= 1:
+        _logger.warning("Only %d sample(s) provided, skipping nearest neighbor calculation", n)
         return CompletenessResult(
             completeness=float(completeness_score),
             nearest_neighbor_pairs=[],
@@ -120,6 +129,12 @@ def completeness(embeddings: Array) -> CompletenessResult:
     # Sort by distance descending and extract just the index pairs
     pairs_with_distances.sort(key=lambda x: x[2], reverse=True)
     nearest_neighbor_pairs = [(i, j) for i, j, _ in pairs_with_distances]
+
+    _logger.info(
+        "Completeness calculation complete: completeness=%.4f, %d nearest neighbor pairs identified",
+        completeness_score,
+        len(nearest_neighbor_pairs),
+    )
 
     return CompletenessResult(
         completeness=float(completeness_score),
