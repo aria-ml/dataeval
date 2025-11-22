@@ -4,6 +4,7 @@ from typing import TypedDict
 
 __all__ = []
 
+import logging
 from collections import defaultdict
 from collections.abc import Mapping
 
@@ -13,6 +14,8 @@ from scipy.stats.contingency import chi2_contingency, crosstab
 
 from dataeval.types import Array1D, Array2D
 from dataeval.utils._array import as_numpy
+
+_logger = logging.getLogger(__name__)
 
 
 class ParityResult(TypedDict):
@@ -83,8 +86,13 @@ def parity(
     --------
     balance
     """
+    _logger.info("Starting parity calculation")
+
     factor_data_np = as_numpy(factor_data, dtype=np.intp, required_ndim=2)
     class_labels_np = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
+
+    _logger.debug("Factor data shape: %s, Class labels shape: %s", factor_data_np.shape, class_labels_np.shape)
+
     chi_scores = np.zeros(factor_data_np.shape[1])
     p_values = np.zeros_like(chi_scores)
     insufficient_ddict: defaultdict[int, defaultdict[int, dict[int, int]]] = defaultdict(lambda: defaultdict(dict))
@@ -112,5 +120,14 @@ def parity(
         chi_scores[i], p_values[i] = chi2_contingency(contingency_matrix)[:2]  # type: ignore
 
     insufficient_data = {k: dict(v) for k, v in insufficient_ddict.items()}
+
+    _logger.info(
+        "Parity calculation complete: %d factors analyzed, mean chi-score=%.4f",
+        factor_data_np.shape[1],
+        np.mean(chi_scores),
+    )
+    _logger.debug("P-values: %s", p_values)
+    if insufficient_data:
+        _logger.warning("Found insufficient data for %d factor(s)", len(insufficient_data))
 
     return ParityResult(chi_scores=chi_scores, p_values=p_values, insufficient_data=insufficient_data)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
-import warnings
+import logging
 from collections.abc import Callable, Iterable, Mapping, Sequence, Sized
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -18,6 +18,8 @@ from dataeval.types import Array1D
 from dataeval.utils._array import as_numpy
 from dataeval.utils._merge import merge
 from dataeval.utils._tqdm import tqdm
+
+_logger = logging.getLogger(__name__)
 
 
 def _binned(name: str) -> str:
@@ -548,7 +550,7 @@ class Metadata:
         # Check for invalid keys
         invalid_keys = set(factor_bins.keys()) - set(df.columns)
         if invalid_keys:
-            warnings.warn(
+            _logger.warning(
                 f"The keys - {invalid_keys} - are present in the `continuous_factor_bins` dictionary "
                 "but are not columns in the metadata DataFrame. Unknown keys will be ignored."
             )
@@ -576,12 +578,11 @@ class Metadata:
                     factor_info[col] = FactorInfo("categorical", is_digitized=True)
                 elif is_continuous(data, self.item_indices):
                     # Continuous values - discretize by binning
-                    warnings.warn(
+                    _logger.warning(
                         f"A user defined binning was not provided for {col}. "
                         f"Using the {self.auto_bin_method} method to discretize the data. "
                         "It is recommended that the user rerun and supply the desired "
                         "bins using the continuous_factor_bins parameter.",
-                        UserWarning,
                     )
                     # Create binned version
                     binned_data = bin_data(data, self.auto_bin_method)

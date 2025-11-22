@@ -6,13 +6,15 @@ from __future__ import annotations
 
 __all__ = ["merge", "flatten"]
 
-import warnings
+import logging
 from collections.abc import Iterable, Mapping, Sequence
 from enum import Enum
 from typing import Any, Literal, overload
 
 import numpy as np
 from numpy.typing import NDArray
+
+_logger = logging.getLogger(__name__)
 
 _TYPE_MAP = {int: 0, float: 1, str: 2}
 
@@ -231,7 +233,7 @@ def flatten(
         return output, size, _sorted_drop_reasons(dropped)
     if dropped:
         dropped_items = "\n".join([f"    {k}: {v}" for k, v in _sorted_drop_reasons(dropped).items()])
-        warnings.warn(f"Metadata entries were dropped:\n{dropped_items}")
+        _logger.warning(f"Metadata entries were dropped:\n{dropped_items}")
     return output, size
 
 
@@ -423,6 +425,6 @@ def merge(
 
     if dropped:
         dropped_items = "\n".join([f"    {k}: {v}" for k, v in _sorted_drop_reasons(dropped).items()])
-        warnings.warn(f"Metadata entries were dropped:\n{dropped_items}")
+        _logger.warning(f"Metadata entries were dropped:\n{dropped_items}")
 
     return output

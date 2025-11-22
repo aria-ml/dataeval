@@ -2,7 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
-import warnings
+import logging
 from typing import Any, TypedDict
 
 import numpy as np
@@ -11,6 +11,8 @@ from scipy.stats import chisquare
 
 from dataeval.types import Array1D
 from dataeval.utils._array import as_numpy
+
+_logger = logging.getLogger(__name__)
 
 
 class LabelParityResult(TypedDict):
@@ -99,11 +101,10 @@ def _validate_dist(label_dist: NDArray[Any], label_name: str) -> None:
     if not len(label_dist):
         raise ValueError(f"No labels found in the {label_name} dataset")
     if np.any(label_dist < 5):
-        warnings.warn(
+        _logger.warning(
             f"Labels {np.where(label_dist < 5)[0]} in {label_name}"
             " dataset have frequencies less than 5. This may lead"
             " to invalid chi-squared evaluation.",
-            UserWarning,
         )
 
 
@@ -166,14 +167,20 @@ def label_parity(
     >>> label_parity(expected_labels, observed_labels)
     {'chi_squared': 14.007374204742625, 'p_value': 0.0072715574616218}
     """
+    _logger.info("Starting label_parity calculation with num_classes=%s", num_classes)
 
     # Calculate
     if not num_classes:
         num_classes = 0
 
     # Calculate the class frequencies associated with the datasets
-    observed_dist = np.bincount(as_numpy(observed_labels, dtype=np.intp, required_ndim=1), minlength=num_classes)
-    expected_dist = np.bincount(as_numpy(expected_labels, dtype=np.intp, required_ndim=1), minlength=num_classes)
+    observed_labels_np = as_numpy(observed_labels, dtype=np.intp, required_ndim=1)
+    expected_labels_np = as_numpy(expected_labels, dtype=np.intp, required_ndim=1)
+
+    _logger.debug("Observed labels: %d, Expected labels: %d", len(observed_labels_np), len(expected_labels_np))
+
+    observed_dist = np.bincount(observed_labels_np, minlength=num_classes)
+    expected_dist = np.bincount(expected_labels_np, minlength=num_classes)
 
     # Validate
     _validate_dist(observed_dist, "observed")
@@ -195,4 +202,7 @@ def label_parity(
         )
 
     cs, p = chisquare(f_obs=observed_dist, f_exp=expected_dist)
+
+    _logger.info("Label parity calculation complete: chi_squared=%.4f, p_value=%.4f", float(cs), float(p))
+
     return {"chi_squared": float(cs), "p_value": float(p)}

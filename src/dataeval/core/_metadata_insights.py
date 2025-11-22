@@ -4,7 +4,7 @@ from __future__ import annotations
 
 __all__ = []
 
-import warnings
+import logging
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -14,6 +14,8 @@ from sklearn.feature_selection import mutual_info_classif
 
 from dataeval.config import get_max_processes, get_seed
 from dataeval.protocols import SequenceLike
+
+_logger = logging.getLogger(__name__)
 
 _NATS2BITS = 1.442695
 """
@@ -153,10 +155,7 @@ def factor_deviation(
         raise ValueError("All test factor arrays must have the same length")
 
     if n_ref < 3:
-        warnings.warn(
-            f"At least 3 reference metadata samples are needed, got {n_ref}",
-            UserWarning,
-        )
+        _logger.warning(f"At least 3 reference metadata samples are needed, got {n_ref}")
         return [{} for _ in indices]
 
     # Convert indices to array

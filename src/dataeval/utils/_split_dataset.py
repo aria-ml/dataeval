@@ -3,7 +3,6 @@ from __future__ import annotations
 __all__ = []
 
 import logging
-import warnings
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -300,7 +299,7 @@ def make_splits(
             good = good or (len(np.unique(labels[t])) == n_labels and len(np.unique(labels[v])) == n_labels)
             split_defs.append(TrainValSplit(t, v))
     if not good and attempts == 3:
-        warnings.warn("Unable to create a good split definition, not all classes are represented in each split.")
+        _logger.warning("Unable to create a good split definition, not all classes are represented in each split.")
     return split_defs
 
 

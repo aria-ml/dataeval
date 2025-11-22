@@ -7,7 +7,7 @@ from __future__ import annotations
 
 __all__ = []
 
-import warnings
+import logging
 from typing import Any, Literal, TypedDict, overload
 
 import numpy as np
@@ -17,6 +17,8 @@ from sklearn.neighbors import NearestNeighbors
 from dataeval.config import get_max_processes
 from dataeval.types import ArrayND
 from dataeval.utils._array import as_numpy, flatten
+
+_logger = logging.getLogger(__name__)
 
 
 class MSTResult(TypedDict):
@@ -249,12 +251,11 @@ def minimum_spanning_tree_edges(
             break
     else:
         # Exhausted k-nearest neighbors without achieving connectivity
-        warnings.warn(
+        _logger.warning(
             f"Exhausted k-nearest neighbors (k={k_neighbors.shape[0] - 1}) "
             f"before finding connected spanning tree. "
             f"Consider increasing k parameter. "
             f"Falling back to inter-cluster connection heuristics.",
-            RuntimeWarning,
         )
     final_merge_idx = k_now
 
@@ -321,7 +322,10 @@ def minimum_spanning_tree(embeddings: ArrayND[float], k: int = 15) -> MSTResult:
     minimum_spanning_tree_edges : Lower-level function that returns edge weights
     compute_neighbor_distances : Computes the k-NN graph
     """
+    _logger.info("Starting minimum_spanning_tree calculation with k=%d", k)
+
     embeddings_np = flatten(embeddings)
+    _logger.debug("Embeddings shape: %s", embeddings_np.shape)
 
     # Get k-nearest neighbors and build MST
     neighbors, distances = compute_neighbor_distances(embeddings_np, k=k)
@@ -329,6 +333,8 @@ def minimum_spanning_tree(embeddings: ArrayND[float], k: int = 15) -> MSTResult:
 
     source = mst_edges[:, 0].astype(np.intp)
     target = mst_edges[:, 1].astype(np.intp)
+
+    _logger.info("MST calculation complete: %d edges computed", len(source))
 
     return {"source": source, "target": target}
 
@@ -338,6 +344,8 @@ def compute_neighbor_distances(
 ) -> tuple[NDArray[np.int32], NDArray[np.float32]]:
     """
     Compute k nearest neighbors for each point in data (self-query, excluding self).
+
+    _logger.debug("Computing neighbor distances with k=%d", k)
 
     Parameters
     ----------

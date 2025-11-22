@@ -2,6 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
+import logging
 from typing import Any, TypedDict
 
 import numpy as np
@@ -10,6 +11,8 @@ from numpy.typing import NDArray
 from dataeval.core._mst import compute_neighbor_distances, minimum_spanning_tree_edges
 from dataeval.types import ArrayND
 from dataeval.utils._array import flatten, to_numpy
+
+_logger = logging.getLogger(__name__)
 
 
 class CondensedTree(TypedDict):
@@ -108,11 +111,16 @@ def compute_cluster_stats(
     ClusterStats
         Pre-calculated statistics with empty arrays if no valid clusters found
     """
+    _logger.debug("Computing cluster statistics for %d samples", len(embeddings))
+
     # Get unique clusters (excluding -1)
     unique_clusters = np.unique(clusters[clusters >= 0])
     n_samples = len(embeddings)
 
+    _logger.debug("Found %d unique clusters (excluding outliers)", len(unique_clusters))
+
     if len(unique_clusters) == 0:
+        _logger.warning("No valid clusters found, returning empty statistics")
         return ClusterStats(
             cluster_ids=np.array([], dtype=np.intp),
             centers=np.array([], dtype=embeddings.dtype),
@@ -147,6 +155,8 @@ def compute_cluster_stats(
     # Get minimum distance and nearest cluster index for each point
     nearest_cluster_idx = np.argmin(all_distances, axis=1)
     min_distances = all_distances[np.arange(n_samples), nearest_cluster_idx]
+
+    _logger.debug("Cluster stats computed: %d centers with mean distances %s", n_clusters, cluster_distances_mean)
 
     return ClusterStats(
         cluster_ids=unique_clusters,
@@ -214,12 +224,17 @@ def cluster(
         mst_to_linkage_tree,
     )
 
+    _logger.info("Starting cluster calculation")
+
     single_cluster = True
     cluster_selection_epsilon = 0.0
     # cluster_selection_method = "eom"
 
     x: NDArray[Any] = flatten(to_numpy(embeddings))
     samples, features = x.shape  # Due to flatten(), we know shape has a length of 2
+
+    _logger.debug("Input embeddings shape after flattening: (%d samples, %d features)", samples, features)
+
     if samples < 2:
         raise ValueError(f"Data should have at least 2 samples; got {samples}")
     if features < 1:
@@ -232,12 +247,17 @@ def cluster(
         # Encourage finding approximately n_expected_clusters
         # Divide by 3 to allow smaller, more granular clusters
         min_cluster_size = max(5, num_samples // (n_expected_clusters * 3))
+        _logger.debug(
+            "Using adaptive min_cluster_size=%d for %d expected clusters", min_cluster_size, n_expected_clusters
+        )
     else:
         # Default behavior: use 5% but cap at 100
         min_num = int(num_samples * 0.05)
         min_cluster_size = min(max(5, min_num), 100)
+        _logger.debug("Using default min_cluster_size=%d", min_cluster_size)
 
     max_neighbors = min(25, num_samples - 1)
+    _logger.debug("Computing neighbors with max_neighbors=%d", max_neighbors)
     kneighbors, kdistances = compute_neighbor_distances(x, max_neighbors)
     unsorted_mst: NDArray[np.float32] = minimum_spanning_tree_edges(x, kneighbors, kdistances)
     mst: NDArray[np.float32] = unsorted_mst[np.argsort(unsorted_mst.T[2])]
@@ -270,6 +290,15 @@ def cluster(
         condensed_tree,
         selected_clusters,
         clusters,
+    )
+
+    n_clusters = len(np.unique(clusters[clusters >= 0]))
+    n_outliers = np.sum(clusters == -1)
+    _logger.info(
+        "Cluster calculation complete: found %d clusters, %d outliers out of %d samples",
+        n_clusters,
+        n_outliers,
+        num_samples,
     )
 
     return ClusterResult(

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
-import warnings
+import logging
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Sized
 from dataclasses import dataclass
 from enum import Flag
@@ -32,6 +32,8 @@ from dataeval.utils._image import clip_and_pad, normalize_image_shape, rescale
 from dataeval.utils._multiprocessing import PoolWrapper
 from dataeval.utils._tqdm import tqdm
 from dataeval.utils._unzip_dataset import unzip_dataset
+
+_logger = logging.getLogger(__name__)
 
 SOURCE_INDEX = "source_index"
 
@@ -487,6 +489,13 @@ def calculate(
     # Get calculators from registry based on flags
     calculators = CalculatorRegistry.get_calculators(stats)
 
+    _logger.info(
+        "Starting calculate with per_image=%s, per_target=%s, per_channel=%s",
+        per_image,
+        per_target,
+        per_channel,
+    )
+
     total_images = len(data) if isinstance(data, Sized) else None
 
     images, boxes = (
@@ -500,6 +509,7 @@ def calculate(
     # Build description for progress bar
     calculator_names = [c[0].__name__.removesuffix("Calculator") for c in calculators]
     desc = f"Processing images for {', '.join(calculator_names)}"
+    _logger.debug("Using calculators: %s", calculator_names)
 
     with PoolWrapper(processes=get_max_processes()) as p:
         for result in tqdm(
@@ -523,9 +533,20 @@ def calculate(
                 progress_callback(image_count, total_images)
 
     for w in warning_list:
-        warnings.warn(w, UserWarning)
+        _logger.warning(w)
 
+    _logger.debug("Sorting %d source indices and %d stats", len(source_indices), len(aggregated_stats))
     sorted_source_indices, sorted_aggregated_stats = _sort(source_indices, aggregated_stats)
+
+    total_boxes = sum(object_count.values())
+    total_invalid = sum(invalid_box_count.values())
+    _logger.info(
+        "Calculate complete: %d images processed, %d total boxes (%d invalid), %d stats computed",
+        image_count,
+        total_boxes,
+        total_invalid,
+        len(sorted_aggregated_stats),
+    )
 
     return CalculationResult(
         source_index=sorted_source_indices,

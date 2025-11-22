@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 import pytest
 
@@ -353,17 +355,19 @@ class TestUtilsMetadata:
     def test_flatten_no_dropped_no_warn(self):
         flatten({"a": {"b": 1, "c": 2}}, return_dropped=False)
 
-    def test_flatten_no_dropped_warns(self):
-        with pytest.warns(UserWarning, match=r"Metadata entries were dropped"):
+    def test_flatten_no_dropped_warns(self, caplog):
+        with caplog.at_level(logging.WARNING):
             flatten(self.inconsistent_keys[0], return_dropped=False)
+        assert "Metadata entries were dropped" in caplog.text
 
     @pytest.mark.filterwarnings("error")
     def test_merge_no_dropped_no_warn(self):
         merge([{"a": {"b": 1, "c": 2}}], return_dropped=False)
 
-    def test_merge_no_dropped_warns(self):
-        with pytest.warns(UserWarning, match=r"Metadata entries were dropped"):
+    def test_merge_no_dropped_warns(self, caplog):
+        with caplog.at_level(logging.WARNING):
             merge(self.inconsistent_keys, return_dropped=False)
+        assert "Metadata entries were dropped" in caplog.text
 
     def test_handle_numpy(self):
         output, dropped = merge(self.numpy_value, return_dropped=True)

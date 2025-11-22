@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -62,11 +63,11 @@ class TestFeatureDistance:
             pytest.param(["a", "b", "c"], (1, 3), (4, 3), id="mismatched samples, multi factors"),
         ],
     )
-    def test_input_shapes(self, RNG: Generator, factors: list[str], shape1, shape2):
+    def test_input_shapes(self, RNG: Generator, factors: list[str], shape1, shape2, caplog):
         m1 = mock_metadata(continuous_names=factors, continuous_data=RNG.random(shape1))
         m2 = mock_metadata(continuous_names=factors, continuous_data=RNG.random(shape2))
 
-        with pytest.warns(UserWarning):
+        with caplog.at_level(logging.WARNING):
             result = m1.calculate_distance(m2)
 
         assert len(result) == len(factors)

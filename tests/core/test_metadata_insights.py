@@ -135,14 +135,17 @@ class TestFindDeviatedFactors:
             factor_deviation(reference_factors, test_factors, [0])
 
     @pytest.mark.parametrize("n_ref", (0, 1, 2))
-    def test_insufficient_reference_samples_warns(self, n_ref):
+    def test_insufficient_reference_samples_warns(self, n_ref, caplog):
         """Tests that less than 3 reference samples raises warning and returns empty list."""
+        import logging
+
         reference_factors = {"time": np.arange(n_ref, dtype=float)}
         test_factors = {"time": np.array([10.0])}
 
-        with pytest.warns(UserWarning, match=f"At least 3 reference metadata samples are needed, got {n_ref}"):
+        with caplog.at_level(logging.WARNING):
             result = factor_deviation(reference_factors, test_factors, [0])
 
+        assert f"At least 3 reference metadata samples are needed, got {n_ref}" in caplog.text
         assert result == [{}]
 
     def test_single_index_single_factor(self):

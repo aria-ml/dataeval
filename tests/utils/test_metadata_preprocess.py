@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 import pytest
 
@@ -6,13 +8,14 @@ from tests.conftest import to_metadata
 
 @pytest.mark.required
 class TestMDPreprocessingUnit:
-    def test_bad_factor_ref(self):
+    def test_bad_factor_ref(self, caplog):
         labels = [0] * 5 + [1] * 5
         factors = {"factor1": ["a"] * 5 + ["b"] * 5}
         continuous_bincounts = {"something_else": 2}
         err_msg = "The keys - {'something_else'} - are present in the `continuous_factor_bins` dictionary"
-        with pytest.warns(UserWarning, match=err_msg):
+        with caplog.at_level(logging.WARNING):
             to_metadata(factors, labels, continuous_bincounts)._bin()
+        assert err_msg in caplog.text
 
     def test_doesnt_modify_input(self):
         factors = {"data1": [0.1, 0.2, 0.3]}
@@ -30,12 +33,13 @@ class TestMDPreprocessingUnit:
             list(np.random.randint(0, 1000, 100)),
         ],
     )
-    def test_discrete_without_bins(self, data_values):
+    def test_discrete_without_bins(self, data_values, caplog):
         factors = {"data": data_values}
         labels = list(np.random.randint(5, size=len(data_values)))
         err_msg = "A user defined binning was not provided for data."
-        with pytest.warns(UserWarning, match=err_msg):
+        with caplog.at_level(logging.WARNING):
             to_metadata(factors, labels)._bin()
+        assert err_msg in caplog.text
 
     @pytest.mark.parametrize("factors", ({"a": [1, 2, 3], "b": [1, 2, 3]}, {"a": [1, 2, 3]}))
     @pytest.mark.parametrize("bincounts", ({"a": 1, "b": 1}, {"a": 1}, None))

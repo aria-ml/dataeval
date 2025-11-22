@@ -2,7 +2,7 @@ from __future__ import annotations
 
 __all__ = []
 
-import warnings
+import logging
 from collections.abc import Sequence
 from typing import NamedTuple, TypedDict, cast
 
@@ -11,6 +11,8 @@ from scipy.stats import iqr, ks_2samp, wasserstein_distance
 
 from dataeval.types import Array1D, Array2D
 from dataeval.utils._array import as_numpy
+
+_logger = logging.getLogger(__name__)
 
 
 class KSType(NamedTuple):
@@ -91,8 +93,12 @@ def feature_distance(
 
     Kolmogorov-Smirnov two-sample test
     """
+    _logger.info("Starting feature_distance calculation")
+
     cont1 = np.atleast_2d(as_numpy(continuous_data_1, dtype=np.float64, required_ndim=(1, 2)))  # (S, F)
     cont2 = np.atleast_2d(as_numpy(continuous_data_2, dtype=np.float64, required_ndim=(1, 2)))  # (S, F)
+
+    _logger.debug("Data 1 shape: %s, Data 2 shape: %s", cont1.shape, cont2.shape)
 
     if len(cont1.T) != len(cont2.T):
         raise ValueError(f"Data must have the same numbers of features. ({len(cont1.T)} != {len(cont2.T)})")
@@ -102,10 +108,9 @@ def feature_distance(
 
     # This is a simplified version of sqrt(N*M / N+M) < 4
     if (N - 16) * (M - 16) < 256:
-        warnings.warn(
+        _logger.warning(
             f"Sample sizes of {N}, {M} will yield unreliable p-values from the KS test. "
             f"Recommended 32 samples per factor or at least 16 if one set has many more.",
-            UserWarning,
         )
 
     # Set default for statistic, location, and magnitude to zero and pvalue to one
@@ -133,5 +138,7 @@ def feature_distance(
         drift = _calculate_drift(fdata1, fdata2)
 
         results.append({"statistic": ks_result.statistic, "location": loc, "dist": drift, "p_value": ks_result.pvalue})
+
+    _logger.info("Feature distance calculation complete: analyzed %d features", len(results))
 
     return results
