@@ -106,6 +106,17 @@ class TestMMDDrift:
             assert preds.p_val >= preds.threshold == cd.p_val
             assert preds.distance <= preds.distance_threshold
 
+    def test_permutation_pvalue_not_degenerate(self):
+        """Regression test: p-value should be between 0 and 1, not exactly 0 or 1."""
+        np.random.seed(0)
+        x_ref = np.random.randn(50, 10).astype(np.float32)
+        x_test = np.random.randn(50, 10).astype(np.float32)
+
+        cd = DriftMMD(data=x_ref, p_val=0.05, n_permutations=100, device="cpu")
+        p_val, _, _ = cd.score(x_test)
+
+        assert 0 < p_val < 1
+
 
 @pytest.mark.required
 class TestSquaredPairwiseDistance:
