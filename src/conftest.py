@@ -37,10 +37,6 @@ else:
     np.set_printoptions(precision=3)
 
 
-# Set manual seeds
-set_seed(0, all_generators=True)
-
-
 def generate_random_metadata(
     labels: Sequence[str], factors: Mapping[str, Sequence[str | int]], length: int, random_seed: int
 ) -> Metadata:
@@ -90,6 +86,17 @@ def get_object_detection_target(idx: int, det_data_mm: MagicMock) -> MagicMock:
 class ClassificationModel(PtModel):
     def __init__(self) -> None:
         super().__init__(16, 3, softmax=True, dropout=False)
+
+
+@pytest.fixture(autouse=True, scope="function")
+def reset_random_seed() -> Any:
+    """
+    Automatically reset the random seed before each test.
+    This ensures deterministic behavior for tests involving randomness.
+    """
+    # Set manual seeds
+    set_seed(0, all_generators=True)
+    yield
 
 
 @pytest.fixture(autouse=True, scope="session")
