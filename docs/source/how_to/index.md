@@ -18,6 +18,7 @@ These guides will provide quick examples of how to configure DataEval for your e
 :hidden:
 
 ../notebooks/h2_configure_hardware_settings.ipynb
+../notebooks/h2_configure_logging.ipynb
 ```
 
 :::{list-table}
@@ -28,10 +29,14 @@ These guides will provide quick examples of how to configure DataEval for your e
 - - [](../notebooks/h2_configure_hardware_settings.ipynb)
   - Configure global hardware settings used in DataEval
   - [![Open In Colab][colab-badge]][hdw-colab]
+- - [](../notebooks/h2_configure_logging.ipynb)
+  - Configure logging with DataEval
+  - [![Open In Colab][colab-badge]][log-colab]
 
 :::
 
 [hdw-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_configure_hardware_settings.ipynb
+[log-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_configure_logging.ipynb
 
 ## Detectors
 
