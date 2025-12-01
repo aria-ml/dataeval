@@ -183,7 +183,7 @@ class DriftMMD(BaseDrift):
         kernel_mat = kernel_mat - torch.diag(kernel_mat.diag())  # zero diagonal
         mmd2 = mmd2_from_kernel_matrix(kernel_mat, n, permute=False, zero_diag=False)
         mmd2_permuted = torch.tensor(
-            [mmd2_from_kernel_matrix(kernel_mat, n, permute=True, zero_diag=False)] * self.n_permutations,
+            [mmd2_from_kernel_matrix(kernel_mat, n, permute=True, zero_diag=False) for _ in range(self.n_permutations)],
             device=self.device,
         )
         p_val = (mmd2 <= mmd2_permuted).float().mean()
