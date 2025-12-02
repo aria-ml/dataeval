@@ -7,17 +7,17 @@ from __future__ import annotations
 
 __all__ = ["LastSeenUpdate", "ReservoirSamplingUpdate"]
 
-from abc import ABC, abstractmethod
 
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval.protocols import UpdateStrategy
 from dataeval.utils._array import flatten
 
 
-class BaseUpdateStrategy(ABC):
+class LastSeenUpdate(UpdateStrategy):
     """
-    Updates reference dataset for drift detector
+    Updates reference dataset for :term:`drift<Drift>` detector using last seen method.
 
     Parameters
     ----------
@@ -28,25 +28,11 @@ class BaseUpdateStrategy(ABC):
     def __init__(self, n: int) -> None:
         self.n = n
 
-    @abstractmethod
-    def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32], count: int) -> NDArray[np.float32]: ...
-
-
-class LastSeenUpdate(BaseUpdateStrategy):
-    """
-    Updates reference dataset for :term:`drift<Drift>` detector using last seen method.
-
-    Parameters
-    ----------
-    n : int
-        Update with last n instances seen by the detector.
-    """
-
-    def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32], count: int) -> NDArray[np.float32]:
+    def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32]) -> NDArray[np.float32]:
         return np.concatenate([x_ref, flatten(x_new)], axis=0)[-self.n :]
 
 
-class ReservoirSamplingUpdate(BaseUpdateStrategy):
+class ReservoirSamplingUpdate(UpdateStrategy):
     """
     Updates reference dataset for :term:`drift<Drift>` detector using reservoir sampling method.
 
@@ -56,9 +42,15 @@ class ReservoirSamplingUpdate(BaseUpdateStrategy):
         Update with last n instances seen by the detector.
     """
 
-    def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32], count: int) -> NDArray[np.float32]:
-        if x_new.shape[0] + count <= self.n:
-            return np.concatenate([x_ref, flatten(x_new)], axis=0)
+    def __init__(self, n: int) -> None:
+        self.n = n
+        self._count = 0
+
+    def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32]) -> NDArray[np.float32]:
+        if x_new.shape[0] + self._count <= self.n:
+            self._count += x_new.shape[0]
+            result = np.concatenate([x_ref, flatten(x_new)], axis=0)
+            return result[: self.n]
 
         n_ref = x_ref.shape[0]
         output_size = min(self.n, n_ref + x_new.shape[0])
@@ -68,12 +60,12 @@ class ReservoirSamplingUpdate(BaseUpdateStrategy):
         x_reservoir[:n_ref] = x_ref
 
         for item in x_new:
-            count += 1
+            self._count += 1
             if n_ref < self.n:
                 x_reservoir[n_ref, :] = item
                 n_ref += 1
             else:
-                r = np.random.randint(0, count)
+                r = np.random.randint(0, self._count)
                 if r < self.n:
                     x_reservoir[r, :] = item
         return x_reservoir

@@ -41,7 +41,7 @@ class TestUpdateReference:
         X_ref = np.random.rand(n_ref * n_features).reshape(n_ref, n_features)
         X = np.random.rand(n_test * n_features).reshape(n_test, n_features)
         update_method = update_method(n)
-        X_ref_new = update_method(X_ref, X, n)
+        X_ref_new = update_method(X_ref, X)
 
         assert X_ref_new.shape[0] <= n
         if isinstance(update_method, LastSeenUpdate):

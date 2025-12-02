@@ -16,8 +16,8 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.stats import ks_2samp
 
-from dataeval.evaluators.drift._base import BaseDriftUnivariate, UpdateStrategy
-from dataeval.protocols import Array
+from dataeval.evaluators.drift._base import BaseDriftUnivariate
+from dataeval.protocols import Array, UpdateStrategy
 
 
 class DriftKS(BaseDriftUnivariate):
