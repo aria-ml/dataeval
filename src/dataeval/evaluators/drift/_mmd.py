@@ -12,7 +12,7 @@ __all__ = []
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 import torch
 
@@ -20,6 +20,83 @@ from dataeval.config import get_device
 from dataeval.evaluators.drift._base import BaseDrift, DriftBaseOutput, UpdateStrategy, update_strategy
 from dataeval.protocols import Array, DeviceLike
 from dataeval.types import set_metadata
+
+
+def _auto_detect_permutation_batch_size(
+    kernel_mat_size: int,
+    n_permutations: int,
+    device: torch.device,
+) -> int:
+    """
+    Auto-detect appropriate permutation batch size based on available GPU memory.
+
+    Parameters
+    ----------
+    kernel_mat_size : int
+        Size of the kernel matrix (n_ref + n_test).
+    n_permutations : int
+        Total number of permutations to compute.
+    device : torch.device
+        Device where computation will occur.
+
+    Returns
+    -------
+    int
+        Suggested batch size, or 1 if batching is not needed (CPU or sufficient memory).
+
+    Notes
+    -----
+    This function estimates memory requirements and suggests a batch size that keeps
+    memory usage reasonable. The heuristic is very conservative to avoid OOM errors,
+    accounting for:
+
+    - CUDA caching allocator overhead and memory fragmentation
+    - Unreleased memory from previous operations
+    - Intermediate computation buffers
+    - Other concurrent GPU operations
+
+    The function uses only 50% of available memory and suggests batch sizes at 50%
+    of the calculated maximum, ensuring safe operation even in memory-constrained
+    environments.
+
+    Memory is primarily consumed by the permuted kernel matrices which have shape
+    (batch_size, kernel_mat_size, kernel_mat_size) in float32 (4 bytes per element).
+    """
+    # Only auto-batch on CUDA devices
+    if device.type != "cuda":
+        return 1
+
+    try:
+        # Get available GPU memory
+        total_memory = torch.cuda.get_device_properties(device).total_memory
+
+        # Use reserved memory (not allocated) as it includes CUDA caching allocator overhead
+        # This is more conservative and accounts for memory that hasn't been freed yet
+        reserved_memory = torch.cuda.memory_reserved(device)
+
+        # Be very conservative: only use 50% of remaining memory after reserved
+        safe_available_memory = (total_memory - reserved_memory) * 0.5
+
+        # Each permuted kernel matrix: kernel_mat_size^2 * 4 bytes (float32)
+        # Account for intermediate computations and overhead (multiply by 2.0 for safety)
+        memory_per_permutation = kernel_mat_size * kernel_mat_size * 4 * 2.0
+
+        # Calculate how many permutations can fit in available memory
+        max_batch_size = max(1, int(safe_available_memory / memory_per_permutation))
+
+        # If we can fit all permutations, no need to batch
+        if max_batch_size >= n_permutations:
+            return 1
+
+        # Otherwise, use a very conservative batch size (50% of max to be extra safe)
+        return max(1, int(max_batch_size * 0.5))
+
+    except (RuntimeError, AttributeError):
+        # If we can't determine memory, use a conservative default
+        # Heuristic: batch size of 10 for large matrices (>500), otherwise don't batch
+        if kernel_mat_size > 500:
+            return 10
+        return 1
 
 
 @dataclass(frozen=True)
@@ -89,6 +166,14 @@ class DriftMMD(BaseDrift):
         the null distribution of MMD² under no drift. Higher values provide
         more accurate p-value estimates but increase computation time.
         Default 100 balances statistical accuracy with computational efficiency.
+    permutation_batch_size : int or "auto", default "auto"
+        Batch size for computing permutations to reduce memory usage. When "auto" (default),
+        automatically detects appropriate batch size based on available GPU memory
+        (on CUDA devices) or computes all permutations at once (on CPU). Set to an
+        integer to manually specify batch size. Useful when working with large kernel
+        matrices or many permutations to avoid GPU out-of-memory errors. For example,
+        with n_permutations=100 and permutation_batch_size=10, permutations are computed
+        in 10 batches of 10 each.
     device : DeviceLike or None, default None
         Hardware device for computation. When None, automatically selects
         DataEval's configured device, falling back to PyTorch's default.
@@ -105,6 +190,8 @@ class DriftMMD(BaseDrift):
         Gaussian RBF kernel bandwidth parameter(s).
     n_permutations : int
         Number of permutations for statistical testing.
+    permutation_batch_size : int or "auto"
+        Batch size for computing permutations, or "auto" for automatic detection.
     device : torch.device
         Hardware device used for computations.
 
@@ -134,11 +221,13 @@ class DriftMMD(BaseDrift):
         update_strategy: UpdateStrategy | None = None,
         sigma: Array | None = None,
         n_permutations: int = 100,
+        permutation_batch_size: int | Literal["auto"] = "auto",
         device: DeviceLike | None = None,
     ) -> None:
         super().__init__(data, p_val, update_strategy)
 
         self.n_permutations = n_permutations  # nb of iterations through permutation test
+        self.permutation_batch_size: int | Literal["auto"] = permutation_batch_size
 
         # set device
         self.device: torch.device = get_device(device)
@@ -181,9 +270,18 @@ class DriftMMD(BaseDrift):
         n = x_test.shape[0]
         kernel_mat = self._kernel_matrix(self.x_ref, x_test)
         kernel_mat = kernel_mat - torch.diag(kernel_mat.diag())  # zero diagonal
-        mmd2 = mmd2_from_kernel_matrix(kernel_mat, n, zero_diag=False)
-        mmd2_permuted = mmd2_from_kernel_matrix(kernel_mat, n, zero_diag=False, n_permutations=self.n_permutations)
+        mmd2 = mmd2_from_kernel_matrix(kernel_mat, n, False)
+
+        # auto-detect batch size if set to "auto"
+        batch_size = (
+            _auto_detect_permutation_batch_size(kernel_mat.shape[0], self.n_permutations, kernel_mat.device)
+            if self.permutation_batch_size == "auto"
+            else self.permutation_batch_size
+        )
+
+        mmd2_permuted = mmd2_from_kernel_matrix(kernel_mat, n, False, self.n_permutations, batch_size)
         p_val = (mmd2 <= mmd2_permuted).float().mean()
+
         # compute distance threshold
         idx_threshold = int(self.p_val * len(mmd2_permuted))
         distance_threshold = torch.sort(mmd2_permuted, descending=True).values[idx_threshold]
@@ -342,6 +440,7 @@ def mmd2_from_kernel_matrix(
     m: int,
     zero_diag: bool = True,
     n_permutations: int = 0,
+    permutation_batch_size: int | None = None,
 ) -> torch.Tensor:
     """
     Compute maximum mean discrepancy (MMD^2) between 2 samples x and y from the
@@ -359,6 +458,12 @@ def mmd2_from_kernel_matrix(
         Number of random permutations to compute. If 0, computes the non-permuted
         MMD^2 and returns a scalar. If > 0, computes MMD^2 for this many random
         permutations in batch and returns tensor of shape (n_permutations,).
+    permutation_batch_size : int or None, default None
+        Batch size for computing permutations to reduce memory usage. When None,
+        all permutations are computed at once (no batching). Set to a positive
+        integer to enable batched computation. Useful for large kernel matrices
+        or many permutations to avoid GPU OOM errors. Note: The DriftMMD class
+        uses auto-detection when None; this parameter requires explicit values.
 
     Returns
     -------
@@ -387,7 +492,29 @@ def mmd2_from_kernel_matrix(
         kernel_mat = kernel_mat - torch.diag(kernel_mat.diag())
 
     if n_permutations > 0:
-        # Batched permutations
+        # Determine if we should use batched computation
+        if permutation_batch_size is not None and permutation_batch_size < n_permutations:
+            # Batched permutation computation to reduce memory usage
+            results = []
+            for i in range(0, n_permutations, permutation_batch_size):
+                batch_perms = min(permutation_batch_size, n_permutations - i)
+                perm_indices = torch.argsort(
+                    torch.rand(batch_perms, kernel_mat.shape[0], device=kernel_mat.device), dim=1
+                )
+                kernel_mat_batch = kernel_mat[perm_indices[:, :, None], perm_indices[:, None, :]]
+                k_xx, k_yy, k_xy = (
+                    kernel_mat_batch[:, :-m, :-m],
+                    kernel_mat_batch[:, -m:, -m:],
+                    kernel_mat_batch[:, -m:, :-m],
+                )
+                c_xx, c_yy, c_xy = 1 / (n * (n - 1)), 1 / (m * (m - 1)), 1 / (n * m)
+                batch_result = (
+                    c_xx * k_xx.sum(dim=(1, 2)) + c_yy * k_yy.sum(dim=(1, 2)) - 2.0 * c_xy * k_xy.sum(dim=(1, 2))
+                )
+                results.append(batch_result)
+            return torch.cat(results)
+
+        # Original single-batch computation
         perm_indices = torch.argsort(torch.rand(n_permutations, kernel_mat.shape[0], device=kernel_mat.device), dim=1)
         kernel_mat = kernel_mat[perm_indices[:, :, None], perm_indices[:, None, :]]
         k_xx, k_yy, k_xy = kernel_mat[:, :-m, :-m], kernel_mat[:, -m:, -m:], kernel_mat[:, -m:, :-m]

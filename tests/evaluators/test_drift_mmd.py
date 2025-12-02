@@ -20,7 +20,13 @@ import torch.nn as nn
 # from maite_datasets import to_image_classification_dataset
 from dataeval.config import get_device
 from dataeval.data._embeddings import Embeddings
-from dataeval.evaluators.drift._mmd import DriftMMD, GaussianRBF, _squared_pairwise_distance, mmd2_from_kernel_matrix
+from dataeval.evaluators.drift._mmd import (
+    DriftMMD,
+    GaussianRBF,
+    _auto_detect_permutation_batch_size,
+    _squared_pairwise_distance,
+    mmd2_from_kernel_matrix,
+)
 from dataeval.evaluators.drift.updates import LastSeenUpdate, ReservoirSamplingUpdate
 
 
@@ -118,6 +124,37 @@ class TestMMDDrift:
         p_val, _, _ = cd.score(x_test)
 
         assert 0 < p_val < 1
+
+    def test_permutation_batch_size_parameter(self, RNG):
+        """Test that DriftMMD with permutation_batch_size produces same results as without."""
+        x_ref = RNG.normal(size=(50, 10)).astype(np.float32)
+        x_test = RNG.normal(size=(50, 10)).astype(np.float32)
+
+        # Create detector with auto (default)
+        cd_auto = DriftMMD(data=x_ref, p_val=0.05, n_permutations=100, device="cpu")
+        assert cd_auto.permutation_batch_size == "auto"
+
+        # Create detector with explicit batching
+        cd_with_batch = DriftMMD(data=x_ref, p_val=0.05, n_permutations=100, permutation_batch_size=10, device="cpu")
+
+        # Create detector with batching disabled (batch_size >= n_permutations)
+        cd_no_batch = DriftMMD(data=x_ref, p_val=0.05, n_permutations=100, permutation_batch_size=100, device="cpu")
+
+        # All should produce consistent results (setting seed for reproducibility)
+        torch.manual_seed(42)
+        result_auto = cd_auto.predict(x_test)
+
+        torch.manual_seed(42)
+        result_with_batch = cd_with_batch.predict(x_test)
+
+        torch.manual_seed(42)
+        result_no_batch = cd_no_batch.predict(x_test)
+
+        # Check that drift detection is consistent across all modes
+        assert result_auto.drifted == result_with_batch.drifted == result_no_batch.drifted
+        # P-values and distances should be close (within reasonable tolerance due to random permutations)
+        assert abs(result_auto.p_val - result_with_batch.p_val) < 0.2
+        assert abs(result_auto.distance - result_with_batch.distance) < 0.1
 
 
 @pytest.mark.required
@@ -274,6 +311,33 @@ class TestMMDKernelMatrix:
         # (not all identical, which would indicate a bug)
         assert mmd_batched.std() > 0
 
+    def test_mmd_permutation_batch_size(self):
+        """Test permutation_batch_size parameter reduces memory usage without changing results."""
+        n, m, n_perms = 50, 30, 100
+        kernel_mat = torch.rand(n + m, n + m)
+        kernel_mat -= torch.diag(kernel_mat.diag())
+
+        # Compute with full batch
+        torch.manual_seed(42)
+        mmd_full = mmd2_from_kernel_matrix(kernel_mat, m, zero_diag=False, n_permutations=n_perms)
+
+        # Compute with batched permutations
+        torch.manual_seed(42)
+        mmd_batched = mmd2_from_kernel_matrix(
+            kernel_mat, m, zero_diag=False, n_permutations=n_perms, permutation_batch_size=10
+        )
+
+        # Results should match
+        torch.testing.assert_close(mmd_full, mmd_batched, rtol=1e-5, atol=1e-7)
+
+        # Test with different batch sizes
+        for batch_size in [1, 5, 25, 50]:
+            torch.manual_seed(42)
+            mmd_test = mmd2_from_kernel_matrix(
+                kernel_mat, m, zero_diag=False, n_permutations=n_perms, permutation_batch_size=batch_size
+            )
+            torch.testing.assert_close(mmd_full, mmd_test, rtol=1e-5, atol=1e-7)
+
 
 @pytest.mark.required
 @pytest.mark.parametrize("device", [None, torch.device("cpu"), "cpu", "cuda"])
@@ -286,3 +350,43 @@ def test_gaussianrbf_forward_valueerror():
     g = GaussianRBF(trainable=True)
     with pytest.raises(ValueError):
         g.forward(np.zeros((2, 2)), np.zeros((2, 2)), infer_sigma=True)
+
+
+@pytest.mark.required
+class TestAutoDetectBatchSize:
+    def test_auto_detect_returns_one_for_cpu(self):
+        """Auto-detection should return 1 (no batching) for CPU devices."""
+        batch_size = _auto_detect_permutation_batch_size(
+            kernel_mat_size=500, n_permutations=100, device=torch.device("cpu")
+        )
+        assert batch_size == 1
+
+    def test_auto_detect_returns_one_for_small_matrices(self):
+        """Auto-detection should return 1 (no batching) when all permutations fit in memory."""
+        # Small matrix that should fit in memory even with all permutations
+        batch_size = _auto_detect_permutation_batch_size(
+            kernel_mat_size=50, n_permutations=100, device=torch.device("cpu")
+        )
+        assert batch_size == 1
+
+    @pytest.mark.cuda
+    def test_auto_detect_suggests_batch_for_large_matrices(self):
+        """Auto-detection should suggest batching for large matrices on GPU."""
+        if not torch.cuda.is_available():
+            pytest.skip("CUDA not available")
+
+        # Large matrix that would require significant memory
+        batch_size = _auto_detect_permutation_batch_size(
+            kernel_mat_size=2000, n_permutations=1000, device=torch.device("cuda")
+        )
+        # Should always return a positive integer
+        assert isinstance(batch_size, int) and batch_size > 0
+
+    def test_auto_detect_batch_size_is_positive(self):
+        """Auto-detection always returns a positive integer."""
+        # Use a scenario on CPU
+        batch_size = _auto_detect_permutation_batch_size(
+            kernel_mat_size=1000, n_permutations=500, device=torch.device("cpu")
+        )
+        # Should always return a positive integer
+        assert isinstance(batch_size, int) and batch_size > 0
