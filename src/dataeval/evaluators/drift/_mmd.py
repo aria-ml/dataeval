@@ -181,11 +181,8 @@ class DriftMMD(BaseDrift):
         n = x_test.shape[0]
         kernel_mat = self._kernel_matrix(self.x_ref, x_test)
         kernel_mat = kernel_mat - torch.diag(kernel_mat.diag())  # zero diagonal
-        mmd2 = mmd2_from_kernel_matrix(kernel_mat, n, permute=False, zero_diag=False)
-        mmd2_permuted = torch.tensor(
-            [mmd2_from_kernel_matrix(kernel_mat, n, permute=True, zero_diag=False) for _ in range(self.n_permutations)],
-            device=self.device,
-        )
+        mmd2 = mmd2_from_kernel_matrix(kernel_mat, n, zero_diag=False)
+        mmd2_permuted = mmd2_from_kernel_matrix(kernel_mat, n, zero_diag=False, n_permutations=self.n_permutations)
         p_val = (mmd2 <= mmd2_permuted).float().mean()
         # compute distance threshold
         idx_threshold = int(self.p_val * len(mmd2_permuted))
@@ -341,7 +338,10 @@ class GaussianRBF(torch.nn.Module):
 
 
 def mmd2_from_kernel_matrix(
-    kernel_mat: torch.Tensor, m: int, permute: bool = False, zero_diag: bool = True
+    kernel_mat: torch.Tensor,
+    m: int,
+    zero_diag: bool = True,
+    n_permutations: int = 0,
 ) -> torch.Tensor:
     """
     Compute maximum mean discrepancy (MMD^2) between 2 samples x and y from the
@@ -353,22 +353,48 @@ def mmd2_from_kernel_matrix(
         Kernel matrix between samples x and y.
     m : int
         Number of instances in y.
-    permute : bool, default False
-        Whether to permute the row indices. Used for permutation tests.
     zero_diag : bool, default True
         Whether to zero out the diagonal of the kernel matrix.
+    n_permutations : int, default 0
+        Number of random permutations to compute. If 0, computes the non-permuted
+        MMD^2 and returns a scalar. If > 0, computes MMD^2 for this many random
+        permutations in batch and returns tensor of shape (n_permutations,).
 
     Returns
     -------
     torch.Tensor
-        MMD^2 between the samples from the kernel matrix.
+        MMD^2 between the samples. Scalar if n_permutations is 0,
+        otherwise shape (n_permutations,).
+
+    Notes
+    -----
+    This function computes an unbiased estimator of MMD^2 that can produce small
+    negative values even though the true MMD^2 is theoretically non-negative.
+    This occurs due to:
+
+    - Finite sample variance: With limited samples, the unbiased estimator has
+    variance that can push estimates slightly negative when the true MMD^2 is
+    close to zero (e.g., under the null hypothesis of no distributional difference).
+    - Numerical precision: Floating-point arithmetic errors can accumulate.
+
+    These small negative values are statistically valid and should NOT be clamped
+    to zero, as doing so would bias permutation tests that rely on the empirical
+    distribution of MMD^2 values.
     """
     n = kernel_mat.shape[0] - m
+
     if zero_diag:
         kernel_mat = kernel_mat - torch.diag(kernel_mat.diag())
-    if permute:
-        idx = torch.randperm(kernel_mat.shape[0])
-        kernel_mat = kernel_mat[idx][:, idx]
+
+    if n_permutations > 0:
+        # Batched permutations
+        perm_indices = torch.argsort(torch.rand(n_permutations, kernel_mat.shape[0], device=kernel_mat.device), dim=1)
+        kernel_mat = kernel_mat[perm_indices[:, :, None], perm_indices[:, None, :]]
+        k_xx, k_yy, k_xy = kernel_mat[:, :-m, :-m], kernel_mat[:, -m:, -m:], kernel_mat[:, -m:, :-m]
+        c_xx, c_yy, c_xy = 1 / (n * (n - 1)), 1 / (m * (m - 1)), 1 / (n * m)
+        return c_xx * k_xx.sum(dim=(1, 2)) + c_yy * k_yy.sum(dim=(1, 2)) - 2.0 * c_xy * k_xy.sum(dim=(1, 2))
+
+    # Non-permuted single computation (no random permutation)
     k_xx, k_yy, k_xy = kernel_mat[:-m, :-m], kernel_mat[-m:, -m:], kernel_mat[-m:, :-m]
     c_xx, c_yy = 1 / (n * (n - 1)), 1 / (m * (m - 1))
     return c_xx * k_xx.sum() + c_yy * k_yy.sum() - 2.0 * k_xy.mean()
