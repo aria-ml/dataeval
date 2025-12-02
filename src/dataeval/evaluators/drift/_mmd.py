@@ -17,8 +17,8 @@ from typing import Any, Literal
 import torch
 
 from dataeval.config import get_device
-from dataeval.evaluators.drift._base import BaseDrift, DriftBaseOutput, UpdateStrategy, update_strategy
-from dataeval.protocols import Array, DeviceLike
+from dataeval.evaluators.drift._base import BaseDrift, DriftBaseOutput, update_strategy
+from dataeval.protocols import Array, DeviceLike, UpdateStrategy
 from dataeval.types import set_metadata
 
 

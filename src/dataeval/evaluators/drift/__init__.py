@@ -11,12 +11,11 @@ __all__ = [
     "DriftMVDCOutput",
     "DriftOutput",
     "DriftUncertainty",
-    "UpdateStrategy",
     "updates",
 ]
 
 from dataeval.evaluators.drift import updates
-from dataeval.evaluators.drift._base import DriftOutput, UpdateStrategy
+from dataeval.evaluators.drift._base import DriftOutput
 from dataeval.evaluators.drift._cvm import DriftCVM
 from dataeval.evaluators.drift._ks import DriftKS
 from dataeval.evaluators.drift._mmd import DriftMMD, DriftMMDOutput

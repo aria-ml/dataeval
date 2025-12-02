@@ -15,12 +15,12 @@ from abc import abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Literal, Protocol, TypeVar, runtime_checkable
+from typing import Any, Literal, TypeVar
 
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.protocols import Array
+from dataeval.protocols import Array, UpdateStrategy
 from dataeval.types import DictOutput, set_metadata
 from dataeval.utils._array import flatten
 
@@ -105,15 +105,6 @@ class DriftOutput(DriftBaseOutput):
     distances: NDArray[np.float32]
 
 
-@runtime_checkable
-class UpdateStrategy(Protocol):
-    """
-    Protocol for reference dataset update strategy for drift detectors
-    """
-
-    def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32], count: int) -> NDArray[np.float32]: ...
-
-
 def update_strategy(fn: Callable[..., R]) -> Callable[..., R]:
     """Decorator to update x_ref with x using selected update methodology"""
 
@@ -123,7 +114,7 @@ def update_strategy(fn: Callable[..., R]) -> Callable[..., R]:
 
         # update reference dataset
         if self.update_strategy is not None:
-            self._x_ref = self.update_strategy(self.x_ref, self._encode(data), self.n)
+            self._x_ref = self.update_strategy(self.x_ref, self._encode(data))
             self.n += len(data)
 
         return output
