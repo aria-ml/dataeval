@@ -11,6 +11,7 @@ __all__ = [
     "Dataset",
     "DatasetMetadata",
     "DeviceLike",
+    "EvaluationSchedule",
     "EvaluationStrategy",
     "ImageClassificationDatum",
     "ImageClassificationDataset",
@@ -577,3 +578,38 @@ class UpdateStrategy(Protocol):
     """
 
     def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32]) -> NDArray[np.float32]: ...
+
+
+@runtime_checkable
+class EvaluationSchedule(Protocol):
+    """
+    Protocol for determining evaluation points in sufficiency analysis.
+
+    Implementations determine at which dataset sizes to train and
+    evaluate the model during sufficiency analysis.
+
+    Examples
+    --------
+    Custom scheduler evaluating at 0%, 50%, 100% of the dataset
+
+    >>> class MidpointSchedule:
+    ...     def get_step(self, dataset_length: int) -> np.typing.NDArray[np.intp]:
+    ...         return np.array([0, dataset_length // 2, dataset_length - 1], dtype=np.intp)
+    """
+
+    def get_steps(self, dataset_length: int) -> np.typing.NDArray[np.intp]:
+        """
+        Calculate evaluation points for given dataset length.
+
+        Parameters
+        ----------
+        dataset_length : int
+            Total length of training dataset
+
+        Returns
+        -------
+        NDArray[np.intp]
+            Array of dataset sizes at which to evaluate, must be
+            monotonically increasing and within [1, dataset_length]
+        """
+        ...
