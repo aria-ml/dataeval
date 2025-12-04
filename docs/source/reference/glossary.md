@@ -23,6 +23,17 @@ Accuracy
 
     ![binary accuracy example](../_static/images/reference/binary_accuracy_example.png)
 
+Artificial Intelligence (AI)
+    Artificial Intelligence, or AI, is technology that enables computers and machines to simulate human intelligence and problem-solving capabilities. It is modeled after the decision-making processes of the human brain that can ‘learn’ from available data and make increasingly more accurate classifications or predictions over time. For the applications in DataEval, Neural Networks are the main modeling method.
+
+    See {term}`Neural Network`
+
+Aspect Ratio
+    For Images, the ratio of the width (in pixels) over the height (in pixels)
+    - $Aspect Ratio = \frac{width}{height}$
+
+    See {term}`Image Size`
+
 AUROC
     The Area Under the ROC Curve (AUROC) is a metric that measures the performance of a {term}`classification<Classification>` model at all possible classification thresholds. It's calculated by measuring the two-dimensional area underneath a ROC curve from (0,0) to (1,1). AUROC can range from 0 to 1, with higher values indicating better performance:
 
@@ -35,17 +46,6 @@ AUROC
     - 0.7–0.8: Acceptable
     - 0.8–0.9: Excellent
     - 1: A perfect model that can correctly distinguish between all positive and negative class points
-
-Artificial Intelligence (AI)
-    Artificial Intelligence, or AI, is technology that enables computers and machines to simulate human intelligence and problem-solving capabilities. It is modeled after the decision-making processes of the human brain that can ‘learn’ from available data and make increasingly more accurate classifications or predictions over time. For the applications in DataEval, Neural Networks are the main modeling method.
-
-    See {term}`Neural Network`
-
-Aspect Ratio
-    For Images, the ratio of the width (in pixels) over the height (in pixels)
-    - $Aspect Ratio = \frac{width}{height}$
-
-    See {term}`Image Size`
 
 Autoencoder
     An autoencoder is a type of artificial {term}`neural network<Neural Network>` that learns efficient encodings of unlabeled data by doing {term}`unsupervised learning<Unsupervised Learning>`. An autoencoder learns two functions: an encoding function that transforms the input data into a {term}`latent space<Latent Space>`, and a decoding function that recreates the input data from the encoded representation. Typically used for {term}`dimensionality reduction<Dimensionality Reduction>`.
@@ -132,8 +132,15 @@ Convolutional Neural Network (CNN)
 Coverage
     A measure of the distribution of the images in a dataset. A covered dataset has at least one image for every distinguishing property of the data set.
 
+Covariate Shift
+    A type of {term}`drift<Drift>` where the distribution of input features changes between training and deployment, while the relationship between inputs and outputs remains the same. 
+
 Cramér-von Mises (CVM) Test
     The Cramér-von Mises algorithm tests the {term}`null hypothesis<Null Hypothesis>` that a data sample (i.e. operational dataset) comes from a pre-specified population distribution or a family of such distributions with the idea that if the operational dataset does not come from the same distribution or family of distributions as the training dataset then data drift may have occurred. It is similar to the {term}`Kolmogorov-Smirnov test<Kolmogorov-Smirnov (K-S) Test>`.
+
+Cross-Validation
+    A technique for assessing model performance by splitting data into folds.
+
 ```
 
 ## D
@@ -163,6 +170,9 @@ Divergence
 Diversity
     A measure of the distribution of metadata factors in the dataset. A balanced dataset has an even distribution of class labels and generative factors.
 
+Domain Classifier (DC)
+    A machine learning model that attempts to distinguish between two datasets.
+
 Drift
     In predictive analytics, data science, {term}`machine learning<Machine Learning (ML)>` and related fields, the phenomenon where the statistical properties of the data change over time. It occurs when the underlying distribution of the input features or the target variable (what the model is trying to predict) shifts, leading to a discrepancy between the training data and the real-world data the model encounters during deployment.
 
@@ -175,6 +185,9 @@ Duplicates
 ```{glossary}
 Embeddings
     Embeddings are representations of values or objects like text, images, and audio that are designed to be consumed by {term}`machine learning<Machine Learning (ML)>` models and semantic search algorithms.
+
+Entropy
+    Entropy is a measure of how evenly data examples are distributed over their set of possible values.  If all possible values are equally likely, then entropy is maximal.  If only one value ever occurs, entropy is zero.  Entropy is  used to evaluate feature importance, measure dataset complexity, and detect {term}`drift<Drift>` in data distributions over time.
 
 Epoch
     Each time a dataset passes through an algorithm, it is said to have completed an epoch. Therefore, epoch, in {term}`machine learning<Machine Learning (ML)>`, refers to one entire pass of training data through the algorithm.
