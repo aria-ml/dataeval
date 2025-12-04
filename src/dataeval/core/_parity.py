@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from typing import TypedDict
-
 __all__ = []
 
 import logging
 from collections import defaultdict
 from collections.abc import Mapping
+from typing import TypedDict, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -20,19 +19,22 @@ _logger = logging.getLogger(__name__)
 
 class ParityResult(TypedDict):
     """
-    Type definition for parity output.
+    Type definition for the output of the parity function.
 
     Attributes
     ----------
-    chi_scores : NDArray[np.float64]
-        Array of chi-squared statistics for each factor
+    scores : NDArray[np.float64]
+        Array of Bias-Corrected Cramér's V statistics for each factor.
+        Values range from 0.0 (independent/high parity) to 1.0 (perfect association).
     p_values : NDArray[np.float64]
-        Array of p-values for each factor
+        Array of p-values calculated via the G-test (Log-Likelihood Ratio).
+        Indicates the statistical significance of the calculated association.
     insufficient_data : Mapping[int, Mapping[int, Mapping[int, int]]]
-        Mapping of factors to categories to classes with insufficient data counts
+        Dictionary flagging specific data subsets with low sample counts (< 5).
+        Structure: {factor_index: {factor_category_value: {class_label: count}}}.
     """
 
-    chi_scores: NDArray[np.float64]
+    scores: NDArray[np.float64]
     p_values: NDArray[np.float64]
     insufficient_data: Mapping[int, Mapping[int, Mapping[int, int]]]
 
@@ -40,47 +42,59 @@ class ParityResult(TypedDict):
 def parity(
     factor_data: Array2D[int],
     class_labels: Array1D[int],
-    *,
-    return_insufficient_data: bool = False,
 ) -> ParityResult:
     """
-    Calculate chi-square statistics to assess the linear relationship \
-    between multiple factors and class labels.
+    Calculate statistical parity using Bias-Corrected Cramér's V.
 
-    This function computes the chi-square statistic for each metadata factor to determine if there is
-    a significant relationship between the factor values and class labels. The chi-square statistic is
-    only valid for linear relationships. If non-linear relationships exist, use `balance`.
+    This function measures the association between metadata factors and class labels
+    to identify potential bias or spurious correlations. It assumes an equal distribution
+    of metadata factors within the dataset.
+
+    The calculation uses the G-test (Log-Likelihood Ratio) for the statistical test
+    and applies the Bergsma (2013) bias correction to the Cramér's V statistic.
+    This correction provides a more accurate estimate of association strength than
+    standard Cramér's V, particularly for finite samples or large contingency tables.
 
     Parameters
     ----------
-    factor_data: Array2D[int]
-        Binned metadata factor values. Can be a 2D list, or array-like object.
-    class_labels: Array1D[int]
-        Observed class labels. Can be a 1D list, or array-like object.
+    factor_data : Array2D[int]
+        Binned metadata factor values. Shape should be (n_samples, n_factors).
+    class_labels : Array1D[int]
+        Observed class labels. Shape should be (n_samples,).
 
     Returns
     -------
     ParityResult
-        Mapping with keys:
-        - chi_scores : NDArray[np.float64] - Array of chi-squared statistics for each factor
-        - p_values : NDArray[np.float64] - Array of p-values for each factor
-        - insufficient_data : Mapping[int, Mapping[int, Mapping[int, int]]] - Mapping of factors to categories to
-        classes with insufficient data counts
-
-    Raises
-    ------
-    Warning
-        If any cell in the contingency matrix has a value between 0 and 5, a warning is issued because this can
-        lead to inaccurate chi-square calculations. It is recommended to ensure that each label co-occurs with
-        factor values either 0 times or at least 5 times.
+        A dictionary containing:
+        - scores : NDArray[np.float64]
+        Array of Bias-Corrected Cramér's V statistics (range 0.0 to 1.0).
+        0 indicates independence (parity), 1 indicates perfect association.
+        - p_values : NDArray[np.float64]
+        Array of p-values from the G-test. Low p-values (< 0.05) indicate
+        statistical significance.
+        - insufficient_data : Mapping[int, Mapping[int, Mapping[int, int]]]
+        Nested dictionary flagging specific combinations with low sample counts (< 5).
+        Structure: {factor_index: {factor_category: {class_label: count}}}.
 
     Notes
     -----
-    - A high score with a low p-value suggests that a metadata factor is strongly correlated with a class label.
-    - The function creates a contingency matrix for each factor, where each entry represents the frequency of a
-      specific factor value co-occurring with a particular class label.
-    - Rows containing only zeros in the contingency matrix are removed before performing the chi-square test
-      to prevent errors in the calculation.
+    **Interpretation:**
+    - **0.0 - 0.1:** Negligible association (High Parity)
+    - **0.1 - 0.3:** Weak association
+    - **0.3 - 0.5:** Moderate association
+    - **> 0.5:** Strong association (Potential Bias)
+
+    **Methodology:**
+    1. Constructs a contingency matrix for each factor against class labels.
+    2. Identifies and flags cells with counts < 5 (insufficient data).
+    3. Removes rows with zero sums to prevent calculation errors.
+    4. Performs a G-test (Log-Likelihood Ratio) instead of Pearson's Chi-Squared.
+    5. Computes Cramér's V with Bergsma's bias correction.
+
+    References
+    ----------
+    Bergsma, W. (2013). A bias-correction for Cramér's V and Tschuprow's T.
+    Journal of the Korean Statistical Society, 42(3), 323-328.
 
     See Also
     --------
@@ -96,6 +110,7 @@ def parity(
     chi_scores = np.zeros(factor_data_np.shape[1])
     p_values = np.zeros_like(chi_scores)
     insufficient_ddict: defaultdict[int, defaultdict[int, dict[int, int]]] = defaultdict(lambda: defaultdict(dict))
+
     for i, col_data in enumerate(factor_data_np.T):
         # Builds a contingency matrix where entry at index (r,c) represents
         # the frequency of current_factor_name achieving value unique_factor_values[r]
@@ -117,12 +132,44 @@ def parity(
         # because scipy.stats.chi2_contingency fails when there are rows containing only zeros.
         contingency_matrix = contingency_matrix[np.any(contingency_matrix, axis=1)]
 
-        chi_scores[i], p_values[i] = chi2_contingency(contingency_matrix)[:2]  # type: ignore
+        # Perform chi-square test using log-likelihood ratio (G-test)
+        # https://en.wikipedia.org/wiki/G-test
+        chi_results = chi2_contingency(contingency_matrix, lambda_="log-likelihood")
+        chi_stat, p_val = cast(tuple[np.float64, np.float64], chi_results[:2])
+
+        # Calculate Bias-Corrected Cramér's V
+        # Based on Bergsma (2013)
+        n = contingency_matrix.sum()
+        r, k = contingency_matrix.shape
+
+        if n > 1:
+            # 1. Calculate phi-squared
+            phi2 = chi_stat / n
+
+            # 2. Correct phi-squared
+            phi2_corr = max(0.0, phi2 - ((k - 1) * (r - 1)) / (n - 1))
+
+            # 3. Correct dimensions
+            r_corr = r - ((r - 1) ** 2) / (n - 1)
+            k_corr = k - ((k - 1) ** 2) / (n - 1)
+
+            # 4. Calculate corrected score
+            min_dim_corr = min((k_corr - 1), (r_corr - 1))
+
+            # Avoid division by zero if corrected dimensions are too small
+            if min_dim_corr > 0:
+                chi_scores[i] = np.sqrt(phi2_corr / min_dim_corr)
+            else:
+                chi_scores[i] = 0.0
+        else:
+            chi_scores[i] = 0.0
+
+        p_values[i] = p_val
 
     insufficient_data = {k: dict(v) for k, v in insufficient_ddict.items()}
 
     _logger.info(
-        "Parity calculation complete: %d factors analyzed, mean chi-score=%.4f",
+        "Parity calculation complete: %d factors analyzed, mean Bias-Corrected Cramér's V=%.4f",
         factor_data_np.shape[1],
         np.mean(chi_scores),
     )
@@ -130,4 +177,4 @@ def parity(
     if insufficient_data:
         _logger.warning("Found insufficient data for %d factor(s)", len(insufficient_data))
 
-    return ParityResult(chi_scores=chi_scores, p_values=p_values, insufficient_data=insufficient_data)
+    return ParityResult(scores=chi_scores, p_values=p_values, insufficient_data=insufficient_data)

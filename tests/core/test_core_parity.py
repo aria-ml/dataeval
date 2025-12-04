@@ -17,7 +17,7 @@ class TestParity:
         class_labels = np.array([0, 0, 1, 1], dtype=np.intp)
 
         result = parity(binned_data, class_labels)
-        chi_scores = result["chi_scores"]
+        chi_scores = result["scores"]
         p_values = result["p_values"]
 
         assert isinstance(chi_scores, np.ndarray)
@@ -34,18 +34,24 @@ class TestParity:
 
         result = parity(binned_data, class_labels)
 
-        assert result["chi_scores"].shape == (1,)
+        assert result["scores"].shape == (1,)
         assert result["p_values"].shape == (1,)
 
-    def test_perfect_correlation(self):
-        """Test with perfectly correlated factor and labels."""
+    def test_high_correlation(self):
+        """Test with highly correlated factor and labels.
+
+        Note: Uses Bergsma bias-corrected Cramér's V (G-test), which adjusts
+        for positive bias in small samples. For n=10 with perfect association,
+        the corrected value is ~0.8.
+        """
         data = [0] * 5 + [1] * 5
         binned_data = np.array([data], dtype=np.intp).T
         class_labels = np.array(data, dtype=np.intp)
 
         result = parity(binned_data, class_labels)
 
-        assert result["chi_scores"][0] > 0
+        # Bias-corrected value for n=10, perfect association in 2x2 table
+        assert 0.8 <= result["scores"][0] <= 0.85
         assert result["p_values"][0] < 0.05
 
     def test_no_correlation(self):
@@ -55,7 +61,7 @@ class TestParity:
 
         result = parity(binned_data, class_labels)
 
-        assert_array_almost_equal(result["chi_scores"], [0.0])
+        assert_array_almost_equal(result["scores"], [0.0])
         assert_array_almost_equal(result["p_values"], [1.0])
 
     def test_return_types(self):
@@ -63,10 +69,10 @@ class TestParity:
         binned_data = np.array([[0], [1]], dtype=np.intp)
         class_labels = np.array([0, 1], dtype=np.intp)
 
-        result = parity(binned_data, class_labels, return_insufficient_data=True)
+        result = parity(binned_data, class_labels)
 
         assert len(result) == 3
-        chi_scores = result["chi_scores"]
+        chi_scores = result["scores"]
         p_values = result["p_values"]
         insufficient_data = result["insufficient_data"]
         assert isinstance(chi_scores, np.ndarray)
@@ -78,7 +84,7 @@ class TestParity:
         binned_data = np.array([[0], [1], [0]], dtype=np.intp)
         class_labels = np.array([0, 1, 0], dtype=np.intp)
 
-        result = parity(binned_data, class_labels, return_insufficient_data=True)
+        result = parity(binned_data, class_labels)
         insufficient_data = result["insufficient_data"]
 
         assert 0 in insufficient_data
@@ -91,7 +97,7 @@ class TestParity:
 
         result = parity(binned_data, class_labels)
 
-        assert result["chi_scores"].shape == (3,)
+        assert result["scores"].shape == (3,)
         assert result["p_values"].shape == (3,)
 
     def test_zero_row_removal(self):
@@ -103,7 +109,7 @@ class TestParity:
         result = parity(binned_data, class_labels)
 
         # Should not raise error despite having only one factor value
-        assert len(result["chi_scores"]) == 1
+        assert len(result["scores"]) == 1
         assert len(result["p_values"]) == 1
 
     def test_single_class(self):
@@ -113,7 +119,7 @@ class TestParity:
 
         result = parity(binned_data, class_labels)
 
-        assert_array_almost_equal(result["chi_scores"], [0.0])
+        assert_array_almost_equal(result["scores"], [0.0])
         assert_array_almost_equal(result["p_values"], [1.0])
 
     def test_empty_arrays(self):
@@ -133,13 +139,18 @@ class TestParity:
             parity(binned_data, class_labels)
 
     def test_large_factor_values(self):
-        """Test with large factor values."""
-        binned_data = np.array([[100], [200], [100], [200]], dtype=np.intp)
-        class_labels = np.array([0, 1, 0, 1], dtype=np.intp)
+        """Test with large factor values.
+
+        Note: Uses larger sample size (n=20) to avoid bias correction
+        reducing the score to 0 in very small samples.
+        """
+        # Increase sample size to avoid bias correction zeroing out the score
+        binned_data = np.array([[100] * 5 + [200] * 5], dtype=np.intp).T
+        class_labels = np.array([0] * 5 + [1] * 5, dtype=np.intp)
 
         result = parity(binned_data, class_labels)
 
-        assert result["chi_scores"][0] > 0
+        assert result["scores"][0] > 0
         assert 0 <= result["p_values"][0] <= 1
 
     def test_dtype_consistency(self):
@@ -149,7 +160,7 @@ class TestParity:
 
         result = parity(binned_data, class_labels)
 
-        assert result["chi_scores"].dtype == np.float64
+        assert result["scores"].dtype == np.float64
         assert result["p_values"].dtype == np.float64
 
     def test_class_labels_as_list(self):
@@ -165,7 +176,7 @@ class TestParity:
         # Test with numpy array
         result3 = parity(binned_data, np.array([0, 1]))
 
-        assert_array_almost_equal(result1["chi_scores"], result2["chi_scores"])
-        assert_array_almost_equal(result2["chi_scores"], result3["chi_scores"])
+        assert_array_almost_equal(result1["scores"], result2["scores"])
+        assert_array_almost_equal(result2["scores"], result3["scores"])
         assert_array_almost_equal(result1["p_values"], result2["p_values"])
         assert_array_almost_equal(result2["p_values"], result3["p_values"])
