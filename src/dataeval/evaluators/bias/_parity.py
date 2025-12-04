@@ -25,13 +25,16 @@ class ParityOutput(DictOutput):
     Attributes
     ----------
     score : NDArray[np.float64]
-        chi-squared score(s) of the test
+        Array of Bias-Corrected Cramér's V statistics for each factor.
+        Values range from 0.0 (independent/high parity) to 1.0 (perfect association).
     p_value : NDArray[np.float64]
-        p-value(s) of the test
+        Array of p-values calculated via the G-test (Log-Likelihood Ratio).
+        Indicates the statistical significance of the calculated association.
     factor_names : Sequence[str]
         Names of each metadata factor
     insufficient_data: Mapping[str, Mapping[int, Mapping[str, int]]]
-        Mapping of metadata factors with less than 5 class occurrences per value
+        Dictionary flagging specific data subsets with low sample counts (< 5).
+        Structure: {factor_name: {factor_category_value: {class_label: count}}}.
     """
 
     score: NDArray[np.float64]
@@ -45,7 +48,7 @@ class ParityOutput(DictOutput):
 
         data = {
             "factor_name": self.factor_names,
-            "chi_square_score": self.score,
+            "cramers_v": self.score,
             "p_value": self.p_value,
         }
         return pd.DataFrame(data)
@@ -54,12 +57,16 @@ class ParityOutput(DictOutput):
 @set_metadata
 def parity(metadata: Metadata) -> ParityOutput:
     """
-    Calculate chi-square statistics to assess the linear relationship \
-    between multiple factors and class labels.
+    Calculate statistical parity using Bias-Corrected Cramér's V.
 
-    This function computes the chi-square statistic for each metadata factor to determine if there is
-    a significant relationship between the factor values and class labels. The chi-square statistic is
-    only valid for linear relationships. If non-linear relationships exist, use `balance`.
+    This function measures the association between metadata factors and class labels
+    to identify potential bias or spurious correlations. It assumes an equal distribution
+    of metadata factors within the dataset.
+
+    The calculation uses the G-test (Log-Likelihood Ratio) for the statistical test
+    and applies the Bergsma (2013) bias correction to the Cramér's V statistic.
+    This correction provides a more accurate estimate of association strength than
+    standard Cramér's V, particularly for finite samples or large contingency tables.
 
     Parameters
     ----------
@@ -68,25 +75,35 @@ def parity(metadata: Metadata) -> ParityOutput:
 
     Returns
     -------
-    ParityOutput[NDArray[np.float64]]
-        Arrays of length (num_factors) whose (i)th element corresponds to the
-        chi-square score and :term:`p-value<P-Value>` for the relationship between factor i and
-        the class labels in the dataset.
-
-    Raises
-    ------
-    Warning
-        If any cell in the contingency matrix has a value between 0 and 5, a warning is issued because this can
-        lead to inaccurate chi-square calculations. It is recommended to ensure that each label co-occurs with
-        factor values either 0 times or at least 5 times.
+    ParityOutput
+        Output dataclass containing:
+        - score: Array of Bias-Corrected Cramér's V statistics (range 0.0 to 1.0).
+        0 indicates independence (parity), 1 indicates perfect association.
+        - p_value: Array of p-values from the G-test. Low p-values (< 0.05) indicate
+        statistical significance.
+        - factor_names: Names of the metadata factors analyzed.
+        - insufficient_data: Nested dictionary flagging specific combinations with low sample counts (< 5).
+        Structure: {factor_name: {factor_category: {class_label: count}}}.
 
     Notes
     -----
-    - A high score with a low p-value suggests that a metadata factor is strongly correlated with a class label.
-    - The function creates a contingency matrix for each factor, where each entry represents the frequency of a
-      specific factor value co-occurring with a particular class label.
-    - Rows containing only zeros in the contingency matrix are removed before performing the chi-square test
-      to prevent errors in the calculation.
+    **Interpretation:**
+    - **0.0 - 0.1:** Negligible association (High Parity)
+    - **0.1 - 0.3:** Weak association
+    - **0.3 - 0.5:** Moderate association
+    - **> 0.5:** Strong association (Potential Bias)
+
+    **Methodology:**
+    1. Constructs a contingency matrix for each factor against class labels.
+    2. Identifies and flags cells with counts < 5 (insufficient data).
+    3. Removes rows with zero sums to prevent calculation errors.
+    4. Performs a G-test (Log-Likelihood Ratio) instead of Pearson's Chi-Squared.
+    5. Computes Cramér's V with Bergsma's bias correction.
+
+    References
+    ----------
+    Bergsma, W. (2013). A bias-correction for Cramér's V and Tschuprow's T.
+    Journal of the Korean Statistical Society, 42(3), 323-328.
 
     See Also
     --------
@@ -98,15 +115,13 @@ def parity(metadata: Metadata) -> ParityOutput:
 
     >>> metadata = generate_random_metadata(
     ...     labels=["doctor", "artist", "teacher"],
-    ...     factors={
-    ...         "age": [25, 30, 35, 45],
-    ...         "income": [50000, 65000, 80000],
-    ...         "gender": ["M", "F"]},
+    ...     factors={"age": [25, 30, 35, 45], "income": [50000, 65000, 80000], "gender": ["M", "F"]},
     ...     length=100,
-    ...     random_seed=175)
+    ...     random_seed=175,
+    ... )
 
     >>> parity(metadata)
-    ParityOutput(score=array([7.357, 5.467, 0.515]), p_value=array([0.289, 0.243, 0.773]), factor_names=['age', 'income', 'gender'], insufficient_data={'age': {35: {'artist': 4}, 45: {'artist': 4, 'teacher': 3}}, 'income': {50000: {'artist': 3}}})
+    ParityOutput(score=array([0.081, 0.086, 0.   ]), p_value=array([0.29 , 0.239, 0.773]), factor_names=['age', 'income', 'gender'], insufficient_data={'age': {35: {'artist': 4}, 45: {'artist': 4, 'teacher': 3}}, 'income': {50000: {'artist': 3}}})
     """  # noqa: E501
     factor_names = metadata.factor_names
     index2label = metadata.index2label
@@ -114,7 +129,7 @@ def parity(metadata: Metadata) -> ParityOutput:
     if not factor_names:
         raise ValueError("No factors found in provided metadata.")
 
-    output = _parity(metadata.binned_data, metadata.class_labels.tolist(), return_insufficient_data=True)
+    output = _parity(metadata.binned_data, metadata.class_labels.tolist())
 
     insufficient_data = {
         factor_names[k]: {vk: {index2label[vvk]: vvv for vvk, vvv in vv.items()} for vk, vv in v.items()}
@@ -128,7 +143,7 @@ def parity(metadata: Metadata) -> ParityOutput:
         )
 
     return ParityOutput(
-        score=output["chi_scores"],
+        score=output["scores"],
         p_value=output["p_values"],
         factor_names=metadata.factor_names,
         insufficient_data=insufficient_data,
