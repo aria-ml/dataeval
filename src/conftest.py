@@ -42,7 +42,38 @@ def generate_random_metadata(
 ) -> Metadata:
     rng = np.random.default_rng(random_seed)
     labels_arr = rng.choice(range(len(labels)), (length))
-    metadata_dict = {k: list(rng.choice(v, (length))) for k, v in factors.items()}
+
+    # Create artificially biased metadata where certain classes correlate with specific factors
+    metadata_dict: dict[str, list[Any]] = {}
+    factor_names = list(factors.keys())
+
+    # If we have the expected doctor/artist/teacher example with age/income/gender factors
+    if set(labels) == {"doctor", "artist", "teacher"} and set(factor_names) == {"age", "income", "gender"}:
+        # Create biased distributions
+        metadata_dict["age"] = []
+        metadata_dict["income"] = []
+        metadata_dict["gender"] = []
+
+        for label_idx in labels_arr:
+            if label_idx == 0:  # doctor
+                # Doctors: tend to be older (35, 45), higher income, more male
+                metadata_dict["age"].append(rng.choice([35, 45, 30, 25], p=[0.5, 0.35, 0.1, 0.05]))
+                metadata_dict["income"].append(rng.choice([80000, 65000, 50000], p=[0.7, 0.25, 0.05]))
+                metadata_dict["gender"].append(rng.choice(["M", "F"], p=[0.8, 0.2]))
+            elif label_idx == 1:  # artist
+                # Artists: tend to be younger (25, 30), lower income, more female
+                metadata_dict["age"].append(rng.choice([25, 30, 35, 45], p=[0.5, 0.35, 0.1, 0.05]))
+                metadata_dict["income"].append(rng.choice([50000, 65000, 80000], p=[0.6, 0.3, 0.1]))
+                metadata_dict["gender"].append(rng.choice(["F", "M"], p=[0.65, 0.35]))
+            else:  # teacher (label_idx == 2)
+                # Teachers: middle-aged (30, 35), middle income, balanced gender
+                metadata_dict["age"].append(rng.choice([30, 35, 25, 45], p=[0.4, 0.4, 0.1, 0.1]))
+                metadata_dict["income"].append(rng.choice([65000, 50000, 80000], p=[0.5, 0.35, 0.15]))
+                metadata_dict["gender"].append(rng.choice(["F", "M"], p=[0.55, 0.45]))
+    else:
+        # Default: random generation for other factor combinations
+        metadata_dict = {k: list(rng.choice(v, (length))) for k, v in factors.items()}
+
     metadata = Metadata(None)  # type: ignore
     metadata._raw = [{} for _ in range(len(labels))]
     metadata._class_labels = labels_arr
