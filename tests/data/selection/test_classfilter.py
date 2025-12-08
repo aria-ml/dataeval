@@ -267,4 +267,5 @@ class TestObjectDetectionSelections:
 
         # Verify nested metadata is processed by Metadata class
         md = Metadata(select)
-        assert md.dataframe["nested"].to_list() == [0, 2, 3, 3]
+        # With dual-key indexing, target_data filters to only target-level rows
+        assert md.target_data["nested"].to_list() == [0, 2, 3, 3]
