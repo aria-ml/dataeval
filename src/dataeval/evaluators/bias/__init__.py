@@ -4,14 +4,14 @@ representation which may impact model performance.
 """
 
 __all__ = [
+    "Balance",
     "BalanceOutput",
+    "Diversity",
     "DiversityOutput",
+    "Parity",
     "ParityOutput",
-    "balance",
-    "diversity",
-    "parity",
 ]
 
-from dataeval.evaluators.bias._balance import BalanceOutput, balance
-from dataeval.evaluators.bias._diversity import DiversityOutput, diversity
-from dataeval.evaluators.bias._parity import ParityOutput, parity
+from dataeval.evaluators.bias._balance import Balance, BalanceOutput
+from dataeval.evaluators.bias._diversity import Diversity, DiversityOutput
+from dataeval.evaluators.bias._parity import Parity, ParityOutput
