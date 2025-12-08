@@ -2,15 +2,15 @@ from __future__ import annotations
 
 __all__ = []
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from numpy.typing import NDArray
+import polars as pl
 
 from dataeval.core._mutual_info import mutual_info, mutual_info_classwise
 from dataeval.data import Metadata
+from dataeval.protocols import AnnotatedDataset, ArrayLike
 from dataeval.types import DictOutput, set_metadata
 from dataeval.utils._plot import heatmap
 
@@ -21,32 +21,38 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class BalanceOutput(DictOutput):
     """
-    Output class for :func:`.balance` :term:`bias<Bias>` metric.
+    Output class for the :class:`.Balance` :term:`bias<Bias>` evaluator.
+
+    Contains three polars DataFrames with mutual information scores and threshold flags.
 
     Attributes
     ----------
-    balance : NDArray[np.float64]
-        Estimate of mutual information between metadata factors and class label
-    factors : NDArray[np.float64]
-        Estimate of inter/intra-factor mutual information
-    classwise : NDArray[np.float64]
-        Estimate of mutual information between metadata factors and individual class labels
-    factor_names : Sequence[str]
-        Names of each metadata factor
-    class_names : Sequence[str]
-        List of the class labels present in the dataset
+    balance : pl.DataFrame
+        DataFrame with global class-to-factor mutual information:
+        - factor_name: str - Name of the metadata factor
+        - mi_value: float - Mutual information value between this factor and class labels
+    factors : pl.DataFrame
+        DataFrame with inter-factor mutual information correlations:
+        - factor1: str - Name of the first factor
+        - factor2: str - Name of the second factor
+        - mi_value: float - Mutual information value
+        - is_correlated: bool - True if mi_value > factor_correlation_threshold
+    classwise : pl.DataFrame
+        DataFrame with per-class-to-factor mutual information:
+        - class_name: str - Name of the class
+        - factor_name: str - Name of the metadata factor
+        - mi_value: float - Mutual information value
+        - is_imbalanced: bool - True if mi_value > class_imbalance_threshold
     """
 
-    balance: NDArray[np.float64]
-    factors: NDArray[np.float64]
-    classwise: NDArray[np.float64]
-    factor_names: Sequence[str]
-    class_names: Sequence[str]
+    balance: pl.DataFrame
+    factors: pl.DataFrame
+    classwise: pl.DataFrame
 
     def plot(
         self,
-        row_labels: Sequence[Any] | NDArray[Any] | None = None,
-        col_labels: Sequence[Any] | NDArray[Any] | None = None,
+        row_labels: ArrayLike | None = None,
+        col_labels: ArrayLike | None = None,
         plot_classwise: bool = False,
     ) -> Figure:
         """
@@ -70,13 +76,22 @@ class BalanceOutput(DictOutput):
         This method requires `matplotlib <https://matplotlib.org/>`_ to be installed.
         """
         if plot_classwise:
+            # Convert classwise DataFrame to numpy array for heatmap
+            class_names = self.classwise["class_name"].unique(maintain_order=True).to_list()
+            factor_names = self.classwise["factor_name"].unique(maintain_order=True).to_list()
+
+            # Reshape to matrix
+            classwise_pivoted = self.classwise.pivot(on="factor_name", index="class_name", values="mi_value")
+            # Drop the index column and get values only
+            classwise_matrix = classwise_pivoted.select(pl.all().exclude("class_name")).to_numpy()
+
             if row_labels is None:
-                row_labels = self.class_names
+                row_labels = class_names
             if col_labels is None:
-                col_labels = self.factor_names
+                col_labels = factor_names
 
             fig = heatmap(
-                self.classwise,
+                classwise_matrix,
                 row_labels,
                 col_labels,
                 xlabel="Factors",
@@ -84,50 +99,81 @@ class BalanceOutput(DictOutput):
                 cbarlabel="Normalized Mutual Information",
             )
         else:
-            # Combine balance and factors results
-            data = np.concatenate(
-                [
-                    self.balance[np.newaxis, 1:],
-                    self.factors,
-                ],
-                axis=0,
-            )
-            # Create a mask for the upper triangle of the symmetrical array, ignoring the diagonal
-            mask = np.triu(data + 1, k=0) < 1
-            # Finalize the data for the plot, last row is last factor x last factor so it gets dropped
-            heat_data = np.where(mask, np.nan, data)[:-1]
-            # Creating label array for heat map axes
-            heat_labels = self.factor_names
+            # Combine balance (class_to_factor) and factors (interfactor) results
+            # This recreates the original visualization from the old implementation
+
+            # Get all factor names from balance DataFrame (includes "class_label" + metadata factors)
+            all_factor_names = self.balance["factor_name"].to_list()
+            # Metadata factor names only (exclude class_label)
+            factor_names = all_factor_names[1:]
+            n_factors = len(factor_names)
+
+            # Create matrix: first row is balance (class-to-factor MI for metadata factors only),
+            # rest is interfactor MI
+            # Skip class_label's self-MI (index 0) and use only metadata factors
+            balance_row = self.balance["mi_value"].to_numpy()[1:]  # Skip class_label self-MI
+
+            # Create interfactor matrix
+            factor_matrix = np.zeros((n_factors, n_factors))
+            factor_to_idx = {f: i for i, f in enumerate(factor_names)}
+
+            # Fill matrix with MI values from factors DataFrame
+            for row in self.factors.iter_rows(named=True):
+                i = factor_to_idx[row["factor1"]]
+                j = factor_to_idx[row["factor2"]]
+                factor_matrix[i, j] = row["mi_value"]
+                factor_matrix[j, i] = row["mi_value"]
+
+            # Set diagonal to 1 (self-correlation)
+            np.fill_diagonal(factor_matrix, 1.0)
+
+            # Combine: balance row + interfactor matrix
+            data = np.concatenate([balance_row[np.newaxis, :], factor_matrix], axis=0)
+
+            # Create mask for lower triangle (excluding diagonal)
+            # This creates an upper triangular matrix for visualization
+            # Shift diagonal down by 1 to account for the class_label row at the top
+            mask = np.tril(np.ones_like(data, dtype=bool), k=-1)
+            heat_data = np.where(mask, np.nan, data)[:-1, :]
 
             if row_labels is None:
-                row_labels = heat_labels[:-1]
+                row_labels = ["class_label"] + factor_names[:-1]
             if col_labels is None:
-                col_labels = heat_labels[1:]
+                col_labels = factor_names
 
             fig = heatmap(heat_data, row_labels, col_labels, cbarlabel="Normalized Mutual Information")
 
         return fig
 
 
-@set_metadata
-def balance(
-    metadata: Metadata,
-    num_neighbors: int = 5,
-) -> BalanceOutput:
+class Balance:
     """
-    Mutual information (MI) between factors (class label, metadata, label/image properties).
+    Calculates mutual information (MI) between factors (class label, metadata, label/image properties).
+
+    Identifies imbalanced classes and highly correlated metadata factors based on
+    mutual information thresholds.
 
     Parameters
     ----------
-    metadata : Metadata
-        Preprocessed metadata
     num_neighbors : int, default 5
         Number of points to consider as neighbors
+    class_imbalance_threshold : float, default 0.3
+        Threshold for identifying imbalanced classes. Classes with MI above this
+        threshold with any metadata factor are considered imbalanced.
+    factor_correlation_threshold : float, default 0.5
+        Threshold for identifying highly correlated metadata factors. Factor pairs
+        with MI above this threshold are considered highly correlated.
 
-    Returns
-    -------
-    BalanceOutput
-        Contains separate arrays for class-to-factor MI and factor-to-factor MI.
+    Attributes
+    ----------
+    metadata : Metadata
+        Preprocessed metadata from the last evaluate() call.
+    num_neighbors : int
+        Number of points to consider as neighbors
+    class_imbalance_threshold : float
+        Threshold for identifying imbalanced classes
+    factor_correlation_threshold : float
+        Threshold for identifying highly correlated metadata factors
 
     Notes
     -----
@@ -135,35 +181,15 @@ def balance(
     `mutual_info_classif` outputs are consistent up to O(1e-4) and depend on a random
     seed. MI is computed differently for categorical and continuous variables.
 
-    Example
-    -------
-    Return balance (mutual information) of factors with class_labels
+    Examples
+    --------
+    Initialize the Balance class:
 
-    >>> metadata = generate_random_metadata(
-    ...     labels=["doctor", "artist", "teacher"],
-    ...     factors={"age": [25, 30, 35, 45], "income": [50000, 65000, 80000], "gender": ["M", "F"]},
-    ...     length=100,
-    ...     random_seed=175,
-    ... )
+    >>> balance = Balance()
 
-    >>> bal = balance(metadata)
-    >>> bal.balance
-    array([1.017, 0.034, 0.   , 0.028])
+    Specifying custom thresholds:
 
-    Return intra/interfactor balance (mutual information)
-
-    >>> bal.factors
-    array([[1.   , 0.015, 0.038],
-           [0.015, 1.   , 0.008],
-           [0.038, 0.008, 1.   ]])
-
-    Return classwise balance (mutual information) of factors with individual class_labels
-
-    >>> bal.classwise
-    array([[7.818e-01, 1.388e-02, 1.803e-03, 7.282e-04],
-           [7.084e-01, 2.934e-02, 1.744e-02, 3.996e-03],
-           [7.295e-01, 1.157e-02, 2.799e-02, 9.451e-04]])
-
+    >>> balance = Balance(class_imbalance_threshold=0.2, factor_correlation_threshold=0.6)
 
     See Also
     --------
@@ -171,28 +197,202 @@ def balance(
     sklearn.feature_selection.mutual_info_regression
     sklearn.metrics.mutual_info_score
     """
-    if not metadata.factor_names:
-        raise ValueError("No factors found in provided metadata.")
 
-    factor_types = {k: v.factor_type for k, v in metadata.factor_info.items()}
-    is_discrete = [factor_type != "continuous" for factor_type in factor_types.values()]
+    def __init__(
+        self,
+        num_neighbors: int = 5,
+        class_imbalance_threshold: float = 0.3,
+        factor_correlation_threshold: float = 0.5,
+    ) -> None:
+        self.metadata: Metadata
+        self.num_neighbors = num_neighbors
+        self.class_imbalance_threshold = class_imbalance_threshold
+        self.factor_correlation_threshold = factor_correlation_threshold
 
-    mi = mutual_info(
-        metadata.class_labels,
-        metadata.binned_data,
-        is_discrete,
-        num_neighbors,
-    )
+    @set_metadata(state=["num_neighbors", "class_imbalance_threshold", "factor_correlation_threshold"])
+    def evaluate(self, data: AnnotatedDataset[Any] | Metadata) -> BalanceOutput:
+        """
+        Compute mutual information between factors and identify imbalanced classes.
 
-    # Calculate classwise balance
-    classwise = mutual_info_classwise(
-        metadata.class_labels,
-        metadata.binned_data,
-        is_discrete,
-        num_neighbors,
-    )
+        Parameters
+        ----------
+        data : AnnotatedDataset[Any] or Metadata
+            Either an annotated dataset (which will be converted to Metadata)
+            or preprocessed Metadata directly.
 
-    # Grabbing factor names for plotting function
-    factor_names = ["class_label"] + list(metadata.factor_names)
+        Returns
+        -------
+        BalanceOutput
+            Three DataFrames containing MI scores and threshold flags:
+            - balance: Global class-to-factor mutual information
+            - factors: Inter-factor mutual information
+            - classwise: Per-class-to-factor mutual information
 
-    return BalanceOutput(mi["class_to_factor"], mi["interfactor"], classwise, factor_names, metadata.class_names)
+        Example
+        -------
+        Return balance (mutual information) of factors with class_labels
+
+        >>> metadata = generate_random_metadata(
+        ...     labels=["doctor", "artist", "teacher"],
+        ...     factors={"age": [25, 30, 35, 45], "income": [50000, 65000, 80000], "gender": ["M", "F"]},
+        ...     length=100,
+        ...     random_seed=175,
+        ... )
+
+        >>> balance = Balance()
+        >>> result = balance.evaluate(metadata)
+        >>> result.balance
+        shape: (4, 2)
+        ┌─────────────┬──────────┐
+        │ factor_name ┆ mi_value │
+        │ ---         ┆ ---      │
+        │ cat         ┆ f64      │
+        ╞═════════════╪══════════╡
+        │ class_label ┆ 1.01656  │
+        │ age         ┆ 0.218666 │
+        │ income      ┆ 0.292495 │
+        │ gender      ┆ 0.003119 │
+        └─────────────┴──────────┘
+
+        >>> result.factors
+        shape: (6, 4)
+        ┌─────────┬─────────┬──────────┬───────────────┐
+        │ factor1 ┆ factor2 ┆ mi_value ┆ is_correlated │
+        │ ---     ┆ ---     ┆ ---      ┆ ---           │
+        │ cat     ┆ cat     ┆ f64      ┆ bool          │
+        ╞═════════╪═════════╪══════════╪═══════════════╡
+        │ age     ┆ income  ┆ 0.069446 ┆ false         │
+        │ age     ┆ gender  ┆ 0.031473 ┆ false         │
+        │ income  ┆ age     ┆ 0.069446 ┆ false         │
+        │ income  ┆ gender  ┆ 0.037382 ┆ false         │
+        │ gender  ┆ age     ┆ 0.031473 ┆ false         │
+        │ gender  ┆ income  ┆ 0.037382 ┆ false         │
+        └─────────┴─────────┴──────────┴───────────────┘
+
+        >>> result.classwise
+        shape: (9, 4)
+        ┌────────────┬─────────────┬──────────┬───────────────┐
+        │ class_name ┆ factor_name ┆ mi_value ┆ is_imbalanced │
+        │ ---        ┆ ---         ┆ ---      ┆ ---           │
+        │ cat        ┆ cat         ┆ f64      ┆ bool          │
+        ╞════════════╪═════════════╪══════════╪═══════════════╡
+        │ doctor     ┆ age         ┆ 0.088231 ┆ false         │
+        │ doctor     ┆ income      ┆ 0.355217 ┆ true          │
+        │ doctor     ┆ gender      ┆ 0.073388 ┆ false         │
+        │ artist     ┆ age         ┆ 0.185507 ┆ false         │
+        │ artist     ┆ income      ┆ 0.172931 ┆ false         │
+        │ artist     ┆ gender      ┆ 0.036066 ┆ false         │
+        │ teacher    ┆ age         ┆ 0.075241 ┆ false         │
+        │ teacher    ┆ income      ┆ 0.103269 ┆ false         │
+        │ teacher    ┆ gender      ┆ 0.014255 ┆ false         │
+        └────────────┴─────────────┴──────────┴───────────────┘
+        """
+        # Convert AnnotatedDataset to Metadata if needed
+        if isinstance(data, Metadata):
+            self.metadata = data
+        else:
+            self.metadata = Metadata(data)
+
+        if not self.metadata.factor_names:
+            raise ValueError("No factors found in provided metadata.")
+
+        factor_types = {k: v.factor_type for k, v in self.metadata.factor_info.items()}
+        is_discrete = [factor_type != "continuous" for factor_type in factor_types.values()]
+
+        mi = mutual_info(
+            self.metadata.class_labels,
+            self.metadata.binned_data,
+            is_discrete,
+            self.num_neighbors,
+        )
+
+        # Calculate classwise balance
+        classwise = mutual_info_classwise(
+            self.metadata.class_labels,
+            self.metadata.binned_data,
+            is_discrete,
+            self.num_neighbors,
+        )
+
+        # Grabbing factor names for plotting function
+        factor_names = list(self.metadata.factor_names)
+
+        # Create classwise DataFrame - build as columnar data
+        # classwise is (num_classes, num_factors+1) where column 0 is class_label itself
+        class_name_col: list[str] = []
+        factor_name_col: list[str] = []
+        mi_value_col: list[float] = []
+        is_imbalanced_col: list[bool] = []
+
+        for class_idx in range(classwise.shape[0]):
+            class_name = (
+                self.metadata.class_names[class_idx] if class_idx < len(self.metadata.class_names) else str(class_idx)
+            )
+            # Skip the first column (class_label's own MI with the binary class indicator)
+            for factor_idx in range(1, classwise.shape[1]):
+                mi_value = classwise[class_idx, factor_idx]
+                class_name_col.append(class_name)
+                factor_name_col.append(factor_names[factor_idx - 1])
+                mi_value_col.append(float(mi_value))
+                is_imbalanced_col.append(bool(mi_value > self.class_imbalance_threshold))
+
+        classwise_df = pl.DataFrame(
+            {
+                "class_name": class_name_col,
+                "factor_name": factor_name_col,
+                "mi_value": mi_value_col,
+                "is_imbalanced": is_imbalanced_col,
+            }
+        ).with_columns(
+            pl.col("class_name").cast(pl.Categorical),
+            pl.col("factor_name").cast(pl.Categorical),
+        )
+
+        # Create factors DataFrame for inter-factor correlations - build as columnar data
+        # mi["interfactor"] is symmetric matrix of metadata factors (excluding class_label)
+        interfactor_matrix = mi["interfactor"]
+        num_metadata_factors = interfactor_matrix.shape[0]
+
+        factor1_col: list[str] = []
+        factor2_col: list[str] = []
+        mi_value_col_factors: list[float] = []
+        is_correlated_col: list[bool] = []
+
+        for i in range(num_metadata_factors):
+            for j in range(num_metadata_factors):
+                # skip diagonal
+                if i == j:
+                    continue
+                mi_value = interfactor_matrix[i, j]
+                factor1_col.append(factor_names[i])
+                factor2_col.append(factor_names[j])
+                mi_value_col_factors.append(float(mi_value))
+                is_correlated_col.append(bool(mi_value > self.factor_correlation_threshold))
+
+        factors_df = pl.DataFrame(
+            {
+                "factor1": factor1_col,
+                "factor2": factor2_col,
+                "mi_value": mi_value_col_factors,
+                "is_correlated": is_correlated_col,
+            }
+        ).with_columns(
+            pl.col("factor1").cast(pl.Categorical),
+            pl.col("factor2").cast(pl.Categorical),
+        )
+
+        # Create balance DataFrame for global class-to-factor MI
+        # mi["class_to_factor"] has shape (num_factors+1,) where index 0 is class_label's self-MI
+        # Include all values: class_label + metadata factors
+        class_to_factor = mi["class_to_factor"]
+        all_factor_names = ["class_label"] + factor_names
+        balance_df = pl.DataFrame(
+            {
+                "factor_name": all_factor_names,
+                "mi_value": [float(class_to_factor[i]) for i in range(len(all_factor_names))],
+            }
+        ).with_columns(
+            pl.col("factor_name").cast(pl.Categorical),
+        )
+
+        return BalanceOutput(balance=balance_df, factors=factors_df, classwise=classwise_df)
