@@ -2,6 +2,7 @@ import copy
 from unittest.mock import MagicMock
 
 import numpy as np
+import polars as pl
 import pytest
 
 from dataeval.data._metadata import Metadata
@@ -11,7 +12,7 @@ try:
 except ImportError:
     Figure = type(None)
 
-from dataeval.evaluators.bias._balance import balance
+from dataeval.evaluators.bias._balance import Balance
 from tests.conftest import to_metadata
 
 
@@ -55,57 +56,138 @@ def simple_metadata():
 
 @pytest.mark.required
 class TestBalanceUnit:
-    def test_correct_mi_shape_and_dtype(self, metadata_results):
-        metadata = copy.deepcopy(metadata_results)
-        metadata.exclude = []
-        num_vars = len(metadata.factor_names) + 1
-        expected_shape = {
-            "balance": (num_vars,),
-            "factors": (num_vars - 1, num_vars - 1),
-            "classwise": (2, num_vars),
-            "factor_names": (num_vars),
-            "class_names": (np.unique(metadata.class_labels).size),
-        }
-        expected_type = {
-            "balance": float,
-            "factors": float,
-            "classwise": float,
-            "factor_names": list,
-            "class_names": list,
-        }
-        mi = balance(metadata)
-        for k, v in mi.data().items():
-            if type(v) is list:
-                assert len(v) == expected_shape[k]
-            else:
-                assert v.shape == expected_shape[k]
-                if k in expected_type:
-                    assert v.dtype == expected_type[k]
+    """Test the Balance class interface"""
+
+    def test_initialization_defaults(self):
+        balance_obj = Balance()
+        assert balance_obj.num_neighbors == 5
+        assert balance_obj.class_imbalance_threshold == 0.3
+        assert balance_obj.factor_correlation_threshold == 0.5
+
+    def test_initialization_custom(self):
+        balance_obj = Balance(num_neighbors=10, class_imbalance_threshold=0.4, factor_correlation_threshold=0.6)
+        assert balance_obj.num_neighbors == 10
+        assert balance_obj.class_imbalance_threshold == 0.4
+        assert balance_obj.factor_correlation_threshold == 0.6
 
     def test_empty_metadata(self):
         mock_metadata = MagicMock(spec=Metadata)
         mock_metadata.factor_names = []
+        balance_obj = Balance()
         with pytest.raises(ValueError):
-            balance(mock_metadata)
+            balance_obj.evaluate(mock_metadata)
+
+    def test_metadata_stored(self, metadata_results):
+        balance_obj = Balance()
+        balance_obj.evaluate(metadata_results)
+        assert balance_obj.metadata is not None
+        assert isinstance(balance_obj.metadata, Metadata)
+        assert balance_obj.metadata.factor_names == metadata_results.factor_names
+
+    def test_threshold_parameters(self, simple_metadata):
+        """Test that custom thresholds affect the output"""
+        balance_obj1 = Balance(class_imbalance_threshold=0.1, factor_correlation_threshold=0.1)
+        result1 = balance_obj1.evaluate(simple_metadata)
+
+        balance_obj2 = Balance(class_imbalance_threshold=0.9, factor_correlation_threshold=0.9)
+        result2 = balance_obj2.evaluate(simple_metadata)
+
+        # Lower thresholds should detect more issues (or equal)
+        imbalanced_1 = result1.classwise.filter(pl.col("is_imbalanced")).height
+        imbalanced_2 = result2.classwise.filter(pl.col("is_imbalanced")).height
+        assert imbalanced_1 >= imbalanced_2
+
+        correlated_1 = result1.factors.filter(pl.col("is_correlated")).height
+        correlated_2 = result2.factors.filter(pl.col("is_correlated")).height
+        assert correlated_1 >= correlated_2
+
+    def test_correct_dataframe_shapes(self, metadata_results):
+        metadata = copy.deepcopy(metadata_results)
+        metadata.exclude = []
+        num_factors = len(metadata.factor_names)
+        num_classes = len(np.unique(metadata.class_labels))
+
+        balance_obj = Balance()
+        result = balance_obj.evaluate(metadata)
+
+        # Check balance DataFrame
+        assert isinstance(result.balance, pl.DataFrame)
+        # balance includes class_label + metadata factors
+        assert result.balance.height == num_factors + 1
+
+        # Check balance DataFrame schema
+        assert set(result.balance.schema.keys()) == {
+            "factor_name",
+            "mi_value",
+        }
+        assert result.balance.schema["factor_name"].base_type() == pl.Categorical
+        assert result.balance.schema["mi_value"] == pl.Float64
+
+        # First entry should be class_label
+        assert result.balance["factor_name"][0] == "class_label"
+
+        # Check classwise DataFrame
+        assert isinstance(result.classwise, pl.DataFrame)
+        assert result.classwise.height == num_classes * num_factors
+
+        # Check classwise DataFrame schema
+        assert set(result.classwise.schema.keys()) == {
+            "class_name",
+            "factor_name",
+            "mi_value",
+            "is_imbalanced",
+        }
+        assert result.classwise.schema["class_name"].base_type() == pl.Categorical
+        assert result.classwise.schema["factor_name"].base_type() == pl.Categorical
+        assert result.classwise.schema["mi_value"] == pl.Float64
+        assert result.classwise.schema["is_imbalanced"] == pl.Boolean
+
+        # Check factors DataFrame
+        assert isinstance(result.factors, pl.DataFrame)
+        # Number of ordered pairs = n*(n-1) (includes both A->B and B->A)
+        expected_pairs = num_factors * (num_factors - 1)
+        assert result.factors.height == expected_pairs
+
+        # Check factors DataFrame schema
+        assert set(result.factors.schema.keys()) == {
+            "factor1",
+            "factor2",
+            "mi_value",
+            "is_correlated",
+        }
+        assert result.factors.schema["factor1"].base_type() == pl.Categorical
+        assert result.factors.schema["factor2"].base_type() == pl.Categorical
+        assert result.factors.schema["mi_value"] == pl.Float64
+        assert result.factors.schema["is_correlated"] == pl.Boolean
 
 
 @pytest.mark.requires_all
 @pytest.mark.required
 class TestBalancePlot:
+    """Test plotting functionality of Balance class"""
+
     def test_base_plotting(self, metadata_results):
-        mi = balance(metadata_results)
+        balance_obj = Balance()
+        mi = balance_obj.evaluate(metadata_results)
         output = mi.plot()
         assert isinstance(output, Figure)
         classwise_output = mi.plot(plot_classwise=True)
         assert isinstance(classwise_output, Figure)
 
     def test_plotting_vars(self, metadata_results):
-        mi = balance(metadata_results)
-        factor_names = mi.factor_names
-        heat_labels = np.arange(len(factor_names))
-        output = mi.plot(heat_labels[:-1], heat_labels[1:], plot_classwise=False)
+        balance_obj = Balance()
+        mi = balance_obj.evaluate(metadata_results)
+
+        # Get factor names from the dataframes
+        factor_names = sorted(set(mi.factors["factor1"].to_list() + mi.factors["factor2"].to_list()))
+        # Row labels include "class_label" + factor_names[:-1]
+        row_labels = np.arange(len(factor_names))  # 3 labels: 0, 1, 2 for ["class_label", factor1, factor2]
+        col_labels = np.arange(len(factor_names))  # 3 labels: 0, 1, 2 for all factors
+        output = mi.plot(row_labels, col_labels, plot_classwise=False)
         assert isinstance(output, Figure)
-        _, row_labels = np.unique(mi.class_names, return_inverse=True)
+
+        class_names = mi.classwise["class_name"].unique(maintain_order=True).to_list()
+        row_labels = np.arange(len(class_names))
         col_labels = np.arange(len(factor_names))
         classwise_output = mi.plot(row_labels, col_labels, plot_classwise=True)
         assert isinstance(classwise_output, Figure)
