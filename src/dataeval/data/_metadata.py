@@ -90,6 +90,7 @@ class Metadata:
         self._dropped_factors: dict[str, list[str]]
         self._dataframe: pl.DataFrame
         self._raw: Sequence[Mapping[str, Any]]
+        self._has_targets: bool | None = None
 
         self._is_structured = False
         self._is_binned = False
@@ -243,21 +244,33 @@ class Metadata:
 
     @property
     def dataframe(self) -> pl.DataFrame:
-        """Processed DataFrame containing targets and metadata factors.
+        """Processed DataFrame containing both image-level and target-level rows.
 
-        Access the main data structure with target information (class labels,
-        scores, bounding boxes) and processed metadata factors ready for analysis.
+        Access the main data structure with both image-level metadata and
+        target-level information (class labels, scores, bounding boxes).
+        Use `image_data` or `target_data` properties to filter to specific row types.
 
         Returns
         -------
         pl.DataFrame
-            DataFrame with columns for item indices, class labels, scores,
+            DataFrame with columns for image_index, target_index, class_label, scores,
             bounding boxes (when applicable), and all processed metadata factors.
+            Rows where target_index is None contain image-level data.
+            Rows where target_index is an integer contain target/detection-level data.
 
         Notes
         -----
         This property triggers dataset structure analysis on first access.
         Factor binning occurs automatically when accessing factor-related data.
+
+        For Object Detection datasets, the dataframe now contains:
+        - Image-level rows (target_index=None): One per image with image-level factors
+        - Target-level rows (target_index=0,1,2...): One per detection with detection data
+
+        See Also
+        --------
+        image_data : Filter to image-level rows only
+        target_data : Filter to target-level rows only
         """
         self._structure()
         return self._dataframe
@@ -294,21 +307,25 @@ class Metadata:
             Array with shape (n_samples, n_factors) containing binned integer
             data ready for categorical analysis algorithms. Returns empty array
             when no factors are available.
+            For OD datasets, returns only target-level rows to align with class_label.
 
         Notes
         -----
         This property triggers factor binning analysis on first access.
         Use this for algorithms requiring purely discrete input data.
+
+        For object detection datasets, this returns target-level data only to
+        ensure alignment with class_labels (one row per detection).
         """
         if not self.factor_names:
             return np.array([], dtype=np.int64)
 
         self._bin()
-        return (
-            self.dataframe.select([_to_col(k, v, True) for k, v in self.factor_info.items()])
-            .to_numpy()
-            .astype(np.int64)
-        )
+
+        # For datasets with targets, use only target-level rows to align with class_label
+        df = self.target_data if self.has_targets() else self.dataframe
+
+        return df.select([_to_col(k, v, True) for k, v in self.factor_info.items()]).to_numpy().astype(np.int64)
 
     @property
     def factor_names(self) -> Sequence[str]:
@@ -358,18 +375,25 @@ class Metadata:
         NDArray[Any]
             Array with shape (n_samples, n_factors) containing original factor
             values. Returns empty array when no factors are available.
+            For OD datasets, returns only target-level rows to align with class_labels.
 
         Notes
         -----
         Use this for algorithms that can work with mixed data types or when
         you need access to original continuous values. For analysis-ready
-        numeric data, use `binned_data`.
+        numeric data, use binned_data.
+
+        For object detection datasets, this returns target-level data only to
+        ensure alignment with class_labels (one row per detection).
         """
         if not self.factor_names:
             return np.array([], dtype=np.float64)
 
+        # For datasets with targets, use only target-level rows to align with class_label
+        df = self.target_data if self.has_targets() else self.dataframe
+
         # Extract continuous columns and convert to NumPy array
-        return self.dataframe.select(self.factor_names).to_numpy()
+        return df.select(self.factor_names).to_numpy()
 
     @property
     def class_labels(self) -> NDArray[np.intp]:
@@ -443,6 +467,154 @@ class Metadata:
             self._structure()
         return self._count
 
+    @property
+    def image_data(self) -> pl.DataFrame:
+        """Dataframe containing only image-level rows.
+
+        Returns a view of the metadata dataframe filtered to rows where
+        target_index is None, containing one row per image with image-level
+        factors.
+
+        Returns
+        -------
+        pl.DataFrame
+            Dataframe with image-level metadata. For Object Detection datasets,
+            this provides per-image analysis without target-level duplication.
+
+        Notes
+        -----
+        This property triggers dataset structure analysis on first access.
+        Image-level factors are stored only in these rows to avoid duplication.
+
+        Examples
+        --------
+        >>> metadata.image_data
+        shape: (3, 8)
+        ┌─────────────┬──────────────┬─────────────┬───────────┬───────────┬──────┬───────────┬──────────┐
+        │ image_index ┆ target_index ┆ class_label ┆ score     ┆ box       ┆ temp ┆ time      ┆ loc      │
+        │ ---         ┆ ---          ┆ ---         ┆ ---       ┆ ---       ┆ ---  ┆ ---       ┆ ---      │
+        │ i64         ┆ i64          ┆ i64         ┆ list[f64] ┆ list[f64] ┆ f64  ┆ str       ┆ str      │
+        ╞═════════════╪══════════════╪═════════════╪═══════════╪═══════════╪══════╪═══════════╪══════════╡
+        │ 0           ┆ null         ┆ null        ┆ null      ┆ null      ┆ 72.5 ┆ morning   ┆ urban    │
+        │ 1           ┆ null         ┆ null        ┆ null      ┆ null      ┆ 65.3 ┆ afternoon ┆ rural    │
+        │ 2           ┆ null         ┆ null        ┆ null      ┆ null      ┆ 68.1 ┆ evening   ┆ suburban │
+        └─────────────┴──────────────┴─────────────┴───────────┴───────────┴──────┴───────────┴──────────┘
+        """
+        self._structure()
+        if self.has_targets():
+            return self._dataframe.filter(pl.col("target_index").is_null())
+
+        # Return target data as image data for classification datasets
+        return self.target_data
+
+    @property
+    def target_data(self) -> pl.DataFrame:
+        """Dataframe containing only target-level rows.
+
+        Returns a view of the metadata dataframe filtered to rows where
+        target_index is not None, containing target/detection-level data.
+
+        Returns
+        -------
+        pl.DataFrame
+            Dataframe with target-level metadata. Each row represents a
+            single target or detection with its associated class, score,
+            and bounding box information.
+
+        Notes
+        -----
+        This property triggers dataset structure analysis on first access.
+        This is similar to the legacy behavior where only target-level rows
+        existed, but now image-level metadata is stored separately in image_data.
+
+        Examples
+        --------
+        >>> metadata.target_data
+        shape: (5, 8)
+        ┌─────────────┬──────────────┬─────────────┬──────────────┬─────────────┬──────┬───────────┬───────┐
+        │ image_index ┆ target_index ┆ class_label ┆ score        ┆ box         ┆ temp ┆ time      ┆ loc   │
+        │ ---         ┆ ---          ┆ ---         ┆ ---          ┆ ---         ┆ ---  ┆ ---       ┆ ---   │
+        │ i64         ┆ i64          ┆ i64         ┆ list[f64]    ┆ list[f64]   ┆ f64  ┆ str       ┆ str   │
+        ╞═════════════╪══════════════╪═════════════╪══════════════╪═════════════╪══════╪═══════════╪═══════╡
+        │ 0           ┆ 0            ┆ 0           ┆ [1.0, 0.0,   ┆ [10.0,      ┆ 72.5 ┆ morning   ┆ urban │
+        │             ┆              ┆             ┆ 0.0]         ┆ 10.0, …     ┆      ┆           ┆       │
+        │             ┆              ┆             ┆              ┆ 20.0]       ┆      ┆           ┆       │
+        │ 0           ┆ 1            ┆ 1           ┆ [0.0, 1.0,   ┆ [30.0,      ┆ 72.5 ┆ morning   ┆ urban │
+        │             ┆              ┆             ┆ 0.0]         ┆ 30.0, …     ┆      ┆           ┆       │
+        │             ┆              ┆             ┆              ┆ 40.0]       ┆      ┆           ┆       │
+        │ 1           ┆ 0            ┆ 1           ┆ [0.0, 1.0,   ┆ [5.0, 5.0,  ┆ 65.3 ┆ afternoon ┆ rural │
+        │             ┆              ┆             ┆ 0.0]         ┆ … 15.0]     ┆      ┆           ┆       │
+        │ 1           ┆ 1            ┆ 2           ┆ [0.0, 0.0,   ┆ [25.0,      ┆ 65.3 ┆ afternoon ┆ rural │
+        │             ┆              ┆             ┆ 1.0]         ┆ 25.0, …     ┆      ┆           ┆       │
+        │             ┆              ┆             ┆              ┆ 35.0]       ┆      ┆           ┆       │
+        │ 1           ┆ 2            ┆ 0           ┆ [1.0, 0.0,   ┆ [45.0,      ┆ 65.3 ┆ afternoon ┆ rural │
+        │             ┆              ┆             ┆ 0.0]         ┆ 45.0, …     ┆      ┆           ┆       │
+        │             ┆              ┆             ┆              ┆ 55.0]       ┆      ┆           ┆       │
+        └─────────────┴──────────────┴─────────────┴──────────────┴─────────────┴──────┴───────────┴───────┘
+        """
+        self._structure()
+        return self._dataframe.filter(pl.col("target_index").is_not_null())
+
+    def get_image_factors(self, image_idx: int) -> dict[str, Any]:
+        """Get all factors for a specific image.
+
+        Parameters
+        ----------
+        image_idx : int
+            Index of the image to retrieve factors for
+
+        Returns
+        -------
+        dict[str, Any]
+            Dictionary mapping factor names to their values for the specified image
+
+        Examples
+        --------
+        >>> factors = metadata.get_image_factors(0)
+        >>> factors["temp"]
+        72.5
+        >>> factors["time"]
+        'morning'
+        >>> factors["loc"]
+        'urban'
+        """
+        self._structure()
+        row = self.image_data.filter(pl.col("image_index") == image_idx)
+        if row.height == 0:
+            raise ValueError(f"No image found with index {image_idx}")
+        return row.to_dicts()[0]
+
+    def get_target_factors(self, image_idx: int, target_idx: int) -> dict[str, Any]:
+        """Get all factors for a specific target within an image.
+
+        Parameters
+        ----------
+        image_idx : int
+            Index of the image containing the target
+        target_idx : int
+            Index of the target within the image (0-indexed per image)
+
+        Returns
+        -------
+        dict[str, Any]
+            Dictionary mapping factor names to their values for the specified target
+
+        Examples
+        --------
+        >>> factors = metadata.get_target_factors(0, 1)
+        >>> factors["image_index"]
+        0
+        >>> factors["target_index"]
+        1
+        >>> factors["class_label"]
+        1
+        """
+        self._structure()
+        row = self.target_data.filter((pl.col("image_index") == image_idx) & (pl.col("target_index") == target_idx))
+        if row.height == 0:
+            raise ValueError(f"No target found with image_index={image_idx}, target_index={target_idx}")
+        return row.to_dicts()[0]
+
     def _filter(self, factor: str | tuple[str, Any]) -> bool:
         factor = factor[0] if isinstance(factor, tuple) else factor
         return factor in self.include if self.include else factor not in self.exclude
@@ -455,25 +627,200 @@ class Metadata:
                 self._factors[col] = None
             self._is_binned = False
 
-    def _structure(
+    def _compute_target_indices(self, srcidx: NDArray[np.intp], datum_count: int, is_od: bool) -> NDArray[np.intp]:
+        """Compute per-image target indices (0, 1, 2, ... within each image)."""
+        target_idx = np.zeros_like(srcidx, dtype=np.intp)
+        if is_od and len(srcidx) > 0:
+            for img_idx in range(datum_count):
+                mask = srcidx == img_idx
+                target_idx[mask] = np.arange(mask.sum())
+        return target_idx
+
+    def _build_target_rows(
         self,
-        *,
-        progress_callback: Callable[[int, int | None], None] | None = None,
+        srcidx: NDArray[np.intp],
+        target_idx: NDArray[np.intp],
+        labels: NDArray[np.intp],
+        scores: NDArray[np.float32],
+        bboxes: NDArray[np.float32] | None,
+        factor_dict: dict[str, Any],
+        is_od: bool,
+        image_factor_names: set[str] | None = None,
+        image_factor_dict: dict[str, Any] | None = None,
+    ) -> dict[str, list]:
+        """Build target-level rows with detection data.
+
+        Parameters
+        ----------
+        factor_dict : dict[str, Any]
+            For OD datasets: target-level factors (from merge with ignore_lists=False)
+            For IC datasets: image-level factors (from merge with ignore_lists=False)
+        image_factor_dict : dict[str, Any] | None
+            For OD datasets: image-level factors (from merge with ignore_lists=True)
+            Used to replicate image metadata to target rows
+        """
+        target_rows = {
+            "image_index": srcidx.tolist() if isinstance(srcidx, np.ndarray) else list(srcidx),
+            "target_index": target_idx.tolist() if isinstance(target_idx, np.ndarray) else list(target_idx),
+            "class_label": labels.tolist() if isinstance(labels, np.ndarray) else list(labels),
+            "score": scores.tolist() if isinstance(scores, np.ndarray) else list(scores),
+            "box": (bboxes.tolist() if isinstance(bboxes, np.ndarray) else list(bboxes))
+            if bboxes is not None
+            else [None] * len(labels),
+        }
+        # Add factor values to target rows
+        for factor_name, factor_values in factor_dict.items():
+            target_rows[factor_name] = self._get_target_factor_values(
+                factor_name, factor_values, srcidx, is_od, image_factor_names, image_factor_dict
+            )
+        return target_rows
+
+    def _get_target_factor_values(
+        self,
+        factor_name: str,
+        factor_values: Any,
+        srcidx: NDArray[np.intp],
+        is_od: bool,
+        image_factor_names: set[str] | None,
+        image_factor_dict: dict[str, Any] | None = None,
+    ) -> list:
+        """Get factor values for target rows, handling OD vs IC datasets."""
+        if is_od and image_factor_names is not None and factor_name in image_factor_names:
+            # Image-level metadata for OD: replicate to target rows using srcidx mapping
+            # Use image_factor_dict if provided, otherwise fall back to factor_values
+            source_values = image_factor_dict[factor_name] if image_factor_dict is not None else factor_values
+            if isinstance(source_values, np.ndarray):
+                return source_values[srcidx].tolist()
+            if isinstance(source_values, list):
+                return [source_values[i] for i in srcidx]
+            return [list(source_values)[i] for i in srcidx]
+
+        if is_od:
+            # Target-level metadata for OD: use values as-is
+            if isinstance(factor_values, np.ndarray):
+                return factor_values.tolist()
+            if isinstance(factor_values, list):
+                return factor_values
+            return list(factor_values)
+
+        # For IC datasets, map image factors to target rows using srcidx
+        if isinstance(factor_values, np.ndarray):
+            return factor_values[srcidx].tolist()
+        if isinstance(factor_values, list):
+            return [factor_values[i] for i in srcidx]
+        return [list(factor_values)[i] for i in srcidx]
+
+    def _build_image_rows(self, datum_count: int, image_factor_dict: dict[str, Any]) -> dict[str, list]:
+        """Build image-level rows with metadata."""
+        image_rows = {
+            "image_index": list(range(datum_count)),
+            "target_index": [None] * datum_count,
+            "class_label": [None] * datum_count,
+            "score": [None] * datum_count,
+            "box": [None] * datum_count,
+        }
+        # Add image-level factors to image rows
+        for factor_name, factor_values in image_factor_dict.items():
+            if isinstance(factor_values, np.ndarray):
+                image_rows[factor_name] = factor_values.tolist()
+            elif isinstance(factor_values, list):
+                image_rows[factor_name] = factor_values
+            else:
+                image_rows[factor_name] = list(factor_values)
+        return image_rows
+
+    def _combine_rows(self, image_rows: dict[str, list], target_rows: dict[str, list]) -> dict[str, list]:
+        """Combine image-level and target-level rows into a single dictionary."""
+        combined_rows = {}
+        num_image_rows = len(image_rows["image_index"])
+
+        for key in target_rows:
+            if key in image_rows:
+                combined_rows[key] = image_rows[key] + target_rows[key]
+            else:
+                # Key exists in target_rows but not image_rows (e.g., list-type metadata)
+                # Add None values for image rows
+                combined_rows[key] = [None] * num_image_rows + target_rows[key]
+        return combined_rows
+
+    def _infer_factor_level(
+        self, factors: Mapping[str, Array1D[Any]], num_image_rows: int, num_target_rows: int
+    ) -> Literal["image", "target"]:
+        """Infer factor level based on array lengths."""
+        factor_lengths = {len(v) for v in factors.values()}
+        if len(factor_lengths) > 1:
+            raise ValueError("All factors must have the same length when using level='auto'")
+        factor_len = factor_lengths.pop()
+
+        if factor_len == num_image_rows:
+            return "image"
+        if factor_len == num_target_rows:
+            return "target"
+        raise ValueError(
+            "The lists/arrays in the provided factors have a different length "
+            f"than the current metadata factors. Expected {num_image_rows} (image count) "
+            f"or {num_target_rows} (target count), got {factor_len}."
+        )
+
+    def _validate_factor_lengths(
+        self, factors: Mapping[str, Array1D[Any]], level: str, num_image_rows: int, num_target_rows: int
     ) -> None:
-        if self._is_structured:
-            return
+        """Validate that factor lengths match the specified level."""
+        if level == "image":
+            expected_len = num_image_rows
+            if not all(len(v) == expected_len for v in factors.values()):
+                raise ValueError(f"All image-level factors must have length {expected_len} (image count)")
+        elif level == "target":
+            expected_len = num_target_rows
+            if not all(len(v) == expected_len for v in factors.values()):
+                raise ValueError(f"All target-level factors must have length {expected_len} (target count)")
+        else:
+            raise ValueError(f"Invalid level: {level}. Must be 'image', 'target', or 'auto'")
 
-        raw: Sequence[Mapping[str, Any]] = []
+    def _create_factor_column(self, data_array: NDArray, level: str, num_image_rows: int) -> list:
+        """Create a factor column with values at the appropriate level."""
+        if level == "image":
+            # Create column: image-level values in image rows, None in target rows
+            full_data = [None] * len(self.dataframe)
+            for idx, val in enumerate(data_array):
+                full_data[idx] = val  # Image rows come first in our structure
+            return full_data
+        # level == "target"
+        # Create column: None in image rows, target-level values in target rows
+        return [None] * num_image_rows + list(data_array)
 
-        labels = []
-        bboxes = []
-        scores = []
-        itmidx = []
+    def has_targets(self) -> bool:
+        """Check if the source dataset has targets.
+
+        Returns
+        -------
+        bool
+            True if dataset contains targets, False for classification datasets.
+        """
+        if self._has_targets is None:
+            self._structure()
+        return bool(self._has_targets)
+
+    def _process_targets(
+        self,
+        raw: list,
+        labels: list,
+        bboxes: list,
+        scores: list,
+        srcidx: list,
+        datum_count: int,
+        progress_callback: Callable[[int, int | None], None] | None,
+    ) -> bool | None:
+        """Process dataset targets and extract labels, bboxes, scores.
+
+        Returns
+        -------
+        bool | None
+            True if OD dataset, False if IC dataset, None if empty dataset
+        """
         is_od = None
-        datum_count = len(self._dataset)
         for i in tqdm(range(datum_count), desc="Processing datum metadata"):
             _, target, metadata = self._dataset[i]
-
             raw.append(metadata)
 
             if is_od_target := isinstance(target, ObjectDetectionTarget):
@@ -483,13 +830,13 @@ class Metadata:
                     labels.append(target_labels)
                     bboxes.append(as_numpy(target.boxes))
                     scores.append(as_numpy(target.scores))
-                    itmidx.extend([i] * target_len)
+                    srcidx.extend([i] * target_len)
             elif isinstance(target, Array):
                 target_scores = as_numpy(target)
                 if len(target_scores):
                     labels.append([np.argmax(target_scores)])
                     scores.append([target_scores])
-                    itmidx.append(i)
+                    srcidx.append(i)
             else:
                 raise TypeError("Encountered unsupported target type in dataset")
 
@@ -500,36 +847,182 @@ class Metadata:
             if progress_callback:
                 progress_callback(i, datum_count)
 
-        np_asarray: Callable[..., np.ndarray] = np.concatenate if itmidx else np.asarray
+        return is_od
+
+    def _merge_od_metadata(
+        self, raw: Sequence[Mapping[str, Any]], datum_count: int, srcidx: NDArray[np.intp], reserved: list[str]
+    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, list[str]]]:
+        """Merge OD metadata at both target and image levels.
+
+        Returns
+        -------
+        tuple
+            (target_factor_dict, image_factor_dict, dropped_factors)
+        """
+        targets_per_image = [np.sum(srcidx == i) for i in range(datum_count)]
+
+        # Target-level merge
+        merged_target_level = merge(raw, return_dropped=True, ignore_lists=False, targets_per_image=targets_per_image)
+        target_factor_dict = {
+            f"metadata_{k}" if k in reserved else k: v for k, v in merged_target_level[0].items() if k != "_image_index"
+        }
+
+        # Image-level merge
+        merged_image_level = merge(raw, return_dropped=True, ignore_lists=True, targets_per_image=None)
+        image_factor_dict = {
+            f"metadata_{k}" if k in reserved else k: v for k, v in merged_image_level[0].items() if k != "_image_index"
+        }
+
+        return target_factor_dict, image_factor_dict, merged_target_level[1]
+
+    def _build_od_rows(
+        self,
+        srcidx: NDArray[np.intp],
+        target_idx: NDArray[np.intp],
+        labels: NDArray[np.intp],
+        scores: NDArray[np.float32],
+        bboxes: NDArray[np.float32] | None,
+        target_factor_dict: dict[str, Any],
+        image_factor_dict: dict[str, Any],
+        datum_count: int,
+    ) -> dict[str, list]:
+        """Build combined rows for OD dataset."""
+        target_rows = self._build_target_rows(
+            srcidx,
+            target_idx,
+            labels,
+            scores,
+            bboxes,
+            target_factor_dict,
+            True,
+            set(image_factor_dict.keys()),
+            image_factor_dict,
+        )
+        image_rows = self._build_image_rows(datum_count, image_factor_dict)
+        return self._combine_rows(image_rows, target_rows)
+
+    def _structure(
+        self,
+        *,
+        progress_callback: Callable[[int, int | None], None] | None = None,
+    ) -> None:
+        if self._is_structured:
+            return
+
+        raw: list[Mapping[str, Any]] = []
+        labels = []
+        bboxes = []
+        scores = []
+        srcidx = []
+        datum_count = len(self._dataset)
+
+        self._has_targets = self._process_targets(raw, labels, bboxes, scores, srcidx, datum_count, progress_callback)
+
+        np_asarray: Callable[..., np.ndarray] = np.concatenate if srcidx else np.asarray
         labels = np_asarray(labels, dtype=np.intp)
         scores = np_asarray(scores, dtype=np.float32)
-        bboxes = np_asarray(bboxes, dtype=np.float32) if is_od else None
-        itmidx = np.asarray(itmidx, dtype=np.intp)
+        bboxes = np_asarray(bboxes, dtype=np.float32) if self._has_targets else None
+        srcidx = np.asarray(srcidx, dtype=np.intp)
 
         index2label = self._dataset.metadata.get("index2label", {i: str(i) for i in np.unique(labels)})
+        target_idx = self._compute_target_indices(srcidx, datum_count, bool(self._has_targets))
+        reserved = ["image_index", "target_index", "class_label", "score", "box"]
+        target_factor_dict = {}
 
-        targets_per_image = np.bincount(itmidx, minlength=len(self._dataset)).tolist() if is_od else None
-        merged = merge(raw, return_dropped=True, ignore_lists=False, targets_per_image=targets_per_image)
-
-        reserved = ["item_index", "class_label", "score", "box"]
-        factor_dict = {f"metadata_{k}" if k in reserved else k: v for k, v in merged[0].items() if k != "_image_index"}
-
-        target_dict = {
-            "item_index": itmidx,
-            "class_label": labels,
-            "score": scores,
-            "box": bboxes if bboxes is not None else [None] * len(labels),
-        }
+        # Build target-level and image-level rows
+        if self._has_targets:
+            target_factor_dict, image_factor_dict, dropped_factors = self._merge_od_metadata(
+                raw, datum_count, srcidx, reserved
+            )
+            combined_rows = self._build_od_rows(
+                srcidx, target_idx, labels, scores, bboxes, target_factor_dict, image_factor_dict, datum_count
+            )
+            self._dropped_factors = dropped_factors
+        else:
+            # For IC datasets, only need target-level rows (which are same as image-level)
+            merged_image_level = merge(raw, return_dropped=True, ignore_lists=False, targets_per_image=None)
+            image_factor_dict = {
+                f"metadata_{k}" if k in reserved else k: v
+                for k, v in merged_image_level[0].items()
+                if k != "_image_index"
+            }
+            target_rows = self._build_target_rows(
+                srcidx, target_idx, labels, scores, bboxes, image_factor_dict, bool(self._has_targets)
+            )
+            combined_rows = target_rows
+            self._dropped_factors = merged_image_level[1]
 
         self._raw = raw
         self._index2label = index2label
         self._class_labels = labels
         self._class_names = list(index2label.values())
-        self._item_indices = target_dict["item_index"]
-        self._factors = dict.fromkeys(factor_dict, None)
-        self._dataframe = pl.DataFrame({**target_dict, **factor_dict})
-        self._dropped_factors = merged[1]
+        self._item_indices = srcidx
+
+        # For OD datasets, use target_factor_dict for _factors; for IC, use image_factor_dict
+        if self._has_targets:
+            self._image_level_factors = set(image_factor_dict.keys())
+            target_level_factors = {k: v for k, v in target_factor_dict.items() if k not in self._image_level_factors}
+            self._factors = dict.fromkeys(target_level_factors, None)
+        else:
+            self._image_level_factors = set()
+            self._factors = dict.fromkeys(image_factor_dict, None)
+
+        self._dataframe = pl.DataFrame(combined_rows)
         self._is_structured = True
+
+    def _add_column_with_padding(self, df: pl.DataFrame, col_name: str, values: NDArray, is_od: bool) -> pl.DataFrame:
+        """Add a column to dataframe with None padding for OD image rows."""
+        if is_od:
+            num_image_rows = len(self.image_data)
+            full_values = [None] * num_image_rows + values.tolist()
+            return df.with_columns(pl.Series(name=col_name, values=full_values))
+        return df.with_columns(pl.Series(name=col_name, values=values))
+
+    def _process_binned_factor(
+        self, df: pl.DataFrame, col: str, data: NDArray, bins: int | Sequence[float], is_od: bool
+    ) -> tuple[pl.DataFrame, FactorInfo]:
+        """Process a factor with user-provided bins."""
+        col_bn = _binned(col)
+        binned_values = digitize_data(data, bins).astype(np.int64)
+        df = self._add_column_with_padding(df, col_bn, binned_values, is_od)
+        return df, FactorInfo("continuous", is_binned=True)
+
+    def _process_categorical_factor(
+        self, df: pl.DataFrame, col: str, ordinal: NDArray, is_od: bool
+    ) -> tuple[pl.DataFrame, FactorInfo]:
+        """Process a non-numeric categorical factor."""
+        col_dg = _digitized(col)
+        df = self._add_column_with_padding(df, col_dg, ordinal.astype(np.int64), is_od)
+        return df, FactorInfo("categorical", is_digitized=True)
+
+    def _process_continuous_factor(
+        self, df: pl.DataFrame, col: str, data: NDArray, is_od: bool
+    ) -> tuple[pl.DataFrame, FactorInfo]:
+        """Process a continuous numeric factor with automatic binning."""
+        _logger.warning(
+            f"A user defined binning was not provided for {col}. "
+            f"Using the {self.auto_bin_method} method to discretize the data. "
+            "It is recommended that the user rerun and supply the desired "
+            "bins using the continuous_factor_bins parameter."
+        )
+        binned_data = bin_data(data, self.auto_bin_method)
+        col_bn = _binned(col)
+        df = self._add_column_with_padding(df, col_bn, binned_data.astype(np.int64), is_od)
+        return df, FactorInfo("continuous", is_binned=True)
+
+    def _process_factor(
+        self, df: pl.DataFrame, col: str, data: NDArray, factor_bins: Mapping[str, int | Sequence[float]], is_od: bool
+    ) -> tuple[pl.DataFrame, FactorInfo]:
+        """Process a single factor based on its type."""
+        if col in factor_bins:
+            return self._process_binned_factor(df, col, data, factor_bins[col], is_od)
+
+        _, ordinal = np.unique(data, return_inverse=True)
+        if not np.issubdtype(data.dtype, np.number):
+            return self._process_categorical_factor(df, col, ordinal, is_od)
+        if is_continuous(data, self.item_indices):
+            return self._process_continuous_factor(df, col, data, is_od)
+        return df, FactorInfo("discrete")
 
     def _bin(
         self,
@@ -540,12 +1033,13 @@ class Metadata:
         if self._is_binned:
             return
 
-        # Start with an empty set of factor info
         factor_info: dict[str, FactorInfo] = {}
-
-        # Create a mutable DataFrame for updates
         df = self.dataframe.clone()
         factor_bins = self.continuous_factor_bins
+
+        # For OD datasets, use target_data to extract data for analysis (avoids None values)
+        is_od = self.has_targets()
+        data_df = self.target_data if is_od else df
 
         # Check for invalid keys
         invalid_keys = set(factor_bins.keys()) - set(df.columns)
@@ -560,38 +1054,9 @@ class Metadata:
         total_factors = len(factors_to_process)
 
         for i, col in enumerate(factors_to_process):
-            # Get data as numpy array for processing
-            data = df[col].to_numpy()
-            if col in factor_bins:
-                # User provided binning
-                bins = factor_bins[col]
-                col_bn = _binned(col)
-                df = df.with_columns(pl.Series(name=col_bn, values=digitize_data(data, bins).astype(np.int64)))
-                factor_info[col] = FactorInfo("continuous", is_binned=True)
-            else:
-                # Check if data is numeric
-                _, ordinal = np.unique(data, return_inverse=True)
-                if not np.issubdtype(data.dtype, np.number):
-                    # Non-numeric data - convert to categorical
-                    col_dg = _digitized(col)
-                    df = df.with_columns(pl.Series(name=col_dg, values=ordinal.astype(np.int64)))
-                    factor_info[col] = FactorInfo("categorical", is_digitized=True)
-                elif is_continuous(data, self.item_indices):
-                    # Continuous values - discretize by binning
-                    _logger.warning(
-                        f"A user defined binning was not provided for {col}. "
-                        f"Using the {self.auto_bin_method} method to discretize the data. "
-                        "It is recommended that the user rerun and supply the desired "
-                        "bins using the continuous_factor_bins parameter.",
-                    )
-                    # Create binned version
-                    binned_data = bin_data(data, self.auto_bin_method)
-                    col_bn = _binned(col)
-                    df = df.with_columns(pl.Series(name=col_bn, values=binned_data.astype(np.int64)))
-                    factor_info[col] = FactorInfo("continuous", is_binned=True)
-                else:
-                    # Non-continuous values - treat as discrete
-                    factor_info[col] = FactorInfo("discrete")
+            data = data_df[col].to_numpy()
+            df, info = self._process_factor(df, col, data, factor_bins, is_od)
+            factor_info[col] = info
 
             if progress_callback:
                 progress_callback(i + 1, total_factors)
@@ -601,50 +1066,69 @@ class Metadata:
         self._factors.update(factor_info)
         self._is_binned = True
 
-    def add_factors(self, factors: Mapping[str, Array1D[Any]]) -> None:
+    def add_factors(
+        self, factors: Mapping[str, Array1D[Any]], level: Literal["image", "target", "auto"] = "auto"
+    ) -> None:
         """Add additional factors to metadata collection.
 
-        Extend the current metadata with new factors, automatically handling
-        length validation and integration with existing data structures.
+        Extend the current metadata with new factors at either image or target level.
+        For image-level factors, values are stored only in image-level rows.
+        For target-level factors, values are stored only in target-level rows.
 
         Parameters
         ----------
         factors : Mapping[str, _1DArray[Any]]
-            Mapping of factor names to their values. Factor length must
-            match either the number of images or number of detections in the dataset.
+            Mapping of factor names to their values. Factor length must match
+            the specified level (image count or target count).
+        level : {"image", "target", "auto"}, default="auto"
+            Level at which to store the factors:
+            - "image": Array length must match image count, stored in image-level rows only
+            - "target": Array length must match target count, stored in target-level rows only
+            - "auto": Automatically infers level based on array length
 
         Raises
         ------
         ValueError
-            When factor lengths do not match dataset dimensions.
+            When factor lengths do not match the specified level's dimensions.
 
         Examples
         --------
-        >>> metadata = Metadata(dataset)
-        >>> new_factors = {
-        ...     "brightness": [0.2, 0.8, 0.5, 0.3, 0.4, 0.1, 0.3, 0.2],
-        ...     "contrast": [1.1, 0.9, 1.0, 0.8, 1.2, 1.0, 0.7, 1.3],
+        >>> metadata = Metadata(od_dataset)
+        >>> # Add image-level factors (e.g., from imagestats)
+        >>> image_factors = {
+        ...     "brightness": [0.2, 0.8, 0.5],  # One per image
+        ...     "contrast": [1.1, 0.9, 1.0],
         ... }
-        >>> metadata.add_factors(new_factors)
+        >>> metadata.add_factors(image_factors, level="image")
+        >>>
+        >>> # Add target-level factors (e.g., detection confidence scores)
+        >>> target_factors = {
+        ...     "iou": [0.85, 0.92, 0.78, 0.88, 0.91],  # One per target/detection
+        ... }
+        >>> metadata.add_factors(target_factors, level="target")
         """
         self._structure()
 
-        targets = len(self.dataframe)
-        images = self.item_count
-        targets_match = all(len(v) == targets for v in factors.values())
-        images_match = targets_match if images == targets else all(len(v) == images for v in factors.values())
-        if not targets_match and not images_match:
-            raise ValueError(
-                "The lists/arrays in the provided factors have a different length than the current metadata factors."
-            )
+        # Early return for empty factors
+        if not factors:
+            return
 
+        num_image_rows = len(self.image_data)
+        num_target_rows = len(self.target_data)
+
+        # Determine the level
+        if level == "auto":
+            level = self._infer_factor_level(factors, num_image_rows, num_target_rows)
+
+        # Validate factor lengths match the specified level
+        self._validate_factor_lengths(factors, level, num_image_rows, num_target_rows)
+
+        # Add factors to the appropriate rows
         new_columns = []
         for k, v in factors.items():
-            data = as_numpy(v)
-            if data.ndim != 1:
-                continue
-            selected_data = data[self.item_indices]
-            new_columns.append(pl.Series(name=k, values=selected_data))
+            data_array = as_numpy(v)
+            full_data = self._create_factor_column(data_array, level, num_image_rows)
+            new_columns.append(pl.Series(name=k, values=full_data))
             self._factors[k] = None
 
         if new_columns:
