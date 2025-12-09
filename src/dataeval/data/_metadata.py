@@ -84,7 +84,6 @@ class Metadata:
         include: Sequence[str] | None = None,
     ) -> None:
         self._class_labels: NDArray[np.intp]
-        self._class_names: list[str]
         self._item_indices: NDArray[np.intp]
         self._factors: dict[str, FactorInfo | None]
         self._dropped_factors: dict[str, list[str]]
@@ -408,27 +407,10 @@ class Metadata:
         Notes
         -----
         This property triggers dataset structure analysis on first access.
-        Use class_names property to get human-readable label names.
+        Use index2label property to get human-readable label names.
         """
         self._structure()
         return self._class_labels
-
-    @property
-    def class_names(self) -> Sequence[str]:
-        """Human-readable names corresponding to class labels.
-
-        Returns
-        -------
-        Sequence[str]
-            List of class names where index corresponds to class label value.
-            Derived from dataset metadata or auto-generated from label indices.
-
-        Notes
-        -----
-        This property triggers dataset structure analysis on first access.
-        """
-        self._structure()
-        return self._class_names
 
     @property
     def index2label(self) -> Mapping[int, str]:
@@ -955,7 +937,6 @@ class Metadata:
         self._raw = raw
         self._index2label = index2label
         self._class_labels = labels
-        self._class_names = list(index2label.values())
         self._item_indices = srcidx
 
         # For OD datasets, use target_factor_dict for _factors; for IC, use image_factor_dict

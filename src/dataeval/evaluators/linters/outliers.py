@@ -27,24 +27,39 @@ TIndexIssueMap = TypeVar("TIndexIssueMap", IndexIssueMap, Sequence[IndexIssueMap
 
 def _reorganize_by_class_and_metric(
     result: IndexIssueMap, lstats: LabelStatsResult
-) -> tuple[Mapping[str, Sequence[int]], Mapping[str, Mapping[str, int]]]:
+) -> tuple[Mapping[str, Sequence[int]], Mapping[str | None, Mapping[str, int]]]:
     """Flip result from grouping by image to grouping by class and metric"""
     metrics: dict[str, list[int]] = {}
-    class_wise: dict[str, dict[str, int]] = {label: {} for label in lstats["class_names"]}
+
+    # Create class_wise dict using index2label mapping and empty images
+    index2label = lstats["index2label"]
+    class_wise: dict[str | None, dict[str, int]] = {label: {} for label in index2label.values()}
+
+    # Add empty images if they exist
+    if lstats["empty_image_count"] > 0:
+        class_wise[None] = {}
 
     # Group metrics and calculate class-wise counts
     for img, group in result.items():
         for extreme in group:
             metrics.setdefault(extreme, []).append(img)
-            for i, images in lstats["image_indices_per_class"].items():
-                if img in images:
-                    class_name = lstats["class_names"][i]
-                    class_wise[class_name][extreme] = class_wise[class_name].get(extreme, 0) + 1
+
+            # Check if image is in empty images
+            if img in lstats["empty_image_indices"]:
+                class_wise[None][extreme] = class_wise[None].get(extreme, 0) + 1
+            else:
+                # Check regular class indices
+                for class_idx, images in lstats["image_indices_per_class"].items():
+                    if img in images:
+                        class_name = index2label.get(class_idx, str(class_idx))
+                        class_wise[class_name][extreme] = class_wise[class_name].get(extreme, 0) + 1
 
     return metrics, class_wise
 
 
-def _create_table(metrics: Mapping[str, Sequence[int]], class_wise: Mapping[str, Mapping[str, int]]) -> Sequence[str]:
+def _create_table(
+    metrics: Mapping[str, Sequence[int]], class_wise: Mapping[str | None, Mapping[str, int]]
+) -> Sequence[str]:
     """Create table for displaying the results"""
     max_class_length = max(len(str(label)) for label in class_wise)
     max_class_length = max(max_class_length, len("Class"), 5)
@@ -87,11 +102,13 @@ def _create_table(metrics: Mapping[str, Sequence[int]], class_wise: Mapping[str,
     return [table_header] + table_rows
 
 
-def _create_pandas_dataframe(class_wise: Mapping[str, Mapping[str, int]]) -> Sequence[Mapping[str, str | int]]:
+def _create_pandas_dataframe(
+    class_wise: Mapping[str | None, Mapping[str, int]],
+) -> Sequence[Mapping[str, str | int | None]]:
     """Create data for pandas dataframe"""
     data = []
     for label, metrics_dict in class_wise.items():
-        row: dict[str, str | int] = {"Class": label}
+        row: dict[str, str | int | None] = {"Class": label}
         total = sum(metrics_dict.values())
         row.update(metrics_dict)  # Add metric counts
         row["Total"] = total
