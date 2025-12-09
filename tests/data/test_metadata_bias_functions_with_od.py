@@ -215,7 +215,7 @@ class TestBiasFunctionsWithOD:
 
         # result.classwise is a DataFrame with class_name, factor_name, mi_value, is_imbalanced columns
         # It contains one row per (class, factor) combination (excluding class_label itself)
-        n_classes = len(md.class_names)
+        n_classes = len(md.index2label)
         assert result.classwise.height == n_classes * len(md.factor_names)
         assert "class_name" in result.classwise.columns
         assert "factor_name" in result.classwise.columns
@@ -238,7 +238,7 @@ class TestBiasFunctionsWithOD:
 
         # result.classwise is a DataFrame with class_name, factor_name, diversity_value, is_low_diversity
         # One row per (class, factor) combination
-        n_classes = len(md.class_names)
+        n_classes = len(md.index2label)
         assert result.classwise.height == n_classes * len(md.factor_names)
         assert "class_name" in result.classwise.columns
         assert "factor_name" in result.classwise.columns

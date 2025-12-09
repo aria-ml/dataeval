@@ -210,10 +210,13 @@ class TestOutliersOutput:
         "label_counts_per_image": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         "image_counts_per_class": {0: 3, 1: 4, 2: 3},
         "image_indices_per_class": {0: [0, 3, 7], 1: [1, 4, 6, 9], 2: [2, 5, 8]},
+        "classes_per_image": [[0], [1], [2], [0], [1], [2], [1], [0], [2], [1]],
         "image_count": 10,
         "class_count": 3,
         "label_count": 10,
-        "class_names": ["horse", "dog", "mule"],
+        "index2label": {0: "horse", 1: "dog", 2: "mule"},
+        "empty_image_indices": [],
+        "empty_image_count": 0,
     }
 
     def test_dict_len(self):
