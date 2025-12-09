@@ -79,8 +79,7 @@ class TestMetadata:
         labels: list[list[int]] = [[] for _ in range(md.item_count)]
         for class_label, item_index in zip(md.class_labels, md.item_indices):
             labels[item_index].append(int(class_label))
-        index2label = dict(enumerate(md.class_names))
-        stats = label_stats(labels, index2label)
+        stats = label_stats(labels, md.index2label)
 
         assert stats["label_counts_per_image"] == [1, 0, 1, 1, 1, 0, 1, 1, 1, 1]
 
@@ -100,8 +99,7 @@ class TestMetadata:
         labels: list[list[int]] = [[] for _ in range(md.item_count)]
         for class_label, item_index in zip(md.class_labels, md.item_indices):
             labels[item_index].append(int(class_label))
-        index2label = dict(enumerate(md.class_names))
-        stats = label_stats(labels, index2label)
+        stats = label_stats(labels, md.index2label)
 
         assert stats["label_counts_per_image"] == [2, 0, 2, 2, 2, 0, 2, 2, 2, 2]
 

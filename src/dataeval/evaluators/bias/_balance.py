@@ -326,7 +326,7 @@ class Balance:
 
         for class_idx in range(classwise.shape[0]):
             class_name = (
-                self.metadata.class_names[class_idx] if class_idx < len(self.metadata.class_names) else str(class_idx)
+                self.metadata.index2label[class_idx] if class_idx in self.metadata.index2label else str(class_idx)
             )
             # Skip the first column (class_label's own MI with the binary class indicator)
             for factor_idx in range(1, classwise.shape[1]):

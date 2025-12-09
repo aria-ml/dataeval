@@ -283,7 +283,7 @@ class Diversity:
 
         for class_idx in range(classwise_div.shape[0]):
             class_name = (
-                self.metadata.class_names[class_idx] if class_idx < len(self.metadata.class_names) else str(class_idx)
+                self.metadata.index2label[class_idx] if class_idx in self.metadata.index2label else str(class_idx)
             )
             for factor_idx in range(num_factors):
                 div_value = classwise_div[class_idx, factor_idx]
