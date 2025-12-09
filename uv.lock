@@ -824,7 +824,7 @@ requires-dist = [
     { name = "tqdm", marker = "extra == 'all'", specifier = ">=4.66" },
     { name = "tqdm", marker = "extra == 'tqdm'", specifier = ">=4.66" },
     { name = "typing-extensions", specifier = ">=4.12" },
-    { name = "xxhash", specifier = ">=3.3" },
+    { name = "xxhash", specifier = ">=3.4" },
 ]
 provides-extras = ["all", "cpu", "cu118", "cu126", "matplotlib", "tqdm"]
 
