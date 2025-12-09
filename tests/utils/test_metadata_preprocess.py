@@ -46,7 +46,7 @@ class TestMDPreprocessingUnit:
     def test_exclude_raw_metadata_only(self, factors, bincounts):
         labels = [0, 0, 0]
         output = to_metadata(factors, labels, bincounts, exclude=["b"])
-        assert "b" not in output.class_names
+        assert "b" not in output.index2label.values()
 
 
 @pytest.mark.optional
