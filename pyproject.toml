@@ -46,7 +46,7 @@ dependencies = [
   "torch>=2.2.0",
   "torchvision>=0.17.0",
   "typing-extensions>=4.12",
-  "xxhash>=3.3",
+  "xxhash>=3.4",
   "psutil>=7.0.0",
 ]
 
