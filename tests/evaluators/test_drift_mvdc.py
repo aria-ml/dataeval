@@ -1,8 +1,6 @@
 from unittest.mock import MagicMock
 
 import numpy as np
-import numpy.testing as npt
-import pandas as pd
 import polars as pl
 import pytest
 
@@ -87,12 +85,12 @@ class TestMVDC:
             dc.predict(tst_data)
 
     def test_validate_empty(self):
-        df = pd.DataFrame([])
+        df = pl.DataFrame([])
         with pytest.raises(ValueError):
             _validate(df)
 
     def test_validate_feature_mismatch(self):
-        df = pd.DataFrame([[1], [2]])
+        df = pl.DataFrame({"col1": [1, 2]})
         with pytest.raises(ValueError):
             _validate(df, expected_features=2)
 
@@ -160,7 +158,7 @@ class TestDriftMVDCOutput:
         fig = output.plot()
         x_data = fig.axes[0].lines[0].get_xdata()
         x_values = np.arange(0, 10, dtype=int)
-        npt.assert_array_equal(x_data, x_values)
+        np.testing.assert_array_equal(x_data, x_values)
         assert fig._dpi == 300  # type: ignore
 
     @pytest.mark.requires_all

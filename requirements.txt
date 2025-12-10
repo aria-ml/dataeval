@@ -924,7 +924,6 @@ numpy==2.2.6 \
     #   maite-datasets
     #   matplotlib
     #   numba
-    #   pandas
     #   scikit-learn
     #   scipy
     #   torchmetrics
@@ -1033,43 +1032,6 @@ packaging==25.0 \
     #   pytest
     #   sphinx
     #   torchmetrics
-pandas==2.2.3 \
-    --hash=sha256:062309c1b9ea12a50e8ce661145c6aab431b1e99530d3cd60640e255778bd43a \
-    --hash=sha256:15c0e1e02e93116177d29ff83e8b1619c93ddc9c49083f237d4312337a61165d \
-    --hash=sha256:1948ddde24197a0f7add2bdc4ca83bf2b1ef84a1bc8ccffd95eda17fd836ecb5 \
-    --hash=sha256:1db71525a1538b30142094edb9adc10be3f3e176748cd7acc2240c2f2e5aa3a4 \
-    --hash=sha256:22a9d949bfc9a502d320aa04e5d02feab689d61da4e7764b62c30b991c42c5f0 \
-    --hash=sha256:29401dbfa9ad77319367d36940cd8a0b3a11aba16063e39632d98b0e931ddf32 \
-    --hash=sha256:3508d914817e153ad359d7e069d752cdd736a247c322d932eb89e6bc84217f28 \
-    --hash=sha256:37e0aced3e8f539eccf2e099f65cdb9c8aa85109b0be6e93e2baff94264bdc6f \
-    --hash=sha256:381175499d3802cde0eabbaf6324cce0c4f5d52ca6f8c377c29ad442f50f6348 \
-    --hash=sha256:38cf8125c40dae9d5acc10fa66af8ea6fdf760b2714ee482ca691fc66e6fcb18 \
-    --hash=sha256:3b71f27954685ee685317063bf13c7709a7ba74fc996b84fc6821c59b0f06468 \
-    --hash=sha256:3fc6873a41186404dad67245896a6e440baacc92f5b716ccd1bc9ed2995ab2c5 \
-    --hash=sha256:4f18ba62b61d7e192368b84517265a99b4d7ee8912f8708660fb4a366cc82667 \
-    --hash=sha256:56534ce0746a58afaf7942ba4863e0ef81c9c50d3f0ae93e9497d6a41a057645 \
-    --hash=sha256:59ef3764d0fe818125a5097d2ae867ca3fa64df032331b7e0917cf5d7bf66b13 \
-    --hash=sha256:5de54125a92bb4d1c051c0659e6fcb75256bf799a732a87184e5ea503965bce3 \
-    --hash=sha256:61c5ad4043f791b61dd4752191d9f07f0ae412515d59ba8f005832a532f8736d \
-    --hash=sha256:6374c452ff3ec675a8f46fd9ab25c4ad0ba590b71cf0656f8b6daa5202bca3fb \
-    --hash=sha256:63cc132e40a2e084cf01adf0775b15ac515ba905d7dcca47e9a251819c575ef3 \
-    --hash=sha256:66108071e1b935240e74525006034333f98bcdb87ea116de573a6a0dccb6c039 \
-    --hash=sha256:6dfcb5ee8d4d50c06a51c2fffa6cff6272098ad6540aed1a76d15fb9318194d8 \
-    --hash=sha256:7c2875855b0ff77b2a64a0365e24455d9990730d6431b9e0ee18ad8acee13dbd \
-    --hash=sha256:800250ecdadb6d9c78eae4990da62743b857b470883fa27f652db8bdde7f6659 \
-    --hash=sha256:86976a1c5b25ae3f8ccae3a5306e443569ee3c3faf444dfd0f41cda24667ad57 \
-    --hash=sha256:a5a1595fe639f5988ba6a8e5bc9649af3baf26df3998a0abe56c02609392e0a4 \
-    --hash=sha256:ad5b65698ab28ed8d7f18790a0dc58005c7629f227be9ecc1072aa74c0c1d43a \
-    --hash=sha256:b1d432e8d08679a40e2a6d8b2f9770a5c21793a6f9f47fdd52c5ce1948a5a8a9 \
-    --hash=sha256:b8661b0238a69d7aafe156b7fa86c44b881387509653fdf857bebc5e4008ad42 \
-    --hash=sha256:ba96630bc17c875161df3818780af30e43be9b166ce51c9a18c1feae342906c2 \
-    --hash=sha256:c124333816c3a9b03fbeef3a9f230ba9a737e9e5bb4060aa2107a86cc0a497fc \
-    --hash=sha256:cd8d0c3be0515c12fed0bdbae072551c8b54b7192c7b1fda0ba56059a0179698 \
-    --hash=sha256:d9c45366def9a3dd85a6454c0e7908f2b3b8e9c138f5dc38fed7ce720d8453ed \
-    --hash=sha256:f00d1345d84d8c86a63e476bb4955e46458b304b9575dcf71102b5c705320015 \
-    --hash=sha256:f3a255b2c19987fbbe62a9dfd6cff7ff2aa9ccab3fc75218fd4b7530f01efa24 \
-    --hash=sha256:fffb8ae78d8af97f849404f21411c95062db1496aeb3e56f146f0355c9989319
-    # via dataeval
 parso==0.8.4 \
     --hash=sha256:a418670a20291dacd2dddc80c377c5c3791378ee1e8d12bffc35420643d43f18 \
     --hash=sha256:eb3a7b58240fb99099a345571deecc0f9540ea5f4dd2fe14c2a99d6b281ab92d
@@ -1331,11 +1293,6 @@ python-dateutil==2.9.0.post0 \
     # via
     #   jupyter-client
     #   matplotlib
-    #   pandas
-pytz==2025.2 \
-    --hash=sha256:360b9e3dbb49a209c21ad61809c7fb453643e048b38924c765813546746e81c3 \
-    --hash=sha256:5ddf76296dd8c44c26eb8f4b6f35488f3ccbf6fbbd7adee0b7262d43f0ec2f00
-    # via pandas
 pywin32==310 ; platform_python_implementation != 'PyPy' and sys_platform == 'win32' \
     --hash=sha256:126298077a9d7c95c53823934f000599f66ec9296b09167810eb24875f32689c \
     --hash=sha256:19ec5fc9b1d51c4350be7bb00760ffce46e6c95eaf2f0b2f1150657b1a43c582 \
@@ -1958,10 +1915,6 @@ typing-inspection==0.4.1 \
     --hash=sha256:389055682238f53b04f7badcb49b989835495a96700ced5dab2d8feae4b26f51 \
     --hash=sha256:6ae134cc0203c33377d43188d4064e9b357dba58cff3185f22924610e70a9d28
     # via pydantic
-tzdata==2025.2 \
-    --hash=sha256:1a403fada01ff9221ca8044d701868fa132215d84beb92242d9acd2147f667a8 \
-    --hash=sha256:b60a638fcc0daffadf82fe0f57e53d06bdec2f36c4df66280ae79bce6bd6f2b9
-    # via pandas
 urllib3==2.5.0 \
     --hash=sha256:3fc47733c7e419d4bc3f6b3dc2b4f890bb743906a30d56ba4a5bfa4bbff92760 \
     --hash=sha256:e6b01673c0fa6a13e374b50871808eb3bf7046c4b125b216f6bf1cc604cff0dc
