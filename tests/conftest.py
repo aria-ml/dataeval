@@ -304,6 +304,6 @@ def simple_dataset() -> SimpleDataset:
     return SimpleDataset(size=50, image_shape=(3, 32, 32))
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def RNG() -> np.random.Generator:
     return np.random.default_rng(0)
