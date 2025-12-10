@@ -334,14 +334,18 @@ class Metadata:
         -------
         Sequence[str]
             List of factor names that passed filtering and preprocessing steps.
-            Order matches columns in factor_data, numeric_data, and binned_data.
+            Order matches columns in factor_data, and binned_data.
 
         Notes
         -----
         This property triggers dataset structure analysis on first access.
         Factor names respect include/exclude filtering settings.
+        Only includes factors that survived preprocessing (excludes multi-dimensional factors).
         """
         self._structure()
+        # After binning, exclude factors with None FactorInfo (e.g., multi-dimensional)
+        if self._is_binned:
+            return [k for k, v in self._factors.items() if v is not None and self._filter(k)]
         return list(filter(self._filter, self._factors))
 
     @property
@@ -993,8 +997,19 @@ class Metadata:
 
     def _process_factor(
         self, df: pl.DataFrame, col: str, data: NDArray, factor_bins: Mapping[str, int | Sequence[float]], is_od: bool
-    ) -> tuple[pl.DataFrame, FactorInfo]:
+    ) -> tuple[pl.DataFrame, FactorInfo | None]:
         """Process a single factor based on its type."""
+        # Skip multi-dimensional factors (e.g., embeddings, feature vectors)
+        # Check both ndim > 1 and object dtype containing arrays
+        if data.ndim != 1:
+            _logger.info(f"Skipping factor '{col}' with shape {data.shape} - only 1D factors can be binned")
+            return df, None
+        if data.dtype == object and len(data) > 0 and isinstance(data[0], np.ndarray):
+            _logger.info(
+                f"Skipping factor '{col}' with shape ({len(data)}, {data[0].shape}) - only 1D factors can be binned"
+            )
+            return df, None
+
         if col in factor_bins:
             return self._process_binned_factor(df, col, data, factor_bins[col], is_od)
 
@@ -1014,7 +1029,7 @@ class Metadata:
         if self._is_binned:
             return
 
-        factor_info: dict[str, FactorInfo] = {}
+        factor_info: dict[str, FactorInfo | None] = {}
         df = self.dataframe.clone()
         factor_bins = self.continuous_factor_bins
 

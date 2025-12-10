@@ -130,7 +130,7 @@ def is_continuous(data: NDArray[np.number[Any]], image_indices: NDArray[np.numbe
         return False
 
     # Require at least 3 unique values before bothering with NNN
-    xu = np.unique(data, axis=None)
+    xu = np.unique(data)
     if xu.size < 3:
         return False
 

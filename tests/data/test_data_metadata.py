@@ -337,3 +337,47 @@ class TestMetadata:
         assert callback.call_count == expected_calls
         # Check that the last call has the correct final values
         callback.assert_called_with(expected_calls, expected_calls)
+
+    def test_multidimensional_factors_skipped(self, RNG: np.random.Generator):
+        """Test that multi-dimensional factors are skipped during binning and filtered from outputs."""
+        md = Metadata(None)  # type: ignore
+
+        # Create a mix of 1D and 2D factors
+        md_dict = {
+            "factor_1d": RNG.random(size=50).tolist(),
+            "embedding_2d": RNG.random(size=(50, 10)).tolist(),  # 2D factor (e.g., embedding)
+            "another_1d": RNG.choice(["A", "B", "C"], size=50).tolist(),
+        }
+
+        md._dataframe = pl.from_dict(md_dict)
+        md._factors = dict.fromkeys(md_dict, None)
+        md._is_structured = True
+        md._item_indices = np.arange(50)
+        md._class_labels = RNG.integers(0, 3, size=50)
+
+        # Trigger binning
+        md._bin()
+
+        # Verify that only 1D factors are in factor_names
+        assert set(md.factor_names) == {"factor_1d", "another_1d"}
+        assert "embedding_2d" not in md.factor_names
+
+        # Verify that only 1D factors are in factor_info
+        assert set(md.factor_info.keys()) == {"factor_1d", "another_1d"}
+        assert "embedding_2d" not in md.factor_info
+
+        # Verify that factor_data only includes 1D factors
+        factor_data = md.factor_data
+        assert factor_data.shape == (50, 2)  # 50 samples, 2 1D factors
+
+        # Verify that binned_data only includes 1D factors
+        binned_data = md.binned_data
+        assert binned_data.shape == (50, 2)  # 50 samples, 2 1D factors
+
+        # Verify that the 2D factor is still in the dataframe (not removed, just skipped)
+        assert "embedding_2d" in md.dataframe.columns
+
+        # Verify that _factors has None for the 2D factor
+        assert md._factors["embedding_2d"] is None
+        assert md._factors["factor_1d"] is not None
+        assert md._factors["another_1d"] is not None
