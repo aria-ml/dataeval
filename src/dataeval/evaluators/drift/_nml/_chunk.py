@@ -13,10 +13,9 @@ import copy
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import Any, Generic, Literal, TypeVar, cast
+from typing import Any, Generic, Literal, TypeVar
 
-import pandas as pd
-from pandas import Index, Period
+import polars as pl
 from typing_extensions import Self
 
 _logger = logging.getLogger(__name__)
@@ -29,7 +28,7 @@ class Chunk(ABC):
 
     def __init__(
         self,
-        data: pd.DataFrame,
+        data: pl.DataFrame,
     ) -> None:
         self.key: str
         self.data = data
@@ -40,7 +39,7 @@ class Chunk(ABC):
 
     def __repr__(self) -> str:
         attr_str = ", ".join([f"{k}={v}" for k, v in self.dict().items()])
-        return f"{self.__class__.__name__}(data=pd.DataFrame(shape={self.data.shape}), {attr_str})"
+        return f"{self.__class__.__name__}(data=pl.DataFrame(shape={self.data.shape}), {attr_str})"
 
     def __len__(self) -> int:
         return self.data.shape[0]
@@ -72,7 +71,7 @@ class IndexChunk(Chunk):
 
     def __init__(
         self,
-        data: pd.DataFrame,
+        data: pl.DataFrame,
         start_index: int,
         end_index: int,
     ) -> None:
@@ -87,7 +86,7 @@ class IndexChunk(Chunk):
     def __add__(self, other: Self) -> Self:
         a, b = (self, other) if self < other else (other, self)
         result = copy.deepcopy(a)
-        result.data = pd.concat([a.data, b.data])
+        result.data = pl.concat([a.data, b.data])
         result.end_index = b.end_index
         return result
 
@@ -112,7 +111,7 @@ class PeriodChunk(Chunk):
 
     KEYS = ("key", "index", "start_date", "end_date", "chunk_size")
 
-    def __init__(self, data: pd.DataFrame, period: Period, chunk_size: int) -> None:
+    def __init__(self, data: pl.DataFrame, period: Any, chunk_size: int) -> None:
         super().__init__(data)
         self.key = str(period)
         self.start_datetime = period.start_time
@@ -120,12 +119,12 @@ class PeriodChunk(Chunk):
         self.chunk_size = chunk_size
 
     def __lt__(self, other: Self) -> bool:
-        return self.end_datetime < other.start_datetime
+        return self.start_datetime < other.start_datetime
 
     def __add__(self, other: Self) -> Self:
         a, b = (self, other) if self < other else (other, self)
         result = copy.deepcopy(a)
-        result.data = pd.concat([a.data, b.data])
+        result.data = pl.concat([a.data, b.data])
         result.end_index = b.end_index
         result.end_datetime = b.end_datetime
         result.chunk_size += b.chunk_size
@@ -146,7 +145,7 @@ class Chunker(Generic[TChunk]):
     or a preferred number of Chunks.
     """
 
-    def split(self, data: pd.DataFrame) -> list[TChunk]:
+    def split(self, data: pl.DataFrame) -> list[TChunk]:
         """Splits a given data frame into a list of chunks.
 
         This method provides a uniform interface across Chunker implementations to keep them interchangeable.
@@ -176,8 +175,8 @@ class Chunker(Generic[TChunk]):
         chunks = self._split(data)
         for index, chunk in enumerate(chunks):
             chunk.index = index
-            chunk.start_index = cast(int, chunk.data.index.min())
-            chunk.end_index = cast(int, chunk.data.index.max())
+            # Polars doesn't have an index attribute - start_index and end_index are set in chunk creation
+            # Keep the values already set during chunk creation
 
         if len(chunks) < 6:
             # TODO wording
@@ -189,29 +188,11 @@ class Chunker(Generic[TChunk]):
         return chunks
 
     @abstractmethod
-    def _split(self, data: pd.DataFrame) -> list[TChunk]: ...
+    def _split(self, data: pl.DataFrame) -> list[TChunk]: ...
 
 
 class PeriodBasedChunker(Chunker[PeriodChunk]):
-    """A Chunker that will split data into Chunks based on a date column in the data.
-
-    Examples
-    --------
-    Chunk using monthly periods and providing a column name
-
-    >>> from nannyml.chunk import PeriodBasedChunker
-    >>> df = pd.read_parquet("/path/to/my/data.pq")
-    >>> chunker = PeriodBasedChunker(timestamp_column_name="observation_date", offset="M")
-    >>> chunks = chunker.split(data=df)
-
-    Or chunk using weekly periods
-
-    >>> from nannyml.chunk import PeriodBasedChunker
-    >>> df = pd.read_parquet("/path/to/my/data.pq")
-    >>> chunker = PeriodBasedChunker(timestamp_column_name=df["observation_date"], offset="W", minimum_chunk_size=50)
-    >>> chunks = chunker.split(data=df)
-
-    """
+    """A Chunker that will split data into Chunks based on a date column in the data."""
 
     def __init__(self, timestamp_column_name: str, offset: str = "W") -> None:
         """Creates a new PeriodBasedChunker.
@@ -221,30 +202,60 @@ class PeriodBasedChunker(Chunker[PeriodChunk]):
         timestamp_column_name : str
             The column name containing the timestamp to chunk on
         offset : str
-            A frequency string representing a pandas.tseries.offsets.DateOffset.
+            A frequency string representing a relative time offset.
             The offset determines how the time-based grouping will occur. A list of possible values
-            can be found at <https://pandas.pydata.org/docs/user_guide/timeseries.html#offset-aliases>.
+            can be found at <https://docs.pola.rs/api/python/stable/reference/expressions/api/polars.Expr.dt.offset_by.html>.
         """
         self.timestamp_column_name = timestamp_column_name
         self.offset = offset
 
-    def _split(self, data: pd.DataFrame) -> list[PeriodChunk]:
+    def _split(self, data: pl.DataFrame) -> list[PeriodChunk]:
         chunks = []
         if self.timestamp_column_name is None:
             raise ValueError("timestamp_column_name must be provided")
-        if self.timestamp_column_name not in data:
+        if self.timestamp_column_name not in data.columns:
             raise ValueError(f"timestamp column '{self.timestamp_column_name}' not in columns")
 
-        grouped = data.groupby(pd.to_datetime(data[self.timestamp_column_name]).dt.to_period(self.offset))
+        # Use polars datetime operations with offset_by for period calculations
+        # Convert offset to polars duration (W->1w, M->1mo, etc)
+        offset_map = {"W": "1w", "M": "1mo", "D": "1d", "H": "1h", "Y": "1y"}
+        polars_offset = offset_map.get(self.offset, self.offset)
 
-        for k, v in grouped.groups.items():
-            period, index = cast(Period, k), cast(Index, v)
+        # Group by truncated timestamp and calculate period boundaries
+        data_with_period = data.with_columns(
+            [
+                pl.col(self.timestamp_column_name).dt.truncate(polars_offset).alias("_period_start"),
+                pl.col(self.timestamp_column_name)
+                .dt.truncate(polars_offset)
+                .dt.offset_by(polars_offset)
+                .alias("_period_end"),
+            ]
+        )
+
+        for (period_start, period_end), group_df in data_with_period.group_by(["_period_start", "_period_end"]):
+            # Remove the temporary period columns
+            group_data = group_df.drop("_period_start", "_period_end")
+
+            # Create a period-like object with proper start and end times
+            period = type(
+                "Period",
+                (),
+                {
+                    "start_time": period_start,
+                    "end_time": period_end,
+                    "__str__": lambda self, s=period_start: str(s),  # Capture period_start in closure
+                },
+            )()
+
             chunk = PeriodChunk(
-                data=grouped.get_group(period),  # type: ignore | dataframe
+                data=group_data,
                 period=period,
-                chunk_size=len(index),
+                chunk_size=len(group_df),
             )
             chunks.append(chunk)
+
+        # Sort chunks by start_datetime to ensure chronological order
+        chunks.sort(key=lambda c: c.start_datetime)
 
         return chunks
 
@@ -303,9 +314,9 @@ class SizeBasedChunker(Chunker[IndexChunk]):
         self.chunk_size = chunk_size
         self.incomplete = incomplete
 
-    def _split(self, data: pd.DataFrame) -> list[IndexChunk]:
-        def _create_chunk(index: int, data: pd.DataFrame, chunk_size: int) -> IndexChunk:
-            chunk_data = data.iloc[index : index + chunk_size]
+    def _split(self, data: pl.DataFrame) -> list[IndexChunk]:
+        def _create_chunk(index: int, data: pl.DataFrame, chunk_size: int) -> IndexChunk:
+            chunk_data = data.slice(index, chunk_size)
             return IndexChunk(
                 data=chunk_data,
                 start_index=index,
@@ -388,7 +399,7 @@ class CountBasedChunker(Chunker[IndexChunk]):
         self.chunk_number = chunk_number
         self.incomplete: Literal["append", "drop", "keep"] = incomplete
 
-    def _split(self, data: pd.DataFrame) -> list[IndexChunk]:
+    def _split(self, data: pl.DataFrame) -> list[IndexChunk]:
         chunk_size = data.shape[0] // self.chunk_number
         chunker = SizeBasedChunker(chunk_size, self.incomplete)
         return chunker.split(data=data)

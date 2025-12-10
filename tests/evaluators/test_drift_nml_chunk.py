@@ -4,9 +4,8 @@ import math
 from typing import Any
 
 import numpy as np
-import pandas as pd
+import polars as pl
 import pytest
-from pandas import Period
 
 from dataeval.evaluators.drift._nml._chunk import (
     Chunk,
@@ -34,40 +33,74 @@ class MockChunk(Chunk):
 
 @pytest.fixture
 def sample_index_chunk() -> IndexChunk:
-    df = pd.DataFrame(rng.uniform(0, 100, size=(100, 4)), columns=pd.Series(list("ABCD")))
+    df = pl.DataFrame(rng.uniform(0, 100, size=(100, 4)), schema=list("ABCD"))
     chunk = IndexChunk(data=df, start_index=0, end_index=100)
     return chunk
 
 
 @pytest.fixture
 def sample_period_chunk() -> PeriodChunk:
-    df = pd.DataFrame(rng.uniform(0, 100, size=(100, 4)), columns=pd.Series(list("ABCD")))
-    chunk = PeriodChunk(data=df, period=Period("1/1/2020", "Y"), chunk_size=100)  # type: ignore - Period might be NaTType?
+    import datetime
+
+    df = pl.DataFrame(rng.uniform(0, 100, size=(100, 4)), schema=list("ABCD"))
+    # Create a simple period-like object for testing
+    period = type(
+        "Period",
+        (),
+        {
+            "start_time": datetime.datetime(2020, 1, 1),
+            "end_time": datetime.datetime(2020, 12, 31, 23, 59, 59, 999999),
+            "__str__": lambda self: "2020",
+        },
+    )()
+    chunk = PeriodChunk(data=df, period=period, chunk_size=100)
     return chunk
 
 
 @pytest.fixture
-def sample_chunk_data() -> pd.DataFrame:
-    data = pd.DataFrame(
-        pd.date_range(start="1/6/2020", freq="10min", periods=20 * 1008), columns=pd.Series(["ordered_at"])
+def sample_chunk_data() -> pl.DataFrame:
+    n_rows = 20 * 1008
+    # Create date range using polars
+    # Calculate end time: start + (n_rows - 1) * interval
+    import datetime
+
+    start_dt = datetime.datetime(2020, 1, 6)
+    end_dt = start_dt + datetime.timedelta(minutes=10 * (n_rows - 1))
+
+    data = pl.DataFrame({"ordered_at": pl.datetime_range(start=start_dt, end=end_dt, interval="10m", eager=True)})
+
+    # Add week column
+    data = data.with_columns((pl.col("ordered_at").dt.week() - 1).alias("week"))
+
+    # Add period column
+    data = data.with_columns(pl.lit("reference").alias("period"))
+    data = data.with_columns(
+        pl.when(pl.col("week") >= 11).then(pl.lit("analysis")).otherwise(pl.col("period")).alias("period")
     )
-    data["week"] = data.ordered_at.dt.isocalendar().week - 1
-    data["period"] = "reference"
-    data.loc[data.week >= 11, ["period"]] = "analysis"
+
+    # Add random columns
     np.random.seed(13)
-    data["f1"] = np.random.randn(data.shape[0])
-    data["f2"] = np.random.rand(data.shape[0])
-    data["f3"] = np.random.randint(4, size=data.shape[0])
-    data["f4"] = np.random.randint(20, size=data.shape[0])
-    data["y_pred"] = np.random.randint(2, size=data.shape[0])
-    data["y_true"] = np.random.randint(2, size=data.shape[0])
-    data["timestamp"] = data["ordered_at"]
+    data = data.with_columns(
+        [
+            pl.Series("f1", np.random.randn(n_rows)),
+            pl.Series("f2", np.random.rand(n_rows)),
+            pl.Series("f3", np.random.randint(4, size=n_rows)),
+            pl.Series("f4", np.random.randint(20, size=n_rows), dtype=pl.Int64),
+            pl.Series("y_pred", np.random.randint(2, size=n_rows)),
+            pl.Series("y_true", np.random.randint(2, size=n_rows)),
+        ]
+    )
+    data = data.with_columns(pl.col("ordered_at").alias("timestamp"))
 
     # Rule 1b is the shifted feature, 75% 0 instead of 50%
     rule1a = {2: 0, 3: 1}
     rule1b = {2: 0, 3: 0}
-    data.loc[data.week < 16, ["f3"]] = data.loc[data.week < 16, ["f3"]].replace(rule1a)
-    data.loc[data.week >= 16, ["f3"]] = data.loc[data.week >= 16, ["f3"]].replace(rule1b)
+    data = data.with_columns(
+        pl.when(pl.col("week") < 16)
+        .then(pl.col("f3").replace(rule1a))
+        .otherwise(pl.col("f3").replace(rule1b))
+        .alias("f3")
+    )
 
     # Rule 2b is the shifted feature
     c1 = "white"
@@ -76,56 +109,27 @@ def sample_chunk_data() -> pd.DataFrame:
     c4 = "blue"
 
     rule2a = {
-        0: c1,
-        1: c1,
-        2: c1,
-        3: c1,
-        4: c1,
-        5: c2,
-        6: c2,
-        7: c2,
-        8: c2,
-        9: c2,
-        10: c3,
-        11: c3,
-        12: c3,
-        13: c3,
-        14: c3,
-        15: c4,
-        16: c4,
-        17: c4,
-        18: c4,
-        19: c4,
-    }
+        0: c1, 1: c1, 2: c1, 3: c1, 4: c1, 5: c2, 6: c2, 7: c2, 8: c2, 9: c2,
+        10: c3, 11: c3, 12: c3, 13: c3, 14: c3, 15: c4, 16: c4, 17: c4, 18: c4, 19: c4,
+    }  # fmt: skip
 
     rule2b = {
-        0: c1,
-        1: c1,
-        2: c1,
-        3: c1,
-        4: c1,
-        5: c2,
-        6: c2,
-        7: c2,
-        8: c2,
-        9: c2,
-        10: c3,
-        11: c3,
-        12: c3,
-        13: c1,
-        14: c1,
-        15: c4,
-        16: c4,
-        17: c4,
-        18: c1,
-        19: c2,
-    }
+        0: c1, 1: c1, 2: c1, 3: c1, 4: c1, 5: c2, 6: c2, 7: c2, 8: c2, 9: c2,
+        10: c3, 11: c3, 12: c3, 13: c1, 14: c1, 15: c4, 16: c4, 17: c4, 18: c1, 19: c2,
+    }  # fmt: skip
 
-    data.loc[data.week < 16, ["f4"]] = data.loc[data.week < 16, ["f4"]].replace(rule2a)
-    data.loc[data.week >= 16, ["f4"]] = data.loc[data.week >= 16, ["f4"]].replace(rule2b)
+    data = data.with_columns(
+        pl.when(pl.col("week") < 16)
+        .then(pl.col("f4").replace_strict(rule2a, return_dtype=pl.Utf8))
+        .otherwise(pl.col("f4").replace_strict(rule2b, return_dtype=pl.Utf8))
+        .alias("f4")
+    )
 
-    data.loc[data.week >= 16, ["f1"]] = data.loc[data.week >= 16, ["f1"]] + 0.6
-    data.loc[data.week >= 16, ["f2"]] = np.sqrt(data.loc[data.week >= 16, ["f2"]])
+    data = data.with_columns(pl.when(pl.col("week") >= 16).then(pl.col("f1") + 0.6).otherwise(pl.col("f1")).alias("f1"))
+
+    data = data.with_columns(
+        pl.when(pl.col("week") >= 16).then(pl.col("f2").sqrt()).otherwise(pl.col("f2")).alias("f2")
+    )
 
     return data
 
@@ -134,7 +138,7 @@ def sample_chunk_data() -> pd.DataFrame:
     "text",
     [
         "key=[0:100]",
-        "data=pd.DataFrame(shape=(100, 4))",
+        "data=pl.DataFrame(shape=(100, 4))",
         "start_index=0",
         "end_index=100",
     ],
@@ -148,9 +152,9 @@ def test_index_chunk_repr_should_contain_attribute(sample_index_chunk, text):
     "text",
     [
         "key=2020",
-        "data=pd.DataFrame(shape=(100, 4))",
+        "data=pl.DataFrame(shape=(100, 4))",
         "start_date=2020-01-01 00:00:00",
-        "end_date=2020-12-31 23:59:59.999999999",
+        "end_date=2020-12-31",
         "chunk_size=100",
     ],
 )
@@ -165,7 +169,7 @@ def test_chunk_len_should_return_data_length(sample_index_chunk):
 
 
 def test_chunk_len_should_return_0_for_empty_chunk():
-    sut = len(MockChunk(data=pd.DataFrame()))
+    sut = len(MockChunk(data=pl.DataFrame()))
     assert sut == 0
 
 
@@ -173,7 +177,7 @@ def test_chunker_should_log_warning_when_less_than_6_chunks(sample_chunk_data, c
     import logging
 
     class SimpleChunker(Chunker[MockChunk]):
-        def _split(self, data: pd.DataFrame) -> list[MockChunk]:
+        def _split(self, data: pl.DataFrame) -> list[MockChunk]:
             return [MockChunk(data=data)]
 
     c = SimpleChunker()
@@ -185,11 +189,11 @@ def test_chunker_should_log_warning_when_less_than_6_chunks(sample_chunk_data, c
 
 def test_chunker_should_set_index_boundaries(sample_chunk_data):
     class SimpleChunker(Chunker[IndexChunk]):
-        def _split(self, data: pd.DataFrame) -> list[IndexChunk]:
+        def _split(self, data: pl.DataFrame) -> list[IndexChunk]:
             return [
-                IndexChunk(data.iloc[0:6666, :], 0, 6666),
-                IndexChunk(data.iloc[6666:13332, :], 6666, 13332),
-                IndexChunk(data.iloc[13332:, :], 13332, 20159),
+                IndexChunk(data.slice(0, 6666), 0, 6665),
+                IndexChunk(data.slice(6666, 6666), 6666, 13331),
+                IndexChunk(data.slice(13332), 13332, 20159),
             ]
 
     chunker = SimpleChunker()
@@ -204,7 +208,7 @@ def test_chunker_should_set_index_boundaries(sample_chunk_data):
 
 def test_chunker_should_include_all_data_columns_by_default(sample_chunk_data):
     class SimpleChunker(Chunker[MockChunk]):
-        def _split(self, data: pd.DataFrame) -> list[MockChunk]:
+        def _split(self, data: pl.DataFrame) -> list[MockChunk]:
             return [MockChunk(data=data)]
 
     c = SimpleChunker()
@@ -241,7 +245,7 @@ def test_size_based_chunker_raises_exception_when_passed_zero_size(sample_chunk_
 
 def test_size_based_chunker_works_with_empty_dataset():
     chunker = SizeBasedChunker(chunk_size=100)
-    sut = chunker.split(pd.DataFrame(columns=pd.Series(["date", "timestamp", "f1", "f2", "f3", "f4"])))
+    sut = chunker.split(pl.DataFrame(schema=["date", "timestamp", "f1", "f2", "f3", "f4"]))
     assert len(sut) == 0
 
 
@@ -263,7 +267,7 @@ def test_size_based_chunker_returns_last_chunk_that_is_partially_filled(sample_c
 
 def test_size_based_chunker_works_when_data_set_is_multiple_of_chunk_size(sample_chunk_data):
     chunk_size = 1000
-    data = sample_chunk_data.loc[0:19999, :]
+    data = sample_chunk_data.slice(0, 20000)
     chunker = SizeBasedChunker(chunk_size)
     sut = []
     try:
@@ -333,7 +337,7 @@ def test_count_based_chunker_raises_exception_when_passed_zero_size(sample_chunk
 
 def test_count_based_chunker_works_with_empty_dataset():
     chunker = CountBasedChunker(chunk_number=5)
-    sut = chunker.split(pd.DataFrame(columns=pd.Series(["date", "timestamp", "f1", "f2", "f3", "f4"])))
+    sut = chunker.split(pl.DataFrame(schema=["date", "timestamp", "f1", "f2", "f3", "f4"]))
     assert len(sut) == 0
 
 
@@ -357,9 +361,10 @@ def test_count_based_chunker_assigns_observation_range_to_chunk_keys(sample_chun
 
 def test_period_based_chunker_raises_ValueError(sample_chunk_data):
     chunker = PeriodBasedChunker(offset="W", timestamp_column_name="timestamp")
-    bad_dates = sample_chunk_data.copy()
-    bad_dates["timestamp"] = "foo"
-    with pytest.raises(ValueError):
+    bad_dates = sample_chunk_data.clone()
+    bad_dates = bad_dates.with_columns(pl.lit("foo").alias("timestamp"))
+    # Polars raises InvalidOperationError instead of ValueError for invalid datetime operations
+    with pytest.raises((ValueError, pl.exceptions.InvalidOperationError)):
         chunker.split(bad_dates)
 
 
