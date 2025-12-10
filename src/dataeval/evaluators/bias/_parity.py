@@ -208,9 +208,14 @@ class Parity:
                 "p_value": p_value_col,
                 "is_correlated": is_correlated_col,
                 "has_insufficient_data": has_insufficient_data_col,
-            }
-        ).with_columns(
-            pl.col("factor_name").cast(pl.Categorical),
+            },
+            schema={
+                "factor_name": pl.Categorical("lexical"),
+                "score": pl.Float64,
+                "p_value": pl.Float64,
+                "is_correlated": pl.Boolean,
+                "has_insufficient_data": pl.Boolean,
+            },
         )
 
         return ParityOutput(factors=factors_df, insufficient_data=insufficient_data)

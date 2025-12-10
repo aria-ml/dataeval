@@ -270,9 +270,12 @@ class Diversity:
                 "factor_name": factor_names,
                 "diversity_value": diversity_index[1:],
                 "is_low_diversity": (diversity_index[1:] <= self.threshold).astype(bool),
-            }
-        ).with_columns(
-            pl.col("factor_name").cast(pl.Categorical),
+            },
+            schema={
+                "factor_name": pl.Categorical("lexical"),
+                "diversity_value": pl.Float64,
+                "is_low_diversity": pl.Boolean,
+            },
         )
 
         # Create classwise DataFrame - build as columnar data
@@ -299,10 +302,13 @@ class Diversity:
                 "factor_name": factor_name_col,
                 "diversity_value": diversity_value_col,
                 "is_low_diversity": is_low_diversity_col,
-            }
-        ).with_columns(
-            pl.col("class_name").cast(pl.Categorical),
-            pl.col("factor_name").cast(pl.Categorical),
+            },
+            schema={
+                "class_name": pl.Categorical("lexical"),
+                "factor_name": pl.Categorical("lexical"),
+                "diversity_value": pl.Float64,
+                "is_low_diversity": pl.Boolean,
+            },
         )
 
         return DiversityOutput(factors=factors_df, classwise=classwise_df)

@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
+import polars as pl
 import pytest
 
 from dataeval.config import use_max_processes
@@ -35,18 +36,20 @@ def trn_data():
 
 @pytest.fixture
 def result_df():
-    result_dict = {
-        ("chunk", "key"): {i: f"[{i % 5 * 20}:{(i % 5 + 1) * 20 - 1}]" for i in range(10)},
-        ("chunk", "chunk_index"): {i: i % 5 for i in range(10)},
-        ("chunk", "start_index"): {i: i % 5 * 20 for i in range(10)},
-        ("chunk", "end_index"): {i: (i % 5 + 1) * 20 - 1 for i in range(10)},
-        ("chunk", "period"): {i: "reference" if i < 5 else "analysis" for i in range(10)},
-        ("domain_classifier_auroc", "value"): {i: 0.5 if i < 5 else 1.0 for i in range(10)},
-        ("domain_classifier_auroc", "upper_threshold"): dict.fromkeys(range(10), 0.65),
-        ("domain_classifier_auroc", "lower_threshold"): dict.fromkeys(range(10), 0.45),
-        ("domain_classifier_auroc", "alert"): {i: i >= 5 for i in range(10)},
-    }
-    return pd.DataFrame(result_dict)
+    # Convert from MultiIndex to flat column names with polars DataFrame
+    return pl.DataFrame(
+        {
+            "chunk_key": [f"[{i % 5 * 20}:{(i % 5 + 1) * 20 - 1}]" for i in range(10)],
+            "chunk_chunk_index": [i % 5 for i in range(10)],
+            "chunk_start_index": [i % 5 * 20 for i in range(10)],
+            "chunk_end_index": [(i % 5 + 1) * 20 - 1 for i in range(10)],
+            "chunk_period": ["reference" if i < 5 else "analysis" for i in range(10)],
+            "domain_classifier_auroc_value": [0.5 if i < 5 else 1.0 for i in range(10)],
+            "domain_classifier_auroc_upper_threshold": [0.65 for _ in range(10)],
+            "domain_classifier_auroc_lower_threshold": [0.45 for _ in range(10)],
+            "domain_classifier_auroc_alert": [i >= 5 for i in range(10)],
+        }
+    )
 
 
 @pytest.mark.required
@@ -107,12 +110,12 @@ class TestMVDC:
             dc.fit(trn_data)
         assert dc._calc.result is not None
         results = dc.predict(tst_data)
-        resdf = results.to_dataframe()
-        tstdf = resdf[resdf["chunk"]["period"] == "analysis"]
-        tst_auc_vals = tstdf["domain_classifier_auroc"]["value"].values  # type: ignore
-        assert np.all(tst_auc_vals > dc.threshold[0])  # type: ignore
-        isdrift = tstdf["domain_classifier_auroc"]["alert"].values  # type: ignore
-        assert np.all(isdrift)  # type: ignore
+        resdf = results.data()
+        tstdf = resdf.filter(pl.col("chunk_period") == "analysis")
+        tst_auc_vals = tstdf["domain_classifier_auroc_value"].to_numpy()
+        assert np.all(tst_auc_vals > dc.threshold[0])
+        isdrift = tstdf["domain_classifier_auroc_alert"].to_numpy()
+        assert np.all(isdrift)
 
 
 @pytest.mark.required
@@ -121,25 +124,16 @@ class TestDriftMVDCOutput:
         output = DriftMVDCOutput(result_df)
         df = output.data()
         assert not output.empty
-        assert len(df) == len(output.to_dataframe())
+        assert len(df) == len(output.data())
         assert len(output) == len(df)
-        np.testing.assert_equal(df.to_numpy(), output.to_dataframe().to_numpy())
+        np.testing.assert_equal(df.to_numpy(), output.data().to_numpy())
 
     def test_output_empty(self):
-        output = DriftMVDCOutput(pd.DataFrame([]))
+        output = DriftMVDCOutput(pl.DataFrame([]))
         df = output.data()
         assert output.empty
-        assert len(df) == len(output.to_dataframe())
+        assert len(df) == len(output.data())
         assert len(output) == len(df)
-
-    def test_output_to_df_multilevel(self, result_df):
-        output = DriftMVDCOutput(result_df)
-        ml_df = output.to_dataframe()
-        sl_df = output.to_dataframe(multilevel=False)
-        for col_name in sl_df:
-            assert isinstance(col_name, str)
-        assert len(ml_df) == len(sl_df)
-        assert len(ml_df.index) == len(sl_df.index)
 
     def test_output_filter(self, result_df):
         output = DriftMVDCOutput(result_df)
@@ -147,7 +141,7 @@ class TestDriftMVDCOutput:
         o_ref = output.filter("reference")
         o_anl = output.filter("analysis")
         assert len(o_all) == len(o_ref) + len(o_anl)
-        assert len(o_all.to_dataframe().keys()) == len(o_ref.to_dataframe().keys()) == len(o_anl.to_dataframe().keys())
+        assert len(o_all.data().columns) == len(o_ref.data().columns) == len(o_anl.data().columns)
 
     def test_output_filter_invalid_metric_raises(self, result_df):
         output = DriftMVDCOutput(result_df)
@@ -171,13 +165,14 @@ class TestDriftMVDCOutput:
 
     @pytest.mark.requires_all
     def test_plot_driftx_not_gt2(self, result_df):
-        modified = result_df.copy().iloc[:2]
+        modified = result_df.head(2)
         output = DriftMVDCOutput(modified)
         fig = output.plot()
         assert fig
 
 
-if __name__ == "__main__":
+@pytest.mark.skip
+def driftmvdc_demo():
     # Demo code (uses more features than the pytest, but has the same result)
 
     # Data defined params
@@ -202,7 +197,14 @@ if __name__ == "__main__":
     results = dc.predict(tstData)
     results.plot().show()  # fig: DomainClassification.png will be to cwd
 
-    # Test domain data frame and classification
-    resdf = results.to_dataframe()
-    tstdf = resdf[resdf["chunk"]["period"] == "analysis"]
-    isdrift = tstdf["domain_classifier_auroc"]["alert"].values  # type: ignore
+    # Test domain data using Polars backend
+    resdf = results.data()  # Returns pl.DataFrame directly
+    tstdf = resdf.filter(pl.col("chunk_period") == "analysis")
+    isdrift = tstdf["domain_classifier_auroc_alert"].to_numpy()
+
+    # Display the Polars DataFrame
+    print("Results DataFrame (Polars):")
+    print(resdf)
+    print("\nAnalysis period data:")
+    print(tstdf)
+    print(f"\nDrift detected: {isdrift}")

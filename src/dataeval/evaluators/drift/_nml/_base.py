@@ -9,14 +9,13 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
 from logging import Logger
 
 import pandas as pd
 from typing_extensions import Self
 
 from dataeval.evaluators.drift._mvdc import DriftMVDCOutput
-from dataeval.evaluators.drift._nml._chunk import Chunk, Chunker, CountBasedChunker
+from dataeval.evaluators.drift._nml._chunk import Chunker, CountBasedChunker
 
 
 def _validate(data: pd.DataFrame, expected_features: int | None = None) -> int:
@@ -25,15 +24,6 @@ def _validate(data: pd.DataFrame, expected_features: int | None = None) -> int:
     if expected_features is not None and data.shape[-1] != expected_features:
         raise ValueError(f"expected '{expected_features}' features in data set:\n\t{data}")
     return data.shape[-1]
-
-
-def _create_multilevel_index(
-    chunks: Sequence[Chunk], result_group_name: str, result_column_names: Sequence[str]
-) -> pd.MultiIndex:
-    chunk_column_names = (*chunks[0].KEYS, "period")
-    chunk_tuples = [("chunk", chunk_column_name) for chunk_column_name in chunk_column_names]
-    result_tuples = [(result_group_name, column_name) for column_name in result_column_names]
-    return pd.MultiIndex.from_tuples(chunk_tuples + result_tuples)
 
 
 class AbstractCalculator(ABC):
