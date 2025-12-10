@@ -63,11 +63,35 @@ pre, pre code, div.highlight pre {
     background-color: #f8f8f8;
 }
 
-/* Dataframe tables - use smaller font for better readability with large tables */
+/* Dataframe tables - use smaller font for better readability with large tables and set theme colors*/
 .dataframe {
+    color: var(--md-typeset-color);
+    background-color: var(--md-default-bg-color);
+    border: none;
+    border-collapse: collapse;
     font-size: 0.75em;
 }
 
-.dataframe th, .dataframe td {
+/* Style headers */
+.dataframe th {
+    background-color: var(--md-default-bg-color--light);
+    color: var(--md-typeset-color);
+    border-bottom: 1px solid var(--md-typeset-table-color);
+    font-weight: bold;
     font-size: 0.75em;
+    padding: 0.6rem;
+}
+
+/* Style cells */
+.dataframe td {
+    background-color: var(--md-default-bg-color);
+    color: var(--md-typeset-color);
+    border-bottom: 1px solid var(--md-default-fg-color--lightest);
+    font-size: 0.75em;
+    padding: 0.6rem;
+}
+
+/* Add hover effect for better readability */
+.dataframe tr:hover td {
+    background-color: var(--md-default-bg-color--lighter);
 }
