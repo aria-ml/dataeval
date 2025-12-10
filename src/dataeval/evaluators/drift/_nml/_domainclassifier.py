@@ -12,6 +12,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import polars as pl
 from lightgbm import LGBMClassifier
 from numpy.typing import NDArray
 from sklearn.metrics import roc_auc_score
@@ -19,7 +20,7 @@ from sklearn.model_selection import StratifiedKFold
 
 from dataeval.config import get_max_processes, get_seed
 from dataeval.evaluators.drift._mvdc_output import DriftMVDCOutput
-from dataeval.evaluators.drift._nml._base import AbstractCalculator, _create_multilevel_index
+from dataeval.evaluators.drift._nml._base import AbstractCalculator
 from dataeval.evaluators.drift._nml._chunk import Chunk, Chunker
 from dataeval.evaluators.drift._nml._thresholds import ConstantThreshold, Threshold
 from dataeval.types import set_metadata
@@ -91,7 +92,7 @@ class DomainClassifierCalculator(AbstractCalculator):
         """Fits the DC calculator to a set of reference data."""
         self._x_ref = reference_data
         result = self._calculate(data=self._x_ref)
-        result._data[("chunk", "period")] = "reference"
+        result._data = result._data.with_columns(pl.lit("reference").alias("chunk_period"))
 
         return result
 
@@ -100,28 +101,24 @@ class DomainClassifierCalculator(AbstractCalculator):
         """Calculate the data DC calculator metric for a given data set."""
         chunks = self.chunker.split(data)
 
-        res = pd.DataFrame.from_records(
-            [
-                {
-                    **chunk.dict(),
-                    "period": "analysis",
-                    "classifier_auroc_value": self._calculate_chunk(chunk=chunk),
-                }
-                for chunk in chunks
-            ]
-        )
+        # Create records with flattened column names (no MultiIndex)
+        records = [
+            {f"chunk_{k}": v for k, v in chunk.dict().items()}
+            | {
+                "chunk_period": "analysis",
+                "domain_classifier_auroc_value": self._calculate_chunk(chunk=chunk),
+            }
+            for chunk in chunks
+        ]
 
-        multilevel_index = _create_multilevel_index(chunks, "domain_classifier_auroc", ["value"])
-        res.columns = multilevel_index
-        res = res.reset_index(drop=True)
-
+        res = pl.DataFrame(records)
         res = self._populate_alert_thresholds(res)
 
         if self.result is None:
             self.result = DriftMVDCOutput(results_data=res)
         else:
             self.result = self.result.filter(period="reference")
-            self.result._data = pd.concat([self.result._data, res], ignore_index=True)
+            self.result._data = pl.concat([self.result._data, res])
         return self.result
 
     def _calculate_chunk(self, chunk: Chunk) -> float:
@@ -160,22 +157,25 @@ class DomainClassifierCalculator(AbstractCalculator):
         result = roc_auc_score(np_all_tgts, np_all_preds)
         return 0.5 if result == np.nan else float(result)
 
-    def _populate_alert_thresholds(self, result_data: pd.DataFrame) -> pd.DataFrame:
+    def _populate_alert_thresholds(self, result_data: pl.DataFrame) -> pl.DataFrame:
         if self.result is None:
             self._threshold_values = self.threshold.calculate(
-                data=result_data.loc[:, ("domain_classifier_auroc", "value")],  # type: ignore | dataframe loc
+                data=result_data["domain_classifier_auroc_value"].to_numpy(),
                 lower_limit=0.0,
                 upper_limit=1.0,
                 logger=self._logger,
             )
 
-        result_data[("domain_classifier_auroc", "upper_threshold")] = self._threshold_values[1]
-        result_data[("domain_classifier_auroc", "lower_threshold")] = self._threshold_values[0]
-        result_data[("domain_classifier_auroc", "alert")] = result_data.apply(
-            lambda row: bool(
-                row["domain_classifier_auroc", "value"] > row["domain_classifier_auroc", "upper_threshold"]
-                or row["domain_classifier_auroc", "value"] < row["domain_classifier_auroc", "lower_threshold"]
-            ),
-            axis=1,
+        result_data = result_data.with_columns(
+            [
+                pl.lit(self._threshold_values[1]).alias("domain_classifier_auroc_upper_threshold"),
+                pl.lit(self._threshold_values[0]).alias("domain_classifier_auroc_lower_threshold"),
+            ]
         )
-        return result_data
+
+        return result_data.with_columns(
+            (
+                (pl.col("domain_classifier_auroc_value") > pl.col("domain_classifier_auroc_upper_threshold"))
+                | (pl.col("domain_classifier_auroc_value") < pl.col("domain_classifier_auroc_lower_threshold"))
+            ).alias("domain_classifier_auroc_alert")
+        )

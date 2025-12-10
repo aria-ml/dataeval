@@ -342,10 +342,13 @@ class Balance:
                 "factor_name": factor_name_col,
                 "mi_value": mi_value_col,
                 "is_imbalanced": is_imbalanced_col,
-            }
-        ).with_columns(
-            pl.col("class_name").cast(pl.Categorical),
-            pl.col("factor_name").cast(pl.Categorical),
+            },
+            schema={
+                "class_name": pl.Categorical("lexical"),
+                "factor_name": pl.Categorical("lexical"),
+                "mi_value": pl.Float64,
+                "is_imbalanced": pl.Boolean,
+            },
         )
 
         # Create factors DataFrame for inter-factor correlations - build as columnar data
@@ -375,10 +378,13 @@ class Balance:
                 "factor2": factor2_col,
                 "mi_value": mi_value_col_factors,
                 "is_correlated": is_correlated_col,
-            }
-        ).with_columns(
-            pl.col("factor1").cast(pl.Categorical),
-            pl.col("factor2").cast(pl.Categorical),
+            },
+            schema={
+                "factor1": pl.Categorical("lexical"),
+                "factor2": pl.Categorical("lexical"),
+                "mi_value": pl.Float64,
+                "is_correlated": pl.Boolean,
+            },
         )
 
         # Create balance DataFrame for global class-to-factor MI
@@ -390,9 +396,11 @@ class Balance:
             {
                 "factor_name": all_factor_names,
                 "mi_value": [float(class_to_factor[i]) for i in range(len(all_factor_names))],
-            }
-        ).with_columns(
-            pl.col("factor_name").cast(pl.Categorical),
+            },
+            schema={
+                "factor_name": pl.Categorical("lexical"),
+                "mi_value": pl.Float64,
+            },
         )
 
         return BalanceOutput(balance=balance_df, factors=factors_df, classwise=classwise_df)
