@@ -2,201 +2,192 @@ from __future__ import annotations
 
 __all__ = []
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Generic, Literal, TypeAlias, TypeVar, overload
+from typing import Any, Literal, TypeVar, overload
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from numpy.typing import NDArray
 
 from dataeval.config import EPSILON
 from dataeval.core._calculate import CalculationResult, calculate
 from dataeval.core._clusterer import ClusterResult, ClusterStats, compute_cluster_stats
-from dataeval.core._label_stats import LabelStatsResult
 from dataeval.core.flags import ImageStats
+from dataeval.data import Metadata
 from dataeval.data._images import Images
 from dataeval.protocols import ArrayLike, Dataset
-from dataeval.types import ArrayND, DictOutput, set_metadata
+from dataeval.types import ArrayND, Output, set_metadata
 from dataeval.utils._array import flatten, to_numpy
 from dataeval.utils._stats import StatsMap, combine_results, get_dataset_step_from_idx
 
-IndexIssueMap: TypeAlias = Mapping[int, Mapping[str, float]]
-TIndexIssueMap = TypeVar("TIndexIssueMap", IndexIssueMap, Sequence[IndexIssueMap])
-
-
-def _reorganize_by_class_and_metric(
-    result: IndexIssueMap, lstats: LabelStatsResult
-) -> tuple[Mapping[str, Sequence[int]], Mapping[str | None, Mapping[str, int]]]:
-    """Flip result from grouping by image to grouping by class and metric"""
-    metrics: dict[str, list[int]] = {}
-
-    # Create class_wise dict using index2label mapping and empty images
-    index2label = lstats["index2label"]
-    class_wise: dict[str | None, dict[str, int]] = {label: {} for label in index2label.values()}
-
-    # Add empty images if they exist
-    if lstats["empty_image_count"] > 0:
-        class_wise[None] = {}
-
-    # Group metrics and calculate class-wise counts
-    for img, group in result.items():
-        for extreme in group:
-            metrics.setdefault(extreme, []).append(img)
-
-            # Check if image is in empty images
-            if img in lstats["empty_image_indices"]:
-                class_wise[None][extreme] = class_wise[None].get(extreme, 0) + 1
-            else:
-                # Check regular class indices
-                for class_idx, images in lstats["image_indices_per_class"].items():
-                    if img in images:
-                        class_name = index2label.get(class_idx, str(class_idx))
-                        class_wise[class_name][extreme] = class_wise[class_name].get(extreme, 0) + 1
-
-    return metrics, class_wise
-
-
-def _create_table(
-    metrics: Mapping[str, Sequence[int]], class_wise: Mapping[str | None, Mapping[str, int]]
-) -> Sequence[str]:
-    """Create table for displaying the results"""
-    max_class_length = max(len(str(label)) for label in class_wise)
-    max_class_length = max(max_class_length, len("Class"), 5)
-
-    # Calculate actual totals to determine proper column width
-    totals = []
-    for class_cat, results in class_wise.items():
-        total = sum(results.get(group, 0) for group in metrics)
-        totals.append(total)
-
-    # Single width calculation for both header and content
-    max_total_width = max(len("Total"), max(len(str(total)) for total in totals), 5)
-
-    # Calculate group column widths (single width for both header and content)
-    group_widths = {}
-    for group in sorted(metrics):
-        # Find max width needed for this group's data
-        max_data_width = max(len(str(results.get(group, 0))) for results in class_wise.values())
-        base_width = max(len(str(group)), max_data_width)
-        group_widths[group] = max(base_width, 5)
-
-    table_header = " | ".join(
-        [f"{'Class':>{max_class_length}}"]
-        + [f"{group:^{group_widths[group]}}" for group in sorted(metrics)]
-        + [f"{'Total':^{max_total_width}}"]
-    )
-
-    table_rows: Sequence[str] = []
-
-    for class_cat, results in class_wise.items():
-        table_value = [f"{class_cat:>{max_class_length}}"]
-        total = 0
-        for group in sorted(metrics):
-            count = results.get(group, 0)
-            table_value.append(f"{count:^{group_widths[group]}}")
-            total += count
-        table_value.append(f"{total:^{max_total_width}}")
-        table_rows.append(" | ".join(table_value))
-
-    return [table_header] + table_rows
-
-
-def _create_pandas_dataframe(
-    class_wise: Mapping[str | None, Mapping[str, int]],
-) -> Sequence[Mapping[str, str | int | None]]:
-    """Create data for pandas dataframe"""
-    data = []
-    for label, metrics_dict in class_wise.items():
-        row: dict[str, str | int | None] = {"Class": label}
-        total = sum(metrics_dict.values())
-        row.update(metrics_dict)  # Add metric counts
-        row["Total"] = total
-        data.append(row)
-    return data
+TDataFrame = TypeVar("TDataFrame", pl.DataFrame, Sequence[pl.DataFrame])
 
 
 @dataclass(frozen=True)
-class OutliersOutput(DictOutput, Generic[TIndexIssueMap]):
+class OutliersOutput(Output[TDataFrame]):
     """
     Output class for :class:`.Outliers` lint detector.
 
     Attributes
     ----------
-    issues : Mapping[int, Mapping[str, float]] | Sequence[Mapping[int, Mapping[str, float]]]
-        Indices of image Outliers with their associated issue type and calculated values.
+    issues : pl.DataFrame | Sequence[pl.DataFrame]
+        DataFrame of outlier issues with columns:
+        - image_id: int - Index of the outlier image
+        - metric_name: str - Name of the metric that flagged this image
+        - metric_value: float - Value of the metric for this image
 
-    - For a single dataset, a dictionary containing the indices of outliers and
-      a dictionary showing the issues and calculated values for the given index.
-    - For multiple stats outputs, a list of dictionaries containing the indices of
-      outliers and their associated issues and calculated values.
+    - For a single dataset, a single DataFrame
+    - For multiple stats outputs, a sequence of DataFrames
     """
 
-    issues: TIndexIssueMap
+    issues: TDataFrame
+
+    def data(self) -> TDataFrame:
+        """Returns the underlying DataFrame(s)."""
+        return self.issues
 
     def __len__(self) -> int:
-        if isinstance(self.issues, Mapping):
-            return len(self.issues)
-        return sum(len(d) for d in self.issues)
+        if isinstance(self.issues, pl.DataFrame):
+            return self.issues["image_id"].n_unique()
+        return sum(df["image_id"].n_unique() for df in self.issues)
 
-    def to_table(self, labelstats: LabelStatsResult) -> str:
+    def aggregate_by_class(self, metadata: Metadata) -> pl.DataFrame:
         """
-        Formats the outlier output results as a table.
+        Returns a Polars DataFrame summarizing outliers per class and metric.
+
+        Creates a pivot table showing the count of outlier images for each combination
+        of class and metric. Includes a Total row showing the total number of
+        outliers per metric across all classes, and a Total column showing the total number
+        of outliers per class across all metrics.
 
         Parameters
         ----------
-        labelstats : LabelStatsResult
-            Output of :func:`dataeval.core.label_stats`
+        metadata : Metadata
+            Metadata object containing class labels and image-to-class mappings for the dataset.
 
         Returns
         -------
-        str
-        """
-        if isinstance(self.issues, Mapping):
-            metrics, classwise = _reorganize_by_class_and_metric(self.issues, labelstats)
-            listed_table = _create_table(metrics, classwise)
-            table = "\n".join(listed_table)
-        else:
-            outertable = []
-            for d in self.issues:
-                metrics, classwise = _reorganize_by_class_and_metric(d, labelstats)
-                listed_table = _create_table(metrics, classwise)
-                str_table = "\n".join(listed_table)
-                outertable.append(str_table)
-            table = "\n\n".join(outertable)
-        return table
+        pl.DataFrame
+            DataFrame with columns:
+            - class_name: cat - Name of the class
+            - <metric_name>: int - Count of outliers for each metric (one column per metric)
+            - Total: int - Total outlier count for the class across all metrics
+            The last row is "Total" showing the sum across all classes for each metric.
+            Rows are sorted by Total in descending order (excluding the Total row).
 
-    def to_dataframe(self, labelstats: LabelStatsResult) -> pd.DataFrame:
-        """
-        Exports the outliers output results to a pandas DataFrame.
+        Raises
+        ------
+        ValueError
+            If the issues contain multiple DataFrames (from multiple datasets).
 
-        Parameters
-        ----------
-        labelstats : LabelStatsResult
-            Output of :func:`dataeval.core.label_stats`
+        Examples
+        --------
+        >>> outliers = Outliers()
+        >>> results = outliers.evaluate(dataset)
+        >>> metadata = Metadata(dataset)
+        >>> summary = results.aggregate_by_class(metadata)
+        >>> summary
+        shape: (4, 10)
+        ┌────────────┬──────────┬───────┬──────────┬───┬──────┬───────┬───────┬───────┐
+        │ class_name ┆ contrast ┆ depth ┆ kurtosis ┆ … ┆ skew ┆ width ┆ zeros ┆ Total │
+        │ ---        ┆ ---      ┆ ---   ┆ ---      ┆   ┆ ---  ┆ ---   ┆ ---   ┆ ---   │
+        │ cat        ┆ u32      ┆ u32   ┆ u32      ┆   ┆ u32  ┆ u32   ┆ u32   ┆ u32   │
+        ╞════════════╪══════════╪═══════╪══════════╪═══╪══════╪═══════╪═══════╪═══════╡
+        │ chicken    ┆ 2        ┆ 1     ┆ 2        ┆ … ┆ 2    ┆ 1     ┆ 1     ┆ 11    │
+        │ cow        ┆ 0        ┆ 0     ┆ 1        ┆ … ┆ 1    ┆ 1     ┆ 0     ┆ 5     │
+        │ pig        ┆ 1        ┆ 1     ┆ 1        ┆ … ┆ 1    ┆ 0     ┆ 1     ┆ 5     │
+        │ Total      ┆ 3        ┆ 2     ┆ 4        ┆ … ┆ 4    ┆ 2     ┆ 2     ┆ 21    │
+        └────────────┴──────────┴───────┴──────────┴───┴──────┴───────┴───────┴───────┘
+        """
+        # Handle the case where self.issues might be a list of DataFrames
+        if not isinstance(self.issues, pl.DataFrame):
+            raise ValueError("Aggregation by class only works with output from a single dataset.")
+
+        # Create mapping: image_index -> class_name
+        mapping_data = {
+            "image_id": metadata.item_indices.tolist(),
+            "class_name": [metadata.index2label[label] for label in metadata.class_labels],
+        }
+        labels_df = pl.DataFrame(mapping_data)
+
+        # Join the Issues with the Labels
+        joined_df = self.issues.join(labels_df, on="image_id", how="left")
+
+        # Create the Summary Pivot (classes as rows, metrics as columns)
+        summary_df = (
+            joined_df.group_by(["class_name", "metric_name"])
+            .len()  # Count occurrences
+            .pivot(on="metric_name", index="class_name", values="len")
+            .fill_null(0)  # Replace NaNs with 0 for cleaner viewing
+        )
+
+        # Get metric columns (all columns except class_name)
+        metric_cols = sorted([col for col in summary_df.columns if col != "class_name"])
+
+        # Add a Total column (sum across all metrics for each class)
+        summary_df = summary_df.with_columns(pl.sum_horizontal(metric_cols).alias("Total"))
+
+        # Sort by Total in descending order
+        summary_df = summary_df.sort(["Total", "class_name"], descending=[True, False])
+
+        # Create a Total row (sum across all classes for each metric)
+        total_row_data = {"class_name": pl.Series(["Total"], dtype=pl.String)}
+        for metric_col in metric_cols:
+            total_row_data[metric_col] = pl.Series([summary_df[metric_col].sum()], dtype=pl.UInt32)
+        total_row_data["Total"] = pl.Series([summary_df["Total"].sum()], dtype=pl.UInt32)
+
+        total_row = pl.DataFrame(total_row_data)
+
+        # Concatenate the summary with the total row
+        column_order = ["class_name"] + metric_cols + ["Total"]
+        return pl.concat([summary_df.select(column_order), total_row], how="vertical").cast(
+            {"class_name": pl.Categorical("lexical")}
+        )
+
+    def aggregate_by_metric(self) -> pl.DataFrame:
+        """
+        Returns a Polars DataFrame summarizing outlier counts per metric.
 
         Returns
         -------
-        pd.DataFrame
+        pl.DataFrame
+            DataFrame with columns:
+            - metric_name: str - Name of the metric
+            - count: int - Number of images flagged by this metric
 
-        Notes
-        -----
-        This method requires `pandas <https://pandas.pydata.org/>`_ to be installed.
+        Examples
+        --------
+        >>> outliers = Outliers()
+        >>> results = outliers.evaluate(dataset)
+        >>> summary = results.aggregate_by_metric()
+        >>> summary
+        shape: (8, 2)
+        ┌─────────────┬───────┐
+        │ metric_name ┆ count │
+        │ ---         ┆ ---   │
+        │ cat         ┆ u32   │
+        ╞═════════════╪═══════╡
+        │ contrast    ┆ 2     │
+        │ kurtosis    ┆ 2     │
+        │ skew        ┆ 2     │
+        │ depth       ┆ 1     │
+        │ sharpness   ┆ 1     │
+        │ size        ┆ 1     │
+        │ width       ┆ 1     │
+        │ zeros       ┆ 1     │
+        └─────────────┴───────┘
         """
-        if isinstance(self.issues, Mapping):
-            _, classwise = _reorganize_by_class_and_metric(self.issues, labelstats)
-            data = _create_pandas_dataframe(classwise)
-            df = pd.DataFrame(data)
-        else:
-            df_list = []
-            for i, d in enumerate(self.issues):
-                _, classwise = _reorganize_by_class_and_metric(d, labelstats)
-                data = _create_pandas_dataframe(classwise)
-                single_df = pd.DataFrame(data)
-                single_df["Dataset"] = i
-                df_list.append(single_df)
-            df = pd.concat(df_list)
-        return df
+        # Handle the case where self.issues might be a list of DataFrames
+        if not isinstance(self.issues, pl.DataFrame):
+            raise ValueError("Aggregation by metric only works with output from a single dataset.")
+
+        # Group by metric_name and count unique images
+        return (
+            self.issues.group_by("metric_name")
+            .agg(pl.col("image_id").n_unique().alias("count"))
+            .sort(["count", "metric_name"], descending=[True, False])
+        )
 
 
 def _get_zscore_mask(values: NDArray[np.float64], threshold: float | None) -> NDArray[np.bool_] | None:
@@ -342,27 +333,44 @@ class Outliers:
         self.outlier_method: Literal["zscore", "modzscore", "iqr"] = outlier_method
         self.outlier_threshold = outlier_threshold
 
-    def _get_outliers(self, stats: StatsMap) -> dict[int, dict[str, float]]:
-        flagged_images: dict[int, dict[str, float]] = {}
+    def _get_outliers(self, stats: StatsMap) -> pl.DataFrame:
+        image_ids: list[int] = []
+        metric_names: list[str] = []
+        metric_values: list[float] = []
+
         for stat, values in stats.items():
             if values.ndim == 1:
                 mask = _get_outlier_mask(values.astype(np.float64), self.outlier_method, self.outlier_threshold)
                 indices = np.flatnonzero(mask)
-                for i, value in zip(indices, values[mask]):
-                    flagged_images.setdefault(int(i), {})[stat] = value
+                outlier_values = values[mask]
 
-        return {k: dict(sorted(v.items())) for k, v in sorted(flagged_images.items())}
+                image_ids.extend(indices.tolist())
+                metric_names.extend([stat] * len(indices))
+                metric_values.extend(outlier_values.tolist())
+
+        if not image_ids:
+            return pl.DataFrame(
+                schema={"image_id": pl.Int64, "metric_name": pl.Categorical("lexical"), "metric_value": pl.Float64}
+            )
+
+        return pl.DataFrame(
+            {
+                "image_id": pl.Series(image_ids, dtype=pl.Int64),
+                "metric_name": pl.Series(metric_names, dtype=pl.Categorical("lexical")),
+                "metric_value": pl.Series(metric_values, dtype=pl.Float64),
+            }
+        ).sort(["image_id", "metric_name"], descending=[False, False])
 
     @overload
-    def from_stats(self, stats: CalculationResult) -> OutliersOutput[IndexIssueMap]: ...
+    def from_stats(self, stats: CalculationResult) -> OutliersOutput[pl.DataFrame]: ...
 
     @overload
-    def from_stats(self, stats: Sequence[CalculationResult]) -> OutliersOutput[list[IndexIssueMap]]: ...
+    def from_stats(self, stats: Sequence[CalculationResult]) -> OutliersOutput[list[pl.DataFrame]]: ...
 
     @set_metadata(state=["outlier_method", "outlier_threshold"])
     def from_stats(
         self, stats: CalculationResult | Sequence[CalculationResult]
-    ) -> OutliersOutput[IndexIssueMap] | OutliersOutput[list[IndexIssueMap]]:
+    ) -> OutliersOutput[pl.DataFrame] | OutliersOutput[list[pl.DataFrame]]:
         """
         Returns indices of Outliers with the issues identified for each.
 
@@ -374,8 +382,10 @@ class Outliers:
         Returns
         -------
         OutliersOutput
-            Output class containing the indices of outliers and a dictionary showing
-            the issues and calculated values for the given index.
+            Output class containing a DataFrame of outlier issues with columns:
+            - image_id: int - Index of the outlier image
+            - metric_name: str - Name of the metric that flagged this image
+            - metric_value: float - Value of the metric for this image
 
         Example
         -------
@@ -386,21 +396,61 @@ class Outliers:
         >>> len(results)
         2
         >>> results.issues[0]
-        {10: {'entropy': 0.2128, 'zeros': 0.05493}, 12: {'entropy': 0.2128, 'std': 0.00536, 'var': 2.87e-05, 'zeros': 0.05493}}
-        >>> results.issues[1]
-        {}
-        """  # noqa: E501
+        shape: (6, 3)
+        ┌──────────┬─────────────┬──────────────┐
+        │ image_id ┆ metric_name ┆ metric_value │
+        │ ---      ┆ ---         ┆ ---          │
+        │ i64      ┆ cat         ┆ f64          │
+        ╞══════════╪═════════════╪══════════════╡
+        │ 10       ┆ entropy     ┆ 0.212769     │
+        │ 10       ┆ zeros       ┆ 0.054932     │
+        │ 12       ┆ entropy     ┆ 0.212769     │
+        │ 12       ┆ std         ┆ 0.00536      │
+        │ 12       ┆ var         ┆ 0.000029     │
+        │ 12       ┆ zeros       ┆ 0.054932     │
+        └──────────┴─────────────┴──────────────┘
+        """
         combined_stats, dataset_steps = combine_results(stats)
-        outliers = self._get_outliers(combined_stats)
+        outliers_df = self._get_outliers(combined_stats)
 
         if not isinstance(stats, Sequence):
-            return OutliersOutput(outliers)
+            return OutliersOutput(outliers_df)
 
         # Split results back to individual datasets
-        output_list: list[dict[int, dict[str, float]]] = [{} for _ in stats]
-        for idx, issue in outliers.items():
-            k, v = get_dataset_step_from_idx(idx, dataset_steps)
-            output_list[k][v] = issue
+        output_list: list[pl.DataFrame] = []
+        for dataset_idx in range(len(stats)):
+            # Filter rows that belong to this dataset
+            dataset_image_ids: list[int] = []
+            dataset_metric_names: list[str] = []
+            dataset_metric_values: list[float] = []
+
+            for row in outliers_df.iter_rows(named=True):
+                k, v = get_dataset_step_from_idx(row["image_id"], dataset_steps)
+                if k == dataset_idx:
+                    dataset_image_ids.append(v)
+                    dataset_metric_names.append(row["metric_name"])
+                    dataset_metric_values.append(row["metric_value"])
+
+            if dataset_image_ids:
+                output_list.append(
+                    pl.DataFrame(
+                        {
+                            "image_id": pl.Series(dataset_image_ids, dtype=pl.Int64),
+                            "metric_name": pl.Series(dataset_metric_names, dtype=pl.Categorical("lexical")),
+                            "metric_value": pl.Series(dataset_metric_values, dtype=pl.Float64),
+                        }
+                    ).sort(["image_id", "metric_name"], descending=[False, False])
+                )
+            else:
+                output_list.append(
+                    pl.DataFrame(
+                        schema={
+                            "image_id": pl.Int64,
+                            "metric_name": pl.Categorical("lexical"),
+                            "metric_value": pl.Float64,
+                        }
+                    )
+                )
 
         return OutliersOutput(output_list)
 
@@ -410,7 +460,7 @@ class Outliers:
         embeddings: ArrayND[float],
         cluster_result: ClusterResult,
         threshold: float | None = None,
-    ) -> OutliersOutput[IndexIssueMap]:
+    ) -> OutliersOutput[pl.DataFrame]:
         """
         Find outliers using cluster-based adaptive distance detection.
 
@@ -481,7 +531,7 @@ class Outliers:
         self,
         cluster_stats: ClusterStats,
         threshold_std: float,
-    ) -> dict[int, dict[str, float]]:
+    ) -> pl.DataFrame:
         """
         Find outliers using pre-calculated cluster statistics.
 
@@ -502,10 +552,11 @@ class Outliers:
 
         Returns
         -------
-        dict[int, dict[str, float]]
-            Dictionary mapping outlier indices to their issue details.
-            Each issue dict contains:
-            - 'cluster_distance': distance in std dev from cluster mean
+        pl.DataFrame
+            DataFrame with outlier details containing columns:
+            - image_id: int - Index of the outlier
+            - metric_name: str - Always "cluster_distance"
+            - metric_value: float - Distance in std dev from cluster mean
         """
         # Get pre-calculated distances and nearest cluster indices
         min_distances = cluster_stats["distances"]
@@ -522,9 +573,16 @@ class Outliers:
         # Points are outliers if their distance exceeds the threshold of their nearest cluster
         is_outlier = min_distances > nearest_thresholds
 
-        # Build the result dictionary with issue details
+        # Build the result DataFrame with issue details
         outlier_indices = np.nonzero(is_outlier)[0]
-        flagged_images: dict[int, dict[str, float]] = {}
+
+        if len(outlier_indices) == 0:
+            return pl.DataFrame(
+                schema={"image_id": pl.Int64, "metric_name": pl.Categorical("lexical"), "metric_value": pl.Float64}
+            )
+
+        image_ids: list[int] = []
+        metric_values: list[float] = []
 
         for idx in outlier_indices:
             cluster_idx = nearest_cluster_idx[idx]
@@ -535,14 +593,19 @@ class Outliers:
             # Calculate number of standard deviations from mean
             std_devs = (distance - mean) / std if std > EPSILON else 0.0
 
-            flagged_images[int(idx)] = {
-                "cluster_distance": std_devs,
-            }
+            image_ids.append(int(idx))
+            metric_values.append(std_devs)
 
-        return flagged_images
+        return pl.DataFrame(
+            {
+                "image_id": pl.Series(image_ids, dtype=pl.Int64),
+                "metric_name": pl.Series(["cluster_distance"] * len(image_ids), dtype=pl.Categorical("lexical")),
+                "metric_value": pl.Series(metric_values, dtype=pl.Float64),
+            }
+        ).sort(["image_id", "metric_name"], descending=[False, False])
 
     @set_metadata(state=["use_dimension", "use_pixel", "use_visual", "outlier_method", "outlier_threshold"])
-    def evaluate(self, data: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]]) -> OutliersOutput[IndexIssueMap]:
+    def evaluate(self, data: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]]) -> OutliersOutput[pl.DataFrame]:
         """
         Returns indices of Outliers with the issues identified for each.
 
@@ -569,10 +632,23 @@ class Outliers:
 
         >>> outliers = Outliers(outlier_method="zscore", outlier_threshold=3.5)
         >>> results = outliers.evaluate(outlier_images)
-        >>> list(results.issues)
-        [10, 12]
-        >>> results.issues[10]
-        {'contrast': 1.25, 'entropy': 0.2128, 'zeros': 0.05493}
+        >>> results.issues
+        shape: (9, 3)
+        ┌──────────┬─────────────┬──────────────┐
+        │ image_id ┆ metric_name ┆ metric_value │
+        │ ---      ┆ ---         ┆ ---          │
+        │ i64      ┆ cat         ┆ f64          │
+        ╞══════════╪═════════════╪══════════════╡
+        │ 10       ┆ contrast    ┆ 1.25         │
+        │ 10       ┆ entropy     ┆ 0.212769     │
+        │ 10       ┆ zeros       ┆ 0.054932     │
+        │ 12       ┆ contrast    ┆ 1.25         │
+        │ 12       ┆ entropy     ┆ 0.212769     │
+        │ 12       ┆ sharpness   ┆ 1.509766     │
+        │ 12       ┆ std         ┆ 0.00536      │
+        │ 12       ┆ var         ┆ 0.000029     │
+        │ 12       ┆ zeros       ┆ 0.054932     │
+        └──────────┴─────────────┴──────────────┘
 
         Access computed statistics for reuse:
 

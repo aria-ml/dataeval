@@ -34,9 +34,9 @@ class Chunk(ABC):
         self.key: str
         self.data = data
 
+        self.index: int = -1
         self.start_index: int = -1
         self.end_index: int = -1
-        self.chunk_index: int = -1
 
     def __repr__(self) -> str:
         attr_str = ", ".join([f"{k}={v}" for k, v in self.dict().items()])
@@ -68,7 +68,7 @@ class IndexChunk(Chunk):
         The end point in time for this chunk.
     """
 
-    KEYS = ("key", "chunk_index", "start_index", "end_index")
+    KEYS = ("key", "index", "start_index", "end_index")
 
     def __init__(
         self,
@@ -92,7 +92,7 @@ class IndexChunk(Chunk):
         return result
 
     def dict(self) -> dict[str, Any]:
-        return dict(zip(self.KEYS, (self.key, self.chunk_index, self.start_index, self.end_index)))
+        return dict(zip(self.KEYS, (self.key, self.index, self.start_index, self.end_index)))
 
 
 class PeriodChunk(Chunk):
@@ -110,7 +110,7 @@ class PeriodChunk(Chunk):
         The size of the chunk.
     """
 
-    KEYS = ("key", "chunk_index", "start_date", "end_date", "chunk_size")
+    KEYS = ("key", "index", "start_date", "end_date", "chunk_size")
 
     def __init__(self, data: pd.DataFrame, period: Period, chunk_size: int) -> None:
         super().__init__(data)
@@ -132,9 +132,7 @@ class PeriodChunk(Chunk):
         return result
 
     def dict(self) -> dict[str, Any]:
-        return dict(
-            zip(self.KEYS, (self.key, self.chunk_index, self.start_datetime, self.end_datetime, self.chunk_size))
-        )
+        return dict(zip(self.KEYS, (self.key, self.index, self.start_datetime, self.end_datetime, self.chunk_size)))
 
 
 TChunk = TypeVar("TChunk", bound=Chunk)
@@ -176,10 +174,10 @@ class Chunker(Generic[TChunk]):
             return []
 
         chunks = self._split(data)
-        for chunk_index, chunk in enumerate(chunks):
+        for index, chunk in enumerate(chunks):
+            chunk.index = index
             chunk.start_index = cast(int, chunk.data.index.min())
             chunk.end_index = cast(int, chunk.data.index.max())
-            chunk.chunk_index = chunk_index
 
         if len(chunks) < 6:
             # TODO wording

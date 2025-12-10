@@ -46,3 +46,28 @@
         padding-left: 0.5rem;
     }
 }
+
+/* Import Fira Code font from Google Fonts as backup */
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap');
+
+/* Change font for inline code in docstrings - optimized for box-drawing characters */
+code, .docutils.literal {
+    font-family: "Consolas", "Menlo", "Monaco", "Fira Code", "Courier New", monospace;
+    font-size: 0.9em;
+}
+
+/* Change font for code blocks in docstrings - optimized for box-drawing characters */
+pre, pre code, div.highlight pre {
+    font-family: "Consolas", "Menlo", "Monaco", "Fira Code", "Courier New", monospace;
+    font-size: 0.9em;
+    background-color: #f8f8f8;
+}
+
+/* Dataframe tables - use smaller font for better readability with large tables */
+.dataframe {
+    font-size: 0.75em;
+}
+
+.dataframe th, .dataframe td {
+    font-size: 0.75em;
+}
