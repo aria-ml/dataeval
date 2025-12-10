@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 import numpy as np
+import polars as pl
 import pytest
 
 from dataeval.config import use_max_processes
@@ -66,7 +67,8 @@ class TestOutliers:
             )
         outliers = Outliers()
         results = outliers.from_stats(stats)
-        assert all(vv != np.nan for k, v in results.issues.items() for vv in v.values())
+        # Check that all metric values are not NaN
+        assert all(val != np.nan for val in results.issues["metric_value"].to_list())
 
     def test_outliers_with_multiple_stats(self):
         dataset1 = np.zeros((50, 3, 16, 16))
@@ -132,8 +134,8 @@ class TestOutliers:
         detector = Outliers()
         result = detector.from_clusters(embeddings, mock_cluster_result, threshold=2.0)
 
-        # Should be a dict of indices
-        assert isinstance(result.issues, dict)
+        # Should be a DataFrame
+        assert isinstance(result.issues, pl.DataFrame)
         # Should not raise an error
         assert len(result.issues) >= 0
 
@@ -197,14 +199,33 @@ class TestOutliers:
         result = detector.from_clusters(embeddings, mock_cluster_result, threshold=3.0)
 
         # With permissive threshold and tight cluster, should find few or no outliers
-        assert isinstance(result.issues, dict)
+        assert isinstance(result.issues, pl.DataFrame)
         assert len(result.issues) == 0
 
 
 @pytest.mark.required
 class TestOutliersOutput:
-    outlier = {1: {"a": 1.0, "b": 1.0}, 3: {"a": 1.0, "b": 1.0}, 5: {"a": 1.0, "b": 1.0}}
-    outlier2 = {2: {"a": 2.0, "d": 2.0}, 6: {"a": 1.0, "d": 1.0}, 7: {"a": 0.5, "c": 0.5}}
+    # Convert dict format to DataFrame format
+    outlier = pl.DataFrame(
+        [
+            {"image_id": 1, "metric_name": "a", "metric_value": 1.0},
+            {"image_id": 1, "metric_name": "b", "metric_value": 1.0},
+            {"image_id": 3, "metric_name": "a", "metric_value": 1.0},
+            {"image_id": 3, "metric_name": "b", "metric_value": 1.0},
+            {"image_id": 5, "metric_name": "a", "metric_value": 1.0},
+            {"image_id": 5, "metric_name": "b", "metric_value": 1.0},
+        ]
+    )
+    outlier2 = pl.DataFrame(
+        [
+            {"image_id": 2, "metric_name": "a", "metric_value": 2.0},
+            {"image_id": 2, "metric_name": "d", "metric_value": 2.0},
+            {"image_id": 6, "metric_name": "a", "metric_value": 1.0},
+            {"image_id": 6, "metric_name": "d", "metric_value": 1.0},
+            {"image_id": 7, "metric_name": "a", "metric_value": 0.5},
+            {"image_id": 7, "metric_name": "c", "metric_value": 0.5},
+        ]
+    )
     lstat: LabelStatsResult = {
         "label_counts_per_class": {0: 3, 1: 4, 2: 3},
         "label_counts_per_image": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -226,29 +247,3 @@ class TestOutliersOutput:
     def test_list_len(self):
         output = OutliersOutput([self.outlier, self.outlier2])
         assert len(output) == 6
-
-    def test_to_table(self):
-        output = OutliersOutput(self.outlier)
-        assert len(output) == 3
-        table_result = output.to_table(self.lstat)
-        assert isinstance(table_result, str)
-        assert table_result.splitlines()[0] == "Class |   a   |   b   | Total"
-
-    def test_to_table_list(self):
-        output = OutliersOutput([self.outlier2, self.outlier])
-        assert len(output) == 6
-        table_result = output.to_table(self.lstat)
-        assert isinstance(table_result, str)
-        assert table_result.splitlines()[0] == "Class |   a   |   c   |   d   | Total"
-
-    def test_to_dataframe_list(self):
-        output = OutliersOutput([self.outlier2, self.outlier])
-        assert len(output) == 6
-        output_df = output.to_dataframe(self.lstat)
-        assert output_df.shape == (6, 7)
-
-    def test_to_dataframe_dict(self):
-        output = OutliersOutput(self.outlier)
-        assert len(output) == 3
-        output_df = output.to_dataframe(self.lstat)
-        assert output_df.shape == (3, 4)

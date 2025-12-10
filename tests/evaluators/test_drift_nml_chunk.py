@@ -374,7 +374,7 @@ def test_period_based_chunker_raises_ValueError(sample_chunk_data):
 class TestChunkOperations:
     def test_size_based_chunker_sets_chunk_index(self, sample_chunk_data, chunker):
         sut = chunker.split(sample_chunk_data)
-        assert all(chunk.chunk_index == chunk_index for chunk_index, chunk in enumerate(sut))
+        assert all(chunk.index == index for index, chunk in enumerate(sut))
 
     def test_chunk_compare(self, sample_chunk_data, chunker):
         sut = chunker.split(sample_chunk_data)
