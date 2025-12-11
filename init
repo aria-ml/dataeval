@@ -8,18 +8,44 @@ if ! $(which uv 1> /dev/null); then echo "Install uv to continue: https://docs.a
 
 allowed=(3.10 3.11 3.12 3.13)
 default=(3.11)
+cuda_allowed=(cpu cu118 cu124 cu128)
+cuda_default=(cpu)
 
-# Use arguments or prompt for python versions
-if [[ $@ ]]; then
-    input=$@
-else
-    read -p "Enter space delimited desired versions of python [supported: ${allowed[*]}] [default: ${default[*]}]: " input
+# Parse command line arguments
+python_input=""
+device_input=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -p|--python)
+            python_input="$2"
+            shift 2
+            ;;
+        -d|--device)
+            device_input="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: $0 [-p|--python <versions>] [-d|--device <cuda_version>]"
+            echo "  -p, --python   Space-delimited Python versions (e.g., '3.11 3.12')"
+            echo "  -d, --device   CUDA device version (cpu, cu118, cu124, cu128)"
+            echo ""
+            echo "If options are not provided, the script will prompt for them interactively."
+            exit 1
+            ;;
+    esac
+done
+
+# Prompt for python versions if not provided
+if [[ -z "$python_input" ]]; then
+    read -p "Enter space delimited desired versions of python [supported: ${allowed[*]}] [default: ${default[*]}]: " python_input
 fi
 
 # Parse python version inputs
 versions=()
-if [[ $input ]]; then
-    for token in ${input}; do
+if [[ $python_input ]]; then
+    for token in ${python_input}; do
         token=$(echo $token | cut -d '.' -f 1,2)
         if [[ ! " ${allowed[*]} " =~ [[:space:]]${token}[[:space:]] ]]; then
             echo "Unrecognized input $token - skipping..."
@@ -34,19 +60,61 @@ if [ ${#versions[@]} == 0 ]; then
     versions=(${default[@]})
 fi
 
+# Prompt for CUDA version if not provided
+if [[ -z "$device_input" ]]; then
+    read -p "Enter desired CUDA version [supported: ${cuda_allowed[*]}] [default: ${cuda_default[*]}]: " device_input
+fi
+
+# Parse CUDA version input
+cuda_version=""
+if [[ $device_input ]]; then
+    if [[ " ${cuda_allowed[*]} " =~ [[:space:]]${device_input}[[:space:]] ]]; then
+        cuda_version=$device_input
+    else
+        echo "Unrecognized CUDA version '$device_input', defaulting to ${cuda_default[*]}"
+        cuda_version=${cuda_default[0]}
+    fi
+else
+    cuda_version=${cuda_default[0]}
+fi
+
+echo "Installing with CUDA version: $cuda_version"
+
+# Determine venv naming strategy
+if [ ${#versions[@]} == 1 ]; then
+    venv_suffix=""
+else
+    venv_suffix="-\$0"
+fi
+
 # Install dataeval environment for each version of python
+echo -n ${versions[*]} | xargs -n1 bash -c "\
+    if [ ${#versions[@]} == 1 ]; then
+        export UV_PROJECT_ENVIRONMENT=.venv
+        echo \"Creating python virtual environment for \$0...\"
+        rm -rf \$UV_PROJECT_ENVIRONMENT
+        uv sync -p \$0 --extra all --extra $cuda_version
+    else
+        export UV_PROJECT_ENVIRONMENT=.venv-\$0
+        echo \"Creating python virtual environment for \$0...\"
+        rm -rf \$UV_PROJECT_ENVIRONMENT
+        uv sync -p \$0 --extra all --extra $cuda_version
+    fi"
 echo -n ${versions[*]} | xargs -n1 bash -c '\
-    export UV_PROJECT_ENVIRONMENT=.venv-$0 && \
-    echo "Creating python virtual environment for $0..." && \
-    rm -rf $UV_PROJECT_ENVIRONMENT && \
-    uv sync -p $0 --extra all'
-echo -n ${versions[*]} | xargs -n1 bash -c '\
-    echo "Finished installing dataeval for python $0 to .venv-$0"'
+    if [ '"${#versions[@]}"' == 1 ]; then
+        echo "Finished installing dataeval for python $0 to .venv"
+    else
+        echo "Finished installing dataeval for python $0 to .venv-$0"
+    fi'
 echo
 
 echo
 if [[ -v $REMOTE_CONTAINERS ]]; then
-    echo -e '\033[1;37mActivate your desired virtual environment (e.g. \033[1;32msource .venv-'${versions[-1]}'/bin/activate\033[1;37m) before proceeding.'
+    if [ ${#versions[@]} == 1 ]; then
+        echo -e '\033[1;37mActivate your desired virtual environment (e.g. \033[1;32msource .venv/bin/activate\033[1;37m) before proceeding.'
+    else
+        echo -e '\033[1;37mActivate your desired virtual environment (e.g. \033[1;32msource .venv-'${versions[-1]}'/bin/activate\033[1;37m) before proceeding.'
+    fi
 else
     echo -e '\033[1;37mIt is now safe to reload the window (\033[1;32mDeveloper: Reload Window\033[1;37m) and select a Python interpreter (\033[1;32mPython: Select Interpreter\033[1;37m) from the Command Palette.'
 fi

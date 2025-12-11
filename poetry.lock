@@ -1729,11 +1729,12 @@ files = [
 all = ["matplotlib", "tqdm"]
 cpu = ["torch", "torchvision"]
 cu118 = ["torch", "torchvision"]
-cu126 = ["torch", "torchvision"]
+cu124 = ["torch", "torchvision"]
+cu128 = ["torch", "torchvision"]
 matplotlib = ["matplotlib"]
 tqdm = ["tqdm"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.14"
-content-hash = "d803c972f5e4641f3605d9f4ea0fb2f40de878735492d5a195fb50a35dc4edb6"
+content-hash = "293214d96dc628b9e1b59b15b411e66ebb245542cf48d16a36f599d8e38c3678"
