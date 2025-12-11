@@ -104,6 +104,7 @@ class Metadata:
 
         self._exclude = set(exclude or ())
         self._include = set(include or ())
+        self._target_factors_only = False
 
     @property
     def raw(self) -> Sequence[Mapping[str, Any]]:
@@ -242,6 +243,37 @@ class Metadata:
             self._reset_bins()
 
     @property
+    def target_factors_only(self) -> bool:
+        """Whether only target-level factors are included from the factors list.
+
+        Returns
+        -------
+        bool
+            True if image-level factors are excluded, False if included (default).
+        """
+        return self._target_factors_only
+
+    @target_factors_only.setter
+    def target_factors_only(self, value: bool) -> None:
+        """Set whether to only include target-level factors.
+
+        Rebuilds the factor list when the value changes to ensure proper
+        inclusion or exclusion of image-level factors.
+
+        Parameters
+        ----------
+        value : bool
+            True to exclude image-level factors, False to include them.
+        """
+        if self._target_factors_only != value:
+            self._target_factors_only = value
+            # Reset bins before building factors so _build_factors can properly clean up
+            if self._is_binned:
+                self._reset_bins()
+            self._build_factors()
+            self._is_binned = False
+
+    @property
     def dataframe(self) -> pl.DataFrame:
         """Processed DataFrame containing both image-level and target-level rows.
 
@@ -334,19 +366,15 @@ class Metadata:
         -------
         Sequence[str]
             List of factor names that passed filtering and preprocessing steps.
-            Order matches columns in factor_data, and binned_data.
+            Order matches columns in factor_data and binned_data.
 
         Notes
         -----
         This property triggers dataset structure analysis on first access.
         Factor names respect include/exclude filtering settings.
-        Only includes factors that survived preprocessing (excludes multi-dimensional factors).
         """
         self._structure()
-        # After binning, exclude factors with None FactorInfo (e.g., multi-dimensional)
-        if self._is_binned:
-            return [k for k, v in self._factors.items() if v is not None and self._filter(k)]
-        return list(filter(self._filter, self._factors))
+        return sorted(filter(self._filter, self._factors))
 
     @property
     def factor_info(self) -> Mapping[str, FactorInfo]:
@@ -364,7 +392,8 @@ class Metadata:
         Only includes factors that survived preprocessing and filtering.
         """
         self._bin()
-        return dict(filter(self._filter, ((k, v) for k, v in self._factors.items() if v is not None)))
+        filtered = dict(filter(self._filter, ((k, v) for k, v in self._factors.items() if v is not None)))
+        return {k: filtered[k] for k in sorted(filtered)}
 
     @property
     def factor_data(self) -> NDArray[Any]:
@@ -608,9 +637,20 @@ class Metadata:
     def _reset_bins(self, cols: Iterable[str] | None = None) -> None:
         if self._is_binned:
             columns = self._dataframe.columns
-            for col in (col for col in cols or columns if _binned(col) in columns):
-                self._dataframe.drop_in_place(_binned(col))
-                self._factors[col] = None
+            for col in cols or columns:
+                # Track if we removed any processed columns for this factor
+                removed = False
+                # Remove binned columns
+                if _binned(col) in columns:
+                    self._dataframe.drop_in_place(_binned(col))
+                    removed = True
+                # Remove digitized columns
+                if _digitized(col) in columns:
+                    self._dataframe.drop_in_place(_digitized(col))
+                    removed = True
+                # Reset factor info only if we actually removed a processed column
+                if removed and hasattr(self, "_factors") and col in self._factors:
+                    self._factors[col] = None
             self._is_binned = False
 
     def _compute_target_indices(self, srcidx: NDArray[np.intp], datum_count: int, is_od: bool) -> NDArray[np.intp]:
@@ -887,6 +927,24 @@ class Metadata:
         image_rows = self._build_image_rows(datum_count, image_factor_dict)
         return self._combine_rows(image_rows, target_rows)
 
+    def _build_factors(self) -> None:
+        """Build the _factors dict from stored factor names."""
+        if not self._is_structured:
+            self._factors = {}
+            return
+
+        factors = (
+            self._target_factors - self._image_factors
+            if self._has_targets and self._target_factors_only
+            else self._target_factors.union(self._image_factors)
+        )
+
+        usable_factors = {
+            k for k in factors if not isinstance(self._dataframe.schema.get(k), pl.List | pl.Struct | pl.Array)
+        }
+
+        self._factors = dict.fromkeys(usable_factors, None)
+
     def _structure(
         self,
         *,
@@ -924,6 +982,8 @@ class Metadata:
                 srcidx, target_idx, labels, scores, bboxes, target_factor_dict, image_factor_dict, datum_count
             )
             self._dropped_factors = dropped_factors
+            self._target_factors = set(target_factor_dict)
+            self._image_factors = set(image_factor_dict)
         else:
             # For IC datasets, only need target-level rows (which are same as image-level)
             merged_image_level = merge(raw, return_dropped=True, ignore_lists=False, targets_per_image=None)
@@ -937,23 +997,19 @@ class Metadata:
             )
             combined_rows = target_rows
             self._dropped_factors = merged_image_level[1]
+            self._image_factors = set(image_factor_dict)
+            self._target_factors = set()
 
         self._raw = raw
         self._index2label = index2label
         self._class_labels = labels
         self._item_indices = srcidx
 
-        # For OD datasets, use target_factor_dict for _factors; for IC, use image_factor_dict
-        if self._has_targets:
-            self._image_level_factors = set(image_factor_dict.keys())
-            target_level_factors = {k: v for k, v in target_factor_dict.items() if k not in self._image_level_factors}
-            self._factors = dict.fromkeys(target_level_factors, None)
-        else:
-            self._image_level_factors = set()
-            self._factors = dict.fromkeys(image_factor_dict, None)
-
         self._dataframe = pl.DataFrame(combined_rows)
         self._is_structured = True
+
+        # Build _factors dict from stored factor dictionaries
+        self._build_factors()
 
     def _add_column_with_padding(self, df: pl.DataFrame, col_name: str, values: NDArray, is_od: bool) -> pl.DataFrame:
         """Add a column to dataframe with None padding for OD image rows."""
@@ -997,19 +1053,8 @@ class Metadata:
 
     def _process_factor(
         self, df: pl.DataFrame, col: str, data: NDArray, factor_bins: Mapping[str, int | Sequence[float]], is_od: bool
-    ) -> tuple[pl.DataFrame, FactorInfo | None]:
+    ) -> tuple[pl.DataFrame, FactorInfo]:
         """Process a single factor based on its type."""
-        # Skip multi-dimensional factors (e.g., embeddings, feature vectors)
-        # Check both ndim > 1 and object dtype containing arrays
-        if data.ndim != 1:
-            _logger.info(f"Skipping factor '{col}' with shape {data.shape} - only 1D factors can be binned")
-            return df, None
-        if data.dtype == object and len(data) > 0 and isinstance(data[0], np.ndarray):
-            _logger.info(
-                f"Skipping factor '{col}' with shape ({len(data)}, {data[0].shape}) - only 1D factors can be binned"
-            )
-            return df, None
-
         if col in factor_bins:
             return self._process_binned_factor(df, col, data, factor_bins[col], is_od)
 
@@ -1029,7 +1074,7 @@ class Metadata:
         if self._is_binned:
             return
 
-        factor_info: dict[str, FactorInfo | None] = {}
+        factor_info: dict[str, FactorInfo] = {}
         df = self.dataframe.clone()
         factor_bins = self.continuous_factor_bins
 

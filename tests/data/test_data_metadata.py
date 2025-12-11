@@ -351,9 +351,14 @@ class TestMetadata:
 
         md._dataframe = pl.from_dict(md_dict)
         md._factors = dict.fromkeys(md_dict, None)
+        md._target_factors = set(md_dict)
+        md._image_factors = set()
         md._is_structured = True
         md._item_indices = np.arange(50)
         md._class_labels = RNG.integers(0, 3, size=50)
+
+        # Trigger factor filtering
+        md._build_factors()
 
         # Trigger binning
         md._bin()
@@ -378,6 +383,59 @@ class TestMetadata:
         assert "embedding_2d" in md.dataframe.columns
 
         # Verify that _factors has None for the 2D factor
-        assert md._factors["embedding_2d"] is None
         assert md._factors["factor_1d"] is not None
         assert md._factors["another_1d"] is not None
+
+    def test_target_factors_only_toggle(self, get_mock_od_dataset, RNG: np.random.Generator):
+        """Test that toggling target_factors_only properly resets binned data dimensions."""
+        # Create an OD dataset with both image-level and target-level factors
+        images = [np.random.random((3, 64, 64)) for _ in range(10)]
+        labels = [[0, 1] for _ in range(10)]  # 2 targets per image
+        bboxes = [[[0, 0, 10, 10], [20, 20, 30, 30]] for _ in range(10)]
+
+        # Create metadata with both image-level and target-level factors
+        metadata = []
+        for i in range(10):
+            metadata.append({
+                "image_factor": f"img_{i}",
+                "shared_factor": i,
+                "target_factor": [f"tgt_{i}_0", f"tgt_{i}_1"],  # 2 target-level values
+            })
+
+        ds = get_mock_od_dataset(images, labels, bboxes, metadata=metadata)
+        md = Metadata(ds)
+
+        # Initially, should have both image-level and target-level factors
+        initial_factor_names = set(md.factor_names)
+        initial_binned_shape = md.binned_data.shape
+
+        # Should have at least 2 factors (image_factor and target_factor)
+        assert "image_factor" in initial_factor_names
+        assert "target_factor" in initial_factor_names
+        assert initial_binned_shape[0] == 20  # 10 images * 2 targets each
+        assert initial_binned_shape[1] >= 2  # At least 2 factors
+
+        # Set target_factors_only to True - should only have target-level factors
+        md.target_factors_only = True
+        target_only_factor_names = set(md.factor_names)
+        target_only_binned_shape = md.binned_data.shape
+
+        # Should only have target_factor now
+        assert "image_factor" not in target_only_factor_names
+        assert "target_factor" in target_only_factor_names
+        assert target_only_binned_shape[0] == 20  # Still 20 targets
+        assert target_only_binned_shape[1] < initial_binned_shape[1]  # Fewer factors
+
+        # Set target_factors_only back to False - should have both factors again
+        md.target_factors_only = False
+        final_factor_names = set(md.factor_names)
+        final_binned_shape = md.binned_data.shape
+
+        # Should have both factors again
+        assert "image_factor" in final_factor_names
+        assert "target_factor" in final_factor_names
+        assert final_binned_shape[0] == 20  # Still 20 targets
+        assert final_binned_shape[1] == initial_binned_shape[1]  # Same number of factors as initially
+
+        # Verify the dimensions match factor_names count
+        assert final_binned_shape[1] == len(final_factor_names)
