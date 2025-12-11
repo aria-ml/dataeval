@@ -1175,6 +1175,11 @@ class Metadata:
         if new_columns:
             self._dataframe = self.dataframe.with_columns(new_columns)
             self._is_binned = False
+            if level == "image":
+                self._image_factors.update(factors)
+            elif level == "target":
+                self._target_factors.update(factors)
+            self._build_factors()
 
     def filter_by_factor(self, condition: Callable[[str, FactorInfo], bool]) -> NDArray[np.float64]:
         """Filters metadata factors by factor name or FactorInfo.

@@ -396,11 +396,13 @@ class TestMetadata:
         # Create metadata with both image-level and target-level factors
         metadata = []
         for i in range(10):
-            metadata.append({
-                "image_factor": f"img_{i}",
-                "shared_factor": i,
-                "target_factor": [f"tgt_{i}_0", f"tgt_{i}_1"],  # 2 target-level values
-            })
+            metadata.append(
+                {
+                    "image_factor": f"img_{i}",
+                    "shared_factor": i,
+                    "target_factor": [f"tgt_{i}_0", f"tgt_{i}_1"],  # 2 target-level values
+                }
+            )
 
         ds = get_mock_od_dataset(images, labels, bboxes, metadata=metadata)
         md = Metadata(ds)
