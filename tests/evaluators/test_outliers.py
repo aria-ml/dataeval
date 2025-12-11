@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import polars as pl
@@ -9,7 +9,17 @@ from dataeval.core import calculate
 from dataeval.core._clusterer import ClusterResult
 from dataeval.core._label_stats import LabelStatsResult
 from dataeval.core.flags import ImageStats
+from dataeval.data import Metadata
 from dataeval.evaluators.linters.outliers import Outliers, OutliersOutput, _get_outlier_mask
+
+
+def make_mock_metadata(lstat: LabelStatsResult) -> MagicMock:
+    """Create a MagicMock with spec=Metadata for testing aggregate_by_class."""
+    mock = MagicMock(spec=Metadata)
+    mock.item_indices = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    mock.class_labels = np.array([0, 1, 2, 0, 1, 2, 1, 0, 2, 1])
+    mock.index2label = lstat["index2label"]
+    return mock
 
 
 @pytest.mark.required
@@ -247,3 +257,188 @@ class TestOutliersOutput:
     def test_list_len(self):
         output = OutliersOutput([self.outlier, self.outlier2])
         assert len(output) == 6
+
+    def test_aggregate_by_metric(self):
+        """Test aggregate_by_metric returns correct counts"""
+        output = OutliersOutput(self.outlier)
+        result = output.aggregate_by_metric()
+
+        # Should have 2 metrics (a and b)
+        assert result.shape[0] == 2
+        assert set(result["metric_name"].to_list()) == {"a", "b"}
+
+        # Both metrics should have 3 images
+        assert all(count == 3 for count in result["count"].to_list())
+
+        # Should be sorted by count (descending) then metric_name
+        assert result["metric_name"].to_list() == ["a", "b"]
+
+    def test_aggregate_by_metric_different_counts(self):
+        """Test aggregate_by_metric with varying counts per metric"""
+        df = pl.DataFrame(
+            [
+                {"image_id": 1, "metric_name": "contrast", "metric_value": 1.0},
+                {"image_id": 2, "metric_name": "contrast", "metric_value": 1.0},
+                {"image_id": 3, "metric_name": "depth", "metric_value": 1.0},
+                {"image_id": 4, "metric_name": "skew", "metric_value": 1.0},
+                {"image_id": 5, "metric_name": "skew", "metric_value": 1.0},
+                {"image_id": 6, "metric_name": "skew", "metric_value": 1.0},
+            ]
+        )
+        output = OutliersOutput(df)
+        result = output.aggregate_by_metric()
+
+        # Should have 3 metrics
+        assert result.shape[0] == 3
+
+        # Check sorted order: skew (3), contrast (2), depth (1)
+        assert result["metric_name"].to_list() == ["skew", "contrast", "depth"]
+        assert result["count"].to_list() == [3, 2, 1]
+
+    def test_aggregate_by_metric_raises_on_list(self):
+        """Test aggregate_by_metric raises error for multiple datasets"""
+        output = OutliersOutput([self.outlier, self.outlier2])
+        with pytest.raises(ValueError, match="only works with output from a single dataset"):
+            output.aggregate_by_metric()
+
+    def test_aggregate_by_class(self):
+        """Test aggregate_by_class returns correct pivot table"""
+        metadata = make_mock_metadata(self.lstat)
+
+        # Create outliers DataFrame matching the test data
+        # image_id: 0,3,7=horse(0), 1,4,6,9=dog(1), 2,5,8=mule(2)
+        df = pl.DataFrame(
+            [
+                {"image_id": 0, "metric_name": "contrast", "metric_value": 1.0},  # horse
+                {"image_id": 1, "metric_name": "contrast", "metric_value": 1.0},  # dog
+                {"image_id": 1, "metric_name": "depth", "metric_value": 1.0},  # dog
+                {"image_id": 2, "metric_name": "depth", "metric_value": 1.0},  # mule
+                {"image_id": 3, "metric_name": "skew", "metric_value": 1.0},  # horse
+                {"image_id": 4, "metric_name": "skew", "metric_value": 1.0},  # dog
+                {"image_id": 6, "metric_name": "contrast", "metric_value": 1.0},  # dog
+            ]
+        )
+        output = OutliersOutput(df)
+        result = output.aggregate_by_class(metadata)
+
+        # Check shape: 3 classes + 1 Total row, 3 metrics + class_name + Total columns
+        assert result.shape == (4, 5)  # 4 rows (3 classes + Total), 5 cols (class_name + 3 metrics + Total)
+
+        # Check column names
+        assert "class_name" in result.columns
+        assert "Total" in result.columns
+        assert "contrast" in result.columns
+        assert "depth" in result.columns
+        assert "skew" in result.columns
+
+        # Check Total row exists
+        assert "Total" in result["class_name"].to_list()
+
+        # Verify data types
+        assert result["class_name"].dtype == pl.Categorical("lexical")
+        for col in ["contrast", "depth", "skew", "Total"]:
+            assert result[col].dtype == pl.UInt32
+
+    def test_aggregate_by_class_raises_on_list(self):
+        """Test aggregate_by_class raises error for multiple datasets"""
+        metadata = make_mock_metadata(self.lstat)
+
+        output = OutliersOutput([self.outlier, self.outlier2])
+        with pytest.raises(ValueError, match="only works with output from a single dataset"):
+            output.aggregate_by_class(metadata)
+
+    def test_aggregate_by_image(self):
+        """Test aggregate_by_image returns correct pivot table"""
+        # Create test data with known structure
+        df = pl.DataFrame(
+            [
+                {"image_id": 0, "metric_name": "contrast", "metric_value": 1.0},
+                {"image_id": 0, "metric_name": "depth", "metric_value": 1.0},
+                {"image_id": 0, "metric_name": "skew", "metric_value": 1.0},
+                {"image_id": 1, "metric_name": "contrast", "metric_value": 1.0},
+                {"image_id": 2, "metric_name": "depth", "metric_value": 1.0},
+                {"image_id": 2, "metric_name": "skew", "metric_value": 1.0},
+            ]
+        )
+        output = OutliersOutput(df)
+        result = output.aggregate_by_image()
+
+        # Check shape: 3 images, 4 columns (image_id + 3 metrics + Total)
+        assert result.shape == (3, 5)
+
+        # Check column names
+        assert "image_id" in result.columns
+        assert "Total" in result.columns
+        assert set(result.columns) == {"image_id", "contrast", "depth", "skew", "Total"}
+
+        # Verify image_id sorted by Total
+        assert result["Total"].to_list() == [3, 2, 1]
+        assert result["image_id"].to_list() == [0, 2, 1]
+
+        # Check data types
+        assert result["image_id"].dtype == pl.Int64
+        for col in ["contrast", "depth", "skew", "Total"]:
+            assert result[col].dtype == pl.UInt32
+
+        # Verify binary indicators (0 or 1)
+        for col in ["contrast", "depth", "skew"]:
+            values = result[col].to_list()
+            assert all(v in [0, 1] for v in values)
+
+    def test_aggregate_by_image_sparse_metrics(self):
+        """Test aggregate_by_image with images having different metrics"""
+        df = pl.DataFrame(
+            [
+                {"image_id": 0, "metric_name": "a", "metric_value": 1.0},
+                {"image_id": 0, "metric_name": "b", "metric_value": 1.0},
+                {"image_id": 1, "metric_name": "c", "metric_value": 1.0},
+                {"image_id": 2, "metric_name": "a", "metric_value": 1.0},
+                {"image_id": 2, "metric_name": "c", "metric_value": 1.0},
+            ]
+        )
+        output = OutliersOutput(df)
+        result = output.aggregate_by_image()
+
+        # Check shape: 3 images, 5 columns (image_id + 3 metrics + Total)
+        assert result.shape == (3, 5)
+
+        # Check that missing combinations are 0
+        # Image 0: has a, b (not c)
+        row_0 = result.filter(pl.col("image_id") == 0)
+        assert row_0["a"][0] == 1
+        assert row_0["b"][0] == 1
+        assert row_0["c"][0] == 0
+        assert row_0["Total"][0] == 2
+
+        # Image 1: has c (not a, b)
+        row_1 = result.filter(pl.col("image_id") == 1)
+        assert row_1["a"][0] == 0
+        assert row_1["b"][0] == 0
+        assert row_1["c"][0] == 1
+        assert row_1["Total"][0] == 1
+
+        # Image 2: has a, c (not b)
+        row_2 = result.filter(pl.col("image_id") == 2)
+        assert row_2["a"][0] == 1
+        assert row_2["b"][0] == 0
+        assert row_2["c"][0] == 1
+        assert row_2["Total"][0] == 2
+
+    def test_aggregate_by_image_empty(self):
+        """Test aggregate_by_image with empty DataFrame"""
+        df = pl.DataFrame(
+            schema={"image_id": pl.Int64, "metric_name": pl.Categorical("lexical"), "metric_value": pl.Float64}
+        )
+        output = OutliersOutput(df)
+        result = output.aggregate_by_image()
+
+        # Should return empty DataFrame with just image_id and Total columns
+        assert result.shape[0] == 0
+        assert "image_id" in result.columns
+        assert "Total" in result.columns
+
+    def test_aggregate_by_image_raises_on_list(self):
+        """Test aggregate_by_image raises error for multiple datasets"""
+        output = OutliersOutput([self.outlier, self.outlier2])
+        with pytest.raises(ValueError, match="only works with output from a single dataset"):
+            output.aggregate_by_image()
