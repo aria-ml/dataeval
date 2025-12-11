@@ -11,7 +11,6 @@ import logging
 from typing import Any
 
 import numpy as np
-import pandas as pd
 import polars as pl
 from lightgbm import LGBMClassifier
 from numpy.typing import NDArray
@@ -88,7 +87,7 @@ class DomainClassifierCalculator(AbstractCalculator):
         self.threshold = threshold
         self.result: DriftMVDCOutput | None = None
 
-    def _fit(self, reference_data: pd.DataFrame) -> DriftMVDCOutput:
+    def _fit(self, reference_data: pl.DataFrame) -> DriftMVDCOutput:
         """Fits the DC calculator to a set of reference data."""
         self._x_ref = reference_data
         result = self._calculate(data=self._x_ref)
@@ -97,7 +96,7 @@ class DomainClassifierCalculator(AbstractCalculator):
         return result
 
     @set_metadata
-    def _calculate(self, data: pd.DataFrame) -> DriftMVDCOutput:
+    def _calculate(self, data: pl.DataFrame) -> DriftMVDCOutput:
         """Calculate the data DC calculator metric for a given data set."""
         chunks = self.chunker.split(data)
 
@@ -135,16 +134,19 @@ class DomainClassifierCalculator(AbstractCalculator):
             reference_X = self._x_ref
             chunk_y = np.ones(len(chunk_X), dtype=np.intp)
             reference_y = np.zeros(len(reference_X), dtype=np.intp)
-            df_X = pd.concat([reference_X, chunk_X], ignore_index=True)
+            df_X = pl.concat([reference_X, chunk_X])
             y = np.concatenate([reference_y, chunk_y])
+
+        # Convert to numpy for sklearn operations
+        X_numpy = df_X.to_numpy()
 
         skf = StratifiedKFold(n_splits=self.cv_folds_num)
         all_preds: list[NDArray[np.float32]] = []
         all_tgts: list[NDArray[np.intp]] = []
-        for i, (train_index, test_index) in enumerate(skf.split(df_X, y)):
-            _trx = df_X.iloc[train_index]
+        for i, (train_index, test_index) in enumerate(skf.split(X_numpy, y)):
+            _trx = X_numpy[train_index]
             _try = y[train_index]
-            _tsx = df_X.iloc[test_index]
+            _tsx = X_numpy[test_index]
             _tsy = y[test_index]
             model = LGBMClassifier(**self.hyperparameters, n_jobs=get_max_processes(), random_state=get_seed())
             model.fit(_trx, _try)

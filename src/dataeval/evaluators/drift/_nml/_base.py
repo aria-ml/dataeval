@@ -11,15 +11,15 @@ import logging
 from abc import ABC, abstractmethod
 from logging import Logger
 
-import pandas as pd
+import polars as pl
 from typing_extensions import Self
 
 from dataeval.evaluators.drift._mvdc import DriftMVDCOutput
 from dataeval.evaluators.drift._nml._chunk import Chunker, CountBasedChunker
 
 
-def _validate(data: pd.DataFrame, expected_features: int | None = None) -> int:
-    if data.empty:
+def _validate(data: pl.DataFrame, expected_features: int | None = None) -> int:
+    if data.is_empty():
         raise ValueError("data contains no rows. Please provide a valid data set.")
     if expected_features is not None and data.shape[-1] != expected_features:
         raise ValueError(f"expected '{expected_features}' features in data set:\n\t{data}")
@@ -35,7 +35,7 @@ class AbstractCalculator(ABC):
         self.n_features: int | None = None
         self._logger = logger if isinstance(logger, Logger) else logging.getLogger(__name__)
 
-    def fit(self, reference_data: pd.DataFrame) -> Self:
+    def fit(self, reference_data: pl.DataFrame) -> Self:
         """Trains the calculator using reference data."""
         self.n_features = _validate(reference_data)
 
@@ -43,7 +43,7 @@ class AbstractCalculator(ABC):
         self.result = self._fit(reference_data)
         return self
 
-    def calculate(self, data: pd.DataFrame) -> DriftMVDCOutput:
+    def calculate(self, data: pl.DataFrame) -> DriftMVDCOutput:
         """Performs a calculation on the provided data."""
         if self.result is None:
             raise RuntimeError("must run fit with reference data before running calculate")
@@ -54,7 +54,7 @@ class AbstractCalculator(ABC):
         return self.result
 
     @abstractmethod
-    def _fit(self, reference_data: pd.DataFrame) -> DriftMVDCOutput: ...
+    def _fit(self, reference_data: pl.DataFrame) -> DriftMVDCOutput: ...
 
     @abstractmethod
-    def _calculate(self, data: pd.DataFrame) -> DriftMVDCOutput: ...
+    def _calculate(self, data: pl.DataFrame) -> DriftMVDCOutput: ...

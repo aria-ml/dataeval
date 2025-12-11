@@ -12,7 +12,7 @@ from __future__ import annotations
 __all__ = []
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from numpy.typing import ArrayLike
 
 from dataeval.evaluators.drift._mvdc_output import DriftMVDCOutput
@@ -71,7 +71,7 @@ class DriftMVDC:
 
         """
         # for 1D input, assume that is 1 sample: dim[1,n_features]
-        self.x_ref: pd.DataFrame = pd.DataFrame(flatten(np.atleast_2d(np.asarray(x_ref))))
+        self.x_ref: pl.DataFrame = pl.DataFrame(flatten(np.atleast_2d(np.asarray(x_ref))))
         self.n_features: int = self.x_ref.shape[-1]
         self._calc.fit(self.x_ref)
         return self
@@ -89,7 +89,7 @@ class DriftMVDC:
         -------
         DomainClassifierDriftResult
         """
-        self.x_test: pd.DataFrame = pd.DataFrame(flatten(np.atleast_2d(np.asarray(x))))
+        self.x_test: pl.DataFrame = pl.DataFrame(flatten(np.atleast_2d(np.asarray(x))))
         if self.x_test.shape[-1] != self.n_features:
             raise ValueError("Reference and test embeddings have different number of features")
 
