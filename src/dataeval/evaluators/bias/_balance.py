@@ -248,10 +248,10 @@ class Balance:
         │ ---         ┆ ---      │
         │ cat         ┆ f64      │
         ╞═════════════╪══════════╡
-        │ class_label ┆ 1.01656  │
         │ age         ┆ 0.218666 │
-        │ income      ┆ 0.292495 │
+        │ class_label ┆ 1.01656  │
         │ gender      ┆ 0.003119 │
+        │ income      ┆ 0.292495 │
         └─────────────┴──────────┘
 
         >>> result.factors
@@ -261,12 +261,12 @@ class Balance:
         │ ---     ┆ ---     ┆ ---      ┆ ---           │
         │ cat     ┆ cat     ┆ f64      ┆ bool          │
         ╞═════════╪═════════╪══════════╪═══════════════╡
-        │ age     ┆ income  ┆ 0.069446 ┆ false         │
         │ age     ┆ gender  ┆ 0.031473 ┆ false         │
-        │ income  ┆ age     ┆ 0.069446 ┆ false         │
-        │ income  ┆ gender  ┆ 0.037382 ┆ false         │
+        │ age     ┆ income  ┆ 0.069446 ┆ false         │
         │ gender  ┆ age     ┆ 0.031473 ┆ false         │
         │ gender  ┆ income  ┆ 0.037382 ┆ false         │
+        │ income  ┆ age     ┆ 0.069446 ┆ false         │
+        │ income  ┆ gender  ┆ 0.037382 ┆ false         │
         └─────────┴─────────┴──────────┴───────────────┘
 
         >>> result.classwise
@@ -276,15 +276,15 @@ class Balance:
         │ ---        ┆ ---         ┆ ---      ┆ ---           │
         │ cat        ┆ cat         ┆ f64      ┆ bool          │
         ╞════════════╪═════════════╪══════════╪═══════════════╡
-        │ doctor     ┆ age         ┆ 0.088231 ┆ false         │
-        │ doctor     ┆ income      ┆ 0.355217 ┆ true          │
-        │ doctor     ┆ gender      ┆ 0.073388 ┆ false         │
         │ artist     ┆ age         ┆ 0.185507 ┆ false         │
-        │ artist     ┆ income      ┆ 0.172931 ┆ false         │
         │ artist     ┆ gender      ┆ 0.036066 ┆ false         │
+        │ artist     ┆ income      ┆ 0.172931 ┆ false         │
+        │ doctor     ┆ age         ┆ 0.088231 ┆ false         │
+        │ doctor     ┆ gender      ┆ 0.073388 ┆ false         │
+        │ doctor     ┆ income      ┆ 0.355217 ┆ true          │
         │ teacher    ┆ age         ┆ 0.075241 ┆ false         │
-        │ teacher    ┆ income      ┆ 0.103269 ┆ false         │
         │ teacher    ┆ gender      ┆ 0.014255 ┆ false         │
+        │ teacher    ┆ income      ┆ 0.103269 ┆ false         │
         └────────────┴─────────────┴──────────┴───────────────┘
         """
         # Convert AnnotatedDataset to Metadata if needed
@@ -349,7 +349,7 @@ class Balance:
                 "mi_value": pl.Float64,
                 "is_imbalanced": pl.Boolean,
             },
-        )
+        ).sort(["class_name", "factor_name"], descending=[False, False])
 
         # Create factors DataFrame for inter-factor correlations - build as columnar data
         # mi["interfactor"] is symmetric matrix of metadata factors (excluding class_label)
@@ -385,7 +385,7 @@ class Balance:
                 "mi_value": pl.Float64,
                 "is_correlated": pl.Boolean,
             },
-        )
+        ).sort(["factor1", "factor2"])
 
         # Create balance DataFrame for global class-to-factor MI
         # mi["class_to_factor"] has shape (num_factors+1,) where index 0 is class_label's self-MI
@@ -401,6 +401,6 @@ class Balance:
                 "factor_name": pl.Categorical("lexical"),
                 "mi_value": pl.Float64,
             },
-        )
+        ).sort("factor_name")
 
         return BalanceOutput(balance=balance_df, factors=factors_df, classwise=classwise_df)

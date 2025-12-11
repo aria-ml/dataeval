@@ -120,11 +120,11 @@ def mutual_info(
 
     >>> result = mutual_info(class_labels=class_labels, factor_data=binned_data)
     >>> result["class_to_factor"]
-    array([1.017, 0.219, 0.292, 0.003])
+    array([1.017, 0.219, 0.003, 0.292])
     >>> result["interfactor"]
-    array([[1.   , 0.069, 0.031],
-           [0.069, 1.   , 0.037],
-           [0.031, 0.037, 1.   ]])
+    array([[1.   , 0.031, 0.069],
+           [0.031, 1.   , 0.037],
+           [0.069, 0.037, 1.   ]])
 
     See Also
     --------
@@ -226,9 +226,9 @@ def mutual_info_classwise(
     Return classwise balance (mutual information) of factors with individual class_labels
 
     >>> mutual_info_classwise(class_labels=class_labels, factor_data=binned_data)
-    array([[0.782, 0.088, 0.355, 0.073],
-           [0.708, 0.186, 0.173, 0.036],
-           [0.73 , 0.075, 0.103, 0.014]])
+    array([[0.782, 0.088, 0.073, 0.355],
+           [0.708, 0.186, 0.036, 0.173],
+           [0.73 , 0.075, 0.014, 0.103]])
 
     See Also
     --------

@@ -153,8 +153,8 @@ class Parity:
         │ cat         ┆ f64      ┆ f64        ┆ bool          ┆ bool                  │
         ╞═════════════╪══════════╪════════════╪═══════════════╪═══════════════════════╡
         │ age         ┆ 0.445379 ┆ 4.8290e-8  ┆ true          ┆ true                  │
-        │ income      ┆ 0.568195 ┆ 8.4062e-14 ┆ true          ┆ true                  │
         │ gender      ┆ 0.291057 ┆ 0.0055     ┆ false         ┆ false                 │
+        │ income      ┆ 0.568195 ┆ 8.4062e-14 ┆ true          ┆ true                  │
         └─────────────┴──────────┴────────────┴───────────────┴───────────────────────┘
         """
         # Convert AnnotatedDataset to Metadata if needed

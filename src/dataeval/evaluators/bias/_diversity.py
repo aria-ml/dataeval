@@ -214,8 +214,8 @@ class Diversity:
         │ cat         ┆ f64             ┆ bool             │
         ╞═════════════╪═════════════════╪══════════════════╡
         │ age         ┆ 0.907669        ┆ false            │
-        │ income      ┆ 0.954334        ┆ false            │
         │ gender      ┆ 0.992826        ┆ false            │
+        │ income      ┆ 0.954334        ┆ false            │
         └─────────────┴─────────────────┴──────────────────┘
 
         >>> result.classwise
@@ -226,14 +226,14 @@ class Diversity:
         │ cat        ┆ cat         ┆ f64             ┆ bool             │
         ╞════════════╪═════════════╪═════════════════╪══════════════════╡
         │ doctor     ┆ age         ┆ 0.619268        ┆ false            │
-        │ doctor     ┆ income      ┆ 0.269775        ┆ true             │
         │ doctor     ┆ gender      ┆ 0.832507        ┆ false            │
+        │ doctor     ┆ income      ┆ 0.269775        ┆ true             │
         │ artist     ┆ age         ┆ 0.556777        ┆ false            │
-        │ artist     ┆ income      ┆ 0.334096        ┆ true             │
         │ artist     ┆ gender      ┆ 0.715294        ┆ false            │
+        │ artist     ┆ income      ┆ 0.334096        ┆ true             │
         │ teacher    ┆ age         ┆ 0.477477        ┆ true             │
-        │ teacher    ┆ income      ┆ 0.703209        ┆ false            │
         │ teacher    ┆ gender      ┆ 0.86722         ┆ false            │
+        │ teacher    ┆ income      ┆ 0.703209        ┆ false            │
         └────────────┴─────────────┴─────────────────┴──────────────────┘
         """
         # Convert AnnotatedDataset to Metadata if needed
