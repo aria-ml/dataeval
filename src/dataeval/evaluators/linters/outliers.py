@@ -189,6 +189,77 @@ class OutliersOutput(Output[TDataFrame]):
             .sort(["count", "metric_name"], descending=[True, False])
         )
 
+    def aggregate_by_image(self) -> pl.DataFrame:
+        """
+        Returns a Polars DataFrame summarizing outliers per image and metric.
+
+        Creates a pivot table showing whether each image is flagged by each metric (1 if flagged, 0 if not).
+        Includes a Total column showing the total number of metrics that flagged each image.
+
+        Returns
+        -------
+        pl.DataFrame
+            DataFrame with columns:
+            - image_id: int - Image identifier
+            - <metric_name>: int - Binary indicator (1 or 0) for each metric
+            - Total: int - Total number of metrics that flagged this image
+            Rows are sorted by Total in descending order, then by image_id.
+
+        Raises
+        ------
+        ValueError
+            If the issues contain multiple DataFrames (from multiple datasets).
+
+        Examples
+        --------
+        >>> outliers = Outliers()
+        >>> results = outliers.evaluate(dataset)
+        >>> summary = results.aggregate_by_image()
+        >>> summary
+        shape: (3, 10)
+        ┌──────────┬──────────┬───────┬──────────┬───┬──────┬───────┬───────┬───────┐
+        │ image_id ┆ contrast ┆ depth ┆ kurtosis ┆ … ┆ skew ┆ width ┆ zeros ┆ Total │
+        │ ---      ┆ ---      ┆ ---   ┆ ---      ┆   ┆ ---  ┆ ---   ┆ ---   ┆ ---   │
+        │ i64      ┆ u32      ┆ u32   ┆ u32      ┆   ┆ u32  ┆ u32   ┆ u32   ┆ u32   │
+        ╞══════════╪══════════╪═══════╪══════════╪═══╪══════╪═══════╪═══════╪═══════╡
+        │ 0        ┆ 1        ┆ 1     ┆ 1        ┆ … ┆ 1    ┆ 0     ┆ 1     ┆ 5     │
+        │ 4        ┆ 0        ┆ 0     ┆ 1        ┆ … ┆ 1    ┆ 1     ┆ 0     ┆ 5     │
+        │ 1        ┆ 1        ┆ 0     ┆ 0        ┆ … ┆ 0    ┆ 0     ┆ 0     ┆ 1     │
+        └──────────┴──────────┴───────┴──────────┴───┴──────┴───────┴───────┴───────┘
+        """
+        # Handle the case where self.issues might be a list of DataFrames
+        if not isinstance(self.issues, pl.DataFrame):
+            raise ValueError("Aggregation by image only works with output from a single dataset.")
+
+        # Handle empty DataFrame case
+        if self.issues.shape[0] == 0:
+            return pl.DataFrame({"image_id": pl.Series([], dtype=pl.Int64), "Total": pl.Series([], dtype=pl.UInt32)})
+
+        # Create a binary indicator for each image-metric combination
+        # Group by image_id and metric_name, then pivot
+        summary_df = (
+            self.issues.group_by(["image_id", "metric_name"])
+            .agg(pl.len().alias("count"))  # Count occurrences (should be 1 per combination)
+            .with_columns(pl.lit(1, dtype=pl.UInt32).alias("flagged"))  # Create binary indicator
+            .pivot(on="metric_name", index="image_id", values="flagged")
+            .fill_null(0)  # Replace NaNs with 0 for images not flagged by certain metrics
+        )
+
+        # Get metric columns (all columns except image_id)
+        metric_cols = sorted([col for col in summary_df.columns if col != "image_id"])
+
+        # Cast metric columns to UInt32 and add a Total column (sum across all metrics for each image)
+        summary_df = summary_df.with_columns([pl.col(col).cast(pl.UInt32) for col in metric_cols]).with_columns(
+            pl.sum_horizontal(metric_cols).cast(pl.UInt32).alias("Total")
+        )
+
+        # Sort by Total, then by image_id
+        summary_df = summary_df.sort(["Total", "image_id"], descending=[True, False])
+
+        # Return with proper column ordering
+        column_order = ["image_id"] + metric_cols + ["Total"]
+        return summary_df.select(column_order)
+
 
 def _get_zscore_mask(values: NDArray[np.float64], threshold: float | None) -> NDArray[np.bool_] | None:
     threshold = threshold if threshold is not None else 3.0
