@@ -21,7 +21,7 @@ os.environ.setdefault("NUMBA_CACHE_DIR", os.path.expanduser("~/.cache/numba"))
 os.environ.setdefault("NUMBA_ENABLE_CACHING", "1")
 
 nox.options.default_venv_backend = "uv"
-nox.options.sessions = ["test", "type", "deps", "lint", "doctest", "check"]
+nox.options.sessions = ["test", "type", "deps", "lint", "doclint", "doctest", "check"]
 
 DOCS_ENVS = {"LANG": "C", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True", "PYDEVD_DISABLE_FILE_VALIDATION": "1"}
 DOCTEST_ENVS = {"NB_EXECUTION_MODE_OVERRIDE": "off"}
@@ -39,20 +39,6 @@ fi
 def get_python_version(session: nox.Session) -> str:
     matches = PYTHON_RE_PATTERN.search(session.name)
     return matches.group(0) if matches else PYTHON_VERSION
-
-
-@nox_uv.session(uv_groups=["base"])
-def dev(session: nox.Session) -> None:
-    """Set up a python development environment at `.venv-{version}`. Specify version using `nox -P {version} -e dev`."""
-    arch_extras = {"cpu", "cu118", "cu126"}
-    arch_posargs = arch_extras & set(session.posargs)
-    arch_args = [] if not arch_posargs else [f"--extra={list(arch_posargs)[0]}"]
-
-    python_version = get_python_version(session)
-    venv_path = f".venv-{python_version}"
-    session.run("rm", "-rf", venv_path, external=True)
-    session.run("uv", "venv", "-p", python_version, "--seed", venv_path, external=True)
-    session.run("uv", "sync", "-p", venv_path, "--extra=all", *arch_args, external=True)
 
 
 @nox_uv.session(uv_groups=["test"], uv_extras=["cpu", "all"])
