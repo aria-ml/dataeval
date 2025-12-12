@@ -104,6 +104,12 @@ class OutliersOutput(Output[TDataFrame]):
         if not isinstance(self.issues, pl.DataFrame):
             raise ValueError("Aggregation by class only works with output from a single dataset.")
 
+        # Handle empty DataFrame case
+        if self.issues.shape[0] == 0:
+            return pl.DataFrame(
+                {"class_name": pl.Series([], dtype=pl.Categorical("lexical")), "Total": pl.Series([], dtype=pl.UInt32)}
+            )
+
         # Create mapping: image_index -> class_name
         mapping_data = {
             "image_id": metadata.item_indices.tolist(),
@@ -126,7 +132,10 @@ class OutliersOutput(Output[TDataFrame]):
         metric_cols = sorted([col for col in summary_df.columns if col != "class_name"])
 
         # Add a Total column (sum across all metrics for each class)
-        summary_df = summary_df.with_columns(pl.sum_horizontal(metric_cols).alias("Total"))
+        if metric_cols:
+            summary_df = summary_df.with_columns(pl.sum_horizontal(metric_cols).alias("Total"))
+        else:
+            summary_df = summary_df.with_columns(pl.lit(0, dtype=pl.UInt32).alias("Total"))
 
         # Sort by Total in descending order
         summary_df = summary_df.sort(["Total", "class_name"], descending=[True, False])
@@ -181,6 +190,12 @@ class OutliersOutput(Output[TDataFrame]):
         # Handle the case where self.issues might be a list of DataFrames
         if not isinstance(self.issues, pl.DataFrame):
             raise ValueError("Aggregation by metric only works with output from a single dataset.")
+
+        # Handle empty DataFrame case
+        if self.issues.shape[0] == 0:
+            return pl.DataFrame(
+                {"metric_name": pl.Series([], dtype=pl.Categorical("lexical")), "count": pl.Series([], dtype=pl.UInt32)}
+            )
 
         # Group by metric_name and count unique images
         return (
@@ -249,9 +264,12 @@ class OutliersOutput(Output[TDataFrame]):
         metric_cols = sorted([col for col in summary_df.columns if col != "image_id"])
 
         # Cast metric columns to UInt32 and add a Total column (sum across all metrics for each image)
-        summary_df = summary_df.with_columns([pl.col(col).cast(pl.UInt32) for col in metric_cols]).with_columns(
-            pl.sum_horizontal(metric_cols).cast(pl.UInt32).alias("Total")
-        )
+        if metric_cols:
+            summary_df = summary_df.with_columns([pl.col(col).cast(pl.UInt32) for col in metric_cols]).with_columns(
+                pl.sum_horizontal(metric_cols).cast(pl.UInt32).alias("Total")
+            )
+        else:
+            summary_df = summary_df.with_columns(pl.lit(0, dtype=pl.UInt32).alias("Total"))
 
         # Sort by Total, then by image_id
         summary_df = summary_df.sort(["Total", "image_id"], descending=[True, False])
