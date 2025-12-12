@@ -448,7 +448,7 @@ class SufficiencyOutput(DictOutput):
         and recall which are defined to take values on [0,1].  Set False for metrics not on the unit interval.
     """
 
-    steps: NDArray[np.uint32]
+    steps: NDArray[np.intp]
     measures: Mapping[str, NDArray[Any]]
     averaged_measures: MutableMapping[str, NDArray[Any]] = field(default_factory=lambda: {})
     n_iter: int = 1000
