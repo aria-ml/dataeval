@@ -38,7 +38,7 @@ class GeometricSchedule:
         return np.geomspace(start, stop, self.substeps, dtype=np.intp)
 
 
-class CustomSchedule:
+class ManualSchedule:
     """
     Custom evaluation schedule with user-specified points.
 
@@ -63,13 +63,13 @@ class CustomSchedule:
     --------
     Single point:
 
-    >>> schedule = CustomSchedule(50)
+    >>> schedule = ManualSchedule(50)
     >>> schedule.get_steps(dataset_length=100)
     array([50])
 
     Multiple points:
 
-    >>> schedule = CustomSchedule([10, 50, 100])
+    >>> schedule = ManualSchedule([10, 50, 100])
     >>> schedule.get_steps(dataset_length=100)
     array([ 10,  50, 100])
     """

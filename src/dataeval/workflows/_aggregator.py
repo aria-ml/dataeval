@@ -3,6 +3,8 @@ __all__ = []
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval.protocols import ArrayLike
+
 
 class ResultAggregator:
     """
@@ -41,7 +43,7 @@ class ResultAggregator:
         self.substeps = substeps
         self._storage: dict[str, NDArray[np.floating]] = {}
 
-    def add_result(self, run: int, step: int, metric_name: str, value: float | NDArray[np.floating]) -> None:
+    def add_result(self, run: int, step: int, metric_name: str, value: ArrayLike) -> None:
         """
         Add a single evaluation result.
 
