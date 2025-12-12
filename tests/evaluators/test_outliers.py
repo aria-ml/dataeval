@@ -442,3 +442,35 @@ class TestOutliersOutput:
         output = OutliersOutput([self.outlier, self.outlier2])
         with pytest.raises(ValueError, match="only works with output from a single dataset"):
             output.aggregate_by_image()
+
+    def test_aggregate_by_metric_empty(self):
+        """Test aggregate_by_metric with empty DataFrame"""
+        df = pl.DataFrame(
+            schema={"image_id": pl.Int64, "metric_name": pl.Categorical("lexical"), "metric_value": pl.Float64}
+        )
+        output = OutliersOutput(df)
+        result = output.aggregate_by_metric()
+
+        # Should return empty DataFrame with correct schema
+        assert result.shape[0] == 0
+        assert "metric_name" in result.columns
+        assert "count" in result.columns
+        assert result["metric_name"].dtype == pl.Categorical("lexical")
+        assert result["count"].dtype == pl.UInt32
+
+    def test_aggregate_by_class_empty(self):
+        """Test aggregate_by_class with empty DataFrame"""
+        metadata = make_mock_metadata(self.lstat)
+
+        df = pl.DataFrame(
+            schema={"image_id": pl.Int64, "metric_name": pl.Categorical("lexical"), "metric_value": pl.Float64}
+        )
+        output = OutliersOutput(df)
+        result = output.aggregate_by_class(metadata)
+
+        # Should return empty DataFrame with correct schema
+        assert result.shape[0] == 0
+        assert "class_name" in result.columns
+        assert "Total" in result.columns
+        assert result["class_name"].dtype == pl.Categorical("lexical")
+        assert result["Total"].dtype == pl.UInt32
