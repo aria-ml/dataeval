@@ -105,30 +105,25 @@ class BalanceOutput(DictOutput):
             # Get all factor names from balance DataFrame (includes "class_label" + metadata factors)
             all_factor_names = self.balance["factor_name"].to_list()
             # Metadata factor names only (exclude class_label)
-            factor_names = all_factor_names[1:]
-            n_factors = len(factor_names)
+            factor_names = sorted(all_factor_names[1:])
 
             # Create matrix: first row is balance (class-to-factor MI for metadata factors only),
             # rest is interfactor MI
-            # Skip class_label's self-MI (index 0) and use only metadata factors
             balance_row = self.balance["mi_value"].to_numpy()[1:]  # Skip class_label self-MI
-
-            # Create interfactor matrix
-            factor_matrix = np.zeros((n_factors, n_factors))
-            factor_to_idx = {f: i for i, f in enumerate(factor_names)}
-
-            # Fill matrix with MI values from factors DataFrame
-            for row in self.factors.iter_rows(named=True):
-                i = factor_to_idx[row["factor1"]]
-                j = factor_to_idx[row["factor2"]]
-                factor_matrix[i, j] = row["mi_value"]
-                factor_matrix[j, i] = row["mi_value"]
-
-            # Set diagonal to 1 (self-correlation)
-            np.fill_diagonal(factor_matrix, 1.0)
+            interfactor_matrix = (
+                self.factors.pivot(
+                    on="factor2",
+                    index="factor1",
+                    values="mi_value",
+                    aggregate_function=None,
+                )
+                .sort("factor1")  # Sort the rows alphabetically
+                .select(factor_names)  # Select columns in the exact same order
+                .to_numpy()  # Export to pure NumPy
+            )
 
             # Combine: balance row + interfactor matrix
-            data = np.concatenate([balance_row[np.newaxis, :], factor_matrix], axis=0)
+            data = np.concatenate([balance_row[np.newaxis, :], interfactor_matrix], axis=0)
 
             # Create mask for lower triangle (excluding diagonal)
             # This creates an upper triangular matrix for visualization
@@ -248,8 +243,8 @@ class Balance:
         │ ---         ┆ ---      │
         │ cat         ┆ f64      │
         ╞═════════════╪══════════╡
-        │ age         ┆ 0.218666 │
         │ class_label ┆ 1.01656  │
+        │ age         ┆ 0.218666 │
         │ gender      ┆ 0.003119 │
         │ income      ┆ 0.292495 │
         └─────────────┴──────────┘
@@ -391,16 +386,21 @@ class Balance:
         # mi["class_to_factor"] has shape (num_factors+1,) where index 0 is class_label's self-MI
         # Include all values: class_label + metadata factors
         class_to_factor = mi["class_to_factor"]
-        all_factor_names = ["class_label"] + factor_names
+        sorted_factor_names = sorted(factor_names)
+        all_factor_names = ["class_label"] + sorted_factor_names
+        # Map sorted factor names to their original indices in class_to_factor
+        mi_values = [float(class_to_factor[0])] + [
+            float(class_to_factor[factor_names.index(fn) + 1]) for fn in sorted_factor_names
+        ]
         balance_df = pl.DataFrame(
             {
                 "factor_name": all_factor_names,
-                "mi_value": [float(class_to_factor[i]) for i in range(len(all_factor_names))],
+                "mi_value": mi_values,
             },
             schema={
                 "factor_name": pl.Categorical("lexical"),
                 "mi_value": pl.Float64,
             },
-        ).sort("factor_name")
+        )
 
         return BalanceOutput(balance=balance_df, factors=factors_df, classwise=classwise_df)
