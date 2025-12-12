@@ -11,8 +11,8 @@ from numpy.testing import assert_array_equal
 
 from dataeval.protocols import EvaluationSchedule
 from dataeval.workflows._schedules import (
-    CustomSchedule,
     GeometricSchedule,
+    ManualSchedule,
 )
 
 
@@ -26,7 +26,7 @@ class TestEvaluationScheduleProtocol:
 
     def test_custom_schedule_conforms_to_protocol(self):
         """Verify CustomSchedule implements protocol."""
-        schedule = CustomSchedule([10, 20, 30])
+        schedule = ManualSchedule([10, 20, 30])
         assert isinstance(schedule, EvaluationSchedule)
 
 
@@ -73,7 +73,7 @@ class TestCustomSchedule:
 
     def test_accepts_single_int(self):
         """Verify CustomSchedule handles single integer."""
-        schedule = CustomSchedule(50)
+        schedule = ManualSchedule(50)
         steps = schedule.get_steps(dataset_length=100)
 
         assert len(steps) == 1
@@ -81,7 +81,7 @@ class TestCustomSchedule:
 
     def test_accepts_list(self):
         """Verify CustomSchedule handles list of ints."""
-        schedule = CustomSchedule([10, 20, 50, 100])
+        schedule = ManualSchedule([10, 20, 50, 100])
         steps = schedule.get_steps(dataset_length=100)
 
         assert len(steps) == 4
@@ -89,7 +89,7 @@ class TestCustomSchedule:
 
     def test_accepts_numpy_array(self):
         """Verify CustomSchedule handles numpy array."""
-        schedule = CustomSchedule(np.array([5, 15, 25]))
+        schedule = ManualSchedule(np.array([5, 15, 25]))
         steps = schedule.get_steps(dataset_length=100)
 
         assert len(steps) == 3
@@ -97,7 +97,7 @@ class TestCustomSchedule:
 
     def test_accepts_iterable(self):
         """Verify CustomSchedule handles any iterable."""
-        schedule = CustomSchedule(range(10, 101, 10))
+        schedule = ManualSchedule(range(10, 101, 10))
         steps = schedule.get_steps(dataset_length=100)
 
         assert len(steps) == 10
@@ -109,11 +109,11 @@ class TestCustomSchedule:
 
         # Mainly verifies call to `to_numpy`
         with pytest.raises(ValueError, match="invalid literal"):
-            CustomSchedule(["a", "b", "c"])  # pyright: ignore[reportArgumentType] --> testing incorrect type
+            ManualSchedule(["a", "b", "c"])  # pyright: ignore[reportArgumentType] --> testing incorrect type
 
     def test_returns_intp_array(self):
         """Verify output is uint32 array for indexing."""
-        schedule = CustomSchedule([10, 20, 30])
+        schedule = ManualSchedule([10, 20, 30])
         steps = schedule.get_steps(dataset_length=100)
 
         assert isinstance(steps, np.ndarray)

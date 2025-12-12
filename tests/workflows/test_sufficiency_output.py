@@ -582,7 +582,7 @@ class TestSufficiencyInverseProject:
         """
         Tests metric projection output can be inversed
         """
-        num_samples = np.arange(20, 80, step=10, dtype=np.uint32)
+        num_samples = np.arange(20, 80, step=10, dtype=np.intp)
         accuracies = num_samples / 100.0
 
         data = SufficiencyOutput(steps=num_samples, measures={}, averaged_measures={"Accuracy": accuracies})
@@ -652,7 +652,7 @@ class TestSufficiencyInverseProject:
         """
         import logging
 
-        num_samples = np.arange(20, 80, step=10, dtype=np.uint32)
+        num_samples = np.arange(20, 80, step=10, dtype=np.intp)
         accuracies = num_samples / 100.0
         data = SufficiencyOutput(steps=num_samples, measures={}, averaged_measures={"Accuracy": accuracies})
         # upper bound for these parameters is 0.9369, any desired accuracy above is unachievable

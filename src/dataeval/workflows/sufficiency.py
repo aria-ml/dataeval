@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from dataeval.workflows._aggregator import ResultAggregator
+from dataeval.workflows._schedules import GeometricSchedule, ManualSchedule
+
 __all__ = []
 
 from collections.abc import Iterable, Sized
@@ -10,7 +13,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from dataeval.protocols import Dataset, EvaluationStrategy, TrainingStrategy
+from dataeval.protocols import Dataset, EvaluationSchedule, EvaluationStrategy, TrainingStrategy
 from dataeval.types import set_metadata
 from dataeval.workflows._output import SufficiencyOutput
 
@@ -117,18 +120,21 @@ def validate_dataset_len(dataset: Dataset[Any]) -> int:
 
 class Sufficiency(Generic[T]):
     """
-    Project dataset :term:`sufficiency<Sufficiency>` using given a model and evaluation criteria.
+    Analyze how much training data is needed for target model performance.
+
+    Trains models on progressively larger data subsets, evaluates at each step,
+    and fits power law curves to predict performance on larger datasets.
 
     Parameters
     ----------
     model : nn.Module
-        Model that will be trained for each subset of data
+        Model to train (reset for each run)
     train_ds : torch.Dataset
-        Full training data that will be split for each run
+        Full training data
     test_ds : torch.Dataset
-        Data that will be used for every run's evaluation
+        Test/validation data
     config : SufficiencyConfig
-        Configuration object containing training/evaluation strategies and parameters.
+        Training/evaluation strategies and run parameters.
 
     Warning
     -------
@@ -136,13 +142,14 @@ class Sufficiency(Generic[T]):
 
     Notes
     -----
-    Substeps is overridden by the parameter `eval_at` in :meth:`.Sufficiency.evaluate`
+    Datasets are immutable after construction. To use different data, create a new instance.
 
-    The parameter based API has been removed. Use `.SufficiencyConfig` instead.
+    Multiple runs average results to reduce variance.
 
     See Also
     --------
-    :class:`.SufficiencyConfig`
+    :class:`.SufficiencyConfig` : Configuration object
+    :class:`.SufficiencyOutput` : Results with measures and projections
     """
 
     def __init__(
@@ -153,45 +160,114 @@ class Sufficiency(Generic[T]):
         config: SufficiencyConfig[T],
     ) -> None:
         self.model = model
-        self.train_ds = train_ds
-        self.test_ds = test_ds
+
+        # Validate and store datasets
+        self._length = validate_dataset_len(train_ds)
+        self._train_ds = train_ds
+
+        validate_dataset_len(test_ds)
+        self._test_ds = test_ds
 
         self.config = config
 
     @property
     def train_ds(self) -> Dataset[T]:
-        return self._train_ds
+        """
+        Training dataset (read-only)
 
-    @train_ds.setter
-    def train_ds(self, value: Dataset[T]) -> None:
-        self._train_ds = value
-        self._length = validate_dataset_len(value)
+        Notes
+        -----
+        This property is read-only. To use a different training dataset, create a new Sufficiency instance
+        """
+        return self._train_ds
 
     @property
     def test_ds(self) -> Dataset[T]:
-        return self._test_ds
+        """
+        Test dataset (read-only)
 
-    @test_ds.setter
-    def test_ds(self, value: Dataset[T]) -> None:
-        validate_dataset_len(value)
-        self._test_ds = value
+        Notes
+        -----
+        This property is read-only. To use a different test dataset, create a new Sufficiency instance
+        """
+        return self._test_ds
 
     @property
     def runs(self) -> int:
+        """Number of independent runs"""
         return self.config.runs
 
     @property
     def substeps(self) -> int:
+        """Number of a evaluation steps per run"""
         return self.config.substeps
 
     @property
     def unit_interval(self) -> bool:
+        """Whether metrics are constrained to [0, 1]"""
         return self.config.unit_interval
 
-    @set_metadata(state=["runs", "substeps"])
-    def evaluate(self, eval_at: int | Iterable[int] | None = None) -> SufficiencyOutput:
+    def _create_schedule(self, schedule: EvaluationSchedule | int | Iterable[int] | None) -> EvaluationSchedule:
         """
-        Train and evaluate a model over multiple substeps
+        Convert schedule parameter into an EvaluationSchedule object.
+
+        Handles auto-wrapping of int and iterable inputs for convenience.
+
+        Parameters
+        ----------
+        schedule : EvaluationSchedule or int or Iterable[int] or None, default None
+            Custom schedule object, specific evaluation points, or None for default geometric schedule
+
+        Returns
+        -------
+        EvaluationSchedule
+            Concrete schedule object
+        """
+        if schedule is None:
+            return GeometricSchedule(substeps=self.substeps)
+        if isinstance(schedule, EvaluationSchedule):
+            return schedule
+        # Wrap int or iterable
+        return ManualSchedule(schedule)
+
+    def _execute_run(self, run_index: int, steps: Iterable[int], aggregator: ResultAggregator) -> None:
+        """
+        Execute a single training run across all evaluation steps.
+
+        This method makes temporal coupling explicit: model must be reset
+        before training, and training must occur before evaluation at each step.
+
+        Parameters
+        ----------
+        run_index : int
+            Index of current run (0-based)
+        steps : NDArray[uint32]
+            Evaluation points (dataset sizes)
+        aggregator : ResultAggregator
+            Accumulator for storing results
+        """
+        # Step 1: Create randomized indices for this run
+        indices = np.random.randint(0, self._length, size=self._length)
+
+        # Step 2: Reset model to fresh initialization (temporal coupling explicit)
+        model = reset_parameters(self.model)
+
+        # Step 3: Train and evaluate at each step (temporal coupling explicit)
+        for step_index, dataset_size in enumerate(steps):
+            # Train on subset
+            self.config.training_strategy.train(model, self.train_ds, indices[: int(dataset_size)].tolist())
+
+            # Evaluate on test set
+            metrics = self.config.evaluation_strategy.evaluate(model, self.test_ds)
+
+            # Store results
+            for metric_name, metric_value in metrics.items():
+                aggregator.add_result(run=run_index, step=step_index, metric_name=metric_name, value=metric_value)
+
+    @set_metadata(state=["runs", "substeps"])
+    def evaluate(self, schedule: EvaluationSchedule | int | Iterable[int] | None = None) -> SufficiencyOutput:
+        """
+        Train and evaluate model across multiple dataset sizes.
 
         This function trains a model up to each step calculated from substeps. The model is then evaluated
         at that step and trained from 0 to the next step. This repeats for all substeps. Once a model has been
@@ -203,89 +279,61 @@ class Sufficiency(Generic[T]):
 
         Parameters
         ----------
-        eval_at : int | Iterable[int] | None, default None
+        schedule : EvaluationStrategy or int or Iterable[int] or None, default None
             Specify this to collect metrics over a specific set of dataset lengths.
-            If `None`, evaluates at each step is calculated by
-            `np.geomspace` over the length of the dataset for self.substeps
+            If `None`, evaluates at each step calculated by
+            `np.geomspace` over the length of the dataset
 
         Returns
         -------
         SufficiencyOutput
-            Dataclass containing the average of each measure per substep
-
-        Raises
-        ------
-        ValueError
-            If `eval_at` is not numerical
+            Contains steps, measures, averaged_measures, and params
 
         Examples
         --------
-        Default runs and substeps
-
         >>> config = SufficiencyConfig(
         ...     CustomTrainingStrategy(),
         ...     CustomEvaluationStrategy(),
         ... )
 
-        >>> suff = Sufficiency(
+        >>> sufficiency = Sufficiency(
         ...     model=model,
         ...     train_ds=train_ds,
         ...     test_ds=test_ds,
         ...     config=config,
         ... )
-        >>> suff.evaluate()
-        SufficiencyOutput(steps=array([  1,   3,  10,  31, 100], dtype=uint32), measures={'test': array([[1., 1., 1., 1., 1.]])}, averaged_measures={'test': array([1., 1., 1., 1., 1.])}, n_iter=1000, unit_interval=True)
 
-        Evaluate at a single value
+        Default runs and substeps:
 
-        >>> suff.evaluate(eval_at=50)
-        SufficiencyOutput(steps=array([50]), measures={'test': array([[1.]])}, averaged_measures={'test': array([1.])}, n_iter=1000, unit_interval=True)
+        >>> output = sufficiency.evaluate()
 
-        Evaluating at linear steps from 0-100 inclusive
+        Evaluate at specific points:
 
-        >>> suff.evaluate(eval_at=np.arange(0, 101, 20))
-        SufficiencyOutput(steps=array([  0,  20,  40,  60,  80, 100]), measures={'test': array([[1., 1., 1., 1., 1., 1.]])}, averaged_measures={'test': array([1., 1., 1., 1., 1., 1.])}, n_iter=1000, unit_interval=True)
+        >>> output = sufficiency.evaluate(schedule=[100, 500, 1000])
 
-        """  # noqa: E501
-        if eval_at is not None:
-            ranges = np.asarray(list(eval_at) if isinstance(eval_at, Iterable) else [eval_at])
-            if not np.issubdtype(ranges.dtype, np.number):
-                raise ValueError("'eval_at' must consist of numerical values")
-        else:
-            geomshape = (
-                0.01 * self._length,
-                self._length,
-                self.substeps,
-            )  # Start, Stop, Num steps
-            ranges = np.geomspace(*geomshape, dtype=np.uint32)
-        substeps = len(ranges)
-        measures = {}
+        Evaluate at a custom geometric spacing
 
-        # Run each model over all indices
-        for run in range(self.runs):
-            # Create a randomized set of indices to use
-            indices = np.random.randint(0, self._length, size=self._length)
-            # Reset the network weights to "create" an untrained model
-            model = reset_parameters(self.model)
-            # Run the model with each substep of data
-            for iteration, substep in enumerate(ranges):
-                self.config.training_strategy.train(
-                    model,
-                    self.train_ds,
-                    indices[: int(substep)].tolist(),
-                )
+        >>> from dataeval.workflows._schedules import GeometricSchedule
+        >>> output = sufficiency.evaluate(schedule=GeometricSchedule(substeps=20))
 
-                # evaluate on test data
-                measure = self.config.evaluation_strategy.evaluate(model, self.test_ds)
+        Evaluate at custom linear steps from 0-100 inclusive
 
-                # Keep track of each measures values
-                for name, value in measure.items():
-                    # Sum result into current substep iteration to be averaged later
-                    value = np.array(value).ravel()
-                    if name not in measures:
-                        measures[name] = np.zeros(
-                            (self.runs, substeps) if len(value) == 1 else (self.runs, substeps, len(value))
-                        )
+        >>> class LinearSchedule:
+        ...     def get_steps(self, dataset_length):
+        ...         return np.arange(0, 101, 20)
+        >>> output = sufficiency.evaluate(schedule=LinearSchedule())
+        """
 
-                    measures[name][run, iteration] = value
-        return SufficiencyOutput(ranges, measures, unit_interval=self.unit_interval)
+        # Create evaluation schedule
+        schedule_obj = self._create_schedule(schedule=schedule)
+        steps = schedule_obj.get_steps(self._length)
+
+        aggregator = ResultAggregator(runs=self.runs, substeps=len(steps))
+
+        # Execute all runs
+        for run_index in range(self.runs):
+            self._execute_run(run_index=run_index, steps=steps, aggregator=aggregator)
+
+        # Create output
+        results = aggregator.get_results()
+        return SufficiencyOutput(steps=steps, measures=results, unit_interval=self.unit_interval)
