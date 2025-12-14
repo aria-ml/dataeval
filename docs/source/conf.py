@@ -115,8 +115,16 @@ nb_execution_cache_path = ".jupyter_cache"
 nb_execution_mode = "cache" if EXECUTION_MODE is None else EXECUTION_MODE
 nb_execution_raise_on_error = True
 nb_execution_timeout = -1
+nb_render_plugin = "default"
+nb_html_output = "both"
 
-myst_enable_extensions = ["attrs_inline", "colon_fence", "dollarmath", "html_image"]
+myst_enable_extensions = [
+    "attrs_inline",
+    "colon_fence",
+    "dollarmath",
+    "html_image",
+    "html_admonition",
+]
 myst_heading_anchors = 4
 myst_footnote_transition = False
 

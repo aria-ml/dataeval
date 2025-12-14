@@ -3,7 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 import numpy as np
 import polars as pl
@@ -11,13 +11,9 @@ import polars as pl
 from dataeval.core._bin import get_counts
 from dataeval.core._diversity import diversity_shannon, diversity_simpson
 from dataeval.data import Metadata
-from dataeval.protocols import AnnotatedDataset, ArrayLike
+from dataeval.protocols import AnnotatedDataset
 from dataeval.types import DictOutput, set_metadata
 from dataeval.utils._method import get_method
-from dataeval.utils._plot import heatmap
-
-if TYPE_CHECKING:
-    from matplotlib.figure import Figure
 
 _DIVERSITY_FN_MAP = {"simpson": diversity_simpson, "shannon": diversity_shannon}
 
@@ -47,72 +43,9 @@ class DiversityOutput(DictOutput):
     factors: pl.DataFrame
     classwise: pl.DataFrame
 
-    def plot(
-        self,
-        row_labels: ArrayLike | None = None,
-        col_labels: ArrayLike | None = None,
-        plot_classwise: bool = False,
-    ) -> Figure:
-        """
-        Plot a heatmap of diversity information.
-
-        Parameters
-        ----------
-        row_labels : ArrayLike or None, default None
-            List/Array containing the labels for rows in the histogram
-        col_labels : ArrayLike or None, default None
-            List/Array containing the labels for columns in the histogram
-        plot_classwise : bool, default False
-            Whether to plot per-class balance instead of global balance
-
-        Returns
-        -------
-        matplotlib.figure.Figure
-
-        Notes
-        -----
-        This method requires `matplotlib <https://matplotlib.org/>`_ to be installed.
-        """
-        if plot_classwise:
-            # Convert classwise DataFrame to numpy array for heatmap
-            class_names = self.classwise["class_name"].unique(maintain_order=True).to_list()
-            factor_names = self.classwise["factor_name"].unique(maintain_order=True).to_list()
-
-            # Reshape to matrix
-            classwise_pivoted = self.classwise.pivot(on="factor_name", index="class_name", values="diversity_value")
-            # Drop the index column and get values only
-            classwise_matrix = classwise_pivoted.select(pl.all().exclude("class_name")).to_numpy()
-
-            if row_labels is None:
-                row_labels = class_names
-            if col_labels is None:
-                col_labels = factor_names
-
-            method = self.meta().state.get("method", "Diversity")
-            fig = heatmap(
-                classwise_matrix,
-                row_labels,
-                col_labels,
-                xlabel="Factors",
-                ylabel="Class",
-                cbarlabel=f"Normalized {method.title()} Index",
-            )
-
-        else:
-            # Creating bar chart for factor-level diversity
-            import matplotlib.pyplot as plt
-
-            fig, ax = plt.subplots(figsize=(8, 8))
-            factor_names = self.factors["factor_name"].to_list()
-            diversity_values = self.factors["diversity_value"].to_list()
-
-            ax.bar(factor_names, diversity_values)
-            ax.set_xlabel("Factors")
-            ax.set_ylabel("Diversity Index")
-            plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
-            fig.tight_layout()
-
-        return fig
+    @property
+    def plot_type(self) -> Literal["diversity"]:
+        return "diversity"
 
 
 class Diversity:

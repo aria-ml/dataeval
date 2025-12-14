@@ -514,6 +514,10 @@ class SufficiencyOutput(DictOutput):
         proj._params = self._params
         return proj
 
+    @property
+    def plot_type(self) -> Literal["sufficiency"]:
+        return "sufficiency"
+
     def plot(
         self,
         class_names: Sequence[str] | None = None,

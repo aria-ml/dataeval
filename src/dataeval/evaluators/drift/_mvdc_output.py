@@ -14,16 +14,12 @@ __all__ = []
 import copy
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, NamedTuple
+from typing import Literal, NamedTuple
 
-import numpy as np
 import polars as pl
 from typing_extensions import Self
 
 from dataeval.types import Output
-
-if TYPE_CHECKING:
-    from matplotlib.figure import Figure
 
 
 class Metric(NamedTuple):
@@ -113,51 +109,6 @@ class DriftMVDCOutput(PerMetricResult):
         metric = Metric(display_name="Domain Classifier", column_name="domain_classifier_auroc")
         super().__init__(results_data, [metric])
 
-    def plot(self) -> Figure:
-        """
-        Render the roc_auc metric over the train/test data in relation to the threshold.
-
-        Returns
-        -------
-        matplotlib.figure.Figure
-        """
-        import matplotlib.pyplot as plt
-
-        fig, ax = plt.subplots(dpi=300)
-        resdf = self._data
-        n_rows = len(resdf)
-        xticks = np.arange(n_rows)
-
-        # Filter for reference and analysis periods
-        trndf = resdf.filter(pl.col("chunk_period") == "reference")
-        tstdf = resdf.filter(pl.col("chunk_period") == "analysis")
-
-        # Get drift alert indices
-        drift_mask = resdf["domain_classifier_auroc_alert"].to_numpy()
-        driftx = np.where(drift_mask)[0]
-
-        if len(driftx) > 2:
-            indices = np.arange(n_rows)
-            trn_indices = resdf.with_row_index().filter(pl.col("chunk_period") == "reference")["index"].to_numpy()
-            tst_indices = resdf.with_row_index().filter(pl.col("chunk_period") == "analysis")["index"].to_numpy()
-
-            ax.plot(indices, resdf["domain_classifier_auroc_upper_threshold"].to_numpy(), "r--", label="thr_up")
-            ax.plot(indices, resdf["domain_classifier_auroc_lower_threshold"].to_numpy(), "r--", label="thr_low")
-            ax.plot(trn_indices, trndf["domain_classifier_auroc_value"].to_numpy(), "b", label="train")
-            ax.plot(tst_indices, tstdf["domain_classifier_auroc_value"].to_numpy(), "g", label="test")
-            ax.plot(
-                driftx,
-                resdf["domain_classifier_auroc_value"].to_numpy()[driftx],
-                "dm",
-                markersize=3,
-                label="drift",
-            )
-            ax.set_xticks(xticks)
-            ax.tick_params(axis="x", labelsize=6)
-            ax.tick_params(axis="y", labelsize=6)
-            ax.legend(loc="lower left", fontsize=6)
-            ax.set_title("Domain Classifier, Drift Detection", fontsize=8)
-            ax.set_ylabel("ROC AUC", fontsize=7)
-            ax.set_xlabel("Chunk Index", fontsize=7)
-            ax.set_ylim((0.0, 1.1))
-        return fig
+    @property
+    def plot_type(self) -> Literal["drift_mvdc"]:
+        return "drift_mvdc"

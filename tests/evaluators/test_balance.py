@@ -159,35 +159,3 @@ class TestBalanceUnit:
         assert result.factors.schema["factor2"].base_type() == pl.Categorical
         assert result.factors.schema["mi_value"] == pl.Float64
         assert result.factors.schema["is_correlated"] == pl.Boolean
-
-
-@pytest.mark.requires_all
-@pytest.mark.required
-class TestBalancePlot:
-    """Test plotting functionality of Balance class"""
-
-    def test_base_plotting(self, metadata_results):
-        balance_obj = Balance()
-        mi = balance_obj.evaluate(metadata_results)
-        output = mi.plot()
-        assert isinstance(output, Figure)
-        classwise_output = mi.plot(plot_classwise=True)
-        assert isinstance(classwise_output, Figure)
-
-    def test_plotting_vars(self, metadata_results):
-        balance_obj = Balance()
-        mi = balance_obj.evaluate(metadata_results)
-
-        # Get factor names from the dataframes
-        factor_names = sorted(set(mi.factors["factor1"].to_list() + mi.factors["factor2"].to_list()))
-        # Row labels include "class_label" + factor_names[:-1]
-        row_labels = np.arange(len(factor_names))  # 3 labels: 0, 1, 2 for ["class_label", factor1, factor2]
-        col_labels = np.arange(len(factor_names))  # 3 labels: 0, 1, 2 for all factors
-        output = mi.plot(row_labels, col_labels, plot_classwise=False)
-        assert isinstance(output, Figure)
-
-        class_names = mi.classwise["class_name"].unique(maintain_order=True).to_list()
-        row_labels = np.arange(len(class_names))
-        col_labels = np.arange(len(factor_names))
-        classwise_output = mi.plot(row_labels, col_labels, plot_classwise=True)
-        assert isinstance(classwise_output, Figure)

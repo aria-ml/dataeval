@@ -109,7 +109,7 @@ def deps(session: nox.Session) -> None:
     """Run unit tests against standard installation."""
     session.run_install("uv", "pip", "install", ".[cpu]", "--resolution=lowest-direct")
     session.run_install("uv", "pip", "install", "pytest")
-    session.run("pytest", "-m", "not (requires_all or optional)")
+    session.run("pytest", "-m", "not (optional)")
 
 
 @nox_uv.session(uv_only_groups=["lint"], uv_no_install_project=True)

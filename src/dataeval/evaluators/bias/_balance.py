@@ -3,19 +3,14 @@ from __future__ import annotations
 __all__ = []
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any, Literal
 
-import numpy as np
 import polars as pl
 
 from dataeval.core._mutual_info import mutual_info, mutual_info_classwise
 from dataeval.data import Metadata
-from dataeval.protocols import AnnotatedDataset, ArrayLike
+from dataeval.protocols import AnnotatedDataset
 from dataeval.types import DictOutput, set_metadata
-from dataeval.utils._plot import heatmap
-
-if TYPE_CHECKING:
-    from matplotlib.figure import Figure
 
 
 @dataclass(frozen=True)
@@ -49,96 +44,9 @@ class BalanceOutput(DictOutput):
     factors: pl.DataFrame
     classwise: pl.DataFrame
 
-    def plot(
-        self,
-        row_labels: ArrayLike | None = None,
-        col_labels: ArrayLike | None = None,
-        plot_classwise: bool = False,
-    ) -> Figure:
-        """
-        Plot a heatmap of balance information.
-
-        Parameters
-        ----------
-        row_labels : ArrayLike or None, default None
-            List/Array containing the labels for rows in the histogram
-        col_labels : ArrayLike or None, default None
-            List/Array containing the labels for columns in the histogram
-        plot_classwise : bool, default False
-            Whether to plot per-class balance instead of global balance
-
-        Returns
-        -------
-        matplotlib.figure.Figure
-
-        Notes
-        -----
-        This method requires `matplotlib <https://matplotlib.org/>`_ to be installed.
-        """
-        if plot_classwise:
-            # Convert classwise DataFrame to numpy array for heatmap
-            class_names = self.classwise["class_name"].unique(maintain_order=True).to_list()
-            factor_names = self.classwise["factor_name"].unique(maintain_order=True).to_list()
-
-            # Reshape to matrix
-            classwise_pivoted = self.classwise.pivot(on="factor_name", index="class_name", values="mi_value")
-            # Drop the index column and get values only
-            classwise_matrix = classwise_pivoted.select(pl.all().exclude("class_name")).to_numpy()
-
-            if row_labels is None:
-                row_labels = class_names
-            if col_labels is None:
-                col_labels = factor_names
-
-            fig = heatmap(
-                classwise_matrix,
-                row_labels,
-                col_labels,
-                xlabel="Factors",
-                ylabel="Class",
-                cbarlabel="Normalized Mutual Information",
-            )
-        else:
-            # Combine balance (class_to_factor) and factors (interfactor) results
-            # This recreates the original visualization from the old implementation
-
-            # Get all factor names from balance DataFrame (includes "class_label" + metadata factors)
-            all_factor_names = self.balance["factor_name"].to_list()
-            # Metadata factor names only (exclude class_label)
-            factor_names = sorted(all_factor_names[1:])
-
-            # Create matrix: first row is balance (class-to-factor MI for metadata factors only),
-            # rest is interfactor MI
-            balance_row = self.balance["mi_value"].to_numpy()[1:]  # Skip class_label self-MI
-            interfactor_matrix = (
-                self.factors.pivot(
-                    on="factor2",
-                    index="factor1",
-                    values="mi_value",
-                    aggregate_function=None,
-                )
-                .sort("factor1")  # Sort the rows alphabetically
-                .select(factor_names)  # Select columns in the exact same order
-                .to_numpy()  # Export to pure NumPy
-            )
-
-            # Combine: balance row + interfactor matrix
-            data = np.concatenate([balance_row[np.newaxis, :], interfactor_matrix], axis=0)
-
-            # Create mask for lower triangle (excluding diagonal)
-            # This creates an upper triangular matrix for visualization
-            # Shift diagonal down by 1 to account for the class_label row at the top
-            mask = np.tril(np.ones_like(data, dtype=bool), k=-1)
-            heat_data = np.where(mask, np.nan, data)[:-1, :]
-
-            if row_labels is None:
-                row_labels = ["class_label"] + factor_names[:-1]
-            if col_labels is None:
-                col_labels = factor_names
-
-            fig = heatmap(heat_data, row_labels, col_labels, cbarlabel="Normalized Mutual Information")
-
-        return fig
+    @property
+    def plot_type(self) -> Literal["balance"]:
+        return "balance"
 
 
 class Balance:
