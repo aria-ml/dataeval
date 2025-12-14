@@ -121,31 +121,6 @@ class TestDiversityUnit:
         assert low_div_1 >= low_div_2
 
 
-@pytest.mark.requires_all
-class TestDiversityPlot:
-    """Test plotting functionality of Diversity class"""
-
-    def test_base_plotting(self, metadata_results):
-        diversity_obj = Diversity(method="simpson")
-        result = diversity_obj.evaluate(metadata_results)
-        output = result.plot()
-        assert isinstance(output, Figure)
-        classwise_output = result.plot(plot_classwise=True)
-        assert isinstance(classwise_output, Figure)
-
-    def test_plotting_vars(self, metadata_results):
-        diversity_obj = Diversity(method="shannon")
-        result = diversity_obj.evaluate(metadata_results)
-
-        class_names = result.classwise["class_name"].unique(maintain_order=True).to_list()
-        factor_names = result.factors["factor_name"].to_list()
-
-        row_labels = np.arange(len(class_names))
-        col_labels = np.arange(len(factor_names))
-        classwise_output = result.plot(row_labels, col_labels, plot_classwise=True)
-        assert isinstance(classwise_output, Figure)
-
-
 @pytest.mark.optional
 class TestDiversityFunctional:
     """Test functional behavior of Diversity class"""

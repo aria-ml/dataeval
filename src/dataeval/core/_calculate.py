@@ -19,12 +19,9 @@ from dataeval.config import get_max_processes
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.core.flags import ImageStats, resolve_dependencies
 from dataeval.protocols import (
-    AnnotatedDataset,
     ArrayLike,
-    ImageClassificationDataset,
-    ObjectDetectionDataset,
+    Dataset,
     ObjectDetectionTarget,
-    SequenceLike,
 )
 from dataeval.types import SourceIndex
 from dataeval.utils._boundingbox import BoundingBox, BoxLike
@@ -384,7 +381,7 @@ def _aggregate(
 
 
 def calculate(
-    data: Iterable[ArrayLike] | ImageClassificationDataset | ObjectDetectionDataset,
+    data: Iterable[ArrayLike] | Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
     boxes: Iterable[Iterable[BoxLike] | None] | None = None,
     stats: Flag = ImageStats.ALL,
     *,
@@ -398,7 +395,7 @@ def calculate(
 
     Parameters
     ----------
-    data : Iterable[ArrayLike] | ImageClassificationDataset | ObjectDetectionDataset
+    data : Iterable[ArrayLike] | Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]]
         An iterable of images or a Dataset to compute statistics on.
     boxes : Iterable[Iterable[BoxLike] | None] | None
         Optional bounding boxes for each image. If None, defers to the data provided.
@@ -469,12 +466,10 @@ def calculate(
 
     isObjectDetectionDataset: bool = False
 
-    if isinstance(data, AnnotatedDataset) and isinstance(data[0], tuple) and len(data[0]) == 3:
-        for datum in data:
-            if not isinstance(datum[1], SequenceLike | ObjectDetectionTarget):
-                continue
+    if isinstance(data, Dataset) and isinstance(data[0], tuple):
+        datum = cast(tuple, data[0])
+        if len(datum) == 3:
             isObjectDetectionDataset = isinstance(datum[1], ObjectDetectionTarget)
-            break
 
     # `per_target` is True only if boxes are provided or data is an ObjectDetectionDataset
     per_target = per_target and (isObjectDetectionDataset or boxes is not None)
@@ -500,7 +495,7 @@ def calculate(
 
     images, boxes = (
         (data, boxes)
-        if not isinstance(data, AnnotatedDataset)
+        if not isinstance(data, Dataset)
         else (unzip_dataset(data, per_target=False)[0], boxes)
         if boxes is not None
         else unzip_dataset(data, per_target=per_target)

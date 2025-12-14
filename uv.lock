@@ -683,6 +683,7 @@ dev = [
     { name = "certifi" },
     { name = "codespell", extra = ["toml"] },
     { name = "coverage", extra = ["toml"] },
+    { name = "dataeval-plots", extra = ["plotly"] },
     { name = "ipykernel" },
     { name = "ipywidgets" },
     { name = "jinja2" },
@@ -690,7 +691,6 @@ dev = [
     { name = "jupyter-client" },
     { name = "maite-datasets" },
     { name = "markupsafe" },
-    { name = "matplotlib" },
     { name = "myst-nb" },
     { name = "nox" },
     { name = "nox-uv" },
@@ -715,6 +715,7 @@ dev = [
 ]
 doclint = [
     { name = "certifi" },
+    { name = "dataeval-plots", extra = ["plotly"] },
     { name = "ipykernel" },
     { name = "ipywidgets" },
     { name = "jinja2" },
@@ -722,7 +723,6 @@ doclint = [
     { name = "jupyter-client" },
     { name = "maite-datasets" },
     { name = "markupsafe" },
-    { name = "matplotlib" },
     { name = "myst-nb" },
     { name = "nbconvert" },
     { name = "nox" },
@@ -745,6 +745,7 @@ doclint = [
 ]
 docs = [
     { name = "certifi" },
+    { name = "dataeval-plots", extra = ["plotly"] },
     { name = "ipykernel" },
     { name = "ipywidgets" },
     { name = "jinja2" },
@@ -752,7 +753,6 @@ docs = [
     { name = "jupyter-client" },
     { name = "maite-datasets" },
     { name = "markupsafe" },
-    { name = "matplotlib" },
     { name = "myst-nb" },
     { name = "nox" },
     { name = "nox-uv" },
@@ -785,13 +785,11 @@ lock = [
     { name = "uv" },
 ]
 plus = [
-    { name = "matplotlib" },
     { name = "pip" },
     { name = "tqdm" },
 ]
 test = [
     { name = "coverage", extra = ["toml"] },
-    { name = "matplotlib" },
     { name = "nox" },
     { name = "nox-uv" },
     { name = "pip" },
@@ -849,6 +847,7 @@ dev = [
     { name = "certifi", specifier = ">=2024.7.4" },
     { name = "codespell", extras = ["toml"], specifier = ">=2.3" },
     { name = "coverage", extras = ["toml"], specifier = ">=7.6" },
+    { name = "dataeval-plots", extras = ["plotly"], specifier = ">=0.0.5a0" },
     { name = "ipykernel", specifier = ">=6.26.0" },
     { name = "ipywidgets", specifier = ">=8.1.1" },
     { name = "jinja2", specifier = ">=3.1.6" },
@@ -856,7 +855,6 @@ dev = [
     { name = "jupyter-client", specifier = ">=8.6.0" },
     { name = "maite-datasets", specifier = ">=0.0.10" },
     { name = "markupsafe", specifier = ">=3,<3.0.2" },
-    { name = "matplotlib", specifier = ">=3.7.1" },
     { name = "myst-nb", specifier = ">=1.0" },
     { name = "nox", specifier = ">=2025.5.1" },
     { name = "nox-uv", specifier = ">=0.6.2" },
@@ -880,6 +878,7 @@ dev = [
 ]
 doclint = [
     { name = "certifi", specifier = ">=2024.7.4" },
+    { name = "dataeval-plots", extras = ["plotly"], specifier = ">=0.0.5a0" },
     { name = "ipykernel", specifier = ">=6.26.0" },
     { name = "ipywidgets", specifier = ">=8.1.1" },
     { name = "jinja2", specifier = ">=3.1.6" },
@@ -887,7 +886,6 @@ doclint = [
     { name = "jupyter-client", specifier = ">=8.6.0" },
     { name = "maite-datasets", specifier = ">=0.0.10" },
     { name = "markupsafe", specifier = ">=3,<3.0.2" },
-    { name = "matplotlib", specifier = ">=3.7.1" },
     { name = "myst-nb", specifier = ">=1.0" },
     { name = "nbconvert", specifier = ">=7.0" },
     { name = "nox", specifier = ">=2025.5.1" },
@@ -909,6 +907,7 @@ doclint = [
 ]
 docs = [
     { name = "certifi", specifier = ">=2024.7.4" },
+    { name = "dataeval-plots", extras = ["plotly"], specifier = ">=0.0.5a0" },
     { name = "ipykernel", specifier = ">=6.26.0" },
     { name = "ipywidgets", specifier = ">=8.1.1" },
     { name = "jinja2", specifier = ">=3.1.6" },
@@ -916,7 +915,6 @@ docs = [
     { name = "jupyter-client", specifier = ">=8.6.0" },
     { name = "maite-datasets", specifier = ">=0.0.10" },
     { name = "markupsafe", specifier = ">=3,<3.0.2" },
-    { name = "matplotlib", specifier = ">=3.7.1" },
     { name = "myst-nb", specifier = ">=1.0" },
     { name = "nox", specifier = ">=2025.5.1" },
     { name = "nox-uv", specifier = ">=0.6.2" },
@@ -948,13 +946,11 @@ lock = [
     { name = "uv", specifier = ">=0.8.0" },
 ]
 plus = [
-    { name = "matplotlib", specifier = ">=3.7.1" },
     { name = "pip", specifier = ">=25" },
     { name = "tqdm", specifier = ">=4.66" },
 ]
 test = [
     { name = "coverage", extras = ["toml"], specifier = ">=7.6" },
-    { name = "matplotlib", specifier = ">=3.7.1" },
     { name = "nox", specifier = ">=2025.5.1" },
     { name = "nox-uv", specifier = ">=0.6.2" },
     { name = "pip", specifier = ">=25" },
@@ -969,6 +965,25 @@ type = [
     { name = "nox-uv", specifier = ">=0.6.2" },
     { name = "pyright", extras = ["nodejs"], specifier = ">=1.1.400" },
     { name = "uv", specifier = ">=0.8.0" },
+]
+
+[[package]]
+name = "dataeval-plots"
+version = "0.0.5a0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "polars" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/35/79/12d3699839d8599c06d684a06e5ec7e031c8cb947acc2551a39db3d9ca86/dataeval_plots-0.0.5a0.tar.gz", hash = "sha256:f7dd1e9fedf2fbaa3c7076c53b35d0ceed8137cebf55bd0a702592411d4370a1", size = 33432, upload-time = "2025-12-11T15:47:32.179Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d9/53/15cb5e77d47bd011b8f28b49255df75ebe9cacc277c5c1f0896350a34c8d/dataeval_plots-0.0.5a0-py3-none-any.whl", hash = "sha256:98b4f3cb36307df64d5a1727e160887d7e8e5cb6b7dec602c0958f79e664baaa", size = 42081, upload-time = "2025-12-11T15:47:30.821Z" },
+]
+
+[package.optional-dependencies]
+plotly = [
+    { name = "plotly" },
 ]
 
 [[package]]
@@ -4724,7 +4739,7 @@ resolution-markers = [
     "python_full_version < '3.11' and extra != 'extra-8-dataeval-cpu' and extra != 'extra-8-dataeval-cu118' and extra != 'extra-8-dataeval-cu124' and extra != 'extra-8-dataeval-cu128'",
 ]
 dependencies = [
-    { name = "mpmath" },
+    { name = "mpmath", marker = "extra == 'extra-8-dataeval-cpu' or extra == 'extra-8-dataeval-cu118' or extra != 'extra-8-dataeval-cu124' or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/83/d3/803453b36afefb7c2bb238361cd4ae6125a569b4db67cd9e79846ba2d68c/sympy-1.14.0.tar.gz", hash = "sha256:d3d3fe8df1e5a0b42f0e7bdf50541697dbe7d23746e894990c030e2b05e72517", size = 7793921, upload-time = "2025-04-27T18:05:01.611Z" }
 wheels = [
@@ -5379,7 +5394,7 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "setuptools" },
+    { name = "setuptools", marker = "extra == 'extra-8-dataeval-cu118' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128') or (extra != 'extra-8-dataeval-cpu' and extra != 'extra-8-dataeval-cu124' and extra != 'extra-8-dataeval-cu128')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/76/04/d54d3a6d077c646624dc9461b0059e23fd5d30e0dbe67471e3654aec81f9/triton-3.3.0-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:fad99beafc860501d7fcc1fb7045d9496cbe2c882b1674640304949165a916e7", size = 156441993, upload-time = "2025-04-09T20:27:25.107Z" },

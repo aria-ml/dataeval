@@ -12,7 +12,6 @@ from numpy.typing import NDArray
 from dataeval.core._calculate import CalculationResult, calculate
 from dataeval.core._clusterer import ClusterResult
 from dataeval.core.flags import ImageStats
-from dataeval.data._images import Images
 from dataeval.protocols import ArrayLike, Dataset
 from dataeval.types import DictOutput, set_metadata
 from dataeval.utils._stats import StatsMap, combine_results, get_dataset_step_from_idx
@@ -339,7 +338,6 @@ class Duplicates:
         >>> saved_stats = detector.stats
 
         """
-        images = Images(data) if isinstance(data, Dataset) else data
-        self.stats = calculate(images, None, ImageStats.HASH)
+        self.stats = calculate(data, None, ImageStats.HASH)
         duplicates = self._get_duplicates(self.stats["stats"])
         return DuplicatesOutput(**duplicates)

@@ -95,7 +95,7 @@ def generate_random_class_labels_and_binned_data(
 
 
 def get_one_hot(class_count: int, sub_labels: Sequence[int]) -> list[list[float]]:
-    one_hot = [[0.0] * class_count] * len(sub_labels)
+    one_hot = [[0.0] * class_count for _ in range(len(sub_labels))]
     for i, label in enumerate(sub_labels):
         one_hot[i][label] = 1.0
     return one_hot
@@ -243,24 +243,52 @@ def doctest_metrics_estimators_divergence(doctest_namespace: dict[str, Any]) -> 
 
 @pytest.fixture(autouse=True, scope="session")
 def doctest_metrics_stats(doctest_namespace: dict[str, Any]) -> None:
-    images = np.repeat(np.arange(65536, dtype=np.int32), 4 * 8).reshape(8, -1, 128, 128)[:, :3, :, :]
+    # Create 8 images with consistent pixel values (to avoid image-level outliers)
+    # but with varying bbox content to create target-level outliers
+    rng = np.random.default_rng(42)
+    images = []
+
     for i in range(8):
-        for j in range(3):
-            images[i, j, 30:50, 50:80] = i * j
-    images = list(images)
-    images[2] = np.resize(np.mean(images[2], axis=0), (1, 96, 128))
-    images[4] = np.resize(np.mean(images[4], axis=0), (1, 96, 64))
+        # Create base image with normal pixel values (mean ~128, std ~30)
+        img = rng.normal(128, 30, (3, 128, 128)).astype(np.int32)
+        img = np.clip(img, 0, 255)
+        images.append(img)
+
+    # Make images 2 and 4 have different dimensions for dimension outliers
+    images[2] = np.resize(images[2].mean(axis=0), (1, 96, 128))
+    images[4] = np.resize(images[4].mean(axis=0), (1, 96, 64))
 
     bboxes = [
-        [[5, 21, 24, 43], [7, 4, 17, 21]],
-        [[12, 23, 28, 24]],
-        [[13, 9, 29, 23], [17, 7, 39, 20], [2, 14, 9, 26]],
-        [[18, 14, 28, 29]],
-        [[21, 18, 44, 27], [15, 13, 28, 23]],
-        [[13, 2, 23, 14]],
-        [[4, 16, 8, 20], [16, 14, 25, 29]],
-        [[1, 22, 13, 45], [12, 20, 27, 21], [16, 22, 39, 28]],
+        [[5, 21, 24, 43], [7, 4, 17, 21]],  # Image 0: 2 normal bboxes
+        [[12, 23, 28, 24]],  # Image 1: 1 normal bbox
+        [[13, 9, 29, 23], [17, 7, 39, 20], [2, 14, 9, 26]],  # Image 2: 3 bboxes
+        [[18, 14, 28, 29]],  # Image 3: 1 bbox
+        [[21, 18, 44, 27], [15, 13, 28, 23]],  # Image 4: 2 bboxes
+        [[13, 2, 23, 14]],  # Image 5: 1 bbox
+        [[4, 16, 8, 20], [16, 14, 25, 29]],  # Image 6: 2 bboxes
+        [[1, 22, 13, 45], [12, 20, 27, 21], [16, 22, 39, 28]],  # Image 7: 3 bboxes
     ]
+
+    # Create target-level outliers by modifying bbox regions
+    # Make some bboxes very bright (outliers), some very dark (outliers), rest normal
+    for img_idx, bbox_list in enumerate(bboxes):
+        for bbox_idx, bbox in enumerate(bbox_list):
+            y1, x1, y2, x2 = bbox
+            if img_idx == 0 and bbox_idx == 0:
+                # Very bright bbox - target outlier
+                images[img_idx][:, x1:x2, y1:y2] = 250
+            elif img_idx == 2 and bbox_idx == 1:
+                # Very dark bbox - target outlier
+                images[img_idx][:, x1:x2, y1:y2] = 5
+            elif img_idx == 5 and bbox_idx == 0:
+                # Very bright bbox - target outlier
+                images[img_idx][:, x1:x2, y1:y2] = 245
+            elif img_idx == 7 and bbox_idx == 2:
+                # Very dark bbox - target outlier
+                images[img_idx][:, x1:x2, y1:y2] = 10
+            # Other bboxes remain with normal pixel values from base image
+
+    images = list(images)
 
     rng = np.random.default_rng(4)
     label_array = rng.choice(5, 50)

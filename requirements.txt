@@ -298,6 +298,9 @@ cycler==0.12.1 \
     --hash=sha256:85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30 \
     --hash=sha256:88bb128f02ba341da8ef447245a9e138fae777f6a23943da4540077d3601eb1c
     # via matplotlib
+dataeval-plots==0.0.5a0 \
+    --hash=sha256:98b4f3cb36307df64d5a1727e160887d7e8e5cb6b7dec602c0958f79e664baaa \
+    --hash=sha256:f7dd1e9fedf2fbaa3c7076c53b35d0ceed8137cebf55bd0a702592411d4370a1
 debugpy==1.8.14 \
     --hash=sha256:0f920c7f9af409d90f5fd26e313e119d908b0dd2952c2393cd3247a462331f15 \
     --hash=sha256:1b2ac8c13b2645e0b1eaf30e816404990fbdb168e193322be8f545e8c01644a9 \
@@ -760,7 +763,9 @@ matplotlib==3.10.3 \
     --hash=sha256:f6929fc618cb6db9cb75086f73b3219bbb25920cb24cee2ea7a12b04971a4158 \
     --hash=sha256:fd5641a9bb9d55f4dd2afe897a53b537c834b9012684c8444cc105895c8c16fd \
     --hash=sha256:fdfa07c0ec58035242bc8b2c8aae37037c9a886370eef6850703d7583e19964b
-    # via dataeval
+    # via
+    #   dataeval
+    #   dataeval-plots
 matplotlib-inline==0.1.7 \
     --hash=sha256:8423b23ec666be3d16e16b60bdd8ac4e86e840ebd1dd11a30b9f117f2fa0ab90 \
     --hash=sha256:df192d39a4ff8f21b1895d72e6a13f5fcc5099f00fa84384e0ea28c2cc0653ca
@@ -919,6 +924,7 @@ numpy==2.2.6 \
     # via
     #   contourpy
     #   dataeval
+    #   dataeval-plots
     #   lightgbm
     #   maite
     #   maite-datasets
@@ -1130,6 +1136,7 @@ platformdirs==4.3.8 \
 plotly==6.3.1 \
     --hash=sha256:8b4420d1dcf2b040f5983eed433f95732ed24930e496d36eb70d211923532e64 \
     --hash=sha256:dd896e3d940e653a7ce0470087e82c2bd903969a55e30d1b01bb389319461bb0
+    # via dataeval-plots
 pluggy==1.6.0 \
     --hash=sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3 \
     --hash=sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746
@@ -1142,7 +1149,9 @@ polars==1.30.0 \
     --hash=sha256:dfe94ae84a5efd9ba74e616e3e125b24ca155494a931890a8f17480737c4db45 \
     --hash=sha256:e3d05914c364b8e39a5b10dcf97e84d76e516b3b1693880bf189a93aab3ca00d \
     --hash=sha256:ffb3ef133454275d4254442257c5f71dd6e393ce365c97997dadeb6fa9d6d4b5
-    # via dataeval
+    # via
+    #   dataeval
+    #   dataeval-plots
 prompt-toolkit==3.0.51 \
     --hash=sha256:52742911fde84e2d423e2f9a4cf1de7d7ac4e51958f648d9540e0fb8db077b07 \
     --hash=sha256:931a162e3b27fc90c86f1b48bb1fb2c528c2761475e57c9c06de13311c7b54ed

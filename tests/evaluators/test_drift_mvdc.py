@@ -151,23 +151,6 @@ class TestDriftMVDCOutput:
         with pytest.raises(KeyError):
             output.filter(metrics="foo")
 
-    @pytest.mark.requires_all
-    def test_plot(self, result_df):
-        output = DriftMVDCOutput(result_df)
-
-        fig = output.plot()
-        x_data = fig.axes[0].lines[0].get_xdata()
-        x_values = np.arange(0, 10, dtype=int)
-        np.testing.assert_array_equal(x_data, x_values)
-        assert fig._dpi == 300  # type: ignore
-
-    @pytest.mark.requires_all
-    def test_plot_driftx_not_gt2(self, result_df):
-        modified = result_df.head(2)
-        output = DriftMVDCOutput(modified)
-        fig = output.plot()
-        assert fig
-
 
 @pytest.mark.skip
 def driftmvdc_demo():
@@ -193,7 +176,6 @@ def driftmvdc_demo():
     dc = DriftMVDC(n_folds=cvfold, chunk_size=chunksz, threshold=bounds)
     dc.fit(trnData)
     results = dc.predict(tstData)
-    results.plot().show()  # fig: DomainClassification.png will be to cwd
 
     # Test domain data using Polars backend
     resdf = results.data()  # Returns pl.DataFrame directly
