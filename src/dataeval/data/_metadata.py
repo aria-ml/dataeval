@@ -13,11 +13,10 @@ from numpy.typing import NDArray
 
 from dataeval.core._bin import bin_data, digitize_data, is_continuous
 from dataeval.core._feature_distance import FeatureDistanceResult, feature_distance
-from dataeval.protocols import AnnotatedDataset, Array, DatumMetadata, ObjectDetectionTarget
+from dataeval.protocols import AnnotatedDataset, Array, DatumMetadata, ObjectDetectionTarget, ProgressCallback
 from dataeval.types import Array1D
 from dataeval.utils._array import as_numpy
 from dataeval.utils._merge import merge
-from dataeval.utils._tqdm import tqdm
 
 _logger = logging.getLogger(__name__)
 
@@ -835,7 +834,7 @@ class Metadata:
         scores: list,
         srcidx: list,
         datum_count: int,
-        progress_callback: Callable[[int, int | None], None] | None,
+        progress_callback: ProgressCallback | None,
     ) -> bool | None:
         """Process dataset targets and extract labels, bboxes, scores.
 
@@ -845,7 +844,8 @@ class Metadata:
             True if OD dataset, False if IC dataset, None if empty dataset
         """
         is_od = None
-        for i in tqdm(range(datum_count), desc="Processing datum metadata"):
+        datum_count = len(self._dataset)
+        for i in range(datum_count):
             _, target, metadata = self._dataset[i]
             raw.append(metadata)
 
@@ -871,7 +871,7 @@ class Metadata:
                 raise ValueError("Encountered unexpected target type in dataset")
 
             if progress_callback:
-                progress_callback(i, datum_count)
+                progress_callback(i, total=datum_count)
 
         return is_od
 
@@ -948,7 +948,7 @@ class Metadata:
     def _structure(
         self,
         *,
-        progress_callback: Callable[[int, int | None], None] | None = None,
+        progress_callback: ProgressCallback | None = None,
     ) -> None:
         if self._is_structured:
             return
@@ -1068,7 +1068,7 @@ class Metadata:
     def _bin(
         self,
         *,
-        progress_callback: Callable[[int, int | None], None] | None = None,
+        progress_callback: ProgressCallback | None = None,
     ) -> None:
         """Populate factor info and bin non-categorical factors."""
         if self._is_binned:
@@ -1100,7 +1100,7 @@ class Metadata:
             factor_info[col] = info
 
             if progress_callback:
-                progress_callback(i + 1, total_factors)
+                progress_callback(i + 1, total=total_factors)
 
         # Store the results
         self._dataframe = df

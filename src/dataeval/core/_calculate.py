@@ -3,7 +3,7 @@ from __future__ import annotations
 __all__ = []
 
 import logging
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Sized
+from collections.abc import Iterable, Iterator, Mapping, Sequence, Sized
 from dataclasses import dataclass
 from enum import Flag
 from functools import cached_property, partial
@@ -22,12 +22,12 @@ from dataeval.protocols import (
     ArrayLike,
     Dataset,
     ObjectDetectionTarget,
+    ProgressCallback,
 )
 from dataeval.types import SourceIndex
 from dataeval.utils._boundingbox import BoundingBox, BoxLike
 from dataeval.utils._image import clip_and_pad, normalize_image_shape, rescale
 from dataeval.utils._multiprocessing import PoolWrapper
-from dataeval.utils._tqdm import tqdm
 from dataeval.utils._unzip_dataset import unzip_dataset
 
 _logger = logging.getLogger(__name__)
@@ -388,7 +388,7 @@ def calculate(
     per_image: bool = True,
     per_target: bool = True,
     per_channel: bool = False,
-    progress_callback: Callable[[int, int | None], None] | None = None,
+    progress_callback: ProgressCallback | None = None,
 ) -> CalculationResult:
     """
     Compute specified statistics on a set of images, optionally within bounding boxes.
@@ -413,8 +413,9 @@ def calculate(
     per_channel : bool, default False
         If True, compute per-channel statistics. If False, statistics are
         aggregated across all channels.
-    progress_callback : Callable[[int, int | None], None] | None
-        Optional callback for progress updates.
+    progress_callback : ProgressCallback or None, default None
+        Callback to report progress during calculation. Called after each image is processed
+        with the current image count and total number of images (if known).
 
     Returns
     -------
@@ -503,29 +504,24 @@ def calculate(
 
     # Build description for progress bar
     calculator_names = [c[0].__name__.removesuffix("Calculator") for c in calculators]
-    desc = f"Processing images for {', '.join(calculator_names)}"
     _logger.debug("Using calculators: %s", calculator_names)
 
     with PoolWrapper(processes=get_max_processes()) as p:
-        for result in tqdm(
-            p.imap_unordered(
-                partial(
-                    _unpack,
-                    calculators=calculators,
-                    per_image=per_image,
-                    per_target=per_target,
-                    per_channel=per_channel,
-                ),
-                _enumerate(images, boxes),
+        for result in p.imap_unordered(
+            partial(
+                _unpack,
+                calculators=calculators,
+                per_image=per_image,
+                per_target=per_target,
+                per_channel=per_channel,
             ),
-            total=total_images,
-            desc=desc,
+            _enumerate(images, boxes),
         ):
             _aggregate(result, source_indices, aggregated_stats, object_count, invalid_box_count, warning_list)
             image_count += 1
 
             if progress_callback:
-                progress_callback(image_count, total_images)
+                progress_callback(image_count, total=total_images)
 
     for w in warning_list:
         _logger.warning(w)

@@ -451,10 +451,7 @@ class TestEmbeddings:
         assert input_result.shape == expected_input_shape
         assert (output_result.shape == input_result.shape) == shapes_match
 
-    def test_embeddings_verbose_logging(self, torch_ic_ds, sequential_model, caplog):
-        """Test that verbose parameter controls logging output"""
-
-        # Test with verbose=True - should log
+    def test_embeddings_layer_logging(self, torch_ic_ds, sequential_model, caplog):
         with caplog.at_level(logging.DEBUG):
             _ = Embeddings(
                 torch_ic_ds,
@@ -462,27 +459,10 @@ class TestEmbeddings:
                 model=sequential_model,
                 layer_name="2",
                 use_output=True,
-                verbose=True,
                 device="cpu",
             )
 
             assert "Capturing output data from layer 2" in caplog.text
-
-        caplog.clear()
-
-        # Test with verbose=False - should not log
-        with caplog.at_level(logging.DEBUG):
-            _ = Embeddings(
-                torch_ic_ds,
-                batch_size=64,
-                model=sequential_model,
-                layer_name="2",
-                use_output=False,
-                verbose=False,
-                device="cpu",
-            )
-
-            assert "Capturing" not in caplog.text
 
     def test_empty_dataset_shape(self):
         """Test that shape property handles empty dataset (line 149)"""
@@ -656,3 +636,85 @@ class TestResolvePath:
         assert resolved.parent == path_no_suffix
         assert resolved.suffix == ".npy"
         assert "emb-" in resolved.name
+
+
+class TestProgressCallback:
+    """Test suite for progress_callback functionality"""
+
+    def test_progress_callback_called_during_compute(self):
+        """Test that progress_callback is called during embedding computation"""
+        ds = get_dataset(10)
+        callback_calls = []
+
+        def callback(step: int, *, total: int | None = None, desc: str | None = None, extra_info: dict | None = None):
+            callback_calls.append({"step": step, "total": total, "desc": desc, "extra_info": extra_info})
+
+        embs = Embeddings(ds, batch_size=2, model=torch.nn.Identity(), device="cpu", progress_callback=callback)
+        _ = embs[:]  # Trigger computation
+
+        # Callback should have been called
+        assert len(callback_calls) > 0
+        # Verify callback was called with proper parameters
+        for call in callback_calls:
+            assert "step" in call
+            assert "total" in call
+            assert call["total"] == 10  # Total should be the dataset length
+
+    def test_progress_callback_not_called_when_none(self):
+        """Test that no error occurs when progress_callback is None"""
+        ds = get_dataset(10)
+        embs = Embeddings(ds, batch_size=2, model=torch.nn.Identity(), device="cpu", progress_callback=None)
+        _ = embs[:]  # Should work without error
+
+    def test_progress_callback_with_getitem(self):
+        """Test that progress_callback works with __getitem__"""
+        ds = get_dataset(10)
+        callback_calls = []
+
+        def callback(step: int, *, total: int | None = None, desc: str | None = None, extra_info: dict | None = None):
+            callback_calls.append({"step": step, "total": total})
+
+        embs = Embeddings(ds, batch_size=3, model=torch.nn.Identity(), device="cpu", progress_callback=callback)
+        _ = embs[0:5]  # Get first 5 items
+
+        # Callback should have been called
+        assert len(callback_calls) > 0
+
+    def test_progress_callback_with_compute(self):
+        """Test that progress_callback works with compute method"""
+        ds = get_dataset(10)
+        callback_calls = []
+
+        def callback(step: int, *, total: int | None = None, desc: str | None = None, extra_info: dict | None = None):
+            callback_calls.append({"step": step, "total": total})
+
+        embs = Embeddings(ds, batch_size=2, model=torch.nn.Identity(), device="cpu", progress_callback=callback)
+        embs.compute()
+
+        # Callback should have been called
+        assert len(callback_calls) > 0
+        # Total should be the full dataset length
+        for call in callback_calls:
+            assert call["total"] == 10
+
+    def test_progress_callback_preserved_in_new(self, torch_ic_ds):
+        """Test that progress_callback is preserved when creating new embeddings"""
+        callback_calls = []
+
+        def callback(step: int, *, total: int | None = None, desc: str | None = None, extra_info: dict | None = None):
+            callback_calls.append({"step": step, "total": total})
+
+        embs = Embeddings(torch_ic_ds, batch_size=2, model=IdentityModel(), device="cpu", progress_callback=callback)
+        mini_ds = TorchDataset(torch.ones((5, 1, 3, 3)), torch.nn.functional.one_hot(torch.arange(5)))
+        mini_embs = embs.new(mini_ds)
+
+        # Clear previous calls
+        callback_calls.clear()
+
+        # Use the new embeddings
+        _ = mini_embs[:]
+
+        # Callback should have been called with new dataset
+        assert len(callback_calls) > 0
+        for call in callback_calls:
+            assert call["total"] == 5  # New dataset size

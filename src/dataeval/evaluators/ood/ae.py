@@ -19,7 +19,7 @@ import torch
 from numpy.typing import NDArray
 
 from dataeval.evaluators.ood.base import OODBase, OODScoreOutput
-from dataeval.protocols import ArrayLike, DeviceLike
+from dataeval.protocols import ArrayLike, DeviceLike, ProgressCallback
 from dataeval.utils._predict import predict
 
 
@@ -70,7 +70,7 @@ class OOD_AE(OODBase):
         optimizer: torch.optim.Optimizer | None = None,
         epochs: int = 20,
         batch_size: int = 64,
-        verbose: bool = False,
+        progress_callback: ProgressCallback | None = None,
     ) -> None:
         if loss_fn is None:
             loss_fn = torch.nn.MSELoss()
@@ -78,7 +78,7 @@ class OOD_AE(OODBase):
         if optimizer is None:
             optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
 
-        super().fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
+        super().fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, batch_size, progress_callback)
 
     def _score(self, X: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput:
         # reconstruct instances

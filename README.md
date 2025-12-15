@@ -54,10 +54,9 @@ Choose your preferred method of installation below or follow our
 ### **Installing with pip**
 
 You can install DataEval directly from pypi.org using the following command.
-The optional dependencies of DataEval are `all`.
 
 ```bash
-pip install dataeval[all]
+pip install dataeval
 ```
 
 ### **Installing with conda**
@@ -82,10 +81,10 @@ cd dataeval
 
 #### **Using Poetry**
 
-Install DataEval with all extras.
+Install DataEval.
 
 ```bash
-poetry install --extras=all
+poetry install
 ```
 
 Enable Poetry's virtual environment.
@@ -96,10 +95,10 @@ poetry env activate
 
 #### **Using uv**
 
-Install DataEval with all extras and dependencies for development.
+Install DataEval with dependencies for development.
 
 ```bash
-uv sync --extra=all
+uv sync
 ```
 
 Enable uv's virtual environment.

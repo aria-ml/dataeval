@@ -312,7 +312,7 @@ class TestMetadata:
         # Verify callback was called for each datum
         assert callback.call_count == len(mock_ds)
         # Check that the last call has the correct final values
-        callback.assert_called_with(len(mock_ds) - 1, len(mock_ds))
+        callback.assert_called_with(len(mock_ds) - 1, total=len(mock_ds))
 
     def test_bin_progress_callback(self, RNG: np.random.Generator):
         """Test that _bin calls progress_callback with correct values"""
@@ -336,7 +336,7 @@ class TestMetadata:
         expected_calls = len(md_dict)
         assert callback.call_count == expected_calls
         # Check that the last call has the correct final values
-        callback.assert_called_with(expected_calls, expected_calls)
+        callback.assert_called_with(expected_calls, total=expected_calls)
 
     def test_multidimensional_factors_skipped(self, RNG: np.random.Generator):
         """Test that multi-dimensional factors are skipped during binning and filtered from outputs."""
