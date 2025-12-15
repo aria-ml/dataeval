@@ -64,12 +64,6 @@ cu128 = [
   "torch>=2.2.0",
   "torchvision>=0.17.0",
 ]
-matplotlib = ["matplotlib>=3.7.1"]
-tqdm = ["tqdm>=4.66"]
-all = [
-  "matplotlib>=3.7.1",
-  "tqdm>=4.66",
-]
 
 [project.urls]
 Homepage = "https://dataeval.ai/"
@@ -81,10 +75,6 @@ base = [
   "nox>=2025.5.1",
   "nox-uv>=0.6.2",
   "uv>=0.8.0",
-]
-plus = [
-  "pip>=25",
-  "tqdm>=4.66",
 ]
 lock = [
   { include-group = "base" },
@@ -105,7 +95,6 @@ doclint = [
 ]
 test = [
   { include-group = "base" },
-  { include-group = "plus" },
   "coverage[toml]>=7.6",
   "pytest>=8.3",
   "pytest-cov>=6.1",
@@ -117,7 +106,6 @@ type = [
 ]
 docs = [
   { include-group = "base" },
-  { include-group = "plus" },
   "numpy>=2.0.2",
   "certifi>=2024.07.04",
   "dataeval-plots[plotly]>=0.0.5a",
@@ -140,12 +128,12 @@ docs = [
 ]
 dev = [
   { include-group = "base" },
-  { include-group = "plus" },
   { include-group = "lint" },
   { include-group = "test" },
   { include-group = "type" },
   { include-group = "docs" },
   "pip>=25",  # just in case
+  "jupyter",
 ]
 
 [tool.uv]

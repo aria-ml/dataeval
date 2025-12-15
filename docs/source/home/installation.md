@@ -24,24 +24,6 @@ Installing from `pip`
 pip install dataeval
 ```
 
-DataEval also has an installable _extras_ `all` that provide access to
-additional output formats and utility functions for analysis of your data.
-
-```{list-table}
-:header-rows: 1
-
-* - Additional Functionality
-  - Plot visualizations
-* - Modules Installed
-  - `matplotlib`
-```
-
-Installing from `pip` with extras
-
-```bash
-pip install dataeval[all]
-```
-
 ::::
 
 ::::{tab-item} conda-forge
@@ -51,19 +33,12 @@ Installing from `conda`
 conda install -c conda-forge dataeval
 ```
 
-:::{note}
-
-Conda installs all _extras_ automatically
-
-:::
-
 ::::
 
 ::::{tab-item} source (poetry)
 
-To install DataEval from source locally on Ubuntu, you will need git-lfs to
-download larger, binary source files and uv for project dependency
-management.
+To install DataEval from source locally on Ubuntu using poetry, begin
+by ensuring poetry is installed in your Python environment.
 
 ```bash
     sudo apt-get install git-lfs
@@ -77,10 +52,10 @@ Pull the source down and change to the DataEval project directory.
     cd dataeval
 ```
 
-Install DataEval with all extras
+Install DataEval
 
 ```bash
-    poetry install --extras=all
+    poetry install
 ```
 
 Now that DataEval is installed, you can run commands in the Poetry virtual
@@ -111,10 +86,21 @@ Pull the source down and change to the DataEval project directory.
     cd dataeval
 ```
 
-Install DataEval with all extras for Python 3.X
+Install DataEval with development dependencies.
 
 ```bash
-    uv sync -p 3.X --extra=all
+    uv sync
+```
+
+Optionally, you can specify the version of Python and PyTorch CPU/CUDA
+support (cpu, cu118, cu124, cu128) using -p and --extra respectively.
+
+For example, the following command installs DataEval in a Python 3.11
+environment using only PyTorch with CPU support, and no development
+dependencies:
+
+```bash
+    uv sync -p 3.11 --extra cpu --no-default-groups
 ```
 
 Now that DataEval is installed, you can run commands in the uv virtual
