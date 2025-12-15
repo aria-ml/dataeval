@@ -613,3 +613,32 @@ class EvaluationSchedule(Protocol):
             monotonically increasing and within [1, dataset_length]
         """
         ...
+
+
+# ========== CALLBACKS ==========
+
+
+class ProgressCallback(Protocol):
+    """
+    Protocol for a callable progress callback function.
+
+    Parameters
+    ----------
+    step : int
+        The current step or iteration number.
+    total : int or None
+        The total number of steps or iterations, if known.
+    desc : str or None
+        Optional description of the progress.
+    extra_info : Mapping[str, Any] or None
+        Optional dictionary of additional information.
+    """
+
+    def __call__(
+        self,
+        step: int,
+        *,
+        total: int | None = None,
+        desc: str | None = None,
+        extra_info: dict[str, Any] | None = None,
+    ) -> None: ...

@@ -88,7 +88,7 @@ echo "Installing Python ${python_version}+${cuda_version} to ${venv_name}"
 export UV_PROJECT_ENVIRONMENT=$venv_name
 echo "Creating python virtual environment for ${python_version}..."
 rm -rf $UV_PROJECT_ENVIRONMENT
-uv sync -p $python_version --extra all --extra $cuda_version
+uv sync -p $python_version --extra $cuda_version
 
 echo "Finished installing dataeval for python ${python_version} to ${venv_name}"
 echo

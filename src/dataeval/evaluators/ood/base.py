@@ -20,7 +20,7 @@ import torch
 from numpy.typing import NDArray
 
 from dataeval.config import get_device
-from dataeval.protocols import Array, ArrayLike, DeviceLike
+from dataeval.protocols import Array, ArrayLike, DeviceLike, ProgressCallback
 from dataeval.types import DictOutput, set_metadata
 from dataeval.utils._array import as_numpy, to_numpy
 from dataeval.utils._gmm import GaussianMixtureModelParams, gmm_params
@@ -101,7 +101,7 @@ class OODFitMixin(Generic[TLossFn, TOptimizer], ABC):
         optimizer: TOptimizer | None,
         epochs: int,
         batch_size: int,
-        verbose: bool,
+        progress_callback: ProgressCallback | None = None,
     ) -> None:
         """
         Train the model and infer the threshold value.
@@ -120,8 +120,8 @@ class OODFitMixin(Generic[TLossFn, TOptimizer], ABC):
             Number of training epochs.
         batch_size : int, default 64
             Batch size used for training.
-        verbose : bool, default True
-            Whether to print training progress.
+        progress_callback : ProgressCallback, default None
+            Callback to update training progress.
         """
 
 
@@ -239,7 +239,7 @@ class OODBase(OODBaseMixin[torch.nn.Module], OODFitMixin[Callable[..., torch.Ten
         optimizer: torch.optim.Optimizer | None,
         epochs: int,
         batch_size: int,
-        verbose: bool,
+        progress_callback: ProgressCallback | None = None,
     ) -> None:
         """
         Train the model and infer the threshold value.
@@ -258,8 +258,8 @@ class OODBase(OODBaseMixin[torch.nn.Module], OODFitMixin[Callable[..., torch.Ten
             Number of training epochs.
         batch_size : int, default 64
             Batch size used for training.
-        verbose : bool, default True
-            Whether to print training progress.
+        progress_callback : ProgressCallback, default None
+            Callback to update training progress.
         """
 
         # Train the model
@@ -273,7 +273,7 @@ class OODBase(OODBaseMixin[torch.nn.Module], OODFitMixin[Callable[..., torch.Ten
             epochs=epochs,
             batch_size=batch_size,
             device=self.device,
-            verbose=verbose,
+            progress_callback=progress_callback,
         )
 
         # Infer the threshold values
@@ -290,9 +290,9 @@ class OODBaseGMM(OODBase, OODGMMMixin[GaussianMixtureModelParams]):
         optimizer: torch.optim.Optimizer | None,
         epochs: int,
         batch_size: int,
-        verbose: bool,
+        progress_callback: ProgressCallback | None = None,
     ) -> None:
-        super().fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, batch_size, verbose)
+        super().fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, batch_size, progress_callback)
 
         # Calculate the GMM parameters
         _, z, gamma = cast(tuple[torch.Tensor, torch.Tensor, torch.Tensor], self.model(x_ref))

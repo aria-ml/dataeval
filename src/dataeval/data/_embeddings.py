@@ -24,10 +24,10 @@ from dataeval.protocols import (
     Dataset,
     DeviceLike,
     EmbeddingModel,
+    ProgressCallback,
     Transform,
 )
 from dataeval.utils._array import as_numpy, flatten
-from dataeval.utils._tqdm import tqdm
 
 _logger = logging.getLogger(__name__)
 
@@ -71,9 +71,9 @@ class Embeddings(Array):
         Fraction of available memory (0-1) that triggers memory-mapped storage. When estimated
         embedding size exceeds this threshold, uses disk-backed memmap instead of in-memory arrays.
         Only applies when path is provided.
-    verbose : bool, default False
-        When True, displays a progress bar when encoding images. Default False reduces console output
-        for cleaner automated workflows.
+    progress_callback : ProgressCallback or None, default None
+        Callback to report progress during embedding computation.
+
 
     Attributes
     ----------
@@ -83,14 +83,11 @@ class Embeddings(Array):
         Hardware device used for tensor computations.
     memory_threshold : float
         Fraction of available memory (0-1) that triggers memory-mapped storage.
-    verbose : bool
-        Whether progress information is displayed during operations.
     """
 
     device: torch.device
     batch_size: int
     memory_threshold: float
-    verbose: bool
 
     def __init__(
         self,
@@ -104,12 +101,12 @@ class Embeddings(Array):
         device: DeviceLike | None = None,
         path: Path | str | None = None,
         memory_threshold: float = 0.8,
-        verbose: bool = False,
+        progress_callback: ProgressCallback | None = None,
     ) -> None:
         self.device = get_device(device)
         self.batch_size = batch_size if batch_size > 0 else 1
-        self.verbose = verbose
         self.memory_threshold = max(0.0, min(1.0, memory_threshold))
+        self._progress_callback = progress_callback
 
         self._dataset = dataset
         self._transforms = (
@@ -126,11 +123,7 @@ class Embeddings(Array):
             self._use_output = bool(use_output)
 
             target_layer.register_forward_hook(self._hook_fn)
-
-            if verbose:
-                _logger.log(
-                    logging.DEBUG, f"Capturing {'output' if use_output else 'input'} data from layer {layer_name}."
-                )
+            _logger.log(logging.DEBUG, f"Capturing {'output' if use_output else 'input'} data from layer {layer_name}.")
 
         self._model = model.to(self.device).eval() if isinstance(model, torch.nn.Module) else flatten
 
@@ -275,7 +268,7 @@ class Embeddings(Array):
 
         use_memmap = bool(estimated_bytes > threshold_bytes)
 
-        if use_memmap and self.verbose:
+        if use_memmap:
             _logger.info(
                 f"Using memory-mapped storage: estimated size {estimated_bytes / 1e9:.2f}GB "
                 f"exceeds {self.memory_threshold * 100:.0f}% of available memory "
@@ -364,7 +357,7 @@ class Embeddings(Array):
             self.device,
             self._path,
             self.memory_threshold,
-            self.verbose,
+            self._progress_callback,
         )
 
     @classmethod
@@ -398,7 +391,7 @@ class Embeddings(Array):
         >>> print(embeddings.shape)
         (100, 512)
         """
-        embeddings = Embeddings([], 0, None, None, None, False, None, None, 0.8, False)
+        embeddings = Embeddings([], 0, None, None, None, False, None, None, 0.8)
         embeddings._embeddings = array if isinstance(array, np.ndarray) else as_numpy(array)
         embeddings._cached_idx = set(range(len(embeddings._embeddings)))
         embeddings._embeddings_only = True
@@ -455,7 +448,8 @@ class Embeddings(Array):
         Compute all embeddings and save to disk.
 
         Forces computation of all embeddings if not already computed, then
-        saves to the specified file path.
+        saves to the specified file path. Progress updates are reported via
+        the progress_callback if configured during computation.
 
         Parameters
         ----------
@@ -487,20 +481,19 @@ class Embeddings(Array):
         if isinstance(self._embeddings, np.memmap):
             # Memmap is already on disk, just flush
             self._embeddings.flush()
-            if self.verbose:
-                _logger.debug(f"Flushed memmap embeddings to {target_path}")
+            _logger.debug(f"Flushed memmap embeddings to {target_path}")
         else:
             # Save in-memory array to disk
             np.save(target_path, self._embeddings)
-            if self.verbose:
-                _logger.debug(f"Saved embeddings to {target_path}")
+            _logger.debug(f"Saved embeddings to {target_path}")
 
     def compute(self, force: bool = False) -> Embeddings:
         """
         Compute and cache all embeddings.
 
         Forces evaluation of all lazy embeddings, storing them in memory or
-        memmap according to the configured storage strategy.
+        memmap according to the configured storage strategy. Progress updates
+        are reported via the progress_callback if configured.
 
         Parameters
         ----------
@@ -559,7 +552,7 @@ class Embeddings(Array):
         dataset = self._TorchDatasetWrapper(self._dataset, self._transforms)
 
         # Process all indices in batches
-        for i in tqdm(range(0, len(indices), self.batch_size), desc="Batch embedding", disable=not self.verbose):
+        for batch_idx, i in enumerate(range(0, len(indices), self.batch_size)):
             batch = indices[i : i + self.batch_size]
             uncached = [idx for idx in batch if idx not in self._cached_idx]
 
@@ -583,11 +576,18 @@ class Embeddings(Array):
                     if isinstance(self._embeddings, np.memmap):
                         self._embeddings.flush()
 
+                    # Report progress
+                    if self._progress_callback:
+                        self._progress_callback(i + len(batch), total=len(indices))
+
             yield self._embeddings[batch]
 
     def __getitem__(self, key: int | Iterable[int] | slice, /) -> NDArray[Any]:
         """
         Access embeddings by index, indices or slice.
+
+        Computes embeddings on-demand for uncached indices. Progress updates
+        are reported via the progress_callback if configured.
 
         Parameters
         ----------

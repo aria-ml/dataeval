@@ -61,7 +61,7 @@ def test_oodbasegmm_fit():
     outlier = MockOODGMM(lambda _: (1, 1, 1))  # type: ignore
     mock_train = patch("dataeval.evaluators.ood.base.train").start()
     mock_gmm_params = patch("dataeval.evaluators.ood.base.gmm_params").start()
-    outlier.fit(np.zeros((10, 3, 64, 64)), 0.5, None, None, 1, 1, False)
+    outlier.fit(np.zeros((10, 3, 64, 64)), 0.5, None, None, 1, 1)
 
     assert mock_train.called
     assert mock_gmm_params.called

@@ -63,7 +63,7 @@ def lazy_embeddings(simple_dataset, tmp_path) -> Generator[tuple[Embeddings, Sim
     cache_path = tmp_path / "lazy_embeddings.npy"
     model = IdentityModel(embedding_dim=128)
 
-    emb = Embeddings(simple_dataset, batch_size=16, model=model, device="cpu", path=cache_path, verbose=False)
+    emb = Embeddings(simple_dataset, batch_size=16, model=model, device="cpu", path=cache_path)
 
     yield emb, simple_dataset, cache_path
 
@@ -79,7 +79,6 @@ def in_memory_embeddings(simple_dataset) -> Generator[tuple[Embeddings, SimpleDa
         model=model,
         device="cpu",
         path=None,  # In-memory only
-        verbose=False,
     )
 
     yield emb, simple_dataset
@@ -225,7 +224,7 @@ class TestEdgeCases:
         empty_dataset = SimpleDataset(size=0)
         model = IdentityModel()
 
-        emb = Embeddings(empty_dataset, batch_size=16, model=model, device="cpu", path=None, verbose=False)
+        emb = Embeddings(empty_dataset, batch_size=16, model=model, device="cpu", path=None)
 
         arr = np.asarray(emb)
         assert arr.shape[0] == 0
@@ -236,7 +235,7 @@ class TestEdgeCases:
         single_dataset = SimpleDataset(size=1)
         model = IdentityModel()
 
-        emb = Embeddings(single_dataset, batch_size=16, model=model, device="cpu", path=None, verbose=False)
+        emb = Embeddings(single_dataset, batch_size=16, model=model, device="cpu", path=None)
 
         arr = np.asarray(emb)
         assert arr.shape[0] == 1
@@ -403,7 +402,7 @@ class TestArrayProtocol:
         empty_dataset = SimpleDataset(size=0)
         model = IdentityModel()
 
-        emb = Embeddings(empty_dataset, batch_size=16, model=model, device="cpu", path=None, verbose=False)
+        emb = Embeddings(empty_dataset, batch_size=16, model=model, device="cpu", path=None)
 
         arr = np.asarray(emb)
 
@@ -564,7 +563,7 @@ class TestIntegration:
         model = IdentityModel()
 
         # Create embeddings
-        emb = Embeddings(simple_dataset, batch_size=16, model=model, device="cpu", path=None, verbose=False)
+        emb = Embeddings(simple_dataset, batch_size=16, model=model, device="cpu", path=None)
 
         # Access some embeddings
         sample = emb[0:10]
@@ -584,7 +583,7 @@ class TestIntegration:
         save_path = tmp_path / "embeddings.npy"
 
         # Create and compute embeddings
-        emb = Embeddings(simple_dataset, batch_size=16, model=model, device="cpu", path=save_path, verbose=False)
+        emb = Embeddings(simple_dataset, batch_size=16, model=model, device="cpu", path=save_path)
 
         # Compute and save
         emb.compute().save()
@@ -751,9 +750,7 @@ class TestLoadMethod:
         save_path = tmp_path / "roundtrip.npy"
 
         # Create, compute, and save embeddings
-        original_emb = Embeddings(
-            simple_dataset, batch_size=16, model=model, device="cpu", path=save_path, verbose=False
-        )
+        original_emb = Embeddings(simple_dataset, batch_size=16, model=model, device="cpu", path=save_path)
         original_emb.compute().save()
 
         # Load back using load() method
@@ -769,9 +766,7 @@ class TestLoadMethod:
         save_path = tmp_path / "roundtrip_memmap.npy"
 
         # Create, compute, and save embeddings
-        original_emb = Embeddings(
-            simple_dataset, batch_size=16, model=model, device="cpu", path=save_path, verbose=False
-        )
+        original_emb = Embeddings(simple_dataset, batch_size=16, model=model, device="cpu", path=save_path)
         original_emb.compute().save()
 
         # Load back as memmap
@@ -814,7 +809,6 @@ class TestShouldUseMemmap:
             model=model,
             device="cpu",
             path=None,  # No path
-            verbose=False,
         )
 
         # Should return False regardless of estimated size
@@ -842,7 +836,6 @@ class TestShouldUseMemmap:
             device="cpu",
             path=cache_path,
             memory_threshold=0.8,
-            verbose=False,
         )
 
         # Small embedding shape - should be well below threshold
@@ -871,7 +864,6 @@ class TestShouldUseMemmap:
             device="cpu",
             path=cache_path,
             memory_threshold=0.8,
-            verbose=False,
         )
 
         # Large embedding shape - should exceed threshold
@@ -899,7 +891,6 @@ class TestShouldUseMemmap:
             device="cpu",
             path=cache_path,
             memory_threshold=0.8,  # Threshold at 800 bytes
-            verbose=False,
         )
 
         # Calculate embedding shape that gives exactly 800 bytes
@@ -938,7 +929,6 @@ class TestShouldUseMemmap:
             device="cpu",
             path=cache_path,
             memory_threshold=0.3,
-            verbose=False,
         )
         assert emb_low._should_use_memmap(embedding_shape) is True
 
@@ -950,7 +940,6 @@ class TestShouldUseMemmap:
             device="cpu",
             path=cache_path,
             memory_threshold=0.5,
-            verbose=False,
         )
         # Note: This may be True or False depending on exact calculation
         result_med = emb_med._should_use_memmap(embedding_shape)
@@ -965,121 +954,8 @@ class TestShouldUseMemmap:
             device="cpu",
             path=cache_path,
             memory_threshold=0.9,
-            verbose=False,
         )
         assert emb_high._should_use_memmap(embedding_shape) is False
-
-    def test_should_use_memmap_verbose_logging(
-        self, simple_dataset: SimpleDataset, tmp_path: Path, monkeypatch, caplog
-    ):
-        """_should_use_memmap should log when using memmap if verbose=True."""
-        import logging
-
-        model = IdentityModel()
-        cache_path = tmp_path / "test.npy"
-
-        # Mock psutil to return small available memory
-        class MockVirtualMemory:
-            available = 50 * 1024**2  # 50 MB
-
-        monkeypatch.setattr("psutil.virtual_memory", lambda: MockVirtualMemory())
-
-        # Create embeddings with verbose=True
-        emb = Embeddings(
-            simple_dataset,
-            batch_size=16,
-            model=model,
-            device="cpu",
-            path=cache_path,
-            memory_threshold=0.8,
-            verbose=True,
-        )
-
-        # Large embedding that will trigger memmap
-        # 50 samples * 1000000 dims * 4 bytes = 200 MB > 40 MB (80% of 50 MB)
-        embedding_shape = (1000000,)
-
-        with caplog.at_level(logging.INFO):
-            result = emb._should_use_memmap(embedding_shape)
-
-        assert result is True
-
-        # Check that log message was produced
-        assert any("Using memory-mapped storage" in record.message for record in caplog.records)
-
-    def test_should_use_memmap_no_logging_when_not_verbose(
-        self, simple_dataset: SimpleDataset, tmp_path: Path, monkeypatch, caplog
-    ):
-        """_should_use_memmap should not log when verbose=False."""
-        import logging
-
-        model = IdentityModel()
-        cache_path = tmp_path / "test.npy"
-
-        # Mock psutil to return small available memory
-        class MockVirtualMemory:
-            available = 50 * 1024**2  # 50 MB
-
-        monkeypatch.setattr("psutil.virtual_memory", lambda: MockVirtualMemory())
-
-        # Create embeddings with verbose=False
-        emb = Embeddings(
-            simple_dataset,
-            batch_size=16,
-            model=model,
-            device="cpu",
-            path=cache_path,
-            memory_threshold=0.8,
-            verbose=False,
-        )
-
-        # Large embedding that will trigger memmap
-        embedding_shape = (1000000,)
-
-        with caplog.at_level(logging.INFO):
-            result = emb._should_use_memmap(embedding_shape)
-
-        assert result is True
-
-        # Should NOT have any log messages
-        assert not any("Using memory-mapped storage" in record.message for record in caplog.records)
-
-    def test_should_use_memmap_no_logging_when_false(
-        self, simple_dataset: SimpleDataset, tmp_path: Path, monkeypatch, caplog
-    ):
-        """_should_use_memmap should not log when returning False, even if verbose."""
-        import logging
-
-        model = IdentityModel()
-        cache_path = tmp_path / "test.npy"
-
-        # Mock psutil to return large available memory
-        class MockVirtualMemory:
-            available = 10 * 1024**3  # 10 GB
-
-        monkeypatch.setattr("psutil.virtual_memory", lambda: MockVirtualMemory())
-
-        # Create embeddings with verbose=True
-        emb = Embeddings(
-            simple_dataset,
-            batch_size=16,
-            model=model,
-            device="cpu",
-            path=cache_path,
-            memory_threshold=0.8,
-            verbose=True,
-        )
-
-        # Small embedding that won't trigger memmap
-        embedding_shape = (128,)
-
-        with caplog.at_level(logging.INFO):
-            result = emb._should_use_memmap(embedding_shape)
-
-        assert result is False
-
-        # Should NOT have any log messages since memmap wasn't used
-        assert not any("Using memory-mapped storage" in record.message for record in caplog.records)
 
 
 class TestInitializeStorage:
@@ -1103,7 +979,6 @@ class TestInitializeStorage:
             device="cpu",
             path=cache_path,
             memory_threshold=0.01,  # Very low threshold (1%)
-            verbose=False,
         )
 
         # Trigger initialization by accessing first embedding
@@ -1136,7 +1011,6 @@ class TestInitializeStorage:
             device="cpu",
             path=cache_path,
             memory_threshold=0.8,
-            verbose=False,
         )
 
         # Trigger initialization
@@ -1151,7 +1025,7 @@ class TestInitializeStorage:
     def test_initialize_storage_without_path(self, simple_dataset: SimpleDataset):
         """Test _initialize_storage creates in-memory array when no path is set"""
         model = IdentityModel()
-        embs = Embeddings(simple_dataset, batch_size=16, model=model, device="cpu", path=None, verbose=False)
+        embs = Embeddings(simple_dataset, batch_size=16, model=model, device="cpu", path=None)
 
         # Trigger initialization
         sample_embedding = np.random.randn(128).astype(np.float32)
@@ -1186,7 +1060,6 @@ class TestSaveMemmap:
             device="cpu",
             path=cache_path,
             memory_threshold=0.01,  # Very low threshold
-            verbose=False,
         )
 
         # Compute to create memmap
@@ -1212,67 +1085,6 @@ class TestSaveMemmap:
         # Verify flush was called
         assert flush_called
 
-    def test_save_verbose_logging_memmap(self, tmp_path, monkeypatch, caplog):
-        """Test save() logs when flushing memmap with verbose=True (lines 489-490)"""
-        import logging
-
-        cache_path = tmp_path / "test.npy"
-        dataset = SimpleDataset(size=50, image_shape=(3, 32, 32))
-
-        # Mock psutil to force memmap usage
-        class MockVirtualMemory:
-            available = 10 * 1024  # 10 KB
-
-        monkeypatch.setattr("psutil.virtual_memory", lambda: MockVirtualMemory())
-
-        model = IdentityModel()
-        embs = Embeddings(
-            dataset,
-            batch_size=16,
-            model=model,
-            device="cpu",
-            path=cache_path,
-            memory_threshold=0.01,  # Very low threshold
-            verbose=True,
-        )
-
-        embs.compute()
-        assert isinstance(embs._embeddings, np.memmap)
-
-        with caplog.at_level(logging.DEBUG):
-            embs.save()
-
-        # Should log flushing message
-        assert any("Flushed memmap embeddings" in record.message for record in caplog.records)
-
-    def test_save_verbose_logging_in_memory(self, tmp_path, caplog):
-        """Test save() logs when saving in-memory array with verbose=True (lines 493-495)"""
-        import logging
-
-        cache_path = tmp_path / "test.npy"
-        dataset = SimpleDataset(size=10, image_shape=(3, 32, 32))
-
-        model = IdentityModel()
-        embs = Embeddings(
-            dataset,
-            batch_size=16,
-            model=model,
-            device="cpu",
-            path=cache_path,
-            memory_threshold=0.8,
-            verbose=True,
-        )
-
-        embs.compute()
-        # Should be in-memory
-        assert not isinstance(embs._embeddings, np.memmap)
-
-        with caplog.at_level(logging.DEBUG):
-            embs.save()
-
-        # Should log saving message
-        assert any("Saved embeddings to" in record.message for record in caplog.records)
-
 
 class TestBatchErrors:
     """Test suite for error cases in _batch method."""
@@ -1280,7 +1092,7 @@ class TestBatchErrors:
     def test_batch_out_of_range_error(self, simple_dataset: SimpleDataset):
         """Test _batch raises IndexError for out of range indices (lines 567-570)"""
         model = IdentityModel()
-        embs = Embeddings(simple_dataset, batch_size=16, model=model, device="cpu", verbose=False)
+        embs = Embeddings(simple_dataset, batch_size=16, model=model, device="cpu")
 
         # Try to access indices beyond dataset size
         out_of_range_indices = [0, 1, 100, 200]  # 100 and 200 are out of range
@@ -1307,7 +1119,6 @@ class TestBatchErrors:
             device="cpu",
             path=cache_path,
             memory_threshold=0.01,  # Very low threshold
-            verbose=False,
         )
 
         # Track flush calls
@@ -1371,3 +1182,84 @@ class TestGetitemErrors:
         with pytest.raises(ValueError, match="Unable to generate new embeddings from a shallow instance"):
             # Try to access index 4 which is not in cached_idx
             embs[4]
+
+
+class TestProgressCallback:
+    """Test suite for progress_callback functionality with memmap storage."""
+
+    def test_progress_callback_with_memmap_storage(self, simple_dataset: SimpleDataset, tmp_path, monkeypatch):
+        """Test that progress_callback works with memmap-backed embeddings"""
+        cache_path = tmp_path / "test.npy"
+        callback_calls = []
+
+        def callback(step: int, *, total: int | None = None, desc: str | None = None, extra_info: dict | None = None):
+            callback_calls.append({"step": step, "total": total})
+
+        # Mock psutil to force memmap usage
+        class MockVirtualMemory:
+            available = 10 * 1024  # 10 KB
+
+        monkeypatch.setattr("psutil.virtual_memory", lambda: MockVirtualMemory())
+
+        model = IdentityModel()
+        embs = Embeddings(
+            simple_dataset,
+            batch_size=5,
+            model=model,
+            device="cpu",
+            path=cache_path,
+            memory_threshold=0.01,
+            progress_callback=callback,
+        )
+
+        # Compute embeddings
+        embs.compute()
+
+        # Callback should have been called
+        assert len(callback_calls) > 0
+        # Verify it used memmap
+        assert isinstance(embs._embeddings, np.memmap)
+
+    def test_progress_callback_with_lazy_loading(self, lazy_embeddings: tuple[Embeddings, SimpleDataset, Path]):
+        """Test that progress_callback works with lazy loading"""
+        emb, dataset, _ = lazy_embeddings
+        callback_calls = []
+
+        def callback(step: int, *, total: int | None = None, desc: str | None = None, extra_info: dict | None = None):
+            callback_calls.append({"step": step, "total": total})
+
+        # Add progress callback
+        emb._progress_callback = callback
+
+        # Access some embeddings
+        _ = emb[0:10]
+
+        # Callback should have been called
+        assert len(callback_calls) > 0
+
+    def test_progress_callback_incremental_access(self, simple_dataset: SimpleDataset):
+        """Test that progress_callback is called with correct step counts during incremental access"""
+        callback_calls = []
+
+        def callback(step: int, *, total: int | None = None, desc: str | None = None, extra_info: dict | None = None):
+            callback_calls.append({"step": step, "total": total})
+
+        model = IdentityModel()
+        embs = Embeddings(
+            simple_dataset,
+            batch_size=5,
+            model=model,
+            device="cpu",
+            path=None,
+            progress_callback=callback,
+        )
+
+        # Access embeddings in chunks
+        _ = embs[0:10]
+        first_count = len(callback_calls)
+
+        _ = embs[10:20]
+        second_count = len(callback_calls)
+
+        # Should have more calls after second access
+        assert second_count > first_count
