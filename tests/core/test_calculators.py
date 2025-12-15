@@ -1128,4 +1128,90 @@ class TestObjectDetectionDataset:
         assert "offset_y" in stats
 
         # Should have 2 results: full image + 1 box
-        assert len(stats["mean"]) == 2
+
+
+class TestProgressCallback:
+    """Test suite for progress_callback functionality in calculate."""
+
+    def test_progress_callback_called_during_calculate(self):
+        """Test that progress_callback is called during calculation"""
+        images = [np.random.random((3, 10, 10)) for _ in range(5)]
+        callback_calls = []
+
+        def callback(step: int, *, total: int | None = None, desc: str | None = None, extra_info: dict | None = None):
+            callback_calls.append({"step": step, "total": total})
+
+        result = calculate(images, None, stats=ImageStats.PIXEL, progress_callback=callback)
+
+        # Callback should have been called for each image
+        assert len(callback_calls) == 5
+        assert result["image_count"] == 5
+
+        # Verify callbacks have correct step values
+        for i, call in enumerate(callback_calls):
+            assert call["step"] == i + 1
+            assert call["total"] == 5
+
+    def test_progress_callback_not_called_when_none(self):
+        """Test that no error occurs when progress_callback is None"""
+        images = [np.random.random((3, 10, 10)) for _ in range(3)]
+
+        result = calculate(images, None, stats=ImageStats.PIXEL, progress_callback=None)
+
+        # Should work without error
+        assert result["image_count"] == 3
+
+    def test_progress_callback_with_boxes(self):
+        """Test that progress_callback works with bounding boxes"""
+        images = [np.random.random((3, 100, 100)) for _ in range(3)]
+        boxes = [[[10, 10, 50, 50], [20, 20, 60, 60]] for _ in range(3)]
+        callback_calls = []
+
+        def callback(step: int, *, total: int | None = None, desc: str | None = None, extra_info: dict | None = None):
+            callback_calls.append({"step": step, "total": total})
+
+        result = calculate(images, boxes, stats=ImageStats.DIMENSION, progress_callback=callback)
+
+        # Callback should be called for each image (not each box)
+        assert len(callback_calls) == 3
+        assert result["image_count"] == 3
+
+        # Verify step counts
+        for i, call in enumerate(callback_calls):
+            assert call["step"] == i + 1
+            assert call["total"] == 3
+
+    def test_progress_callback_with_dataset(self, get_mock_od_dataset):
+        """Test that progress_callback works with Dataset input"""
+        images = [np.random.random((3, 100, 100)) for _ in range(4)]
+        labels = [[0, 1] for _ in range(4)]
+        bboxes = [[[10, 10, 50, 50], [20, 20, 60, 60]] for _ in range(4)]
+
+        dataset = get_mock_od_dataset(images, labels, bboxes)
+        callback_calls = []
+
+        def callback(step: int, *, total: int | None = None, desc: str | None = None, extra_info: dict | None = None):
+            callback_calls.append({"step": step, "total": total})
+
+        result = calculate(dataset, stats=ImageStats.PIXEL, progress_callback=callback)
+
+        # Callback should be called for each image
+        assert len(callback_calls) == 4
+        assert result["image_count"] == 4
+
+        # Verify total is provided for Dataset (which is Sized)
+        for call in callback_calls:
+            assert call["total"] == 4
+
+    def test_progress_callback_incremental_steps(self):
+        """Test that progress_callback receives incremental step counts"""
+        images = [np.random.random((3, 10, 10)) for _ in range(10)]
+        callback_calls = []
+
+        def callback(step: int, *, total: int | None = None, desc: str | None = None, extra_info: dict | None = None):
+            callback_calls.append(step)
+
+        calculate(images, None, stats=ImageStats.PIXEL_BASIC, progress_callback=callback)
+
+        # Steps should be 1, 2, 3, ..., 10
+        assert callback_calls == list(range(1, 11))

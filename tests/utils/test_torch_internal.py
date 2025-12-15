@@ -30,7 +30,6 @@ class TestTorchTrainerCPU:
             epochs=1,
             batch_size=batch_size,
             device=torch.device("cpu"),
-            verbose=False,
         )
 
 
@@ -53,7 +52,6 @@ class TestTorchTrainerCUDA:
             epochs=1,
             batch_size=batch_size,
             device=torch.device("cuda"),
-            verbose=False,
         )
 
 

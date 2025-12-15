@@ -13,8 +13,6 @@ PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13"]
 PYTHON_RE_PATTERN = re.compile(r"\d\.\d{1,2}")
 IS_CI = bool(os.environ.get("CI"))
 
-os.environ["TQDM_DISABLE"] = "1"
-
 # Configure Numba disk caching for faster test execution
 # This caches JIT-compiled functions to avoid recompilation across test workers
 os.environ.setdefault("NUMBA_CACHE_DIR", os.path.expanduser("~/.cache/numba"))
@@ -41,7 +39,7 @@ def get_python_version(session: nox.Session) -> str:
     return matches.group(0) if matches else PYTHON_VERSION
 
 
-@nox_uv.session(uv_groups=["test"], uv_extras=["cpu", "all"])
+@nox_uv.session(uv_groups=["test"], uv_extras=["cpu"])
 def test(session: nox.Session) -> None:
     """Run unit tests with coverage reporting. Specify version using `nox -P {version} -e test`.
 
@@ -97,7 +95,7 @@ def unit(session: nox.Session) -> None:
     test(session)
 
 
-@nox_uv.session(uv_groups=["type"], uv_extras=["cpu", "all"])
+@nox_uv.session(uv_groups=["type"], uv_extras=["cpu"])
 def type(session: nox.Session) -> None:  # noqa: A001
     """Run type checks and verify external types. Specify version using `nox -P {version} -e type`."""
     session.run("pyright", "--stats", "src/", "tests/")
@@ -134,7 +132,7 @@ def doctest(session: nox.Session) -> None:
     )
 
 
-@nox_uv.session(uv_groups=["docs"], uv_extras=["matplotlib"])
+@nox_uv.session(uv_groups=["docs"])
 def docs(session: nox.Session) -> None:
     """Generate documentation. Clear the jupyter cache by calling `nox -e docs -- clean`."""
     if {"chart", "charts"} | set(session.posargs):
@@ -185,9 +183,9 @@ def lock(session: nox.Session) -> None:
     """Lock dependencies in "uv.lock". Update dependencies by calling `nox -e lock -- upgrade`."""
     upgrade_args = ["--upgrade"] if "upgrade" in session.posargs else []
     session.run("uv", "lock", *upgrade_args)
-    session.run("uv", "export", "--extra=all", "--no-emit-project", "-o", "requirements.txt")
+    session.run("uv", "export", "--no-emit-project", "-o", "requirements.txt")
     session.run("poetry", "lock")
-    session.run("p2c", "y", "-f", "pyproject.toml", "-e", "all", "--python-include", "infer", "-o", "environment.yaml")
+    session.run("p2c", "y", "-f", "pyproject.toml", "--python-include", "infer", "-o", "environment.yaml")
 
 
 def _clean_notebook_script(script_path: str) -> None:
