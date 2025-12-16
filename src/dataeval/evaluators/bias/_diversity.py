@@ -8,9 +8,9 @@ from typing import Any, Literal
 import numpy as np
 import polars as pl
 
+from dataeval import Metadata
 from dataeval.core._bin import get_counts
 from dataeval.core._diversity import diversity_shannon, diversity_simpson
-from dataeval.data import Metadata
 from dataeval.protocols import AnnotatedDataset
 from dataeval.types import DictOutput, set_metadata
 from dataeval.utils._method import get_method

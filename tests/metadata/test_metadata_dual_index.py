@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from dataeval.data._metadata import Metadata
-from tests.data.test_data_embeddings import MockDataset
+from dataeval._metadata import Metadata
+from tests.embeddings.test_embeddings import MockDataset
 
 
 @pytest.fixture

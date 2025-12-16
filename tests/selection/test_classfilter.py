@@ -5,9 +5,9 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from dataeval.data._metadata import Metadata
-from dataeval.data._selection import Select
-from dataeval.data.selections._classfilter import ClassFilter, _try_mask_object
+from dataeval._metadata import Metadata
+from dataeval.selection._classfilter import ClassFilter, _try_mask_object
+from dataeval.selection._select import Select
 
 
 @pytest.mark.required

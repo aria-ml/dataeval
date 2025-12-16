@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from dataeval.data._embeddings import Embeddings
+from dataeval._embeddings import Embeddings
 from dataeval.evaluators.drift._ks import DriftKS
 from dataeval.evaluators.drift.updates import LastSeenUpdate, ReservoirSamplingUpdate
 

@@ -17,9 +17,10 @@ import pytest
 import torch
 import torch.nn as nn
 
+from dataeval._embeddings import Embeddings
+
 # from maite_datasets import to_image_classification_dataset
 from dataeval.config import get_device
-from dataeval.data._embeddings import Embeddings
 from dataeval.evaluators.drift._mmd import (
     DriftMMD,
     GaussianRBF,

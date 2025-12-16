@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import torch
 
-from dataeval.data import Embeddings
+from dataeval import Embeddings
 from dataeval.protocols import Array, DatasetMetadata, DatumMetadata
 
 
@@ -221,7 +221,7 @@ class TestEmbeddings:
         with pytest.raises(ValueError):
             embs.new([])
 
-    @patch("dataeval.data._embeddings.np.save", side_effect=OSError())
+    @patch("dataeval._embeddings.np.save", side_effect=OSError())
     def test_embeddings_save_failure(self, tmp_path):
         arr = np.array([[1, 2], [3, 4], [5, 6]])
         embs = Embeddings.from_array(arr)

@@ -12,9 +12,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dataeval.data import Metadata
+from dataeval import Metadata
 from dataeval.evaluators.bias import Balance, Diversity, Parity
-from tests.data.test_data_embeddings import MockDataset
+from tests.embeddings.test_embeddings import MockDataset
 
 
 @pytest.fixture
