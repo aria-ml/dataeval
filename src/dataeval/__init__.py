@@ -15,11 +15,13 @@ except ImportError:  # pragma: no cover
 # Strongly type for pyright
 __version__ = str(__version__)
 
-__all__ = ["__version__", "config", "log", "protocols", "types"]
+__all__ = ["__version__", "config", "log", "protocols", "types", "Embeddings", "Metadata"]
 
 import logging
 
 from . import config, protocols, types
+from ._embeddings import Embeddings
+from ._metadata import Metadata
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 

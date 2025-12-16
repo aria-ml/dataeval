@@ -4,12 +4,12 @@ import numpy as np
 import polars as pl
 import pytest
 
+from dataeval import Metadata
 from dataeval.config import use_max_processes
 from dataeval.core import calculate
 from dataeval.core._clusterer import ClusterResult
 from dataeval.core._label_stats import LabelStatsResult
 from dataeval.core.flags import ImageStats
-from dataeval.data import Metadata
 from dataeval.evaluators.linters.outliers import Outliers, OutliersOutput, _get_outlier_mask
 
 

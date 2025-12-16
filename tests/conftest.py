@@ -10,8 +10,8 @@ import pytest
 from numpy.random import randint, random
 from numpy.typing import NDArray
 
+from dataeval import Metadata
 from dataeval.config import set_seed
-from dataeval.data import Metadata
 from dataeval.protocols import ObjectDetectionTarget
 
 

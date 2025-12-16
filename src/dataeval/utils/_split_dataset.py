@@ -12,8 +12,8 @@ from numpy.typing import NDArray
 from sklearn.model_selection import GroupKFold, KFold, StratifiedGroupKFold, StratifiedKFold
 from sklearn.utils.multiclass import type_of_target
 
+from dataeval._metadata import Metadata
 from dataeval.config import EPSILON
-from dataeval.data._metadata import Metadata
 from dataeval.protocols import AnnotatedDataset
 
 _logger = logging.getLogger(__name__)

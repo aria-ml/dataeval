@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 import torch
 
-from dataeval.data._embeddings import Embeddings
+from dataeval._embeddings import Embeddings
 from dataeval.evaluators.drift._base import BaseDriftUnivariate
 from dataeval.evaluators.drift.updates import LastSeenUpdate, ReservoirSamplingUpdate
 from dataeval.protocols import Dataset

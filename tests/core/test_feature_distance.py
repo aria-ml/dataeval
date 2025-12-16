@@ -10,8 +10,8 @@ import pytest
 from numpy.random import Generator
 from numpy.typing import NDArray
 
+from dataeval._metadata import FactorInfo, Metadata
 from dataeval.core._feature_distance import _calculate_drift, feature_distance
-from dataeval.data._metadata import FactorInfo, Metadata
 
 
 def mock_metadata(
