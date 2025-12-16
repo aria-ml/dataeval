@@ -1,6 +1,6 @@
 import pytest
 
-from dataeval.data import Metadata
+from dataeval import Metadata
 from dataeval.utils._merge import merge
 from tests.conftest import to_metadata
 

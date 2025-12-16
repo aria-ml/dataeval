@@ -8,8 +8,8 @@ from typing import Any
 
 import polars as pl
 
+from dataeval import Metadata
 from dataeval.core import parity
-from dataeval.data import Metadata
 from dataeval.protocols import AnnotatedDataset
 from dataeval.types import DictOutput, set_metadata
 

@@ -4,7 +4,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-from dataeval.data._metadata import Metadata
+from dataeval._metadata import Metadata
 from dataeval.types import ExecutionMetadata
 
 try:

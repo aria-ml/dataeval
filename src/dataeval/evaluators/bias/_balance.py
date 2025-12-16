@@ -7,8 +7,8 @@ from typing import Any, Literal
 
 import polars as pl
 
+from dataeval import Metadata
 from dataeval.core._mutual_info import mutual_info, mutual_info_classwise
-from dataeval.data import Metadata
 from dataeval.protocols import AnnotatedDataset
 from dataeval.types import DictOutput, set_metadata
 

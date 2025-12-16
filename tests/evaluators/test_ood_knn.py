@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from sklearn.datasets import load_digits
 
-from dataeval.data import Embeddings
+from dataeval import Embeddings
 from dataeval.evaluators.ood.knn import OOD_KNN
 
 # Embedding dimensions for test

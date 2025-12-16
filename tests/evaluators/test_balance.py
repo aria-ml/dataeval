@@ -5,7 +5,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-from dataeval.data._metadata import Metadata
+from dataeval._metadata import Metadata
 
 try:
     from matplotlib.figure import Figure
