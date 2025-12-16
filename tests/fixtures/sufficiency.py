@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, NonCallableMagicMock
 
 import pytest
 
-from dataeval.workflows.sufficiency import EvaluationStrategy, SufficiencyConfig, TrainingStrategy
+from dataeval.performance._sufficiency import EvaluationStrategy, SufficiencyConfig, TrainingStrategy
 
 # ========== STRATEGY FIXTURES ==========
 

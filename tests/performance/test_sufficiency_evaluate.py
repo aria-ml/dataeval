@@ -4,9 +4,7 @@ Tests for evaluate() method using strategy pattern.
 
 import torch.nn as nn
 
-from dataeval.workflows.sufficiency import (
-    Sufficiency,
-)
+from dataeval.performance import Sufficiency
 
 
 class TestEvaluateUsesStrategies:
@@ -40,7 +38,7 @@ class TestEvaluateUsesStrategies:
         # Should call evaluation for each substep (at least 2 times)
         assert basic_config.evaluation_strategy.evaluate.call_count >= 2
 
-    # @patch("dataeval.workflows.sufficiency.reset_parameters")
+    # @patch("dataeval.performance._sufficiency.reset_parameters")
     def test_evaluate_passes_model_to_training(self, basic_config, simple_dataset):
         """Verify evaluate passes model to training strategy."""
 

@@ -9,11 +9,8 @@ import numpy as np
 import pytest
 from numpy.testing import assert_array_equal
 
+from dataeval.performance.schedules import GeometricSchedule, ManualSchedule
 from dataeval.protocols import EvaluationSchedule
-from dataeval.workflows._schedules import (
-    GeometricSchedule,
-    ManualSchedule,
-)
 
 
 class TestEvaluationScheduleProtocol:

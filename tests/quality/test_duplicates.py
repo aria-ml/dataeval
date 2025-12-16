@@ -4,7 +4,7 @@ import pytest
 from dataeval.core._calculate import calculate
 from dataeval.core._clusterer import ClusterResult
 from dataeval.core.flags import ImageStats
-from dataeval.evaluators.linters.duplicates import Duplicates
+from dataeval.quality import Duplicates
 
 
 class MockDataset:

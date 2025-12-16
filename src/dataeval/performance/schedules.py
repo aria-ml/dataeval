@@ -1,4 +1,4 @@
-__all__ = []
+__all__ = ["GeometricSchedule", "ManualSchedule"]
 
 from collections.abc import Iterable
 

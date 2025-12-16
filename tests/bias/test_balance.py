@@ -6,13 +6,7 @@ import polars as pl
 import pytest
 
 from dataeval._metadata import Metadata
-
-try:
-    from matplotlib.figure import Figure
-except ImportError:
-    Figure = type(None)
-
-from dataeval.evaluators.bias._balance import Balance
+from dataeval.bias._balance import Balance
 from tests.conftest import to_metadata
 
 

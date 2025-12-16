@@ -9,8 +9,8 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
+from dataeval.performance import SufficiencyConfig
 from dataeval.protocols import EvaluationStrategy, TrainingStrategy
-from dataeval.workflows.sufficiency import SufficiencyConfig
 
 
 class TestSufficiencyConfigConstruction:
