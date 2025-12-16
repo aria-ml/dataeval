@@ -7,7 +7,7 @@ import pytest
 import torch
 from numpy.typing import NDArray
 
-from dataeval.data import Embeddings
+from dataeval import Embeddings
 from tests.conftest import SimpleDataset
 
 NP_MAJOR_VERSION = tuple(int(x) for x in np.__version__.split("."))[0]

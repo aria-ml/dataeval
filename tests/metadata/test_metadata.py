@@ -6,13 +6,13 @@ import numpy as np
 import polars as pl
 import pytest
 
+from dataeval._metadata import FactorInfo, Metadata, _binned
 from dataeval.core import calculate
 from dataeval.core._calculate_ratios import calculate_ratios
 from dataeval.core._label_stats import label_stats
 from dataeval.core.flags import ImageStats
-from dataeval.data._metadata import FactorInfo, Metadata, _binned
 from dataeval.utils import unzip_dataset
-from tests.data.test_data_embeddings import MockDataset
+from tests.embeddings.test_embeddings import MockDataset
 
 
 @dataclass

@@ -4,15 +4,15 @@ import numpy as np
 import pytest
 import torch
 
-from dataeval.data._embeddings import Embeddings
-from dataeval.data._selection import Select
-from dataeval.data.selections._prioritize import (
+from dataeval._embeddings import Embeddings
+from dataeval.selection._prioritize import (
     Prioritize,
     _Clusters,
     _KMeansComplexitySorter,
     _KMeansDistanceSorter,
     _KNNSorter,
 )
+from dataeval.selection._select import Select
 
 
 class TestPrioritizeClusters:
@@ -97,7 +97,7 @@ class TestPrioritizeSorters:
         with pytest.raises(ValueError):
             _KMeansComplexitySorter(c=10, samples=10)
 
-    @patch("dataeval.data.selections._prioritize.KMeans")
+    @patch("dataeval.selection._prioritize.KMeans")
     def test_kmeans_sorter_kmeans_returns_none(self, mock_kmeans_cls):
         mock_kmeans = mock_kmeans_cls.return_value
         mock_kmeans.labels_ = None

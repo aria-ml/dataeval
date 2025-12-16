@@ -51,7 +51,7 @@ class Select(AnnotatedDataset[_TDatum]):
 
     Examples
     --------
-    >>> from dataeval.data.selections import ClassFilter, Limit
+    >>> from dataeval.selection import ClassFilter, Limit
 
     >>> # Construct a sample dataset with size of 100 and class count of 10
     >>> # Elements at index `idx` are returned as tuples:

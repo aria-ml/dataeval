@@ -11,10 +11,10 @@ from numpy.typing import NDArray
 from sklearn.cluster import KMeans
 from sklearn.metrics import pairwise_distances
 
+from dataeval import Embeddings
 from dataeval.config import EPSILON, DeviceLike, get_seed
-from dataeval.data import Embeddings, Select
-from dataeval.data._selection import Selection, SelectionStage
 from dataeval.protocols import EmbeddingModel
+from dataeval.selection._select import Select, Selection, SelectionStage
 
 _logger = logging.getLogger(__name__)
 

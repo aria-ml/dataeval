@@ -379,7 +379,7 @@ class Embeddings(Array):
         Example
         -------
         >>> import numpy as np
-        >>> from dataeval.data import Embeddings
+        >>> from dataeval import Embeddings
         >>> # From in-memory array
         >>> array = np.random.randn(100, 512)
         >>> embeddings = Embeddings.from_array(array)
@@ -424,7 +424,7 @@ class Embeddings(Array):
         Example
         -------
         >>> import numpy as np
-        >>> from dataeval.data import Embeddings
+        >>> from dataeval import Embeddings
         >>> # Save some embeddings
         >>> array = np.random.randn(100, 512)
         >>> tmp_file = tmp_path / "embeddings.npy"

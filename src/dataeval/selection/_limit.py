@@ -4,7 +4,7 @@ __all__ = []
 
 from typing import Any
 
-from dataeval.data._selection import Select, Selection, SelectionStage
+from dataeval.selection._select import Select, Selection, SelectionStage
 
 
 class Limit(Selection[Any]):

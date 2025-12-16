@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from dataeval.data._metadata import Metadata
+from dataeval._metadata import Metadata
 from dataeval.utils._split_dataset import (
     DatasetSplits,
     calculate_validation_fraction,

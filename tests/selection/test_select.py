@@ -1,4 +1,4 @@
-from dataeval.data._selection import Select, Selection, SelectionStage, Subselection
+from dataeval.selection._select import Select, Selection, SelectionStage, Subselection
 
 
 class MockDataset:
