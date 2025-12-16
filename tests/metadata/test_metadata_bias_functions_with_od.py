@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 from dataeval import Metadata
-from dataeval.evaluators.bias import Balance, Diversity, Parity
+from dataeval.bias import Balance, Diversity, Parity
 from tests.embeddings.test_embeddings import MockDataset
 
 

@@ -179,7 +179,7 @@ def doctest_detectors_linters_duplicates(doctest_namespace: dict[str, Any]) -> N
     images[16] = images[37]
     images[3] = images[20]
 
-    """dataeval.evaluators.linters.Duplicates"""
+    """dataeval.quality.Duplicates"""
 
     doctest_namespace["duplicate_images"] = images
     doctest_namespace["hashes1"] = calculate(images[:24], None, ImageStats.HASH)
@@ -193,7 +193,7 @@ def doctest_detectors_linters_outliers(doctest_namespace: dict[str, Any]) -> Non
     images[10:13, :, 50:80, 50:80] = 0
     images[[7, 11, 18, 25]] = 512
 
-    """dataeval.evaluators.linters.Outliers"""
+    """dataeval.quality.Outliers"""
 
     doctest_namespace["outlier_images"] = images
     doctest_namespace["stats1"] = calculate(images[:14], None, ImageStats.PIXEL)
@@ -216,7 +216,7 @@ def doctest_metrics_bias_coverage(doctest_namespace: dict[str, Any]) -> None:
     blobs = blobs - np.min(blobs)
     blobs = blobs / np.max(blobs)
 
-    """dataeval.evaluators.bias.coverage.coverage"""
+    """dataeval.bias.coverage.coverage"""
     doctest_namespace["embeddings"] = blobs
 
 
@@ -348,7 +348,7 @@ def doctest_workflows_sufficiency(doctest_namespace: dict[str, Any]) -> None:
         def evaluate(self, model, dataset) -> dict:  # noqa
             return {"test": 1.0}
 
-    """dataeval.workflows.sufficiency.Sufficiency"""
+    """dataeval.performance.Sufficiency"""
 
     doctest_namespace["model"] = model
     doctest_namespace["train_ds"] = train_ds
