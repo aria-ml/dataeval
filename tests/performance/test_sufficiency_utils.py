@@ -8,8 +8,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from dataeval.workflows._output import Constraints, calc_params, f_out, linear_initialization
-from dataeval.workflows.sufficiency import reset_parameters
+from dataeval.performance._output import Constraints, calc_params, f_out, linear_initialization
+from dataeval.performance._sufficiency import reset_parameters
 
 np.random.seed(0)
 torch.manual_seed(0)

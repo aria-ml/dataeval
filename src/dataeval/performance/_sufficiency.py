@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from dataeval.workflows._aggregator import ResultAggregator
-from dataeval.workflows._schedules import GeometricSchedule, ManualSchedule
-
 __all__ = []
 
 from collections.abc import Iterable, Sized
@@ -13,9 +10,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from dataeval.performance._aggregator import ResultAggregator
+from dataeval.performance._output import SufficiencyOutput
+from dataeval.performance.schedules import GeometricSchedule, ManualSchedule
 from dataeval.protocols import Dataset, EvaluationSchedule, EvaluationStrategy, TrainingStrategy
 from dataeval.types import set_metadata
-from dataeval.workflows._output import SufficiencyOutput
 
 T = TypeVar("T")
 
@@ -313,7 +312,7 @@ class Sufficiency(Generic[T]):
 
         Evaluate at a custom geometric spacing
 
-        >>> from dataeval.workflows._schedules import GeometricSchedule
+        >>> from dataeval.performance.schedules import GeometricSchedule
         >>> output = sufficiency.evaluate(schedule=GeometricSchedule(substeps=20))
 
         Evaluate at custom linear steps from 0-100 inclusive

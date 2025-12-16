@@ -6,7 +6,7 @@ import polars as pl
 import pytest
 
 from dataeval._metadata import Metadata
-from dataeval.evaluators.bias._parity import Parity
+from dataeval.bias import Parity
 from tests.conftest import to_metadata
 
 

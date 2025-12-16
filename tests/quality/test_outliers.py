@@ -10,7 +10,7 @@ from dataeval.core import calculate
 from dataeval.core._clusterer import ClusterResult
 from dataeval.core._label_stats import LabelStatsResult
 from dataeval.core.flags import ImageStats
-from dataeval.evaluators.linters.outliers import Outliers, OutliersOutput, _get_outlier_mask
+from dataeval.quality._outliers import Outliers, OutliersOutput, _get_outlier_mask
 
 
 def make_mock_metadata(lstat: LabelStatsResult) -> MagicMock:
@@ -43,7 +43,7 @@ class TestOutliers:
         np.testing.assert_array_equal(mask_value, mask_none)
 
     @pytest.mark.parametrize("method", ["zscore", "modzscore", "iqr"])
-    @patch("dataeval.evaluators.linters.outliers.EPSILON", 100.0)
+    @patch("dataeval.quality._outliers.EPSILON", 100.0)
     def test_get_outlier_mask_with_large_epsilon(self, method):
         mask_value = _get_outlier_mask(np.array([0.1, 0.2, 0.1, 1.0]), method, 2.5)
         mask_none = _get_outlier_mask(np.array([0.1, 0.2, 0.1, 1.0]), method, None)

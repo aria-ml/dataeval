@@ -6,7 +6,7 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
-from dataeval.workflows._output import (
+from dataeval.performance._output import (
     SufficiencyOutput,
     f_inv_out,
     f_out,

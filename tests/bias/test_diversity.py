@@ -5,14 +5,8 @@ import polars as pl
 import pytest
 
 from dataeval._metadata import Metadata
+from dataeval.bias import Diversity
 from dataeval.types import ExecutionMetadata
-
-try:
-    from matplotlib.figure import Figure
-except ImportError:
-    Figure = type(None)
-
-from dataeval.evaluators.bias import Diversity
 from tests.conftest import to_metadata
 
 

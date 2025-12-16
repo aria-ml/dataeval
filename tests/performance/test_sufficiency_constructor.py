@@ -6,7 +6,7 @@ during the compatibility period. The old signature will be removed in
 a future step.
 """
 
-from dataeval.workflows.sufficiency import Sufficiency, SufficiencyConfig
+from dataeval.performance import Sufficiency, SufficiencyConfig
 
 
 class TestSufficiencyConfigConstructor:

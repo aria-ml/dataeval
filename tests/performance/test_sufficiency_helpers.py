@@ -8,12 +8,9 @@ evaluate() orchestration.
 import numpy as np
 import torch.nn as nn
 
-from dataeval.workflows import Sufficiency, SufficiencyConfig
-from dataeval.workflows._aggregator import ResultAggregator
-from dataeval.workflows._schedules import (
-    GeometricSchedule,
-    ManualSchedule,
-)
+from dataeval.performance._aggregator import ResultAggregator
+from dataeval.performance._sufficiency import Sufficiency, SufficiencyConfig
+from dataeval.performance.schedules import GeometricSchedule, ManualSchedule
 
 
 class TestCreateScheduleHelper:

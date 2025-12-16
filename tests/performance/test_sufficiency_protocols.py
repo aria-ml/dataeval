@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 
-from dataeval.workflows.sufficiency import EvaluationStrategy, TrainingStrategy
+from dataeval.protocols import EvaluationStrategy, TrainingStrategy
 
 
 class SimpleDataset(Dataset):

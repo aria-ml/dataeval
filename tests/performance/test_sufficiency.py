@@ -7,12 +7,10 @@ import numpy as np
 import pytest
 import torch
 
+from dataeval.performance import Sufficiency
+from dataeval.performance._output import SufficiencyOutput
+from dataeval.performance._sufficiency import SufficiencyConfig
 from dataeval.protocols import EvaluationStrategy, TrainingStrategy
-from dataeval.workflows import Sufficiency
-from dataeval.workflows._output import (
-    SufficiencyOutput,
-)
-from dataeval.workflows.sufficiency import SufficiencyConfig
 from tests.conftest import SimpleDataset
 
 np.random.seed(0)
