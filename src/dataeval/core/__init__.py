@@ -17,7 +17,6 @@ __all__ = [
     "feature_distance",
     "factor_deviation",
     "factor_predictors",
-    "flags",
     "label_parity",
     "label_stats",
     "minimum_spanning_tree",
@@ -34,7 +33,6 @@ __all__ = [
     "uap",
 ]
 
-from dataeval.core import flags
 from dataeval.core._ber import ber_knn, ber_mst
 from dataeval.core._calculate import calculate
 from dataeval.core._calculate_ratios import calculate_ratios

@@ -17,7 +17,7 @@ from numpy.typing import NDArray
 import dataeval.core._calculators._register  # noqa: F401
 from dataeval.config import get_max_processes
 from dataeval.core._calculators._registry import CalculatorRegistry
-from dataeval.core.flags import ImageStats, resolve_dependencies
+from dataeval.flags import ImageStats, resolve_dependencies
 from dataeval.protocols import (
     ArrayLike,
     Dataset,
@@ -434,7 +434,7 @@ def calculate(
     --------
     Compute all statistics:
 
-    >>> from dataeval.core.flags import ImageStats
+    >>> from dataeval.flags import ImageStats
     >>> stats = calculate(images, boxes)
 
     Compute specific statistics:

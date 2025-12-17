@@ -9,7 +9,7 @@ from numpy.typing import NDArray
 
 from dataeval.core._calculators._base import Calculator
 from dataeval.core._calculators._registry import CalculatorRegistry
-from dataeval.core.flags import ImageStats
+from dataeval.flags import ImageStats
 
 if TYPE_CHECKING:
     from dataeval.core._calculate import CalculatorCache

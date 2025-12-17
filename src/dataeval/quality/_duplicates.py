@@ -11,7 +11,7 @@ from numpy.typing import NDArray
 
 from dataeval.core._calculate import CalculationResult, calculate
 from dataeval.core._clusterer import ClusterResult
-from dataeval.core.flags import ImageStats
+from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset
 from dataeval.types import DictOutput, set_metadata
 from dataeval.utils._stats import StatsMap, combine_results, get_dataset_step_from_idx

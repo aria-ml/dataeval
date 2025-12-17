@@ -3,7 +3,7 @@ import pytest
 
 from dataeval.core._calculate import calculate
 from dataeval.core._clusterer import ClusterResult
-from dataeval.core.flags import ImageStats
+from dataeval.flags import ImageStats
 from dataeval.quality import Duplicates
 
 

@@ -301,7 +301,7 @@ def calculate_ratios(
     **Pattern 1: Unified input (recommended)**
 
     >>> from dataeval.core import calculate, calculate_ratios
-    >>> from dataeval.core.flags import ImageStats
+    >>> from dataeval.flags import ImageStats
     >>>
     >>> # Single call gets both image and target stats
     >>> stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=True)

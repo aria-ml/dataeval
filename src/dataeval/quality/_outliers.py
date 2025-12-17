@@ -14,7 +14,7 @@ from dataeval import Metadata
 from dataeval.config import EPSILON
 from dataeval.core._calculate import CalculationResult, calculate
 from dataeval.core._clusterer import ClusterResult, ClusterStats, compute_cluster_stats
-from dataeval.core.flags import ImageStats
+from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset
 from dataeval.types import ArrayND, Output, SourceIndex, set_metadata
 from dataeval.utils._array import flatten, to_numpy

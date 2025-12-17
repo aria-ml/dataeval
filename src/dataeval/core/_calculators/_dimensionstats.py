@@ -10,7 +10,7 @@ from numpy.typing import NDArray
 
 from dataeval.core._calculators._base import Calculator
 from dataeval.core._calculators._registry import CalculatorRegistry
-from dataeval.core.flags import ImageStats
+from dataeval.flags import ImageStats
 from dataeval.utils._image import get_bitdepth
 
 if TYPE_CHECKING:

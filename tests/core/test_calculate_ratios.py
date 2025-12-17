@@ -5,7 +5,7 @@ import pytest
 
 from dataeval.core import calculate, calculate_ratios
 from dataeval.core._calculate import SOURCE_INDEX
-from dataeval.core.flags import ImageStats
+from dataeval.flags import ImageStats
 from dataeval.types import SourceIndex
 
 
