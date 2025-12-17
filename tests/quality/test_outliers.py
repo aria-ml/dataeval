@@ -9,7 +9,7 @@ from dataeval.config import use_max_processes
 from dataeval.core import calculate
 from dataeval.core._clusterer import ClusterResult
 from dataeval.core._label_stats import LabelStatsResult
-from dataeval.core.flags import ImageStats
+from dataeval.flags import ImageStats
 from dataeval.quality._outliers import Outliers, OutliersOutput, _get_outlier_mask
 
 

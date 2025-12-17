@@ -15,11 +15,11 @@ except ImportError:  # pragma: no cover
 # Strongly type for pyright
 __version__ = str(__version__)
 
-__all__ = ["__version__", "config", "log", "protocols", "types", "Embeddings", "Metadata"]
+__all__ = ["__version__", "config", "flags", "log", "protocols", "types", "Embeddings", "Metadata"]
 
 import logging
 
-from . import config, protocols, types
+from . import config, flags, protocols, types
 from ._embeddings import Embeddings
 from ._metadata import Metadata
 

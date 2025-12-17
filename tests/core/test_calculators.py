@@ -7,7 +7,7 @@ from dataeval.core import calculate
 from dataeval.core._calculate import CalculatorCache
 from dataeval.core._calculators._dimensionstats import DimensionStatCalculator
 from dataeval.core._calculators._hashstats import HashStatCalculator
-from dataeval.core.flags import ImageStats
+from dataeval.flags import ImageStats
 from dataeval.utils._boundingbox import BoundingBox
 
 

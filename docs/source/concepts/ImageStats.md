@@ -129,7 +129,7 @@ Example code for calculating all statistics for images:
 ```python
 # Import the calculate function and ImageStats flags
 from dataeval.core import calculate
-from dataeval.core.flags import ImageStats
+from dataeval.flags import ImageStats
 from torchvision.datasets import VOCDetection
 from torchvision.transforms import v2
 
@@ -156,7 +156,7 @@ Example code for calculating specific statistics:
 
 ```python
 from dataeval.core import calculate
-from dataeval.core.flags import ImageStats
+from dataeval.flags import ImageStats
 
 # Calculate only pixel and visual statistics
 result = calculate(

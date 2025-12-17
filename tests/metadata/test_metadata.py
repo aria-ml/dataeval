@@ -10,7 +10,7 @@ from dataeval._metadata import FactorInfo, Metadata, _binned
 from dataeval.core import calculate
 from dataeval.core._calculate_ratios import calculate_ratios
 from dataeval.core._label_stats import label_stats
-from dataeval.core.flags import ImageStats
+from dataeval.flags import ImageStats
 from dataeval.utils import unzip_dataset
 from tests.embeddings.test_embeddings import MockDataset
 
