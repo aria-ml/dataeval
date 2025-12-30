@@ -14,12 +14,12 @@ Algorithm Overview
 Functions work together in the following pipeline:
     _init_tree -> _update_tree_by_distance -> _cluster_edges -> compare_links_to_cluster_std
 
-Adapted for DataEval by Ryan Wood
-
 Adapted from fast_hdbscan python module:
     https://github.com/TutteInstitute/fast_hdbscan
     Copyright (c) 2020, Leland McInnes
     License: BSD 2-Clause
+
+Adapted for DataEval by Ryan Wood based on boruvka.py
 """
 
 from __future__ import annotations
@@ -67,7 +67,7 @@ def _init_tree(
     tree : NDArray[np.float32]
         MST edge array with shape (n_samples - 1, 3). Each row is [point_i, point_j, distance].
         Note: point indices are stored as float32 for array homogeneity.
-    int_tree : int
+    total_edge : int
         Number of edges currently in the tree (may be < n_samples - 1 if disconnected)
     disjoint_set : tuple[NDArray[np.int32], NDArray[np.int32]]
         Disjoint set data structure tracking connected components
@@ -84,28 +84,28 @@ def _init_tree(
     disjoint_set = ds_rank_create(np.int32(n_neighbors.size))
     cluster_points = np.empty(n_neighbors.size, dtype=np.uint32)
 
-    # int_tree tracks current number of edges added to the tree
-    int_tree = 0
+    # tot_edge tracks current number of edges added to the tree
+    total_edge = 0
     for i in range(n_neighbors.size):
         nbr = n_neighbors[i]
         if ds_union_by_rank(disjoint_set, np.intp(i), np.intp(nbr)):
             dist = n_distance[i]
             # Store edge as (point_i, neighbor, distance)
             # Note: Storing indices as float32 for array homogeneity with distances
-            tree[int_tree] = (np.float32(i), np.float32(nbr), dist)
-            int_tree += 1
+            tree[total_edge] = (np.float32(i), np.float32(nbr), dist)
+            total_edge += 1
 
     # Determine cluster membership for each point
     for i in range(cluster_points.size):
         cluster_points[i] = ds_find(disjoint_set, np.intp(i))
 
-    return tree, int_tree, disjoint_set, cluster_points
+    return tree, total_edge, disjoint_set, cluster_points
 
 
 @numba.njit(locals={"i": numba.types.uint32, "nbr": numba.types.uint32}, cache=True)
 def _update_tree_by_distance(
     tree: NDArray[np.float32],
-    int_tree: int,
+    total_edge: int,
     disjoint_set: tuple[NDArray[np.int32], NDArray[np.int32]],
     n_neighbors: NDArray[np.uint32],
     n_distance: NDArray[np.float32],
@@ -121,7 +121,7 @@ def _update_tree_by_distance(
     ----------
     tree : NDArray[np.float32]
         Existing MST edge array with shape (n_samples - 1, 3)
-    int_tree : int
+    total_edge : int
         Current number of edges in the tree
     disjoint_set : tuple[NDArray[np.int32], NDArray[np.int32]]
         Current disjoint set tracking connected components
@@ -134,7 +134,7 @@ def _update_tree_by_distance(
     -------
     tree : NDArray[np.float32]
         Updated MST edge array
-    int_tree : int
+    total_edge : int
         Updated number of edges in the tree
     disjoint_set : tuple[NDArray[np.int32], NDArray[np.int32]]
         Updated disjoint set
@@ -162,14 +162,14 @@ def _update_tree_by_distance(
         if ds_union_by_rank(disjoint_set, point, nbr):
             dist = dist_sorted[i]
             # Add edge to tree (storing indices as float32)
-            tree[int_tree] = (np.float32(point), np.float32(nbr), dist)
-            int_tree += 1
+            tree[total_edge] = (np.float32(point), np.float32(nbr), dist)
+            total_edge += 1
 
     # Update cluster assignments
     for i in range(cluster_points.size):
         cluster_points[i] = ds_find(disjoint_set, np.intp(i))
 
-    return tree, int_tree, disjoint_set, cluster_points
+    return tree, total_edge, disjoint_set, cluster_points
 
 
 @numba.njit(locals={"i": numba.types.uint32}, cache=True)

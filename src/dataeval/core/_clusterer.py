@@ -171,6 +171,7 @@ def compute_cluster_stats(
 def cluster(
     embeddings: ArrayND[float],
     n_expected_clusters: int | None = None,
+    max_cluster_size: int | None = None,
 ) -> ClusterResult:
     """
     Uses hierarchical clustering on the flattened data and returns clustering
@@ -187,6 +188,9 @@ def cluster(
         If provided, adaptively adjusts min_cluster_size to encourage finding
         approximately this many clusters. Useful when you have domain knowledge
         about the data structure.
+    max_cluster_size : int, optional
+        Option to limit the size of the identified clusters. Useful when you have
+        domain knowledge about the data structure.
 
     Returns
     -------
@@ -256,16 +260,23 @@ def cluster(
         min_cluster_size = min(max(5, min_num), 100)
         _logger.debug("Using default min_cluster_size=%d", min_cluster_size)
 
+    max_num = max_cluster_size if max_cluster_size is not None else np.inf
+    if max_num <= min_cluster_size:
+        _logger.warning("Provided max_cluster_size is smaller than min_cluster_size. Resetting to infinity.")
+        max_num = np.inf
+
     max_neighbors = min(25, num_samples - 1)
     _logger.debug("Computing neighbors with max_neighbors=%d", max_neighbors)
     kneighbors, kdistances = compute_neighbor_distances(x, max_neighbors)
     unsorted_mst: NDArray[np.float32] = minimum_spanning_tree_edges(x, kneighbors, kdistances)
     mst: NDArray[np.float32] = unsorted_mst[np.argsort(unsorted_mst.T[2])]
     linkage_tree: NDArray[np.float32] = mst_to_linkage_tree(mst).astype(np.float32)
-    condensed_tree = condense_tree(linkage_tree, min_cluster_size)
+    condensed_tree = condense_tree(linkage_tree, min_cluster_size, max_cluster_size=max_num)
     cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
 
-    selected_clusters = extract_eom_clusters(condensed_tree, cluster_tree, allow_single_cluster=single_cluster)
+    selected_clusters = extract_eom_clusters(
+        condensed_tree, cluster_tree, max_cluster_size=max_num, allow_single_cluster=single_cluster
+    )
 
     # Uncomment if cluster_selection_method is made a parameter
     # if cluster_selection_method != "eom":
@@ -276,14 +287,14 @@ def cluster(
     #     selected_clusters = cluster_epsilon_search(
     #         selected_clusters,
     #         cluster_tree,
-    #         min_persistence=cluster_selection_epsilon,
+    #         min_epsilon=cluster_selection_epsilon,
     #     )
 
     clusters: NDArray[np.intp] = get_cluster_label_vector(
         condensed_tree,
         selected_clusters,
         cluster_selection_epsilon,
-        n_samples=x.shape[0],
+        n_samples=mst.shape[0] + 1,
     )
 
     membership_strengths: NDArray[np.float32] = get_point_membership_strength_vector(
