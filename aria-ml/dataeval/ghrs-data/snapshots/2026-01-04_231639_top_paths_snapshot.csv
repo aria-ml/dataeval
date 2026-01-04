@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,26,21
+/aria-ml/dataeval/tree/main/src/dataeval,10,2
+/aria-ml/dataeval/tree/v0.93.1/src/dataeval,6,2
+/aria-ml/dataeval/tree/v0.93.1/src/dataeval/outputs,5,2
+/aria-ml/dataeval/tree/main/src/dataeval/core,3,1
+/aria-ml/dataeval/blob/main/docs/installation.md,2,2
+/aria-ml/dataeval/blob/v0.93.1/src/dataeval/outputs/_linters.py,2,2
+/aria-ml/dataeval/tree/main/src,2,2
+/aria-ml/dataeval/blob/main/pyproject.toml,2,1
+/aria-ml/dataeval/blob/main/src/dataeval/utils/_stats.py,2,1
