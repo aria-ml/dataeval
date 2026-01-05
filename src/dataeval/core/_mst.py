@@ -235,14 +235,14 @@ def minimum_spanning_tree_edges(
     merge_tracker = np.full((k_neighbors.shape[0] + 1, k_neighbors.shape[1]), -1, dtype=np.int32)
 
     # Initialize tree
-    tree, int_tree, tree_disjoint_set, merge_tracker[0] = _init_tree(k_neighbors[0], k_distances[0])
+    tree, total_edge, tree_disjoint_set, merge_tracker[0] = _init_tree(k_neighbors[0], k_distances[0])
 
     # Loop through all of the neighbors, updating the tree
     k_max = k_neighbors.shape[0]
     k_now = 0  # to catch k_neighbors.shape[0] == 1 edge case
     for k_now in range(1, k_max):
-        tree, int_tree, tree_disjoint_set, merge_tracker[k_now] = _update_tree_by_distance(
-            tree, int_tree, tree_disjoint_set, k_neighbors[k_now], k_distances[k_now]
+        tree, total_edge, tree_disjoint_set, merge_tracker[k_now] = _update_tree_by_distance(
+            tree, total_edge, tree_disjoint_set, k_neighbors[k_now], k_distances[k_now]
         )
 
         time_to_stop = len(np.unique(merge_tracker[k_now])) == 1
@@ -272,8 +272,8 @@ def minimum_spanning_tree_edges(
 
         # Update clusters
         next_merge_idx = final_merge_idx + 1
-        tree, int_tree, tree_disjoint_set, merge_tracker[next_merge_idx] = _update_tree_by_distance(
-            tree, int_tree, tree_disjoint_set, additional_neighbors, additional_distances
+        tree, total_edge, tree_disjoint_set, merge_tracker[next_merge_idx] = _update_tree_by_distance(
+            tree, total_edge, tree_disjoint_set, additional_neighbors, additional_distances
         )
 
     return tree
