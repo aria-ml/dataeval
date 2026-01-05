@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-__all__ = ["Autoencoder", "Encoder", "Decoder", "ResNet18"]
+__all__ = ["Autoencoder", "Encoder", "Decoder"]
 
 import math
 from typing import Any
 
 import torch
 import torch.nn as nn
-from torchvision.models import ResNet18_Weights, resnet18
 
 
 class Autoencoder(nn.Module):
@@ -176,37 +175,3 @@ class Decoder(nn.Module):
         x = x.reshape((-1, *self.encoding_shape))
         x = self.decoder(x)
         return x.reshape((-1, *self.input_shape))
-
-
-class ResNet18(nn.Module):
-    """
-    A wrapper class for the torchvision.models.resnet18 model
-
-    Notes
-    -----
-    This class is provided for the use of DataEval documentation and excludes many features
-    of the torchvision implementation.
-
-    Warning
-    -------
-    This class has been thoroughly tested for the purposes
-    of DataEval's documentation but not for operational use.
-    Please use with caution if deploying this class or subclasses.
-    """
-
-    def __init__(self, embedding_size: int = 128) -> None:
-        super().__init__()
-        self.model: nn.Module = resnet18(weights=ResNet18_Weights.DEFAULT, progress=False)
-        self.model.fc = nn.Linear(self.model.fc.in_features, embedding_size)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.model(x)
-
-    @staticmethod
-    def transforms() -> Any:
-        """(Returns) the default ResNet18 IMAGENET1K_V1 transforms"""
-
-        return ResNet18_Weights.DEFAULT.transforms()
-
-    def __str__(self) -> str:
-        return str(self.model)

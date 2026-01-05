@@ -41,29 +41,16 @@ dependencies = [
   "scipy>=1.14.1; python_version>='3.13'",
   "scikit-learn>=1.5.0",
   "torch>=2.2.0",
-  "torchvision>=0.17.0",
   "typing-extensions>=4.12",
   "xxhash>=3.4",
   "psutil>=7.0.0",
 ]
 
 [project.optional-dependencies]
-cpu = [
-  "torch>=2.2.0",
-  "torchvision>=0.17.0",
-]
-cu118 = [
-  "torch>=2.2.0",
-  "torchvision>=0.17.0",
-]
-cu124 = [
-  "torch>=2.2.0",
-  "torchvision>=0.17.0",
-]
-cu128 = [
-  "torch>=2.2.0",
-  "torchvision>=0.17.0",
-]
+cpu = ["torch>=2.2.0"]
+cu118 = ["torch>=2.2.0"]
+cu124 = ["torch>=2.2.0"]
+cu128 = ["torch>=2.2.0"]
 
 [project.urls]
 Homepage = "https://dataeval.ai/"
@@ -124,6 +111,7 @@ docs = [
   "sphinx-tabs>=3.4.7",
   "Sphinx>=7.2.6",
   "torchmetrics>=1.0.0",
+  "torchvision>=0.17.0",
   "markupsafe>=3,<3.0.2",
 ]
 dev = [
@@ -173,12 +161,6 @@ torch = [
   { index = "pytorch-cu124", extra = "cu124" },
   { index = "pytorch-cu128", extra = "cu128" },
 ]
-torchvision = [
-  { index = "pytorch-cpu", extra = "cpu" },
-  { index = "pytorch-cu118", extra = "cu118" },
-  { index = "pytorch-cu124", extra = "cu124" },
-  { index = "pytorch-cu128", extra = "cu128" },
-]
 
 [tool.uv.extra-build-dependencies]
 numba = ["tbb>=2021.6"]
@@ -203,7 +185,6 @@ version = "0.0.0"  # unused
 
 [tool.pyproject2conda.dependencies]
 torch = { pip = true }
-torchvision = { pip = true }
 xxhash = { skip = true, packages = "python-xxhash>=3.3" }
 
 [tool.pyright]
