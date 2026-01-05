@@ -10,6 +10,27 @@ primary backends.
 
 We currently support python versions `3.9` - `3.13`
 
+## PyTorch Dependency
+
+DataEval requires PyTorch to be installed. When installing from PyPI with `pip install dataeval`,
+PyTorch will be automatically installed from PyPI as a dependency.
+
+If you need a specific PyTorch version or CUDA configuration, install PyTorch first:
+
+```bash
+# Example: Install PyTorch with CUDA 11.8 support
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+
+# Then install DataEval (will use your pre-installed PyTorch)
+pip install dataeval
+```
+
+See the [PyTorch installation guide](https://pytorch.org/get-started/locally/) for all available PyTorch installation options.
+
+**Note:** When installing from source using `uv`, you can use extras to specify PyTorch versions
+(e.g., `--extra cpu`, `--extra cu118`, `--extra cu124`, `--extra cu128`). See the source installation
+instructions below for details.
+
 ## Installing DataEval
 
 Now that you have a chosen which DataEval to install, the following methods
@@ -41,7 +62,6 @@ To install DataEval from source locally on Ubuntu using poetry, begin
 by ensuring poetry is installed in your Python environment.
 
 ```bash
-    sudo apt-get install git-lfs
     pip install poetry
 ```
 
@@ -70,14 +90,9 @@ virtual environment directly in the shell.
 
 ::::{tab-item} source (uv)
 
-To install DataEval from source locally on Ubuntu, you will need git-lfs to
-download larger, binary source files and uv for project dependency
-management.
-
-```bash
-    sudo apt-get install git-lfs
-    pip install uv
-```
+To install DataEval from source locally on Ubuntu, you will need
+[uv](https://docs.astral.sh/uv/getting-started/installation/) for
+Python environment management.
 
 Pull the source down and change to the DataEval project directory.
 

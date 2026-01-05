@@ -45,7 +45,7 @@ using MAITE-compliant datasets and models.
 **Supported packages**: _NumPy_, _Pandas_, _Sci-kit learn_, _MAITE_, _NRTK_
 
 Choose your preferred method of installation below or follow our
-[installation guide](https://dataeval.readthedocs.io/en/v0.74.2/installation.html).
+[installation guide](docs/source/home/installation.md).
 
 - [Installing with pip](#installing-with-pip)
 - [Installing with conda/mamba](#installing-with-conda)
