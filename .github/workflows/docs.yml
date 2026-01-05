@@ -1,0 +1,146 @@
+name: Documentation
+
+on:
+  push:
+    paths:
+      - 'src/**'
+      - 'docs/**'
+      - 'uv.lock'
+      - '*.md'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'docs/**'
+      - 'uv.lock'
+      - '*.md'
+  workflow_dispatch:
+
+# Cancel in-progress runs when a new workflow is triggered
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_CACHE_DIR: /tmp/.uv-cache
+  FORCE_COLOR: '1'
+  PYTHON_VERSION: '3.13'
+
+jobs:
+  docs-build:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y graphviz
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install dependencies
+        run: uv pip install nox nox-uv --system
+
+      - name: Build documentation
+        run: nox -e docs
+        env:
+          LANG: C
+          PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+          PYDEVD_DISABLE_FILE_VALIDATION: '1'
+
+      - name: Upload documentation artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: docs-html
+          path: output/docs/html/
+          retention-days: 30
+
+      - name: Upload Jupyter cache
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: docs-jupyter-cache
+          path: output/docs/.jupyter_cache/
+          retention-days: 7
+
+  doclint:
+    name: Documentation Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install dependencies
+        run: uv pip install nox nox-uv --system
+
+      - name: Run doclint
+        run: nox -e doclint
+
+  doctest:
+    name: Documentation Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install dependencies
+        run: uv pip install nox nox-uv --system
+
+      - name: Run doctest
+        run: nox -e doctest
+
+  linkcheck:
+    name: Check Markdown Links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check links in README
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          config-file: 'docs/.markdown-link-check.json'
+          use-quiet-mode: 'yes'
+          check-modified-files-only: 'no'
+
+  markdownlint:
+    name: Markdown Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@v18
+        with:
+          globs: |
+            README.md
+            CONTRIBUTING.md
+            docs/**/*.md
