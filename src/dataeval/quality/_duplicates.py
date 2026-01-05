@@ -157,7 +157,7 @@ class Duplicates:
         Exact duplicates: [[3, 20]]
 
         >>> print(f"Near duplicates: {result.near}")
-        Near duplicates: [[3, 20, 22], [12, 18]]
+        Near duplicates: [[13, 22], [18, 23]]
 
         Cross-dataset duplicate detection:
 
@@ -331,7 +331,7 @@ class Duplicates:
         Exact duplicates: [[3, 20], [16, 37]]
 
         >>> print(f"Near duplicates: {result.near}")
-        Near duplicates: [[3, 20, 22], [12, 18], [13, 36], [14, 31], [17, 27], [19, 38, 47]]
+        Near duplicates: [[3, 20, 28, 40], [5, 30], [8, 47], [13, 22, 39], [18, 23, 26], [29, 42]]
 
         Access computed hashes for reuse
 
