@@ -157,8 +157,7 @@ class DriftUncertainty(BaseDrift):
 
     With data preprocessing
 
-    >>> import torchvision.transforms.v2 as T
-    >>> transforms = T.Compose([T.ToDtype(torch.float32)])
+    >>> transforms = lambda x: torch.as_tensor(x, dtype=torch.float32)
     >>> drift_detector = DriftUncertainty(x_ref, model=model, batch_size=16, transforms=transforms)
 
     Notes
