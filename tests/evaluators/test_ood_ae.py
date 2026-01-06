@@ -44,7 +44,7 @@ def test_ae(ood_type, x_ref):
     assert threshold_perc + 5 > perc_score > threshold_perc - 5
 
     # make and check predictions
-    od_preds = ae.predict(x_ref, ood_type=ood_type)
+    od_preds = ae.predict(x_ref, batch_size=1, ood_type=ood_type)
     scores = ae._threshold_score(ood_type)
 
     if ood_type == "instance":
