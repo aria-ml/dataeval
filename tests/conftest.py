@@ -11,7 +11,7 @@ from numpy.random import randint, random
 from numpy.typing import NDArray
 
 from dataeval import Metadata
-from dataeval.config import set_seed
+from dataeval.config import set_batch_size, set_seed
 from dataeval.protocols import ObjectDetectionTarget
 
 
@@ -53,6 +53,8 @@ TEMP_CONTENTS = "ABCDEF1234567890"
 pytest_plugins = ["tests.fixtures.metadata", "tests.fixtures.models", "tests.fixtures.sufficiency"]
 
 set_seed(0, all_generators=True)
+
+set_batch_size(16)
 
 
 class SimpleDataset:

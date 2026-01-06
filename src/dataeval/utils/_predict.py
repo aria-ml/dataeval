@@ -7,7 +7,7 @@ from collections.abc import Callable
 import numpy as np
 import torch
 
-from dataeval.config import DeviceLike, get_device
+from dataeval.config import DeviceLike, get_batch_size, get_device
 from dataeval.protocols import Array
 
 
@@ -15,7 +15,7 @@ def predict(
     x: Array,
     model: torch.nn.Module,
     device: DeviceLike | None = None,
-    batch_size: int = int(1e10),
+    batch_size: int | None = None,
     preprocess_fn: Callable[[torch.Tensor], torch.Tensor] | None = None,
 ) -> torch.Tensor:
     """
@@ -45,6 +45,7 @@ def predict(
         model = model.to(device).eval()
     x = torch.tensor(x, device=device)
     n = len(x)
+    batch_size = get_batch_size(batch_size)
     n_minibatch = int(np.ceil(n / batch_size))
     preds_array = []
     with torch.no_grad():

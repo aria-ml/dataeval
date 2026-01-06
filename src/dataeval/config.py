@@ -4,7 +4,17 @@ Global configuration settings for DataEval.
 
 from __future__ import annotations
 
-__all__ = ["get_device", "set_device", "get_max_processes", "set_max_processes", "use_max_processes"]
+__all__ = [
+    "get_device",
+    "set_device",
+    "use_device",
+    "get_batch_size",
+    "set_batch_size",
+    "use_batch_size",
+    "get_max_processes",
+    "set_max_processes",
+    "use_max_processes",
+]
 
 from typing import Any
 
@@ -18,10 +28,31 @@ from dataeval.protocols import DeviceLike
 _device: torch.device | None = None
 _processes: int | None = None
 _seed: int | None = None
+_batch_size: int | None = None
 
 ### CONSTS ###
 
 EPSILON = 1e-12
+
+
+### CONTEXT MANAGER ###
+
+
+class _ConfigContextManager:
+    """Generic context manager for temporarily overriding configuration values."""
+
+    def __init__(self, global_name: str, value: Any) -> None:
+        self._global_name = global_name
+        self._value = value
+        self._old: Any = None
+
+    def __enter__(self) -> None:
+        self._old = globals()[self._global_name]
+        globals()[self._global_name] = self._value
+
+    def __exit__(self, *args: tuple[Any, ...]) -> None:
+        globals()[self._global_name] = self._old
+
 
 ### FUNCS ###
 
@@ -72,6 +103,62 @@ def get_device(override: DeviceLike | None = None) -> torch.device:
     return _todevice(override)
 
 
+def use_device(device: DeviceLike) -> _ConfigContextManager:
+    return _ConfigContextManager("_device", None if device is None else _todevice(device))
+
+
+def set_batch_size(batch_size: int | None) -> None:
+    """
+    Sets the default batch size to use when processing data.
+
+    Parameters
+    ----------
+    batch_size : int or None
+        The default batch size to use. None will unset the global batch size.
+    """
+    global _batch_size
+    _batch_size = batch_size
+
+
+def get_batch_size(override: int | None = None) -> int:
+    """
+    Returns the batch size to use.
+
+    Parameters
+    ----------
+    override : int or None, default None
+        The user specified override if provided, otherwise returns the global batch size.
+
+    Returns
+    -------
+    int
+        The batch size to use.
+
+    Raises
+    ------
+    ValueError
+        If no batch size is provided and no global batch size is set.
+    ValueError
+        If the batch size is less than 1.
+    """
+    if override is not None:
+        return override
+
+    global _batch_size
+    if _batch_size is None:
+        raise ValueError(
+            "No batch_size provided. Either pass batch_size as a parameter to the call "
+            "or set a global batch_size using dataeval.config.set_batch_size()."
+        )
+    if _batch_size < 1:
+        raise ValueError("Provided batch_size must be greater than 1.")
+    return _batch_size
+
+
+def use_batch_size(batch_size: int) -> _ConfigContextManager:
+    return _ConfigContextManager("_batch_size", batch_size)
+
+
 def set_max_processes(processes: int | None) -> None:
     """
     Sets the maximum number of worker processes to use when running tasks that support parallel processing.
@@ -117,22 +204,8 @@ def get_max_processes() -> int | None:
     return _processes
 
 
-class MaxProcessesContextManager:
-    def __init__(self, processes: int) -> None:
-        self._processes = processes
-
-    def __enter__(self) -> None:
-        global _processes
-        self._old = _processes
-        set_max_processes(self._processes)
-
-    def __exit__(self, *args: tuple[Any, ...]) -> None:
-        global _processes
-        _processes = self._old
-
-
-def use_max_processes(processes: int) -> MaxProcessesContextManager:
-    return MaxProcessesContextManager(processes)
+def use_max_processes(processes: int) -> _ConfigContextManager:
+    return _ConfigContextManager("_processes", processes)
 
 
 def set_seed(seed: int | None, all_generators: bool = False) -> None:

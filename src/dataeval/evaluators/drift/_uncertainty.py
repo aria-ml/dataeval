@@ -18,7 +18,7 @@ import torch
 from scipy.special import softmax
 from scipy.stats import entropy
 
-from dataeval.config import get_device
+from dataeval.config import get_batch_size, get_device
 from dataeval.evaluators.drift._base import BaseDrift, DriftOutput
 from dataeval.evaluators.drift._ks import DriftKS
 from dataeval.protocols import Array, DeviceLike, Transform, UpdateStrategy
@@ -185,13 +185,13 @@ class DriftUncertainty(BaseDrift):
         update_strategy: UpdateStrategy | None = None,
         correction: Literal["bonferroni", "fdr"] = "bonferroni",
         preds_type: Literal["probs", "logits"] = "probs",
-        batch_size: int = 32,
+        batch_size: int | None = None,
         transforms: Transform[torch.Tensor] | Sequence[Transform[torch.Tensor]] | None = None,
         device: DeviceLike | None = None,
     ) -> None:
         self.model: torch.nn.Module = model
         self.device: torch.device = get_device(device)
-        self.batch_size: int = batch_size
+        self.batch_size: int = get_batch_size(batch_size)
         self.preds_type: Literal["probs", "logits"] = preds_type
 
         self._transforms = (
