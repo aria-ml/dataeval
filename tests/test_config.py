@@ -55,9 +55,9 @@ class TestBatchSize:
 
     def test_batch_size_less_than_one(self):
         config.set_batch_size(0)
-        with pytest.raises(ValueError, match="Provided batch_size must be greater than 1"):
+        with pytest.raises(ValueError, match="Provided batch_size must be greater than 0"):
             config.get_batch_size()
 
         config.set_batch_size(-1)
-        with pytest.raises(ValueError, match="Provided batch_size must be greater than 1"):
+        with pytest.raises(ValueError, match="Provided batch_size must be greater than 0"):
             config.get_batch_size()

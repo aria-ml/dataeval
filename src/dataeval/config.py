@@ -151,7 +151,7 @@ def get_batch_size(override: int | None = None) -> int:
             "or set a global batch_size using dataeval.config.set_batch_size()."
         )
     if _batch_size < 1:
-        raise ValueError("Provided batch_size must be greater than 1.")
+        raise ValueError("Provided batch_size must be greater than 0.")
     return _batch_size
 
 
