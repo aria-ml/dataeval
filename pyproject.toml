@@ -34,12 +34,14 @@ dependencies = [
   "numba>=0.61.0",
   "lightgbm>=4",
   "numpy>=1.24.2,<2.3; python_version<'3.12'",
-  "numpy>=1.26.2,<2.3; python_version>='3.12'",
+  "numpy>=1.26.2,<2.3; python_version>='3.12,<3.13'",
+  "numpy>=2.1.0,<2.3; python_version>='3.13'",
   "polars>=1.0.0",
+  "scikit-learn>=1.5.0; python_version<'3.13'",
+  "scikit-learn>=1.5.2; python_version>='3.13'",
   "scipy>=1.10.0; python_version<'3.12'",
   "scipy>=1.11.2; python_version>='3.12,<3.13'",
   "scipy>=1.14.1; python_version>='3.13'",
-  "scikit-learn>=1.5.0",
   "torch>=2.2.0",
   "typing-extensions>=4.12",
   "xxhash>=3.4",
@@ -184,7 +186,10 @@ version-file = "src/dataeval/_version.py"
 version = "0.0.0"  # unused
 
 [tool.pyproject2conda.dependencies]
-torch = { pip = true }
+numpy = { skip = true, packages = "numpy<2.3,>=1.24.2" }
+scikit-learn = { skip = true, packages = "scikit-learn>=1.5.0" }
+scipy = { skip = true, packages = "scipy>=1.10.0" }
+torch = { pip = true }  # PyTorch is no longer maintained on conda-forge
 xxhash = { skip = true, packages = "python-xxhash>=3.3" }
 
 [tool.pyright]
