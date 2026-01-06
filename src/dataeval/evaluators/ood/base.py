@@ -19,7 +19,7 @@ import numpy as np
 import torch
 from numpy.typing import NDArray
 
-from dataeval.config import get_device
+from dataeval.config import get_batch_size, get_device
 from dataeval.protocols import Array, ArrayLike, DeviceLike, ProgressCallback
 from dataeval.types import DictOutput, set_metadata
 from dataeval.utils._array import as_numpy, to_numpy
@@ -100,7 +100,7 @@ class OODFitMixin(Generic[TLossFn, TOptimizer], ABC):
         loss_fn: TLossFn | None,
         optimizer: TOptimizer | None,
         epochs: int,
-        batch_size: int,
+        batch_size: int | None = None,
         progress_callback: ProgressCallback | None = None,
     ) -> None:
         """
@@ -159,10 +159,10 @@ class OODBaseMixin(Generic[TModel], ABC):
         self._validate(X)
 
     @abstractmethod
-    def _score(self, X: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput: ...
+    def _score(self, X: NDArray[np.float32], batch_size: int | None = None) -> OODScoreOutput: ...
 
     @set_metadata
-    def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
+    def score(self, X: ArrayLike, batch_size: int | None = None) -> OODScoreOutput:
         """
         Compute the :term:`out of distribution<Out-of-distribution (OOD)>` scores for a given dataset.
 
@@ -170,7 +170,7 @@ class OODBaseMixin(Generic[TModel], ABC):
         ----------
         X : ArrayLike
             Input data to score.
-        batch_size : int, default 1e10
+        batch_size : int | None, default None
             Number of instances to process in each batch.
             Use a smaller batch size if your dataset is large or if you encounter memory issues.
 
@@ -185,7 +185,7 @@ class OODBaseMixin(Generic[TModel], ABC):
             An object containing the instance-level and feature-level OOD scores.
         """
         self._validate(X := as_numpy(X).astype(np.float32))
-        return self._score(X, batch_size)
+        return self._score(X, get_batch_size(batch_size))
 
     def _threshold_score(self, ood_type: Literal["feature", "instance"] = "instance") -> np.floating:
         return np.percentile(self._ref_score.get(ood_type), self._threshold_perc)
@@ -194,7 +194,7 @@ class OODBaseMixin(Generic[TModel], ABC):
     def predict(
         self,
         X: ArrayLike,
-        batch_size: int = int(1e10),
+        batch_size: int | None = None,
         ood_type: Literal["feature", "instance"] = "instance",
     ) -> OODOutput:
         """
@@ -238,7 +238,7 @@ class OODBase(OODBaseMixin[torch.nn.Module], OODFitMixin[Callable[..., torch.Ten
         loss_fn: Callable[..., torch.Tensor] | None,
         optimizer: torch.optim.Optimizer | None,
         epochs: int,
-        batch_size: int,
+        batch_size: int | None = None,
         progress_callback: ProgressCallback | None = None,
     ) -> None:
         """
@@ -289,10 +289,10 @@ class OODBaseGMM(OODBase, OODGMMMixin[GaussianMixtureModelParams]):
         loss_fn: Callable[..., torch.Tensor] | None,
         optimizer: torch.optim.Optimizer | None,
         epochs: int,
-        batch_size: int,
+        batch_size: int | None = None,
         progress_callback: ProgressCallback | None = None,
     ) -> None:
-        super().fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, batch_size, progress_callback)
+        super().fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, get_batch_size(batch_size), progress_callback)
 
         # Calculate the GMM parameters
         _, z, gamma = cast(tuple[torch.Tensor, torch.Tensor, torch.Tensor], self.model(x_ref))

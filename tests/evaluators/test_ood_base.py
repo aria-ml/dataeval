@@ -14,12 +14,12 @@ ood_output = OODScoreOutput(np.array([0.0]), np.array([0.0]))
 
 
 class MockOOD(OODGMMMixin, OODBaseMixin[Callable]):
-    def _score(self, X: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput:
+    def _score(self, X: NDArray[np.float32], batch_size: int | None = None) -> OODScoreOutput:
         return ood_output
 
 
 class MockOODGMM(OODBaseGMM):
-    def _score(self, X: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput:
+    def _score(self, X: NDArray[np.float32], batch_size: int | None = None) -> OODScoreOutput:
         return ood_output
 
 
@@ -77,7 +77,7 @@ def test_ood_unit_interval():
 
 def test_embedding_based_ood_base():
     class MockEmbeddingBasedOOD(EmbeddingBasedOODBase):
-        def _score(self, X: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput:
+        def _score(self, X: NDArray[np.float32], batch_size: int | None = None) -> OODScoreOutput:
             return ood_output
 
         def fit_embeddings(self, embeddings: Array, threshold_perc: float = 95) -> None:

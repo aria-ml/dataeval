@@ -18,6 +18,7 @@ import numpy as np
 import torch
 from numpy.typing import NDArray
 
+from dataeval.config import get_batch_size
 from dataeval.evaluators.ood.base import OODBase, OODScoreOutput
 from dataeval.protocols import ArrayLike, DeviceLike, ProgressCallback
 from dataeval.utils._predict import predict
@@ -40,8 +41,10 @@ class OOD_AE(OODBase):
     -------
     Perform out-of-distribution detection on test data.
 
+    >>> from dataeval.config import set_batch_size
     >>> from dataeval.utils.models import Autoencoder
 
+    >>> set_batch_size(32)
     >>> train_images = np.ones((50, 1, 16, 16), dtype=np.float32)
     >>> input_shape = train_images[0].shape
     >>> ood = OOD_AE(Autoencoder(input_shape))
@@ -69,7 +72,7 @@ class OOD_AE(OODBase):
         loss_fn: Callable[..., torch.Tensor] | None = None,
         optimizer: torch.optim.Optimizer | None = None,
         epochs: int = 20,
-        batch_size: int = 64,
+        batch_size: int | None = None,
         progress_callback: ProgressCallback | None = None,
     ) -> None:
         if loss_fn is None:
@@ -78,9 +81,9 @@ class OOD_AE(OODBase):
         if optimizer is None:
             optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
 
-        super().fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, batch_size, progress_callback)
+        super().fit(x_ref, threshold_perc, loss_fn, optimizer, epochs, get_batch_size(batch_size), progress_callback)
 
-    def _score(self, X: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput:
+    def _score(self, X: NDArray[np.float32], batch_size: int | None = None) -> OODScoreOutput:
         # reconstruct instances
         X_recon = predict(X, self.model, batch_size=batch_size).detach().cpu().numpy()
 

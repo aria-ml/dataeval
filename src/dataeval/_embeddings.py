@@ -15,7 +15,7 @@ import xxhash as xxh
 from numpy.typing import NDArray
 from torch.utils.data import DataLoader, Subset
 
-from dataeval.config import get_device
+from dataeval.config import get_batch_size, get_device
 from dataeval.protocols import (
     AnnotatedDataset,
     AnnotatedModel,
@@ -93,7 +93,7 @@ class Embeddings(Array):
         self,
         # Technically more permissive than ImageClassificationDataset or ObjectDetectionDataset
         dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike],
-        batch_size: int,
+        batch_size: int | None = None,
         transforms: Transform[torch.Tensor] | Iterable[Transform[torch.Tensor]] | None = None,
         model: EmbeddingModel | None = None,
         layer_name: str | None = None,
@@ -104,7 +104,7 @@ class Embeddings(Array):
         progress_callback: ProgressCallback | None = None,
     ) -> None:
         self.device = get_device(device)
-        self.batch_size = batch_size if batch_size > 0 else 1
+        self.batch_size = get_batch_size(batch_size)
         self.memory_threshold = max(0.0, min(1.0, memory_threshold))
         self._progress_callback = progress_callback
 
