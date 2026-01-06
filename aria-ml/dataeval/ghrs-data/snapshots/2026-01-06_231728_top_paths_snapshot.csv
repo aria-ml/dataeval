@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,35,27
+/aria-ml/dataeval/tree/main/src/dataeval,17,4
+/aria-ml/dataeval/tree/main/src/dataeval/core,9,4
+/aria-ml/dataeval/tree/v0.93.1/src/dataeval,6,2
+/aria-ml/dataeval/branches/all,6,1
+/aria-ml/dataeval/tree/v0.93.1/src/dataeval/outputs,5,2
+/aria-ml/dataeval/tree/main/src,4,4
+/aria-ml/dataeval/tree/main/src/dataeval/core/_calculators,3,2
+/aria-ml/dataeval/tree/main/src/dataeval/performance,3,2
+/aria-ml/dataeval/tree/main/src/dataeval/utils,3,2
