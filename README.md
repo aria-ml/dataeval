@@ -42,8 +42,6 @@ using MAITE-compliant datasets and models.
 
 **Python versions:** 3.10 - 3.13
 
-**Supported packages**: _NumPy_, _Pandas_, _Sci-kit learn_, _MAITE_, _NRTK_
-
 Choose your preferred method of installation below or follow our
 [installation guide](docs/source/home/installation.md).
 
