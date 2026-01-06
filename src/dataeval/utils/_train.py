@@ -21,7 +21,7 @@ def train(
     optimizer: torch.optim.Optimizer | None,
     preprocess_fn: Callable[[torch.Tensor], torch.Tensor] | None,
     epochs: int,
-    batch_size: int,
+    batch_size: int | None,
     device: DeviceLike | None = None,
     *,
     progress_callback: ProgressCallback | None = None,
