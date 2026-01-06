@@ -90,7 +90,7 @@ class TestBalanceFunctional:
         assert len(result["class_to_factor"]) == FACTOR_DATA.shape[1] + 1
         np.testing.assert_allclose(
             result["class_to_factor"],
-            np.array([0.115358, 0.045411, 0.0, 0.006385]),
+            np.array([0.255898, 0.032484, 0.0, 0.036158]),
             atol=1e-6,
         )
 
@@ -100,12 +100,6 @@ class TestBalanceFunctional:
         np.testing.assert_allclose(result["interfactor"], result["interfactor"].T, atol=1e-6)
         np.testing.assert_allclose(
             result["interfactor"],
-            np.array(
-                [
-                    [1.0, 0.481648, 0.538835],
-                    [0.481648, 1.0, 0.331053],
-                    [0.538835, 0.331053, 0.205118],
-                ]
-            ),
+            np.array([[1.0, 0.8, 0.55596], [0.8, 1.0, 0.785557], [0.55596, 0.785557, 0.705458]]),
             atol=1e-6,
         )

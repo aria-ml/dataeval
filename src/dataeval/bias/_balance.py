@@ -151,10 +151,10 @@ class Balance:
         │ ---         ┆ ---      │
         │ cat         ┆ f64      │
         ╞═════════════╪══════════╡
-        │ class_label ┆ 1.01656  │
-        │ age         ┆ 0.218666 │
-        │ gender      ┆ 0.003119 │
-        │ income      ┆ 0.292495 │
+        │ class_label ┆ 0.888187 │
+        │ age         ┆ 0.251485 │
+        │ gender      ┆ 0.00399  │
+        │ income      ┆ 0.362771 │
         └─────────────┴──────────┘
 
         >>> result.factors
@@ -164,12 +164,12 @@ class Balance:
         │ ---     ┆ ---     ┆ ---      ┆ ---           │
         │ cat     ┆ cat     ┆ f64      ┆ bool          │
         ╞═════════╪═════════╪══════════╪═══════════════╡
-        │ age     ┆ gender  ┆ 0.031473 ┆ false         │
-        │ age     ┆ income  ┆ 0.069446 ┆ false         │
-        │ gender  ┆ age     ┆ 0.031473 ┆ false         │
-        │ gender  ┆ income  ┆ 0.037382 ┆ false         │
-        │ income  ┆ age     ┆ 0.069446 ┆ false         │
-        │ income  ┆ gender  ┆ 0.037382 ┆ false         │
+        │ age     ┆ gender  ┆ 0.046483 ┆ false         │
+        │ age     ┆ income  ┆ 0.078066 ┆ false         │
+        │ gender  ┆ age     ┆ 0.046483 ┆ false         │
+        │ gender  ┆ income  ┆ 0.047947 ┆ false         │
+        │ income  ┆ age     ┆ 0.078066 ┆ false         │
+        │ income  ┆ gender  ┆ 0.047947 ┆ false         │
         └─────────┴─────────┴──────────┴───────────────┘
 
         >>> result.classwise
@@ -179,15 +179,15 @@ class Balance:
         │ ---        ┆ ---         ┆ ---      ┆ ---           │
         │ cat        ┆ cat         ┆ f64      ┆ bool          │
         ╞════════════╪═════════════╪══════════╪═══════════════╡
-        │ artist     ┆ age         ┆ 0.185507 ┆ false         │
-        │ artist     ┆ gender      ┆ 0.036066 ┆ false         │
-        │ artist     ┆ income      ┆ 0.172931 ┆ false         │
-        │ doctor     ┆ age         ┆ 0.088231 ┆ false         │
-        │ doctor     ┆ gender      ┆ 0.073388 ┆ false         │
-        │ doctor     ┆ income      ┆ 0.355217 ┆ true          │
-        │ teacher    ┆ age         ┆ 0.075241 ┆ false         │
-        │ teacher    ┆ gender      ┆ 0.014255 ┆ false         │
-        │ teacher    ┆ income      ┆ 0.103269 ┆ false         │
+        │ artist     ┆ age         ┆ 0.301469 ┆ true          │
+        │ artist     ┆ gender      ┆ 0.04493  ┆ false         │
+        │ artist     ┆ income      ┆ 0.250237 ┆ false         │
+        │ doctor     ┆ age         ┆ 0.164287 ┆ false         │
+        │ doctor     ┆ gender      ┆ 0.095962 ┆ false         │
+        │ doctor     ┆ income      ┆ 0.46587  ┆ true          │
+        │ teacher    ┆ age         ┆ 0.137221 ┆ false         │
+        │ teacher    ┆ gender      ┆ 0.018392 ┆ false         │
+        │ teacher    ┆ income      ┆ 0.160404 ┆ false         │
         └────────────┴─────────────┴──────────┴───────────────┘
         """
         # Convert AnnotatedDataset to Metadata if needed
