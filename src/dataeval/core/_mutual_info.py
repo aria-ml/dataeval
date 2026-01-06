@@ -11,8 +11,8 @@ from numpy.typing import NDArray
 from scipy.stats import entropy
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 
-from dataeval.config import EPSILON, get_max_processes, get_seed
-from dataeval.core._bin import get_counts, is_continuous
+from dataeval.config import get_max_processes, get_seed
+from dataeval.core._bin import is_continuous
 from dataeval.types import Array1D, Array2D
 from dataeval.utils._array import as_numpy, opt_as_numpy
 
@@ -74,6 +74,26 @@ def _merge_labels_and_factors(
     return data, discrete_features
 
 
+def linfoot_transformation(mi: NDArray[np.intp | np.floating]) -> NDArray[np.float64]:
+    """
+    Transforms MI values in nats into a number between 0 and 1 representing the
+    corresponding strength of association. For Gaussian data, this reduces exactly
+    to the square of the correlation coefficient between the two samples.
+
+    Parameters
+    ----------
+    mi : NDArray[np.intp | np.floating]
+        Mutual information estimated for some pair of data samples. Samples can be
+        continuous or discrete.
+
+    Returns
+    -------
+    The transformed mi value(s) : float
+
+    """
+    return 1.0 - np.exp(-2.0 * mi.astype(np.float64))
+
+
 def mutual_info(
     class_labels: Array1D[int],
     factor_data: Array2D[int | float],
@@ -81,7 +101,8 @@ def mutual_info(
     num_neighbors: int = 5,
 ) -> MutualInfoResult:
     """
-    Mutual information between factors (class label, metadata, label/image properties).
+    Mutual information between factors (class label, metadata, label/image properties),
+    transformed to lie in [0, 1].
 
     Parameters
     ----------
@@ -105,7 +126,15 @@ def mutual_info(
     -----
     We use `mutual_info_classif` from sklearn since class label is categorical.
     `mutual_info_classif` outputs are consistent up to O(1e-4) and depend on a random
-    seed. MI is computed differently for categorical and continuous variables.
+    seed. MI is computed differently for categorical and continuous variables. With
+    continuous variables, since there is no upper limit to the entropy of a continuous
+    distribution, normalization by entropy becomes problematic.  So instead we transform
+    mutual information into a balance metric using the Linfoot transformation.
+
+    References
+    ----------
+    [1] `Linfoot, E.H. (1957). "An Informational Measure of Correlation." Information and
+    Control, 1(1), 85-89. <https://www.sciencedirect.com/science/article/pii/S001999585790116X>`_
 
     Example
     -------
@@ -120,11 +149,11 @@ def mutual_info(
 
     >>> result = mutual_info(class_labels=class_labels, factor_data=binned_data)
     >>> result["class_to_factor"]
-    array([1.017, 0.219, 0.003, 0.292])
+    array([0.888, 0.251, 0.004, 0.363])
     >>> result["interfactor"]
-    array([[1.   , 0.031, 0.069],
-           [0.031, 1.   , 0.037],
-           [0.069, 0.037, 1.   ]])
+    array([[1.   , 0.046, 0.078],
+           [0.046, 1.   , 0.048],
+           [0.078, 0.048, 1.   ]])
 
     See Also
     --------
@@ -149,6 +178,17 @@ def mutual_info(
     # initialize output matrix
     mi = np.full((num_factors, num_factors), np.nan, dtype=np.float32)
 
+    # pre-compute normalization factor and use it for discrete-discrete continuous-discrete cases.
+    norm_factor = np.zeros(len(discrete_list))
+    for i in range(len(discrete_list)):
+        if not discrete_list[i]:
+            # Ensure that bogus entropies from a continuous variable will not be chosen ever.
+            norm_factor[i] = np.inf
+        else:
+            _, counts = np.unique(data[:, i], return_counts=True)
+            probs = counts / counts.sum()
+            norm_factor[i] = entropy(probs)  # natural log by default; use base=2 for bits
+
     for idx, is_discrete in enumerate(discrete_list):
         mi[idx, :] = (mutual_info_classif if is_discrete else mutual_info_regression)(
             data,
@@ -159,11 +199,17 @@ def mutual_info(
             n_jobs=get_max_processes(),  # type: ignore - added in 1.5
         )
 
-    # Normalization via entropy
-    bin_cnts = get_counts(data)
-    ent_factor = entropy(bin_cnts, axis=0)
-    norm_factor = 0.5 * np.add.outer(ent_factor, ent_factor) + EPSILON
-    full_matrix = 0.5 * (mi + mi.T) / norm_factor
+        # Normalization via entropy, pre-computed above
+        for j in range(data.shape[1]):
+            if discrete_list[j] or is_discrete:
+                mi[idx, j] /= min(norm_factor[j], norm_factor[idx])
+            else:
+                mi[idx, :] = linfoot_transformation(mi[idx, :])
+
+    full_matrix = 0.5 * (mi + mi.T).astype(np.float64)
+
+    # Linfoot transformation instead of normalization. Linfoot inputs should be in nats.
+    # full_matrix = linfoot_transformation(mi_symmetric)  # mi_symmetric is measured in nats.
 
     _logger.info(
         "Mutual info calculation complete: %d factors, mean class_to_factor MI=%.4f",
@@ -184,7 +230,8 @@ def mutual_info_classwise(
     num_neighbors: int = 5,
 ) -> NDArray[np.float64]:
     """
-    Mutual information (MI) between factors (class label, metadata, label/image properties).
+    Mutual information (MI) between factors (class label, metadata, label/image properties),
+    transformed to lie in [0, 1]. 
 
     Parameters
     ----------
@@ -208,7 +255,8 @@ def mutual_info_classwise(
     -----
     We use `mutual_info_classif` from sklearn since class label is categorical.
     `mutual_info_classif` outputs are consistent up to O(1e-4) and depend on a random
-    seed. MI is computed differently for categorical and continuous variables.
+    seed. MI is computed differently for categorical and continuous variables. We
+    return a transformation of MI onto the interval [0, 1]. 
 
     Example
     -------
@@ -226,9 +274,9 @@ def mutual_info_classwise(
     Return classwise balance (mutual information) of factors with individual class_labels
 
     >>> mutual_info_classwise(class_labels=class_labels, factor_data=binned_data)
-    array([[0.782, 0.088, 0.073, 0.355],
-           [0.708, 0.186, 0.036, 0.173],
-           [0.73 , 0.075, 0.014, 0.103]])
+    array([[0.748, 0.164, 0.096, 0.466],
+           [0.692, 0.301, 0.045, 0.25 ],
+           [0.708, 0.137, 0.018, 0.16 ]])
 
     See Also
     --------
@@ -267,13 +315,7 @@ def mutual_info_classwise(
             n_jobs=get_max_processes(),  # type: ignore - added in 1.5
         )
 
-    # Classwise normalization via entropy
-    bin_cnts = get_counts(data)
-    ent_factor = entropy(bin_cnts, axis=0)
-    classwise_bin_cnts = get_counts(tgt_bin)
-    ent_tgt_bin = entropy(classwise_bin_cnts, axis=0)
-    norm_factor = 0.5 * np.add.outer(ent_tgt_bin, ent_factor) + EPSILON
-    result = classwise_mi / norm_factor
+    result = linfoot_transformation(classwise_mi)
 
     _logger.info("Mutual info classwise calculation complete: %d classes x %d factors", num_classes, num_factors)
 
