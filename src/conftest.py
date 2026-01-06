@@ -13,7 +13,7 @@ import sklearn.datasets as dsets
 import torch
 
 from dataeval._metadata import FactorInfo, Metadata
-from dataeval.config import set_seed
+from dataeval.config import set_batch_size, set_seed
 from dataeval.core import calculate
 from dataeval.evaluators.ood.base import OODOutput
 from dataeval.flags import ImageStats
@@ -21,6 +21,9 @@ from dataeval.flags import ImageStats
 # Manually add the import path for test_drift_uncertainty
 sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute() / "tests" / "evaluators"))
 from test_drift_uncertainty import PtModel
+
+# Set global batch_size for doctests
+set_batch_size(32)
 
 # Set numpy print option to legacy 1.25 so native numpy types
 # are not printed with dtype information.
@@ -373,6 +376,108 @@ def doctest_sampledataset(doctest_namespace: dict[str, Any]) -> None:
             return self._size
 
     doctest_namespace["SampleDataset"] = SampleDataset
+
+
+class AnnotatedDatasetMock:
+    """Mock that properly implements AnnotatedDataset protocol."""
+
+    def __init__(
+        self,
+        start: int,
+        end: int,
+        images: list[np.ndarray],
+        labels_data: list[int],
+        dataset_metadata: dict[str, Any],
+        num_classes: int = 3,
+    ) -> None:
+        self._start = start
+        self._end = end
+        self._images = images
+        self._labels_data = labels_data
+        self._metadata = dataset_metadata
+        self._num_classes = num_classes
+
+    @property
+    def metadata(self) -> dict[str, Any]:
+        return self._metadata
+
+    def __len__(self) -> int:
+        return self._end - self._start
+
+    def __getitem__(self, key: int) -> tuple[Any, np.ndarray, dict[str, Any]]:
+        if isinstance(key, int):
+            actual_idx = self._start + key
+            label = self._labels_data[actual_idx]
+
+            # Return one-hot encoded labels for Metadata compatibility
+            one_hot = np.zeros(self._num_classes, dtype=np.float32)
+            one_hot[label] = 1.0
+            return (torch.from_numpy(self._images[actual_idx]), one_hot, {"id": actual_idx})
+        raise TypeError(f"indices must be integers, not {type(key).__name__}")
+
+
+class SliceableDataset:
+    """Dataset with slicing support for Prioritize doctests."""
+
+    def __init__(
+        self,
+        images: list[np.ndarray],
+        labels_data: list[int],
+        dataset_metadata: dict[str, Any],
+        num_classes: int = 3,
+    ) -> None:
+        self._images = images
+        self._labels_data = labels_data
+        self._dataset_metadata = dataset_metadata
+        self._num_classes = num_classes
+        self._data = AnnotatedDatasetMock(0, len(images), images, labels_data, dataset_metadata, num_classes)
+
+    @property
+    def metadata(self) -> dict[str, Any]:
+        return self._data.metadata
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def __getitem__(self, key: int | slice) -> Any:
+        if isinstance(key, slice):
+            start = key.start or 0
+            stop = key.stop or len(self._images)
+            return AnnotatedDatasetMock(
+                start,
+                stop,
+                self._images,
+                self._labels_data,
+                self._dataset_metadata,
+                self._num_classes,
+            )
+        return self._data[key]
+
+
+@pytest.fixture(autouse=True, scope="session")
+def doctest_quality_prioritize(doctest_namespace: dict[str, Any]) -> None:
+    """Create dataset fixture for Prioritize doctests."""
+    # Create a simple classification dataset with consistent image dimensions
+    rng = np.random.default_rng(42)
+    images = [rng.random((3, 32, 32)).astype(np.float32) for _ in range(100)]
+    labels_data = list(rng.choice([0, 1, 2], size=100))
+    dataset_metadata = {"id": "prioritize_doctest_dataset", "index2label": {0: "class_0", 1: "class_1", 2: "class_2"}}
+    num_classes = 3
+
+    # Create datasets with appropriate parameters
+    unlabeled_data_mm = SliceableDataset(images, labels_data, dataset_metadata, num_classes)
+    labeled_data_mm = AnnotatedDatasetMock(0, 50, images, labels_data, dataset_metadata, num_classes)
+    reference_data_mm = AnnotatedDatasetMock(50, 100, images, labels_data, dataset_metadata, num_classes)
+
+    # Create labels array for class_balanced examples
+    class_labels = np.array(labels_data[:100], dtype=np.intp)
+
+    doctest_namespace["unlabeled_data"] = unlabeled_data_mm
+    doctest_namespace["labeled_data"] = labeled_data_mm
+    doctest_namespace["reference_data"] = reference_data_mm
+    doctest_namespace["class_labels"] = class_labels
+    doctest_namespace["prioritizer"] = None  # Will be set in examples
+    doctest_namespace["model"] = torch.nn.Flatten()  # Simple model for examples
 
 
 @pytest.fixture(autouse=True, scope="session")
