@@ -38,7 +38,7 @@ def test_ae(ood_type, x_ref):
     ae = OOD_AE(Autoencoder(input_shape=input_shape))
 
     # fit OutlierAE, infer threshold and compute scores
-    ae.fit(x_ref, threshold_perc=threshold_perc, epochs=1)
+    ae.fit(x_ref, threshold_perc=threshold_perc, batch_size=1, epochs=1)
     iscore = ae._ref_score.instance_score
     perc_score = 100 * (iscore < ae._threshold_score()).sum() / iscore.shape[0]
     assert threshold_perc + 5 > perc_score > threshold_perc - 5
@@ -64,7 +64,7 @@ def test_ae(ood_type, x_ref):
 def test_custom_loss_fn(mock_fit, x_ref):
     mock_loss_fn = MagicMock()
     ae = OOD_AE(Autoencoder(input_shape=input_shape))
-    ae.fit(x_ref, 0.0, mock_loss_fn)
+    ae.fit(x_ref, 0.0, mock_loss_fn, batch_size=1)
     assert isinstance(mock_fit.call_args_list[0][0][2], MagicMock)
 
 
@@ -73,5 +73,5 @@ def test_custom_loss_fn(mock_fit, x_ref):
 def test_custom_optimizer(mock_fit, x_ref):
     mock_opt = MagicMock()
     ae = OOD_AE(Autoencoder(input_shape=input_shape))
-    ae.fit(x_ref, 0.0, None, mock_opt)
+    ae.fit(x_ref, 0.0, None, mock_opt, batch_size=1)
     assert isinstance(mock_fit.call_args_list[0][0][3], MagicMock)

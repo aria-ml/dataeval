@@ -86,16 +86,21 @@ class OOD_KNN(EmbeddingBasedOODBase):
         # Skip first neighbor (self with distance 0) and average the rest
         return np.mean(distances[:, 1:], axis=1)
 
-    def _score(self, X: np.ndarray, batch_size: int = int(1e10)) -> OODScoreOutput:
+    def _score(self, X: np.ndarray, batch_size: int | None = None) -> OODScoreOutput:
         """
         Compute OOD scores for input embeddings.
 
-        Args:
-            X: Input embeddings to score
-            batch_size: Batch size (not used, kept for interface compatibility)
+        Parameters
+        ----------
+        X : np.ndarray
+            Input embeddings to score
+        batch_size : int | None, default None
+            Batch size (not used, kept for interface compatibility)
 
-        Returns:
-            OODScoreOutput containing instance-level scores
+        Returns
+        -------
+        OODScoreOutput
+            Output class containing instance-level scores
         """
         # Compute OOD scores using sklearn's efficient k-NN search
         distances, _ = self._nn_model.kneighbors(X)
