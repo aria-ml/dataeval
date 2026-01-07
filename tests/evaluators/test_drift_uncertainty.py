@@ -14,7 +14,8 @@ import torch
 import torch.nn as nn
 from sklearn.linear_model import LogisticRegression
 
-from dataeval.evaluators.drift._uncertainty import DriftUncertainty, classifier_uncertainty
+from dataeval.evaluators.drift import DriftUnivariate, UncertaintyFeatureExtractor
+from dataeval.evaluators.drift.feature_extractors import _classifier_uncertainty
 from dataeval.evaluators.drift.updates import LastSeenUpdate, ReservoirSamplingUpdate
 
 
@@ -80,26 +81,33 @@ class TestFunctionalClassifierUncertainty:
         x_test0 = x_ref.clone()
         x_test1 = torch.ones_like(x_ref)
 
-        cd = DriftUncertainty(
-            data=x_ref,
+        # Create uncertainty feature extractor using the class directly
+        uncertainty_extractor = UncertaintyFeatureExtractor(
             model=model,  # type: ignore
-            p_val=p_val,
-            update_strategy=update_strategy,
             preds_type=preds_type,
             batch_size=10,
             transforms=transforms,
             device="cpu",
         )
 
+        # Create drift detector with uncertainty feature extractor
+        cd = DriftUnivariate(
+            data=x_ref,
+            method="ks",
+            p_val=p_val,
+            update_strategy=update_strategy,
+            feature_extractor=uncertainty_extractor,
+        )
+
         preds_0 = cd.predict(x_test0)
         expected_n = len(x_ref) if update_strategy is None else len(x_test0) + len(x_ref)
-        assert cd._detector.n == expected_n
+        assert cd.n == expected_n
         assert not preds_0.drifted
         assert preds_0.distances >= 0
 
         preds_1 = cd.predict(x_test1)
         expected_n = len(x_ref) if update_strategy is None else len(x_test1) + len(x_test0) + len(x_ref)
-        assert cd._detector.n == expected_n
+        assert cd.n == expected_n
         assert preds_1.drifted
         assert preds_1.distances >= 0
         assert preds_0.distances < preds_1.distances
@@ -127,13 +135,13 @@ class TestClassifierUncertainty:
         clf = LogisticRegression().fit(self.X_train, self.y_train_clf)
         model_fn = clf.predict_log_proba if preds_type == "logits" else clf.predict_proba
         x_test = model_fn(self.X_test)
-        uncertainties = classifier_uncertainty(x_test, preds_type=preds_type)  # type: ignore
+        uncertainties = _classifier_uncertainty(x_test, preds_type=preds_type)  # type: ignore
         assert uncertainties.shape == (x_test.shape[0], 1)
 
     def test_classifier_uncertainty_notimplementederror(self):
         with pytest.raises(NotImplementedError):
-            classifier_uncertainty(torch.empty([]), "invalid")  # type: ignore
+            _classifier_uncertainty(torch.empty([]), "invalid")  # type: ignore
 
     def test_classifier_uncertainty_valueerror(self):
         with pytest.raises(ValueError):
-            classifier_uncertainty(torch.empty([]), "probs")
+            _classifier_uncertainty(torch.empty([]), "probs")

@@ -13,6 +13,7 @@ __all__ = [
     "DeviceLike",
     "EvaluationSchedule",
     "EvaluationStrategy",
+    "FeatureExtractor",
     "ImageClassificationDatum",
     "ImageClassificationDataset",
     "ObjectDetectionTarget",
@@ -339,6 +340,82 @@ class Transform(Protocol[_T]):
     def __call__(self, data: _T, /) -> _T: ...
 
 
+@runtime_checkable
+class FeatureExtractor(Protocol):
+    """
+    Protocol defining a feature extraction function for drift detection.
+
+    Feature extractors transform arbitrary input data types into arrays
+    suitable for drift detection. This enables drift detection on non-array
+    inputs such as datasets, metadata, or raw model outputs.
+
+    Common use cases include:
+    - Extracting model prediction uncertainties from raw data
+    - Computing embeddings from a neural network layer
+    - Extracting statistical features from metadata
+    - Converting structured data to numeric representations
+
+    Example
+    -------
+    Creating a feature extractor for model uncertainties:
+
+    >>> import torch
+    >>> import torch.nn as nn
+    >>> from dataeval.protocols import FeatureExtractor
+    >>>
+    >>> class UncertaintyExtractor:
+    ...     def __init__(self, model: nn.Module) -> None:
+    ...         self.model = model
+    ...
+    ...     def __call__(self, data: Any, /) -> Array:
+    ...         # Get model predictions
+    ...         with torch.no_grad():
+    ...             preds = self.model(torch.tensor(data))
+    ...             # Compute uncertainty as entropy
+    ...             probs = torch.softmax(preds, dim=-1)
+    ...             uncertainty = -(probs * torch.log(probs + 1e-10)).sum(dim=-1)
+    ...         return uncertainty.numpy()
+    >>>
+    >>> model = nn.Linear(10, 3)
+    >>> extractor = UncertaintyExtractor(model)
+    >>> isinstance(extractor, FeatureExtractor)
+    True
+
+    Creating a feature extractor for metadata:
+
+    >>> class MetadataExtractor:
+    ...     def __call__(self, metadata_list: list, /) -> Array:
+    ...         import numpy as np
+    ...
+    ...         # Extract statistics from metadata
+    ...         features = [[m.brightness, m.contrast] for m in metadata_list]
+    ...         return np.array(features)
+    >>>
+    >>> extractor = MetadataExtractor()
+    >>> isinstance(extractor, FeatureExtractor)
+    True
+    """
+
+    def __call__(self, data: Any, /) -> Array:
+        """
+        Extract features from input data.
+
+        Parameters
+        ----------
+        data : Any
+            Input data to extract features from. Can be any type that the
+            specific extractor implementation supports.
+
+        Returns
+        -------
+        Array
+            Extracted features as an array suitable for drift detection.
+            Should have shape (n_samples, n_features) or be convertible to
+            such a shape.
+        """
+        ...
+
+
 # ========== MODEL ==========
 
 
@@ -548,7 +625,7 @@ class UpdateStrategy(Protocol):
 
     Using a custom update strategy with a drift detector:
 
-    >>> from dataeval.evaluators.drift import DriftKS
+    >>> from dataeval.evaluators.drift import DriftUnivariate
     >>> import numpy as np
     >>>
     >>> # Create reference data
@@ -556,7 +633,7 @@ class UpdateStrategy(Protocol):
     >>>
     >>> # Initialize drift detector with custom update strategy
     >>> update_strategy = MovingAverageUpdate(n=100, alpha=0.9)
-    >>> detector = DriftKS(ref_data, update_strategy=update_strategy)
+    >>> detector = DriftUnivariate(ref_data, method="ks", update_strategy=update_strategy)
     >>>
     >>> # Detect drift on new data - reference will be updated automatically
     >>> new_data = np.random.normal(0.5, 1, (50, 10))

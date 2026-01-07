@@ -20,4 +20,28 @@ or {term}`False Discovery Rate (FDR)` correction. The
 at least one false positive, making it more conservative, while the FDR
 correction allows for a controlled proportion of false positives.
 
+**Key characteristics:**
+
+- **Sensitivity**: Higher sensitivity to subtle distributional shifts across
+  the entire range
+- **Weighting**: Gives equal weight to differences across the entire
+  distribution
+
+- **Power**: Generally more powerful than KS for detecting variance changes
+- **Granularity**: Integrates over all points rather than taking maximum
+  difference
+
+**When to use:**
+
+- **Camera/lighting condition changes** (subtle exposure, white balance drift)
+- Detecting subtle shifts in higher-order moments (variance, skewness)
+- When distribution changes are spread across multiple regions
+- For continuous variables with fine-grained distributional changes
+- When you need higher statistical power than KS
+
+**Limitations:**
+
+Computationally more intensive than KS (though usually negligible for most ML use
+cases) and less intuitive to visualize or explain to non-technical stakeholders.
+
 [bonferroni]: https://en.wikipedia.org/wiki/Bonferroni_correction

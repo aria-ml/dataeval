@@ -23,6 +23,9 @@ Accuracy
 
     ![binary accuracy example](../_static/images/reference/binary_accuracy_example.png)
 
+Anderson-Darling Test
+    A non-parametric statistical test for comparing distributions that places greater weight on differences in the tails compared to tests like the {term}`Kolmogorov-Smirnov (K-S) test<Kolmogorov-Smirnov (K-S) Test>` or {term}`Cramér-von Mises (CVM) Test<Cramér-von Mises (CVM) Test>`. The Anderson-Darling test measures weighted squared differences between two empirical cumulative distribution functions, with its weighting function emphasizing discrepancies at the distribution extremes. This makes it particularly powerful for detecting {term}`drift<Drift>` in heavy-tailed distributions or scenarios where tail behavior is critical, such as in safety-critical computer vision applications where rare edge cases (extreme lighting conditions, unusual object poses) must be detected. The test is commonly used in quality control and reliability engineering, and in the context of machine learning, it serves as a sensitive method for identifying distributional shifts that might indicate model degradation.
+
 Artificial Intelligence (AI)
     Artificial Intelligence, or AI, is technology that enables computers and machines to simulate human intelligence and problem-solving capabilities. It is modeled after the decision-making processes of the human brain that can ‘learn’ from available data and make increasingly more accurate classifications or predictions over time. For the applications in DataEval, Neural Networks are the main modeling method.
 
@@ -59,6 +62,9 @@ Average Pooling
 ```{glossary}
 Balance
     A measure of co-occurrence of metadata factors with class labels. Metadata factors that spuriously correlate with individual classes may allow a model to learn shortcut relationships rather than the salient properties of each class.
+
+Baumgartner-Weiss-Schindler Test
+    A modern non-parametric statistical test for comparing two distributions. The Baumgartner-Weiss-Schindler (BWS) test combines advantages of several classical tests and has particularly high statistical power for detecting distributional differences. It has strong sensitivity to tail differences similar to the {term}`Anderson-Darling test<Anderson-Darling Test>` while also being effective at detecting location and scale shifts. In the context of {term}`drift<Drift>` detection, BWS is recommended for critical applications where missing drift is costly, such as production computer vision systems in medical imaging or autonomous driving.
 
 Bayes Error Rate (BER)
     In statistical classification, bayes error rate is the lowest possible error rate for any classifier of a random outcome (into, for example, one of two categories) and is analogous to the {term}`irreducible error<Irreducible Error>`. A number of approaches to the estimation of the bayes error rate exist. In general, it is impossible to compute the exact value of the bayes error.
@@ -313,6 +319,9 @@ Machine Learning (ML)
 
 Manifold
     In mathematics, a manifold is a topological space that locally resembles Euclidean space near each point. One dimensional manifolds include lines and circles. Two dimensional manifolds are also called surfaces. One example is the family of Gaussian or Normal Functions. They form a manifold parameterized by the expected value and {term}`variance<Variance>` of the Gaussian functions.
+
+Mann-Whitney U Test
+    A non-parametric statistical test (also known as the Wilcoxon rank-sum test) that compares whether two samples come from the same distribution by analyzing their ranks rather than their raw values. The Mann-Whitney U test is particularly robust to outliers and extreme values because it uses rank-based comparisons. It is most sensitive to shifts in the median (location shifts) and makes minimal assumptions about the underlying distributions, requiring only that the data be ordinal (rankable). In the context of {term}`drift<Drift>` detection in computer vision, it is especially useful for image quality metrics that may contain noise spikes or for outdoor vision systems with weather-induced variance and illumination extremes.
 
 Maximum Pooling
     Method used in the {term}`pooling layer<Pooling Layer>` of a {term}`convolutional neural netwok<Convolutional Neural Network (CNN)>`. It uses the maximum value in a group of pixel values (typically a 2 x 2 or 3 x 3 area) produced from the {term}`convolutional layer<Convolutional Layer>` to reduce the dimensionality of the result. An image of the operation is shown below.
