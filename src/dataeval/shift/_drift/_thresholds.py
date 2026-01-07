@@ -42,7 +42,7 @@ class Threshold(ABC):
         Threshold._registry[threshold_type] = cls
 
     @abstractmethod
-    def _thresholds(self, data: np.ndarray) -> tuple[float | None, float | None]:
+    def thresholds(self, data: np.ndarray) -> tuple[float | None, float | None]:
         """Returns lower and upper threshold values when given one or more np.ndarray instances.
 
         Parameters:
@@ -105,7 +105,7 @@ class Threshold(ABC):
             gets overridden by a threshold value limit.
         """
 
-        lower_value, upper_value = self._thresholds(data)
+        lower_value, upper_value = self.thresholds(data)
 
         if lower_limit is not None and lower_value is not None and lower_value <= lower_limit:
             override_value = None if override_using_none else lower_limit
@@ -142,9 +142,8 @@ class ConstantThreshold(Threshold, threshold_type="constant"):
     Examples:
         >>> data = np.array(range(10))
         >>> t = ConstantThreshold(lower=None, upper=0.1)
-        >>> lower, upper = t.threshold()
-        >>> print(lower, upper)
-        None 0.1
+        >>> t.calculate(data)
+        (None, 0.1)
     """
 
     def __init__(self, lower: float | int | None = None, upper: float | int | None = None) -> None:
@@ -165,7 +164,7 @@ class ConstantThreshold(Threshold, threshold_type="constant"):
         self.lower = lower
         self.upper = upper
 
-    def _thresholds(self, data: np.ndarray) -> tuple[float | None, float | None]:
+    def thresholds(self, data: np.ndarray) -> tuple[float | None, float | None]:
         return self.lower, self.upper
 
     @staticmethod
@@ -194,10 +193,9 @@ class StandardDeviationThreshold(Threshold, threshold_type="standard_deviation")
 
     Examples:
         >>> data = np.array(range(10))
-        >>> t = ConstantThreshold(lower=None, upper=0.1)
-        >>> lower, upper = t.threshold()
-        >>> print(lower, upper)
-        -4.116843969807043 13.116843969807043
+        >>> t = StandardDeviationThreshold(std_lower_multiplier=2, std_upper_multiplier=2.5)
+        >>> t.calculate(data)
+        (-1.2445626465380286, 11.680703308172536)
     """
 
     def __init__(
@@ -229,7 +227,7 @@ class StandardDeviationThreshold(Threshold, threshold_type="standard_deviation")
         self.std_upper_multiplier = std_upper_multiplier
         self.offset_from = offset_from
 
-    def _thresholds(self, data: np.ndarray) -> tuple[float | None, float | None]:
+    def thresholds(self, data: np.ndarray) -> tuple[float | None, float | None]:
         aggregate = self.offset_from(data)
         std = np.nanstd(data)
 

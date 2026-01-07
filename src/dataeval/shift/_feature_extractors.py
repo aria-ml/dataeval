@@ -7,11 +7,8 @@ data types (datasets, embeddings, metadata) into arrays suitable for drift detec
 
 from __future__ import annotations
 
-__all__ = [
-    "EmbeddingsFeatureExtractor",
-    "MetadataFeatureExtractor",
-    "UncertaintyFeatureExtractor",
-]
+__all__ = []
+
 
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal, cast
@@ -133,8 +130,7 @@ class EmbeddingsFeatureExtractor:
 
     >>> import numpy as np
     >>> import torch.nn as nn
-    >>> from dataeval.evaluators.drift import DriftUnivariate
-    >>> from dataeval.evaluators.drift.feature_extractors import EmbeddingsFeatureExtractor
+    >>> from dataeval.shift import DriftUnivariate, EmbeddingsFeatureExtractor
     >>>
     >>> # Create dummy data
     >>> train_data = np.random.randn(100, 16).astype(np.float32)
@@ -322,9 +318,8 @@ class MetadataFeatureExtractor:
     -------
     Basic usage with a dataset:
 
-    >>> from dataeval.evaluators.drift import DriftUnivariate
-    >>> from dataeval.evaluators.drift.feature_extractors import MetadataFeatureExtractor
     >>> from dataeval.flags import ImageStats
+    >>> from dataeval.shift import DriftUnivariate, MetadataFeatureExtractor
     >>>
     >>> # Use ExampleDataset from conftest
     >>> train_dataset = ExampleDataset(100, seed=42)
@@ -491,7 +486,7 @@ class UncertaintyFeatureExtractor:
     """Feature extractor that converts data to model uncertainty scores.
 
     This class implements the :class:`~dataeval.protocols.FeatureExtractor` protocol
-    for use with drift detectors (e.g., :class:`~dataeval.evaluators.drift.DriftUnivariate`).
+    for use with drift detectors (e.g., :class:`~dataeval.shift.DriftUnivariate`).
     It computes prediction uncertainty (entropy) from a classification model.
 
     Uncertainty-based drift detection monitors changes in model confidence rather
@@ -534,8 +529,7 @@ class UncertaintyFeatureExtractor:
 
     >>> import numpy as np
     >>> import torch.nn as nn
-    >>> from dataeval.evaluators.drift import DriftUnivariate
-    >>> from dataeval.evaluators.drift.feature_extractors import UncertaintyFeatureExtractor
+    >>> from dataeval.shift import DriftUnivariate, UncertaintyFeatureExtractor
     >>>
     >>> # Create dummy datasets
     >>> train_dataset = np.random.randn(100, 16).astype(np.float32)

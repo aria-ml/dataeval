@@ -625,7 +625,7 @@ class UpdateStrategy(Protocol):
 
     Using a custom update strategy with a drift detector:
 
-    >>> from dataeval.evaluators.drift import DriftUnivariate
+    >>> from dataeval.shift import DriftUnivariate
     >>> import numpy as np
     >>>
     >>> # Create reference data

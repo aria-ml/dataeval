@@ -5,7 +5,7 @@ for drift.
 
 from __future__ import annotations
 
-__all__ = ["LastSeenUpdate", "ReservoirSamplingUpdate"]
+__all__ = []
 
 
 import numpy as np
@@ -15,7 +15,7 @@ from dataeval.protocols import UpdateStrategy
 from dataeval.utils._array import flatten
 
 
-class LastSeenUpdate(UpdateStrategy):
+class LastSeenUpdateStrategy(UpdateStrategy):
     """
     Updates reference dataset for :term:`drift<Drift>` detector using last seen method.
 
@@ -32,7 +32,7 @@ class LastSeenUpdate(UpdateStrategy):
         return np.concatenate([x_ref, flatten(x_new)], axis=0)[-self.n :]
 
 
-class ReservoirSamplingUpdate(UpdateStrategy):
+class ReservoirSamplingUpdateStrategy(UpdateStrategy):
     """
     Updates reference dataset for :term:`drift<Drift>` detector using reservoir sampling method.
 
