@@ -11,8 +11,8 @@ class TestMst:
 
         images = np.ones((10, 3, 3))
         mst = minimum_spanning_tree(images)
-        assert (mst["source"] == [0, 1, 2, 4, 5, 6, 7, 8, 9]).all()
-        assert (mst["target"] == [3, 3, 3, 3, 3, 3, 3, 3, 3]).all()
+        assert (mst["source"] == [7, 7, 7, 6, 6, 6, 6, 6, 7]).all()
+        assert (mst["target"] == [6, 3, 2, 0, 5, 9, 4, 8, 1]).all()
 
     def test_simple_nodes(self):
         from dataeval.core._mst import minimum_spanning_tree
@@ -26,6 +26,7 @@ class TestMst:
                 [10, 0],
                 [11, 0],
                 [10, 1],
+                [15, 0],
             ]
         ).astype(np.float64)
         mst = minimum_spanning_tree(X)
@@ -36,8 +37,7 @@ class TestMst:
             x1, y1 = X[mst["target"][i]]
             total += np.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
 
-        # Disabling test until fix is in
-        assert total == 14.0  # 14-Aug-2025, picking wrong long edge and getting 15.0
+        assert total == 18.0
 
     def test_compute_neighbors(self):
         from dataeval.core._mst import compute_neighbors
@@ -98,7 +98,7 @@ class TestMst:
 
         # Test with k=5 (insufficient: each cluster has 9 other points, so inter-cluster edges at rank 10+)
         caplog.clear()
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.DEBUG):
             mst = minimum_spanning_tree(X, k=5)
 
         # Should trigger KNN exhaustion warning
@@ -110,7 +110,7 @@ class TestMst:
 
         # Test with k=15 (sufficient: should NOT warn)
         caplog.clear()
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.DEBUG):
             mst = minimum_spanning_tree(X, k=15)
 
         knn_warnings = [rec for rec in caplog.records if "k-nearest neighbors" in rec.message.lower()]

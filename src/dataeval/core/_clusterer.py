@@ -39,7 +39,7 @@ class ClusterResult(TypedDict):
 
     Attributes
     ----------
-    clusters : NDArray[np.intp]
+    clusters : NDArray[np.int64]
         Assigned clusters
     mst : NDArray[np.float32]
         The minimum spanning tree of the data
@@ -49,18 +49,18 @@ class ClusterResult(TypedDict):
         The condensed tree of the data
     membership_strengths : NDArray[np.float32]
         The strength of the data point belonging to the assigned cluster
-    k_neighbors : NDArray[np.int32]
+    k_neighbors : NDArray[np.int64]
         Indices of the nearest points in the population matrix
     k_distances : NDArray[np.float32]
         Array representing the lengths to points
     """
 
-    clusters: NDArray[np.intp]
+    clusters: NDArray[np.int64]
     mst: NDArray[np.float32]
     linkage_tree: NDArray[np.float32]
     condensed_tree: CondensedTree
     membership_strengths: NDArray[np.float32]
-    k_neighbors: NDArray[np.int32]
+    k_neighbors: NDArray[np.int64]
     k_distances: NDArray[np.float32]
 
 
@@ -70,7 +70,7 @@ class ClusterStats(TypedDict):
 
     Attributes
     ----------
-    cluster_ids : NDArray[np.intp]
+    cluster_ids : NDArray[np.int64]
         Array of unique cluster IDs (excluding -1)
     centers : NDArray[np.floating]
         Cluster centers, shape (n_clusters, n_features)
@@ -80,21 +80,21 @@ class ClusterStats(TypedDict):
         Standard deviation of distances within each cluster, shape (n_clusters,)
     distances : NDArray[np.floating]
         Distance from each point to its nearest cluster center, shape (n_samples,)
-    nearest_cluster_idx : NDArray[np.intp]
+    nearest_cluster_idx : NDArray[np.int64]
         Index of nearest cluster center for each point, shape (n_samples,)
     """
 
-    cluster_ids: NDArray[np.intp]
+    cluster_ids: NDArray[np.int64]
     centers: NDArray[np.floating]
     cluster_distances_mean: NDArray[np.floating]
     cluster_distances_std: NDArray[np.floating]
     distances: NDArray[np.floating]
-    nearest_cluster_idx: NDArray[np.intp]
+    nearest_cluster_idx: NDArray[np.int64]
 
 
 def compute_cluster_stats(
     embeddings: NDArray[np.floating],
-    clusters: NDArray[np.intp],
+    clusters: NDArray[np.int64],
 ) -> ClusterStats:
     """
     Compute cluster centers and distance statistics for adaptive outlier detection.
@@ -103,7 +103,7 @@ def compute_cluster_stats(
     ----------
     embeddings : NDArray[np.floating]
         The embedding vectors, shape (n_samples, n_features)
-    clusters : NDArray[np.intp]
+    clusters : NDArray[np.int64]
         Cluster labels from HDBSCAN (-1 for HDBSCAN outliers)
 
     Returns
@@ -122,12 +122,12 @@ def compute_cluster_stats(
     if len(unique_clusters) == 0:
         _logger.warning("No valid clusters found, returning empty statistics")
         return ClusterStats(
-            cluster_ids=np.array([], dtype=np.intp),
+            cluster_ids=np.array([], dtype=np.int64),
             centers=np.array([], dtype=embeddings.dtype),
             cluster_distances_mean=np.array([], dtype=embeddings.dtype),
             cluster_distances_std=np.array([], dtype=embeddings.dtype),
             distances=np.full(n_samples, np.inf, dtype=embeddings.dtype),
-            nearest_cluster_idx=np.full(n_samples, -1, dtype=np.intp),
+            nearest_cluster_idx=np.full(n_samples, -1, dtype=np.int64),
         )
 
     n_clusters = len(unique_clusters)
@@ -196,14 +196,13 @@ def cluster(
     -------
     ClusterResult
         Mapping with keys:
-
-        - clusters: NDArray[np.intp] - Assigned clusters
-        - mst: NDArray[np.float32] - The minimum spanning tree of the data
-        - linkage_tree: NDArray[np.float32] - The linkage array of the data
-        - condensed_tree: CondensedTree(Mapping) - Derived from fast_hdbscan.cluster_trees.CondensedTree
-        - membership_strengths: NDArray[np.float32] - The strength of the data point belonging to the assigned cluster
-        - k_neighbors: NDArray[np.int32] - Indices of the nearest points in the population matrix
-        - k_distances: NDArray[np.float32] - Array representing the lengths to points
+        - clusters : NDArray[np.int64] - Assigned clusters
+        - mst : NDArray[np.float32] - The minimum spanning tree of the data
+        - linkage_tree : NDArray[np.float32] - The linkage array of the data
+        - condensed_tree : CondensedTree(Mapping) - Derived from fast_hdbscan.cluster_trees.CondensedTree
+        - membership_strengths : NDArray[np.float32] - The strength of the data point belonging to the assigned cluster
+        - k_neighbors : NDArray[np.int64] - Indices of the nearest points in the population matrix
+        - k_distances : NDArray[np.float32] - Array representing the lengths to points
 
     Notes
     -----
@@ -213,11 +212,21 @@ def cluster(
 
     Examples
     --------
+    Return dataset clusters
+
+    >>> import sklearn.datasets as dsets
+    >>> from dataeval.core import cluster
+    >>> clusterer_images = dsets.make_blobs(
+    ...     n_samples=50, centers=np.array([(-1, -1), (1, 1)]), cluster_std=0.5, random_state=33
+    ... )[0]
+
+    Two distinct clusters
+
     >>> output = cluster(clusterer_images)
     >>> output["clusters"]
-    array([ 2,  0,  0,  0,  0,  0,  4,  0,  3,  1,  1,  0,  2,  0,  0,  0,  0,
-            4,  2,  0,  0,  1,  2,  0,  1,  3,  0,  3,  3,  4,  0,  0,  3,  0,
-            3, -1,  0,  0,  2,  4,  3,  4,  0,  1,  0, -1,  3,  0,  0,  0])
+    array([0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0, 1, 1, 0,
+           0, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0,
+           1, 0, 0, 1, 1, 1])
     """
     # Import from our cached cluster_trees implementation
     from dataeval.core._fast_hdbscan._cluster_trees import (
@@ -291,7 +300,7 @@ def cluster(
     #         min_epsilon=cluster_selection_epsilon,
     #     )
 
-    clusters: NDArray[np.intp] = get_cluster_label_vector(
+    clusters: NDArray[np.int64] = get_cluster_label_vector(
         condensed_tree,
         selected_clusters,
         cluster_selection_epsilon,

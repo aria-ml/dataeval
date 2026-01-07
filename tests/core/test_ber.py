@@ -11,7 +11,7 @@ class TestBERCore:
     @pytest.mark.parametrize(
         "method, k, expected_upper, expected_lower",
         [
-            (ber_mst, None, 0.004, 0.0020022271742540345),
+            (ber_mst, None, 0.0, 0.0),
             (ber_knn, 1, 0.0, 0.0),
             (ber_knn, 10, 0.0, 0.0),
         ],
@@ -21,8 +21,29 @@ class TestBERCore:
         rng = np.random.default_rng(3)
         labels = np.concatenate([rng.choice(10, 500), np.arange(10).repeat(50)])
         data = np.ones((1000, 784)) * labels[:, np.newaxis]
-        data[:, 13:16] += 1
-        data[-200:, 13:16] += rng.choice(5)
+        data[:, 5] += rng.choice(100, 1000)
+        data[:, 10] += rng.choice(50, 1000)
+
+        result = method(data, labels, k) if k else method(data, labels)
+        assert result["upper_bound"] == expected_upper
+        assert result["lower_bound"] == expected_lower
+
+    @pytest.mark.parametrize(
+        "method, k, expected_upper, expected_lower",
+        [
+            (ber_mst, None, 0.01, 0.00501396658942207),
+            (ber_knn, 1, 0.011, 0.005516909047465568),
+            (ber_knn, 10, 0.005, 0.0025034819009044917),
+        ],
+    )
+    def test_ber_on_mock_data_with_mismatch(self, method, k, expected_upper, expected_lower):
+        """Core methods correctly calculate BER with given params"""
+        rng = np.random.default_rng(3)
+        labels = np.concatenate([rng.choice(10, 500), np.arange(10).repeat(50)])
+        data = np.ones((1000, 784)) * labels[:, np.newaxis]
+        data[:, 5] += rng.choice(100, 1000)
+        data[:, 10] += rng.choice(50, 1000)
+        labels[:5] = [0, 1, 8, 3, 5]
 
         result = method(data, labels, k) if k else method(data, labels)
         assert result["upper_bound"] == expected_upper

@@ -169,7 +169,7 @@ class TestOutliers:
                 "child_size": np.array([]),
             },
             "membership_strengths": np.array([], dtype=np.float32),
-            "k_neighbors": np.array([], dtype=np.int32),
+            "k_neighbors": np.array([], dtype=np.int64),
             "k_distances": np.array([], dtype=np.float32),
         }
 
@@ -202,7 +202,7 @@ class TestOutliers:
                 "child_size": np.array([]),
             },
             "membership_strengths": np.array([], dtype=np.float32),
-            "k_neighbors": np.array([], dtype=np.int32),
+            "k_neighbors": np.array([], dtype=np.int64),
             "k_distances": np.array([], dtype=np.float32),
         }
 
@@ -258,7 +258,7 @@ class TestOutliers:
                 "child_size": np.array([]),
             },
             "membership_strengths": np.array([], dtype=np.float32),
-            "k_neighbors": np.array([], dtype=np.int32),
+            "k_neighbors": np.array([], dtype=np.int64),
             "k_distances": np.array([], dtype=np.float32),
         }
 
@@ -287,7 +287,7 @@ class TestOutliers:
                 "child_size": np.array([]),
             },
             "membership_strengths": np.array([], dtype=np.float32),
-            "k_neighbors": np.array([], dtype=np.int32),
+            "k_neighbors": np.array([], dtype=np.int64),
             "k_distances": np.array([], dtype=np.float32),
         }
 

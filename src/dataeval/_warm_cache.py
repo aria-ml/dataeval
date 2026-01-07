@@ -42,28 +42,31 @@ def warm_cache() -> None:
         from dataeval.core._fast_hdbscan._disjoint_set import ds_rank_create, ds_union_by_rank
         from dataeval.core._fast_hdbscan._mst import (
             _cluster_edges,
-            _init_tree,
-            _update_tree_by_distance,
+            _flatten_and_sort,
+            _update_tree,
             compare_links_to_cluster_std,
         )
 
         # Warm disjoint set functions
-        disjoint_set = ds_rank_create(np.int32(10))
+        disjoint_set = ds_rank_create(np.int64(10))
         ds_union_by_rank(disjoint_set, np.intp(0), np.intp(1))
 
-        # Warm MST construction functions
+        # Warm flatten and sort
         n_neighbors = np.array([1, 0, 3, 2, 5, 4, 7, 6, 9, 8], dtype=np.intp)
         n_distance = np.array([0.1, 0.1, 0.2, 0.2, 0.3, 0.3, 0.4, 0.4, 0.5, 0.5], dtype=np.float32)
-        tree, int_tree, disjoint_set, _ = _init_tree(n_neighbors, n_distance)
+        nbrs_sorted, dist_sorted, point_sorted = _flatten_and_sort(n_neighbors, n_distance)
 
-        n_neighbors_uint = np.array([2, 3, 4, 5, 6, 7, 8, 9, 0, 1], dtype=np.uint32)
-        n_distance_new = np.array([0.6, 0.6, 0.7, 0.7, 0.8, 0.8, 0.9, 0.9, 1.0, 1.0], dtype=np.float32)
-        tree, int_tree, disjoint_set, _ = _update_tree_by_distance(
-            tree, int_tree, disjoint_set, n_neighbors_uint, n_distance_new
+        # Warm MST construction functions
+        size = np.int64(n_neighbors.shape[0])
+        tree = np.zeros((size - 1, 3), dtype=np.float32)
+        total_edge = 0
+        merge_tracker = np.full((n_neighbors.shape[1] + 1, n_neighbors.shape[0]), -1, dtype=np.int64)
+        tree, total_edge, tree_disjoint_set, merge_tracker[0] = _update_tree(
+            tree, total_edge, disjoint_set, merge_tracker[0], nbrs_sorted, dist_sorted, point_sorted
         )
 
         # Warm cluster edge detection
-        tracker = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4], dtype=np.int32)
+        tracker = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4], dtype=np.int64)
         cluster_distances = np.random.rand(5, 10).astype(np.float32)
         _cluster_edges(tracker, 2, cluster_distances)
 
