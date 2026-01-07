@@ -4,10 +4,13 @@
 :maxdepth: 1
 :hidden:
 
+DriftAD
+DriftBWS
 DriftCVM
 DriftKS
 DriftMMD
 DriftMVDC
+DriftMWU
 DriftUncertainty
 ```
 
@@ -145,22 +148,38 @@ drift in datasets efficiently.
 
 DataEval's drift detection classes are:
 
-- **{class}`.DriftCVM`**: Implements the Cramér-von Mises (CVM) test for
-  feature-wise drift detection.
-- **{class}`.DriftKS`**: Implements the Kolmogorov-Smirnov test for detecting
-  feature-wise distributional shifts.
+- **{class}`.DriftUnivariate`**: Implements univariate statistical tests for
+  feature-wise drift detection. Supports five methods:
+  - **Kolmogorov-Smirnov (ks)**: General-purpose test, sensitive to middle
+    portions of distributions
+  - **Cramér-von Mises (cvm)**: Higher sensitivity to subtle distributional shifts
+  - **Mann-Whitney U (mwu)**: Robust rank-based test for median shifts, handles outliers well
+  - **Anderson-Darling (anderson)**: Emphasizes tail differences for heavy-tailed distributions
+  - **Baumgartner-Weiss-Schindler (bws)**: Modern high-power test with tail sensitivity
 - **{class}`.DriftMMD`**: Utilizes the Maximum Mean Discrepancy (MMD) test to
   detect drift in multivariate data using kernel methods.
-- **{class}`.DriftUncertainty`**: Detects drift by analyzing changes in the
-  model's uncertainty across datasets.
-- **{class}`.DriftMVDC`**: Detects drift by using {term}`AUROC<AUROC>` to detect
-  when incoming data are distinguishable from reference data.
+- **{class}`.DriftMVDC`**: Utilizes multivariate domain classifier (MVDC) to detect drift by
+  comparing the distance between the reference and test data.
+
+Classifier uncertainty drift detection is available by creating a
+{class}`.UncertaintyFeatureExtractor`, which computes prediction uncertainty
+(entropy) from a classification model. The feature extractor can then be
+provided to `DriftUnivariate` for drift detection based on the model's
+uncertainty.
 
 To see how these detectors work in practice, refer to our
 [Monitoring Guide](../notebooks/tt_monitor_shift.ipynb), where you can explore
 real-world examples of drift detection using DataEval.
 
 ## Understanding the drift detectors
+
+### _Kolmogorov-Smirnov_
+
+The Kolmogorov-Smirnov test measures the maximum distance between two empirical
+distributions to detect drift, making it effective for identifying shifts in
+distribution shape, location, or scale. When applied to multivariate data, it
+analyzes each feature independently, with resulting p-values aggregated using
+either Bonferroni or FDR correction methods. [Read more...](DriftKS.md)
 
 ### _Cramér-von Mises_
 
@@ -171,13 +190,36 @@ applied to multivariate data, it operates on each feature separately with
 p-values aggregated using either Bonferroni or FDR correction techniques.
 [Read more...](DriftCVM.md)
 
-### _Kolmogorov-Smirnov_
+### _Mann-Whitney U_
 
-The Kolmogorov-Smirnov test measures the maximum distance between two empirical
-distributions to detect drift, making it effective for identifying shifts in
-distribution shape, location, or scale. When applied to multivariate data, it
-analyzes each feature independently, with resulting p-values aggregated using
-either Bonferroni or FDR correction methods. [Read more...](DriftKS.md)
+The Mann-Whitney U test is a non-parametric rank-based method that detects
+drift by comparing the central tendencies of two distributions without assuming
+normality. It is particularly robust to outliers and excels at identifying
+median shifts, making it effective for detecting location-based drift in skewed
+or heavy-tailed distributions. When applied to multivariate data, it operates
+feature-wise with p-values aggregated using Bonferroni or FDR correction
+methods. [Read more...](DriftMWU.md)
+
+### _Anderson-Darling_
+
+The Anderson-Darling test is a non-parametric method that detects drift by
+measuring weighted squared differences between empirical distributions, with
+special emphasis on the tails. This makes it particularly powerful for
+identifying distributional shifts in heavy-tailed or extreme-value scenarios
+where tail behavior is critical. Like other univariate tests, it analyzes each
+feature independently in multivariate settings, with p-values combined using
+Bonferroni or FDR correction. [Read more...](DriftAD.md)
+
+### _Baumgartner-Weiss-Schindler_
+
+The Baumgartner-Weiss-Schindler test is a modern non-parametric method that
+combines rank-based statistics with variance-weighted scoring to achieve high
+statistical power in detecting distributional drift. It provides enhanced
+sensitivity to both location and scale shifts while maintaining good performance
+across tail regions, making it a versatile choice for drift detection in diverse
+data distributions. For multivariate data, it evaluates features independently
+with aggregated p-values using Bonferroni or FDR correction.
+[Read more...](DriftBWS.md)
 
 ### _Maximum Mean Discrepancy_
 

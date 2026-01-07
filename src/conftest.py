@@ -1,5 +1,7 @@
 """doctest fixtures"""
 
+from __future__ import annotations
+
 import pathlib
 import sys
 from collections.abc import Mapping, Sequence
@@ -144,6 +146,7 @@ def add_all(doctest_namespace: dict[str, Any]) -> None:
     doctest_namespace["generate_random_metadata"] = generate_random_metadata
     doctest_namespace["generate_random_class_labels_and_binned_data"] = generate_random_class_labels_and_binned_data
     doctest_namespace["OODOutput"] = OODOutput
+    doctest_namespace["ExampleDataset"] = ExampleDataset
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -478,6 +481,61 @@ def doctest_quality_prioritize(doctest_namespace: dict[str, Any]) -> None:
     doctest_namespace["class_labels"] = class_labels
     doctest_namespace["prioritizer"] = None  # Will be set in examples
     doctest_namespace["model"] = torch.nn.Flatten()  # Simple model for examples
+
+
+class ExampleDataset:
+    """Example annotated dataset for doctests and examples.
+
+    This class provides a simple, reusable dataset that implements the
+    AnnotatedDataset protocol. Always returns images in CHW format (channels, height, width).
+
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples in the dataset.
+    image_shape : tuple[int, int, int], default (3, 32, 32)
+        Shape of images as (channels, height, width).
+    n_classes : int, default 10
+        Number of classes for classification.
+    seed : int, default 42
+        Random seed for reproducibility.
+    """
+
+    def __init__(
+        self,
+        n_samples: int,
+        image_shape: tuple[int, int, int] = (3, 32, 32),
+        n_classes: int = 10,
+        seed: int = 42,
+    ) -> None:
+        self.n_samples = n_samples
+        self.image_shape = image_shape
+        self.n_classes = n_classes
+        self.metadata = {"id": f"example_dataset_{n_samples}"}
+
+        # Pre-generate all data for reproducibility (always 3D CHW format)
+        np.random.seed(seed)
+        self.images = [np.random.randn(*image_shape).astype(np.float32) for _ in range(n_samples)]
+        self.targets = [np.eye(n_classes)[i % n_classes] for i in range(n_samples)]
+        self.metadatas = [{"id": i, "brightness": 0.5 + 0.01 * i, "contrast": 0.5 + 0.01 * i} for i in range(n_samples)]
+
+    def __len__(self) -> int:
+        return self.n_samples
+
+    def __getitem__(self, idx: int | slice) -> tuple[Any, Any, dict[str, Any]] | ExampleDataset:
+        if isinstance(idx, slice):
+            # Return a new dataset with sliced data
+            start, stop, step = idx.indices(self.n_samples)
+            sliced = ExampleDataset.__new__(ExampleDataset)
+            sliced.n_samples = len(range(start, stop, step))
+            sliced.image_shape = self.image_shape
+            sliced.n_classes = self.n_classes
+            sliced.metadata = self.metadata
+            sliced.images = self.images[idx]
+            sliced.targets = self.targets[idx]
+            sliced.metadatas = self.metadatas[idx]
+            return sliced
+        return self.images[idx], self.targets[idx], self.metadatas[idx]
 
 
 @pytest.fixture(autouse=True, scope="session")

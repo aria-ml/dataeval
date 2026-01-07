@@ -39,12 +39,12 @@ are less reliable.
 
 ## Why use uncertainty-based drift detection?
 
-Typical feature-based drift detectors (like {class}`.DriftKS` or
-{class}`.DriftMMD`) flag any change in the input distribution $P(X)$, regardless
-of whether those changes affect model predictions. This can produce false alarms
-when irrelevant features change (like background pixels or lighting) while
-missing performance degradation when the relationship between inputs and outputs
-shifts but the overall feature distribution appears stable.
+Typical feature-based drift detectors (like {class}`.DriftUnivariate`) flag any
+change in the input distribution $P(X)$, regardless of whether those changes
+affect model predictions. This can produce false alarms when irrelevant features
+change (like background pixels or lighting) while missing performance degradation
+when the relationship between inputs and outputs shifts but the overall feature
+distribution appears stable.
 
 UBDD focuses specifically on whether the model encounters data in its
 uncertainty regions, making it a **performance-oriented** detector that catches
@@ -77,8 +77,9 @@ classes.
   uncertain
 
 The detector compares entropy distributions between reference and test datasets
-using the {term}`Kolmogorov-Smirnov test<Kolmogorov-Smirnov (K-S) test>`. If
-test data has significantly higher entropy, drift is flagged.
+using a selected univariate statistical test such as
+{term}`Kolmogorov-Smirnov test<Kolmogorov-Smirnov (K-S) test>`. If the test
+data has significantly higher entropy, drift is flagged.
 
 While DataEval uses entropy, other uncertainty measures exist.
 [Sethi and Kantardzic (2017)](#references) originally proposed monitoring
