@@ -227,27 +227,6 @@ def doctest_metrics_bias_coverage(doctest_namespace: dict[str, Any]) -> None:
 
 
 @pytest.fixture(autouse=True, scope="session")
-def doctest_metrics_estimators_clusterer(doctest_namespace: dict[str, Any]) -> None:
-    images = dsets.make_blobs(n_samples=50, centers=np.array([(-1, -1), (1, 1)]), cluster_std=0.5, random_state=33)[0]
-    images[9] = images[24]
-    images[23] = images[48] + 1e-5
-
-    """dataeval.core.cluster"""
-    doctest_namespace["clusterer_images"] = images
-
-
-@pytest.fixture(autouse=True, scope="session")
-def doctest_metrics_estimators_divergence(doctest_namespace: dict[str, Any]) -> None:
-    a = dsets.make_blobs(n_samples=50, centers=np.array([(-1, -1), (1, 1)]), cluster_std=0.3, random_state=712)[0]
-    b = dsets.make_blobs(n_samples=50, centers=np.array([(-0.5, -0.5), (1, 1)]), cluster_std=0.3, random_state=712)[0]
-
-    """dataeval.core.divergence"""
-
-    doctest_namespace["datasetA"] = a
-    doctest_namespace["datasetB"] = b
-
-
-@pytest.fixture(autouse=True, scope="session")
 def doctest_metrics_stats(doctest_namespace: dict[str, Any]) -> None:
     # Create 8 images with consistent pixel values (to avoid image-level outliers)
     # but with varying bbox content to create target-level outliers

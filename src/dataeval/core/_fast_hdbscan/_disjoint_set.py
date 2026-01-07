@@ -18,7 +18,7 @@ from numpy.typing import NDArray
 
 
 @numba.njit(cache=True)
-def ds_find(disjoint_set: tuple[NDArray[np.int32], NDArray[np.int32]], x: np.intp) -> np.intp:
+def ds_find(disjoint_set: tuple[NDArray[np.int64], NDArray[np.int64]], x: np.int64) -> np.int64:
     """
     Find the root of the set containing element x with path compression.
 
@@ -28,15 +28,15 @@ def ds_find(disjoint_set: tuple[NDArray[np.int32], NDArray[np.int32]], x: np.int
 
     Parameters
     ----------
-    disjoint_set : tuple[NDArray[np.int32], NDArray[np.int32]]
+    disjoint_set : tuple[NDArray[np.int64], NDArray[np.int64]]
         Tuple of (parent, rank) arrays representing the disjoint set forest.
         parent[i] gives the parent of node i.
-    x : np.int32
+    x : np.int64
         The element whose set root we want to find
 
     Returns
     -------
-    np.int32
+    np.int64
         The root element of the set containing x
     """
     parent = disjoint_set[0]
@@ -46,7 +46,7 @@ def ds_find(disjoint_set: tuple[NDArray[np.int32], NDArray[np.int32]], x: np.int
 
 
 @numba.njit(cache=True)
-def ds_rank_create(n_elements: np.int32) -> tuple[NDArray[np.int32], NDArray[np.int32]]:
+def ds_rank_create(n_elements: np.int64) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
     """
     Create a new disjoint set data structure for n_elements.
 
@@ -55,23 +55,23 @@ def ds_rank_create(n_elements: np.int32) -> tuple[NDArray[np.int32], NDArray[np.
 
     Parameters
     ----------
-    n_elements : np.int32
+    n_elements : np.int64
         The number of elements in the disjoint set
 
     Returns
     -------
-    tuple[NDArray[np.int32], NDArray[np.int32]]
+    tuple[NDArray[np.int64], NDArray[np.int64]]
         Tuple of (parent, rank) arrays where:
         - parent[i] = i initially (each element is its own parent/root)
         - rank[i] = 0 initially (all trees have height 0)
     """
-    parent = np.arange(n_elements, dtype=np.int32)
-    rank = np.zeros(n_elements, dtype=np.int32)
+    parent = np.arange(n_elements, dtype=np.int64)
+    rank = np.zeros(n_elements, dtype=np.int64)
     return (parent, rank)
 
 
 @numba.njit(cache=True)
-def ds_union_by_rank(disjoint_set: tuple[NDArray[np.int32], NDArray[np.int32]], point: np.intp, nbr: np.intp) -> bool:
+def ds_union_by_rank(disjoint_set: tuple[NDArray[np.int64], NDArray[np.int64]], point: np.int64, nbr: np.int64) -> bool:
     """
     Perform union-by-rank on two points in a disjoint set data structure.
 
@@ -84,7 +84,7 @@ def ds_union_by_rank(disjoint_set: tuple[NDArray[np.int32], NDArray[np.int32]], 
 
     Parameters
     ----------
-    disjoint_set : tuple[NDArray[np.int32], NDArray[np.int32]]
+    disjoint_set : tuple[NDArray[np.int64], NDArray[np.int64]]
         Tuple of (parent, rank) arrays representing the disjoint set forest.
         parent[i] gives the parent of node i, rank[i] gives the rank (depth bound) of node i.
     point : int
