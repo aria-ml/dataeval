@@ -30,6 +30,7 @@ features.
 - [Clustering](Clustering.md)
 - [Coverage](Coverage.md)
 - [Completeness](Completeness.md)
+- [Dataset Balancing](ClassBalancing.md)
 - [Dataset Cleaning](DataCleaning.md)
 - [Dataset Prioritization](Prioritization.md)
 - [Divergence](Divergence.md)
@@ -54,6 +55,7 @@ BER.md
 Clustering.md
 Coverage.md
 Completeness.md
+ClassBalancing.md
 DataCleaning.md
 Prioritization.md
 Divergence.md
