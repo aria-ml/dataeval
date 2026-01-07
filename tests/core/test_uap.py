@@ -10,4 +10,4 @@ class TestUAP:
         labels = np.arange(10).repeat(100)
         scores = np.zeros((1000, 10), dtype=float)
         result = uap(labels, scores)
-        assert result["uap"] > 0
+        assert result > 0
