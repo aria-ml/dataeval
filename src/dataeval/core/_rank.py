@@ -126,12 +126,19 @@ class _KNNSorter(_Sorter):
         self._k = k
 
     def _sort(self, embeddings: NDArray[Any], reference: NDArray[Any] | None = None) -> NDArray[np.intp]:
+        _logger.debug("Computing KNN distances with k=%d", self._k)
         if reference is None:
             dists = pairwise_distances(embeddings, embeddings).astype(np.float32)
             np.fill_diagonal(dists, np.inf)
         else:
             dists = pairwise_distances(embeddings, reference).astype(np.float32)
         self.scores = np.sort(dists, axis=1)[:, self._k]
+        _logger.debug(
+            "KNN scores computed: min=%.4f, max=%.4f, mean=%.4f",
+            np.min(self.scores),
+            np.max(self.scores),
+            np.mean(self.scores),
+        )
         return np.argsort(self.scores)
 
 
@@ -146,10 +153,19 @@ class _KMeansSorter(_Sorter):
         self._n_init = n_init
 
     def _get_clusters(self, embeddings: NDArray[Any]) -> _Clusters:
+        _logger.debug("Computing KMeans clustering with c=%d clusters", self._c)
         clst = KMeans(n_clusters=self._c, init="k-means++", n_init=self._n_init, random_state=get_seed())  # type: ignore - n_init allows int but is typed as str
         clst.fit(embeddings)
         if clst.labels_ is None or clst.cluster_centers_ is None:
             raise ValueError("Clustering failed to produce labels or cluster centers")
+        n_samples_per_cluster = np.bincount(clst.labels_)
+        _logger.debug(
+            "KMeans clustering complete: %d clusters, samples per cluster: min=%d, max=%d, mean=%.1f",
+            self._c,
+            np.min(n_samples_per_cluster),
+            np.max(n_samples_per_cluster),
+            np.mean(n_samples_per_cluster),
+        )
         return _Clusters(clst.labels_, clst.cluster_centers_)
 
 
@@ -157,12 +173,19 @@ class _KMeansDistanceSorter(_KMeansSorter):
     def _sort(self, embeddings: NDArray[Any], reference: NDArray[Any] | None = None) -> NDArray[np.intp]:
         clst = self._get_clusters(embeddings if reference is None else reference)
         self.scores = clst._dist2center(embeddings)
+        _logger.debug(
+            "Distance to center scores: min=%.4f, max=%.4f, mean=%.4f",
+            np.min(self.scores),
+            np.max(self.scores),
+            np.mean(self.scores),
+        )
         return np.argsort(self.scores)
 
 
 class _KMeansComplexitySorter(_KMeansSorter):
     def _sort(self, embeddings: NDArray[Any], reference: NDArray[Any] | None = None) -> NDArray[np.intp]:
         clst = self._get_clusters(embeddings if reference is None else reference)
+        _logger.debug("Sorting by complexity weights")
         return clst._sort_by_weights(embeddings)
 
 
@@ -180,100 +203,6 @@ def _normalize(embeddings: NDArray[np.floating[Any]]) -> NDArray[np.floating[Any
     return emb
 
 
-def _compute_bin_extents(scores: NDArray[np.floating[Any]]) -> tuple[np.float64, np.float64]:
-    """
-    Compute min/max bin extents for scores, padding outward by epsilon.
-
-    Parameters
-    ----------
-    scores : NDArray[np.float64]
-        Array of floats to bin
-
-    Returns
-    -------
-    tuple[np.float64, np.float64]
-        (min, max) scores padded outward by epsilon = 1e-6 * range(scores).
-    """
-    scores = scores.astype(np.float64)
-    min_score = np.min(scores)
-    max_score = np.max(scores)
-    rng = max_score - min_score
-    eps = rng * 1e-6
-    return min_score - eps, max_score + eps
-
-
-def _select_ordered_by_label(labels: NDArray[np.integer[Any]]) -> NDArray[np.intp]:
-    """
-    Given labels (class, group, bin, etc) sorted with decreasing priority,
-    rerank so that we have approximate class/group balance.
-
-    Parameters
-    ----------
-    labels : NDArray[np.integer]
-        Class label or group ID per instance in order of decreasing priority
-
-    Returns
-    -------
-    NDArray[np.intp]
-        Indices that sort samples according to uniform class balance or
-        group membership while respecting priority of the initial ordering.
-    """
-    labels = np.array(labels)
-    num_samp = labels.shape[0]
-    selected = np.zeros(num_samp, dtype=bool)
-    # preserve ordering
-    _, index = np.unique(labels, return_index=True)
-    u_lab = labels[np.sort(index)]
-    n_cls = len(u_lab)
-
-    resort_inds = []
-    cls_idx = 0
-    n = 0
-    while len(resort_inds) < num_samp:
-        c0 = u_lab[cls_idx % n_cls]
-        samples_available = (~selected) * (labels == c0)
-        if any(samples_available):
-            i0 = np.argmax(samples_available)  # selects first occurrence
-            resort_inds.append(i0)
-            selected[i0] = True
-        cls_idx += 1
-        n += 1
-    return np.array(resort_inds).astype(np.intp)
-
-
-def _stratified_rerank(
-    scores: NDArray[np.floating[Any]],
-    indices: NDArray[np.integer[Any]],
-    num_bins: int = 50,
-) -> NDArray[np.intp]:
-    """
-    Re-rank samples by sampling uniformly over binned scores.
-
-    This de-weights selection of samples with similar scores and encourages
-    both prototypical and challenging samples near the decision boundary.
-
-    Parameters
-    ----------
-    scores : NDArray[np.floating]
-        Ranking scores sorted in order of decreasing priority
-    indices : NDArray[np.integer]
-        Indices to be re-sorted according to stratified sampling of scores.
-        Indices are ordered by decreasing priority.
-    num_bins : int, default 50
-        Number of bins for stratification.
-
-    Returns
-    -------
-    NDArray[np.intp]
-        Re-ranked indices
-    """
-    mn, mx = _compute_bin_extents(scores)
-    bin_edges = np.linspace(mn, mx, num=num_bins + 1, endpoint=True)
-    bin_label = np.digitize(scores, bin_edges)
-    srt_inds = _select_ordered_by_label(bin_label)
-    return indices[srt_inds].astype(np.intp)
-
-
 def _rank_base(
     embeddings: NDArray[np.floating[Any]],
     *,
@@ -284,9 +213,21 @@ def _rank_base(
     reference: NDArray[np.floating[Any]] | None = None,
 ) -> RankResult:
     """Internal function that performs the core ranking without policy application."""
+    _logger.info(
+        "Starting rank with method=%s, k=%s, c=%s, reference=%s",
+        method,
+        k,
+        c,
+        "provided" if reference is not None else "None",
+    )
+
     # Validate method
     if method not in _SORTER_MAP:
         raise ValueError(f"Invalid method: {method}. Must be one of {list(_SORTER_MAP.keys())}")
+
+    _logger.debug("Embeddings shape: %s", embeddings.shape)
+    if reference is not None:
+        _logger.debug("Reference shape: %s", reference.shape)
 
     # Normalize embeddings
     embeddings = _normalize(embeddings)
@@ -299,6 +240,13 @@ def _rank_base(
 
     # Sort (always returns easy_first order)
     indices = sorter._sort(embeddings, reference)
+
+    _logger.info(
+        "Rank complete: method=%s, %d samples ranked, has_scores=%s",
+        method,
+        len(indices),
+        sorter.scores is not None,
+    )
 
     return RankResult(
         indices=indices,
@@ -334,10 +282,11 @@ def rank_knn(
     -------
     RankResult
         Dictionary containing:
-        - indices : Ranked indices in easy-first order
-        - scores : KNN distance scores for each sample
-        - method : "knn"
-        - policy : "easy_first"
+
+        - indices: NDArray[np.intp] - Ranked indices in easy-first order
+        - scores: NDArray[np.float32] | None - KNN distance scores for each sample
+        - method: str - "knn"
+        - policy: str - "easy_first"
 
     Raises
     ------
@@ -395,10 +344,11 @@ def rank_kmeans_distance(
     -------
     RankResult
         Dictionary containing:
-        - indices : Ranked indices in easy-first order
-        - scores : Distance to cluster center for each sample
-        - method : "kmeans_distance"
-        - policy : "easy_first"
+
+        - indices: NDArray[np.intp] - Ranked indices in easy-first order
+        - scores: NDArray[np.float32] | None - Distance to cluster center for each sample
+        - method: str - "kmeans_distance"
+        - policy: str - "easy_first"
 
     Raises
     ------
@@ -446,10 +396,11 @@ def rank_kmeans_complexity(
     -------
     RankResult
         Dictionary containing:
-        - indices : Ranked indices in easy-first order
-        - scores : None (this method does not produce scores)
-        - method : "kmeans_complexity"
-        - policy : "easy_first"
+
+        - indices: NDArray[np.intp] - Ranked indices in easy-first order
+        - scores: None (this method does not produce scores)
+        - method: str - "kmeans_complexity"
+        - policy: str - "easy_first"
 
     Raises
     ------
@@ -464,156 +415,3 @@ def rank_kmeans_complexity(
     >>> result = rank_kmeans_complexity(embeddings, c=10)
     """
     return _rank_base(embeddings, method="kmeans_complexity", c=c, n_init=n_init, reference=reference)
-
-
-def rerank_hard_first(result: RankResult) -> RankResult:
-    """
-    Reverse ranking order to put hard samples first.
-
-    Takes a RankResult (expected to be in easy_first order) and reverses
-    the indices to produce hard_first order.
-
-    Parameters
-    ----------
-    result : RankResult
-        Ranking result, typically in easy_first order.
-
-    Returns
-    -------
-    RankResult
-        Dictionary containing:
-        - indices : Reversed indices (hard samples first)
-        - scores : Scores in original order (unchanged if present)
-        - method : Same as input
-        - policy : "hard_first"
-
-    Examples
-    --------
-    >>> from dataeval.core import rank_knn, rerank_hard_first
-    >>> import numpy as np
-    >>> embeddings = np.random.rand(100, 64).astype(np.float32)
-    >>> result = rank_knn(embeddings, k=5)
-    >>> result = rerank_hard_first(result)
-    """
-    return RankResult(
-        indices=result["indices"][::-1],
-        scores=result["scores"],
-        method=result["method"],
-        policy="hard_first",
-    )
-
-
-def rerank_stratified(
-    result: RankResult,
-    num_bins: int = 50,
-) -> RankResult:
-    """
-    Rerank by stratified sampling across score bins.
-
-    Takes a RankResult (expected to be in easy_first order) and applies
-    stratified sampling to balance selection across score bins. This
-    encourages diversity by de-weighting samples with similar scores.
-
-    The output is in hard_first order to maintain priority while balancing.
-
-    Parameters
-    ----------
-    result : RankResult
-        Ranking result with scores (must be from rank_knn or rank_kmeans_distance).
-    num_bins : int, default 50
-        Number of bins for stratification.
-
-    Returns
-    -------
-    RankResult
-        Dictionary containing:
-        - indices : Reranked indices in hard_first order
-        - scores : Scores in original order (unchanged)
-        - method : Same as input
-        - policy : "stratified"
-
-    Raises
-    ------
-    ValueError
-        If result does not contain scores (e.g., from rank_kmeans_complexity).
-
-    Examples
-    --------
-    >>> from dataeval.core import rank_knn, rerank_stratified
-    >>> import numpy as np
-    >>> embeddings = np.random.rand(100, 64).astype(np.float32)
-    >>> result = rank_knn(embeddings, k=5)
-    >>> result = rerank_stratified(result, num_bins=20)
-    """
-    if result["scores"] is None:
-        raise ValueError(
-            "Ranking scores are necessary for stratified reranking. Use rank_knn or rank_kmeans_distance methods."
-        )
-
-    # Reverse to hard_first order for reranking (as expected by _stratified_rerank)
-    indices_hard = result["indices"][::-1]
-    scores_hard = result["scores"][::-1]
-
-    # Apply stratified reranking
-    reranked_indices = _stratified_rerank(scores_hard, indices_hard, num_bins)
-
-    return RankResult(
-        indices=reranked_indices,
-        scores=result["scores"],
-        method=result["method"],
-        policy="stratified",
-    )
-
-
-def rerank_class_balance(
-    result: RankResult,
-    class_labels: NDArray[np.integer[Any]],
-) -> RankResult:
-    """
-    Rerank to balance selection across class labels.
-
-    Takes a RankResult (expected to be in easy_first order) and reranks
-    to ensure balanced representation across classes while maintaining
-    the priority order within each class.
-
-    The output is in hard_first order to maintain priority while balancing.
-
-    Parameters
-    ----------
-    result : RankResult
-        Ranking result in any order.
-    class_labels : NDArray[np.integer]
-        Class label for each sample in the original dataset.
-
-    Returns
-    -------
-    RankResult
-        Dictionary containing:
-        - indices : Reranked indices in hard_first order with class balance
-        - scores : Scores in original order (unchanged if present)
-        - method : Same as input
-        - policy : "class_balance"
-
-    Examples
-    --------
-    >>> from dataeval.core import rank_knn, rerank_class_balance
-    >>> import numpy as np
-    >>> embeddings = np.random.rand(100, 64).astype(np.float32)
-    >>> labels = np.random.randint(0, 3, size=100)
-    >>> result = rank_knn(embeddings, k=5)
-    >>> result = rerank_class_balance(result, class_labels=labels)
-    """
-    # Reverse to hard_first order for reranking (as expected by _select_ordered_by_label)
-    indices_hard = result["indices"][::-1]
-
-    # Apply class balance reranking
-    indices_reversed = _select_ordered_by_label(class_labels[indices_hard]).astype(np.int32)
-    n = len(indices_reversed)
-    reranked_indices = (n - 1 - indices_reversed).astype(np.intp)
-
-    return RankResult(
-        indices=reranked_indices,
-        scores=result["scores"],
-        method=result["method"],
-        policy="class_balance",
-    )

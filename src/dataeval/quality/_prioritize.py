@@ -17,14 +17,8 @@ from numpy.typing import NDArray
 
 from dataeval import Embeddings, Metadata
 from dataeval.config import DeviceLike, get_device
-from dataeval.core._rank import (
-    rank_kmeans_complexity,
-    rank_kmeans_distance,
-    rank_knn,
-    rerank_class_balance,
-    rerank_hard_first,
-    rerank_stratified,
-)
+from dataeval.core._rank import rank_kmeans_complexity, rank_kmeans_distance, rank_knn
+from dataeval.core._rerank import rerank_class_balance, rerank_hard_first, rerank_stratified
 from dataeval.protocols import AnnotatedDataset, EmbeddingModel
 from dataeval.types import Output, set_metadata
 
