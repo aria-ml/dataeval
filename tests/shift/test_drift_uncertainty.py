@@ -14,9 +14,9 @@ import torch
 import torch.nn as nn
 from sklearn.linear_model import LogisticRegression
 
-from dataeval.evaluators.drift import DriftUnivariate, UncertaintyFeatureExtractor
-from dataeval.evaluators.drift.feature_extractors import _classifier_uncertainty
-from dataeval.evaluators.drift.updates import LastSeenUpdate, ReservoirSamplingUpdate
+from dataeval.shift import DriftUnivariate
+from dataeval.shift._feature_extractors import UncertaintyFeatureExtractor, _classifier_uncertainty
+from dataeval.shift._update_strategies import LastSeenUpdateStrategy, ReservoirSamplingUpdateStrategy
 
 
 class PtModel(nn.Module):
@@ -45,7 +45,7 @@ class TestFunctionalClassifierUncertainty:
     n_features = [16]
     n_labels = [3]
     preds_type = ["probs", "logits"]
-    update_strategy = [LastSeenUpdate(1000), ReservoirSamplingUpdate(1000), None]
+    update_strategy = [LastSeenUpdateStrategy(1000), ReservoirSamplingUpdateStrategy(1000), None]
     transforms = [None, lambda _: _]
     test_params = list(
         product(

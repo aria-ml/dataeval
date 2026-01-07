@@ -16,8 +16,8 @@ import numpy as np
 import scipy.stats
 from numpy.typing import NDArray
 
-from dataeval.evaluators.drift._base import BaseDriftUnivariate
 from dataeval.protocols import FeatureExtractor, UpdateStrategy
+from dataeval.shift._drift._base import BaseDriftUnivariate
 
 
 class DriftUnivariate(BaseDriftUnivariate):

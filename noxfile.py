@@ -127,7 +127,6 @@ def doctest(session: nox.Session) -> None:
         "--doctest-modules",
         "--doctest-continue-on-failure",
         "--disable-warnings",
-        "--ignore=src/dataeval/evaluators/drift/_nml",
         *target,
     )
 

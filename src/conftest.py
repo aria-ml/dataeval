@@ -21,7 +21,7 @@ from dataeval.evaluators.ood.base import OODOutput
 from dataeval.flags import ImageStats
 
 # Manually add the import path for test_drift_uncertainty
-sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute() / "tests" / "evaluators"))
+sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute() / "tests" / "shift"))
 from test_drift_uncertainty import PtModel
 
 # Set global batch_size for doctests
