@@ -421,11 +421,12 @@ def calculate(
     -------
     CalculationResult
         Mapping containing computed statistics and metadata:
-        - 'source_index': Sequence of SourceIndex objects with image/box/channel info
-        - 'object_count': Sequence of object counts per image
-        - 'invalid_box_count': Sequence of invalid box counts per image
-        - 'image_count': Total number of images processed
-        - 'stats': Mapping of statistic names to sequences of computed values
+
+        - source_index: Sequence[SourceIndex] - SourceIndex objects with image/box/channel info
+        - object_count: Sequence[int] - Object counts per image
+        - invalid_box_count: Sequence[int] - Invalid box counts per image
+        - image_count: int - Total number of images processed
+        - stats: Mapping[str, Sequence[Any]] - Mapping of statistic names to sequences of computed values
 
         Output is sorted by (item_index, box_index, channel_index) ascending,
         with None values appearing before 0.

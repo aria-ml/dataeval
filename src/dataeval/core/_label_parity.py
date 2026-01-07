@@ -136,8 +136,9 @@ def label_parity(
     -------
     LabelParityResult
         Mapping with keys:
-        - chi_squared : float - The chi-squared test statistic
-        - p_value : float - The p-value from the chi-squared test
+
+        - chi_squared: float - The chi-squared test statistic
+        - p_value: float - The p-value from the chi-squared test
 
     Raises
     ------

@@ -48,10 +48,11 @@ def completeness(embeddings: Array) -> CompletenessResult:
 
     Returns
     -------
-    dict
+    CompletenessResult
         Mapping with keys:
-        - completeness : float - Completeness score between 0 and 1
-        - nearest_neighbor_pairs : Sequence[tuple[int, int]] - Sequence of tuples (i, j)
+
+        - completeness: float - Completeness score between 0 and 1
+        - nearest_neighbor_pairs: Sequence[tuple[int, int]] - Sequence of tuples (i, j)
           representing point indices and their nearest neighbors, sorted by decreasing
           nearest neighbor distance. Each pair appears only once.
     """

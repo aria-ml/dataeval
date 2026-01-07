@@ -66,15 +66,15 @@ def parity(
     -------
     ParityResult
         A dictionary containing:
-        - scores : NDArray[np.float64]
-        Array of Bias-Corrected Cramér's V statistics (range 0.0 to 1.0).
-        0 indicates independence (parity), 1 indicates perfect association.
-        - p_values : NDArray[np.float64]
-        Array of p-values from the G-test. Low p-values (< 0.05) indicate
-        statistical significance.
-        - insufficient_data : Mapping[int, Mapping[int, Mapping[int, int]]]
-        Nested dictionary flagging specific combinations with low sample counts (< 5).
-        Structure: {factor_index: {factor_category: {class_label: count}}}.
+
+        - scores: NDArray[np.float64] - Array of bias-corrected Cramér's V statistics ranging from
+          0 (independence) to 1 (perfect association).
+        - p_values: NDArray[np.float64] - Array of p-values from the G-test. Low p-values (< 0.05) indicate
+          statistical significance.
+        - insufficient_data: Mapping[int, Mapping[int, Mapping[int, int]]] - Nested dictionary flagging
+          specific combinations with low sample counts (< 5).
+
+          Sample structure: `{factor_index: {factor_category: {class_label: count}}}`.
 
     Notes
     -----

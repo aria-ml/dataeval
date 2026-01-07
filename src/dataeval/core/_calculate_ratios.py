@@ -259,6 +259,7 @@ def calculate_ratios(
     ----------
     stats_output : CalculationResult
         Either:
+
         - Output from calculate() with both per_image=True and per_target=True (unified), OR
         - Output from calculate() with per_image=True, per_target=False (if box_stats_output provided)
     target_stats_output : CalculationResult | None, optional
@@ -267,18 +268,21 @@ def calculate_ratios(
         Default is None (use unified input from stats_output).
     override_map : OverrideFunctionMap | None, optional
         Optional custom ratio calculations for specific stat keys.
-        Function signature: (box_stats_dict, img_stats_dict) -> ratio_value
+
+        Function signature: `(box_stats_dict, img_stats_dict) -> ratio_value`
+
         If None, uses default override map for common statistics.
 
     Returns
     -------
     CalculationResult
         Dictionary with same structure as calculate() output, including:
-        - source_index: Sequence of SourceIndex objects for box-level entries only
-        - object_count: Sequence of object counts per image
-        - invalid_box_count: Sequence of invalid box counts per image
-        - image_count: Total number of images processed
-        - stats: Mapping of statistic names to ratio values (box stats as ratios of image stats)
+
+        - source_index: Sequence[SourceIndex] - SourceIndex objects with image/box/channel info
+        - object_count: Sequence[int] - Object counts per image
+        - invalid_box_count: Sequence[int] - Invalid box counts per image
+        - image_count: int - Total number of images processed
+        - stats: Mapping[str, Sequence[Any]] - Mapping of statistic names to sequences of computed values
 
     Raises
     ------

@@ -412,7 +412,25 @@ def nullmodel_metrics(test_labels: ArrayLike, train_labels: ArrayLike | None = N
     Returns
     -------
     NullModelMetricsResult
-        Result mapping containing metrics for each null model strategy
+        Result mapping containing metrics for each null model strategy:
+
+        - uniform_random: `NullModelMetrics` for uniform random classifier
+        - dominant_class: `NullModelMetrics` for dominant class classifier (if train_labels provided)
+        - proportional_random: `NullModelMetrics` for proportional random classifier (if train_labels provided)
+
+    Notes
+    -----
+    The NullModelMetrics returned in each map value are a mapping of:
+
+    - precision_macro: float - Macro-averaged precision across all classes
+    - precision_micro: float - Micro-averaged precision across all classes
+    - recall_macro: float - Macro-averaged recall across all classes
+    - recall_micro: float - Micro-averaged recall across all classes
+    - false_positive_rate_macro: float - Macro-averaged false positive rate across all classes
+    - false_positive_rate_micro: float - Micro-averaged false positive rate across all classes
+    - accuracy_macro: float - Macro-averaged accuracy (only for binary classification)
+    - accuracy_micro: float - Micro-averaged accuracy (only for binary classification)
+    - multiclass_accuracy: float - Multiclass accuracy (only for multiclass classification)
     """
     # Prepare probability distributions
     test_probs, train_probs = _prepare_probability_distributions(test_labels, train_labels)

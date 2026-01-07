@@ -119,8 +119,9 @@ def mutual_info(
     -------
     MutualInfoResult
         TypedDict containing:
-        - class_to_factor: 1D array of MI between class labels and each factor
-        - interfactor: (num_factors) x (num_factors) matrix of MI between factors only
+
+        - class_to_factor: NDArray[np.float64] - 1D array of MI between class labels and each factor
+        - interfactor: NDArray[np.float64] - (num_factors) x (num_factors) matrix of MI between factors only
 
     Notes
     -----
@@ -231,7 +232,7 @@ def mutual_info_classwise(
 ) -> NDArray[np.float64]:
     """
     Mutual information (MI) between factors (class label, metadata, label/image properties),
-    transformed to lie in [0, 1]. 
+    transformed to lie in [0, 1].
 
     Parameters
     ----------
@@ -248,15 +249,15 @@ def mutual_info_classwise(
     Returns
     -------
     NDArray[np.float64]
-        (num_factors+1) x (num_factors+1) estimate of mutual information \
-            between num_factors metadata factors and class label. Symmetry is enforced.
+        (num_factors+1) x (num_factors+1) estimate of mutual information
+        between num_factors metadata factors and class label. Symmetry is enforced.
 
     Notes
     -----
     We use `mutual_info_classif` from sklearn since class label is categorical.
     `mutual_info_classif` outputs are consistent up to O(1e-4) and depend on a random
     seed. MI is computed differently for categorical and continuous variables. We
-    return a transformation of MI onto the interval [0, 1]. 
+    return a transformation of MI onto the interval [0, 1].
 
     Example
     -------
@@ -264,12 +265,10 @@ def mutual_info_classwise(
 
     >>> class_labels, binned_data = generate_random_class_labels_and_binned_data(
     ...     labels=["doctor", "artist", "teacher"],
-    ...     factors={
-    ...         "age": [25, 30, 35, 45],
-    ...         "income": [50000, 65000, 80000],
-    ...         "gender": ["M", "F"]},
+    ...     factors={"age": [25, 30, 35, 45], "income": [50000, 65000, 80000], "gender": ["M", "F"]},
     ...     length=100,
-    ...     random_seed=175)
+    ...     random_seed=175,
+    ... )
 
     Return classwise balance (mutual information) of factors with individual class_labels
 
