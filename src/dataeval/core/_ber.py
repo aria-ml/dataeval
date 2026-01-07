@@ -102,11 +102,11 @@ def ber_mst(embeddings: ArrayND[float], class_labels: Array1D[int]) -> BERResult
     Examples
     --------
     >>> import sklearn.datasets as dsets
-    >>> from dataeval.core._ber import ber_mst
+    >>> from dataeval.core import ber_mst
 
     >>> images, labels = dsets.make_blobs(n_samples=50, centers=2, n_features=2, random_state=0)
     >>> ber_mst(images, labels)
-    {'upper_bound': 0.04, 'lower_bound': 0.020416847668728033}
+    {'upper_bound': 0.02, 'lower_bound': 0.010102051443364402}
     """
     _logger.info("Starting ber_mst calculation")
 
@@ -117,10 +117,14 @@ def ber_mst(embeddings: ArrayND[float], class_labels: Array1D[int]) -> BERResult
     M, N = _get_classes_counts(labels_np)
     _logger.debug("Number of classes: %d, Number of samples: %d", M, N)
 
+    # Get MST
     mst_result = minimum_spanning_tree(data_np)
     source, target = mst_result["source"], mst_result["target"]
-    mismatches = np.sum(labels_np[source] != labels_np[target])
+    # MST forces every group to connect, so remove the minimum number of forced connections
+    mismatches = np.sum(labels_np[source] != labels_np[target]) - (M - 1)
+    # BER sample scaling
     deltas = mismatches / (2 * N)
+    # Get BER upper and lower values
     upper = float(2 * deltas)
     lower = float(((M - 1) / (M)) * (1 - max(1 - 2 * ((M) / (M - 1)) * deltas, 0) ** 0.5))
 
@@ -158,7 +162,7 @@ def ber_knn(embeddings: ArrayND[float], class_labels: Array1D[int], k: int) -> B
     Examples
     --------
     >>> import sklearn.datasets as dsets
-    >>> from dataeval.core._ber import ber_knn
+    >>> from dataeval.core import ber_knn
 
     >>> images, labels = dsets.make_blobs(n_samples=50, centers=2, n_features=2, random_state=0)
     >>> ber_knn(images, labels, 1)
@@ -173,10 +177,14 @@ def ber_knn(embeddings: ArrayND[float], class_labels: Array1D[int], k: int) -> B
     M, N = _get_classes_counts(labels_np)
     _logger.debug("Number of classes: %d, Number of samples: %d", M, N)
 
-    nn_indices = compute_neighbors(data_np, data_np, k=k)
+    # Get k neareset neighbors
+    nn_indices = compute_neighbors(data_np, k=k)
     nn_indices = np.expand_dims(nn_indices, axis=1) if nn_indices.ndim == 1 else nn_indices
+    # Get most common neighbor label
     modal_class = mode(class_labels[nn_indices], axis=1, keepdims=True).mode.squeeze()
+    # Get sample/neighbor mismatches
     misclassified = np.count_nonzero(modal_class - class_labels)
+    # Get BER upper and lower values
     upper = float(misclassified / N)
     lower = _knn_lowerbound(upper, M, k)
 
