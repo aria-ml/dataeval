@@ -300,8 +300,9 @@ def minimum_spanning_tree(embeddings: ArrayND[float], k: int = 15) -> MSTResult:
     -------
     MSTResult
         Mapping with keys:
-        - source : NDArray[np.intp] - Source node indices for each edge in the MST with shape (n_samples - 1,)
-        - target : NDArray[np.intp] - Target node indices for each edge in the MST with shape (n_samples - 1,)
+
+        - source: NDArray[np.intp] - Source node indices for each edge in the MST with shape (n_samples - 1,)
+        - target: NDArray[np.intp] - Target node indices for each edge in the MST with shape (n_samples - 1,)
 
     Notes
     -----

@@ -9,7 +9,6 @@ from __future__ import annotations
 __all__ = []
 
 import logging
-from typing import TypedDict
 
 from sklearn.metrics import average_precision_score
 
@@ -19,20 +18,7 @@ from dataeval.utils._array import as_numpy
 _logger = logging.getLogger(__name__)
 
 
-class UAPResult(TypedDict):
-    """
-    Type definition for UAP result.
-
-    Attributes
-    ----------
-    uap : float
-        The empirical mean precision estimate
-    """
-
-    uap: float
-
-
-def uap(labels: Array2D[int], scores: Array2D[float]) -> UAPResult:
+def uap(labels: Array2D[int], scores: Array2D[float]) -> float:
     """
     FR Test Statistic based estimate of the empirical mean precision for the \
     upperbound average precision.
@@ -42,17 +28,17 @@ def uap(labels: Array2D[int], scores: Array2D[float]) -> UAPResult:
     labels : ArrayLike
         A 2D array of n_samples of class labels with M unique classes.
     scores : ArrayLike
-        A 2D array of class probabilities per image
+        A 2D array of class probabilities per image.
 
     Returns
     -------
-    UAPOutput
-        The empirical mean precision estimate, float
+    float
+        The empirical mean precision estimate.
 
     Raises
     ------
     ValueError
-        If unique classes M < 2
+        If unique classes M < 2.
 
     Notes
     -----
@@ -64,7 +50,7 @@ def uap(labels: Array2D[int], scores: Array2D[float]) -> UAPResult:
     >>> y_true = np.array([0, 0, 1, 1])
     >>> y_scores = np.array([0.1, 0.4, 0.35, 0.8])
     >>> uap(y_true, y_scores)
-    {'uap': 0.8333333333333333}
+    0.8333333333333333
 
     >>> y_true = np.array([0, 0, 1, 1, 2, 2])
     >>> y_scores = np.array(
@@ -78,7 +64,7 @@ def uap(labels: Array2D[int], scores: Array2D[float]) -> UAPResult:
     ...     ]
     ... )
     >>> uap(y_true, y_scores)
-    {'uap': 0.7777777777777777}
+    0.7777777777777777
     """
     _logger.info("Starting UAP calculation")
 
@@ -91,4 +77,4 @@ def uap(labels: Array2D[int], scores: Array2D[float]) -> UAPResult:
 
     _logger.info("UAP calculation complete: uap=%.4f", avg_precision)
 
-    return UAPResult(uap=avg_precision)
+    return avg_precision

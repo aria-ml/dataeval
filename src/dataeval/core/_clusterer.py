@@ -196,13 +196,14 @@ def cluster(
     -------
     ClusterResult
         Mapping with keys:
-        - clusters : NDArray[np.intp] - Assigned clusters
-        - mst : NDArray[np.float32] - The minimum spanning tree of the data
-        - linkage_tree : NDArray[np.float32] - The linkage array of the data
-        - condensed_tree : CondensedTree(Mapping) - Derived from fast_hdbscan.cluster_trees.CondensedTree
-        - membership_strengths : NDArray[np.float32] - The strength of the data point belonging to the assigned cluster
-        - k_neighbors : NDArray[np.int32] - Indices of the nearest points in the population matrix
-        - k_distances : NDArray[np.float32] - Array representing the lengths to points
+
+        - clusters: NDArray[np.intp] - Assigned clusters
+        - mst: NDArray[np.float32] - The minimum spanning tree of the data
+        - linkage_tree: NDArray[np.float32] - The linkage array of the data
+        - condensed_tree: CondensedTree(Mapping) - Derived from fast_hdbscan.cluster_trees.CondensedTree
+        - membership_strengths: NDArray[np.float32] - The strength of the data point belonging to the assigned cluster
+        - k_neighbors: NDArray[np.int32] - Indices of the nearest points in the population matrix
+        - k_distances: NDArray[np.float32] - Array representing the lengths to points
 
     Notes
     -----

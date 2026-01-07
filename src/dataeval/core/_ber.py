@@ -91,8 +91,9 @@ def ber_mst(embeddings: ArrayND[float], class_labels: Array1D[int]) -> BERResult
     -------
     BERResult
         Mapping with keys:
-        - upper_bound : float - The upper bound of the Bayes Error Rate
-        - lower_bound : float - The lower bound of the Bayes Error Rate
+
+        - upper_bound: float - The upper bound of the Bayes Error Rate
+        - lower_bound: float - The lower bound of the Bayes Error Rate
 
     References
     ----------
@@ -146,8 +147,9 @@ def ber_knn(embeddings: ArrayND[float], class_labels: Array1D[int], k: int) -> B
     -------
     BERResult
         Mapping with keys:
-        - upper_bound : float - The upper bound of the Bayes Error Rate
-        - lower_bound : float - The lower bound of the Bayes Error Rate
+
+        - upper_bound: float - The upper bound of the Bayes Error Rate
+        - lower_bound: float - The lower bound of the Bayes Error Rate
 
     References
     ----------

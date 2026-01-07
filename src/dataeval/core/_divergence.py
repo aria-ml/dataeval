@@ -94,7 +94,10 @@ def divergence_mst(emb_a: ArrayND[float], emb_b: ArrayND[float]) -> DivergenceRe
     Returns
     -------
     DivergenceResult
-        Dictionary containing 'divergence' and 'errors' (number of cross-label edges)
+        Mapping with keys:
+
+        - divergence: float - The divergence value between 0.0 and 1.0
+        - errors: int - The number of cross-label edges
 
     Examples
     --------
@@ -122,7 +125,10 @@ def divergence_fnn(emb_a: ArrayND[float], emb_b: ArrayND[float]) -> DivergenceRe
     Returns
     -------
     DivergenceResult
-        Dictionary containing 'divergence' and 'errors' (number of label disagreements)
+        Mapping with keys:
+
+        - divergence: float - The divergence value between 0.0 and 1.0
+        - errors: int - The number of label disagreements
 
     Examples
     --------

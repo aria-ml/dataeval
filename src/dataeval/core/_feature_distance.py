@@ -82,10 +82,11 @@ def feature_distance(
     -------
     Sequence[FeatureDistanceResult]
         Sequence of mappings, one per feature, each with keys:
-        - statistic : float - The Kolmogorov-Smirnov test statistic
-        - location : float - The normalized location where the KS statistic was achieved
-        - dist : float - The Earth Mover's Distance between distributions
-        - p_value : float - The p-value from the KS test
+
+        - statistic: float - The Kolmogorov-Smirnov test statistic
+        - location: float - The normalized location where the KS statistic was achieved
+        - dist: float - The Earth Mover's Distance between distributions
+        - p_value: float - The p-value from the KS test
 
     See Also
     --------

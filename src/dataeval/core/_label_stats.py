@@ -81,6 +81,7 @@ def label_stats(
     -------
     LabelStatsResult
         A mapping containing the computed counting metrics for the labels with keys:
+
         - label_counts_per_class: Mapping[int, int] - Total count of each class
         - label_counts_per_image: Sequence[int] - Number of labels per image
         - image_counts_per_class: Mapping[int, int] - How many images contain each label

@@ -73,11 +73,12 @@ def coverage_naive(
 
     Returns
     -------
-    dict
+    CoverageResult
         Mapping with keys:
-        - uncovered_indices : NDArray[np.intp] - Array of indices for uncovered observations
-        - critical_value_radii : NDArray[np.float64] - Array of critical value radii for each observation
-        - coverage_radius : float - The radius threshold for coverage
+
+        - uncovered_indices: NDArray[np.intp] - Array of indices for uncovered observations
+        - critical_value_radii: NDArray[np.float64] - Array of critical value radii for each observation
+        - coverage_radius: float - The radius threshold for coverage
 
     Raises
     ------
@@ -156,9 +157,10 @@ def coverage_adaptive(
     -------
     CoverageResult
         Mapping with keys:
-        - uncovered_indices : NDArray[np.intp] - Array of indices for uncovered observations
-        - critical_value_radii : NDArray[np.float64] - Array of critical value radii for each observation
-        - coverage_radius : float - The adaptive radius threshold for coverage
+
+        - uncovered_indices: NDArray[np.intp] - Array of indices for uncovered observations
+        - critical_value_radii: NDArray[np.float64] - Array of critical value radii for each observation
+        - coverage_radius: float - The adaptive radius threshold for coverage
 
     Raises
     ------
