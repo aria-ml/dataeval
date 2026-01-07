@@ -21,14 +21,14 @@ from dataeval._embeddings import Embeddings
 
 # from maite_datasets import to_image_classification_dataset
 from dataeval.config import get_device
-from dataeval.evaluators.drift._mmd import (
+from dataeval.shift._drift._mmd import (
     DriftMMD,
     GaussianRBF,
     _auto_detect_permutation_batch_size,
     _squared_pairwise_distance,
     mmd2_from_kernel_matrix,
 )
-from dataeval.evaluators.drift.updates import LastSeenUpdate, ReservoirSamplingUpdate
+from dataeval.shift._update_strategies import LastSeenUpdateStrategy, ReservoirSamplingUpdateStrategy
 
 
 class HiddenOutput(nn.Module):
@@ -78,7 +78,7 @@ class TestMMDDrift:
     n, n_hidden, n_classes = 100, 10, 5
     n_shape = (1, 16, 16)
     model = [nn.Identity(), HiddenOutput(MyModel(n_shape), layer=-1)]
-    update_strategy = [LastSeenUpdate(750), ReservoirSamplingUpdate(750), None]
+    update_strategy = [LastSeenUpdateStrategy(750), ReservoirSamplingUpdateStrategy(750), None]
     n_permutations = [10]
     sigma = [np.array([[1, 0], [0, 1]]), None]
     tests_mmddrift = list(product(model, n_permutations, update_strategy, sigma))

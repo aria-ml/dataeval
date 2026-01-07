@@ -16,7 +16,6 @@ from collections.abc import Sequence
 from typing import Any, Generic, Literal, TypeVar
 
 import polars as pl
-from typing_extensions import Self
 
 _logger = logging.getLogger(__name__)
 
@@ -80,10 +79,10 @@ class IndexChunk(Chunk):
         self.start_index: int = start_index
         self.end_index: int = end_index
 
-    def __lt__(self, other: Self) -> bool:
+    def __lt__(self, other: IndexChunk) -> bool:
         return self.end_index < other.start_index
 
-    def __add__(self, other: Self) -> Self:
+    def __add__(self, other: IndexChunk) -> IndexChunk:
         a, b = (self, other) if self < other else (other, self)
         result = copy.deepcopy(a)
         result.data = pl.concat([a.data, b.data])
@@ -118,10 +117,10 @@ class PeriodChunk(Chunk):
         self.end_datetime = period.end_time
         self.chunk_size = chunk_size
 
-    def __lt__(self, other: Self) -> bool:
+    def __lt__(self, other: PeriodChunk) -> bool:
         return self.start_datetime < other.start_datetime
 
-    def __add__(self, other: Self) -> Self:
+    def __add__(self, other: PeriodChunk) -> PeriodChunk:
         a, b = (self, other) if self < other else (other, self)
         result = copy.deepcopy(a)
         result.data = pl.concat([a.data, b.data])
@@ -192,20 +191,24 @@ class Chunker(Generic[TChunk]):
 
 
 class PeriodBasedChunker(Chunker[PeriodChunk]):
-    """A Chunker that will split data into Chunks based on a date column in the data."""
+    """
+    A Chunker that will split data into Chunks based on a date column in the data.
+
+    Parameters
+    ----------
+    timestamp_column_name : str
+        The column name containing the timestamp to chunk on
+    offset : str
+        A frequency string representing a relative time offset.
+
+    Notes
+    -----
+    The offset determines how the time-based grouping will occur. A list of possible values
+    can be found at <https://docs.pola.rs/api/python/stable/reference/expressions/api/polars.Expr.dt.offset_by.html>.
+    """
 
     def __init__(self, timestamp_column_name: str, offset: str = "W") -> None:
-        """Creates a new PeriodBasedChunker.
-
-        Parameters
-        ----------
-        timestamp_column_name : str
-            The column name containing the timestamp to chunk on
-        offset : str
-            A frequency string representing a relative time offset.
-            The offset determines how the time-based grouping will occur. A list of possible values
-            can be found at <https://docs.pola.rs/api/python/stable/reference/expressions/api/polars.Expr.dt.offset_by.html>.
-        """
+        """Creates a new PeriodBasedChunker."""
         self.timestamp_column_name = timestamp_column_name
         self.offset = offset
 
@@ -261,23 +264,28 @@ class PeriodBasedChunker(Chunker[PeriodChunk]):
 
 
 class SizeBasedChunker(Chunker[IndexChunk]):
-    """A Chunker that will split data into Chunks based on the preferred number of observations per Chunk.
+    """
+    A Chunker that will split data into Chunks based on the preferred number of observations per Chunk.
+
+    Parameters
+    ----------
+    chunk_size: int
+        The preferred size of the resulting Chunks, i.e. the number of observations in each Chunk.
+    incomplete: str, default='keep'
+        Choose how to handle any leftover observations that don't make up a full Chunk.
+        The following options are available:
+
+        - ``'drop'``: drop the leftover observations
+        - ``'keep'``: keep the incomplete Chunk (containing less than ``chunk_size`` observations)
+        - ``'append'``: append leftover observations to the last complete Chunk (overfilling it)
+
+        Defaults to ``'keep'``.
 
     Notes
     -----
     - Chunks are adjacent, not overlapping
     - There may be "incomplete" chunks, as the remainder of observations after dividing by `chunk_size`
       will form a chunk of their own.
-
-    Examples
-    --------
-    Chunk using monthly periods and providing a column name
-
-    >>> from nannyml.chunk import SizeBasedChunker
-    >>> df = pd.read_parquet("/path/to/my/data.pq")
-    >>> chunker = SizeBasedChunker(chunk_size=2000, incomplete="drop")
-    >>> chunks = chunker.split(data=df)
-
     """
 
     def __init__(
@@ -285,27 +293,7 @@ class SizeBasedChunker(Chunker[IndexChunk]):
         chunk_size: int,
         incomplete: Literal["append", "drop", "keep"] = "keep",
     ) -> None:
-        """Create a new SizeBasedChunker.
-
-        Parameters
-        ----------
-        chunk_size: int
-            The preferred size of the resulting Chunks, i.e. the number of observations in each Chunk.
-        incomplete: str, default='keep'
-            Choose how to handle any leftover observations that don't make up a full Chunk.
-            The following options are available:
-
-            - ``'drop'``: drop the leftover observations
-            - ``'keep'``: keep the incomplete Chunk (containing less than ``chunk_size`` observations)
-            - ``'append'``: append leftover observations to the last complete Chunk (overfilling it)
-
-            Defaults to ``'keep'``.
-
-        Returns
-        -------
-        chunker: a size-based instance used to split data into Chunks of a constant size.
-
-        """
+        """Create a new SizeBasedChunker."""
         if not isinstance(chunk_size, int) or chunk_size <= 0:
             raise ValueError(f"chunk_size={chunk_size} is invalid - provide an integer greater than 0")
         if incomplete not in ("append", "drop", "keep"):
@@ -345,21 +333,31 @@ class SizeBasedChunker(Chunker[IndexChunk]):
 
 
 class CountBasedChunker(Chunker[IndexChunk]):
-    """A Chunker that will split data into chunks based on the preferred number of total chunks.
+    """
+    A Chunker that will split data into chunks based on the preferred number of total chunks.
+
+    It will calculate the amount of observations per chunk based on the given chunk count.
+    It then continues to split the data into chunks just like a SizeBasedChunker does.
+
+    Parameters
+    ----------
+    chunk_number: int
+        The amount of chunks to split the data in.
+    incomplete: str, default='keep'
+        Choose how to handle any leftover observations that don't make up a full Chunk.
+        The following options are available:
+
+        - ``'drop'``: drop the leftover observations
+        - ``'keep'``: keep the incomplete Chunk (containing less than ``chunk_size`` observations)
+        - ``'append'``: append leftover observations to the last complete Chunk (overfilling it)
+
+        Defaults to ``'keep'``.
 
     Notes
     -----
     - Chunks are adjacent, not overlapping
     - There may be "incomplete" chunks, as the remainder of observations after dividing by `chunk_size`
       will form a chunk of their own.
-
-    Examples
-    --------
-    >>> from nannyml.chunk import CountBasedChunker
-    >>> df = pd.read_parquet("/path/to/my/data.pq")
-    >>> chunker = CountBasedChunker(chunk_number=100)
-    >>> chunks = chunker.split(data=df)
-
     """
 
     def __init__(
@@ -367,30 +365,7 @@ class CountBasedChunker(Chunker[IndexChunk]):
         chunk_number: int,
         incomplete: Literal["append", "drop", "keep"] = "keep",
     ) -> None:
-        """Creates a new CountBasedChunker.
-
-        It will calculate the amount of observations per chunk based on the given chunk count.
-        It then continues to split the data into chunks just like a SizeBasedChunker does.
-
-        Parameters
-        ----------
-        chunk_number: int
-            The amount of chunks to split the data in.
-        incomplete: str, default='keep'
-            Choose how to handle any leftover observations that don't make up a full Chunk.
-            The following options are available:
-
-            - ``'drop'``: drop the leftover observations
-            - ``'keep'``: keep the incomplete Chunk (containing less than ``chunk_size`` observations)
-            - ``'append'``: append leftover observations to the last complete Chunk (overfilling it)
-
-            Defaults to ``'keep'``.
-
-        Returns
-        -------
-        chunker: CountBasedChunker
-
-        """
+        """Creates a new CountBasedChunker."""
         if not isinstance(chunk_number, int) or chunk_number <= 0:
             raise ValueError(f"given chunk_number {chunk_number} is invalid - provide an integer greater than 0")
         if incomplete not in ("append", "drop", "keep"):
