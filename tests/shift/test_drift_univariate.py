@@ -15,8 +15,8 @@ import numpy as np
 import pytest
 
 from dataeval._embeddings import Embeddings
-from dataeval.evaluators.drift._univariate import DriftUnivariate
-from dataeval.evaluators.drift.updates import LastSeenUpdate, ReservoirSamplingUpdate
+from dataeval.shift._drift._univariate import DriftUnivariate
+from dataeval.shift._update_strategies import LastSeenUpdateStrategy, ReservoirSamplingUpdateStrategy
 
 
 @pytest.mark.required
@@ -27,7 +27,7 @@ class TestKSDrift:
     n_features = [1, 10]
     alternative = ["two-sided", "less", "greater"]
     correction = ["bonferroni", "fdr"]
-    update_strategy = [LastSeenUpdate(1000), ReservoirSamplingUpdate(1000)]
+    update_strategy = [LastSeenUpdateStrategy(1000), ReservoirSamplingUpdateStrategy(1000)]
     tests_ksdrift = list(
         product(
             n_features,

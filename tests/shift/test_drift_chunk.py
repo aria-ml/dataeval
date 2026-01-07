@@ -7,7 +7,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-from dataeval.evaluators.drift._nml._chunk import (
+from dataeval.shift._drift._chunk import (
     Chunk,
     Chunker,
     CountBasedChunker,

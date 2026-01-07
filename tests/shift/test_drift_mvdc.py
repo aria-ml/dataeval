@@ -5,9 +5,8 @@ import polars as pl
 import pytest
 
 from dataeval.config import use_max_processes
-from dataeval.evaluators.drift._mvdc import DriftMVDC, DriftMVDCOutput
-from dataeval.evaluators.drift._nml._base import _validate
-from dataeval.evaluators.drift._nml._thresholds import ConstantThreshold
+from dataeval.shift._drift._mvdc import DriftMVDC, DriftMVDCOutput, _validate
+from dataeval.shift._drift._thresholds import ConstantThreshold
 
 
 @pytest.fixture
