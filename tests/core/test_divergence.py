@@ -19,7 +19,7 @@ class TestDivergenceCore:
         "method, expected_errors",
         [
             (_compute_mst_errors, 9),  # all 9 edges of MST will connect different labels
-            (_compute_fnn_errors, 9),  # FNN gets the whole MST in this case.
+            (_compute_fnn_errors, 10),  # FNN gets every sample in this case.
         ],
     )
     def test_divergence_error_funcs(self, method, expected_errors):

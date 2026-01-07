@@ -55,6 +55,9 @@ def _compute_divergence(
     labels[N:] = 1
 
     errors = error_fn(stacked_data, labels)
+    # A MST between two completely separate distributions results in 1 error
+    if error_fn == _compute_mst_errors:
+        errors -= 1
     dp = max(0.0, 1 - ((N + M) / (2 * N * M)) * errors)
 
     _logger.info("Divergence computation complete: divergence=%.4f, errors=%d", dp, errors)
@@ -73,7 +76,7 @@ def _compute_mst_errors(embeddings: ArrayND[float], labels: ArrayND[int]) -> int
 def _compute_fnn_errors(embeddings: ArrayND[float], labels: ArrayND[int]) -> int:
     from dataeval.core._mst import compute_neighbors
 
-    nn_indices = compute_neighbors(embeddings, embeddings)
+    nn_indices = compute_neighbors(embeddings)
     return np.sum(labels[nn_indices] != labels)
 
 
@@ -101,8 +104,32 @@ def divergence_mst(emb_a: ArrayND[float], emb_b: ArrayND[float]) -> DivergenceRe
 
     Examples
     --------
+    Return divergence of two datasets (0-no divergence, 1-complete divergence)
+
+    >>> import sklearn.datasets as dsets
+    >>> from dataeval.core import divergence_mst
+    >>> datasetA = dsets.make_blobs(
+    ...     n_samples=50, centers=np.array([(-1, -1), (1, 1)]), cluster_std=0.3, random_state=712
+    ... )[0]
+    >>> datasetB = (
+    ...     dsets.make_blobs(n_samples=50, centers=np.array([(-0.5, -0.5), (1, 1)]), cluster_std=0.3, random_state=712)[
+    ...         0
+    ...     ]
+    ...     + 0.05
+    ... )
+    >>> datasetC = dsets.make_blobs(
+    ...     n_samples=50, centers=np.array([(-0.5, 0.5), (1, -1)]), cluster_std=0.3, random_state=712
+    ... )[0]
+
+    Overlapping datasets - divergence == 0:
+
     >>> divergence_mst(datasetA, datasetB)
-    {'divergence': 0.0, 'errors': 50}
+    {'divergence': 0.040000000000000036, 'errors': 48}
+
+    Completely separated datasets - divergence == 1:
+
+    >>> divergence_mst(datasetA, datasetC)
+    {'divergence': 0.96, 'errors': 2}
     """
     _logger.info("Starting divergence_mst calculation")
     return _compute_divergence(emb_a, emb_b, _compute_mst_errors)
@@ -132,8 +159,32 @@ def divergence_fnn(emb_a: ArrayND[float], emb_b: ArrayND[float]) -> DivergenceRe
 
     Examples
     --------
+    Return divergence of two datasets (0-no divergence, 1-complete divergence)
+
+    >>> import sklearn.datasets as dsets
+    >>> from dataeval.core import divergence_fnn
+    >>> datasetA = dsets.make_blobs(
+    ...     n_samples=50, centers=np.array([(-1, -1), (1, 1)]), cluster_std=0.3, random_state=712
+    ... )[0]
+    >>> datasetB = (
+    ...     dsets.make_blobs(n_samples=50, centers=np.array([(-0.5, -0.5), (1, 1)]), cluster_std=0.3, random_state=712)[
+    ...         0
+    ...     ]
+    ...     + 0.05
+    ... )
+    >>> datasetC = dsets.make_blobs(
+    ...     n_samples=50, centers=np.array([(-0.5, 0.5), (1, -1)]), cluster_std=0.3, random_state=712
+    ... )[0]
+
+    Overlapping datasets - divergence == 0:
+
     >>> divergence_fnn(datasetA, datasetB)
-    {'divergence': 0.28, 'errors': 36}
+    {'divergence': 0.0, 'errors': 54}
+
+    Completely separated datasets - divergence == 1:
+
+    >>> divergence_fnn(datasetA, datasetC)
+    {'divergence': 1.0, 'errors': 0}
     """
     _logger.info("Starting divergence_fnn calculation")
     return _compute_divergence(emb_a, emb_b, _compute_fnn_errors)

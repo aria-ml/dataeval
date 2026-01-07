@@ -30,7 +30,7 @@ import numba
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.core._fast_hdbscan._disjoint_set import ds_find, ds_rank_create, ds_union_by_rank
+from dataeval.core._fast_hdbscan._disjoint_set import ds_find, ds_union_by_rank
 
 # Constants for cluster edge detection thresholds
 CLUSTER_SIZE_LOG_THRESHOLD = 2  # Threshold for large vs small clusters (10^2 = 100 samples)
@@ -43,10 +43,11 @@ EXACT_DUPLICATE_MAGNITUDE_OFFSET = -3  # Orders of magnitude below mean to consi
 EXACT_DUPLICATE_FALLBACK_OFFSET = 3  # Additional offset when mean is very small
 
 
-@numba.njit(locals={"i": numba.types.intp, "nbr": numba.types.intp, "dist": numba.types.float32}, cache=True)
-def _init_tree(
-    n_neighbors: NDArray[np.intp], n_distance: NDArray[np.float32]
-) -> tuple[NDArray[np.float32], int, tuple[NDArray[np.int32], NDArray[np.int32]], NDArray[np.uint32]]:
+@numba.njit(cache=True)
+def _expand_tree(
+    additional_size: int,
+    tree: NDArray[np.float32],
+) -> NDArray[np.float32]:
     """
     Initialize minimum spanning tree from first set of k-nearest neighbors.
 
@@ -55,7 +56,7 @@ def _init_tree(
 
     Parameters
     ----------
-    n_neighbors : NDArray[np.intp]
+    n_neighbors : NDArray[np.int64]
         Array of neighbor indices, shape (n_samples,). For each sample i, n_neighbors[i]
         gives the index of its nearest neighbor.
     n_distance : NDArray[np.float32]
@@ -69,9 +70,9 @@ def _init_tree(
         Note: point indices are stored as float32 for array homogeneity.
     total_edge : int
         Number of edges currently in the tree (may be < n_samples - 1 if disconnected)
-    disjoint_set : tuple[NDArray[np.int32], NDArray[np.int32]]
+    disjoint_set : tuple[NDArray[np.int64], NDArray[np.int64]]
         Disjoint set data structure tracking connected components
-    cluster_points : NDArray[np.uint32]
+    cluster_points : NDArray[np.int64]
         Cluster assignment for each point (root of its set in disjoint_set)
 
     Notes
@@ -79,103 +80,81 @@ def _init_tree(
     The tree array stores node indices as float32 rather than integers for homogeneity
     with distance values. Callers should cast back to int when extracting node indices.
     """
-    # Pre-allocate tree to hold maximum possible edges (n_samples - 1)
-    tree = np.zeros((n_neighbors.size - 1, 3), dtype=np.float32)
-    disjoint_set = ds_rank_create(np.int32(n_neighbors.size))
-    cluster_points = np.empty(n_neighbors.size, dtype=np.uint32)
-
-    # tot_edge tracks current number of edges added to the tree
-    total_edge = 0
-    for i in range(n_neighbors.size):
-        nbr = n_neighbors[i]
-        if ds_union_by_rank(disjoint_set, np.intp(i), np.intp(nbr)):
-            dist = n_distance[i]
-            # Store edge as (point_i, neighbor, distance)
-            # Note: Storing indices as float32 for array homogeneity with distances
-            tree[total_edge] = (np.float32(i), np.float32(nbr), dist)
-            total_edge += 1
-
-    # Determine cluster membership for each point
-    for i in range(cluster_points.size):
-        cluster_points[i] = ds_find(disjoint_set, np.intp(i))
-
-    return tree, total_edge, disjoint_set, cluster_points
+    new_tree = np.full((tree.shape[0] + additional_size - 1, 3), -1, dtype=np.float32)
+    new_tree[: tree.shape[0]] = tree
+    return new_tree
 
 
-@numba.njit(locals={"i": numba.types.uint32, "nbr": numba.types.uint32}, cache=True)
-def _update_tree_by_distance(
+@numba.njit(locals={"i": numba.types.intp, "nbr": numba.types.intp, "dist": numba.types.float32}, cache=True)
+def _update_tree(
     tree: NDArray[np.float32],
     total_edge: int,
-    disjoint_set: tuple[NDArray[np.int32], NDArray[np.int32]],
-    n_neighbors: NDArray[np.uint32],
+    disjoint_set: tuple[NDArray[np.int64], NDArray[np.int64]],
+    cluster_points: NDArray[np.int64],
+    n_neighbors: NDArray[np.int64],
     n_distance: NDArray[np.float32],
-) -> tuple[NDArray[np.float32], int, tuple[NDArray[np.int32], NDArray[np.int32]], NDArray[np.uint32]]:
+    points: NDArray[np.int64] | None = None,
+) -> tuple[NDArray[np.float32], int, tuple[NDArray[np.int64], NDArray[np.int64]], NDArray[np.int64]]:
     """
-    Update MST by adding edges from a new set of neighbors in distance-sorted order.
+    Initialize minimum spanning tree from first set of k-nearest neighbors.
 
-    This function extends an existing MST by processing a new set of neighbor relationships.
-    Edges are added in order of increasing distance to ensure MST property is maintained.
-    Only edges that connect previously disconnected components are added.
+    This creates the initial MST structure by processing the closest neighbor for each point.
+    Uses a disjoint set data structure to track connected components and avoid cycles.
 
     Parameters
     ----------
-    tree : NDArray[np.float32]
-        Existing MST edge array with shape (n_samples - 1, 3)
-    total_edge : int
-        Current number of edges in the tree
-    disjoint_set : tuple[NDArray[np.int32], NDArray[np.int32]]
-        Current disjoint set tracking connected components
-    n_neighbors : NDArray[np.uint32]
-        New neighbor indices to add, shape (n_samples,)
+    n_neighbors : NDArray[np.int64]
+        Array of neighbor indices, shape (n_samples,). For each sample i, n_neighbors[i]
+        gives the index of its nearest neighbor.
     n_distance : NDArray[np.float32]
-        Distances to new neighbors, shape (n_samples,)
+        Array of distances to nearest neighbors, shape (n_samples,). n_distance[i] is the
+        distance from sample i to its nearest neighbor n_neighbors[i].
 
     Returns
     -------
     tree : NDArray[np.float32]
-        Updated MST edge array
+        MST edge array with shape (n_samples - 1, 3). Each row is [point_i, point_j, distance].
+        Note: point indices are stored as float32 for array homogeneity.
     total_edge : int
-        Updated number of edges in the tree
-    disjoint_set : tuple[NDArray[np.int32], NDArray[np.int32]]
-        Updated disjoint set
-    cluster_points : NDArray[np.uint32]
-        Updated cluster assignments
+        Number of edges currently in the tree (may be < n_samples - 1 if disconnected)
+    disjoint_set : tuple[NDArray[np.int64], NDArray[np.int64]]
+        Disjoint set data structure tracking connected components
+    cluster_points : NDArray[np.int64]
+        Cluster assignment for each point (root of its set in disjoint_set)
 
     Notes
     -----
-    Edges are processed in distance-sorted order to maintain the MST property.
-    This function modifies tree and disjoint_set in-place.
+    The tree array stores node indices as float32 rather than integers for homogeneity
+    with distance values. Callers should cast back to int when extracting node indices.
     """
-    cluster_points = np.empty(n_neighbors.size, dtype=np.uint32)
+    if points is None:
+        points = np.arange(n_neighbors.size, dtype=np.int64)
 
-    # Sort edges by distance to process shortest edges first
-    sort_dist = np.argsort(n_distance)
-    dist_sorted = n_distance[sort_dist]
-    nbrs_sorted = n_neighbors[sort_dist]
-    points = np.arange(n_neighbors.size)
-    point_sorted = points[sort_dist]
+    # Expand variables to contain all new points if necessary
+    if tree.shape[0] - total_edge < points.max():
+        tree = _expand_tree(points.max(), tree)
 
-    # Process edges in distance order
-    for i in range(n_neighbors.size):
-        point = point_sorted[i]
-        nbr = nbrs_sorted[i]
-        if ds_union_by_rank(disjoint_set, point, nbr):
-            dist = dist_sorted[i]
-            # Add edge to tree (storing indices as float32)
+    for i in range(points.size):
+        point = points[i]
+        nbr = n_neighbors[i]
+        if ds_union_by_rank(disjoint_set, point, np.int64(nbr)) and nbr >= 0:
+            dist = n_distance[i]
+            # Store edge as (point_i, neighbor, distance)
+            # Note: Storing indices as float32 for array homogeneity with distances
             tree[total_edge] = (np.float32(point), np.float32(nbr), dist)
             total_edge += 1
 
-    # Update cluster assignments
+    # Determine cluster membership for each point
     for i in range(cluster_points.size):
-        cluster_points[i] = ds_find(disjoint_set, np.intp(i))
+        cluster_points[i] = ds_find(disjoint_set, np.int64(i))
 
     return tree, total_edge, disjoint_set, cluster_points
 
 
 @numba.njit(locals={"i": numba.types.uint32}, cache=True)
 def _cluster_edges(
-    tracker: NDArray[np.int32], final_merge_idx: int, cluster_distances: NDArray[np.float32]
-) -> list[NDArray[np.intp]]:
+    tracker: NDArray[np.int64], final_merge_idx: int, cluster_distances: NDArray[np.float32]
+) -> list[NDArray[np.int64]]:
     """
     Identify edge points in each cluster based on distance statistics.
 
@@ -186,7 +165,7 @@ def _cluster_edges(
 
     Parameters
     ----------
-    tracker : NDArray[np.int32]
+    tracker : NDArray[np.int64]
         Cluster assignment for each point, shape (n_samples,)
     final_merge_idx : int
         Index into cluster_distances indicating the final merge level to consider
@@ -196,7 +175,7 @@ def _cluster_edges(
 
     Returns
     -------
-    edge_points : list[NDArray[np.intp]]
+    edge_points : list[NDArray[np.int64]]
         List of arrays, one per cluster. Each array contains indices of edge points
         for that cluster. If too few edge points are found, returns all cluster points.
 
@@ -207,7 +186,7 @@ def _cluster_edges(
     Always returns at least MIN_EDGE_POINTS (10) edge points if possible.
     """
     cluster_ids = np.unique(tracker)
-    edge_points: list[NDArray[np.intp]] = []
+    edge_points: list[NDArray[np.int64]] = []
 
     for idx in range(cluster_ids.size):
         cluster_points = np.nonzero(tracker == cluster_ids[idx])[0]
@@ -241,10 +220,50 @@ def _cluster_edges(
     return edge_points
 
 
+@numba.njit(cache=True)
+def _flatten_and_sort(
+    neighbors: NDArray[np.int64], distances: NDArray[np.float32]
+) -> tuple[NDArray[np.int64], NDArray[np.float32], NDArray[np.int64]]:
+    """
+    Flattens and sorts both the neighbors and distances arrays based on the sorted distance array.
+
+    Due to the flattening/rearranging of the neighbors array, a row index array is created
+    and returned to ensure that the correct neighbor-point pair is maintained.
+    Array is created by numpy.arange(neighbors.shape[0]).repeat(neighbors.shape[1]).
+
+    Parameters
+    ----------
+    neighbors : NDArray[np.int64]
+        Array of neighbor indices, shape (n_samples, k neighbors). For each sample i, neighbors[i]
+        gives the index of its nearest neighbor.
+    distances : NDArray[np.float32]
+        Array of distances to nearest neighbors, shape (n_samples, k neighbors). distances[i] is the
+        distance from sample i to its nearest neighbor neighbors[i].
+
+    Returns
+    -------
+    flattened_sorted_neighbors : NDArray[int64]
+        Flattened neighbors array sorted by shortest distance
+    flattened_sorted_distances : NDArray[float32]
+        Flattened distances array sorted by shortest distance
+    flattened_sorted_indicies : NDArray[int64]
+        Flattened row index array sorted by shortest distance
+    """
+    flat_nbrs = neighbors.flatten()
+    flat_dist = distances.flatten()
+    sort_dist = np.argsort(flat_dist)
+    dist_sorted = flat_dist[sort_dist]
+    nbrs_sorted = flat_nbrs[sort_dist]
+    indices = np.arange(neighbors.shape[0]).repeat(neighbors.shape[1])
+    flat_index = indices.flatten()
+    index_sorted = flat_index[sort_dist]
+    return nbrs_sorted, dist_sorted, index_sorted
+
+
 @numba.njit(locals={"i": numba.types.int32}, cache=True)
 def compare_links_to_cluster_std(
-    mst: NDArray[np.float32], clusters: NDArray[np.intp]
-) -> tuple[NDArray[np.int32], NDArray[np.int32]]:
+    mst: NDArray[np.float32], clusters: NDArray[np.int64]
+) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
     """
     Identify exact and near duplicate pairs based on MST edge distances and cluster statistics.
 
@@ -257,15 +276,15 @@ def compare_links_to_cluster_std(
     mst : NDArray[np.float32]
         Minimum spanning tree edges with shape (n_samples - 1, 3).
         Each row is [point_i, point_j, distance].
-    clusters : NDArray[np.intp]
+    clusters : NDArray[np.int64]
         Cluster assignment for each point, shape (n_samples,)
 
     Returns
     -------
-    exact_duplicates : NDArray[np.int32]
+    exact_duplicates : NDArray[np.int64]
         Array of exact duplicate pairs with shape (n_exact, 2).
         Each row is [point_i, point_j] indices.
-    near_duplicates : NDArray[np.int32]
+    near_duplicates : NDArray[np.int64]
         Array of near duplicate pairs with shape (n_near, 2).
         Each row is [point_i, point_j] indices. Excludes pairs already in exact_duplicates.
 
@@ -286,8 +305,8 @@ def compare_links_to_cluster_std(
     # Identify which edges connect points within the same cluster
     # Note: Using regular range instead of prange - serial is faster for this workload
     for i in range(mst.shape[0]):
-        cluster_id = clusters[np.int32(mst[i, 0])]
-        if cluster_id == clusters[np.int32(mst[i, 1])]:
+        cluster_id = clusters[np.int64(mst[i, 0])]
+        if cluster_id == clusters[np.int64(mst[i, 1])]:
             cluster_grouping[i] = np.int16(cluster_id)
 
     # Calculate threshold for exact duplicates based on mean distance
@@ -298,12 +317,12 @@ def compare_links_to_cluster_std(
     compare_mag = EXACT_DUPLICATE_MAGNITUDE_OFFSET if order_mag >= 0 else order_mag - EXACT_DUPLICATE_FALLBACK_OFFSET
 
     # Find exact duplicates: edges with very small distances
-    exact_dup = np.full((mst.shape[0], 2), -1, dtype=np.int32)
+    exact_dup = np.full((mst.shape[0], 2), -1, dtype=np.int64)
     exact_dups_index = np.nonzero(mst[:, 2] < 10**compare_mag)[0]
     exact_dup[exact_dups_index] = mst[exact_dups_index, :2]
 
     # Find near duplicates: per-cluster edges below cluster std dev
-    near_dup = np.full((mst.shape[0], 2), -1, dtype=np.int32)
+    near_dup = np.full((mst.shape[0], 2), -1, dtype=np.int64)
     for i in range(cluster_ids.size):
         cluster_links = np.nonzero(cluster_grouping == cluster_ids[i])[0]
         cluster_std = mst[cluster_links, 2].std()
@@ -315,7 +334,7 @@ def compare_links_to_cluster_std(
 
     # Remove exact duplicates from near duplicates list
     exact_idx = np.nonzero(exact_dup.T[0] != -1)[0]
-    near_dup[exact_idx] = np.full((exact_idx.size, 2), -1, dtype=np.int32)
+    near_dup[exact_idx] = np.full((exact_idx.size, 2), -1, dtype=np.int64)
     near_idx = np.nonzero(near_dup.T[0] != -1)[0]
 
     return exact_dup[exact_idx], near_dup[near_idx]
