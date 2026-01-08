@@ -313,7 +313,7 @@ def minimum_spanning_tree(embeddings: ArrayND[float], k: int = 15) -> MSTResult:
 
 
 def compute_neighbor_distances(
-    embeddings: ArrayND[float], k: int = 10
+    embeddings: ArrayND[float], neighbor_embeddings: ArrayND[float] | None = None, k: int = 10
 ) -> tuple[NDArray[np.int64], NDArray[np.float32]]:
     """
     Compute k nearest neighbors for each point in data (self-query, excluding self).
@@ -339,7 +339,8 @@ def compute_neighbor_distances(
     """
     _logger.debug("Computing neighbor distances with k=%d", k)
     embeddings_np = as_numpy(embeddings, required_ndim=2)
-    return _compute_nearest_neighbors(embeddings_np, None, k, algorithm="brute", return_distances=True)
+    nbr_embeddings_np = None if neighbor_embeddings is None else as_numpy(neighbor_embeddings, required_ndim=2)
+    return _compute_nearest_neighbors(embeddings_np, nbr_embeddings_np, k, algorithm="brute", return_distances=True)
 
 
 def compute_neighbors(
