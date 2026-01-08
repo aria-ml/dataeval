@@ -277,7 +277,7 @@ def cluster(
 
     max_neighbors = min(25, num_samples - 1)
     _logger.debug("Computing neighbors with max_neighbors=%d", max_neighbors)
-    kneighbors, kdistances = compute_neighbor_distances(x, max_neighbors)
+    kneighbors, kdistances = compute_neighbor_distances(x, k=max_neighbors)
     unsorted_mst: NDArray[np.float32] = minimum_spanning_tree_edges(x, kneighbors, kdistances)
     mst: NDArray[np.float32] = unsorted_mst[np.argsort(unsorted_mst.T[2])]
     linkage_tree: NDArray[np.float32] = mst_to_linkage_tree(mst).astype(np.float32)
