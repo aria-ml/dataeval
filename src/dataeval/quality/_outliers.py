@@ -371,10 +371,6 @@ class Outliers:
     ----------
     flags : ImageStats, default ImageStats.DIMENSION | ImageStats.PIXEL | ImageStats.VISUAL
         Statistics to compute for outlier detection
-    per_image : bool, default True
-        If True, calculate statistics per image
-    per_target : bool, default True
-        If True, calculate statistics per target within an image
     outlier_method : ["modzscore" | "zscore" | "iqr"], optional - default "modzscore"
         Statistical method used to identify outliers
     outlier_threshold : float, optional - default None
@@ -385,13 +381,9 @@ class Outliers:
     ----------
     stats : CalculationResult
         Statistics computed during the last evaluate() call.
-        Contains dimension, pixel, and/or visual statistics based on the use_* flags.
-    flags : ImageStats, default ImageStats.ALL
+        Contains dimension, pixel, and/or visual statistics based on the flags.
+    flags : ImageStats
         Statistics to compute for outlier detection
-    per_image : bool, default True
-        If True, calculate statistics per image
-    per_target : bool, default True
-        If True, calculate statistics per target within an image
     outlier_method : Literal["zscore", "modzscore", "iqr"]
         Statistical method used to identify outliers
     outlier_threshold : float | None
@@ -439,15 +431,11 @@ class Outliers:
     def __init__(
         self,
         flags: ImageStats = ImageStats.DIMENSION | ImageStats.PIXEL | ImageStats.VISUAL,
-        per_image: bool = True,
-        per_target: bool = True,
         outlier_method: Literal["zscore", "modzscore", "iqr"] = "modzscore",
         outlier_threshold: float | None = None,
     ) -> None:
         self.stats: CalculationResult
         self.flags = flags
-        self.per_image = per_image
-        self.per_target = per_target
         self.outlier_method: Literal["zscore", "modzscore", "iqr"] = outlier_method
         self.outlier_threshold = outlier_threshold
 
@@ -794,8 +782,14 @@ class Outliers:
             }
         ).sort(["item_id", "metric_name"], descending=[False, False])
 
-    @set_metadata(state=["flags", "per_image", "per_target", "outlier_method", "outlier_threshold"])
-    def evaluate(self, data: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]]) -> OutliersOutput[pl.DataFrame]:
+    @set_metadata(state=["flags", "outlier_method", "outlier_threshold"])
+    def evaluate(
+        self,
+        data: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
+        *,
+        per_image: bool = True,
+        per_target: bool = True,
+    ) -> OutliersOutput[pl.DataFrame]:
         """
         Returns indices of Outliers with the issues identified for each.
 
@@ -809,6 +803,13 @@ class Outliers:
             Dataset of images in array format. Can be image-only dataset
             or dataset with additional tuple elements (labels, metadata).
             Images should be in standard array format (C, H, W).
+        per_image : bool, default True
+            Whether to compute statistics for full items (images/videos).
+            When True, item-level outliers will be detected.
+        per_target : bool, default True
+            Whether to compute statistics for individual targets/detections.
+            When True and targets are present, target-level outliers will be detected.
+            Has no effect for datasets without targets.
 
         Returns
         -------
@@ -847,11 +848,11 @@ class Outliers:
         if self.flags == ImageStats(0):
             raise ValueError("At least one method of analysis needs to be selected.")
 
-        if not (self.per_image or self.per_target):
+        if not (per_image or per_target):
             raise ValueError("At least one of per_image or per_target must be True.")
 
         self.stats: CalculationResult = calculate(
-            data, None, stats=self.flags, per_image=self.per_image, per_target=self.per_target
+            data, None, stats=self.flags, per_image=per_image, per_target=per_target
         )
         outliers = self._get_outliers(self.stats["stats"], self.stats["source_index"])
 

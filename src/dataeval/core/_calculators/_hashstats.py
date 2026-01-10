@@ -30,12 +30,12 @@ class HashStatCalculator(Calculator):
     def _xxhash(self) -> list[str]:
         from dataeval.core._hash import xxhash
 
-        return [xxhash(self.cache.raw)]
+        return [xxhash(self.cache.image)]
 
     def _pchash(self) -> list[str]:
         from dataeval.core._hash import pchash
 
-        return [pchash(self.cache.raw)]
+        return [pchash(self.cache.image)]
 
     def get_empty_values(self) -> dict[str, Any]:
         """Return empty values for hash statistics."""
