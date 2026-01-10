@@ -12,6 +12,9 @@ PYTHON_VERSION = f"{version_info[0]}.{version_info[1]}"
 PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13"]
 PYTHON_RE_PATTERN = re.compile(r"\d\.\d{1,2}")
 IS_CI = bool(os.environ.get("CI"))
+DATAEVAL_NOX_UV_EXTRAS_OVERRIDE = os.environ.get("DATAEVAL_NOX_UV_EXTRAS_OVERRIDE", "")
+
+UV_EXTRAS = [DATAEVAL_NOX_UV_EXTRAS_OVERRIDE] if DATAEVAL_NOX_UV_EXTRAS_OVERRIDE else []
 
 # Configure Numba disk caching for faster test execution
 # This caches JIT-compiled functions to avoid recompilation across test workers
@@ -131,7 +134,7 @@ def doctest(session: nox.Session) -> None:
     )
 
 
-@nox_uv.session(uv_groups=["docs"])
+@nox_uv.session(uv_groups=["docs"], uv_extras=UV_EXTRAS)
 def docs(session: nox.Session) -> None:
     """Generate documentation. Clear the jupyter cache by calling `nox -e docs -- clean`."""
     if {"chart", "charts"} | set(session.posargs):

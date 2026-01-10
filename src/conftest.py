@@ -180,10 +180,12 @@ def doctest_metadata_explanatory_funcs(doctest_namespace: dict[str, Any]) -> Non
 @pytest.fixture(autouse=True, scope="session")
 def doctest_detectors_linters_duplicates(doctest_namespace: dict[str, Any]) -> None:
     rng = np.random.default_rng(42)
-    base = np.concatenate([np.ones((5, 10)), np.zeros((5, 10))])
+    base = np.concatenate([np.ones((32, 64)), np.zeros((32, 64))])
     images = np.stack([rng.permutation(base) * i for i in range(50)], axis=0)
+    images = (images * 255).astype(np.uint8)
     images[16] = images[37]
     images[3] = images[20]
+    images[5] = np.ones((64, 64), dtype=np.uint8) * 150
 
     """dataeval.quality.Duplicates"""
 
@@ -523,9 +525,9 @@ def doctest_metadata_object(doctest_namespace: dict[str, Any]) -> None:
     # Create a simple OD dataset with metadata for testing
     # 3 images with varying numbers of detections
     images = [
-        np.ones((3, 64, 64), dtype=np.uint8) * 100,  # Image 0
-        np.ones((3, 64, 64), dtype=np.uint8) * 150,  # Image 1
-        np.ones((3, 64, 64), dtype=np.uint8) * 200,  # Image 2
+        np.ones((64, 64), dtype=np.uint8) * 100,  # Image 0
+        np.ones((64, 64), dtype=np.uint8) * 150,  # Image 1
+        np.ones((64, 64), dtype=np.uint8) * 150,  # Image 2
     ]
 
     # Labels for each image (per detection)
