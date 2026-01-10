@@ -1,11 +1,11 @@
-from __future__ import annotations
-
 __all__ = []
 
 from collections.abc import Callable, Iterable, Iterator
 from multiprocessing import Pool
 from os import cpu_count
 from typing import Any, TypeVar
+
+from typing_extensions import Self
 
 _S = TypeVar("_S")
 _T = TypeVar("_T")
@@ -27,7 +27,7 @@ class PoolWrapper:
     def imap_unordered(self, func: Callable[[_S], _T], iterable: Iterable[_S]) -> Iterator[_T]:
         return map(func, iterable) if self.pool is None else self.pool.imap_unordered(func, iterable)
 
-    def __enter__(self, *args: Any, **kwargs: Any) -> PoolWrapper:
+    def __enter__(self, *args: Any, **kwargs: Any) -> Self:
         return self
 
     def __exit__(self, *args: Any) -> None:

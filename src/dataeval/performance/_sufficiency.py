@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 __all__ = []
 
 from collections.abc import Iterable, Sized

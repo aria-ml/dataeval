@@ -1,7 +1,5 @@
 """Unit tests for metadata insights functions."""
 
-from __future__ import annotations
-
 import numpy as np
 import pytest
 from numpy.random import Generator

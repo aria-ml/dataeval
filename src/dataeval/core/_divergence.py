@@ -3,8 +3,6 @@ This module contains the implementation of HP :term:`divergence<Divergence>`
 using the Fast Nearest Neighbor and Minimum Spanning Tree algorithms
 """
 
-from __future__ import annotations
-
 __all__ = []
 
 import logging

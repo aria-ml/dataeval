@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 __all__ = []
 
 from collections.abc import Callable
@@ -22,7 +20,7 @@ if TYPE_CHECKING:
 class PixelStatCalculator(Calculator[ImageStats]):
     """Calculator for pixel-level statistics."""
 
-    def __init__(self, datum: NDArray[Any], cache: CalculatorCache, per_channel: bool = False) -> None:
+    def __init__(self, datum: NDArray[Any], cache: "CalculatorCache", per_channel: bool = False) -> None:
         self.datum = datum
         self.cache = cache
         self.per_channel_mode = per_channel

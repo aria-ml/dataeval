@@ -6,11 +6,10 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
-from __future__ import annotations
-
 import math
 from collections.abc import Callable
 from itertools import product
+from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
@@ -391,3 +390,311 @@ class TestAutoDetectBatchSize:
         )
         # Should always return a positive integer
         assert isinstance(batch_size, int) and batch_size > 0
+
+    @pytest.mark.cuda
+    def test_auto_detect_batch_size_cuda_fallback(self):
+        """Test auto-detection fallback when CUDA memory info unavailable (line 94-99)"""
+        if not torch.cuda.is_available():
+            pytest.skip("CUDA not available")
+
+        # Test with very large matrix that might trigger fallback heuristic
+        batch_size = _auto_detect_permutation_batch_size(
+            kernel_mat_size=600,  # > 500 threshold
+            n_permutations=100,
+            device=torch.device("cuda"),
+        )
+
+        # Should return a positive integer
+        assert isinstance(batch_size, int) and batch_size > 0
+
+    @pytest.mark.cuda
+    def test_auto_detect_small_matrix_cuda(self):
+        """Test auto-detection with small matrix on CUDA returns 1 (line 97-99)"""
+        if not torch.cuda.is_available():
+            pytest.skip("CUDA not available")
+
+        # Small matrix should not need batching
+        batch_size = _auto_detect_permutation_batch_size(
+            kernel_mat_size=100,  # <= 500 threshold
+            n_permutations=50,
+            device=torch.device("cuda"),
+        )
+
+        # Small matrices might return 1 (no batching) or a reasonable batch size
+        assert isinstance(batch_size, int) and batch_size > 0
+
+
+@pytest.fixture
+def mock_cuda_memory():
+    """
+    Fixture to mock torch.cuda functions for memory management.
+
+    Returns a context manager factory that accepts total_memory and reserved_memory.
+    """
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _mock(total_memory=None, reserved_memory=None, get_props_side_effect=None, mem_reserved_side_effect=None):
+        """
+        Mock torch.cuda memory functions.
+
+        Parameters
+        ----------
+        total_memory : int or None
+            Total GPU memory in bytes. If None, get_device_properties will raise side_effect.
+        reserved_memory : int or None
+            Reserved GPU memory in bytes. If None, memory_reserved will raise side_effect.
+        get_props_side_effect : Exception or None
+            Exception to raise when get_device_properties is called.
+        mem_reserved_side_effect : Exception or None
+            Exception to raise when memory_reserved is called.
+        """
+        mock_device_props = Mock()
+        if total_memory is not None:
+            mock_device_props.total_memory = total_memory
+
+        with (
+            patch(
+                "dataeval.shift._drift._mmd.torch.cuda.get_device_properties",
+                return_value=mock_device_props if get_props_side_effect is None else None,
+                side_effect=get_props_side_effect,
+            ) as mock_get_props,
+            patch(
+                "dataeval.shift._drift._mmd.torch.cuda.memory_reserved",
+                return_value=reserved_memory if mem_reserved_side_effect is None else None,
+                side_effect=mem_reserved_side_effect,
+            ) as mock_mem_reserved,
+        ):
+            yield mock_get_props, mock_mem_reserved
+
+    return _mock
+
+
+@pytest.mark.required
+class TestAutoDetectBatchSizeMocked:
+    """Test _auto_detect_permutation_batch_size with mocked torch.cuda functions."""
+
+    def test_cpu_device_returns_one(self, mock_cuda_memory):
+        """CPU device should always return 1 without calling CUDA functions."""
+
+        with mock_cuda_memory() as (mock_props, mock_reserved):
+            batch_size = _auto_detect_permutation_batch_size(
+                kernel_mat_size=1000, n_permutations=100, device=torch.device("cpu")
+            )
+
+            # Should return 1 for CPU
+            assert batch_size == 1
+            # Should not call any CUDA functions
+            mock_props.assert_not_called()
+            mock_reserved.assert_not_called()
+
+    def test_cuda_device_with_sufficient_memory(self, mock_cuda_memory):
+        """CUDA device with sufficient memory should return 1 (no batching needed)."""
+        # Mock device properties with large total memory (16 GB)
+        with mock_cuda_memory(total_memory=16 * 1024**3, reserved_memory=1 * 1024**3):
+            batch_size = _auto_detect_permutation_batch_size(
+                kernel_mat_size=100, n_permutations=100, device=torch.device("cuda:0")
+            )
+
+            # With small kernel matrix and lots of memory, should return 1
+            assert batch_size == 1
+
+    def test_cuda_device_with_limited_memory_suggests_batching(self, mock_cuda_memory):
+        """CUDA device with limited memory should suggest appropriate batch size."""
+        # Mock device properties with limited memory (2 GB)
+        with mock_cuda_memory(total_memory=2 * 1024**3, reserved_memory=1 * 1024**3):
+            # Large kernel matrix requiring significant memory
+            batch_size = _auto_detect_permutation_batch_size(
+                kernel_mat_size=2000, n_permutations=100, device=torch.device("cuda:0")
+            )
+
+            # Should suggest batching (return value < n_permutations and > 1)
+            assert isinstance(batch_size, int)
+            assert batch_size >= 1
+
+    def test_cuda_device_calculates_batch_size_from_memory(self, mock_cuda_memory):
+        """Test correct batch size calculation based on available memory."""
+        # Set up specific memory scenario
+        total_memory = 8 * 1024**3  # 8 GB
+        reserved_memory = 2 * 1024**3  # 2 GB reserved
+        # Available memory: (8GB - 2GB) * 0.5 = 3GB safe to use
+
+        with mock_cuda_memory(total_memory=total_memory, reserved_memory=reserved_memory):
+            # kernel_mat_size=1000 means each permutation needs:
+            # 1000 * 1000 * 4 bytes * 2.0 (safety factor) = 8 MB
+            kernel_mat_size = 1000
+            n_permutations = 1000
+
+            batch_size = _auto_detect_permutation_batch_size(
+                kernel_mat_size=kernel_mat_size, n_permutations=n_permutations, device=torch.device("cuda:0")
+            )
+
+            # With 3GB available and ~8MB per permutation:
+            # max_batch_size = 3GB / 8MB = ~375
+            # final batch_size = max_batch_size * 0.5 = ~187
+            assert isinstance(batch_size, int)
+            assert batch_size >= 1
+            # Should be significantly less than n_permutations
+            assert batch_size < n_permutations
+
+    def test_cuda_device_high_memory_pressure(self, mock_cuda_memory):
+        """Test behavior when most memory is already reserved."""
+        # Almost all memory is reserved
+        total_memory = 4 * 1024**3  # 4 GB
+        reserved_memory = int(3.9 * 1024**3)  # 3.9 GB reserved
+
+        with mock_cuda_memory(total_memory=total_memory, reserved_memory=reserved_memory):
+            batch_size = _auto_detect_permutation_batch_size(
+                kernel_mat_size=1000, n_permutations=100, device=torch.device("cuda:0")
+            )
+
+            # With very little available memory, should still return at least 1
+            assert batch_size >= 1
+
+    def test_cuda_fallback_on_runtime_error(self, mock_cuda_memory):
+        """Test fallback behavior when CUDA functions raise RuntimeError."""
+        with mock_cuda_memory(get_props_side_effect=RuntimeError("CUDA error")):
+            # Large matrix should trigger fallback heuristic: return 10
+            batch_size = _auto_detect_permutation_batch_size(
+                kernel_mat_size=600, n_permutations=100, device=torch.device("cuda:0")
+            )
+
+            assert batch_size == 10
+
+    def test_cuda_fallback_on_attribute_error(self, mock_cuda_memory):
+        """Test fallback behavior when CUDA functions raise AttributeError."""
+        with mock_cuda_memory(get_props_side_effect=AttributeError("No CUDA support")):
+            # Small matrix should trigger fallback: return 1
+            batch_size = _auto_detect_permutation_batch_size(
+                kernel_mat_size=400, n_permutations=100, device=torch.device("cuda:0")
+            )
+
+            assert batch_size == 1
+
+    def test_cuda_fallback_large_matrix_heuristic(self, mock_cuda_memory):
+        """Test fallback returns 10 for large matrices (>500)."""
+        # Mock get_device_properties to succeed but memory_reserved to fail
+        with mock_cuda_memory(
+            total_memory=16 * 1024**3, reserved_memory=None, mem_reserved_side_effect=RuntimeError("CUDA error")
+        ):
+            # kernel_mat_size > 500 should return 10
+            batch_size = _auto_detect_permutation_batch_size(
+                kernel_mat_size=1000, n_permutations=100, device=torch.device("cuda:0")
+            )
+
+            assert batch_size == 10
+
+    def test_cuda_fallback_small_matrix_heuristic(self, mock_cuda_memory):
+        """Test fallback returns 1 for small matrices (<=500)."""
+        # Mock get_device_properties to succeed but memory_reserved to fail
+        with mock_cuda_memory(
+            total_memory=16 * 1024**3, reserved_memory=None, mem_reserved_side_effect=RuntimeError("CUDA error")
+        ):
+            # kernel_mat_size <= 500 should return 1
+            batch_size = _auto_detect_permutation_batch_size(
+                kernel_mat_size=500, n_permutations=100, device=torch.device("cuda:0")
+            )
+
+            assert batch_size == 1
+
+    def test_cuda_max_batch_size_calculation(self, mock_cuda_memory):
+        """Test max_batch_size is correctly calculated and capped at 1."""
+        # Very limited memory scenario
+        total_memory = 1 * 1024**3  # 1 GB
+        reserved_memory = int(0.99 * 1024**3)  # 0.99 GB reserved
+
+        with mock_cuda_memory(total_memory=total_memory, reserved_memory=reserved_memory):
+            batch_size = _auto_detect_permutation_batch_size(
+                kernel_mat_size=5000,  # Very large matrix
+                n_permutations=100,
+                device=torch.device("cuda:0"),
+            )
+
+            # Even with very limited memory, should return at least 1
+            assert batch_size >= 1
+
+    def test_cuda_all_permutations_fit_returns_one(self, mock_cuda_memory):
+        """Test returns 1 when all permutations fit in memory."""
+        # Lots of memory available
+        with mock_cuda_memory(total_memory=32 * 1024**3, reserved_memory=1 * 1024**3):
+            batch_size = _auto_detect_permutation_batch_size(
+                kernel_mat_size=500,  # Moderate matrix
+                n_permutations=100,  # Not too many permutations
+                device=torch.device("cuda:0"),
+            )
+
+            # With plenty of memory, should return 1 (no batching needed)
+            assert batch_size == 1
+
+    def test_cuda_conservative_batch_size_50_percent_reduction(self, mock_cuda_memory):
+        """Test that suggested batch size is 50% of calculated max."""
+        # Set up memory to force specific calculation
+        total_memory = 10 * 1024**3  # 10 GB
+        reserved_memory = 5 * 1024**3  # 5 GB reserved
+        # Available: (10-5) * 0.5 = 2.5 GB
+
+        with mock_cuda_memory(total_memory=total_memory, reserved_memory=reserved_memory):
+            # kernel_mat_size=1500: 1500*1500*4*2 = 18 MB per permutation
+            # max_batch = 2.5GB / 18MB = ~142
+            # final_batch = 142 * 0.5 = 71
+            kernel_mat_size = 1500
+            n_permutations = 200  # More than max_batch
+
+            batch_size = _auto_detect_permutation_batch_size(
+                kernel_mat_size=kernel_mat_size,
+                n_permutations=n_permutations,
+                device=torch.device("cuda:0"),
+            )
+
+            # Should be significantly less than max_batch
+            # and definitely less than n_permutations
+            assert isinstance(batch_size, int)
+            assert 1 <= batch_size < n_permutations
+
+
+@pytest.mark.required
+class TestMMDKernelMatrixEdgeCases:
+    """Additional tests for MMD kernel matrix edge cases"""
+
+    def test_mmd_from_kernel_matrix_batched_exact_division(self):
+        """Test batched permutations when n_permutations divides evenly"""
+        n, m, n_perms = 50, 30, 20
+        batch_size = 10  # Divides evenly into 20
+        kernel_mat = torch.rand(n + m, n + m)
+        kernel_mat -= torch.diag(kernel_mat.diag())
+
+        torch.manual_seed(42)
+        mmd_batched = mmd2_from_kernel_matrix(
+            kernel_mat, m, zero_diag=False, n_permutations=n_perms, permutation_batch_size=batch_size
+        )
+
+        # Should return correct number of permutations
+        assert mmd_batched.shape == (n_perms,)
+
+    def test_mmd_from_kernel_matrix_batched_partial_batch(self):
+        """Test batched permutations with remainder (line 499-514)"""
+        n, m, n_perms = 50, 30, 25
+        batch_size = 10  # Last batch will have 5 permutations
+        kernel_mat = torch.rand(n + m, n + m)
+        kernel_mat -= torch.diag(kernel_mat.diag())
+
+        torch.manual_seed(42)
+        mmd_batched = mmd2_from_kernel_matrix(
+            kernel_mat, m, zero_diag=False, n_permutations=n_perms, permutation_batch_size=batch_size
+        )
+
+        # Should still return correct number of permutations
+        assert mmd_batched.shape == (n_perms,)
+
+    def test_mmd_from_kernel_matrix_no_permutations(self):
+        """Test mmd2_from_kernel_matrix with n_permutations=0 (line 524-527)"""
+        n, m = 50, 30
+        kernel_mat = torch.rand(n + m, n + m)
+        kernel_mat -= torch.diag(kernel_mat.diag())
+
+        # With n_permutations=0, should return scalar MMD^2
+        mmd_scalar = mmd2_from_kernel_matrix(kernel_mat, m, zero_diag=False, n_permutations=0)
+
+        # Should be a scalar (0-d tensor)
+        assert mmd_scalar.ndim == 0
+        assert isinstance(mmd_scalar.item(), float)

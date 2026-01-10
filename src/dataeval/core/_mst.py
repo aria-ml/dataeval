@@ -3,7 +3,6 @@
 # Adapted for DataEval by Ryan Wood
 # License: BSD 2-Clause
 
-from __future__ import annotations
 
 __all__ = []
 
