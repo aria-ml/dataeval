@@ -35,7 +35,7 @@ def combine_results(results: CalculationResult | Sequence[CalculationResult]) ->
     return output, dataset_steps
 
 
-def get_dataset_step_from_idx(idx: int, dataset_steps: list[int]) -> tuple[int, int]:
+def get_dataset_step_from_idx(idx: int, dataset_steps: Sequence[int]) -> tuple[int, int]:
     last_step = 0
     for i, step in enumerate(dataset_steps):
         if idx < step:

@@ -11,7 +11,7 @@ from scipy.fftpack import dct
 
 from dataeval.types import Array3D
 from dataeval.utils._array import as_numpy
-from dataeval.utils._image import normalize_image_shape, rescale, resize
+from dataeval.utils._image import normalize_image_shape, resize, to_canonical_grayscale
 
 _logger = logging.getLogger(__name__)
 
@@ -56,14 +56,14 @@ def pchash(image: Array3D[Any]) -> str:
     # Calculates the dimensions of the resized square image
     resize_dim = HASH_SIZE * min((min_dim - 1) // HASH_SIZE, MAX_FACTOR)
 
-    # Normalizes the image to CxHxW and takes the mean over all the channels
-    normalized = np.mean(normalize_image_shape(image_np), axis=0).squeeze()
+    # Normalize the image shape to CxHxW
+    normalized = normalize_image_shape(image_np)
 
-    # Rescales the pixel values to an 8-bit 0-255 image
-    rescaled = rescale(normalized, 8).astype(np.uint8)
+    # Convert to single-channel grayscale image
+    grayscale = to_canonical_grayscale(normalized)
 
     # Resizes the image using the Lanczos algorithm to a square image
-    im = resize(rescaled, resize_dim)
+    im = resize(grayscale, resize_dim)
 
     # Performs discrete cosine transforms to compress the image information and takes the lowest frequency component
     transform = dct(dct(im.T).T)[:HASH_SIZE, :HASH_SIZE]
@@ -71,12 +71,9 @@ def pchash(image: Array3D[Any]) -> str:
     # Encodes the transform as a bit array over the median value
     diff = transform > np.median(transform)
 
-    # Pads the front of the bit array to a multiple of 8 with False
-    padded = np.full(int(np.ceil(diff.size / 8) * 8), False)
-    padded[-diff.size :] = diff.ravel()
-
-    # Converts the bit array to a hex string and strips leading 0s
-    hash_hex = np.packbits(padded).tobytes().hex().lstrip("0")
+    # Convert the bit array to a hex string
+    padded = diff.flatten()
+    hash_hex = np.packbits(padded).tobytes().hex()
     result = hash_hex if hash_hex else "0"
     _logger.debug("Perceptual hash computed: %s", result[:16] + "..." if len(result) > 16 else result)
     return result
