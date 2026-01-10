@@ -103,9 +103,9 @@ class TestOutliers:
             outliers.from_stats([1234])  # type: ignore
 
     def test_outliers_all_false(self):
-        outliers = Outliers(flags=ImageStats(0), per_image=False, per_target=False)
+        outliers = Outliers(flags=ImageStats(0))
         with pytest.raises(ValueError):
-            outliers.evaluate(np.zeros([]))
+            outliers.evaluate(np.zeros([]), per_image=False, per_target=False)
 
     @pytest.mark.parametrize(
         "flags, expected, not_expected",
@@ -128,8 +128,8 @@ class TestOutliers:
         dataset = get_od_dataset(images, 2, True, {0: [(10, 10, 30, 30)], 5: [(20, 20, 40, 40)]})
 
         # Test with per_image=True, per_target=True (default)
-        outliers1 = Outliers(flags=ImageStats.DIMENSION, per_image=True, per_target=True)
-        outliers1.evaluate(dataset)
+        outliers1 = Outliers(flags=ImageStats.DIMENSION)
+        outliers1.evaluate(dataset, per_image=True, per_target=True)
         # Should have both image-level and target-level stats
         source_indices1 = outliers1.stats["source_index"]
         has_image_level = any(idx.target is None for idx in source_indices1)
@@ -137,15 +137,15 @@ class TestOutliers:
         assert has_image_level and has_target_level
 
         # Test with per_image=True, per_target=False
-        outliers2 = Outliers(flags=ImageStats.DIMENSION, per_image=True, per_target=False)
-        outliers2.evaluate(dataset)
+        outliers2 = Outliers(flags=ImageStats.DIMENSION)
+        outliers2.evaluate(dataset, per_image=True, per_target=False)
         # Should have only image-level stats
         source_indices2 = outliers2.stats["source_index"]
         assert all(idx.target is None for idx in source_indices2)
 
         # Test with per_image=False, per_target=True
-        outliers3 = Outliers(flags=ImageStats.DIMENSION, per_image=False, per_target=True)
-        outliers3.evaluate(dataset)
+        outliers3 = Outliers(flags=ImageStats.DIMENSION)
+        outliers3.evaluate(dataset, per_image=False, per_target=True)
         # Should have only target-level stats
         source_indices3 = outliers3.stats["source_index"]
         assert all(idx.target is not None for idx in source_indices3)
@@ -219,8 +219,8 @@ class TestOutliers:
     def test_outliers_target_id_column_dropped_when_per_target_false(self):
         """Test that target_id column is dropped when per_target=False"""
         # Test with per_target=False (image-level only)
-        outliers = Outliers(flags=ImageStats.PIXEL, per_target=False)
-        result = outliers.evaluate(np.random.random((20, 3, 16, 16)))
+        outliers = Outliers(flags=ImageStats.PIXEL)
+        result = outliers.evaluate(np.random.random((20, 3, 16, 16)), per_target=False)
 
         # target_id column should be dropped since per_target=False
         assert "target_id" not in result.issues.columns
@@ -235,8 +235,8 @@ class TestOutliers:
         dataset = get_od_dataset(images, 2, True, {0: [(0, 0, 64, 64)], 5: [(0, 0, 64, 64)]})
 
         # Test with per_target=True (should have target-level stats)
-        outliers = Outliers(flags=ImageStats.DIMENSION, per_image=True, per_target=True)
-        result = outliers.evaluate(dataset)
+        outliers = Outliers(flags=ImageStats.DIMENSION)
+        result = outliers.evaluate(dataset, per_image=True, per_target=True)
 
         # target_id column should be kept since we have target-level outliers
         assert "target_id" in result.issues.columns
