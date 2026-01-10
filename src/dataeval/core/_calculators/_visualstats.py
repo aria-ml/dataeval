@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 __all__ = []
 
 from collections.abc import Callable
@@ -25,7 +23,7 @@ QUARTILES = (0, 25, 50, 75, 100)
 class VisualStatCalculator(Calculator[ImageStats]):
     """Calculator for visual statistics like brightness, contrast, sharpness."""
 
-    def __init__(self, datum: NDArray[Any], cache: CalculatorCache, per_channel: bool = False) -> None:
+    def __init__(self, datum: NDArray[Any], cache: "CalculatorCache", per_channel: bool = False) -> None:
         self.datum = datum
         self.cache = cache
         self.per_channel_mode = per_channel

@@ -1,7 +1,5 @@
 """Core metadata insight functions."""
 
-from __future__ import annotations
-
 __all__ = []
 
 import logging

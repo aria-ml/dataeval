@@ -1,11 +1,10 @@
-from __future__ import annotations
-
 import math
 from typing import Any
 
 import numpy as np
 import polars as pl
 import pytest
+from typing_extensions import Self
 
 from dataeval.shift._drift._chunk import (
     Chunk,
@@ -21,10 +20,10 @@ rng = np.random.default_rng()
 
 
 class MockChunk(Chunk):
-    def __lt__(self, other: MockChunk) -> bool:
+    def __lt__(self, other: Self) -> bool:
         return True
 
-    def __add__(self, other: MockChunk) -> MockChunk:
+    def __add__(self, other: Self) -> Self:
         return other
 
     def dict(self) -> dict[str, Any]:

@@ -5,8 +5,6 @@ This module provides pure algorithmic implementations that operate on
 numpy arrays, independent of dataset abstractions.
 """
 
-from __future__ import annotations
-
 __all__ = []
 
 import logging

@@ -7,6 +7,7 @@ from dataeval.utils._boundingbox import (
     BoundingBoxFormat,
     clip_box,
     is_valid_box,
+    to_bounding_box,
     to_int_box,
 )
 
@@ -155,32 +156,32 @@ class TestBoundingBox:
         mock_valid.return_value = False
         assert bbox.is_clippable() is False
 
-    def test_from_boxlike_bounding_box(self):
+    def test_to_bounding_box_bounding_box(self):
         original = BoundingBox(10, 20, 30, 40)
-        result = BoundingBox.from_boxlike(original)
+        result = to_bounding_box(original)
         assert result is original
 
-    def test_from_boxlike_tuple(self):
-        result = BoundingBox.from_boxlike((10, 20, 30, 40))
+    def test_to_bounding_box_tuple(self):
+        result = to_bounding_box((10, 20, 30, 40))
         assert result.xyxy == (10, 20, 30, 40)
 
-    def test_from_boxlike_list(self):
-        result = BoundingBox.from_boxlike([10, 20, 30, 40])
+    def test_to_bounding_box_list(self):
+        result = to_bounding_box([10, 20, 30, 40])
         assert result.xyxy == (10, 20, 30, 40)
 
-    def test_from_boxlike_iterable(self):
-        result = BoundingBox.from_boxlike(iter([10, 20, 30, 40]))
+    def test_to_bounding_box_iterable(self):
+        result = to_bounding_box(iter([10, 20, 30, 40]))
         assert result.xyxy == (10, 20, 30, 40)
 
-    def test_from_boxlike_image_shape_fallback(self):
-        result = BoundingBox.from_boxlike(None, image_shape=(3, 100, 200))
+    def test_to_bounding_box_image_shape_fallback(self):
+        result = to_bounding_box(None, image_shape=(3, 100, 200))
         assert result.xyxy == (0, 0, 100, 200)
 
-    def test_from_boxlike_invalid_with_warning(self, caplog):
+    def test_to_bounding_box_invalid_with_warning(self, caplog):
         import logging
 
         with caplog.at_level(logging.WARNING):
-            result = BoundingBox.from_boxlike("invalid")  # type: ignore
+            result = to_bounding_box("invalid")  # type: ignore
         assert len([rec for rec in caplog.records if "Invalid bounding box format" in rec.message]) == 1
         assert result.xyxy == (0, 0, 0, 0)
 

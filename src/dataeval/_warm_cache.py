@@ -7,8 +7,6 @@ to disk before running tests in parallel, avoiding redundant compilation overhea
 This is an internal implementation detail and should not be imported by users.
 """
 
-from __future__ import annotations
-
 __all__ = []
 
 

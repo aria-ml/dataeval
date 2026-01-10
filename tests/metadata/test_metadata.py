@@ -441,3 +441,85 @@ class TestMetadata:
 
         # Verify the dimensions match factor_names count
         assert final_binned_shape[1] == len(final_factor_names)
+
+    def test_get_image_factors_not_found(self, get_od_dataset):
+        """Test get_image_factors with non-existent image_idx (line 598)"""
+        images = np.random.random((3, 3, 16, 16))
+        dataset = get_od_dataset(images, 2, True)
+
+        md = Metadata(dataset)
+
+        with pytest.raises(ValueError, match="No image found with index"):
+            md.get_image_factors(999)
+
+    def test_get_target_factors_not_found(self, get_od_dataset):
+        """Test get_target_factors with non-existent indices (line 629)"""
+        images = np.random.random((3, 3, 16, 16))
+        dataset = get_od_dataset(images, 2, True)
+
+        md = Metadata(dataset)
+
+        with pytest.raises(ValueError, match="No target found"):
+            md.get_target_factors(999, 0)
+
+        with pytest.raises(ValueError, match="No target found"):
+            md.get_target_factors(0, 999)
+
+    def test_infer_factor_level_errors(self, get_od_dataset):
+        """Test _infer_factor_level error conditions (lines 777, 783)"""
+        images = np.random.random((5, 3, 16, 16))
+        dataset = get_od_dataset(images, 2, True)
+
+        md = Metadata(dataset)
+
+        with pytest.raises(ValueError, match="All factors must have the same length"):
+            md._infer_factor_level({"a": [1, 2, 3], "b": [1, 2]}, num_image_rows=5, num_target_rows=10)
+
+        with pytest.raises(ValueError, match="different length"):
+            md._infer_factor_level({"a": [1, 2, 3]}, num_image_rows=5, num_target_rows=10)
+
+    def test_validate_factor_lengths_invalid_level(self, get_od_dataset):
+        """Test _validate_factor_lengths with invalid level (line 803)"""
+        images = np.random.random((5, 3, 16, 16))
+        dataset = get_od_dataset(images, 2, True)
+
+        md = Metadata(dataset)
+
+        with pytest.raises(ValueError, match="Invalid level"):
+            md._validate_factor_lengths(
+                {"a": [1, 2, 3]},
+                level="invalid",  # type: ignore
+                num_image_rows=5,
+                num_target_rows=10,
+            )
+
+    def test_filter_by_factor_with_condition(self, get_od_dataset):
+        """Test filter_by_factor returns filtered results (line 1199)"""
+        images = np.random.random((5, 3, 16, 16))
+        metadata = [{"continuous_val": float(i * 10.0), "categorical_val": f"cat_{i}"} for i in range(5)]
+
+        dataset = get_od_dataset(images, 2, True, metadata=metadata)
+
+        md = Metadata(dataset, continuous_factor_bins={"continuous_val": 3})
+
+        # Filter for only continuous factors
+        result = md.filter_by_factor(lambda name, info: info.factor_type == "continuous")
+        assert result.shape[0] >= 5  # At least 5 samples (could be more with targets)
+        assert result.shape[1] >= 1  # At least 1 continuous factor
+
+    def test_calculate_distance_mismatched_factor_names(self, get_od_dataset):
+        """Test calculate_distance with mismatched factor names (line 1240)"""
+        images1 = np.random.random((5, 3, 16, 16))
+        images2 = np.random.random((5, 3, 16, 16))
+
+        metadata1 = [{"factor_a": float(i), "factor_b": float(i * 2)} for i in range(5)]
+        metadata2 = [{"factor_x": float(i), "factor_y": float(i * 2)} for i in range(5)]
+
+        dataset1 = get_od_dataset(images1, 2, True, metadata=metadata1)
+        dataset2 = get_od_dataset(images2, 2, True, metadata=metadata2)
+
+        md1 = Metadata(dataset1, continuous_factor_bins={"factor_a": 3, "factor_b": 3})
+        md2 = Metadata(dataset2, continuous_factor_bins={"factor_x": 3, "factor_y": 3})
+
+        with pytest.raises(ValueError, match="Metadata keys must be identical"):
+            md1.calculate_distance(md2)

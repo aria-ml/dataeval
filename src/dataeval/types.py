@@ -1,7 +1,5 @@
 """Data types used in DataEval."""
 
-from __future__ import annotations
-
 __all__ = [
     "Array1D",
     "Array2D",
@@ -27,6 +25,7 @@ from functools import partial, wraps
 from typing import Any, Generic, NamedTuple, ParamSpec, TypeAlias, TypeVar, overload
 
 import numpy as np
+from typing_extensions import Self
 
 from dataeval import __version__
 from dataeval.protocols import Array, SequenceLike
@@ -101,7 +100,7 @@ class SourceIndex(NamedTuple):
         return "/".join(parts)
 
     @classmethod
-    def from_string(cls, s: str) -> SourceIndex:
+    def from_string(cls, s: str) -> Self:
         """
         Construct a SourceIndex from a human-readable string.
 
@@ -169,8 +168,8 @@ class ExecutionMetadata:
     version: str
 
     @classmethod
-    def empty(cls) -> ExecutionMetadata:
-        return ExecutionMetadata(
+    def empty(cls) -> Self:
+        return cls(
             name="",
             execution_time=datetime.min,
             execution_duration=0.0,

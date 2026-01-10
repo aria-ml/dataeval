@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from dataeval.config import get_seed
 
 __all__ = []

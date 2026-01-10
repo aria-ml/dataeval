@@ -1,7 +1,5 @@
 """Module for flag enums that control function behavior."""
 
-from __future__ import annotations
-
 __all__ = ["ImageStats"]
 
 from enum import Flag, auto

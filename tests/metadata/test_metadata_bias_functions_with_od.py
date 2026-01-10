@@ -7,8 +7,6 @@ handle both Image Classification (IC) and Object Detection (OD) datasets with
 dual-key indexing.
 """
 
-from __future__ import annotations
-
 import numpy as np
 import pytest
 

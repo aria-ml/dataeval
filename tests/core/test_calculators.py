@@ -1215,3 +1215,25 @@ class TestProgressCallback:
 
         # Steps should be 1, 2, 3, ..., 10
         assert callback_calls == list(range(1, 11))
+
+    def test_calculate_with_empty_dataset(self):
+        """Test calculate with empty dataset"""
+        images = []
+        result = calculate(images, None, stats=ImageStats.PIXEL)
+
+        assert result["image_count"] == 0
+        assert len(result["source_index"]) == 0
+        assert len(result["object_count"]) == 0
+        assert len(result["invalid_box_count"]) == 0
+
+    def test_calculate_determine_channel_indices_error(self):
+        """Test _determine_channel_indices raises error for unexpected output (line 190)"""
+        from dataeval.core._calculate import _determine_channel_indices
+
+        # Create calculator output with unexpected number of elements
+        # (not 1 for image-level, not equal to num_channels for per-channel)
+        calculator_output = [{"stat1": [1, 2, 3]}]  # 3 values but image has 1 channel
+        num_channels = 1
+
+        with pytest.raises(ValueError, match="Processor produced"):
+            _determine_channel_indices(calculator_output, num_channels)

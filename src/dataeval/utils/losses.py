@@ -8,8 +8,6 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
-from __future__ import annotations
-
 __all__ = []
 
 import torch

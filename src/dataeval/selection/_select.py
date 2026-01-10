@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 __all__ = []
 
 from collections.abc import Iterator, Sequence
@@ -21,7 +19,7 @@ class SelectionStage(IntEnum):
 class Selection(Generic[_TDatum]):
     stage: SelectionStage
 
-    def __call__(self, dataset: Select[_TDatum]) -> None: ...
+    def __call__(self, dataset: "Select[_TDatum]") -> None: ...
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}({', '.join([f'{k}={v}' for k, v in self.__dict__.items()])})"

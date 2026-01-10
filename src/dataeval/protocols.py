@@ -2,8 +2,6 @@
 Common type protocols used for interoperability with DataEval.
 """
 
-from __future__ import annotations
-
 __all__ = [
     "AnnotatedDataset",
     "Array",
@@ -45,7 +43,7 @@ from typing import (
 import numpy as np
 import torch
 from numpy.typing import NDArray
-from typing_extensions import NotRequired, ReadOnly, Required
+from typing_extensions import NotRequired, ReadOnly, Required, Self
 
 ArrayLike: TypeAlias = np.typing.ArrayLike
 """
@@ -114,7 +112,7 @@ class SequenceLike(Protocol[_T_co]):
     @overload
     def __getitem__(self, key: int, /) -> _T_co: ...
     @overload
-    def __getitem__(self, key: Any, /) -> _T_co | SequenceLike[_T_co]: ...
+    def __getitem__(self, key: Any, /) -> _T_co | Self: ...
     def __iter__(self) -> Iterator[_T_co]: ...
     def __len__(self) -> int: ...
 

@@ -5,14 +5,13 @@ https://github.com/NannyML/nannyml/blob/main/nannyml/thresholds.py
 Licensed under Apache Software License (Apache 2.0)
 """
 
-from __future__ import annotations
-
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any, ClassVar
 
 import numpy as np
+from typing_extensions import Self
 
 
 class Threshold(ABC):
@@ -26,7 +25,7 @@ class Threshold(ABC):
     One or both values might be `None`.
     """
 
-    _registry: ClassVar[dict[str, type[Threshold]]] = {}
+    _registry: ClassVar[dict[str, type[Self]]] = {}
     """Class registry lookup to get threshold subclass from threshold_type string"""
 
     def __str__(self) -> str:
@@ -58,7 +57,7 @@ class Threshold(ABC):
         """
 
     @classmethod
-    def parse_object(cls, obj: dict[str, Any]) -> Threshold:
+    def parse_object(cls, obj: dict[str, Any]) -> Self:
         """Parse object as :class:`Threshold`"""
         class_name = obj.pop("type", "")
 
