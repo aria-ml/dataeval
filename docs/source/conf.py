@@ -204,8 +204,58 @@ def setup(app):
     if nb_execution_mode != "off":
         import os
         import sys
+        from importlib.util import module_from_spec, spec_from_file_location
 
         sys.path.append(os.path.dirname(__file__))
-        import data
 
-        data.download()  # type: ignore
+        # Check if any notebooks need execution before downloading datasets
+        from pathlib import Path
+
+        # Import the cache checking function
+        cache_check_script = Path(__file__).parent.parent / "check_notebook_cache.py"
+        # Read and execute the cache checking logic
+        spec = (
+            spec_from_file_location("check_notebook_cache", cache_check_script) if cache_check_script.exists() else None
+        )
+        cache_module = None if spec is None else module_from_spec(spec)
+        if spec is not None and spec.loader is not None and cache_module is not None:
+            spec.loader.exec_module(cache_module)
+
+            # Check cache status
+            docs_source_dir = Path(__file__).parent
+            needs_execution = []
+            notebooks_dir = docs_source_dir / "notebooks"
+            cache_dir = docs_source_dir / ".jupyter_cache" / "executed"
+
+            if notebooks_dir.exists() and cache_dir.exists():
+                notebooks = sorted(notebooks_dir.glob("*.ipynb"))
+                {p.name for p in cache_dir.iterdir() if p.is_dir()}
+
+                for nb_path in notebooks:
+                    nb_hash = cache_module.compute_notebook_hash(nb_path)
+                    cache_path = cache_dir / nb_hash / "base.ipynb"
+                    if not cache_path.exists():
+                        needs_execution.append(nb_path.name)
+
+                if needs_execution:
+                    print(f"Found {len(needs_execution)} notebook(s) that need execution:")
+                    for nb in needs_execution:
+                        print(f"  - {nb}")
+                    print("Downloading datasets (if not already present)...")
+                    import data
+
+                    data.download()  # type: ignore
+                else:
+                    print("✓ All notebooks are cached, skipping dataset download.")
+            else:
+                # Cache doesn't exist or notebooks not found, download datasets
+                print("Cache not found, downloading datasets...")
+                import data
+
+                data.download()  # type: ignore
+        else:
+            # Fallback: cache check script not found, always download
+            print("Cache check script not found, downloading datasets...")
+            import data
+
+            data.download()  # type: ignore

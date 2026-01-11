@@ -42,6 +42,7 @@ ENV PATH=/${USER}/.venv/bin:${PATH}
 ######################## docs image ########################
 FROM base AS docs
 ARG UID
+COPY --chown=${UID} docs/check_notebook_cache.py docs/check_notebook_cache.py
 COPY --chown=${UID} docs/source/data.py docs/source/data.py
 ARG USER
 RUN python -c "\
