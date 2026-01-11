@@ -65,7 +65,7 @@ def test(session: nox.Session) -> None:
     pytest_args = ["-m", "not cuda"]
     xdist_args = ["-n4", "--dist", "loadfile"]
     cov_args = ["--cov", f"--junitxml=output/junit.{python_version}.xml"]
-    cov_term_args = ["--cov-report", "term"]
+    cov_term_args = ["--cov-report", "term-missing"]
     cov_xml_args = ["--cov-report", f"xml:output/coverage.{python_version}.xml"]
     cov_html_args = ["--cov-report", f"html:output/htmlcov.{python_version}"]
 
