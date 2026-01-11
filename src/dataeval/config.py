@@ -224,7 +224,12 @@ def set_seed(seed: int | None, all_generators: bool = False) -> None:
 
     if all_generators:
         np.random.seed(seed)
-        torch.manual_seed(seed)
+        if seed is not None:
+            torch.manual_seed(seed)
+            torch.cuda.manual_seed_all(seed)
+        else:
+            torch.seed()
+            torch.cuda.seed_all()
 
 
 def get_seed() -> int | None:
