@@ -642,7 +642,7 @@ class UncertaintyFeatureExtractor:
             Uncertainty scores as numpy array of shape (n_samples, 1).
         """
         preds = predict(data, self.model, self.device, self.batch_size, self._apply_transforms)
-        uncertainties = _classifier_uncertainty(preds, self.preds_type)
+        uncertainties = _classifier_uncertainty(preds[0] if isinstance(preds, tuple) else preds, self.preds_type)
         return uncertainties.cpu().numpy()
 
     def __repr__(self) -> str:
