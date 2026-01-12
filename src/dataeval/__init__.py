@@ -5,8 +5,6 @@ datasets to test and train performant, robust, unbiased and reliable AI models a
 shifts that impact performance of deployed models.
 """
 
-from __future__ import annotations
-
 try:
     from ._version import __version__
 except ImportError:  # pragma: no cover

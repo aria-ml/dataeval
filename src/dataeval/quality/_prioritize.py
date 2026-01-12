@@ -5,8 +5,6 @@ This module provides convenient wrappers around core ranking algorithms
 that handle dataset loading and embedding computation.
 """
 
-from __future__ import annotations
-
 __all__ = []
 
 from dataclasses import dataclass
@@ -14,6 +12,7 @@ from typing import Any, Literal
 
 import numpy as np
 from numpy.typing import NDArray
+from typing_extensions import Self
 
 from dataeval import Embeddings, Metadata
 from dataeval.config import DeviceLike, get_device
@@ -145,7 +144,7 @@ class Prioritize:
 
     # Method configuration (returns self for chaining)
 
-    def with_knn(self, k: int | None = None) -> Prioritize:
+    def with_knn(self, k: int | None = None) -> Self:
         """
         Configure k-nearest neighbors ranking method.
 
@@ -172,7 +171,7 @@ class Prioritize:
         self,
         c: int | None = None,
         n_init: int | Literal["auto"] = "auto",
-    ) -> Prioritize:
+    ) -> Self:
         """
         Configure K-means distance ranking method.
 
@@ -203,7 +202,7 @@ class Prioritize:
         self,
         c: int | None = None,
         n_init: int | Literal["auto"] = "auto",
-    ) -> Prioritize:
+    ) -> Self:
         """
         Configure K-means complexity ranking method.
 
@@ -233,7 +232,7 @@ class Prioritize:
 
     # Policy configuration (returns self for chaining)
 
-    def easy_first(self) -> Prioritize:
+    def easy_first(self) -> Self:
         """
         Configure policy to select easy/prototypical samples first.
 
@@ -253,7 +252,7 @@ class Prioritize:
         self._policy_params = {}
         return self
 
-    def hard_first(self) -> Prioritize:
+    def hard_first(self) -> Self:
         """
         Configure policy to select hard/challenging samples first.
 
@@ -273,7 +272,7 @@ class Prioritize:
         self._policy_params = {}
         return self
 
-    def stratified(self, num_bins: int = 50) -> Prioritize:
+    def stratified(self, num_bins: int = 50) -> Self:
         """
         Configure stratified sampling policy across score bins.
 
@@ -301,7 +300,7 @@ class Prioritize:
         self._policy_params = {"num_bins": num_bins}
         return self
 
-    def class_balanced(self, class_labels: NDArray[np.integer[Any]] | None = None) -> Prioritize:
+    def class_balanced(self, class_labels: NDArray[np.integer[Any]] | None = None) -> Self:
         """
         Configure class-balanced selection policy.
 

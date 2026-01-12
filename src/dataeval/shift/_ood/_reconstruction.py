@@ -8,20 +8,18 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
-from __future__ import annotations
-
 __all__ = []
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 import numpy as np
 import torch
 from numpy.typing import NDArray
 
 from dataeval.config import get_device
-from dataeval.protocols import ArrayLike, DeviceLike
+from dataeval.protocols import ArrayLike, DeviceLike, EvidenceLowerBoundLossFn, ReconstructionLossFn
 from dataeval.shift._ood._base import OODOutput, OODScoreOutput
 from dataeval.types import set_metadata
 from dataeval.utils._array import as_numpy, to_numpy
@@ -29,9 +27,6 @@ from dataeval.utils._gmm import gmm_energy
 from dataeval.utils._predict import predict
 from dataeval.utils._train import train
 from dataeval.utils.losses import ELBOLoss
-
-if TYPE_CHECKING:
-    from dataeval.protocols import EvidenceLowerBoundLossFn, ReconstructionLossFn
 
 
 @dataclass

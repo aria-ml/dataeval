@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 import math
 from collections.abc import Iterable
@@ -174,24 +172,6 @@ class BoundingBox:
         """Check if bounding box can be clipped to image bounds."""
         return is_valid_box(clip_box(self.image_hw, self.xyxy_int))
 
-    @classmethod
-    def from_boxlike(cls, boxlike: BoxLike, image_shape: tuple[int, ...] | None = None) -> BoundingBox:
-        if isinstance(boxlike, BoundingBox):
-            return boxlike
-        try:
-            if isinstance(boxlike, tuple | list) and len(boxlike) == 4:
-                return BoundingBox(boxlike[0], boxlike[1], boxlike[2], boxlike[3], image_shape=image_shape)
-            if isinstance(boxlike, Iterable):
-                return BoundingBox(*boxlike, image_shape=image_shape)
-            if isinstance(image_shape, tuple) and len(image_shape) > 2:
-                return BoundingBox(0, 0, image_shape[-2], image_shape[-1], image_shape=image_shape)
-        except (TypeError, ValueError):
-            _logger.warning(
-                f"Invalid bounding box format: {boxlike}. Expected a BoundingBox or a tuple/list of 4 numbers."
-            )
-
-        return BoundingBox(0, 0, 0, 0, image_shape=image_shape)
-
 
 IntBox = tuple[int, int, int, int]
 """Bounding box as tuple of integers in xyxy format."""
@@ -201,6 +181,25 @@ FloatBox = tuple[float, float, float, float]
 
 Box = IntBox | FloatBox
 BoxLike = BoundingBox | Box | Iterable[int | float] | None
+
+
+def to_bounding_box(boxlike: BoxLike, image_shape: tuple[int, ...] | None = None) -> BoundingBox:
+    """
+    Converts a box-like input to a BoundingBox instance.
+    """
+    if isinstance(boxlike, BoundingBox):
+        return boxlike
+    try:
+        if isinstance(boxlike, tuple | list) and len(boxlike) == 4:
+            return BoundingBox(boxlike[0], boxlike[1], boxlike[2], boxlike[3], image_shape=image_shape)
+        if isinstance(boxlike, Iterable):
+            return BoundingBox(*boxlike, image_shape=image_shape)
+        if isinstance(image_shape, tuple) and len(image_shape) > 2:
+            return BoundingBox(0, 0, image_shape[-2], image_shape[-1], image_shape=image_shape)
+    except (TypeError, ValueError):
+        _logger.warning(f"Invalid bounding box format: {boxlike}. Expected a BoundingBox or a tuple/list of 4 numbers.")
+
+    return BoundingBox(0, 0, 0, 0, image_shape=image_shape)
 
 
 def to_int_box(box: Box) -> IntBox:

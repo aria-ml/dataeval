@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import contextlib
 from collections.abc import Iterable, Sequence
-from typing import Any, Literal, TypeVar
+from typing import Any, Literal, TypeVar, cast
 from unittest.mock import Mock
 
 import numpy as np
@@ -244,6 +242,7 @@ def _get_dataset(
     targets_per_image: int | None = None,
     as_float: bool = False,
     override: list[BoxLike] | dict[int, list[BoxLike]] | None = None,
+    metadata: Sequence[dict[str, Any]] | None = None,
 ):
     if images is None or isinstance(images, int):
         images = (images or 10, None, None)
@@ -257,17 +256,26 @@ def _get_dataset(
         if override_dict is not None:
             for i, boxes in override_dict.items():
                 bboxes[i] = boxes
-        return MockODDataset(images, labels, bboxes)
+        return MockODDataset(images, labels, bboxes, metadata=metadata)
     else:
         labels = [0 for _ in range(length)]
-        return MockICDataset(images, labels)
+        return MockICDataset(images, labels, metadata=metadata)
 
 
 def _get_mock_ic_dataset(
     images: NDArray | Sequence[NDArray],
-    labels: Sequence[int],
+    labels: Sequence[int] | Sequence[str],
+    classes: Sequence[str] | None = None,
 ):
-    return MockICDataset(images, labels)
+    # If labels are strings, treat them as class names
+    if labels and isinstance(labels[0], str):
+        # Create a mapping from class names to indices
+        str_labels = cast(Sequence[str], labels)
+        unique_classes: list[str] = list(dict.fromkeys(str_labels))
+        class_to_idx = {cls: idx for idx, cls in enumerate(unique_classes)}
+        int_labels: list[int] = [class_to_idx[label] for label in str_labels]
+        return MockICDataset(images, int_labels, None, unique_classes)
+    return MockICDataset(images, cast(Sequence[int], labels), None, classes)
 
 
 @pytest.fixture

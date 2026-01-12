@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 __all__ = []
 
 from collections.abc import Callable
@@ -19,7 +17,7 @@ if TYPE_CHECKING:
 class HashStatCalculator(Calculator):
     """Calculator for hash-based statistics."""
 
-    def __init__(self, datum: NDArray[Any], cache: CalculatorCache, per_channel: bool = False) -> None:
+    def __init__(self, datum: NDArray[Any], cache: "CalculatorCache", per_channel: bool = False) -> None:
         self.datum = datum
         self.cache = cache
 

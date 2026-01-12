@@ -1,7 +1,5 @@
 """Simple PyTorch model architectures used by DataEval."""
 
-from __future__ import annotations
-
 __all__ = ["AE", "Encoder", "Decoder", "VAE", "VAEEncoder", "VAEDecoder", "GMMDensityNet"]
 
 import math
@@ -9,6 +7,88 @@ from typing import Any
 
 import torch
 import torch.nn as nn
+
+
+class GMMDensityNet(nn.Module):
+    """
+    Gaussian Mixture Model (GMM) density network for converting latent representations
+    to mixture assignment probabilities.
+
+    This network can be appended to AE or VAE models to enable GMM-based OOD detection
+    by producing gamma (mixture assignment probabilities) from the latent representation.
+
+    Parameters
+    ----------
+    latent_dim : int
+        Dimensionality of the latent space (encoding dimension from AE/VAE).
+    n_gmm : int, default 2
+        Number of Gaussian mixture components.
+    hidden_dim : int, default 10
+        Number of hidden units in the dense layer.
+
+    Example
+    -------
+    Creating a VAE with GMM density estimation:
+
+    >>> from dataeval.shift import OODReconstruction
+    >>> from dataeval.utils.models import VAE, GMMDensityNet
+    >>>
+    >>> # Use with OODReconstruction
+    >>> gmm_density_net = GMMDensityNet(latent_dim=256, n_gmm=3)
+    >>> vae_gmm_model = VAE(input_shape=(1, 28, 28), gmm_density_net=gmm_density_net)
+    >>> ood = OODReconstruction(vae_gmm_model, model_type="vae", use_gmm=True)
+
+    Notes
+    -----
+    The network architecture is based on the GMM density network from Alibi-Detect,
+    adapted from TensorFlow to PyTorch. It consists of:
+    - A hidden layer with tanh activation
+    - An output layer with softmax activation to produce valid probability distributions
+    """
+
+    def __init__(
+        self,
+        latent_dim: int,
+        n_gmm: int = 2,
+        hidden_dim: int = 10,
+    ) -> None:
+        super().__init__()
+
+        if n_gmm < 1:
+            raise ValueError(f"n_gmm must be at least 1, got {n_gmm}")
+        if latent_dim < 1:
+            raise ValueError(f"latent_dim must be at least 1, got {latent_dim}")
+        if hidden_dim < 1:
+            raise ValueError(f"hidden_dim must be at least 1, got {hidden_dim}")
+
+        self.latent_dim = latent_dim
+        self.n_gmm = n_gmm
+        self.hidden_dim = hidden_dim
+
+        self.network: nn.Module = nn.Sequential(
+            nn.Linear(latent_dim, hidden_dim),
+            nn.Tanh(),
+            nn.Linear(hidden_dim, n_gmm),
+            nn.Softmax(dim=-1),
+        )
+
+    def forward(self, z: torch.Tensor) -> torch.Tensor:
+        """
+        Convert latent representation to mixture assignment probabilities.
+
+        Parameters
+        ----------
+        z : torch.Tensor
+            Latent representation with shape (batch_size, latent_dim).
+
+        Returns
+        -------
+        torch.Tensor
+            Mixture assignment probabilities (gamma) with shape (batch_size, n_gmm).
+            Each row sums to 1.0 and represents the probability distribution over
+            mixture components for that sample.
+        """
+        return self.network(z)
 
 
 class Encoder(nn.Module):
@@ -455,85 +535,3 @@ class VAE(nn.Module):
             return recon, mu, gamma
 
         return recon, mu, logvar
-
-
-class GMMDensityNet(nn.Module):
-    """
-    Gaussian Mixture Model (GMM) density network for converting latent representations
-    to mixture assignment probabilities.
-
-    This network can be appended to AE or VAE models to enable GMM-based OOD detection
-    by producing gamma (mixture assignment probabilities) from the latent representation.
-
-    Parameters
-    ----------
-    latent_dim : int
-        Dimensionality of the latent space (encoding dimension from AE/VAE).
-    n_gmm : int, default 2
-        Number of Gaussian mixture components.
-    hidden_dim : int, default 10
-        Number of hidden units in the dense layer.
-
-    Example
-    -------
-    Creating a VAE with GMM density estimation:
-
-    >>> from dataeval.shift import OODReconstruction
-    >>> from dataeval.utils.models import VAE, GMMDensityNet
-    >>>
-    >>> # Use with OODReconstruction
-    >>> gmm_density_net = GMMDensityNet(latent_dim=256, n_gmm=3)
-    >>> vae_gmm_model = VAE(input_shape=(1, 28, 28), gmm_density_net=gmm_density_net)
-    >>> ood = OODReconstruction(vae_gmm_model, model_type="vae", use_gmm=True)
-
-    Notes
-    -----
-    The network architecture is based on the GMM density network from Alibi-Detect,
-    adapted from TensorFlow to PyTorch. It consists of:
-    - A hidden layer with tanh activation
-    - An output layer with softmax activation to produce valid probability distributions
-    """
-
-    def __init__(
-        self,
-        latent_dim: int,
-        n_gmm: int = 2,
-        hidden_dim: int = 10,
-    ) -> None:
-        super().__init__()
-
-        if n_gmm < 1:
-            raise ValueError(f"n_gmm must be at least 1, got {n_gmm}")
-        if latent_dim < 1:
-            raise ValueError(f"latent_dim must be at least 1, got {latent_dim}")
-        if hidden_dim < 1:
-            raise ValueError(f"hidden_dim must be at least 1, got {hidden_dim}")
-
-        self.latent_dim = latent_dim
-        self.n_gmm = n_gmm
-        self.hidden_dim = hidden_dim
-
-        self.network: nn.Module = nn.Sequential(
-            nn.Linear(latent_dim, hidden_dim),
-            nn.Tanh(),
-            nn.Linear(hidden_dim, n_gmm),
-            nn.Softmax(dim=-1),
-        )
-
-    def forward(self, z: torch.Tensor) -> torch.Tensor:
-        """
-        Convert latent representation to mixture assignment probabilities.
-
-        Parameters
-        ----------
-        z : torch.Tensor
-            Latent representation with shape (batch_size, latent_dim).
-
-        Returns
-        -------
-        torch.Tensor
-            Mixture assignment probabilities (gamma) with shape (batch_size, n_gmm).
-            Each row sums to 1.0 and represents the probability distribution over
-            mixture components for that sample.
-        """
-        return self.network(z)

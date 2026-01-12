@@ -1,12 +1,9 @@
-from __future__ import annotations
-
 __all__ = []
 
 from enum import Flag
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    from dataeval.core._calculators._base import Calculator
+from dataeval.core._calculators._base import Calculator
 
 
 class CalculatorRegistry:

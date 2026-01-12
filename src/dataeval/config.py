@@ -2,8 +2,6 @@
 Global configuration settings for DataEval.
 """
 
-from __future__ import annotations
-
 __all__ = [
     "get_device",
     "set_device",

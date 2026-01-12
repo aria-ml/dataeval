@@ -644,3 +644,68 @@ class TestOutliersOutput:
         assert "Total" in result.columns
         assert result["class_name"].dtype == pl.Categorical("lexical")
         assert result["Total"].dtype == pl.UInt32
+
+
+@pytest.mark.required
+class TestOutliersCoverageImprovements:
+    """Additional tests to improve coverage in _outliers.py"""
+
+    def test_outliers_get_outliers_with_no_outliers_found(self):
+        """Test _get_outliers when no outliers are detected (line 509)"""
+        # Create data with very small variation (no outliers expected)
+        images = np.ones((20, 3, 16, 16)) * 0.5
+        # Add tiny variation to avoid completely constant data
+        images += np.random.random(images.shape) * 0.001
+
+        outliers = Outliers(outlier_method="zscore", outlier_threshold=3.0)
+        result = outliers.evaluate(images)
+
+        # Should return empty DataFrame with correct schema
+        assert isinstance(result.issues, pl.DataFrame)
+        assert "item_id" in result.issues.columns
+        assert "metric_name" in result.issues.columns
+        assert "metric_value" in result.issues.columns
+
+    def test_outliers_evaluate_with_per_target_false_no_boxes(self):
+        """Test evaluate with no boxes (line 461-509, 851)"""
+        images = np.random.random((10, 3, 16, 16))
+        images[5] = 1.0  # Make one image an outlier
+
+        outliers = Outliers(
+            flags=ImageStats.PIXEL,
+            outlier_method="zscore",
+            outlier_threshold=2.0,
+        )
+
+        result = outliers.evaluate(images)
+
+        assert result is not None
+
+        # Should have image-level stats only
+        assert len(outliers.stats["source_index"]) > 0
+        # All source indices should have target=None (no boxes in input)
+        assert all(idx.target is None for idx in outliers.stats["source_index"])
+
+    def test_outliers_from_stats_with_empty_result(self):
+        """Test from_stats when no outliers are found (line 606-641)"""
+        # Create data with no outliers
+        images1 = np.ones((20, 3, 16, 16)) * 0.5
+        images2 = np.ones((20, 3, 16, 16)) * 0.5
+        images1 += np.random.random(images1.shape) * 0.001
+        images2 += np.random.random(images2.shape) * 0.001
+
+        stats1 = calculate(images1, None, ImageStats.PIXEL)
+        stats2 = calculate(images2, None, ImageStats.PIXEL)
+
+        outliers = Outliers(outlier_method="zscore", outlier_threshold=5.0)  # Very high threshold
+        result = outliers.from_stats([stats1, stats2])
+
+        # Should return list of DataFrames
+        assert isinstance(result.issues, list)
+        assert len(result.issues) == 2
+
+        # Check that empty DataFrames have correct schema
+        for df in result.issues:
+            assert "item_id" in df.columns
+            assert "metric_name" in df.columns
+            assert "metric_value" in df.columns

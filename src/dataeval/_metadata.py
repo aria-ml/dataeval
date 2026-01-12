@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 __all__ = []
 
 import logging
@@ -10,6 +8,7 @@ from typing import Any, Literal
 import numpy as np
 import polars as pl
 from numpy.typing import NDArray
+from typing_extensions import Self
 
 from dataeval.core._bin import bin_data, digitize_data, is_continuous
 from dataeval.core._feature_distance import FeatureDistanceResult, feature_distance
@@ -1202,7 +1201,7 @@ class Metadata:
         filtered = [name for name, info in self.factor_info.items() if condition(name, info)]
         return self.dataframe[filtered].to_numpy().astype(np.float64)
 
-    def calculate_distance(self, other: Metadata) -> Mapping[str, FeatureDistanceResult]:
+    def calculate_distance(self, other: Self) -> Mapping[str, FeatureDistanceResult]:
         """Measures the feature-wise distance between two continuous metadata distributions and
         computes a p-value to evaluate its significance.
 

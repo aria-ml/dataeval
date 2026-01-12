@@ -8,8 +8,6 @@ https://github.com/NannyML/nannyml/blob/main/nannyml/base.py
 Licensed under Apache Software License (Apache 2.0)
 """
 
-from __future__ import annotations
-
 __all__ = []
 
 import copy
@@ -24,6 +22,7 @@ from lightgbm import LGBMClassifier
 from numpy.typing import ArrayLike, NDArray
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold
+from typing_extensions import Self
 
 from dataeval.config import get_max_processes, get_seed
 from dataeval.shift._drift._chunk import Chunk, Chunker, CountBasedChunker, SizeBasedChunker
@@ -97,7 +96,7 @@ class DriftMVDCOutput(Output[pl.DataFrame]):
         """Return the number of rows in the results."""
         return 0 if self.empty else len(self._data)
 
-    def filter(self, period: str = "all", metrics: str | None = None) -> DriftMVDCOutput:
+    def filter(self, period: str = "all", metrics: str | None = None) -> Self:
         """Filter results by period and optionally by metric.
 
         Parameters
@@ -177,7 +176,7 @@ class _DomainClassifierCalculator:
         self.hyperparameters = DEFAULT_LGBM_HYPERPARAMS if hyperparameters is None else hyperparameters
         self.threshold = threshold
 
-    def fit(self, reference_data: pl.DataFrame) -> _DomainClassifierCalculator:
+    def fit(self, reference_data: pl.DataFrame) -> Self:
         """Train the calculator using reference data."""
         self.n_features = _validate(reference_data)
         self._logger.debug(f"fitting {str(self)}")
@@ -339,7 +338,7 @@ class DriftMVDC:
             threshold=ConstantThreshold(lower=self.threshold[0], upper=self.threshold[1]),
         )
 
-    def fit(self, x_ref: ArrayLike) -> DriftMVDC:
+    def fit(self, x_ref: ArrayLike) -> Self:
         """
         Fit the domain classifier on the training dataframe
 

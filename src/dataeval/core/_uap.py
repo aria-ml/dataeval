@@ -4,8 +4,6 @@ FR Test Statistic based estimate for the :term:`upper-bound
 average precision<Upper-Bound Average Precision (UAP)>` using empirical mean precision
 """
 
-from __future__ import annotations
-
 __all__ = []
 
 import logging

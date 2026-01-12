@@ -7,8 +7,6 @@ https://github.com/NannyML/nannyml/blob/main/nannyml/chunk.py
 Licensed under Apache Software License (Apache 2.0)
 """
 
-from __future__ import annotations
-
 import copy
 import logging
 from abc import ABC, abstractmethod
@@ -16,6 +14,7 @@ from collections.abc import Sequence
 from typing import Any, Generic, Literal, TypeVar
 
 import polars as pl
+from typing_extensions import Self
 
 _logger = logging.getLogger(__name__)
 
@@ -79,10 +78,10 @@ class IndexChunk(Chunk):
         self.start_index: int = start_index
         self.end_index: int = end_index
 
-    def __lt__(self, other: IndexChunk) -> bool:
+    def __lt__(self, other: Self) -> bool:
         return self.end_index < other.start_index
 
-    def __add__(self, other: IndexChunk) -> IndexChunk:
+    def __add__(self, other: Self) -> Self:
         a, b = (self, other) if self < other else (other, self)
         result = copy.deepcopy(a)
         result.data = pl.concat([a.data, b.data])
@@ -117,10 +116,10 @@ class PeriodChunk(Chunk):
         self.end_datetime = period.end_time
         self.chunk_size = chunk_size
 
-    def __lt__(self, other: PeriodChunk) -> bool:
+    def __lt__(self, other: Self) -> bool:
         return self.start_datetime < other.start_datetime
 
-    def __add__(self, other: PeriodChunk) -> PeriodChunk:
+    def __add__(self, other: Self) -> Self:
         a, b = (self, other) if self < other else (other, self)
         result = copy.deepcopy(a)
         result.data = pl.concat([a.data, b.data])

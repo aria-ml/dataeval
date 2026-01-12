@@ -2,8 +2,6 @@
 Utility functions that help organize raw metadata.
 """
 
-from __future__ import annotations
-
 __all__ = ["merge", "flatten"]
 
 import logging

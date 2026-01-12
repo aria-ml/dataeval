@@ -5,8 +5,6 @@ This module provides feature extraction implementations that convert various
 data types (datasets, embeddings, metadata) into arrays suitable for drift detection.
 """
 
-from __future__ import annotations
-
 __all__ = []
 
 
