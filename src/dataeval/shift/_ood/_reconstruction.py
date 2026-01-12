@@ -19,7 +19,7 @@ import torch
 from numpy.typing import NDArray
 from scipy.stats import norm
 
-from dataeval.config import EPSILON, get_device
+from dataeval.config import get_device
 from dataeval.protocols import ArrayLike, DeviceLike, EvidenceLowerBoundLossFn, ReconstructionLossFn
 from dataeval.shift._ood._base import OODOutput, OODScoreOutput
 from dataeval.types import set_metadata
@@ -152,7 +152,12 @@ def gmm_params(z: torch.Tensor, gamma: torch.Tensor) -> GaussianMixtureModelPara
 
     # cholesky decomposition of covariance and determinant derivation
     D = cov.shape[1]
-    L = torch.linalg.cholesky(cov + torch.eye(D) * EPSILON)  # K x D x D
+    # Use adaptive epsilon that scales with covariance magnitude to ensure numerical stability
+    # For high-dimensional spaces or collapsed latent dimensions, a larger epsilon is needed
+    # Use the maximum diagonal element as a reference scale, with a minimum of 1e-6
+    max_diag = torch.max(torch.diagonal(cov, dim1=-2, dim2=-1))
+    adaptive_epsilon = torch.maximum(max_diag * 1e-6, torch.tensor(1e-6))
+    L = torch.linalg.cholesky(cov + torch.eye(D) * adaptive_epsilon)  # K x D x D
     log_det_cov = 2.0 * torch.sum(torch.log(torch.diagonal(L, dim1=-2, dim2=-1)), 1)  # K
 
     return GaussianMixtureModelParams(phi, mu, cov, L, log_det_cov)
@@ -293,8 +298,6 @@ class OODReconstruction:
         self._gmm_energy_ref_std: float | None = None  # Std GMM energy on reference data
         self._recon_ref_mean: float | None = None  # Mean reconstruction error on reference data
         self._recon_ref_std: float | None = None  # Std reconstruction error on reference data
-        self._z_mean: torch.Tensor | None = None  # Mean of latent representations for normalization
-        self._z_std: torch.Tensor | None = None  # Std of latent representations for normalization
         self._ref_score: OODScoreOutput
         self._threshold_perc: float
         self._data_info: tuple[tuple, type] | None = None
@@ -411,32 +414,6 @@ class OODReconstruction:
                 "Consider using nn.Softmax(dim=-1) as the final layer of your GMM density network."
             )
 
-    def _normalize_z(self, z: torch.Tensor, fit: bool = False) -> torch.Tensor:
-        """
-        Normalize latent representations to prevent numerical issues in GMM covariance computation.
-
-        Parameters
-        ----------
-        z : torch.Tensor
-            Latent representations to normalize.
-        fit : bool, default False
-            If True, compute and store normalization statistics. If False, use stored statistics.
-
-        Returns
-        -------
-        torch.Tensor
-            Normalized latent representations with zero mean and unit variance.
-        """
-        if fit:
-            # Compute and store normalization statistics
-            self._z_mean = z.mean(dim=0, keepdim=True)
-            self._z_std = z.std(dim=0, keepdim=True) + 1e-8  # Add epsilon to prevent division by zero
-
-        if self._z_mean is None or self._z_std is None:
-            raise RuntimeError("Normalization statistics not computed. Call _normalize_z with fit=True first.")
-
-        return (z - self._z_mean) / self._z_std
-
     def fit(
         self,
         x_ref: ArrayLike,
@@ -549,13 +526,10 @@ class OODReconstruction:
             # Expected: (reconstruction, z, gamma)
             z = model_output[1].detach()
             gamma = model_output[2].detach()
+            self._gmm_params = gmm_params(z, gamma)
 
-            # Normalize z to prevent numerical issues in covariance computation
-            z_normalized = self._normalize_z(z, fit=True)
-            self._gmm_params = gmm_params(z_normalized, gamma)
-
-            # Compute GMM energy statistics on reference data using normalized z
-            ref_gmm_energy, _ = gmm_energy(z_normalized, self._gmm_params, return_mean=False)
+            # Compute GMM energy statistics on reference data
+            ref_gmm_energy, _ = gmm_energy(z, self._gmm_params, return_mean=False)
             ref_gmm_energy_np = ref_gmm_energy.detach().cpu().numpy()
             self._gmm_energy_ref_mean = float(ref_gmm_energy_np.mean())
             self._gmm_energy_ref_std = float(ref_gmm_energy_np.std())
@@ -679,9 +653,7 @@ class OODReconstruction:
             # Extract latent representation (second element of tuple)
             if isinstance(model_output, tuple) and len(model_output) >= 2:
                 z = model_output[1].detach()
-                # Normalize z using the same statistics from training
-                z_normalized = self._normalize_z(z, fit=False)
-                gmm_energy_score, _ = gmm_energy(z_normalized, self._gmm_params, return_mean=False)
+                gmm_energy_score, _ = gmm_energy(z, self._gmm_params, return_mean=False)
                 gmm_energy_np = gmm_energy_score.detach().cpu().numpy()
 
                 # Get configuration parameters
