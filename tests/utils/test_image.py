@@ -9,6 +9,8 @@ from dataeval.utils._image import (
     get_bitdepth,
     normalize_image_shape,
     rescale,
+    resize,
+    to_canonical_grayscale,
 )
 
 
@@ -102,3 +104,68 @@ class TestClipAndPad:
     def test_outside(self, image):
         result = clip_and_pad(image, BoundingBox(-5.5, -5.4, -2.1, -2.6).xyxy_int)
         assert np.isnan(result).all()
+
+
+@pytest.mark.required
+class TestToCanonicalGrayscale:
+    """Tests for to_canonical_grayscale function."""
+
+    def test_single_channel(self):
+        """Test conversion from 1-channel image."""
+        image = np.random.randint(0, 256, (1, 28, 28)).astype(np.uint8)
+        result = to_canonical_grayscale(image)
+        assert result.shape == (28, 28)
+        np.testing.assert_array_equal(result, image[0])
+
+    def test_rgb_conversion(self):
+        """Test conversion from 3-channel RGB image."""
+        image = np.random.randint(0, 256, (3, 28, 28)).astype(np.uint8)
+        result = to_canonical_grayscale(image)
+        assert result.shape == (28, 28)
+        assert result.dtype == np.uint8
+
+    def test_rgba_to_grayscale(self):
+        """Test conversion from 4-channel RGBA image (line 159-189)."""
+        # Create RGBA image with mostly opaque pixels (high alpha)
+        image = np.random.randint(0, 256, (4, 28, 28)).astype(np.uint8)
+        image[3] = 255  # Make alpha channel fully opaque
+        result = to_canonical_grayscale(image)
+        assert result.shape == (28, 28)
+        assert result.dtype == np.uint8
+
+    def test_cmyk_to_grayscale(self):
+        """Test conversion from 4-channel CMYK image (line 159-189)."""
+        # Create CMYK-like image with high variance in K channel
+        image = np.random.randint(0, 256, (4, 28, 28)).astype(np.uint8)
+        # Make K channel (4th) have high variance and mid-range mean
+        image[3] = np.random.randint(40, 215, (28, 28)).astype(np.uint8)
+        result = to_canonical_grayscale(image)
+        assert result.shape == (28, 28)
+        assert result.dtype == np.uint8
+
+    def test_arbitrary_channels(self):
+        """Test conversion from image with arbitrary channels (line 191-193)."""
+        # 5-channel image
+        image = np.random.randint(0, 256, (5, 28, 28)).astype(np.uint8)
+        result = to_canonical_grayscale(image)
+        assert result.shape == (28, 28)
+        assert result.dtype == np.uint8
+
+
+@pytest.mark.required
+class TestResize:
+    """Tests for resize function."""
+
+    def test_resize_with_pil(self):
+        """Test resizing with PIL (line 123-124)."""
+        image = np.random.randint(0, 256, (28, 28)).astype(np.uint8)
+        result = resize(image, 64, use_pil=True)
+        assert result.shape == (64, 64)
+        assert result.dtype == np.uint8
+
+    def test_resize_without_pil(self):
+        """Test resizing without PIL using scipy (line 126-127)."""
+        image = np.random.randint(0, 256, (28, 28)).astype(np.uint8)
+        result = resize(image, 64, use_pil=False)
+        assert result.shape == (64, 64)
+        assert result.dtype == np.uint8

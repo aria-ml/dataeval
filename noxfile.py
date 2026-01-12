@@ -92,12 +92,6 @@ def test(session: nox.Session) -> None:
     session.run("mv", ".coverage", f"output/.coverage.{python_version}", external=True)
 
 
-@nox_uv.session
-def unit(session: nox.Session) -> None:
-    """Alias for `test` session."""
-    test(session)
-
-
 @nox_uv.session(uv_groups=["type"], uv_extras=["cpu"])
 def type(session: nox.Session) -> None:  # noqa: A001
     """Run type checks and verify external types. Specify version using `nox -P {version} -e type`."""

@@ -22,8 +22,6 @@ Adapted from fast_hdbscan python module:
 Adapted for DataEval by Ryan Wood based on boruvka.py
 """
 
-from __future__ import annotations
-
 __all__ = []
 
 import numba

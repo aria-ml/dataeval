@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 __all__ = []
 
 import logging
@@ -8,7 +6,7 @@ from dataclasses import dataclass
 from enum import Flag
 from functools import cached_property, partial
 from itertools import zip_longest
-from typing import Any, TypedDict, cast, get_type_hints
+from typing import Any, TypedDict, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -25,7 +23,7 @@ from dataeval.protocols import (
     ProgressCallback,
 )
 from dataeval.types import SourceIndex
-from dataeval.utils._boundingbox import BoundingBox, BoxLike
+from dataeval.utils._boundingbox import BoundingBox, BoxLike, to_bounding_box
 from dataeval.utils._image import clip_and_pad, normalize_image_shape, rescale
 from dataeval.utils._multiprocessing import PoolWrapper
 from dataeval.utils._unzip_dataset import unzip_dataset
@@ -61,21 +59,6 @@ class CalculationResult(TypedDict):
     invalid_box_count: Sequence[int]
     image_count: int
     stats: Mapping[str, NDArray[Any]]
-
-
-def as_calculation_result(obj: dict[str, Any]) -> CalculationResult | None:
-    if not isinstance(obj, dict):
-        return None
-
-    type_hints = get_type_hints(CalculationResult)
-
-    for key, expected_type in type_hints.items():
-        if key not in obj:
-            return None
-        if not isinstance(obj[key], expected_type):
-            return None
-
-    return cast(CalculationResult, obj)
 
 
 @dataclass
@@ -326,7 +309,7 @@ def _enumerate(
             if image is None:
                 continue
             np_image = np.asarray(image)
-            bboxes = [BoundingBox.from_boxlike(b, image_shape=np_image.shape) for b in box or ()]
+            bboxes = [to_bounding_box(b, image_shape=np_image.shape) for b in box or ()]
             yield i, np_image, bboxes
 
 
@@ -468,7 +451,7 @@ def calculate(
 
     isObjectDetectionDataset: bool = False
 
-    if isinstance(data, Dataset) and isinstance(data[0], tuple):
+    if isinstance(data, Dataset) and len(data) > 0 and isinstance(data[0], tuple):
         datum = cast(tuple, data[0])
         if len(datum) == 3:
             isObjectDetectionDataset = isinstance(datum[1], ObjectDetectionTarget)

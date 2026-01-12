@@ -3,8 +3,6 @@ Update strategies inform how the :term:`drift<Drift>` detector classes update th
 for drift.
 """
 
-from __future__ import annotations
-
 __all__ = []
 
 

@@ -1,7 +1,5 @@
 """doctest fixtures"""
 
-from __future__ import annotations
-
 import pathlib
 import sys
 from collections.abc import Mapping, Sequence
@@ -13,6 +11,7 @@ import polars as pl
 import pytest
 import sklearn.datasets as dsets
 import torch
+from typing_extensions import Self
 
 from dataeval._metadata import FactorInfo, Metadata
 from dataeval.config import set_batch_size, set_seed
@@ -503,11 +502,11 @@ class ExampleDataset:
     def __len__(self) -> int:
         return self.n_samples
 
-    def __getitem__(self, idx: int | slice) -> tuple[Any, Any, dict[str, Any]] | ExampleDataset:
+    def __getitem__(self, idx: int | slice) -> tuple[Any, Any, dict[str, Any]] | Self:
         if isinstance(idx, slice):
             # Return a new dataset with sliced data
             start, stop, step = idx.indices(self.n_samples)
-            sliced = ExampleDataset.__new__(ExampleDataset)
+            sliced = self.__class__.__new__(self.__class__)
             sliced.n_samples = len(range(start, stop, step))
             sliced.image_shape = self.image_shape
             sliced.n_classes = self.n_classes

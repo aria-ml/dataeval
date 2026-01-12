@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 __all__ = []
 
 import logging
@@ -14,6 +12,7 @@ import torch
 import xxhash as xxh
 from numpy.typing import NDArray
 from torch.utils.data import DataLoader, Subset
+from typing_extensions import Self
 
 from dataeval.config import get_batch_size, get_device
 from dataeval.protocols import (
@@ -323,7 +322,7 @@ class Embeddings(Array):
         arr = np.vstack([self[i] for i in indices]) if indices is not None else self[:]
         return torch.from_numpy(arr).to(self.device)
 
-    def new(self, dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike]) -> Embeddings:
+    def new(self, dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike]) -> Self:
         """
         Create new Embeddings instance with a different dataset.
 
@@ -347,7 +346,7 @@ class Embeddings(Array):
         """
         if self._embeddings_only:
             raise ValueError("Embeddings object does not have a model.")
-        return Embeddings(
+        return self.__class__(
             dataset,
             self.batch_size,
             self._transforms,
@@ -361,7 +360,7 @@ class Embeddings(Array):
         )
 
     @classmethod
-    def from_array(cls, array: ArrayLike) -> Embeddings:
+    def from_array(cls, array: ArrayLike) -> Self:
         """
         Create Embeddings instance from an existing array.
 
@@ -391,14 +390,14 @@ class Embeddings(Array):
         >>> print(embeddings.shape)
         (100, 512)
         """
-        embeddings = Embeddings([], 0, None, None, None, False, None, None, 0.8)
+        embeddings = cls([], 0, None, None, None, False, None, None, 0.8)
         embeddings._embeddings = array if isinstance(array, np.ndarray) else as_numpy(array)
         embeddings._cached_idx = set(range(len(embeddings._embeddings)))
         embeddings._embeddings_only = True
         return embeddings
 
     @classmethod
-    def load(cls, path: Path | str, mmap_mode: Literal["r", "r+", "w+", "c"] | None = None) -> Embeddings:
+    def load(cls, path: Path | str, mmap_mode: Literal["r", "r+", "w+", "c"] | None = None) -> Self:
         """
         Load embeddings from a saved .npy file.
 
@@ -487,7 +486,7 @@ class Embeddings(Array):
             np.save(target_path, self._embeddings)
             _logger.debug(f"Saved embeddings to {target_path}")
 
-    def compute(self, force: bool = False) -> Embeddings:
+    def compute(self, force: bool = False) -> Self:
         """
         Compute and cache all embeddings.
 
