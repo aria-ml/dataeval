@@ -14,9 +14,9 @@ from dataeval.core._calculate import CalculationResult, calculate
 from dataeval.core._clusterer import ClusterResult, ClusterStats, compute_cluster_stats
 from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset
+from dataeval.quality._results import StatsMap, combine_results, get_dataset_step_from_idx
 from dataeval.types import ArrayND, Output, SourceIndex, set_metadata
-from dataeval.utils._array import flatten, to_numpy
-from dataeval.utils._stats import StatsMap, combine_results, get_dataset_step_from_idx
+from dataeval.utils.arrays import flatten_samples, to_numpy
 
 TDataFrame = TypeVar("TDataFrame", pl.DataFrame, Sequence[pl.DataFrame])
 
@@ -682,7 +682,7 @@ class Outliers:
         - 3.0-3.5: Permissive (fewer outliers)
         """
         # Convert embeddings to numpy array and flatten if needed
-        embeddings_array = flatten(to_numpy(embeddings))
+        embeddings_array = flatten_samples(to_numpy(embeddings))
 
         # Compute cluster statistics
         cluster_stats = compute_cluster_stats(

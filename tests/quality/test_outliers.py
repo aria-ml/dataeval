@@ -11,6 +11,7 @@ from dataeval.core._clusterer import ClusterResult
 from dataeval.core._label_stats import LabelStatsResult
 from dataeval.flags import ImageStats
 from dataeval.quality._outliers import Outliers, OutliersOutput, _get_outlier_mask
+from dataeval.utils.data import unzip_dataset
 
 
 def make_mock_metadata(lstat: LabelStatsResult) -> MagicMock:
@@ -69,7 +70,6 @@ class TestOutliers:
         images = images / 2.0
         images[10] = 1.0
         dataset = get_od_dataset(images, 2, True, {10: [(-5, -5, -1, -1), (1, 1, 5, 5)]})
-        from dataeval.utils import unzip_dataset
 
         with use_max_processes(1):
             stats = calculate(

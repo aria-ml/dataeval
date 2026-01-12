@@ -8,7 +8,7 @@ from numpy.typing import NDArray
 
 from dataeval.protocols import Array, ObjectDetectionDatum, ObjectDetectionTarget, SegmentationDatum, SegmentationTarget
 from dataeval.selection._select import Select, Selection, SelectionStage, Subselection
-from dataeval.utils._array import as_numpy
+from dataeval.utils.arrays import as_numpy
 
 
 class ClassFilter(Selection[Any]):

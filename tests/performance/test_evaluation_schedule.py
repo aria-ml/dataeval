@@ -65,11 +65,11 @@ class TestGeometricSchedule:
         assert steps.dtype == np.intp
 
 
-class TestCustomSchedule:
+class TestManualSchedule:
     """Test custom evaluation point schedule."""
 
     def test_accepts_single_int(self):
-        """Verify CustomSchedule handles single integer."""
+        """Verify ManualSchedule handles single integer."""
         schedule = ManualSchedule(50)
         steps = schedule.get_steps(dataset_length=100)
 
@@ -77,7 +77,7 @@ class TestCustomSchedule:
         assert steps[0] == 50
 
     def test_accepts_list(self):
-        """Verify CustomSchedule handles list of ints."""
+        """Verify ManualSchedule handles list of ints."""
         schedule = ManualSchedule([10, 20, 50, 100])
         steps = schedule.get_steps(dataset_length=100)
 
@@ -85,7 +85,7 @@ class TestCustomSchedule:
         assert_array_equal(steps, [10, 20, 50, 100])
 
     def test_accepts_numpy_array(self):
-        """Verify CustomSchedule handles numpy array."""
+        """Verify ManualSchedule handles numpy array."""
         schedule = ManualSchedule(np.array([5, 15, 25]))
         steps = schedule.get_steps(dataset_length=100)
 
@@ -93,7 +93,7 @@ class TestCustomSchedule:
         assert_array_equal(steps, [5, 15, 25])
 
     def test_accepts_iterable(self):
-        """Verify CustomSchedule handles any iterable."""
+        """Verify ManualSchedule handles any iterable."""
         schedule = ManualSchedule(range(10, 101, 10))
         steps = schedule.get_steps(dataset_length=100)
 
@@ -102,7 +102,7 @@ class TestCustomSchedule:
         assert steps[-1] == 100
 
     def test_rejects_non_numeric(self):
-        """Verify CustomSchedule validates input types."""
+        """Verify ManualSchedule validates input types."""
 
         # Mainly verifies call to `to_numpy`
         with pytest.raises(ValueError, match="invalid literal"):

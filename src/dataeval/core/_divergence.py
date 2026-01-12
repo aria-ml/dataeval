@@ -12,7 +12,7 @@ from typing import TypedDict
 import numpy as np
 
 from dataeval.types import ArrayND
-from dataeval.utils._array import as_numpy
+from dataeval.utils.arrays import as_numpy
 
 _logger = logging.getLogger(__name__)
 

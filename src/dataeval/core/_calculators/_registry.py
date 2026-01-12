@@ -59,13 +59,10 @@ class CalculatorRegistry:
         """
         flag_type = type(flags)
 
-        if flag_type not in cls._registry:
-            return []
-
         # dict == poor man's ordered set
         result: dict[tuple[type[Calculator[Any]], Flag], None] = {}
 
-        for calculator_class in cls._registry[flag_type]:
+        for calculator_class in cls._registry.get(flag_type, []):
             # Create a temporary instance to query applicable flags
             # We use __new__ to avoid needing constructor args
             temp_instance = calculator_class.__new__(calculator_class)

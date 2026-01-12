@@ -3,9 +3,8 @@ import pytest
 import torch
 
 from dataeval.config import get_device
-from dataeval.utils._predict import predict
-from dataeval.utils._train import train
 from dataeval.utils.models import AE
+from dataeval.utils.training import predict, train
 
 model = AE((1, 16, 16))
 

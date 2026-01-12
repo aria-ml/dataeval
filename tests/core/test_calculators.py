@@ -8,7 +8,7 @@ from dataeval.core._calculate import CalculatorCache
 from dataeval.core._calculators._dimensionstats import DimensionStatCalculator
 from dataeval.core._calculators._hashstats import HashStatCalculator
 from dataeval.flags import ImageStats
-from dataeval.utils._boundingbox import BoundingBox
+from dataeval.utils.preprocessing import BoundingBox
 
 
 class TestPixelStats:
@@ -827,9 +827,6 @@ class TestImageClassificationDataset:
 
         dataset = get_mock_ic_dataset(images, labels)
 
-        # Even though boxes are provided, they should be ignored since dataset is IC
-        from dataeval.utils._boundingbox import BoundingBox
-
         boxes = [
             [BoundingBox(0, 0, 50, 50, image_shape=(3, 100, 100))],
             [BoundingBox(25, 25, 75, 75, image_shape=(3, 100, 100))],
@@ -1051,9 +1048,6 @@ class TestObjectDetectionDataset:
         ]
 
         dataset = get_mock_od_dataset(images, labels, bboxes_dataset)
-
-        # Override with different boxes via parameter
-        from dataeval.utils._boundingbox import BoundingBox
 
         boxes_override = [
             [BoundingBox(5, 5, 25, 25, image_shape=(3, 100, 100))],
