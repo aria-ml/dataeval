@@ -15,7 +15,7 @@ from sklearn.neighbors import NearestNeighbors
 
 from dataeval.config import get_max_processes
 from dataeval.types import ArrayND
-from dataeval.utils._array import as_numpy, flatten
+from dataeval.utils.arrays import as_numpy, flatten_samples
 
 _logger = logging.getLogger(__name__)
 
@@ -296,7 +296,7 @@ def minimum_spanning_tree(embeddings: ArrayND[float], k: int = 15) -> MSTResult:
     """
     _logger.info("Starting minimum_spanning_tree calculation with k=%d", k)
 
-    embeddings_np = flatten(embeddings)
+    embeddings_np = flatten_samples(embeddings)
     _logger.debug("Embeddings shape: %s", embeddings_np.shape)
 
     # Get k-nearest neighbors and build MST
@@ -402,9 +402,9 @@ def compute_neighbors(
     if algorithm not in ["auto", "ball_tree", "kd_tree"]:
         raise ValueError("Algorithm must be 'auto', 'ball_tree', or 'kd_tree'")
 
-    data_fit = flatten(data_fit)
+    data_fit = flatten_samples(data_fit)
     if data_query is not None:
-        data_query = flatten(data_query)
+        data_query = flatten_samples(data_query)
 
     # Note: exclude_self=True handles the case where data_query and data_fit may overlap
     # but we want neighbors from data_fit, not self-matches

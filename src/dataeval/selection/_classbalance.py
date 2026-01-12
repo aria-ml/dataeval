@@ -9,7 +9,7 @@ from dataeval.config import get_seed
 from dataeval.core._label_stats import label_stats
 from dataeval.protocols import AnnotatedDataset, Array, ObjectDetectionTarget, SegmentationTarget
 from dataeval.selection._select import Select, Selection, SelectionStage
-from dataeval.utils._array import as_numpy
+from dataeval.utils.arrays import as_numpy
 
 
 class ClassBalance(Selection[Any]):

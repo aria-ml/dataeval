@@ -9,7 +9,7 @@ from numpy.typing import NDArray
 from scipy.spatial.distance import pdist, squareform
 
 from dataeval.types import Array2D
-from dataeval.utils._array import as_numpy, ensure_embeddings, flatten
+from dataeval.utils.arrays import as_numpy, ensure_embeddings, flatten_samples
 
 _logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ def _validate_inputs(embeddings: NDArray[np.float64], num_observations: int) -> 
 
 
 def _calculate_critical_value_radii(embeddings: NDArray[np.float64], num_observations: int) -> NDArray[np.float64]:
-    embeddings_matrix = squareform(pdist(flatten(embeddings))).astype(np.float64)
+    embeddings_matrix = squareform(pdist(flatten_samples(embeddings))).astype(np.float64)
     sorted_dists = np.sort(embeddings_matrix, axis=1)
     return sorted_dists[:, num_observations]
 

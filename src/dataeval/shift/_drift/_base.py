@@ -20,7 +20,7 @@ from numpy.typing import NDArray
 
 from dataeval.protocols import Array, FeatureExtractor, UpdateStrategy
 from dataeval.types import DictOutput, set_metadata
-from dataeval.utils._array import flatten
+from dataeval.utils.arrays import flatten_samples
 
 R = TypeVar("R")
 
@@ -252,7 +252,7 @@ class BaseDrift:
         if self.feature_extractor is not None:
             data = self.feature_extractor(data)
 
-        return flatten(np.asarray(data, dtype=np.float32))
+        return flatten_samples(np.asarray(data, dtype=np.float32))
 
 
 class BaseDriftUnivariate(BaseDrift):

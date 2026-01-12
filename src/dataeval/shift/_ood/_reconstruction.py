@@ -12,21 +12,22 @@ __all__ = []
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, TypeVar
 
 import numpy as np
 import torch
 from numpy.typing import NDArray
+from scipy.stats import norm
 
-from dataeval.config import get_device
+from dataeval.config import EPSILON, get_device
 from dataeval.protocols import ArrayLike, DeviceLike, EvidenceLowerBoundLossFn, ReconstructionLossFn
 from dataeval.shift._ood._base import OODOutput, OODScoreOutput
 from dataeval.types import set_metadata
-from dataeval.utils._array import as_numpy, to_numpy
-from dataeval.utils._gmm import gmm_energy
-from dataeval.utils._predict import predict
-from dataeval.utils._train import train
+from dataeval.utils.arrays import as_numpy, to_numpy
 from dataeval.utils.losses import ELBOLoss
+from dataeval.utils.training import predict, train
+
+TGMMData = TypeVar("TGMMData")
 
 
 @dataclass
@@ -94,6 +95,109 @@ class OODReconstructionConfig:
     threshold_perc: float = 95.0
     gmm_weight: float = 0.5
     gmm_score_mode: Literal["standardized", "percentile"] = "standardized"
+
+
+@dataclass
+class GaussianMixtureModelParams:
+    """
+    phi : torch.Tensor
+        Mixture component distribution weights.
+    mu : torch.Tensor
+        Mixture means.
+    cov : torch.Tensor
+        Mixture covariance.
+    L : torch.Tensor
+        Cholesky decomposition of `cov`.
+    log_det_cov : torch.Tensor
+        Log of the determinant of `cov`.
+    """
+
+    phi: torch.Tensor
+    mu: torch.Tensor
+    cov: torch.Tensor
+    L: torch.Tensor
+    log_det_cov: torch.Tensor
+
+
+def gmm_params(z: torch.Tensor, gamma: torch.Tensor) -> GaussianMixtureModelParams:
+    """
+    Compute parameters of Gaussian Mixture Model.
+
+    Parameters
+    ----------
+    z : torch.Tensor
+        Observations.
+    gamma : torch.Tensor
+        Mixture probabilities to derive mixture distribution weights from.
+
+    Returns
+    -------
+    GaussianMixtureModelParams(phi, mu, cov, L, log_det_cov)
+        The parameters used to calculate energy.
+    """
+
+    # compute gmm parameters phi, mu and cov
+    N = gamma.shape[0]  # nb of samples in batch
+    sum_gamma = torch.sum(gamma, 0)  # K
+    phi = sum_gamma / N  # K
+    # K x D (D = latent_dim)
+    mu = torch.sum(torch.unsqueeze(gamma, -1) * torch.unsqueeze(z, 1), 0) / torch.unsqueeze(sum_gamma, -1)
+    z_mu = torch.unsqueeze(z, 1) - torch.unsqueeze(mu, 0)  # N x K x D
+    z_mu_outer = torch.unsqueeze(z_mu, -1) * torch.unsqueeze(z_mu, -2)  # N x K x D x D
+
+    # K x D x D
+    cov = torch.sum(torch.unsqueeze(torch.unsqueeze(gamma, -1), -1) * z_mu_outer, 0) / torch.unsqueeze(
+        torch.unsqueeze(sum_gamma, -1), -1
+    )
+
+    # cholesky decomposition of covariance and determinant derivation
+    D = cov.shape[1]
+    L = torch.linalg.cholesky(cov + torch.eye(D) * EPSILON)  # K x D x D
+    log_det_cov = 2.0 * torch.sum(torch.log(torch.diagonal(L, dim1=-2, dim2=-1)), 1)  # K
+
+    return GaussianMixtureModelParams(phi, mu, cov, L, log_det_cov)
+
+
+def gmm_energy(
+    z: torch.Tensor,
+    params: GaussianMixtureModelParams,
+    return_mean: bool = True,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Compute sample energy from Gaussian Mixture Model.
+
+    Parameters
+    ----------
+    params : GaussianMixtureModelParams
+        The gaussian mixture model parameters.
+    return_mean : bool, default True
+        Take mean across all sample energies in a batch.
+
+    Returns
+    -------
+    sample_energy
+        The sample energy of the GMM.
+    cov_diag
+        The inverse sum of the diagonal components of the covariance matrix.
+    """
+    D = params.cov.shape[1]
+    z_mu = torch.unsqueeze(z, 1) - torch.unsqueeze(params.mu, 0)  # N x K x D
+    z_mu_T = torch.permute(z_mu, dims=[1, 2, 0])  # K x D x N
+    v = torch.linalg.solve_triangular(params.L, z_mu_T, upper=False)  # K x D x D
+
+    # rewrite sample energy in logsumexp format for numerical stability
+    logits = torch.log(torch.unsqueeze(params.phi, -1)) - 0.5 * (
+        torch.sum(torch.square(v), 1) + float(D) * np.log(2.0 * np.pi) + torch.unsqueeze(params.log_det_cov, -1)
+    )  # K x N
+    sample_energy = -torch.logsumexp(logits, 0)  # N
+
+    if return_mean:
+        sample_energy = torch.mean(sample_energy)
+
+    # inverse sum of variances
+    cov_diag = torch.sum(torch.divide(torch.tensor(1), torch.diagonal(params.cov, dim1=-2, dim2=-1)))
+
+    return sample_energy, cov_diag
 
 
 class OODReconstruction:
@@ -189,6 +293,8 @@ class OODReconstruction:
         self._gmm_energy_ref_std: float | None = None  # Std GMM energy on reference data
         self._recon_ref_mean: float | None = None  # Mean reconstruction error on reference data
         self._recon_ref_std: float | None = None  # Std reconstruction error on reference data
+        self._z_mean: torch.Tensor | None = None  # Mean of latent representations for normalization
+        self._z_std: torch.Tensor | None = None  # Std of latent representations for normalization
         self._ref_score: OODScoreOutput
         self._threshold_perc: float
         self._data_info: tuple[tuple, type] | None = None
@@ -305,6 +411,32 @@ class OODReconstruction:
                 "Consider using nn.Softmax(dim=-1) as the final layer of your GMM density network."
             )
 
+    def _normalize_z(self, z: torch.Tensor, fit: bool = False) -> torch.Tensor:
+        """
+        Normalize latent representations to prevent numerical issues in GMM covariance computation.
+
+        Parameters
+        ----------
+        z : torch.Tensor
+            Latent representations to normalize.
+        fit : bool, default False
+            If True, compute and store normalization statistics. If False, use stored statistics.
+
+        Returns
+        -------
+        torch.Tensor
+            Normalized latent representations with zero mean and unit variance.
+        """
+        if fit:
+            # Compute and store normalization statistics
+            self._z_mean = z.mean(dim=0, keepdim=True)
+            self._z_std = z.std(dim=0, keepdim=True) + 1e-8  # Add epsilon to prevent division by zero
+
+        if self._z_mean is None or self._z_std is None:
+            raise RuntimeError("Normalization statistics not computed. Call _normalize_z with fit=True first.")
+
+        return (z - self._z_mean) / self._z_std
+
     def fit(
         self,
         x_ref: ArrayLike,
@@ -411,18 +543,19 @@ class OODReconstruction:
 
         # If using GMM, compute GMM parameters after training but BEFORE computing threshold
         if self.use_gmm:
-            from dataeval.utils._gmm import gmm_params
-
             x_ref_np = to_numpy(x_ref).astype(np.float32)
             model_output = predict(x_ref_np, self.model, batch_size=batch_size)
 
             # Expected: (reconstruction, z, gamma)
             z = model_output[1].detach()
             gamma = model_output[2].detach()
-            self._gmm_params = gmm_params(z, gamma)
 
-            # Compute GMM energy statistics on reference data
-            ref_gmm_energy, _ = gmm_energy(z, self._gmm_params, return_mean=False)
+            # Normalize z to prevent numerical issues in covariance computation
+            z_normalized = self._normalize_z(z, fit=True)
+            self._gmm_params = gmm_params(z_normalized, gamma)
+
+            # Compute GMM energy statistics on reference data using normalized z
+            ref_gmm_energy, _ = gmm_energy(z_normalized, self._gmm_params, return_mean=False)
             ref_gmm_energy_np = ref_gmm_energy.detach().cpu().numpy()
             self._gmm_energy_ref_mean = float(ref_gmm_energy_np.mean())
             self._gmm_energy_ref_std = float(ref_gmm_energy_np.std())
@@ -493,8 +626,6 @@ class OODReconstruction:
         NDArray
             Combined scores as probability of being OOD.
         """
-        from scipy.stats import norm
-
         # Reconstruction percentile
         recon_mean = self._recon_ref_mean if self._recon_ref_mean is not None else recon_scores.mean()
         recon_std = self._recon_ref_std if self._recon_ref_std is not None else (recon_scores.std() + 1e-10)
@@ -548,7 +679,9 @@ class OODReconstruction:
             # Extract latent representation (second element of tuple)
             if isinstance(model_output, tuple) and len(model_output) >= 2:
                 z = model_output[1].detach()
-                gmm_energy_score, _ = gmm_energy(z, self._gmm_params, return_mean=False)
+                # Normalize z using the same statistics from training
+                z_normalized = self._normalize_z(z, fit=False)
+                gmm_energy_score, _ = gmm_energy(z_normalized, self._gmm_params, return_mean=False)
                 gmm_energy_np = gmm_energy_score.detach().cpu().numpy()
 
                 # Get configuration parameters

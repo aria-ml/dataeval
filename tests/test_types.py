@@ -1,6 +1,8 @@
 """Tests for dataeval.types module."""
 
-from dataeval.types import SourceIndex
+import pytest
+
+from dataeval.types import MappingOutput, SequenceOutput, SourceIndex
 
 
 class TestSourceIndex:
@@ -61,3 +63,78 @@ class TestSourceIndex:
         # Test with non-SourceIndex
         assert si1 != "5/2/1"
         assert si1 != 5
+
+    def test_from_string_item_only(self):
+        """Test from_string with only item."""
+        si = SourceIndex.from_string("0")
+        assert si == SourceIndex(0)
+
+    def test_from_string_with_target(self):
+        """Test from_string with item and target."""
+        si = SourceIndex.from_string("0/3")
+        assert si == SourceIndex(0, 3)
+
+    def test_from_string_with_none_target(self):
+        """Test from_string with item, None target, and channel (line 134)."""
+        si = SourceIndex.from_string("0/-/1")
+        assert si == SourceIndex(0, None, 1)
+
+    def test_from_string_with_all_fields(self):
+        """Test from_string with item, target, and channel."""
+        si = SourceIndex.from_string("0/3/1")
+        assert si == SourceIndex(0, 3, 1)
+
+    def test_from_string_with_none_channel(self):
+        """Test from_string with item, target, and None channel (line 136)."""
+        si = SourceIndex.from_string("0/3/-")
+        assert si == SourceIndex(0, 3, None)
+
+    def test_from_string_invalid_too_many_parts(self):
+        """Test from_string with too many parts (line 137-138)."""
+        with pytest.raises(ValueError, match="Invalid SourceIndex string format"):
+            SourceIndex.from_string("0/1/2/3")
+
+
+class TestMappingOutput:
+    """Tests for MappingOutput class."""
+
+    def test_getitem(self):
+        """Test __getitem__ method (line 247)."""
+        data = {"a": 1, "b": 2, "c": 3}
+        output = MappingOutput(data)
+        assert output["a"] == 1
+        assert output["b"] == 2
+        assert output["c"] == 3
+
+    def test_iter(self):
+        """Test __iter__ method (line 250)."""
+        data = {"a": 1, "b": 2, "c": 3}
+        output = MappingOutput(data)
+        keys = list(output)
+        assert keys == ["a", "b", "c"]
+
+
+class TestSequenceOutput:
+    """Tests for SequenceOutput class."""
+
+    def test_getitem_int(self):
+        """Test __getitem__ with int index (line 263)."""
+        data = [10, 20, 30, 40]
+        output = SequenceOutput(data)
+        assert output[0] == 10
+        assert output[2] == 30
+        assert output[-1] == 40
+
+    def test_getitem_slice(self):
+        """Test __getitem__ with slice (line 263)."""
+        data = [10, 20, 30, 40]
+        output = SequenceOutput(data)
+        assert output[1:3] == [20, 30]
+        assert output[:2] == [10, 20]
+
+    def test_iter(self):
+        """Test __iter__ method (line 266)."""
+        data = [10, 20, 30, 40]
+        output = SequenceOutput(data)
+        result = list(output)
+        assert result == [10, 20, 30, 40]

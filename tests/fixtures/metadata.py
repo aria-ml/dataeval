@@ -1,7 +1,7 @@
 import pytest
 
 from dataeval import Metadata
-from dataeval.utils._merge import merge
+from dataeval.utils.data import merge_metadata
 from tests.conftest import to_metadata
 
 BIG_SAMPLES_COUNT = 1000
@@ -22,7 +22,7 @@ def metadata_ref_big(RNG) -> Metadata:
     metadata = {k: X[:, i].tolist() for i, k in enumerate(BIG_FEATURE_NAMES)}
 
     MD = to_metadata(
-        merge([metadata]),
+        merge_metadata([metadata]),
         class_labels=range(1000),
         continuous_factor_bins={k: len(v) for k, v in metadata.items()},
     )
@@ -50,7 +50,7 @@ def metadata_tst_big(RNG) -> Metadata:
     metadata_tst = {k: X[:, i].tolist() for i, k in enumerate(BIG_FEATURE_NAMES)}
 
     MD = to_metadata(
-        merge([metadata_tst]),
+        merge_metadata([metadata_tst]),
         class_labels=range(1000),
         continuous_factor_bins={k: len(v) for k, v in metadata_tst.items()},
     )

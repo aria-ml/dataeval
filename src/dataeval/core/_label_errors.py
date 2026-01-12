@@ -7,7 +7,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.core._mst import compute_neighbor_distances
-from dataeval.utils._array import flatten
+from dataeval.utils.arrays import flatten_samples
 
 _logger = logging.getLogger(__name__)
 
@@ -211,7 +211,7 @@ def label_errors(embeddings: NDArray[Any], labels: NDArray[np.int64], k: int = 5
     """
     _logger.info("Starting label class distance ratio calculation with k=%d", k)
 
-    embeddings_np = flatten(embeddings)
+    embeddings_np = flatten_samples(embeddings)
     _logger.debug("Embeddings shape: %s", embeddings_np.shape)
 
     # Get label_scores and rank them
