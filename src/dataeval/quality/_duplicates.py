@@ -11,8 +11,8 @@ from dataeval.core._calculate import CalculationResult, calculate
 from dataeval.core._clusterer import ClusterResult
 from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset
+from dataeval.quality._results import StatsMap, combine_results, get_dataset_step_from_idx
 from dataeval.types import DictOutput, SourceIndex, set_metadata
-from dataeval.utils._stats import StatsMap, combine_results, get_dataset_step_from_idx
 
 
 class DatasetItemTuple(NamedTuple):

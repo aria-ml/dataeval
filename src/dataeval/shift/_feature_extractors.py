@@ -21,8 +21,8 @@ from dataeval.config import get_batch_size, get_device
 from dataeval.core import calculate
 from dataeval.flags import ImageStats
 from dataeval.protocols import Array, DeviceLike, Transform
-from dataeval.utils._array import as_numpy
-from dataeval.utils._predict import predict
+from dataeval.utils.arrays import as_numpy
+from dataeval.utils.training import predict
 
 
 def _classifier_uncertainty(

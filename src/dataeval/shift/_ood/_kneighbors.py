@@ -8,7 +8,7 @@ from dataeval.config import get_max_processes
 from dataeval.protocols import Array, ArrayLike
 from dataeval.shift._ood._base import OODOutput, OODScoreOutput
 from dataeval.types import set_metadata
-from dataeval.utils._array import as_numpy, to_numpy
+from dataeval.utils.arrays import as_numpy, to_numpy
 
 
 class OODKNeighbors:

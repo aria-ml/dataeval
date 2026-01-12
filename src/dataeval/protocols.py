@@ -582,7 +582,7 @@ class UpdateStrategy(Protocol):
 
     >>> import numpy as np
     >>> from numpy.typing import NDArray
-    >>> from dataeval.utils._array import flatten
+    >>> from dataeval.utils.arrays import flatten_samples
     >>>
     >>> class MovingAverageUpdate:
     ...     '''Update strategy that maintains a moving average of reference data.'''
@@ -615,7 +615,7 @@ class UpdateStrategy(Protocol):
     ...         NDArray[np.float32]
     ...             Updated reference data of shape (n_updated, n_features)
     ...         '''
-    ...         x_new_flat = flatten(x_new)
+    ...         x_new_flat = flatten_samples(x_new)
     ...         # Compute moving average for overlapping samples
     ...         n_overlap = min(len(x_ref), len(x_new_flat))
     ...         if n_overlap > 0:

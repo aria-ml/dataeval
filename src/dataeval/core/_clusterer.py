@@ -8,7 +8,7 @@ from numpy.typing import NDArray
 
 from dataeval.core._mst import compute_neighbor_distances, minimum_spanning_tree_edges
 from dataeval.types import ArrayND
-from dataeval.utils._array import flatten, to_numpy
+from dataeval.utils.arrays import flatten_samples, to_numpy
 
 _logger = logging.getLogger(__name__)
 
@@ -242,8 +242,8 @@ def cluster(
     cluster_selection_epsilon = 0.0
     # cluster_selection_method = "eom"
 
-    x: NDArray[Any] = flatten(to_numpy(embeddings))
-    samples, features = x.shape  # Due to flatten(), we know shape has a length of 2
+    x: NDArray[Any] = flatten_samples(to_numpy(embeddings))
+    samples, features = x.shape  # Due to flatten_samples(), we know shape has a length of 2
 
     _logger.debug("Input embeddings shape after flattening: (%d samples, %d features)", samples, features)
 

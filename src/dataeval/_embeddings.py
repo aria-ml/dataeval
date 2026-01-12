@@ -26,7 +26,7 @@ from dataeval.protocols import (
     ProgressCallback,
     Transform,
 )
-from dataeval.utils._array import as_numpy, flatten
+from dataeval.utils.arrays import as_numpy, flatten_samples
 
 _logger = logging.getLogger(__name__)
 
@@ -124,7 +124,7 @@ class Embeddings(Array):
             target_layer.register_forward_hook(self._hook_fn)
             _logger.log(logging.DEBUG, f"Capturing {'output' if use_output else 'input'} data from layer {layer_name}.")
 
-        self._model = model.to(self.device).eval() if isinstance(model, torch.nn.Module) else flatten
+        self._model = model.to(self.device).eval() if isinstance(model, torch.nn.Module) else flatten_samples
 
         self._cached_idx: set[int] = set()
         self._embeddings: np.ndarray | np.memmap = np.empty((0,))

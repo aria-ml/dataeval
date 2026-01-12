@@ -1,12 +1,19 @@
-"""Tests for GMMDensityNet model."""
-
 import pytest
 import torch
-import torch.nn as nn
 
-from dataeval.utils.models import VAE, GMMDensityNet
+from dataeval.utils.models import AE, VAE, GMMDensityNet
 
 
+@pytest.mark.required
+class TestAE:
+    def test_encode_output_shape(self):
+        ae = AE(input_shape=(1, 32, 32))
+        images = torch.ones(size=[1, 1, 32, 32])
+        encoded = ae.encoder(images)
+        assert encoded.shape == (1, 256)
+
+
+@pytest.mark.required
 class TestGMMDensityNet:
     """Test suite for GMMDensityNet."""
 
@@ -80,7 +87,7 @@ class TestGMMDensityNet:
     def test_integration_with_vae(self):
         """Test integration of GMMDensityNet with VAE model."""
 
-        class VAE_GMM(nn.Module):
+        class VAE_GMM(torch.nn.Module):
             """VAE with GMM density estimation."""
 
             def __init__(self, input_shape, latent_dim=None, n_gmm=2):

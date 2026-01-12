@@ -9,7 +9,7 @@ from scipy.stats import mode
 
 from dataeval.config import EPSILON
 from dataeval.types import Array1D, ArrayND
-from dataeval.utils._array import as_numpy
+from dataeval.utils.arrays import as_numpy
 
 _logger = logging.getLogger(__name__)
 

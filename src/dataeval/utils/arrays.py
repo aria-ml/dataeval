@@ -1,4 +1,16 @@
-__all__ = []
+"""
+Utility functions for array conversion and manipulation across different frameworks.
+"""
+
+__all__ = [
+    "as_numpy",
+    "to_numpy",
+    "opt_as_numpy",
+    "opt_to_numpy",
+    "flatten_samples",
+    "ensure_embeddings",
+    "rescale_array",
+]
 
 import logging
 from collections.abc import Iterable, Iterator
@@ -42,6 +54,25 @@ def opt_as_numpy(
     required_ndim: int | Iterable[int] | None = None,
     required_shape: tuple[int, ...] | None = None,
 ) -> NDArray[_np_dtype] | None:
+    """
+    Converts an ArrayLike to Numpy array without copying (if possible), returns None if input is None.
+
+    Parameters
+    ----------
+    array : ArrayLike or SequenceLike or None
+        Input array-like object or None
+    dtype : numpy dtype or None, default None
+        Desired output dtype
+    required_ndim : int or Iterable[int] or None, default None
+        Required number of dimensions (or set of valid dimensions)
+    required_shape : tuple[int, ...] or None, default None
+        Required shape of output
+
+    Returns
+    -------
+    NDArray or None
+        NumPy array or None if input was None
+    """
     return opt_to_numpy(array, dtype=dtype, required_ndim=required_ndim, required_shape=required_shape, copy=False)
 
 
@@ -53,6 +84,27 @@ def opt_to_numpy(
     required_shape: tuple[int, ...] | None = None,
     copy: bool = True,
 ) -> NDArray[_np_dtype] | None:
+    """
+    Converts an ArrayLike to Numpy array, returns None if input is None.
+
+    Parameters
+    ----------
+    array : ArrayLike or SequenceLike or None
+        Input array-like object or None
+    dtype : numpy dtype or None, default None
+        Desired output dtype
+    required_ndim : int or Iterable[int] or None, default None
+        Required number of dimensions (or set of valid dimensions)
+    required_shape : tuple[int, ...] or None, default None
+        Required shape of output
+    copy : bool, default True
+        Whether to copy the array
+
+    Returns
+    -------
+    NDArray or None
+        NumPy array or None if input was None
+    """
     return (
         None
         if array is None
@@ -67,7 +119,25 @@ def as_numpy(
     required_ndim: int | Iterable[int] | None = None,
     required_shape: tuple[int, ...] | None = None,
 ) -> NDArray[_np_dtype]:
-    """Converts an ArrayLike to Numpy array without copying (if possible)"""
+    """
+    Converts an ArrayLike to Numpy array without copying (if possible).
+
+    Parameters
+    ----------
+    array : ArrayLike or SequenceLike or None
+        Input array-like object
+    dtype : numpy dtype or None, default None
+        Desired output dtype
+    required_ndim : int or Iterable[int] or None, default None
+        Required number of dimensions (or set of valid dimensions)
+    required_shape : tuple[int, ...] or None, default None
+        Required shape of output
+
+    Returns
+    -------
+    NDArray
+        NumPy array
+    """
     return to_numpy(array, dtype=dtype, required_ndim=required_ndim, required_shape=required_shape, copy=False)
 
 
@@ -79,7 +149,32 @@ def to_numpy(
     required_shape: tuple[int, ...] | None = None,
     copy: bool = True,
 ) -> NDArray[_np_dtype]:
-    """Converts an ArrayLike to new Numpy array"""
+    """
+    Converts an ArrayLike to new Numpy array.
+
+    Parameters
+    ----------
+    array : ArrayLike or SequenceLike or None
+        Input array-like object
+    dtype : numpy dtype or None, default None
+        Desired output dtype
+    required_ndim : int or Iterable[int] or None, default None
+        Required number of dimensions (or set of valid dimensions)
+    required_shape : tuple[int, ...] or None, default None
+        Required shape of output
+    copy : bool, default True
+        Whether to copy the array
+
+    Returns
+    -------
+    NDArray
+        NumPy array
+
+    Raises
+    ------
+    ValueError
+        If required_ndim or required_shape constraints are not met
+    """
     _array: NDArray[_np_dtype] | None = None
 
     if array is None:
@@ -114,7 +209,19 @@ def to_numpy(
 
 
 def to_numpy_iter(iterable: Iterable[ArrayLike]) -> Iterator[NDArray[Any]]:
-    """Yields an iterator of numpy arrays from an ArrayLike"""
+    """
+    Yields an iterator of numpy arrays from an ArrayLike iterable.
+
+    Parameters
+    ----------
+    iterable : Iterable[ArrayLike]
+        Iterable of array-like objects
+
+    Yields
+    ------
+    NDArray
+        NumPy arrays
+    """
     for array in iterable:
         yield to_numpy(array)
 
@@ -124,7 +231,24 @@ def rescale_array(array: NDArray[_np_dtype]) -> NDArray[_np_dtype]: ...
 @overload
 def rescale_array(array: torch.Tensor) -> torch.Tensor: ...
 def rescale_array(array: Array | NDArray[_np_dtype] | torch.Tensor) -> Array | NDArray[_np_dtype] | torch.Tensor:
-    """Rescale an array to the range [0, 1]"""
+    """
+    Rescale an array to the range [0, 1].
+
+    Parameters
+    ----------
+    array : NDArray or torch.Tensor
+        Input array
+
+    Returns
+    -------
+    NDArray or torch.Tensor
+        Rescaled array in range [0, 1]
+
+    Raises
+    ------
+    TypeError
+        If array type is not supported
+    """
     if isinstance(array, np.ndarray | torch.Tensor):
         arr_min = array.min()
         arr_max = array.max()
@@ -162,7 +286,7 @@ def ensure_embeddings(
     unit_interval: Literal[True, False, "force"] = False,
 ) -> torch.Tensor | NDArray[_np_dtype] | T:
     """
-    Validates the embeddings array and converts it to the specified type
+    Validates the embeddings array and converts it to the specified type.
 
     Parameters
     ----------
@@ -175,6 +299,7 @@ def ensure_embeddings(
 
     Returns
     -------
+    torch.Tensor or NDArray or T
         Converted embeddings array
 
     Raises
@@ -182,7 +307,9 @@ def ensure_embeddings(
     ValueError
         If the embeddings array is not 2D
     ValueError
-        If the embeddings array is not unit interval [0, 1]
+        If the embeddings array has a zero dimension
+    ValueError
+        If the embeddings array is not unit interval [0, 1] (when unit_interval=True)
     """
     if isinstance(dtype, torch.dtype):
         arr = torch.as_tensor(embeddings, dtype=dtype)
@@ -212,23 +339,29 @@ def ensure_embeddings(
 
 
 @overload
-def flatten(array: torch.Tensor) -> torch.Tensor: ...
+def flatten_samples(array: torch.Tensor) -> torch.Tensor: ...
 @overload
-def flatten(array: SequenceLike[Any]) -> NDArray[Any]: ...
+def flatten_samples(array: SequenceLike[Any]) -> NDArray[Any]: ...
 
 
-def flatten(array: SequenceLike[Any] | torch.Tensor) -> NDArray[Any] | torch.Tensor:
+def flatten_samples(array: SequenceLike[Any] | torch.Tensor) -> NDArray[Any] | torch.Tensor:
     """
-    Flattens input array from (N, ... ) to (N, -1) where all samples N have all data in their last dimension
+    Flattens input array from (N, ...) to (N, -1) where all samples N have all data in their last dimension.
 
     Parameters
     ----------
     array : ArrayLike
-        Input array
+        Input array with shape (N, ...)
 
     Returns
     -------
-    np.ndarray or torch.Tensor, shape: (N, -1)
+    np.ndarray or torch.Tensor
+        Flattened array with shape (N, -1)
+
+    Raises
+    ------
+    TypeError
+        If array type is not supported
     """
     if isinstance(array, torch.Tensor):
         return torch.flatten(array, start_dim=1)
@@ -244,17 +377,22 @@ _TArray = TypeVar("_TArray", bound=Array)
 
 def channels_first_to_last(array: _TArray) -> _TArray:
     """
-    Converts array from channels first to channels last format
+    Converts array from channels first to channels last format.
 
     Parameters
     ----------
     array : ArrayLike
-        Input array
+        Input array in CHW format
 
     Returns
     -------
     ArrayLike
-        Converted array
+        Converted array in HWC format
+
+    Raises
+    ------
+    TypeError
+        If array type is not supported
     """
     if isinstance(array, np.ndarray):
         return np.transpose(array, (1, 2, 0))

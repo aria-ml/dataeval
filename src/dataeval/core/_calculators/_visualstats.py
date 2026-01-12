@@ -11,7 +11,7 @@ from dataeval.config import EPSILON
 from dataeval.core._calculators._base import Calculator
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.flags import ImageStats
-from dataeval.utils._image import edge_filter
+from dataeval.utils.preprocessing import edge_filter
 
 if TYPE_CHECKING:
     from dataeval.core._calculate import CalculatorCache

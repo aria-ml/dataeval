@@ -8,8 +8,8 @@ import xxhash as xxh
 from scipy.fftpack import dct
 
 from dataeval.types import Array3D
-from dataeval.utils._array import as_numpy
-from dataeval.utils._image import normalize_image_shape, resize, to_canonical_grayscale
+from dataeval.utils.arrays import as_numpy
+from dataeval.utils.preprocessing import normalize_image_shape, resize, to_canonical_grayscale
 
 _logger = logging.getLogger(__name__)
 
