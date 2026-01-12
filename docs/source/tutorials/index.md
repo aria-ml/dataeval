@@ -67,6 +67,7 @@ To run the tutorial interactively in Google Colab, click the
 
 ../notebooks/tt_monitor_shift.ipynb
 ../notebooks/tt_error_analysis.ipynb
+../notebooks/tt_identify_ood_samples.ipynb
 ```
 
 ```{list-table}
@@ -77,6 +78,9 @@ To run the tutorial interactively in Google Colab, click the
   - Learn how to analyze incoming data against training data to ensure deployed
     models stay reliable and robust.
   - [![Open In Colab][colab-badge]][monitoring-colab]
+* - [](../notebooks/tt_identify_ood_samples.ipynb)
+  - Identify out-of-distribution samples in incoming data
+  - [![Open In Colab][colab-badge]][iood-colab]
 ```
 
 <!-- ref links -->
@@ -84,6 +88,7 @@ To run the tutorial interactively in Google Colab, click the
 <!-- markdownlint-disable MD053 -->
 
 [monitoring-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/tutorials/notebooks/tt_monitor_shift.ipynb
+[iood-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/tt_identify_ood_samples.ipynb
 
 <!-- markdownlint-enable MD053 -->
 

@@ -1,5 +1,5 @@
 """
-Detect changes in data distribution between different datasets.
+Detect changes in data between different datasets.
 """
 
 __all__ = [
@@ -14,6 +14,11 @@ __all__ = [
     "UncertaintyFeatureExtractor",
     "LastSeenUpdateStrategy",
     "ReservoirSamplingUpdateStrategy",
+    "OODReconstructionConfig",
+    "OODKNeighbors",
+    "OODReconstruction",
+    "OODOutput",
+    "OODScoreOutput",
 ]
 
 from dataeval.shift._drift._base import DriftOutput
@@ -25,4 +30,7 @@ from dataeval.shift._feature_extractors import (
     MetadataFeatureExtractor,
     UncertaintyFeatureExtractor,
 )
+from dataeval.shift._ood._base import OODOutput, OODScoreOutput
+from dataeval.shift._ood._kneighbors import OODKNeighbors
+from dataeval.shift._ood._reconstruction import OODReconstruction, OODReconstructionConfig
 from dataeval.shift._update_strategies import LastSeenUpdateStrategy, ReservoirSamplingUpdateStrategy
