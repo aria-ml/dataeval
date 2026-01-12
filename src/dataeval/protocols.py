@@ -14,11 +14,14 @@ __all__ = [
     "EvaluationSchedule",
     "EvaluationStrategy",
     "FeatureExtractor",
+    "EvidenceLowerBoundLossFn",
     "ImageClassificationDatum",
     "ImageClassificationDataset",
+    "LossFn",
     "ObjectDetectionTarget",
     "ObjectDetectionDatum",
     "ObjectDetectionDataset",
+    "ReconstructionLossFn",
     "SegmentationTarget",
     "SegmentationDatum",
     "SegmentationDataset",
@@ -688,6 +691,155 @@ class EvaluationSchedule(Protocol):
         NDArray[np.intp]
             Array of dataset sizes at which to evaluate, must be
             monotonically increasing and within [1, dataset_length]
+        """
+        ...
+
+
+# ========== LOSS FUNCTIONS ==========
+
+
+@runtime_checkable
+class LossFn(Protocol):
+    """
+    Protocol for generic loss functions that can be used with PyTorch models.
+
+    This is the base protocol for all loss functions. It supports both
+    class-based (torch.nn.Module-like) and functional loss implementations.
+
+    Examples
+    --------
+    Using built-in PyTorch loss:
+
+    >>> import torch.nn as nn
+    >>> loss_fn = nn.MSELoss()
+    >>> isinstance(loss_fn, LossFn)
+    True
+
+    Creating a custom functional loss:
+
+    >>> def custom_loss(y_true, y_pred):
+    ...     return torch.mean((y_true - y_pred) ** 2)
+    >>> isinstance(custom_loss, LossFn)
+    True
+
+    Creating a custom class-based loss:
+
+    >>> class CustomLoss:
+    ...     def __call__(self, y_true, y_pred):
+    ...         return torch.mean((y_true - y_pred) ** 2)
+    >>> loss_fn = CustomLoss()
+    >>> isinstance(loss_fn, LossFn)
+    True
+    """
+
+    def __call__(self, *args: torch.Tensor, **kwargs: torch.Tensor) -> torch.Tensor: ...
+
+
+@runtime_checkable
+class ReconstructionLossFn(Protocol):
+    """
+    Protocol for reconstruction-based loss functions (Autoencoder).
+
+    Used for standard autoencoders that only return reconstruction.
+    The loss function takes the original input and reconstruction.
+
+    Examples
+    --------
+    Using MSE for reconstruction:
+
+    >>> import torch
+    >>> import torch.nn as nn
+    >>> loss_fn = nn.MSELoss()
+    >>> x = torch.randn(32, 1, 28, 28)
+    >>> x_recon = torch.randn(32, 1, 28, 28)
+    >>> loss = loss_fn(x, x_recon)
+
+    Creating a custom reconstruction loss:
+
+    >>> class CustomReconstructionLoss:
+    ...     def __call__(self, x: torch.Tensor, x_recon: torch.Tensor) -> torch.Tensor:
+    ...         return torch.mean(torch.abs(x - x_recon))
+    >>> loss_fn = CustomReconstructionLoss()
+    """
+
+    def __call__(self, x: torch.Tensor, x_recon: torch.Tensor) -> torch.Tensor:
+        """
+        Compute reconstruction loss.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Original input
+        x_recon : torch.Tensor
+            Reconstructed output
+
+        Returns
+        -------
+        torch.Tensor
+            Scalar loss value
+        """
+        ...
+
+
+@runtime_checkable
+class EvidenceLowerBoundLossFn(Protocol):
+    """
+    Protocol for Evidence Lower Bound (ELBO) loss functions.
+
+    ELBO loss functions take the original input, reconstruction, mean (mu),
+    and log-variance (logvar) to compute the ELBO loss.
+
+    Examples
+    --------
+    Using the ELBO class:
+
+    >>> from dataeval.utils.losses import ELBOLoss
+    >>> loss_fn = ELBOLoss(beta=1.0)
+    >>> x = torch.randn(32, 1, 28, 28)
+    >>> x_recon = torch.randn(32, 1, 28, 28)
+    >>> mu = torch.randn(32, 128)
+    >>> logvar = torch.randn(32, 128)
+    >>> loss = loss_fn(x, x_recon, mu, logvar)
+
+    Creating a custom ELBO loss:
+
+    >>> class CustomELBOLoss:
+    ...     def __init__(self, beta: float = 1.0):
+    ...         self.beta = beta
+    ...
+    ...     def __call__(
+    ...         self, x: torch.Tensor, x_recon: torch.Tensor, mu: torch.Tensor, logvar: torch.Tensor
+    ...     ) -> torch.Tensor:
+    ...         recon_loss = torch.mean((x - x_recon) ** 2)
+    ...         kld_loss = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
+    ...         return recon_loss + self.beta * kld_loss
+    """
+
+    def __call__(
+        self,
+        x: torch.Tensor,
+        x_recon: torch.Tensor,
+        mu: torch.Tensor,
+        logvar: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Compute VAE loss (ELBO).
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Original input
+        x_recon : torch.Tensor
+            Reconstructed output
+        mu : torch.Tensor
+            Mean of latent distribution
+        logvar : torch.Tensor
+            Log-variance of latent distribution
+
+        Returns
+        -------
+        torch.Tensor
+            Scalar loss value (reconstruction + KL divergence)
         """
         ...
 

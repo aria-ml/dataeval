@@ -17,8 +17,8 @@ import torch
 from dataeval._metadata import FactorInfo, Metadata
 from dataeval.config import set_batch_size, set_seed
 from dataeval.core import calculate
-from dataeval.evaluators.ood.base import OODOutput
 from dataeval.flags import ImageStats
+from dataeval.shift._ood._base import OODOutput
 
 # Manually add the import path for test_drift_uncertainty
 sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute() / "tests" / "shift"))
