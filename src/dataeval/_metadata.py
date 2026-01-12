@@ -14,8 +14,8 @@ from dataeval.core._bin import bin_data, digitize_data, is_continuous
 from dataeval.core._feature_distance import FeatureDistanceResult, feature_distance
 from dataeval.protocols import AnnotatedDataset, Array, DatumMetadata, ObjectDetectionTarget, ProgressCallback
 from dataeval.types import Array1D
-from dataeval.utils._array import as_numpy
-from dataeval.utils._merge import merge
+from dataeval.utils.arrays import as_numpy
+from dataeval.utils.data import merge_metadata
 
 _logger = logging.getLogger(__name__)
 
@@ -887,13 +887,15 @@ class Metadata:
         targets_per_image = [np.sum(srcidx == i) for i in range(datum_count)]
 
         # Target-level merge
-        merged_target_level = merge(raw, return_dropped=True, ignore_lists=False, targets_per_image=targets_per_image)
+        merged_target_level = merge_metadata(
+            raw, return_dropped=True, ignore_lists=False, targets_per_image=targets_per_image
+        )
         target_factor_dict = {
             f"metadata_{k}" if k in reserved else k: v for k, v in merged_target_level[0].items() if k != "_image_index"
         }
 
         # Image-level merge
-        merged_image_level = merge(raw, return_dropped=True, ignore_lists=True, targets_per_image=None)
+        merged_image_level = merge_metadata(raw, return_dropped=True, ignore_lists=True, targets_per_image=None)
         image_factor_dict = {
             f"metadata_{k}" if k in reserved else k: v for k, v in merged_image_level[0].items() if k != "_image_index"
         }
@@ -985,7 +987,7 @@ class Metadata:
             self._image_factors = set(image_factor_dict)
         else:
             # For IC datasets, only need target-level rows (which are same as image-level)
-            merged_image_level = merge(raw, return_dropped=True, ignore_lists=False, targets_per_image=None)
+            merged_image_level = merge_metadata(raw, return_dropped=True, ignore_lists=False, targets_per_image=None)
             image_factor_dict = {
                 f"metadata_{k}" if k in reserved else k: v
                 for k, v in merged_image_level[0].items()

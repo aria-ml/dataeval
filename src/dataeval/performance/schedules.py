@@ -5,7 +5,7 @@ from collections.abc import Iterable
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.utils._array import as_numpy
+from dataeval.utils.arrays import as_numpy
 
 
 class GeometricSchedule:
@@ -78,10 +78,8 @@ class ManualSchedule:
         # Convert to list if iterable
         points = list(eval_points) if isinstance(eval_points, Iterable) else [eval_points]
 
-        # Convert to array and validate
+        # Convert to integer array
         arr = as_numpy(points, dtype=np.intp)
-        if not np.issubdtype(arr.dtype, np.number):
-            raise ValueError("eval_points must consist of numerical values")
 
         self.eval_points = arr
 

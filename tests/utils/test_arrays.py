@@ -5,10 +5,10 @@ import numpy as np
 import pytest
 import torch
 
-from dataeval.utils._array import (
+from dataeval.utils.arrays import (
     channels_first_to_last,
     ensure_embeddings,
-    flatten,
+    flatten_samples,
     rescale_array,
     to_numpy,
     to_numpy_iter,
@@ -144,18 +144,18 @@ class TestFlatten:
     na = np.random.random((4, 1, 16, 16))
 
     def test_flatten_torch(self):
-        flat = flatten(self.tt)
+        flat = flatten_samples(self.tt)
         assert flat.shape == (4, 256)
         assert type(flat) is torch.Tensor
 
     def test_flatten_numpy(self):
-        flat = flatten(self.na)
+        flat = flatten_samples(self.na)
         assert flat.shape == (4, 256)
         assert type(flat) is np.ndarray
 
     def test_invalid_input(self):
         with pytest.raises(TypeError):
-            flatten("invalid input")  # type: ignore
+            flatten_samples("invalid input")  # type: ignore
 
 
 @pytest.mark.required

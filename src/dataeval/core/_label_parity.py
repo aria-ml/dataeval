@@ -8,7 +8,7 @@ from numpy.typing import NDArray
 from scipy.stats import chisquare
 
 from dataeval.types import Array1D
-from dataeval.utils._array import as_numpy
+from dataeval.utils.arrays import as_numpy
 
 _logger = logging.getLogger(__name__)
 

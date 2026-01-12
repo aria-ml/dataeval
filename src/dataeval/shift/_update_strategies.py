@@ -10,7 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.protocols import UpdateStrategy
-from dataeval.utils._array import flatten
+from dataeval.utils.arrays import flatten_samples
 
 
 class LastSeenUpdateStrategy(UpdateStrategy):
@@ -27,7 +27,7 @@ class LastSeenUpdateStrategy(UpdateStrategy):
         self.n = n
 
     def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32]) -> NDArray[np.float32]:
-        return np.concatenate([x_ref, flatten(x_new)], axis=0)[-self.n :]
+        return np.concatenate([x_ref, flatten_samples(x_new)], axis=0)[-self.n :]
 
 
 class ReservoirSamplingUpdateStrategy(UpdateStrategy):
@@ -47,7 +47,7 @@ class ReservoirSamplingUpdateStrategy(UpdateStrategy):
     def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32]) -> NDArray[np.float32]:
         if x_new.shape[0] + self._count <= self.n:
             self._count += x_new.shape[0]
-            result = np.concatenate([x_ref, flatten(x_new)], axis=0)
+            result = np.concatenate([x_ref, flatten_samples(x_new)], axis=0)
             return result[: self.n]
 
         n_ref = x_ref.shape[0]

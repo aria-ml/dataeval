@@ -28,7 +28,7 @@ from dataeval.config import get_max_processes, get_seed
 from dataeval.shift._drift._chunk import Chunk, Chunker, CountBasedChunker, SizeBasedChunker
 from dataeval.shift._drift._thresholds import ConstantThreshold, Threshold
 from dataeval.types import Output, set_metadata
-from dataeval.utils._array import flatten
+from dataeval.utils.arrays import flatten_samples
 
 logger = logging.getLogger(__name__)
 
@@ -353,7 +353,7 @@ class DriftMVDC:
 
         """
         # for 1D input, assume that is 1 sample: dim[1,n_features]
-        self.x_ref: pl.DataFrame = pl.DataFrame(flatten(np.atleast_2d(np.asarray(x_ref))))
+        self.x_ref: pl.DataFrame = pl.DataFrame(flatten_samples(np.atleast_2d(np.asarray(x_ref))))
         self.n_features: int = self.x_ref.shape[-1]
         self._calc.fit(self.x_ref)
         return self
@@ -371,7 +371,7 @@ class DriftMVDC:
         -------
         DomainClassifierDriftResult
         """
-        self.x_test: pl.DataFrame = pl.DataFrame(flatten(np.atleast_2d(np.asarray(x))))
+        self.x_test: pl.DataFrame = pl.DataFrame(flatten_samples(np.atleast_2d(np.asarray(x))))
         if self.x_test.shape[-1] != self.n_features:
             raise ValueError("Reference and test embeddings have different number of features")
 

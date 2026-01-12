@@ -13,7 +13,7 @@ import pytest
 import torch
 from sklearn.datasets import load_digits
 
-from dataeval.shift._ood._reconstruction import OODReconstruction
+from dataeval.shift._ood._reconstruction import OODReconstruction, gmm_energy, gmm_params
 from dataeval.utils.losses import ELBOLoss
 from dataeval.utils.models import AE, VAE
 
@@ -940,6 +940,26 @@ def test_gmm_scoring_with_energy():
 
 
 @pytest.mark.required
+def test_gmm_params_energy():
+    N, K, D = 10, 5, 1
+    tz = torch.rand(N, D, dtype=torch.float32)
+    tg = torch.rand(N, K, dtype=torch.float32)
+    params = gmm_params(tz, tg)
+    assert params.phi.numpy().shape[0] == K == params.log_det_cov.shape[0]  # type: ignore
+    assert params.mu.numpy().shape == (K, D)  # type: ignore
+    assert params.cov.numpy().shape == params.L.numpy().shape == (K, D, D)  # type: ignore
+    for _ in range(params.cov.numpy().shape[0]):  # type: ignore
+        assert (np.diag(params.cov[_].numpy()) >= 0.0).all()  # type: ignore
+        assert (np.diag(params.L[_].numpy()) >= 0.0).all()  # type: ignore
+
+    sample_energy, cov_diag = gmm_energy(tz, params, return_mean=True)
+    assert sample_energy.numpy().shape == cov_diag.numpy().shape == ()  # type: ignore
+
+    sample_energy, _ = gmm_energy(tz, params, return_mean=False)
+    assert sample_energy.numpy().shape[0] == N  # type: ignore
+
+
+@pytest.mark.required
 def test_vae_output_extraction():
     """Test VAE model output extraction in _score."""
     vae = OODReconstruction(VAE(input_shape=input_shape), model_type="vae")
@@ -953,3 +973,293 @@ def test_vae_output_extraction():
     assert score.instance_score.shape == (5,)
     assert score.feature_score is not None
     assert score.feature_score.shape == x_test.shape
+
+
+@pytest.mark.required
+def test_gmm_z_normalization_prevents_covariance_error():
+    """
+    Regression test for non-positive-definite covariance matrix error.
+
+    This test ensures that latent representations are normalized before computing
+    GMM parameters, which prevents numerical issues in Cholesky decomposition
+    when the latent space has very small or very large variance.
+    """
+
+    class GMMModelWithSmallLatents(torch.nn.Module):
+        """Model that produces very small latent values to trigger the error."""
+
+        def __init__(self):
+            super().__init__()
+            self.encoder = torch.nn.Sequential(
+                torch.nn.Flatten(), torch.nn.Linear(64, 32), torch.nn.ReLU(), torch.nn.Linear(32, 10)
+            )
+            self.decoder = torch.nn.Sequential(
+                torch.nn.Linear(10, 32), torch.nn.ReLU(), torch.nn.Linear(32, 64), torch.nn.Unflatten(1, input_shape)
+            )
+            self.gmm_net = torch.nn.Linear(10, 3)
+
+            # Initialize encoder to produce very small values (simulates collapsed latent space)
+            for layer in self.encoder:
+                if isinstance(layer, torch.nn.Linear):
+                    torch.nn.init.uniform_(layer.weight, -0.001, 0.001)
+                    torch.nn.init.zeros_(layer.bias)
+
+        def forward(self, x):
+            z = self.encoder(x)
+            # Scale down z to create very small variance (this would trigger the error without normalization)
+            z = z * 1e-3
+            recon = self.decoder(z)
+            gamma = torch.softmax(self.gmm_net(z), dim=-1)
+            return recon, z, gamma
+
+    gmm_model = GMMModelWithSmallLatents()
+    ood = OODReconstruction(gmm_model, model_type="ae", use_gmm=True)
+
+    # Create reference data
+    x_ref_small = np.random.rand(50, *input_shape).astype(np.float32)
+
+    # This should NOT raise _LinAlgError about non-positive-definite matrix
+    # The normalization should prevent the error
+    ood.fit(x_ref_small, threshold_perc=90, epochs=1)
+
+    # Verify that normalization statistics were computed
+    assert ood._z_mean is not None
+    assert ood._z_std is not None
+    assert ood._gmm_params is not None
+
+    # Verify that scoring works with normalized latents
+    x_test = np.random.rand(10, *input_shape).astype(np.float32)
+    score = ood.score(x_test)
+
+    assert score.instance_score.shape == (10,)
+    assert score.feature_score is not None
+    assert score.feature_score.shape == x_test.shape
+
+
+@pytest.mark.required
+def test_gmm_z_normalization_consistency():
+    """
+    Test that z normalization is applied consistently during fit and score.
+
+    This ensures that the same normalization statistics are used for both
+    computing GMM parameters and computing GMM energy scores.
+    """
+
+    class SimpleGMMModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.encoder = torch.nn.Sequential(
+                torch.nn.Flatten(), torch.nn.Linear(64, 32), torch.nn.ReLU(), torch.nn.Linear(32, 10)
+            )
+            self.decoder = torch.nn.Sequential(
+                torch.nn.Linear(10, 32), torch.nn.ReLU(), torch.nn.Linear(32, 64), torch.nn.Unflatten(1, input_shape)
+            )
+            self.gmm_net = torch.nn.Linear(10, 3)
+
+        def forward(self, x):
+            z = self.encoder(x)
+            recon = self.decoder(z)
+            gamma = torch.softmax(self.gmm_net(z), dim=-1)
+            return recon, z, gamma
+
+    gmm_model = SimpleGMMModel()
+    ood = OODReconstruction(gmm_model, model_type="ae", use_gmm=True)
+
+    x_ref = np.random.rand(30, *input_shape).astype(np.float32)
+
+    # Fit and verify normalization stats are stored
+    ood.fit(x_ref, threshold_perc=90, epochs=1)
+
+    # Verify that normalization stats were computed
+    assert ood._z_mean is not None
+    assert ood._z_std is not None
+
+    # Store original normalization stats
+    z_mean_original = ood._z_mean.clone()
+    z_std_original = ood._z_std.clone()
+
+    # Score on new data
+    x_test = np.random.rand(10, *input_shape).astype(np.float32)
+    score = ood.score(x_test)
+
+    # Verify normalization stats haven't changed (they should be fixed from training)
+    assert torch.allclose(ood._z_mean, z_mean_original)
+    assert torch.allclose(ood._z_std, z_std_original)
+
+    # Verify scores are computed successfully
+    assert score.instance_score.shape == (10,)
+    assert not np.isnan(score.instance_score).any()
+    assert not np.isinf(score.instance_score).any()
+
+
+@pytest.mark.required
+def test_combine_gmm_percentile():
+    """
+    Test _combine_gmm_percentile method for combining reconstruction and GMM scores.
+
+    This method converts reconstruction error and GMM energy to percentiles using
+    z-score to CDF transformation, then combines them as: 1 - (P_in * P_in).
+    """
+
+    class SimpleGMMModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.encoder = torch.nn.Sequential(
+                torch.nn.Flatten(), torch.nn.Linear(64, 32), torch.nn.ReLU(), torch.nn.Linear(32, 10)
+            )
+            self.decoder = torch.nn.Sequential(
+                torch.nn.Linear(10, 32), torch.nn.ReLU(), torch.nn.Linear(32, 64), torch.nn.Unflatten(1, input_shape)
+            )
+            self.gmm_net = torch.nn.Linear(10, 3)
+
+        def forward(self, x):
+            z = self.encoder(x)
+            recon = self.decoder(z)
+            gamma = torch.softmax(self.gmm_net(z), dim=-1)
+            return recon, z, gamma
+
+    # Test basic functionality of _combine_gmm_percentile
+    gmm_model = SimpleGMMModel()
+    from dataeval.shift._ood._reconstruction import OODReconstructionConfig
+
+    config = OODReconstructionConfig(gmm_score_mode="percentile")
+    ood = OODReconstruction(gmm_model, model_type="ae", use_gmm=True, config=config)
+
+    # Create synthetic data
+    x_ref = np.random.rand(30, *input_shape).astype(np.float32)
+    ood.fit(x_ref, threshold_perc=90, epochs=1)
+
+    # Check that reference statistics were computed
+    assert ood._recon_ref_mean is not None
+    assert ood._recon_ref_std is not None
+    assert ood._gmm_energy_ref_mean is not None
+    assert ood._gmm_energy_ref_std is not None
+
+    # Test scoring with percentile mode
+    x_test = np.random.rand(10, *input_shape).astype(np.float32)
+    score = ood.score(x_test)
+
+    # Verify output shape and validity
+    assert score.instance_score.shape == (10,)
+    assert not np.isnan(score.instance_score).any()
+    assert not np.isinf(score.instance_score).any()
+
+    # Verify scores are in valid probability range [0, 1] after percentile combination
+    # Note: After combination, scores may be outside [0, 1] due to z-score standardization
+    # But they should be finite and reasonable
+    assert np.all(np.isfinite(score.instance_score))
+
+    # Test that percentile method produces different results than standardized
+    config_std = OODReconstructionConfig(gmm_score_mode="standardized", gmm_weight=0.5)
+    ood_std = OODReconstruction(SimpleGMMModel(), model_type="ae", use_gmm=True, config=config_std)
+    ood_std.fit(x_ref, threshold_perc=90, epochs=1)
+    score_std = ood_std.score(x_test)
+
+    # The two methods should produce different scores
+    assert not np.allclose(score.instance_score, score_std.instance_score)
+
+
+@pytest.mark.required
+def test_combine_gmm_percentile_direct():
+    """
+    Direct unit test of _combine_gmm_percentile method with controlled inputs.
+
+    Tests the mathematical correctness of the percentile-based fusion.
+    """
+
+    class DummyGMMModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.encoder = torch.nn.Sequential(
+                torch.nn.Flatten(), torch.nn.Linear(64, 32), torch.nn.ReLU(), torch.nn.Linear(32, 10)
+            )
+            self.decoder = torch.nn.Sequential(
+                torch.nn.Linear(10, 32), torch.nn.ReLU(), torch.nn.Linear(32, 64), torch.nn.Unflatten(1, input_shape)
+            )
+            self.gmm_net = torch.nn.Linear(10, 3)
+
+        def forward(self, x):
+            z = self.encoder(x)
+            recon = self.decoder(z)
+            gamma = torch.softmax(self.gmm_net(z), dim=-1)
+            return recon, z, gamma
+
+    ood = OODReconstruction(DummyGMMModel(), model_type="ae", use_gmm=True)
+
+    # Set known reference statistics
+    ood._recon_ref_mean = 0.0
+    ood._recon_ref_std = 1.0
+    ood._gmm_energy_ref_mean = 0.0
+    ood._gmm_energy_ref_std = 1.0
+
+    # Test with specific values
+    recon_scores = np.array([0.0, 1.0, -1.0, 2.0])
+    gmm_energy = np.array([0.0, 1.0, -1.0, 2.0])
+
+    combined = ood._combine_gmm_percentile(recon_scores, gmm_energy)
+
+    # Verify output shape
+    assert combined.shape == recon_scores.shape
+    assert not np.isnan(combined).any()
+    assert not np.isinf(combined).any()
+
+    # Test mathematical properties
+    # For z=0 (mean), CDF should be 0.5, P_in = 0.5, combined = 1 - 0.5*0.5 = 0.75
+    from scipy.stats import norm
+
+    expected_0 = 1.0 - (1.0 - norm.cdf(0.0)) * (1.0 - norm.cdf(0.0))
+    assert np.isclose(combined[0], expected_0, atol=1e-5)
+
+    # For higher z-scores, combined score should be higher (more OOD)
+    assert combined[3] > combined[0]  # z=2 should have higher OOD score than z=0
+
+    # For negative z-scores, combined score should be lower (more in-distribution)
+    assert combined[2] < combined[0]  # z=-1 should have lower OOD score than z=0
+
+
+@pytest.mark.required
+def test_gmm_score_mode_config_parameter():
+    """
+    Test that gmm_score_mode configuration parameter is properly used.
+    """
+
+    class SimpleGMMModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.encoder = torch.nn.Sequential(
+                torch.nn.Flatten(), torch.nn.Linear(64, 32), torch.nn.ReLU(), torch.nn.Linear(32, 10)
+            )
+            self.decoder = torch.nn.Sequential(
+                torch.nn.Linear(10, 32), torch.nn.ReLU(), torch.nn.Linear(32, 64), torch.nn.Unflatten(1, input_shape)
+            )
+            self.gmm_net = torch.nn.Linear(10, 3)
+
+        def forward(self, x):
+            z = self.encoder(x)
+            recon = self.decoder(z)
+            gamma = torch.softmax(self.gmm_net(z), dim=-1)
+            return recon, z, gamma
+
+    from dataeval.shift._ood._reconstruction import OODReconstructionConfig
+
+    # Test with standardized mode (default)
+    config_std = OODReconstructionConfig(gmm_score_mode="standardized")
+    ood_std = OODReconstruction(SimpleGMMModel(), model_type="ae", use_gmm=True, config=config_std)
+    assert ood_std.config.gmm_score_mode == "standardized"
+
+    # Test with percentile mode
+    config_pct = OODReconstructionConfig(gmm_score_mode="percentile")
+    ood_pct = OODReconstruction(SimpleGMMModel(), model_type="ae", use_gmm=True, config=config_pct)
+    assert ood_pct.config.gmm_score_mode == "percentile"
+
+    # Verify both modes work end-to-end
+    x_ref = np.random.rand(30, *input_shape).astype(np.float32)
+    x_test = np.random.rand(10, *input_shape).astype(np.float32)
+
+    ood_std.fit(x_ref, threshold_perc=90, epochs=1)
+    score_std = ood_std.score(x_test)
+    assert score_std.instance_score.shape == (10,)
+
+    ood_pct.fit(x_ref, threshold_perc=90, epochs=1)
+    score_pct = ood_pct.score(x_test)
+    assert score_pct.instance_score.shape == (10,)

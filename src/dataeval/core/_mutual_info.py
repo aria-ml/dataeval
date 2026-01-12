@@ -12,7 +12,7 @@ from sklearn.feature_selection import mutual_info_classif, mutual_info_regressio
 from dataeval.config import get_max_processes, get_seed
 from dataeval.core._bin import is_continuous
 from dataeval.types import Array1D, Array2D
-from dataeval.utils._array import as_numpy, opt_as_numpy
+from dataeval.utils.arrays import as_numpy, opt_as_numpy
 
 _logger = logging.getLogger(__name__)
 

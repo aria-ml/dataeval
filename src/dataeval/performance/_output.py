@@ -13,7 +13,7 @@ from typing_extensions import Self
 
 from dataeval.protocols import ArrayLike
 from dataeval.types import DictOutput, set_metadata
-from dataeval.utils._array import as_numpy
+from dataeval.utils.arrays import as_numpy
 
 _logger = logging.getLogger(__name__)
 

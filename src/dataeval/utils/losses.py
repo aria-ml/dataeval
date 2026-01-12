@@ -8,7 +8,7 @@ Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
 """
 
-__all__ = []
+__all__ = ["ELBOLoss"]
 
 import torch
 import torch.nn.functional as F

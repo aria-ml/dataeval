@@ -11,7 +11,6 @@ from dataeval.core._bin import get_counts
 from dataeval.core._diversity import diversity_shannon, diversity_simpson
 from dataeval.protocols import AnnotatedDataset
 from dataeval.types import DictOutput, set_metadata
-from dataeval.utils._method import get_method
 
 _DIVERSITY_FN_MAP = {"simpson": diversity_simpson, "shannon": diversity_shannon}
 
@@ -176,7 +175,10 @@ class Diversity:
         if not self.metadata.factor_names:
             raise ValueError("No factors found in provided metadata.")
 
-        diversity_fn = get_method(_DIVERSITY_FN_MAP, self.method)
+        if self.method not in _DIVERSITY_FN_MAP:
+            raise ValueError(f"Invalid method '{self.method}'. Supported methods are '{list(_DIVERSITY_FN_MAP)}'.")
+
+        diversity_fn = _DIVERSITY_FN_MAP[self.method]
         binned_data = self.metadata.binned_data
         factor_names = self.metadata.factor_names
         class_lbl = self.metadata.class_labels
