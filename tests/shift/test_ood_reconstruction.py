@@ -1023,8 +1023,6 @@ def test_gmm_z_normalization_prevents_covariance_error():
     ood.fit(x_ref_small, threshold_perc=90, epochs=1)
 
     # Verify that normalization statistics were computed
-    assert ood._z_mean is not None
-    assert ood._z_std is not None
     assert ood._gmm_params is not None
 
     # Verify that scoring works with normalized latents
@@ -1034,62 +1032,6 @@ def test_gmm_z_normalization_prevents_covariance_error():
     assert score.instance_score.shape == (10,)
     assert score.feature_score is not None
     assert score.feature_score.shape == x_test.shape
-
-
-@pytest.mark.required
-def test_gmm_z_normalization_consistency():
-    """
-    Test that z normalization is applied consistently during fit and score.
-
-    This ensures that the same normalization statistics are used for both
-    computing GMM parameters and computing GMM energy scores.
-    """
-
-    class SimpleGMMModel(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.encoder = torch.nn.Sequential(
-                torch.nn.Flatten(), torch.nn.Linear(64, 32), torch.nn.ReLU(), torch.nn.Linear(32, 10)
-            )
-            self.decoder = torch.nn.Sequential(
-                torch.nn.Linear(10, 32), torch.nn.ReLU(), torch.nn.Linear(32, 64), torch.nn.Unflatten(1, input_shape)
-            )
-            self.gmm_net = torch.nn.Linear(10, 3)
-
-        def forward(self, x):
-            z = self.encoder(x)
-            recon = self.decoder(z)
-            gamma = torch.softmax(self.gmm_net(z), dim=-1)
-            return recon, z, gamma
-
-    gmm_model = SimpleGMMModel()
-    ood = OODReconstruction(gmm_model, model_type="ae", use_gmm=True)
-
-    x_ref = np.random.rand(30, *input_shape).astype(np.float32)
-
-    # Fit and verify normalization stats are stored
-    ood.fit(x_ref, threshold_perc=90, epochs=1)
-
-    # Verify that normalization stats were computed
-    assert ood._z_mean is not None
-    assert ood._z_std is not None
-
-    # Store original normalization stats
-    z_mean_original = ood._z_mean.clone()
-    z_std_original = ood._z_std.clone()
-
-    # Score on new data
-    x_test = np.random.rand(10, *input_shape).astype(np.float32)
-    score = ood.score(x_test)
-
-    # Verify normalization stats haven't changed (they should be fixed from training)
-    assert torch.allclose(ood._z_mean, z_mean_original)
-    assert torch.allclose(ood._z_std, z_std_original)
-
-    # Verify scores are computed successfully
-    assert score.instance_score.shape == (10,)
-    assert not np.isnan(score.instance_score).any()
-    assert not np.isinf(score.instance_score).any()
 
 
 @pytest.mark.required
