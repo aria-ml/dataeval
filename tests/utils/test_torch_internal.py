@@ -5,9 +5,9 @@ import torch
 from dataeval.config import get_device
 from dataeval.utils._predict import predict
 from dataeval.utils._train import train
-from dataeval.utils.models import Autoencoder
+from dataeval.utils.models import AE
 
-model = Autoencoder((1, 16, 16))
+model = AE((1, 16, 16))
 
 
 @pytest.mark.required
@@ -19,7 +19,7 @@ model = Autoencoder((1, 16, 16))
 class TestTorchTrainerCPU:
     def test_torch_trainer(self, y_train, loss_fn, optimizer, preprocess_fn, batch_size):
         train(
-            model=Autoencoder((1, 16, 16)),
+            model=AE((1, 16, 16)),
             x_train=np.ones((3, 1, 16, 16)),
             y_train=y_train,
             loss_fn=loss_fn,
@@ -41,7 +41,7 @@ class TestTorchTrainerCPU:
 class TestTorchTrainerCUDA:
     def test_torch_trainer(self, y_train, loss_fn, optimizer, preprocess_fn, batch_size):
         train(
-            model=Autoencoder((1, 16, 16)),
+            model=AE((1, 16, 16)),
             x_train=np.ones((3, 1, 16, 16)),
             y_train=y_train,
             loss_fn=loss_fn,

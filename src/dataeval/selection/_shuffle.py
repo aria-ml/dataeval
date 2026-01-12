@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataeval.config import get_seed
+
 __all__ = []
 
 from collections.abc import Sequence
@@ -34,7 +36,8 @@ class Shuffle(Selection[Any]):
     def __init__(
         self, seed: int | Sequence[int] | Array | SeedSequence | BitGenerator | Generator | None = None
     ) -> None:
-        self.seed = as_numpy(seed) if isinstance(seed, Sequence | Array) else seed
+        _seed = get_seed() if seed is None else seed
+        self.seed = as_numpy(_seed) if isinstance(_seed, Sequence | Array) else _seed
 
     def __call__(self, dataset: Select[Any]) -> None:
         rng = np.random.default_rng(self.seed)

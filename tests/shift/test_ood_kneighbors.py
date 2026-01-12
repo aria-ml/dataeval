@@ -3,7 +3,7 @@ import pytest
 from sklearn.datasets import load_digits
 
 from dataeval import Embeddings
-from dataeval.evaluators.ood.knn import OOD_KNN
+from dataeval.shift._ood._kneighbors import OODKNeighbors
 
 # Embedding dimensions for test
 embedding_dim = 64
@@ -53,10 +53,10 @@ def test_knn(ood_type, k, distance_metric, reference_embeddings, query_embedding
     threshold_perc = 90.0
 
     # init OOD_KNN
-    knn = OOD_KNN(k=k, distance_metric=distance_metric)
+    knn = OODKNeighbors(k=k, distance_metric=distance_metric)
 
     # fit OOD_KNN, infer threshold and compute reference scores
-    knn.fit_embeddings(reference_embeddings, threshold_perc=threshold_perc)
+    knn.fit(reference_embeddings, threshold_perc=threshold_perc)
 
     # Check that reference scores were computed
     assert hasattr(knn, "_ref_score")
@@ -82,39 +82,39 @@ def test_knn(ood_type, k, distance_metric, reference_embeddings, query_embedding
 
 @pytest.mark.required
 def test_knn_fit_validation(reference_embeddings):
-    """Test validation in fit_embeddings method."""
-    knn = OOD_KNN(k=10)
+    """Test validation in fit method."""
+    knn = OODKNeighbors(k=10)
 
     # Test with empty embeddings - create one with empty array
     empty_embeddings = Embeddings.from_array(np.array([]).reshape(0, embedding_dim))
 
     with pytest.raises(ValueError):  # Any ValueError is fine
-        knn.fit_embeddings(empty_embeddings)
+        knn.fit(empty_embeddings)
 
     # Test with k too large for non-empty embeddings
     small_embeddings = Embeddings.from_array(np.random.randn(5, embedding_dim))  # Only 5 embeddings
-    knn_large_k = OOD_KNN(k=10)  # k=10 > 5 embeddings
+    knn_large_k = OODKNeighbors(k=10)  # k=10 > 5 embeddings
     with pytest.raises(ValueError):  # Any ValueError is fine
-        knn_large_k.fit_embeddings(small_embeddings)
+        knn_large_k.fit(small_embeddings)
 
     # Test with k equal to number of embeddings (should also fail)
-    knn_equal_k = OOD_KNN(k=5)  # k=5 == 5 embeddings
+    knn_equal_k = OODKNeighbors(k=5)  # k=5 == 5 embeddings
     with pytest.raises(ValueError, match="k \\(5\\) must be less than number of reference embeddings \\(5\\)"):
-        knn_equal_k.fit_embeddings(small_embeddings)
+        knn_equal_k.fit(small_embeddings)
 
 
 @pytest.mark.required
 def test_knn_predict_validation(reference_embeddings, query_embeddings):
     """Test validation in predict method."""
-    knn = OOD_KNN(k=10)
+    knn = OODKNeighbors(k=10)
 
     # Test prediction before fitting
     query_array = query_embeddings
-    with pytest.raises(RuntimeError, match="Metric needs to be `fit` before method call"):
+    with pytest.raises(RuntimeError, match="Detector needs to be `fit` before calling predict or score"):
         knn.predict(query_array)
 
     # Fit the detector
-    knn.fit_embeddings(reference_embeddings)
+    knn.fit(reference_embeddings)
 
     # Test prediction after fitting
     od_preds = knn.predict(query_array)
@@ -124,8 +124,8 @@ def test_knn_predict_validation(reference_embeddings, query_embeddings):
 @pytest.mark.required
 def test_knn_score_computation(reference_embeddings, query_embeddings):
     """Test that KNN scores are computed correctly."""
-    knn = OOD_KNN(k=5, distance_metric="cosine")
-    knn.fit_embeddings(reference_embeddings)
+    knn = OODKNeighbors(k=5, distance_metric="cosine")
+    knn.fit(reference_embeddings)
 
     # Get scores
     query_array = query_embeddings
@@ -144,13 +144,13 @@ def test_knn_different_distance_metrics(reference_embeddings, query_embeddings):
     query_array = query_embeddings
 
     # Test cosine distance
-    knn_cosine = OOD_KNN(k=10, distance_metric="cosine")
-    knn_cosine.fit_embeddings(reference_embeddings)
+    knn_cosine = OODKNeighbors(k=10, distance_metric="cosine")
+    knn_cosine.fit(reference_embeddings)
     scores_cosine = knn_cosine.score(query_array)
 
     # Test euclidean distance
-    knn_euclidean = OOD_KNN(k=10, distance_metric="euclidean")
-    knn_euclidean.fit_embeddings(reference_embeddings)
+    knn_euclidean = OODKNeighbors(k=10, distance_metric="euclidean")
+    knn_euclidean.fit(reference_embeddings)
     scores_euclidean = knn_euclidean.score(query_array)
 
     # Scores should be different (unless by extreme coincidence)

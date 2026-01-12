@@ -17,7 +17,7 @@ def predict(
     device: DeviceLike | None = None,
     batch_size: int | None = None,
     preprocess_fn: Callable[[torch.Tensor], torch.Tensor] | None = None,
-) -> torch.Tensor:
+) -> torch.Tensor | tuple[torch.Tensor, ...]:
     """
     Make batch predictions on a model.
 
@@ -37,8 +37,9 @@ def predict(
 
     Returns
     -------
-    torch.Tensor
-        PyTorch tensor with model outputs.
+    torch.Tensor | tuple[torch.Tensor, ...]
+        PyTorch tensor with model outputs, or tuple of tensors if model returns tuple
+        (e.g., VAE models return (reconstruction, mu, logvar)).
     """
     device = get_device(device)
     if isinstance(model, torch.nn.Module):
@@ -54,6 +55,13 @@ def predict(
             x_batch = x[istart:istop]
             if isinstance(preprocess_fn, Callable):
                 x_batch = preprocess_fn(x_batch)
-            preds_array.append(model(x_batch.to(dtype=torch.float32)).cpu())
+            output = model(x_batch.to(dtype=torch.float32))
+            output = tuple(o.cpu() for o in output) if isinstance(output, tuple) else output.cpu()
+            preds_array.append(output)
 
+    # Concatenate predictions
+    if preds_array and isinstance(preds_array[0], tuple):
+        # If model returns tuples, concatenate each element separately
+        num_outputs = len(preds_array[0])
+        return tuple(torch.cat([batch[i] for batch in preds_array], dim=0) for i in range(num_outputs))
     return torch.cat(preds_array, dim=0)
