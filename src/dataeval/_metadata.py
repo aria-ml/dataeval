@@ -1235,7 +1235,7 @@ class Metadata:
         >>> list(output)
         ['time', 'altitude']
         >>> output["time"]
-        {'statistic': 1.0, 'location': 0.44354838709677413, 'dist': 2.7, 'p_value': 0.0}
+        {'statistic': 1.0, 'location': 0.44354838709677413, 'dist': 2.6999999999999997, 'p_value': 0.0}
         """
         if set(self.factor_names) != set(other.factor_names):
             raise ValueError(f"Metadata keys must be identical, got {self.factor_names} and {other.factor_names}")
