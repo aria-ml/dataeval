@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,55,36
+/aria-ml/dataeval/tree/main/src/dataeval/core,9,3
+/aria-ml/dataeval/tree/main/src/dataeval,8,3
+/aria-ml/dataeval/tree/v0.93.1/src/dataeval/outputs,7,2
+/aria-ml/dataeval/tree/v0.93.1/src/dataeval,6,2
+/aria-ml/dataeval/branches/all,6,1
+/aria-ml/dataeval/blob/v0.65.0/docs/reference/detectors/drift_mmd.md,4,1
+/aria-ml/dataeval/tree/main/src,3,3
+/aria-ml/dataeval/blob/v0.93.1/src/dataeval/outputs/_linters.py,3,2
+/aria-ml/dataeval/branches,3,1
