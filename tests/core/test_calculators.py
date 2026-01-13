@@ -41,6 +41,141 @@ class TestPixelStats:
         result = calculate(images, None, stats=ImageStats.PIXEL, per_channel=False)
         assert result["stats"]["missing"][0] > 0
 
+    def test_missing_global_mode_counts_all_channels(self):
+        """Test that global missing calculation counts across all channels correctly.
+
+        Regression test for bug where denominator only counted H×W instead of C×H×W.
+        """
+        # Create a 3-channel image (3, 2, 2) with specific NaN pattern
+        # Channel 0: 1 NaN out of 4 pixels
+        # Channel 1: 2 NaNs out of 4 pixels
+        # Channel 2: 0 NaNs out of 4 pixels
+        # Total: 3 NaNs out of 12 pixel values
+        images = [
+            np.array(
+                [
+                    [[np.nan, 1.0], [1.0, 1.0]],  # Channel 0: 1 NaN
+                    [[np.nan, np.nan], [1.0, 1.0]],  # Channel 1: 2 NaNs
+                    [[1.0, 1.0], [1.0, 1.0]],  # Channel 2: 0 NaNs
+                ]
+            )
+        ]
+
+        result = calculate(images, None, stats=ImageStats.PIXEL_MISSING, per_channel=False)
+
+        # Global mode should count: 3 NaN values / 12 total values = 0.25
+        expected_missing = 3 / 12
+        assert result["stats"]["missing"][0] == pytest.approx(expected_missing, abs=1e-4)
+
+    def test_missing_per_channel_mode(self):
+        """Test that per-channel missing calculation is correct."""
+        # Same image as above
+        images = [
+            np.array(
+                [
+                    [[np.nan, 1.0], [1.0, 1.0]],  # Channel 0: 1 NaN / 4 = 0.25
+                    [[np.nan, np.nan], [1.0, 1.0]],  # Channel 1: 2 NaN / 4 = 0.5
+                    [[1.0, 1.0], [1.0, 1.0]],  # Channel 2: 0 NaN / 4 = 0.0
+                ]
+            )
+        ]
+
+        result = calculate(images, None, stats=ImageStats.PIXEL_MISSING, per_channel=True)
+
+        # Per-channel mode should return list with one value per channel
+        assert len(result["stats"]["missing"]) == 3
+        assert result["stats"]["missing"][0] == pytest.approx(0.25, abs=1e-4)
+        assert result["stats"]["missing"][1] == pytest.approx(0.5, abs=1e-4)
+        assert result["stats"]["missing"][2] == pytest.approx(0.0, abs=1e-4)
+
+    def test_missing_single_channel_image(self):
+        """Test missing calculation for single-channel image."""
+        # Single channel (1, 3, 3) with 2 NaNs out of 9 pixels
+        images = [np.array([[[np.nan, 1.0, 1.0], [1.0, np.nan, 1.0], [1.0, 1.0, 1.0]]])]
+
+        result = calculate(images, None, stats=ImageStats.PIXEL_MISSING, per_channel=False)
+
+        # 2 NaNs / 9 total = 0.222...
+        expected_missing = 2 / 9
+        assert result["stats"]["missing"][0] == pytest.approx(expected_missing, abs=1e-4)
+
+    def test_zeros_global_mode_counts_all_channels(self):
+        """Test that global zeros calculation counts across all channels correctly.
+
+        Regression test for bug where global mode counted spatial positions where
+        all channels were zero, instead of counting individual zero pixel values.
+        """
+        # Create a 3-channel image (3, 2, 2) with specific zero pattern
+        # Channel 0: 1 zero out of 4 pixels
+        # Channel 1: 2 zeros out of 4 pixels
+        # Channel 2: 0 zeros out of 4 pixels
+        # Total: 3 zeros out of 12 pixel values
+        images = [
+            np.array(
+                [
+                    [[0.0, 1.0], [1.0, 1.0]],  # Channel 0: 1 zero
+                    [[0.0, 0.0], [1.0, 1.0]],  # Channel 1: 2 zeros
+                    [[1.0, 1.0], [1.0, 1.0]],  # Channel 2: 0 zeros
+                ]
+            )
+        ]
+
+        result = calculate(images, None, stats=ImageStats.PIXEL_ZEROS, per_channel=False)
+
+        # Global mode should count: 3 zero values / 12 total values = 0.25
+        expected_zeros = 3 / 12
+        assert result["stats"]["zeros"][0] == pytest.approx(expected_zeros, abs=1e-4)
+
+    def test_zeros_per_channel_mode(self):
+        """Test that per-channel zeros calculation is correct."""
+        # Same image as above
+        images = [
+            np.array(
+                [
+                    [[0.0, 1.0], [1.0, 1.0]],  # Channel 0: 1 zero / 4 = 0.25
+                    [[0.0, 0.0], [1.0, 1.0]],  # Channel 1: 2 zeros / 4 = 0.5
+                    [[1.0, 1.0], [1.0, 1.0]],  # Channel 2: 0 zeros / 4 = 0.0
+                ]
+            )
+        ]
+
+        result = calculate(images, None, stats=ImageStats.PIXEL_ZEROS, per_channel=True)
+
+        # Per-channel mode should return list with one value per channel
+        assert len(result["stats"]["zeros"]) == 3
+        assert result["stats"]["zeros"][0] == pytest.approx(0.25, abs=1e-4)
+        assert result["stats"]["zeros"][1] == pytest.approx(0.5, abs=1e-4)
+        assert result["stats"]["zeros"][2] == pytest.approx(0.0, abs=1e-4)
+
+    def test_zeros_single_channel_image(self):
+        """Test zeros calculation for single-channel image."""
+        # Single channel (1, 3, 3) with 2 zeros out of 9 pixels
+        images = [np.array([[[0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 1.0]]])]
+
+        result = calculate(images, None, stats=ImageStats.PIXEL_ZEROS, per_channel=False)
+
+        # 2 zeros / 9 total = 0.222...
+        expected_zeros = 2 / 9
+        assert result["stats"]["zeros"][0] == pytest.approx(expected_zeros, abs=1e-4)
+
+    def test_zeros_all_zeros_image(self):
+        """Test zeros calculation when entire image is zeros."""
+        images = [np.zeros((3, 10, 10))]
+
+        result = calculate(images, None, stats=ImageStats.PIXEL_ZEROS, per_channel=False)
+
+        # All pixels are zero, so should be 1.0
+        assert result["stats"]["zeros"][0] == pytest.approx(1.0, abs=1e-4)
+
+    def test_missing_all_nans_image(self):
+        """Test missing calculation when entire image is NaN."""
+        images = [np.full((3, 10, 10), np.nan)]
+
+        result = calculate(images, None, stats=ImageStats.PIXEL_MISSING, per_channel=False)
+
+        # All pixels are NaN, so should be 1.0
+        assert result["stats"]["missing"][0] == pytest.approx(1.0, abs=1e-4)
+
 
 class TestVisualStats:
     @pytest.mark.parametrize("n_channels", [1, 3])
