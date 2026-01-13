@@ -175,7 +175,7 @@ class OutliersOutput(Output[TDataFrame]):
         >>> results = outliers.evaluate(dataset)
         >>> summary = results.aggregate_by_metric()
         >>> summary
-        shape: (6, 2)
+        shape: (7, 2)
         ┌─────────────┬───────┐
         │ metric_name ┆ Total │
         │ ---         ┆ ---   │
@@ -187,6 +187,7 @@ class OutliersOutput(Output[TDataFrame]):
         │ kurtosis    ┆ 1     │
         │ skew        ┆ 1     │
         │ std         ┆ 1     │
+        │ zeros       ┆ 1     │
         └─────────────┴───────┘
         """
         # Handle the case where self.issues might be a list of DataFrames
@@ -231,23 +232,23 @@ class OutliersOutput(Output[TDataFrame]):
         >>> results = outliers.evaluate(dataset)
         >>> summary = results.aggregate_by_item()
         >>> summary
-        shape: (10, 16)
-        ┌─────────┬───────────┬────────────┬──────────┬───┬─────┬─────┬───────┬───────┐
-        │ item_id ┆ target_id ┆ brightness ┆ contrast ┆ … ┆ std ┆ var ┆ width ┆ Total │
-        │ ---     ┆ ---       ┆ ---        ┆ ---      ┆   ┆ --- ┆ --- ┆ ---   ┆ ---   │
-        │ i64     ┆ i64       ┆ u32        ┆ u32      ┆   ┆ u32 ┆ u32 ┆ u32   ┆ u32   │
-        ╞═════════╪═══════════╪════════════╪══════════╪═══╪═════╪═════╪═══════╪═══════╡
-        │ 0       ┆ null      ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 0     ┆ 1     │
-        │ 0       ┆ 0         ┆ 1          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 0     ┆ 4     │
-        │ 1       ┆ 0         ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 0     ┆ 1     │
-        │ 2       ┆ null      ┆ 1          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 0     ┆ 5     │
-        │ 2       ┆ 0         ┆ 1          ┆ 0        ┆ … ┆ 0   ┆ 1   ┆ 0     ┆ 4     │
-        │ 2       ┆ 1         ┆ 1          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 0     ┆ 4     │
-        │ 4       ┆ null      ┆ 1          ┆ 1        ┆ … ┆ 1   ┆ 1   ┆ 1     ┆ 8     │
-        │ 4       ┆ 0         ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 0     ┆ 1     │
-        │ 5       ┆ 0         ┆ 1          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 0     ┆ 4     │
-        │ 7       ┆ 2         ┆ 1          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 0     ┆ 4     │
-        └─────────┴───────────┴────────────┴──────────┴───┴─────┴─────┴───────┴───────┘
+        shape: (10, 17)
+        ┌─────────┬───────────┬────────────┬──────────┬───┬─────┬───────┬───────┬───────┐
+        │ item_id ┆ target_id ┆ brightness ┆ contrast ┆ … ┆ var ┆ width ┆ zeros ┆ Total │
+        │ ---     ┆ ---       ┆ ---        ┆ ---      ┆   ┆ --- ┆ ---   ┆ ---   ┆ ---   │
+        │ i64     ┆ i64       ┆ u32        ┆ u32      ┆   ┆ u32 ┆ u32   ┆ u32   ┆ u32   │
+        ╞═════════╪═══════════╪════════════╪══════════╪═══╪═════╪═══════╪═══════╪═══════╡
+        │ 0       ┆ null      ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0     ┆ 1     ┆ 2     │
+        │ 0       ┆ 0         ┆ 1          ┆ 0        ┆ … ┆ 0   ┆ 0     ┆ 0     ┆ 4     │
+        │ 1       ┆ 0         ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0     ┆ 0     ┆ 1     │
+        │ 2       ┆ null      ┆ 1          ┆ 0        ┆ … ┆ 0   ┆ 0     ┆ 0     ┆ 5     │
+        │ 2       ┆ 0         ┆ 1          ┆ 0        ┆ … ┆ 1   ┆ 0     ┆ 0     ┆ 4     │
+        │ 2       ┆ 1         ┆ 1          ┆ 0        ┆ … ┆ 0   ┆ 0     ┆ 0     ┆ 4     │
+        │ 4       ┆ null      ┆ 1          ┆ 1        ┆ … ┆ 1   ┆ 1     ┆ 0     ┆ 8     │
+        │ 4       ┆ 0         ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0     ┆ 0     ┆ 1     │
+        │ 5       ┆ 0         ┆ 1          ┆ 0        ┆ … ┆ 0   ┆ 0     ┆ 0     ┆ 4     │
+        │ 7       ┆ 2         ┆ 1          ┆ 0        ┆ … ┆ 0   ┆ 0     ┆ 0     ┆ 4     │
+        └─────────┴───────────┴────────────┴──────────┴───┴─────┴───────┴───────┴───────┘
         """
         # Handle the case where self.issues might be a list of DataFrames
         if not isinstance(self.issues, pl.DataFrame):
