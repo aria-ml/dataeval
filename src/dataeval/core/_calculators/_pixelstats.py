@@ -70,12 +70,12 @@ class PixelStatCalculator(Calculator[ImageStats]):
             return (
                 np.count_nonzero(np.isnan(self.cache.per_channel), axis=1) / self.cache.per_channel.shape[1]
             ).tolist()
-        return [float(np.count_nonzero(np.isnan(self.cache.image)) / np.prod(self.cache.shape[-2:]))]
+        return [float(np.count_nonzero(np.isnan(self.cache.image)) / self.cache.image.size)]
 
     def _zeros(self) -> list[float]:
         if self.per_channel_mode:
             return (np.count_nonzero(self.cache.per_channel == 0, axis=1) / self.cache.per_channel.shape[1]).tolist()
-        return [float(np.count_nonzero(np.sum(self.cache.image, axis=0) == 0) / np.prod(self.cache.shape[-2:]))]
+        return [float(np.count_nonzero(self.cache.image == 0) / self.cache.image.size)]
 
     def _histogram(self) -> list[Any]:
         if self.per_channel_mode:
