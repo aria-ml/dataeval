@@ -523,7 +523,7 @@ def resize(image: NDArray[np.uint8], resize_dim: int, use_pil: bool = True) -> N
         return np.array(Image.fromarray(image).resize((resize_dim, resize_dim), Image.Resampling.LANCZOS))
 
     zoom_factors = (resize_dim / image.shape[0], resize_dim / image.shape[1])
-    return np.clip(zoom(image, zoom_factors, order=5, mode="reflect"), 0, 255, dtype=np.uint8)
+    return np.clip(np.asarray(zoom(image, zoom_factors, order=5, mode="reflect")), 0, 255, dtype=np.uint8)
 
 
 def to_canonical_grayscale(image: NDArray[Any]) -> NDArray[np.uint8]:
