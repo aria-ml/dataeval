@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,57,38
+/aria-ml/dataeval/tree/main/src/dataeval/core,10,4
+/aria-ml/dataeval/tree/main/src/dataeval,9,4
+/aria-ml/dataeval/tree/v0.93.1/src/dataeval/outputs,6,2
+/aria-ml/dataeval/branches/all,6,1
+/aria-ml/dataeval/tree/main/src,4,4
+/aria-ml/dataeval/tree/v0.93.1/src/dataeval,4,2
+/aria-ml/dataeval/blob/v0.65.0/docs/reference/detectors/drift_mmd.md,4,1
+/aria-ml/dataeval/branches,3,1
+/aria-ml/dataeval/blob/main/docs/installation.md,2,2
