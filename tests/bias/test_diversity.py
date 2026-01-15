@@ -124,17 +124,17 @@ class TestDiversityFunctional:
         [
             (
                 to_metadata({"factor1": [5, 5, 5, 6, 6, 6]}, [0, 0, 0, 1, 1, 1], {}),
-                1.0,
+                [1.0, 1.0],
                 0.0,
             ),
             (
                 to_metadata({"factor1": [5.1, 4.9, 4.9, 6.1, 6.2, 6.1]}, [0, 0, 0, 1, 1, 1], {"factor1": 2}),
-                1.0,
+                [1.0, 1.0],
                 0.0,
             ),
             (
                 to_metadata({"factor1": [5, 5, 5, 5, 5, 5]}, [0, 0, 0, 1, 1, 1], {}),
-                0.0,
+                [1.0, 0.0],
                 0.0,
             ),
         ],
@@ -145,7 +145,7 @@ class TestDiversityFunctional:
 
         # Check factors DataFrame
         diversity_values = result.factors["diversity_value"].to_numpy()
-        np.testing.assert_array_almost_equal(diversity_values, [expected_diversity])
+        np.testing.assert_array_almost_equal(diversity_values, expected_diversity)
 
         # Check classwise DataFrame
         classwise_values = result.classwise["diversity_value"].to_numpy()
@@ -157,17 +157,17 @@ class TestDiversityFunctional:
         [
             (
                 to_metadata({"factor1": [5, 5, 5, 6, 6, 6]}, [0, 0, 0, 1, 1, 1], {}),
-                1.0,
+                [1.0, 1.0],
                 0.0,
             ),
             (
                 to_metadata({"factor1": [5.1, 4.9, 4.9, 6.1, 6.2, 6.1]}, [0, 0, 0, 1, 1, 1], {"factor1": 2}),
-                1.0,
+                [1.0, 1.0],
                 0.0,
             ),
             (
                 to_metadata({"factor1": [5, 5, 5, 5, 5, 5]}, [0, 0, 0, 1, 1, 1], {}),
-                0.0,
+                [1.0, 0.0],
                 0.0,
             ),
         ],
@@ -178,7 +178,7 @@ class TestDiversityFunctional:
 
         # Check factors DataFrame
         diversity_values = result.factors["diversity_value"].to_numpy()
-        np.testing.assert_array_almost_equal(diversity_values, [expected_diversity])
+        np.testing.assert_array_almost_equal(diversity_values, expected_diversity)
 
         # Check classwise DataFrame
         classwise_values = result.classwise["diversity_value"].to_numpy()

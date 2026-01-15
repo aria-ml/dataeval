@@ -149,10 +149,10 @@ class Balance:
         │ ---         ┆ ---      │
         │ cat         ┆ f64      │
         ╞═════════════╪══════════╡
-        │ class_label ┆ 0.888187 │
-        │ age         ┆ 0.251485 │
-        │ gender      ┆ 0.00399  │
-        │ income      ┆ 0.362771 │
+        │ class_label ┆ 1.0      │
+        │ age         ┆ 0.208476 │
+        │ gender      ┆ 0.075259 │
+        │ income      ┆ 0.312287 │
         └─────────────┴──────────┘
 
         >>> result.factors
@@ -171,19 +171,21 @@ class Balance:
         └─────────┴─────────┴──────────┴───────────────┘
 
         >>> result.classwise
-        shape: (9, 4)
+        shape: (12, 4)
         ┌────────────┬─────────────┬──────────┬───────────────┐
         │ class_name ┆ factor_name ┆ mi_value ┆ is_imbalanced │
         │ ---        ┆ ---         ┆ ---      ┆ ---           │
         │ cat        ┆ cat         ┆ f64      ┆ bool          │
         ╞════════════╪═════════════╪══════════╪═══════════════╡
         │ artist     ┆ age         ┆ 0.301469 ┆ true          │
+        │ artist     ┆ class_label ┆ 0.68855  ┆ true          │
         │ artist     ┆ gender      ┆ 0.04493  ┆ false         │
         │ artist     ┆ income      ┆ 0.250237 ┆ false         │
         │ doctor     ┆ age         ┆ 0.164287 ┆ false         │
-        │ doctor     ┆ gender      ┆ 0.095962 ┆ false         │
+        │ …          ┆ …           ┆ …        ┆ …             │
         │ doctor     ┆ income      ┆ 0.46587  ┆ true          │
         │ teacher    ┆ age         ┆ 0.137221 ┆ false         │
+        │ teacher    ┆ class_label ┆ 0.70528  ┆ true          │
         │ teacher    ┆ gender      ┆ 0.018392 ┆ false         │
         │ teacher    ┆ income      ┆ 0.160404 ┆ false         │
         └────────────┴─────────────┴──────────┴───────────────┘
@@ -225,15 +227,17 @@ class Balance:
         mi_value_col: list[float] = []
         is_imbalanced_col: list[bool] = []
 
+        # Include class_label as the first factor (index 0), then all metadata factors
+        all_factor_names = ["class_label"] + factor_names
+
         for class_idx in range(classwise.shape[0]):
             class_name = (
                 self.metadata.index2label[class_idx] if class_idx in self.metadata.index2label else str(class_idx)
             )
-            # Skip the first column (class_label's own MI with the binary class indicator)
-            for factor_idx in range(1, classwise.shape[1]):
+            for factor_idx in range(classwise.shape[1]):
                 mi_value = classwise[class_idx, factor_idx]
                 class_name_col.append(class_name)
-                factor_name_col.append(factor_names[factor_idx - 1])
+                factor_name_col.append(all_factor_names[factor_idx])
                 mi_value_col.append(float(mi_value))
                 is_imbalanced_col.append(bool(mi_value > self.class_imbalance_threshold))
 

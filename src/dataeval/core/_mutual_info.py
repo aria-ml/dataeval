@@ -58,7 +58,7 @@ def _validate_num_neighbors(num_neighbors: int) -> int:
 def _merge_labels_and_factors(
     class_labels: NDArray[np.intp], factor_data: NDArray[np.intp], discrete_features: Iterable[bool] | None
 ) -> tuple[NDArray[np.intp], list[bool]]:
-    discrete_features = [False] + (
+    discrete_features = [True] + (
         [not is_continuous(d) for d in factor_data.T] if discrete_features is None else list(discrete_features)
     )
 
@@ -148,7 +148,7 @@ def mutual_info(
 
     >>> result = mutual_info(class_labels=class_labels, factor_data=binned_data)
     >>> result["class_to_factor"]
-    array([0.888, 0.251, 0.004, 0.363])
+    array([1.   , 0.208, 0.075, 0.312])
     >>> result["interfactor"]
     array([[1.   , 0.046, 0.078],
            [0.046, 1.   , 0.048],
@@ -271,9 +271,9 @@ def mutual_info_classwise(
     Return classwise balance (mutual information) of factors with individual class_labels
 
     >>> mutual_info_classwise(class_labels=class_labels, factor_data=binned_data)
-    array([[0.748, 0.164, 0.096, 0.466],
-           [0.692, 0.301, 0.045, 0.25 ],
-           [0.708, 0.137, 0.018, 0.16 ]])
+    array([[0.745, 0.164, 0.096, 0.466],
+           [0.689, 0.301, 0.045, 0.25 ],
+           [0.705, 0.137, 0.018, 0.16 ]])
 
     See Also
     --------
