@@ -47,11 +47,12 @@ jobs:
           cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies
-        run: uv pip install nox nox-uv --system
+        run: uv tool install nox --with nox-uv
 
       - name: Build documentation
-        run: nox -e docs
+        run: uvx nox -e docs
         env:
+          DATAEVAL_NOX_UV_EXTRAS_OVERRIDE=cpu
           LANG: C
           PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
           PYDEVD_DISABLE_FILE_VALIDATION: '1'
@@ -90,10 +91,10 @@ jobs:
           cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies
-        run: uv pip install nox nox-uv --system
+        run: uv tool install nox --with nox-uv
 
       - name: Run doclint
-        run: nox -e doclint
+        run: uvx nox -e doclint
 
   doctest:
     name: Documentation Tests
@@ -113,10 +114,10 @@ jobs:
           cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies
-        run: uv pip install nox nox-uv --system
+        run: uv tool install nox --with nox-uv
 
       - name: Run doctest
-        run: nox -e doctest
+        run: uvx nox -e doctest
 
   linkcheck:
     name: Check Markdown Links

@@ -5,28 +5,28 @@ lint:
     - .nox
     - .rules_main_mr_skip_cache_update
   script:
-    - nox -e lint
+    - uvx nox -e lint
 
 minimum install:
   extends:
     - .nox_all
     - .rules_main_mr_code
   script:
-    - nox -e deps
+    - uvx nox -e deps
 
 typecheck:
   extends:
     - .nox_all
     - .rules_main_mr_code
   script:
-    - nox -e type
+    - uvx nox -e type
 
 test:
   extends:
     - .nox_all
     - .rules_main_mr
   script:
-    - nox -e test
+    - uvx nox -e test
   artifacts:
     reports:
       junit: output/junit.*.xml
@@ -45,4 +45,4 @@ verify lock:
     - .nox
     - .rules_main_mr_deps
   script:
-    - nox -e check
+    - uvx nox -e check
