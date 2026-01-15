@@ -56,11 +56,11 @@ class TestBalanceMergeLabelsAndFactors:
     def test_without_discrete_features(self):
         data, discrete_features = _merge_labels_and_factors(CLASS_LABELS, FACTOR_DATA, None)
         assert data.shape == (FACTOR_DATA.shape[0], FACTOR_DATA.shape[1] + 1)
-        assert discrete_features == [False, True, True, False]
+        assert discrete_features == [True, True, True, False]
 
     def test_provided_discrete_features(self):
         provided_discrete_features = [False, True, False]
-        expected_discrete_features = [False] + provided_discrete_features
+        expected_discrete_features = [True] + provided_discrete_features
 
         data, discrete_features = _merge_labels_and_factors(CLASS_LABELS, FACTOR_DATA, provided_discrete_features)
         assert data.shape == (FACTOR_DATA.shape[0], FACTOR_DATA.shape[1] + 1)
@@ -68,7 +68,7 @@ class TestBalanceMergeLabelsAndFactors:
 
     def test_provided_discrete_features_override_unique(self):
         provided_discrete_features = [False, True, True]
-        expected_discrete_features = [False, False, True, False]
+        expected_discrete_features = [True, False, True, False]
 
         data, discrete_features = _merge_labels_and_factors(CLASS_LABELS, FACTOR_DATA, provided_discrete_features)
         assert data.shape == (FACTOR_DATA.shape[0], FACTOR_DATA.shape[1] + 1)
@@ -90,7 +90,7 @@ class TestBalanceFunctional:
         assert len(result["class_to_factor"]) == FACTOR_DATA.shape[1] + 1
         np.testing.assert_allclose(
             result["class_to_factor"],
-            np.array([0.255898, 0.032484, 0.0, 0.036158]),
+            np.array([1.0, 0.4, 0.029049, 0.0]),
             atol=1e-6,
         )
 
@@ -100,6 +100,6 @@ class TestBalanceFunctional:
         np.testing.assert_allclose(result["interfactor"], result["interfactor"].T, atol=1e-6)
         np.testing.assert_allclose(
             result["interfactor"],
-            np.array([[1.0, 0.8, 0.55596], [0.8, 1.0, 0.785557], [0.55596, 0.785557, 0.705458]]),
+            np.array([[1.0, 0.8, 0.729606], [0.8, 1.0, 0.70399], [0.729606, 0.70399, 0.621398]]),
             atol=1e-6,
         )

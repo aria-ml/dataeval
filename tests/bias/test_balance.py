@@ -122,7 +122,7 @@ class TestBalanceUnit:
 
         # Check classwise DataFrame
         assert isinstance(result.classwise, pl.DataFrame)
-        assert result.classwise.height == num_classes * num_factors
+        assert result.classwise.height == num_classes * (num_factors + 1)
 
         # Check classwise DataFrame schema
         assert set(result.classwise.schema.keys()) == {
