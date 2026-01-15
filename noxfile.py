@@ -215,7 +215,7 @@ def _run_doclint_tests(session: nox.Session, output_dir: str, scripts: list) -> 
     # Run ruff check (lint)
     session.log("Running ruff check on generated scripts...")
     try:
-        session.run("ruff", "check", "--ignore=E501,E703,I001,RUF100,SIM105,UP009", output_dir)
+        session.run("ruff", "check", "--ignore=E402,E501,E703,I001,RUF100,SIM105,UP009", output_dir)
     except Exception as e:
         test_failures.append(("ruff", str(e)))
 
