@@ -30,6 +30,8 @@ __all__ = [
     "nullmodel_recall",
     "parity",
     "pchash",
+    "rank_hdbscan_complexity",
+    "rank_hdbscan_distance",
     "rank_knn",
     "rank_kmeans_distance",
     "rank_kmeans_complexity",
@@ -62,6 +64,12 @@ from dataeval.core._nullmodel import (
     nullmodel_recall,
 )
 from dataeval.core._parity import parity
-from dataeval.core._rank import rank_kmeans_complexity, rank_kmeans_distance, rank_knn
+from dataeval.core._rank import (
+    rank_hdbscan_complexity,
+    rank_hdbscan_distance,
+    rank_kmeans_complexity,
+    rank_kmeans_distance,
+    rank_knn,
+)
 from dataeval.core._rerank import rerank_class_balance, rerank_hard_first, rerank_stratified
 from dataeval.core._uap import uap

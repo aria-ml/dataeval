@@ -27,19 +27,18 @@ class TestMatrixOps:
         test_sets = (rand_arr, dup_arr)
 
         for test_set in test_sets:
-            c = cluster(test_set)
+            for alg in ["hdbscan", "kmeans"]:
+                c = cluster(test_set, algorithm=alg)  # type: ignore
 
-            # Distance matrix
-            assert not np.any(np.isnan(c["k_distances"]))  # Should contain no NaN
-            assert (c["k_distances"] >= 0).all()  # Distances are always positive or 0 (same data point)
+                # Distance matrix
+                assert not np.any(np.isnan(c["k_distances"]))  # Should contain no NaN
+                assert (c["k_distances"] >= 0).all()  # Distances are always positive or 0 (same data point)
 
-            # Minimum spanning tree
-            assert not np.any(np.isnan(c["mst"]))  # Should contain no NaN
-            print(c["mst"])
+                # Minimum spanning tree
+                assert not np.any(np.isnan(c["mst"]))  # Should contain no NaN
 
-            # Linkage arr
-            assert not np.any(np.isnan(c["linkage_tree"]))  # Should contain no NaN
-            print(c["linkage_tree"])
+                # Linkage arr
+                assert not np.any(np.isnan(c["linkage_tree"]))  # Should contain no NaN
 
 
 @pytest.mark.required
@@ -60,16 +59,18 @@ class TestClustererValidate:
         # import on runtime to minimize load times
         from dataeval.core._clusterer import cluster
 
-        with pytest.raises(error) as e:
-            cluster(data)
-        assert e.value.args[0] == error_msg
+        for alg in ["hdbscan", "kmeans"]:
+            with pytest.raises(error) as e:
+                cluster(data, algorithm=alg)  # type: ignore
+            assert e.value.args[0] == error_msg
 
     def test_valid(self):
         # import on runtime to minimize load times
         from dataeval.core._clusterer import cluster
 
         data = np.ones((2, 1, 2, 3, 4))
-        cluster(data.reshape((2, -1)))
+        for alg in ["hdbscan", "kmeans"]:
+            cluster(data.reshape((2, -1)), algorithm=alg)  # type: ignore
 
 
 def get_blobs(std=0.3) -> np.typing.NDArray[np.float64]:
@@ -122,21 +123,21 @@ class TestClusterer:
         from dataeval.core._clusterer import cluster
 
         dataset = request.getfixturevalue(data_func)
-        cl = cluster(dataset)
+        for alg in ["hdbscan", "kmeans"]:
+            cl = cluster(dataset)
 
-        # clusters are counting numbers >= -1
-        assert (cl["clusters"] >= -1).all()
-        assert np.issubdtype(cl["clusters"].dtype, np.integer)
+            # clusters are counting numbers >= -1
+            assert (cl["clusters"] >= -1).all()
+            assert np.issubdtype(cl["clusters"].dtype, np.integer)
 
-    def test_functional(self, functional_data):
+    def test_hdbscan_functional(self, functional_data):
         """The results of evaluate are equivalent to the known outputs"""
         from dataeval.core._clusterer import cluster
 
-        cl = cluster(functional_data)
+        cl = cluster(functional_data, algorithm="hdbscan")
 
         assert cl["mst"] is not None
         assert cl["linkage_tree"] is not None
-        assert cl["condensed_tree"] is not None
 
         # fmt: off
         assert cl["clusters"].tolist() == [
@@ -145,5 +146,24 @@ class TestClusterer:
             3, 3, 2, 4, 3, 1, 4, 4, 4, 3, 1, 4, 0, 2, 0, 1, 3, 3, 1, 0, 4, 3,
             2, 2, 1, 0, 4, 0, 1, 3, 4, 4, 4, 0, 0, 2, 0, 0, 0, 0, 1, 0, 1, 2,
             1, 1, 3, 0, 4, 0, 4, 2, 1, 0, 0, 2
+        ]
+        # fmt: on
+
+    def test_kmeans_functional(self, functional_data):
+        """The results of evaluate are equivalent to the known outputs"""
+        from dataeval.core._clusterer import cluster
+
+        cl = cluster(functional_data, algorithm="kmeans", n_clusters=5)
+
+        assert cl["mst"] is not None
+        assert cl["linkage_tree"] is not None
+
+        # fmt: off
+        assert cl["clusters"].tolist() == [
+            3, 2, 3, 3, 3, 4, 4, 1, 1, 2, 4, 3, 1, 3, 0, 3, 3, 1, 4, 1, 2, 4,
+            3, 0, 3, 0, 4, 1, 2, 1, 3, 0, 1, 1, 0, 4, 3, 4, 0, 1, 0, 0, 4, 0,
+            4, 4, 3, 1, 4, 0, 1, 1, 1, 4, 0, 1, 2, 3, 2, 0, 4, 4, 0, 2, 1, 4,
+            3, 3, 0, 2, 4, 2, 0, 4, 1, 1, 1, 2, 2, 3, 2, 2, 2, 2, 0, 2, 0, 3,
+            0, 0, 4, 2, 1, 2, 1, 3, 0, 2, 2, 3
         ]
         # fmt: on
