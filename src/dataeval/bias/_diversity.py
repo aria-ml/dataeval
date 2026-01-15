@@ -137,12 +137,13 @@ class Diversity:
         >>> diversity = Diversity(method="simpson", threshold=0.5)
         >>> result = diversity.evaluate(metadata)
         >>> result.factors
-        shape: (3, 3)
+        shape: (4, 3)
         ┌─────────────┬─────────────────┬──────────────────┐
         │ factor_name ┆ diversity_value ┆ is_low_diversity │
         │ ---         ┆ ---             ┆ ---              │
         │ cat         ┆ f64             ┆ bool             │
         ╞═════════════╪═════════════════╪══════════════════╡
+        │ class_label ┆ 0.937608        ┆ false            │
         │ age         ┆ 0.907669        ┆ false            │
         │ gender      ┆ 0.992826        ┆ false            │
         │ income      ┆ 0.954334        ┆ false            │
@@ -198,11 +199,13 @@ class Diversity:
 
         # Create factors DataFrame
         # diversity_index[0] is class_labels, [1:] are the metadata factors
+        # Include class_label as the first factor (index 0), then all metadata factors
+        all_factor_names = ["class_label"] + list(factor_names)
         factors_df = pl.DataFrame(
             {
-                "factor_name": factor_names,
-                "diversity_value": diversity_index[1:],
-                "is_low_diversity": (diversity_index[1:] <= self.threshold).astype(bool),
+                "factor_name": all_factor_names,
+                "diversity_value": diversity_index,
+                "is_low_diversity": (diversity_index <= self.threshold).astype(bool),
             },
             schema={
                 "factor_name": pl.Categorical("lexical"),
