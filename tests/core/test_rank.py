@@ -3,10 +3,10 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from dataeval.core._rank import (
+from dataeval.core._clusterer import (
     _Clusters,
-    _KMeansComplexitySorter,
-    _KMeansDistanceSorter,
+    _ComplexitySorter,
+    _DistanceSorter,
     _KNNSorter,
 )
 
@@ -66,38 +66,48 @@ class TestSorters:
         assert len(caplog.records) >= 1
 
     def test_kmeans_distance_sorter(self):
-        sorter = _KMeansDistanceSorter(c=2, samples=len(self.embeddings))
+        sorter = _DistanceSorter(samples=len(self.embeddings), algorithm="kmeans", c=2)
         inds = sorter._sort(self.embeddings)
         assert inds.shape == (10,)
 
     def test_kmeans_distance_sorter_with_reference(self):
-        sorter = _KMeansDistanceSorter(c=2, samples=len(self.embeddings))
+        sorter = _DistanceSorter(samples=len(self.embeddings), algorithm="kmeans", c=2)
         inds = sorter._sort(self.embeddings, self.reference)
         assert inds.shape == (10,)
 
     def test_kmeans_complexity_sorter(self):
-        sorter = _KMeansComplexitySorter(c=2, samples=len(self.embeddings))
+        sorter = _ComplexitySorter(samples=len(self.embeddings), algorithm="kmeans", c=2)
         inds = sorter._sort(self.embeddings)
         assert inds.shape == (10,)
 
-    def test_kmeans_complexity_sorter_with_reference(self):
-        sorter = _KMeansComplexitySorter(c=2, samples=len(self.embeddings))
-        inds = sorter._sort(self.embeddings, self.reference)
-        assert inds.shape == (10,)
+    def test_complexity_sorter_with_reference(self):
+        for alg in ["hdbscan", "kmeans"]:
+            sorter = _ComplexitySorter(samples=len(self.embeddings), algorithm=alg, c=2)  # type: ignore
+            inds = sorter._sort(self.embeddings, self.reference)
+            assert inds.shape == (10,)
 
     def test_kmeans_sorter_with_c_zero(self):
-        sorter = _KMeansComplexitySorter(c=0, samples=len(self.embeddings))
-        assert sorter._c == int(np.sqrt(len(self.embeddings)))
+        sorter = _ComplexitySorter(samples=len(self.embeddings), algorithm="kmeans", c=0)
+        assert sorter._clusterer._c == int(np.sqrt(len(self.embeddings)))  # type: ignore
 
     def test_kmeans_sorter_with_c_greater_than_samples_raises_valueerror(self):
         with pytest.raises(ValueError):
-            _KMeansComplexitySorter(c=10, samples=10)
+            _ComplexitySorter(samples=10, algorithm="kmeans", c=10)
 
-    @patch("dataeval.core._rank.KMeans")
+    @patch("dataeval.core._clusterer.KMeans")
     def test_kmeans_sorter_kmeans_returns_none(self, mock_kmeans_cls):
         mock_kmeans = mock_kmeans_cls.return_value
         mock_kmeans.labels_ = None
         mock_kmeans.cluster_centers_ = None
-        sorter = _KMeansDistanceSorter(c=2, samples=len(self.embeddings))
+        sorter = _DistanceSorter(samples=len(self.embeddings), algorithm="kmeans", c=2)
+        with pytest.raises(ValueError):
+            sorter._sort(self.embeddings)
+
+    @patch("dataeval.core._clusterer._HDBSCAN")
+    def test_hdbscan_sorter_hdbscan_returns_none(self, mock_cls):
+        mock_hdbscan = mock_cls.return_value
+        mock_hdbscan.labels_ = None
+        mock_hdbscan.cluster_centers_ = None
+        sorter = _DistanceSorter(samples=len(self.embeddings), algorithm="hdbscan", c=2)
         with pytest.raises(ValueError):
             sorter._sort(self.embeddings)

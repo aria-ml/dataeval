@@ -688,7 +688,7 @@ class Outliers:
         # Compute cluster statistics
         cluster_stats = compute_cluster_stats(
             embeddings=embeddings_array,
-            clusters=cluster_result["clusters"],
+            cluster_labels=cluster_result["clusters"],
         )
 
         # Find outliers using adaptive method
