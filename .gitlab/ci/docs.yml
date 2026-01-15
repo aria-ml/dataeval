@@ -2,19 +2,22 @@
 
 docs:
   stage: docs
-  extends: 
-    - .nox_docs
+  extends:
+    - .nox
     - .rules_main_mr_docs
   needs: []
   tags:
     - $DOCS_RUNNER_TAG
   script:
+    - apt update && apt install graphviz -y
     - uvx nox -e docs $DOCS_CLEAN
   artifacts:
     paths:
       - output/docs/.jupyter_cache/
       - output/docs/html/
     when: always
+  variables:
+    DATAEVAL_NOX_UV_EXTRAS_OVERRIDE: cu124
 
 doclint:
   stage: docs
