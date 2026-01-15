@@ -1,6 +1,70 @@
-[//]: # (880070f74fccefce92f632808c42ec176ec671e7)
+[//]: # (a10f5e7f209c2f7f537e80943950ff2b921439ff)
 
 # DataEval Change Log
+
+## v0.94.0
+
+🌟 **Feature Release**
+- `1765195b` - Adding in detection of label errors through clustering
+- `7481c4c3` - Refactor evaluate into private helper methods.
+- `67445937` - Release new config-based Sufficiency API
+- `f37da8f1` - Add calculate_ratio function to replace boxratiostats
+
+🚧 **Deprecations and Removals**
+- `e8d6fce3` - Remove matplotlib dependency and switch to dataeval-plots package for visualization
+- `ee320402` - Remove dataeval.metrics.estimators
+- `8fe4ba33` - Remove dataeval.metrics.stats
+
+🛠️ **Improvements and Enhancements**
+- `d9be329b` - Overhaul OOD classes and concept page
+- `938735b5` - Fix duplicates and enhance functionality
+- `05fabdd2` - Add Class Balance concept page
+- `711f367b` - Refactor evaluators.drift module into shift
+- `0beae0e5` - Overhaul Drift classes and concept page
+- `9d7789a0` - Move prioritize to be its own independent class
+- `653976a2` - Add config for global batch_size
+- `644c3290` - Transform mutual information rather than normalizing, for output of balance metric
+- `da508d46` - Remove torchvision and ResNet18 wrapper
+- `76e8de4f` - Refactor bias, performance and quality modules
+- `6196502c` - Refactor data module to root
+- `cb0dec38` - Switch additional output classes as polars outputs
+- `faadfab2` - Update Class Balance selection to handle OD datasets
+- `b4082246` - [impr] Allow object detection Metadata objects to pivot on per-image and per-target
+- `a5532207` - Update bias evaluators to be stateful classes
+- `3a5e875b` - Normalize parity output using Cramer's V
+- `21801449` - Add logging and convert warnings in core
+- `87d401c6` - Re-implementation of Completeness metric
+- `5c6cca7f` - Remove `metrics` and `outputs` submodules and refactor `detectors` as `evaluators`
+- `1749165c` - Normalize aspect ratio stat in dimensionstats
+- `7bcc33cb` - [feat] Add selection resolution feature to Select datasets
+- `1f5f702d` - [misc] Refactor and move ood metadata tools as general metadata insight functions
+- `539d51ce` - [impr] Port clustering from fast_hdbscan and implement numba cache
+- `b638c45c` - Update sufficiency.evaluate to use config strategies
+- `0e5a4364` - Add methods to Outliers and Duplicates utilizing ClusterData for analysis
+- `73340730` - Add validation for dimensionality of arrays
+- `0ebc1702` - Add application-level Sufficiency dataclass and Protocols
+- `cdbf5dfe` - [improvement] allow stats to be run on lower dimensional data
+
+👾 **Fixes**
+- `37362f26` - [fix] Correct the denominator for missing and zeros stats calculation
+- `496c675a` - Bug fix in the MST creation algorithm
+- `a6d75805` - Update fast_hdbscan to v0.2.2
+- `9d739f8c` - fix bug - Drift permutation bug - p-value in drift test is either 0.0 or 1.0 and nothing in between
+
+📝 **Miscellaneous**
+- `a10f5e7f` - Update pipeline jobs to use uvx (uv tool) and switch to CUDA 12.4 for docs
+- `2199d878` - Refactor utils module
+- `fd4e3479` - Fix coverage and remove annotations from future
+- `45fb3f35` - Remove pandas dependency
+- `2a61604e` - Uncertainty-based drift detection concept page
+- `8c3345f1` - Add schedulers for geometric and custom eval_at parameter
+- `d49d9969` - Add how-to for using dataeval.config to set global configuration
+- `af3af300` - [impr] update per_box references to per_target
+- `a51817e9` - Switch to TypedDict for outputs over anonymous tuples
+- `91017332` - Rework pages for user roles
+- `d85115d5` - Relax typing for core functionality and standardize parameter naming
+- `e48b90f8` - Add BRANCHING.md file for branching strategy
+- `52d0346f` - Add grouped tables for the Algorithm summary
 
 ## v0.93.0
 
