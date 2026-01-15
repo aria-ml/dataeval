@@ -39,10 +39,10 @@ jobs:
           cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies
-        run: uv pip install nox nox-uv --system
+        run: uv tool install nox --with nox-uv
 
       - name: Verify lock file
-        run: nox -e check
+        run: uvx nox -e check
 
   lint:
     name: Lint
@@ -62,10 +62,10 @@ jobs:
           cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies
-        run: uv pip install nox nox-uv --system
+        run: uv tool install nox --with nox-uv
 
       - name: Run lint
-        run: nox -e lint
+        run: uvx nox -e lint
 
   minimum-dependencies:
     name: Minimum Dependencies (Python ${{ matrix.python-version }})
@@ -97,10 +97,10 @@ jobs:
             wheels-${{ runner.os }}-py${{ matrix.python-version }}-
 
       - name: Install dependencies
-        run: uv pip install nox nox-uv --system
+        run: uv tool install nox --with nox-uv
 
       - name: Run minimum install test
-        run: nox -e deps -P ${{ matrix.python-version }}
+        run: uvx nox -e deps -P ${{ matrix.python-version }}
 
   typecheck:
     name: Type Check (Python ${{ matrix.python-version }})
@@ -124,10 +124,10 @@ jobs:
           cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies
-        run: uv pip install nox nox-uv --system
+        run: uv tool install nox --with nox-uv
 
       - name: Run type check
-        run: nox -e type -P ${{ matrix.python-version }}
+        run: uvx nox -e type -P ${{ matrix.python-version }}
 
   test:
     name: Test (Python ${{ matrix.python-version }})
@@ -151,10 +151,10 @@ jobs:
           cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies
-        run: uv pip install nox nox-uv --system
+        run: uv tool install nox --with nox-uv
 
       - name: Run tests
-        run: nox -e test -P ${{ matrix.python-version }}
+        run: uvx nox -e test -P ${{ matrix.python-version }}
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
