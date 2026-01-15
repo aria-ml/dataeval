@@ -17,7 +17,8 @@ class TestPrioritize:
     def get_dataset(self, n: int = 1000):
         mock = MagicMock(spec=AnnotatedDataset)
         mock.__len__.return_value = n
-        mock.__getitem__.return_value = np.random.random((1, 10, 10)), np.zeros(10), {}
+        # Use side_effect to return different random data for each call (not the same data every time)
+        mock.__getitem__.side_effect = lambda _: (np.random.random((1, 10, 10)), np.zeros(10), {})
         mock.metadata = {"id": "mock_dataset", "index2label": {i: str(i) for i in range(10)}}
         return mock
 

@@ -322,7 +322,7 @@ def _prepare_probability_distributions(
 def _calculate_null_model_metrics(
     test_probs: NDArray[np.float64],
     prediction_probs: NDArray[np.float64],
-    is_multiclass: bool,
+    is_multiclass: bool | np.bool_,
     classes: NDArray[np.intp],
 ) -> NullModelMetrics:
     """
