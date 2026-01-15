@@ -35,8 +35,8 @@ These guides will provide quick examples of how to configure DataEval for your e
 
 :::
 
-[hdw-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_configure_hardware_settings.ipynb
-[log-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_configure_logging.ipynb
+[hdw-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.94.0/docs/source/notebooks/h2_configure_hardware_settings.ipynb
+[log-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.94.0/docs/source/notebooks/h2_configure_logging.ipynb
 
 ## Detectors
 
@@ -72,10 +72,10 @@ The guides below exemplify powerful solutions to common problems in ML.
 
 :::
 
-[clst-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_cluster_analysis.ipynb
-[dupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_deduplicate.ipynb
-[clean-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_visualize_cleaning_issues.ipynb
-[calc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_custom_image_stats_object_detection.ipynb
+[clst-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.94.0/docs/source/notebooks/h2_cluster_analysis.ipynb
+[dupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.94.0/docs/source/notebooks/h2_deduplicate.ipynb
+[clean-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.94.0/docs/source/notebooks/h2_visualize_cleaning_issues.ipynb
+[calc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.94.0/docs/source/notebooks/h2_custom_image_stats_object_detection.ipynb
 
 ## Metrics
 
@@ -118,11 +118,11 @@ The guides below show best practices when solving common ML problems.
 
 :::
 
-[ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_measure_ic_feasibility.ipynb
-[div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_measure_divergence.ipynb
-[lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_measure_label_independence.ipynb
-[cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_detect_undersampling.ipynb
-[imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_add_intrinsic_factors.ipynb
+[ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.94.0/docs/source/notebooks/h2_measure_ic_feasibility.ipynb
+[div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.94.0/docs/source/notebooks/h2_measure_divergence.ipynb
+[lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.94.0/docs/source/notebooks/h2_measure_label_independence.ipynb
+[cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.94.0/docs/source/notebooks/h2_detect_undersampling.ipynb
+[imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.94.0/docs/source/notebooks/h2_add_intrinsic_factors.ipynb
 
 ## Workflows
 
@@ -150,7 +150,7 @@ The guides below help you solve common problems found across machine learning ta
 
 :::
 
-[suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.93.0/docs/source/notebooks/h2_measure_ic_sufficiency.ipynb
+[suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.94.0/docs/source/notebooks/h2_measure_ic_sufficiency.ipynb
 
 <!-- Google collab badge icon for all collab links -->
 
