@@ -212,9 +212,9 @@ class TestBiasFunctionsWithOD:
             assert "is_correlated" in result.factors.columns
 
         # result.classwise is a DataFrame with class_name, factor_name, mi_value, is_imbalanced columns
-        # It contains one row per (class, factor) combination (excluding class_label itself)
+        # It contains one row per (class, factor + class_label) combination
         n_classes = len(md.index2label)
-        assert result.classwise.height == n_classes * len(md.factor_names)
+        assert result.classwise.height == n_classes * (len(md.factor_names) + 1)
         assert "class_name" in result.classwise.columns
         assert "factor_name" in result.classwise.columns
         assert "mi_value" in result.classwise.columns
@@ -228,8 +228,8 @@ class TestBiasFunctionsWithOD:
         result = Diversity().evaluate(md)
 
         # result.factors is a DataFrame with factor_name, diversity_value, is_low_diversity columns
-        # It includes only metadata factors (not class_label)
-        assert result.factors.height == len(md.factor_names)
+        # It includes class_label + metadata factors
+        assert result.factors.height == len(md.factor_names) + 1
         assert "factor_name" in result.factors.columns
         assert "diversity_value" in result.factors.columns
         assert "is_low_diversity" in result.factors.columns
@@ -276,8 +276,8 @@ class TestBiasFunctionsWithOD:
         # Verify basic structure - all now return DataFrames
         # Balance: balance includes class_label + metadata factors
         assert balance_result.balance.height == len(md.factor_names) + 1
-        # Diversity: factors includes only metadata factors (not class_label)
-        assert diversity_result.factors.height == len(md.factor_names)
+        # Diversity: factors includes class_label + metadata factors
+        assert diversity_result.factors.height == len(md.factor_names) + 1
         # Parity: factors includes one row per metadata factor
         assert parity_result.factors.height == len(md.factor_names)
 
