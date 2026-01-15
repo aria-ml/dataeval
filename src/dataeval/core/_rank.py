@@ -164,7 +164,7 @@ class _KMeansSorter(_Sorter):
             np.max(n_samples_per_cluster),
             np.mean(n_samples_per_cluster),
         )
-        return _Clusters(clst.labels_, clst.cluster_centers_)
+        return _Clusters(clst.labels_.astype(np.intp), clst.cluster_centers_.astype(np.float64))
 
 
 class _KMeansDistanceSorter(_KMeansSorter):

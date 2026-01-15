@@ -542,7 +542,7 @@ class Duplicates:
         groups: list[list[np.int32]] = [[np.int32(x) for x in range(0)] for y in range(0)]
         uniques, inverse = np.unique(index_groups, return_inverse=True)
         inverse = inverse.flatten()
-        disjoint_set = ds_rank_create(uniques.size)
+        disjoint_set = ds_rank_create(np.int64(uniques.size))
         cluster_points = np.empty(uniques.size, dtype=np.uint32)
         for i in range(index_groups.shape[0]):
             point, nbr = np.intp(inverse[i * 2]), np.intp(inverse[i * 2 + 1])
