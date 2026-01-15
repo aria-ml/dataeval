@@ -3,14 +3,13 @@
 docs:
   stage: docs
   extends: 
-    - .nox
+    - .nox_docs
     - .rules_main_mr_docs
   needs: []
   tags:
     - $DOCS_RUNNER_TAG
   script:
-    - apt update && apt install graphviz -y
-    - nox -e docs $DOCS_CLEAN
+    - uvx nox -e docs $DOCS_CLEAN
   artifacts:
     paths:
       - output/docs/.jupyter_cache/
@@ -23,7 +22,7 @@ doclint:
     - .nox
     - .rules_main_mr_docs_skip_cache_update
   script:
-    - nox -e doclint
+    - uvx nox -e doclint
 
 doctest:
   stage: docs
@@ -31,7 +30,7 @@ doctest:
     - .nox
     - .rules_main_mr_docs_skip_cache_update
   script:
-    - nox -e doctest
+    - uvx nox -e doctest
 
 linkchecker:
   stage: docs

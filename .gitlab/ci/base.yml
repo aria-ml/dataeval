@@ -76,7 +76,7 @@ stages:
   needs: []
   image: $UV_IMAGE:python$PYTHON_VERSION-$UV_BASE_LAYER
   before_script:
-    - uv pip install nox nox-uv --system
+    - uv tool install nox --with nox-uv
   cache:
     - key:
         files:
@@ -89,6 +89,17 @@ stages:
   variables:
     PYTHON_VERSION: $PYTHON_LATEST_SUPPORTED_VERSION
 
+.nox_docs:
+  extends: .nox
+  image: nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+  before_script:
+    - apt update && apt install graphviz curl -y
+    - curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
+    - uv tool install nox --with nox-uv
+  variables:
+    SETUPTOOLS_SCM_PRETEND_VERSION: '0.0.0'
+    DATAEVAL_NOX_UV_EXTRAS_OVERRIDE: cu124
+
 .nox_all:
   extends: .nox
   parallel:
@@ -96,14 +107,13 @@ stages:
 
 .conda:
   needs: []
-  image: mambaorg/micromamba:2-cuda11.8.0-ubuntu20.04
+  image: mambaorg/micromamba:2-cuda12.4.1-ubuntu22.04
   before_script:
     - eval "$(micromamba shell hook --shell bash)"
     - micromamba create -f environment.yaml -n dataeval python=$PYTHON_VERSION
     - micromamba activate dataeval
     - micromamba install pytest pytest-xdist requests
     - pip install -e . --no-deps
-    - pip install maite-datasets
     - micromamba list
   variables:
     SETUPTOOLS_SCM_PRETEND_VERSION: '0.0.0'
