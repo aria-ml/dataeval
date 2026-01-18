@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,68,38
+/aria-ml/dataeval/tree/main/src/dataeval,11,4
+/aria-ml/dataeval/tree/main/src/dataeval/core,10,4
+/aria-ml/dataeval/tree/main/src,6,5
+/aria-ml/dataeval/branches/all,6,1
+/aria-ml/dataeval/tree/main,5,3
+/aria-ml/dataeval/commits/main,5,1
+/aria-ml/dataeval/commit/26a7e9a7e15a496264eaf33aa23a699fdd1f66d4,4,4
+/aria-ml/dataeval/actions,4,2
+/aria-ml/dataeval/actions/workflows/docs.yml,4,2
