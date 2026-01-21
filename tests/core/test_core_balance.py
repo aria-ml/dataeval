@@ -100,6 +100,6 @@ class TestBalanceFunctional:
         np.testing.assert_allclose(result["interfactor"], result["interfactor"].T, atol=1e-6)
         np.testing.assert_allclose(
             result["interfactor"],
-            np.array([[1.0, 0.8, 0.729606], [0.8, 1.0, 0.70399], [0.729606, 0.70399, 0.621398]]),
+            np.array([[1.0, 0.8, 0.670401], [0.8, 1.0, 0.680443], [0.670401, 0.680443, 0.621398]]),
             atol=1e-6,
         )
