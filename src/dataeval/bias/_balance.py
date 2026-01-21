@@ -170,6 +170,7 @@ class Balance:
         │ income  ┆ gender  ┆ 0.047947 ┆ false         │
         └─────────┴─────────┴──────────┴───────────────┘
 
+        >>> _ = pl.Config.set_tbl_rows(20)
         >>> result.classwise
         shape: (12, 4)
         ┌────────────┬─────────────┬──────────┬───────────────┐
@@ -177,17 +178,18 @@ class Balance:
         │ ---        ┆ ---         ┆ ---      ┆ ---           │
         │ cat        ┆ cat         ┆ f64      ┆ bool          │
         ╞════════════╪═════════════╪══════════╪═══════════════╡
-        │ artist     ┆ age         ┆ 0.301469 ┆ true          │
-        │ artist     ┆ class_label ┆ 0.68855  ┆ true          │
-        │ artist     ┆ gender      ┆ 0.04493  ┆ false         │
-        │ artist     ┆ income      ┆ 0.250237 ┆ false         │
-        │ doctor     ┆ age         ┆ 0.164287 ┆ false         │
-        │ …          ┆ …           ┆ …        ┆ …             │
-        │ doctor     ┆ income      ┆ 0.46587  ┆ true          │
-        │ teacher    ┆ age         ┆ 0.137221 ┆ false         │
-        │ teacher    ┆ class_label ┆ 0.70528  ┆ true          │
-        │ teacher    ┆ gender      ┆ 0.018392 ┆ false         │
-        │ teacher    ┆ income      ┆ 0.160404 ┆ false         │
+        │ artist     ┆ age         ┆ 0.307562 ┆ true          │
+        │ artist     ┆ class_label ┆ 1.0      ┆ true          │
+        │ artist     ┆ gender      ┆ 0.039408 ┆ false         │
+        │ artist     ┆ income      ┆ 0.246887 ┆ false         │
+        │ doctor     ┆ age         ┆ 0.131323 ┆ false         │
+        │ doctor     ┆ class_label ┆ 1.0      ┆ true          │
+        │ doctor     ┆ gender      ┆ 0.073819 ┆ false         │
+        │ doctor     ┆ income      ┆ 0.458878 ┆ true          │
+        │ teacher    ┆ age         ┆ 0.120809 ┆ false         │
+        │ teacher    ┆ class_label ┆ 1.0      ┆ true          │
+        │ teacher    ┆ gender      ┆ 0.015194 ┆ false         │
+        │ teacher    ┆ income      ┆ 0.143104 ┆ false         │
         └────────────┴─────────────┴──────────┴───────────────┘
         """
         # Convert AnnotatedDataset to Metadata if needed

@@ -72,26 +72,6 @@ def _merge_labels_and_factors(
     return data, discrete_features
 
 
-def linfoot_transformation(mi: NDArray[np.intp | np.floating]) -> NDArray[np.float64]:
-    """
-    Transforms MI values in nats into a number between 0 and 1 representing the
-    corresponding strength of association. For Gaussian data, this reduces exactly
-    to the square of the correlation coefficient between the two samples.
-
-    Parameters
-    ----------
-    mi : NDArray[np.intp | np.floating]
-        Mutual information estimated for some pair of data samples. Samples can be
-        continuous or discrete.
-
-    Returns
-    -------
-    The transformed mi value(s) : float
-
-    """
-    return 1.0 - np.exp(-2.0 * mi.astype(np.float64))
-
-
 def mutual_info(
     class_labels: Array1D[int],
     factor_data: Array2D[int | float],
@@ -198,17 +178,18 @@ def mutual_info(
             n_jobs=get_max_processes(),  # type: ignore - added in 1.5
         )
 
+        pass
         # Normalization via entropy, pre-computed above
         for j in range(data.shape[1]):
             if discrete_list[j] or is_discrete:
-                mi[idx, j] /= min(norm_factor[j], norm_factor[idx])
+                if norm_factor[j] == 0 or norm_factor[idx] == 0:
+                    mi[idx, j] = 0.0
+                else:
+                    mi[idx, j] /= min(norm_factor[j], norm_factor[idx])
             else:
-                mi[idx, :] = linfoot_transformation(mi[idx, :])
+                mi[idx, j] = 1.0 - np.exp(-2.0 * float(mi[idx, j]))  # Linfoot transformation, mi in nats
 
     full_matrix = 0.5 * (mi + mi.T).astype(np.float64)
-
-    # Linfoot transformation instead of normalization. Linfoot inputs should be in nats.
-    # full_matrix = linfoot_transformation(mi_symmetric)  # mi_symmetric is measured in nats.
 
     _logger.info(
         "Mutual info calculation complete: %d factors, mean class_to_factor MI=%.4f",
@@ -271,9 +252,9 @@ def mutual_info_classwise(
     Return classwise balance (mutual information) of factors with individual class_labels
 
     >>> mutual_info_classwise(class_labels=class_labels, factor_data=binned_data)
-    array([[0.745, 0.164, 0.096, 0.466],
-           [0.689, 0.301, 0.045, 0.25 ],
-           [0.705, 0.137, 0.018, 0.16 ]])
+    array([[1.   , 0.131, 0.074, 0.459],
+           [1.   , 0.308, 0.039, 0.247],
+           [1.   , 0.121, 0.015, 0.143]])
 
     See Also
     --------
@@ -295,13 +276,28 @@ def mutual_info_classwise(
 
     _logger.debug("Computing classwise MI for %d classes and %d factors", num_classes, num_factors)
 
-    # initialize output matrix
-    classwise_mi = np.full((num_classes, num_factors), np.nan, dtype=np.float32)
-
-    # classwise targets
+    # classwise targets (binary indicators)
     tgt_bin = data[:, 0][:, None] == u_classes
 
-    # classification MI for discrete/categorical features
+    # Entropy of each binary class indicator
+    ent_tgt = np.zeros(num_classes)
+    for idx in range(num_classes):
+        _, counts = np.unique(tgt_bin[:, idx], return_counts=True)
+        probs = counts / counts.sum()
+        ent_tgt[idx] = entropy(probs)
+
+    # Entropy of each factor (inf for continuous)
+    ent_factor = np.zeros(num_factors)
+    for j in range(num_factors):
+        if not discrete_list[j]:
+            ent_factor[j] = np.inf
+        else:
+            _, counts = np.unique(data[:, j], return_counts=True)
+            probs = counts / counts.sum()
+            ent_factor[j] = entropy(probs)
+
+    # Compute MI
+    classwise_mi = np.full((num_classes, num_factors), np.nan, dtype=np.float32)
     for idx in range(num_classes):
         classwise_mi[idx, :] = mutual_info_classif(
             data,
@@ -312,8 +308,13 @@ def mutual_info_classwise(
             n_jobs=get_max_processes(),  # type: ignore - added in 1.5
         )
 
-    result = linfoot_transformation(classwise_mi)
+    # Normalize: vectorized with 0/0 handling
+    min_ent = np.minimum.outer(ent_tgt, ent_factor)
+    zero_mask = (ent_tgt[:, None] == 0) | (ent_factor[None, :] == 0)
+    min_ent[zero_mask] = 1.0  # avoid division warning
+    classwise_mi /= min_ent
+    classwise_mi[zero_mask] = 0.0
 
     _logger.info("Mutual info classwise calculation complete: %d classes x %d factors", num_classes, num_factors)
 
-    return result
+    return classwise_mi.astype(np.float64)
