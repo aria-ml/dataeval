@@ -112,20 +112,6 @@ class TestEmbeddingsFeatureExtractor:
 class TestEmbeddingsErrorCases:
     """Test error handling in Embeddings."""
 
-    def test_bind_embeddings_only_raises(self):
-        """Test bind() raises ValueError on embeddings-only instance."""
-        arr = np.random.randn(10, 512)
-        embeddings = Embeddings.from_array(arr)
-        with pytest.raises(ValueError, match="Cannot bind dataset"):
-            embeddings.bind(None)  # type: ignore
-
-    def test_new_embeddings_only_raises(self):
-        """Test new() raises ValueError on embeddings-only instance."""
-        arr = np.random.randn(10, 512)
-        embeddings = Embeddings.from_array(arr)
-        with pytest.raises(ValueError, match="does not have a model"):
-            embeddings.new(None)  # type: ignore
-
     def test_batch_unbound_raises(self, simple_model):
         """Test _batch raises ValueError when no dataset is bound."""
         embeddings = Embeddings(model=simple_model)
@@ -164,13 +150,6 @@ class TestEmbeddingsHash:
     def test_hash_unbound(self, simple_model):
         """Test hash for unbound instance."""
         embeddings = Embeddings(model=simple_model)
-        hash_val = hash(embeddings)
-        assert isinstance(hash_val, int)
-
-    def test_hash_embeddings_only(self):
-        """Test hash for embeddings-only instance."""
-        arr = np.random.randn(10, 512)
-        embeddings = Embeddings.from_array(arr)
         hash_val = hash(embeddings)
         assert isinstance(hash_val, int)
 

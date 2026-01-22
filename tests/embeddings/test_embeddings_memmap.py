@@ -1,6 +1,6 @@
 from collections.abc import Generator
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import numpy as np
 import pytest
@@ -45,14 +45,11 @@ def memmap_embeddings(tmp_path) -> Generator[tuple[Embeddings, NDArray[Any]], No
     data = np.random.randn(*shape).astype(dtype)
     np.save(cache_path, data)
 
-    # Load as memmap from the .npy file
-    loaded_memmap = np.load(cache_path, mmap_mode="r")
-
     # Create embeddings-only instance from memmap
-    emb = Embeddings.from_array(loaded_memmap)
-
-    # Verify it's actually memmap backed
-    assert isinstance(emb._embeddings, np.memmap), "Fixture should create memmap-backed embeddings"
+    emb = Embeddings()
+    emb._embeddings = np.load(cache_path, mmap_mode="r")
+    emb._cached_idx = set(range(shape[0]))
+    emb._dataset = data
 
     yield emb, data
 
@@ -268,19 +265,6 @@ class TestComputeMethod:
 
         result = emb.compute()
         assert result is emb
-
-    def test_compute_no_op_on_embeddings_only(self):
-        """compute() should be a no-op on embeddings-only instances."""
-        # Create embeddings-only instance
-        data = np.random.randn(100, 128).astype(np.float32)
-        emb = Embeddings.from_array(data)
-
-        original_data = emb._embeddings.copy()
-
-        # Should return immediately without error
-        result = emb.compute()
-        assert result is emb
-        np.testing.assert_array_equal(emb._embeddings, original_data)
 
     def test_compute_force_recomputes(self, lazy_embeddings: tuple[Embeddings, SimpleDataset, Path]):
         """compute(force=True) should recompute all embeddings."""
@@ -501,61 +485,6 @@ class TestSaveMethod:
         assert loaded.shape[0] == len(dataset)
 
 
-class TestFromArrayMethod:
-    """Test suite for from_array() classmethod."""
-
-    def test_from_array_creates_embeddings_only(self):
-        """from_array() should create embeddings-only instance."""
-        data = np.random.randn(100, 128).astype(np.float32)
-
-        emb = Embeddings.from_array(data)
-
-        # Should be embeddings-only
-        assert emb._embeddings_only
-        assert len(emb._cached_idx) == len(data)
-
-    def test_from_array_preserves_data(self):
-        """from_array() should preserve original data."""
-        data = np.random.randn(50, 256).astype(np.float32)
-
-        emb = Embeddings.from_array(data)
-
-        np.testing.assert_array_equal(emb._embeddings, data)
-
-    def test_from_array_replaces_load(self, tmp_path: Path):
-        """from_array(np.load()) should replace old load() method."""
-        save_path = tmp_path / "test.npy"
-
-        # Save some data
-        original_data = np.random.randn(75, 384).astype(np.float32)
-        np.save(save_path, original_data)
-
-        # Load using from_array
-        loaded = np.load(save_path)
-        emb = Embeddings.from_array(loaded)
-
-        # Should match original
-        np.testing.assert_array_equal(emb._embeddings, original_data)
-
-    def test_from_array_with_memmap(self, tmp_path: Path):
-        """from_array() should work with memmap arrays."""
-        memmap_path = tmp_path / "memmap.npy"
-        shape = (200, 128)
-
-        # Create memmap
-        data = np.random.randn(*shape).astype(np.float32)
-        memmap_arr = np.memmap(memmap_path, dtype=np.float32, mode="w+", shape=shape)
-        memmap_arr[:] = data
-        memmap_arr.flush()
-
-        # Create embeddings from memmap
-        emb = Embeddings.from_array(memmap_arr)
-
-        # Should preserve memmap
-        assert isinstance(emb._embeddings, np.memmap)
-        np.testing.assert_array_equal(emb._embeddings, data)
-
-
 class TestIntegration:
     """Integration tests for complete workflows."""
 
@@ -590,210 +519,6 @@ class TestIntegration:
         emb.compute().save()
 
         assert save_path.exists()
-
-        # Load back
-        loaded_arr = np.load(save_path)
-        loaded_emb = Embeddings.from_array(loaded_arr)
-
-        # Verify
-        assert loaded_emb.shape[0] == len(simple_dataset)
-        np.testing.assert_array_equal(loaded_emb[:], emb[:])
-
-
-class TestLoadMethod:
-    """Test suite for the load() classmethod."""
-
-    def test_load_as_ndarray(self, tmp_path: Path):
-        """load() without mmap_mode should load as in-memory ndarray."""
-        save_path = tmp_path / "test.npy"
-
-        # Save some data
-        original_data = np.random.randn(100, 128).astype(np.float32)
-        np.save(save_path, original_data)
-
-        # Load as ndarray (default)
-        emb = Embeddings.load(save_path)
-
-        # Should be in-memory ndarray
-        assert isinstance(emb._embeddings, np.ndarray)
-        assert not isinstance(emb._embeddings, np.memmap)
-        np.testing.assert_array_equal(emb._embeddings, original_data)
-
-    def test_load_as_memmap(self, tmp_path: Path):
-        """load() with mmap_mode should load as memmap."""
-        save_path = tmp_path / "test.npy"
-
-        # Save some data
-        original_data = np.random.randn(200, 256).astype(np.float32)
-        np.save(save_path, original_data)
-
-        # Load as memmap
-        emb = Embeddings.load(save_path, mmap_mode="r")
-
-        # Should be memmap
-        assert isinstance(emb._embeddings, np.memmap)
-        np.testing.assert_array_equal(emb._embeddings, original_data)
-
-    def test_load_different_mmap_modes(self, tmp_path: Path):
-        """load() should support different mmap_mode values."""
-        save_path = tmp_path / "test.npy"
-        original_data = np.random.randn(50, 64).astype(np.float32)
-        np.save(save_path, original_data)
-
-        # This is a little silly
-        modes: list[Literal["r", "r+", "c"]] = ["r", "r+", "c"]
-
-        # Test different modes
-        for mode in modes:
-            emb = Embeddings.load(save_path, mmap_mode=mode)
-            assert isinstance(emb._embeddings, np.memmap)
-            np.testing.assert_array_equal(emb._embeddings, original_data)
-
-    def test_load_creates_embeddings_only_instance(self, tmp_path: Path):
-        """load() should create embeddings-only instance."""
-        save_path = tmp_path / "test.npy"
-        original_data = np.random.randn(75, 128).astype(np.float32)
-        np.save(save_path, original_data)
-
-        emb = Embeddings.load(save_path)
-
-        # Should be embeddings-only
-        assert emb._embeddings_only
-        assert len(emb._cached_idx) == len(original_data)
-
-    def test_load_nonexistent_file_raises(self, tmp_path: Path):
-        """load() with nonexistent file should raise FileNotFoundError."""
-        nonexistent_path = tmp_path / "does_not_exist.npy"
-
-        with pytest.raises(FileNotFoundError, match="File not found"):
-            Embeddings.load(nonexistent_path)
-
-    def test_load_with_string_path(self, tmp_path: Path):
-        """load() should accept string paths."""
-        save_path = tmp_path / "test.npy"
-        original_data = np.random.randn(50, 128).astype(np.float32)
-        np.save(save_path, original_data)
-
-        # Load using string path
-        emb = Embeddings.load(str(save_path))
-
-        np.testing.assert_array_equal(emb._embeddings, original_data)
-
-    def test_load_with_path_object(self, tmp_path: Path):
-        """load() should accept Path objects."""
-        save_path = tmp_path / "test.npy"
-        original_data = np.random.randn(50, 128).astype(np.float32)
-        np.save(save_path, original_data)
-
-        # Load using Path object
-        emb = Embeddings.load(save_path)
-
-        np.testing.assert_array_equal(emb._embeddings, original_data)
-
-    def test_load_preserves_dtype(self, tmp_path: Path):
-        """load() should preserve the original dtype."""
-        save_path = tmp_path / "test.npy"
-
-        # Test with different dtypes
-        for dtype in [np.float32, np.float64, np.float16]:
-            data = np.random.randn(50, 64).astype(dtype)
-            np.save(save_path, data)
-
-            emb = Embeddings.load(save_path)
-            assert emb._embeddings.dtype == dtype
-
-    def test_load_preserves_shape(self, tmp_path: Path):
-        """load() should preserve the original shape."""
-        save_path = tmp_path / "test.npy"
-
-        # Test with different shapes
-        shapes = [(100, 128), (50, 256), (200, 64)]
-        for shape in shapes:
-            data = np.random.randn(*shape).astype(np.float32)
-            np.save(save_path, data)
-
-            emb = Embeddings.load(save_path)
-            assert emb.shape == shape
-
-    def test_load_then_access(self, tmp_path: Path):
-        """Loaded embeddings should support indexing."""
-        save_path = tmp_path / "test.npy"
-        original_data = np.random.randn(100, 128).astype(np.float32)
-        np.save(save_path, original_data)
-
-        emb = Embeddings.load(save_path)
-
-        # Test various access patterns
-        assert emb[0].shape == (128,)
-        assert emb[0:10].shape == (10, 128)
-        assert emb[:].shape == (100, 128)
-
-        # Verify data integrity
-        np.testing.assert_array_equal(emb[0], original_data[0])
-        np.testing.assert_array_equal(emb[:], original_data)
-
-    def test_load_memmap_then_access(self, tmp_path: Path):
-        """Loaded memmap embeddings should support indexing."""
-        save_path = tmp_path / "test.npy"
-        original_data = np.random.randn(100, 128).astype(np.float32)
-        np.save(save_path, original_data)
-
-        emb = Embeddings.load(save_path, mmap_mode="r")
-
-        # Verify memmap is preserved and data is accessible
-        assert isinstance(emb._embeddings, np.memmap)
-        np.testing.assert_array_equal(emb[0], original_data[0])
-        np.testing.assert_array_equal(emb[:], original_data)
-
-    def test_save_then_load_roundtrip(self, simple_dataset: SimpleDataset, tmp_path: Path):
-        """save() then load() should preserve embeddings."""
-        model = IdentityModel()
-        save_path = tmp_path / "roundtrip.npy"
-
-        # Create, compute, and save embeddings
-        original_emb = Embeddings(simple_dataset, batch_size=16, model=model, device="cpu", path=save_path)
-        original_emb.compute().save()
-
-        # Load back using load() method
-        loaded_emb = Embeddings.load(save_path)
-
-        # Verify data is identical
-        assert loaded_emb.shape == original_emb.shape
-        np.testing.assert_array_equal(loaded_emb[:], original_emb[:])
-
-    def test_save_then_load_memmap_roundtrip(self, simple_dataset: SimpleDataset, tmp_path: Path):
-        """save() then load(mmap_mode='r') should preserve embeddings as memmap."""
-        model = IdentityModel()
-        save_path = tmp_path / "roundtrip_memmap.npy"
-
-        # Create, compute, and save embeddings
-        original_emb = Embeddings(simple_dataset, batch_size=16, model=model, device="cpu", path=save_path)
-        original_emb.compute().save()
-
-        # Load back as memmap
-        loaded_emb = Embeddings.load(save_path, mmap_mode="r")
-
-        # Verify it's memmap and data is identical
-        assert isinstance(loaded_emb._embeddings, np.memmap)
-        assert loaded_emb.shape == original_emb.shape
-        np.testing.assert_array_equal(loaded_emb[:], original_emb[:])
-
-    def test_load_equivalent_to_from_array_with_np_load(self, tmp_path: Path):
-        """load() should be equivalent to from_array(np.load())."""
-        save_path = tmp_path / "test.npy"
-        original_data = np.random.randn(100, 128).astype(np.float32)
-        np.save(save_path, original_data)
-
-        # Using load()
-        emb1 = Embeddings.load(save_path)
-
-        # Using from_array(np.load())
-        emb2 = Embeddings.from_array(np.load(save_path))
-
-        # Should be equivalent
-        assert emb1._embeddings_only == emb2._embeddings_only
-        assert emb1.shape == emb2.shape
-        np.testing.assert_array_equal(emb1[:], emb2[:])
 
 
 class TestShouldUseMemmap:
@@ -1157,32 +882,13 @@ class TestGetitemErrors:
     def test_getitem_sequence_invalid_element_raises(self):
         """Test __getitem__ raises TypeError for sequence with non-int elements (lines 620-621)"""
         arr = np.random.randn(10, 128)
-        embs = Embeddings.from_array(arr)
+        embs = Embeddings()
+        embs._embeddings = arr
+        embs._cached_idx = set(range(len(arr)))
 
         # Sequence with invalid element types
         with pytest.raises(TypeError, match="All indices in the sequence must be integers"):
             embs[[0, 1, "invalid", 3]]  # type: ignore
-
-    def test_getitem_embeddings_only_empty_raises(self):
-        """Test __getitem__ on embeddings-only with empty array raises (lines 626-627)"""
-        # Create embeddings-only with empty array
-        embs = Embeddings.from_array(np.empty((0,)))
-        embs._cached_idx = set()  # Clear cached indices
-
-        with pytest.raises(ValueError, match="Embeddings not initialized"):
-            embs[0]
-
-    def test_getitem_embeddings_only_out_of_cache_raises(self):
-        """Test __getitem__ on embeddings-only accessing uncached index raises (lines 628-629)"""
-        arr = np.random.randn(5, 128)
-        embs = Embeddings.from_array(arr)
-
-        # Manually remove some indices from cache to simulate partial cache
-        embs._cached_idx = {0, 1, 2}  # Only first 3 are "cached"
-
-        with pytest.raises(ValueError, match="Unable to generate new embeddings from a shallow instance"):
-            # Try to access index 4 which is not in cached_idx
-            embs[4]
 
 
 class TestProgressCallback:
