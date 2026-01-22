@@ -6,11 +6,12 @@ from typing import Any, Literal
 import numpy as np
 import polars as pl
 
-from dataeval import Metadata
+from dataeval import Metadata as _Metadata
 from dataeval.core._bin import get_counts
 from dataeval.core._diversity import diversity_shannon, diversity_simpson
-from dataeval.protocols import AnnotatedDataset
+from dataeval.protocols import AnnotatedDataset, Metadata
 from dataeval.types import DictOutput, set_metadata
+from dataeval.utils.data import _get_index2label
 
 _DIVERSITY_FN_MAP = {"simpson": diversity_simpson, "shannon": diversity_shannon}
 
@@ -114,7 +115,7 @@ class Diversity:
         ----------
         data : AnnotatedDataset[Any] or Metadata
             Either an annotated dataset (which will be converted to Metadata)
-            or preprocessed Metadata directly.
+            or any object implementing the Metadata protocol.
 
         Returns
         -------
@@ -171,7 +172,7 @@ class Diversity:
         if isinstance(data, Metadata):
             self.metadata = data
         else:
-            self.metadata = Metadata(data)
+            self.metadata = _Metadata(data)
 
         if not self.metadata.factor_names:
             raise ValueError("No factors found in provided metadata.")
@@ -180,11 +181,12 @@ class Diversity:
             raise ValueError(f"Invalid method '{self.method}'. Supported methods are '{list(_DIVERSITY_FN_MAP)}'.")
 
         diversity_fn = _DIVERSITY_FN_MAP[self.method]
-        binned_data = self.metadata.binned_data
+        factor_data = self.metadata.factor_data
         factor_names = self.metadata.factor_names
         class_lbl = self.metadata.class_labels
+        index2label = _get_index2label(self.metadata)
 
-        class_labels_with_binned_data = np.hstack((class_lbl[:, np.newaxis], binned_data))
+        class_labels_with_binned_data = np.hstack((class_lbl[:, np.newaxis], factor_data))
         cnts = get_counts(class_labels_with_binned_data)
         num_bins = np.bincount(np.nonzero(cnts)[1])
         diversity_index = diversity_fn(cnts, num_bins)
@@ -194,7 +196,7 @@ class Diversity:
         classwise_div = np.full((len(u_classes), num_factors), np.nan)
         for idx, cls in enumerate(u_classes):
             subset_mask = class_lbl == cls
-            cls_cnts = get_counts(binned_data[subset_mask], min_num_bins=cnts.shape[0])
+            cls_cnts = get_counts(factor_data[subset_mask], min_num_bins=cnts.shape[0])
             classwise_div[idx, :] = diversity_fn(cls_cnts, num_bins[1:])
 
         # Create factors DataFrame
@@ -221,9 +223,7 @@ class Diversity:
         is_low_diversity_col: list[bool] = []
 
         for class_idx in range(classwise_div.shape[0]):
-            class_name = (
-                self.metadata.index2label[class_idx] if class_idx in self.metadata.index2label else str(class_idx)
-            )
+            class_name = index2label.get(class_idx, str(class_idx))
             for factor_idx in range(num_factors):
                 div_value = classwise_div[class_idx, factor_idx]
                 if not np.isnan(div_value):

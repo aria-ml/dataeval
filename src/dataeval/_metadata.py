@@ -192,7 +192,7 @@ class Metadata(Array, FeatureExtractor):
         This property triggers factor binning analysis on first access.
         Use this for interoperability with libraries expecting NumPy arrays.
         """
-        return self.binned_data
+        return self.factor_data
 
     def __len__(self) -> int:
         """Number of items in the bound dataset.
@@ -244,7 +244,7 @@ class Metadata(Array, FeatureExtractor):
         """
         if self._dataset is None:
             raise ValueError("No dataset bound. Call bind() first.")
-        yield from self.binned_data
+        yield from self.factor_data
 
     def __getitem__(self, index: int | str | slice) -> Array:
         """Get binned metadata for specific indices or factors.
@@ -271,17 +271,17 @@ class Metadata(Array, FeatureExtractor):
         if self._dataset is None:
             raise ValueError("No dataset bound. Call bind() first.")
 
-        binned = self.binned_data
+        data = self.factor_data
 
         if isinstance(index, int):
-            return binned[index]
+            return data[index]
         if isinstance(index, str):
             if index not in self.factor_names:
                 raise KeyError(f"Factor '{index}' not found in metadata.")
             col_index = self.factor_names.index(index)
-            return binned[:, col_index]
+            return data[:, col_index]
         if isinstance(index, slice):
-            return binned[index]
+            return data[index]
         raise TypeError("Index must be an int, str, or slice.")
 
     def new(self, dataset: AnnotatedDataset[tuple[Any, Any, DatumMetadata]]) -> Self:
@@ -345,14 +345,14 @@ class Metadata(Array, FeatureExtractor):
             if self._dataset is None:
                 raise ValueError("No dataset bound. Provide data or call bind() first.")
             # Return factors for bound dataset
-            return self.binned_data
+            return self.factor_data
 
         # Check if same as bound dataset (by identity)
         if self._dataset is not None and data is self._dataset:
-            return self.binned_data
+            return self.factor_data
 
         # Compute metadata for new data using this config
-        return self.new(data).binned_data
+        return self.new(data).factor_data
 
     @property
     def raw(self) -> Sequence[Mapping[str, Any]]:
@@ -574,7 +574,7 @@ class Metadata(Array, FeatureExtractor):
         return self._dropped_factors
 
     @property
-    def binned_data(self) -> NDArray[np.int64]:
+    def factor_data(self) -> NDArray[np.int64]:
         """Factor data with continuous values discretized into bins.
 
         Access fully processed factor data where both categorical and
@@ -644,7 +644,26 @@ class Metadata(Array, FeatureExtractor):
         return {k: filtered[k] for k in sorted(filtered)}
 
     @property
-    def factor_data(self) -> NDArray[Any]:
+    def is_discrete(self) -> Sequence[bool]:
+        """Whether each factor is discrete (True) or continuous (False).
+
+        Returns
+        -------
+        Sequence[bool]
+            Boolean sequence with length equal to factor_names, where True
+            indicates a discrete factor (categorical or discrete numeric)
+            and False indicates a continuous factor.
+
+        Notes
+        -----
+        This property is part of the :class:`~dataeval.protocols.Metadata`
+        and aligns with scientific computing conventions where discrete factors
+        are treated differently from continuous ones in statistical analyses.
+        """
+        return [info.factor_type != "continuous" for info in self.factor_info.values()]
+
+    @property
+    def raw_data(self) -> NDArray[Any]:
         """Raw factor values before binning or digitization.
 
         Access unprocessed factor data in its original numeric form before

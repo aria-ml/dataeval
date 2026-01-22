@@ -8,15 +8,15 @@ import numpy as np
 import polars as pl
 from numpy.typing import NDArray
 
-from dataeval import Metadata
 from dataeval.config import EPSILON
 from dataeval.core._calculate import CalculationResult, calculate
 from dataeval.core._clusterer import ClusterResult, ClusterStats, cluster, compute_cluster_stats
 from dataeval.flags import ImageStats
-from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor
+from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor, Metadata
 from dataeval.quality._results import StatsMap, combine_results, get_dataset_step_from_idx
 from dataeval.types import ArrayND, Output, SourceIndex, set_metadata
 from dataeval.utils.arrays import flatten_samples, to_numpy
+from dataeval.utils.data import _get_index2label, _get_item_indices
 
 TDataFrame = TypeVar("TDataFrame", pl.DataFrame, Sequence[pl.DataFrame])
 
@@ -87,6 +87,10 @@ class OutliersOutput(Output[TDataFrame]):
 
         Examples
         --------
+        >>> from dataeval import Metadata
+        >>> from dataeval.flags import ImageStats
+        >>> from dataeval.quality import Outliers
+
         >>> outliers = Outliers(flags=ImageStats.VISUAL)
         >>> results = outliers.evaluate(dataset)
         >>> metadata = Metadata(dataset)
@@ -116,12 +120,11 @@ class OutliersOutput(Output[TDataFrame]):
         if self.issues.shape[0] == 0:
             return pl.DataFrame(schema=schema)
 
-        # Create mapping: image_index -> class_name
-        mapping_data = {
-            "item_id": metadata.item_indices.tolist(),
-            "class_name": [metadata.index2label[label] for label in metadata.class_labels],
-        }
-        labels_df = pl.DataFrame(mapping_data)
+        item_ids = _get_item_indices(metadata)
+        index2label = _get_index2label(metadata)
+        class_names = [index2label[label] for label in metadata.class_labels]
+
+        labels_df = pl.DataFrame({"item_id": item_ids, "class_name": class_names})
 
         # Join the Issues with the Labels
         joined_df = self.issues.join(labels_df, on="item_id", how="left")

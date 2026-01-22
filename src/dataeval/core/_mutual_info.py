@@ -119,20 +119,22 @@ def mutual_info(
     -------
     Return balance (mutual information) of factors with class_labels
 
-    >>> class_labels, binned_data = generate_random_class_labels_and_binned_data(
-    ...     labels=["doctor", "artist", "teacher"],
-    ...     factors={"age": [25, 30, 35, 45], "income": [50000, 65000, 80000], "gender": ["M", "F"]},
-    ...     length=100,
-    ...     random_seed=175,
+    >>> rng = np.random.default_rng(175)
+    >>> class_labels = rng.choice([0, 1, 2], size=100)
+    >>> factor_data = np.column_stack(
+    ...     [
+    ...         rng.choice([25, 35, 45, 55], size=100),  # age
+    ...         rng.choice([50000, 65000, 80000], size=100),  # income
+    ...         rng.choice([0, 1], size=100),  # gender
+    ...     ]
     ... )
-
-    >>> result = mutual_info(class_labels=class_labels, factor_data=binned_data)
+    >>> result = mutual_info(class_labels=class_labels, factor_data=factor_data)
     >>> result["class_to_factor"]
-    array([1.   , 0.208, 0.075, 0.312])
+    array([1.   , 0.034, 0.026, 0.004])
     >>> result["interfactor"]
-    array([[1.   , 0.046, 0.078],
-           [0.046, 1.   , 0.048],
-           [0.078, 0.048, 1.   ]])
+    array([[1.   , 0.017, 0.056],
+           [0.017, 1.   , 0.01 ],
+           [0.056, 0.01 , 1.   ]])
 
     See Also
     --------
@@ -240,21 +242,21 @@ def mutual_info_classwise(
 
     Example
     -------
-    Return balance (mutual information) of factors with class_labels
-
-    >>> class_labels, binned_data = generate_random_class_labels_and_binned_data(
-    ...     labels=["doctor", "artist", "teacher"],
-    ...     factors={"age": [25, 30, 35, 45], "income": [50000, 65000, 80000], "gender": ["M", "F"]},
-    ...     length=100,
-    ...     random_seed=175,
-    ... )
-
     Return classwise balance (mutual information) of factors with individual class_labels
 
-    >>> mutual_info_classwise(class_labels=class_labels, factor_data=binned_data)
-    array([[1.   , 0.131, 0.074, 0.459],
-           [1.   , 0.308, 0.039, 0.247],
-           [1.   , 0.121, 0.015, 0.143]])
+    >>> rng = np.random.default_rng(175)
+    >>> class_labels = rng.choice([0, 1, 2], size=100)
+    >>> factor_data = np.column_stack(
+    ...     [
+    ...         rng.choice([25, 35, 45, 55], size=100),  # age
+    ...         rng.choice([50000, 65000, 80000], size=100),  # income
+    ...         rng.choice([0, 1], size=100),  # gender
+    ...     ]
+    ... )
+    >>> mutual_info_classwise(class_labels=class_labels, factor_data=factor_data)
+    array([[1.000e+00, 2.077e-02, 2.296e-03, 7.317e-04],
+           [1.000e+00, 4.893e-02, 2.451e-02, 4.362e-03],
+           [1.000e+00, 1.868e-02, 3.820e-02, 1.006e-03]])
 
     See Also
     --------

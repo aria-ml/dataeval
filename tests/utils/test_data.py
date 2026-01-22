@@ -45,7 +45,7 @@ def get_metadata(labels, groups=None) -> Metadata:
     metadata.class_labels = labels
     if groups is not None:
         metadata.factor_names = ["Discrete", "Binned"]
-        metadata.binned_data = np.column_stack(tuple(groups.values()))
+        metadata.factor_data = np.column_stack(tuple(groups.values()))
     return metadata
 
 

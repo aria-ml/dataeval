@@ -1,6 +1,6 @@
 __all__ = []
 
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, Literal
 
 import numpy as np
@@ -85,9 +85,9 @@ class ClassBalance(Selection[Any]):
         self.images_per_class: Mapping[int, Sequence[int]]
         self.classes: Sequence[int]
 
-    def _yield_labels(self, dataset: Select[Any]) -> Iterator[list[int]]:
+    def _extract_labels(self, dataset: Select[Any]) -> tuple[list[int], list[int]]:
         """
-        Extract labels from dataset targets for use with core label_stats.
+        Extract flat labels and item indices from dataset targets.
 
         Parameters
         ----------
@@ -96,19 +96,28 @@ class ClassBalance(Selection[Any]):
 
         Returns
         -------
-        list[list[int]]
-            List of label lists, one per image. Empty lists represent images with no targets.
+        class_labels : list[int]
+            Flat list of all class labels across all images.
+        item_indices : list[int]
+            List mapping each label to its source image index.
         """
-        for datum in dataset:
+        class_labels: list[int] = []
+        item_indices: list[int] = []
+
+        for img_idx, datum in enumerate(dataset):
             target = datum[1] if isinstance(datum, tuple) else None
             if isinstance(target, Array):
-                yield [int(np.argmax(as_numpy(target)))] if len(target) > 0 else []
+                if len(target) > 0:
+                    class_labels.append(int(np.argmax(as_numpy(target))))
+                    item_indices.append(img_idx)
             elif isinstance(target, ObjectDetectionTarget | SegmentationTarget):
                 labels_raw = target.labels if isinstance(target.labels, Iterable) else [target.labels]
-                labels = [int(as_numpy(lbl)) for lbl in labels_raw]
-                yield labels
-            else:
-                yield []
+                for lbl in labels_raw:
+                    class_labels.append(int(as_numpy(lbl)))
+                    item_indices.append(img_idx)
+            # Empty images: no labels added, tracked via image_count parameter
+
+        return class_labels, item_indices
 
     def _compute_label_stats(
         self, dataset: Select[Any]
@@ -146,8 +155,11 @@ class ClassBalance(Selection[Any]):
             dataset.metadata.get("index2label", None) if isinstance(dataset, AnnotatedDataset) else None
         )
 
-        # Use core label_stats function with iterator (no need to materialize)
-        stats = label_stats(self._yield_labels(dataset), index2label)
+        # Extract flat labels and item indices
+        class_labels, item_indices = self._extract_labels(dataset)
+
+        # Use core label_stats function
+        stats = label_stats(class_labels, item_indices, index2label, image_count=self._num_images)
 
         # Convert image_indices_per_class to the format we need
         images_per_class = {k: list(v) for k, v in stats["image_indices_per_class"].items()}

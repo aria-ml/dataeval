@@ -3,6 +3,7 @@
 import pathlib
 import sys
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -11,6 +12,7 @@ import polars as pl
 import pytest
 import sklearn.datasets as dsets
 import torch
+from numpy.typing import NDArray
 from typing_extensions import Self
 
 from dataeval._metadata import FactorInfo, Metadata
@@ -41,9 +43,20 @@ else:
     np.set_printoptions(precision=3)
 
 
+@dataclass
+class MockMetadata:
+    """Simple Metadata implementation for doctests."""
+
+    class_labels: NDArray[np.intp]
+    factor_data: NDArray[np.int64]
+    factor_names: Sequence[str]
+    is_discrete: Sequence[bool]
+    index2label: Mapping[int, str]
+
+
 def generate_random_metadata(
     labels: Sequence[str], factors: Mapping[str, Sequence[str | int]], length: int, random_seed: int
-) -> Metadata:
+) -> MockMetadata:
     rng = np.random.default_rng(random_seed)
     labels_arr = rng.choice(range(len(labels)), (length))
 
@@ -78,25 +91,24 @@ def generate_random_metadata(
         # Default: random generation for other factor combinations
         metadata_dict = {k: list(rng.choice(v, (length))) for k, v in factors.items()}
 
-    metadata = Metadata(None)  # type: ignore
-    metadata._raw = [{} for _ in range(len(labels))]
-    metadata._class_labels = labels_arr
-    metadata._item_indices = np.arange(len(labels))
-    metadata._index2label = dict(enumerate(labels))
-    metadata._dataframe = pl.DataFrame(metadata_dict)
-    metadata._factors = dict.fromkeys(factors, FactorInfo("discrete"))
-    metadata._dropped_factors = {}
-    metadata._is_structured = True
-    metadata._dataset = []  # type: ignore
-    metadata._bin()
-    return metadata
+    # Sort factor names to ensure consistent ordering
+    sorted_factor_names = sorted(factors.keys())
 
+    # Convert factors to binned_data (digitize each factor) in sorted order
+    binned_columns = []
+    for name in sorted_factor_names:
+        factor_values = metadata_dict[name]
+        _, inverse = np.unique(factor_values, return_inverse=True)
+        binned_columns.append(inverse)
+    binned_data = np.column_stack(binned_columns).astype(np.int64) if binned_columns else np.array([], dtype=np.int64)
 
-def generate_random_class_labels_and_binned_data(
-    labels: Sequence[str], factors: dict[str, Sequence[str | int]], length: int, random_seed: int
-) -> tuple[np.typing.NDArray[np.intp], np.typing.NDArray[np.intp]]:
-    metadata = generate_random_metadata(labels=labels, factors=factors, length=length, random_seed=random_seed)
-    return metadata.class_labels, metadata.binned_data
+    return MockMetadata(
+        class_labels=labels_arr,
+        factor_data=binned_data,
+        factor_names=sorted_factor_names,
+        is_discrete=[True] * len(factors),
+        index2label=dict(enumerate(labels)),
+    )
 
 
 def get_one_hot(class_count: int, sub_labels: Sequence[int]) -> list[list[float]]:
@@ -144,7 +156,6 @@ def add_tmp_path(doctest_namespace: dict[str, Any], tmp_path_factory: pytest.Tem
 def add_all(doctest_namespace: dict[str, Any]) -> None:
     doctest_namespace["np"] = np
     doctest_namespace["generate_random_metadata"] = generate_random_metadata
-    doctest_namespace["generate_random_class_labels_and_binned_data"] = generate_random_class_labels_and_binned_data
     doctest_namespace["OODOutput"] = OODOutput
     doctest_namespace["ExampleDataset"] = ExampleDataset
 

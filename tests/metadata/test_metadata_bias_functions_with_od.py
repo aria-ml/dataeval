@@ -166,7 +166,7 @@ class TestMetadataStructureWithBiasFunctions:
         md = Metadata(od_dataset_for_bias)
 
         # factor_data should have 9 rows (one per detection)
-        assert md.factor_data.shape[0] == 9
+        assert md.raw_data.shape[0] == 9
 
         # class_labels should also have 9 values
         assert len(md.class_labels) == 9
@@ -176,7 +176,7 @@ class TestMetadataStructureWithBiasFunctions:
         md = Metadata(ic_dataset_for_bias)
 
         # factor_data should have 5 rows (one per image)
-        assert md.factor_data.shape[0] == 5
+        assert md.raw_data.shape[0] == 5
 
         # class_labels should also have 5 values
         assert len(md.class_labels) == 5
@@ -289,30 +289,30 @@ class TestFactorDataConsistency:
         """Verify factor_data and class_labels have same length for OD."""
         md = Metadata(od_dataset_for_bias)
 
-        assert md.factor_data.shape[0] == len(md.class_labels)
+        assert md.raw_data.shape[0] == len(md.class_labels)
         # Should be 9 (number of detections)
-        assert md.factor_data.shape[0] == 9
+        assert md.raw_data.shape[0] == 9
 
     def test_ic_factor_data_length_matches_class_labels(self, ic_dataset_for_bias):
         """Verify factor_data and class_labels have same length for IC."""
         md = Metadata(ic_dataset_for_bias)
 
-        assert md.factor_data.shape[0] == len(md.class_labels)
+        assert md.raw_data.shape[0] == len(md.class_labels)
         # Should be 5 (number of images)
-        assert md.factor_data.shape[0] == 5
+        assert md.raw_data.shape[0] == 5
 
     def test_od_binned_data_length_matches_class_labels(self, od_dataset_for_bias):
         """Verify binned_data and class_labels have same length for OD."""
         md = Metadata(od_dataset_for_bias)
 
-        assert md.binned_data.shape[0] == len(md.class_labels)
+        assert md.factor_data.shape[0] == len(md.class_labels)
         # Should be 9 (number of detections)
-        assert md.binned_data.shape[0] == 9
+        assert md.factor_data.shape[0] == 9
 
     def test_ic_binned_data_length_matches_class_labels(self, ic_dataset_for_bias):
         """Verify binned_data and class_labels have same length for IC."""
         md = Metadata(ic_dataset_for_bias)
 
-        assert md.binned_data.shape[0] == len(md.class_labels)
+        assert md.factor_data.shape[0] == len(md.class_labels)
         # Should be 5 (number of images)
-        assert md.binned_data.shape[0] == 5
+        assert md.factor_data.shape[0] == 5

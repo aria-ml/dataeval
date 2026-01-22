@@ -53,8 +53,10 @@ class LabelStatsResult(TypedDict):
 
 
 def label_stats(
-    labels: Iterable[int] | Iterable[Iterable[int]],
+    class_labels: Iterable[int],
+    item_indices: Iterable[int] | None = None,
     index2label: Mapping[int, str] | None = None,
+    image_count: int | None = None,
 ) -> LabelStatsResult:
     """
     Calculates statistics for data labels.
@@ -65,15 +67,19 @@ def label_stats(
 
     Parameters
     ----------
-    labels : Iterable[int] | Iterable[Iterable[int]]
-        A sequence of label sequences, where each inner sequence contains the integer
-        labels for a single image. For image classification, each inner sequence
-        typically contains a single label. For object detection, each inner sequence
-        contains multiple labels (one per detected object). Empty sequences represent
-        images with no labels/detections.
+    class_labels : Iterable[int]
+        A flat sequence of integer class labels. For image classification, this has
+        one label per image. For object detection, this has one label per detection
+        across all images.
+    item_indices : Iterable[int] | None, optional
+        A sequence mapping each label to its source image index. Must have the same
+        length as class_labels. If None, a 1:1 mapping is assumed (one label per image).
     index2label : Mapping[int, str] | None, optional
         A mapping from label integers to class names. If None, class names will be
         generated as string representations of the label integers.
+    image_count : int | None, optional
+        Total number of images. Required when item_indices is provided to detect
+        empty images. If None and item_indices is provided, inferred from max index + 1.
 
     Returns
     -------
@@ -84,6 +90,7 @@ def label_stats(
         - label_counts_per_image: Sequence[int] - Number of labels per image
         - image_counts_per_class: Mapping[int, int] - How many images contain each label
         - image_indices_per_class: Mapping[int, Sequence[int]] - Which images contain each label
+        - classes_per_image: Sequence[Sequence[int]] - Class labels for each image
         - image_count: int - Total number of images
         - class_count: int - Total number of classes
         - label_count: int - Total number of labels
@@ -95,9 +102,10 @@ def label_stats(
     --------
     Calculate basic statistics on labels for object detection.
 
-    >>> labels = [[0, 0, 1], [1, 2], [], [0, 1, 2, 3]]
+    >>> class_labels = [0, 0, 1, 1, 2, 0, 1, 2, 3]
+    >>> item_indices = [0, 0, 0, 1, 1, 3, 3, 3, 3]  # image 2 is empty
     >>> index2label = {0: "horse", 1: "cow", 2: "sheep", 3: "pig"}
-    >>> stats = label_stats(labels, index2label)
+    >>> stats = label_stats(class_labels, item_indices, index2label, image_count=4)
     >>> stats["label_counts_per_class"]
     {0: 3, 1: 3, 2: 2, 3: 1}
     >>> stats["label_counts_per_image"]
@@ -107,11 +115,11 @@ def label_stats(
     >>> stats["empty_image_count"]
     1
 
-    Calculate basic statistics on labels for image classification.
+    Calculate basic statistics on labels for image classification (1:1 mapping).
 
-    >>> labels = [[0], [1], [2], [0]]
+    >>> class_labels = [0, 1, 2, 0]
     >>> index2label = {0: "cat", 1: "dog", 2: "bird"}
-    >>> stats = label_stats(labels, index2label)
+    >>> stats = label_stats(class_labels, index2label=index2label)
     >>> stats["label_counts_per_class"]
     {0: 2, 1: 1, 2: 1}
     >>> stats["label_counts_per_image"]
@@ -121,48 +129,55 @@ def label_stats(
     """
     _logger.info("Starting label_stats calculation")
 
-    # Initialize counters - separate empty image tracking from class statistics
+    # Convert to lists for indexing if needed
+    class_labels_list = list(class_labels)
+    total_labels = len(class_labels_list)
+
+    # Handle item_indices: if None, assume 1:1 mapping
+    if item_indices is None:
+        item_indices_list = list(range(total_labels))
+        inferred_image_count = total_labels
+    else:
+        item_indices_list = list(item_indices)
+        if len(item_indices_list) != total_labels:
+            raise ValueError(
+                f"item_indices length ({len(item_indices_list)}) must match class_labels length ({total_labels})"
+            )
+        inferred_image_count = max(item_indices_list) + 1 if item_indices_list else 0
+
+    # Determine actual image count
+    img_count = image_count if image_count is not None else inferred_image_count
+
+    # Initialize data structures
     label_counts: dict[int, int] = defaultdict(int)
-    image_counts: dict[int, int] = defaultdict(int)
     image_indices_per_class: dict[int, list[int]] = defaultdict(list)
-    classes_per_image: list[list[int]] = []
-    label_counts_per_image: list[int] = []
-    empty_image_indices: list[int] = []
+    classes_per_image: list[list[int]] = [[] for _ in range(img_count)]
+    label_counts_per_image: list[int] = [0] * img_count
+    classes_seen_per_image: list[set[int]] = [set() for _ in range(img_count)]
 
     # Single pass through the data
-    img_idx = None
-    for img_idx, img_labels in enumerate(labels):
-        # Track which classes appear in this image (for image_counts)
-        classes_in_image = set()
-        classes_in_image_list: list[int] = []
+    for label, img_idx in zip(class_labels_list, item_indices_list):
+        # Ensure label is always native int type
+        label = int(label)
+        img_idx = int(img_idx)
 
-        label_count = None
-        labels = img_labels if isinstance(img_labels, Iterable) else [img_labels]
-        for label_count, label in enumerate(labels):
-            # Ensure label is always native int type
-            label = int(label)
+        # Count total occurrences of each label
+        label_counts[label] += 1
 
-            # Count total occurrences of each label
-            label_counts[label] += 1
+        # Count labels per image
+        label_counts_per_image[img_idx] += 1
 
-            # Track which images contain each label (avoid duplicates)
-            if label not in classes_in_image:
-                classes_in_image.add(label)
-                classes_in_image_list.append(label)
-                image_indices_per_class[label].append(img_idx)
-
-        # Store classes for this image (empty list for images with no labels)
-        classes_per_image.append(classes_in_image_list)
-
-        # Track empty images separately
-        if label_count is None:
-            empty_image_indices.append(img_idx)
-
-        label_counts_per_image.append(0 if label_count is None else label_count + 1)
+        # Track which images contain each label (avoid duplicates)
+        if label not in classes_seen_per_image[img_idx]:
+            classes_seen_per_image[img_idx].add(label)
+            classes_per_image[img_idx].append(label)
+            image_indices_per_class[label].append(img_idx)
 
     # Count images per class
-    for label, indices in image_indices_per_class.items():
-        image_counts[label] = len(indices)
+    image_counts: dict[int, int] = {label: len(indices) for label, indices in image_indices_per_class.items()}
+
+    # Find empty images
+    empty_image_indices = [i for i, count in enumerate(label_counts_per_image) if count == 0]
 
     # Determine all unique classes and create index2label mapping
     unique_classes = sorted(label_counts.keys()) if label_counts else []
@@ -170,11 +185,6 @@ def label_stats(
         result_index2label: dict[int, str] = {cls: str(cls) for cls in unique_classes}
     else:
         result_index2label = {cls: index2label[cls] for cls in unique_classes}
-
-    # Calculate total label count
-    total_labels = sum(label_counts.values())
-
-    img_count = 0 if img_idx is None else img_idx + 1
 
     _logger.info(
         "Label stats calculation complete: %d images, %d classes, %d total labels, %d empty images",
