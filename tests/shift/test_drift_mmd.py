@@ -27,7 +27,7 @@ from dataeval.shift._drift._mmd import (
     _squared_pairwise_distance,
     mmd2_from_kernel_matrix,
 )
-from dataeval.shift._update_strategies import LastSeenUpdateStrategy, ReservoirSamplingUpdateStrategy
+from dataeval.shift.update_strategies import LastSeenUpdateStrategy, ReservoirSamplingUpdateStrategy
 
 
 class HiddenOutput(nn.Module):
