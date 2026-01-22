@@ -87,6 +87,7 @@ def generate_random_metadata(
     metadata._factors = dict.fromkeys(factors, FactorInfo("discrete"))
     metadata._dropped_factors = {}
     metadata._is_structured = True
+    metadata._dataset = []  # type: ignore
     metadata._bin()
     return metadata
 
@@ -590,3 +591,27 @@ def doctest_metadata_object(doctest_namespace: dict[str, Any]) -> None:
     # Add to doctest namespace
     doctest_namespace["od_dataset"] = od_dataset_mm
     doctest_namespace["metadata"] = metadata_obj
+
+
+@pytest.fixture(autouse=True, scope="session")
+def doctest_embeddings_model(doctest_namespace: dict[str, Any]) -> None:
+    """Create a simple model and dataset for Embeddings doctests."""
+    # Simple model that takes image input and outputs embeddings
+    my_model = torch.nn.Sequential(
+        torch.nn.AdaptiveAvgPool2d((4, 4)),  # Reduce to fixed 4x4
+        torch.nn.Flatten(),
+        torch.nn.LazyLinear(64),
+        torch.nn.ReLU(),
+        torch.nn.Linear(64, 32),
+    )
+    # Initialize lazy modules with a dummy forward pass
+    dummy_input = torch.randn(1, 3, 32, 32)
+    my_model(dummy_input)
+
+    # Create a dataset with consistent image sizes for embeddings examples
+    embeddings_dataset = ExampleDataset(n_samples=20, image_shape=(3, 32, 32), n_classes=5, seed=42)
+
+    doctest_namespace["my_model"] = my_model
+    doctest_namespace["embeddings_dataset"] = embeddings_dataset
+    doctest_namespace["train_dataset"] = embeddings_dataset
+    doctest_namespace["test_dataset"] = embeddings_dataset

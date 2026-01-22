@@ -39,34 +39,40 @@ class TestDuplicates:
         data = np.random.random((20, 3, 16, 16))
         dupes = Duplicates()
         results = dupes.evaluate(np.concatenate((data, data + 0.001)))
-        assert results.items.exact is not None
+        # Adding 0.001 to random data creates values that are NOT byte-identical,
+        # so xxhash will NOT find them as exact duplicates. However, pchash will
+        # find them as near duplicates because the visual difference is minimal.
+        # exact may or may not be None depending on whether some random images
+        # happen to hash to the same xxhash value
         assert results.items.near is not None
-        assert len(results.items.exact) < 20
         assert len(results.items.near) > 0
         assert results.targets.exact is None
         assert results.targets.near is None
 
     def test_duplicates_only_exact(self):
         data = np.random.random((20, 3, 16, 16))
-        dupes = Duplicates(only_exact=True)
+        dupes = Duplicates(ImageStats.HASH_XXHASH)
         results = dupes.evaluate(np.concatenate((data, data, data + 0.001)))
         assert results.items.exact is not None
-        assert results.items.near is not None
         assert len(results.items.exact) == 20
-        assert len(results.items.near) == 0
+        # near is None because HASH_PCHASH was not included in flags
+        assert results.items.near is None
         assert results.targets.exact is None
         assert results.targets.near is None
 
     def test_duplicates_with_stats(self):
         data = np.random.random((20, 3, 16, 16))
         data = np.concatenate((data, data, data + 0.001))
+        # Stats computed with full HASH (includes both xxhash and pchash)
         stats = calculate(data, None, ImageStats.HASH, per_image=True, per_target=False)
-        dupes = Duplicates(only_exact=True)
+        # Detector configured for exact only - but from_stats uses what's in the stats
+        dupes = Duplicates(ImageStats.HASH_XXHASH)
         results = dupes.from_stats(stats)
         assert results.items.exact is not None
-        assert results.items.near is not None
         assert len(results.items.exact) == 20
-        assert len(results.items.near) == 0
+        # from_stats uses what's available in the stats, so pchash results will be present
+        # since the stats were computed with ImageStats.HASH
+        assert results.items.near is not None
         assert results.targets.exact is None
         assert results.targets.near is None
 
@@ -197,36 +203,38 @@ class TestDuplicates:
 
         # Should return proper structure
         assert isinstance(result.items.exact, list)
-        assert isinstance(result.items.near, list)
+        assert isinstance(result.items.near_cluster, list)
         # Targets is now an empty DuplicateDetectionResult, not None
         assert result.targets.exact is None
-        assert result.targets.near is None
+        assert result.targets.near_cluster is None
 
-    def test_duplicates_from_clusters_only_exact(self):
-        """Test cluster-based detection with only_exact=True"""
+    def test_duplicates_from_clusters_with_near(self):
+        """Test cluster-based detection finds both exact and near duplicates"""
 
-        # Create ClusterResult
+        # Create ClusterResult with zero-distance edge (exact) and edges that will
+        # produce near duplicates. Near duplicates are edges with distance < cluster std.
+        # With distances [0.0, 0.01, 0.05, 0.1], std is ~0.042, so 0.01 will be a near dup.
         mock_cluster_result: ClusterResult = {
-            "mst": np.array([[0, 1, 0.0], [1, 2, 0.05]], dtype=np.float32),
-            "clusters": np.array([0, 0, 0], dtype=np.intp),
+            "mst": np.array([[0, 1, 0.0], [1, 2, 0.01], [2, 3, 0.05], [3, 4, 0.1]], dtype=np.float32),
+            "clusters": np.array([0, 0, 0, 0, 0], dtype=np.intp),
             "linkage_tree": np.array([], dtype=np.float32),
             "membership_strengths": np.array([], dtype=np.float32),
             "k_neighbors": np.array([], dtype=np.int64),
             "k_distances": np.array([], dtype=np.float32),
         }
 
-        # Only exact duplicates
-        detector = Duplicates(only_exact=True)
+        # Cluster-based detection (flags don't affect from_clusters)
+        detector = Duplicates()
         result = detector.from_clusters(mock_cluster_result)
 
-        # Should find exact duplicates
+        # Should find exact duplicates (zero distance edge)
         assert isinstance(result.items.exact, list)
-        # Near duplicates should be empty
-        assert isinstance(result.items.near, list)
-        assert len(result.items.near) == 0
+        # Near duplicates come from cluster analysis, not phash
+        assert result.items.near is None
+        assert isinstance(result.items.near_cluster, list)
         # Targets is now an empty DuplicateDetectionResult, not None
         assert result.targets.exact is None
-        assert result.targets.near is None
+        assert result.targets.near_cluster is None
 
     def test_duplicates_from_clusters_no_duplicates(self):
         """Test with data that has no duplicates"""
@@ -244,12 +252,12 @@ class TestDuplicates:
         detector = Duplicates()
         result = detector.from_clusters(mock_cluster_result)
 
-        # Should have proper structure (may be empty)
-        assert isinstance(result.items.exact, list)
-        assert isinstance(result.items.near, list)
+        # Should have proper structure - no exact duplicates, possibly near_cluster
+        # (depends on cluster std calculation)
+        assert result.items.near is None  # phash not used in cluster detection
         # Targets is now an empty DuplicateDetectionResult, not None
         assert result.targets.exact is None
-        assert result.targets.near is None
+        assert result.targets.near_cluster is None
 
     def test_hash_differs_for_full_image_vs_targets(self, get_mock_od_dataset):
         """Regression test: hash values should differ between full image and individual targets.

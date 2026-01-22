@@ -68,6 +68,7 @@ class ImageStats(Flag):
 
     Full Categories:
 
+    - `NONE` : No statistics
     - `PIXEL` : All pixel statistics
     - `VISUAL` : All visual statistics
     - `DIMENSION` : All dimension statistics
@@ -91,6 +92,9 @@ class ImageStats(Flag):
     Some statistics have dependencies on others, the dependencies will be added
     automatically during processing.
     """
+
+    # ===== NONE (no stats) =====
+    NONE = 0
 
     # ===== PIXEL STATS =====
     PIXEL_MEAN = auto()

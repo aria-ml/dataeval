@@ -14,9 +14,9 @@ import torch
 import torch.nn as nn
 from sklearn.linear_model import LogisticRegression
 
+from dataeval.extractors._uncertainty import UncertaintyFeatureExtractor, _classifier_uncertainty
 from dataeval.shift import DriftUnivariate
-from dataeval.shift._feature_extractors import UncertaintyFeatureExtractor, _classifier_uncertainty
-from dataeval.shift._update_strategies import LastSeenUpdateStrategy, ReservoirSamplingUpdateStrategy
+from dataeval.shift.update_strategies import LastSeenUpdateStrategy, ReservoirSamplingUpdateStrategy
 
 
 class PtModel(nn.Module):
