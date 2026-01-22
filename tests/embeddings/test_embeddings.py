@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -191,19 +191,6 @@ class TestEmbeddings:
         with pytest.raises(TypeError):
             embs[np.array([[0, 1]])]
 
-    def test_embeddings_from_array(self):
-        arr = np.array([[1, 2], [3, 4], [5, 6]])
-        embs = Embeddings.from_array(arr)
-        assert isinstance(embs, Embeddings)
-        assert len(embs) == arr.shape[0]
-        assert np.array_equal(embs.to_tensor().numpy(), arr)
-
-    def test_embeddings_embeddings_only_no_embeddings(self):
-        embs = Embeddings([], 1)
-        embs._embeddings_only = True
-        with pytest.raises(ValueError):
-            embs[0]
-
     def test_embeddings_new(self, torch_ic_ds):
         embs = Embeddings(torch_ic_ds, batch_size=64, model=IdentityModel(), device="cpu", transforms=lambda x: x + 1)
         mini_ds = TorchDataset(torch.ones((5, 1, 3, 3)), torch.nn.functional.one_hot(torch.arange(5)))
@@ -214,19 +201,6 @@ class TestEmbeddings:
         assert mini_embs._dataset != embs._dataset
         assert mini_embs._transforms == embs._transforms
         assert mini_embs._model == embs._model
-
-    def test_embeddings_new_embeddings_only_raises(self):
-        arr = np.array([[1, 2], [3, 4], [5, 6]])
-        embs = Embeddings.from_array(arr)
-        with pytest.raises(ValueError):
-            embs.new([])
-
-    @patch("dataeval._embeddings.np.save", side_effect=OSError())
-    def test_embeddings_save_failure(self, tmp_path):
-        arr = np.array([[1, 2], [3, 4], [5, 6]])
-        embs = Embeddings.from_array(arr)
-        with pytest.raises(OSError):
-            embs.save(tmp_path)
 
     def test_embeddings_layer_name_extraction(self, torch_ic_ds, sequential_model):
         """Test that layer_name correctly extracts embeddings from specified layer"""
@@ -472,26 +446,6 @@ class TestEmbeddings:
         # Shape should be (0,) for empty dataset
         assert embs.shape == (0,)
 
-    def test_hash_embeddings_only(self):
-        """Test __hash__ for embeddings-only instance (lines 225-227)"""
-        arr = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
-        embs = Embeddings.from_array(arr)
-
-        # Should hash based on embeddings array data
-        hash1 = hash(embs)
-        assert isinstance(hash1, int)
-
-        # Same data should give same hash
-        embs2 = Embeddings.from_array(arr.copy())
-        hash2 = hash(embs2)
-        assert hash1 == hash2
-
-        # Different data should give different hash
-        arr_different = np.array([[7.0, 8.0], [9.0, 10.0], [11.0, 12.0]])
-        embs3 = Embeddings.from_array(arr_different)
-        hash3 = hash(embs3)
-        assert hash1 != hash3
-
     def test_hash_with_dataset_model_transforms(self, torch_ic_ds):
         """Test __hash__ for regular embeddings with dataset, model, and transforms (lines 228-231)"""
         model = IdentityModel()
@@ -546,26 +500,6 @@ class TestPathProperty:
 
         # Path property should return None
         assert embs.path is None
-
-    def test_path_setter_none_converts_memmap_to_array(self, tmp_path):
-        """Test path setter with None converts memmap to in-memory array (lines 241-247)"""
-        path = tmp_path / "test.npy"
-        arr = np.random.randn(100, 128).astype(np.float32)
-        np.save(path, arr)
-
-        # Load as memmap
-        loaded = np.load(path, mmap_mode="r+")
-        embs = Embeddings.from_array(loaded)
-        assert isinstance(embs._embeddings, np.memmap)
-
-        # Set path to None
-        embs.path = None
-
-        # Should convert to regular array
-        assert not isinstance(embs._embeddings, np.memmap)
-        assert isinstance(embs._embeddings, np.ndarray)
-        assert embs._use_memmap is False
-        np.testing.assert_array_equal(embs._embeddings, arr)
 
     def test_path_setter_new_path_saves_embeddings(self, tmp_path):
         """Test path setter with new path saves current embeddings (lines 248-254)"""

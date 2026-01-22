@@ -4,7 +4,7 @@ import logging
 import os
 from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import numpy as np
 import psutil
@@ -27,7 +27,7 @@ from dataeval.protocols import (
     ProgressCallback,
     Transform,
 )
-from dataeval.utils.arrays import as_numpy, flatten_samples
+from dataeval.utils.arrays import flatten_samples
 
 _logger = logging.getLogger(__name__)
 
@@ -139,7 +139,6 @@ class Embeddings(Array, FeatureExtractor):
         self._transforms = (
             [transforms] if isinstance(transforms, Transform) else [] if transforms is None else list(transforms)
         )
-        self._embeddings_only: bool = False
 
         self.layer_name = layer_name
         self.use_output = use_output
@@ -164,11 +163,9 @@ class Embeddings(Array, FeatureExtractor):
     @property
     def shape(self) -> tuple[int, ...]:
         if self._shape is None:
-            if self._embeddings_only:
-                self._shape = tuple(self._embeddings.shape)
-            elif self._dataset is None:
+            if self._dataset is None:
                 raise ValueError("Cannot determine shape: no dataset bound. Call bind() first.")
-            elif len(self._dataset) == 0:
+            if len(self._dataset) == 0:
                 self._shape = (0,)
             elif self._cached_idx:
                 embedding_shape = self[list(self._cached_idx)[0]].shape
@@ -218,8 +215,6 @@ class Embeddings(Array, FeatureExtractor):
         >>> _ = extractor.bind(train_dataset)
         >>> embeddings = extractor()
         """
-        if self._embeddings_only:
-            raise ValueError("Cannot bind dataset to an embeddings-only instance.")
         self._dataset = dataset
         # Clear cached state
         self._cached_idx.clear()
@@ -302,7 +297,7 @@ class Embeddings(Array, FeatureExtractor):
         """
         # Trigger computation for lazy embeddings
         # Always compute if not embeddings-only (handles both empty cache and no-cache scenarios)
-        arr = self[:] if not self._embeddings_only else self._embeddings
+        arr = self[:]
 
         # Check if dtype conversion is needed
         needs_conversion = dtype is not None and np.dtype(dtype) != arr.dtype
@@ -341,9 +336,7 @@ class Embeddings(Array, FeatureExtractor):
         return modules_dict[layer_name]
 
     def __hash__(self) -> int:
-        if self._embeddings_only:
-            bid = self._embeddings.ravel().tobytes()
-        elif self._dataset is None:
+        if self._dataset is None:
             # Unbound instance - hash based on model and transforms only
             mid = self._model.metadata["id"] if isinstance(self._model, AnnotatedModel) else str(self._model)
             tid = str.join("|", [str(t) for t in self._transforms])
@@ -481,8 +474,6 @@ class Embeddings(Array, FeatureExtractor):
         ValueError
             When called on embeddings-only instance that lacks a model.
         """
-        if self._embeddings_only:
-            raise ValueError("Embeddings object does not have a model.")
         return self.__class__(
             dataset,
             self.batch_size,
@@ -495,89 +486,6 @@ class Embeddings(Array, FeatureExtractor):
             self.memory_threshold,
             self._progress_callback,
         )
-
-    @classmethod
-    def from_array(cls, array: ArrayLike) -> Self:
-        """
-        Create Embeddings instance from an existing array.
-
-        Parameters
-        ----------
-        array : ArrayLike
-            In-memory data to wrap in an Embeddings object. Can be a numpy array,
-            memmap, or the result of np.load(). Memmap arrays are preserved as-is.
-
-        Returns
-        -------
-        Embeddings
-            Embeddings-only instance containing the provided data.
-
-        Example
-        -------
-        >>> import numpy as np
-        >>> from dataeval import Embeddings
-        >>> # From in-memory array
-        >>> array = np.random.randn(100, 512)
-        >>> embeddings = Embeddings.from_array(array)
-        >>> tmp_file = tmp_path / "embeddings.npy"
-        >>> # From saved file (preserves memmap)
-        >>> np.save(tmp_file, array)
-        >>> loaded = np.load(tmp_file, mmap_mode="r")
-        >>> embeddings = Embeddings.from_array(loaded)
-        >>> print(embeddings.shape)
-        (100, 512)
-        """
-        embeddings = cls(None, 0, None, None, None, False, None, None, 0.8)
-        embeddings._embeddings = array if isinstance(array, np.ndarray) else as_numpy(array)
-        embeddings._cached_idx = set(range(len(embeddings._embeddings)))
-        embeddings._embeddings_only = True
-        return embeddings
-
-    @classmethod
-    def load(cls, path: Path | str, mmap_mode: Literal["r", "r+", "w+", "c"] | None = None) -> Self:
-        """
-        Load embeddings from a saved .npy file.
-
-        Parameters
-        ----------
-        path : Path or str
-            File path to the saved .npy file containing embeddings.
-        mmap_mode : str or None, default None
-            Mode for memory-mapping the file. When None, loads the entire array
-            into memory as an ndarray. When specified, uses memory-mapping which
-            is more efficient for large files. Valid modes are:
-            - 'r': Open existing file for reading only
-            - 'r+': Open existing file for reading and writing
-            - 'w+' : Open existing file and overwrite
-            - 'c': Copy-on-write mode without updating file
-            See numpy.load documentation for more details.
-
-        Returns
-        -------
-        Embeddings
-            Embeddings-only instance containing the loaded data.
-
-        Example
-        -------
-        >>> import numpy as np
-        >>> from dataeval import Embeddings
-        >>> # Save some embeddings
-        >>> array = np.random.randn(100, 512)
-        >>> tmp_file = tmp_path / "embeddings.npy"
-        >>> np.save(tmp_file, array)
-        >>> # Load as in-memory array
-        >>> embeddings = Embeddings.load(tmp_file)
-        >>> # Load as memmap for large files
-        >>> embeddings_mmap = Embeddings.load(tmp_file, mmap_mode="r")
-        >>> print(embeddings.shape)
-        (100, 512)
-        """
-        file_path = Path(path) if isinstance(path, str) else path
-        if not file_path.exists():
-            raise FileNotFoundError(f"File not found: {file_path}")
-
-        array = np.load(file_path, mmap_mode=mmap_mode)
-        return cls.from_array(array)
 
     def save(self, path: Path | str | None = None) -> None:
         """
@@ -608,8 +516,7 @@ class Embeddings(Array, FeatureExtractor):
             raise ValueError("No path specified. Provide a path or initialize Embeddings with a path.")
 
         # Ensure all embeddings are computed
-        if not self._embeddings_only:
-            self.compute()
+        self.compute()
 
         # Save to disk
         target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -642,9 +549,6 @@ class Embeddings(Array, FeatureExtractor):
         Embeddings
             Returns self for method chaining.
         """
-        if self._embeddings_only:
-            return self  # No-op for already-computed embeddings
-
         if force:
             self._cached_idx.clear()
             self._embeddings = np.empty((0,))
@@ -725,55 +629,50 @@ class Embeddings(Array, FeatureExtractor):
         """
         Access embeddings by index, indices or slice.
 
-        Computes embeddings on-demand for uncached indices. Progress updates
-        are reported via the progress_callback if configured.
-
-        Parameters
-        ----------
-        key : int, Iterable[int], or slice
-            Index, indices or slice to retrieve embeddings.
-
-        Returns
-        -------
-        NDArray
-            Embedding array for the requested indices.
-
-        Raises
-        ------
-        TypeError
-            When key is not an integer, Iterable[int] or slice.
-        ValueError
-            When trying to generate new embeddings from an embeddings-only instance.
+        Returns a view of the memmap when possible (slices/ints),
+        and a copy only when necessary (arbitrary list of indices).
         """
-        if not isinstance(key, int | Iterable | slice) and not hasattr(key, "__int__"):
-            raise TypeError("Invalid argument type.")
+        from collections import deque
 
-        # Validate and listify Iterable of indices
-        if isinstance(key, Iterable):
-            listified: list[int] = []
+        # 1. Validation and Index Normalization
+        if isinstance(key, (int, np.integer)):
+            # Fast path for single integer
+            if self._embeddings.size > 0 and int(key) in self._cached_idx:
+                return self._embeddings[key]
+            indices = [int(key)]
+
+        elif isinstance(key, slice):
+            # Resolve slice without expanding to a list (preserves memory)
+            # key.indices handles step size and negative indices correctly
+            indices = range(*key.indices(len(self)))
+
+        elif isinstance(key, Iterable) and not isinstance(key, str | bytes):
+            # Handle arbitrary list of indices
+            indices = []
             for k in key:
-                if not isinstance(k, int) and not hasattr(k, "__int__"):
-                    raise TypeError(f"All indices in the sequence must be integers. Found: {k}")
-                listified.append(int(k))
-            key = listified
+                if not isinstance(k, int | np.integer):
+                    raise TypeError("All indices in the sequence must be integers")
+                indices.append(int(k))
+        else:
+            raise TypeError(f"Invalid argument type: {type(key)}")
 
-            if any(not isinstance(k, int) and not hasattr(k, "__int__") for k in key):
-                raise TypeError("All indices in the sequence must be integers.")
+        # 2. Ensure Cache is Populated
+        # If the array is not initialized OR we are missing items, we must compute.
+        # We check specific indices only if the global "fully cached" flag is false.
+        is_fully_cached = (self._embeddings.size > 0) and (len(self._cached_idx) == len(self))
 
-        indices = list(range(len(self))[key]) if isinstance(key, slice) else [int(key)] if isinstance(key, int) else key
+        if not is_fully_cached:
+            # Run _batch purely for side effects (updating self._embeddings).
+            # deque(..., maxlen=0) consumes the generator at C-speed without storing results.
+            deque(self._batch(indices), maxlen=0)
 
-        if self._embeddings_only:
-            if self._embeddings.size == 0:
-                raise ValueError("Embeddings not initialized.")
-            if not set(indices).issubset(self._cached_idx):
-                raise ValueError("Unable to generate new embeddings from a shallow instance.")
-            return self._embeddings[key]
+        # 3. Return Data
+        # At this point, self._embeddings is guaranteed to be initialized and populated.
 
-        if not indices:
-            return np.empty((0,), dtype=np.float32)
-
-        result = np.vstack(list(self._batch(indices)))
-        return result[0] if isinstance(key, int) else result
+        # Slices return a VIEW of the memmap (Zero-Copy)
+        # Advanced indexing (lists) returns a COPY (NumPy limitation)
+        key = key if isinstance(key, slice | range | int) else indices
+        return self._embeddings[key]
 
     def __iter__(self) -> Iterator[NDArray[Any]]:
         """Iterate over individual embeddings."""
@@ -788,8 +687,6 @@ class Embeddings(Array, FeatureExtractor):
         ValueError
             If no dataset is bound and instance is not embeddings-only.
         """
-        if self._embeddings_only:
-            return len(self._embeddings)
         if self._dataset is None:
             raise ValueError("Cannot determine length: no dataset bound. Call bind() first.")
         return len(self._dataset)

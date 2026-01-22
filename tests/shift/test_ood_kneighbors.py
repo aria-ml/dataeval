@@ -2,7 +2,6 @@ import numpy as np
 import pytest
 from sklearn.datasets import load_digits
 
-from dataeval import Embeddings
 from dataeval.shift._ood._kneighbors import OODKNeighbors
 
 # Embedding dimensions for test
@@ -10,7 +9,7 @@ embedding_dim = 64
 
 
 @pytest.fixture(scope="module")
-def reference_embeddings() -> Embeddings:
+def reference_embeddings() -> np.typing.NDArray[np.float32]:
     """Create reference embeddings for testing."""
     X, y = load_digits(return_X_y=True)
     assert isinstance(X, np.ndarray)
@@ -20,13 +19,11 @@ def reference_embeddings() -> Embeddings:
     # Simulate embeddings from first 500 samples
     n_ref = 500
     X_ref = X[:n_ref].reshape(n_ref, -1)[:, :embedding_dim]  # Take first 64 features as "embeddings"
-
-    # Use from_array class method - much simpler!
-    return Embeddings.from_array(X_ref)
+    return X_ref
 
 
 @pytest.fixture(scope="module")
-def query_embeddings() -> Embeddings:
+def query_embeddings() -> np.typing.NDArray[np.float32]:
     """Create query embeddings for testing (mix of ID and OOD-like)."""
     X, y = load_digits(return_X_y=True)
     assert isinstance(X, np.ndarray)
@@ -39,9 +36,7 @@ def query_embeddings() -> Embeddings:
     # Add some artificial OOD samples (shifted distribution)
     X_ood = X_query[:50] + 2.0  # Make first 50 samples more "OOD-like"
     X_query[:50] = X_ood
-
-    # Use from_array class method - much simpler!
-    return Embeddings.from_array(X_query)
+    return X_query
 
 
 @pytest.mark.optional
@@ -86,13 +81,13 @@ def test_knn_fit_validation(reference_embeddings):
     knn = OODKNeighbors(k=10)
 
     # Test with empty embeddings - create one with empty array
-    empty_embeddings = Embeddings.from_array(np.array([]).reshape(0, embedding_dim))
+    empty_embeddings = np.array([]).reshape(0, embedding_dim)
 
     with pytest.raises(ValueError):  # Any ValueError is fine
         knn.fit(empty_embeddings)
 
     # Test with k too large for non-empty embeddings
-    small_embeddings = Embeddings.from_array(np.random.randn(5, embedding_dim))  # Only 5 embeddings
+    small_embeddings = np.random.randn(5, embedding_dim)  # Only 5 embeddings
     knn_large_k = OODKNeighbors(k=10)  # k=10 > 5 embeddings
     with pytest.raises(ValueError):  # Any ValueError is fine
         knn_large_k.fit(small_embeddings)
