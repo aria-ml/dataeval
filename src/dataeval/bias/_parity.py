@@ -6,10 +6,11 @@ from typing import Any
 
 import polars as pl
 
-from dataeval import Metadata
+from dataeval import Metadata as _Metadata
 from dataeval.core import parity
-from dataeval.protocols import AnnotatedDataset
+from dataeval.protocols import AnnotatedDataset, Metadata
 from dataeval.types import DictOutput, set_metadata
+from dataeval.utils.data import _get_index2label
 
 _logger = logging.getLogger(__name__)
 
@@ -122,7 +123,8 @@ class Parity:
         Parameters
         ----------
         data : AnnotatedDataset[Any] or Metadata
-            Either an annotated dataset (which will be converted to Metadata) or preprocessed Metadata directly.
+            Either an annotated dataset (which will be converted to Metadata) or any object
+            implementing the Metadata protocol.
 
         Returns
         -------
@@ -159,15 +161,16 @@ class Parity:
         if isinstance(data, Metadata):
             self.metadata = data
         else:
-            self.metadata = Metadata(data)
+            self.metadata = _Metadata(data)
 
         factor_names = self.metadata.factor_names
-        index2label = self.metadata.index2label
+        class_labels = self.metadata.class_labels
+        index2label = _get_index2label(self.metadata)
 
         if not factor_names:
             raise ValueError("No factors found in provided metadata.")
 
-        output = parity(self.metadata.binned_data, self.metadata.class_labels.tolist())
+        output = parity(self.metadata.factor_data, class_labels)
 
         insufficient_data = {
             factor_names[k]: {vk: {index2label[vvk]: vvv for vvk, vvv in vv.items()} for vk, vv in v.items()}

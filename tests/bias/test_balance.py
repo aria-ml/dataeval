@@ -1,5 +1,4 @@
 import copy
-from unittest.mock import MagicMock
 
 import numpy as np
 import polars as pl
@@ -7,7 +6,7 @@ import pytest
 
 from dataeval._metadata import Metadata
 from dataeval.bias._balance import Balance
-from tests.conftest import to_metadata
+from tests.conftest import MockMetadata, to_metadata
 
 
 @pytest.fixture(scope="module")
@@ -65,8 +64,13 @@ class TestBalanceUnit:
         assert balance_obj.factor_correlation_threshold == 0.6
 
     def test_empty_metadata(self):
-        mock_metadata = MagicMock(spec=Metadata)
-        mock_metadata.factor_names = []
+        mock_metadata = MockMetadata(
+            class_labels=np.array([], dtype=np.intp),
+            factor_data=np.array([], dtype=np.int64),
+            factor_names=[],
+            is_discrete=[],
+            index2label={},
+        )
         balance_obj = Balance()
         with pytest.raises(ValueError):
             balance_obj.evaluate(mock_metadata)

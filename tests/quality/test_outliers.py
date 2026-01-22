@@ -1,10 +1,9 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import numpy as np
 import polars as pl
 import pytest
 
-from dataeval import Metadata
 from dataeval.config import use_max_processes
 from dataeval.core import calculate
 from dataeval.core._clusterer import ClusterResult
@@ -12,15 +11,21 @@ from dataeval.core._label_stats import LabelStatsResult
 from dataeval.flags import ImageStats
 from dataeval.quality._outliers import Outliers, OutliersOutput, _get_outlier_mask
 from dataeval.utils.data import unzip_dataset
+from tests.conftest import MockMetadata
 
 
-def make_mock_metadata(lstat: LabelStatsResult) -> MagicMock:
-    """Create a MagicMock with spec=Metadata for testing aggregate_by_class."""
-    mock = MagicMock(spec=Metadata)
-    mock.item_indices = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
-    mock.class_labels = np.array([0, 1, 2, 0, 1, 2, 1, 0, 2, 1])
-    mock.index2label = lstat["index2label"]
-    return mock
+def make_mock_metadata(lstat: LabelStatsResult) -> MockMetadata:
+    """Create a MockMetadata (Metadata) for testing aggregate_by_class."""
+    # class_labels maps item_id -> class: [0,1,2,0,1,2,1,0,2,1] (from lstat)
+    # Nested structure: each item has one class label
+
+    return MockMetadata(
+        class_labels=np.array([0, 1, 2, 0, 1, 2, 1, 0, 2, 1], dtype=np.intp),
+        factor_data=np.array([], dtype=np.int64),  # Not used by aggregate_by_class
+        factor_names=[],  # Not used by aggregate_by_class
+        is_discrete=[],  # Not used by aggregate_by_class
+        index2label=lstat["index2label"],
+    )
 
 
 @pytest.mark.required

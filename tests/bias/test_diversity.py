@@ -1,5 +1,3 @@
-from unittest.mock import MagicMock
-
 import numpy as np
 import polars as pl
 import pytest
@@ -7,7 +5,7 @@ import pytest
 from dataeval._metadata import Metadata
 from dataeval.bias import Diversity
 from dataeval.types import ExecutionMetadata
-from tests.conftest import to_metadata
+from tests.conftest import MockMetadata, to_metadata
 
 
 @pytest.fixture(scope="module")
@@ -86,8 +84,13 @@ class TestDiversityUnit:
         assert isinstance(result.meta(), ExecutionMetadata)
 
     def test_empty_metadata(self):
-        mock_metadata = MagicMock(spec=Metadata)
-        mock_metadata.factor_names = []
+        mock_metadata = MockMetadata(
+            class_labels=np.array([], dtype=np.intp),
+            factor_data=np.array([], dtype=np.int64),
+            factor_names=[],
+            is_discrete=[],
+            index2label={},
+        )
         diversity_obj = Diversity()
         with pytest.raises(ValueError):
             diversity_obj.evaluate(mock_metadata)

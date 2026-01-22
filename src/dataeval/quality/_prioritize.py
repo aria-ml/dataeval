@@ -14,11 +14,12 @@ import numpy as np
 from numpy.typing import NDArray
 from typing_extensions import Self
 
-from dataeval import Embeddings, Metadata
+from dataeval import Embeddings
+from dataeval import Metadata as _Metadata
 from dataeval.config import DeviceLike, get_device
 from dataeval.core._rank import rank_kmeans_complexity, rank_kmeans_distance, rank_knn
 from dataeval.core._rerank import rerank_class_balance, rerank_hard_first, rerank_stratified
-from dataeval.protocols import AnnotatedDataset, EmbeddingModel
+from dataeval.protocols import AnnotatedDataset, EmbeddingModel, Metadata
 from dataeval.types import Output, set_metadata
 
 
@@ -439,7 +440,7 @@ class Prioritize:
         class_labels = self._policy_params.get("class_labels")
         if self._policy_name == "class_balance" and class_labels is None:
             if isinstance(dataset, AnnotatedDataset):
-                self.metadata = Metadata(dataset)
+                self.metadata = _Metadata(dataset)
                 class_labels = self.metadata.class_labels
             else:
                 raise ValueError(

@@ -1,5 +1,4 @@
 import logging
-from unittest.mock import MagicMock
 
 import numpy as np
 import polars as pl
@@ -7,7 +6,7 @@ import pytest
 
 from dataeval._metadata import Metadata
 from dataeval.bias import Parity
-from tests.conftest import to_metadata
+from tests.conftest import MockMetadata, to_metadata
 
 
 @pytest.mark.required
@@ -66,8 +65,13 @@ class TestParityUnit:
         assert result.factors.schema["has_insufficient_data"] == pl.Boolean
 
     def test_empty_metadata(self):
-        mock_metadata = MagicMock(spec=Metadata)
-        mock_metadata.factor_names = []
+        mock_metadata = MockMetadata(
+            class_labels=np.array([], dtype=np.intp),
+            factor_data=np.array([], dtype=np.int64),
+            factor_names=[],
+            is_discrete=[],
+            index2label={},
+        )
         parity_obj = Parity()
         with pytest.raises(ValueError):
             parity_obj.evaluate(mock_metadata)

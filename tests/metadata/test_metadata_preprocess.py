@@ -22,8 +22,8 @@ class TestMDPreprocessingUnit:
         labels = [0, 0, 0]
         bincounts = {"data1": 1}
         output = to_metadata(factors, labels, bincounts)
-        if output.factor_data is not None:
-            cont_factors = output.factor_data.T[0]
+        if output.raw_data is not None:
+            cont_factors = output.raw_data.T[0]
             assert np.all(cont_factors == [0.1, 0.2, 0.3])
 
     @pytest.mark.parametrize(
@@ -56,7 +56,7 @@ class TestMDPreprocessingFunctional:
         labels = [0, 0, 0, 0, 0]
         bincounts = {"data1": 2}
         output = to_metadata(factors, labels, bincounts)
-        disc_factors = output.binned_data
+        disc_factors = output.factor_data
         assert len(np.unique(disc_factors)) == 2
 
     def test_bin_edges(self):
@@ -64,7 +64,7 @@ class TestMDPreprocessingFunctional:
         bin_edges = {"data1": [-np.inf, 1, np.inf]}
         labels = [0, 0, 0, 0, 0]
         output = to_metadata(factors, labels, bin_edges)
-        disc_factors = output.binned_data
+        disc_factors = output.factor_data
         assert len(np.unique(disc_factors)) == 2
 
     def test_mix_match(self):
@@ -72,7 +72,7 @@ class TestMDPreprocessingFunctional:
         labels = [0, 1, 2, 0, 1]
         bincounts = {"data1": 3, "data2": [-np.inf, 1, np.inf]}
         output = to_metadata(factors, labels, bincounts)
-        disc_factors = output.binned_data.T
+        disc_factors = output.factor_data.T
         assert len(np.unique(disc_factors[0])) == 3
         assert len(np.unique(disc_factors[1])) == 2
 
@@ -81,7 +81,7 @@ class TestMDPreprocessingFunctional:
         labels = [0, 0, 0, 0, 0]
         bincounts = {"data1": 1}
         output = to_metadata(factors, labels, bincounts)
-        disc_factors = output.binned_data
+        disc_factors = output.factor_data
         assert len(np.unique(disc_factors)) == 1
 
     def test_over_specified(self):
@@ -89,5 +89,5 @@ class TestMDPreprocessingFunctional:
         labels = [0, 0, 0, 0, 0]
         bincounts = {"data1": 100}
         output = to_metadata(factors, labels, bincounts)
-        disc_factors = output.binned_data
+        disc_factors = output.factor_data
         assert len(np.unique(disc_factors)) == 5

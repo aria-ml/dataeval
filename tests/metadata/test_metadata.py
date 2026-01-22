@@ -75,11 +75,8 @@ class TestMetadata:
         assert len(md.class_labels) == 8
         assert md.item_indices.tolist() == [0, 2, 3, 4, 6, 7, 8, 9]
 
-        # Extract labels from metadata
-        labels: list[list[int]] = [[] for _ in range(md.item_count)]
-        for class_label, item_index in zip(md.class_labels, md.item_indices):
-            labels[item_index].append(int(class_label))
-        stats = label_stats(labels, md.index2label)
+        # Use label_stats directly with flat class_labels and item_indices
+        stats = label_stats(md.class_labels, md.item_indices, md.index2label, image_count=md.item_count)
 
         assert stats["label_counts_per_image"] == [1, 0, 1, 1, 1, 0, 1, 1, 1, 1]
 
@@ -95,11 +92,8 @@ class TestMetadata:
         assert len(md.class_labels) == 16
         assert md.item_indices.tolist() == [0, 0, 2, 2, 3, 3, 4, 4, 6, 6, 7, 7, 8, 8, 9, 9]
 
-        # Extract labels from metadata
-        labels: list[list[int]] = [[] for _ in range(md.item_count)]
-        for class_label, item_index in zip(md.class_labels, md.item_indices):
-            labels[item_index].append(int(class_label))
-        stats = label_stats(labels, md.index2label)
+        # Use label_stats directly with flat class_labels and item_indices
+        stats = label_stats(md.class_labels, md.item_indices, md.index2label, image_count=md.item_count)
 
         assert stats["label_counts_per_image"] == [2, 0, 2, 2, 2, 0, 2, 2, 2, 2]
 
@@ -271,14 +265,14 @@ class TestMetadata:
         md._is_structured = True
         md._factors = {"foo": None}
         md._exclude = {"foo"}
-        assert md.binned_data.size == 0
+        assert md.factor_data.size == 0
 
     def test_empty_factor_data(self):
         md = Metadata(None)  # type: ignore
         md._is_structured = True
         md._factors = {"foo": None}
         md._exclude = {"foo"}
-        assert md.factor_data.size == 0
+        assert md.raw_data.size == 0
 
     @pytest.mark.parametrize(
         "is_binned, exists",
@@ -372,11 +366,11 @@ class TestMetadata:
         assert "embedding_2d" not in md.factor_info
 
         # Verify that factor_data only includes 1D factors
-        factor_data = md.factor_data
+        factor_data = md.raw_data
         assert factor_data.shape == (50, 2)  # 50 samples, 2 1D factors
 
         # Verify that binned_data only includes 1D factors
-        binned_data = md.binned_data
+        binned_data = md.factor_data
         assert binned_data.shape == (50, 2)  # 50 samples, 2 1D factors
 
         # Verify that the 2D factor is still in the dataframe (not removed, just skipped)
@@ -409,7 +403,7 @@ class TestMetadata:
 
         # Initially, should have both image-level and target-level factors
         initial_factor_names = set(md.factor_names)
-        initial_binned_shape = md.binned_data.shape
+        initial_binned_shape = md.factor_data.shape
 
         # Should have at least 2 factors (image_factor and target_factor)
         assert "image_factor" in initial_factor_names
@@ -420,7 +414,7 @@ class TestMetadata:
         # Set target_factors_only to True - should only have target-level factors
         md.target_factors_only = True
         target_only_factor_names = set(md.factor_names)
-        target_only_binned_shape = md.binned_data.shape
+        target_only_binned_shape = md.factor_data.shape
 
         # Should only have target_factor now
         assert "image_factor" not in target_only_factor_names
@@ -431,7 +425,7 @@ class TestMetadata:
         # Set target_factors_only back to False - should have both factors again
         md.target_factors_only = False
         final_factor_names = set(md.factor_names)
-        final_binned_shape = md.binned_data.shape
+        final_binned_shape = md.factor_data.shape
 
         # Should have both factors again
         assert "image_factor" in final_factor_names

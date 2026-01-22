@@ -8,7 +8,7 @@ import logging
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Literal, Protocol, overload
+from typing import Any, Literal, Protocol, overload
 
 import numpy as np
 from numpy.typing import NDArray
@@ -16,12 +16,15 @@ from sklearn.model_selection import GroupKFold, KFold, StratifiedGroupKFold, Str
 from sklearn.utils.multiclass import type_of_target
 
 from dataeval.config import EPSILON
-from dataeval.protocols import AnnotatedDataset, Array, Dataset, ObjectDetectionTarget
+from dataeval.protocols import (
+    AnnotatedDataset,
+    Array,
+    Dataset,
+    Metadata,
+    ObjectDetectionTarget,
+)
 from dataeval.utils.arrays import as_numpy
 from dataeval.utils.preprocessing import BoundingBox
-
-if TYPE_CHECKING:
-    from dataeval._metadata import Metadata
 
 _logger = logging.getLogger(__name__)
 
@@ -640,7 +643,7 @@ def validate_groupable(groups: NDArray[np.intp], num_partitions: int) -> None:
         raise ValueError(f"Unique groups ({num_unique_groups}) must be greater than num partitions ({num_partitions}).")
 
 
-def get_groups(metadata: "Metadata", split_on: Sequence[str] | None) -> NDArray[np.intp] | None:
+def get_groups(metadata: Metadata, split_on: Sequence[str] | None) -> NDArray[np.intp] | None:
     """
     Returns individual group numbers based on a subset of metadata defined by groupnames
 
@@ -662,7 +665,7 @@ def get_groups(metadata: "Metadata", split_on: Sequence[str] | None) -> NDArray[
 
     split_set = set(split_on)
     indices = [i for i, name in enumerate(metadata.factor_names) if name in split_set]
-    binned_features = metadata.binned_data[:, indices]
+    binned_features = metadata.factor_data[:, indices]
     return np.unique(binned_features, axis=0, return_inverse=True)[1]
 
 
@@ -824,7 +827,7 @@ def single_split(
 
 
 def split_dataset(
-    dataset: AnnotatedDataset[Any] | "Metadata",
+    dataset: AnnotatedDataset[Any] | Metadata,
     num_folds: int = 1,
     stratify: bool = False,
     split_on: Sequence[str] | None = None,
@@ -869,9 +872,9 @@ def split_dataset(
     total_partitions = num_folds + 1 if test_frac else num_folds
 
     # Import Metadata at runtime to avoid circular import
-    from dataeval._metadata import Metadata
+    from dataeval._metadata import Metadata as _Metadata
 
-    metadata = dataset if isinstance(dataset, Metadata) else Metadata(dataset)
+    metadata = dataset if isinstance(dataset, Metadata) else _Metadata(dataset)
     labels = metadata.class_labels
 
     validate_labels(labels, total_partitions)
@@ -963,3 +966,19 @@ def unzip_dataset(
     targets_iter = (pair[1] for pair in iter2) if per_target else None
 
     return images_iter, targets_iter
+
+
+def _get_item_indices(metadata: Metadata) -> Sequence[int]:
+    """Get item indices from metadata, generating default if not available."""
+    item_indices = getattr(metadata, "item_indices", None)
+    if item_indices is not None:
+        return item_indices
+    return list(range(len(metadata.class_labels)))
+
+
+def _get_index2label(metadata: Metadata) -> dict[int, str]:
+    """Get index2label mapping, generating default if not available."""
+    index2label = getattr(metadata, "index2label", None)
+    if index2label:
+        return dict(index2label)
+    return {int(i): str(i) for i in np.unique(metadata.class_labels)}

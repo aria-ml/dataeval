@@ -1,5 +1,6 @@
 import contextlib
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any, Literal, TypeVar, cast
 from unittest.mock import Mock
 
@@ -11,6 +12,23 @@ from numpy.typing import NDArray
 from dataeval import Metadata
 from dataeval.config import set_batch_size, set_seed
 from dataeval.protocols import ObjectDetectionTarget
+
+
+@dataclass
+class MockMetadata:
+    """Simple Metadata implementation for unit tests.
+
+    This provides a lightweight alternative to the full Metadata class
+    when tests only need the protocol interface (class_labels, binned_data,
+    factor_names, is_discrete, index2label).
+    """
+
+    class_labels: NDArray[np.intp]
+    factor_data: NDArray[np.int64]
+    factor_names: Sequence[str]
+    is_discrete: Sequence[bool]
+    index2label: Mapping[int, str]
+    item_indices: NDArray[np.int64] | None = None
 
 
 def pytest_configure(config):

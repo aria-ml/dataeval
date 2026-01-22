@@ -11,9 +11,11 @@ class TestLabelStats:
 
     def test_label_stats_basic(self):
         """Test basic label counting with multiple images and classes."""
-        labels = [[0, 0, 0, 0, 0], [0, 1], [0, 1, 2], [0, 1, 2, 3]]
+        # Flat labels: image 0 has [0,0,0,0,0], image 1 has [0,1], image 2 has [0,1,2], image 3 has [0,1,2,3]
+        class_labels = [0, 0, 0, 0, 0, 0, 1, 0, 1, 2, 0, 1, 2, 3]
+        item_indices = [0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 3]
         index2label = {0: "class_0", 1: "class_1", 2: "class_2", 3: "class_3"}
-        stats = label_stats(labels, index2label)
+        stats = label_stats(class_labels, item_indices, index2label, image_count=4)
 
         assert stats["label_counts_per_class"] == {0: 8, 1: 3, 2: 2, 3: 1}
         assert stats["class_count"] == 4
@@ -29,9 +31,11 @@ class TestLabelStats:
 
     def test_label_stats_empty_targets(self):
         """Test handling of images with empty targets tracked separately."""
-        labels = [[0, 0, 0, 0, 0], [], [0, 1, 2, 3], []]
+        # image 0 has [0,0,0,0,0], image 1 is empty, image 2 has [0,1,2,3], image 3 is empty
+        class_labels = [0, 0, 0, 0, 0, 0, 1, 2, 3]
+        item_indices = [0, 0, 0, 0, 0, 2, 2, 2, 2]
         index2label = {0: "class_0", 1: "class_1", 2: "class_2", 3: "class_3"}
-        stats = label_stats(labels, index2label)
+        stats = label_stats(class_labels, item_indices, index2label, image_count=4)
 
         assert stats["label_counts_per_class"] == {0: 6, 1: 1, 2: 1, 3: 1}
         assert stats["class_count"] == 4
@@ -47,17 +51,20 @@ class TestLabelStats:
 
     def test_label_stats_no_index2label(self):
         """Test that class names are auto-generated when index2label is None."""
-        labels = [[0, 1], [2]]
-        stats = label_stats(labels, index2label=None)
+        # image 0 has [0, 1], image 1 has [2]
+        class_labels = [0, 1, 2]
+        item_indices = [0, 0, 1]
+        stats = label_stats(class_labels, item_indices, index2label=None)
 
         assert stats["index2label"] == {0: "0", 1: "1", 2: "2"}
         assert stats["label_counts_per_class"] == {0: 1, 1: 1, 2: 1}
 
     def test_label_stats_single_class(self):
         """Test with only a single class."""
-        labels = [[0], [0], [0]]
+        class_labels = [0, 0, 0]
+        # 1:1 mapping (no item_indices)
         index2label = {0: "cat"}
-        stats = label_stats(labels, index2label)
+        stats = label_stats(class_labels, index2label=index2label)
 
         assert stats["label_counts_per_class"] == {0: 3}
         assert stats["class_count"] == 1
@@ -71,9 +78,10 @@ class TestLabelStats:
 
     def test_label_stats_all_empty(self):
         """Test with all empty labels - tracked separately."""
-        labels = [[], [], []]
+        class_labels = []  # No labels
+        item_indices = []
         index2label = {}
-        stats = label_stats(labels, index2label)
+        stats = label_stats(class_labels, item_indices, index2label, image_count=3)
 
         assert stats["label_counts_per_class"] == {}
         assert stats["class_count"] == 0
@@ -89,9 +97,11 @@ class TestLabelStats:
 
     def test_label_stats_object_detection(self):
         """Test with object detection-style data (multiple labels per image)."""
-        labels = [[0, 0, 1], [1, 2], [], [0, 1, 2, 3]]
+        # image 0 has [0,0,1], image 1 has [1,2], image 2 is empty, image 3 has [0,1,2,3]
+        class_labels = [0, 0, 1, 1, 2, 0, 1, 2, 3]
+        item_indices = [0, 0, 0, 1, 1, 3, 3, 3, 3]
         index2label = {0: "horse", 1: "cow", 2: "sheep", 3: "pig"}
-        stats = label_stats(labels, index2label)
+        stats = label_stats(class_labels, item_indices, index2label, image_count=4)
 
         assert stats["label_counts_per_class"] == {0: 3, 1: 3, 2: 2, 3: 1}
         assert stats["label_counts_per_image"] == [3, 2, 0, 4]
@@ -104,10 +114,11 @@ class TestLabelStats:
         assert stats["index2label"] == {0: "horse", 1: "cow", 2: "sheep", 3: "pig"}
 
     def test_label_stats_image_classification(self):
-        """Test with image classification-style data (one label per image)."""
-        labels = [[0], [1], [2], [0]]
+        """Test with image classification-style data (one label per image, 1:1 mapping)."""
+        class_labels = [0, 1, 2, 0]
+        # No item_indices means 1:1 mapping
         index2label = {0: "cat", 1: "dog", 2: "bird"}
-        stats = label_stats(labels, index2label)
+        stats = label_stats(class_labels, index2label=index2label)
 
         assert stats["label_counts_per_class"] == {0: 2, 1: 1, 2: 1}
         assert stats["label_counts_per_image"] == [1, 1, 1, 1]
@@ -117,9 +128,11 @@ class TestLabelStats:
 
     def test_label_stats_none_sentinel_mixed(self):
         """Test separate tracking with mixed empty and non-empty images."""
-        labels = [[0, 1], [], [2, 3], [], [0]]
+        # image 0 has [0,1], image 1 is empty, image 2 has [2,3], image 3 is empty, image 4 has [0]
+        class_labels = [0, 1, 2, 3, 0]
+        item_indices = [0, 0, 2, 2, 4]
         index2label = {0: "a", 1: "b", 2: "c", 3: "d"}
-        stats = label_stats(labels, index2label)
+        stats = label_stats(class_labels, item_indices, index2label, image_count=5)
 
         # Empty images should be tracked separately
         assert stats["empty_image_indices"] == [1, 3]
@@ -139,9 +152,11 @@ class TestLabelStats:
 
     def test_label_stats_negative_one_as_valid_class(self):
         """Test that -1 can be used as a valid class label."""
-        labels = [[-1, 0], [1], [-1, -1], []]
+        # image 0 has [-1,0], image 1 has [1], image 2 has [-1,-1], image 3 is empty
+        class_labels = [-1, 0, 1, -1, -1]
+        item_indices = [0, 0, 1, 2, 2]
         index2label = {-1: "background", 0: "cat", 1: "dog"}
-        stats = label_stats(labels, index2label)
+        stats = label_stats(class_labels, item_indices, index2label, image_count=4)
 
         # -1 should be treated as a normal class
         assert stats["label_counts_per_class"][-1] == 3
@@ -155,10 +170,10 @@ class TestLabelStats:
         assert None not in stats["image_indices_per_class"]
 
     def test_label_stats_flat_list_classification(self):
-        """Test with flat 1D list of ints for image classification."""
-        labels = [0, 1, 2, 0, 1, 0]
+        """Test with flat 1D list of ints for image classification (1:1 mapping)."""
+        class_labels = [0, 1, 2, 0, 1, 0]
         index2label = {0: "cat", 1: "dog", 2: "bird"}
-        stats = label_stats(labels, index2label)
+        stats = label_stats(class_labels, index2label=index2label)
 
         # Each int should be treated as a single label for one image
         assert stats["label_counts_per_class"] == {0: 3, 1: 2, 2: 1}
@@ -175,9 +190,9 @@ class TestLabelStats:
 
     def test_label_stats_flat_list_single_class(self):
         """Test with flat 1D list containing only one class."""
-        labels = [0, 0, 0, 0]
+        class_labels = [0, 0, 0, 0]
         index2label = {0: "cat"}
-        stats = label_stats(labels, index2label)
+        stats = label_stats(class_labels, index2label=index2label)
 
         assert stats["label_counts_per_class"] == {0: 4}
         assert stats["label_counts_per_image"] == [1, 1, 1, 1]
@@ -191,11 +206,28 @@ class TestLabelStats:
 
     def test_label_stats_flat_list_no_index2label(self):
         """Test with flat 1D list and auto-generated index2label."""
-        labels = [0, 1, 2, 1, 0]
-        stats = label_stats(labels, index2label=None)
+        class_labels = [0, 1, 2, 1, 0]
+        stats = label_stats(class_labels, index2label=None)
 
         assert stats["index2label"] == {0: "0", 1: "1", 2: "2"}
         assert stats["label_counts_per_class"] == {0: 2, 1: 2, 2: 1}
         assert stats["image_count"] == 5
         assert stats["class_count"] == 3
         assert stats["label_count"] == 5
+
+    def test_label_stats_item_indices_length_mismatch(self):
+        """Test that mismatched lengths raise an error."""
+        class_labels = [0, 1, 2]
+        item_indices = [0, 0]  # Wrong length
+        with pytest.raises(ValueError, match="item_indices length"):
+            label_stats(class_labels, item_indices)
+
+    def test_label_stats_infer_image_count(self):
+        """Test that image_count is inferred from max item_indices when not provided."""
+        class_labels = [0, 1, 2]
+        item_indices = [0, 2, 5]  # Max is 5, so 6 images inferred
+        stats = label_stats(class_labels, item_indices)
+
+        assert stats["image_count"] == 6
+        assert stats["empty_image_indices"] == [1, 3, 4]
+        assert stats["empty_image_count"] == 3

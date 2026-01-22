@@ -67,7 +67,6 @@ class TestClassifierUncertainty:
 
 
 @pytest.mark.required
-@pytest.mark.required
 class TestUncertaintyFeatureExtractor:
     """Test UncertaintyFeatureExtractor."""
 

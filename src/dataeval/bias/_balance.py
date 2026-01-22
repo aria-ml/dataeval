@@ -5,10 +5,11 @@ from typing import Any, Literal
 
 import polars as pl
 
-from dataeval import Metadata
+from dataeval import Metadata as _Metadata
 from dataeval.core._mutual_info import mutual_info, mutual_info_classwise
-from dataeval.protocols import AnnotatedDataset
+from dataeval.protocols import AnnotatedDataset, Metadata
 from dataeval.types import DictOutput, set_metadata
+from dataeval.utils.data import _get_index2label
 
 
 @dataclass(frozen=True)
@@ -119,7 +120,7 @@ class Balance:
         ----------
         data : AnnotatedDataset[Any] or Metadata
             Either an annotated dataset (which will be converted to Metadata)
-            or preprocessed Metadata directly.
+            or any object implementing the Metadata protocol.
 
         Returns
         -------
@@ -196,17 +197,16 @@ class Balance:
         if isinstance(data, Metadata):
             self.metadata = data
         else:
-            self.metadata = Metadata(data)
+            self.metadata = _Metadata(data)
 
         if not self.metadata.factor_names:
             raise ValueError("No factors found in provided metadata.")
 
-        factor_types = {k: v.factor_type for k, v in self.metadata.factor_info.items()}
-        is_discrete = [factor_type != "continuous" for factor_type in factor_types.values()]
+        is_discrete = list(self.metadata.is_discrete)
 
         mi = mutual_info(
             self.metadata.class_labels,
-            self.metadata.binned_data,
+            self.metadata.factor_data,
             is_discrete,
             self.num_neighbors,
         )
@@ -214,13 +214,14 @@ class Balance:
         # Calculate classwise balance
         classwise = mutual_info_classwise(
             self.metadata.class_labels,
-            self.metadata.binned_data,
+            self.metadata.factor_data,
             is_discrete,
             self.num_neighbors,
         )
 
         # Grabbing factor names for plotting function
         factor_names = list(self.metadata.factor_names)
+        index2label = _get_index2label(self.metadata)
 
         # Create classwise DataFrame - build as columnar data
         # classwise is (num_classes, num_factors+1) where column 0 is class_label itself
@@ -233,9 +234,7 @@ class Balance:
         all_factor_names = ["class_label"] + factor_names
 
         for class_idx in range(classwise.shape[0]):
-            class_name = (
-                self.metadata.index2label[class_idx] if class_idx in self.metadata.index2label else str(class_idx)
-            )
+            class_name = index2label.get(class_idx, str(class_idx))
             for factor_idx in range(classwise.shape[1]):
                 mi_value = classwise[class_idx, factor_idx]
                 class_name_col.append(class_name)

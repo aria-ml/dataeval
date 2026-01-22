@@ -16,6 +16,7 @@ __all__ = [
     "ImageClassificationDatum",
     "ImageClassificationDataset",
     "LossFn",
+    "Metadata",
     "ObjectDetectionTarget",
     "ObjectDetectionDatum",
     "ObjectDetectionDataset",
@@ -163,6 +164,98 @@ class DatumMetadata(TypedDict, total=False):
     """
 
     id: Required[ReadOnly[int | str]]
+
+
+@runtime_checkable
+class Metadata(Protocol):
+    """
+    Minimal protocol for metadata objects used in bias and quality analysis.
+
+    This protocol defines the minimum interface required for metadata objects
+    to be used with DataEval's bias evaluators (Balance, Diversity, Parity)
+    and quality evaluators (Outliers). Users can implement lightweight custom
+    metadata containers that satisfy this protocol.
+
+    Attributes
+    ----------
+    factor_names : Sequence[str]
+        Names of the metadata factors.
+    factor_data : NDArray[np.int64]
+        Metadata factors in array of shape (n_samples, n_factors).
+        Continuous factors or non-integer data should be preprocessed into
+        discrete integer bins before being returned here.
+    class_labels : NDArray[np.intp]
+        Flat array of class labels with one entry per target/detection.
+        For image classification, length equals number of images.
+        For object detection, length equals total detections across all images.
+    is_discrete : Sequence[bool]
+        Whether each factor is discrete (True) or continuous (False).
+        Must have the same length as factor_names.
+    index2label : NotRequired[Mapping[int, str]]
+        Optional mapping from class label indices to human-readable names.
+    item_indices : NotRequired[NDArray[np.intp]]
+        Optional array mapping each label back to its source item/image.
+        If not provided, a 1:1 mapping is assumed (one label per image).
+
+    Example
+    -------
+    Creating a simple metadata container:
+
+    >>> import numpy as np
+    >>> from dataeval.protocols import Metadata
+    >>>
+    >>> class SimpleMetadata(Metadata):
+    ...     def __init__(self, factors, labels, names, discrete):
+    ...         self._factors = factors
+    ...         self._labels = labels
+    ...         self._names = names
+    ...         self._discrete = discrete
+    ...
+    ...     @property
+    ...     def factor_names(self):
+    ...         return self._names
+    ...
+    ...     @property
+    ...     def factor_data(self):
+    ...         return self._factors
+    ...
+    ...     @property
+    ...     def class_labels(self):
+    ...         return self._labels
+    ...
+    ...     @property
+    ...     def is_discrete(self):
+    ...         return self._discrete
+    >>>
+    >>> meta = SimpleMetadata(
+    ...     factors=np.array([[0, 1], [1, 0], [0, 1]]),
+    ...     labels=np.array([0, 1, 0]),
+    ...     names=["age_bin", "gender"],
+    ...     discrete=[True, True],
+    ... )
+    >>> isinstance(meta, Metadata)
+    True
+    """
+
+    @property
+    def factor_names(self) -> SequenceLike[str]:
+        """Names of the metadata factors."""
+        ...
+
+    @property
+    def factor_data(self) -> NDArray[np.int64]:
+        """Metadata factors in array of shape (n_samples, n_factors)."""
+        ...
+
+    @property
+    def class_labels(self) -> NDArray[np.intp]:
+        """Flat array of class labels (one per target/detection)."""
+        ...
+
+    @property
+    def is_discrete(self) -> Sequence[bool]:
+        """Whether each factor is discrete (True) or continuous (False)."""
+        ...
 
 
 # ========== DATASETS ==========
