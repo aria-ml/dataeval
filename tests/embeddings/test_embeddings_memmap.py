@@ -353,6 +353,7 @@ class TestComputeMethod:
         emb.compute(force=True)
 
         # Should have same final state
+        assert emb._dataset is not None
         assert len(emb._cached_idx) == len(emb._dataset)
         assert emb._embeddings.size == original_size
 

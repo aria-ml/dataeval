@@ -23,6 +23,7 @@ from dataeval.protocols import (
     Dataset,
     DeviceLike,
     EmbeddingModel,
+    FeatureExtractor,
     ProgressCallback,
     Transform,
 )
@@ -31,7 +32,7 @@ from dataeval.utils.arrays import as_numpy, flatten_samples
 _logger = logging.getLogger(__name__)
 
 
-class Embeddings(Array):
+class Embeddings(Array, FeatureExtractor):
     """
     Collection of image embeddings from a dataset.
 
@@ -39,11 +40,17 @@ class Embeddings(Array):
     datasets, embeddings are automatically memory-mapped to disk to avoid exceeding
     available memory.
 
+    This class also implements the :class:`~dataeval.protocols.FeatureExtractor` protocol,
+    allowing it to be used directly with drift detectors and quality metrics that accept
+    feature extractors.
+
     Parameters
     ----------
-    dataset : ImageClassificationDataset or ObjectDetectionDataset
-        Dataset to access original images from.
-    batch_size : int
+    dataset : ImageClassificationDataset, ObjectDetectionDataset, or None, default None
+        Dataset to access original images from. When None, creates an unbound instance
+        that can be used as a reusable feature extractor. Use :meth:`bind` to attach
+        a dataset later, or pass data directly to :meth:`__call__`.
+    batch_size : int or None, default None
         Batch size to use when encoding images. When less than 1, automatically sets to 1 for safe processing.
     transforms : Transform or Sequence[Transform] or None, default None
         Image transformations to apply before encoding. When None, uses raw images without
@@ -82,6 +89,27 @@ class Embeddings(Array):
         Hardware device used for tensor computations.
     memory_threshold : float
         Fraction of available memory (0-1) that triggers memory-mapped storage.
+
+    Example
+    -------
+    Using as a feature extractor with drift detection:
+
+    >>> from dataeval import Embeddings
+    >>> from dataeval.shift import DriftUnivariate
+    >>>
+    >>> # Create reusable extractor (no dataset bound)
+    >>> extractor = Embeddings(model=my_model, batch_size=32)
+    >>>
+    >>> # Use with drift detector
+    >>> drift = DriftUnivariate(data=train_dataset, feature_extractor=extractor)
+    >>> result = drift.predict(test_dataset)
+
+    Using with a bound dataset:
+
+    >>> # Create with dataset bound
+    >>> embeddings = Embeddings(train_dataset, model=my_model, batch_size=32)
+    >>> train_emb = embeddings()  # Extract from bound dataset
+    >>> test_emb = embeddings(test_dataset)  # Extract from new dataset
     """
 
     device: torch.device
@@ -91,7 +119,7 @@ class Embeddings(Array):
     def __init__(
         self,
         # Technically more permissive than ImageClassificationDataset or ObjectDetectionDataset
-        dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike],
+        dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike] | None = None,
         batch_size: int | None = None,
         transforms: Transform[torch.Tensor] | Iterable[Transform[torch.Tensor]] | None = None,
         model: EmbeddingModel | None = None,
@@ -138,6 +166,8 @@ class Embeddings(Array):
         if self._shape is None:
             if self._embeddings_only:
                 self._shape = tuple(self._embeddings.shape)
+            elif self._dataset is None:
+                raise ValueError("Cannot determine shape: no dataset bound. Call bind() first.")
             elif len(self._dataset) == 0:
                 self._shape = (0,)
             elif self._cached_idx:
@@ -147,6 +177,102 @@ class Embeddings(Array):
                 embedding_shape = self[0].shape
                 self._shape = tuple([len(self)] + [*embedding_shape])
         return self._shape
+
+    @property
+    def is_bound(self) -> bool:
+        """Whether this instance is bound to a dataset.
+
+        Returns
+        -------
+        bool
+            True if a dataset is bound, False otherwise.
+        """
+        return self._dataset is not None
+
+    def bind(self, dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike]) -> Self:
+        """Bind this instance to a dataset.
+
+        Attaches a dataset to this Embeddings instance for embedding computation.
+        Any previously cached embeddings are cleared.
+
+        Parameters
+        ----------
+        dataset : ImageClassificationDataset or ObjectDetectionDataset
+            Dataset to bind for embedding computation.
+
+        Returns
+        -------
+        Self
+            Returns self for method chaining.
+
+        Raises
+        ------
+        ValueError
+            When called on an embeddings-only instance.
+
+        Example
+        -------
+        >>> from dataeval import Embeddings
+
+        >>> extractor = Embeddings(model=my_model, batch_size=32)
+        >>> _ = extractor.bind(train_dataset)
+        >>> embeddings = extractor()
+        """
+        if self._embeddings_only:
+            raise ValueError("Cannot bind dataset to an embeddings-only instance.")
+        self._dataset = dataset
+        # Clear cached state
+        self._cached_idx.clear()
+        self._embeddings = np.empty((0,))
+        self._shape = None
+        return self
+
+    def __call__(self, data: Any | None = None) -> Array:
+        """Extract embeddings from data.
+
+        Implements the :class:`~dataeval.protocols.FeatureExtractor` protocol,
+        allowing this instance to be used directly with drift detectors and
+        quality metrics.
+
+        Parameters
+        ----------
+        data : Any or None, default None
+            Dataset to extract embeddings from. If None, uses the bound dataset.
+
+        Returns
+        -------
+        Array
+            Embeddings array of shape (n_samples, embedding_dim).
+
+        Raises
+        ------
+        ValueError
+            If data is None and no dataset is bound.
+
+        Example
+        -------
+        >>> from dataeval import Embeddings
+        >>>
+        >>> embeddings = Embeddings(train_dataset, model=my_model, batch_size=32)
+        >>>
+        >>> # Extract from bound dataset
+        >>> train_emb = embeddings()
+        >>>
+        >>> # Extract from new dataset
+        >>> test_emb = embeddings(test_dataset)
+        """
+        if data is None:
+            if self._dataset is None:
+                raise ValueError("No dataset bound. Provide data or call bind() first.")
+            # Return embeddings for bound dataset
+            return self[:]
+
+        # Check if same as bound dataset (by identity)
+        if self._dataset is not None and data is self._dataset:
+            return self[:]
+
+        # Compute embeddings for new data using this config
+        return self.new(data).compute()[:]
 
     def __array__(self, dtype: Any = None, copy: Any = None) -> NDArray[Any]:
         """
@@ -217,6 +343,11 @@ class Embeddings(Array):
     def __hash__(self) -> int:
         if self._embeddings_only:
             bid = self._embeddings.ravel().tobytes()
+        elif self._dataset is None:
+            # Unbound instance - hash based on model and transforms only
+            mid = self._model.metadata["id"] if isinstance(self._model, AnnotatedModel) else str(self._model)
+            tid = str.join("|", [str(t) for t in self._transforms])
+            bid = f"unbound:{mid}{tid}".encode()
         else:
             did = self._dataset.metadata["id"] if isinstance(self._dataset, AnnotatedDataset) else str(self._dataset)
             mid = self._model.metadata["id"] if isinstance(self._model, AnnotatedModel) else str(self._model)
@@ -258,6 +389,9 @@ class Embeddings(Array):
         if self._path is None:
             return False
 
+        if self._dataset is None:
+            raise ValueError("No dataset bound. Call bind() first.")
+
         n_samples = len(self._dataset)
         bytes_per_element = np.dtype(np.float32).itemsize  # Assume float32
         estimated_bytes = n_samples * np.prod(embedding_shape) * bytes_per_element
@@ -278,6 +412,9 @@ class Embeddings(Array):
 
     def _initialize_storage(self, sample_embedding: NDArray[Any]) -> None:
         """Initialize storage backend (in-memory or memmap) based on size."""
+        if self._dataset is None:
+            raise ValueError("No dataset bound. Call bind() first.")
+
         n_samples = len(self._dataset)
         embedding_shape = sample_embedding.shape
         full_shape = (n_samples, *embedding_shape)
@@ -390,7 +527,7 @@ class Embeddings(Array):
         >>> print(embeddings.shape)
         (100, 512)
         """
-        embeddings = cls([], 0, None, None, None, False, None, None, 0.8)
+        embeddings = cls(None, 0, None, None, None, False, None, None, 0.8)
         embeddings._embeddings = array if isinstance(array, np.ndarray) else as_numpy(array)
         embeddings._cached_idx = set(range(len(embeddings._embeddings)))
         embeddings._embeddings_only = True
@@ -547,6 +684,9 @@ class Embeddings(Array):
             return image
 
     def _batch(self, indices: Sequence[int]) -> Iterator[NDArray[Any]]:
+        if self._dataset is None:
+            raise ValueError("No dataset bound. Call bind() first.")
+
         """Process indices in batches, yielding numpy arrays."""
         dataset = self._TorchDatasetWrapper(self._dataset, self._transforms)
 
@@ -641,5 +781,15 @@ class Embeddings(Array):
             yield from batch
 
     def __len__(self) -> int:
-        """Return number of embeddings."""
-        return len(self._embeddings) if self._embeddings_only else len(self._dataset)
+        """Return number of embeddings.
+
+        Raises
+        ------
+        ValueError
+            If no dataset is bound and instance is not embeddings-only.
+        """
+        if self._embeddings_only:
+            return len(self._embeddings)
+        if self._dataset is None:
+            raise ValueError("Cannot determine length: no dataset bound. Call bind() first.")
+        return len(self._dataset)

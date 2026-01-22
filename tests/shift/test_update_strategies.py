@@ -3,7 +3,7 @@ from itertools import product
 import numpy as np
 import pytest
 
-from dataeval.shift._update_strategies import LastSeenUpdateStrategy, ReservoirSamplingUpdateStrategy
+from dataeval.shift.update_strategies import LastSeenUpdateStrategy, ReservoirSamplingUpdateStrategy
 
 
 @pytest.mark.required

@@ -1,7 +1,7 @@
 __all__ = []
 
 import logging
-from collections.abc import Callable, Iterable, Mapping, Sequence, Sized
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Sized
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -12,7 +12,14 @@ from typing_extensions import Self
 
 from dataeval.core._bin import bin_data, digitize_data, is_continuous
 from dataeval.core._feature_distance import FeatureDistanceResult, feature_distance
-from dataeval.protocols import AnnotatedDataset, Array, DatumMetadata, ObjectDetectionTarget, ProgressCallback
+from dataeval.protocols import (
+    AnnotatedDataset,
+    Array,
+    DatumMetadata,
+    FeatureExtractor,
+    ObjectDetectionTarget,
+    ProgressCallback,
+)
 from dataeval.types import Array1D
 from dataeval.utils.arrays import as_numpy
 from dataeval.utils.data import merge_metadata
@@ -43,16 +50,21 @@ def _to_col(name: str, info: FactorInfo, binned: bool = True) -> str:
     return name
 
 
-class Metadata:
+class Metadata(Array, FeatureExtractor):
     """Collection of binned metadata using Polars DataFrames.
 
     Processes dataset metadata by automatically binning continuous factors and digitizing
     categorical factors for analysis and visualization workflows.
 
+    This class also implements the :class:`~dataeval.protocols.FeatureExtractor` protocol,
+    allowing it to be used directly with drift detectors that accept feature extractors.
+
     Parameters
     ----------
-    dataset : ImageClassificationDataset or ObjectDetectionDataset
-        Dataset that provides original targets and metadata for processing.
+    dataset : ImageClassificationDataset, ObjectDetectionDataset, or None, default None
+        Dataset that provides original targets and metadata for processing. When None,
+        creates an unbound instance that can be used as a reusable feature extractor.
+        Use :meth:`bind` to attach a dataset later, or pass data directly to :meth:`__call__`.
     continuous_factor_bins : Mapping[str, int | Sequence[float]] | None, default None
         Mapping from continuous factor names to bin counts or explicit bin edges.
         When None, uses automatic discretization.
@@ -70,11 +82,32 @@ class Metadata:
     ------
     ValueError
         When both exclude and include parameters are specified simultaneously.
+
+    Example
+    -------
+    Using as a feature extractor with drift detection:
+
+    >>> from dataeval import Metadata
+    >>> from dataeval.shift import DriftUnivariate
+    >>>
+    >>> # Create reusable extractor (no dataset bound)
+    >>> extractor = Metadata(continuous_factor_bins={"brightness": 10})
+    >>>
+    >>> # Use with drift detector
+    >>> drift = DriftUnivariate(data=train_dataset, feature_extractor=extractor)
+    >>> result = drift.predict(test_dataset)
+
+    Using with a bound dataset:
+
+    >>> # Create with dataset bound
+    >>> metadata = Metadata(train_dataset, continuous_factor_bins={"brightness": 10})
+    >>> train_factors = metadata()  # Extract from bound dataset
+    >>> test_factors = metadata(test_dataset)  # Extract from new dataset
     """
 
     def __init__(
         self,
-        dataset: AnnotatedDataset[tuple[Any, Any, DatumMetadata]],
+        dataset: AnnotatedDataset[tuple[Any, Any, DatumMetadata]] | None = None,
         *,
         continuous_factor_bins: Mapping[str, int | Sequence[float]] | None = None,
         auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = "uniform_width",
@@ -93,7 +126,7 @@ class Metadata:
         self._is_binned = False
 
         self._dataset = dataset
-        self._count = len(dataset) if isinstance(dataset, Sized) else 0
+        self._count = len(dataset) if dataset is not None and isinstance(dataset, Sized) else 0
         self._continuous_factor_bins = dict(continuous_factor_bins) if continuous_factor_bins else {}
         self._auto_bin_method: Literal["uniform_width", "uniform_count", "clusters"] = auto_bin_method
 
@@ -103,6 +136,223 @@ class Metadata:
         self._exclude = set(exclude or ())
         self._include = set(include or ())
         self._target_factors_only = False
+
+    @property
+    def is_bound(self) -> bool:
+        """Whether this instance is bound to a dataset.
+
+        Returns
+        -------
+        bool
+            True if a dataset is bound, False otherwise.
+        """
+        return self._dataset is not None
+
+    def bind(self, dataset: AnnotatedDataset[tuple[Any, Any, DatumMetadata]]) -> Self:
+        """Bind this instance to a dataset.
+
+        Attaches a dataset to this Metadata instance for metadata extraction.
+        Any previously processed metadata is cleared.
+
+        Parameters
+        ----------
+        dataset : ImageClassificationDataset or ObjectDetectionDataset
+            Dataset to bind for metadata extraction.
+
+        Returns
+        -------
+        Self
+            Returns self for method chaining.
+
+        Example
+        -------
+        >>> from dataeval import Metadata
+        >>>
+        >>> extractor = Metadata(continuous_factor_bins={"brightness": 10})
+        >>> _ = extractor.bind(train_dataset)
+        """
+        self._dataset = dataset
+        self._count = len(dataset) if isinstance(dataset, Sized) else 0
+        # Clear cached state
+        self._is_structured = False
+        self._is_binned = False
+        self._has_targets = None
+        return self
+
+    def __array__(self) -> NDArray[np.int64]:
+        """NumPy array representation of binned metadata.
+
+        Returns
+        -------
+        NDArray[np.int64]
+            Binned metadata as a NumPy array of shape (n_samples, n_factors).
+
+        Notes
+        -----
+        This property triggers factor binning analysis on first access.
+        Use this for interoperability with libraries expecting NumPy arrays.
+        """
+        return self.binned_data
+
+    def __len__(self) -> int:
+        """Number of items in the bound dataset.
+
+        Returns
+        -------
+        int
+            Number of items in the bound dataset.
+
+        Raises
+        ------
+        ValueError
+            If no dataset is bound.
+        """
+        if self._dataset is None:
+            raise ValueError("No dataset bound. Call bind() first.")
+        return self._count
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        """Shape of the binned metadata array.
+
+        Returns
+        -------
+        tuple[int, ...]
+            Shape of the binned metadata as (n_samples, n_factors).
+
+        Raises
+        ------
+        ValueError
+            If no dataset is bound.
+        """
+        if self._dataset is None:
+            raise ValueError("No dataset bound. Call bind() first.")
+        return (len(self._dataset), len(self.factor_names))
+
+    def __iter__(self) -> Iterator[NDArray[np.int64]]:
+        """Iterate over rows of the binned metadata.
+
+        Yields
+        ------
+        Iterator[NDArray[np.int64]]
+            Rows of the binned metadata array, one at a time.
+
+        Raises
+        ------
+        ValueError
+            If no dataset is bound.
+        """
+        if self._dataset is None:
+            raise ValueError("No dataset bound. Call bind() first.")
+        yield from self.binned_data
+
+    def __getitem__(self, index: int | str | slice) -> Array:
+        """Get binned metadata for specific indices or factors.
+
+        Parameters
+        ----------
+        index : int, str, or slice
+            Index or slice to select specific rows (by integer index)
+            or columns (by factor name) from the binned metadata.
+
+        Returns
+        -------
+        Array
+
+            Binned metadata for the specified indices or factors.
+
+        Raises
+        ------
+        ValueError
+            If no dataset is bound.
+        KeyError
+            If a specified factor name is not found in the metadata.
+        """
+        if self._dataset is None:
+            raise ValueError("No dataset bound. Call bind() first.")
+
+        binned = self.binned_data
+
+        if isinstance(index, int):
+            return binned[index]
+        if isinstance(index, str):
+            if index not in self.factor_names:
+                raise KeyError(f"Factor '{index}' not found in metadata.")
+            col_index = self.factor_names.index(index)
+            return binned[:, col_index]
+        if isinstance(index, slice):
+            return binned[index]
+        raise TypeError("Index must be an int, str, or slice.")
+
+    def new(self, dataset: AnnotatedDataset[tuple[Any, Any, DatumMetadata]]) -> Self:
+        """Create new Metadata instance with a different dataset.
+
+        Generate a new Metadata object using the same configuration
+        but with a different dataset.
+
+        Parameters
+        ----------
+        dataset : ImageClassificationDataset or ObjectDetectionDataset
+            Dataset that provides metadata for the new Metadata instance.
+
+        Returns
+        -------
+        Metadata
+            New Metadata object configured identically to the current instance.
+        """
+        return self.__class__(
+            dataset,
+            continuous_factor_bins=self._continuous_factor_bins,
+            auto_bin_method=self._auto_bin_method,
+            exclude=list(self._exclude) if self._exclude else None,
+            include=list(self._include) if self._include else None,
+        )
+
+    def __call__(self, data: Any | None = None) -> Array:
+        """Extract metadata factors from data.
+
+        Implements the :class:`~dataeval.protocols.FeatureExtractor` protocol,
+        allowing this instance to be used directly with drift detectors.
+
+        Parameters
+        ----------
+        data : Any or None, default None
+            Dataset to extract metadata from. If None, uses the bound dataset.
+
+        Returns
+        -------
+        Array
+            Binned metadata array of shape (n_samples, n_factors).
+
+        Raises
+        ------
+        ValueError
+            If data is None and no dataset is bound.
+
+        Example
+        -------
+        >>> from dataeval import Metadata
+        >>>
+        >>> metadata = Metadata(train_dataset, continuous_factor_bins={"brightness": 10})
+        >>>
+        >>> # Extract from bound dataset
+        >>> train_factors = metadata()
+        >>>
+        >>> # Extract from new dataset
+        >>> test_factors = metadata(test_dataset)
+        """
+        if data is None:
+            if self._dataset is None:
+                raise ValueError("No dataset bound. Provide data or call bind() first.")
+            # Return factors for bound dataset
+            return self.binned_data
+
+        # Check if same as bound dataset (by identity)
+        if self._dataset is not None and data is self._dataset:
+            return self.binned_data
+
+        # Compute metadata for new data using this config
+        return self.new(data).binned_data
 
     @property
     def raw(self) -> Sequence[Mapping[str, Any]]:
@@ -842,6 +1092,9 @@ class Metadata:
         bool | None
             True if OD dataset, False if IC dataset, None if empty dataset
         """
+        if self._dataset is None:
+            return None
+
         is_od = None
         datum_count = len(self._dataset)
         for i in range(datum_count):
@@ -953,6 +1206,9 @@ class Metadata:
     ) -> None:
         if self._is_structured:
             return
+
+        if self._dataset is None:
+            raise ValueError("No dataset bound. Call bind() first.")
 
         raw: list[Mapping[str, Any]] = []
         labels = []

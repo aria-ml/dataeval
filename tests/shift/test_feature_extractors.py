@@ -2,22 +2,14 @@
 Tests for drift feature extractors.
 """
 
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pytest
 import torch
 import torch.nn as nn
 
-from dataeval import Embeddings, Metadata
-from dataeval.flags import ImageStats
-from dataeval.shift._drift._univariate import DriftUnivariate
-from dataeval.shift._feature_extractors import (
-    EmbeddingsFeatureExtractor,
-    MetadataFeatureExtractor,
-    UncertaintyFeatureExtractor,
-    _classifier_uncertainty,
-)
+from dataeval.extractors._uncertainty import UncertaintyFeatureExtractor, _classifier_uncertainty
 
 
 class SimpleModel(nn.Module):
@@ -27,112 +19,6 @@ class SimpleModel(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.fc(x)
-
-
-@pytest.mark.required
-class TestEmbeddingsFeatureExtractor:
-    """Test EmbeddingsFeatureExtractor for caching and rehydration."""
-
-    def test_basic_extraction(self):
-        """Test basic embedding extraction from arrays."""
-        model = SimpleModel(10, 5)
-        extractor = EmbeddingsFeatureExtractor(model=model, batch_size=32)
-
-        # Create simple array "dataset" (treating as data)
-        data = np.random.randn(100, 10).astype(np.float32)
-
-        # Extract embeddings
-        embeddings = extractor(data)
-
-        assert embeddings.shape == (100, 5)
-        assert isinstance(embeddings, np.ndarray)
-
-    def test_caching_same_dataset(self):
-        """Test that same dataset object is cached and not re-extracted."""
-        model = SimpleModel(10, 5)
-        extractor = EmbeddingsFeatureExtractor(model=model, batch_size=32)
-
-        data = np.random.randn(100, 10).astype(np.float32)
-
-        # First extraction
-        embeddings1 = extractor(data)
-
-        # Second extraction of same object - should be cached
-        embeddings2 = extractor(data)
-
-        # Should be exact same array (from cache)
-        assert embeddings1 is embeddings2
-        np.testing.assert_array_equal(embeddings1, embeddings2)
-
-    def test_different_datasets(self):
-        """Test that different datasets are extracted separately."""
-        model = SimpleModel(10, 5)
-        extractor = EmbeddingsFeatureExtractor(model=model, batch_size=32)
-
-        data1 = np.random.randn(100, 10).astype(np.float32)
-        data2 = np.random.randn(100, 10).astype(np.float32)
-
-        embeddings1 = extractor(data1)
-        embeddings2 = extractor(data2)
-
-        # Should be different arrays (different data)
-        assert embeddings1 is not embeddings2
-        # Values should be different (different data through same model)
-        assert not np.allclose(embeddings1, embeddings2)
-
-    def test_with_drift_detector(self):
-        """Test integration with DriftUnivariate."""
-        model = SimpleModel(10, 5)
-        extractor = EmbeddingsFeatureExtractor(model=model, batch_size=32)
-
-        # Reference data
-        ref_data = np.random.randn(100, 10).astype(np.float32)
-
-        # Create drift detector
-        detector = DriftUnivariate(data=ref_data, method="ks", feature_extractor=extractor)
-
-        # Test data (similar to reference)
-        test_data = np.random.randn(50, 10).astype(np.float32)
-        result = detector.predict(test_data)
-
-        assert hasattr(result, "drifted")
-        assert hasattr(result, "distances")
-
-
-@pytest.mark.required
-class TestFeatureExtractorRehydration:
-    """Test that pre-computed Embeddings/Metadata can be reused."""
-
-    def test_embeddings_rehydration_concept(self):
-        """Test the rehydration pattern conceptually."""
-
-        model = SimpleModel(10, 5)
-
-        # Simulate a dataset-like object (simple wrapper)
-        class SimpleDataset:
-            def __init__(self, data):
-                self.data = data
-
-            def __len__(self):
-                return len(self.data)
-
-            def __getitem__(self, idx):
-                return self.data[idx]
-
-        dataset = SimpleDataset(np.random.randn(100, 10).astype(np.float32))
-
-        # Pre-compute embeddings
-        pre_embeddings = Embeddings(dataset=dataset, batch_size=32, model=model).compute()
-
-        # Create extractor with rehydration
-        extractor = EmbeddingsFeatureExtractor(embeddings=pre_embeddings)
-
-        # When we pass the same dataset, it should use cached embeddings
-        result = extractor(dataset)
-
-        assert result.shape == (100, 5)
-        # Should be using the cached embeddings
-        assert len(extractor._dataset_cache) > 0
 
 
 @pytest.mark.required
@@ -181,129 +67,6 @@ class TestClassifierUncertainty:
 
 
 @pytest.mark.required
-class TestEmbeddingsFeatureExtractorErrors:
-    """Test error handling in EmbeddingsFeatureExtractor."""
-
-    def test_no_model_no_embeddings(self):
-        """Test that missing both model and embeddings raises ValueError."""
-        with pytest.raises(ValueError, match="Either model or embeddings must be provided"):
-            EmbeddingsFeatureExtractor()
-
-    def test_invalid_embeddings_type(self):
-        """Test that invalid embeddings type raises TypeError."""
-        with pytest.raises(TypeError, match="embeddings must be an Embeddings instance"):
-            EmbeddingsFeatureExtractor(embeddings="not_an_embeddings_object")  # type: ignore
-
-    def test_repr(self):
-        """Test __repr__ method."""
-        model = SimpleModel(10, 5)
-        extractor = EmbeddingsFeatureExtractor(model=model, batch_size=32)
-
-        repr_str = repr(extractor)
-
-        assert "EmbeddingsFeatureExtractor" in repr_str
-        assert "SimpleModel" in repr_str
-        assert "batch_size=32" in repr_str
-
-
-@pytest.mark.required
-class TestMetadataFeatureExtractor:
-    """Test MetadataFeatureExtractor."""
-
-    def test_basic_extraction_with_mock(self):
-        """Test basic metadata extraction using mock."""
-        # Create mock dataset
-        mock_dataset = Mock()
-        mock_metadata = Mock(spec=Metadata)
-        mock_metadata.binned_data = np.random.randint(0, 5, (100, 3))
-
-        with patch("dataeval.shift._feature_extractors.Metadata", return_value=mock_metadata):
-            extractor = MetadataFeatureExtractor(use_binned=True)
-            result = extractor(mock_dataset)
-
-        assert result.shape == (100, 3)
-
-    def test_use_binned_false(self):
-        """Test extraction with use_binned=False."""
-        mock_dataset = Mock()
-        mock_metadata = Mock(spec=Metadata)
-        mock_metadata.factor_data = np.random.randn(100, 3)
-
-        with patch("dataeval.shift._feature_extractors.Metadata", return_value=mock_metadata):
-            extractor = MetadataFeatureExtractor(use_binned=False)
-            result = extractor(mock_dataset)
-
-        assert result.shape == (100, 3)
-
-    def test_invalid_metadata_type(self):
-        """Test that invalid metadata type raises TypeError."""
-        with pytest.raises(TypeError, match="metadata must be a Metadata instance"):
-            MetadataFeatureExtractor(metadata="not_a_metadata_object")  # type: ignore
-
-    def test_with_add_stats(self):
-        """Test extraction with add_stats parameter."""
-        mock_dataset = Mock()
-        mock_metadata = Mock(spec=Metadata)
-        mock_metadata.binned_data = np.random.randint(0, 5, (50, 2))
-        mock_stats = {"stats": {"brightness": np.random.rand(50)}}
-
-        with (
-            patch("dataeval.shift._feature_extractors.Metadata", return_value=mock_metadata),
-            patch("dataeval.shift._feature_extractors.calculate", return_value=mock_stats),
-        ):
-            extractor = MetadataFeatureExtractor(use_binned=True, add_stats=ImageStats.VISUAL_BRIGHTNESS)
-            result = extractor(mock_dataset)
-
-        assert result.shape == (50, 2)
-        # Verify add_factors was called
-        mock_metadata.add_factors.assert_called_once()
-
-    def test_caching_same_dataset(self):
-        """Test that same dataset is cached."""
-        mock_dataset = Mock()
-        mock_metadata = Mock(spec=Metadata)
-        mock_metadata.binned_data = np.random.randint(0, 5, (100, 3))
-
-        with patch("dataeval.shift._feature_extractors.Metadata", return_value=mock_metadata) as mock_cls:
-            extractor = MetadataFeatureExtractor(use_binned=True)
-            result1 = extractor(mock_dataset)
-            result2 = extractor(mock_dataset)
-
-        # Should be same cached object
-        assert result1 is result2
-        # Metadata should only be created once
-        assert mock_cls.call_count == 1
-
-    def test_metadata_rehydration(self):
-        """Test using pre-computed metadata."""
-        mock_dataset = Mock()
-        mock_metadata = Mock(spec=Metadata)
-        mock_metadata._dataset = mock_dataset
-        mock_metadata.binned_data = np.random.randint(0, 5, (100, 3))
-        mock_metadata.factor_data = np.random.randn(100, 3)
-        mock_metadata.continuous_factor_bins = {"brightness": 10}
-        mock_metadata.auto_bin_method = "uniform_width"
-        mock_metadata.exclude = set()
-        mock_metadata.include = set()
-
-        extractor = MetadataFeatureExtractor(metadata=mock_metadata, use_binned=True)
-        result = extractor(mock_dataset)
-
-        # Should use the cached metadata
-        assert result.shape == (100, 3)
-        assert result is mock_metadata.binned_data
-
-    def test_repr(self):
-        """Test __repr__ method."""
-        extractor = MetadataFeatureExtractor(use_binned=False, auto_bin_method="uniform_count")
-
-        repr_str = repr(extractor)
-
-        assert "MetadataFeatureExtractor" in repr_str
-        assert "use_binned=False" in repr_str
-        assert "uniform_count" in repr_str
-
-
 @pytest.mark.required
 class TestUncertaintyFeatureExtractor:
     """Test UncertaintyFeatureExtractor."""
@@ -316,7 +79,7 @@ class TestUncertaintyFeatureExtractor:
         # Mock the predict function to return probabilities
         mock_probs = np.array([[0.7, 0.2, 0.05, 0.05]] * 50)
 
-        with patch("dataeval.shift._feature_extractors.predict", return_value=mock_probs):
+        with patch("dataeval.extractors._uncertainty.predict", return_value=mock_probs):
             extractor = UncertaintyFeatureExtractor(model=model, preds_type="probs", batch_size=16)
             result = extractor(data)
 
@@ -330,7 +93,7 @@ class TestUncertaintyFeatureExtractor:
 
         mock_logits = np.random.randn(20, 4)
 
-        with patch("dataeval.shift._feature_extractors.predict", return_value=mock_logits):
+        with patch("dataeval.extractors._uncertainty.predict", return_value=mock_logits):
             extractor = UncertaintyFeatureExtractor(model=model, preds_type="logits", batch_size=8)
             result = extractor(data)
 
@@ -346,7 +109,7 @@ class TestUncertaintyFeatureExtractor:
 
         mock_probs = np.array([[0.25, 0.25, 0.25, 0.25]] * 30)
 
-        with patch("dataeval.shift._feature_extractors.predict", return_value=mock_probs):
+        with patch("dataeval.extractors._uncertainty.predict", return_value=mock_probs):
             extractor = UncertaintyFeatureExtractor(
                 model=model, preds_type="probs", transforms=transform_fn, device="cpu"
             )

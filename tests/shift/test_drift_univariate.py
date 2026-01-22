@@ -14,7 +14,7 @@ import pytest
 
 from dataeval._embeddings import Embeddings
 from dataeval.shift._drift._univariate import DriftUnivariate
-from dataeval.shift._update_strategies import LastSeenUpdateStrategy, ReservoirSamplingUpdateStrategy
+from dataeval.shift.update_strategies import LastSeenUpdateStrategy, ReservoirSamplingUpdateStrategy
 
 
 @pytest.mark.required
