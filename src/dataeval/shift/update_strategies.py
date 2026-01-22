@@ -3,7 +3,7 @@ Update strategies inform how the :term:`drift<Drift>` detector classes update th
 for drift.
 """
 
-__all__ = []
+__all__ = ["LastSeenUpdateStrategy", "ReservoirSamplingUpdateStrategy"]
 
 
 import numpy as np

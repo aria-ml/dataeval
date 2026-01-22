@@ -2,17 +2,18 @@ __all__ = []
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Generic, NamedTuple, TypeVar, cast, overload
+from typing import Any, Generic, Literal, NamedTuple, TypeVar, overload
 
 import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.core._calculate import CalculationResult, calculate
-from dataeval.core._clusterer import ClusterResult
+from dataeval.core._clusterer import ClusterResult, cluster
 from dataeval.flags import ImageStats
-from dataeval.protocols import ArrayLike, Dataset
+from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor
 from dataeval.quality._results import StatsMap, combine_results, get_dataset_step_from_idx
 from dataeval.types import DictOutput, SourceIndex, set_metadata
+from dataeval.utils.arrays import flatten_samples, to_numpy
 
 
 class DatasetItemTuple(NamedTuple):
@@ -46,13 +47,22 @@ class DuplicateDetectionResult(Generic[TIndexType]):
     exact : Sequence[Sequence[int]] | Sequence[Sequence[SourceIndex]] | None
         Groups of exact duplicates. Each inner sequence contains indices or SourceIndex
         objects that are exact duplicates of each other. None if not computed.
+        Includes both hash-based exact duplicates and cluster-based exact duplicates
+        (zero distance in minimum spanning tree) when a feature_extractor is used.
     near : Sequence[Sequence[int]] | Sequence[Sequence[SourceIndex]] | None
-        Groups of near duplicates. Each inner sequence contains indices or SourceIndex
-        objects that are perceptually similar but not exact duplicates. None if not computed.
+        Groups of perceptual hashing-based near duplicates. Each inner sequence contains
+        indices or SourceIndex objects that are perceptually similar but not exact
+        duplicates. None if not computed.
+    near_cluster : Sequence[Sequence[int]] | Sequence[Sequence[SourceIndex]] | None
+        Groups of cluster-based near duplicates from minimum spanning tree analysis
+        in embedding space. Each inner sequence contains indices that are semantically
+        similar based on neural network embeddings. None if no feature_extractor was
+        provided or only exact duplicates were requested.
     """
 
     exact: Sequence[Sequence[TIndexType]] | None = None
     near: Sequence[Sequence[TIndexType]] | None = None
+    near_cluster: Sequence[Sequence[TIndexType]] | None = None
 
 
 @dataclass(frozen=True)
@@ -90,55 +100,100 @@ class DuplicatesOutput(DictOutput):
 
 
 class Duplicates:
-    """Finds duplicate images using non-cryptographic and perceptual hashing.
+    """Finds duplicate images using hashing and/or embedding-based clustering.
 
-    Detects both exact duplicates (identical pixel values) using xxhash
-    non-cryptographic hashing and near duplicates (visually similar) using
-    perceptual hashing with discrete cosine transform. Supports analysis
-    of single datasets or cross-dataset duplicate detection.
+    Supports two complementary detection methods:
 
-    Perceptual hashing identifies visually similar images that may differ
-    in compression, resolution, or minor modifications while maintaining
-    the same visual content structure.
+    1. **Hash-based**: Detects exact duplicates (identical pixel values) using xxhash
+       and near duplicates (visually similar) using perceptual hashing with DCT.
+    2. **Cluster-based**: Uses neural network embeddings to cluster images and identifies
+       duplicates based on distance relationships in embedding space via minimum spanning tree.
+
+    Both methods can be used together or independently based on the ``flags`` parameter.
 
     Parameters
     ----------
-    only_exact : bool, default False
-        Whether to detect only exact pixel-level duplicates using xxhash.
-        When True, skips near duplicate computation for faster processing
-        and lower memory usage. When False, detects both exact and near
-        duplicates. Default False provides comprehensive duplicate detection.
+    flags : ImageStats, default ImageStats.HASH
+        Statistics to compute for hash-based duplicate detection:
+
+        - ``ImageStats.HASH`` (default): Compute both exact and near duplicates
+        - ``ImageStats.HASH_XXHASH``: Compute only exact duplicates (faster)
+        - ``ImageStats.HASH_PCHASH``: Compute only near duplicates
+        - ``ImageStats.NONE``: Skip hash computation, use only cluster-based detection
+          (requires ``feature_extractor``)
+    feature_extractor : FeatureExtractor, optional
+        Feature extractor for cluster-based duplicate detection. When provided, embeddings
+        are extracted and clustered to find semantic duplicates in embedding space.
+        Common extractors include :class:`~dataeval.Embeddings`.
+    cluster_threshold : float, optional
+        Threshold for cluster-based *near* duplicate detection. This does NOT affect
+        exact duplicates (which are zero distance in the MST). When None, only exact
+        cluster duplicates are detected. Lower values are stricter (fewer near duplicates).
+    cluster_algorithm : {"kmeans", "hdbscan"}, default "hdbscan"
+        Clustering algorithm for cluster-based detection.
+    n_clusters : int, optional
+        Expected number of clusters. For HDBSCAN, this is a hint that adjusts
+        min_cluster_size. For KMeans, this is the exact number of clusters.
 
     Attributes
     ----------
     stats : CalculationResult
         Hash statistics computed during the last evaluate() call.
         Contains xxhash and pchash values for all processed images.
-    only_exact : bool
-        Configuration for duplicate detection scope.
+    flags : ImageStats
+        Statistics to compute for duplicate detection.
+    feature_extractor : FeatureExtractor | None
+        Feature extractor for cluster-based detection.
+    cluster_threshold : float | None
+        Threshold for cluster-based near duplicate detection.
+    cluster_algorithm : Literal["kmeans", "hdbscan"]
+        Clustering algorithm to use.
+    n_clusters : int | None
+        Expected number of clusters.
 
     Examples
     --------
-
-    End-to-end detection: compute hashes + find duplicates
+    End-to-end hash-based detection:
 
     >>> detector = Duplicates()
     >>> result = detector.evaluate(dataset)
 
-    Reuse pre-computed statistics for efficiency
+    Reuse pre-computed statistics for efficiency:
 
     >>> result = detector.from_stats(hashes1)
 
-    Fast exact-only detection for large datasets
+    Fast exact-only detection for large datasets:
 
-    >>> fast_detector = Duplicates(only_exact=True)
+    >>> fast_detector = Duplicates(flags=ImageStats.HASH_XXHASH)
     >>> result = fast_detector.evaluate(duplicate_images)
 
+    Cluster-based detection with embeddings:
+
+    >>> from dataeval import Embeddings
+    >>> extractor = Embeddings(model=my_model)
+    >>> detector = Duplicates(feature_extractor=extractor, cluster_threshold=1.0)
+    >>> result = detector.evaluate(embeddings_dataset)
+
+    Cluster-only detection (skip hash computation):
+
+    >>> detector = Duplicates(flags=ImageStats.NONE, feature_extractor=extractor)
+    >>> result = detector.evaluate(embeddings_dataset)
     """
 
-    def __init__(self, only_exact: bool = False) -> None:
+    def __init__(
+        self,
+        flags: ImageStats = ImageStats.HASH,
+        feature_extractor: FeatureExtractor | None = None,
+        cluster_threshold: float | None = None,
+        cluster_algorithm: Literal["kmeans", "hdbscan"] = "hdbscan",
+        n_clusters: int | None = None,
+    ) -> None:
         self.stats: CalculationResult
-        self.only_exact = only_exact
+        self.flags: ImageStats = flags & ImageStats.HASH
+        self.feature_extractor = feature_extractor
+        self.cluster_threshold = cluster_threshold
+        self.cluster_algorithm: Literal["kmeans", "hdbscan"] = cluster_algorithm
+        self.n_clusters = n_clusters
 
     def _get_duplicates(
         self, stats: StatsMap, source_index: Sequence[SourceIndex]
@@ -196,7 +251,7 @@ class Duplicates:
         Parameters
         ----------
         stats : StatsMap
-            Hash statistics containing xxhash and pchash values
+            Hash statistics containing xxhash and/or pchash values
         source_index : Sequence[SourceIndex]
             Source index information for each hash value
         item_indices : list[int]
@@ -207,15 +262,19 @@ class Duplicates:
         DuplicateDetectionResult[int]
             Item-level duplicate groups with simple integer indices
         """
-        # Find exact duplicates using xxhash
-        item_exact_dict: dict[str, list[int]] = {}
-        for i in item_indices:
-            value = stats["xxhash"][i]
-            item_exact_dict.setdefault(value, []).append(source_index[i].item)
-        item_exact = [sorted(v) for v in item_exact_dict.values() if len(v) > 1]
+        item_exact: list[list[int]] = []
+        item_near: list[list[int]] = []
 
-        # Find near duplicates using pchash if enabled
-        if not self.only_exact:
+        # Find exact duplicates using xxhash if available
+        if "xxhash" in stats:
+            item_exact_dict: dict[str, list[int]] = {}
+            for i in item_indices:
+                value = stats["xxhash"][i]
+                item_exact_dict.setdefault(value, []).append(source_index[i].item)
+            item_exact = [sorted(v) for v in item_exact_dict.values() if len(v) > 1]
+
+        # Find near duplicates using pchash if available
+        if "pchash" in stats:
             item_near_dict: dict[str, list[int]] = {}
             for i in item_indices:
                 value = stats["pchash"][i]
@@ -226,10 +285,8 @@ class Duplicates:
                 for v in item_near_dict.values()
                 if len(v) > 1 and not any(set(v).issubset(x) for x in item_exact)
             ]
-        else:
-            item_near = []
 
-        return DuplicateDetectionResult(exact=sorted(item_exact), near=sorted(item_near))
+        return DuplicateDetectionResult(exact=sorted(item_exact) or None, near=sorted(item_near) or None)
 
     def _find_target_duplicates(
         self, stats: StatsMap, source_index: Sequence[SourceIndex], target_indices: list[int]
@@ -240,7 +297,7 @@ class Duplicates:
         Parameters
         ----------
         stats : StatsMap
-            Hash statistics containing xxhash and pchash values
+            Hash statistics containing xxhash and/or pchash values
         source_index : Sequence[SourceIndex]
             Source index information for each hash value
         target_indices : list[int]
@@ -251,15 +308,19 @@ class Duplicates:
         DuplicateDetectionResult[SourceIndex]
             Target-level duplicate groups with SourceIndex objects
         """
-        # Find exact duplicates using xxhash
-        target_exact_dict: dict[str, list[SourceIndex]] = {}
-        for i in target_indices:
-            value = stats["xxhash"][i]
-            target_exact_dict.setdefault(value, []).append(source_index[i])
-        target_exact = [sorted(v) for v in target_exact_dict.values() if len(v) > 1]
+        target_exact: list[list[SourceIndex]] = []
+        target_near: list[list[SourceIndex]] = []
 
-        # Find near duplicates using pchash if enabled
-        if not self.only_exact:
+        # Find exact duplicates using xxhash if available
+        if "xxhash" in stats:
+            target_exact_dict: dict[str, list[SourceIndex]] = {}
+            for i in target_indices:
+                value = stats["xxhash"][i]
+                target_exact_dict.setdefault(value, []).append(source_index[i])
+            target_exact = [sorted(v) for v in target_exact_dict.values() if len(v) > 1]
+
+        # Find near duplicates using pchash if available
+        if "pchash" in stats:
             target_near_dict: dict[str, list[SourceIndex]] = {}
             for i in target_indices:
                 value = stats["pchash"][i]
@@ -270,10 +331,8 @@ class Duplicates:
                 for v in target_near_dict.values()
                 if len(v) > 1 and not any(set(v).issubset(x) for x in target_exact)
             ]
-        else:
-            target_near = []
 
-        return DuplicateDetectionResult(exact=sorted(target_exact), near=sorted(target_near))
+        return DuplicateDetectionResult(exact=sorted(target_exact) or None, near=sorted(target_near) or None)
 
     @overload
     def from_stats(self, stats: CalculationResult) -> DuplicatesOutput: ...
@@ -281,7 +340,7 @@ class Duplicates:
     @overload
     def from_stats(self, stats: Sequence[CalculationResult]) -> DuplicatesOutput: ...
 
-    @set_metadata(state=["only_exact"])
+    @set_metadata
     def from_stats(self, stats: CalculationResult | Sequence[CalculationResult]) -> DuplicatesOutput:
         """Find duplicates from pre-computed hash statistics.
 
@@ -375,20 +434,16 @@ class Duplicates:
 
         # Split results back into per-dataset groups using item-based steps
         item_result = self._split_cross_dataset_duplicates(
-            cast(Sequence[Sequence[int]], item_duplicates.exact),
-            cast(Sequence[Sequence[int]], item_duplicates.near),
+            item_duplicates.exact,
+            item_duplicates.near,
             item_dataset_steps,
         )
 
         # Check if target_duplicates has any actual data (not just None fields)
         if target_duplicates.exact is not None or target_duplicates.near is not None:
             target_result = self._split_cross_dataset_duplicates(
-                cast(Sequence[Sequence[SourceIndex]], target_duplicates.exact)
-                if target_duplicates.exact is not None
-                else [],
-                cast(Sequence[Sequence[SourceIndex]], target_duplicates.near)
-                if target_duplicates.near is not None
-                else [],
+                target_duplicates.exact,
+                target_duplicates.near,
                 item_dataset_steps,
             )
         else:
@@ -398,8 +453,8 @@ class Duplicates:
 
     def _split_cross_dataset_duplicates(
         self,
-        exact_groups: Sequence[Sequence[TIndexType]],
-        near_groups: Sequence[Sequence[TIndexType]],
+        exact_groups: Sequence[Sequence[TIndexType]] | None,
+        near_groups: Sequence[Sequence[TIndexType]] | None,
         dataset_steps: Sequence[int],
     ) -> DuplicateDetectionResult[DatasetItemTuple]:
         """
@@ -407,9 +462,9 @@ class Duplicates:
 
         Parameters
         ----------
-        exact_groups : Sequence[Sequence[int]] | Sequence[Sequence[SourceIndex]]
+        exact_groups : Sequence[Sequence[int]] | Sequence[Sequence[SourceIndex]] | None
             Exact duplicate groups with combined dataset indices
-        near_groups : Sequence[Sequence[int]] | Sequence[Sequence[SourceIndex]]
+        near_groups : Sequence[Sequence[int]] | Sequence[Sequence[SourceIndex]] | None
             Near duplicate groups with combined dataset indices
         dataset_steps : Sequence[int]
             Cumulative counts of items per dataset for index mapping
@@ -438,12 +493,12 @@ class Duplicates:
                     result.append(DatasetItemTuple(dataset_id=dataset_idx, id=local_idx))
             return result
 
-        exact_split = [split_group(group) for group in exact_groups]
-        near_split = [split_group(group) for group in near_groups]
+        exact_split = [split_group(group) for group in exact_groups] if exact_groups is not None else None
+        near_split = [split_group(group) for group in near_groups] if near_groups is not None else None
 
         return DuplicateDetectionResult(exact=exact_split, near=near_split)
 
-    @set_metadata(state=["only_exact"])
+    @set_metadata
     def from_clusters(
         self,
         cluster_result: ClusterResult,
@@ -480,10 +535,6 @@ class Duplicates:
         detection identifies duplicates in embedding space, which can capture
         semantic or visual similarity rather than pixel-level equality.
 
-        The `only_exact` parameter set during initialization controls whether
-        near duplicates are computed. Set `only_exact=True` for faster processing
-        when only exact duplicates are needed.
-
         Cluster-based detection returns item-level duplicates only. The targets
         field will always be None since clustering operates on the embedding level.
 
@@ -499,7 +550,10 @@ class Duplicates:
             clusters=cluster_result["clusters"],
         )
 
-        item_result = DuplicateDetectionResult(exact=exact_duplicates, near=near_duplicates)
+        item_result = DuplicateDetectionResult(
+            exact=exact_duplicates or None,
+            near_cluster=near_duplicates or None,
+        )
 
         return DuplicatesOutput(items=item_result, targets=DuplicateDetectionResult())
 
@@ -507,7 +561,7 @@ class Duplicates:
         self,
         mst: NDArray[np.float32],
         clusters: NDArray[np.intp],
-    ) -> tuple[Sequence[Sequence[int]], Sequence[Sequence[int]]]:
+    ) -> tuple[list[list[int]], list[list[int]]]:
         """
         Finds duplicate and near duplicate data based on cluster average distance.
 
@@ -528,7 +582,7 @@ class Duplicates:
 
         exact_indices, near_indices = compare_links_to_cluster_std(mst, clusters)  # type: ignore
         exact_dupes = self._sorted_union_find(exact_indices)
-        near_dupes = self._sorted_union_find(near_indices) if not self.only_exact else []
+        near_dupes = self._sorted_union_find(near_indices)
 
         return [[int(ii) for ii in il] for il in exact_dupes], [[int(ii) for ii in il] for il in near_dupes]
 
@@ -555,7 +609,7 @@ class Duplicates:
                 groups.append(uniques[dups].tolist())
         return sorted(groups)
 
-    @set_metadata(state=["only_exact"])
+    @set_metadata(state=["flags", "cluster_threshold", "cluster_algorithm", "n_clusters"])
     def evaluate(
         self,
         data: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
@@ -563,13 +617,12 @@ class Duplicates:
         per_image: bool = True,
         per_target: bool = True,
     ) -> DuplicatesOutput:
-        """Find duplicates by computing hashes and analyzing for duplicate groups.
+        """Find duplicates by computing hashes and/or analyzing embeddings.
 
-        Performs end-to-end duplicate detection by computing hash statistics
-        for the provided dataset and then identifying duplicate groups.
-        Separates item-level duplicates (full images/videos) from target-level
-        duplicates (bounding boxes/detections). Stores computed hash statistics
-        in the stats attribute for reuse.
+        Performs duplicate detection using hash statistics and/or cluster-based
+        analysis depending on configuration. When both methods are enabled,
+        results are merged with exact duplicates combined and near duplicates
+        separated by detection method.
 
         Parameters
         ----------
@@ -583,41 +636,153 @@ class Duplicates:
         per_target : bool, default True
             Whether to compute hashes for individual targets/detections.
             When True and targets are present, target-level duplicates will be detected.
-            Has no effect for datasets without targets.
+            Has no effect for datasets without targets or for cluster-based detection.
 
         Returns
         -------
         DuplicatesOutput
             Duplicate detection results with separate item and target duplicate groups.
 
-            - items: Contains item-level duplicates (indices are simple integers)
-            - targets: Contains target-level duplicates (indices are SourceIndex objects),
-              or None if per_target=False or no targets present
+            - items.exact: Exact duplicates (hash-based and/or cluster-based with zero distance)
+            - items.near: Hash-based near duplicates (perceptual hash similarity)
+            - items.near_cluster: Cluster-based near duplicates (embedding space similarity)
+            - targets: Target-level duplicates (hash-based only, cluster detection is item-level)
+
+        Raises
+        ------
+        ValueError
+            If ``flags`` is ``ImageStats.NONE`` and no ``feature_extractor`` is provided.
 
         Examples
         --------
-        Item-level duplicates only (default for non-OD datasets):
+        Hash-based duplicates only (default):
 
         >>> detector = Duplicates()
         >>> result = detector.evaluate(duplicate_images)
         >>> print(result.items.exact)
         [[3, 20], [16, 37]]
-        >>> print(result.targets.exact)
+        >>> print(result.items.near_cluster)
         None
 
-        Target-level duplicates only:
+        Cluster-based duplicates with embeddings:
 
-        >>> result = detector.evaluate(od_dataset, per_image=False, per_target=True)
-        >>> print(result.items.exact)
+        >>> from dataeval import Embeddings
+        >>> extractor = Embeddings(model=my_model)
+        >>> detector = Duplicates(feature_extractor=extractor, cluster_threshold=1.0)
+        >>> result = detector.evaluate(embeddings_dataset)
+
+        Cluster-only detection (skip hash computation):
+
+        >>> detector = Duplicates(flags=ImageStats.NONE, feature_extractor=extractor)
+        >>> result = detector.evaluate(embeddings_dataset)
+        >>> print(result.items.near)  # None - hash-based near not computed
         None
-        >>> print(result.targets.exact)
-        [[SourceIndex(0, 0), SourceIndex(0, 1)], [SourceIndex(1, 0), SourceIndex(1, 1), SourceIndex(1, 2)]]
-
-        Access computed hashes for reuse:
-
-        >>> saved_stats = detector.stats
 
         """
-        self.stats = calculate(data, None, ImageStats.HASH, per_image=per_image, per_target=per_target)
-        item_duplicates, target_duplicates = self._get_duplicates(self.stats["stats"], self.stats["source_index"])
-        return DuplicatesOutput(items=item_duplicates, targets=target_duplicates)
+        # Validate parameters
+        if not (self.flags & ImageStats.HASH) and self.feature_extractor is None:
+            raise ValueError("Either flags must contain hash stats or feature_extractor must be provided.")
+
+        # Initialize results
+        hash_item_result: DuplicateDetectionResult[int] | None = None
+        hash_target_result: DuplicateDetectionResult[SourceIndex] | None = None
+        cluster_exact: list[list[int]] = []
+        cluster_near: list[list[int]] = []
+
+        # Hash-based duplicate detection
+        if self.flags & ImageStats.HASH:
+            self.stats = calculate(data, None, self.flags & ImageStats.HASH, per_image=per_image, per_target=per_target)
+            hash_item_result, hash_target_result = self._get_duplicates(self.stats["stats"], self.stats["source_index"])
+
+        # Cluster-based duplicate detection
+        if self.feature_extractor is not None:
+            # Extract embeddings
+            embeddings = self.feature_extractor(data)
+            embeddings_array = flatten_samples(to_numpy(embeddings))
+
+            # Cluster the embeddings
+            cluster_result = cluster(
+                embeddings_array,
+                algorithm=self.cluster_algorithm,
+                n_clusters=self.n_clusters,
+            )
+
+            # Find cluster-based duplicates
+            cluster_exact, cluster_near = self._find_duplicates(
+                mst=cluster_result["mst"],
+                clusters=cluster_result["clusters"],
+            )
+
+            # If cluster_threshold is None, don't include near duplicates from clusters
+            if self.cluster_threshold is None:
+                cluster_near = []
+
+        # Merge results
+        final_item_result = self._merge_item_results(hash_item_result, cluster_exact, cluster_near)
+        final_target_result = hash_target_result or DuplicateDetectionResult()
+
+        return DuplicatesOutput(items=final_item_result, targets=final_target_result)
+
+    def _merge_item_results(
+        self,
+        hash_result: DuplicateDetectionResult[int] | None,
+        cluster_exact: list[list[int]],
+        cluster_near: list[list[int]],
+    ) -> DuplicateDetectionResult[int]:
+        """Merge hash-based and cluster-based item duplicate results."""
+        if hash_result is None and not cluster_exact and not cluster_near:
+            return DuplicateDetectionResult()
+
+        if hash_result is None:
+            # Only cluster results
+            return DuplicateDetectionResult(
+                exact=cluster_exact if cluster_exact else None,
+                near=None,
+                near_cluster=cluster_near if cluster_near else None,
+            )
+
+        if not cluster_exact and not cluster_near:
+            # Only hash results
+            return hash_result
+
+        # Merge both - combine exact duplicates, keep near separate
+        merged_exact = self._merge_duplicate_groups(
+            list(hash_result.exact or []),
+            cluster_exact,
+        )
+
+        return DuplicateDetectionResult(
+            exact=merged_exact if merged_exact else None,
+            near=hash_result.near,
+            near_cluster=cluster_near if cluster_near else None,
+        )
+
+    def _merge_duplicate_groups(
+        self,
+        groups_a: Sequence[Sequence[int]],
+        groups_b: Sequence[Sequence[int]],
+    ) -> list[list[int]]:
+        """Merge two sets of duplicate groups, combining overlapping groups."""
+        # Convert to sets for easier manipulation
+        all_groups = [set(g) for g in groups_a] + [set(g) for g in groups_b]
+
+        if not all_groups:
+            return []
+
+        # Merge overlapping groups using union-find approach
+        merged: list[set[int]] = []
+        for group in all_groups:
+            # Find all existing groups that overlap with this one
+            overlapping = [i for i, m in enumerate(merged) if m & group]
+
+            if not overlapping:
+                merged.append(group)
+            else:
+                # Merge all overlapping groups with the new group
+                new_group = group.copy()
+                for i in sorted(overlapping, reverse=True):
+                    new_group |= merged.pop(i)
+                merged.append(new_group)
+
+        # Convert back to sorted lists, filter to groups with more than 1 element
+        return sorted([sorted(g) for g in merged if len(g) > 1])
