@@ -40,7 +40,7 @@ class TestDuplicates:
         dupes = Duplicates()
         results = dupes.evaluate(np.concatenate((data, data + 0.001)))
         # Adding 0.001 to random data creates values that are NOT byte-identical,
-        # so xxhash will NOT find them as exact duplicates. However, pchash will
+        # so xxhash will NOT find them as exact duplicates. However, phash will
         # find them as near duplicates because the visual difference is minimal.
         # exact may or may not be None depending on whether some random images
         # happen to hash to the same xxhash value
@@ -55,7 +55,7 @@ class TestDuplicates:
         results = dupes.evaluate(np.concatenate((data, data, data + 0.001)))
         assert results.items.exact is not None
         assert len(results.items.exact) == 20
-        # near is None because HASH_PCHASH was not included in flags
+        # near is None because HASH_PHASH was not included in flags
         assert results.items.near is None
         assert results.targets.exact is None
         assert results.targets.near is None
@@ -63,14 +63,14 @@ class TestDuplicates:
     def test_duplicates_with_stats(self):
         data = np.random.random((20, 3, 16, 16))
         data = np.concatenate((data, data, data + 0.001))
-        # Stats computed with full HASH (includes both xxhash and pchash)
+        # Stats computed with full HASH (includes both xxhash and phash)
         stats = calculate(data, None, ImageStats.HASH, per_image=True, per_target=False)
         # Detector configured for exact only - but from_stats uses what's in the stats
         dupes = Duplicates(ImageStats.HASH_XXHASH)
         results = dupes.from_stats(stats)
         assert results.items.exact is not None
         assert len(results.items.exact) == 20
-        # from_stats uses what's available in the stats, so pchash results will be present
+        # from_stats uses what's available in the stats, so phash results will be present
         # since the stats were computed with ImageStats.HASH
         assert results.items.near is not None
         assert results.targets.exact is None
@@ -98,14 +98,14 @@ class TestDuplicates:
         # Format is now: [DatasetItemIndex(dataset_id=0, id=0), DatasetItemIndex(dataset_id=1, id=1), ...]
         exact_groups = []
         for group in results.items.exact:
-            group_dict = {}
+            group_dict: dict[int, list[int]] = {}
             for item in group:
                 assert isinstance(item, tuple)
                 dataset_id = item[0]
                 item_id = item[1]
                 if dataset_id not in group_dict:
                     group_dict[dataset_id] = []
-                group_dict[dataset_id].append(item_id)
+                group_dict[dataset_id].append(item_id)  # type: ignore
             exact_groups.append(group_dict)
 
         # Check that we have ones group and zeros group
@@ -117,15 +117,16 @@ class TestDuplicates:
         assert results.items.near is not None
         assert len(results.items.near) >= 1
         near_groups = []
-        for group in results.items.near:
-            group_dict = {}
-            for item in group:
+        for near_group in results.items.near:
+            # near_group is now a NearDuplicateGroup with indices and methods
+            group_dict: dict[int, list[int]] = {}
+            for item in near_group.indices:
                 assert isinstance(item, tuple)
                 dataset_id = item[0]
                 item_id = item[1]
                 if dataset_id not in group_dict:
                     group_dict[dataset_id] = []
-                group_dict[dataset_id].append(item_id)
+                group_dict[dataset_id].append(item_id)  # type: ignore
             near_groups.append(group_dict)
 
         # Near group includes perceptually similar across datasets
@@ -159,7 +160,7 @@ class TestDuplicates:
         images[3] = np.zeros((3, 5, 5))
         images[5] = np.zeros((3, 5, 5))
         results = dupes.evaluate(images)
-        # Small images get hashed with xxhash but not pchash
+        # Small images get hashed with xxhash but not phash
         # So they can still appear in exact duplicates
         assert results.items is not None
         # The test just ensures we don't crash on small images
@@ -203,10 +204,12 @@ class TestDuplicates:
 
         # Should return proper structure
         assert isinstance(result.items.exact, list)
-        assert isinstance(result.items.near_cluster, list)
+        # Near duplicates from cluster detection have "cluster" in methods
+        assert isinstance(result.items.near, list)
+        assert all("cluster" in g.methods for g in result.items.near)
         # Targets is now an empty DuplicateDetectionResult, not None
         assert result.targets.exact is None
-        assert result.targets.near_cluster is None
+        assert result.targets.near is None
 
     def test_duplicates_from_clusters_with_near(self):
         """Test cluster-based detection finds both exact and near duplicates"""
@@ -229,12 +232,12 @@ class TestDuplicates:
 
         # Should find exact duplicates (zero distance edge)
         assert isinstance(result.items.exact, list)
-        # Near duplicates come from cluster analysis, not phash
-        assert result.items.near is None
-        assert isinstance(result.items.near_cluster, list)
+        # Near duplicates come from cluster analysis with "cluster" method
+        assert isinstance(result.items.near, list)
+        assert all("cluster" in g.methods for g in result.items.near)
         # Targets is now an empty DuplicateDetectionResult, not None
         assert result.targets.exact is None
-        assert result.targets.near_cluster is None
+        assert result.targets.near is None
 
     def test_duplicates_from_clusters_no_duplicates(self):
         """Test with data that has no duplicates"""
@@ -252,12 +255,14 @@ class TestDuplicates:
         detector = Duplicates()
         result = detector.from_clusters(mock_cluster_result)
 
-        # Should have proper structure - no exact duplicates, possibly near_cluster
+        # Should have proper structure - no exact duplicates, possibly near duplicates
         # (depends on cluster std calculation)
-        assert result.items.near is None  # phash not used in cluster detection
+        # Near will be None or contain groups with "cluster" method
+        if result.items.near is not None:
+            assert all("cluster" in g.methods for g in result.items.near)
         # Targets is now an empty DuplicateDetectionResult, not None
         assert result.targets.exact is None
-        assert result.targets.near_cluster is None
+        assert result.targets.near is None
 
     def test_hash_differs_for_full_image_vs_targets(self, get_mock_od_dataset):
         """Regression test: hash values should differ between full image and individual targets.
@@ -293,9 +298,9 @@ class TestDuplicates:
         box0_xxhash = result["stats"]["xxhash"][1]  # target=0 (white region)
         box1_xxhash = result["stats"]["xxhash"][2]  # target=1 (black region)
 
-        full_image_pchash = result["stats"]["pchash"][0]  # target=None
-        box0_pchash = result["stats"]["pchash"][1]  # target=0 (white region)
-        box1_pchash = result["stats"]["pchash"][2]  # target=1 (black region)
+        full_image_phash = result["stats"]["phash"][0]  # target=None
+        box0_phash = result["stats"]["phash"][1]  # target=0 (white region)
+        box1_phash = result["stats"]["phash"][2]  # target=1 (black region)
 
         # CRITICAL: Full image hash should differ from both box hashes
         assert full_image_xxhash != box0_xxhash, "Full image xxhash should differ from box 0"
@@ -305,9 +310,9 @@ class TestDuplicates:
         assert box0_xxhash != box1_xxhash, "Box 0 and Box 1 should have different xxhashes"
 
         # Same checks for perceptual hash
-        assert full_image_pchash != box0_pchash, "Full image pchash should differ from box 0"
-        assert full_image_pchash != box1_pchash, "Full image pchash should differ from box 1"
-        assert box0_pchash != box1_pchash, "Box 0 and Box 1 should have different pchashes"
+        assert full_image_phash != box0_phash, "Full image phash should differ from box 0"
+        assert full_image_phash != box1_phash, "Full image phash should differ from box 1"
+        assert box0_phash != box1_phash, "Box 0 and Box 1 should have different phashes"
 
     def test_duplicate_detection_with_items_and_targets(self, get_mock_od_dataset):
         """Test new API separating item and target duplicate detection."""

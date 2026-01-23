@@ -12,6 +12,8 @@ __all__ = [
     "compute_neighbors",
     "coverage_adaptive",
     "coverage_naive",
+    "dhash",
+    "dhash_d4",
     "divergence_fnn",
     "divergence_mst",
     "feature_distance",
@@ -29,7 +31,8 @@ __all__ = [
     "nullmodel_metrics",
     "nullmodel_recall",
     "parity",
-    "pchash",
+    "phash",
+    "phash_d4",
     "rank_hdbscan_complexity",
     "rank_hdbscan_distance",
     "rank_knn",
@@ -49,7 +52,7 @@ from dataeval.core._clusterer import cluster, compute_cluster_stats
 from dataeval.core._coverage import coverage_adaptive, coverage_naive
 from dataeval.core._divergence import divergence_fnn, divergence_mst
 from dataeval.core._feature_distance import feature_distance
-from dataeval.core._hash import pchash, xxhash
+from dataeval.core._hash import dhash, dhash_d4, phash, phash_d4, xxhash
 from dataeval.core._label_errors import label_errors
 from dataeval.core._label_parity import label_parity
 from dataeval.core._label_stats import label_stats

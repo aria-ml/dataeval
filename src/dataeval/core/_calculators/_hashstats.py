@@ -1,3 +1,5 @@
+"""Calculator for hash-based image statistics."""
+
 __all__ = []
 
 from collections.abc import Callable
@@ -15,7 +17,13 @@ if TYPE_CHECKING:
 
 @CalculatorRegistry.register(ImageStats)
 class HashStatCalculator(Calculator):
-    """Calculator for hash-based statistics."""
+    """Calculator for hash-based statistics.
+
+    Computes various hash values for duplicate detection:
+    - xxhash: Fast non-cryptographic hash for exact duplicates
+    - phash: DCT-based perceptual hash for near duplicates
+    - dhash: Gradient-based perceptual hash for near duplicates
+    """
 
     def __init__(self, datum: NDArray[Any], cache: "CalculatorCache", per_channel: bool = False) -> None:
         self.datum = datum
@@ -30,21 +38,28 @@ class HashStatCalculator(Calculator):
 
         return [xxhash(self.cache.image)]
 
-    def _pchash(self) -> list[str]:
-        from dataeval.core._hash import pchash
+    def _phash(self) -> list[str]:
+        from dataeval.core._hash import phash
 
-        return [pchash(self.cache.image)]
+        return [phash(self.cache.image)]
+
+    def _dhash(self) -> list[str]:
+        from dataeval.core._hash import dhash
+
+        return [dhash(self.cache.image)]
 
     def get_empty_values(self) -> dict[str, Any]:
         """Return empty values for hash statistics."""
         return {
-            "xxhash": "",  # Empty string for hash
-            "pchash": "",  # Empty string for hash
+            "xxhash": "",
+            "phash": "",
+            "dhash": "",
         }
 
     def get_handlers(self) -> dict[ImageStats, tuple[str, Callable[[], list[Any]]]]:
         """Return mapping of flags to (stat_name, handler_function)."""
         return {
             ImageStats.HASH_XXHASH: ("xxhash", self._xxhash),
-            ImageStats.HASH_PCHASH: ("pchash", self._pchash),
+            ImageStats.HASH_PHASH: ("phash", self._phash),
+            ImageStats.HASH_DHASH: ("dhash", self._dhash),
         }
