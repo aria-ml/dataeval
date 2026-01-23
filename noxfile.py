@@ -191,7 +191,7 @@ def doctest(session: nox.Session) -> None:
 @session(uv_groups=["docs"], uv_extras=UV_EXTRAS)
 def docs(session: nox.Session) -> None:
     """Generate documentation. Clear the jupyter cache by calling `nox -e docs -- clean`."""
-    if {"chart", "charts"} | set(session.posargs):
+    if {"chart", "charts"} & set(session.posargs):
         try:
             session.run(
                 "python",
