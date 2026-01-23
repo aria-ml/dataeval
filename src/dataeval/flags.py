@@ -53,7 +53,8 @@ class ImageStats(Flag):
     Hash Statistics (computed on raw image data):
 
     - `HASH_XXHASH` : xxHash of raw image
-    - `HASH_PCHASH` : Perceptual hash of image
+    - `HASH_PHASH` : Perceptual hash of image
+    - `HASH_DHASH` : Difference/gradient hash of image
 
     Convenience Groups
     ------------------
@@ -65,6 +66,7 @@ class ImageStats(Flag):
     - `DIMENSION_BASIC` : Width, height, channels
     - `DIMENSION_OFFSET` : Offset X and Y
     - `DIMENSION_POSITION` : Center, distance to center, distance to edge
+    - `HASH_PERCEPTION` : Perceptual and difference hashes
 
     Full Categories:
 
@@ -130,7 +132,8 @@ class ImageStats(Flag):
 
     # ===== HASH STATS =====
     HASH_XXHASH = auto()
-    HASH_PCHASH = auto()
+    HASH_PHASH = auto()
+    HASH_DHASH = auto()
 
     # ===== COARSE-GRAINED GROUPS =====
     # Full category groups
@@ -163,7 +166,7 @@ class ImageStats(Flag):
         | DIMENSION_INVALID_BOX
     )
 
-    HASH = HASH_XXHASH | HASH_PCHASH
+    HASH = HASH_XXHASH | HASH_PHASH | HASH_DHASH
 
     # Convenience sub-groups
     PIXEL_BASIC = PIXEL_MEAN | PIXEL_STD | PIXEL_VAR
@@ -174,6 +177,8 @@ class ImageStats(Flag):
     DIMENSION_BASIC = DIMENSION_WIDTH | DIMENSION_HEIGHT | DIMENSION_CHANNELS | DIMENSION_ASPECT_RATIO
     DIMENSION_OFFSET = DIMENSION_OFFSET_X | DIMENSION_OFFSET_Y
     DIMENSION_POSITION = DIMENSION_CENTER | DIMENSION_DISTANCE_CENTER | DIMENSION_DISTANCE_EDGE
+
+    HASH_PERCEPTION = HASH_PHASH | HASH_DHASH
 
     # Ultimate convenience
     ALL = PIXEL | VISUAL | DIMENSION | HASH

@@ -51,7 +51,8 @@ def _default_ratio_map() -> OverrideFunctionMap:
         "depth": lambda box, img: box["depth"],
         # Hash stats should be kept as-is (they're strings, not numeric)
         "xxhash": lambda box, img: box["xxhash"],
-        "pchash": lambda box, img: box["pchash"],
+        "phash": lambda box, img: box["phash"],
+        "dhash": lambda box, img: box["dhash"],
         # Normalize distance to center by half-diagonal of image
         "distance_center": lambda box, img: box["distance_center"]
         / (np.sqrt(np.square(img["width"]) + np.square(img["height"])) / 2 + EPSILON),

@@ -13,7 +13,7 @@ controlled via {class}`.ImageStats` flags:
 - `PIXEL` - Pixel-level statistics (mean, std, variance, skewness, kurtosis, entropy, etc.)
 - `VISUAL` - Visual quality statistics (brightness, contrast, darkness, sharpness, percentiles)
 - `DIMENSION` - Dimension-based statistics (width, height, channels, size, aspect ratio, etc.)
-- `HASH` - Hash-based statistics for duplicate detection (xxhash, pchash)
+- `HASH` - Hash-based statistics for duplicate detection (xxhash, phash, dhash)
 
 The information below includes what each category provides and the statistical
 metrics that are available in each.
@@ -102,7 +102,12 @@ The `HASH` flag group calculates hash values for duplicate detection:
 | Flag        | Description                                                                                      |
 | ----------- | ------------------------------------------------------------------------------------------------ |
 | HASH_XXHASH | [xxHash](https://github.com/Cyan4973/xxHash) for exact image matching                            |
-| HASH_PCHASH | [Perceptual hash](https://en.wikipedia.org/wiki/Perceptual_hashing) for near-duplicate detection |
+| HASH_PHASH  | [Perceptual hash](https://en.wikipedia.org/wiki/Perceptual_hashing) for near-duplicate detection |
+| HASH_DHASH  | Difference/gradient hash for near-duplicate detection                                            |
+
+Convenience sub-groups:
+
+- `HASH_PERCEPTION` - Perceptual and difference/gradient based hashes
 
 These hashes can be used in conjunction with the {class}`.Duplicates` class to identify duplicate images.
 
