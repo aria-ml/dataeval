@@ -410,7 +410,7 @@ class TestCalculateRatios:
         ratios = calculate_ratios(stats)
 
         assert "xxhash" in ratios["stats"]
-        assert "pchash" in ratios["stats"]
+        assert "phash" in ratios["stats"]
 
     def test_all_stats_combined(self):
         """Test with all stat types combined."""
