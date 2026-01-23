@@ -1,3 +1,4 @@
+import functools
 import glob
 import os
 import re
@@ -6,7 +7,66 @@ from pathlib import Path
 from sys import version_info
 
 import nox
-import nox_uv
+
+# Try importing nox_uv. If it fails, define a fallback decorator.
+try:
+    import nox_uv
+except ImportError:
+    nox_uv = None
+
+
+# Session compatibility shim for nox/nox-uv
+def session(**kwargs):
+    """
+    Custom session decorator that works with or without nox-uv.
+    If nox-uv is missing, it strips 'uv_*' arguments and falls back to standard nox.
+    """
+
+    def decorator(func):
+        if nox_uv is not None:
+            # If nox-uv is installed, pass everything through directly
+            return nox_uv.session(**kwargs)(func)
+        else:
+            # Extract uv_* options (use .get() to avoid mutating kwargs)
+            uv_groups = kwargs.get("uv_groups", [])
+            uv_extras = kwargs.get("uv_extras", [])
+            uv_only_groups = kwargs.get("uv_only_groups", [])
+            uv_no_install_project = kwargs.get("uv_no_install_project", False)
+            # Strip all uv_* args to avoid kwargs errors in standard nox
+            clean_kwargs = {k: v for k, v in kwargs.items() if not k.startswith("uv_")}
+
+            # Define a wrapper that runs the install command before the actual session
+            @functools.wraps(func)
+            def wrapper(session: nox.Session):
+                # Ensure pip >= 25.1 for --group support (PEP 735)
+                session.install("pip>=25.1")
+
+                # Build install command for the project with extras
+                if not uv_no_install_project and not uv_only_groups:
+                    # Install the project itself, optionally with extras
+                    if uv_extras:
+                        extras_str = ",".join(uv_extras)
+                        session.install("-e", f".[{extras_str}]")
+                    else:
+                        session.install("-e", ".")
+
+                # Handle dependency groups (uv_groups installs project + groups,
+                # uv_only_groups installs only the groups without the project)
+                groups = uv_only_groups if uv_only_groups else uv_groups
+                if groups:
+                    group_args = []
+                    for group in groups:
+                        group_args.extend(["--group", group])
+                    session.install(*group_args)
+
+                # Run the original function
+                return func(session)
+
+            # Register the wrapper with standard nox
+            return nox.session(**clean_kwargs)(wrapper)
+
+    return decorator
+
 
 PYTHON_VERSION = f"{version_info[0]}.{version_info[1]}"
 PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13"]
@@ -14,14 +74,14 @@ PYTHON_RE_PATTERN = re.compile(r"\d\.\d{1,2}")
 IS_CI = bool(os.environ.get("CI"))
 DATAEVAL_NOX_UV_EXTRAS_OVERRIDE = os.environ.get("DATAEVAL_NOX_UV_EXTRAS_OVERRIDE", "")
 
-UV_EXTRAS = [DATAEVAL_NOX_UV_EXTRAS_OVERRIDE] if DATAEVAL_NOX_UV_EXTRAS_OVERRIDE else []
+UV_EXTRAS = [DATAEVAL_NOX_UV_EXTRAS_OVERRIDE] if DATAEVAL_NOX_UV_EXTRAS_OVERRIDE else ["cu124"]
 
-# Configure Numba disk caching for faster test execution
-# This caches JIT-compiled functions to avoid recompilation across test workers
+# Configure Numba disk caching
 os.environ.setdefault("NUMBA_CACHE_DIR", os.path.expanduser("~/.cache/numba"))
 os.environ.setdefault("NUMBA_ENABLE_CACHING", "1")
 
-nox.options.default_venv_backend = "uv"
+# Standard nox options
+nox.options.default_venv_backend = "uv" if nox_uv is not None else "virtualenv"
 nox.options.sessions = ["test", "type", "deps", "lint", "doclint", "doctest", "check"]
 
 DOCS_ENVS = {"LANG": "C", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True", "PYDEVD_DISABLE_FILE_VALIDATION": "1"}
@@ -42,7 +102,7 @@ def get_python_version(session: nox.Session) -> str:
     return matches.group(0) if matches else PYTHON_VERSION
 
 
-@nox_uv.session(uv_groups=["test"], uv_extras=["cpu"])
+@session(uv_groups=["test"], uv_extras=["cpu"])
 def test(session: nox.Session) -> None:
     """Run unit tests with coverage reporting. Specify version using `nox -P {version} -e test`.
 
@@ -92,14 +152,14 @@ def test(session: nox.Session) -> None:
     session.run("mv", ".coverage", f"output/.coverage.{python_version}", external=True)
 
 
-@nox_uv.session(uv_groups=["type"], uv_extras=["cpu"])
+@session(uv_groups=["type"], uv_extras=["cpu"])
 def type(session: nox.Session) -> None:  # noqa: A001
     """Run type checks and verify external types. Specify version using `nox -P {version} -e type`."""
     session.run("pyright", "--stats", "src/", "tests/")
     session.run("pyright", "--ignoreexternal", "--verifytypes", "dataeval")
 
 
-@nox_uv.session(uv_only_groups=["base"], reuse_venv=False)
+@session(uv_only_groups=["base"], reuse_venv=False)
 def deps(session: nox.Session) -> None:
     """Run unit tests against standard installation."""
     session.run_install("uv", "pip", "install", ".[cpu]", "--resolution=lowest-direct")
@@ -107,7 +167,7 @@ def deps(session: nox.Session) -> None:
     session.run("pytest", "-m", "not (optional)")
 
 
-@nox_uv.session(uv_only_groups=["lint"], uv_no_install_project=True)
+@session(uv_only_groups=["lint"], uv_no_install_project=True)
 def lint(session: nox.Session) -> None:
     """Perform linting and spellcheck."""
     session.run("ruff", "check", "--show-fixes", "--exit-non-zero-on-fix", "--fix")
@@ -115,7 +175,7 @@ def lint(session: nox.Session) -> None:
     session.run("codespell")
 
 
-@nox_uv.session(uv_groups=["test"], uv_extras=["cpu"])
+@session(uv_groups=["test"], uv_extras=["cpu"])
 def doctest(session: nox.Session) -> None:
     """Run docstring tests."""
     target = session.posargs if session.posargs else ["src/dataeval"]
@@ -128,7 +188,7 @@ def doctest(session: nox.Session) -> None:
     )
 
 
-@nox_uv.session(uv_groups=["docs"], uv_extras=UV_EXTRAS)
+@session(uv_groups=["docs"], uv_extras=UV_EXTRAS)
 def docs(session: nox.Session) -> None:
     """Generate documentation. Clear the jupyter cache by calling `nox -e docs -- clean`."""
     if {"chart", "charts"} | set(session.posargs):
@@ -174,7 +234,7 @@ def docs(session: nox.Session) -> None:
     session.run_always("bash", "-c", RESTORE_CMD, external=True)
 
 
-@nox_uv.session(uv_only_groups=["lock"], uv_sync_locked=False)
+@session(uv_only_groups=["lock"], uv_sync_locked=False)
 def lock(session: nox.Session) -> None:
     """Lock dependencies in "uv.lock". Update dependencies by calling `nox -e lock -- upgrade`."""
     upgrade_args = ["--upgrade"] if "upgrade" in session.posargs else []
@@ -229,7 +289,7 @@ def _run_doclint_tests(session: nox.Session, output_dir: str, scripts: list) -> 
     return test_failures
 
 
-@nox_uv.session(uv_only_groups=["doclint"])
+@session(uv_only_groups=["doclint"])
 def doclint(session: nox.Session) -> None:
     """Extract scripts from notebooks in docs and run lint, typecheck, and compile tests."""
     # Setup output directory - clear it first
@@ -272,7 +332,8 @@ def doclint(session: nox.Session) -> None:
         )
 
 
-@nox_uv.session(uv_only_groups=["base"])
+@session(uv_only_groups=["lock"])
 def check(session: nox.Session) -> None:
     """Validate lock file and exported dependency files are up to date."""
     session.run("uv", "lock", "--check")
+    session.run("poetry", "check", "--lock")

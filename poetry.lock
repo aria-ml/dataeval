@@ -75,7 +75,7 @@ version = "3.6.3"
 description = "Bash tab completion for argparse"
 optional = false
 python-versions = ">=3.8"
-groups = ["base", "dev", "doclint", "docs", "lint", "lock", "test", "type"]
+groups = ["dev"]
 files = [
     {file = "argcomplete-3.6.3-py3-none-any.whl", hash = "sha256:f5007b3a600ccac5d25bbce33089211dfd49eab4a7718da3f10e3082525a92ce"},
     {file = "argcomplete-3.6.3.tar.gz", hash = "sha256:62e8ed4fd6a45864acc8235409461b72c9a28ee785a2011cc5eb78318786c89c"},
@@ -224,7 +224,7 @@ version = "25.4.0"
 description = "Classes Without Boilerplate"
 optional = false
 python-versions = ">=3.9"
-groups = ["base", "dev", "doclint", "docs", "lint", "lock", "test", "type"]
+groups = ["dev", "doclint", "docs"]
 files = [
     {file = "attrs-25.4.0-py3-none-any.whl", hash = "sha256:adcf7e2a1fb3b36ac48d97835bb6d8ade15b8dcce26aba8bf1d14847b57a3373"},
     {file = "attrs-25.4.0.tar.gz", hash = "sha256:16d5969b87f0859ef33a48b35d55ac1be6e42ae49d5e853b597db70c35c57e11"},
@@ -640,12 +640,12 @@ version = "0.4.6"
 description = "Cross-platform colored terminal text."
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
-groups = ["base", "dev", "doclint", "docs", "lint", "lock", "test", "type"]
+groups = ["dev", "doclint", "docs", "lock", "test"]
 files = [
     {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
 ]
-markers = {base = "sys_platform == \"win32\"", dev = "sys_platform == \"win32\" or platform_system == \"Windows\"", doclint = "sys_platform == \"win32\" or platform_system == \"Windows\"", docs = "sys_platform == \"win32\" or platform_system == \"Windows\"", lint = "sys_platform == \"win32\"", lock = "sys_platform == \"win32\" or platform_system == \"Windows\" or os_name == \"nt\"", test = "sys_platform == \"win32\"", type = "sys_platform == \"win32\""}
+markers = {dev = "platform_system == \"Windows\" or sys_platform == \"win32\"", doclint = "platform_system == \"Windows\" or sys_platform == \"win32\"", docs = "platform_system == \"Windows\" or sys_platform == \"win32\"", lock = "platform_system == \"Windows\" or os_name == \"nt\"", test = "sys_platform == \"win32\""}
 
 [[package]]
 name = "colorlog"
@@ -653,7 +653,7 @@ version = "6.10.1"
 description = "Add colours to the output of Python's logging module."
 optional = false
 python-versions = ">=3.6"
-groups = ["base", "dev", "doclint", "docs", "lint", "lock", "test", "type"]
+groups = ["dev"]
 files = [
     {file = "colorlog-6.10.1-py3-none-any.whl", hash = "sha256:2d7e8348291948af66122cff006c9f8da6255d224e7cf8e37d8de2df3bad8c9c"},
     {file = "colorlog-6.10.1.tar.gz", hash = "sha256:eb4ae5cb65fe7fec7773c2306061a8e63e02efc2c72eba9d27b0fa23c94f1321"},
@@ -1164,7 +1164,7 @@ version = "1.3.1"
 description = "A tool for resolving PEP 735 Dependency Group data"
 optional = false
 python-versions = ">=3.8"
-groups = ["base", "dev", "doclint", "docs", "lint", "lock", "test", "type"]
+groups = ["dev", "lock"]
 files = [
     {file = "dependency_groups-1.3.1-py3-none-any.whl", hash = "sha256:51aeaa0dfad72430fcfb7bcdbefbd75f3792e5919563077f30bc0d73f4493030"},
     {file = "dependency_groups-1.3.1.tar.gz", hash = "sha256:78078301090517fd938c19f64a53ce98c32834dfe0dee6b88004a569a6adfefd"},
@@ -1183,7 +1183,7 @@ version = "0.4.0"
 description = "Distribution utilities"
 optional = false
 python-versions = "*"
-groups = ["base", "dev", "doclint", "docs", "lint", "lock", "test", "type"]
+groups = ["dev", "lock"]
 files = [
     {file = "distlib-0.4.0-py2.py3-none-any.whl", hash = "sha256:9659f7d87e46584a30b5780e43ac7a2143098441670ff0a49d5f9034c54a6c16"},
     {file = "distlib-0.4.0.tar.gz", hash = "sha256:feec40075be03a04501a973d81f633735b4b69f98b05450592310c0f401a4e0d"},
@@ -1327,7 +1327,7 @@ version = "3.18.0"
 description = "A platform independent file lock."
 optional = false
 python-versions = ">=3.9"
-groups = ["main", "base", "dev", "doclint", "docs", "lint", "lock", "test", "type"]
+groups = ["main", "dev", "doclint", "docs", "lock"]
 files = [
     {file = "filelock-3.18.0-py3-none-any.whl", hash = "sha256:c401f4f8377c4464e6db25fff06205fd89bdd83b65eb0488ed1b160f780e21de"},
     {file = "filelock-3.18.0.tar.gz", hash = "sha256:adbc88eabb99d2fec8c9c1b229b171f18afa655400173ddc653d5d01501fb9f2"},
@@ -1607,7 +1607,7 @@ version = "4.15.0"
 description = "Python humanize utilities"
 optional = false
 python-versions = ">=3.10"
-groups = ["base", "dev", "doclint", "docs", "lint", "lock", "test", "type"]
+groups = ["dev"]
 files = [
     {file = "humanize-4.15.0-py3-none-any.whl", hash = "sha256:b1186eb9f5a9749cd9cb8565aee77919dd7c8d076161cf44d70e59e3301e1769"},
     {file = "humanize-4.15.0.tar.gz", hash = "sha256:1dd098483eb1c7ee8e32eb2e99ad1910baefa4b75c3aff3a82f4d78688993b10"},
@@ -3277,7 +3277,7 @@ version = "2025.11.12"
 description = "Flexible test automation."
 optional = false
 python-versions = ">=3.8"
-groups = ["base", "dev", "doclint", "docs", "lint", "lock", "test", "type"]
+groups = ["dev"]
 files = [
     {file = "nox-2025.11.12-py3-none-any.whl", hash = "sha256:707171f9f63bc685da9d00edd8c2ceec8405b8e38b5fb4e46114a860070ef0ff"},
     {file = "nox-2025.11.12.tar.gz", hash = "sha256:3d317f9e61f49d6bde39cf2f59695bb4e1722960457eee3ae19dacfe03c07259"},
@@ -3304,7 +3304,7 @@ version = "0.7.0"
 description = "Facilitate nox integration with uv for Python projects"
 optional = false
 python-versions = ">=3.9"
-groups = ["base", "dev", "doclint", "docs", "lint", "lock", "test", "type"]
+groups = ["dev"]
 files = [
     {file = "nox_uv-0.7.0-py3-none-any.whl", hash = "sha256:51f9bb68ca6d721706f6372f0dec8ebfcc00408c2172b2bfeb6a6c06d9e3ab38"},
     {file = "nox_uv-0.7.0.tar.gz", hash = "sha256:60ac21c16650f05ebb520d737cc2e838c7a49be2ad1dbcd7165ffd3675560991"},
@@ -3654,7 +3654,7 @@ version = "25.0"
 description = "Core utilities for Python packages"
 optional = false
 python-versions = ">=3.8"
-groups = ["base", "dev", "doclint", "docs", "lint", "lock", "test", "type"]
+groups = ["dev", "doclint", "docs", "lock", "test"]
 files = [
     {file = "packaging-25.0-py3-none-any.whl", hash = "sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484"},
     {file = "packaging-25.0.tar.gz", hash = "sha256:d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f"},
@@ -3867,7 +3867,7 @@ version = "4.5.1"
 description = "A small Python package for determining appropriate platform-specific dirs, e.g. a `user data dir`."
 optional = false
 python-versions = ">=3.10"
-groups = ["base", "dev", "doclint", "docs", "lint", "lock", "test", "type"]
+groups = ["dev", "doclint", "docs", "lock"]
 files = [
     {file = "platformdirs-4.5.1-py3-none-any.whl", hash = "sha256:d03afa3963c806a9bed9d5125c8f4cb2fdaf74a55ab60e5d59b3fde758104d31"},
     {file = "platformdirs-4.5.1.tar.gz", hash = "sha256:61d5cdcc6065745cdd94f0f878977f8de9437be93de97c1c12f853c9c0cdcbda"},
@@ -5797,7 +5797,7 @@ version = "2.4.0"
 description = "A lil' TOML parser"
 optional = false
 python-versions = ">=3.8"
-groups = ["base", "dev", "doclint", "docs", "lint", "lock", "test", "type"]
+groups = ["dev", "doclint", "docs", "lint", "lock", "test"]
 files = [
     {file = "tomli-2.4.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:b5ef256a3fd497d4973c11bf142e9ed78b150d36f5773f1ca6088c230ffc5867"},
     {file = "tomli-2.4.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:5572e41282d5268eb09a697c89a7bee84fae66511f87533a6f88bd2f7b652da9"},
@@ -5847,7 +5847,7 @@ files = [
     {file = "tomli-2.4.0-py3-none-any.whl", hash = "sha256:1f776e7d669ebceb01dee46484485f43a4048746235e683bcdffacdf1fb4785a"},
     {file = "tomli-2.4.0.tar.gz", hash = "sha256:aa89c3f6c277dd275d8e243ad24f3b5e701491a860d5121f2cdd399fbb31fc9c"},
 ]
-markers = {base = "python_version == \"3.10\"", dev = "python_full_version <= \"3.11.0a6\"", doclint = "python_version == \"3.10\"", docs = "python_version == \"3.10\"", lint = "python_version == \"3.10\"", lock = "python_version == \"3.10\"", test = "python_full_version <= \"3.11.0a6\"", type = "python_version == \"3.10\""}
+markers = {dev = "python_full_version <= \"3.11.0a6\"", doclint = "python_version == \"3.10\"", docs = "python_version == \"3.10\"", lint = "python_version == \"3.10\"", lock = "python_version == \"3.10\"", test = "python_full_version <= \"3.11.0a6\""}
 
 [[package]]
 name = "tomlkit"
@@ -6096,12 +6096,12 @@ version = "4.14.0"
 description = "Backported and Experimental Type Hints for Python 3.9+"
 optional = false
 python-versions = ">=3.9"
-groups = ["main", "base", "dev", "doclint", "docs", "lint", "lock", "test", "type"]
+groups = ["main", "dev", "doclint", "docs", "lock", "test", "type"]
 files = [
     {file = "typing_extensions-4.14.0-py3-none-any.whl", hash = "sha256:a1514509136dd0b477638fc68d6a91497af5076466ad0fa6c338e44e359944af"},
     {file = "typing_extensions-4.14.0.tar.gz", hash = "sha256:8676b788e32f02ab42d9e7c61324048ae4c6d844a399eebace3d4979d75ceef4"},
 ]
-markers = {base = "python_version < \"3.12\"", lint = "python_version < \"3.12\"", test = "python_version < \"3.12\""}
+markers = {test = "python_version < \"3.12\""}
 
 [[package]]
 name = "typing-inspection"
@@ -6169,7 +6169,7 @@ version = "0.9.24"
 description = "An extremely fast Python package and project manager, written in Rust."
 optional = false
 python-versions = ">=3.8"
-groups = ["base", "dev", "doclint", "docs", "lint", "lock", "test", "type"]
+groups = ["base", "dev", "lock"]
 files = [
     {file = "uv-0.9.24-py3-none-linux_armv6l.whl", hash = "sha256:75a000f529ec92235b10fb5e16ca41f23f46c643308fd6c5b0d7b73ca056c5b9"},
     {file = "uv-0.9.24-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:207c8a2d4c4d55589feb63b4be74f6ff6ab92fa81b14a6515007ccec5a868ae0"},
@@ -6198,7 +6198,7 @@ version = "20.35.4"
 description = "Virtual Python Environment builder"
 optional = false
 python-versions = ">=3.8"
-groups = ["base", "dev", "doclint", "docs", "lint", "lock", "test", "type"]
+groups = ["dev", "lock"]
 files = [
     {file = "virtualenv-20.35.4-py3-none-any.whl", hash = "sha256:c21c9cede36c9753eeade68ba7d523529f228a403463376cf821eaae2b650f1b"},
     {file = "virtualenv-20.35.4.tar.gz", hash = "sha256:643d3914d73d3eeb0c552cbb12d7e82adf0e504dbf86a3182f8771a153a1971c"},
