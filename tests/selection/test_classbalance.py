@@ -164,7 +164,7 @@ class TestClassBalanceEmptyImages:
         # Empty images should be indices 2, 5, 8
         assert set(class_balance._empty_image_indices) == {2, 5, 8}
         # None should NOT be in images_per_class
-        assert None not in class_balance.images_per_class
+        assert None not in class_balance._images_per_class
         # Empty images should not be in the selection since num_empty=0
         empty_in_selection = [idx for idx in select._selection if idx in [2, 5, 8]]
         assert len(empty_in_selection) == 0
@@ -210,13 +210,13 @@ class TestClassBalanceNoneSentinel:
         Select(od_dataset_with_empty, selections=[class_balance])
 
         # None should NOT be in images_per_class (empty images tracked separately)
-        assert None not in class_balance.images_per_class
+        assert None not in class_balance._images_per_class
 
         # -1 should NOT be in images_per_class (old sentinel)
-        assert -1 not in class_balance.images_per_class
+        assert -1 not in class_balance._images_per_class
 
         # None should NOT be in classes list
-        assert None not in class_balance.classes
+        assert None not in class_balance._classes
 
         # Empty images should be in separate tracking
         assert hasattr(class_balance, "_empty_image_indices")
@@ -245,11 +245,11 @@ class TestClassBalanceNoneSentinel:
         Select(mock_dataset, selections=[class_balance])
 
         # -1 should be treated as a valid class
-        assert -1 in class_balance.images_per_class
-        assert len(class_balance.images_per_class[-1]) > 0
+        assert -1 in class_balance._images_per_class
+        assert len(class_balance._images_per_class[-1]) > 0
 
         # Empty images should be in separate tracking, not in images_per_class
-        assert None not in class_balance.images_per_class
+        assert None not in class_balance._images_per_class
         assert 0 in class_balance._empty_image_indices
 
 
