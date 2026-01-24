@@ -238,24 +238,16 @@ class Metadata(Protocol):
     """
 
     @property
-    def factor_names(self) -> SequenceLike[str]:
-        """Names of the metadata factors."""
-        ...
+    def factor_names(self) -> SequenceLike[str]: ...
 
     @property
-    def factor_data(self) -> NDArray[np.int64]:
-        """Metadata factors in array of shape (n_samples, n_factors)."""
-        ...
+    def factor_data(self) -> NDArray[np.int64]: ...
 
     @property
-    def class_labels(self) -> NDArray[np.intp]:
-        """Flat array of class labels (one per target/detection)."""
-        ...
+    def class_labels(self) -> NDArray[np.intp]: ...
 
     @property
-    def is_discrete(self) -> Sequence[bool]:
-        """Whether each factor is discrete (True) or continuous (False)."""
-        ...
+    def is_discrete(self) -> Sequence[bool]: ...
 
 
 # ========== DATASETS ==========
