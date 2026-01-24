@@ -73,8 +73,14 @@ PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13"]
 PYTHON_RE_PATTERN = re.compile(r"\d\.\d{1,2}")
 IS_CI = bool(os.environ.get("CI"))
 DATAEVAL_NOX_UV_EXTRAS_OVERRIDE = os.environ.get("DATAEVAL_NOX_UV_EXTRAS_OVERRIDE", "")
+if not DATAEVAL_NOX_UV_EXTRAS_OVERRIDE:
+    if os.path.exists(".cuda-version"):
+        with open(".cuda-version") as f:
+            DATAEVAL_NOX_UV_EXTRAS_OVERRIDE = f.read().strip()
+    if DATAEVAL_NOX_UV_EXTRAS_OVERRIDE not in ["cpu", "cu118", "cu124", "cu128"]:
+        DATAEVAL_NOX_UV_EXTRAS_OVERRIDE = "cu118"
 
-UV_EXTRAS = [DATAEVAL_NOX_UV_EXTRAS_OVERRIDE] if DATAEVAL_NOX_UV_EXTRAS_OVERRIDE else ["cu124"]
+UV_EXTRAS = [DATAEVAL_NOX_UV_EXTRAS_OVERRIDE]
 
 # Configure Numba disk caching
 os.environ.setdefault("NUMBA_CACHE_DIR", os.path.expanduser("~/.cache/numba"))

@@ -18,6 +18,7 @@ output/
 .tox/
 .nox/
 .python-version
+.cuda-version
 
 # Used to store user customizable settings
 .settings
