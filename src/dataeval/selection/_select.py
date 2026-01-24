@@ -1,5 +1,6 @@
 __all__ = []
 
+import inspect
 from collections.abc import Iterator, Sequence
 from enum import IntEnum
 from typing import Generic, TypeVar
@@ -22,7 +23,9 @@ class Selection(Generic[_TDatum]):
     def __call__(self, dataset: "Select[_TDatum]") -> None: ...
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}({', '.join([f'{k}={v}' for k, v in self.__dict__.items()])})"
+        sig = inspect.signature(self.__init__)
+        params = [f"{n}={getattr(self, n)}" for n in sig.parameters if n != "self" and hasattr(self, n)]
+        return f"{self.__class__.__name__}({', '.join(params)})"
 
 
 class Subselection(Generic[_TDatum]):

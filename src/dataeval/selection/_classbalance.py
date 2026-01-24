@@ -46,16 +46,6 @@ class ClassBalance(Selection[Any]):
         If True, use probability scoring to reduce duplicate selections in 'interclass'
         method when sampling with replacement.
 
-    Attributes
-    ----------
-    stage : SelectionStage
-        Set to SelectionStage.FILTER, indicating this is a filtering operation.
-    images_per_class : Mapping[int, Sequence[int]]
-        Mapping from class label to sequence of image indices containing that class.
-        Computed during __call__.
-    classes : Sequence[int]
-        Sequence of all class labels present in the dataset. Computed during __call__.
-
     Notes
     -----
     - Empty images (those with no detection/segmentation targets) are tracked separately from class labels
@@ -75,16 +65,16 @@ class ClassBalance(Selection[Any]):
         oversample_factor: float = 1.0,
         minimize_duplicates: bool = False,
     ) -> None:
-        self._method = method
+        self.method = method
         self.num_samples = num_samples
         self.background_class = background_class
         self.num_empty = num_empty
-        self.agg_fn = aggregation_func
+        self.aggregation_func = aggregation_func
         self.oversample_factor = oversample_factor
         self.minimize_duplicates = minimize_duplicates
         self._rng = np.random.default_rng(get_seed())
-        self.images_per_class: Mapping[int, Sequence[int]]
-        self.classes: Sequence[int]
+        self._images_per_class: Mapping[int, Sequence[int]]
+        self._classes: Sequence[int]
 
     def _yield_labels(self, dataset: Select[Any]) -> Iterator[tuple[int, int]]:
         """
@@ -237,7 +227,7 @@ class ClassBalance(Selection[Any]):
                     if i in empty_image_set
                     else (
                         np.mean([class_repeat_factor[lbl] for lbl in self._cls_per_img[i]])
-                        if self.agg_fn == "mean"
+                        if self.aggregation_func == "mean"
                         else np.max([class_repeat_factor[lbl] for lbl in self._cls_per_img[i]])
                     )
                 )
@@ -245,7 +235,7 @@ class ClassBalance(Selection[Any]):
             imgs_to_get = self._num_images if self.num_samples is not None else self._num_images
             img_prob = (
                 [np.mean([class_repeat_factor[lbl] for lbl in self._cls_per_img[i]]) for i in range(self._num_images)]
-                if self.agg_fn == "mean"
+                if self.aggregation_func == "mean"
                 else [
                     np.max([class_repeat_factor[lbl] for lbl in self._cls_per_img[i]]) for i in range(self._num_images)
                 ]
@@ -321,13 +311,13 @@ class ClassBalance(Selection[Any]):
         fewer images than required
         """
         if self._empty > 0 and len(self._empty_image_indices) > 0:
-            class_keys = [k for k in self.images_per_class if k != self.background_class]
+            class_keys = [k for k in self._images_per_class if k != self.background_class]
             imgs_to_get = (
                 self.num_samples - self._empty if self.num_samples is not None else self._num_images - self._empty
             )
         else:
             # Always filter out background_class from balancing
-            class_keys = [k for k in self.images_per_class if k != self.background_class]
+            class_keys = [k for k in self._images_per_class if k != self.background_class]
             imgs_to_get = self.num_samples if self.num_samples is not None else self._num_images
 
         samples = []
@@ -340,7 +330,7 @@ class ClassBalance(Selection[Any]):
         samples_per_class, leftover = divmod(imgs_to_get, n_class)
         gets_extra_sample = self._rng.permutation(class_keys)[:leftover].tolist()
         for i, cls in enumerate(class_keys):
-            class_imgs = self.images_per_class[cls]
+            class_imgs = self._images_per_class[cls]
             n_imgs = samples_per_class
             n_imgs += 1 if i in gets_extra_sample else 0
             replace = len(class_imgs) < n_imgs
@@ -366,14 +356,14 @@ class ClassBalance(Selection[Any]):
             else (0 if self.num_empty is None else self.num_empty)
         )
         (
-            self.images_per_class,
+            self._images_per_class,
             self._cls_per_img,
             self._cls_frq,
             self._empty_image_indices,
         ) = self._compute_label_stats(dataset)
-        self.classes = list(self.images_per_class.keys())
+        self._classes = list(self._images_per_class.keys())
         if self._empty is not None and len(self._empty_image_indices) > 0:
             selection.extend(self._get_empty_images())
-        selection.extend(self._global_balance() if self._method == "global" else self._inter_balance())
+        selection.extend(self._global_balance() if self.method == "global" else self._inter_balance())
         selection.sort()
         dataset._selection = selection
