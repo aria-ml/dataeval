@@ -134,63 +134,64 @@ class Balance:
         -------
         Return balance (mutual information) of factors with class_labels
 
-        >>> metadata = generate_random_metadata(
-        ...     labels=["doctor", "artist", "teacher"],
-        ...     factors={"age": [25, 30, 35, 45], "income": [50000, 65000, 80000], "gender": ["M", "F"]},
-        ...     length=100,
-        ...     random_seed=175,
-        ... )
+        >>> from dataeval import Metadata
+        >>> metadata = Metadata(dataset)
 
         >>> balance = Balance()
         >>> result = balance.evaluate(metadata)
         >>> result.balance
-        shape: (4, 2)
+        shape: (6, 2)
         ┌─────────────┬──────────┐
         │ factor_name ┆ mi_value │
         │ ---         ┆ ---      │
         │ cat         ┆ f64      │
         ╞═════════════╪══════════╡
         │ class_label ┆ 1.0      │
-        │ age         ┆ 0.208476 │
-        │ gender      ┆ 0.075259 │
-        │ income      ┆ 0.312287 │
+        │ angle       ┆ 0.029047 │
+        │ id          ┆ 0.575706 │
+        │ location    ┆ 0.024849 │
+        │ time_of_day ┆ 0.06278  │
+        │ weather     ┆ 0.023614 │
         └─────────────┴──────────┘
 
         >>> result.factors
-        shape: (6, 4)
-        ┌─────────┬─────────┬──────────┬───────────────┐
-        │ factor1 ┆ factor2 ┆ mi_value ┆ is_correlated │
-        │ ---     ┆ ---     ┆ ---      ┆ ---           │
-        │ cat     ┆ cat     ┆ f64      ┆ bool          │
-        ╞═════════╪═════════╪══════════╪═══════════════╡
-        │ age     ┆ gender  ┆ 0.046483 ┆ false         │
-        │ age     ┆ income  ┆ 0.078066 ┆ false         │
-        │ gender  ┆ age     ┆ 0.046483 ┆ false         │
-        │ gender  ┆ income  ┆ 0.047947 ┆ false         │
-        │ income  ┆ age     ┆ 0.078066 ┆ false         │
-        │ income  ┆ gender  ┆ 0.047947 ┆ false         │
-        └─────────┴─────────┴──────────┴───────────────┘
+        shape: (20, 4)
+        ┌─────────────┬─────────────┬──────────┬───────────────┐
+        │ factor1     ┆ factor2     ┆ mi_value ┆ is_correlated │
+        │ ---         ┆ ---         ┆ ---      ┆ ---           │
+        │ cat         ┆ cat         ┆ f64      ┆ bool          │
+        ╞═════════════╪═════════════╪══════════╪═══════════════╡
+        │ angle       ┆ id          ┆ 1.0      ┆ true          │
+        │ angle       ┆ location    ┆ 0.12422  ┆ false         │
+        │ angle       ┆ time_of_day ┆ 0.072422 ┆ false         │
+        │ angle       ┆ weather     ┆ 0.037279 ┆ false         │
+        │ id          ┆ angle       ┆ 1.0      ┆ true          │
+        │ …           ┆ …           ┆ …        ┆ …             │
+        │ time_of_day ┆ weather     ┆ 0.023866 ┆ false         │
+        │ weather     ┆ angle       ┆ 0.037279 ┆ false         │
+        │ weather     ┆ id          ┆ 1.0      ┆ true          │
+        │ weather     ┆ location    ┆ 0.047246 ┆ false         │
+        │ weather     ┆ time_of_day ┆ 0.023866 ┆ false         │
+        └─────────────┴─────────────┴──────────┴───────────────┘
 
-        >>> _ = pl.Config.set_tbl_rows(20)
         >>> result.classwise
-        shape: (12, 4)
+        shape: (24, 4)
         ┌────────────┬─────────────┬──────────┬───────────────┐
         │ class_name ┆ factor_name ┆ mi_value ┆ is_imbalanced │
         │ ---        ┆ ---         ┆ ---      ┆ ---           │
         │ cat        ┆ cat         ┆ f64      ┆ bool          │
         ╞════════════╪═════════════╪══════════╪═══════════════╡
-        │ artist     ┆ age         ┆ 0.307562 ┆ true          │
-        │ artist     ┆ class_label ┆ 1.0      ┆ true          │
-        │ artist     ┆ gender      ┆ 0.039408 ┆ false         │
-        │ artist     ┆ income      ┆ 0.246887 ┆ false         │
-        │ doctor     ┆ age         ┆ 0.131323 ┆ false         │
-        │ doctor     ┆ class_label ┆ 1.0      ┆ true          │
-        │ doctor     ┆ gender      ┆ 0.073819 ┆ false         │
-        │ doctor     ┆ income      ┆ 0.458878 ┆ true          │
-        │ teacher    ┆ age         ┆ 0.120809 ┆ false         │
-        │ teacher    ┆ class_label ┆ 1.0      ┆ true          │
-        │ teacher    ┆ gender      ┆ 0.015194 ┆ false         │
-        │ teacher    ┆ income      ┆ 0.143104 ┆ false         │
+        │ boat       ┆ angle       ┆ 0.020807 ┆ false         │
+        │ boat       ┆ class_label ┆ 1.0      ┆ true          │
+        │ boat       ┆ id          ┆ 0.471488 ┆ true          │
+        │ boat       ┆ location    ┆ 0.009547 ┆ false         │
+        │ boat       ┆ time_of_day ┆ 0.04239  ┆ false         │
+        │ …          ┆ …           ┆ …        ┆ …             │
+        │ plane      ┆ class_label ┆ 1.0      ┆ true          │
+        │ plane      ┆ id          ┆ 0.49531  ┆ true          │
+        │ plane      ┆ location    ┆ 0.033162 ┆ false         │
+        │ plane      ┆ time_of_day ┆ 0.040861 ┆ false         │
+        │ plane      ┆ weather     ┆ 0.000407 ┆ false         │
         └────────────┴─────────────┴──────────┴───────────────┘
         """
         # Convert AnnotatedDataset to Metadata if needed

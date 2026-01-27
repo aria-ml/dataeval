@@ -54,23 +54,18 @@ class Select(AnnotatedDataset[_TDatum]):
     --------
     >>> from dataeval.selection import ClassFilter, Limit
 
-    >>> # Construct a sample dataset with size of 100 and class count of 10
-    >>> # Elements at index `idx` are returned as tuples:
-    >>> # - f"data_{idx}", one_hot_encoded(idx % class_count), {"id": idx}
-    >>> dataset = SampleDataset(size=100, class_count=10)
-
     >>> # Apply selection criteria to the dataset
     >>> selections = [Limit(size=5), ClassFilter(classes=[0, 2])]
     >>> selected_dataset = Select(dataset, selections=selections)
 
-    >>> # Iterate over the selected dataset
-    >>> for data, target, meta in selected_dataset:
-    ...     print(f"({data}, {np.argmax(target)}, {meta})")
-    (data_0, 0, {'id': 0})
-    (data_2, 2, {'id': 2})
-    (data_10, 0, {'id': 10})
-    (data_12, 2, {'id': 12})
-    (data_20, 0, {'id': 20})
+    >>> # View selected dataset information
+    >>> print(selected_dataset)
+    Select Dataset
+    --------------
+        Selections: [Limit(size=5), ClassFilter(classes=[0, 2], filter_detections=True)]
+        Selected Size: 5
+    <BLANKLINE>
+    ObjectDetectionDataset(n_images=50, classes=['person', 'car', 'boat', 'plane'])
 
     Notes
     -----

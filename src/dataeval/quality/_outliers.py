@@ -96,18 +96,16 @@ class OutliersOutput(Output[TDataFrame]):
         >>> metadata = Metadata(dataset)
         >>> summary = results.aggregate_by_class(metadata)
         >>> summary
-        shape: (6, 6)
+        shape: (4, 6)
         ┌────────────┬────────────┬──────────┬──────────┬───────────┬───────┐
         │ class_name ┆ brightness ┆ contrast ┆ darkness ┆ sharpness ┆ Total │
         │ ---        ┆ ---        ┆ ---      ┆ ---      ┆ ---       ┆ ---   │
         │ cat        ┆ u32        ┆ u32      ┆ u32      ┆ u32       ┆ u32   │
         ╞════════════╪════════════╪══════════╪══════════╪═══════════╪═══════╡
-        │ cow        ┆ 7          ┆ 1        ┆ 5        ┆ 2         ┆ 15    │
-        │ chicken    ┆ 3          ┆ 1        ┆ 3        ┆ 3         ┆ 10    │
-        │ pig        ┆ 4          ┆ 0        ┆ 3        ┆ 2         ┆ 9     │
-        │ sheep      ┆ 2          ┆ 0        ┆ 2        ┆ 2         ┆ 6     │
-        │ horse      ┆ 1          ┆ 0        ┆ 1        ┆ 1         ┆ 3     │
-        │ Total      ┆ 17         ┆ 2        ┆ 14       ┆ 10        ┆ 43    │
+        │ plane      ┆ 5          ┆ 5        ┆ 6        ┆ 5         ┆ 21    │
+        │ person     ┆ 5          ┆ 5        ┆ 5        ┆ 5         ┆ 20    │
+        │ boat       ┆ 2          ┆ 2        ┆ 2        ┆ 2         ┆ 8     │
+        │ Total      ┆ 12         ┆ 12       ┆ 13       ┆ 12        ┆ 49    │
         └────────────┴────────────┴──────────┴──────────┴───────────┴───────┘
         """
         # Handle the case where self.issues might be a list of DataFrames
@@ -178,19 +176,18 @@ class OutliersOutput(Output[TDataFrame]):
         >>> results = outliers.evaluate(dataset)
         >>> summary = results.aggregate_by_metric()
         >>> summary
-        shape: (7, 2)
+        shape: (6, 2)
         ┌─────────────┬───────┐
         │ metric_name ┆ Total │
         │ ---         ┆ ---   │
         │ cat         ┆ u32   │
         ╞═════════════╪═══════╡
+        │ zeros       ┆ 8     │
+        │ entropy     ┆ 7     │
         │ mean        ┆ 4     │
-        │ entropy     ┆ 2     │
-        │ var         ┆ 2     │
+        │ std         ┆ 4     │
+        │ var         ┆ 4     │
         │ kurtosis    ┆ 1     │
-        │ skew        ┆ 1     │
-        │ std         ┆ 1     │
-        │ zeros       ┆ 1     │
         └─────────────┴───────┘
         """
         # Handle the case where self.issues might be a list of DataFrames
@@ -235,23 +232,24 @@ class OutliersOutput(Output[TDataFrame]):
         >>> results = outliers.evaluate(dataset)
         >>> summary = results.aggregate_by_item()
         >>> summary
-        shape: (10, 17)
-        ┌─────────┬───────────┬────────────┬──────────┬───┬─────┬───────┬───────┬───────┐
-        │ item_id ┆ target_id ┆ brightness ┆ contrast ┆ … ┆ var ┆ width ┆ zeros ┆ Total │
-        │ ---     ┆ ---       ┆ ---        ┆ ---      ┆   ┆ --- ┆ ---   ┆ ---   ┆ ---   │
-        │ i64     ┆ i64       ┆ u32        ┆ u32      ┆   ┆ u32 ┆ u32   ┆ u32   ┆ u32   │
-        ╞═════════╪═══════════╪════════════╪══════════╪═══╪═════╪═══════╪═══════╪═══════╡
-        │ 0       ┆ null      ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0     ┆ 1     ┆ 2     │
-        │ 0       ┆ 0         ┆ 1          ┆ 0        ┆ … ┆ 0   ┆ 0     ┆ 0     ┆ 4     │
-        │ 1       ┆ 0         ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0     ┆ 0     ┆ 1     │
-        │ 2       ┆ null      ┆ 1          ┆ 0        ┆ … ┆ 0   ┆ 0     ┆ 0     ┆ 5     │
-        │ 2       ┆ 0         ┆ 1          ┆ 0        ┆ … ┆ 1   ┆ 0     ┆ 0     ┆ 4     │
-        │ 2       ┆ 1         ┆ 1          ┆ 0        ┆ … ┆ 0   ┆ 0     ┆ 0     ┆ 4     │
-        │ 4       ┆ null      ┆ 1          ┆ 1        ┆ … ┆ 1   ┆ 1     ┆ 0     ┆ 8     │
-        │ 4       ┆ 0         ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0     ┆ 0     ┆ 1     │
-        │ 5       ┆ 0         ┆ 1          ┆ 0        ┆ … ┆ 0   ┆ 0     ┆ 0     ┆ 4     │
-        │ 7       ┆ 2         ┆ 1          ┆ 0        ┆ … ┆ 0   ┆ 0     ┆ 0     ┆ 4     │
-        └─────────┴───────────┴────────────┴──────────┴───┴─────┴───────┴───────┴───────┘
+        shape: (20, 13)
+        ┌─────────┬───────────┬────────────┬──────────┬───┬─────┬─────┬───────┬───────┐
+        │ item_id ┆ target_id ┆ brightness ┆ contrast ┆ … ┆ std ┆ var ┆ zeros ┆ Total │
+        │ ---     ┆ ---       ┆ ---        ┆ ---      ┆   ┆ --- ┆ --- ┆ ---   ┆ ---   │
+        │ i64     ┆ i64       ┆ u32        ┆ u32      ┆   ┆ u32 ┆ u32 ┆ u32   ┆ u32   │
+        ╞═════════╪═══════════╪════════════╪══════════╪═══╪═════╪═════╪═══════╪═══════╡
+        │ 0       ┆ null      ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
+        │ 2       ┆ null      ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
+        │ 7       ┆ null      ┆ 1          ┆ 1        ┆ … ┆ 1   ┆ 1   ┆ 0     ┆ 8     │
+        │ 7       ┆ 0         ┆ 1          ┆ 1        ┆ … ┆ 1   ┆ 1   ┆ 0     ┆ 8     │
+        │ 11      ┆ null      ┆ 1          ┆ 1        ┆ … ┆ 1   ┆ 1   ┆ 0     ┆ 8     │
+        │ …       ┆ …         ┆ …          ┆ …        ┆ … ┆ …   ┆ …   ┆ …     ┆ …     │
+        │ 34      ┆ null      ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
+        │ 36      ┆ 2         ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 0     ┆ 2     │
+        │ 38      ┆ null      ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
+        │ 40      ┆ null      ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
+        │ 41      ┆ null      ┆ 0          ┆ 0        ┆ … ┆ 0   ┆ 0   ┆ 1     ┆ 1     │
+        └─────────┴───────────┴────────────┴──────────┴───┴─────┴─────┴───────┴───────┘
         """
         # Handle the case where self.issues might be a list of DataFrames
         if not isinstance(self.issues, pl.DataFrame):
@@ -460,7 +458,7 @@ class Outliers:
     >>> from dataeval import Embeddings
     >>> extractor = Embeddings(model=my_model)
     >>> outliers = Outliers(flags=ImageStats.NONE, feature_extractor=extractor)
-    >>> result = outliers.evaluate(embeddings_dataset)  # Only cluster_distance metric
+    >>> result = outliers.evaluate(train_ds)  # Only cluster_distance metric
     """
 
     def __init__(
@@ -585,25 +583,30 @@ class Outliers:
 
         Example
         -------
-        Evaluate the dataset:
+        Evaluate the dataset using pre-computed stats:
 
-        >>> outliers = Outliers(outlier_method="zscore", outlier_threshold=3.5)
-        >>> results = outliers.from_stats([stats1, stats2])
-        >>> len(results)
-        2
-        >>> results.issues[0]
-        shape: (6, 3)
+        >>> from dataeval.core import calculate
+        >>> from dataeval.flags import ImageStats
+        >>> stats = calculate(images, stats=ImageStats.PIXEL)
+        >>> outliers = Outliers(outlier_method="zscore", outlier_threshold=2.5)
+        >>> results = outliers.from_stats(stats)
+        >>> results.issues.head(10)
+        shape: (10, 3)
         ┌─────────┬─────────────┬──────────────┐
         │ item_id ┆ metric_name ┆ metric_value │
         │ ---     ┆ ---         ┆ ---          │
         │ i64     ┆ cat         ┆ f64          │
         ╞═════════╪═════════════╪══════════════╡
-        │ 10      ┆ entropy     ┆ 0.212769     │
-        │ 10      ┆ zeros       ┆ 0.054932     │
-        │ 12      ┆ entropy     ┆ 0.212769     │
-        │ 12      ┆ std         ┆ 0.00536      │
-        │ 12      ┆ var         ┆ 0.000029     │
-        │ 12      ┆ zeros       ┆ 0.054932     │
+        │ 7       ┆ entropy     ┆ 0.0          │
+        │ 7       ┆ mean        ┆ 0.97998      │
+        │ 7       ┆ std         ┆ 0.0          │
+        │ 7       ┆ var         ┆ 0.0          │
+        │ 8       ┆ skew        ┆ 0.062317     │
+        │ 11      ┆ entropy     ┆ 0.0          │
+        │ 11      ┆ mean        ┆ 0.97998      │
+        │ 11      ┆ std         ┆ 0.0          │
+        │ 11      ┆ var         ┆ 0.0          │
+        │ 18      ┆ entropy     ┆ 0.0          │
         └─────────┴─────────────┴──────────────┘
         """
         combined_stats, dataset_steps = combine_results(stats)
@@ -886,24 +889,25 @@ class Outliers:
         --------
         Basic outlier detection:
 
-        >>> outliers = Outliers(outlier_method="zscore", outlier_threshold=3.5)
-        >>> results = outliers.evaluate(outlier_images)
-        >>> results.issues
-        shape: (9, 3)
+        >>> outliers = Outliers(outlier_method="zscore", outlier_threshold=2.5)
+        >>> results = outliers.evaluate(images)
+        >>> results.issues.head(10)
+        shape: (10, 3)
         ┌─────────┬─────────────┬──────────────┐
         │ item_id ┆ metric_name ┆ metric_value │
         │ ---     ┆ ---         ┆ ---          │
         │ i64     ┆ cat         ┆ f64          │
         ╞═════════╪═════════════╪══════════════╡
-        │ 10      ┆ contrast    ┆ 1.25         │
-        │ 10      ┆ entropy     ┆ 0.212769     │
-        │ 10      ┆ zeros       ┆ 0.054932     │
-        │ 12      ┆ contrast    ┆ 1.25         │
-        │ 12      ┆ entropy     ┆ 0.212769     │
-        │ 12      ┆ sharpness   ┆ 1.509766     │
-        │ 12      ┆ std         ┆ 0.00536      │
-        │ 12      ┆ var         ┆ 0.000029     │
-        │ 12      ┆ zeros       ┆ 0.054932     │
+        │ 7       ┆ brightness  ┆ 0.97998      │
+        │ 7       ┆ contrast    ┆ 0.0          │
+        │ 7       ┆ darkness    ┆ 0.97998      │
+        │ 7       ┆ entropy     ┆ 0.0          │
+        │ 7       ┆ mean        ┆ 0.97998      │
+        │ 7       ┆ sharpness   ┆ 0.0          │
+        │ 7       ┆ std         ┆ 0.0          │
+        │ 7       ┆ var         ┆ 0.0          │
+        │ 8       ┆ skew        ┆ 0.062317     │
+        │ 11      ┆ brightness  ┆ 0.97998      │
         └─────────┴─────────────┴──────────────┘
 
         Cluster-based detection with embeddings:
@@ -911,7 +915,7 @@ class Outliers:
         >>> from dataeval import Embeddings
         >>> extractor = Embeddings(model=my_model)
         >>> outliers = Outliers(flags=ImageStats.NONE, feature_extractor=extractor)
-        >>> results = outliers.evaluate(embeddings_dataset)
+        >>> results = outliers.evaluate(train_ds)
         """
         # Validate parameters
         if self.flags == ImageStats.NONE and self.feature_extractor is None:

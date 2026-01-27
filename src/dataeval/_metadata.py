@@ -11,7 +11,6 @@ from numpy.typing import NDArray
 from typing_extensions import Self
 
 from dataeval.core._bin import bin_data, digitize_data, is_continuous
-from dataeval.core._feature_distance import FeatureDistanceResult, feature_distance
 from dataeval.protocols import (
     AnnotatedDataset,
     Array,
@@ -770,17 +769,20 @@ class Metadata(Array, FeatureExtractor):
 
         Examples
         --------
-        >>> metadata.image_data
-        shape: (3, 8)
-        ┌─────────────┬──────────────┬─────────────┬───────────┬───────────┬──────┬───────────┬──────────┐
-        │ image_index ┆ target_index ┆ class_label ┆ score     ┆ box       ┆ temp ┆ time      ┆ loc      │
-        │ ---         ┆ ---          ┆ ---         ┆ ---       ┆ ---       ┆ ---  ┆ ---       ┆ ---      │
-        │ i64         ┆ i64          ┆ i64         ┆ list[f64] ┆ list[f64] ┆ f64  ┆ str       ┆ str      │
-        ╞═════════════╪══════════════╪═════════════╪═══════════╪═══════════╪══════╪═══════════╪══════════╡
-        │ 0           ┆ null         ┆ null        ┆ null      ┆ null      ┆ 72.5 ┆ morning   ┆ urban    │
-        │ 1           ┆ null         ┆ null        ┆ null      ┆ null      ┆ 65.3 ┆ afternoon ┆ rural    │
-        │ 2           ┆ null         ┆ null        ┆ null      ┆ null      ┆ 68.1 ┆ evening   ┆ suburban │
-        └─────────────┴──────────────┴─────────────┴───────────┴───────────┴──────┴───────────┴──────────┘
+        >>> metadata = Metadata(dataset)
+        >>> metadata.image_data.select("image_index", "time_of_day", "weather", "location").head(5)
+        shape: (5, 4)
+        ┌─────────────┬─────────────┬─────────┬──────────┐
+        │ image_index ┆ time_of_day ┆ weather ┆ location │
+        │ ---         ┆ ---         ┆ ---     ┆ ---      │
+        │ i64         ┆ str         ┆ str     ┆ str      │
+        ╞═════════════╪═════════════╪═════════╪══════════╡
+        │ 0           ┆ dawn        ┆ rainy   ┆ suburban │
+        │ 1           ┆ day         ┆ rainy   ┆ rural    │
+        │ 2           ┆ dawn        ┆ clear   ┆ maritime │
+        │ 3           ┆ dusk        ┆ rainy   ┆ maritime │
+        │ 4           ┆ dusk        ┆ clear   ┆ suburban │
+        └─────────────┴─────────────┴─────────┴──────────┘
         """
         self._structure()
         if self.has_targets():
@@ -811,28 +813,20 @@ class Metadata(Array, FeatureExtractor):
 
         Examples
         --------
-        >>> metadata.target_data
-        shape: (5, 8)
-        ┌─────────────┬──────────────┬─────────────┬──────────────┬─────────────┬──────┬───────────┬───────┐
-        │ image_index ┆ target_index ┆ class_label ┆ score        ┆ box         ┆ temp ┆ time      ┆ loc   │
-        │ ---         ┆ ---          ┆ ---         ┆ ---          ┆ ---         ┆ ---  ┆ ---       ┆ ---   │
-        │ i64         ┆ i64          ┆ i64         ┆ list[f64]    ┆ list[f64]   ┆ f64  ┆ str       ┆ str   │
-        ╞═════════════╪══════════════╪═════════════╪══════════════╪═════════════╪══════╪═══════════╪═══════╡
-        │ 0           ┆ 0            ┆ 0           ┆ [1.0, 0.0,   ┆ [10.0,      ┆ 72.5 ┆ morning   ┆ urban │
-        │             ┆              ┆             ┆ 0.0]         ┆ 10.0, …     ┆      ┆           ┆       │
-        │             ┆              ┆             ┆              ┆ 20.0]       ┆      ┆           ┆       │
-        │ 0           ┆ 1            ┆ 1           ┆ [0.0, 1.0,   ┆ [30.0,      ┆ 72.5 ┆ morning   ┆ urban │
-        │             ┆              ┆             ┆ 0.0]         ┆ 30.0, …     ┆      ┆           ┆       │
-        │             ┆              ┆             ┆              ┆ 40.0]       ┆      ┆           ┆       │
-        │ 1           ┆ 0            ┆ 1           ┆ [0.0, 1.0,   ┆ [5.0, 5.0,  ┆ 65.3 ┆ afternoon ┆ rural │
-        │             ┆              ┆             ┆ 0.0]         ┆ … 15.0]     ┆      ┆           ┆       │
-        │ 1           ┆ 1            ┆ 2           ┆ [0.0, 0.0,   ┆ [25.0,      ┆ 65.3 ┆ afternoon ┆ rural │
-        │             ┆              ┆             ┆ 1.0]         ┆ 25.0, …     ┆      ┆           ┆       │
-        │             ┆              ┆             ┆              ┆ 35.0]       ┆      ┆           ┆       │
-        │ 1           ┆ 2            ┆ 0           ┆ [1.0, 0.0,   ┆ [45.0,      ┆ 65.3 ┆ afternoon ┆ rural │
-        │             ┆              ┆             ┆ 0.0]         ┆ 45.0, …     ┆      ┆           ┆       │
-        │             ┆              ┆             ┆              ┆ 55.0]       ┆      ┆           ┆       │
-        └─────────────┴──────────────┴─────────────┴──────────────┴─────────────┴──────┴───────────┴───────┘
+        >>> metadata = Metadata(dataset)
+        >>> metadata.target_data.select("image_index", "target_index", "class_label").head(5)
+        shape: (5, 3)
+        ┌─────────────┬──────────────┬─────────────┐
+        │ image_index ┆ target_index ┆ class_label │
+        │ ---         ┆ ---          ┆ ---         │
+        │ i64         ┆ i64          ┆ i64         │
+        ╞═════════════╪══════════════╪═════════════╡
+        │ 0           ┆ 0            ┆ 0           │
+        │ 1           ┆ 0            ┆ 3           │
+        │ 1           ┆ 1            ┆ 2           │
+        │ 1           ┆ 2            ┆ 1           │
+        │ 2           ┆ 0            ┆ 1           │
+        └─────────────┴──────────────┴─────────────┘
         """
         self._structure()
         return self._dataframe.filter(pl.col("target_index").is_not_null())
@@ -852,13 +846,14 @@ class Metadata(Array, FeatureExtractor):
 
         Examples
         --------
+        >>> metadata = Metadata(dataset)
         >>> factors = metadata.get_image_factors(0)
-        >>> factors["temp"]
-        72.5
-        >>> factors["time"]
-        'morning'
-        >>> factors["loc"]
-        'urban'
+        >>> factors["time_of_day"]
+        'dawn'
+        >>> factors["weather"]
+        'rainy'
+        >>> factors["location"]
+        'suburban'
         """
         self._structure()
         row = self.image_data.filter(pl.col("image_index") == image_idx)
@@ -883,13 +878,14 @@ class Metadata(Array, FeatureExtractor):
 
         Examples
         --------
-        >>> factors = metadata.get_target_factors(0, 1)
+        >>> metadata = Metadata(dataset)
+        >>> factors = metadata.get_target_factors(1, 1)
         >>> factors["image_index"]
-        0
+        1
         >>> factors["target_index"]
         1
         >>> factors["class_label"]
-        1
+        2
         """
         self._structure()
         row = self.target_data.filter((pl.col("image_index") == image_idx) & (pl.col("target_index") == target_idx))
@@ -1413,14 +1409,14 @@ class Metadata(Array, FeatureExtractor):
         >>> metadata = Metadata(od_dataset)
         >>> # Add image-level factors (e.g., from imagestats)
         >>> image_factors = {
-        ...     "brightness": [0.2, 0.8, 0.5],  # One per image
-        ...     "contrast": [1.1, 0.9, 1.0],
+        ...     "brightness": np.random.rand(50),  # One per image
+        ...     "contrast": np.random.rand(50),  # One per image
         ... }
         >>> metadata.add_factors(image_factors, level="image")
         >>>
         >>> # Add target-level factors (e.g., detection confidence scores)
         >>> target_factors = {
-        ...     "iou": [0.85, 0.92, 0.78, 0.88, 0.91],  # One per target/detection
+        ...     "iou": np.random.rand(93),  # One per target/detection
         ... }
         >>> metadata.add_factors(target_factors, level="target")
         """
@@ -1478,43 +1474,20 @@ class Metadata(Array, FeatureExtractor):
         filtered = [name for name, info in self.factor_info.items() if condition(name, info)]
         return self.dataframe[filtered].to_numpy().astype(np.float64)
 
-    def calculate_distance(self, other: Self) -> Mapping[str, FeatureDistanceResult]:
-        """Measures the feature-wise distance between two continuous metadata distributions and
-        computes a p-value to evaluate its significance.
-
-        Uses the Earth Mover's Distance and the Kolmogorov-Smirnov two-sample test, featurewise.
+    def filter_by_factor_type(
+        self, factor_type: Literal["categorical", "discrete", "continuous"]
+    ) -> NDArray[np.float64]:
+        """Filters metadata factors by factor type.
 
         Parameters
         ----------
-        other : Metadata
-            Class containing continuous factor names and values to be compared
+        factor_type : "categorical", "discrete" or "continuous"
+            The factor type to include in the output.
 
         Returns
         -------
-        MetadataDistanceOutput
-            A mapping with keys corresponding to metadata feature names, and values that are KstestResult objects, as
-            defined by scipy.stats.ks_2samp.
-
-        See Also
-        --------
-        Earth mover's distance
-        Kolmogorov-Smirnov two-sample test
-
-        Notes
-        -----
-        This function only applies to the continuous data
-
-        Examples
-        --------
-        >>> output = metadata1.calculate_distance(metadata2)
-        >>> list(output)
-        ['time', 'altitude']
-        >>> output["time"]
-        {'statistic': 1.0, 'location': 0.44354838709677413, 'dist': 2.6999999999999997, 'p_value': 0.0}
+        NDArray[np.float64]
+            Array with shape (n_samples, n_factors) where the factors
+            are filtered by the user provided factor type.
         """
-        if set(self.factor_names) != set(other.factor_names):
-            raise ValueError(f"Metadata keys must be identical, got {self.factor_names} and {other.factor_names}")
-        c1 = self.filter_by_factor(lambda _, fi: fi.factor_type == "continuous")
-        c2 = other.filter_by_factor(lambda _, fi: fi.factor_type == "continuous")
-        distance = feature_distance(c1, c2)
-        return dict(zip(self.factor_names, distance))
+        return self.filter_by_factor(lambda _, fi: fi.factor_type == factor_type)

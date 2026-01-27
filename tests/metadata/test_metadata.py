@@ -500,20 +500,3 @@ class TestMetadata:
         result = md.filter_by_factor(lambda name, info: info.factor_type == "continuous")
         assert result.shape[0] >= 5  # At least 5 samples (could be more with targets)
         assert result.shape[1] >= 1  # At least 1 continuous factor
-
-    def test_calculate_distance_mismatched_factor_names(self, get_od_dataset):
-        """Test calculate_distance with mismatched factor names (line 1240)"""
-        images1 = np.random.random((5, 3, 16, 16))
-        images2 = np.random.random((5, 3, 16, 16))
-
-        metadata1 = [{"factor_a": float(i), "factor_b": float(i * 2)} for i in range(5)]
-        metadata2 = [{"factor_x": float(i), "factor_y": float(i * 2)} for i in range(5)]
-
-        dataset1 = get_od_dataset(images1, 2, True, metadata=metadata1)
-        dataset2 = get_od_dataset(images2, 2, True, metadata=metadata2)
-
-        md1 = Metadata(dataset1, continuous_factor_bins={"factor_a": 3, "factor_b": 3})
-        md2 = Metadata(dataset2, continuous_factor_bins={"factor_x": 3, "factor_y": 3})
-
-        with pytest.raises(ValueError, match="Metadata keys must be identical"):
-            md1.calculate_distance(md2)
