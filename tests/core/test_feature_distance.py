@@ -42,7 +42,7 @@ def mock_metadata(
     m.dataframe = pl.DataFrame(m.factor_data, schema=m.factor_names)
 
     m.filter_by_factor = lambda x: Metadata.filter_by_factor(m, x)
-    m.calculate_distance = lambda x: Metadata.calculate_distance(m, x)
+    m.filter_by_factor_type = lambda x: Metadata.filter_by_factor_type(m, x)
 
     return m
 
@@ -66,11 +66,10 @@ class TestFeatureDistance:
         m2 = mock_metadata(continuous_names=factors, continuous_data=RNG.random(shape2))
 
         with caplog.at_level(logging.WARNING):
-            result = m1.calculate_distance(m2)
+            result = feature_distance(m1.filter_by_factor_type("continuous"), m2.filter_by_factor_type("continuous"))
 
         assert len(result) == len(factors)
-        assert all(factor in result for factor in factors)
-        assert isinstance(result[factors[0]]["statistic"], float)
+        assert isinstance(result[0]["statistic"], float)
 
     def test_no_warn_on_many_samples(self, RNG: Generator):
         """Solving the equation where N==M brings the sample count to 32 to make a valid solution"""

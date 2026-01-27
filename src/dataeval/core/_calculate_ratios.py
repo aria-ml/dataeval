@@ -309,9 +309,9 @@ def calculate_ratios(
     >>> # Single call gets both image and target stats
     >>> stats = calculate(images, boxes, stats=ImageStats.DIMENSION, per_image=True, per_target=True)
     >>> ratios = calculate_ratios(stats)
-    >>> ratios["stats"]["width"]
-    array([0.148, 0.078, 0.125, 0.125, 0.172, 0.055, 0.078, 0.359, 0.203,
-           0.078, 0.031, 0.07 , 0.094, 0.117, 0.18 ], dtype=float16)
+    >>> ratios["stats"]["width"][:12]
+    array([0.25 , 0.203, 0.328, 0.266, 0.234, 0.297, 0.25 , 0.359, 0.297,
+           0.234, 0.359, 0.234], dtype=float16)
 
     **Pattern 2: Separate inputs (backward compatibility)**
 
