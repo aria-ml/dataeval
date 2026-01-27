@@ -190,19 +190,19 @@ class Duplicates:
     Basic hash-based detection with merged near duplicates:
 
     >>> detector = Duplicates()
-    >>> result = detector.evaluate(duplicate_images)
+    >>> result = detector.evaluate(images)
 
     Fast exact-only detection for large datasets:
 
     >>> fast_detector = Duplicates(flags=ImageStats.HASH_XXHASH)
-    >>> result = fast_detector.evaluate(duplicate_images)
+    >>> result = fast_detector.evaluate(images)
 
     Combined hash and cluster-based detection:
 
     >>> from dataeval import Embeddings
     >>> extractor = Embeddings(model=my_model)
     >>> detector = Duplicates(feature_extractor=extractor, cluster_threshold=1.0)
-    >>> result = detector.evaluate(embeddings_dataset)
+    >>> result = detector.evaluate(train_ds)
     """
 
     def __init__(
@@ -773,9 +773,9 @@ class Duplicates:
         Hash-based duplicates with merged near duplicates (default):
 
         >>> detector = Duplicates()
-        >>> result = detector.evaluate(duplicate_images)
+        >>> result = detector.evaluate(images)
         >>> print(result.items.exact)
-        [[3, 20], [16, 37]]
+        [[3, 20], [7, 11, 18, 25], [16, 37]]
         >>> for group in result.items.near:
         ...     print(f"Index count: {len(group.indices)}, Methods: {sorted(group.methods)}")
         Index count: 50, Methods: ['dhash', 'phash']
@@ -783,14 +783,14 @@ class Duplicates:
         Fast exact-only detection:
 
         >>> detector = Duplicates(flags=ImageStats.HASH_XXHASH)
-        >>> result = detector.evaluate(duplicate_images)
+        >>> result = detector.evaluate(images)
 
         Combined hash and cluster-based detection:
 
         >>> from dataeval import Embeddings
         >>> extractor = Embeddings(model=my_model)
         >>> detector = Duplicates(feature_extractor=extractor, cluster_threshold=1.0)
-        >>> result = detector.evaluate(embeddings_dataset)
+        >>> result = detector.evaluate(train_ds)
         """
         # Validate parameters
         if not (self.flags & ImageStats.HASH) and self.feature_extractor is None:

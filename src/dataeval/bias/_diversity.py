@@ -128,44 +128,44 @@ class Diversity:
         -------
         Compute the diversity index of metadata and class labels
 
-        >>> metadata = generate_random_metadata(
-        ...     labels=["doctor", "artist", "teacher"],
-        ...     factors={"age": [25, 30, 35, 45], "income": [50000, 65000, 80000], "gender": ["M", "F"]},
-        ...     length=100,
-        ...     random_seed=175,
-        ... )
+        >>> from dataeval import Metadata
+        >>> metadata = Metadata(dataset)
 
         >>> diversity = Diversity(method="simpson", threshold=0.5)
         >>> result = diversity.evaluate(metadata)
         >>> result.factors
-        shape: (4, 3)
+        shape: (6, 3)
         ┌─────────────┬─────────────────┬──────────────────┐
         │ factor_name ┆ diversity_value ┆ is_low_diversity │
         │ ---         ┆ ---             ┆ ---              │
         │ cat         ┆ f64             ┆ bool             │
         ╞═════════════╪═════════════════╪══════════════════╡
-        │ class_label ┆ 0.937608        ┆ false            │
-        │ age         ┆ 0.907669        ┆ false            │
-        │ gender      ┆ 0.992826        ┆ false            │
-        │ income      ┆ 0.954334        ┆ false            │
+        │ class_label ┆ 0.983706        ┆ false            │
+        │ angle       ┆ 0.99896         ┆ false            │
+        │ id          ┆ 0.832298        ┆ false            │
+        │ location    ┆ 0.949711        ┆ false            │
+        │ time_of_day ┆ 0.916342        ┆ false            │
+        │ weather     ┆ 0.992751        ┆ false            │
         └─────────────┴─────────────────┴──────────────────┘
 
         >>> result.classwise
-        shape: (9, 4)
+        shape: (20, 4)
         ┌────────────┬─────────────┬─────────────────┬──────────────────┐
         │ class_name ┆ factor_name ┆ diversity_value ┆ is_low_diversity │
         │ ---        ┆ ---         ┆ ---             ┆ ---              │
         │ cat        ┆ cat         ┆ f64             ┆ bool             │
         ╞════════════╪═════════════╪═════════════════╪══════════════════╡
-        │ doctor     ┆ age         ┆ 0.619268        ┆ false            │
-        │ doctor     ┆ gender      ┆ 0.832507        ┆ false            │
-        │ doctor     ┆ income      ┆ 0.269775        ┆ true             │
-        │ artist     ┆ age         ┆ 0.556777        ┆ false            │
-        │ artist     ┆ gender      ┆ 0.715294        ┆ false            │
-        │ artist     ┆ income      ┆ 0.334096        ┆ true             │
-        │ teacher    ┆ age         ┆ 0.477477        ┆ true             │
-        │ teacher    ┆ gender      ┆ 0.86722         ┆ false            │
-        │ teacher    ┆ income      ┆ 0.703209        ┆ false            │
+        │ person     ┆ angle       ┆ 0.888889        ┆ false            │
+        │ person     ┆ id          ┆ 0.293564        ┆ true             │
+        │ person     ┆ location    ┆ 0.836257        ┆ false            │
+        │ person     ┆ time_of_day ┆ 0.924528        ┆ false            │
+        │ person     ┆ weather     ┆ 0.833333        ┆ false            │
+        │ …          ┆ …           ┆ …               ┆ …                │
+        │ plane      ┆ angle       ┆ 0.987755        ┆ false            │
+        │ plane      ┆ id          ┆ 0.430427        ┆ true             │
+        │ plane      ┆ location    ┆ 0.938918        ┆ false            │
+        │ plane      ┆ time_of_day ┆ 0.84058         ┆ false            │
+        │ plane      ┆ weather     ┆ 0.987755        ┆ false            │
         └────────────┴─────────────┴─────────────────┴──────────────────┘
         """
         # Convert AnnotatedDataset to Metadata if needed
