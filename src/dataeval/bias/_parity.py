@@ -136,26 +136,24 @@ class Parity:
         --------
         Randomly creating some "continuous" and categorical variables using ``np.random.default_rng``
 
-        >>> metadata = generate_random_metadata(
-        ...     labels=["doctor", "artist", "teacher"],
-        ...     factors={"age": [25, 30, 35, 45], "income": [50000, 65000, 80000], "gender": ["M", "F"]},
-        ...     length=100,
-        ...     random_seed=175,
-        ... )
+        >>> from dataeval import Metadata
+        >>> metadata = Metadata(dataset)
 
         >>> parity = Parity()
         >>> result = parity.evaluate(metadata)
         >>> result.factors
-        shape: (3, 5)
-        ┌─────────────┬──────────┬────────────┬───────────────┬───────────────────────┐
-        │ factor_name ┆ score    ┆ p_value    ┆ is_correlated ┆ has_insufficient_data │
-        │ ---         ┆ ---      ┆ ---        ┆ ---           ┆ ---                   │
-        │ cat         ┆ f64      ┆ f64        ┆ bool          ┆ bool                  │
-        ╞═════════════╪══════════╪════════════╪═══════════════╪═══════════════════════╡
-        │ age         ┆ 0.445379 ┆ 4.8290e-8  ┆ true          ┆ true                  │
-        │ gender      ┆ 0.291057 ┆ 0.0055     ┆ false         ┆ false                 │
-        │ income      ┆ 0.568195 ┆ 8.4062e-14 ┆ true          ┆ true                  │
-        └─────────────┴──────────┴────────────┴───────────────┴───────────────────────┘
+        shape: (5, 5)
+        ┌─────────────┬──────────┬──────────┬───────────────┬───────────────────────┐
+        │ factor_name ┆ score    ┆ p_value  ┆ is_correlated ┆ has_insufficient_data │
+        │ ---         ┆ ---      ┆ ---      ┆ ---           ┆ ---                   │
+        │ cat         ┆ f64      ┆ f64      ┆ bool          ┆ bool                  │
+        ╞═════════════╪══════════╪══════════╪═══════════════╪═══════════════════════╡
+        │ angle       ┆ 0.0      ┆ 0.43066  ┆ false         ┆ true                  │
+        │ id          ┆ 0.0      ┆ 0.466239 ┆ false         ┆ true                  │
+        │ location    ┆ 0.0      ┆ 0.707677 ┆ false         ┆ true                  │
+        │ time_of_day ┆ 0.157489 ┆ 0.07135  ┆ false         ┆ true                  │
+        │ weather     ┆ 0.0      ┆ 0.567789 ┆ false         ┆ false                 │
+        └─────────────┴──────────┴──────────┴───────────────┴───────────────────────┘
         """
         # Convert AnnotatedDataset to Metadata if needed
         if isinstance(data, Metadata):
