@@ -8,10 +8,12 @@ It computes a hash of each notebook (excluding outputs) and checks if a matching
 Usage:
     python check_notebook_cache.py          # Check cache status
     python check_notebook_cache.py --clean  # Remove stale cache entries
+    python check_notebook_cache.py --fix    # Fix inconsistent cache state
 
     # Or with uv:
     uv run python check_notebook_cache.py
     uv run python check_notebook_cache.py --clean
+    uv run python check_notebook_cache.py --fix
 
 Exit codes:
     0 - All notebooks are cached and up to date (or cleanup succeeded)
@@ -21,6 +23,7 @@ Exit codes:
 import argparse
 import hashlib
 import shutil
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -216,6 +219,110 @@ def clean_stale_cache(docs_source_dir: Path = Path("docs/source"), dry_run: bool
     return len(stale_dirs)
 
 
+def _remove_orphan_db_records(
+    cursor: sqlite3.Cursor, executed_dir: Path, db_hashes: dict[str, tuple[int, str]], dry_run: bool
+) -> int:
+    """Remove database records that don't have corresponding folders on disk."""
+    orphan_records = [
+        (pk, hashkey, uri)
+        for hashkey, (pk, uri) in db_hashes.items()
+        if not (executed_dir / hashkey).exists()
+    ]
+
+    if not orphan_records:
+        return 0
+
+    print(f"Found {len(orphan_records)} database records without folders on disk:")
+    for pk, hashkey, uri in orphan_records:
+        nb_name = Path(uri).name if uri else "unknown"
+        print(f"  - {hashkey[:12]}... ({nb_name})")
+
+    if dry_run:
+        print(f"\nDry run: would remove {len(orphan_records)} orphan database records")
+    else:
+        print(f"\nRemoving {len(orphan_records)} orphan database records...")
+        for pk, hashkey, _uri in orphan_records:
+            cursor.execute("DELETE FROM nbcache WHERE pk = ?", (pk,))
+            print(f"  Removed: {hashkey[:12]}...")
+        print(f"Removed {len(orphan_records)} orphan records from database")
+
+    return len(orphan_records)
+
+
+def _remove_orphan_folders(executed_dir: Path, db_hashes: dict[str, tuple[int, str]], dry_run: bool) -> int:
+    """Remove folders on disk that don't have corresponding database records."""
+    disk_hashes = {p.name for p in executed_dir.iterdir() if p.is_dir()}
+    orphan_folders = [hashkey for hashkey in disk_hashes if hashkey not in db_hashes]
+
+    if not orphan_folders:
+        return 0
+
+    print(f"\nFound {len(orphan_folders)} folders on disk without database records:")
+    for hashkey in orphan_folders:
+        print(f"  - {hashkey}")
+
+    if dry_run:
+        print(f"\nDry run: would delete {len(orphan_folders)} orphan folders")
+    else:
+        print(f"\nDeleting {len(orphan_folders)} orphan folders...")
+        for hashkey in orphan_folders:
+            shutil.rmtree(executed_dir / hashkey)
+            print(f"  Deleted: {hashkey}")
+        print(f"Deleted {len(orphan_folders)} orphan folders")
+
+    return len(orphan_folders)
+
+
+def fix_cache_state(docs_source_dir: Path = Path("docs/source"), dry_run: bool = False) -> int:
+    """
+    Fix inconsistent cache state by reconciling the database with the filesystem.
+
+    This handles two cases:
+    1. Cache database has records for hashes whose folders don't exist on disk
+       -> Remove these orphan records from the database
+    2. Folders exist on disk but have no corresponding database record
+       -> Remove these orphan folders from disk
+
+    Args:
+        docs_source_dir: Path to the docs/source directory
+        dry_run: If True, only report what would be fixed without actually fixing
+
+    Returns:
+        Number of issues fixed (or would be fixed if dry_run)
+    """
+    cache_dir = docs_source_dir / ".jupyter_cache"
+    db_path = cache_dir / "global.db"
+    executed_dir = cache_dir / "executed"
+
+    if not db_path.exists():
+        print(f"Cache database does not exist: {db_path}")
+        return 0
+
+    if not executed_dir.exists():
+        print(f"Executed cache directory does not exist: {executed_dir}")
+        return 0
+
+    # Get all hashkeys from the database
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT pk, hashkey, uri FROM nbcache")
+    db_records = cursor.fetchall()
+    db_hashes = {row[1]: (row[0], row[2]) for row in db_records}  # hashkey -> (pk, uri)
+
+    # Fix orphan records and folders
+    issues_fixed = _remove_orphan_db_records(cursor, executed_dir, db_hashes, dry_run)
+    if not dry_run and issues_fixed > 0:
+        conn.commit()
+    issues_fixed += _remove_orphan_folders(executed_dir, db_hashes, dry_run)
+
+    conn.close()
+
+    if issues_fixed == 0:
+        print("Cache state is consistent. No fixes needed.")
+
+    return issues_fixed
+
+
 def find_docs_source_dir() -> Path | None:
     """
     Find the docs/source directory by searching up from the script location.
@@ -262,9 +369,14 @@ def main():
         help="Remove stale cache entries that don't match any current notebook",
     )
     parser.add_argument(
+        "--fix",
+        action="store_true",
+        help="Fix inconsistent cache state (db records without folders, or folders without db records)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Show what would be deleted without actually deleting (use with --clean)",
+        help="Show what would be changed without actually changing (use with --clean or --fix)",
     )
     args = parser.parse_args()
 
@@ -280,7 +392,10 @@ def main():
 
     print(f"Using docs/source at: {docs_source_dir}\n")
 
-    if args.clean:
+    if args.fix:
+        fixed = fix_cache_state(docs_source_dir, dry_run=args.dry_run)
+        return 0 if fixed >= 0 else 1
+    elif args.clean:
         removed = clean_stale_cache(docs_source_dir, dry_run=args.dry_run)
         return 0 if removed >= 0 else 1
     else:
