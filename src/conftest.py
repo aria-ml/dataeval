@@ -402,11 +402,17 @@ def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:
     doctest_namespace["stats2"] = stats2
 
     # -------------------------------------------------------------------------
-    # Model
+    # Model and Encoder
     # -------------------------------------------------------------------------
+    from dataeval.encoders import TorchEmbeddingEncoder
+
     model = _create_model()
     doctest_namespace["model"] = model
     doctest_namespace["my_model"] = model
+
+    # Create an encoder fixture for Prioritize and other doctests
+    encoder = TorchEmbeddingEncoder(model, batch_size=32)
+    doctest_namespace["encoder"] = encoder
 
     # -------------------------------------------------------------------------
     # Prioritize fixtures
