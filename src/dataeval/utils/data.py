@@ -966,19 +966,3 @@ def unzip_dataset(
     targets_iter = (pair[1] for pair in iter2) if per_target else None
 
     return images_iter, targets_iter
-
-
-def _get_item_indices(metadata: Metadata) -> Sequence[int]:
-    """Get item indices from metadata, generating default if not available."""
-    item_indices = getattr(metadata, "item_indices", None)
-    if item_indices is not None:
-        return item_indices
-    return list(range(len(metadata.class_labels)))
-
-
-def _get_index2label(metadata: Metadata) -> dict[int, str]:
-    """Get index2label mapping, generating default if not available."""
-    index2label = getattr(metadata, "index2label", None)
-    if index2label:
-        return dict(index2label)
-    return {int(i): str(i) for i in np.unique(metadata.class_labels)}

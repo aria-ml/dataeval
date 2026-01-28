@@ -6,17 +6,26 @@ the Sufficiency orchestration workflow, independent of specific
 ML task types (IC, OD, etc.).
 """
 
+from typing import Any
 from unittest.mock import MagicMock, NonCallableMagicMock
 
+import numpy as np
 import pytest
+from numpy.typing import NDArray
 
-from dataeval.performance._sufficiency import EvaluationStrategy, SufficiencyConfig, TrainingStrategy
+from dataeval.performance import Sufficiency
+from dataeval.protocols import EvaluationStrategy, TrainingStrategy
+
+# ========== TYPING ALIASES ==========
+
+DatumType = tuple[NDArray[np.float32], int, dict[str, Any]]
+
 
 # ========== STRATEGY FIXTURES ==========
 
 
 @pytest.fixture(scope="function")
-def mock_training_strategy() -> TrainingStrategy:
+def mock_train() -> TrainingStrategy[DatumType]:
     """
     Mock training strategy for testing.
 
@@ -29,7 +38,7 @@ def mock_training_strategy() -> TrainingStrategy:
 
 
 @pytest.fixture(scope="function")
-def mock_evaluation_strategy() -> EvaluationStrategy:
+def mock_eval() -> EvaluationStrategy[DatumType]:
     """
     Mock evaluation strategy for testing.
 
@@ -42,7 +51,7 @@ def mock_evaluation_strategy() -> EvaluationStrategy:
 
 
 @pytest.fixture(scope="function")
-def mock_eval_mixed_metric_strategy() -> EvaluationStrategy:
+def mock_eval_mixed_metric_strategy() -> EvaluationStrategy[DatumType]:
     """Mock evaluation strategy with multiple metrics including a per-class metric"""
 
     eval_strategy = MagicMock(spec=EvaluationStrategy)
@@ -51,7 +60,7 @@ def mock_eval_mixed_metric_strategy() -> EvaluationStrategy:
 
 
 @pytest.fixture(scope="function")
-def mock_eval_scalar_metrics_strategy() -> EvaluationStrategy:
+def mock_eval_scalar_metrics_strategy() -> EvaluationStrategy[DatumType]:
     """
     Mock evaluation strategy returning multiple scalar metrics only.
 
@@ -66,7 +75,7 @@ def mock_eval_scalar_metrics_strategy() -> EvaluationStrategy:
 
 
 @pytest.fixture(scope="function")
-def mock_eval_classwise_strategy() -> EvaluationStrategy:
+def mock_eval_classwise() -> EvaluationStrategy[DatumType]:
     """
     Mock evaluation strategy retuning a single classwise metric
 
@@ -83,42 +92,42 @@ def mock_eval_classwise_strategy() -> EvaluationStrategy:
 
 
 @pytest.fixture(scope="function")
-def basic_config(mock_training_strategy, mock_evaluation_strategy) -> SufficiencyConfig:
+def basic_config(mock_train, mock_eval) -> Sufficiency.Config[DatumType]:
     """
-    Basic SufficiencyConfig with default parameters.
+    Basic Sufficiency.Config with default parameters.
 
     Uses runs=1, substeps=5 (defaults).
     """
 
-    return SufficiencyConfig(
-        training_strategy=mock_training_strategy,
-        evaluation_strategy=mock_evaluation_strategy,
+    return Sufficiency.Config(
+        training_strategy=mock_train,
+        evaluation_strategy=mock_eval,
         runs=1,
         substeps=5,
     )
 
 
 @pytest.fixture(scope="function")
-def multi_run_config(mock_training_strategy, mock_evaluation_strategy) -> SufficiencyConfig:
+def multi_run_config(mock_train, mock_eval) -> Sufficiency.Config[DatumType]:
     """
     Config for multiple runs (faster testing).
 
     Uses runs=3, substeps=2.
     """
 
-    return SufficiencyConfig(
-        training_strategy=mock_training_strategy,
-        evaluation_strategy=mock_evaluation_strategy,
+    return Sufficiency.Config(
+        training_strategy=mock_train,
+        evaluation_strategy=mock_eval,
         runs=3,
         substeps=2,
     )
 
 
 @pytest.fixture(scope="function")
-def non_callable_sufficiency_config() -> SufficiencyConfig:
-    return SufficiencyConfig(
-        NonCallableMagicMock(),
-        NonCallableMagicMock(),
+def non_callable_sufficiency_config() -> Sufficiency.Config[DatumType]:
+    return Sufficiency.Config(
+        training_strategy=NonCallableMagicMock(),
+        evaluation_strategy=NonCallableMagicMock(),
     )
 
 

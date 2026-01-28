@@ -9,7 +9,6 @@ __all__ = [
     "DriftMVDCOutput",
     "DriftOutput",
     "DriftUnivariate",
-    "OODReconstructionConfig",
     "OODKNeighbors",
     "OODReconstruction",
     "OODOutput",
@@ -24,4 +23,4 @@ from dataeval.shift._drift._mvdc import DriftMVDC, DriftMVDCOutput
 from dataeval.shift._drift._univariate import DriftUnivariate
 from dataeval.shift._ood._base import OODOutput, OODScoreOutput
 from dataeval.shift._ood._kneighbors import OODKNeighbors
-from dataeval.shift._ood._reconstruction import OODReconstruction, OODReconstructionConfig
+from dataeval.shift._ood._reconstruction import OODReconstruction

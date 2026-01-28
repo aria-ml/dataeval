@@ -22,12 +22,14 @@ from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import partial, wraps
-from typing import Any, Generic, NamedTuple, ParamSpec, TypeAlias, TypeVar, overload
+from typing import Any, ClassVar, Generic, Literal, NamedTuple, ParamSpec, TypeAlias, TypeVar, overload
 
 import numpy as np
+from pydantic import BaseModel, ConfigDict
 from typing_extensions import Self
 
 from dataeval import __version__
+from dataeval._helpers import apply_config, get_overrides
 from dataeval.protocols import Array, SequenceLike
 
 DType = TypeVar("DType", covariant=True)
@@ -54,6 +56,34 @@ ArrayND: TypeAlias = (
     | Array8D[DType]
     | Array9D[DType]
 )
+
+# Default values for ClusterConfigMixin
+DEFAULT_CLUSTER_ALGORITHM: Literal["kmeans", "hdbscan"] = "hdbscan"
+DEFAULT_CLUSTER_N_CLUSTERS: int | None = None
+
+
+class EvaluatorConfig(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(
+        extra="forbid",
+        arbitrary_types_allowed=True,
+    )
+
+
+class ClusterConfigMixin(BaseModel):
+    cluster_algorithm: Literal["kmeans", "hdbscan"] = DEFAULT_CLUSTER_ALGORITHM
+    n_clusters: int | None = DEFAULT_CLUSTER_N_CLUSTERS
+
+
+class Evaluator:
+    """Base class for all evaluators."""
+
+    def __init__(self, kwargs: dict[str, Any], *, exclude: set[str] | None = None) -> None:
+        config_cls = getattr(self, "Config", None)
+        if config_cls is None:
+            raise NotImplementedError("Evaluator subclasses must define a Config class.")
+        base_config = kwargs.get("config") or config_cls()
+        self._config = base_config.model_copy(update=get_overrides(kwargs, exclude))
+        apply_config(self, self._config)
 
 
 class SourceIndex(NamedTuple):

@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
@@ -33,6 +34,9 @@ class OODKNeighbors:
         Number of nearest neighbors to consider
     distance_metric : "cosine" | "euclidean", default "cosine"
         Distance metric to use
+    config : OODKNeighbors.Config or None, default None
+        Optional configuration object with default parameters. Parameters
+        specified directly in __init__ will override config defaults.
 
     Examples
     --------
@@ -50,18 +54,54 @@ class OODKNeighbors:
     >>> test_embeddings = np.random.randn(20, 128).astype(np.float32)
     >>> scores = detector.score(test_embeddings)
     >>> predictions = detector.predict(test_embeddings)
+
+    Using configuration:
+
+    >>> config = OODKNeighbors.Config(k=15, distance_metric="euclidean", threshold_perc=99.0)
+    >>> detector = OODKNeighbors(config=config)
+    >>> detector.fit(ref_embeddings)  # Uses config.threshold_perc
     """
 
-    def __init__(self, k: int = 10, distance_metric: Literal["cosine", "euclidean"] = "cosine") -> None:
-        self.k = k
-        self.distance_metric = distance_metric
+    @dataclass
+    class Config:
+        """
+        Configuration for OODKNeighbors detector.
+
+        Attributes
+        ----------
+        k : int, default 10
+            Number of nearest neighbors to consider.
+        distance_metric : {"cosine", "euclidean"}, default "cosine"
+            Distance metric to use.
+        threshold_perc : float, default 95.0
+            Percentage of reference data considered normal.
+        """
+
+        k: int = 10
+        distance_metric: Literal["cosine", "euclidean"] = "cosine"
+        threshold_perc: float = 95.0
+
+    def __init__(
+        self,
+        k: int | None = None,
+        distance_metric: Literal["cosine", "euclidean"] | None = None,
+        config: Config | None = None,
+    ) -> None:
+        # Store config or create default
+        self.config: OODKNeighbors.Config = config or OODKNeighbors.Config()
+
+        # Use config defaults if parameters not specified
+        self.k: int = k if k is not None else self.config.k
+        self.distance_metric: Literal["cosine", "euclidean"] = (
+            distance_metric if distance_metric is not None else self.config.distance_metric
+        )
         self._nn_model: NearestNeighbors
         self._ref_score: OODScoreOutput
         self._threshold_perc: float
         self._data_info: tuple[tuple, type] | None = None
         self.reference_embeddings: NDArray[np.float32]
 
-    def fit(self, embeddings: Array, threshold_perc: float = 95.0) -> None:
+    def fit(self, embeddings: Array, threshold_perc: float | None = None) -> None:
         """
         Fit the detector using reference (in-distribution) embeddings.
 
@@ -72,10 +112,14 @@ class OODKNeighbors:
         ----------
         embeddings : Array
             Reference (in-distribution) embeddings
-        threshold_perc : float, default 95.0
+        threshold_perc : float or None, default None
             Percentage of reference data considered normal (0-100).
             Higher values result in more permissive thresholds.
+            If None, uses config.threshold_perc (default 95.0).
         """
+        # Use config default if not specified
+        threshold_perc = threshold_perc if threshold_perc is not None else self.config.threshold_perc
+
         self.reference_embeddings = np.asarray(embeddings, dtype=np.float32)
 
         # Validate inputs

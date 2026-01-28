@@ -64,7 +64,7 @@ training curve per model (substeps).
 train_strategy = CustomTrainingStrategy()
 eval_strategy = CustomEvaluationStrategy()
 
-custom_config = SufficiencyConfig(
+custom_config = Sufficiency.Config(
     training_strategy=train_strategy,
     evaluation_strategy=eval_strategy,
     runs=5,

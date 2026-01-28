@@ -1364,6 +1364,7 @@ pydantic==2.12.5 \
     --hash=sha256:4d351024c75c0f085a9febbb665ce8c0c6ec5d30e903bdb6394b7ede26aebb49 \
     --hash=sha256:e561593fccf61e8a20fc46dfc2dfe075b8be7d0188df33f221ad1f0139180f9d
     # via
+    #   dataeval
     #   pydantic-extra-types
     #   sphinx-immaterial
 pydantic-core==2.41.5 \

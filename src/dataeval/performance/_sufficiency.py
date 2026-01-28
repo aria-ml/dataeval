@@ -1,91 +1,25 @@
 __all__ = []
 
 from collections.abc import Iterable, Sized
-from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
 import numpy as np
 import torch
 import torch.nn as nn
+from pydantic import field_validator
 
 from dataeval.performance._aggregator import ResultAggregator
 from dataeval.performance._output import SufficiencyOutput
 from dataeval.performance.schedules import GeometricSchedule, ManualSchedule
 from dataeval.protocols import Dataset, EvaluationSchedule, EvaluationStrategy, TrainingStrategy
-from dataeval.types import set_metadata
+from dataeval.types import Evaluator, EvaluatorConfig, set_metadata
+
+DEFAULT_SUFFICIENCY_RUNS = 1
+DEFAULT_SUFFICIENCY_SUBSTEPS = 5
+DEFAULT_SUFFICIENCY_UNIT_INTERVAL = True
 
 T = TypeVar("T")
-
-
-@dataclass(frozen=True)
-class SufficiencyConfig(Generic[T]):
-    """
-    Configuration for sufficiency analysis execution.
-
-    Attributes
-    ----------
-    training_strategy : TrainingStrategy
-        Strategy for training models on dataset subsets. Must implement
-        the `train(model, dataset, indices)` method.
-    evaluation_strategy : EvaluationStrategy
-        Strategy for evaluating trained models. Must implement the
-        `evaluate(model, dataset)` method returning metrics.
-    runs : int, default 1
-        Number of independent training runs to perform. Each run trains
-        a fresh model from scratch.
-    substeps : int, default 5
-        Number of evaluation steps per run. Used for default geometric
-        schedule if no custom schedule is provided.
-    unit_interval : bool, default True
-        Whether metrics are constrained to [0, 1]. Set True for metrics
-        like accuracy, precision, recall. Set False for unbounded metrics
-        like loss or error.
-
-    Raises
-    ------
-    ValueError
-        If runs or substeps is not greater than 1
-
-    Examples
-    --------
-    Basic configuration:
-
-    >>> training = CustomTrainingStrategy(learning_rate=0.001, epochs=10)
-    >>> evaluation = CustomEvaluationStrategy(batch_size=32)
-    >>> config = SufficiencyConfig(training, evaluation, runs=3, substeps=5)
-
-    Configuration for unbounded metrics (e.g., loss):
-
-    >>> config = SufficiencyConfig(
-    ...     training,
-    ...     evaluation,
-    ...     runs=5,
-    ...     unit_interval=False,  # For loss metrics
-    ... )
-
-    Notes
-    -----
-    This class is immutable (frozen=True) to ensure configuration
-    cannot be accidentally modified during analysis.
-
-    See Also
-    --------
-    - :class:`.TrainingStrategy`
-    - :class:`.EvaluationStrategy`
-    """
-
-    training_strategy: TrainingStrategy[T]
-    evaluation_strategy: EvaluationStrategy[T]
-    runs: int = 1
-    substeps: int = 5
-    unit_interval: bool = True
-
-    def __post_init__(self) -> None:
-        """Validate configuration parameters."""
-        if self.runs <= 0:
-            raise ValueError(f"runs must be positive, got {self.runs}")
-        if self.substeps <= 0:
-            raise ValueError(f"substeps must be positive, got {self.substeps}")
+S = TypeVar("S")
 
 
 def reset_parameters(model: nn.Module) -> nn.Module:
@@ -115,7 +49,7 @@ def validate_dataset_len(dataset: Dataset[Any]) -> int:
     return length
 
 
-class Sufficiency(Generic[T]):
+class Sufficiency(Evaluator, Generic[T]):
     """
     Analyze how much training data is needed for target model performance.
 
@@ -130,8 +64,18 @@ class Sufficiency(Generic[T]):
         Full training data
     test_ds : torch.Dataset
         Test/validation data
-    config : SufficiencyConfig
-        Training/evaluation strategies and run parameters.
+    training_strategy : TrainingStrategy or None, default None
+        Strategy for training models. If None, uses config.training_strategy.
+    evaluation_strategy : EvaluationStrategy or None, default None
+        Strategy for evaluating models. If None, uses config.evaluation_strategy.
+    runs : int or None, default None
+        Number of independent training runs. If None, uses config.runs (default 1).
+    substeps : int or None, default None
+        Number of evaluation steps per run. If None, uses config.substeps (default 5).
+    unit_interval : bool or None, default None
+        Whether metrics are constrained to [0, 1]. If None, uses config.unit_interval (default True).
+    config : Sufficiency.Config or None, default None
+        Optional configuration object. Parameters passed directly to __init__ override config values.
 
     Warning
     -------
@@ -143,18 +87,101 @@ class Sufficiency(Generic[T]):
 
     Multiple runs average results to reduce variance.
 
+    Parameters passed directly to __init__ override config defaults.
+
     See Also
     --------
-    :class:`.SufficiencyConfig` : Configuration object
+    :class:`.Sufficiency.Config` : Configuration object
     :class:`.SufficiencyOutput` : Results with measures and projections
     """
+
+    class Config(EvaluatorConfig, Generic[S]):
+        """
+        Configuration for sufficiency analysis execution.
+
+        Attributes
+        ----------
+        training_strategy : TrainingStrategy
+            Strategy for training models on dataset subsets. Must implement
+            the `train(model, dataset, indices)` method.
+        evaluation_strategy : EvaluationStrategy
+            Strategy for evaluating trained models. Must implement the
+            `evaluate(model, dataset)` method returning metrics.
+        runs : int, default 1
+            Number of independent training runs to perform. Each run trains
+            a fresh model from scratch.
+        substeps : int, default 5
+            Number of evaluation steps per run. Used for default geometric
+            schedule if no custom schedule is provided.
+        unit_interval : bool, default True
+            Whether metrics are constrained to [0, 1]. Set True for metrics
+            like accuracy, precision, recall. Set False for unbounded metrics
+            like loss or error.
+
+        Raises
+        ------
+        ValueError
+            If runs or substeps is not greater than 1
+
+        Examples
+        --------
+        Basic configuration:
+
+        >>> training = CustomTrainingStrategy(learning_rate=0.001, epochs=10)
+        >>> evaluation = CustomEvaluationStrategy(batch_size=32)
+        >>> config = Sufficiency.Config(
+        ...     training_strategy=training,
+        ...     evaluation_strategy=evaluation,
+        ...     runs=3,
+        ...     substeps=5,
+        ... )
+
+        Configuration for unbounded metrics (e.g., loss):
+
+        >>> config = Sufficiency.Config(
+        ...     training_strategy=training,
+        ...     evaluation_strategy=evaluation,
+        ...     runs=5,
+        ...     unit_interval=False,  # For loss metrics
+        ... )
+
+        See Also
+        --------
+        - :class:`.TrainingStrategy`
+        - :class:`.EvaluationStrategy`
+        """
+
+        training_strategy: TrainingStrategy[S] | None = None
+        evaluation_strategy: EvaluationStrategy[S] | None = None
+        runs: int = DEFAULT_SUFFICIENCY_RUNS
+        substeps: int = DEFAULT_SUFFICIENCY_SUBSTEPS
+        unit_interval: bool = DEFAULT_SUFFICIENCY_UNIT_INTERVAL
+
+        @field_validator("runs", "substeps")
+        @classmethod
+        def validate_positive(cls, v: int) -> int:
+            if v <= 0:
+                raise ValueError("must be positive")
+            return v
+
+    runs: int
+    substeps: int
+    unit_interval: bool
+    training_strategy: TrainingStrategy[T]
+    evaluation_strategy: EvaluationStrategy[T]
+    config: Config[T]
 
     def __init__(
         self,
         model: nn.Module,
         train_ds: Dataset[T],
         test_ds: Dataset[T],
-        config: SufficiencyConfig[T],
+        training_strategy: TrainingStrategy[T] | None = None,
+        evaluation_strategy: EvaluationStrategy[T] | None = None,
+        runs: int | None = None,
+        substeps: int | None = None,
+        unit_interval: bool | None = None,
+        config: Config[T] | None = None,
     ) -> None:
         self.model = model
 
@@ -165,7 +192,13 @@ class Sufficiency(Generic[T]):
         validate_dataset_len(test_ds)
         self._test_ds = test_ds
 
-        self.config = config
+        super().__init__(locals(), exclude={"model", "train_ds", "test_ds"})
+
+        # Validate parameters
+        if self.runs <= 0:
+            raise ValueError(f"runs must be positive, got {self.runs}")
+        if self.substeps <= 0:
+            raise ValueError(f"substeps must be positive, got {self.substeps}")
 
     @property
     def train_ds(self) -> Dataset[T]:
@@ -188,21 +221,6 @@ class Sufficiency(Generic[T]):
         This property is read-only. To use a different test dataset, create a new Sufficiency instance
         """
         return self._test_ds
-
-    @property
-    def runs(self) -> int:
-        """Number of independent runs"""
-        return self.config.runs
-
-    @property
-    def substeps(self) -> int:
-        """Number of a evaluation steps per run"""
-        return self.config.substeps
-
-    @property
-    def unit_interval(self) -> bool:
-        """Whether metrics are constrained to [0, 1]"""
-        return self.config.unit_interval
 
     def _create_schedule(self, schedule: EvaluationSchedule | int | Iterable[int] | None) -> EvaluationSchedule:
         """
@@ -252,10 +270,10 @@ class Sufficiency(Generic[T]):
         # Step 3: Train and evaluate at each step (temporal coupling explicit)
         for step_index, dataset_size in enumerate(steps):
             # Train on subset
-            self.config.training_strategy.train(model, self.train_ds, indices[: int(dataset_size)].tolist())
+            self.training_strategy.train(model, self.train_ds, indices[: int(dataset_size)].tolist())
 
             # Evaluate on test set
-            metrics = self.config.evaluation_strategy.evaluate(model, self.test_ds)
+            metrics = self.evaluation_strategy.evaluate(model, self.test_ds)
 
             # Store results
             for metric_name, metric_value in metrics.items():
@@ -288,16 +306,12 @@ class Sufficiency(Generic[T]):
 
         Examples
         --------
-        >>> config = SufficiencyConfig(
-        ...     CustomTrainingStrategy(),
-        ...     CustomEvaluationStrategy(),
-        ... )
-
         >>> sufficiency = Sufficiency(
         ...     model=model,
         ...     train_ds=train_ds,
         ...     test_ds=test_ds,
-        ...     config=config,
+        ...     training_strategy=CustomTrainingStrategy(),
+        ...     evaluation_strategy=CustomEvaluationStrategy(),
         ... )
 
         Default runs and substeps:

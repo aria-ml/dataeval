@@ -20,7 +20,11 @@ from dataeval.config import DeviceLike, get_device
 from dataeval.core._rank import rank_kmeans_complexity, rank_kmeans_distance, rank_knn
 from dataeval.core._rerank import rerank_class_balance, rerank_hard_first, rerank_stratified
 from dataeval.protocols import AnnotatedDataset, EmbeddingModel, Metadata
-from dataeval.types import Output, set_metadata
+from dataeval.types import Evaluator, EvaluatorConfig, Output, set_metadata
+
+DEFAULT_PRIORITIZE_MODEL: EmbeddingModel | None = None
+DEFAULT_PRIORITIZE_BATCH_SIZE: int | None = None
+DEFAULT_PRIORITIZE_DEVICE: DeviceLike | None = None
 
 
 @dataclass(frozen=True)
@@ -58,7 +62,7 @@ class PrioritizeOutput(Output[NDArray[np.intp]]):
         return len(self.indices)
 
 
-class Prioritize:
+class Prioritize(Evaluator):
     """
     Prioritize dataset samples based on their position in the embedding space.
 
@@ -78,6 +82,9 @@ class Prioritize:
         Default batch size to use when encoding data. Can be overridden in evaluate().
     device : DeviceLike | None, default None
         Default device to use for encoding data. Can be overridden in evaluate().
+    config : Prioritize.Config or None, default None
+        Optional configuration object with default parameters. Parameters
+        specified directly in __init__ will override config defaults.
 
     See Also
     --------
@@ -118,19 +125,47 @@ class Prioritize:
     >>> # Initialize with labeled data as reference
     >>> prioritizer = Prioritize(model, reference=labeled_data)
     >>> result = prioritizer.with_knn(k=10).hard_first().evaluate(reference_data)
+
+    Using configuration:
+
+    >>> config = Prioritize.Config(batch_size=64)
+    >>> prioritizer = Prioritize(model, config=config)
     """
+
+    class Config(EvaluatorConfig):
+        """
+        Configuration for Prioritize evaluator.
+
+        Attributes
+        ----------
+        batch_size : int or None, default None
+            Default batch size for encoding data.
+        device : DeviceLike or None, default None
+            Default device for encoding data.
+        """
+
+        model: EmbeddingModel | None = DEFAULT_PRIORITIZE_MODEL
+        batch_size: int | None = DEFAULT_PRIORITIZE_BATCH_SIZE
+        device: DeviceLike | None = DEFAULT_PRIORITIZE_DEVICE
+
+    model: EmbeddingModel
+    batch_size: int
+    device: DeviceLike
+    config: Config
 
     def __init__(
         self,
-        model: EmbeddingModel,
+        model: EmbeddingModel | None = None,
         reference: AnnotatedDataset[Any] | Embeddings | None = None,
         batch_size: int | None = None,
         device: DeviceLike | None = None,
+        config: Config | None = None,
     ) -> None:
-        self.model = model
+        super().__init__(locals())
+        if self.model is None:
+            raise ValueError("model must be provided either in __init__ or config")
         self._reference = reference
-        self.batch_size = batch_size
-        self.device: DeviceLike = get_device(device)
+        self.device: DeviceLike = get_device(self.device)
 
         # Internal state populated during evaluate
         self.embeddings: Embeddings | None = None
