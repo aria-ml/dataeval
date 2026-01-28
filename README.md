@@ -64,7 +64,7 @@ DataEval can be installed in a Conda/Mamba environment using the provided
 channel, the channel is specified in the below example.
 
 ```bash
-micromamba create -f environment/environment.yaml -c pytorch
+micromamba create -f environment\environment.yaml -c pytorch
 ```
 
 ### **Installing from GitHub**
