@@ -220,6 +220,8 @@ def docs(session: nox.Session) -> None:
     session.run("rm", "-rf", "../../output/docs", external=True)
     if "clean" in session.posargs:
         session.run("rm", "-rf", ".jupyter_cache", external=True)
+    # Fix any inconsistent cache state before building (e.g., db records without folders or vice versa)
+    session.run("python", "../../docs/check_notebook_cache.py", "--fix")
     session.run(
         "sphinx-build",
         "--fail-on-warning",
