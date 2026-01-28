@@ -255,9 +255,7 @@ def find_docs_source_dir() -> Path | None:
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="Check and manage jupyter-cache for documentation notebooks."
-    )
+    parser = argparse.ArgumentParser(description="Check and manage jupyter-cache for documentation notebooks.")
     parser.add_argument(
         "--clean",
         action="store_true",
