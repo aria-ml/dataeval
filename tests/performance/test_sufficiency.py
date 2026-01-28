@@ -7,9 +7,8 @@ import torch
 
 from dataeval.performance import Sufficiency
 from dataeval.performance._output import SufficiencyOutput
-from dataeval.performance._sufficiency import SufficiencyConfig
 from dataeval.protocols import EvaluationStrategy, TrainingStrategy
-from tests.conftest import SimpleDataset
+from tests.conftest import DatumType, SimpleDataset
 
 np.random.seed(0)
 torch.manual_seed(0)
@@ -26,7 +25,7 @@ def mock_ds(length: int | None):
 
 @pytest.mark.required
 class TestSufficiency:
-    def test_mock_run(self, basic_config: SufficiencyConfig, simple_dataset: SimpleDataset) -> None:
+    def test_mock_run(self, basic_config: Sufficiency.Config, simple_dataset: SimpleDataset) -> None:
         """Verify return value of evaluate is the correct output type"""
 
         suff = Sufficiency(
@@ -39,7 +38,7 @@ class TestSufficiency:
         results = suff.evaluate()
         assert isinstance(results, SufficiencyOutput)
 
-    def test_mock_run_at_value(self, basic_config: SufficiencyConfig, simple_dataset: SimpleDataset) -> None:
+    def test_mock_run_at_value(self, basic_config: Sufficiency.Config, simple_dataset: SimpleDataset) -> None:
         """Verify return value of evaluate is the correct output type when run at a specific substep"""
 
         suff = Sufficiency(model=MagicMock(), train_ds=simple_dataset, test_ds=simple_dataset, config=basic_config)
@@ -47,7 +46,7 @@ class TestSufficiency:
         results = suff.evaluate(schedule=np.array([1]))
         assert isinstance(results, SufficiencyOutput)
 
-    def test_run_with_invalid_schedule(self, basic_config: SufficiencyConfig, simple_dataset: SimpleDataset) -> None:
+    def test_run_with_invalid_schedule(self, basic_config: Sufficiency.Config, simple_dataset: SimpleDataset) -> None:
         """
         Verifies an invalid schedule type raises a ValueError due to CustomSchedule auto-numpy conversion
         """
@@ -59,7 +58,7 @@ class TestSufficiency:
     def test_multiple_runs_multiple_metrics(
         self,
         simple_dataset: SimpleDataset,
-        mock_training_strategy: TrainingStrategy,
+        mock_train: TrainingStrategy,
         mock_eval_mixed_metric_strategy: EvaluationStrategy,
     ) -> None:
         """Verifies multiple runs, multiple steps, and multiple mixed metrics have the proper output shape"""
@@ -70,9 +69,9 @@ class TestSufficiency:
         METRIC_COUNT = 2  # Accuracy (scalar) + Precision (array)
         CLASSES = 2  # Precision has 2 classes
 
-        multi_metric_config = SufficiencyConfig(
-            mock_training_strategy,
-            mock_eval_mixed_metric_strategy,
+        multi_metric_config = Sufficiency.Config(
+            training_strategy=mock_train,
+            evaluation_strategy=mock_eval_mixed_metric_strategy,
             runs=RUNS,
             substeps=SUBSTEPS,
         )
@@ -103,7 +102,7 @@ class TestSufficiency:
     def test_run_multiple_scalar_metrics(
         self,
         simple_dataset: SimpleDataset,
-        mock_training_strategy: TrainingStrategy,
+        mock_train: TrainingStrategy,
         mock_eval_scalar_metrics_strategy: EvaluationStrategy,
     ) -> None:
         """Verifies single run with multiple scalar runs has proper output shape"""
@@ -113,9 +112,9 @@ class TestSufficiency:
         SUBSTEPS = 2
         METRIC_COUNT = 2  # Accuracy + Precision (scalars)
 
-        config = SufficiencyConfig(
-            mock_training_strategy,
-            mock_eval_scalar_metrics_strategy,
+        config = Sufficiency.Config(
+            training_strategy=mock_train,
+            evaluation_strategy=mock_eval_scalar_metrics_strategy,
             runs=RUNS,
             substeps=SUBSTEPS,
         )
@@ -144,8 +143,8 @@ class TestSufficiency:
     def test_run_classwise(
         self,
         simple_dataset: SimpleDataset,
-        mock_training_strategy: TrainingStrategy,
-        mock_eval_classwise_strategy: EvaluationStrategy,
+        mock_train: TrainingStrategy,
+        mock_eval_classwise: EvaluationStrategy,
     ) -> None:
         """Verifies single run with classwise array metric has proper shape"""
         patch("torch.utils.data.DataLoader").start()
@@ -155,9 +154,9 @@ class TestSufficiency:
         CLASSES = 4  # Accuracy returns 4-element array
         METRIC_COUNT = 1  # Accuracy
 
-        config = SufficiencyConfig(
-            mock_training_strategy,
-            mock_eval_classwise_strategy,
+        config = Sufficiency.Config(
+            training_strategy=mock_train,
+            evaluation_strategy=mock_eval_classwise,
             runs=RUNS,
             substeps=SUBSTEPS,
         )
@@ -195,7 +194,7 @@ class TestSufficiency:
     )
     def test_dataset_len(
         self,
-        basic_config: SufficiencyConfig,
+        basic_config: Sufficiency.Config,
         train_ds_len: None | Literal[1] | Literal[0],
         test_ds_len: None | Literal[1] | Literal[0],
         expected_error: type[TypeError] | type[ValueError] | None,
@@ -217,37 +216,37 @@ class TestDatasetImmutability:
     """Test that datasets are immutable after construction."""
 
     def test_train_ds_has_no_setter(
-        self, mock_model: MagicMock, simple_dataset: SimpleDataset, basic_config: SufficiencyConfig
+        self, mock_model: MagicMock, simple_dataset: SimpleDataset, basic_config: Sufficiency.Config[DatumType]
     ):
         """Verify train_ds property is read-only."""
-        suff = Sufficiency(mock_model, simple_dataset, simple_dataset, basic_config)
+        suff = Sufficiency(mock_model, simple_dataset, simple_dataset, config=basic_config)
 
         # Should not be able to set train_ds
         with pytest.raises(AttributeError, match="can't set attribute|has no setter"):
             suff.train_ds = simple_dataset  # pyright: ignore[reportAttributeAccessIssue]
 
     def test_test_ds_has_no_setter(
-        self, mock_model: MagicMock, simple_dataset: SimpleDataset, basic_config: SufficiencyConfig
+        self, mock_model: MagicMock, simple_dataset: SimpleDataset, basic_config: Sufficiency.Config[DatumType]
     ):
         """Verify test_ds property is read-only."""
-        suff = Sufficiency(mock_model, simple_dataset, simple_dataset, basic_config)
+        suff = Sufficiency(mock_model, simple_dataset, simple_dataset, config=basic_config)
 
         # Should not be able to set test_ds
         with pytest.raises(AttributeError, match="can't set attribute|has no setter"):
             suff.test_ds = simple_dataset  # pyright: ignore[reportAttributeAccessIssue]
 
     def test_can_read_train_ds(
-        self, mock_model: MagicMock, simple_dataset: SimpleDataset, basic_config: SufficiencyConfig
+        self, mock_model: MagicMock, simple_dataset: SimpleDataset, basic_config: Sufficiency.Config[DatumType]
     ):
         """Verify train_ds is still readable."""
-        suff = Sufficiency(mock_model, simple_dataset, simple_dataset, basic_config)
+        suff = Sufficiency(mock_model, simple_dataset, simple_dataset, config=basic_config)
 
         assert suff.train_ds is simple_dataset
 
     def test_can_read_test_ds(
-        self, mock_model: MagicMock, simple_dataset: SimpleDataset, basic_config: SufficiencyConfig
+        self, mock_model: MagicMock, simple_dataset: SimpleDataset, basic_config: Sufficiency.Config[DatumType]
     ):
         """Verify test_ds is still readable."""
-        suff = Sufficiency(mock_model, simple_dataset, simple_dataset, basic_config)
+        suff = Sufficiency(mock_model, simple_dataset, simple_dataset, config=basic_config)
 
         assert suff.test_ds is simple_dataset

@@ -6,10 +6,14 @@ from typing import Any, Literal
 import polars as pl
 
 from dataeval import Metadata as _Metadata
+from dataeval._helpers import _get_index2label
 from dataeval.core._mutual_info import mutual_info, mutual_info_classwise
 from dataeval.protocols import AnnotatedDataset, Metadata
-from dataeval.types import DictOutput, set_metadata
-from dataeval.utils.data import _get_index2label
+from dataeval.types import DictOutput, Evaluator, EvaluatorConfig, set_metadata
+
+DEFAULT_BALANCE_NUM_NEIGHBORS = 5
+DEFAULT_BALANCE_CLASS_IMBALANCE_THRESHOLD = 0.3
+DEFAULT_BALANCE_FACTOR_CORRELATION_THRESHOLD = 0.5
 
 
 @dataclass(frozen=True)
@@ -23,16 +27,19 @@ class BalanceOutput(DictOutput):
     ----------
     balance : pl.DataFrame
         DataFrame with global class-to-factor mutual information:
+
         - factor_name: str - Name of the metadata factor
         - mi_value: float - Mutual information value between this factor and class labels
     factors : pl.DataFrame
         DataFrame with inter-factor mutual information correlations:
+
         - factor1: str - Name of the first factor
         - factor2: str - Name of the second factor
         - mi_value: float - Mutual information value
         - is_correlated: bool - True if mi_value > factor_correlation_threshold
     classwise : pl.DataFrame
         DataFrame with per-class-to-factor mutual information:
+
         - class_name: str - Name of the class
         - factor_name: str - Name of the metadata factor
         - mi_value: float - Mutual information value
@@ -48,7 +55,7 @@ class BalanceOutput(DictOutput):
         return "balance"
 
 
-class Balance:
+class Balance(Evaluator):
     """
     Calculates mutual information (MI) between factors (class label, metadata, label/image properties).
 
@@ -93,6 +100,11 @@ class Balance:
 
     >>> balance = Balance(class_imbalance_threshold=0.2, factor_correlation_threshold=0.6)
 
+    Using configuration:
+
+    >>> config = Balance.Config(num_neighbors=10, class_imbalance_threshold=0.2)
+    >>> balance = Balance(config=config)
+
     See Also
     --------
     sklearn.feature_selection.mutual_info_classif
@@ -100,16 +112,38 @@ class Balance:
     sklearn.metrics.mutual_info_score
     """
 
+    class Config(EvaluatorConfig):
+        """
+        Configuration for Balance evaluator.
+
+        Attributes
+        ----------
+        num_neighbors : int, default 5
+            Number of points to consider as neighbors.
+        class_imbalance_threshold : float, default 0.3
+            Threshold for identifying imbalanced classes.
+        factor_correlation_threshold : float, default 0.5
+            Threshold for identifying highly correlated metadata factors.
+        """
+
+        num_neighbors: int = DEFAULT_BALANCE_NUM_NEIGHBORS
+        class_imbalance_threshold: float = DEFAULT_BALANCE_CLASS_IMBALANCE_THRESHOLD
+        factor_correlation_threshold: float = DEFAULT_BALANCE_FACTOR_CORRELATION_THRESHOLD
+
+    metadata: Metadata
+    num_neighbors: int
+    class_imbalance_threshold: float
+    factor_correlation_threshold: float
+    config: Config
+
     def __init__(
         self,
-        num_neighbors: int = 5,
-        class_imbalance_threshold: float = 0.3,
-        factor_correlation_threshold: float = 0.5,
+        num_neighbors: int | None = None,
+        class_imbalance_threshold: float | None = None,
+        factor_correlation_threshold: float | None = None,
+        config: Config | None = None,
     ) -> None:
-        self.metadata: Metadata
-        self.num_neighbors = num_neighbors
-        self.class_imbalance_threshold = class_imbalance_threshold
-        self.factor_correlation_threshold = factor_correlation_threshold
+        super().__init__(locals())
 
     @set_metadata(state=["num_neighbors", "class_imbalance_threshold", "factor_correlation_threshold"])
     def evaluate(self, data: AnnotatedDataset[Any] | Metadata) -> BalanceOutput:
@@ -126,6 +160,7 @@ class Balance:
         -------
         BalanceOutput
             Three DataFrames containing MI scores and threshold flags:
+
             - balance: Global class-to-factor mutual information
             - factors: Inter-factor mutual information
             - classwise: Per-class-to-factor mutual information

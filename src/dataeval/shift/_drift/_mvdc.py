@@ -13,6 +13,7 @@ __all__ = []
 import copy
 import logging
 import warnings
+from dataclasses import dataclass
 from logging import Logger
 from typing import Any, Literal
 
@@ -317,15 +318,57 @@ class DriftMVDC:
         Number of total chunks used in CV, will get one metric & prediction per chunk.
     threshold : Tuple[float, float], default (0.45, 0.65)
         (lower, upper) metric bounds on roc_auc for identifying :term:`drift<Drift>`.
+    config : DriftMVDC.Config or None, default None
+        Optional configuration object with default parameters. Parameters
+        specified directly in __init__ will override config defaults.
+
+    Examples
+    --------
+    Using configuration:
+
+    >>> config = DriftMVDC.Config(n_folds=10, threshold=(0.4, 0.6))
+    >>> detector = DriftMVDC(config=config)
     """
+
+    @dataclass
+    class Config:
+        """
+        Configuration for DriftMVDC detector.
+
+        Attributes
+        ----------
+        n_folds : int, default 5
+            Number of cross-validation folds.
+        chunk_size : int or None, default None
+            Number of samples in a chunk.
+        chunk_count : int or None, default None
+            Number of total chunks.
+        threshold : tuple[float, float], default (0.45, 0.65)
+            (lower, upper) metric bounds on roc_auc for drift identification.
+        """
+
+        n_folds: int = 5
+        chunk_size: int | None = None
+        chunk_count: int | None = None
+        threshold: tuple[float, float] = (0.45, 0.65)
 
     def __init__(
         self,
-        n_folds: int = 5,
+        n_folds: int | None = None,
         chunk_size: int | None = None,
         chunk_count: int | None = None,
-        threshold: tuple[float, float] = (0.45, 0.65),
+        threshold: tuple[float, float] | None = None,
+        config: Config | None = None,
     ) -> None:
+        # Store config or create default
+        self.config: DriftMVDC.Config = config or DriftMVDC.Config()
+
+        # Use config defaults if parameters not specified
+        n_folds = n_folds if n_folds is not None else self.config.n_folds
+        chunk_size = chunk_size if chunk_size is not None else self.config.chunk_size
+        chunk_count = chunk_count if chunk_count is not None else self.config.chunk_count
+        threshold = threshold if threshold is not None else self.config.threshold
+
         self.threshold: tuple[float, float] = max(0.0, min(threshold)), min(1.0, max(threshold))
         chunker = (
             CountBasedChunker(10 if chunk_count is None else chunk_count)

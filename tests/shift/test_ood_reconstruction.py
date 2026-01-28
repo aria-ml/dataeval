@@ -350,11 +350,9 @@ def test_dtype_mismatch_after_fit():
 
 @pytest.mark.required
 def test_config_initialization():
-    """Test OODReconstructionConfig initialization and defaults."""
-    from dataeval.shift._ood._reconstruction import OODReconstructionConfig
-
+    """Test OODReconstruction.Config initialization and defaults."""
     # Test default config
-    config = OODReconstructionConfig()
+    config = OODReconstruction.Config()
     assert config.loss_fn is None
     assert config.optimizer is None
     assert config.epochs == 20
@@ -362,7 +360,7 @@ def test_config_initialization():
     assert config.threshold_perc == 95.0
 
     # Test custom config
-    custom_config = OODReconstructionConfig(epochs=10, batch_size=32, threshold_perc=99.0)
+    custom_config = OODReconstruction.Config(epochs=10, batch_size=32, threshold_perc=99.0)
     assert custom_config.epochs == 10
     assert custom_config.batch_size == 32
     assert custom_config.threshold_perc == 99.0
@@ -371,9 +369,7 @@ def test_config_initialization():
 @pytest.mark.required
 def test_config_usage_with_overrides():
     """Test that config values are used and can be overridden."""
-    from dataeval.shift._ood._reconstruction import OODReconstructionConfig
-
-    config = OODReconstructionConfig(epochs=15, batch_size=16, threshold_perc=98.0)
+    config = OODReconstruction.Config(epochs=15, batch_size=16, threshold_perc=98.0)
     ae = OODReconstruction(AE(input_shape=input_shape), config=config)
 
     x_ref_small = np.random.rand(20, *input_shape).astype(np.float32)
@@ -1062,9 +1058,8 @@ def test_combine_gmm_percentile():
 
     # Test basic functionality of _combine_gmm_percentile
     gmm_model = SimpleGMMModel()
-    from dataeval.shift._ood._reconstruction import OODReconstructionConfig
 
-    config = OODReconstructionConfig(gmm_score_mode="percentile")
+    config = OODReconstruction.Config(gmm_score_mode="percentile")
     ood = OODReconstruction(gmm_model, model_type="ae", use_gmm=True, config=config)
 
     # Create synthetic data
@@ -1092,7 +1087,7 @@ def test_combine_gmm_percentile():
     assert np.all(np.isfinite(score.instance_score))
 
     # Test that percentile method produces different results than standardized
-    config_std = OODReconstructionConfig(gmm_score_mode="standardized", gmm_weight=0.5)
+    config_std = OODReconstruction.Config(gmm_score_mode="standardized", gmm_weight=0.5)
     ood_std = OODReconstruction(SimpleGMMModel(), model_type="ae", use_gmm=True, config=config_std)
     ood_std.fit(x_ref, threshold_perc=90, epochs=1)
     score_std = ood_std.score(x_test)
@@ -1182,15 +1177,13 @@ def test_gmm_score_mode_config_parameter():
             gamma = torch.softmax(self.gmm_net(z), dim=-1)
             return recon, z, gamma
 
-    from dataeval.shift._ood._reconstruction import OODReconstructionConfig
-
     # Test with standardized mode (default)
-    config_std = OODReconstructionConfig(gmm_score_mode="standardized")
+    config_std = OODReconstruction.Config(gmm_score_mode="standardized")
     ood_std = OODReconstruction(SimpleGMMModel(), model_type="ae", use_gmm=True, config=config_std)
     assert ood_std.config.gmm_score_mode == "standardized"
 
     # Test with percentile mode
-    config_pct = OODReconstructionConfig(gmm_score_mode="percentile")
+    config_pct = OODReconstruction.Config(gmm_score_mode="percentile")
     ood_pct = OODReconstruction(SimpleGMMModel(), model_type="ae", use_gmm=True, config=config_pct)
     assert ood_pct.config.gmm_score_mode == "percentile"
 

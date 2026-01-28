@@ -9,7 +9,7 @@ import numpy as np
 import torch.nn as nn
 
 from dataeval.performance._aggregator import ResultAggregator
-from dataeval.performance._sufficiency import Sufficiency, SufficiencyConfig
+from dataeval.performance._sufficiency import Sufficiency
 from dataeval.performance.schedules import GeometricSchedule, ManualSchedule
 
 
@@ -48,13 +48,13 @@ class TestCreateScheduleHelper:
 class TestExecuteRunHelper:
     """Test _execute_run helper method."""
 
-    def test_executes_single_run(self, mock_training_strategy, mock_evaluation_strategy, simple_dataset):
+    def test_executes_single_run(self, mock_train, mock_eval, simple_dataset):
         """Verify _execute_run trains and evaluates for all steps."""
-        mock_evaluation_strategy.evaluate.return_value = {"accuracy": 0.95}
+        mock_eval.evaluate.return_value = {"accuracy": 0.95}
 
-        config = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy, runs=1, substeps=3)
+        config = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, runs=1, substeps=3)
         model = nn.Linear(10, 2)
-        suff = Sufficiency(model, simple_dataset, simple_dataset, config)
+        suff = Sufficiency(model, simple_dataset, simple_dataset, config=config)
 
         # Create aggregator and steps
         aggregator = ResultAggregator(runs=1, substeps=3)
@@ -64,16 +64,16 @@ class TestExecuteRunHelper:
         suff._execute_run(run_index=0, steps=steps, aggregator=aggregator)
 
         # Should have called training and evaluation for each step
-        assert mock_training_strategy.train.call_count == 3
-        assert mock_evaluation_strategy.evaluate.call_count == 3
+        assert mock_train.train.call_count == 3
+        assert mock_eval.evaluate.call_count == 3
 
-    def test_passes_correct_indices_to_training(self, mock_training_strategy, mock_evaluation_strategy, simple_dataset):
+    def test_passes_correct_indices_to_training(self, mock_train, mock_eval, simple_dataset):
         """Verify _execute_run passes correct indices to training."""
-        mock_evaluation_strategy.evaluate.return_value = {"accuracy": 0.95}
+        mock_eval.evaluate.return_value = {"accuracy": 0.95}
 
-        config = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy, runs=1, substeps=2)
+        config = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, runs=1, substeps=2)
         model = nn.Linear(10, 2)
-        suff = Sufficiency(model, simple_dataset, simple_dataset, config)
+        suff = Sufficiency(model, simple_dataset, simple_dataset, config=config)
 
         aggregator = ResultAggregator(runs=1, substeps=2)
         steps = np.array([5, 10], dtype=np.uint32)
@@ -81,20 +81,20 @@ class TestExecuteRunHelper:
         suff._execute_run(0, steps, aggregator)
 
         # Check first call - should train on first 5 indices
-        first_call_indices = mock_training_strategy.train.call_args_list[0][0][2]
+        first_call_indices = mock_train.train.call_args_list[0][0][2]
         assert len(first_call_indices) == 5
 
         # Check second call - should train on first 10 indices
-        second_call_indices = mock_training_strategy.train.call_args_list[1][0][2]
+        second_call_indices = mock_train.train.call_args_list[1][0][2]
         assert len(second_call_indices) == 10
 
-    def test_passes_model_to_training(self, mock_training_strategy, mock_evaluation_strategy, simple_dataset):
+    def test_passes_model_to_training(self, mock_train, mock_eval, simple_dataset):
         """Verify _execute_run passes model to training strategy."""
-        mock_evaluation_strategy.evaluate.return_value = {"accuracy": 0.95}
+        mock_eval.evaluate.return_value = {"accuracy": 0.95}
 
-        config = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy, runs=1, substeps=1)
+        config = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, runs=1, substeps=1)
         model = nn.Linear(10, 2)
-        suff = Sufficiency(model, simple_dataset, simple_dataset, config)
+        suff = Sufficiency(model, simple_dataset, simple_dataset, config=config)
 
         aggregator = ResultAggregator(runs=1, substeps=1)
         steps = np.array([10], dtype=np.uint32)
@@ -102,18 +102,18 @@ class TestExecuteRunHelper:
         suff._execute_run(0, steps, aggregator)
 
         # Model should be passed to training
-        call_args = mock_training_strategy.train.call_args[0]
+        call_args = mock_train.train.call_args[0]
         passed_model = call_args[0]
         assert isinstance(passed_model, nn.Module)
 
-    def test_passes_test_dataset_to_evaluation(self, mock_training_strategy, mock_evaluation_strategy, simple_dataset):
+    def test_passes_test_dataset_to_evaluation(self, mock_train, mock_eval, simple_dataset):
         """Verify _execute_run passes test dataset to evaluation strategy."""
-        mock_evaluation_strategy.evaluate.return_value = {"accuracy": 0.95}
+        mock_eval.evaluate.return_value = {"accuracy": 0.95}
 
-        config = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy, runs=1, substeps=1)
+        config = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, runs=1, substeps=1)
         model = nn.Linear(10, 2)
         test_ds = simple_dataset
-        suff = Sufficiency(model, simple_dataset, test_ds, config)
+        suff = Sufficiency(model, simple_dataset, test_ds, config=config)
 
         aggregator = ResultAggregator(runs=1, substeps=1)
         steps = np.array([10], dtype=np.uint32)
@@ -121,17 +121,17 @@ class TestExecuteRunHelper:
         suff._execute_run(0, steps, aggregator)
 
         # Test dataset should be passed to evaluation
-        call_args = mock_evaluation_strategy.evaluate.call_args[0]
+        call_args = mock_eval.evaluate.call_args[0]
         passed_dataset = call_args[1]
         assert passed_dataset is test_ds
 
-    def test_stores_results_in_aggregator(self, mock_training_strategy, mock_evaluation_strategy, simple_dataset):
+    def test_stores_results_in_aggregator(self, mock_train, mock_eval, simple_dataset):
         """Verify _execute_run stores results in aggregator."""
-        mock_evaluation_strategy.evaluate.return_value = {"accuracy": 0.95, "loss": 0.05}
+        mock_eval.evaluate.return_value = {"accuracy": 0.95, "loss": 0.05}
 
-        config = SufficiencyConfig(mock_training_strategy, mock_evaluation_strategy, runs=1, substeps=2)
+        config = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, runs=1, substeps=2)
         model = nn.Linear(10, 2)
-        suff = Sufficiency(model, simple_dataset, simple_dataset, config)
+        suff = Sufficiency(model, simple_dataset, simple_dataset, config=config)
 
         aggregator = ResultAggregator(runs=1, substeps=2)
         steps = np.array([5, 10], dtype=np.uint32)

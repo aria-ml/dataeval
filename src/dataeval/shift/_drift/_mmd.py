@@ -175,6 +175,9 @@ class DriftMMD(BaseDrift):
     device : DeviceLike or None, default None
         Hardware device for computation. When None, automatically selects
         DataEval's configured device, falling back to PyTorch's default.
+    config : DriftMMD.Config or None, default None
+        Optional configuration object with default parameters. Parameters
+        specified directly in __init__ will override config defaults.
 
     Attributes
     ----------
@@ -210,18 +213,61 @@ class DriftMMD(BaseDrift):
 
     >>> print(f"Mean MMD statistic: {result.distance:.2f}")
     Mean MMD statistic: 1.26
+
+    Using configuration:
+
+    >>> config = DriftMMD.Config(p_val=0.01, n_permutations=200)
+    >>> drift = DriftMMD(train_emb, config=config)
     """
+
+    @dataclass
+    class Config:
+        """
+        Configuration for DriftMMD detector.
+
+        Attributes
+        ----------
+        p_val : float, default 0.05
+            Significance threshold for statistical tests.
+        sigma : Array or None, default None
+            Bandwidth parameter(s) for the Gaussian RBF kernel.
+        n_permutations : int, default 100
+            Number of random permutations for the permutation test.
+        permutation_batch_size : int or "auto", default "auto"
+            Batch size for computing permutations.
+        device : DeviceLike or None, default None
+            Hardware device for computation.
+        """
+
+        p_val: float = 0.05
+        sigma: Array | None = None
+        n_permutations: int = 100
+        permutation_batch_size: int | Literal["auto"] = "auto"
+        device: DeviceLike | None = None
 
     def __init__(
         self,
         data: Array,
-        p_val: float = 0.05,
+        p_val: float | None = None,
         update_strategy: UpdateStrategy | None = None,
         sigma: Array | None = None,
-        n_permutations: int = 100,
-        permutation_batch_size: int | Literal["auto"] = "auto",
+        n_permutations: int | None = None,
+        permutation_batch_size: int | Literal["auto"] | None = None,
         device: DeviceLike | None = None,
+        config: Config | None = None,
     ) -> None:
+        # Store config or create default
+        self.config: DriftMMD.Config = config or DriftMMD.Config()
+
+        # Use config defaults if parameters not specified
+        p_val = p_val if p_val is not None else self.config.p_val
+        sigma = sigma if sigma is not None else self.config.sigma
+        n_permutations = n_permutations if n_permutations is not None else self.config.n_permutations
+        permutation_batch_size = (
+            permutation_batch_size if permutation_batch_size is not None else self.config.permutation_batch_size
+        )
+        device = device if device is not None else self.config.device
+
         super().__init__(data, p_val, update_strategy)
 
         self.n_permutations = n_permutations  # nb of iterations through permutation test
