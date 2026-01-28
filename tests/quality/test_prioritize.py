@@ -5,14 +5,16 @@ import pytest
 import torch
 
 from dataeval._embeddings import Embeddings
+from dataeval.encoders import TorchEmbeddingEncoder
 from dataeval.protocols import AnnotatedDataset
 from dataeval.quality import Prioritize, PrioritizeOutput
 
 
 class TestPrioritize:
-    model = torch.nn.Flatten()
-    batch_size = 10
-    device = torch.device("cpu")
+    @pytest.fixture
+    def encoder(self):
+        """Create a TorchEmbeddingEncoder for testing."""
+        return TorchEmbeddingEncoder(torch.nn.Flatten(), batch_size=10, device="cpu")
 
     def get_dataset(self, n: int = 1000):
         mock = MagicMock(spec=AnnotatedDataset)
@@ -22,8 +24,8 @@ class TestPrioritize:
         mock.metadata = {"id": "mock_dataset", "index2label": {i: str(i) for i in range(10)}}
         return mock
 
-    def get_embeddings(self, n: int = 1000) -> Embeddings:
-        return Embeddings(self.get_dataset(n), batch_size=self.batch_size, model=self.model, device=self.device)
+    def get_embeddings(self, encoder, n: int = 1000) -> Embeddings:
+        return Embeddings(self.get_dataset(n), encoder=encoder)
 
     @pytest.mark.parametrize(
         "method, method_kwargs",
@@ -33,8 +35,8 @@ class TestPrioritize:
             ("kmeans_complexity", {"c": 100}),
         ),
     )
-    def test_prioritize_evaluate(self, method, method_kwargs):
-        p = Prioritize(self.model, batch_size=self.batch_size, device=self.device)
+    def test_prioritize_evaluate(self, encoder, method, method_kwargs):
+        p = Prioritize(encoder)
         dataset = self.get_dataset()
 
         # Configure using builder pattern
@@ -59,8 +61,8 @@ class TestPrioritize:
         "policy",
         ("hard_first", "easy_first", "stratified", "class_balance"),
     )
-    def test_prioritize_policies(self, policy):
-        p = Prioritize(self.model, batch_size=self.batch_size, device=self.device)
+    def test_prioritize_policies(self, encoder, policy):
+        p = Prioritize(encoder)
         dataset = self.get_dataset()
         labels = np.random.randint(low=0, high=10, size=1000)
 
@@ -83,32 +85,32 @@ class TestPrioritize:
         assert len(result.indices) == 1000
         assert any(i != j for i, j in zip(result.indices, range(1000)))
 
-    def test_prioritize_method_not_configured_raises_valueerror(self):
-        p = Prioritize(self.model, batch_size=self.batch_size, device=self.device)
+    def test_prioritize_method_not_configured_raises_valueerror(self, encoder):
+        p = Prioritize(encoder)
         dataset = self.get_dataset()
         with pytest.raises(ValueError, match="Method not configured"):
             p.hard_first().evaluate(dataset)
 
-    def test_prioritize_policy_not_configured_raises_valueerror(self):
-        p = Prioritize(self.model, batch_size=self.batch_size, device=self.device)
+    def test_prioritize_policy_not_configured_raises_valueerror(self, encoder):
+        p = Prioritize(encoder)
         dataset = self.get_dataset()
         with pytest.raises(ValueError, match="Policy not configured"):
             p.with_knn(k=5).evaluate(dataset)
 
-    def test_prioritize_dataset_class_balance_without_labels_does_not_raise_valueerror(self):
-        p = Prioritize(self.model, batch_size=self.batch_size, device=self.device)
+    def test_prioritize_dataset_class_balance_without_labels_does_not_raise_valueerror(self, encoder):
+        p = Prioritize(encoder)
         dataset = self.get_dataset(n=100)
         # class_balanced() with no labels will extract from AnnotatedDataset
         p.with_knn(k=5).class_balanced().evaluate(dataset)
 
-    def test_prioritize_embeddings_class_balance_without_labels_raises_valueerror(self):
-        p = Prioritize(self.model, batch_size=self.batch_size, device=self.device)
-        embeddings = self.get_embeddings(n=100)
+    def test_prioritize_embeddings_class_balance_without_labels_raises_valueerror(self, encoder):
+        p = Prioritize(encoder)
+        embeddings = self.get_embeddings(encoder, n=100)
         with pytest.raises(ValueError, match="class_labels must be provided"):
             p.with_knn(k=5).class_balanced().evaluate(embeddings)
 
-    def test_prioritize_stratified_no_scores_raises_valueerror(self):
-        p = Prioritize(self.model, batch_size=self.batch_size, device=self.device)
+    def test_prioritize_stratified_no_scores_raises_valueerror(self, encoder):
+        p = Prioritize(encoder)
         dataset = self.get_dataset(n=100)
         with pytest.raises(ValueError, match="Ranking scores are necessary"):
             p.with_kmeans_complexity(c=5).stratified().evaluate(dataset)
@@ -123,13 +125,13 @@ class TestPrioritize:
             ("kmeans_complexity", {"c": 100}),
         ),
     )
-    def test_prioritize_with_embeddings(self, method, method_kwargs, use_embeddings, use_reference):
+    def test_prioritize_with_embeddings(self, encoder, method, method_kwargs, use_embeddings, use_reference):
         # Setup reference in __init__ if needed
-        reference = self.get_embeddings() if use_reference else None
-        p = Prioritize(self.model, reference=reference, batch_size=self.batch_size, device=self.device)
+        reference = self.get_embeddings(encoder) if use_reference else None
+        p = Prioritize(encoder, reference=reference)
 
         # Pass either Embeddings or AnnotatedDataset as dataset parameter
-        dataset = self.get_embeddings() if use_embeddings else self.get_dataset()
+        dataset = self.get_embeddings(encoder) if use_embeddings else self.get_dataset()
 
         # Configure using builder pattern
         if method == "knn":
@@ -147,10 +149,10 @@ class TestPrioritize:
         assert result.policy == "hard_first"
         assert any(i != j for i, j in zip(result.indices, range(1000)))
 
-    def test_prioritize_with_precomputed_embeddings(self):
+    def test_prioritize_with_precomputed_embeddings(self, encoder):
         """Test that we can pass Embeddings directly as the dataset."""
-        p = Prioritize(self.model, batch_size=self.batch_size, device=self.device)
-        embeddings = self.get_embeddings(100)
+        p = Prioritize(encoder)
+        embeddings = self.get_embeddings(encoder, 100)
         result = p.with_knn(k=5).easy_first().evaluate(embeddings)
 
         assert isinstance(result, PrioritizeOutput)
@@ -175,10 +177,10 @@ class TestPrioritize:
         assert output.method == "kmeans_complexity"
         assert output.policy == "easy_first"
 
-    def test_prioritize_with_reference_dataset(self):
+    def test_prioritize_with_reference_dataset(self, encoder):
         """Test Prioritize with reference dataset provided at init."""
         reference_dataset = self.get_dataset(500)
-        p = Prioritize(self.model, reference=reference_dataset, batch_size=self.batch_size, device=self.device)
+        p = Prioritize(encoder, reference=reference_dataset)
 
         dataset = self.get_dataset(100)
         result = p.with_knn(k=10).hard_first().evaluate(dataset)
@@ -188,20 +190,9 @@ class TestPrioritize:
         assert result.method == "knn"
         assert result.policy == "hard_first"
 
-    def test_prioritize_override_batch_size_device(self):
-        """Test overriding batch_size and device in evaluate()."""
-        p = Prioritize(self.model, batch_size=32, device=self.device)
-        dataset = self.get_dataset(100)
-
-        # Should work with overridden parameters
-        result = p.with_knn(k=5).hard_first().evaluate(dataset, batch_size=16)
-
-        assert isinstance(result, PrioritizeOutput)
-        assert len(result.indices) == 100
-
-    def test_prioritize_reconfigure_and_reuse(self):
+    def test_prioritize_reconfigure_and_reuse(self, encoder):
         """Test that we can reconfigure and reuse the same prioritizer instance."""
-        p = Prioritize(self.model, batch_size=self.batch_size, device=self.device)
+        p = Prioritize(encoder)
         dataset1 = self.get_dataset(100)
         dataset2 = self.get_dataset(200)
 

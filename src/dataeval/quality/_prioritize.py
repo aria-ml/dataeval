@@ -16,15 +16,12 @@ from typing_extensions import Self
 
 from dataeval import Embeddings
 from dataeval import Metadata as _Metadata
-from dataeval.config import DeviceLike, get_device
 from dataeval.core._rank import rank_kmeans_complexity, rank_kmeans_distance, rank_knn
 from dataeval.core._rerank import rerank_class_balance, rerank_hard_first, rerank_stratified
-from dataeval.protocols import AnnotatedDataset, EmbeddingModel, Metadata
+from dataeval.protocols import AnnotatedDataset, EmbeddingEncoder, Metadata
 from dataeval.types import Evaluator, EvaluatorConfig, Output, set_metadata
 
-DEFAULT_PRIORITIZE_MODEL: EmbeddingModel | None = None
-DEFAULT_PRIORITIZE_BATCH_SIZE: int | None = None
-DEFAULT_PRIORITIZE_DEVICE: DeviceLike | None = None
+DEFAULT_PRIORITIZE_ENCODER: EmbeddingEncoder | None = None
 
 
 @dataclass(frozen=True)
@@ -71,17 +68,13 @@ class Prioritize(Evaluator):
 
     Parameters
     ----------
-    model : EmbeddingModel
-        Model to use for encoding data.
+    encoder : EmbeddingEncoder
+        Encoder to use for extracting embeddings from data.
     reference : AnnotatedDataset[Any] | Embeddings | None, default None
         Optional reference dataset or pre-computed embeddings. When provided,
         incoming datasets will be prioritized relative to this reference set.
         Useful for active learning (reference = labeled data) or quality
         filtering (reference = high-quality corpus).
-    batch_size : int | None, default None
-        Default batch size to use when encoding data. Can be overridden in evaluate().
-    device : DeviceLike | None, default None
-        Default device to use for encoding data. Can be overridden in evaluate().
     config : Prioritize.Config or None, default None
         Optional configuration object with default parameters. Parameters
         specified directly in __init__ will override config defaults.
@@ -99,7 +92,9 @@ class Prioritize(Evaluator):
     Basic prioritization using builder pattern:
 
     >>> from dataeval.quality import Prioritize
-    >>> prioritizer = Prioritize(model)
+    >>> from dataeval.encoders import TorchEmbeddingEncoder
+    >>>
+    >>> prioritizer = Prioritize(encoder)
     >>>
     >>> # Configure method and policy, then evaluate
     >>> result = prioritizer.with_knn(k=10).hard_first().evaluate(unlabeled_data)
@@ -123,13 +118,13 @@ class Prioritize(Evaluator):
     Active learning with reference:
 
     >>> # Initialize with labeled data as reference
-    >>> prioritizer = Prioritize(model, reference=labeled_data)
+    >>> prioritizer = Prioritize(encoder, reference=labeled_data)
     >>> result = prioritizer.with_knn(k=10).hard_first().evaluate(reference_data)
 
     Using configuration:
 
-    >>> config = Prioritize.Config(batch_size=64)
-    >>> prioritizer = Prioritize(model, config=config)
+    >>> config = Prioritize.Config(encoder=encoder)
+    >>> prioritizer = Prioritize(config=config)
     """
 
     class Config(EvaluatorConfig):
@@ -138,34 +133,25 @@ class Prioritize(Evaluator):
 
         Attributes
         ----------
-        batch_size : int or None, default None
-            Default batch size for encoding data.
-        device : DeviceLike or None, default None
-            Default device for encoding data.
+        encoder : EmbeddingEncoder
+            Encoder to use for extracting embeddings from data.
         """
 
-        model: EmbeddingModel | None = DEFAULT_PRIORITIZE_MODEL
-        batch_size: int | None = DEFAULT_PRIORITIZE_BATCH_SIZE
-        device: DeviceLike | None = DEFAULT_PRIORITIZE_DEVICE
+        encoder: EmbeddingEncoder | None = None
 
-    model: EmbeddingModel
-    batch_size: int
-    device: DeviceLike
+    encoder: EmbeddingEncoder
     config: Config
 
     def __init__(
         self,
-        model: EmbeddingModel | None = None,
+        encoder: EmbeddingEncoder | None = None,
         reference: AnnotatedDataset[Any] | Embeddings | None = None,
-        batch_size: int | None = None,
-        device: DeviceLike | None = None,
         config: Config | None = None,
     ) -> None:
         super().__init__(locals())
-        if self.model is None:
-            raise ValueError("model must be provided either in __init__ or config")
         self._reference = reference
-        self.device: DeviceLike = get_device(self.device)
+        if self.encoder is None:
+            raise ValueError("encoder must be provided either in __init__ or config")
 
         # Internal state populated during evaluate
         self.embeddings: Embeddings | None = None
@@ -196,7 +182,7 @@ class Prioritize(Evaluator):
 
         Examples
         --------
-        >>> prioritizer = Prioritize(model)
+        >>> prioritizer = Prioritize(encoder)
         >>> result = prioritizer.with_knn(k=5).hard_first().evaluate(unlabeled_data)
         """
         self._method_name = "knn"
@@ -227,7 +213,7 @@ class Prioritize(Evaluator):
 
         Examples
         --------
-        >>> prioritizer = Prioritize(model)
+        >>> prioritizer = Prioritize(encoder)
         >>> result = prioritizer.with_kmeans_distance(c=10).easy_first().evaluate(unlabeled_data)
         """
         self._method_name = "kmeans_distance"
@@ -259,7 +245,7 @@ class Prioritize(Evaluator):
 
         Examples
         --------
-        >>> prioritizer = Prioritize(model)
+        >>> prioritizer = Prioritize(encoder)
         >>> result = prioritizer.with_kmeans_complexity(c=15).hard_first().evaluate(unlabeled_data)
         """
         self._method_name = "kmeans_complexity"
@@ -281,7 +267,7 @@ class Prioritize(Evaluator):
 
         Examples
         --------
-        >>> prioritizer = Prioritize(model)
+        >>> prioritizer = Prioritize(encoder)
         >>> result = prioritizer.with_knn(k=5).easy_first().evaluate(unlabeled_data)
         """
         self._policy_name = "easy_first"
@@ -301,7 +287,7 @@ class Prioritize(Evaluator):
 
         Examples
         --------
-        >>> prioritizer = Prioritize(model)
+        >>> prioritizer = Prioritize(encoder)
         >>> result = prioritizer.with_knn(k=5).hard_first().evaluate(unlabeled_data)
         """
         self._policy_name = "hard_first"
@@ -329,7 +315,7 @@ class Prioritize(Evaluator):
 
         Examples
         --------
-        >>> prioritizer = Prioritize(model)
+        >>> prioritizer = Prioritize(encoder)
         >>> result = prioritizer.with_knn(k=5).stratified(num_bins=20).evaluate(unlabeled_data)
         """
         self._policy_name = "stratified"
@@ -356,7 +342,7 @@ class Prioritize(Evaluator):
 
         Examples
         --------
-        >>> prioritizer = Prioritize(model)
+        >>> prioritizer = Prioritize(encoder)
         >>> result = prioritizer.with_knn(k=5).class_balanced(class_labels).evaluate(unlabeled_data)
 
         With AnnotatedDataset (labels extracted automatically):
@@ -371,8 +357,6 @@ class Prioritize(Evaluator):
     def evaluate(
         self,
         dataset: AnnotatedDataset[Any] | Embeddings,
-        batch_size: int | None = None,
-        device: DeviceLike | None = None,
     ) -> PrioritizeOutput:
         """
         Evaluate the dataset and return prioritized indices.
@@ -386,14 +370,8 @@ class Prioritize(Evaluator):
         dataset : AnnotatedDataset[Any] | Embeddings
             The incoming dataset to prioritize. Can be either:
 
-            - AnnotatedDataset: Will compute embeddings using the model
+            - AnnotatedDataset: Will compute embeddings using the encoder
             - Embeddings: Pre-computed embeddings
-        batch_size : int | None, default None
-            Batch size for encoding the incoming dataset. If None, uses the value
-            from __init__. Only used when dataset is an AnnotatedDataset.
-        device : DeviceLike | None, default None
-            Device for encoding the incoming dataset. If None, uses the value
-            from __init__. Only used when dataset is an AnnotatedDataset.
 
         Returns
         -------
@@ -414,12 +392,8 @@ class Prioritize(Evaluator):
         --------
         Basic usage:
 
-        >>> prioritizer = Prioritize(model)
+        >>> prioritizer = Prioritize(encoder)
         >>> result = prioritizer.with_knn(k=5).hard_first().evaluate(labeled_data)
-
-        Override encoding parameters:
-
-        >>> result = prioritizer.with_knn(k=10).easy_first().evaluate(labeled_data, batch_size=64)
 
         Reconfigure and evaluate different dataset:
 
@@ -441,16 +415,8 @@ class Prioritize(Evaluator):
             self.embeddings = dataset
         else:
             # Assume dataset is an AnnotatedDataset - compute embeddings
-            effective_batch_size = batch_size if batch_size is not None else self.batch_size
-            effective_device = device if device is not None else self.device
-
             try:
-                self.embeddings = Embeddings(
-                    dataset,
-                    batch_size=effective_batch_size,
-                    model=self.model,
-                    device=effective_device,
-                )
+                self.embeddings = Embeddings(dataset, encoder=self.encoder)
             except Exception as e:
                 raise TypeError(
                     f"dataset must be either an AnnotatedDataset or Embeddings, but got {type(dataset).__name__}"
@@ -463,13 +429,7 @@ class Prioritize(Evaluator):
             self.ref_embeddings = self._reference
         else:
             # Reference dataset - compute embeddings
-            # Use instance defaults for reference encoding
-            self.ref_embeddings = Embeddings(
-                self._reference,
-                batch_size=self.batch_size,
-                model=self.model,
-                device=self.device,
-            )
+            self.ref_embeddings = Embeddings(self._reference, encoder=self.encoder)
 
         # Extract class_labels if not provided in configuration
         class_labels = self._policy_params.get("class_labels")
