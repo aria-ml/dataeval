@@ -220,7 +220,7 @@ False Discovery Rate (FDR) Correction
     False Discovery Rate Correction is a statistical procedure for correcting for the problem caused by running multiple hypothesis tests at once. It is typically used in high-throughput experiments in order to correct for random events that falsely appear significant.
 
 False Negative Rate (FN)
-    A measure of {term}`machine leaning<Machine Learning (ML)>` model accuracy. It measures the frequency at which a negative prediction was found for a positive ground truth value.
+    A measure of {term}`machine learning<Machine Learning (ML)>` model accuracy. It measures the frequency at which a negative prediction was found for a positive ground truth value.
 
     See {term}`Confusion Matrix`
 
@@ -239,7 +239,7 @@ FB Score
     - FN = {term}`False Negative Rate (FN)`
 
 Feasibility
-    Feasibility is a measure of whether the available data (both quantity and quality) can be used to satisfy the necessary performance characteristics of the {term}`machine learing<Machine Learning (ML)>` model.
+    Feasibility is a measure of whether the available data (both quantity and quality) can be used to satisfy the necessary performance characteristics of the {term}`machine learning<Machine Learning (ML)>` model.
 
 Fully-Connected Layer
     Layer in a {term}`neural network<Neural Network>`. Every node in the layer is connected to every node in the previous layer. It performs the task of classification by creating probabilities that input data contains the features filtered for by the neural network.
@@ -377,13 +377,13 @@ Operational Drift
     Operational drift is specific type of {term}`drift<Drift>` defined as data drift during data model operations. It occurs when the data used in operation is not like data used during training of a {term}`machine learning<Machine Learning (ML)>` model. It can make the model less accurate in its predictions/classifications.
 
 Outlier Detection
-    Outlier Detection is process of detecting data/images that significantly deviate from the rest of the data/images. DataEval uses the measure of two standard deviations of the  average of the relevant distance measure to identify outliers.
+    Outlier Detection is a process of detecting data/images that significantly deviate from the rest of the data/images. DataEval uses the measure of two standard deviations of the  average of the relevant distance measure to identify outliers.
 
 Outliers (Images)
     Images which differ significantly from all or most of the other images in a dataset.
 
 Out-of-distribution (OOD)
-    Out-of-distribution (OOD) data refers to data that is different from the data used to train the {term}`machine learning<Machine Learning (Ml)>` model. For example, data collected in a different way, at a different time, under different conditions, or for a different task than the data on which the model was originally trained. An illustration is shown below:
+    Out-of-distribution (OOD) data refers to data that is different from the data used to train the {term}`machine learning<Machine Learning (ML)>` model. For example, data collected in a different way, at a different time, under different conditions, or for a different task than the data on which the model was originally trained. An illustration is shown below:
 
     ![Out Of Distribution Illustration](../_static/images/reference/out_of_distribution.png)
 
@@ -495,7 +495,7 @@ TensorFlow
     See {term}`Deep Neural Network (DNN)`
 
 Torch (PyTorch)
-    Torch (or Pytorch) is an open-source {term}`machine learing<Machine Learning (ML)>` library. One of its core packages provides a flexible N-dimensional array (also called a Tensor) data structure used by many machine learning algorithms. It supports routines for manipulation and calculation using Tensors. PyTorch is a library written for the Python programming language.
+    Torch (or Pytorch) is an open-source {term}`machine learning<Machine Learning (ML)>` library. One of its core packages provides a flexible N-dimensional array (also called a Tensor) data structure used by many machine learning algorithms. It supports routines for manipulation and calculation using Tensors. PyTorch is a library written for the Python programming language.
 
 True Negative Rate (TN)
     A measure of {term}`machine learning<Machine Learning (ML)>` model accuracy. It measures the frequency a negative prediction was found for a negative ground truth value.

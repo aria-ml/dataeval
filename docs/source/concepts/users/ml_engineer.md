@@ -83,11 +83,11 @@ to determine the best dataset for the problem.
 
 Analyze the dataset to create a training, validation and testing subset. Ensure that
 each split adequately represents the target operational environment and that there
-is no correlations between the splits.
+are no correlations between the splits.
 
 Datasets can be split using DataEval's {func}`.split_dataset`, which has options that
-enable to user to split the data based on metadata. DataEval's bias functions,
-{func}`.balance` and {func}`.diversity` can help identify when there my be spurious
+enable the user to split the data based on metadata. DataEval's bias functions,
+{func}`.balance` and {func}`.diversity` can help identify when there may be spurious
 correlations between the splits.
 
 <!-- ### Build robust and scalable data ingestion pipelines
