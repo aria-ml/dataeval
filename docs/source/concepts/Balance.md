@@ -110,7 +110,7 @@ may be binned uniquely with a relatively small number of bins.
 
 {term}`Mutual information<Mutual Information (MI)>` between
 categorical/discrete variables is computed from contingency tables which
-measure co-occurence of each variable, while mutual information involving
+measure co-occurrence of each variable, while mutual information involving
 continuous (ordered) data is computed using the k-nearest neighbor (KNN) graph
 as in Refs. [1] and [2].
 
