@@ -236,6 +236,8 @@ def docs(session: nox.Session) -> None:
         "../../output/docs/html",
         env={**DOCS_ENVS},
     )
+    # Clean up stale cache entries after sphinx-build updates the cache
+    session.run("python", "../../docs/check_notebook_cache.py", "--clean")
     session.run("cp", "-R", ".jupyter_cache", "../../output/docs", external=True)
     session.run_always("bash", "-c", RESTORE_CMD, external=True)
 
