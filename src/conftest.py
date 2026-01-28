@@ -19,10 +19,7 @@ import torch
 from numpy.typing import NDArray
 from typing_extensions import Self
 
-from dataeval.config import set_batch_size, set_seed
-
-# Set global batch_size for doctests
-set_batch_size(32)
+from dataeval.config import _config, set_batch_size, set_device, set_seed
 
 # Set numpy print option to legacy 1.25 so native numpy types
 # are not printed with dtype information.
@@ -310,10 +307,24 @@ def _create_model() -> torch.nn.Module:
 
 
 @pytest.fixture(autouse=True, scope="function")
-def reset_random_seed() -> Any:
-    """Reset random seed before each test for deterministic behavior."""
+def reset_config() -> Any:
+    """Reset config state before each test for deterministic behavior."""
+    # Save original config state
+    old_device = _config.device
+    old_batch_size = _config.batch_size
+    old_seed = _config.seed
+
+    # Set defaults for tests
     set_seed(0, all_generators=True)
+    set_device("cpu")
+    set_batch_size(32)
+
     yield
+
+    # Restore original state
+    _config.device = old_device
+    _config.batch_size = old_batch_size
+    _config.seed = old_seed
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -442,7 +453,14 @@ def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:
         def evaluate(self, model: Any, dataset: Any) -> dict[str, float]:
             return {"test": 1.0}
 
-    doctest_namespace["CustomTrainingStrategy"] = MagicMock()
+    class TrainingStrategy:
+        def __init__(self, learning_rate: float = 0.5, epochs: int = 10) -> None:
+            pass
+
+        def train(self, model: torch.nn.Module, dataset: Any, indices: Sequence[int]) -> None:
+            pass
+
+    doctest_namespace["CustomTrainingStrategy"] = TrainingStrategy
     doctest_namespace["CustomEvaluationStrategy"] = EvaluationStrategy
 
     # -------------------------------------------------------------------------

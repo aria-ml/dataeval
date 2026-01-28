@@ -8,6 +8,7 @@ Licensed under Apache Software License (Apache 2.0)
 
 __all__ = []
 
+from dataclasses import dataclass
 from typing import Any, Literal
 
 import numpy as np
@@ -96,6 +97,9 @@ class DriftUnivariate(BaseDriftUnivariate):
         datasets, metadata, or raw model outputs. The extractor is applied to
         both reference and test data before drift detection.
         When None, data must already be Array-like.
+    config : DriftUnivariate.Config or None, default None
+        Optional configuration object with default parameters. Parameters
+        specified directly in __init__ will override config defaults.
 
     Example
     -------
@@ -133,19 +137,60 @@ class DriftUnivariate(BaseDriftUnivariate):
     >>> n_features = result.feature_drift
     >>> print(f"Features showing drift: {n_features.sum()} / {len(n_features)}")
     Features showing drift: 128 / 128
+
+    Using configuration:
+
+    >>> config = DriftUnivariate.Config(method="cvm", p_val=0.01, correction="fdr")
+    >>> drift = DriftUnivariate(train_emb, config=config)
     """
+
+    @dataclass
+    class Config:
+        """
+        Configuration for DriftUnivariate detector.
+
+        Attributes
+        ----------
+        method : {"ks", "cvm", "mwu", "anderson", "bws"}, default "ks"
+            Statistical test method to use.
+        p_val : float, default 0.05
+            Significance threshold for drift detection.
+        correction : {"bonferroni", "fdr"}, default "bonferroni"
+            Multiple testing correction method.
+        alternative : {"two-sided", "less", "greater"}, default "two-sided"
+            Alternative hypothesis for the statistical test.
+        n_features : int or None, default None
+            Number of features to analyze.
+        """
+
+        method: Literal["ks", "cvm", "mwu", "anderson", "bws"] = "ks"
+        p_val: float = 0.05
+        correction: Literal["bonferroni", "fdr"] = "bonferroni"
+        alternative: Literal["two-sided", "less", "greater"] = "two-sided"
+        n_features: int | None = None
 
     def __init__(
         self,
         data: Any,
-        method: Literal["ks", "cvm", "mwu", "anderson", "bws"] = "ks",
-        p_val: float = 0.05,
+        method: Literal["ks", "cvm", "mwu", "anderson", "bws"] | None = None,
+        p_val: float | None = None,
         update_strategy: UpdateStrategy | None = None,
-        correction: Literal["bonferroni", "fdr"] = "bonferroni",
-        alternative: Literal["two-sided", "less", "greater"] = "two-sided",
+        correction: Literal["bonferroni", "fdr"] | None = None,
+        alternative: Literal["two-sided", "less", "greater"] | None = None,
         n_features: int | None = None,
         feature_extractor: FeatureExtractor | None = None,
+        config: Config | None = None,
     ) -> None:
+        # Store config or create default
+        self.config: DriftUnivariate.Config = config or DriftUnivariate.Config()
+
+        # Use config defaults if parameters not specified
+        method = method if method is not None else self.config.method
+        p_val = p_val if p_val is not None else self.config.p_val
+        correction = correction if correction is not None else self.config.correction
+        alternative = alternative if alternative is not None else self.config.alternative
+        n_features = n_features if n_features is not None else self.config.n_features
+
         super().__init__(
             data=data,
             p_val=p_val,

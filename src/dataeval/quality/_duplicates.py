@@ -14,8 +14,12 @@ from dataeval.core._clusterer import ClusterResult, cluster
 from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor
 from dataeval.quality._results import StatsMap, combine_results, get_dataset_step_from_idx
-from dataeval.types import DictOutput, SourceIndex, set_metadata
+from dataeval.types import ClusterConfigMixin, DictOutput, Evaluator, EvaluatorConfig, SourceIndex, set_metadata
 from dataeval.utils.arrays import flatten_samples, to_numpy
+
+DEFAULT_DUPLICATES_FLAGS = ImageStats.HASH
+DEFAULT_DUPLICATES_CLUSTER_THRESHOLD: float | None = None
+DEFAULT_DUPLICATES_MERGE_NEAR_DUPLICATES = True
 
 
 class DatasetItemTuple(NamedTuple):
@@ -125,7 +129,7 @@ class DuplicatesOutput(DictOutput):
     targets: DuplicateDetectionResult[SourceIndex] | DuplicateDetectionResult[DatasetItemTuple]
 
 
-class Duplicates:
+class Duplicates(Evaluator):
     """Finds duplicate images using hashing and/or embedding-based clustering.
 
     Supports multiple complementary detection methods:
@@ -167,6 +171,9 @@ class Duplicates:
         methods are merged into unified groups. Each group tracks which methods
         detected it, providing confidence information. If False, groups from
         each method are kept separate.
+    config : Duplicates.Config or None, default None
+        Optional configuration object with default parameters. Parameters
+        specified directly in __init__ will override config defaults.
 
     Attributes
     ----------
@@ -203,24 +210,56 @@ class Duplicates:
     >>> extractor = Embeddings(model=my_model)
     >>> detector = Duplicates(feature_extractor=extractor, cluster_threshold=1.0)
     >>> result = detector.evaluate(train_ds)
+
+    Using configuration:
+
+    >>> config = Duplicates.Config(cluster_algorithm="kmeans", merge_near_duplicates=False)
+    >>> detector = Duplicates(config=config)
     """
+
+    class Config(EvaluatorConfig, ClusterConfigMixin):
+        """
+        Configuration for Duplicates detector.
+
+        Attributes
+        ----------
+        flags : ImageStats, default ImageStats.HASH
+            Statistics to compute for hash-based duplicate detection.
+        cluster_threshold : float or None, default None
+            Threshold for cluster-based near duplicate detection.
+        cluster_algorithm : {"kmeans", "hdbscan"}, default "hdbscan"
+            Clustering algorithm for cluster-based detection.
+        n_clusters : int or None, default None
+            Expected number of clusters.
+        merge_near_duplicates : bool, default True
+            Whether to merge overlapping near duplicate groups.
+        """
+
+        flags: ImageStats = DEFAULT_DUPLICATES_FLAGS
+        cluster_threshold: float | None = DEFAULT_DUPLICATES_CLUSTER_THRESHOLD
+        merge_near_duplicates: bool = DEFAULT_DUPLICATES_MERGE_NEAR_DUPLICATES
+
+    stats: CalculationResult
+    flags: ImageStats
+    cluster_threshold: float | None
+    cluster_algorithm: Literal["kmeans", "hdbscan"]
+    n_clusters: int | None
+    merge_near_duplicates: bool
+    config: Config
+    feature_extractor: FeatureExtractor | None
 
     def __init__(
         self,
-        flags: ImageStats = ImageStats.HASH,
-        feature_extractor: FeatureExtractor | None = None,
+        flags: ImageStats | None = None,
         cluster_threshold: float | None = None,
-        cluster_algorithm: Literal["kmeans", "hdbscan"] = "hdbscan",
+        cluster_algorithm: Literal["kmeans", "hdbscan"] | None = None,
         n_clusters: int | None = None,
-        merge_near_duplicates: bool = True,
+        merge_near_duplicates: bool | None = None,
+        config: Config | None = None,
+        feature_extractor: FeatureExtractor | None = None,
     ) -> None:
-        self.stats: CalculationResult
-        self.flags: ImageStats = flags & ImageStats.HASH
+        super().__init__(locals())
         self.feature_extractor = feature_extractor
-        self.cluster_threshold = cluster_threshold
-        self.cluster_algorithm: Literal["kmeans", "hdbscan"] = cluster_algorithm
-        self.n_clusters = n_clusters
-        self.merge_near_duplicates = merge_near_duplicates
 
     def _get_duplicates(
         self, stats: StatsMap, source_index: Sequence[SourceIndex]

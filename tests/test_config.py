@@ -9,10 +9,10 @@ class TestSeed:
         original_seed = config.get_seed()
         try:
             config.set_seed(42)
-            assert config._seed == 42
+            assert config._config.seed == 42
             assert config.get_seed() == 42
             config.set_seed(0)
-            assert config._seed == 0
+            assert config._config.seed == 0
             assert config.get_seed() == 0
         finally:
             config.set_seed(original_seed, all_generators=True)
@@ -20,75 +20,73 @@ class TestSeed:
 
 class TestDevice:
     def test_device(self):
-        original_device = config._device
+        original_device = config._config.device
         try:
             config.set_device("cpu")
-            assert config._device == torch.device("cpu")
+            assert config._config.device == torch.device("cpu")
             assert config.get_device() == torch.device("cpu")
             config.set_device(None)
-            assert config._device is None
+            assert config._config.device is None
             if hasattr(torch, "get_default_device"):
                 assert config.get_device() == torch.get_default_device()
         finally:
-            config._device = original_device
+            config._config.device = original_device
 
     def test_device_context(self):
-        original_device = config._device
+        original_device = config._config.device
         try:
             config.set_device(None)
-            assert config._device is None
+            assert config._config.device is None
             with config.use_device("cpu"):
                 assert config.get_device() == torch.device("cpu")
-            assert config._device is None
+            assert config._config.device is None
         finally:
-            config._device = original_device
+            config._config.device = original_device
 
 
 class TestBatchSize:
     def test_batch_size(self):
-        original_batch_size = config._batch_size
+        original_batch_size = config._config.batch_size
         try:
             config.set_batch_size(64)
-            assert config._batch_size == 64
+            assert config._config.batch_size == 64
             assert config.get_batch_size() == 64
             config.set_batch_size(32)
-            assert config._batch_size == 32
+            assert config._config.batch_size == 32
             assert config.get_batch_size() == 32
         finally:
-            config._batch_size = original_batch_size
+            config._config.batch_size = original_batch_size
 
     def test_batch_size_context(self):
-        original_batch_size = config._batch_size
+        original_batch_size = config._config.batch_size
         try:
             config.set_batch_size(16)
-            assert config._batch_size == 16
+            assert config._config.batch_size == 16
             with config.use_batch_size(128):
                 assert config.get_batch_size() == 128
-            assert config._batch_size == 16
+            assert config._config.batch_size == 16
         finally:
-            config._batch_size = original_batch_size
+            config._config.batch_size = original_batch_size
 
     def test_batch_size_not_set(self):
-        original_batch_size = config._batch_size
+        original_batch_size = config._config.batch_size
         try:
             config.set_batch_size(None)
             with pytest.raises(ValueError, match="No batch_size provided"):
                 config.get_batch_size()
         finally:
-            config._batch_size = original_batch_size
+            config._config.batch_size = original_batch_size
 
     def test_batch_size_less_than_one(self):
-        original_batch_size = config._batch_size
+        original_batch_size = config._config.batch_size
         try:
-            config.set_batch_size(0)
-            with pytest.raises(ValueError, match="Provided batch_size must be greater than 0"):
-                config.get_batch_size()
+            with pytest.raises(ValueError, match="batch_size must be greater than 0"):
+                config.set_batch_size(0)
 
-            config.set_batch_size(-1)
-            with pytest.raises(ValueError, match="Provided batch_size must be greater than 0"):
-                config.get_batch_size()
+            with pytest.raises(ValueError, match="batch_size must be greater than 0"):
+                config.set_batch_size(-1)
         finally:
-            config._batch_size = original_batch_size
+            config._config.batch_size = original_batch_size
 
 
 class TestMaxProcesses:
@@ -99,21 +97,21 @@ class TestMaxProcesses:
 
     def test_set_max_processes_valid(self):
         """Test setting valid max_processes value (lines 184-185)."""
-        original_processes = config._processes
+        original_processes = config._config.max_processes
         try:
             config.set_max_processes(4)
-            assert config._processes == 4
+            assert config._config.max_processes == 4
             assert config.get_max_processes() == 4
 
             config.set_max_processes(-1)
-            assert config._processes == -1
+            assert config._config.max_processes == -1
             assert config.get_max_processes() == -1
 
             config.set_max_processes(None)
-            assert config._processes is None
+            assert config._config.max_processes is None
             assert config.get_max_processes() is None
         finally:
-            config._processes = original_processes
+            config._config.max_processes = original_processes
 
 
 class TestSetSeedAllGenerators:

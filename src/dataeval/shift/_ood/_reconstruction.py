@@ -31,73 +31,6 @@ TGMMData = TypeVar("TGMMData")
 
 
 @dataclass
-class OODReconstructionConfig:
-    """
-    Configuration for OODReconstruction detector training and threshold computation.
-
-    This dataclass provides default values for common training parameters
-    that can be overridden when needed. It's designed to work with the hybrid
-    approach where parameters can be set either via config or directly in fit().
-
-    Attributes
-    ----------
-    loss_fn : Callable or None, default None
-        Loss function for training. If None, will use default based on model type:
-        - AE: MSELoss()
-        - VAE: ELBOLoss()
-        - GMM models: MSELoss() (reconstruction only)
-    optimizer : torch.optim.Optimizer or None, default None
-        Optimizer for training. If None, uses Adam with lr=0.001.
-    epochs : int, default 20
-        Number of training epochs.
-    batch_size : int, default 64
-        Batch size for training and scoring.
-    threshold_perc : float, default 95.0
-        Percentage of reference data considered normal.
-    gmm_weight : float, default 0.5
-        Weight for GMM component when combining with reconstruction error (α in the formula).
-        Final score = (1-α) * recon_score + α * gmm_score, where both are standardized.
-        Only used when use_gmm=True. Range [0, 1]: 0=reconstruction only, 1=GMM only.
-    gmm_score_mode : {"standardized", "percentile"}, default "standardized"
-        Method for combining reconstruction and GMM scores when use_gmm=True:
-        - "standardized": Z-score normalization of both components, then weighted sum
-        - "percentile": Convert to percentiles, combine as 1 - (P_recon * P_gmm)
-
-    Examples
-    --------
-    >>> from dataeval.shift import OODReconstruction, OODReconstructionConfig
-    >>> from dataeval.utils.models import VAE
-    >>>
-    >>> train_data = torch.rand(10, 1, 28, 28)
-
-    Using default configuration:
-
-    >>> ood = OODReconstruction(VAE(input_shape=(1, 28, 28)))
-    >>> ood.fit(train_data)  # Uses default config
-
-    Using custom configuration:
-
-    >>> config = OODReconstructionConfig(epochs=10, batch_size=128, threshold_perc=99.0)
-    >>> ood = OODReconstruction(VAE(input_shape=(1, 28, 28)), config=config)
-    >>> ood.fit(train_data)  # Uses config defaults
-
-    Overriding config in fit():
-
-    >>> config = OODReconstructionConfig(epochs=10, batch_size=128)
-    >>> ood = OODReconstruction(VAE(input_shape=(1, 28, 28)), config=config)
-    >>> ood.fit(train_data, epochs=100)  # Override config.epochs
-    """
-
-    loss_fn: Callable[..., torch.Tensor] | None = None
-    optimizer: torch.optim.Optimizer | None = None
-    epochs: int = 20
-    batch_size: int = 64
-    threshold_perc: float = 95.0
-    gmm_weight: float = 0.5
-    gmm_score_mode: Literal["standardized", "percentile"] = "standardized"
-
-
-@dataclass
 class GaussianMixtureModelParams:
     """
     phi : torch.Tensor
@@ -230,7 +163,7 @@ class OODReconstruction:
         If None, will be auto-detected based on whether model has gmm_density_net attribute.
         When True, the model must output (reconstruction, z, gamma) where z is the latent
         representation and gamma is the mixture assignment probabilities.
-    config : OODReconstructionConfig or None, default None
+    config : OODReconstruction.Config or None, default None
         Optional configuration object with default training parameters. Parameters
         specified in fit() will override these defaults.
 
@@ -257,8 +190,7 @@ class OODReconstruction:
 
     Using configuration:
 
-    >>> from dataeval.shift import OODReconstructionConfig
-    >>> config = OODReconstructionConfig(epochs=10, batch_size=128, threshold_perc=99.0)
+    >>> config = OODReconstruction.Config(epochs=10, batch_size=128, threshold_perc=99.0)
     >>> ood = OODReconstruction(vae, config=config)
     >>> ood.fit(train_data)  # Uses config defaults
 
@@ -268,19 +200,85 @@ class OODReconstruction:
     >>> ood.fit(train_data, threshold_perc=95, epochs=20)
     """
 
+    @dataclass
+    class Config:
+        """
+        Configuration for OODReconstruction detector training and threshold computation.
+
+        This dataclass provides default values for common training parameters
+        that can be overridden when needed. It's designed to work with the hybrid
+        approach where parameters can be set either via config or directly in fit().
+
+        Attributes
+        ----------
+        loss_fn : Callable or None, default None
+            Loss function for training. If None, will use default based on model type:
+            - AE: MSELoss()
+            - VAE: ELBOLoss()
+            - GMM models: MSELoss() (reconstruction only)
+        optimizer : torch.optim.Optimizer or None, default None
+            Optimizer for training. If None, uses Adam with lr=0.001.
+        epochs : int, default 20
+            Number of training epochs.
+        batch_size : int, default 64
+            Batch size for training and scoring.
+        threshold_perc : float, default 95.0
+            Percentage of reference data considered normal.
+        gmm_weight : float, default 0.5
+            Weight for GMM component when combining with reconstruction error (α in the formula).
+            Final score = (1-α) * recon_score + α * gmm_score, where both are standardized.
+            Only used when use_gmm=True. Range [0, 1]: 0=reconstruction only, 1=GMM only.
+        gmm_score_mode : {"standardized", "percentile"}, default "standardized"
+            Method for combining reconstruction and GMM scores when use_gmm=True:
+            - "standardized": Z-score normalization of both components, then weighted sum
+            - "percentile": Convert to percentiles, combine as 1 - (P_recon * P_gmm)
+
+        Examples
+        --------
+        >>> from dataeval.shift import OODReconstruction
+        >>> from dataeval.utils.models import VAE
+        >>>
+        >>> train_data = torch.rand(10, 1, 28, 28)
+
+        Using default configuration:
+
+        >>> ood = OODReconstruction(VAE(input_shape=(1, 28, 28)))
+        >>> ood.fit(train_data)  # Uses default config
+
+        Using custom configuration:
+
+        >>> config = OODReconstruction.Config(epochs=10, batch_size=128, threshold_perc=99.0)
+        >>> ood = OODReconstruction(VAE(input_shape=(1, 28, 28)), config=config)
+        >>> ood.fit(train_data)  # Uses config defaults
+
+        Overriding config in fit():
+
+        >>> config = OODReconstruction.Config(epochs=10, batch_size=128)
+        >>> ood = OODReconstruction(VAE(input_shape=(1, 28, 28)), config=config)
+        >>> ood.fit(train_data, epochs=100)  # Override config.epochs
+        """
+
+        loss_fn: Callable[..., torch.Tensor] | None = None
+        optimizer: torch.optim.Optimizer | None = None
+        epochs: int = 20
+        batch_size: int = 64
+        threshold_perc: float = 95.0
+        gmm_weight: float = 0.5
+        gmm_score_mode: Literal["standardized", "percentile"] = "standardized"
+
     def __init__(
         self,
         model: torch.nn.Module,
         device: DeviceLike | None = None,
         model_type: Literal["ae", "vae", "auto"] | None = "auto",
         use_gmm: bool | None = None,
-        config: OODReconstructionConfig | None = None,
+        config: Config | None = None,
     ) -> None:
         self.model = model
         self.device: torch.device = get_device(device)
 
         # Store config or create default
-        self.config: OODReconstructionConfig = config or OODReconstructionConfig()
+        self.config: OODReconstruction.Config = config or OODReconstruction.Config()
 
         # Auto-detect model type if needed
         if model_type is None or model_type == "auto":
@@ -454,11 +452,11 @@ class OODReconstruction:
         --------
         Using config defaults (recommended):
 
-        >>> from dataeval.shift import OODReconstruction, OODReconstructionConfig
+        >>> from dataeval.shift import OODReconstruction
         >>> from dataeval.utils.models import AE, VAE
         >>> input_shape = (1, 28, 28)
         >>> train_data = torch.rand(20, *input_shape)
-        >>> config = OODReconstructionConfig(epochs=10, threshold_perc=95)
+        >>> config = OODReconstruction.Config(epochs=10, threshold_perc=95)
         >>> ood = OODReconstruction(AE(input_shape), config=config)
         >>> ood.fit(train_data)  # Uses config defaults
 
@@ -469,7 +467,7 @@ class OODReconstruction:
 
         Using custom loss:
 
-        >>> config = OODReconstructionConfig(loss_fn=ELBOLoss(beta=2.0))
+        >>> config = OODReconstruction.Config(loss_fn=ELBOLoss(beta=2.0))
         >>> ood = OODReconstruction(VAE(input_shape), config=config)
         >>> ood.fit(train_data)
         """

@@ -7,13 +7,16 @@ import numpy as np
 import polars as pl
 
 from dataeval import Metadata as _Metadata
+from dataeval._helpers import _get_index2label
 from dataeval.core._bin import get_counts
 from dataeval.core._diversity import diversity_shannon, diversity_simpson
 from dataeval.protocols import AnnotatedDataset, Metadata
-from dataeval.types import DictOutput, set_metadata
-from dataeval.utils.data import _get_index2label
+from dataeval.types import DictOutput, Evaluator, EvaluatorConfig, set_metadata
 
 _DIVERSITY_FN_MAP = {"simpson": diversity_simpson, "shannon": diversity_shannon}
+
+DEFAULT_DIVERSITY_THRESHOLD = 0.5
+DEFAULT_DIVERSITY_METHOD = "simpson"
 
 
 @dataclass(frozen=True)
@@ -46,7 +49,7 @@ class DiversityOutput(DictOutput):
         return "diversity"
 
 
-class Diversity:
+class Diversity(Evaluator):
     """
     Computes diversity and classwise diversity for discrete/categorical variables through
     standard histogram binning, for continuous variables.
@@ -92,19 +95,43 @@ class Diversity:
 
     >>> diversity = Diversity(method="shannon", threshold=0.6)
 
+    Using configuration:
+
+    >>> config = Diversity.Config(method="shannon", threshold=0.6)
+    >>> diversity = Diversity(config=config)
+
     See Also
     --------
     scipy.stats.entropy
     """
 
+    class Config(EvaluatorConfig):
+        """
+        Configuration for Diversity evaluator.
+
+        Attributes
+        ----------
+        method : {"simpson", "shannon"}, default "simpson"
+            The methodology used for defining diversity.
+        threshold : float, default 0.5
+            Threshold for identifying low diversity.
+        """
+
+        method: Literal["simpson", "shannon"] = DEFAULT_DIVERSITY_METHOD
+        threshold: float = DEFAULT_DIVERSITY_THRESHOLD
+
+    metadata: Metadata
+    method: Literal["simpson", "shannon"]
+    threshold: float
+    config: Config
+
     def __init__(
         self,
-        method: Literal["simpson", "shannon"] = "simpson",
-        threshold: float = 0.5,
+        method: Literal["simpson", "shannon"] | None = None,
+        threshold: float | None = None,
+        config: Config | None = None,
     ) -> None:
-        self.metadata: Metadata
-        self.method: Literal["simpson", "shannon"] = method
-        self.threshold = threshold
+        super().__init__(locals())
 
     @set_metadata(state=["method", "threshold"])
     def evaluate(self, data: AnnotatedDataset[Any] | Metadata) -> DiversityOutput:

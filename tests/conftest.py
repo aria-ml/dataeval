@@ -72,6 +72,8 @@ set_seed(0, all_generators=True)
 
 set_batch_size(16)
 
+DatumType = tuple[NDArray[np.float32], int, dict[str, Any]]
+
 
 class SimpleDataset:
     """Simple dataset that returns random images for testing."""
@@ -82,10 +84,10 @@ class SimpleDataset:
         # Pre-generate data for consistency
         self.data = [np.random.randn(*image_shape).astype(np.float32) for _ in range(size)]
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.size
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> DatumType:
         # Return as tuple to match expected dataset format
         return (self.data[idx], 0, {})  # (image, label, metadata)
 

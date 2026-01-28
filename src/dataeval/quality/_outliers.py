@@ -8,15 +8,20 @@ import numpy as np
 import polars as pl
 from numpy.typing import NDArray
 
+from dataeval._helpers import _get_index2label, _get_item_indices
 from dataeval.config import EPSILON
 from dataeval.core._calculate import CalculationResult, calculate
 from dataeval.core._clusterer import ClusterResult, ClusterStats, cluster, compute_cluster_stats
 from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, Dataset, FeatureExtractor, Metadata
 from dataeval.quality._results import StatsMap, combine_results, get_dataset_step_from_idx
-from dataeval.types import ArrayND, Output, SourceIndex, set_metadata
+from dataeval.types import ArrayND, ClusterConfigMixin, Evaluator, EvaluatorConfig, Output, SourceIndex, set_metadata
 from dataeval.utils.arrays import flatten_samples, to_numpy
-from dataeval.utils.data import _get_index2label, _get_item_indices
+
+DEFAULT_OUTLIERS_FLAGS = ImageStats.DIMENSION | ImageStats.PIXEL | ImageStats.VISUAL
+DEFAULT_OUTLIERS_OUTLIER_METHOD: Literal["zscore", "modzscore", "iqr"] = "modzscore"
+DEFAULT_OUTLIERS_OUTLIER_THRESHOLD: float | None = None
+DEFAULT_OUTLIERS_CLUSTER_THRESHOLD = 2.5
 
 TDataFrame = TypeVar("TDataFrame", pl.DataFrame, Sequence[pl.DataFrame])
 
@@ -363,7 +368,7 @@ def _get_outlier_mask(
     return outliers & ~nan_mask if outliers is not None else np.full(values.shape, False, dtype=bool)
 
 
-class Outliers:
+class Outliers(Evaluator):
     r"""
     Calculates statistical outliers of a dataset using various statistical tests applied to each image.
 
@@ -400,6 +405,9 @@ class Outliers:
     n_clusters : int, optional
         Expected number of clusters. For HDBSCAN, this is a hint that adjusts
         min_cluster_size. For KMeans, this is the exact number of clusters.
+    config : Outliers.Config or None, default None
+        Optional configuration object with default parameters. Parameters
+        specified directly in __init__ will override config defaults.
 
     Attributes
     ----------
@@ -459,26 +467,61 @@ class Outliers:
     >>> extractor = Embeddings(model=my_model)
     >>> outliers = Outliers(flags=ImageStats.NONE, feature_extractor=extractor)
     >>> result = outliers.evaluate(train_ds)  # Only cluster_distance metric
+
+    Using configuration:
+
+    >>> config = Outliers.Config(outlier_method="zscore", outlier_threshold=2.5)
+    >>> outliers = Outliers(config=config)
     """
+
+    class Config(EvaluatorConfig, ClusterConfigMixin):
+        """
+        Configuration for Outliers detector.
+
+        Attributes
+        ----------
+        flags : ImageStats, default ImageStats.DIMENSION | ImageStats.PIXEL | ImageStats.VISUAL
+            Statistics to compute for image statistics-based outlier detection.
+        outlier_method : {"zscore", "modzscore", "iqr"}, default "modzscore"
+            Statistical method used to identify outliers.
+        outlier_threshold : float or None, default None
+            Threshold value for the outlier method.
+        cluster_threshold : float, default 2.5
+            Number of standard deviations from cluster center for cluster-based detection.
+        cluster_algorithm : {"kmeans", "hdbscan"}, default "hdbscan"
+            Clustering algorithm for cluster-based detection.
+        n_clusters : int or None, default None
+            Expected number of clusters.
+        """
+
+        flags: ImageStats = DEFAULT_OUTLIERS_FLAGS
+        outlier_method: Literal["zscore", "modzscore", "iqr"] = DEFAULT_OUTLIERS_OUTLIER_METHOD
+        outlier_threshold: float | None = DEFAULT_OUTLIERS_OUTLIER_THRESHOLD
+        cluster_threshold: float = DEFAULT_OUTLIERS_CLUSTER_THRESHOLD
+
+    stats: CalculationResult
+    flags: ImageStats
+    outlier_method: Literal["zscore", "modzscore", "iqr"]
+    outlier_threshold: float | None
+    cluster_threshold: float
+    cluster_algorithm: Literal["kmeans", "hdbscan"]
+    n_clusters: int | None
+    config: Config
+    feature_extractor: FeatureExtractor | None
 
     def __init__(
         self,
-        flags: ImageStats = ImageStats.DIMENSION | ImageStats.PIXEL | ImageStats.VISUAL,
-        outlier_method: Literal["zscore", "modzscore", "iqr"] = "modzscore",
+        flags: ImageStats | None = None,
+        outlier_method: Literal["zscore", "modzscore", "iqr"] | None = None,
         outlier_threshold: float | None = None,
-        feature_extractor: FeatureExtractor | None = None,
-        cluster_threshold: float = 2.5,
-        cluster_algorithm: Literal["kmeans", "hdbscan"] = "hdbscan",
+        cluster_threshold: float | None = None,
+        cluster_algorithm: Literal["kmeans", "hdbscan"] | None = None,
         n_clusters: int | None = None,
+        config: Config | None = None,
+        feature_extractor: FeatureExtractor | None = None,
     ) -> None:
-        self.stats: CalculationResult
-        self.flags = flags
-        self.outlier_method: Literal["zscore", "modzscore", "iqr"] = outlier_method
-        self.outlier_threshold = outlier_threshold
+        super().__init__(locals())
         self.feature_extractor = feature_extractor
-        self.cluster_threshold = cluster_threshold
-        self.cluster_algorithm: Literal["kmeans", "hdbscan"] = cluster_algorithm
-        self.n_clusters = n_clusters
 
     def _get_outliers(self, stats: StatsMap, source_index: Sequence[SourceIndex]) -> pl.DataFrame:
         item_ids: list[int] = []
