@@ -464,7 +464,7 @@ class Outliers(Evaluator):
     Cluster-based detection with embeddings:
 
     >>> from dataeval import Embeddings
-    >>> extractor = Embeddings(model=my_model)
+    >>> extractor = Embeddings(encoder=encoder)
     >>> outliers = Outliers(flags=ImageStats.NONE, feature_extractor=extractor)
     >>> result = outliers.evaluate(train_ds)  # Only cluster_distance metric
 
@@ -956,7 +956,7 @@ class Outliers(Evaluator):
         Cluster-based detection with embeddings:
 
         >>> from dataeval import Embeddings
-        >>> extractor = Embeddings(model=my_model)
+        >>> extractor = Embeddings(encoder=encoder)
         >>> outliers = Outliers(flags=ImageStats.NONE, feature_extractor=extractor)
         >>> results = outliers.evaluate(train_ds)
         """
