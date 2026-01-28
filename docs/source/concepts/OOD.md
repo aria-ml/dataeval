@@ -164,7 +164,7 @@ clustering capability of a Gaussian Mixture Model (GMM).
 - **Best For:** Multimodal data with distinct sub-populations (e.g., different
   machine operating speeds, day/night imagery).
 
-**Configuration:** The `OODReconstructionConfig` class allows tuning of score
+**Configuration:** The `OODReconstruction.Config` class allows tuning of score
 fusion parameters:
 
 - `gmm_weight`: Weight for GMM component (default 0.5, range [0, 1])

@@ -7,12 +7,15 @@ from typing import Any
 import polars as pl
 
 from dataeval import Metadata as _Metadata
+from dataeval._helpers import _get_index2label
 from dataeval.core import parity
 from dataeval.protocols import AnnotatedDataset, Metadata
-from dataeval.types import DictOutput, set_metadata
-from dataeval.utils.data import _get_index2label
+from dataeval.types import DictOutput, Evaluator, EvaluatorConfig, set_metadata
 
 _logger = logging.getLogger(__name__)
+
+DEFAULT_PARITY_SCORE_THRESHOLD = 0.3
+DEFAULT_PARITY_P_VALUE_THRESHOLD = 0.05
 
 
 @dataclass(frozen=True)
@@ -40,7 +43,7 @@ class ParityOutput(DictOutput):
     insufficient_data: dict[str, dict[int, dict[str, int]]]
 
 
-class Parity:
+class Parity(Evaluator):
     """
     Calculate statistical parity using Bias-Corrected Cramér's V.
 
@@ -102,18 +105,41 @@ class Parity:
 
     >>> parity = Parity(score_threshold=0.4, p_value_threshold=0.01)
 
+    Using configuration:
+
+    >>> config = Parity.Config(score_threshold=0.4, p_value_threshold=0.01)
+    >>> parity = Parity(config=config)
+
     output = parity(metadata.binned_data, metadata.class_labels.tolist())
     """
 
+    class Config(EvaluatorConfig):
+        """
+        Configuration for Parity evaluator.
+
+        Attributes
+        ----------
+        score_threshold : float, default 0.3
+            Threshold for identifying highly correlated factors.
+        p_value_threshold : float, default 0.05
+            P-value threshold for statistical significance.
+        """
+
+        score_threshold: float = DEFAULT_PARITY_SCORE_THRESHOLD
+        p_value_threshold: float = DEFAULT_PARITY_P_VALUE_THRESHOLD
+
+    metadata: Metadata
+    score_threshold: float
+    p_value_threshold: float
+    config: Config
+
     def __init__(
         self,
-        score_threshold: float = 0.3,
-        p_value_threshold: float = 0.05,
+        score_threshold: float | None = None,
+        p_value_threshold: float | None = None,
+        config: Config | None = None,
     ) -> None:
-        """Initialize Parity evaluator."""
-        self.metadata: Metadata
-        self.score_threshold = score_threshold
-        self.p_value_threshold = p_value_threshold
+        super().__init__(locals())
 
     @set_metadata(state=["score_threshold", "p_value_threshold"])
     def evaluate(self, data: AnnotatedDataset[Any] | Metadata) -> ParityOutput:

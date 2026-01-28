@@ -81,6 +81,7 @@ autoapi_generate_api_docs = True
 # uncomment to review or debug generated content
 # autoapi_keep_files = True
 autodoc_typehints = "description"
+autodoc_typehints_description_target = "documented"
 autoapi_own_page_level = "function"
 autoapi_member_order = "groupwise"
 autoapi_add_toctree_entry = False
@@ -188,6 +189,11 @@ def autoapi_skip_member(app, what, name, obj, skip, options):
         skip = True
     # selectively skip inherited members
     if inherits_from(obj, "torch.nn.modules.module.Module"):
+        skip = True
+    if inherits_from(obj, "pydantic.main.BaseModel"):
+        skip = True
+    # skip pydantic model_config attribute
+    if what == "attribute" and name.endswith(".model_config"):
         skip = True
 
     return skip
