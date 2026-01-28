@@ -207,7 +207,7 @@ class Duplicates(Evaluator):
     Combined hash and cluster-based detection:
 
     >>> from dataeval import Embeddings
-    >>> extractor = Embeddings(model=my_model)
+    >>> extractor = Embeddings(encoder=encoder)
     >>> detector = Duplicates(feature_extractor=extractor, cluster_threshold=1.0)
     >>> result = detector.evaluate(train_ds)
 
@@ -827,7 +827,7 @@ class Duplicates(Evaluator):
         Combined hash and cluster-based detection:
 
         >>> from dataeval import Embeddings
-        >>> extractor = Embeddings(model=my_model)
+        >>> extractor = Embeddings(encoder=encoder)
         >>> detector = Duplicates(feature_extractor=extractor, cluster_threshold=1.0)
         >>> result = detector.evaluate(train_ds)
         """

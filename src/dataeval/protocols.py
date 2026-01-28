@@ -9,6 +9,7 @@ __all__ = [
     "Dataset",
     "DatasetMetadata",
     "DeviceLike",
+    "EmbeddingEncoder",
     "EvaluationSchedule",
     "EvaluationStrategy",
     "FeatureExtractor",
@@ -33,6 +34,7 @@ __all__ = [
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from typing import (
     Any,
+    Literal,
     Protocol,
     TypeAlias,
     TypedDict,
@@ -522,6 +524,116 @@ Type alias for a callable embedding model.
 Embedding models should take an input array or a batch of arrays and return an output
 representing the input data in a lower dimensional space.
 """
+
+
+@runtime_checkable
+class EmbeddingEncoder(Protocol):
+    """
+    Protocol for embedding encoders that extract features from datasets.
+
+    Implementations handle all backend-specific logic including:
+    - Model/function management
+    - Device handling (if applicable)
+    - Transforms (preprocessing)
+    - Batching strategy
+    - Layer extraction (if applicable)
+
+    The :meth:`encode` method supports both streaming and non-streaming modes
+    via the ``stream`` parameter.
+
+    Example
+    -------
+    Creating a custom encoder:
+
+    >>> import numpy as np
+    >>> from numpy.typing import NDArray
+    >>> from dataeval.protocols import EmbeddingEncoder, Dataset
+    >>>
+    >>> class MyEncoder:
+    ...     def __init__(self, batch_size: int = 32):
+    ...         self._batch_size = batch_size
+    ...
+    ...     @property
+    ...     def batch_size(self) -> int:
+    ...         return self._batch_size
+    ...
+    ...     def encode(self, dataset, indices, stream=False):
+    ...         def _generate():
+    ...             for batch_start in range(0, len(indices), self._batch_size):
+    ...                 batch_idx = list(indices[batch_start : batch_start + self._batch_size])
+    ...                 results = []
+    ...                 for idx in batch_idx:
+    ...                     item = dataset[idx]
+    ...                     image = item[0] if isinstance(item, tuple) else item
+    ...                     results.append(np.asarray(image).flatten())
+    ...                 yield batch_idx, np.vstack(results)
+    ...
+    ...         if stream:
+    ...             return _generate()
+    ...         return np.vstack([emb for _, emb in _generate()])
+    >>>
+    >>> encoder = MyEncoder(batch_size=32)
+    >>> isinstance(encoder, EmbeddingEncoder)
+    True
+    """
+
+    @property
+    def batch_size(self) -> int:
+        """
+        Return the batch size used for encoding.
+
+        Returns
+        -------
+        int
+            Number of samples processed per batch during encoding.
+        """
+        ...
+
+    @overload
+    def encode(
+        self,
+        dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike],
+        indices: Sequence[int],
+        stream: Literal[True],
+    ) -> Iterator[tuple[Sequence[int], Array]]: ...
+
+    @overload
+    def encode(
+        self,
+        dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike],
+        indices: Sequence[int],
+        stream: Literal[False] = ...,
+    ) -> Array: ...
+
+    def encode(
+        self,
+        dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike],
+        indices: Sequence[int],
+        stream: bool = False,
+    ) -> Iterator[tuple[Sequence[int], Array]] | Array:
+        """
+        Encode images at specified indices to embeddings.
+
+        Parameters
+        ----------
+        dataset : Dataset
+            Dataset providing images to encode. Can return either
+            (image, label, metadata) tuples or just images.
+        indices : Sequence[int]
+            Indices of images to encode from the dataset.
+        stream : bool, default False
+            If True, yields (batch_indices, batch_embeddings) tuples for
+            memory-efficient streaming. If False (default), returns all
+            embeddings as a single array.
+
+        Returns
+        -------
+        Array or Iterator[tuple[Sequence[int], Array]]
+            When stream=False: Embeddings array of shape (len(indices), embedding_dim).
+            When stream=True: Iterator yielding (batch_indices, batch_embeddings) tuples.
+        """
+        ...
+
 
 # ========== SUFFICIENCY STRATEGIES ==========
 
