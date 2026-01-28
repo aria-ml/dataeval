@@ -220,7 +220,7 @@ False Discovery Rate (FDR) Correction
     False Discovery Rate Correction is a statistical procedure for correcting for the problem caused by running multiple hypothesis tests at once. It is typically used in high-throughput experiments in order to correct for random events that falsely appear significant.
 
 False Negative Rate (FN)
-    A measure of {term}`machine leaning<Machine Learning (ML)>` model accuracy. It measures the frequency at which a negative prediction was found for a positive ground truth value.
+    A measure of {term}`machine learning<Machine Learning (ML)>` model accuracy. It measures the frequency at which a negative prediction was found for a positive ground truth value.
 
     See {term}`Confusion Matrix`
 
@@ -383,7 +383,7 @@ Outliers (Images)
     Images which differ significantly from all or most of the other images in a dataset.
 
 Out-of-distribution (OOD)
-    Out-of-distribution (OOD) data refers to data that is different from the data used to train the {term}`machine learning<Machine Learning (Ml)>` model. For example, data collected in a different way, at a different time, under different conditions, or for a different task than the data on which the model was originally trained. An illustration is shown below:
+    Out-of-distribution (OOD) data refers to data that is different from the data used to train the {term}`machine learning<Machine Learning (ML)>` model. For example, data collected in a different way, at a different time, under different conditions, or for a different task than the data on which the model was originally trained. An illustration is shown below:
 
     ![Out Of Distribution Illustration](../_static/images/reference/out_of_distribution.png)
 
