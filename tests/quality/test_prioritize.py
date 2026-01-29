@@ -36,16 +36,17 @@ class TestPrioritize:
         ),
     )
     def test_prioritize_evaluate(self, encoder, method, method_kwargs):
-        p = Prioritize(encoder)
         dataset = self.get_dataset()
 
-        # Configure using builder pattern
+        # Use factory class methods
         if method == "knn":
-            p.with_knn(**method_kwargs)
+            p = Prioritize.knn(encoder, **method_kwargs)
         elif method == "kmeans_distance":
-            p.with_kmeans_distance(**method_kwargs)
+            p = Prioritize.kmeans_distance(encoder, **method_kwargs)
         elif method == "kmeans_complexity":
-            p.with_kmeans_complexity(**method_kwargs)
+            p = Prioritize.kmeans_complexity(encoder, **method_kwargs)
+        else:
+            assert False, f"Unknown method: {method}"
 
         result = p.hard_first().evaluate(dataset)
 
@@ -62,14 +63,13 @@ class TestPrioritize:
         ("hard_first", "easy_first", "stratified", "class_balance"),
     )
     def test_prioritize_policies(self, encoder, policy):
-        p = Prioritize(encoder)
         dataset = self.get_dataset()
         labels = np.random.randint(low=0, high=10, size=1000)
 
-        # Configure method
-        p.with_knn(k=10)
+        # Use factory method to create base instance
+        p = Prioritize.knn(encoder, k=10)
 
-        # Configure policy
+        # Configure policy using fluent methods
         if policy == "hard_first":
             result = p.hard_first().evaluate(dataset)
         elif policy == "easy_first":
@@ -85,35 +85,35 @@ class TestPrioritize:
         assert len(result.indices) == 1000
         assert any(i != j for i, j in zip(result.indices, range(1000)))
 
-    def test_prioritize_method_not_configured_raises_valueerror(self, encoder):
-        p = Prioritize(encoder)
-        dataset = self.get_dataset()
-        with pytest.raises(ValueError, match="Method not configured"):
-            p.hard_first().evaluate(dataset)
+    def test_prioritize_encoder_required(self):
+        """Test that encoder must be provided."""
+        with pytest.raises(ValueError, match="encoder must be provided"):
+            Prioritize()
 
-    def test_prioritize_policy_not_configured_raises_valueerror(self, encoder):
-        p = Prioritize(encoder)
-        dataset = self.get_dataset()
-        with pytest.raises(ValueError, match="Policy not configured"):
-            p.with_knn(k=5).evaluate(dataset)
+    def test_prioritize_default_method_and_policy(self, encoder):
+        """Test that default method (knn) and policy (hard_first) are used."""
+        p = Prioritize(encoder=encoder)
+        dataset = self.get_dataset(n=100)
+        result = p.evaluate(dataset)
+
+        assert result.method == "knn"
+        assert result.policy == "hard_first"
+        assert len(result.indices) == 100
 
     def test_prioritize_dataset_class_balance_without_labels_does_not_raise_valueerror(self, encoder):
-        p = Prioritize(encoder)
         dataset = self.get_dataset(n=100)
         # class_balanced() with no labels will extract from AnnotatedDataset
-        p.with_knn(k=5).class_balanced().evaluate(dataset)
+        Prioritize.knn(encoder, k=5).class_balanced().evaluate(dataset)
 
     def test_prioritize_embeddings_class_balance_without_labels_raises_valueerror(self, encoder):
-        p = Prioritize(encoder)
         embeddings = self.get_embeddings(encoder, n=100)
         with pytest.raises(ValueError, match="class_labels must be provided"):
-            p.with_knn(k=5).class_balanced().evaluate(embeddings)
+            Prioritize.knn(encoder, k=5).class_balanced().evaluate(embeddings)
 
     def test_prioritize_stratified_no_scores_raises_valueerror(self, encoder):
-        p = Prioritize(encoder)
         dataset = self.get_dataset(n=100)
-        with pytest.raises(ValueError, match="Ranking scores are necessary"):
-            p.with_kmeans_complexity(c=5).stratified().evaluate(dataset)
+        with pytest.raises(ValueError, match="stratified policy is not available"):
+            Prioritize.kmeans_complexity(encoder, c=5).stratified().evaluate(dataset)
 
     @pytest.mark.parametrize("use_embeddings", [False, True])
     @pytest.mark.parametrize("use_reference", [False, True])
@@ -126,20 +126,21 @@ class TestPrioritize:
         ),
     )
     def test_prioritize_with_embeddings(self, encoder, method, method_kwargs, use_embeddings, use_reference):
-        # Setup reference in __init__ if needed
+        # Setup reference if needed
         reference = self.get_embeddings(encoder) if use_reference else None
-        p = Prioritize(encoder, reference=reference)
 
         # Pass either Embeddings or AnnotatedDataset as dataset parameter
         dataset = self.get_embeddings(encoder) if use_embeddings else self.get_dataset()
 
-        # Configure using builder pattern
+        # Use factory class methods with reference
         if method == "knn":
-            p.with_knn(**method_kwargs)
+            p = Prioritize.knn(encoder, reference=reference, **method_kwargs)
         elif method == "kmeans_distance":
-            p.with_kmeans_distance(**method_kwargs)
+            p = Prioritize.kmeans_distance(encoder, reference=reference, **method_kwargs)
         elif method == "kmeans_complexity":
-            p.with_kmeans_complexity(**method_kwargs)
+            p = Prioritize.kmeans_complexity(encoder, reference=reference, **method_kwargs)
+        else:
+            assert False, f"Unknown method: {method}"
 
         result = p.hard_first().evaluate(dataset)
 
@@ -151,9 +152,8 @@ class TestPrioritize:
 
     def test_prioritize_with_precomputed_embeddings(self, encoder):
         """Test that we can pass Embeddings directly as the dataset."""
-        p = Prioritize(encoder)
         embeddings = self.get_embeddings(encoder, 100)
-        result = p.with_knn(k=5).easy_first().evaluate(embeddings)
+        result = Prioritize.knn(encoder, k=5).easy_first().evaluate(embeddings)
 
         assert isinstance(result, PrioritizeOutput)
         assert len(result.indices) == 100
@@ -180,29 +180,60 @@ class TestPrioritize:
     def test_prioritize_with_reference_dataset(self, encoder):
         """Test Prioritize with reference dataset provided at init."""
         reference_dataset = self.get_dataset(500)
-        p = Prioritize(encoder, reference=reference_dataset)
-
         dataset = self.get_dataset(100)
-        result = p.with_knn(k=10).hard_first().evaluate(dataset)
+
+        result = Prioritize.knn(encoder, k=10, reference=reference_dataset).hard_first().evaluate(dataset)
 
         assert isinstance(result, PrioritizeOutput)
         assert len(result.indices) == 100
         assert result.method == "knn"
         assert result.policy == "hard_first"
 
-    def test_prioritize_reconfigure_and_reuse(self, encoder):
-        """Test that we can reconfigure and reuse the same prioritizer instance."""
-        p = Prioritize(encoder)
-        dataset1 = self.get_dataset(100)
-        dataset2 = self.get_dataset(200)
+    def test_prioritize_immutable_policy_methods(self, encoder):
+        """Test that policy methods return new instances (immutable pattern)."""
+        p1 = Prioritize.knn(encoder, k=5)
+        p2 = p1.easy_first()
+        p3 = p1.hard_first()
 
-        # First configuration
-        result1 = p.with_knn(k=5).hard_first().evaluate(dataset1)
-        assert len(result1.indices) == 100
-        assert result1.method == "knn"
+        # p1 should still have default policy
+        assert p1.policy == "hard_first"
+        # p2 and p3 are new instances with different policies
+        assert p2.policy == "easy_first"
+        assert p3.policy == "hard_first"
+        # They should be different objects
+        assert p1 is not p2
+        assert p1 is not p3
+        assert p2 is not p3
 
-        # Reconfigure with different method
-        result2 = p.with_kmeans_distance(c=10).easy_first().evaluate(dataset2)
-        assert len(result2.indices) == 200
-        assert result2.method == "kmeans_distance"
-        assert result2.policy == "easy_first"
+    def test_prioritize_direct_instantiation(self, encoder):
+        """Test direct instantiation with all parameters."""
+        dataset = self.get_dataset(100)
+
+        p = Prioritize(
+            encoder=encoder,
+            method="kmeans_distance",
+            c=10,
+            policy="stratified",
+            num_bins=20,
+        )
+        result = p.evaluate(dataset)
+
+        assert result.method == "kmeans_distance"
+        assert result.policy == "stratified"
+        assert len(result.indices) == 100
+
+    def test_prioritize_config_usage(self, encoder):
+        """Test using Config object for configuration."""
+        config = Prioritize.Config(
+            encoder=encoder,
+            method="knn",
+            k=10,
+            policy="easy_first",
+        )
+        p = Prioritize(config=config)
+        dataset = self.get_dataset(100)
+        result = p.evaluate(dataset)
+
+        assert result.method == "knn"
+        assert result.policy == "easy_first"
+        assert len(result.indices) == 100
