@@ -55,6 +55,8 @@ class ImageStats(Flag):
     - `HASH_XXHASH` : xxHash of raw image
     - `HASH_PHASH` : Perceptual hash of image
     - `HASH_DHASH` : Difference/gradient hash of image
+    - `HASH_PHASH_D4` : Perceptual hash with D4 symmetry (rotation/flip invariant)
+    - `HASH_DHASH_D4` : Difference hash with D4 symmetry (rotation/flip invariant)
 
     Convenience Groups
     ------------------
@@ -66,7 +68,8 @@ class ImageStats(Flag):
     - `DIMENSION_BASIC` : Width, height, channels
     - `DIMENSION_OFFSET` : Offset X and Y
     - `DIMENSION_POSITION` : Center, distance to center, distance to edge
-    - `HASH_PERCEPTION` : Perceptual and difference hashes
+    - `HASH_DUPLICATES_BASIC` : Standard duplicate detection (xxhash + phash + dhash)
+    - `HASH_DUPLICATES_D4` : Rotation/flip-invariant detection (xxhash + phash_d4 + dhash_d4)
 
     Full Categories:
 
@@ -133,7 +136,9 @@ class ImageStats(Flag):
     # ===== HASH STATS =====
     HASH_XXHASH = auto()
     HASH_PHASH = auto()
+    HASH_PHASH_D4 = auto()
     HASH_DHASH = auto()
+    HASH_DHASH_D4 = auto()
 
     # ===== COARSE-GRAINED GROUPS =====
     # Full category groups
@@ -166,7 +171,7 @@ class ImageStats(Flag):
         | DIMENSION_INVALID_BOX
     )
 
-    HASH = HASH_XXHASH | HASH_PHASH | HASH_DHASH
+    HASH = HASH_XXHASH | HASH_PHASH | HASH_DHASH | HASH_PHASH_D4 | HASH_DHASH_D4
 
     # Convenience sub-groups
     PIXEL_BASIC = PIXEL_MEAN | PIXEL_STD | PIXEL_VAR
@@ -178,7 +183,8 @@ class ImageStats(Flag):
     DIMENSION_OFFSET = DIMENSION_OFFSET_X | DIMENSION_OFFSET_Y
     DIMENSION_POSITION = DIMENSION_CENTER | DIMENSION_DISTANCE_CENTER | DIMENSION_DISTANCE_EDGE
 
-    HASH_PERCEPTION = HASH_PHASH | HASH_DHASH
+    HASH_DUPLICATES_BASIC = HASH_XXHASH | HASH_PHASH | HASH_DHASH
+    HASH_DUPLICATES_D4 = HASH_XXHASH | HASH_PHASH_D4 | HASH_DHASH_D4
 
     # Ultimate convenience
     ALL = PIXEL | VISUAL | DIMENSION | HASH
