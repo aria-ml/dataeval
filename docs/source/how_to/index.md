@@ -38,6 +38,29 @@ These guides will provide quick examples of how to configure DataEval for your e
 [hdw-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.94.0/docs/source/notebooks/h2_configure_hardware_settings.ipynb
 [log-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.94.0/docs/source/notebooks/h2_configure_logging.ipynb
 
+## Encoding
+
+These guides provide examples of how to extract Embeddings using the Encoder classes.
+
+```{toctree}
+:hidden:
+
+../notebooks/h2_encode_with_onnx.ipynb
+```
+
+:::{list-table}
+:widths: 30 50 20
+:header-rows: 0
+:align: center
+
+- - [](../notebooks/h2_encode_with_onnx.ipynb)
+  - Encode image embeddings with an ONNX model
+  - [![Open In Colab][colab-badge]][onx-colab]
+
+:::
+
+[onx-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.94.0/docs/source/notebooks/h2_encode_with_onnx.ipynb
+
 ## Detectors
 
 The purpose of these tools is to identify or detect issues within a dataset.
