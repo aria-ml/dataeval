@@ -17,7 +17,7 @@ from dataeval.quality._results import StatsMap, combine_results, get_dataset_ste
 from dataeval.types import ClusterConfigMixin, DictOutput, Evaluator, EvaluatorConfig, SourceIndex, set_metadata
 from dataeval.utils.arrays import flatten_samples, to_numpy
 
-DEFAULT_DUPLICATES_FLAGS = ImageStats.HASH
+DEFAULT_DUPLICATES_FLAGS = ImageStats.HASH_DUPLICATES_BASIC
 DEFAULT_DUPLICATES_CLUSTER_THRESHOLD: float | None = None
 DEFAULT_DUPLICATES_MERGE_NEAR_DUPLICATES = True
 
@@ -43,6 +43,10 @@ class DatasetItemTuple(NamedTuple):
 TIndexType = TypeVar("TIndexType", int, SourceIndex, DatasetItemTuple)
 
 
+_BASIC_HASH_METHODS = frozenset({"phash", "dhash"})
+_D4_HASH_METHODS = frozenset({"phash_d4", "dhash_d4"})
+
+
 @dataclass(frozen=True)
 class NearDuplicateGroup(Generic[TIndexType]):
     """A group of near-duplicate items with detection method metadata.
@@ -52,14 +56,25 @@ class NearDuplicateGroup(Generic[TIndexType]):
     indices : Sequence[TIndexType]
         The indices of items in this near-duplicate group.
     methods : frozenset[str]
-        The detection methods that identified this group (e.g., {"phash", "rhash"}).
+        The detection methods that identified this group. Possible values include:
+        "phash", "dhash" (basic perceptual hashes), "phash_d4", "dhash_d4"
+        (rotation/flip-invariant D4 hashes), and "cluster" (embedding-based).
+    orientation : Literal["rotated", "same"] | None, optional
+        Indicates whether the duplicates are of the same orientation or
+        rotated/flipped versions. Set automatically when both basic (phash/dhash)
+        and D4 (phash_d4/dhash_d4) hashes are computed:
+        - "same": Detected by basic hashes (same orientation)
+        - "rotated": Detected only by D4 hashes (rotated/flipped)
+        - None: Cannot determine (only one hash type was computed)
     """
 
     indices: Sequence[TIndexType]
     methods: frozenset[str]
+    orientation: Literal["rotated", "same"] | None = None
 
     def __repr__(self) -> str:
-        return f"NearDuplicateGroup({list(self.indices)}, methods={set(self.methods)})"
+        orientation = f", orientation={self.orientation}" if self.orientation else ""
+        return f"NearDuplicateGroup({list(self.indices)}, methods={sorted(self.methods)}{orientation})"
 
 
 @dataclass(frozen=True)
@@ -85,7 +100,12 @@ class DuplicateDetectionResult(Generic[TIndexType]):
 
     - **phash**: DCT frequency domain - best for compression artifacts
     - **dhash**: Gradient domain - robust to brightness changes
+    - **phash_d4**: DCT frequency domain with D4 symmetry - rotation/flip invariant
+    - **dhash_d4**: Gradient domain with D4 symmetry - rotation/flip invariant
     - **cluster**: Embedding space - semantic similarity
+
+    Use ``HASH_DUPLICATES_BASIC`` for standard detection or
+    ``HASH_DUPLICATES_D4`` for rotation/flip-invariant detection.
 
     When ``merge_near_duplicates=True`` (default), overlapping groups from
     different methods are merged, and the methods set shows which detection
@@ -137,22 +157,33 @@ class Duplicates(Evaluator):
     - **Hash-based exact (xxhash)**: Detects exact duplicates (identical pixel values) using xxhash.
     - **Hash-based near (phash)**: DCT-based perceptual hashing for compression/resize detection.
     - **Hash-based near (dhash)**: Gradient hash for brightness-invariant detection.
+    - **Multidirectional hashing (phash_d4, dhash_d4)**: Rotation/flip-invariant variants that
+      detect duplicates regardless of orientation.
     - **Cluster-based**: Uses neural network embeddings to find semantic duplicates.
 
     The multiple perceptual hash methods (phash, dhash) are complementary
     and can catch different types of image modifications. Using all hashes provides
     more robust near-duplicate detection without requiring a trained model.
 
+    Three convenience flags are provided for common use cases:
+
+    - ``ImageStats.HASH_DUPLICATES_BASIC``: Standard duplicate detection (xxhash + phash + dhash)
+    - ``ImageStats.HASH_DUPLICATES_D4``: Rotation/flip-invariant detection
+      (xxhash + phash_d4 + dhash_d4)
+
     Parameters
     ----------
-    flags : ImageStats, default ImageStats.HASH
+    flags : ImageStats, default ImageStats.HASH_DUPLICATES_BASIC
         Statistics to compute for hash-based duplicate detection:
 
-        - ``ImageStats.HASH`` (default): Compute all hash types (xxhash + perceptual)
+        - ``ImageStats.HASH_DUPLICATES_BASIC`` (default): Standard detection with exact
+          and perceptual hashes (xxhash + phash + dhash)
+        - ``ImageStats.HASH_DUPLICATES_D4``: Rotation/flip-invariant detection
+          using D4 symmetry hashes (xxhash + phash_d4 + dhash_d4)
+        - ``ImageStats.HASH``: Compute all hash types (includes both basic and D4 variants)
         - ``ImageStats.HASH_XXHASH``: Compute only exact duplicates (fastest)
-        - ``ImageStats.HASH_PHASH``: Compute only DCT-based perception hash near duplicates
-        - ``ImageStats.HASH_DHASH``: Compute only gradient hash near duplicates
-        - ``ImageStats.HASH_PERCEPTUAL``: All perceptual hashes (phash + dhash)
+        - ``ImageStats.HASH_PHASH``: Compute only phash-based near duplicates
+        - ``ImageStats.HASH_DHASH``: Compute only dhash-based near duplicates
         - ``ImageStats.NONE``: Skip hash computation, use only cluster-based detection
     feature_extractor : FeatureExtractor, optional
         Feature extractor for cluster-based duplicate detection. When provided,
@@ -194,7 +225,7 @@ class Duplicates(Evaluator):
 
     Examples
     --------
-    Basic hash-based detection with merged near duplicates:
+    Basic hash-based detection (default):
 
     >>> detector = Duplicates()
     >>> result = detector.evaluate(images)
@@ -327,7 +358,7 @@ class Duplicates(Evaluator):
 
         # Collect near duplicates from each method with method labels
         method_groups: list[tuple[list[int], str]] = []
-        methods = ["phash", "dhash"]
+        methods = ["phash", "dhash", "phash_d4", "dhash_d4"]
 
         for method in methods:
             if method in stats:
@@ -335,7 +366,8 @@ class Duplicates(Evaluator):
                     method_groups.append((group, method))
 
         # Merge or keep separate based on configuration
-        near_groups = self._build_near_duplicate_groups(method_groups)
+        available_stats = set(stats.keys()) & set(methods)
+        near_groups = self._build_near_duplicate_groups(method_groups, available_stats)
 
         return DuplicateDetectionResult(
             exact=sorted(item_exact) or None,
@@ -358,7 +390,7 @@ class Duplicates(Evaluator):
         stats : StatsMap
             Hash statistics.
         hash_key : str
-            Key for the hash type in stats (e.g., "phash", "dhash", "rhash").
+            Key for the hash type in stats (e.g., "phash", "dhash", "phash_d4", "dhash_d4").
         source_index : Sequence[SourceIndex]
             Source index information.
         indices : list[int]
@@ -414,7 +446,7 @@ class Duplicates(Evaluator):
 
         # Collect near duplicates from each method with method labels
         method_groups: list[tuple[list[SourceIndex], str]] = []
-        methods = ["phash", "dhash"]
+        methods = ["phash", "dhash", "phash_d4", "dhash_d4"]
 
         for method in methods:
             if method in stats:
@@ -424,7 +456,8 @@ class Duplicates(Evaluator):
                     method_groups.append((group, method))
 
         # Merge or keep separate based on configuration
-        near_groups = self._build_near_duplicate_groups(method_groups)
+        available_stats = set(stats.keys()) & set(methods)
+        near_groups = self._build_near_duplicate_groups(method_groups, available_stats)
 
         return DuplicateDetectionResult(
             exact=sorted(target_exact) or None,
@@ -471,9 +504,18 @@ class Duplicates(Evaluator):
             sorted(v) for v in near_dict.values() if len(v) > 1 and not any(set(v).issubset(x) for x in exact_groups)
         ]
 
+    def _get_orientation(self, methods: frozenset[str]) -> Literal["rotated", "same"]:
+        """Determine orientation based on which methods detected the group."""
+        has_basic = bool(methods & _BASIC_HASH_METHODS)
+        has_d4 = bool(methods & _D4_HASH_METHODS)
+        if has_d4 and not has_basic:
+            return "rotated"
+        return "same"
+
     def _build_near_duplicate_groups(
         self,
         method_groups: Sequence[tuple[Sequence[Any], str]],
+        available_stats: set[str],
     ) -> list[NearDuplicateGroup[Any]]:
         """
         Build NearDuplicateGroup objects, optionally merging overlapping groups.
@@ -482,6 +524,8 @@ class Duplicates(Evaluator):
         ----------
         method_groups : Sequence[tuple[Sequence[Any], str]]
             List of (indices, method_name) tuples from each detection method.
+        available_stats : set[str]
+            Set of hash types that were computed (e.g., {"phash", "dhash", "phash_d4"}).
 
         Returns
         -------
@@ -491,10 +535,19 @@ class Duplicates(Evaluator):
         if not method_groups:
             return []
 
+        # Determine if we can compute orientation (need both basic and D4 hashes)
+        has_basic_stats = bool(available_stats & _BASIC_HASH_METHODS)
+        has_d4_stats = bool(available_stats & _D4_HASH_METHODS)
+        is_unknown = not (has_basic_stats and has_d4_stats)
+
         if not self.merge_near_duplicates:
             # Keep groups separate - each group has a single method
             groups = [
-                NearDuplicateGroup(indices=tuple(sorted(group)), methods=frozenset({method}))
+                NearDuplicateGroup(
+                    indices=tuple(sorted(group)),
+                    methods=frozenset({method}),
+                    orientation=None if is_unknown else self._get_orientation(frozenset({method})),
+                )
                 for group, method in method_groups
             ]
             return sorted(groups, key=lambda g: tuple(g.indices))
@@ -526,7 +579,11 @@ class Duplicates(Evaluator):
 
         # Convert to NearDuplicateGroup objects
         result = [
-            NearDuplicateGroup(indices=tuple(sorted(indices)), methods=frozenset(methods))
+            NearDuplicateGroup(
+                indices=tuple(sorted(indices)),
+                methods=frozenset(methods),
+                orientation=None if is_unknown else self._get_orientation(frozenset(methods)),
+            )
             for indices, methods in merged
             if len(indices) > 1
         ]
@@ -661,7 +718,10 @@ class Duplicates(Evaluator):
 
         exact_split = [list(split_indices(group)) for group in exact_groups] if exact_groups else None
         near_split = (
-            [NearDuplicateGroup(indices=split_indices(g.indices), methods=g.methods) for g in near_groups]
+            [
+                NearDuplicateGroup(indices=split_indices(g.indices), methods=g.methods, orientation=g.orientation)
+                for g in near_groups
+            ]
             if near_groups
             else None
         )
@@ -866,7 +926,8 @@ class Duplicates(Evaluator):
                 cluster_near = []
 
         # Merge results
-        final_item_result = self._merge_item_results(hash_item_result, cluster_exact, cluster_near)
+        available_stats = set(self.stats["stats"].keys()) if self.flags & ImageStats.HASH else set()
+        final_item_result = self._merge_item_results(hash_item_result, cluster_exact, cluster_near, available_stats)
         final_target_result = hash_target_result or DuplicateDetectionResult()
 
         return DuplicatesOutput(items=final_item_result, targets=final_target_result)
@@ -876,6 +937,7 @@ class Duplicates(Evaluator):
         hash_result: DuplicateDetectionResult[int] | None,
         cluster_exact: list[list[int]],
         cluster_near: list[list[int]],
+        available_stats: set[str],
     ) -> DuplicateDetectionResult[int]:
         """Merge hash-based and cluster-based item duplicate results."""
         if hash_result is None and not cluster_exact and not cluster_near:
@@ -885,8 +947,8 @@ class Duplicates(Evaluator):
         cluster_method_groups: list[tuple[Sequence[Any], str]] = [(group, "cluster") for group in cluster_near]
 
         if hash_result is None:
-            # Only cluster results
-            near_groups = self._build_near_duplicate_groups(cluster_method_groups)
+            # Only cluster results - no hash stats available for orientation
+            near_groups = self._build_near_duplicate_groups(cluster_method_groups, available_stats)
             return DuplicateDetectionResult(
                 exact=cluster_exact if cluster_exact else None,
                 near=near_groups or None,
@@ -910,7 +972,7 @@ class Duplicates(Evaluator):
                     hash_method_groups.append((list(g.indices), method))
 
         all_method_groups = hash_method_groups + cluster_method_groups
-        merged_near = self._build_near_duplicate_groups(all_method_groups)
+        merged_near = self._build_near_duplicate_groups(all_method_groups, available_stats)
 
         return DuplicateDetectionResult(
             exact=merged_exact if merged_exact else None,

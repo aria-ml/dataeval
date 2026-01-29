@@ -13,7 +13,7 @@ controlled via {class}`.ImageStats` flags:
 - `PIXEL` - Pixel-level statistics (mean, std, variance, skewness, kurtosis, entropy, etc.)
 - `VISUAL` - Visual quality statistics (brightness, contrast, darkness, sharpness, percentiles)
 - `DIMENSION` - Dimension-based statistics (width, height, channels, size, aspect ratio, etc.)
-- `HASH` - Hash-based statistics for duplicate detection (xxhash, phash, dhash)
+- `HASH` - Hash-based statistics for duplicate detection (xxhash, phash, dhash, and D4 variants)
 
 The information below includes what each category provides and the statistical
 metrics that are available in each.
@@ -99,17 +99,26 @@ if there are any issues with any of the images in the dataset.
 
 The `HASH` flag group calculates hash values for duplicate detection:
 
-| Flag        | Description                                                                                      |
-| ----------- | ------------------------------------------------------------------------------------------------ |
-| HASH_XXHASH | [xxHash](https://github.com/Cyan4973/xxHash) for exact image matching                            |
-| HASH_PHASH  | [Perceptual hash](https://en.wikipedia.org/wiki/Perceptual_hashing) for near-duplicate detection |
-| HASH_DHASH  | Difference/gradient hash for near-duplicate detection                                            |
+| Flag          | Description                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------------ |
+| HASH_XXHASH   | [xxHash](https://github.com/Cyan4973/xxHash) for exact image matching                            |
+| HASH_PHASH    | [Perceptual hash](https://en.wikipedia.org/wiki/Perceptual_hashing) for near-duplicate detection |
+| HASH_DHASH    | Difference/gradient hash for near-duplicate detection                                            |
+| HASH_PHASH_D4 | Perceptual hash with D4 symmetry (rotation/flip invariant)                                       |
+| HASH_DHASH_D4 | Difference/gradient hash with D4 symmetry (rotation/flip invariant)                              |
 
 Convenience sub-groups:
 
-- `HASH_PERCEPTION` - Perceptual and difference/gradient based hashes
+- `HASH_DUPLICATES_BASIC` - Standard duplicate detection (xxhash + phash + dhash)
+- `HASH_DUPLICATES_D4` - Rotation/flip-invariant detection (xxhash + phash_d4 + dhash_d4)
 
 These hashes can be used in conjunction with the {class}`.Duplicates` class to identify duplicate images.
+The D4 variants detect duplicates regardless of image orientation (90°/180°/270° rotations and flips).
+
+Use `ImageStats.HASH` to compute both hash sets and distinguish between same-orientation
+duplicates (matched by both basic and D4 hashes) vs rotated/flipped duplicates (matched only by D4 hashes).
+The `NearDuplicateGroup.orientation` field is automatically set to `"same"` or `"rotated"` when
+both hash types are computed.
 
 ## When to use calculate with ImageStats
 
@@ -223,14 +232,28 @@ The statistics from {func}`.calculate` are used internally by the {class}`.Outli
 
 ```python
 from dataeval import Outliers, Duplicates
+from dataeval.flags import ImageStats
 
 # Outliers automatically calls calculate with appropriate stats
 outliers = Outliers()
 outlier_results = outliers.evaluate(ds)
 
-# Duplicates uses hash statistics
+# Duplicates uses hash statistics (default: HASH_DUPLICATES_BASIC)
 duplicates = Duplicates()
 duplicate_results = duplicates.evaluate(ds)
+
+# For rotation/flip-invariant duplicate detection
+duplicates_d4 = Duplicates(flags=ImageStats.HASH_DUPLICATES_D4)
+duplicate_results = duplicates_d4.evaluate(ds)
+
+# To distinguish same-orientation vs rotated/flipped duplicates
+duplicates_full = Duplicates(flags=ImageStats.HASH)
+result = duplicates_full.evaluate(ds)
+for group in result.items.near or []:
+    if group.orientation == "rotated":
+        print(f"Rotated/flipped: {group.indices}")
+    elif group.orientation == "same":
+        print(f"Same orientation: {group.indices}")
 ```
 
 ## Performance Overview

@@ -43,10 +43,20 @@ class HashStatCalculator(Calculator):
 
         return [phash(self.cache.image)]
 
+    def _phash_d4(self) -> list[str]:
+        from dataeval.core._hash import phash_d4
+
+        return [phash_d4(self.cache.image)]
+
     def _dhash(self) -> list[str]:
         from dataeval.core._hash import dhash
 
         return [dhash(self.cache.image)]
+
+    def _dhash_d4(self) -> list[str]:
+        from dataeval.core._hash import dhash_d4
+
+        return [dhash_d4(self.cache.image)]
 
     def get_empty_values(self) -> dict[str, Any]:
         """Return empty values for hash statistics."""
@@ -54,6 +64,8 @@ class HashStatCalculator(Calculator):
             "xxhash": "",
             "phash": "",
             "dhash": "",
+            "phash_d4": "",
+            "dhash_d4": "",
         }
 
     def get_handlers(self) -> dict[ImageStats, tuple[str, Callable[[], list[Any]]]]:
@@ -62,4 +74,6 @@ class HashStatCalculator(Calculator):
             ImageStats.HASH_XXHASH: ("xxhash", self._xxhash),
             ImageStats.HASH_PHASH: ("phash", self._phash),
             ImageStats.HASH_DHASH: ("dhash", self._dhash),
+            ImageStats.HASH_PHASH_D4: ("phash_d4", self._phash_d4),
+            ImageStats.HASH_DHASH_D4: ("dhash_d4", self._dhash_d4),
         }
