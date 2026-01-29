@@ -21,7 +21,11 @@ from dataeval.core._rerank import rerank_class_balance, rerank_hard_first, reran
 from dataeval.protocols import AnnotatedDataset, EmbeddingEncoder, Metadata
 from dataeval.types import Evaluator, EvaluatorConfig, Output, set_metadata
 
-DEFAULT_PRIORITIZE_ENCODER: EmbeddingEncoder | None = None
+# Default configuration values
+DEFAULT_PRIORITIZE_METHOD: Literal["knn", "kmeans_distance", "kmeans_complexity"] = "knn"
+DEFAULT_PRIORITIZE_POLICY: Literal["hard_first", "easy_first", "stratified", "class_balance"] = "hard_first"
+DEFAULT_PRIORITIZE_N_INIT: int | Literal["auto"] = "auto"
+DEFAULT_PRIORITIZE_NUM_BINS: int = 50
 
 
 @dataclass(frozen=True)
@@ -63,14 +67,38 @@ class Prioritize(Evaluator):
     """
     Prioritize dataset samples based on their position in the embedding space.
 
-    This class uses a builder pattern to configure ranking method and policy,
-    then evaluates datasets to produce prioritized sample orderings.
+    This class provides factory methods for common configurations and supports
+    both direct instantiation and fluent policy configuration.
 
     Parameters
     ----------
     encoder : EmbeddingEncoder
         Encoder to use for extracting embeddings from data.
-    reference : AnnotatedDataset[Any] | Embeddings | None, default None
+    method : {"knn", "kmeans_distance", "kmeans_complexity"}, default "knn"
+        Ranking method to use:
+
+        - "knn": K-nearest neighbors distance ranking
+        - "kmeans_distance": Distance to assigned cluster center
+        - "kmeans_complexity": Weighted sampling based on cluster structure
+    k : int or None, default None
+        Number of nearest neighbors for "knn" method. If None, uses sqrt(n_samples).
+    c : int or None, default None
+        Number of clusters for kmeans methods. If None, uses sqrt(n_samples).
+    n_init : int or "auto", default "auto"
+        Number of K-means initializations for kmeans methods.
+    policy : {"hard_first", "easy_first", "stratified", "class_balance"}, default "hard_first"
+        Selection policy:
+
+        - "hard_first": Challenging samples first (high distance)
+        - "easy_first": Prototypical samples first (low distance)
+        - "stratified": Balanced selection across difficulty bins
+        - "class_balance": Balanced selection across class labels
+    num_bins : int, default 50
+        Number of bins for "stratified" policy.
+    class_labels : NDArray[np.integer] or None, default None
+        Class labels for "class_balance" policy. If None, extracted from
+        AnnotatedDataset metadata during evaluate().
+    reference : AnnotatedDataset or Embeddings or None, default None
         Optional reference dataset or pre-computed embeddings. When provided,
         incoming datasets will be prioritized relative to this reference set.
         Useful for active learning (reference = labeled data) or quality
@@ -89,41 +117,41 @@ class Prioritize(Evaluator):
 
     Examples
     --------
-    Basic prioritization using builder pattern:
+    Using factory methods (recommended):
 
     >>> from dataeval.quality import Prioritize
-    >>> from dataeval.encoders import TorchEmbeddingEncoder
     >>>
-    >>> prioritizer = Prioritize(encoder)
+    >>> # KNN with hard samples first (default policy)
+    >>> result = Prioritize.knn(encoder, k=10).evaluate(dataset)
     >>>
-    >>> # Configure method and policy, then evaluate
-    >>> result = prioritizer.with_knn(k=10).hard_first().evaluate(unlabeled_data)
-
-    Different policies:
-
-    >>> # Easy samples first
-    >>> result = prioritizer.with_knn(k=5).easy_first().evaluate(unlabeled_data)
+    >>> # KNN with easy samples first
+    >>> result = Prioritize.knn(encoder, k=10).easy_first().evaluate(dataset)
     >>>
-    >>> # Stratified sampling
-    >>> result = prioritizer.with_knn(k=5).stratified(num_bins=20).evaluate(unlabeled_data)
+    >>> # K-means distance with stratified sampling
+    >>> result = Prioritize.kmeans_distance(encoder, c=15).stratified(num_bins=20).evaluate(dataset)
     >>>
-    >>> # Class-balanced selection
-    >>> result = prioritizer.with_kmeans_distance(c=10).class_balanced(class_labels).evaluate(unlabeled_data)
+    >>> # K-means complexity with class-balanced selection
+    >>> result = Prioritize.kmeans_complexity(encoder, c=10).class_balanced().evaluate(labeled_data)
 
-    Reconfigure and reuse:
+    Direct instantiation:
 
-    >>> # Can reconfigure the same instance
-    >>> result = prioritizer.with_kmeans_complexity(c=15).easy_first().evaluate(unlabeled_data)
+    >>> prioritizer = Prioritize(
+    ...     encoder=encoder,
+    ...     method="knn",
+    ...     k=10,
+    ...     policy="stratified",
+    ...     num_bins=20,
+    ... )
+    >>> result = prioritizer.evaluate(dataset)
 
-    Active learning with reference:
+    Active learning with reference data:
 
-    >>> # Initialize with labeled data as reference
-    >>> prioritizer = Prioritize(encoder, reference=labeled_data)
-    >>> result = prioritizer.with_knn(k=10).hard_first().evaluate(reference_data)
+    >>> prioritizer = Prioritize.knn(encoder, k=10, reference=labeled_data)
+    >>> result = prioritizer.hard_first().evaluate(unlabeled_data)
 
     Using configuration:
 
-    >>> config = Prioritize.Config(encoder=encoder)
+    >>> config = Prioritize.Config(encoder=encoder, method="knn", k=10)
     >>> prioritizer = Prioritize(config=config)
     """
 
@@ -133,23 +161,62 @@ class Prioritize(Evaluator):
 
         Attributes
         ----------
-        encoder : EmbeddingEncoder
+        encoder : EmbeddingEncoder or None
             Encoder to use for extracting embeddings from data.
+        method : {"knn", "kmeans_distance", "kmeans_complexity"}, default "knn"
+            Ranking method to use.
+        k : int or None, default None
+            Number of nearest neighbors for "knn" method.
+        c : int or None, default None
+            Number of clusters for kmeans methods.
+        n_init : int or "auto", default "auto"
+            Number of K-means initializations.
+        policy : {"hard_first", "easy_first", "stratified", "class_balance"}, default "hard_first"
+            Selection policy to apply after ranking.
+        num_bins : int, default 50
+            Number of bins for "stratified" policy.
+        class_labels : NDArray[np.integer] or None, default None
+            Class labels for "class_balance" policy.
         """
 
         encoder: EmbeddingEncoder | None = None
+        # Method configuration
+        method: Literal["knn", "kmeans_distance", "kmeans_complexity"] = DEFAULT_PRIORITIZE_METHOD
+        k: int | None = None
+        c: int | None = None
+        n_init: int | Literal["auto"] = DEFAULT_PRIORITIZE_N_INIT
+        # Policy configuration
+        policy: Literal["hard_first", "easy_first", "stratified", "class_balance"] = DEFAULT_PRIORITIZE_POLICY
+        num_bins: int = DEFAULT_PRIORITIZE_NUM_BINS
+        class_labels: NDArray[np.integer[Any]] | None = None
 
+    # Type declarations for attributes set by apply_config
     encoder: EmbeddingEncoder
+    method: Literal["knn", "kmeans_distance", "kmeans_complexity"]
+    k: int | None
+    c: int | None
+    n_init: int | Literal["auto"]
+    policy: Literal["hard_first", "easy_first", "stratified", "class_balance"]
+    num_bins: int
+    class_labels: NDArray[np.integer[Any]] | None
     config: Config
 
     def __init__(
         self,
         encoder: EmbeddingEncoder | None = None,
+        method: Literal["knn", "kmeans_distance", "kmeans_complexity"] | None = None,
+        k: int | None = None,
+        c: int | None = None,
+        n_init: int | Literal["auto"] | None = None,
+        policy: Literal["hard_first", "easy_first", "stratified", "class_balance"] | None = None,
+        num_bins: int | None = None,
+        class_labels: NDArray[np.integer[Any]] | None = None,
         reference: AnnotatedDataset[Any] | Embeddings | None = None,
         config: Config | None = None,
     ) -> None:
-        super().__init__(locals())
+        super().__init__(locals(), exclude={"reference"})
         self._reference = reference
+
         if self.encoder is None:
             raise ValueError("encoder must be provided either in __init__ or config")
 
@@ -158,150 +225,162 @@ class Prioritize(Evaluator):
         self.ref_embeddings: Embeddings | None = None
         self.metadata: Metadata | None = None
 
-        # Configuration state
-        self._method_name: Literal["knn", "kmeans_distance", "kmeans_complexity"] | None = None
-        self._method_params: dict[str, Any] = {}
-        self._policy_name: Literal["hard_first", "easy_first", "stratified", "class_balance"] | None = None
-        self._policy_params: dict[str, Any] = {}
+    # ==================== Factory Class Methods ====================
 
-    # Method configuration (returns self for chaining)
-
-    def with_knn(self, k: int | None = None) -> Self:
+    @classmethod
+    def knn(
+        cls,
+        encoder: EmbeddingEncoder,
+        k: int | None = None,
+        reference: AnnotatedDataset[Any] | Embeddings | None = None,
+    ) -> Self:
         """
-        Configure k-nearest neighbors ranking method.
+        Create a Prioritize instance using k-nearest neighbors method.
 
         Parameters
         ----------
-        k : int | None, default None
+        encoder : EmbeddingEncoder
+            Encoder to use for extracting embeddings from data.
+        k : int or None, default None
             Number of nearest neighbors. If None, uses sqrt(n_samples).
+        reference : AnnotatedDataset or Embeddings or None, default None
+            Optional reference dataset for relative prioritization.
 
         Returns
         -------
         Prioritize
-            Self for method chaining.
+            Configured instance ready for policy selection and evaluation.
 
         Examples
         --------
-        >>> prioritizer = Prioritize(encoder)
-        >>> result = prioritizer.with_knn(k=5).hard_first().evaluate(unlabeled_data)
+        >>> result = Prioritize.knn(encoder, k=10).hard_first().evaluate(dataset)
+        >>> result = Prioritize.knn(encoder, k=5).easy_first().evaluate(dataset)
         """
-        self._method_name = "knn"
-        self._method_params = {"k": k}
-        return self
+        return cls(encoder=encoder, method="knn", k=k, reference=reference)
 
-    def with_kmeans_distance(
-        self,
+    @classmethod
+    def kmeans_distance(
+        cls,
+        encoder: EmbeddingEncoder,
         c: int | None = None,
         n_init: int | Literal["auto"] = "auto",
+        reference: AnnotatedDataset[Any] | Embeddings | None = None,
     ) -> Self:
         """
-        Configure K-means distance ranking method.
+        Create a Prioritize instance using K-means distance method.
 
-        Ranks samples by distance to assigned cluster centers.
+        Ranks samples by distance to their assigned cluster centers.
 
         Parameters
         ----------
-        c : int | None, default None
+        encoder : EmbeddingEncoder
+            Encoder to use for extracting embeddings from data.
+        c : int or None, default None
             Number of clusters. If None, uses sqrt(n_samples).
-        n_init : int | "auto", default "auto"
+        n_init : int or "auto", default "auto"
             Number of K-means initializations.
+        reference : AnnotatedDataset or Embeddings or None, default None
+            Optional reference dataset for relative prioritization.
 
         Returns
         -------
         Prioritize
-            Self for method chaining.
+            Configured instance ready for policy selection and evaluation.
 
         Examples
         --------
-        >>> prioritizer = Prioritize(encoder)
-        >>> result = prioritizer.with_kmeans_distance(c=10).easy_first().evaluate(unlabeled_data)
+        >>> result = Prioritize.kmeans_distance(encoder, c=15).stratified().evaluate(dataset)
         """
-        self._method_name = "kmeans_distance"
-        self._method_params = {"c": c, "n_init": n_init}
-        return self
+        return cls(encoder=encoder, method="kmeans_distance", c=c, n_init=n_init, reference=reference)
 
-    def with_kmeans_complexity(
-        self,
+    @classmethod
+    def kmeans_complexity(
+        cls,
+        encoder: EmbeddingEncoder,
         c: int | None = None,
         n_init: int | Literal["auto"] = "auto",
+        reference: AnnotatedDataset[Any] | Embeddings | None = None,
     ) -> Self:
         """
-        Configure K-means complexity ranking method.
+        Create a Prioritize instance using K-means complexity method.
 
         Uses weighted sampling based on intra/inter-cluster distances.
-        Note: This method does not produce scores, so stratified() policy is not available.
+
+        Note: This method does not produce scores, so "stratified" policy
+        is not available.
 
         Parameters
         ----------
-        c : int | None, default None
+        encoder : EmbeddingEncoder
+            Encoder to use for extracting embeddings from data.
+        c : int or None, default None
             Number of clusters. If None, uses sqrt(n_samples).
-        n_init : int | "auto", default "auto"
+        n_init : int or "auto", default "auto"
             Number of K-means initializations.
+        reference : AnnotatedDataset or Embeddings or None, default None
+            Optional reference dataset for relative prioritization.
 
         Returns
         -------
         Prioritize
-            Self for method chaining.
+            Configured instance ready for policy selection and evaluation.
 
         Examples
         --------
-        >>> prioritizer = Prioritize(encoder)
-        >>> result = prioritizer.with_kmeans_complexity(c=15).hard_first().evaluate(unlabeled_data)
+        >>> result = Prioritize.kmeans_complexity(encoder, c=10).hard_first().evaluate(dataset)
         """
-        self._method_name = "kmeans_complexity"
-        self._method_params = {"c": c, "n_init": n_init}
-        return self
+        return cls(encoder=encoder, method="kmeans_complexity", c=c, n_init=n_init, reference=reference)
 
-    # Policy configuration (returns self for chaining)
+    # ==================== Policy Methods (return new instances) ====================
 
     def easy_first(self) -> Self:
         """
-        Configure policy to select easy/prototypical samples first.
+        Return a new instance configured with easy_first policy.
 
-        Returns samples in ascending order of difficulty (low distance = easy).
+        Selects easy/prototypical samples first (ascending order of difficulty).
 
         Returns
         -------
         Prioritize
-            Self for method chaining.
+            New instance with policy set to "easy_first".
 
         Examples
         --------
-        >>> prioritizer = Prioritize(encoder)
-        >>> result = prioritizer.with_knn(k=5).easy_first().evaluate(unlabeled_data)
+        >>> result = Prioritize.knn(encoder, k=5).easy_first().evaluate(dataset)
         """
-        self._policy_name = "easy_first"
-        self._policy_params = {}
-        return self
+        return self.__class__(
+            config=self.config.model_copy(update={"policy": "easy_first"}),
+            reference=self._reference,
+        )
 
     def hard_first(self) -> Self:
         """
-        Configure policy to select hard/challenging samples first.
+        Return a new instance configured with hard_first policy.
 
-        Returns samples in descending order of difficulty (high distance = hard).
+        Selects hard/challenging samples first (descending order of difficulty).
 
         Returns
         -------
         Prioritize
-            Self for method chaining.
+            New instance with policy set to "hard_first".
 
         Examples
         --------
-        >>> prioritizer = Prioritize(encoder)
-        >>> result = prioritizer.with_knn(k=5).hard_first().evaluate(unlabeled_data)
+        >>> result = Prioritize.knn(encoder, k=5).hard_first().evaluate(dataset)
         """
-        self._policy_name = "hard_first"
-        self._policy_params = {}
-        return self
+        return self.__class__(
+            config=self.config.model_copy(update={"policy": "hard_first"}),
+            reference=self._reference,
+        )
 
-    def stratified(self, num_bins: int = 50) -> Self:
+    def stratified(self, num_bins: int = DEFAULT_PRIORITIZE_NUM_BINS) -> Self:
         """
-        Configure stratified sampling policy across score bins.
+        Return a new instance configured with stratified policy.
 
         Balances selection across different difficulty levels by binning scores
-        and sampling uniformly from bins. Encourages diversity.
+        and sampling uniformly from bins.
 
-        Note: Only available with methods that produce scores (knn, kmeans_distance).
+        Note: Only available with methods that produce scores ("knn", "kmeans_distance").
 
         Parameters
         ----------
@@ -311,49 +390,49 @@ class Prioritize(Evaluator):
         Returns
         -------
         Prioritize
-            Self for method chaining.
+            New instance with policy set to "stratified".
 
         Examples
         --------
-        >>> prioritizer = Prioritize(encoder)
-        >>> result = prioritizer.with_knn(k=5).stratified(num_bins=20).evaluate(unlabeled_data)
+        >>> result = Prioritize.knn(encoder, k=5).stratified(num_bins=20).evaluate(dataset)
         """
-        self._policy_name = "stratified"
-        self._policy_params = {"num_bins": num_bins}
-        return self
+        return self.__class__(
+            config=self.config.model_copy(update={"policy": "stratified", "num_bins": num_bins}),
+            reference=self._reference,
+        )
 
     def class_balanced(self, class_labels: NDArray[np.integer[Any]] | None = None) -> Self:
         """
-        Configure class-balanced selection policy.
+        Return a new instance configured with class_balance policy.
 
         Ensures balanced representation across class labels while maintaining
         priority order within each class.
 
         Parameters
         ----------
-        class_labels : NDArray[np.integer] | None, default None
-            Class labels for each sample in the dataset. If None, will be
-            extracted from AnnotatedDataset metadata during evaluate().
+        class_labels : NDArray[np.integer] or None, default None
+            Class labels for each sample. If None, will be extracted from
+            AnnotatedDataset metadata during evaluate().
 
         Returns
         -------
         Prioritize
-            Self for method chaining.
+            New instance with policy set to "class_balance".
 
         Examples
         --------
-        >>> prioritizer = Prioritize(encoder)
-        >>> result = prioritizer.with_knn(k=5).class_balanced(class_labels).evaluate(unlabeled_data)
+        >>> result = Prioritize.knn(encoder, k=5).class_balanced(class_labels).evaluate(dataset)
 
         With AnnotatedDataset (labels extracted automatically):
 
-        >>> result = prioritizer.with_knn(k=5).class_balanced().evaluate(labeled_data)
+        >>> result = Prioritize.knn(encoder, k=5).class_balanced().evaluate(labeled_data)
         """
-        self._policy_name = "class_balance"
-        self._policy_params = {"class_labels": class_labels}
-        return self
+        return self.__class__(
+            config=self.config.model_copy(update={"policy": "class_balance", "class_labels": class_labels}),
+            reference=self._reference,
+        )
 
-    @set_metadata
+    @set_metadata(state=["method", "k", "c", "n_init", "policy", "num_bins"])
     def evaluate(
         self,
         dataset: AnnotatedDataset[Any] | Embeddings,
@@ -361,9 +440,7 @@ class Prioritize(Evaluator):
         """
         Evaluate the dataset and return prioritized indices.
 
-        Uses the configured method and policy to rank samples. Method and policy
-        must be configured using the builder methods (with_*, easy_first, etc.)
-        before calling evaluate().
+        Uses the configured method and policy to rank samples.
 
         Parameters
         ----------
@@ -382,31 +459,27 @@ class Prioritize(Evaluator):
         Raises
         ------
         ValueError
-            If method or policy not configured.
-            If class_labels is None when using class_balanced policy with Embeddings.
+            If class_labels is None when using class_balance policy with Embeddings.
             If stratified policy is used with kmeans_complexity method.
         TypeError
             If dataset is neither an AnnotatedDataset nor Embeddings.
 
         Examples
         --------
-        Basic usage:
+        Using factory methods:
 
-        >>> prioritizer = Prioritize(encoder)
-        >>> result = prioritizer.with_knn(k=5).hard_first().evaluate(labeled_data)
+        >>> result = Prioritize.knn(encoder, k=5).hard_first().evaluate(dataset)
 
-        Reconfigure and evaluate different dataset:
+        Using direct instantiation:
 
-        >>> result2 = prioritizer.with_kmeans_distance(c=15).stratified().evaluate(reference_data)
+        >>> prioritizer = Prioritize(encoder=encoder, method="knn", k=5, policy="hard_first")
+        >>> result = prioritizer.evaluate(dataset)
         """
-        # Validate configuration
-        if self._method_name is None:
+        # Validate stratified + kmeans_complexity combination
+        if self.policy == "stratified" and self.method == "kmeans_complexity":
             raise ValueError(
-                "Method not configured. Call with_knn(), with_kmeans_distance(), or with_kmeans_complexity() first."
-            )
-        if self._policy_name is None:
-            raise ValueError(
-                "Policy not configured. Call easy_first(), hard_first(), stratified(), or class_balanced() first."
+                "stratified policy is not available with kmeans_complexity method "
+                "(kmeans_complexity does not produce scores)"
             )
 
         # Check if dataset is Embeddings (pre-computed) or AnnotatedDataset
@@ -432,14 +505,14 @@ class Prioritize(Evaluator):
             self.ref_embeddings = Embeddings(self._reference, encoder=self.encoder)
 
         # Extract class_labels if not provided in configuration
-        class_labels = self._policy_params.get("class_labels")
-        if self._policy_name == "class_balance" and class_labels is None:
+        class_labels = self.class_labels
+        if self.policy == "class_balance" and class_labels is None:
             if isinstance(dataset, AnnotatedDataset):
                 self.metadata = _Metadata(dataset)
                 class_labels = self.metadata.class_labels
             else:
                 raise ValueError(
-                    "class_labels must be provided when using class_balanced() policy with Embeddings dataset"
+                    "class_labels must be provided when using class_balance policy with Embeddings dataset"
                 )
 
         # Perform ranking and reranking
@@ -458,38 +531,38 @@ class Prioritize(Evaluator):
         embeddings_array = np.asarray(self.embeddings)
         reference_array = None if self.ref_embeddings is None else np.asarray(self.ref_embeddings)
 
-        if self._method_name == "knn":
-            result = rank_knn(embeddings_array, k=self._method_params["k"], reference=reference_array)
-        elif self._method_name == "kmeans_distance":
+        if self.method == "knn":
+            result = rank_knn(embeddings_array, k=self.k, reference=reference_array)
+        elif self.method == "kmeans_distance":
             result = rank_kmeans_distance(
                 embeddings_array,
-                c=self._method_params["c"],
-                n_init=self._method_params["n_init"],
+                c=self.c,
+                n_init=self.n_init,
                 reference=reference_array,
             )
-        elif self._method_name == "kmeans_complexity":
+        elif self.method == "kmeans_complexity":
             result = rank_kmeans_complexity(
                 embeddings_array,
-                c=self._method_params["c"],
-                n_init=self._method_params["n_init"],
+                c=self.c,
+                n_init=self.n_init,
                 reference=reference_array,
             )
         else:
-            raise ValueError(f"Invalid method: {self._method_name}")
+            raise ValueError(f"Invalid method: {self.method}")
 
         # Step 2: Apply reranking policy
-        if self._policy_name == "easy_first":
+        if self.policy == "easy_first":
             # Already in easy_first order, no reranking needed
             pass
-        elif self._policy_name == "hard_first":
+        elif self.policy == "hard_first":
             result = rerank_hard_first(result)
-        elif self._policy_name == "stratified":
-            result = rerank_stratified(result, num_bins=self._policy_params["num_bins"])
-        elif self._policy_name == "class_balance":
+        elif self.policy == "stratified":
+            result = rerank_stratified(result, num_bins=self.num_bins)
+        elif self.policy == "class_balance":
             if class_labels is None:
                 raise ValueError("class_labels is required for class_balance policy")
             result = rerank_class_balance(result, class_labels=class_labels)
         else:
-            raise ValueError(f"Invalid policy: {self._policy_name}")
+            raise ValueError(f"Invalid policy: {self.policy}")
 
         return result
