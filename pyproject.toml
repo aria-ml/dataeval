@@ -52,6 +52,8 @@ cpu = ["torch>=2.2.0"]
 cu118 = ["torch>=2.2.0"]
 cu124 = ["torch>=2.2.0"]
 cu128 = ["torch>=2.2.0"]
+onnx = ["onnx", "onnxruntime>=1.14.0"]
+onnx-gpu = ["onnx", "onnxruntime-gpu>=1.14.0"]
 
 [project.urls]
 Homepage = "https://dataeval.ai/"
@@ -79,6 +81,7 @@ doclint = [
 ]
 test = [
   "coverage[toml]>=7.6",
+  "onnx>=1.14.0",
   "pytest>=8.3",
   "pytest-cov>=6.1",
   "pytest-xdist>=3.6.1",
@@ -97,6 +100,7 @@ docs = [
   "jupyter-cache>=1.0",
   "maite-datasets>=0.0.10",
   "myst-nb>=1.0",
+  "opencv-python-headless>=4.8.0",
   "plotly>=6.2.0",
   "sphinx-autoapi>=3.6.0",
   "sphinx-design>=0.6.1",
