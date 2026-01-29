@@ -119,9 +119,9 @@ def dhash(image: Array3D[Any]) -> str:
     """
     Compute difference hash (dHash) for an image.
 
-    Resizes image to 9x8 grayscale and computes horizontal gradient by comparing
-    adjacent pixels, producing a 64-bit hash. Captures relative brightness
-    changes rather than absolute values.
+    Resizes then crops image to 9x8 grayscale and computes horizontal gradient
+    by comparing adjacent pixels, producing a 64-bit hash. Captures relative
+    brightness changes rather than absolute values.
 
     Parameters
     ----------
@@ -137,7 +137,6 @@ def dhash(image: Array3D[Any]) -> str:
     Notes
     -----
     Difference hash captures gradient information:
-    - More robust to brightness/contrast changes than aHash
     - Captures structural information via pixel transitions
     - Complementary to DCT-based pHash (frequency vs gradient domain)
 
