@@ -108,7 +108,15 @@ def get_python_version(session: nox.Session) -> str:
     return matches.group(0) if matches else PYTHON_VERSION
 
 
-@session(uv_groups=["test"], uv_extras=["cpu"])
+def with_onnx(extras: list[str]) -> list[str]:
+    if "cpu" in extras:
+        return extras + ["onnx"]
+    if any(extra.startswith("cu") for extra in extras):
+        return extras + ["onnx-gpu"]
+    return extras
+
+
+@session(uv_groups=["test"], uv_extras=["cpu", "onnx"])
 def test(session: nox.Session) -> None:
     """Run unit tests with coverage reporting. Specify version using `nox -P {version} -e test`.
 
@@ -158,7 +166,7 @@ def test(session: nox.Session) -> None:
     session.run("mv", ".coverage", f"output/.coverage.{python_version}", external=True)
 
 
-@session(uv_groups=["type"], uv_extras=["cpu"])
+@session(uv_groups=["type"], uv_extras=with_onnx(["cpu"]))
 def type(session: nox.Session) -> None:  # noqa: A001
     """Run type checks and verify external types. Specify version using `nox -P {version} -e type`."""
     session.run("pyright", "--stats", "src/", "tests/")
@@ -181,7 +189,7 @@ def lint(session: nox.Session) -> None:
     session.run("codespell")
 
 
-@session(uv_groups=["test"], uv_extras=["cpu"])
+@session(uv_groups=["test"], uv_extras=with_onnx(["cpu"]))
 def doctest(session: nox.Session) -> None:
     """Run docstring tests."""
     target = session.posargs if session.posargs else ["src/dataeval"]
@@ -194,7 +202,7 @@ def doctest(session: nox.Session) -> None:
     )
 
 
-@session(uv_groups=["docs"], uv_extras=UV_EXTRAS)
+@session(uv_groups=["docs"], uv_extras=with_onnx(UV_EXTRAS))
 def docs(session: nox.Session) -> None:
     """Generate documentation. Clear the jupyter cache by calling `nox -e docs -- clean`."""
     if {"chart", "charts"} & set(session.posargs):

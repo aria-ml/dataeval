@@ -37,6 +37,7 @@ class MockDatasetWithLabels(Dataset[tuple[ArrayLike, Any, Any]]):
         return self.images[index], self.labels[index], {}
 
 
+@pytest.mark.required
 class TestTorchEmbeddingEncoderInit:
     """Test TorchEmbeddingEncoder initialization."""
 
@@ -104,6 +105,7 @@ class TestTorchEmbeddingEncoderInit:
         assert len(encoder._transforms) == 2
 
 
+@pytest.mark.required
 class TestTorchEmbeddingEncoderEncode:
     """Test TorchEmbeddingEncoder.encode method."""
 
@@ -211,6 +213,7 @@ class TestTorchEmbeddingEncoderLayerExtraction:
         assert result.shape == (5, 768)  # Input to Linear is flattened image
 
 
+@pytest.mark.required
 class TestTorchEmbeddingEncoderTransforms:
     """Test transform functionality."""
 
@@ -235,6 +238,7 @@ class TestTorchEmbeddingEncoderTransforms:
         np.testing.assert_array_almost_equal(result_with_transform, result_no_transform * 2)
 
 
+@pytest.mark.required
 class TestTorchEmbeddingEncoderRepr:
     """Test __repr__ method."""
 
@@ -255,6 +259,7 @@ class TestTorchEmbeddingEncoderRepr:
         assert "layer_name='0'" in repr_str
 
 
+@pytest.mark.required
 class TestTorchEmbeddingEncoderProtocol:
     """Test that TorchEmbeddingEncoder conforms to EmbeddingEncoder protocol."""
 

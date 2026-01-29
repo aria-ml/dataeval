@@ -22,6 +22,7 @@ class MockDataset:
         return self.images[index]
 
 
+@pytest.mark.required
 class TestNumpyFlattenEncoderInit:
     """Test NumpyFlattenEncoder initialization."""
 
@@ -44,6 +45,7 @@ class TestNumpyFlattenEncoderInit:
         assert encoder.batch_size >= 1
 
 
+@pytest.mark.required
 class TestNumpyFlattenEncoderEncode:
     """Test NumpyFlattenEncoder.encode method."""
 
@@ -115,6 +117,7 @@ class TestNumpyFlattenEncoderEncode:
         assert result.shape[1] == 3 * 8 * 8
 
 
+@pytest.mark.required
 class TestNumpyFlattenEncoderFlatten:
     """Test flattening behavior."""
 
@@ -147,6 +150,7 @@ class TestNumpyFlattenEncoderFlatten:
         np.testing.assert_array_almost_equal(np.sort(result.flatten()), np.sort(images.flatten()))
 
 
+@pytest.mark.required
 class TestNumpyFlattenEncoderRepr:
     """Test __repr__ method."""
 
@@ -158,6 +162,7 @@ class TestNumpyFlattenEncoderRepr:
         assert "batch_size=64" in repr_str
 
 
+@pytest.mark.required
 class TestNumpyFlattenEncoderProtocol:
     """Test that NumpyFlattenEncoder conforms to EmbeddingEncoder protocol."""
 
@@ -174,6 +179,7 @@ class TestNumpyFlattenEncoderProtocol:
         assert callable(encoder.encode)
 
 
+@pytest.mark.required
 class TestNumpyFlattenEncoderBatching:
     """Test batching behavior."""
 
