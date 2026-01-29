@@ -224,9 +224,7 @@ def _remove_orphan_db_records(
 ) -> int:
     """Remove database records that don't have corresponding folders on disk."""
     orphan_records = [
-        (pk, hashkey, uri)
-        for hashkey, (pk, uri) in db_hashes.items()
-        if not (executed_dir / hashkey).exists()
+        (pk, hashkey, uri) for hashkey, (pk, uri) in db_hashes.items() if not (executed_dir / hashkey).exists()
     ]
 
     if not orphan_records:
