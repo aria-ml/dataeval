@@ -1,6 +1,28 @@
-[//]: # (a10f5e7f209c2f7f537e80943950ff2b921439ff)
+[//]: # (f8ec65b6e7de4ef1e9093d922ede6bf8e8c0de90)
 
 # DataEval Change Log
+
+## v0.95.0
+
+🌟 **Feature Release**
+- `593f60f6` - Add optional ONNX encoder and utilities to DataEval
+
+🛠️ **Improvements and Enhancements**
+- `f8ec65b6` - Enhance duplicates with rotation/flip invariant hashing
+- `bb4eb501` - Make prioritize configurable at init
+- `347675c4` - Switch to using encoder protocol for encoding
+- `6bf91b02` - Use pydantic for Config classes
+- `ba95d5bc` - Add protocol for Metadata
+- `17006ddc` - Add dhash and enhance duplicates to allow multiple reasons for flagging near duplicates
+- `397d0fe1` - Unify clustering algorithms
+
+👾 **Fixes**
+- `7002c856` - New plan for computing balance metric from MI in cases where a discrete factor is present vs. cases where both factors are continuous.
+- `19a77d8f` - fix missing class_label from outputs
+
+📝 **Miscellaneous**
+- `9c7515dd` - Cleanup doctest fixtures
+- `52a1669b` - Feature Extractor
 
 ## v0.94.0
 
