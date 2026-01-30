@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,55,35
+/aria-ml/dataeval/tree/main/src/dataeval,10,2
+/aria-ml/dataeval/tree/main/tests,7,2
+/aria-ml/dataeval/tree/main,6,4
+/aria-ml/dataeval/tree/main/src,6,3
+/aria-ml/dataeval/issues,6,2
+/aria-ml/dataeval/tree/release/v0.93/src/dataeval,6,2
+/aria-ml/dataeval/commits/main,5,2
+/aria-ml/dataeval/tree/main/src/dataeval/core,5,2
+/aria-ml/dataeval/blob/main/tests/conftest.py,4,2
