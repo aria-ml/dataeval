@@ -804,7 +804,7 @@ class Duplicates(Evaluator):
         """
         from dataeval.core._fast_hdbscan._mst import compare_links_to_cluster_std
 
-        exact_indices, near_indices = compare_links_to_cluster_std(mst, clusters)  # type: ignore
+        exact_indices, near_indices = compare_links_to_cluster_std(mst, clusters)
         exact_dupes = self._sorted_union_find(exact_indices)
         near_dupes = self._sorted_union_find(near_indices)
 

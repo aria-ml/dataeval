@@ -20,6 +20,9 @@ def combine_results(results: CalculationResult | Sequence[CalculationResult]) ->
     if isinstance(results, dict):
         return results["stats"], []
 
+    if len(results) == 0:
+        raise TypeError("Cannot combine empty sequence of stats.")
+
     output: StatsMap = {}
     dataset_steps = []
     cur_len = 0
@@ -28,8 +31,6 @@ def combine_results(results: CalculationResult | Sequence[CalculationResult]) ->
         # Get length from source_index
         cur_len += len(r["source_index"])
         dataset_steps.append(cur_len)
-    if output is None:
-        raise TypeError("Cannot combine empty sequence of stats.")
     return output, dataset_steps
 
 

@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import polars as pl
@@ -10,6 +10,7 @@ from dataeval.core._clusterer import ClusterResult
 from dataeval.core._label_stats import LabelStatsResult
 from dataeval.flags import ImageStats
 from dataeval.quality._outliers import Outliers, OutliersOutput, _get_outlier_mask
+from dataeval.types import SourceIndex
 from dataeval.utils.data import unzip_dataset
 from tests.conftest import MockMetadata
 
@@ -690,3 +691,126 @@ class TestOutliersCoverageImprovements:
             assert "item_id" in df.columns
             assert "metric_name" in df.columns
             assert "metric_value" in df.columns
+
+
+@pytest.mark.required
+class TestOutliersEdgeCases:
+    def test_output_len_empty(self):
+        """Covers __len__ for multiple dataframes."""
+        # Single DF - must have the required columns for __len__ to work
+        empty_schema = {
+            "item_id": pl.Int64,
+            "target_id": pl.Int64,
+            "metric_name": pl.Categorical("lexical"),
+            "metric_value": pl.Float64,
+        }
+        out = OutliersOutput(pl.DataFrame(schema=empty_schema))
+        assert len(out) == 0
+
+        # Multiple DFs
+        out_multi = OutliersOutput([pl.DataFrame(schema=empty_schema), pl.DataFrame(schema=empty_schema)])
+        assert len(out_multi) == 0
+
+    def test_aggregate_empty_dfs(self):
+        """Covers aggregations returning empty structures."""
+        out = OutliersOutput(pl.DataFrame())  # Empty
+
+        # Test aggregate_by_metric on empty
+        res_metric = out.aggregate_by_metric()
+        assert res_metric.shape[0] == 0
+        assert "metric_name" in res_metric.columns
+
+        # Test aggregate_by_item on empty
+        res_item = out.aggregate_by_item()
+        assert res_item.shape[0] == 0
+        assert "Total" in res_item.columns
+
+        # Test aggregate_by_class failure on list
+        out_list = OutliersOutput([pl.DataFrame()])
+        with pytest.raises(ValueError, match="only works with output from a single dataset"):
+            out_list.aggregate_by_class(MagicMock())
+
+        with pytest.raises(ValueError, match="only works with output from a single dataset"):
+            out_list.aggregate_by_item()
+
+    def test_evaluate_drops_null_target_id(self):
+        """
+        Covers evaluate logic dropping 'target_id' column if all null.
+
+        """
+        # Use zscore with threshold 1.0
+        # With values [100.0, 1.0, 100.0]:
+        # - Mean = 67.0, Std ≈ 46.67
+        # - Z-score for 100.0: |100-67|/46.67 ≈ 0.707
+        # - Z-score for 1.0: |1-67|/46.67 ≈ 1.41
+        # Threshold 1.0 means only item 1 (z-score 1.41 > 1.0) is flagged
+        detector = Outliers(outlier_method="zscore", outlier_threshold=1.0)
+
+        # We manually construct a result that has all null target_ids
+        mock_stats = {
+            "stats": {"brightness": np.array([100.0, 1.0, 100.0])},
+            "source_index": [
+                SourceIndex(0, None, None),
+                SourceIndex(1, None, None),  # Outlier (z-score ≈ 1.41)
+                SourceIndex(2, None, None),
+            ],
+        }
+
+        # Test from_stats which uses the same logic
+        output = detector.from_stats(mock_stats)  # type: ignore
+        assert "target_id" not in output.issues.columns
+        assert output.issues["item_id"].to_list() == [1]
+
+    def test_from_stats_multiple_datasets_filtering(self):
+        """
+        Covers from_stats logic when splitting results back to multiple datasets.
+
+        The from_stats method combines stats, runs outlier detection, then splits
+        results back. The item_ids in the output are local indices computed via
+        get_dataset_step_from_idx.
+        """
+        # Use threshold 1.5 so only the extreme value (1000.0) is flagged as outlier
+        # With combined values [10.0, 10.0, 1000.0, 10.0]:
+        # - mean ≈ 257.5, std ≈ 428.5
+        # - z-score for 1000.0 ≈ 1.73 > 1.5 (outlier)
+        # - z-score for 10.0 ≈ 0.58 < 1.5 (not outlier)
+        detector = Outliers(outlier_threshold=1.5)
+
+        # Create stats that mimic 2 datasets
+        # Dataset 1: 1 item (value 10.0)
+        # Dataset 2: 3 items (values 10.0, 1000.0, 10.0)
+        stats1 = {
+            "stats": {"mean": np.array([10.0])},
+            "source_index": [SourceIndex(0, None, None)],
+        }
+        stats2 = {
+            "stats": {"mean": np.array([10.0, 1000.0, 10.0])},
+            "source_index": [SourceIndex(0, None, None), SourceIndex(1, None, None), SourceIndex(2, None, None)],
+        }
+
+        output = detector.from_stats([stats1, stats2])  # type: ignore
+
+        assert isinstance(output.issues, list)
+        assert len(output.issues) == 2
+
+        # Dataset 1 should be empty DF
+        assert output.issues[0].shape[0] == 0
+
+        # Dataset 2 should have 1 outlier
+        # The outlier is at combined index 2 (value 1000.0), with source_index.item = 1
+        # After splitting via get_dataset_step_from_idx(1, [1, 4]) -> (1, 0)
+        assert output.issues[1].shape[0] == 1
+        assert output.issues[1]["item_id"][0] == 0
+
+    def test_get_outlier_mask_branches(self):
+        """Covers _get_outlier_mask specific branches (all nan, empty)."""
+        # Empty
+        assert len(_get_outlier_mask(np.array([]), "zscore", 3.0)) == 0
+
+        # All NaNs
+        res = _get_outlier_mask(np.array([np.nan, np.nan]), "zscore", 3.0)
+        assert not np.any(res)
+
+        # Invalid method
+        with pytest.raises(ValueError):
+            _get_outlier_mask(np.array([1, 2]), "invalid_method", 3.0)  # type: ignore

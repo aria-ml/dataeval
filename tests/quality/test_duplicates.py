@@ -7,7 +7,12 @@ from dataeval.core._calculate import calculate
 from dataeval.core._clusterer import ClusterResult
 from dataeval.flags import ImageStats
 from dataeval.quality import Duplicates
-from dataeval.types import SourceIndex
+from dataeval.quality._duplicates import (
+    DatasetItemTuple,
+    DuplicateDetectionResult,
+    NearDuplicateGroup,
+    SourceIndex,
+)
 
 
 class MockDataset:
@@ -466,3 +471,107 @@ class TestDuplicates:
             source_index = item[1]
             assert isinstance(source_index, SourceIndex)
             assert source_index.target == 0
+
+
+@pytest.mark.required
+class TestDuplicatesEdgeCases:
+    def test_repr_methods(self):
+        """Covers __repr__ for DatasetItemTuple and NearDuplicateGroup."""
+        tup = DatasetItemTuple(dataset_id=1, id=5)
+        assert repr(tup) == "(1, 5)"
+
+        group = NearDuplicateGroup(indices=[1, 2], methods=frozenset(["phash"]))
+        assert "NearDuplicateGroup" in repr(group)
+        assert "orientation" not in repr(group)  # Default is None
+
+        group_oriented = NearDuplicateGroup(indices=[1, 2], methods=frozenset(["phash"]), orientation="rotated")
+        assert "orientation=rotated" in repr(group_oriented)
+
+    def test_evaluate_invalid_config(self):
+        """Covers ValueError when flags=NONE and no feature extractor."""
+        detector = Duplicates(flags=ImageStats.NONE, feature_extractor=None)
+        # Mock data (shape doesn't matter for this check)
+        data = np.zeros((1, 10, 10, 3))
+        with pytest.raises(ValueError, match="Either flags must contain hash stats or feature_extractor"):
+            detector.evaluate(data)
+
+    def test_merge_duplicate_groups_logic(self):
+        """
+        Covers _merge_duplicate_groups logic for overlapping and disjoint sets.
+
+        """
+        detector = Duplicates()
+
+        # Case 1: Disjoint groups
+        groups_a = [[1, 2]]
+        groups_b = [[3, 4]]
+        merged = detector._merge_duplicate_groups(groups_a, groups_b)
+        assert merged == [[1, 2], [3, 4]]
+
+        # Case 2: Overlapping groups (transitive property)
+        # [1, 2] and [2, 3] should merge to [1, 2, 3]
+        groups_a = [[1, 2]]
+        groups_b = [[2, 3]]
+        merged = detector._merge_duplicate_groups(groups_a, groups_b)
+        assert merged == [[1, 2, 3]]
+
+        # Case 3: Complex overlap
+        # [1, 2], [3, 4], [2, 3] -> All connect 1-2-3-4
+        groups_a = [[1, 2], [3, 4]]
+        groups_b = [[2, 3]]
+        merged = detector._merge_duplicate_groups(groups_a, groups_b)
+        assert merged == [[1, 2, 3, 4]]
+
+    def test_merge_item_results_none_cases(self):
+        """Covers _merge_item_results when inputs are None or empty."""
+        detector = Duplicates()
+
+        # Both None/Empty
+        res = detector._merge_item_results(None, [], [], set())
+        assert res.exact is None and res.near is None
+
+        # Only hash result provided
+        mock_hash_result = DuplicateDetectionResult(exact=[[1, 2]], near=None)
+        res = detector._merge_item_results(mock_hash_result, [], [], set())
+        assert res == mock_hash_result
+
+    def test_cluster_threshold_none(self):
+        """
+        Covers logic where cluster_threshold is None, ensuring near duplicates are cleared.
+
+        """
+
+        # Create a dummy extractor that returns fixed embeddings
+        class DummyExtractor:
+            def __call__(self, data):
+                return np.array([[0.1], [0.1], [0.9]])  # 0 and 1 are identical
+
+        # With threshold=None, cluster_near should be wiped
+        detector = Duplicates(
+            flags=ImageStats.NONE,
+            feature_extractor=DummyExtractor(),
+            cluster_threshold=None,
+            cluster_algorithm="kmeans",
+            n_clusters=2,
+        )
+
+        # Mock data
+        data = np.array([0.1, 0.1, 0.2, 0.2, 0.9])
+        output = detector.evaluate(data)
+
+        # Even though 0 and 1 are identical, strict threshold=None (default) might affect how it's reported
+        # The specific line 905 ensures cluster_near = [] if threshold is None.
+        # Exact duplicates might still be found if distance is 0 in MST.
+        assert output.items.near is None or len(output.items.near) == 0
+
+    def test_find_hash_duplicates_empty_logic(self):
+        """Covers _find_hash_duplicates filtering empty values."""
+        detector = Duplicates()
+        stats = {"phash": np.array(["", "abc", "abc", ""])}  # Empty strings simulate missing hashes
+        source_index = [SourceIndex(i, None, None) for i in range(4)]
+        indices = [0, 1, 2, 3]
+        exact_groups = []
+
+        # Should only find group for "abc" (indices 1, 2), ignoring empty strings at 0, 3
+        groups = detector._find_hash_duplicates(stats, "phash", source_index, indices, exact_groups)
+        assert groups == [[1, 2]]
