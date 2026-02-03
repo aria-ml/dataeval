@@ -323,6 +323,11 @@ def compare_links_to_cluster_std(
     near_dup = np.full((mst.shape[0], 2), -1, dtype=np.int64)
     for i in range(cluster_ids.size):
         cluster_links = np.nonzero(cluster_grouping == cluster_ids[i])[0]
+
+        # Skip clusters with no intra-cluster edges (std of empty array causes ZeroDivisionError in Numba)
+        if cluster_links.size == 0:
+            continue
+
         cluster_std = mst[cluster_links, 2].std()
 
         # Edges in this cluster with distance < std dev are near duplicates

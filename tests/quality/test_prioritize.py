@@ -8,8 +8,7 @@ from dataeval._embeddings import Embeddings
 from dataeval.core._rank import RankResult
 from dataeval.encoders import TorchEmbeddingEncoder
 from dataeval.protocols import AnnotatedDataset
-from dataeval.quality import Prioritize
-from dataeval.quality._prioritize import PrioritizeOutput
+from dataeval.quality._prioritize import Prioritize, PrioritizeOutput
 
 
 class TestPrioritize:
@@ -286,3 +285,73 @@ class TestPrioritize:
         assert result.method == "knn"
         assert result.order == "hard_first"
         assert len(result.indices) == 100
+
+
+class TestPrioritizeEdgeCases:
+    def test_prioritize_output_methods(self):
+        """
+        Covers magic methods (__iter__, __len__, __contains__, keys, values, items, get)
+        and idempotency of fluent methods.
+
+        """
+        # Construct dummy output
+        rank_result = RankResult(indices=np.array([0, 1]), scores=np.array([0.9, 0.1]))
+        output = PrioritizeOutput(rank_result, method="knn", order="easy_first")
+
+        # Test Magic Methods
+        assert "method" in output
+        assert len(output) == 5  # fields count
+        assert output.get("method") == "knn"
+        assert output.get("invalid_key", "default") == "default"
+        assert list(output.keys()) == ["indices", "scores", "method", "order", "policy"]
+
+        # Test __repr__
+        assert "PriorityOutput" in repr(output)
+
+        # Test Idempotency (logging check implies coverage of return self)
+        easy = output.easy_first()
+        assert easy is output  # Should return self if already easy_first
+
+        hard = output.hard_first()
+        assert hard.order == "hard_first"
+        hard2 = hard.hard_first()
+        assert hard2 is hard  # Should return self
+
+    def test_evaluate_error_invalid_data(self):
+        # Class balanced without labels (Line 234, 788)
+        embeddings = MagicMock()
+        embeddings.__class__.__name__ = "Embeddings"
+
+        # Use dummy encoder for instantiation
+        p = Prioritize(encoder=MagicMock(), method="knn", policy="class_balanced")
+
+        # If we pass a dataset that isn't annotated/embeddings (Line 759)
+        with pytest.raises(TypeError, match="must be either an AnnotatedDataset or Embeddings"):
+            p.evaluate("invalid_string_dataset")  # type: ignore
+
+    def test_evaluate_error_invalid_method(self):
+        # We bypass __init__ validation by modifying attribute directly or sub-classing
+        p = Prioritize(encoder=MagicMock())
+        p.method = "invalid_method"  # type: ignore
+
+        # Mock embeddings to pass first check
+        mock_emb = MagicMock()
+        # Mock __array__ to return numpy
+        mock_emb.__array__ = MagicMock(return_value=np.zeros((5, 5)))
+
+        # Set reference to None to hit simple path
+        p._reference = None
+        p._embeddings = mock_emb
+        p._ref_embeddings = None
+
+        # Calling _perform_ranking directly or via evaluate catch
+        with pytest.raises(ValueError, match="Invalid method"):
+            p._perform_ranking(np.zeros((5, 5)), None)
+
+    def test_stratified_error_no_scores(self):
+        """Covers error when applying stratified to methods without scores."""
+        rank_result = RankResult(indices=np.array([0, 1]), scores=None)  # No scores
+        output = PrioritizeOutput(rank_result, method="kmeans_complexity")
+
+        with pytest.raises(ValueError, match="scores are not available"):
+            output.stratified()
