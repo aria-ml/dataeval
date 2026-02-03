@@ -5,9 +5,11 @@ import pytest
 import torch
 
 from dataeval._embeddings import Embeddings
+from dataeval.core._rank import RankResult
 from dataeval.encoders import TorchEmbeddingEncoder
 from dataeval.protocols import AnnotatedDataset
-from dataeval.quality import Prioritize, PrioritizeOutput
+from dataeval.quality import Prioritize
+from dataeval.quality._prioritize import PrioritizeOutput
 
 
 class TestPrioritize:
@@ -33,53 +35,67 @@ class TestPrioritize:
             ("knn", {"k": 10}),
             ("kmeans_distance", {"c": 100}),
             ("kmeans_complexity", {"c": 100}),
+            ("hdbscan_distance", {"c": 10}),
+            ("hdbscan_complexity", {"c": 10}),
         ),
     )
     def test_prioritize_evaluate(self, encoder, method, method_kwargs):
         dataset = self.get_dataset()
 
-        # Use factory class methods
+        # Use factory class methods (Configures the "Measure" phase)
         if method == "knn":
             p = Prioritize.knn(encoder, **method_kwargs)
         elif method == "kmeans_distance":
             p = Prioritize.kmeans_distance(encoder, **method_kwargs)
         elif method == "kmeans_complexity":
             p = Prioritize.kmeans_complexity(encoder, **method_kwargs)
+        elif method == "hdbscan_distance":
+            p = Prioritize.hdbscan_distance(encoder, **method_kwargs)
+        elif method == "hdbscan_complexity":
+            p = Prioritize.hdbscan_complexity(encoder, **method_kwargs)
         else:
             assert False, f"Unknown method: {method}"
 
-        result = p.hard_first().evaluate(dataset)
+        # Evaluate (Measure) then Apply Policy (Cut)
+        result = p.evaluate(dataset).hard_first()
 
         # Check result type and attributes
         assert isinstance(result, PrioritizeOutput)
         assert len(result.indices) == 1000
         assert result.method == method
-        assert result.policy == "hard_first"
+        assert result.order == "hard_first"
         # Check that indices are actually different from default order
         assert any(i != j for i, j in zip(result.indices, range(1000)))
 
     @pytest.mark.parametrize(
-        "policy",
-        ("hard_first", "easy_first", "stratified", "class_balance"),
+        "order,policy",
+        [
+            ("hard_first", "difficulty"),
+            ("easy_first", "difficulty"),
+            ("easy_first", "stratified"),
+            ("easy_first", "class_balanced"),
+        ],
     )
-    def test_prioritize_policies(self, encoder, policy):
+    def test_prioritize_policies(self, encoder, order, policy):
         dataset = self.get_dataset()
         labels = np.random.randint(low=0, high=10, size=1000)
 
         # Use factory method to create base instance
         p = Prioritize.knn(encoder, k=10)
+        base_result = p.evaluate(dataset)
 
-        # Configure policy using fluent methods
-        if policy == "hard_first":
-            result = p.hard_first().evaluate(dataset)
-        elif policy == "easy_first":
-            result = p.easy_first().evaluate(dataset)
+        # Configure policy using fluent methods on PrioritizeOutput
+        if order == "hard_first" and policy == "difficulty":
+            result = base_result.hard_first()
+        elif order == "easy_first" and policy == "difficulty":
+            result = base_result.easy_first()
         elif policy == "stratified":
-            result = p.stratified().evaluate(dataset)
-        else:  # class_balance
-            result = p.class_balanced(labels).evaluate(dataset)
+            result = base_result.stratified()
+        else:  # class_balanced
+            result = base_result.class_balanced(labels)
 
         assert isinstance(result, PrioritizeOutput)
+        assert result.order == order
         assert result.policy == policy
         assert result.method == "knn"
         assert len(result.indices) == 1000
@@ -91,29 +107,41 @@ class TestPrioritize:
             Prioritize()
 
     def test_prioritize_default_method_and_policy(self, encoder):
-        """Test that default method (knn) and policy (hard_first) are used."""
+        """Test that default method (knn) and order (easy_first) are used."""
         p = Prioritize(encoder=encoder)
         dataset = self.get_dataset(n=100)
         result = p.evaluate(dataset)
 
         assert result.method == "knn"
-        assert result.policy == "hard_first"
+        assert result.order == "easy_first"
+        assert result.policy == "difficulty"
         assert len(result.indices) == 100
 
     def test_prioritize_dataset_class_balance_without_labels_does_not_raise_valueerror(self, encoder):
         dataset = self.get_dataset(n=100)
-        # class_balanced() with no labels will extract from AnnotatedDataset
-        Prioritize.knn(encoder, k=5).class_balanced().evaluate(dataset)
+        # class_balanced() with no labels will extract metadata from AnnotatedDataset automatically
+        # Note: evaluate() extracts the labels, then class_balanced() uses them.
+        Prioritize.knn(encoder, k=5).evaluate(dataset).class_balanced()
 
     def test_prioritize_embeddings_class_balance_without_labels_raises_valueerror(self, encoder):
         embeddings = self.get_embeddings(encoder, n=100)
+
+        # Evaluate works fine (just calculating scores)
+        result = Prioritize.knn(encoder, k=5).evaluate(embeddings)
+
+        # Apply policy fails because embeddings have no metadata
         with pytest.raises(ValueError, match="class_labels must be provided"):
-            Prioritize.knn(encoder, k=5).class_balanced().evaluate(embeddings)
+            result.class_balanced()
 
     def test_prioritize_stratified_no_scores_raises_valueerror(self, encoder):
         dataset = self.get_dataset(n=100)
-        with pytest.raises(ValueError, match="stratified policy is not available"):
-            Prioritize.kmeans_complexity(encoder, c=5).stratified().evaluate(dataset)
+
+        # Evaluate works fine
+        result = Prioritize.kmeans_complexity(encoder, c=5).evaluate(dataset)
+
+        # Apply policy fails because complexity methods don't have scores
+        with pytest.raises(ValueError, match="Cannot apply stratified policy"):
+            result.stratified()
 
     @pytest.mark.parametrize("use_embeddings", [False, True])
     @pytest.mark.parametrize("use_reference", [False, True])
@@ -123,6 +151,8 @@ class TestPrioritize:
             ("knn", {"k": 10}),
             ("kmeans_distance", {"c": 100}),
             ("kmeans_complexity", {"c": 100}),
+            ("hdbscan_distance", {"c": 10}),
+            ("hdbscan_complexity", {"c": 10}),
         ),
     )
     def test_prioritize_with_embeddings(self, encoder, method, method_kwargs, use_embeddings, use_reference):
@@ -139,71 +169,90 @@ class TestPrioritize:
             p = Prioritize.kmeans_distance(encoder, reference=reference, **method_kwargs)
         elif method == "kmeans_complexity":
             p = Prioritize.kmeans_complexity(encoder, reference=reference, **method_kwargs)
+        elif method == "hdbscan_distance":
+            p = Prioritize.hdbscan_distance(encoder, reference=reference, **method_kwargs)
+        elif method == "hdbscan_complexity":
+            p = Prioritize.hdbscan_complexity(encoder, reference=reference, **method_kwargs)
         else:
             assert False, f"Unknown method: {method}"
 
-        result = p.hard_first().evaluate(dataset)
+        # Test flow: Evaluate -> Rebucket
+        result = p.evaluate(dataset).hard_first()
 
         assert isinstance(result, PrioritizeOutput)
         assert len(result.indices) == 1000
         assert result.method == method
-        assert result.policy == "hard_first"
+        assert result.order == "hard_first"
         assert any(i != j for i, j in zip(result.indices, range(1000)))
 
     def test_prioritize_with_precomputed_embeddings(self, encoder):
         """Test that we can pass Embeddings directly as the dataset."""
         embeddings = self.get_embeddings(encoder, 100)
-        result = Prioritize.knn(encoder, k=5).easy_first().evaluate(embeddings)
+        # Evaluate -> Easy First
+        result = Prioritize.knn(encoder, k=5).evaluate(embeddings).easy_first()
 
         assert isinstance(result, PrioritizeOutput)
         assert len(result.indices) == 100
         assert result.method == "knn"
-        assert result.policy == "easy_first"
+        assert result.order == "easy_first"
 
-    def test_prioritize_output_data(self):
-        """Test PrioritizeOutput.data() method."""
+    def test_rank_result_indices(self):
+        """Test RankResult.indices property."""
         indices = np.array([3, 1, 4, 1, 5, 9, 2, 6], dtype=np.intp)
         scores = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8], dtype=np.float32)
-        output = PrioritizeOutput(indices=indices, scores=scores, method="knn", policy="hard_first")
-        assert np.array_equal(output.data(), indices)
-        assert len(output) == 8
+        rank_result = RankResult(indices=indices, scores=scores)
 
-    def test_prioritize_output_without_scores(self):
-        """Test PrioritizeOutput with scores=None."""
+        output = PrioritizeOutput(rank_result=rank_result, method="knn", order="hard_first")
+        assert np.array_equal(output.indices, indices[::-1])  # hard_first reverses indices
+        assert output.method == "knn"
+        assert output.order == "hard_first"
+
+    def test_rank_result_without_scores(self):
+        """Test RankResult with scores=None."""
         indices = np.array([3, 1, 4], dtype=np.intp)
-        output = PrioritizeOutput(indices=indices, scores=None, method="kmeans_complexity", policy="easy_first")
+        rank_result = RankResult(indices=indices, scores=None)
+
+        output = PrioritizeOutput(rank_result=rank_result, method="kmeans_complexity", order="easy_first")
         assert output.scores is None
-        assert len(output) == 3
         assert output.method == "kmeans_complexity"
-        assert output.policy == "easy_first"
+        assert output.order == "easy_first"
 
     def test_prioritize_with_reference_dataset(self, encoder):
         """Test Prioritize with reference dataset provided at init."""
         reference_dataset = self.get_dataset(500)
         dataset = self.get_dataset(100)
 
-        result = Prioritize.knn(encoder, k=10, reference=reference_dataset).hard_first().evaluate(dataset)
+        # Config(reference) -> evaluate(data) -> hard_first()
+        result = Prioritize.knn(encoder, k=10, reference=reference_dataset).evaluate(dataset).hard_first()
 
         assert isinstance(result, PrioritizeOutput)
         assert len(result.indices) == 100
         assert result.method == "knn"
-        assert result.policy == "hard_first"
+        assert result.order == "hard_first"
 
-    def test_prioritize_immutable_policy_methods(self, encoder):
-        """Test that policy methods return new instances (immutable pattern)."""
-        p1 = Prioritize.knn(encoder, k=5)
-        p2 = p1.easy_first()
-        p3 = p1.hard_first()
+    def test_prioritize_output_immutable_methods(self, encoder):
+        """Test that Output transformation methods return new instances (immutable pattern)."""
+        dataset = self.get_dataset(100)
 
-        # p1 should still have default policy
-        assert p1.policy == "hard_first"
-        # p2 and p3 are new instances with different policies
-        assert p2.policy == "easy_first"
-        assert p3.policy == "hard_first"
+        # Get initial result
+        r1 = Prioritize.knn(encoder, k=5).evaluate(dataset)
+
+        # Create derived results
+        r2 = r1.hard_first()
+        r3 = r2.easy_first()
+
+        # r1 should still have default order (usually easy_first or whatever evaluate produces)
+        # Note: evaluate() uses default order from Config if provided, otherwise defaults to 'easy_first'
+        assert r1.order == "easy_first"
+
+        # r2 and r3 are new instances with different orders
+        assert r2.order == "hard_first"
+        assert r3.order == "easy_first"
+
         # They should be different objects
-        assert p1 is not p2
-        assert p1 is not p3
-        assert p2 is not p3
+        assert r1 is not r2
+        assert r1 is not r3
+        assert r2 is not r3
 
     def test_prioritize_direct_instantiation(self, encoder):
         """Test direct instantiation with all parameters."""
@@ -228,12 +277,12 @@ class TestPrioritize:
             encoder=encoder,
             method="knn",
             k=10,
-            policy="easy_first",
+            order="hard_first",
         )
         p = Prioritize(config=config)
         dataset = self.get_dataset(100)
         result = p.evaluate(dataset)
 
         assert result.method == "knn"
-        assert result.policy == "easy_first"
+        assert result.order == "hard_first"
         assert len(result.indices) == 100
