@@ -167,3 +167,66 @@ class TestClusterer:
             0, 0, 4, 2, 1, 2, 1, 3, 0, 2, 2, 3
         ]
         # fmt: on
+
+
+@pytest.mark.required
+class TestClustersWithDifferentEmbeddings:
+    """Tests for _Clusters methods when embeddings differ from reference data."""
+
+    @pytest.fixture
+    def clusters_and_data(self):
+        """Create clusters from reference data and separate query embeddings."""
+        from dataeval.core._clusterer import _Clusters
+
+        rng = np.random.default_rng(42)
+        # Reference: 100 samples, 3 clusters
+        centers = np.array([[0, 0], [5, 5], [10, 0]], dtype=np.float64)
+        ref_data = np.vstack([centers[i] + rng.normal(0, 0.5, (33, 2)) for i in range(3)])
+        ref_labels = np.repeat(np.arange(3), 33).astype(np.intp)[:99]
+        ref_data = ref_data[:99]
+
+        # Query: 20 samples (different size than reference)
+        query_data = rng.normal(0, 1, (20, 2)).astype(np.float64)
+
+        clusters = _Clusters(ref_labels, centers)
+        return clusters, ref_data, query_data
+
+    def test_get_labels_same_size_returns_original(self, clusters_and_data):
+        """When sizes match, _get_labels returns the original labels."""
+        clusters, ref_data, _ = clusters_and_data
+        labels = clusters._get_labels(ref_data)
+        assert np.array_equal(labels, clusters.labels)
+
+    def test_get_labels_different_size_assigns_nearest(self, clusters_and_data):
+        """When sizes differ, _get_labels assigns to nearest cluster center."""
+        clusters, _, query_data = clusters_and_data
+        labels = clusters._get_labels(query_data)
+
+        assert len(labels) == len(query_data)
+        assert all(lab in clusters.unique_labels for lab in labels)
+
+    def test_dist2center_different_size(self, clusters_and_data):
+        """_dist2center works with different-sized embeddings."""
+        clusters, _, query_data = clusters_and_data
+        dist = clusters._dist2center(query_data)
+
+        assert len(dist) == len(query_data)
+        assert (dist >= 0).all()
+        assert dist.dtype == np.float32
+
+    def test_complexity_different_size(self, clusters_and_data):
+        """_complexity works with different-sized embeddings."""
+        clusters, _, query_data = clusters_and_data
+        prob = clusters._complexity(query_data)
+
+        assert len(prob) == len(clusters.unique_labels)
+        assert np.isclose(prob.sum(), 1.0)
+        assert (prob >= 0).all()
+
+    def test_sort_by_weights_different_size(self, clusters_and_data):
+        """_sort_by_weights works with different-sized embeddings."""
+        clusters, _, query_data = clusters_and_data
+        sorted_indices = clusters._sort_by_weights(query_data)
+
+        assert len(sorted_indices) == len(query_data)
+        assert set(sorted_indices) == set(range(len(query_data)))

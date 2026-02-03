@@ -38,9 +38,8 @@ __all__ = [
     "rank_knn",
     "rank_kmeans_distance",
     "rank_kmeans_complexity",
-    "rerank_hard_first",
-    "rerank_stratified",
-    "rerank_class_balance",
+    "rank_result_class_balanced",
+    "rank_result_stratified",
     "xxhash",
     "uap",
 ]
@@ -73,6 +72,7 @@ from dataeval.core._rank import (
     rank_kmeans_complexity,
     rank_kmeans_distance,
     rank_knn,
+    rank_result_class_balanced,
+    rank_result_stratified,
 )
-from dataeval.core._rerank import rerank_class_balance, rerank_hard_first, rerank_stratified
 from dataeval.core._uap import uap
