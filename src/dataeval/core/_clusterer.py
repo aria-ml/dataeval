@@ -29,26 +29,69 @@ class _Clusters:
         self.cluster_centers = cluster_centers
         self.unique_labels = np.unique(labels)
 
+    def _get_labels(self, embeddings: NDArray[np.floating[Any]]) -> NDArray[np.intp]:
+        """Get cluster labels for embeddings.
+
+        If embeddings has the same number of samples as self.labels, returns
+        the pre-computed labels. Otherwise, assigns each embedding to its
+        nearest cluster center.
+        """
+        if embeddings.shape[0] == len(self.labels):
+            return self.labels
+
+        # Assign each embedding to the nearest cluster center
+        all_distances = np.linalg.norm(embeddings[:, np.newaxis, :] - self.cluster_centers[np.newaxis, :, :], axis=2)
+        return np.argmin(all_distances, axis=1).astype(np.intp)
+
     def _dist2center(self, embeddings: NDArray[np.floating[Any]]) -> NDArray[np.float32]:
-        """Calculate distance from each point to its assigned cluster center."""
-        dist = np.full(self.labels.shape, np.inf, dtype=np.float32)
+        """Calculate distance from each point to its assigned cluster center.
+
+        If embeddings has the same number of samples as self.labels, uses the
+        pre-computed label assignments. Otherwise, assigns each embedding to
+        its nearest cluster center first.
+        """
+        labels = self._get_labels(embeddings)
+        dist = np.zeros(embeddings.shape[0], dtype=np.float32)
         for lab in self.unique_labels:
-            mask = self.labels == lab
-            dist[mask] = np.linalg.norm(embeddings[mask, :] - self.cluster_centers[lab, :], axis=1)
+            mask = labels == lab
+            if mask.any():
+                dist[mask] = np.linalg.norm(embeddings[mask, :] - self.cluster_centers[lab, :], axis=1)
         return dist
 
     def _complexity(self, embeddings: NDArray[np.float64]) -> NDArray[np.float64]:
         """Calculate complexity-based probability weights for each cluster."""
-        num_clst_intra = int(np.maximum(np.minimum(int(self.unique_labels.shape[0] / 5), 20), 1))
+        labels = self._get_labels(embeddings)
+
+        # Rename for clarity: This is essentially 'k' for k-nearest clusters
+        k_neighbors = int(np.maximum(np.minimum(int(self.unique_labels.shape[0] / 5), 20), 1))
+
         d_intra = np.zeros(self.unique_labels.shape)
         d_inter = np.zeros(self.unique_labels.shape)
+
         for cdx, lab in enumerate(self.unique_labels):
-            d_intra[cdx] = np.mean(
-                np.linalg.norm(embeddings[self.labels == lab, :] - self.cluster_centers[cdx, :], axis=1)
-            )
-            d_inter[cdx] = np.mean(
-                np.linalg.norm(self.cluster_centers - self.cluster_centers[cdx, :], axis=1)[:num_clst_intra]
-            )
+            current_center = self.cluster_centers[cdx, :]
+            mask = labels == lab
+            if mask.any():
+                d_intra[cdx] = np.mean(np.linalg.norm(embeddings[mask, :] - current_center, axis=1))
+            else:
+                # No embeddings assigned to this cluster; use distance from center to nearest other center
+                other_centers = np.delete(self.cluster_centers, cdx, axis=0)
+                d_intra[cdx] = (
+                    np.min(np.linalg.norm(other_centers - current_center, axis=1)) if len(other_centers) > 0 else 0.0
+                )
+
+            # Calculate all distances from current center to other centers
+            all_dists = np.linalg.norm(self.cluster_centers - current_center, axis=1)
+
+            # Note: sorted_dists[0] is always 0.0 (distance to self).
+            sorted_dists = np.sort(all_dists)
+
+            # We likely want indices 1 to k+1 to get the nearest *other* clusters.
+            nearest_dists = sorted_dists[1 : k_neighbors + 1]
+
+            # if k_neighbors is larger than available other clusters
+            d_inter[cdx] = np.mean(nearest_dists) if nearest_dists.size > 0 else 0.0
+
         cj = d_intra * d_inter
         tau = 0.1
         exp = np.exp(cj / tau)
@@ -57,20 +100,34 @@ class _Clusters:
 
     def _sort_by_weights(self, embeddings: NDArray[np.float64]) -> NDArray[np.intp]:
         """Sort samples using complexity-based weighted sampling."""
+        labels = self._get_labels(embeddings)
         pr = self._complexity(embeddings)
         d2c = self._dist2center(embeddings)
         inds_per_clst: list[NDArray[np.intp]] = []
         for lab in self.unique_labels:
-            inds = np.nonzero(self.labels == lab)[0]
+            inds = np.nonzero(labels == lab)[0]
             # 'hardest' first == farthest distance
             srt_inds = np.argsort(d2c[inds])[::-1]
             inds_per_clst.append(inds[srt_inds])
+
+        # Zero out probabilities for empty clusters and renormalize
+        for i, arr in enumerate(inds_per_clst):
+            if arr.size == 0:
+                pr[i] = 0.0
+        if pr.sum() > 0:
+            pr = pr / pr.sum()
+
         glob_inds: list[NDArray[np.intp]] = []
         while not bool(np.all([arr.size == 0 for arr in inds_per_clst])):
             clst_ind = np.random.choice(self.unique_labels, 1, p=pr)[0]
             if inds_per_clst[clst_ind].size > 0:
                 glob_inds.append(inds_per_clst[clst_ind][0])
                 inds_per_clst[clst_ind] = inds_per_clst[clst_ind][1:]
+                # Update probability when cluster becomes empty
+                if inds_per_clst[clst_ind].size == 0:
+                    pr[clst_ind] = 0.0
+                    if pr.sum() > 0:
+                        pr = pr / pr.sum()
         # sorted hardest first; reverse for consistency
         return np.array(glob_inds[::-1])
 
