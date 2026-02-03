@@ -140,7 +140,7 @@ class PrioritizeOutput(Output[NDArray[np.intp]]):
 
     @property
     def policy(self) -> PolicyType:
-        """{"default", "stratified", "class_balanced"} : Selection policy."""
+        """{"difficulty", "stratified", "class_balanced"} : Selection policy."""
         return self._policy
 
     def __iter__(self) -> Iterator[str]:
@@ -370,11 +370,15 @@ class Prioritize(Evaluator):
         Number of K-means initializations (kmeans methods only).
     max_cluster_size : int or None, default None
         Maximum cluster size for HDBSCAN methods.
-    policy : {"hard_first", "easy_first", "stratified", "class_balanced"}, default "hard_first"
+    order : {"easy_first", "hard_first"}, default "easy_first"
+        Sort direction for output indices:
+
+        - "easy_first": Prototypical samples first (low distance)
+        - "hard_first": Challenging samples first (high distance)
+    policy : {"difficulty", "stratified", "class_balanced"}, default "difficulty"
         Selection policy:
 
-        - "hard_first": Challenging samples first (high distance)
-        - "easy_first": Prototypical samples first (low distance)
+        - "difficulty": Direct ordering by ranking results (no additional reordering)
         - "stratified": Balanced selection across difficulty bins
         - "class_balanced": Balanced selection across class labels
     num_bins : int, default 50
@@ -466,8 +470,8 @@ class Prioritize(Evaluator):
             Number of K-means initializations (kmeans methods only).
         max_cluster_size : int or None, default None
             Maximum cluster size for HDBSCAN methods.
-        order : {"hard_first", "easy_first"}, default "hard_first"
-            Initial ordering before applying policy.
+        order : {"easy_first", "hard_first"}, default "easy_first"
+            Sort direction for output indices.
         policy : {"difficulty", "stratified", "class_balanced"}, default "difficulty"
             Selection policy to apply after ranking.
         num_bins : int, default 50
@@ -751,7 +755,7 @@ class Prioritize(Evaluator):
 
         Using direct instantiation:
 
-        >>> prioritizer = Prioritize(encoder=encoder, method="knn", k=5, policy="hard_first")
+        >>> prioritizer = Prioritize(encoder=encoder, method="knn", k=5, order="hard_first")
         >>> result = prioritizer.evaluate(unlabeled_data)
         """
         # Validate stratified + complexity method combinations
