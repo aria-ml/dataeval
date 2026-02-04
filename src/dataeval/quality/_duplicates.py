@@ -736,7 +736,7 @@ class Duplicates(Evaluator):
 
         return DuplicateDetectionResult(exact=exact_split, near=near_split)
 
-    @set_metadata
+    @set_metadata(state=["cluster_threshold", "cluster_algorithm", "n_clusters"])
     def from_clusters(
         self,
         cluster_result: ClusterResult,
@@ -771,25 +771,24 @@ class Duplicates(Evaluator):
         from_stats : Find duplicates from pre-computed hash statistics
         evaluate : Find duplicates by computing hashes from images
         """
+        threshold = self.cluster_threshold if self.cluster_threshold is not None else 1.0
         exact_duplicates, near_duplicates = self._find_duplicates(
             mst=cluster_result["mst"],
             clusters=cluster_result["clusters"],
+            cluster_threshold=threshold,
         )
 
         # Treat ALL cluster-based duplicates as near duplicates since embeddings
         # are approximate representations. Zero distance in embedding space doesn't
         # mean pixel-identical images.
-        all_cluster_duplicates = exact_duplicates + near_duplicates
-        near_groups: list[NearDuplicateGroup[int]] | None = None
-        if all_cluster_duplicates:
-            near_groups = [
-                NearDuplicateGroup(indices=tuple(group), methods=frozenset({"cluster"}))
-                for group in all_cluster_duplicates
-            ]
+        cluster_method_groups: list[tuple[Sequence[Any], str]] = [
+            (group, "cluster") for group in exact_duplicates + near_duplicates
+        ]
+        near_groups = self._build_near_duplicate_groups(cluster_method_groups, set())
 
         item_result = DuplicateDetectionResult(
             exact=None,
-            near=near_groups,
+            near=near_groups or None,
         )
 
         return DuplicatesOutput(items=item_result, targets=DuplicateDetectionResult())
@@ -798,6 +797,7 @@ class Duplicates(Evaluator):
         self,
         mst: NDArray[np.float32],
         clusters: NDArray[np.intp],
+        cluster_threshold: float = 1.0,
     ) -> tuple[list[list[int]], list[list[int]]]:
         """
         Find duplicate and near duplicate data based on cluster average distance.
@@ -808,6 +808,9 @@ class Duplicates(Evaluator):
             Minimum spanning tree from cluster() output.
         clusters : NDArray[np.intp]
             Cluster labels from cluster() output.
+        cluster_threshold : float, default 1.0
+            Multiplier on cluster standard deviation for near duplicate detection.
+            Lower values are stricter (fewer near duplicates).
 
         Returns
         -------
@@ -816,7 +819,7 @@ class Duplicates(Evaluator):
         """
         from dataeval.core._fast_hdbscan._mst import compare_links_to_cluster_std
 
-        exact_indices, near_indices = compare_links_to_cluster_std(mst, clusters)
+        exact_indices, near_indices = compare_links_to_cluster_std(mst, clusters, cluster_threshold)
         exact_dupes = self._sorted_union_find(exact_indices)
         near_dupes = self._sorted_union_find(near_indices)
 
@@ -938,6 +941,7 @@ class Duplicates(Evaluator):
             cluster_exact, cluster_near = self._find_duplicates(
                 mst=cluster_result["mst"],
                 clusters=cluster_result["clusters"],
+                cluster_threshold=self.cluster_threshold if self.cluster_threshold is not None else 1.0,
             )
 
         # Merge results
