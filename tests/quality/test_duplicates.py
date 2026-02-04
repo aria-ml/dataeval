@@ -194,7 +194,7 @@ class TestDuplicates:
         mock_cluster_result: ClusterResult = {
             "mst": np.array(
                 [[0, 1, 0.1], [1, 2, 0.05], [2, 3, 0.0], [3, 4, 0.2]],
-                dtype=np.float32,  # Exact duplicate
+                dtype=np.float32,  # Zero distance edge
             ),
             "clusters": np.array([0, 0, 0, 0, 0], dtype=np.intp),
             "linkage_tree": np.array([], dtype=np.float32),
@@ -207,9 +207,10 @@ class TestDuplicates:
         detector = Duplicates()
         result = detector.from_clusters(mock_cluster_result)
 
-        # Should return proper structure
-        assert isinstance(result.items.exact, list)
-        # Near duplicates from cluster detection have "cluster" in methods
+        # Cluster-based detection never returns exact duplicates since embeddings
+        # are approximate representations. Only xxhash can identify true exact duplicates.
+        assert result.items.exact is None
+        # All cluster-based duplicates (including zero-distance) are near duplicates
         assert isinstance(result.items.near, list)
         assert all("cluster" in g.methods for g in result.items.near)
         # Targets is now an empty DuplicateDetectionResult, not None
@@ -217,9 +218,9 @@ class TestDuplicates:
         assert result.targets.near is None
 
     def test_duplicates_from_clusters_with_near(self):
-        """Test cluster-based detection finds both exact and near duplicates"""
+        """Test cluster-based detection treats all duplicates as near duplicates"""
 
-        # Create ClusterResult with zero-distance edge (exact) and edges that will
+        # Create ClusterResult with zero-distance edge and edges that will
         # produce near duplicates. Near duplicates are edges with distance < cluster std.
         # With distances [0.0, 0.01, 0.05, 0.1], std is ~0.042, so 0.01 will be a near dup.
         mock_cluster_result: ClusterResult = {
@@ -235,9 +236,11 @@ class TestDuplicates:
         detector = Duplicates()
         result = detector.from_clusters(mock_cluster_result)
 
-        # Should find exact duplicates (zero distance edge)
-        assert isinstance(result.items.exact, list)
-        # Near duplicates come from cluster analysis with "cluster" method
+        # Cluster-based detection never returns exact duplicates since embeddings
+        # are approximate representations. Zero distance in embedding space doesn't
+        # mean pixel-identical images.
+        assert result.items.exact is None
+        # All cluster-based duplicates come as near duplicates with "cluster" method
         assert isinstance(result.items.near, list)
         assert all("cluster" in g.methods for g in result.items.near)
         # Targets is now an empty DuplicateDetectionResult, not None
@@ -488,11 +491,11 @@ class TestDuplicatesEdgeCases:
         assert "orientation=rotated" in repr(group_oriented)
 
     def test_evaluate_invalid_config(self):
-        """Covers ValueError when flags=NONE and no feature extractor."""
+        """Covers ValueError when flags=NONE and no cluster-based detection configured."""
         detector = Duplicates(flags=ImageStats.NONE, feature_extractor=None)
         # Mock data (shape doesn't matter for this check)
         data = np.zeros((1, 10, 10, 3))
-        with pytest.raises(ValueError, match="Either flags must contain hash stats or feature_extractor"):
+        with pytest.raises(ValueError, match="Either flags must contain hash stats"):
             detector.evaluate(data)
 
     def test_merge_duplicate_groups_logic(self):
@@ -535,10 +538,12 @@ class TestDuplicatesEdgeCases:
         res = detector._merge_item_results(mock_hash_result, [], [], set())
         assert res == mock_hash_result
 
-    def test_cluster_threshold_none(self):
+    def test_cluster_threshold_none_raises_error(self):
         """
-        Covers logic where cluster_threshold is None, ensuring near duplicates are cleared.
+        Covers logic where cluster_threshold is None with feature_extractor provided.
 
+        When flags=NONE and cluster_threshold=None, clustering is skipped entirely,
+        leaving no detection method available. This should raise a ValueError.
         """
 
         # Create a dummy extractor that returns fixed embeddings
@@ -546,7 +551,7 @@ class TestDuplicatesEdgeCases:
             def __call__(self, data):
                 return np.array([[0.1], [0.1], [0.9]])  # 0 and 1 are identical
 
-        # With threshold=None, cluster_near should be wiped
+        # With threshold=None and flags=NONE, there's no detection method available
         detector = Duplicates(
             flags=ImageStats.NONE,
             feature_extractor=DummyExtractor(),
@@ -557,12 +562,10 @@ class TestDuplicatesEdgeCases:
 
         # Mock data
         data = np.array([0.1, 0.1, 0.2, 0.2, 0.9])
-        output = detector.evaluate(data)
 
-        # Even though 0 and 1 are identical, strict threshold=None (default) might affect how it's reported
-        # The specific line 905 ensures cluster_near = [] if threshold is None.
-        # Exact duplicates might still be found if distance is 0 in MST.
-        assert output.items.near is None or len(output.items.near) == 0
+        # Should raise ValueError since no detection method is available
+        with pytest.raises(ValueError, match="Either flags must contain hash stats"):
+            detector.evaluate(data)
 
     def test_find_hash_duplicates_empty_logic(self):
         """Covers _find_hash_duplicates filtering empty values."""

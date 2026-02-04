@@ -1,5 +1,5 @@
 """
-Embedding encoders for extracting features from datasets.
+Encoders for projecting features into a latent space for analysis.
 
 This module provides pluggable encoder implementations for different backends.
 """
