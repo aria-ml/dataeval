@@ -116,7 +116,7 @@ def with_onnx(extras: list[str]) -> list[str]:
     return extras
 
 
-@session(uv_groups=["test"], uv_extras=["cpu", "onnx"])
+@session(uv_groups=["test"], uv_extras=["cpu", "onnx", "opencv"])
 def test(session: nox.Session) -> None:
     """Run unit tests with coverage reporting. Specify version using `nox -P {version} -e test`.
 
@@ -189,7 +189,7 @@ def lint(session: nox.Session) -> None:
     session.run("codespell")
 
 
-@session(uv_groups=["test"], uv_extras=with_onnx(["cpu"]))
+@session(uv_groups=["test"], uv_extras=with_onnx(["cpu", "opencv"]))
 def doctest(session: nox.Session) -> None:
     """Run docstring tests."""
     target = session.posargs if session.posargs else ["src/dataeval"]
@@ -202,7 +202,7 @@ def doctest(session: nox.Session) -> None:
     )
 
 
-@session(uv_groups=["docs"], uv_extras=with_onnx(UV_EXTRAS))
+@session(uv_groups=["docs"], uv_extras=with_onnx(UV_EXTRAS) + ["opencv"])
 def docs(session: nox.Session) -> None:
     """Generate documentation. Clear the jupyter cache by calling `nox -e docs -- clean`."""
     if {"chart", "charts"} & set(session.posargs):

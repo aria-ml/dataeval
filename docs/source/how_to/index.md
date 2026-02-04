@@ -73,6 +73,7 @@ The guides below exemplify powerful solutions to common problems in ML.
 ../notebooks/h2_deduplicate.ipynb
 ../notebooks/h2_visualize_cleaning_issues.ipynb
 ../notebooks/h2_custom_image_stats_object_detection.ipynb
+../notebooks/h2_choose_duplicate_detection_method.ipynb
 ```
 
 :::{list-table}
@@ -92,6 +93,9 @@ The guides below exemplify powerful solutions to common problems in ML.
 - - [](../notebooks/h2_custom_image_stats_object_detection.ipynb)
   - Customize calculation of image stats on an object detection dataset
   - [![Open In Colab][colab-badge]][calc-colab]
+- - [](../notebooks/h2_choose_duplicate_detection_method.ipynb)
+  - Choose a duplicate detection method
+  - [![Open In Colab][colab-badge]][bovw-colab]
 
 :::
 
@@ -99,6 +103,7 @@ The guides below exemplify powerful solutions to common problems in ML.
 [dupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.95.0/docs/source/notebooks/h2_deduplicate.ipynb
 [clean-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.95.0/docs/source/notebooks/h2_visualize_cleaning_issues.ipynb
 [calc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.95.0/docs/source/notebooks/h2_custom_image_stats_object_detection.ipynb
+[bovw-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.95.0/docs/source/notebooks/h2_choose_duplicate_detection_method.ipynb
 
 ## Metrics
 

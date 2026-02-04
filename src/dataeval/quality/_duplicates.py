@@ -39,6 +39,9 @@ class DatasetItemTuple(NamedTuple):
     def __repr__(self) -> str:
         return f"({self.dataset_id}, {self.id})"
 
+    def __int__(self) -> int:
+        return self.id if isinstance(self.id, int) else self.id.item
+
 
 TIndexType = TypeVar("TIndexType", int, SourceIndex, DatasetItemTuple)
 
@@ -87,12 +90,12 @@ class DuplicateDetectionResult(Generic[TIndexType]):
     exact : Sequence[Sequence[TIndexType]] | None
         Groups of exact duplicates (identical pixel values via xxhash).
         Each inner sequence contains indices that are exact duplicates.
-        Includes cluster-based exact duplicates (zero distance in MST)
-        when a feature_extractor is used. None if not computed.
+        None if not computed.
     near : Sequence[NearDuplicateGroup[TIndexType]] | None
         Groups of near duplicates with detection method metadata.
         Each group contains indices and the set of methods that detected it.
-        None if not computed.
+        Includes all cluster-based duplicates (embedding similarity) since
+        embeddings are approximate representations. None if not computed.
 
     Notes
     -----
@@ -168,30 +171,23 @@ class Duplicates(Evaluator):
     Three convenience flags are provided for common use cases:
 
     - ``ImageStats.HASH_DUPLICATES_BASIC``: Standard duplicate detection (xxhash + phash + dhash)
-    - ``ImageStats.HASH_DUPLICATES_D4``: Rotation/flip-invariant detection
-      (xxhash + phash_d4 + dhash_d4)
+    - ``ImageStats.HASH_DUPLICATES_D4``: Rotation/flip-invariant detection (xxhash + phash_d4 + dhash_d4)
+    - ``ImageStats.HASH``: All hash statistics (enables rotation/flip awareness)
 
     Parameters
     ----------
     flags : ImageStats, default ImageStats.HASH_DUPLICATES_BASIC
-        Statistics to compute for hash-based duplicate detection:
-
-        - ``ImageStats.HASH_DUPLICATES_BASIC`` (default): Standard detection with exact
-          and perceptual hashes (xxhash + phash + dhash)
-        - ``ImageStats.HASH_DUPLICATES_D4``: Rotation/flip-invariant detection
-          using D4 symmetry hashes (xxhash + phash_d4 + dhash_d4)
-        - ``ImageStats.HASH``: Compute all hash types (includes both basic and D4 variants)
-        - ``ImageStats.HASH_XXHASH``: Compute only exact duplicates (fastest)
-        - ``ImageStats.HASH_PHASH``: Compute only phash-based near duplicates
-        - ``ImageStats.HASH_DHASH``: Compute only dhash-based near duplicates
-        - ``ImageStats.NONE``: Skip hash computation, use only cluster-based detection
+        Statistics to compute for hash-based duplicate detection. Set to
+        ``ImageStats.NONE`` to disable hash-based detection.
     feature_extractor : FeatureExtractor, optional
-        Feature extractor for cluster-based duplicate detection. When provided,
-        embeddings are extracted and clustered to find semantic duplicates.
+        Feature extractor for cluster-based duplicate detection. Must be provided
+        together with cluster_threshold to enable clustering. When provided alone
+        without cluster_threshold, clustering is skipped.
     cluster_threshold : float, optional
-        Threshold for cluster-based *near* duplicate detection. This does NOT affect
-        exact duplicates (which are zero distance in the MST). When None, only exact
-        cluster duplicates are detected. Lower values are stricter.
+        Threshold for cluster-based near duplicate detection. Must be provided
+        together with feature_extractor to enable clustering. When None or when
+        feature_extractor is None, cluster-based detection is skipped entirely.
+        Lower values are stricter.
     cluster_algorithm : {"kmeans", "hdbscan"}, default "hdbscan"
         Clustering algorithm for cluster-based detection.
     n_clusters : int, optional
@@ -238,13 +234,23 @@ class Duplicates(Evaluator):
     Combined hash and cluster-based detection:
 
     >>> from dataeval import Embeddings
-    >>> extractor = Embeddings(encoder=encoder)
+    >>> from dataeval.encoders import NumpyFlattenEncoder
+
+    >>> extractor = Embeddings(encoder=NumpyFlattenEncoder())
     >>> detector = Duplicates(feature_extractor=extractor, cluster_threshold=1.0)
     >>> result = detector.evaluate(train_ds)
 
     Using configuration:
 
-    >>> config = Duplicates.Config(cluster_algorithm="kmeans", merge_near_duplicates=False)
+    >>> from dataeval import Embeddings
+    >>> from dataeval.encoders import NumpyFlattenEncoder
+
+    >>> extractor = Embeddings(encoder=NumpyFlattenEncoder())
+    >>> config = Duplicates.Config(
+    ...     feature_extractor=extractor,
+    ...     cluster_algorithm="kmeans",
+    ...     merge_near_duplicates=False,
+    ... )
     >>> detector = Duplicates(config=config)
     """
 
@@ -257,13 +263,16 @@ class Duplicates(Evaluator):
         flags : ImageStats, default ImageStats.HASH
             Statistics to compute for hash-based duplicate detection.
         cluster_threshold : float or None, default None
-            Threshold for cluster-based near duplicate detection.
+            Threshold for cluster-based near duplicate detection. Must be
+            provided together with feature_extractor to enable clustering.
+        merge_near_duplicates : bool, default True
+            Whether to merge overlapping near duplicate groups.
+        feature_extractor : FeatureExtractor or None, default None
+            Feature extractor for cluster-based duplicate detection.
         cluster_algorithm : {"kmeans", "hdbscan"}, default "hdbscan"
             Clustering algorithm for cluster-based detection.
         n_clusters : int or None, default None
             Expected number of clusters.
-        merge_near_duplicates : bool, default True
-            Whether to merge overlapping near duplicate groups.
         """
 
         flags: ImageStats = DEFAULT_DUPLICATES_FLAGS
@@ -273,24 +282,23 @@ class Duplicates(Evaluator):
     stats: CalculationResult
     flags: ImageStats
     cluster_threshold: float | None
+    merge_near_duplicates: bool
+    feature_extractor: FeatureExtractor | None
     cluster_algorithm: Literal["kmeans", "hdbscan"]
     n_clusters: int | None
-    merge_near_duplicates: bool
     config: Config
-    feature_extractor: FeatureExtractor | None
 
     def __init__(
         self,
         flags: ImageStats | None = None,
         cluster_threshold: float | None = None,
+        merge_near_duplicates: bool | None = None,
+        feature_extractor: FeatureExtractor | None = None,
         cluster_algorithm: Literal["kmeans", "hdbscan"] | None = None,
         n_clusters: int | None = None,
-        merge_near_duplicates: bool | None = None,
         config: Config | None = None,
-        feature_extractor: FeatureExtractor | None = None,
     ) -> None:
         super().__init__(locals())
-        self.feature_extractor = feature_extractor
 
     def _get_duplicates(
         self, stats: StatsMap, source_index: Sequence[SourceIndex]
@@ -737,7 +745,7 @@ class Duplicates(Evaluator):
         Find duplicates using cluster-based detection from minimum spanning tree.
 
         Analyzes the minimum spanning tree and cluster assignments to identify
-        exact and near duplicates based on distance relationships within clusters.
+        near duplicates based on distance relationships within clusters.
 
         Parameters
         ----------
@@ -752,10 +760,10 @@ class Duplicates(Evaluator):
 
         Notes
         -----
-        This method identifies duplicates in embedding space:
-
-        - **Exact duplicates**: Points at zero distance in the MST
-        - **Near duplicates**: Points within cluster-specific distance thresholds
+        This method identifies duplicates in embedding space. All cluster-based
+        duplicates are returned as **near duplicates** because embeddings are
+        approximate representations - identical embeddings don't guarantee
+        pixel-identical images.
 
         See Also
         --------
@@ -768,15 +776,19 @@ class Duplicates(Evaluator):
             clusters=cluster_result["clusters"],
         )
 
-        # Convert near duplicates to NearDuplicateGroup with "cluster" method
+        # Treat ALL cluster-based duplicates as near duplicates since embeddings
+        # are approximate representations. Zero distance in embedding space doesn't
+        # mean pixel-identical images.
+        all_cluster_duplicates = exact_duplicates + near_duplicates
         near_groups: list[NearDuplicateGroup[int]] | None = None
-        if near_duplicates:
+        if all_cluster_duplicates:
             near_groups = [
-                NearDuplicateGroup(indices=tuple(group), methods=frozenset({"cluster"})) for group in near_duplicates
+                NearDuplicateGroup(indices=tuple(group), methods=frozenset({"cluster"}))
+                for group in all_cluster_duplicates
             ]
 
         item_result = DuplicateDetectionResult(
-            exact=exact_duplicates or None,
+            exact=None,
             near=near_groups,
         )
 
@@ -891,9 +903,15 @@ class Duplicates(Evaluator):
         >>> detector = Duplicates(feature_extractor=extractor, cluster_threshold=1.0)
         >>> result = detector.evaluate(train_ds)
         """
-        # Validate parameters
-        if not (self.flags & ImageStats.HASH) and self.feature_extractor is None:
-            raise ValueError("Either flags must contain hash stats or feature_extractor must be provided.")
+        # Validate parameters - need either hash-based or cluster-based detection
+        # Cluster-based detection requires both feature_extractor AND cluster_threshold
+        has_hash_detection = bool(self.flags & ImageStats.HASH)
+        has_cluster_detection = self.feature_extractor is not None and self.cluster_threshold is not None
+        if not has_hash_detection and not has_cluster_detection:
+            raise ValueError(
+                "Either flags must contain hash stats, or both feature_extractor and "
+                "cluster_threshold must be provided for cluster-based detection."
+            )
 
         # Initialize results
         hash_item_result: DuplicateDetectionResult[int] | None = None
@@ -906,8 +924,8 @@ class Duplicates(Evaluator):
             self.stats = calculate(data, None, self.flags & ImageStats.HASH, per_image=per_image, per_target=per_target)
             hash_item_result, hash_target_result = self._get_duplicates(self.stats["stats"], self.stats["source_index"])
 
-        # Cluster-based duplicate detection
-        if self.feature_extractor is not None:
+        # Cluster-based duplicate detection (requires both feature_extractor and cluster_threshold)
+        if self.feature_extractor is not None and self.cluster_threshold is not None:
             embeddings = self.feature_extractor(data)
             embeddings_array = flatten_samples(to_numpy(embeddings))
 
@@ -921,9 +939,6 @@ class Duplicates(Evaluator):
                 mst=cluster_result["mst"],
                 clusters=cluster_result["clusters"],
             )
-
-            if self.cluster_threshold is None:
-                cluster_near = []
 
         # Merge results
         available_stats = set(self.stats["stats"].keys()) if self.flags & ImageStats.HASH else set()
@@ -939,29 +954,35 @@ class Duplicates(Evaluator):
         cluster_near: list[list[int]],
         available_stats: set[str],
     ) -> DuplicateDetectionResult[int]:
-        """Merge hash-based and cluster-based item duplicate results."""
+        """Merge hash-based and cluster-based item duplicate results.
+
+        Note: Cluster-based "exact" duplicates (zero distance in embedding space) are
+        treated as near duplicates because embeddings are approximate representations.
+        Only hash-based xxhash matches are considered true exact duplicates (identical pixels).
+        """
         if hash_result is None and not cluster_exact and not cluster_near:
             return DuplicateDetectionResult()
 
-        # Convert cluster_near to method_groups format for merging
-        cluster_method_groups: list[tuple[Sequence[Any], str]] = [(group, "cluster") for group in cluster_near]
+        # Treat ALL cluster results as near duplicates since embeddings are approximate.
+        # cluster_exact (zero distance in MST) doesn't mean pixel-identical images.
+        cluster_method_groups: list[tuple[Sequence[Any], str]] = [
+            (group, "cluster") for group in cluster_exact + cluster_near
+        ]
 
         if hash_result is None:
             # Only cluster results - no hash stats available for orientation
+            # No exact duplicates since we don't have xxhash
             near_groups = self._build_near_duplicate_groups(cluster_method_groups, available_stats)
             return DuplicateDetectionResult(
-                exact=cluster_exact if cluster_exact else None,
+                exact=None,
                 near=near_groups or None,
             )
 
         if not cluster_exact and not cluster_near:
             return hash_result
 
-        # Merge both - combine exact duplicates
-        merged_exact = self._merge_duplicate_groups(
-            list(hash_result.exact or []),
-            cluster_exact,
-        )
+        # Keep only hash-based exact duplicates (xxhash = identical pixels)
+        merged_exact = list(hash_result.exact or [])
 
         # Combine near duplicates from hash and cluster
         hash_method_groups: list[tuple[Sequence[Any], str]] = []

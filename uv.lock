@@ -875,6 +875,9 @@ onnx-gpu = [
     { name = "onnx" },
     { name = "onnxruntime-gpu" },
 ]
+opencv = [
+    { name = "opencv-python-headless" },
+]
 
 [package.dev-dependencies]
 base = [
@@ -1005,6 +1008,7 @@ requires-dist = [
     { name = "onnx", marker = "extra == 'onnx-gpu'" },
     { name = "onnxruntime", marker = "extra == 'onnx'", specifier = ">=1.14.0" },
     { name = "onnxruntime-gpu", marker = "extra == 'onnx-gpu'", specifier = ">=1.14.0" },
+    { name = "opencv-python-headless", marker = "extra == 'opencv'", specifier = ">=4.8.0" },
     { name = "polars", specifier = ">=1.0.0" },
     { name = "psutil", specifier = ">=7.0.0" },
     { name = "pydantic", specifier = ">=2.8" },
@@ -1021,7 +1025,7 @@ requires-dist = [
     { name = "typing-extensions", specifier = ">=4.12" },
     { name = "xxhash", specifier = ">=3.4" },
 ]
-provides-extras = ["cpu", "cu118", "cu124", "cu128", "onnx", "onnx-gpu"]
+provides-extras = ["cpu", "cu118", "cu124", "cu128", "onnx", "onnx-gpu", "opencv"]
 
 [package.metadata.requires-dev]
 base = [{ name = "uv", specifier = ">=0.8.0" }]

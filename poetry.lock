@@ -3864,7 +3864,7 @@ version = "4.13.0.90"
 description = "Wrapper package for OpenCV python bindings."
 optional = false
 python-versions = ">=3.6"
-groups = ["dev", "doclint", "docs"]
+groups = ["main", "dev", "doclint", "docs"]
 files = [
     {file = "opencv_python_headless-4.13.0.90-cp37-abi3-macosx_13_0_arm64.whl", hash = "sha256:12a28674f215542c9bf93338de1b5bffd76996d32da9acb9e739fdb9c8bbd738"},
     {file = "opencv_python_headless-4.13.0.90-cp37-abi3-macosx_14_0_x86_64.whl", hash = "sha256:32255203040dc98803be96362e13f9e4bce20146898222d2e5c242f80de50da5"},
@@ -6899,8 +6899,9 @@ cu124 = ["torch"]
 cu128 = ["torch"]
 onnx = ["onnx", "onnxruntime"]
 onnx-gpu = ["onnx", "onnxruntime-gpu"]
+opencv = ["opencv-python-headless"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.14"
-content-hash = "35c5fd9a5a91ce5d609d27c7c90e6c8d1e5b9ba6df8686b482290a3add6ff055"
+content-hash = "6f48c408f2d48ca9ce85f0b0f172fe935c5bf05849e526b99e8ff39a59cbcbe1"
