@@ -85,11 +85,10 @@ class TestSufficiency:
             config=multi_metric_config,
         )
         output = suff.evaluate()
-        # Exact curve shape not important so can reduce expensive curve fitting
-        output.n_iter = 10
 
         assert isinstance(output, SufficiencyOutput)
-        assert len(output.params) == METRIC_COUNT
+        # Exact curve shape not important so can reduce expensive curve fitting
+        assert len(output.get_params(n_iter=10)) == METRIC_COUNT
         assert len(output.measures) == METRIC_COUNT
         assert len(output.averaged_measures) == METRIC_COUNT
 
@@ -131,10 +130,9 @@ class TestSufficiency:
         )
 
         output = suff.evaluate()
-        # Exact curve shape not important so can reduce expensive curve fitting
-        output.n_iter = 10
 
-        assert len(output.params) == METRIC_COUNT
+        # Exact curve shape not important so can reduce expensive curve fitting
+        assert len(output.get_params(n_iter=10)) == METRIC_COUNT
         assert len(output.measures) == METRIC_COUNT
         assert len(output.averaged_measures) == METRIC_COUNT
 
@@ -176,15 +174,13 @@ class TestSufficiency:
 
         output = suff.evaluate()
 
-        # Exact curve shape not important so can reduce expensive curve fitting
-        output.n_iter = 10
-
         assert isinstance(output, SufficiencyOutput)
         assert len(output.measures) == METRIC_COUNT
         assert len(output.averaged_measures) == METRIC_COUNT
 
         # Classwise metric has additional dimension
-        assert output.params["Accuracy"].shape == (CLASSES, 3)  # 3 curve params per class
+        # Exact curve shape not important so can reduce expensive curve fitting
+        assert output.get_params(n_iter=10)["Accuracy"].shape == (CLASSES, 3)  # 3 curve params per class
         assert output.measures["Accuracy"].shape == (RUNS, SUBSTEPS, CLASSES)
         assert output.averaged_measures["Accuracy"].shape == (CLASSES, SUBSTEPS)
 
