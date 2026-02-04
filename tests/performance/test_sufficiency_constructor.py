@@ -35,10 +35,15 @@ class TestSufficiencyConfigConstructor:
         simple_dataset,
         mock_train,
         mock_eval,
+        mock_reset,
     ):
         """Verify constructor stores config objects."""
 
-        config = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval)
+        config = Sufficiency.Config(
+            training_strategy=mock_train,
+            evaluation_strategy=mock_eval,
+            reset_strategy=mock_reset,
+        )
 
         suff = Sufficiency(mock_model, simple_dataset, simple_dataset, config=config)
 

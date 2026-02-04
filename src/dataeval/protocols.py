@@ -18,6 +18,7 @@ __all__ = [
     "ImageClassificationDataset",
     "LossFn",
     "Metadata",
+    "ModelResetStrategy",
     "ObjectDetectionTarget",
     "ObjectDetectionDatum",
     "ObjectDetectionDataset",
@@ -637,6 +638,92 @@ class EmbeddingEncoder(Protocol):
 
 # ========== SUFFICIENCY STRATEGIES ==========
 
+_M = TypeVar("_M")
+
+
+@runtime_checkable
+class ModelResetStrategy(Protocol[_M]):
+    """
+    Protocol for resetting model parameters between training runs.
+
+    This protocol enables backend-agnostic model reset functionality.
+    Implementations can provide custom reset logic for any ML framework
+    (PyTorch, TensorFlow, JAX, etc.).
+
+    For PyTorch models (nn.Module), a default implementation is provided
+    that calls reset_parameters() on each layer. For other backends,
+    users must provide their own reset strategy.
+
+    Examples
+    --------
+    Custom reset for PyTorch with specific initialization:
+
+    >>> import torch.nn as nn
+    >>> class XavierReset:
+    ...     def __call__(self, model: nn.Module) -> nn.Module:
+    ...         for m in model.modules():
+    ...             if hasattr(m, "weight") and m.weight is not None:
+    ...                 nn.init.xavier_uniform_(m.weight)
+    ...             if hasattr(m, "bias") and m.bias is not None:
+    ...                 nn.init.zeros_(m.bias)
+    ...         return model
+
+    Reset strategy for JAX models using parameter reinitialization:
+
+    >>> class JAXReset:
+    ...     def __init__(self, init_fn, rng_key):
+    ...         self.init_fn = init_fn
+    ...         self.rng_key = rng_key
+    ...
+    ...     def __call__(self, params):
+    ...         import jax.random as random
+    ...
+    ...         # Reinitialize parameters with new random key
+    ...         self.rng_key, subkey = random.split(self.rng_key)
+    ...         return self.init_fn(subkey)
+
+    Reset by reloading model weights from checkpoint:
+
+    >>> class CheckpointReset:
+    ...     def __init__(self, checkpoint_path: str):
+    ...         self.checkpoint_path = checkpoint_path
+    ...
+    ...     def __call__(self, model: nn.Module) -> nn.Module:
+    ...         import torch
+    ...
+    ...         model.load_state_dict(torch.load(self.checkpoint_path))
+    ...         return model
+
+    See Also
+    --------
+    :class:`.Sufficiency` : Uses this protocol for model reset between runs
+    """
+
+    def __call__(self, model: _M) -> _M:
+        """
+        Reset model parameters to initial state.
+
+        Parameters
+        ----------
+        model : M
+            The model to reset. Can be any model type (PyTorch Module,
+            TensorFlow model, JAX parameters, etc.).
+
+        Returns
+        -------
+        M
+            The reset model. May be the same instance with modified
+            parameters or a new instance entirely.
+
+        Notes
+        -----
+        Implementations should:
+        - Return the model in a state equivalent to freshly initialized
+        - Handle the specific backend's requirements for parameter reset
+        - Be deterministic or set seeds internally for reproducibility
+        """
+        ...
+
 
 @runtime_checkable
 class TrainingStrategy(Protocol[_T_cn]):
@@ -649,9 +736,12 @@ class TrainingStrategy(Protocol[_T_cn]):
     The @runtime_checkable decorator allows isinstance() checks if needed,
     though structural typing works without it at type-check time.
 
+    The model parameter accepts any type to support different ML backends
+    (PyTorch, TensorFlow, JAX, etc.).
+
     Examples
     --------
-    Creating a custom training strategy:
+    Creating a custom training strategy for PyTorch:
 
     >>> class MyTraining:
     ...     def __init__(self, learning_rate: float, epochs: int):
@@ -664,16 +754,36 @@ class TrainingStrategy(Protocol[_T_cn]):
     ...         for epoch in range(self.epochs):
     ...             # Training loop using specified indices
     ...             ...
+
+    Creating a training strategy for JAX:
+
+    >>> class JAXTraining:
+    ...     def __init__(self, learning_rate: float, epochs: int):
+    ...         self.learning_rate = learning_rate
+    ...         self.epochs = epochs
+    ...
+    ...     def train(self, params, dataset: Dataset, indices: Sequence[int]) -> None:
+    ...         import jax
+    ...         import jax.numpy as jnp
+    ...
+    ...         # JAX training with functional updates
+    ...         for epoch in range(self.epochs):
+    ...             for idx in indices:
+    ...                 x, y, _ = dataset[idx]
+    ...                 grads = jax.grad(loss_fn)(params, x, y)
+    ...                 params = jax.tree.map(lambda p, g: p - self.learning_rate * g, params, grads)
     """
 
-    def train(self, model: torch.nn.Module, dataset: Dataset[_T_cn], indices: Sequence[int]) -> None:
+    def train(self, model: Any, dataset: Dataset[_T_cn], indices: Sequence[int]) -> None:
         """
         Train the model using the specified indices from the dataset.
 
         Parameters
         ----------
-        model : nn.Module
-            The model to train. Training should modify the model in-place.
+        model : Any
+            The model to train. Can be any model type (PyTorch Module,
+            TensorFlow model, etc.). Training should modify the model in-place
+            when the backend supports it.
         dataset : Dataset[T]
             The full dataset. Only samples at the specified indices should
             be used for training.
@@ -709,9 +819,12 @@ class EvaluationStrategy(Protocol[_T_cn]):
     The @runtime_checkable decorator allows isinstance() checks if needed,
     though structural typing works without it at type-check time.
 
+    The model parameter accepts any type to support different ML backends
+    (PyTorch, TensorFlow, JAX, etc.).
+
     Examples
     --------
-    Creating a custom evaluation strategy:
+    Creating a custom evaluation strategy for PyTorch:
 
     >>> class MyEvaluation:
     ...     def __init__(self, batch_size: int, metrics: list[str]):
@@ -725,16 +838,35 @@ class EvaluationStrategy(Protocol[_T_cn]):
     ...             # Compute metrics
     ...             ...
     ...         return {"accuracy": 0.95, "f1": 0.93}
+
+    Creating an evaluation strategy for JAX:
+
+    >>> class JAXEvaluation:
+    ...     def __init__(self, apply_fn):
+    ...         self.apply_fn = apply_fn  # JAX model's forward function
+    ...
+    ...     def evaluate(self, params, dataset: Dataset) -> Mapping[str, float]:
+    ...         import jax.numpy as jnp
+    ...
+    ...         correct = 0
+    ...         total = len(dataset)
+    ...         for i in range(total):
+    ...             x, y, _ = dataset[i]
+    ...             pred = self.apply_fn(params, x)
+    ...             if jnp.argmax(pred) == jnp.argmax(y):
+    ...                 correct += 1
+    ...         return {"accuracy": correct / total}
     """
 
-    def evaluate(self, model: torch.nn.Module, dataset: Dataset[_T_cn]) -> Mapping[str, float | ArrayLike]:
+    def evaluate(self, model: Any, dataset: Dataset[_T_cn]) -> Mapping[str, float | ArrayLike]:
         """
         Evaluate the model on the dataset and return performance metrics.
 
         Parameters
         ----------
-        model : nn.Module
-            The trained model to evaluate
+        model : Any
+            The trained model to evaluate. Can be any model type (PyTorch
+            Module, TensorFlow model, JAX parameters, etc.).
         dataset : Dataset[T]
             The dataset to evaluate on (typically a test/validation set)
 
