@@ -1,11 +1,9 @@
 __all__ = []
 
-from collections.abc import Iterable, Sized
+from collections.abc import Callable, Iterable, Sized
 from typing import Any, Generic, TypeVar
 
 import numpy as np
-import torch
-import torch.nn as nn
 from pydantic import field_validator
 
 from dataeval.performance._aggregator import ResultAggregator
@@ -19,25 +17,9 @@ DEFAULT_SUFFICIENCY_SUBSTEPS = 5
 DEFAULT_SUFFICIENCY_UNIT_INTERVAL = True
 
 T = TypeVar("T")
-S = TypeVar("S")
-
-
-def reset_parameters(model: nn.Module) -> nn.Module:
-    """
-    Re-initializes each layer in the model using
-    the layer's defined weight_init function
-    """
-
-    @torch.no_grad()
-    def weight_reset(m: nn.Module) -> None:
-        # Check if the current module has reset_parameters
-        reset_parameters = getattr(m, "reset_parameters", None)
-        if callable(reset_parameters):
-            m.reset_parameters()  # type: ignore
-
-    # Applies fn recursively to every submodule see:
-    # https://pytorch.org/docs/stable/generated/torch.nn.Module.html
-    return model.apply(fn=weight_reset)
+M = TypeVar("M")
+_T = TypeVar("_T")
+_M = TypeVar("_M")
 
 
 def validate_dataset_len(dataset: Dataset[Any]) -> int:
@@ -49,25 +31,33 @@ def validate_dataset_len(dataset: Dataset[Any]) -> int:
     return length
 
 
-class Sufficiency(Evaluator, Generic[T]):
+class Sufficiency(Evaluator, Generic[T, M]):
     """
     Analyze how much training data is needed for target model performance.
 
     Trains models on progressively larger data subsets, evaluates at each step,
     and fits power law curves to predict performance on larger datasets.
 
+    This class is backend-agnostic and supports any ML framework (PyTorch,
+    TensorFlow, JAX, etc.) through configurable strategies.
+
     Parameters
     ----------
-    model : nn.Module
-        Model to train (reset for each run)
-    train_ds : torch.Dataset
+    model : Any
+        Model to train (reset for each run). Can be any model type supported
+        by your training and evaluation strategies.
+    train_ds : Dataset
         Full training data
-    test_ds : torch.Dataset
+    test_ds : Dataset
         Test/validation data
     training_strategy : TrainingStrategy or None, default None
         Strategy for training models. If None, uses config.training_strategy.
     evaluation_strategy : EvaluationStrategy or None, default None
         Strategy for evaluating models. If None, uses config.evaluation_strategy.
+    reset_strategy : Callable[[Any], Any]
+        Strategy for resetting model parameters between runs. Required.
+        Must be a callable that takes the model and returns a reset model
+        (e.g., with re-initialized weights).
     runs : int or None, default None
         Number of independent training runs. If None, uses config.runs (default 1).
     substeps : int or None, default None
@@ -89,13 +79,17 @@ class Sufficiency(Evaluator, Generic[T]):
 
     Parameters passed directly to __init__ override config defaults.
 
+    You must provide a `reset_strategy` that knows how to reset your model
+    to its initial state between runs.
+
     See Also
     --------
     :class:`.Sufficiency.Config` : Configuration object
     :class:`.SufficiencyOutput` : Results with measures and projections
+    :class:`.ModelResetStrategy` : Protocol for reset strategies
     """
 
-    class Config(EvaluatorConfig, Generic[S]):
+    class Config(EvaluatorConfig, Generic[_T, _M]):
         """
         Configuration for sufficiency analysis execution.
 
@@ -107,6 +101,10 @@ class Sufficiency(Evaluator, Generic[T]):
         evaluation_strategy : EvaluationStrategy
             Strategy for evaluating trained models. Must implement the
             `evaluate(model, dataset)` method returning metrics.
+        reset_strategy : Callable[[Any], Any] or None, default None
+            Strategy for resetting model parameters between runs. Required
+            when using Sufficiency. Must be a callable that takes the model
+            and returns a reset model (e.g., with re-initialized weights).
         runs : int, default 1
             Number of independent training runs to perform. Each run trains
             a fresh model from scratch.
@@ -145,14 +143,28 @@ class Sufficiency(Evaluator, Generic[T]):
         ...     unit_interval=False,  # For loss metrics
         ... )
 
+        Configuration with custom reset strategy:
+
+        >>> def custom_reset(model):
+        ...     # Custom logic to reset model parameters
+        ...     return model
+
+        >>> config = Sufficiency.Config(
+        ...     training_strategy=training,
+        ...     evaluation_strategy=evaluation,
+        ...     reset_strategy=custom_reset,
+        ... )
+
         See Also
         --------
         - :class:`.TrainingStrategy`
         - :class:`.EvaluationStrategy`
+        - :class:`.ModelResetStrategy`
         """
 
-        training_strategy: TrainingStrategy[S] | None = None
-        evaluation_strategy: EvaluationStrategy[S] | None = None
+        training_strategy: TrainingStrategy[_T] | None = None
+        evaluation_strategy: EvaluationStrategy[_T] | None = None
+        reset_strategy: Callable[[_M], _M] | None = None
         runs: int = DEFAULT_SUFFICIENCY_RUNS
         substeps: int = DEFAULT_SUFFICIENCY_SUBSTEPS
         unit_interval: bool = DEFAULT_SUFFICIENCY_UNIT_INTERVAL
@@ -169,19 +181,21 @@ class Sufficiency(Evaluator, Generic[T]):
     unit_interval: bool
     training_strategy: TrainingStrategy[T]
     evaluation_strategy: EvaluationStrategy[T]
-    config: Config[T]
+    reset_strategy: Callable[[M], M]
+    config: Config[T, M]
 
     def __init__(
         self,
-        model: nn.Module,
+        model: M,
         train_ds: Dataset[T],
         test_ds: Dataset[T],
         training_strategy: TrainingStrategy[T] | None = None,
         evaluation_strategy: EvaluationStrategy[T] | None = None,
+        reset_strategy: Callable[[M], M] | None = None,
         runs: int | None = None,
         substeps: int | None = None,
         unit_interval: bool | None = None,
-        config: Config[T] | None = None,
+        config: Config[T, M] | None = None,
     ) -> None:
         self.model = model
 
@@ -192,7 +206,21 @@ class Sufficiency(Evaluator, Generic[T]):
         validate_dataset_len(test_ds)
         self._test_ds = test_ds
 
-        super().__init__(locals(), exclude={"model", "train_ds", "test_ds"})
+        # Store reset_strategy before super().__init__ as Pydantic can't serialize callables properly
+        # Priority: direct param > config > default
+        _reset_strategy = reset_strategy
+        if _reset_strategy is None and config is not None:
+            _reset_strategy = config.reset_strategy
+
+        super().__init__(locals(), exclude={"model", "train_ds", "test_ds", "reset_strategy"})
+
+        # Set up reset strategy (required)
+        if _reset_strategy is None:
+            raise ValueError(
+                "reset_strategy is required. Provide a callable that takes the model "
+                "and returns a reset model (e.g., with re-initialized weights)."
+            )
+        self.reset_strategy = _reset_strategy
 
         # Validate parameters
         if self.runs <= 0:
@@ -264,8 +292,8 @@ class Sufficiency(Evaluator, Generic[T]):
         # Step 1: Create randomized indices for this run
         indices = np.random.randint(0, self._length, size=self._length)
 
-        # Step 2: Reset model to fresh initialization (temporal coupling explicit)
-        model = reset_parameters(self.model)
+        # Step 2: Reset model to fresh initialization using the configured strategy
+        model = self.reset_strategy(self.model)
 
         # Step 3: Train and evaluate at each step (temporal coupling explicit)
         for step_index, dataset_size in enumerate(steps):
@@ -312,6 +340,7 @@ class Sufficiency(Evaluator, Generic[T]):
         ...     test_ds=test_ds,
         ...     training_strategy=CustomTrainingStrategy(),
         ...     evaluation_strategy=CustomEvaluationStrategy(),
+        ...     reset_strategy=CustomResetStrategy(),
         ... )
 
         Default runs and substeps:

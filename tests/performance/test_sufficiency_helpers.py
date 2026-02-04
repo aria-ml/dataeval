@@ -18,7 +18,7 @@ class TestCreateScheduleHelper:
 
     def test_creates_geometric_schedule_when_eval_at_none(self, mock_model, simple_dataset, basic_config):
         """Verify default geometric schedule when eval_at is None."""
-        suff = Sufficiency(mock_model, simple_dataset, simple_dataset, basic_config)
+        suff = Sufficiency(mock_model, simple_dataset, simple_dataset, config=basic_config)
 
         schedule = suff._create_schedule(schedule=None)
 
@@ -28,7 +28,7 @@ class TestCreateScheduleHelper:
 
     def test_creates_custom_schedule_when_eval_at_int(self, mock_model, simple_dataset, basic_config):
         """Verify custom schedule when eval_at is single int."""
-        suff = Sufficiency(mock_model, simple_dataset, simple_dataset, basic_config)
+        suff = Sufficiency(mock_model, simple_dataset, simple_dataset, config=basic_config)
 
         schedule = suff._create_schedule(schedule=50)
 
@@ -37,7 +37,7 @@ class TestCreateScheduleHelper:
 
     def test_creates_custom_schedule_when_eval_at_list(self, mock_model, simple_dataset, basic_config):
         """Verify custom schedule when eval_at is list."""
-        suff = Sufficiency(mock_model, simple_dataset, simple_dataset, basic_config)
+        suff = Sufficiency(mock_model, simple_dataset, simple_dataset, config=basic_config)
 
         schedule = suff._create_schedule(schedule=[10, 20, 30])
 
@@ -48,11 +48,13 @@ class TestCreateScheduleHelper:
 class TestExecuteRunHelper:
     """Test _execute_run helper method."""
 
-    def test_executes_single_run(self, mock_train, mock_eval, simple_dataset):
+    def test_executes_single_run(self, mock_train, mock_eval, mock_reset, simple_dataset):
         """Verify _execute_run trains and evaluates for all steps."""
         mock_eval.evaluate.return_value = {"accuracy": 0.95}
 
-        config = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, runs=1, substeps=3)
+        config = Sufficiency.Config(
+            training_strategy=mock_train, evaluation_strategy=mock_eval, reset_strategy=mock_reset, runs=1, substeps=3
+        )
         model = nn.Linear(10, 2)
         suff = Sufficiency(model, simple_dataset, simple_dataset, config=config)
 
@@ -67,11 +69,13 @@ class TestExecuteRunHelper:
         assert mock_train.train.call_count == 3
         assert mock_eval.evaluate.call_count == 3
 
-    def test_passes_correct_indices_to_training(self, mock_train, mock_eval, simple_dataset):
+    def test_passes_correct_indices_to_training(self, mock_train, mock_eval, mock_reset, simple_dataset):
         """Verify _execute_run passes correct indices to training."""
         mock_eval.evaluate.return_value = {"accuracy": 0.95}
 
-        config = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, runs=1, substeps=2)
+        config = Sufficiency.Config(
+            training_strategy=mock_train, evaluation_strategy=mock_eval, reset_strategy=mock_reset, runs=1, substeps=2
+        )
         model = nn.Linear(10, 2)
         suff = Sufficiency(model, simple_dataset, simple_dataset, config=config)
 
@@ -88,11 +92,13 @@ class TestExecuteRunHelper:
         second_call_indices = mock_train.train.call_args_list[1][0][2]
         assert len(second_call_indices) == 10
 
-    def test_passes_model_to_training(self, mock_train, mock_eval, simple_dataset):
+    def test_passes_model_to_training(self, mock_train, mock_eval, mock_reset, simple_dataset):
         """Verify _execute_run passes model to training strategy."""
         mock_eval.evaluate.return_value = {"accuracy": 0.95}
 
-        config = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, runs=1, substeps=1)
+        config = Sufficiency.Config(
+            training_strategy=mock_train, evaluation_strategy=mock_eval, reset_strategy=mock_reset, runs=1, substeps=1
+        )
         model = nn.Linear(10, 2)
         suff = Sufficiency(model, simple_dataset, simple_dataset, config=config)
 
@@ -106,11 +112,13 @@ class TestExecuteRunHelper:
         passed_model = call_args[0]
         assert isinstance(passed_model, nn.Module)
 
-    def test_passes_test_dataset_to_evaluation(self, mock_train, mock_eval, simple_dataset):
+    def test_passes_test_dataset_to_evaluation(self, mock_train, mock_eval, mock_reset, simple_dataset):
         """Verify _execute_run passes test dataset to evaluation strategy."""
         mock_eval.evaluate.return_value = {"accuracy": 0.95}
 
-        config = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, runs=1, substeps=1)
+        config = Sufficiency.Config(
+            training_strategy=mock_train, evaluation_strategy=mock_eval, reset_strategy=mock_reset, runs=1, substeps=1
+        )
         model = nn.Linear(10, 2)
         test_ds = simple_dataset
         suff = Sufficiency(model, simple_dataset, test_ds, config=config)
@@ -125,11 +133,13 @@ class TestExecuteRunHelper:
         passed_dataset = call_args[1]
         assert passed_dataset is test_ds
 
-    def test_stores_results_in_aggregator(self, mock_train, mock_eval, simple_dataset):
+    def test_stores_results_in_aggregator(self, mock_train, mock_eval, mock_reset, simple_dataset):
         """Verify _execute_run stores results in aggregator."""
         mock_eval.evaluate.return_value = {"accuracy": 0.95, "loss": 0.05}
 
-        config = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, runs=1, substeps=2)
+        config = Sufficiency.Config(
+            training_strategy=mock_train, evaluation_strategy=mock_eval, reset_strategy=mock_reset, runs=1, substeps=2
+        )
         model = nn.Linear(10, 2)
         suff = Sufficiency(model, simple_dataset, simple_dataset, config=config)
 
