@@ -30,7 +30,7 @@ from typing_extensions import Self
 
 from dataeval import __version__
 from dataeval._helpers import apply_config, get_overrides
-from dataeval.protocols import Array, SequenceLike
+from dataeval.protocols import Array, FeatureExtractor, SequenceLike
 
 DType = TypeVar("DType", covariant=True)
 
@@ -63,13 +63,12 @@ DEFAULT_CLUSTER_N_CLUSTERS: int | None = None
 
 
 class EvaluatorConfig(BaseModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(
-        extra="forbid",
-        arbitrary_types_allowed=True,
-    )
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
 
 class ClusterConfigMixin(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+    feature_extractor: FeatureExtractor | None = None
     cluster_algorithm: Literal["kmeans", "hdbscan"] = DEFAULT_CLUSTER_ALGORITHM
     n_clusters: int | None = DEFAULT_CLUSTER_N_CLUSTERS
 

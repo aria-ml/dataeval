@@ -161,6 +161,10 @@ class DriftUnivariate(BaseDriftUnivariate):
             Alternative hypothesis for the statistical test.
         n_features : int or None, default None
             Number of features to analyze.
+        update_strategy : UpdateStrategy or None, default None
+            Strategy for updating reference data over time.
+        feature_extractor : FeatureExtractor or None, default None
+            Feature extractor for transforming input data before drift detection.
         """
 
         method: Literal["ks", "cvm", "mwu", "anderson", "bws"] = "ks"
@@ -168,6 +172,8 @@ class DriftUnivariate(BaseDriftUnivariate):
         correction: Literal["bonferroni", "fdr"] = "bonferroni"
         alternative: Literal["two-sided", "less", "greater"] = "two-sided"
         n_features: int | None = None
+        update_strategy: UpdateStrategy | None = None
+        feature_extractor: FeatureExtractor | None = None
 
     def __init__(
         self,

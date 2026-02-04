@@ -488,6 +488,8 @@ class Outliers(Evaluator):
             Threshold value for the outlier method.
         cluster_threshold : float, default 2.5
             Number of standard deviations from cluster center for cluster-based detection.
+        feature_extractor : FeatureExtractor or None, default None
+            Feature extractor for cluster-based outlier detection.
         cluster_algorithm : {"kmeans", "hdbscan"}, default "hdbscan"
             Clustering algorithm for cluster-based detection.
         n_clusters : int or None, default None
@@ -504,10 +506,10 @@ class Outliers(Evaluator):
     outlier_method: Literal["zscore", "modzscore", "iqr"]
     outlier_threshold: float | None
     cluster_threshold: float
+    feature_extractor: FeatureExtractor | None
     cluster_algorithm: Literal["kmeans", "hdbscan"]
     n_clusters: int | None
     config: Config
-    feature_extractor: FeatureExtractor | None
 
     def __init__(
         self,
@@ -515,13 +517,12 @@ class Outliers(Evaluator):
         outlier_method: Literal["zscore", "modzscore", "iqr"] | None = None,
         outlier_threshold: float | None = None,
         cluster_threshold: float | None = None,
+        feature_extractor: FeatureExtractor | None = None,
         cluster_algorithm: Literal["kmeans", "hdbscan"] | None = None,
         n_clusters: int | None = None,
         config: Config | None = None,
-        feature_extractor: FeatureExtractor | None = None,
     ) -> None:
         super().__init__(locals())
-        self.feature_extractor = feature_extractor
 
     def _get_outliers(self, stats: StatsMap, source_index: Sequence[SourceIndex]) -> pl.DataFrame:
         item_ids: list[int] = []
