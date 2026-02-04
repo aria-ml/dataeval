@@ -7,15 +7,17 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, cast
 
 import numpy as np
+import polars as pl
 from numpy.typing import NDArray
 from scipy.optimize import basinhopping
-from typing_extensions import Self
 
 from dataeval.protocols import ArrayLike
-from dataeval.types import DictOutput, set_metadata
+from dataeval.types import DictOutput
 from dataeval.utils.arrays import as_numpy
 
 _logger = logging.getLogger(__name__)
+
+LRU_CACHE_SIZE = 10
 
 
 @dataclass
@@ -57,8 +59,6 @@ class SufficiencyOutput(DictOutput):
         3D array [runs, substep, classes] of values for all runs observed for each sample size step for each measure
     averaged_measures : dict[str, NDArray]
         Average of values for all runs observed for each sample size step for each measure
-    n_iter : int, default 1000
-        Number of iterations to perform in the basin-hopping curve-fit process
     unit_interval : bool, default True
         Constrains the power law to the interval [0, 1].  Set True (default) for metrics such as accuracy, precision,
         and recall which are defined to take values on [0,1].  Set False for metrics not on the unit interval.
@@ -67,7 +67,6 @@ class SufficiencyOutput(DictOutput):
     steps: NDArray[np.intp]
     measures: Mapping[str, NDArray[Any]]
     averaged_measures: MutableMapping[str, NDArray[Any]] = field(default_factory=lambda: {})
-    n_iter: int = 1000
     unit_interval: bool = True
 
     def __post_init__(self) -> None:
@@ -79,79 +78,121 @@ class SufficiencyOutput(DictOutput):
             c_v = v.shape[1] if v.ndim > 1 else len(v)
             if c != c_v:
                 raise ValueError(f"{m} does not contain the expected number ({c}) of data points.")
-        self._params = None
+        self._params: dict[int, Mapping[str, NDArray[np.float64]]] | None = None
+        self._params_cache_keys: list[int] = []
 
     @property
-    def params(self) -> Mapping[str, NDArray[Any]]:
-        if self._params is None:
-            self._params = {}
-        if self.n_iter not in self._params:
-            self._params[self.n_iter] = get_curve_params(
-                self.averaged_measures, self.steps, self.n_iter, self.unit_interval
-            )
-        return self._params[self.n_iter]
-
-    @set_metadata
-    def project(self, projection: int | Iterable[int]) -> Self:
+    def params(self) -> Mapping[str, NDArray[np.float64]]:
         """
-        Projects the measures for each step.
-
-        Parameters
-        ----------
-        projection : int | Iterable[int]
-            Step or steps to project
-
-        Returns
-        -------
-        SufficiencyOutput
-            Dataclass containing the projected measures per projection
-
-        Raises
-        ------
-        ValueError
-            If the length of data points in the measures do not match
-            If `projection` is not numerical
-        """
-        projection = np.asarray(list(projection) if isinstance(projection, Iterable) else [projection])
-        if not np.issubdtype(projection.dtype, np.number):
-            raise ValueError("'projection' must consist of numerical values")
-
-        output = {}
-        for name, averaged_measures in self.averaged_measures.items():
-            if averaged_measures.ndim > 1:
-                result = []
-                for i in range(len(averaged_measures)):
-                    projected = project_steps(self.params[name][i], projection)
-                    result.append(projected)
-                output[name] = np.array(result)
-            else:
-                output[name] = project_steps(self.params[name], projection)
-        proj = self.__class__(projection, {}, output, self.n_iter)
-        proj._params = self._params
-        return proj
-
-    def inv_project(
-        self, targets: Mapping[str, ArrayLike], n_iter: int | None = None
-    ) -> Mapping[str, NDArray[np.float64]]:
-        """
-        Calculate training samples needed to achieve target model metric values.
-
-        Parameters
-        ----------
-        targets : Mapping[str, ArrayLike]
-            Mapping of target metric scores (from 0.0 to 1.0) that we want
-            to achieve, where the key is the name of the metric.
-        n_iter : int or None, default None
-            Iteration to use when calculating the inverse power curve, if None defaults to 1000
+        Get the curve fit parameters for the power law model.
 
         Returns
         -------
         Mapping[str, NDArray]
-            List of the number of training samples needed to achieve each
-            corresponding entry in targets
+            Mapping of metric names to their fitted power law parameters
         """
+        return self.get_params()
 
-        projection = {}
+    def get_params(self, n_iter: int = 1000) -> Mapping[str, NDArray[np.float64]]:
+        """
+        Get the curve fit parameters for the power law model.
+
+        Parameters
+        ----------
+        n_iter : int, default 1000
+            Number of iterations to perform in the basin-hopping curve-fit process
+
+        Returns
+        -------
+        Mapping[str, NDArray]
+            Mapping of metric names to their fitted power law parameters
+        """
+        if self._params is None:
+            self._params = {}
+
+        if n_iter in self._params:
+            # Move to end (most recently used)
+            if n_iter in self._params_cache_keys:
+                self._params_cache_keys.remove(n_iter)
+            self._params_cache_keys.append(n_iter)
+        else:
+            # Evict oldest if cache is full
+            if len(self._params_cache_keys) >= LRU_CACHE_SIZE:
+                oldest = self._params_cache_keys.pop(0)
+                del self._params[oldest]
+            # Compute and cache
+            self._params[n_iter] = get_curve_params(self.averaged_measures, self.steps, n_iter, self.unit_interval)
+            self._params_cache_keys.append(n_iter)
+
+        return self._params[n_iter]
+
+    def project(self, projection: int | Iterable[int], n_iter: int = 1000) -> pl.DataFrame:
+        """
+        Project metric values to new sample sizes using the fitted power law.
+
+        Parameters
+        ----------
+        projection : int | Iterable[int]
+            Sample size(s) to project metric values to
+        n_iter : int, default 1000
+            Number of iterations to perform in the basin-hopping curve-fit process
+
+        Returns
+        -------
+        pl.DataFrame
+            DataFrame with columns:
+                step: int - The projected sample size
+                <metric>: float - One column per metric (multi-class as metric_0, metric_1, ...)
+
+        Raises
+        ------
+        ValueError
+            If `projection` is not numerical
+        """
+        proj_array = np.asarray(list(projection) if isinstance(projection, Iterable) else [projection])
+        if not np.issubdtype(proj_array.dtype, np.number):
+            raise ValueError("'projection' must consist of numerical values")
+
+        params = self.get_params(n_iter)
+        output: dict[str, NDArray[Any]] = {}
+        for name, averaged_measures in self.averaged_measures.items():
+            if averaged_measures.ndim > 1:
+                result = []
+                for i in range(len(averaged_measures)):
+                    projected = project_steps(params[name][i], proj_array)
+                    result.append(projected)
+                output[name] = np.array(result)
+            else:
+                output[name] = project_steps(params[name], proj_array)
+
+        return self._build_dataframe(proj_array, output)
+
+    def inv_project(self, targets: Mapping[str, ArrayLike] | ArrayLike, n_iter: int = 1000) -> pl.DataFrame:
+        """
+        Calculate training samples needed to achieve target metric values.
+
+        Parameters
+        ----------
+        targets : Mapping[str, ArrayLike] | ArrayLike
+            Mapping of target metric scores (from 0.0 to 1.0) that we want
+            to achieve, where the key is the name of the metric.  If an
+            ArrayLike is provided, the same targets are applied to all metrics.
+        n_iter : int, default 1000
+            Number of iterations to perform in the basin-hopping curve-fit process
+
+        Returns
+        -------
+        pl.DataFrame
+            DataFrame with columns:
+                target: float - Target metric value
+                <metric>: int - One column per metric (multi-class as metric_0, metric_1, ...)
+                Values of -1 indicate the target is unachievable.
+        """
+        params = self.get_params(n_iter)
+        results: dict[str, tuple[NDArray[Any], NDArray[np.int64]]] = {}  # metric -> (targets, samples)
+
+        if not isinstance(targets, Mapping):
+            targets = dict.fromkeys(self.averaged_measures.keys(), targets)
 
         for name, target in targets.items():
             tarray = as_numpy(target)
@@ -160,16 +201,70 @@ class SufficiencyOutput(DictOutput):
 
             measure = self.averaged_measures[name]
             if measure.ndim > 1:
-                projection[name] = np.zeros((len(measure), len(tarray)))
+                samples = np.zeros((len(measure), len(tarray)), dtype=np.int64)
                 for i in range(len(measure)):
-                    projection[name][i] = inv_project_steps(
-                        self.params[name][i],
+                    samples[i] = inv_project_steps(
+                        params[name][i],
                         tarray[i] if tarray.ndim == measure.ndim else tarray,
                     )
+                results[name] = (tarray, samples)
             else:
-                projection[name] = inv_project_steps(self.params[name], tarray)
+                results[name] = (tarray, inv_project_steps(params[name], tarray))
 
-        return projection
+        return self._build_inv_project_dataframe(results)
+
+    @staticmethod
+    def _build_inv_project_dataframe(
+        results: Mapping[str, tuple[NDArray[Any], NDArray[np.int64]]],
+    ) -> pl.DataFrame:
+        """Build wide-format DataFrame from inverse projection results."""
+        # Collect all unique target values
+        all_targets: set[float] = set()
+        for targets, _ in results.values():
+            for t in targets.flatten() if targets.ndim > 1 else targets:
+                all_targets.add(float(t))
+
+        sorted_targets = sorted(all_targets)
+        data: dict[str, list[Any]] = {"target": sorted_targets}
+
+        for name, (targets, samples) in results.items():
+            if samples.ndim > 1:
+                for class_idx, class_samples in enumerate(samples):
+                    t_vals = targets[class_idx] if targets.ndim > 1 else targets
+                    target_to_sample = {float(t_vals[i]): int(class_samples[i]) for i in range(len(class_samples))}
+                    data[f"{name}_{class_idx}"] = [target_to_sample.get(t) for t in sorted_targets]
+            else:
+                target_to_sample = {float(targets[i]): int(samples[i]) for i in range(len(samples))}
+                data[name] = [target_to_sample.get(t) for t in sorted_targets]
+
+        return pl.DataFrame(data).sort("target")
+
+    def to_dataframe(self) -> pl.DataFrame:
+        """
+        Convert averaged measures to a DataFrame.
+
+        Returns
+        -------
+        pl.DataFrame
+            DataFrame with step column and one column per metric.
+        """
+
+        return self._build_dataframe(self.steps, self.averaged_measures)
+
+    @staticmethod
+    def _build_dataframe(
+        steps: NDArray[np.intp],
+        measures: Mapping[str, NDArray[Any]],
+    ) -> pl.DataFrame:
+        """Build wide-format DataFrame from steps and measures."""
+        data: dict[str, list[Any]] = {"step": [int(s) for s in steps]}
+        for name, measure in measures.items():
+            if measure.ndim > 1:
+                for class_idx, class_data in enumerate(measure):
+                    data[f"{name}_{class_idx}"] = [float(v) for v in class_data]
+            else:
+                data[name] = [float(v) for v in measure]
+        return pl.DataFrame(data).sort("step")
 
     @property
     def plot_type(self) -> Literal["sufficiency"]:
