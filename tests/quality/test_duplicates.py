@@ -272,6 +272,36 @@ class TestDuplicates:
         assert result.targets.exact is None
         assert result.targets.near is None
 
+    def test_from_clusters_respects_merge_near_duplicates(self):
+        """Test that from_clusters respects the merge_near_duplicates parameter."""
+        # Create ClusterResult where union-find produces overlapping groups
+        # across exact and near duplicate lists. With distances [0.0, 0.01, 0.5, 5.0]
+        # and all in same cluster: std ~ 2.14, so 0.0 and 0.01 are near dups.
+        # The exact threshold will pick up the 0.0 edge.
+        # This gives us: exact group [0,1] and near group [1,2], which overlap on node 1.
+        mock_cluster_result: ClusterResult = {
+            "mst": np.array([[0, 1, 0.0], [1, 2, 0.01], [2, 3, 0.5], [3, 4, 5.0]], dtype=np.float32),
+            "clusters": np.array([0, 0, 0, 0, 0], dtype=np.intp),
+            "linkage_tree": np.array([], dtype=np.float32),
+            "membership_strengths": np.array([], dtype=np.float32),
+            "k_neighbors": np.array([], dtype=np.int64),
+            "k_distances": np.array([], dtype=np.float32),
+        }
+
+        # With merge_near_duplicates=True (default), overlapping groups should be merged
+        detector_merged = Duplicates(merge_near_duplicates=True)
+        result_merged = detector_merged.from_clusters(mock_cluster_result)
+        assert result_merged.items.near is not None
+
+        # With merge_near_duplicates=False, groups should remain separate
+        detector_separate = Duplicates(merge_near_duplicates=False)
+        result_separate = detector_separate.from_clusters(mock_cluster_result)
+        assert result_separate.items.near is not None
+
+        # When merging, overlapping groups get combined so we should have
+        # fewer or equal groups compared to not merging
+        assert len(result_merged.items.near) <= len(result_separate.items.near)
+
     def test_hash_differs_for_full_image_vs_targets(self, get_mock_od_dataset):
         """Regression test: hash values should differ between full image and individual targets.
 

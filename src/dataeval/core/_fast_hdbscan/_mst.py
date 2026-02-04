@@ -260,14 +260,15 @@ def _flatten_and_sort(
 
 @numba.njit(locals={"i": numba.types.int32}, cache=True)
 def compare_links_to_cluster_std(
-    mst: NDArray[np.float32], clusters: NDArray[np.int64]
+    mst: NDArray[np.float32], clusters: NDArray[np.int64], cluster_threshold: float = 1.0
 ) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
     """
     Identify exact and near duplicate pairs based on MST edge distances and cluster statistics.
 
     Analyzes edges in the minimum spanning tree to find duplicates. Exact duplicates are
     identified by edges with distances orders of magnitude smaller than the mean. Near
-    duplicates are edges within each cluster that fall below the cluster's standard deviation.
+    duplicates are edges within each cluster that fall below the cluster's standard deviation
+    scaled by ``cluster_threshold``.
 
     Parameters
     ----------
@@ -276,6 +277,10 @@ def compare_links_to_cluster_std(
         Each row is [point_i, point_j, distance].
     clusters : NDArray[np.int64]
         Cluster assignment for each point, shape (n_samples,)
+    cluster_threshold : float, default 1.0
+        Multiplier on cluster standard deviation for near duplicate detection.
+        Lower values are stricter (fewer near duplicates). A value of 1.0
+        uses the raw cluster standard deviation as the threshold.
 
     Returns
     -------
@@ -295,7 +300,8 @@ def compare_links_to_cluster_std(
     - If mean distance >= 1: threshold = 10^-3 (3 orders of magnitude below mean)
     - If mean distance < 1: threshold = mean * 10^(order_of_magnitude - 3)
 
-    Near duplicates are found per-cluster by comparing edge distances to cluster std dev.
+    Near duplicates are found per-cluster by comparing edge distances to
+    ``cluster_threshold * cluster_std``.
     """
     cluster_ids = np.unique(clusters)
     cluster_grouping = np.full(mst.shape[0], -1, dtype=np.int16)
@@ -330,8 +336,8 @@ def compare_links_to_cluster_std(
 
         cluster_std = mst[cluster_links, 2].std()
 
-        # Edges in this cluster with distance < std dev are near duplicates
-        near_dups = np.nonzero(mst[cluster_links, 2] < cluster_std)[0]
+        # Edges in this cluster with distance < threshold * std dev are near duplicates
+        near_dups = np.nonzero(mst[cluster_links, 2] < cluster_threshold * cluster_std)[0]
         near_dups_index = cluster_links[near_dups]
         near_dup[near_dups_index] = mst[near_dups_index, :2]
 
