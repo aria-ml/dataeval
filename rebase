@@ -12,10 +12,14 @@ DEFAULT_COMMIT_TITLE="Update documentation jupyter-cache"
 
 # Function to display usage
 show_usage() {
-    echo "Usage: $0 [target_branch] [commit_title_to_drop]"
+    echo "Usage: $0 [OPTIONS] [target_branch] [commit_title_to_drop]"
     echo ""
     echo "This script should be run from the branch you want to rebase."
     echo "It will rebase the current branch onto the target branch."
+    echo ""
+    echo "Options:"
+    echo "  --regen-docs         Regenerate docs (nox -e docs) if jupyter-cache commits are dropped"
+    echo "  -h, --help           Show this help message"
     echo ""
     echo "Defaults:"
     echo "  target_branch        = '$DEFAULT_TARGET_BRANCH'"
@@ -24,6 +28,8 @@ show_usage() {
     echo "Examples:"
     echo "  $0                               # Rebase current branch onto origin/main, drop default commits"
     echo "  $0 main                          # Rebase current branch onto main, drop default commits"
+    echo "  $0 --regen-docs                  # Rebase and regenerate docs if cache commits dropped"
+    echo "  $0 --regen-docs main             # Rebase onto main, regenerate docs if needed"
     echo "  $0 main 'WIP: temporary fix'     # Rebase current branch onto main, drop WIP commits"
     echo "  $0 '' 'debug print'              # Rebase onto origin/main, drop debug commits"
     echo ""
@@ -32,11 +38,29 @@ show_usage() {
     echo "  commit_title_to_drop - The exact commit title/message to drop"
 }
 
-# Check for help flags
-if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-    show_usage
-    exit 0
-fi
+# Parse flags
+REGEN_DOCS=false
+POSITIONAL_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            show_usage
+            exit 0
+            ;;
+        --regen-docs)
+            REGEN_DOCS=true
+            shift
+            ;;
+        *)
+            POSITIONAL_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+
+# Restore positional arguments
+set -- "${POSITIONAL_ARGS[@]}"
 
 # Check if too many arguments provided
 if [ $# -gt 2 ]; then
@@ -180,6 +204,26 @@ if git rebase -i "$TARGET_BRANCH"; then
         echo "Dropped $COMMITS_TO_DROP commit(s) with title: '$COMMIT_TITLE'"
     else
         echo "No commits were dropped (none matched the specified title)"
+    fi
+
+    # Regenerate documentation if --regen-docs flag passed and jupyter-cache commits were dropped
+    if [ "$REGEN_DOCS" = true ] && [ $COMMITS_TO_DROP -gt 0 ] && [ "$COMMIT_TITLE" = "Update documentation jupyter-cache" ]; then
+        echo ""
+        echo "📚 Regenerating documentation (jupyter-cache commits were dropped)..."
+        if nox -e docs; then
+            echo "✅ Documentation regenerated successfully!"
+            # Check if there are any changes to commit
+            if ! git diff-index --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+                echo "📝 Committing documentation changes..."
+                git add -A
+                git commit -m "Update documentation jupyter-cache"
+                echo "✅ Documentation changes committed!"
+            else
+                echo "ℹ️  No documentation changes to commit."
+            fi
+        else
+            echo "⚠️  Documentation generation failed. You may need to run 'nox -e docs' manually."
+        fi
     fi
 else
     echo ""
