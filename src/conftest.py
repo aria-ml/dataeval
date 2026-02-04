@@ -466,8 +466,13 @@ def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:
         def train(self, model: torch.nn.Module, dataset: Any, indices: Sequence[int]) -> None:
             pass
 
+    class ResetStrategy:
+        def __call__(self, model: Any) -> Any:
+            return model
+
     doctest_namespace["CustomTrainingStrategy"] = TrainingStrategy
     doctest_namespace["CustomEvaluationStrategy"] = EvaluationStrategy
+    doctest_namespace["CustomResetStrategy"] = ResetStrategy
 
     # -------------------------------------------------------------------------
     # Utility functions and classes

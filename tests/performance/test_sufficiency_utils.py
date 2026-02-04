@@ -1,5 +1,4 @@
 import logging
-from copy import deepcopy
 
 import numpy as np
 import numpy.testing as npt
@@ -9,7 +8,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from dataeval.performance._output import Constraints, calc_params, f_out, linear_initialization
-from dataeval.performance._sufficiency import reset_parameters
 
 np.random.seed(0)
 torch.manual_seed(0)
@@ -111,23 +109,6 @@ class TestSufficiencyUtils:
         output = calc_params(p_i, n_i, 100, True)
 
         npt.assert_almost_equal(output, answer, decimal=3)
-
-    def test_reset_parameters(self):
-        """
-        Test that resetting the parameters brings us back to the original model
-        """
-
-        # Setup model
-        model = Net()
-        # Get original weights
-        state_dict = deepcopy(model.state_dict())
-
-        # Reset the parameters
-        model = reset_parameters(model)
-        reset_state_dict = model.state_dict()
-
-        # Confirm reset_parameters changed the original parameters
-        assert str(state_dict) != str(reset_state_dict)
 
     def test_linear_initialization_increasing(self):
         """

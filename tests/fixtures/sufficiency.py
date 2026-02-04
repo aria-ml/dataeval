@@ -21,6 +21,24 @@ from dataeval.protocols import EvaluationStrategy, TrainingStrategy
 DatumType = tuple[NDArray[np.float32], int, dict[str, Any]]
 
 
+# ========== RESET STRATEGY FIXTURES ==========
+
+
+def _mock_reset(model: Any) -> Any:
+    """Mock reset strategy that returns the model unchanged."""
+    return model
+
+
+@pytest.fixture(scope="function")
+def mock_reset():
+    """
+    Mock reset strategy for testing with non-PyTorch models.
+
+    Returns a callable that simply returns the model unchanged.
+    """
+    return _mock_reset
+
+
 # ========== STRATEGY FIXTURES ==========
 
 
@@ -92,42 +110,47 @@ def mock_eval_classwise() -> EvaluationStrategy[DatumType]:
 
 
 @pytest.fixture(scope="function")
-def basic_config(mock_train, mock_eval) -> Sufficiency.Config[DatumType]:
+def basic_config(mock_train, mock_eval, mock_reset) -> Sufficiency.Config[DatumType, Any]:
     """
     Basic Sufficiency.Config with default parameters.
 
     Uses runs=1, substeps=5 (defaults).
+    Includes a mock reset_strategy for use with non-PyTorch mock models.
     """
 
     return Sufficiency.Config(
         training_strategy=mock_train,
         evaluation_strategy=mock_eval,
+        reset_strategy=mock_reset,
         runs=1,
         substeps=5,
     )
 
 
 @pytest.fixture(scope="function")
-def multi_run_config(mock_train, mock_eval) -> Sufficiency.Config[DatumType]:
+def multi_run_config(mock_train, mock_eval, mock_reset) -> Sufficiency.Config[DatumType, Any]:
     """
     Config for multiple runs (faster testing).
 
     Uses runs=3, substeps=2.
+    Includes a mock reset_strategy for use with non-PyTorch mock models.
     """
 
     return Sufficiency.Config(
         training_strategy=mock_train,
         evaluation_strategy=mock_eval,
+        reset_strategy=mock_reset,
         runs=3,
         substeps=2,
     )
 
 
 @pytest.fixture(scope="function")
-def non_callable_sufficiency_config() -> Sufficiency.Config[DatumType]:
+def non_callable_sufficiency_config(mock_reset) -> Sufficiency.Config[DatumType, Any]:
     return Sufficiency.Config(
         training_strategy=NonCallableMagicMock(),
         evaluation_strategy=NonCallableMagicMock(),
+        reset_strategy=mock_reset,
     )
 
 
