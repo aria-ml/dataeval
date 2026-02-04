@@ -237,6 +237,8 @@ class DriftMMD(BaseDrift):
             Batch size for computing permutations.
         device : DeviceLike or None, default None
             Hardware device for computation.
+        update_strategy : UpdateStrategy or None, default None
+            Strategy for updating reference data over time.
         """
 
         p_val: float = 0.05
@@ -244,6 +246,7 @@ class DriftMMD(BaseDrift):
         n_permutations: int = 100
         permutation_batch_size: int | Literal["auto"] = "auto"
         device: DeviceLike | None = None
+        update_strategy: UpdateStrategy | None = None
 
     def __init__(
         self,
