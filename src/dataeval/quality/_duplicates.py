@@ -179,14 +179,14 @@ class Duplicates(Evaluator):
     flags : ImageStats, default ImageStats.HASH_DUPLICATES_BASIC
         Statistics to compute for hash-based duplicate detection. Set to
         ``ImageStats.NONE`` to disable hash-based detection.
-    feature_extractor : FeatureExtractor, optional
+    extractor : FeatureExtractor, optional
         Feature extractor for cluster-based duplicate detection. Must be provided
         together with cluster_threshold to enable clustering. When provided alone
         without cluster_threshold, clustering is skipped.
     cluster_threshold : float, optional
         Threshold for cluster-based near duplicate detection. Must be provided
-        together with feature_extractor to enable clustering. When None or when
-        feature_extractor is None, cluster-based detection is skipped entirely.
+        together with extractor to enable clustering. When None or when
+        extractor is None, cluster-based detection is skipped entirely.
         Lower values are stricter.
     cluster_algorithm : {"kmeans", "hdbscan"}, default "hdbscan"
         Clustering algorithm for cluster-based detection.
@@ -208,7 +208,7 @@ class Duplicates(Evaluator):
         Hash statistics computed during the last evaluate() call.
     flags : ImageStats
         Statistics to compute for duplicate detection.
-    feature_extractor : FeatureExtractor | None
+    extractor : FeatureExtractor | None
         Feature extractor for cluster-based detection.
     cluster_threshold : float | None
         Threshold for cluster-based near duplicate detection.
@@ -233,21 +233,15 @@ class Duplicates(Evaluator):
 
     Combined hash and cluster-based detection:
 
-    >>> from dataeval import Embeddings
-    >>> from dataeval.encoders import NumpyFlattenEncoder
+    >>> from dataeval.extractors import FlattenExtractor
 
-    >>> extractor = Embeddings(encoder=NumpyFlattenEncoder())
-    >>> detector = Duplicates(feature_extractor=extractor, cluster_threshold=1.0)
+    >>> detector = Duplicates(extractor=FlattenExtractor(), cluster_threshold=1.0)
     >>> result = detector.evaluate(train_ds)
 
     Using configuration:
 
-    >>> from dataeval import Embeddings
-    >>> from dataeval.encoders import NumpyFlattenEncoder
-
-    >>> extractor = Embeddings(encoder=NumpyFlattenEncoder())
     >>> config = Duplicates.Config(
-    ...     feature_extractor=extractor,
+    ...     extractor=FlattenExtractor(),
     ...     cluster_algorithm="kmeans",
     ...     merge_near_duplicates=False,
     ... )
@@ -264,10 +258,10 @@ class Duplicates(Evaluator):
             Statistics to compute for hash-based duplicate detection.
         cluster_threshold : float or None, default None
             Threshold for cluster-based near duplicate detection. Must be
-            provided together with feature_extractor to enable clustering.
+            provided together with extractor to enable clustering.
         merge_near_duplicates : bool, default True
             Whether to merge overlapping near duplicate groups.
-        feature_extractor : FeatureExtractor or None, default None
+        extractor : FeatureExtractor or None, default None
             Feature extractor for cluster-based duplicate detection.
         cluster_algorithm : {"kmeans", "hdbscan"}, default "hdbscan"
             Clustering algorithm for cluster-based detection.
@@ -283,7 +277,7 @@ class Duplicates(Evaluator):
     flags: ImageStats
     cluster_threshold: float | None
     merge_near_duplicates: bool
-    feature_extractor: FeatureExtractor | None
+    extractor: FeatureExtractor | None
     cluster_algorithm: Literal["kmeans", "hdbscan"]
     n_clusters: int | None
     config: Config
@@ -293,7 +287,7 @@ class Duplicates(Evaluator):
         flags: ImageStats | None = None,
         cluster_threshold: float | None = None,
         merge_near_duplicates: bool | None = None,
-        feature_extractor: FeatureExtractor | None = None,
+        extractor: FeatureExtractor | None = None,
         cluster_algorithm: Literal["kmeans", "hdbscan"] | None = None,
         n_clusters: int | None = None,
         config: Config | None = None,
@@ -880,7 +874,7 @@ class Duplicates(Evaluator):
         Raises
         ------
         ValueError
-            If flags is NONE and no feature_extractor is provided.
+            If flags is NONE and no extractor is provided.
 
         Examples
         --------
@@ -901,18 +895,18 @@ class Duplicates(Evaluator):
 
         Combined hash and cluster-based detection:
 
-        >>> from dataeval import Embeddings
-        >>> extractor = Embeddings(encoder=encoder)
-        >>> detector = Duplicates(feature_extractor=extractor, cluster_threshold=1.0)
+        >>> from dataeval.extractors import FlattenExtractor
+        >>>
+        >>> detector = Duplicates(extractor=FlattenExtractor(), cluster_threshold=1.0)
         >>> result = detector.evaluate(train_ds)
         """
         # Validate parameters - need either hash-based or cluster-based detection
-        # Cluster-based detection requires both feature_extractor AND cluster_threshold
+        # Cluster-based detection requires both extractor AND cluster_threshold
         has_hash_detection = bool(self.flags & ImageStats.HASH)
-        has_cluster_detection = self.feature_extractor is not None and self.cluster_threshold is not None
+        has_cluster_detection = self.extractor is not None and self.cluster_threshold is not None
         if not has_hash_detection and not has_cluster_detection:
             raise ValueError(
-                "Either flags must contain hash stats, or both feature_extractor and "
+                "Either flags must contain hash stats, or both extractor and "
                 "cluster_threshold must be provided for cluster-based detection."
             )
 
@@ -927,9 +921,10 @@ class Duplicates(Evaluator):
             self.stats = calculate(data, None, self.flags & ImageStats.HASH, per_image=per_image, per_target=per_target)
             hash_item_result, hash_target_result = self._get_duplicates(self.stats["stats"], self.stats["source_index"])
 
-        # Cluster-based duplicate detection (requires both feature_extractor and cluster_threshold)
-        if self.feature_extractor is not None and self.cluster_threshold is not None:
-            embeddings = self.feature_extractor(data)
+        # Cluster-based duplicate detection (requires both extractor and cluster_threshold)
+        if self.extractor is not None and self.cluster_threshold is not None:
+            images = [item[0] if isinstance(item, tuple) else item for item in data]
+            embeddings = self.extractor(images)
             embeddings_array = flatten_samples(to_numpy(embeddings))
 
             cluster_result = cluster(

@@ -19,7 +19,7 @@ from dataeval.utils.preprocessing import rescale, to_canonical_grayscale
 
 class BoVWExtractor:
     """
-    Bag of Visual Words (BoVW) feature extractor for images.
+    Computes Bag of Visual Words histograms using SIFT keypoints.
 
     This class implements the :class:`~dataeval.protocols.FeatureExtractor` protocol
     for use with drift detectors and duplicate detection. It extracts SIFT keypoints
@@ -115,7 +115,7 @@ class BoVWExtractor:
     See Also
     --------
     dataeval.quality.Duplicates : Duplicate detection using embeddings
-    dataeval.extractors.UncertaintyFeatureExtractor : Uncertainty-based feature extraction
+    dataeval.extractors.ClassifierUncertaintyExtractor : Uncertainty-based feature extraction
     """
 
     def __init__(self, vocab_size: int = 2048) -> None:

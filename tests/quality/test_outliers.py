@@ -8,6 +8,7 @@ from dataeval.config import use_max_processes
 from dataeval.core import calculate
 from dataeval.core._clusterer import ClusterResult
 from dataeval.core._label_stats import LabelStatsResult
+from dataeval.extractors import FlattenExtractor
 from dataeval.flags import ImageStats
 from dataeval.quality._outliers import Outliers, OutliersOutput, _get_outlier_mask
 from dataeval.types import SourceIndex
@@ -814,3 +815,29 @@ class TestOutliersEdgeCases:
         # Invalid method
         with pytest.raises(ValueError):
             _get_outlier_mask(np.array([1, 2]), "invalid_method", 3.0)  # type: ignore
+
+    def test_evaluate_with_tuple_dataset(self, get_mock_ic_dataset):
+        """Regression test: evaluate with cluster-based detection should handle tuple datasets.
+
+        When a dataset returns (image, label, metadata) tuples, the extractor should
+        receive only the images, not the full tuples.
+        """
+        data = np.random.random((20, 3, 16, 16))
+        labels = list(range(len(data)))
+        dataset = get_mock_ic_dataset(list(data), labels)
+
+        outliers = Outliers(flags=ImageStats.NONE, extractor=FlattenExtractor(), cluster_threshold=2.0)
+        result = outliers.evaluate(dataset)
+        assert result is not None
+        assert isinstance(result.issues, pl.DataFrame)
+
+    def test_evaluate_with_tuple_dataset_combined(self, get_mock_ic_dataset):
+        """Regression test: combined hash + cluster detection on tuple datasets should not crash."""
+        data = np.random.random((20, 3, 16, 16))
+        labels = list(range(len(data)))
+        dataset = get_mock_ic_dataset(list(data), labels)
+
+        outliers = Outliers(flags=ImageStats.PIXEL, extractor=FlattenExtractor(), cluster_threshold=2.0)
+        result = outliers.evaluate(dataset)
+        assert result is not None
+        assert isinstance(result.issues, pl.DataFrame)
