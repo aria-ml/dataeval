@@ -10,7 +10,7 @@ import torch
 from numpy.typing import NDArray
 
 from dataeval import Embeddings
-from dataeval.encoders import TorchEmbeddingEncoder
+from dataeval.extractors import TorchExtractor
 from tests.conftest import SimpleDataset
 
 NP_MAJOR_VERSION = tuple(int(x) for x in np.__version__.split("."))[0]
@@ -25,8 +25,8 @@ class FlattenModel(torch.nn.Module):
 
 @pytest.fixture
 def encoder():
-    """Simple encoder for testing."""
-    return TorchEmbeddingEncoder(FlattenModel(), batch_size=16, device="cpu")
+    """Simple extractor for testing."""
+    return TorchExtractor(FlattenModel(), device="cpu")
 
 
 @pytest.fixture
@@ -52,14 +52,14 @@ def memmap_embeddings(tmp_path) -> Generator[tuple[Embeddings, NDArray[Any]], No
 def lazy_embeddings(simple_dataset, tmp_path, encoder) -> Generator[tuple[Embeddings, SimpleDataset, Path], None, None]:
     """Create embeddings with lazy evaluation for testing compute()."""
     cache_path = tmp_path / "lazy_embeddings.npy"
-    emb = Embeddings(simple_dataset, encoder=encoder, path=cache_path)
+    emb = Embeddings(simple_dataset, extractor=encoder, path=cache_path)
     yield emb, simple_dataset, cache_path
 
 
 @pytest.fixture
 def in_memory_embeddings(simple_dataset, encoder) -> Generator[tuple[Embeddings, SimpleDataset], None, None]:
     """Create in-memory embeddings (no path) for testing."""
-    emb = Embeddings(simple_dataset, encoder=encoder, path=None)
+    emb = Embeddings(simple_dataset, extractor=encoder, path=None)
     yield emb, simple_dataset
 
 
@@ -212,7 +212,7 @@ class TestIntegration:
     def test_full_workflow_in_memory(self, simple_dataset: SimpleDataset, encoder):
         """Test complete workflow with in-memory caching."""
         # Create embeddings
-        emb = Embeddings(simple_dataset, encoder=encoder, path=None)
+        emb = Embeddings(simple_dataset, extractor=encoder, path=None)
 
         # Access some embeddings
         sample = emb[0:10]
@@ -231,7 +231,7 @@ class TestIntegration:
         save_path = tmp_path / "embeddings.npy"
 
         # Create and compute embeddings
-        emb = Embeddings(simple_dataset, encoder=encoder, path=save_path)
+        emb = Embeddings(simple_dataset, extractor=encoder, path=save_path)
 
         # Compute and save
         emb.compute().save()
@@ -244,7 +244,7 @@ class TestShouldUseMemmap:
 
     def test_should_use_memmap_no_path_returns_false(self, simple_dataset: SimpleDataset, encoder):
         """_should_use_memmap should return False when path is None."""
-        emb = Embeddings(simple_dataset, encoder=encoder, path=None)
+        emb = Embeddings(simple_dataset, extractor=encoder, path=None)
         result = emb._should_use_memmap((128,))
         assert result is False
 
@@ -259,7 +259,7 @@ class TestShouldUseMemmap:
         monkeypatch.setattr("psutil.virtual_memory", lambda: MockVirtualMemory())
 
         cache_path = tmp_path / "test.npy"
-        emb = Embeddings(simple_dataset, encoder=encoder, path=cache_path, memory_threshold=0.8)
+        emb = Embeddings(simple_dataset, extractor=encoder, path=cache_path, memory_threshold=0.8)
         result = emb._should_use_memmap((128,))
         assert result is False
 
@@ -274,7 +274,7 @@ class TestShouldUseMemmap:
         monkeypatch.setattr("psutil.virtual_memory", lambda: MockVirtualMemory())
 
         cache_path = tmp_path / "test.npy"
-        emb = Embeddings(simple_dataset, encoder=encoder, path=cache_path, memory_threshold=0.8)
+        emb = Embeddings(simple_dataset, extractor=encoder, path=cache_path, memory_threshold=0.8)
         result = emb._should_use_memmap((2000000,))
         assert result is True
 
@@ -291,7 +291,7 @@ class TestInitializeStorage:
         monkeypatch.setattr("psutil.virtual_memory", lambda: MockVirtualMemory())
 
         cache_path = tmp_path / "test.npy"
-        embs = Embeddings(simple_dataset, encoder=encoder, path=cache_path, memory_threshold=0.01)
+        embs = Embeddings(simple_dataset, extractor=encoder, path=cache_path, memory_threshold=0.01)
 
         sample_embedding = np.random.randn(128).astype(np.float32)
         embs._initialize_storage(sample_embedding)
@@ -311,7 +311,7 @@ class TestInitializeStorage:
         monkeypatch.setattr("psutil.virtual_memory", lambda: MockVirtualMemory())
 
         cache_path = tmp_path / "test.npy"
-        embs = Embeddings(simple_dataset, encoder=encoder, path=cache_path, memory_threshold=0.8)
+        embs = Embeddings(simple_dataset, extractor=encoder, path=cache_path, memory_threshold=0.8)
 
         sample_embedding = np.random.randn(128).astype(np.float32)
         embs._initialize_storage(sample_embedding)
@@ -326,7 +326,7 @@ class TestBatchErrors:
 
     def test_batch_out_of_range_error(self, simple_dataset: SimpleDataset, encoder):
         """Test _batch raises IndexError for out of range indices."""
-        embs = Embeddings(simple_dataset, encoder=encoder)
+        embs = Embeddings(simple_dataset, extractor=encoder)
         out_of_range_indices = [0, 1, 100, 200]
         with pytest.raises(IndexError, match="Indices.*are out of range for dataset of size"):
             list(embs._batch(out_of_range_indices))
@@ -365,7 +365,7 @@ class TestProgressCallback:
         cache_path = tmp_path / "test.npy"
         embs = Embeddings(
             simple_dataset,
-            encoder=encoder,
+            extractor=encoder,
             path=cache_path,
             memory_threshold=0.01,
             progress_callback=callback,

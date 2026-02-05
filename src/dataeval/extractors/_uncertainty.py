@@ -73,8 +73,9 @@ def _classifier_uncertainty(
     return torch.as_tensor(uncertainties[:, None])
 
 
-class UncertaintyFeatureExtractor:
-    """Feature extractor that converts data to model uncertainty scores.
+class ClassifierUncertaintyExtractor:
+    """
+    Computes prediction entropy from a classification model for drift detection.
 
     This class implements the :class:`~dataeval.protocols.FeatureExtractor` protocol
     for use with drift detectors (e.g., :class:`~dataeval.shift.DriftUnivariate`).
@@ -121,7 +122,7 @@ class UncertaintyFeatureExtractor:
     >>> import numpy as np
     >>> import torch.nn as nn
     >>> from dataeval.shift import DriftUnivariate
-    >>> from dataeval.extractors import UncertaintyFeatureExtractor
+    >>> from dataeval.extractors import ClassifierUncertaintyExtractor
     >>>
     >>> # Create dummy datasets
     >>> train_dataset = np.random.randn(100, 16).astype(np.float32)
@@ -131,10 +132,10 @@ class UncertaintyFeatureExtractor:
     >>> model = nn.Sequential(nn.Linear(16, 10), nn.Softmax(dim=-1))
     >>>
     >>> # Create uncertainty feature extractor
-    >>> uncertainty_extractor = UncertaintyFeatureExtractor(model=model, preds_type="probs", batch_size=32)
+    >>> uncertainty_extractor = ClassifierUncertaintyExtractor(model=model, preds_type="probs", batch_size=32)
     >>>
     >>> # Use with DriftUnivariate for uncertainty-based drift detection
-    >>> drift_detector = DriftUnivariate(train_dataset, method="ks", feature_extractor=uncertainty_extractor)
+    >>> drift_detector = DriftUnivariate(train_dataset, method="ks", extractor=uncertainty_extractor)
     >>>
     >>> # Detect drift on new data
     >>> result = drift_detector.predict(test_dataset)
@@ -153,9 +154,9 @@ class UncertaintyFeatureExtractor:
     >>> # Simple transform (no normalization needed for this dummy data)
     >>> transforms = lambda x: x.float() if not x.is_floating_point() else x
     >>>
-    >>> uncertainty_extractor = UncertaintyFeatureExtractor(model=model, transforms=transforms, device="cpu")
+    >>> uncertainty_extractor = ClassifierUncertaintyExtractor(model=model, transforms=transforms, device="cpu")
     >>>
-    >>> drift_detector = DriftUnivariate(train_dataset, method="ks", feature_extractor=uncertainty_extractor)
+    >>> drift_detector = DriftUnivariate(train_dataset, method="ks", extractor=uncertainty_extractor)
 
     Using different statistical methods
 
@@ -163,20 +164,20 @@ class UncertaintyFeatureExtractor:
     >>> train_dataset = np.random.randn(100, 16).astype(np.float32)
     >>> test_dataset = np.random.randn(20, 16).astype(np.float32)
     >>> model = nn.Sequential(nn.Linear(16, 10), nn.Softmax(dim=-1))
-    >>> uncertainty_extractor = UncertaintyFeatureExtractor(model=model, preds_type="probs", batch_size=32)
+    >>> uncertainty_extractor = ClassifierUncertaintyExtractor(model=model, preds_type="probs", batch_size=32)
     >>>
     >>> # Use Cramér-von Mises test instead of Kolmogorov-Smirnov
     >>> drift_detector = DriftUnivariate(
     ...     train_dataset,
     ...     method="cvm",  # More sensitive to overall distributional changes
-    ...     feature_extractor=uncertainty_extractor,
+    ...     extractor=uncertainty_extractor,
     ... )
     >>>
     >>> # Or use Mann-Whitney U test for robust median shift detection
     >>> drift_detector = DriftUnivariate(
     ...     train_dataset,
     ...     method="mwu",  # Robust to outliers
-    ...     feature_extractor=uncertainty_extractor,
+    ...     extractor=uncertainty_extractor,
     ... )
 
     Notes

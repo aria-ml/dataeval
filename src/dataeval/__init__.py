@@ -16,7 +16,6 @@ __version__ = str(__version__)
 __all__ = [
     "__version__",
     "config",
-    "encoders",
     "flags",
     "log",
     "protocols",
@@ -27,7 +26,7 @@ __all__ = [
 
 import logging
 
-from . import config, encoders, flags, protocols, types
+from . import config, flags, protocols, types
 from ._embeddings import Embeddings
 from ._metadata import Metadata
 

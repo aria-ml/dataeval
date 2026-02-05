@@ -16,13 +16,13 @@ import xxhash as xxh
 from numpy.typing import NDArray
 from typing_extensions import Self
 
-from dataeval.encoders import NumpyFlattenEncoder
+from dataeval.config import get_batch_size
+from dataeval.extractors import FlattenExtractor
 from dataeval.protocols import (
     AnnotatedDataset,
     Array,
     ArrayLike,
     Dataset,
-    EmbeddingEncoder,
     FeatureExtractor,
     ProgressCallback,
 )
@@ -48,11 +48,14 @@ class Embeddings(Array, FeatureExtractor):
         Dataset to access original images from. When None, creates an unbound instance
         that can be used as a reusable feature extractor. Use :meth:`bind` to attach
         a dataset later, or pass data directly to :meth:`__call__`.
-    encoder : EmbeddingEncoder or None, default None
-        Encoder for extracting embeddings from images. Handles model inference,
-        device management, transforms, and batching. When None, uses
-        :class:`~dataeval.encoders.NumpyFlattenEncoder` for simple baseline
+    extractor : FeatureExtractor or None, default None
+        Feature extractor for converting images to embeddings. Handles model inference,
+        device management, and transforms. When None, uses
+        :class:`~dataeval.extractors.FlattenExtractor` for simple baseline
         compatibility with all DataEval tools.
+    batch_size : int or None, default None
+        Number of samples to process per batch. When None, uses DataEval's
+        configured batch size via :func:`~dataeval.config.get_batch_size`.
     path : Path, str, or None, default None
         File path for memory-mapped storage. When None, caches embeddings in memory only.
         When Path or string is provided, uses memory-mapped storage for large embeddings
@@ -75,16 +78,16 @@ class Embeddings(Array, FeatureExtractor):
     Using with a PyTorch model:
 
     >>> from dataeval import Embeddings
-    >>> from dataeval.encoders import TorchEmbeddingEncoder
+    >>> from dataeval.extractors import TorchExtractor
     >>>
-    >>> embeddings = Embeddings(train_dataset, encoder=encoder)
+    >>> embeddings = Embeddings(train_dataset, extractor=extractor, batch_size=32)
     >>> train_emb = embeddings[:]
     >>> train_emb.shape
     (40, 32)
 
     Using with default flattening (no model):
 
-    >>> # Uses NumpyFlattenEncoder by default
+    >>> # Uses FlattenExtractor by default
     >>> embeddings = Embeddings(dataset)
     >>> flat_features = np.asarray(embeddings)
     """
@@ -95,13 +98,14 @@ class Embeddings(Array, FeatureExtractor):
         self,
         # Technically more permissive than ImageClassificationDataset or ObjectDetectionDataset
         dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike] | None = None,
-        encoder: EmbeddingEncoder | None = None,
+        extractor: FeatureExtractor | None = None,
+        batch_size: int | None = None,
         path: Path | str | None = None,
         memory_threshold: float = 0.8,
         progress_callback: ProgressCallback | None = None,
     ) -> None:
-        # Use NumpyFlattenEncoder as default
-        self._encoder = encoder if encoder is not None else NumpyFlattenEncoder()
+        self._extractor = extractor if extractor is not None else FlattenExtractor()
+        self._batch_size = get_batch_size(batch_size)
         self.memory_threshold = max(0.0, min(1.0, memory_threshold))
         self._progress_callback = progress_callback
 
@@ -114,6 +118,17 @@ class Embeddings(Array, FeatureExtractor):
 
         self._path = self._resolve_path(path) if path is not None else None
         self._shape: tuple[int, ...] | None = None
+
+    @property
+    def batch_size(self) -> int:
+        """Return the batch size used for embedding computation.
+
+        Returns
+        -------
+        int
+            Number of samples processed per batch.
+        """
+        return self._batch_size
 
     @property
     def shape(self) -> tuple[int, ...]:
@@ -165,12 +180,12 @@ class Embeddings(Array, FeatureExtractor):
         Example
         -------
         >>> from dataeval import Embeddings
-        >>> from dataeval.encoders import TorchEmbeddingEncoder
+        >>> from dataeval.extractors import TorchExtractor
         >>>
-        >>> encoder = TorchEmbeddingEncoder(my_model, batch_size=32)
-        >>> extractor = Embeddings(encoder=encoder)
-        >>> _ = extractor.bind(train_dataset)
-        >>> embeddings = extractor()
+        >>> extractor = TorchExtractor(my_model)
+        >>> emb = Embeddings(extractor=extractor, batch_size=32)
+        >>> _ = emb.bind(train_dataset)
+        >>> embeddings = emb()
         """
         self._dataset = dataset
         # Clear cached state
@@ -204,10 +219,10 @@ class Embeddings(Array, FeatureExtractor):
         Example
         -------
         >>> from dataeval import Embeddings
-        >>> from dataeval.encoders import TorchEmbeddingEncoder
+        >>> from dataeval.extractors import TorchExtractor
         >>>
-        >>> encoder = TorchEmbeddingEncoder(my_model, batch_size=32)
-        >>> embeddings = Embeddings(train_dataset, encoder=encoder)
+        >>> extractor = TorchExtractor(my_model)
+        >>> embeddings = Embeddings(train_dataset, extractor=extractor, batch_size=32)
         >>>
         >>> # Extract from bound dataset
         >>> train_emb = embeddings()
@@ -277,11 +292,11 @@ class Embeddings(Array, FeatureExtractor):
 
     def __hash__(self) -> int:
         if self._dataset is None:
-            # Unbound instance - hash based on encoder only
-            bid = f"unbound:{self._encoder!r}".encode()
+            # Unbound instance - hash based on extractor only
+            bid = f"unbound:{self._extractor!r}".encode()
         else:
             did = self._dataset.metadata["id"] if isinstance(self._dataset, AnnotatedDataset) else str(self._dataset)
-            bid = f"{did}{self._encoder!r}".encode()
+            bid = f"{did}{self._extractor!r}".encode()
 
         return int(xxh.xxh3_64_hexdigest(bid), 16)
 
@@ -367,7 +382,7 @@ class Embeddings(Array, FeatureExtractor):
         """
         Create new Embeddings instance with a different dataset.
 
-        Generate a new Embeddings object using the same encoder and configuration
+        Generate a new Embeddings object using the same extractor and configuration
         but with a different dataset.
 
         Parameters
@@ -383,11 +398,12 @@ class Embeddings(Array, FeatureExtractor):
         Raises
         ------
         ValueError
-            When called on embeddings-only instance that lacks an encoder.
+            When called on embeddings-only instance that lacks an extractor.
         """
         return self.__class__(
             dataset,
-            encoder=self._encoder,
+            extractor=self._extractor,
+            batch_size=self._batch_size,
             path=self._path,
             memory_threshold=self.memory_threshold,
             progress_callback=self._progress_callback,
@@ -464,8 +480,20 @@ class Embeddings(Array, FeatureExtractor):
 
         return self
 
+    def _fetch_images(self, indices: Sequence[int]) -> list[Any]:
+        """Fetch images from the dataset, extracting from tuples if needed."""
+        if self._dataset is None:
+            raise ValueError("No dataset bound. Call bind() first.")
+
+        images: list[Any] = []
+        for idx in indices:
+            item = self._dataset[idx]
+            image = item[0] if isinstance(item, tuple) else item
+            images.append(image)
+        return images
+
     def _batch(self, indices: Sequence[int]) -> Iterator[NDArray[Any]]:
-        """Process indices in batches using the encoder's streaming interface."""
+        """Process indices in batches using the extractor."""
         if self._dataset is None:
             raise ValueError("No dataset bound. Call bind() first.")
 
@@ -480,30 +508,38 @@ class Embeddings(Array, FeatureExtractor):
                     f"Indices {sorted(out_of_range)} are out of range for dataset of size {len(self._dataset)}"
                 )
 
-            # Stream batches from encoder
+            # Process in batches
             processed = 0
-            for batch_indices, embeddings in self._encoder.encode(self._dataset, uncached, stream=True):
+            for batch_start in range(0, len(uncached), self._batch_size):
+                batch_idx = uncached[batch_start : batch_start + self._batch_size]
+
+                # Fetch images from dataset
+                batch_images = self._fetch_images(batch_idx)
+
+                # Extract features
+                embeddings = np.asarray(self._extractor(batch_images))
+
                 # Initialize storage on first batch
                 if self._embeddings.size == 0:
                     self._initialize_storage(embeddings[0])
 
                 # Store embeddings
-                for i, idx in enumerate(batch_indices):
+                for i, idx in enumerate(batch_idx):
                     self._embeddings[idx] = embeddings[i]
-                self._cached_idx.update(batch_indices)
+                self._cached_idx.update(batch_idx)
 
                 # Flush memmap writes (cheap operation)
                 if isinstance(self._embeddings, np.memmap):
                     self._embeddings.flush()
 
                 # Report progress
-                processed += len(batch_indices)
+                processed += len(batch_idx)
                 if self._progress_callback:
                     self._progress_callback(processed, total=len(uncached))
 
-        # Yield results in batches matching encoder's batch size for consistency
-        for batch_start in range(0, len(indices), self._encoder.batch_size):
-            batch_indices = list(indices[batch_start : batch_start + self._encoder.batch_size])
+        # Yield results in batches for consistency
+        for batch_start in range(0, len(indices), self._batch_size):
+            batch_indices = list(indices[batch_start : batch_start + self._batch_size])
             yield self._embeddings[batch_indices]
 
     def __getitem__(self, key: int | Iterable[int] | slice, /) -> NDArray[Any]:
