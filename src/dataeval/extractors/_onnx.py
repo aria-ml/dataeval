@@ -1,20 +1,19 @@
 """
-ONNX Runtime-based embedding encoder.
+ONNX Runtime-based feature extractor.
 """
 
 __all__ = []
 
 import logging
-from collections.abc import Iterator, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, Literal, overload
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.config import get_batch_size
-from dataeval.protocols import ArrayLike, Dataset, Transform
+from dataeval.protocols import Array, Transform
 from dataeval.utils.arrays import as_numpy
 
 if TYPE_CHECKING:
@@ -25,7 +24,7 @@ else:
 _logger = logging.getLogger(__name__)
 
 _ort_import_error = ImportError(
-    "onnxruntime is required for OnnxEncoder. "
+    "onnxruntime is required for OnnxExtractor. "
     "Install it with: pip install onnxruntime (CPU) or pip install onnxruntime-gpu (GPU)"
 )
 
@@ -38,7 +37,7 @@ def _get_ort() -> ModuleType:
         return onnxruntime
     except ImportError as e:
         raise ImportError(
-            "onnxruntime is required for OnnxEncoder. "
+            "onnxruntime is required for OnnxExtractor. "
             "Install it with: pip install onnxruntime (CPU) or pip install onnxruntime-gpu (GPU)"
         ) from e
 
@@ -71,24 +70,24 @@ def _get_execution_providers() -> list[str]:
     return providers
 
 
-class OnnxEncoder:
+class OnnxExtractor:
     """
-    ONNX Runtime-based embedding encoder.
+    Extracts embeddings via ONNX Runtime with lazy model loading.
 
-    Encapsulates ONNX-specific logic for embedding extraction:
+    Encapsulates ONNX-specific logic for feature extraction:
+
     - Model loading from ONNX files or in-memory bytes
     - Automatic GPU/CPU provider selection with fallback
     - Transform pipeline
-    - Batch processing
     - Output layer selection for multi-output models
+
+    Implements the :class:`~dataeval.protocols.FeatureExtractor` protocol.
 
     Parameters
     ----------
     model : str, Path, or bytes
         Path to the ONNX model file, or serialized model bytes from
         :func:`~dataeval.utils.onnx.to_encoding_model`.
-    batch_size : int or None, default None
-        Number of samples per batch. When None, uses DataEval's configured batch size.
     transforms : Transform or Sequence[Transform] or None, default None
         Preprocessing transforms to apply before encoding. When None, uses raw images.
     output_name : str or None, default None
@@ -102,15 +101,15 @@ class OnnxEncoder:
     -------
     Basic usage with a model file:
 
-    >>> from dataeval.encoders import OnnxEncoder
     >>> from dataeval import Embeddings
+    >>> from dataeval.extractors import OnnxExtractor
     >>>
-    >>> encoder = OnnxEncoder("model.onnx", batch_size=32)
-    >>> embeddings = Embeddings(dataset, encoder=encoder)
+    >>> extractor = OnnxExtractor("model.onnx")
+    >>> embeddings = Embeddings(dataset, extractor=extractor, batch_size=32)
 
     Notes
     -----
-    - The encoder expects images in CHW format (channels, height, width).
+    - The extractor expects images in CHW format (channels, height, width).
     - For models with multiple outputs, use ``output_name`` to specify which
       output contains embeddings.
     - The model is loaded lazily on first use.
@@ -120,7 +119,6 @@ class OnnxEncoder:
     def __init__(
         self,
         model: str | Path | bytes,
-        batch_size: int | None = None,
         transforms: Transform[NDArray[Any]] | Sequence[Transform[NDArray[Any]]] | None = None,
         output_name: str | None = None,
         flatten: bool = True,
@@ -132,7 +130,6 @@ class OnnxEncoder:
             self._model_bytes = None
             self._model_path = Path(model)
 
-        self._batch_size = get_batch_size(batch_size)
         self._transforms = self._normalize_transforms(transforms)
         self._output_name = output_name
         self._flatten = flatten
@@ -141,11 +138,6 @@ class OnnxEncoder:
         self._session: InferenceSession | None = None
         self._input_name: str | None = None
         self._output_names: list[str] = []
-
-    @property
-    def batch_size(self) -> int:
-        """Return the batch size used for encoding."""
-        return self._batch_size
 
     @property
     def output_name(self) -> str | None:
@@ -226,22 +218,39 @@ class OnnxEncoder:
         # Ensure float32 for ONNX
         return result.astype(np.float32)
 
-    def _encode_batch(
-        self,
-        dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike],
-        batch_indices: Sequence[int],
-    ) -> NDArray[Any]:
-        """Encode a single batch of images."""
+    def __call__(self, data: Any) -> Array:
+        """
+        Extract features from a batch of images.
+
+        Parameters
+        ----------
+        data : Any
+            Iterable of images to extract features from. Each image should be
+            array-like in CHW format.
+
+        Returns
+        -------
+        Array
+            Embeddings array of shape (n_images, embedding_dim).
+
+        Raises
+        ------
+        FileNotFoundError
+            If the model file does not exist.
+        ImportError
+            If onnxruntime is not installed.
+        """
         session = self._ensure_loaded()
 
         # Collect and preprocess images
         batch_images: list[NDArray[Any]] = []
-        for idx in batch_indices:
-            item = dataset[idx]
-            image = item[0] if isinstance(item, tuple) else item
-            image_array = as_numpy(image)
+        for img in data:
+            image_array = as_numpy(img)
             processed = self._preprocess(image_array)
             batch_images.append(processed)
+
+        if not batch_images:
+            return np.empty((0,), dtype=np.float32)
 
         # Stack into batch: (N, C, H, W)
         batch_array = np.stack(batch_images)
@@ -267,76 +276,6 @@ class OnnxEncoder:
 
         return result
 
-    @overload
-    def encode(
-        self,
-        dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike],
-        indices: Sequence[int],
-        stream: Literal[True],
-    ) -> Iterator[tuple[Sequence[int], NDArray[Any]]]: ...
-
-    @overload
-    def encode(
-        self,
-        dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike],
-        indices: Sequence[int],
-        stream: Literal[False] = ...,
-    ) -> NDArray[Any]: ...
-
-    def encode(
-        self,
-        dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike],
-        indices: Sequence[int],
-        stream: bool = False,
-    ) -> Iterator[tuple[Sequence[int], NDArray[Any]]] | NDArray[Any]:
-        """
-        Encode images at specified indices to embeddings.
-
-        Parameters
-        ----------
-        dataset : Dataset
-            Dataset providing images to encode.
-        indices : Sequence[int]
-            Indices of images to encode from the dataset.
-        stream : bool, default False
-            If True, yields (batch_indices, batch_embeddings) tuples.
-            If False, returns all embeddings as a single array.
-
-        Returns
-        -------
-        NDArray[Any] or Iterator[tuple[Sequence[int], NDArray[Any]]]
-            Embeddings array or iterator of batches.
-
-        Raises
-        ------
-        IndexError
-            If any indices are out of range for the dataset.
-        FileNotFoundError
-            If the model file does not exist.
-        ImportError
-            If onnxruntime is not installed.
-        """
-
-        def _generate() -> Iterator[tuple[Sequence[int], NDArray[Any]]]:
-            for batch_start in range(0, len(indices), self._batch_size):
-                batch_idx = list(indices[batch_start : batch_start + self._batch_size])
-                yield batch_idx, self._encode_batch(dataset, batch_idx)
-
-        if not indices:
-            if stream:
-                return iter([])
-            return np.empty((0,), dtype=np.float32)
-
-        # Validate indices
-        out_of_range = set(indices) - set(range(len(dataset)))
-        if out_of_range:
-            raise IndexError(f"Indices {sorted(out_of_range)} are out of range for dataset of size {len(dataset)}")
-
-        if stream:
-            return _generate()
-
-        return np.vstack([emb for _, emb in _generate()])
-
     def __repr__(self) -> str:
         output_info = f", output_name={self._output_name!r}" if self._output_name else ""
         flatten_info = "" if self._flatten else ", flatten=False"
@@ -344,4 +283,4 @@ class OnnxEncoder:
             model_info = f"model=<{len(self._model_bytes)} bytes>"
         else:
             model_info = f"model={self._model_path!r}"
-        return f"OnnxEncoder({model_info}, batch_size={self._batch_size}{output_info}{flatten_info})"
+        return f"OnnxExtractor({model_info}{output_info}{flatten_info})"

@@ -114,32 +114,21 @@ class TestToEncodingModel:
         assert layer_name == embedding_layer
         assert isinstance(model_bytes, bytes)
 
-    def test_works_with_onnx_encoder(self, simple_classifier_model: Path) -> None:
-        """Test that the result can be used with OnnxEncoder."""
-        from dataeval.encoders import OnnxEncoder
+    def test_works_with_onnx_extractor(self, simple_classifier_model: Path) -> None:
+        """Test that the result can be used with OnnxExtractor."""
+        from dataeval.extractors import OnnxExtractor
         from dataeval.utils.onnx import to_encoding_model
 
         model_bytes, layer_name = to_encoding_model(simple_classifier_model)
 
-        # Create encoder with bytes
-        encoder = OnnxEncoder(model_bytes, batch_size=10, output_name=layer_name)
+        # Create extractor with bytes
+        extractor = OnnxExtractor(model_bytes, output_name=layer_name)
 
-        # Create a simple dataset
-        class SimpleDataset:
-            def __init__(self, images: np.ndarray):
-                self.images = images
+        # Create a list of images
+        images = [np.random.randn(3, 16, 16).astype(np.float32) for _ in range(5)]
 
-            def __len__(self) -> int:
-                return len(self.images)
-
-            def __getitem__(self, idx: int) -> np.ndarray:
-                return self.images[idx]
-
-        images = np.random.randn(5, 3, 16, 16).astype(np.float32)
-        dataset = SimpleDataset(images)
-
-        # Encode
-        result = encoder.encode(dataset, list(range(5)))
+        # Extract features
+        result = extractor(images)
 
         # Should get embeddings with dimension 768 (flattened 3*16*16)
         assert result.shape == (5, 768)

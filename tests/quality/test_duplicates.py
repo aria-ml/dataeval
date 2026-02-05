@@ -5,6 +5,7 @@ import pytest
 
 from dataeval.core._calculate import calculate
 from dataeval.core._clusterer import ClusterResult
+from dataeval.extractors import FlattenExtractor
 from dataeval.flags import ImageStats
 from dataeval.quality import Duplicates
 from dataeval.quality._duplicates import (
@@ -522,7 +523,7 @@ class TestDuplicatesEdgeCases:
 
     def test_evaluate_invalid_config(self):
         """Covers ValueError when flags=NONE and no cluster-based detection configured."""
-        detector = Duplicates(flags=ImageStats.NONE, feature_extractor=None)
+        detector = Duplicates(flags=ImageStats.NONE, extractor=None)
         # Mock data (shape doesn't matter for this check)
         data = np.zeros((1, 10, 10, 3))
         with pytest.raises(ValueError, match="Either flags must contain hash stats"):
@@ -570,7 +571,7 @@ class TestDuplicatesEdgeCases:
 
     def test_cluster_threshold_none_raises_error(self):
         """
-        Covers logic where cluster_threshold is None with feature_extractor provided.
+        Covers logic where cluster_threshold is None with extractor provided.
 
         When flags=NONE and cluster_threshold=None, clustering is skipped entirely,
         leaving no detection method available. This should raise a ValueError.
@@ -584,7 +585,7 @@ class TestDuplicatesEdgeCases:
         # With threshold=None and flags=NONE, there's no detection method available
         detector = Duplicates(
             flags=ImageStats.NONE,
-            feature_extractor=DummyExtractor(),
+            extractor=DummyExtractor(),
             cluster_threshold=None,
             cluster_algorithm="kmeans",
             n_clusters=2,
@@ -608,3 +609,30 @@ class TestDuplicatesEdgeCases:
         # Should only find group for "abc" (indices 1, 2), ignoring empty strings at 0, 3
         groups = detector._find_hash_duplicates(stats, "phash", source_index, indices, exact_groups)
         assert groups == [[1, 2]]
+
+    def test_evaluate_with_tuple_dataset(self, get_mock_ic_dataset):
+        """Regression test: evaluate with cluster-based detection should handle tuple datasets.
+
+        When a dataset returns (image, label, metadata) tuples, the extractor should
+        receive only the images, not the full tuples.
+        """
+        data = np.random.random((20, 3, 16, 16))
+        # Create duplicates so clustering can find them
+        data_with_dupes = np.concatenate([data, data])
+        labels = list(range(len(data_with_dupes)))
+        dataset = get_mock_ic_dataset(list(data_with_dupes), labels)
+
+        detector = Duplicates(extractor=FlattenExtractor(), cluster_threshold=1.0)
+        result = detector.evaluate(dataset)
+        assert result is not None
+        assert result.items is not None
+
+    def test_evaluate_with_tuple_dataset_cluster_only(self, get_mock_ic_dataset):
+        """Regression test: cluster-only detection on tuple datasets should not crash."""
+        data = np.random.random((20, 3, 16, 16))
+        labels = list(range(len(data)))
+        dataset = get_mock_ic_dataset(list(data), labels)
+
+        detector = Duplicates(flags=ImageStats.NONE, extractor=FlattenExtractor(), cluster_threshold=1.0)
+        result = detector.evaluate(dataset)
+        assert result is not None

@@ -15,7 +15,6 @@ import numpy as np
 from numpy.typing import NDArray
 from typing_extensions import Self
 
-from dataeval import Embeddings
 from dataeval import Metadata as _Metadata
 from dataeval.core._rank import (
     RankResult,
@@ -27,7 +26,7 @@ from dataeval.core._rank import (
     rank_result_class_balanced,
     rank_result_stratified,
 )
-from dataeval.protocols import AnnotatedDataset, EmbeddingEncoder
+from dataeval.protocols import AnnotatedDataset, Array, FeatureExtractor
 from dataeval.types import Evaluator, EvaluatorConfig, Output, set_metadata
 
 _logger = logging.getLogger(__name__)
@@ -187,7 +186,7 @@ class PrioritizeOutput(Output[NDArray[np.intp]]):
         Examples
         --------
         >>> # Get result from Prioritize
-        >>> result = Prioritize.knn(encoder, k=5).evaluate(unlabeled_data)
+        >>> result = Prioritize.knn(extractor, k=5).evaluate(unlabeled_data)
         >>> # Transform to easy_first
         >>> easy_result = result.easy_first()
         >>> easy_result.order
@@ -224,7 +223,7 @@ class PrioritizeOutput(Output[NDArray[np.intp]]):
         Examples
         --------
         >>> # Get result from Prioritize
-        >>> result = Prioritize.knn(encoder, k=5).evaluate(unlabeled_data)
+        >>> result = Prioritize.knn(extractor, k=5).evaluate(unlabeled_data)
         >>> # Transform to hard_first
         >>> hard_result = result.hard_first()
         >>> hard_result.order
@@ -271,7 +270,7 @@ class PrioritizeOutput(Output[NDArray[np.intp]]):
         Examples
         --------
         >>> # Get result from Prioritize
-        >>> result = Prioritize.knn(encoder, k=5).evaluate(unlabeled_data)
+        >>> result = Prioritize.knn(extractor, k=5).evaluate(unlabeled_data)
         >>> # Apply stratification to the result
         >>> strat_result = result.stratified(num_bins=10)
         >>> strat_result.policy
@@ -315,7 +314,7 @@ class PrioritizeOutput(Output[NDArray[np.intp]]):
         Examples
         --------
         >>> # Get result
-        >>> result = Prioritize.knn(encoder, k=5).evaluate(unlabeled_data)
+        >>> result = Prioritize.knn(extractor, k=5).evaluate(unlabeled_data)
         >>> # Rebucket based on classes (class_labels typically from metadata)
         >>> balanced = result.class_balanced(class_labels)
         >>> balanced.policy
@@ -351,8 +350,8 @@ class Prioritize(Evaluator):
 
     Parameters
     ----------
-    encoder : EmbeddingEncoder
-        Encoder to use for extracting embeddings from data.
+    extractor : FeatureExtractor
+        Feature extractor instance to use for extracting embeddings from data.
     method : {"knn", "kmeans_distance", "kmeans_complexity", "hdbscan_distance", \
 "hdbscan_complexity"}, default "knn"
         Ranking method to use:
@@ -383,7 +382,7 @@ class Prioritize(Evaluator):
         - "class_balanced": Balanced selection across class labels
     num_bins : int, default 50
         Number of bins for "stratified" policy.
-    reference : AnnotatedDataset or Embeddings or None, default None
+    reference : AnnotatedDataset or Array or None, default None
         Optional reference dataset or pre-computed embeddings. When provided,
         incoming datasets will be prioritized relative to this reference set.
         Useful for active learning (reference = labeled data) or quality
@@ -409,10 +408,10 @@ class Prioritize(Evaluator):
     >>> from dataeval.quality import Prioritize
     >>>
     >>> # KNN with default policy (difficulty/easy_first)
-    >>> result = Prioritize.knn(encoder, k=10).evaluate(unlabeled_data)
+    >>> result = Prioritize.knn(extractor, k=10).evaluate(unlabeled_data)
     >>>
     >>> # Configure specific policy in factory
-    >>> result = Prioritize.knn(encoder, k=10).evaluate(unlabeled_data)
+    >>> result = Prioritize.knn(extractor, k=10).evaluate(unlabeled_data)
     >>>
     >>> # Re-bucket results (Cheap operation)
     >>> stratified_res = result.stratified(num_bins=20)
@@ -421,7 +420,7 @@ class Prioritize(Evaluator):
     Direct instantiation:
 
     >>> prioritizer = Prioritize(
-    ...     encoder=encoder,
+    ...     extractor=extractor,
     ...     method="knn",
     ...     k=10,
     ...     policy="stratified",
@@ -432,19 +431,19 @@ class Prioritize(Evaluator):
     Active learning with reference data:
 
     >>> # Prioritize unlabeled data based on distance to labeled data
-    >>> prioritizer = Prioritize.knn(encoder, k=10, reference=labeled_data)
+    >>> prioritizer = Prioritize.knn(extractor, k=10, reference=labeled_data)
     >>> result = prioritizer.evaluate(unlabeled_data)
     >>> # Get the items most unlike the reference data
     >>> most_novel = result.hard_first().indices
 
     Using configuration:
 
-    >>> config = Prioritize.Config(encoder=encoder, method="knn", k=10)
+    >>> config = Prioritize.Config(extractor=extractor, method="knn", k=10)
     >>> prioritizer = Prioritize(config=config)
 
     Applying class-balanced policy with class labels from metadata:
 
-    >>> prioritizer = Prioritize.knn(encoder, k=5)
+    >>> prioritizer = Prioritize.knn(extractor, k=5)
     >>> # evaluate() extracts labels from dataset metadata automatically
     >>> result = prioritizer.evaluate(unlabeled_data)
     >>> # Apply balancing
@@ -457,8 +456,9 @@ class Prioritize(Evaluator):
 
         Attributes
         ----------
-        encoder : EmbeddingEncoder or None
-            Encoder to use for extracting embeddings from data.
+        extractor : FeatureExtractor or None
+            Feature extractor instance to use for extracting embeddings
+            from data.
         method : {"knn", "kmeans_distance", "kmeans_complexity", "hdbscan_distance", \
 "hdbscan_complexity"}, default "knn"
             Ranking method to use.
@@ -478,7 +478,7 @@ class Prioritize(Evaluator):
             Number of bins for "stratified" policy.
         """
 
-        encoder: EmbeddingEncoder | None = None
+        extractor: FeatureExtractor | None = None
         method: MethodType = DEFAULT_PRIORITIZE_METHOD
         k: int | None = None
         c: int | None = None
@@ -489,7 +489,7 @@ class Prioritize(Evaluator):
         num_bins: int = DEFAULT_PRIORITIZE_NUM_BINS
 
     # Type declarations for attributes set by apply_config
-    encoder: EmbeddingEncoder
+    extractor: FeatureExtractor
     method: MethodType
     k: int | None
     c: int | None
@@ -502,7 +502,7 @@ class Prioritize(Evaluator):
 
     def __init__(
         self,
-        encoder: EmbeddingEncoder | None = None,
+        extractor: FeatureExtractor | None = None,
         method: MethodType | None = None,
         k: int | None = None,
         c: int | None = None,
@@ -511,34 +511,34 @@ class Prioritize(Evaluator):
         order: OrderType | None = None,
         policy: PolicyType | None = None,
         num_bins: int | None = None,
-        reference: AnnotatedDataset[Any] | Embeddings | None = None,
+        reference: AnnotatedDataset[Any] | Array | None = None,
         config: Config | None = None,
     ) -> None:
         super().__init__(locals(), exclude={"reference"})
         self._reference = reference
 
-        if self.encoder is None:
-            raise ValueError("encoder must be provided either in __init__ or config")
+        if self.extractor is None:
+            raise ValueError("extractor must be provided either in __init__ or config")
 
     # ==================== Factory Class Methods ====================
 
     @classmethod
     def knn(
         cls,
-        encoder: EmbeddingEncoder,
+        extractor: FeatureExtractor,
         k: int | None = None,
-        reference: AnnotatedDataset[Any] | Embeddings | None = None,
+        reference: AnnotatedDataset[Any] | Array | None = None,
     ) -> Self:
         """
         Create a Prioritize instance using k-nearest neighbors method.
 
         Parameters
         ----------
-        encoder : EmbeddingEncoder
-            Encoder to use for extracting embeddings from data.
+        extractor : FeatureExtractor
+            Feature extractor instance for embedding extraction.
         k : int or None, default None
             Number of nearest neighbors. If None, uses sqrt(n_samples).
-        reference : AnnotatedDataset or Embeddings or None, default None
+        reference : AnnotatedDataset or Array or None, default None
             Optional reference dataset for relative prioritization.
 
         Returns
@@ -549,34 +549,35 @@ class Prioritize(Evaluator):
         Examples
         --------
         >>> # Default KNN
-        >>> result = Prioritize.knn(encoder, k=10).evaluate(unlabeled_data)
+        >>> result = Prioritize.knn(extractor, k=10).evaluate(unlabeled_data)
         >>> # KNN relative to a reference (Active Learning)
-        >>> result = Prioritize.knn(encoder, k=5, reference=labeled_data).evaluate(unlabeled_data)
+        >>> result = Prioritize.knn(extractor, k=5, reference=labeled_data).evaluate(unlabeled_data)
         """
-        return cls(encoder=encoder, method="knn", k=k, reference=reference)
+        return cls(extractor=extractor, method="knn", k=k, reference=reference)
 
     @classmethod
     def kmeans_distance(
         cls,
-        encoder: EmbeddingEncoder,
+        extractor: FeatureExtractor,
         c: int | None = None,
         n_init: int | Literal["auto"] = "auto",
-        reference: AnnotatedDataset[Any] | Embeddings | None = None,
+        reference: AnnotatedDataset[Any] | Array | None = None,
     ) -> Self:
         """
         Create a Prioritize instance using K-means distance method.
 
         Ranks samples by distance to their assigned cluster centers.
+        Returns samples in easy-first order (low distance = prototypical).
 
         Parameters
         ----------
-        encoder : EmbeddingEncoder
-            Encoder to use for extracting embeddings from data.
+        extractor : FeatureExtractor
+            Feature extractor instance for embedding extraction.
         c : int or None, default None
             Number of clusters. If None, uses sqrt(n_samples).
         n_init : int or "auto", default "auto"
             Number of K-means initializations.
-        reference : AnnotatedDataset or Embeddings or None, default None
+        reference : AnnotatedDataset or Array or None, default None
             Optional reference dataset for relative prioritization.
 
         Returns
@@ -586,35 +587,36 @@ class Prioritize(Evaluator):
 
         Examples
         --------
-        >>> result = Prioritize.kmeans_distance(encoder, c=15).evaluate(unlabeled_data)
+        >>> result = Prioritize.kmeans_distance(extractor, c=15).evaluate(unlabeled_data)
         """
-        return cls(encoder=encoder, method="kmeans_distance", c=c, n_init=n_init, reference=reference)
+        return cls(extractor=extractor, method="kmeans_distance", c=c, n_init=n_init, reference=reference)
 
     @classmethod
     def kmeans_complexity(
         cls,
-        encoder: EmbeddingEncoder,
+        extractor: FeatureExtractor,
         c: int | None = None,
         n_init: int | Literal["auto"] = "auto",
-        reference: AnnotatedDataset[Any] | Embeddings | None = None,
+        reference: AnnotatedDataset[Any] | Array | None = None,
     ) -> Self:
         """
         Create a Prioritize instance using K-means complexity method.
 
         Uses weighted sampling based on intra/inter-cluster distances.
+        Returns samples in easy-first order.
 
         Note: This method does not produce scores, so "stratified" policy
         is not available.
 
         Parameters
         ----------
-        encoder : EmbeddingEncoder
-            Encoder to use for extracting embeddings from data.
+        extractor : FeatureExtractor
+            Feature extractor instance for embedding extraction.
         c : int or None, default None
             Number of clusters. If None, uses sqrt(n_samples).
         n_init : int or "auto", default "auto"
             Number of K-means initializations.
-        reference : AnnotatedDataset or Embeddings or None, default None
+        reference : AnnotatedDataset or Array or None, default None
             Optional reference dataset for relative prioritization.
 
         Returns
@@ -624,17 +626,17 @@ class Prioritize(Evaluator):
 
         Examples
         --------
-        >>> result = Prioritize.kmeans_complexity(encoder, c=10).evaluate(unlabeled_data)
+        >>> result = Prioritize.kmeans_complexity(extractor, c=10).evaluate(unlabeled_data)
         """
-        return cls(encoder=encoder, method="kmeans_complexity", c=c, n_init=n_init, reference=reference)
+        return cls(extractor=extractor, method="kmeans_complexity", c=c, n_init=n_init, reference=reference)
 
     @classmethod
     def hdbscan_distance(
         cls,
-        encoder: EmbeddingEncoder,
+        extractor: FeatureExtractor,
         c: int | None = None,
         max_cluster_size: int | None = None,
-        reference: AnnotatedDataset[Any] | Embeddings | None = None,
+        reference: AnnotatedDataset[Any] | Array | None = None,
     ) -> Self:
         """
         Create a Prioritize instance using HDBSCAN distance method.
@@ -644,14 +646,14 @@ class Prioritize(Evaluator):
 
         Parameters
         ----------
-        encoder : EmbeddingEncoder
-            Encoder to use for extracting embeddings from data.
+        extractor : FeatureExtractor
+            Feature extractor instance for embedding extraction.
         c : int or None, default None
             Expected number of clusters (used as hint for min_cluster_size).
             If None, uses sqrt(n_samples).
         max_cluster_size : int or None, default None
             Maximum size limit for identified clusters.
-        reference : AnnotatedDataset or Embeddings or None, default None
+        reference : AnnotatedDataset or Array or None, default None
             Optional reference dataset for relative prioritization.
 
         Returns
@@ -661,19 +663,19 @@ class Prioritize(Evaluator):
 
         Examples
         --------
-        >>> result = Prioritize.hdbscan_distance(encoder, c=15).evaluate(unlabeled_data)
+        >>> result = Prioritize.hdbscan_distance(extractor, c=15).evaluate(unlabeled_data)
         """
         return cls(
-            encoder=encoder, method="hdbscan_distance", c=c, max_cluster_size=max_cluster_size, reference=reference
+            extractor=extractor, method="hdbscan_distance", c=c, max_cluster_size=max_cluster_size, reference=reference
         )
 
     @classmethod
     def hdbscan_complexity(
         cls,
-        encoder: EmbeddingEncoder,
+        extractor: FeatureExtractor,
         c: int | None = None,
         max_cluster_size: int | None = None,
-        reference: AnnotatedDataset[Any] | Embeddings | None = None,
+        reference: AnnotatedDataset[Any] | Array | None = None,
     ) -> Self:
         """
         Create a Prioritize instance using HDBSCAN complexity method.
@@ -686,14 +688,14 @@ class Prioritize(Evaluator):
 
         Parameters
         ----------
-        encoder : EmbeddingEncoder
-            Encoder to use for extracting embeddings from data.
+        extractor : FeatureExtractor
+            Feature extractor instance for embedding extraction.
         c : int or None, default None
             Expected number of clusters (used as hint for min_cluster_size).
             If None, uses sqrt(n_samples).
         max_cluster_size : int or None, default None
             Maximum size limit for identified clusters.
-        reference : AnnotatedDataset or Embeddings or None, default None
+        reference : AnnotatedDataset or Array or None, default None
             Optional reference dataset for relative prioritization.
 
         Returns
@@ -703,16 +705,20 @@ class Prioritize(Evaluator):
 
         Examples
         --------
-        >>> result = Prioritize.hdbscan_complexity(encoder, c=10).evaluate(unlabeled_data)
+        >>> result = Prioritize.hdbscan_complexity(extractor, c=10).evaluate(unlabeled_data)
         """
         return cls(
-            encoder=encoder, method="hdbscan_complexity", c=c, max_cluster_size=max_cluster_size, reference=reference
+            extractor=extractor,
+            method="hdbscan_complexity",
+            c=c,
+            max_cluster_size=max_cluster_size,
+            reference=reference,
         )
 
     @set_metadata(state=["method", "k", "c", "n_init", "policy", "num_bins"])
     def evaluate(
         self,
-        dataset: AnnotatedDataset[Any] | Embeddings,
+        dataset: AnnotatedDataset[Any] | Array,
         class_labels: NDArray[np.integer[Any]] | None = None,
     ) -> PrioritizeOutput:
         """
@@ -722,11 +728,11 @@ class Prioritize(Evaluator):
 
         Parameters
         ----------
-        dataset : AnnotatedDataset[Any] | Embeddings
+        dataset : AnnotatedDataset[Any] | Array
             The incoming dataset to prioritize. Can be either:
 
-            - AnnotatedDataset: Will compute embeddings using the encoder
-            - Embeddings: Pre-computed embeddings
+            - AnnotatedDataset: Will compute embeddings using the extractor
+            - Array: Pre-computed embeddings (e.g. from Embeddings or numpy)
 
         class_labels : NDArray[np.integer] | None, default None
             Optional class labels for class_balanced policy. If not provided,
@@ -742,20 +748,20 @@ class Prioritize(Evaluator):
         ------
         ValueError
             If class_balanced policy is used with a dataset that lacks metadata
-            (e.g., raw Embeddings).
+            (e.g., raw arrays).
             If stratified policy is used with complexity methods (no scores).
         TypeError
-            If dataset is neither an AnnotatedDataset nor Embeddings.
+            If dataset is neither an AnnotatedDataset nor Array.
 
         Examples
         --------
         Using factory methods:
 
-        >>> result = Prioritize.knn(encoder, k=5).evaluate(unlabeled_data)
+        >>> result = Prioritize.knn(extractor, k=5).evaluate(unlabeled_data)
 
         Using direct instantiation:
 
-        >>> prioritizer = Prioritize(encoder=encoder, method="knn", k=5, order="hard_first")
+        >>> prioritizer = Prioritize(extractor=extractor, method="knn", k=5, order="hard_first")
         >>> result = prioritizer.evaluate(unlabeled_data)
         """
         # Validate stratified + complexity method combinations
@@ -764,39 +770,39 @@ class Prioritize(Evaluator):
                 f"stratified policy is not available with {self.method} method ({self.method} does not produce scores)"
             )
 
-        # Check if dataset is Embeddings (pre-computed) or AnnotatedDataset
-        if isinstance(dataset, Embeddings):
+        # Check if dataset is an Array (pre-computed) or AnnotatedDataset
+        if isinstance(dataset, Array):
             # Pre-computed embeddings - use directly
-            self._embeddings = dataset
+            embeddings_array = np.asarray(dataset)
         else:
             # Assume dataset is an AnnotatedDataset - compute embeddings
             try:
-                self._embeddings = Embeddings(dataset, encoder=self.encoder)
+                from dataeval._embeddings import Embeddings as _Embeddings
+
+                embeddings_array = np.asarray(_Embeddings(dataset, extractor=self.extractor))
                 if class_labels is None:
                     self._metadata = _Metadata(dataset)
                     class_labels = self._metadata.class_labels
             except Exception as e:
                 raise TypeError(
-                    f"dataset must be either an AnnotatedDataset or Embeddings, but got {type(dataset).__name__}"
+                    f"dataset must be either an AnnotatedDataset or Array, but got {type(dataset).__name__}"
                 ) from e
 
         if self._reference is None:
-            self._ref_embeddings = None
-        elif isinstance(self._reference, Embeddings):
-            self._ref_embeddings = self._reference
+            reference_array = None
+        elif isinstance(self._reference, Array):
+            reference_array = np.asarray(self._reference)
         else:
-            self._ref_embeddings = Embeddings(self._reference, encoder=self.encoder)
+            from dataeval._embeddings import Embeddings as _Embeddings
+
+            reference_array = np.asarray(_Embeddings(self._reference, extractor=self.extractor))
 
         # Check if we have labels for the requested policy
         if self.policy == "class_balanced" and class_labels is None:
             raise ValueError(
                 "Policy 'class_balanced' requires an AnnotatedDataset with metadata. "
-                "For raw Embeddings, use result.class_balanced(labels) instead."
+                "For raw arrays, use result.class_balanced(labels) instead."
             )
-
-        # Perform ranking and apply sort and policy
-        embeddings_array = np.asarray(self._embeddings)
-        reference_array = None if self._ref_embeddings is None else np.asarray(self._ref_embeddings)
         result = self._perform_ranking(embeddings_array, reference_array)
 
         return PrioritizeOutput(

@@ -404,15 +404,15 @@ def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:
     # -------------------------------------------------------------------------
     # Model and Encoder
     # -------------------------------------------------------------------------
-    from dataeval.encoders import TorchEmbeddingEncoder
+    from dataeval.extractors import TorchExtractor
 
     model = _create_model()
     doctest_namespace["model"] = model
     doctest_namespace["my_model"] = model
 
-    # Create an encoder fixture for Prioritize and other doctests
-    encoder = TorchEmbeddingEncoder(model, batch_size=32)
-    doctest_namespace["encoder"] = encoder
+    # Create an extractor fixture for Prioritize and other doctests
+    extractor = TorchExtractor(model)
+    doctest_namespace["extractor"] = extractor
 
     # -------------------------------------------------------------------------
     # Prioritize fixtures

@@ -9,7 +9,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from dataeval.extractors._uncertainty import UncertaintyFeatureExtractor, _classifier_uncertainty
+from dataeval.extractors._uncertainty import ClassifierUncertaintyExtractor, _classifier_uncertainty
 
 
 class SimpleModel(nn.Module):
@@ -68,7 +68,7 @@ class TestClassifierUncertainty:
 
 @pytest.mark.required
 class TestUncertaintyFeatureExtractor:
-    """Test UncertaintyFeatureExtractor."""
+    """Test ClassifierUncertaintyExtractor."""
 
     def test_basic_extraction_with_mock(self):
         """Test basic uncertainty extraction using mock."""
@@ -79,7 +79,7 @@ class TestUncertaintyFeatureExtractor:
         mock_probs = np.array([[0.7, 0.2, 0.05, 0.05]] * 50)
 
         with patch("dataeval.extractors._uncertainty.predict", return_value=mock_probs):
-            extractor = UncertaintyFeatureExtractor(model=model, preds_type="probs", batch_size=16)
+            extractor = ClassifierUncertaintyExtractor(model=model, preds_type="probs", batch_size=16)
             result = extractor(data)
 
         assert result.shape == (50, 1)
@@ -93,7 +93,7 @@ class TestUncertaintyFeatureExtractor:
         mock_logits = np.random.randn(20, 4)
 
         with patch("dataeval.extractors._uncertainty.predict", return_value=mock_logits):
-            extractor = UncertaintyFeatureExtractor(model=model, preds_type="logits", batch_size=8)
+            extractor = ClassifierUncertaintyExtractor(model=model, preds_type="logits", batch_size=8)
             result = extractor(data)
 
         assert result.shape == (20, 1)
@@ -109,7 +109,7 @@ class TestUncertaintyFeatureExtractor:
         mock_probs = np.array([[0.25, 0.25, 0.25, 0.25]] * 30)
 
         with patch("dataeval.extractors._uncertainty.predict", return_value=mock_probs):
-            extractor = UncertaintyFeatureExtractor(
+            extractor = ClassifierUncertaintyExtractor(
                 model=model, preds_type="probs", transforms=transform_fn, device="cpu"
             )
             result = extractor(data)
@@ -126,7 +126,7 @@ class TestUncertaintyFeatureExtractor:
         def transform2(x):
             return x + 1.0
 
-        extractor = UncertaintyFeatureExtractor(model=model, transforms=[transform1, transform2])
+        extractor = ClassifierUncertaintyExtractor(model=model, transforms=[transform1, transform2])
 
         x = torch.tensor([1.0, 2.0, 3.0])
         result = extractor._apply_transforms(x)
@@ -138,11 +138,11 @@ class TestUncertaintyFeatureExtractor:
     def test_repr(self):
         """Test __repr__ method."""
         model = SimpleModel(10, 4)
-        extractor = UncertaintyFeatureExtractor(model=model, preds_type="logits", batch_size=64)
+        extractor = ClassifierUncertaintyExtractor(model=model, preds_type="logits", batch_size=64)
 
         repr_str = repr(extractor)
 
-        assert "UncertaintyFeatureExtractor" in repr_str
+        assert "ClassifierUncertaintyExtractor" in repr_str
         assert "SimpleModel" in repr_str
         assert "preds_type='logits'" in repr_str
         assert "batch_size=64" in repr_str
