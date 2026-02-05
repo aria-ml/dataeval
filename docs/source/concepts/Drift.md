@@ -162,7 +162,7 @@ DataEval's drift detection classes are:
   comparing the distance between the reference and test data.
 
 Classifier uncertainty drift detection is available by creating a
-{class}`.UncertaintyFeatureExtractor`, which computes prediction uncertainty
+{class}`.ClassifierUncertaintyExtractor`, which computes prediction uncertainty
 (entropy) from a classification model. The feature extractor can then be
 provided to `DriftUnivariate` for drift detection based on the model's
 uncertainty.

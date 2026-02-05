@@ -61,7 +61,7 @@ class DriftUnivariate(BaseDriftUnivariate):
     ----------
     data : Any
         Reference dataset used as baseline distribution for drift detection.
-        Can be Array or any type supported by feature_extractor parameter.
+        Can be Array or any type supported by extractor parameter.
         Should represent the expected data distribution.
     method : "ks", "cvm", "mwu", "anderson", or "bws", default "ks"
         Statistical test method to use. See method descriptions above.
@@ -91,7 +91,7 @@ class DriftUnivariate(BaseDriftUnivariate):
     n_features : int | None, default None
         Number of features to analyze in univariate tests.
         When None, automatically inferred from the flattened shape of first data sample.
-    feature_extractor : FeatureExtractor or None, default None
+    extractor : FeatureExtractor or None, default None
         Optional feature extraction function to convert input data to arrays.
         When provided, enables drift detection on non-array inputs such as
         datasets, metadata, or raw model outputs. The extractor is applied to
@@ -163,7 +163,7 @@ class DriftUnivariate(BaseDriftUnivariate):
             Number of features to analyze.
         update_strategy : UpdateStrategy or None, default None
             Strategy for updating reference data over time.
-        feature_extractor : FeatureExtractor or None, default None
+        extractor : FeatureExtractor or None, default None
             Feature extractor for transforming input data before drift detection.
         """
 
@@ -173,7 +173,7 @@ class DriftUnivariate(BaseDriftUnivariate):
         alternative: Literal["two-sided", "less", "greater"] = "two-sided"
         n_features: int | None = None
         update_strategy: UpdateStrategy | None = None
-        feature_extractor: FeatureExtractor | None = None
+        extractor: FeatureExtractor | None = None
 
     def __init__(
         self,
@@ -184,7 +184,7 @@ class DriftUnivariate(BaseDriftUnivariate):
         correction: Literal["bonferroni", "fdr"] | None = None,
         alternative: Literal["two-sided", "less", "greater"] | None = None,
         n_features: int | None = None,
-        feature_extractor: FeatureExtractor | None = None,
+        extractor: FeatureExtractor | None = None,
         config: Config | None = None,
     ) -> None:
         # Store config or create default
@@ -203,7 +203,7 @@ class DriftUnivariate(BaseDriftUnivariate):
             update_strategy=update_strategy,
             correction=correction,
             n_features=n_features,
-            feature_extractor=feature_extractor,
+            extractor=extractor,
         )
 
         # Validate method

@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 from sklearn.linear_model import LogisticRegression
 
-from dataeval.extractors._uncertainty import UncertaintyFeatureExtractor, _classifier_uncertainty
+from dataeval.extractors._uncertainty import ClassifierUncertaintyExtractor, _classifier_uncertainty
 from dataeval.shift import DriftUnivariate
 from dataeval.shift.update_strategies import LastSeenUpdateStrategy, ReservoirSamplingUpdateStrategy
 
@@ -82,7 +82,7 @@ class TestFunctionalClassifierUncertainty:
         x_test1 = torch.ones_like(x_ref)
 
         # Create uncertainty feature extractor using the class directly
-        uncertainty_extractor = UncertaintyFeatureExtractor(
+        uncertainty_extractor = ClassifierUncertaintyExtractor(
             model=model,  # type: ignore
             preds_type=preds_type,
             batch_size=10,
@@ -96,7 +96,7 @@ class TestFunctionalClassifierUncertainty:
             method="ks",
             p_val=p_val,
             update_strategy=update_strategy,
-            feature_extractor=uncertainty_extractor,
+            extractor=uncertainty_extractor,
         )
 
         preds_0 = cd.predict(x_test0)

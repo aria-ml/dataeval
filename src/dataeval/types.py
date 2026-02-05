@@ -68,7 +68,7 @@ class EvaluatorConfig(BaseModel):
 
 class ClusterConfigMixin(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
-    feature_extractor: FeatureExtractor | None = None
+    extractor: FeatureExtractor | None = None
     cluster_algorithm: Literal["kmeans", "hdbscan"] = DEFAULT_CLUSTER_ALGORITHM
     n_clusters: int | None = DEFAULT_CLUSTER_N_CLUSTERS
 

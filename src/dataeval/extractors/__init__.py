@@ -1,20 +1,15 @@
 """
-Feature extractors for drift detection and quality metrics.
+Feature extractors that transform input data into arrays.
 
-This module provides feature extraction implementations that convert various
-data types into arrays suitable for drift detection and quality analysis.
-
-The primary feature extractors are :class:`~dataeval.Embeddings` and
-:class:`~dataeval.Metadata`, which implement the :class:`~dataeval.protocols.FeatureExtractor`
-protocol and can be used directly with drift detectors.
-
-This submodule provides additional specialized extractors:
-
-- :class:`BoVWExtractor`: Computes Bag of Visual Words using SIFT for feature comparison
-- :class:`UncertaintyFeatureExtractor`: Computes model prediction uncertainty (entropy)
+All extractors implement the :class:`~dataeval.protocols.FeatureExtractor` protocol
+(``__call__(data) -> Array``) and can be used standalone or passed to
+:class:`~dataeval.Embeddings` for batching, caching, and memory-mapped storage.
 """
 
-__all__ = ["BoVWExtractor", "UncertaintyFeatureExtractor"]
+__all__ = ["FlattenExtractor", "OnnxExtractor", "TorchExtractor", "BoVWExtractor", "ClassifierUncertaintyExtractor"]
 
 from dataeval.extractors._bovw import BoVWExtractor
-from dataeval.extractors._uncertainty import UncertaintyFeatureExtractor
+from dataeval.extractors._flatten import FlattenExtractor
+from dataeval.extractors._onnx import OnnxExtractor
+from dataeval.extractors._torch import TorchExtractor
+from dataeval.extractors._uncertainty import ClassifierUncertaintyExtractor

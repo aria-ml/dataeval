@@ -132,7 +132,7 @@ class BaseDrift:
     data : Any
         Reference dataset used as baseline for drift detection.
         Can be image embeddings, raw arrays, or any data type that can be
-        converted to arrays via the feature_extractor parameter.
+        converted to arrays via the extractor parameter.
     p_val : float, default 0.05
         Significance threshold for drift detection, between 0 and 1.
         Default 0.05 limits false drift alerts to 5% when no drift exists (Type I error rate).
@@ -145,7 +145,7 @@ class BaseDrift:
         "bonferroni" provides conservative family-wise error control.
         "fdr" (False Discovery Rate) offers less conservative control.
         Default "bonferroni" minimizes false positive drift detections.
-    feature_extractor : FeatureExtractor or None, default None
+    extractor : FeatureExtractor or None, default None
         Optional feature extraction function to convert input data to arrays.
         When provided, enables drift detection on non-array inputs such as
         datasets, metadata, or raw model outputs. The extractor is applied to
@@ -162,7 +162,7 @@ class BaseDrift:
         Multiple testing correction method.
     n : int
         Number of samples in the reference dataset.
-    feature_extractor : FeatureExtractor or None
+    extractor : FeatureExtractor or None
         Feature extraction function for converting input data.
     """
 
@@ -170,7 +170,7 @@ class BaseDrift:
     update_strategy: UpdateStrategy | None
     correction: Literal["bonferroni", "fdr"]
     n: int
-    feature_extractor: FeatureExtractor | None
+    extractor: FeatureExtractor | None
 
     def __init__(
         self,
@@ -178,30 +178,28 @@ class BaseDrift:
         p_val: float = 0.05,
         update_strategy: UpdateStrategy | None = None,
         correction: Literal["bonferroni", "fdr"] = "bonferroni",
-        feature_extractor: FeatureExtractor | None = None,
+        extractor: FeatureExtractor | None = None,
     ) -> None:
         # Type checking
         if update_strategy is not None and not isinstance(update_strategy, UpdateStrategy):
             raise ValueError("`update_strategy` is not a valid UpdateStrategy class.")
         if correction not in ["bonferroni", "fdr"]:
             raise ValueError("`correction` must be `bonferroni` or `fdr`.")
-        if feature_extractor is not None and not isinstance(feature_extractor, FeatureExtractor):
-            raise ValueError("`feature_extractor` is not a valid FeatureExtractor.")
+        if extractor is not None and not isinstance(extractor, FeatureExtractor):
+            raise ValueError("`extractor` is not a valid FeatureExtractor.")
 
         # Validate that data is Array-like (or will be after feature extraction)
-        if feature_extractor is None and not isinstance(data, Array):
-            raise ValueError(
-                "`data` must be Array-like or provide a `feature_extractor` to convert your data to an array."
-            )
+        if extractor is None and not isinstance(data, Array):
+            raise ValueError("`data` must be Array-like or provide a `extractor` to convert your data to an array.")
 
         self._data = data
         self.p_val = p_val
         self.update_strategy = update_strategy
         self.correction = correction
-        self.feature_extractor = feature_extractor
+        self.extractor = extractor
         # Compute length after feature extraction if needed
-        if feature_extractor is not None:
-            extracted = feature_extractor(data)
+        if extractor is not None:
+            extracted = extractor(data)
             self.n = len(extracted)
         else:
             self.n = len(data)
@@ -241,7 +239,7 @@ class BaseDrift:
         ----------
         data : Any
             Input data to encode. Can be Array or any type supported by
-            the configured feature_extractor.
+            the configured extractor.
 
         Returns
         -------
@@ -249,8 +247,8 @@ class BaseDrift:
             Encoded data as flattened 32-bit floating point array.
         """
         # Apply feature extractor if configured
-        if self.feature_extractor is not None:
-            data = self.feature_extractor(data)
+        if self.extractor is not None:
+            data = self.extractor(data)
 
         return flatten_samples(np.asarray(data, dtype=np.float32))
 
@@ -267,7 +265,7 @@ class BaseDriftUnivariate(BaseDrift):
     ----------
     data : Any
         Reference dataset used as baseline for drift detection.
-        Can be Array or any type supported by feature_extractor.
+        Can be Array or any type supported by extractor.
     p_val : float, default 0.05
         Significance threshold for drift detection, between 0 and 1.
         Default 0.05 limits false drift alerts to 5% when no drift exists (Type I error rate).
@@ -284,7 +282,7 @@ class BaseDriftUnivariate(BaseDrift):
         Number of features to analyze. When None, automatically inferred
         from the first sample's flattened shape. Default None enables
         automatic feature detection for flexible input handling.
-    feature_extractor : FeatureExtractor or None, default None
+    extractor : FeatureExtractor or None, default None
         Optional feature extraction function to convert input data to arrays.
         When provided, enables drift detection on non-array inputs.
 
@@ -298,7 +296,7 @@ class BaseDriftUnivariate(BaseDrift):
         Multiple testing correction method.
     n : int
         Number of samples in the reference dataset.
-    feature_extractor : FeatureExtractor or None
+    extractor : FeatureExtractor or None
         Feature extraction function for converting input data.
     """
 
@@ -309,9 +307,9 @@ class BaseDriftUnivariate(BaseDrift):
         update_strategy: UpdateStrategy | None = None,
         correction: Literal["bonferroni", "fdr"] = "bonferroni",
         n_features: int | None = None,
-        feature_extractor: FeatureExtractor | None = None,
+        extractor: FeatureExtractor | None = None,
     ) -> None:
-        super().__init__(data, p_val, update_strategy, correction, feature_extractor)
+        super().__init__(data, p_val, update_strategy, correction, extractor)
 
         self._n_features = n_features
 
@@ -337,7 +335,7 @@ class BaseDriftUnivariate(BaseDrift):
         # lazy process n_features as needed
         if self._n_features is None:
             # Apply feature extractor to first sample if configured
-            if self.feature_extractor is not None:
+            if self.extractor is not None:
                 # Get first element to determine feature dimensionality
                 # We need to encode at least one sample to know the output shape
                 first_encoded = self._encode(self._data[:1])

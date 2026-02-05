@@ -386,19 +386,18 @@ class Outliers(Evaluator):
     flags : ImageStats, default ImageStats.DIMENSION | ImageStats.PIXEL | ImageStats.VISUAL
         Statistics to compute for image statistics-based outlier detection. Set to
         ``ImageStats.NONE`` to skip image statistics and use only cluster-based detection
-        (requires ``feature_extractor``).
+        (requires ``extractor``).
     outlier_method : ["modzscore" | "zscore" | "iqr"], default "modzscore"
         Statistical method used to identify outliers from image statistics.
     outlier_threshold : float, optional
         Threshold value for the given ``outlier_method``, above which data is considered an
         outlier. Uses method-specific default if None.
-    feature_extractor : FeatureExtractor, optional
+    extractor : FeatureExtractor, optional
         Feature extractor for cluster-based outlier detection. When provided, embeddings
         are extracted and clustered to find semantic/visual outliers in embedding space.
-        Common extractors include :class:`~dataeval.Embeddings`.
     cluster_threshold : float, default 2.5
         Number of standard deviations from cluster center beyond which a point is
-        considered an outlier. Only used when ``feature_extractor`` is provided.
+        considered an outlier. Only used when ``extractor`` is provided.
         Higher values are more permissive (fewer outliers).
     cluster_algorithm : {"kmeans", "hdbscan"}, default "hdbscan"
         Clustering algorithm for cluster-based detection.
@@ -420,7 +419,7 @@ class Outliers(Evaluator):
         Statistical method used to identify outliers.
     outlier_threshold : float | None
         Threshold value for the outlier method.
-    feature_extractor : FeatureExtractor | None
+    extractor : FeatureExtractor | None
         Feature extractor for cluster-based detection.
     cluster_threshold : float
         Threshold for cluster-based outlier detection.
@@ -463,9 +462,9 @@ class Outliers(Evaluator):
 
     Cluster-based detection with embeddings:
 
-    >>> from dataeval import Embeddings
-    >>> extractor = Embeddings(encoder=encoder)
-    >>> outliers = Outliers(flags=ImageStats.NONE, feature_extractor=extractor)
+    >>> from dataeval.extractors import FlattenExtractor
+
+    >>> outliers = Outliers(flags=ImageStats.NONE, extractor=FlattenExtractor(), cluster_threshold=2.0)
     >>> result = outliers.evaluate(train_ds)  # Only cluster_distance metric
 
     Using configuration:
@@ -488,7 +487,7 @@ class Outliers(Evaluator):
             Threshold value for the outlier method.
         cluster_threshold : float, default 2.5
             Number of standard deviations from cluster center for cluster-based detection.
-        feature_extractor : FeatureExtractor or None, default None
+        extractor : FeatureExtractor or None, default None
             Feature extractor for cluster-based outlier detection.
         cluster_algorithm : {"kmeans", "hdbscan"}, default "hdbscan"
             Clustering algorithm for cluster-based detection.
@@ -506,7 +505,7 @@ class Outliers(Evaluator):
     outlier_method: Literal["zscore", "modzscore", "iqr"]
     outlier_threshold: float | None
     cluster_threshold: float
-    feature_extractor: FeatureExtractor | None
+    extractor: FeatureExtractor | None
     cluster_algorithm: Literal["kmeans", "hdbscan"]
     n_clusters: int | None
     config: Config
@@ -517,7 +516,7 @@ class Outliers(Evaluator):
         outlier_method: Literal["zscore", "modzscore", "iqr"] | None = None,
         outlier_threshold: float | None = None,
         cluster_threshold: float | None = None,
-        feature_extractor: FeatureExtractor | None = None,
+        extractor: FeatureExtractor | None = None,
         cluster_algorithm: Literal["kmeans", "hdbscan"] | None = None,
         n_clusters: int | None = None,
         config: Config | None = None,
@@ -919,14 +918,14 @@ class Outliers(Evaluator):
             - target_id: int | None - Index of the target within the image
               (None for image-level outliers, omitted if all are image-level)
             - metric_name: str - Name of the metric that flagged this image/target.
-              Includes "cluster_distance" when feature_extractor is provided.
+              Includes "cluster_distance" when extractor is provided.
             - metric_value: float - Value of the metric for this image/target.
               For cluster_distance, this is the number of std devs from cluster mean.
 
         Raises
         ------
         ValueError
-            If ``flags`` is ``ImageStats.NONE`` and no ``feature_extractor`` is provided.
+            If ``flags`` is ``ImageStats.NONE`` and no ``extractor`` is provided.
             If both ``per_image`` and ``per_target`` are False.
 
         Examples
@@ -955,15 +954,14 @@ class Outliers(Evaluator):
         └─────────┴─────────────┴──────────────┘
 
         Cluster-based detection with embeddings:
+        >>> from dataeval.extractors import FlattenExtractor
 
-        >>> from dataeval import Embeddings
-        >>> extractor = Embeddings(encoder=encoder)
-        >>> outliers = Outliers(flags=ImageStats.NONE, feature_extractor=extractor)
+        >>> outliers = Outliers(flags=ImageStats.NONE, extractor=FlattenExtractor(), cluster_threshold=2.0)
         >>> results = outliers.evaluate(train_ds)
         """
         # Validate parameters
-        if self.flags == ImageStats.NONE and self.feature_extractor is None:
-            raise ValueError("Either flags must not be ImageStats.NONE or feature_extractor must be provided.")
+        if self.flags == ImageStats.NONE and self.extractor is None:
+            raise ValueError("Either flags must not be ImageStats.NONE or extractor must be provided.")
 
         if not (per_image or per_target):
             raise ValueError("At least one of per_image or per_target must be True.")
@@ -977,9 +975,10 @@ class Outliers(Evaluator):
             outliers_dfs.append(stats_outliers)
 
         # Cluster-based outlier detection
-        if self.feature_extractor is not None:
+        if self.extractor is not None:
             # Extract embeddings
-            embeddings = self.feature_extractor(data)
+            images = [item[0] if isinstance(item, tuple) else item for item in data]
+            embeddings = self.extractor(images)
             embeddings_array = flatten_samples(to_numpy(embeddings))
 
             # Cluster the embeddings
@@ -1016,12 +1015,13 @@ class Outliers(Evaluator):
         elif len(outliers_dfs) == 1:
             outliers = outliers_dfs[0]
         else:
-            # Ensure both DataFrames have target_id column for concatenation
+            # Ensure both DataFrames have target_id column with consistent column order
+            column_order = ["item_id", "target_id", "metric_name", "metric_value"]
             normalized_dfs: list[pl.DataFrame] = []
             for df in outliers_dfs:
                 if "target_id" not in df.columns:
                     df = df.with_columns(pl.lit(None, dtype=pl.Int64).alias("target_id"))
-                normalized_dfs.append(df)
+                normalized_dfs.append(df.select(column_order))
             outliers = pl.concat(normalized_dfs).sort(["item_id", "target_id", "metric_name"])
 
         # Drop target_id column if there are no target-level stats (all target_id values are None)

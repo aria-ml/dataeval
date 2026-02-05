@@ -8,7 +8,7 @@ import pytest
 import torch
 
 from dataeval import Embeddings
-from dataeval.encoders import NumpyFlattenEncoder, TorchEmbeddingEncoder
+from dataeval.extractors import FlattenExtractor, TorchExtractor
 from dataeval.protocols import Array, DatasetMetadata, DatumMetadata
 
 
@@ -101,15 +101,15 @@ def model_with_functional_ops():
 
 
 @pytest.fixture
-def identity_encoder():
-    """Fixture providing an identity model encoder"""
-    return TorchEmbeddingEncoder(IdentityModel(), batch_size=64, device="cpu")
+def identity_extractor():
+    """Fixture providing an identity model extractor"""
+    return TorchExtractor(IdentityModel(), device="cpu")
 
 
 @pytest.fixture
-def numpy_encoder():
-    """Fixture providing a numpy flatten encoder"""
-    return NumpyFlattenEncoder(batch_size=64)
+def numpy_extractor():
+    """Fixture providing a numpy flatten extractor"""
+    return FlattenExtractor()
 
 
 @pytest.mark.required
@@ -132,10 +132,10 @@ class TestEmbeddings:
             ],
         ],
     )
-    def test_mock_inputs(self, data, labels, metadata, numpy_encoder):
+    def test_mock_inputs(self, data, labels, metadata, numpy_extractor):
         """Tests common (input, target, metadata) dataset output"""
         ds = MockDataset(data, labels, metadata)
-        em = Embeddings(ds, encoder=numpy_encoder)
+        em = Embeddings(ds, extractor=numpy_extractor)
 
         assert len(ds) == len(em)
 
@@ -152,10 +152,10 @@ class TestEmbeddings:
             ],
         ],
     )
-    def test_with_model_encode(self, data, targets, identity_encoder):
+    def test_with_model_encode(self, data, targets, identity_extractor):
         """Tests with basic identity model"""
         ds = TorchDataset(data, targets)
-        em = Embeddings(ds, encoder=identity_encoder)
+        em = Embeddings(ds, extractor=identity_extractor)
 
         assert len(ds) == len(em)
         assert len(em) == len(ds)
@@ -166,9 +166,9 @@ class TestEmbeddings:
         for idx, e in enumerate(em):
             np.testing.assert_allclose(ds[idx][0], e)
 
-    def test_embeddings(self, identity_encoder):
-        encoder = TorchEmbeddingEncoder(torch.nn.Identity(), batch_size=10, transforms=lambda x: x + 1, device="cpu")
-        embs = Embeddings(get_dataset(), encoder=encoder)
+    def test_embeddings(self, identity_extractor):
+        extractor = TorchExtractor(torch.nn.Identity(), transforms=lambda x: x + 1, device="cpu")
+        embs = Embeddings(get_dataset(), extractor=extractor)
         assert len(embs[0:3]) == 3
 
         embs_np = np.asarray(embs)
@@ -182,8 +182,8 @@ class TestEmbeddings:
             embs["string"]  # type: ignore
 
     def test_embeddings_getitem_types(self):
-        encoder = TorchEmbeddingEncoder(torch.nn.Identity(), batch_size=10, transforms=lambda x: x + 1, device="cpu")
-        embs = Embeddings(get_dataset(), encoder=encoder)
+        extractor = TorchExtractor(torch.nn.Identity(), transforms=lambda x: x + 1, device="cpu")
+        embs = Embeddings(get_dataset(), extractor=extractor)
         assert len(embs[0])
         assert len(embs[0:2]) == 2
         assert len(embs[[0, 1]]) == 2
@@ -192,8 +192,8 @@ class TestEmbeddings:
         assert len(embs[np.array([0, 1])]) == 2
 
     def test_embeddings_getitem_types_raises(self):
-        encoder = TorchEmbeddingEncoder(torch.nn.Identity(), batch_size=10, transforms=lambda x: x + 1, device="cpu")
-        embs = Embeddings(get_dataset(), encoder=encoder)
+        extractor = TorchExtractor(torch.nn.Identity(), transforms=lambda x: x + 1, device="cpu")
+        embs = Embeddings(get_dataset(), extractor=extractor)
         with pytest.raises(TypeError):
             embs["1"]  # type: ignore
         with pytest.raises(TypeError):
@@ -203,20 +203,20 @@ class TestEmbeddings:
         with pytest.raises(TypeError):
             embs[np.array([[0, 1]])]
 
-    def test_embeddings_new(self, torch_ic_ds, identity_encoder):
-        encoder = TorchEmbeddingEncoder(IdentityModel(), batch_size=64, device="cpu", transforms=lambda x: x + 1)
-        embs = Embeddings(torch_ic_ds, encoder=encoder)
+    def test_embeddings_new(self, torch_ic_ds, identity_extractor):
+        extractor = TorchExtractor(IdentityModel(), device="cpu", transforms=lambda x: x + 1)
+        embs = Embeddings(torch_ic_ds, extractor=extractor)
         mini_ds = TorchDataset(torch.ones((5, 1, 3, 3)), torch.nn.functional.one_hot(torch.arange(5)))
         mini_embs = embs.new(mini_ds)
         assert len(mini_embs) == 5
         assert mini_embs._dataset != embs._dataset
-        assert mini_embs._encoder == embs._encoder
+        assert mini_embs._extractor == embs._extractor
 
     def test_embeddings_layer_name_extraction(self, torch_ic_ds, sequential_model):
         """Test that layer_name correctly extracts embeddings from specified layer"""
         # Test extracting from the flatten layer (layer "2")
-        encoder = TorchEmbeddingEncoder(sequential_model, batch_size=64, layer_name="2", device="cpu")
-        embs = Embeddings(torch_ic_ds, encoder=encoder)
+        extractor = TorchExtractor(sequential_model, layer_name="2", device="cpu")
+        embs = Embeddings(torch_ic_ds, extractor=extractor)
 
         # Get embeddings
         result = embs[0]
@@ -229,18 +229,18 @@ class TestEmbeddings:
         """Test that layer_name raises ValueError when layer doesn't exist"""
         # Try to use a non-existent layer name
         with pytest.raises(ValueError, match="Invalid layer.*nonexistent"):
-            TorchEmbeddingEncoder(sequential_model, batch_size=64, layer_name="nonexistent", device="cpu")
+            TorchExtractor(sequential_model, layer_name="nonexistent", device="cpu")
 
     def test_embeddings_layer_name_vs_normal_output(self, torch_ic_ds, sequential_model):
         """Test that layer_name extraction gives different results than normal model output"""
         # Normal embeddings (final output)
-        normal_encoder = TorchEmbeddingEncoder(sequential_model, batch_size=64, device="cpu")
-        normal_embs = Embeddings(torch_ic_ds, encoder=normal_encoder)
+        normal_extractor = TorchExtractor(sequential_model, device="cpu")
+        normal_embs = Embeddings(torch_ic_ds, extractor=normal_extractor)
         normal_result = normal_embs[0]
 
         # Layer embeddings (from flatten layer)
-        layer_encoder = TorchEmbeddingEncoder(sequential_model, batch_size=64, layer_name="2", device="cpu")
-        layer_embs = Embeddings(torch_ic_ds, encoder=layer_encoder)
+        layer_extractor = TorchExtractor(sequential_model, layer_name="2", device="cpu")
+        layer_embs = Embeddings(torch_ic_ds, extractor=layer_extractor)
         layer_result = layer_embs[0]
 
         # Results should have different shapes and values
@@ -252,16 +252,12 @@ class TestEmbeddings:
     def test_embeddings_use_output_parameter(self, torch_ic_ds, sequential_model):
         """Test that use_output parameter correctly captures input vs output of layer"""
         # Capture output from flatten layer (default behavior)
-        encoder_output = TorchEmbeddingEncoder(
-            sequential_model, batch_size=64, layer_name="2", use_output=True, device="cpu"
-        )
-        embs_output = Embeddings(torch_ic_ds, encoder=encoder_output)
+        extractor_output = TorchExtractor(sequential_model, layer_name="2", use_output=True, device="cpu")
+        embs_output = Embeddings(torch_ic_ds, extractor=extractor_output)
 
         # Capture input to flatten layer
-        encoder_input = TorchEmbeddingEncoder(
-            sequential_model, batch_size=64, layer_name="2", use_output=False, device="cpu"
-        )
-        embs_input = Embeddings(torch_ic_ds, encoder=encoder_input)
+        extractor_input = TorchExtractor(sequential_model, layer_name="2", use_output=False, device="cpu")
+        embs_input = Embeddings(torch_ic_ds, extractor=extractor_input)
 
         output_result = embs_output[0]
         input_result = embs_input[0]
@@ -276,90 +272,93 @@ class TestEmbeddings:
 
     def test_hook_fn_captures_output(self, sequential_model):
         """Test that _hook_fn correctly captures output when use_output=True"""
-        encoder = TorchEmbeddingEncoder(sequential_model, batch_size=1, layer_name="2", use_output=True, device="cpu")
+        extractor = TorchExtractor(sequential_model, layer_name="2", use_output=True, device="cpu")
 
         # Simulate what happens during forward pass
         sample_input = torch.ones(1, 4, 3, 3)
         sample_output = torch.ones(1, 36)  # Flattened output
 
         # Call hook function directly
-        encoder._hook_fn(torch.nn.Identity(), (sample_input,), sample_output)
+        extractor._hook_fn(torch.nn.Identity(), (sample_input,), sample_output)
 
         # Verify output was captured
-        assert encoder._captured_output is not None
-        assert encoder._captured_output.shape == sample_output.shape
-        assert torch.allclose(encoder._captured_output, sample_output)
+        assert extractor._captured_output is not None
+        assert extractor._captured_output.shape == sample_output.shape
+        assert torch.allclose(extractor._captured_output, sample_output)
 
         # Verify it's detached (no gradient tracking)
-        assert not encoder._captured_output.requires_grad
+        assert not extractor._captured_output.requires_grad
 
     def test_hook_fn_captures_input(self, sequential_model):
         """Test that _hook_fn correctly captures input when use_output=False"""
-        encoder = TorchEmbeddingEncoder(sequential_model, batch_size=1, layer_name="2", use_output=False, device="cpu")
+        extractor = TorchExtractor(sequential_model, layer_name="2", use_output=False, device="cpu")
 
         # Simulate what happens during forward pass
         sample_input = torch.ones(1, 4, 3, 3)
         sample_output = torch.ones(1, 36)
 
         # Call hook function directly
-        encoder._hook_fn(torch.nn.Identity(), (sample_input,), sample_output)
+        extractor._hook_fn(torch.nn.Identity(), (sample_input,), sample_output)
 
         # Verify input was captured, not output
-        assert encoder._captured_output is not None
-        assert encoder._captured_output.shape == sample_input.shape
-        assert torch.allclose(encoder._captured_output, sample_input)
-        assert not encoder._captured_output.requires_grad
+        assert extractor._captured_output is not None
+        assert extractor._captured_output.shape == sample_input.shape
+        assert torch.allclose(extractor._captured_output, sample_input)
+        assert not extractor._captured_output.requires_grad
 
     def test_get_valid_layer_returns_module(self, sequential_model):
         """Test that _get_valid_layer returns correct module"""
-        encoder = TorchEmbeddingEncoder(sequential_model, batch_size=1, device="cpu")
+        extractor = TorchExtractor(sequential_model, device="cpu")
 
         # Get the flatten layer
-        layer = encoder._get_valid_layer("2", sequential_model)
+        layer = extractor._get_valid_layer("2", sequential_model)
         assert isinstance(layer, torch.nn.Flatten)
 
         # Get the conv layer
-        layer = encoder._get_valid_layer("0", sequential_model)
+        layer = extractor._get_valid_layer("0", sequential_model)
         assert isinstance(layer, torch.nn.Conv2d)
 
     def test_get_valid_layer_invalid_layer(self, sequential_model):
         """Test that _get_valid_layer raises ValueError for invalid layer"""
         with pytest.raises(ValueError, match="Invalid layer 'invalid_layer'.*Available layers"):
-            TorchEmbeddingEncoder(sequential_model, batch_size=1, layer_name="invalid_layer", device="cpu")
+            TorchExtractor(sequential_model, layer_name="invalid_layer", device="cpu")
 
-    def test_encode_without_layer_name(self, torch_ic_ds):
-        """Test that encode returns normal model output when layer_name is None"""
+    def test_call_without_layer_name(self, torch_ic_ds):
+        """Test that __call__ returns normal model output when layer_name is None"""
         model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(9, 5))
-        encoder = TorchEmbeddingEncoder(model, batch_size=1, layer_name=None, device="cpu")
+        extractor = TorchExtractor(model, layer_name=None, device="cpu")
 
-        # Encode without layer extraction
-        result = encoder.encode(torch_ic_ds, list(range(2)))
+        # Extract features from images
+        images = [torch_ic_ds[i][0] for i in range(2)]
+        result = extractor(images)
 
         # Should be output of final linear layer
         assert result.shape == (2, 5)
         assert isinstance(result, np.ndarray)
 
-    def test_encode_with_layer_name(self, torch_ic_ds, sequential_model):
-        """Test that encode returns hooked output when layer_name is set"""
-        encoder = TorchEmbeddingEncoder(sequential_model, batch_size=1, layer_name="2", use_output=True, device="cpu")
+    def test_call_with_layer_name(self, torch_ic_ds, sequential_model):
+        """Test that __call__ returns hooked output when layer_name is set"""
+        extractor = TorchExtractor(sequential_model, layer_name="2", use_output=True, device="cpu")
 
-        # Encode with layer extraction
-        result = encoder.encode(torch_ic_ds, list(range(2)))
+        # Extract features from images
+        images = [torch_ic_ds[i][0] for i in range(2)]
+        result = extractor(images)
 
         # Should be output of flatten layer (layer "2"), not final linear layer
         assert result.shape == (2, 36)  # Flattened: 4 channels * 3 * 3
         assert isinstance(result, np.ndarray)
 
         # Verify captured_output was populated
-        assert encoder._captured_output is not None
+        assert extractor._captured_output is not None
 
-    def test_encode_preserves_batch_dimension(self, torch_ic_ds, sequential_model):
-        """Test that encode correctly handles different batch sizes"""
-        encoder = TorchEmbeddingEncoder(sequential_model, batch_size=1, layer_name="2", device="cpu")
+    def test_call_preserves_batch_dimension(self, torch_ic_ds, sequential_model):
+        """Test that __call__ correctly handles different batch sizes"""
+        extractor = TorchExtractor(sequential_model, layer_name="2", device="cpu")
 
         # Test with different batch sizes
         for batch_size in [1, 3, 5]:
-            result = encoder.encode(torch_ic_ds, list(range(batch_size)))
+            images = [torch_ic_ds[i][0] for i in range(batch_size)]
+            result = extractor(images)
 
             assert result.shape[0] == batch_size
             assert result.shape[1:] == (36,)
@@ -400,16 +399,12 @@ class TestEmbeddings:
         model = request.getfixturevalue(model_fixture)
 
         # Capture output of layer N
-        encoder_output = TorchEmbeddingEncoder(
-            model, batch_size=1, layer_name=output_layer, use_output=True, device="cpu"
-        )
-        embs_output = Embeddings(torch_ic_ds, encoder=encoder_output)
+        extractor_output = TorchExtractor(model, layer_name=output_layer, use_output=True, device="cpu")
+        embs_output = Embeddings(torch_ic_ds, extractor=extractor_output)
 
         # Capture input of layer N+1
-        encoder_input = TorchEmbeddingEncoder(
-            model, batch_size=1, layer_name=input_layer, use_output=False, device="cpu"
-        )
-        embs_input = Embeddings(torch_ic_ds, encoder=encoder_input)
+        extractor_input = TorchExtractor(model, layer_name=input_layer, use_output=False, device="cpu")
+        embs_input = Embeddings(torch_ic_ds, extractor=extractor_input)
 
         output_result = embs_output[0]
         input_result = embs_input[0]
@@ -419,11 +414,10 @@ class TestEmbeddings:
         assert (output_result.shape == input_result.shape) == shapes_match
 
     def test_embeddings_layer_logging(self, sequential_model, caplog):
-        """Test that TorchEmbeddingEncoder logs layer extraction info"""
+        """Test that TorchExtractor logs layer extraction info"""
         with caplog.at_level(logging.DEBUG):
-            _ = TorchEmbeddingEncoder(
+            _ = TorchExtractor(
                 sequential_model,
-                batch_size=64,
                 layer_name="2",
                 use_output=True,
                 device="cpu",
@@ -431,39 +425,41 @@ class TestEmbeddings:
 
             assert "Capturing output data from layer 2" in caplog.text
 
-    def test_empty_dataset_shape(self, identity_encoder):
+    def test_empty_dataset_shape(self, identity_extractor):
         """Test that shape property handles empty dataset (line 149)"""
         empty_ds = MockDataset([], [], [])
-        embs = Embeddings(empty_ds, encoder=identity_encoder)
+        embs = Embeddings(empty_ds, extractor=identity_extractor)
 
         # Shape should be (0,) for empty dataset
         assert embs.shape == (0,)
 
-    def test_hash_with_dataset_model_transforms(self, torch_ic_ds, identity_encoder):
+    def test_hash_with_dataset_model_transforms(self, torch_ic_ds, identity_extractor):
         """Test __hash__ for regular embeddings with dataset, model, and transforms (lines 228-231)"""
-        embs = Embeddings(torch_ic_ds, encoder=identity_encoder)
+        embs = Embeddings(torch_ic_ds, extractor=identity_extractor)
 
-        # Should hash based on dataset and encoder
+        # Should hash based on dataset and extractor
         hash1 = hash(embs)
         assert isinstance(hash1, int)
 
         # Same configuration should give same hash
-        embs2 = Embeddings(torch_ic_ds, encoder=identity_encoder)
+        embs2 = Embeddings(torch_ic_ds, extractor=identity_extractor)
         hash2 = hash(embs2)
         assert hash1 == hash2
 
-    def test_hash_different_encoders(self, torch_ic_ds):
-        """Test __hash__ with different encoders produces different hash"""
-        encoder1 = TorchEmbeddingEncoder(IdentityModel(), batch_size=32, device="cpu")
-        encoder2 = TorchEmbeddingEncoder(IdentityModel(), batch_size=64, device="cpu")
+    def test_hash_different_extractors(self, torch_ic_ds):
+        """Test __hash__ with different extractors produces different hash"""
+        from dataeval.extractors import FlattenExtractor
 
-        embs1 = Embeddings(torch_ic_ds, encoder=encoder1)
-        embs2 = Embeddings(torch_ic_ds, encoder=encoder2)
+        extractor1 = TorchExtractor(IdentityModel(), device="cpu")
+        extractor2 = FlattenExtractor()
+
+        embs1 = Embeddings(torch_ic_ds, extractor=extractor1)
+        embs2 = Embeddings(torch_ic_ds, extractor=extractor2)
 
         hash1 = hash(embs1)
         hash2 = hash(embs2)
 
-        # Different encoders should produce different hashes
+        # Different extractors should produce different hashes
         assert hash1 != hash2
 
 
@@ -572,8 +568,8 @@ class TestProgressCallback:
         def callback(step: int, *, total: int | None = None, desc: str | None = None, extra_info: dict | None = None):
             callback_calls.append({"step": step, "total": total, "desc": desc, "extra_info": extra_info})
 
-        encoder = TorchEmbeddingEncoder(torch.nn.Identity(), batch_size=2, device="cpu")
-        embs = Embeddings(ds, encoder=encoder, progress_callback=callback)
+        extractor = TorchExtractor(torch.nn.Identity(), device="cpu")
+        embs = Embeddings(ds, extractor=extractor, batch_size=2, progress_callback=callback)
         _ = embs[:]  # Trigger computation
 
         # Callback should have been called
@@ -587,8 +583,8 @@ class TestProgressCallback:
     def test_progress_callback_not_called_when_none(self):
         """Test that no error occurs when progress_callback is None"""
         ds = get_dataset(10)
-        encoder = TorchEmbeddingEncoder(torch.nn.Identity(), batch_size=2, device="cpu")
-        embs = Embeddings(ds, encoder=encoder, progress_callback=None)
+        extractor = TorchExtractor(torch.nn.Identity(), device="cpu")
+        embs = Embeddings(ds, extractor=extractor, batch_size=2, progress_callback=None)
         _ = embs[:]  # Should work without error
 
     def test_progress_callback_with_getitem(self):
@@ -599,8 +595,8 @@ class TestProgressCallback:
         def callback(step: int, *, total: int | None = None, desc: str | None = None, extra_info: dict | None = None):
             callback_calls.append({"step": step, "total": total})
 
-        encoder = TorchEmbeddingEncoder(torch.nn.Identity(), batch_size=3, device="cpu")
-        embs = Embeddings(ds, encoder=encoder, progress_callback=callback)
+        extractor = TorchExtractor(torch.nn.Identity(), device="cpu")
+        embs = Embeddings(ds, extractor=extractor, batch_size=3, progress_callback=callback)
         _ = embs[0:5]  # Get first 5 items
 
         # Callback should have been called
@@ -614,8 +610,8 @@ class TestProgressCallback:
         def callback(step: int, *, total: int | None = None, desc: str | None = None, extra_info: dict | None = None):
             callback_calls.append({"step": step, "total": total})
 
-        encoder = TorchEmbeddingEncoder(torch.nn.Identity(), batch_size=2, device="cpu")
-        embs = Embeddings(ds, encoder=encoder, progress_callback=callback)
+        extractor = TorchExtractor(torch.nn.Identity(), device="cpu")
+        embs = Embeddings(ds, extractor=extractor, batch_size=2, progress_callback=callback)
         embs.compute()
 
         # Callback should have been called
@@ -631,8 +627,8 @@ class TestProgressCallback:
         def callback(step: int, *, total: int | None = None, desc: str | None = None, extra_info: dict | None = None):
             callback_calls.append({"step": step, "total": total})
 
-        encoder = TorchEmbeddingEncoder(IdentityModel(), batch_size=2, device="cpu")
-        embs = Embeddings(torch_ic_ds, encoder=encoder, progress_callback=callback)
+        extractor = TorchExtractor(IdentityModel(), device="cpu")
+        embs = Embeddings(torch_ic_ds, extractor=extractor, batch_size=2, progress_callback=callback)
         mini_ds = TorchDataset(torch.ones((5, 1, 3, 3)), torch.nn.functional.one_hot(torch.arange(5)))
         mini_embs = embs.new(mini_ds)
 

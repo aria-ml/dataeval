@@ -20,7 +20,7 @@ from dataeval._embeddings import Embeddings
 
 # from maite_datasets import to_image_classification_dataset
 from dataeval.config import get_device
-from dataeval.encoders import TorchEmbeddingEncoder
+from dataeval.extractors import TorchExtractor
 from dataeval.shift._drift._mmd import (
     DriftMMD,
     GaussianRBF,
@@ -70,8 +70,8 @@ def get_embeddings(
 ) -> Embeddings:
     images = RNG.standard_normal(n * math.prod(n_shape)).reshape(n, *n_shape).astype(np.float32)
     dataset = get_mock_ic_dataset(images, RNG.integers(n_classes, size=n).tolist())
-    encoder = TorchEmbeddingEncoder(model, batch_size=n, device="cpu")
-    return Embeddings(dataset=dataset, encoder=encoder)
+    extractor = TorchExtractor(model, device="cpu")
+    return Embeddings(dataset=dataset, extractor=extractor)
 
 
 @pytest.mark.required

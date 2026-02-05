@@ -6,16 +6,16 @@ import torch
 
 from dataeval._embeddings import Embeddings
 from dataeval.core._rank import RankResult
-from dataeval.encoders import TorchEmbeddingEncoder
+from dataeval.extractors import TorchExtractor
 from dataeval.protocols import AnnotatedDataset
 from dataeval.quality._prioritize import Prioritize, PrioritizeOutput
 
 
 class TestPrioritize:
     @pytest.fixture
-    def encoder(self):
-        """Create a TorchEmbeddingEncoder for testing."""
-        return TorchEmbeddingEncoder(torch.nn.Flatten(), batch_size=10, device="cpu")
+    def extractor(self):
+        """Create a TorchExtractor for testing."""
+        return TorchExtractor(torch.nn.Flatten(), device="cpu")
 
     def get_dataset(self, n: int = 1000):
         mock = MagicMock(spec=AnnotatedDataset)
@@ -25,8 +25,8 @@ class TestPrioritize:
         mock.metadata = {"id": "mock_dataset", "index2label": {i: str(i) for i in range(10)}}
         return mock
 
-    def get_embeddings(self, encoder, n: int = 1000) -> Embeddings:
-        return Embeddings(self.get_dataset(n), encoder=encoder)
+    def get_embeddings(self, extractor, n: int = 1000) -> Embeddings:
+        return Embeddings(self.get_dataset(n), extractor=extractor)
 
     @pytest.mark.parametrize(
         "method, method_kwargs",
@@ -38,20 +38,20 @@ class TestPrioritize:
             ("hdbscan_complexity", {"c": 10}),
         ),
     )
-    def test_prioritize_evaluate(self, encoder, method, method_kwargs):
+    def test_prioritize_evaluate(self, extractor, method, method_kwargs):
         dataset = self.get_dataset()
 
         # Use factory class methods (Configures the "Measure" phase)
         if method == "knn":
-            p = Prioritize.knn(encoder, **method_kwargs)
+            p = Prioritize.knn(extractor, **method_kwargs)
         elif method == "kmeans_distance":
-            p = Prioritize.kmeans_distance(encoder, **method_kwargs)
+            p = Prioritize.kmeans_distance(extractor, **method_kwargs)
         elif method == "kmeans_complexity":
-            p = Prioritize.kmeans_complexity(encoder, **method_kwargs)
+            p = Prioritize.kmeans_complexity(extractor, **method_kwargs)
         elif method == "hdbscan_distance":
-            p = Prioritize.hdbscan_distance(encoder, **method_kwargs)
+            p = Prioritize.hdbscan_distance(extractor, **method_kwargs)
         elif method == "hdbscan_complexity":
-            p = Prioritize.hdbscan_complexity(encoder, **method_kwargs)
+            p = Prioritize.hdbscan_complexity(extractor, **method_kwargs)
         else:
             assert False, f"Unknown method: {method}"
 
@@ -75,12 +75,12 @@ class TestPrioritize:
             ("easy_first", "class_balanced"),
         ],
     )
-    def test_prioritize_policies(self, encoder, order, policy):
+    def test_prioritize_policies(self, extractor, order, policy):
         dataset = self.get_dataset()
         labels = np.random.randint(low=0, high=10, size=1000)
 
         # Use factory method to create base instance
-        p = Prioritize.knn(encoder, k=10)
+        p = Prioritize.knn(extractor, k=10)
         base_result = p.evaluate(dataset)
 
         # Configure policy using fluent methods on PrioritizeOutput
@@ -101,13 +101,13 @@ class TestPrioritize:
         assert any(i != j for i, j in zip(result.indices, range(1000)))
 
     def test_prioritize_encoder_required(self):
-        """Test that encoder must be provided."""
-        with pytest.raises(ValueError, match="encoder must be provided"):
+        """Test that extractor must be provided."""
+        with pytest.raises(ValueError, match="extractor must be provided"):
             Prioritize()
 
-    def test_prioritize_default_method_and_policy(self, encoder):
+    def test_prioritize_default_method_and_policy(self, extractor):
         """Test that default method (knn) and order (easy_first) are used."""
-        p = Prioritize(encoder=encoder)
+        p = Prioritize(extractor=extractor)
         dataset = self.get_dataset(n=100)
         result = p.evaluate(dataset)
 
@@ -116,27 +116,27 @@ class TestPrioritize:
         assert result.policy == "difficulty"
         assert len(result.indices) == 100
 
-    def test_prioritize_dataset_class_balance_without_labels_does_not_raise_valueerror(self, encoder):
+    def test_prioritize_dataset_class_balance_without_labels_does_not_raise_valueerror(self, extractor):
         dataset = self.get_dataset(n=100)
         # class_balanced() with no labels will extract metadata from AnnotatedDataset automatically
         # Note: evaluate() extracts the labels, then class_balanced() uses them.
-        Prioritize.knn(encoder, k=5).evaluate(dataset).class_balanced()
+        Prioritize.knn(extractor, k=5).evaluate(dataset).class_balanced()
 
-    def test_prioritize_embeddings_class_balance_without_labels_raises_valueerror(self, encoder):
-        embeddings = self.get_embeddings(encoder, n=100)
+    def test_prioritize_embeddings_class_balance_without_labels_raises_valueerror(self, extractor):
+        embeddings = self.get_embeddings(extractor, n=100)
 
         # Evaluate works fine (just calculating scores)
-        result = Prioritize.knn(encoder, k=5).evaluate(embeddings)
+        result = Prioritize.knn(extractor, k=5).evaluate(embeddings)
 
         # Apply policy fails because embeddings have no metadata
         with pytest.raises(ValueError, match="class_labels must be provided"):
             result.class_balanced()
 
-    def test_prioritize_stratified_no_scores_raises_valueerror(self, encoder):
+    def test_prioritize_stratified_no_scores_raises_valueerror(self, extractor):
         dataset = self.get_dataset(n=100)
 
         # Evaluate works fine
-        result = Prioritize.kmeans_complexity(encoder, c=5).evaluate(dataset)
+        result = Prioritize.kmeans_complexity(extractor, c=5).evaluate(dataset)
 
         # Apply policy fails because complexity methods don't have scores
         with pytest.raises(ValueError, match="Cannot apply stratified policy"):
@@ -154,24 +154,24 @@ class TestPrioritize:
             ("hdbscan_complexity", {"c": 10}),
         ),
     )
-    def test_prioritize_with_embeddings(self, encoder, method, method_kwargs, use_embeddings, use_reference):
+    def test_prioritize_with_embeddings(self, extractor, method, method_kwargs, use_embeddings, use_reference):
         # Setup reference if needed
-        reference = self.get_embeddings(encoder) if use_reference else None
+        reference = self.get_embeddings(extractor) if use_reference else None
 
         # Pass either Embeddings or AnnotatedDataset as dataset parameter
-        dataset = self.get_embeddings(encoder) if use_embeddings else self.get_dataset()
+        dataset = self.get_embeddings(extractor) if use_embeddings else self.get_dataset()
 
         # Use factory class methods with reference
         if method == "knn":
-            p = Prioritize.knn(encoder, reference=reference, **method_kwargs)
+            p = Prioritize.knn(extractor, reference=reference, **method_kwargs)
         elif method == "kmeans_distance":
-            p = Prioritize.kmeans_distance(encoder, reference=reference, **method_kwargs)
+            p = Prioritize.kmeans_distance(extractor, reference=reference, **method_kwargs)
         elif method == "kmeans_complexity":
-            p = Prioritize.kmeans_complexity(encoder, reference=reference, **method_kwargs)
+            p = Prioritize.kmeans_complexity(extractor, reference=reference, **method_kwargs)
         elif method == "hdbscan_distance":
-            p = Prioritize.hdbscan_distance(encoder, reference=reference, **method_kwargs)
+            p = Prioritize.hdbscan_distance(extractor, reference=reference, **method_kwargs)
         elif method == "hdbscan_complexity":
-            p = Prioritize.hdbscan_complexity(encoder, reference=reference, **method_kwargs)
+            p = Prioritize.hdbscan_complexity(extractor, reference=reference, **method_kwargs)
         else:
             assert False, f"Unknown method: {method}"
 
@@ -184,11 +184,11 @@ class TestPrioritize:
         assert result.order == "hard_first"
         assert any(i != j for i, j in zip(result.indices, range(1000)))
 
-    def test_prioritize_with_precomputed_embeddings(self, encoder):
+    def test_prioritize_with_precomputed_embeddings(self, extractor):
         """Test that we can pass Embeddings directly as the dataset."""
-        embeddings = self.get_embeddings(encoder, 100)
+        embeddings = self.get_embeddings(extractor, 100)
         # Evaluate -> Easy First
-        result = Prioritize.knn(encoder, k=5).evaluate(embeddings).easy_first()
+        result = Prioritize.knn(extractor, k=5).evaluate(embeddings).easy_first()
 
         assert isinstance(result, PrioritizeOutput)
         assert len(result.indices) == 100
@@ -216,25 +216,25 @@ class TestPrioritize:
         assert output.method == "kmeans_complexity"
         assert output.order == "easy_first"
 
-    def test_prioritize_with_reference_dataset(self, encoder):
+    def test_prioritize_with_reference_dataset(self, extractor):
         """Test Prioritize with reference dataset provided at init."""
         reference_dataset = self.get_dataset(500)
         dataset = self.get_dataset(100)
 
         # Config(reference) -> evaluate(data) -> hard_first()
-        result = Prioritize.knn(encoder, k=10, reference=reference_dataset).evaluate(dataset).hard_first()
+        result = Prioritize.knn(extractor, k=10, reference=reference_dataset).evaluate(dataset).hard_first()
 
         assert isinstance(result, PrioritizeOutput)
         assert len(result.indices) == 100
         assert result.method == "knn"
         assert result.order == "hard_first"
 
-    def test_prioritize_output_immutable_methods(self, encoder):
+    def test_prioritize_output_immutable_methods(self, extractor):
         """Test that Output transformation methods return new instances (immutable pattern)."""
         dataset = self.get_dataset(100)
 
         # Get initial result
-        r1 = Prioritize.knn(encoder, k=5).evaluate(dataset)
+        r1 = Prioritize.knn(extractor, k=5).evaluate(dataset)
 
         # Create derived results
         r2 = r1.hard_first()
@@ -253,12 +253,12 @@ class TestPrioritize:
         assert r1 is not r3
         assert r2 is not r3
 
-    def test_prioritize_direct_instantiation(self, encoder):
+    def test_prioritize_direct_instantiation(self, extractor):
         """Test direct instantiation with all parameters."""
         dataset = self.get_dataset(100)
 
         p = Prioritize(
-            encoder=encoder,
+            extractor=extractor,
             method="kmeans_distance",
             c=10,
             policy="stratified",
@@ -270,10 +270,10 @@ class TestPrioritize:
         assert result.policy == "stratified"
         assert len(result.indices) == 100
 
-    def test_prioritize_config_usage(self, encoder):
+    def test_prioritize_config_usage(self, extractor):
         """Test using Config object for configuration."""
         config = Prioritize.Config(
-            encoder=encoder,
+            extractor=extractor,
             method="knn",
             k=10,
             order="hard_first",
@@ -322,16 +322,16 @@ class TestPrioritizeEdgeCases:
         embeddings = MagicMock()
         embeddings.__class__.__name__ = "Embeddings"
 
-        # Use dummy encoder for instantiation
-        p = Prioritize(encoder=MagicMock(), method="knn", policy="class_balanced")
+        # Use dummy extractor for instantiation
+        p = Prioritize(extractor=MagicMock(), method="knn", policy="class_balanced")
 
         # If we pass a dataset that isn't annotated/embeddings (Line 759)
-        with pytest.raises(TypeError, match="must be either an AnnotatedDataset or Embeddings"):
+        with pytest.raises(TypeError, match="must be either an AnnotatedDataset or Array"):
             p.evaluate("invalid_string_dataset")  # type: ignore
 
     def test_evaluate_error_invalid_method(self):
         # We bypass __init__ validation by modifying attribute directly or sub-classing
-        p = Prioritize(encoder=MagicMock())
+        p = Prioritize(extractor=MagicMock())
         p.method = "invalid_method"  # type: ignore
 
         # Mock embeddings to pass first check
@@ -341,8 +341,6 @@ class TestPrioritizeEdgeCases:
 
         # Set reference to None to hit simple path
         p._reference = None
-        p._embeddings = mock_emb
-        p._ref_embeddings = None
 
         # Calling _perform_ranking directly or via evaluate catch
         with pytest.raises(ValueError, match="Invalid method"):

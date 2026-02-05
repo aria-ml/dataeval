@@ -93,7 +93,7 @@ class Metadata(Array, FeatureExtractor):
     >>> extractor = Metadata(continuous_factor_bins={"brightness": 10})
     >>>
     >>> # Use with drift detector
-    >>> drift = DriftUnivariate(data=train_dataset, feature_extractor=extractor)
+    >>> drift = DriftUnivariate(data=train_dataset, extractor=extractor)
     >>> result = drift.predict(test_dataset)
 
     Using with a bound dataset:
