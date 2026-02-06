@@ -54,18 +54,21 @@ def _default_ratio_map() -> OverrideFunctionMap:
         "phash": lambda box, img: box["phash"],
         "dhash": lambda box, img: box["dhash"],
         # Normalize distance to center by half-diagonal of image
-        "distance_center": lambda box, img: box["distance_center"]
-        / (np.sqrt(np.square(img["width"]) + np.square(img["height"])) / 2 + EPSILON),
+        "distance_center": lambda box, img: (
+            box["distance_center"] / (np.sqrt(np.square(img["width"]) + np.square(img["height"])) / 2 + EPSILON)
+        ),
         # Normalize distance to edge by the relevant dimension (width or height)
-        "distance_edge": lambda box, img: box["distance_edge"]
-        / (
-            (
-                img["width"]
-                if np.min([np.abs(box["offset_x"]), np.abs((box["width"] + box["offset_x"]) - img["width"])])
-                < np.min([np.abs(box["offset_y"]), np.abs((box["height"] + box["offset_y"]) - img["height"])])
-                else img["height"]
+        "distance_edge": lambda box, img: (
+            box["distance_edge"]
+            / (
+                (
+                    img["width"]
+                    if np.min([np.abs(box["offset_x"]), np.abs((box["width"] + box["offset_x"]) - img["width"])])
+                    < np.min([np.abs(box["offset_y"]), np.abs((box["height"] + box["offset_y"]) - img["height"])])
+                    else img["height"]
+                )
+                + EPSILON
             )
-            + EPSILON
         ),
     }
 

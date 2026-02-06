@@ -13,7 +13,8 @@ concurrency:
 env:
   UV_CACHE_DIR: /tmp/.uv-cache
   FORCE_COLOR: '1'
-  PYTHON_LATEST: '3.13'
+  PYTHON_VERSIONS: '["3.10", "3.11", "3.12", "3.13", "3.14"]'
+  PYTHON_DEFAULT: '3.13'
 
 jobs:
   verify-lock:
@@ -30,7 +31,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_LATEST }}
+          python-version: ${{ env.PYTHON_DEFAULT }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -53,7 +54,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_LATEST }}
+          python-version: ${{ env.PYTHON_DEFAULT }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -73,7 +74,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ${{ fromJSON(vars.PYTHON_VERSIONS || env.PYTHON_VERSIONS) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -108,7 +109,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ${{ fromJSON(vars.PYTHON_VERSIONS || env.PYTHON_VERSIONS) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -135,7 +136,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ${{ fromJSON(vars.PYTHON_VERSIONS || env.PYTHON_VERSIONS) }}
     steps:
       - uses: actions/checkout@v4
 
