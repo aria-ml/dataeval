@@ -1,6 +1,20 @@
-[//]: # (f8ec65b6e7de4ef1e9093d922ede6bf8e8c0de90)
+[//]: # (ed11b75a6071f526df95e973ede0829dc3a82f10)
 
 # DataEval Change Log
+
+## v1.0.0-rc0
+
+🚀 **Major Release**
+- `ed11b75a` - Add support for python 3.14
+
+🌟 **Feature Release**
+- `089072d6` - Add SIFT based BoVW extractor and implement with Duplicates
+
+🛠️ **Improvements and Enhancements**
+- `b518d633` - Refactor encoders as extractors
+- `a196e1fe` - Use dataframes for Sufficiency tabular outputs
+- `2ecfa179` - Add ResetModelStrategy protocol for Sufficiency
+- `4a2ef1dd` - Enhance prioritize to offer hdbscan clustering and fix for different length...
 
 ## v0.95.0
 
