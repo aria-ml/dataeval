@@ -86,6 +86,9 @@ UV_EXTRAS = [DATAEVAL_NOX_UV_EXTRAS_OVERRIDE]
 os.environ.setdefault("NUMBA_CACHE_DIR", os.path.expanduser("~/.cache/numba"))
 os.environ.setdefault("NUMBA_ENABLE_CACHING", "1")
 
+# Configure UV to always clear the venv
+os.environ.setdefault("UV_VENV_CLEAR", "1")
+
 # Standard nox options
 nox.options.default_venv_backend = "uv" if nox_uv is not None else "virtualenv"
 nox.options.sessions = ["test", "type", "deps", "lint", "doclint", "doctest", "check"]

@@ -213,7 +213,7 @@ def _determine_channel_indices(calculator_output: list[dict[str, list[Any]]], nu
             )
 
     # Return ordered list of channel indices (None first, then 0,1,2,...)
-    return sorted(channel_indices_needed, key=lambda x: (-1 if x is None else x))
+    return sorted(channel_indices_needed, key=lambda x: -1 if x is None else x)
 
 
 def _reconcile_stats(
