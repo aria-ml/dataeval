@@ -19,7 +19,7 @@ nature of this role, helping the data scientist to quickly understand, clean,
 and prepare data for modeling.
 
 ```{graphviz}
-   
+
    digraph flowchart {
       node [shape=box,width=1.7,height=0.6]
       edge [arrowsize=0.6]
@@ -31,7 +31,7 @@ and prepare data for modeling.
       4 [xref="{ref}`Deployment <deployment>`",style="rounded,filled",pos="1.7,0.2!",color="#97979730",fillcolor="#97979730",fontcolor="gray"]
       5 [xref="{ref}`Monitoring <monitoring>`",style="rounded,filled",pos="0.0,0.9!",fillcolor="#4151B0",fontcolor="white"]
       6 [xref="{ref}`Analysis <analysis>`",style="rounded,filled",pos="0.0,1.8!",fillcolor="#4151B0",fontcolor="white"]
-      
+
       1:e->2:n
       2:s->3:n
       3:s->4:e [color="#97979730",fillcolor="#97979730"]
@@ -117,11 +117,11 @@ to determine the best dataset for the problem.
 
 Analyze the dataset to create a training, validation and testing subset. Ensure that
 each split adequately represents the target operational environment and that there
-is no correlations between the splits.
+are no correlations between the splits.
 
 Datasets can be split using DataEval's {func}`.split_dataset`, which has options that
-enable to user to split the data based on metadata. DataEval's bias functions,
-{func}`.balance` and {func}`.diversity` can help identify when there my be spurious
+enable the user to split the data based on metadata. DataEval's bias functions,
+{func}`.balance` and {func}`.diversity` can help identify when there may be spurious
 correlations between the splits.
 
 ### Build and evaluate models
