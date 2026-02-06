@@ -44,10 +44,9 @@ $$
 \frac{|x_i - \mu|}{\sigma}
 $$
 
-The [modified z score](https://www.statology.org/modified-z-score/) method is
-based on determining if the distance between a data point and the dataset
-median is above a specified threshold. The default threshold value for
-`modzscore` is 3.5. The equation for `modzscore` is:
+The modified z score method is based on determining if the distance between a
+data point and the dataset median is above a specified threshold. The default
+threshold value for `modzscore` is 3.5. The equation for `modzscore` is:
 
 $$
 \frac{0.6745 * |x_i - x̃|}{MAD}

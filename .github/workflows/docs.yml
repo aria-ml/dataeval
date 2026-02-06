@@ -125,8 +125,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check links in README
-        uses: gaurav-nelson/github-action-markdown-link-check@v1
+      - name: Check markdown links
+        uses: tcort/github-action-markdown-link-check@v1
         with:
           config-file: 'docs/.markdown-link-check.json'
           use-quiet-mode: 'yes'
