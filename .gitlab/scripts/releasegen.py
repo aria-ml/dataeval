@@ -406,7 +406,7 @@ class ReleaseGen:
     def _generate_index_markdown_update_action(self, file_name: str, pending_version: str) -> dict[str, str]:
         howto_index_file = self._read_doc_file(file_name)
         if howto_index_file:
-            pattern = re.compile(r"aria-ml/dataeval/blob/v([0-9]+)\.([0-9]+)\.([0-9]+)/docs")
+            pattern = re.compile(r"aria-ml/dataeval/blob/v([0-9]+)\.([0-9]+)\.([0-9]+)(?:-rc[0-9]+)?/docs")
             new_path = f"aria-ml/dataeval/blob/{pending_version}/docs"
 
             verbose(f"Substituting markdown links for new version {pending_version}")
@@ -537,9 +537,9 @@ class ReleaseGen:
 
     def generate_prerelease(self, version: str) -> tuple[str, list[dict[str, str]]]:
         """
-        Generate changelog for a pre-release version.
+        Generate changelog and doc link updates for a pre-release version.
         Similar to generate() but uses provided version instead of calculating it.
-        Does not update jupyter cache or doc links for pre-releases.
+        Does not update jupyter cache for pre-releases.
         """
         current = self._read_changelog()
         last_hash = self._get_last_hash(current[0]) if current else ""
@@ -576,4 +576,10 @@ class ReleaseGen:
             "content": content,
         }
 
-        return version, [changelog_action]
+        # Update documentation links (colab links) to point to the pre-release version
+        actions = [
+            self._generate_index_markdown_update_action(f, version) for f in [HOWTO_INDEX_FILE, TUTORIAL_INDEX_FILE]
+        ]
+        actions.append(changelog_action)
+
+        return version, [action for action in actions if action]
