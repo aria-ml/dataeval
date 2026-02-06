@@ -33,7 +33,7 @@ instructions below for details.
 
 ## Installing DataEval
 
-Now that you have a chosen which DataEval to install, the following methods
+Now that you have chosen which DataEval to install, the following methods
 will show you how to install using your preferred method.
 
 :::::{tab-set}
