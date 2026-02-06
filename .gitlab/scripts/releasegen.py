@@ -19,7 +19,8 @@ NOTEBOOK_DIRECTORY = "docs/source/how_to"
 TUTORIAL_DIRECTORY = "docs/source/tutorials"
 TAB = "    "
 
-version_pattern = re.compile(r"v([0-9]+)\.([0-9]+)\.([0-9]+)")
+# Pattern to match versions with optional pre-release suffix (e.g., v1.0.0 or v1.0.0-rc0)
+version_pattern = re.compile(r"v([0-9]+)\.([0-9]+)\.([0-9]+)(?:-rc([0-9]+))?")
 
 """
 Multiline pattern that matches for the following content in MR description:
@@ -50,12 +51,16 @@ release_notes_pattern = re.compile(
 )
 
 
-def _get_version_tuple(version: str) -> tuple[int, int, int] | None:
+def _get_version_tuple(version: str) -> tuple[int, int, int, int | None] | None:
+    """
+    Parse version string into tuple. Returns (major, minor, patch, rc) where rc is None for non-prerelease.
+    """
     result = version_pattern.match(version)
     groups = None if result is None else result.groups()
-    if groups is None or len(groups) != 3:
+    if groups is None or len(groups) < 3:
         return None
-    return (int(groups[0]), int(groups[1]), int(groups[2]))
+    rc = int(groups[3]) if len(groups) > 3 and groups[3] is not None else None
+    return (int(groups[0]), int(groups[1]), int(groups[2]), rc)
 
 
 class _Category(IntEnum):
@@ -236,13 +241,60 @@ class ReleaseGen:
 
         return latest, categorized
 
+    def _consolidate_prerelease_sections(self, lines: list[str], base_version: str) -> list[str]:
+        """
+        Consolidate pre-release sections (e.g., v1.0.0-rc0, v1.0.0-rc1) into the final version section.
+
+        When finalizing a pre-release, this method finds all rc sections for the same base version
+        and merges their content into the final release section, removing the rc headers.
+        """
+        result: list[str] = []
+        prerelease_pattern = re.compile(rf"^## {re.escape(base_version)}-rc\d+$")
+        in_prerelease_section = False
+        skip_next_empty = False
+
+        for line in lines:
+            # Check if this is a pre-release header for our base version
+            if prerelease_pattern.match(line.strip()):
+                in_prerelease_section = True
+                skip_next_empty = True
+                verbose(f"Consolidating pre-release section: {line.strip()}")
+                continue
+
+            # Check if we've hit a new version section (not a pre-release of our version)
+            if line.strip().startswith("## v") and not prerelease_pattern.match(line.strip()):
+                in_prerelease_section = False
+                skip_next_empty = False
+
+            # Skip empty line immediately after pre-release header
+            if skip_next_empty and line.strip() == "":
+                skip_next_empty = False
+                continue
+
+            skip_next_empty = False
+
+            # If in pre-release section, include content (entries) but not the header
+            # If not in pre-release section, include everything
+            result.append(line)
+
+        return result
+
     def _generate_version_and_changelog_action(self) -> tuple[str, dict[str, str]]:
         current = self._read_changelog()
         last_hash = self._get_last_hash(current[0]) if current else ""
 
+        vt = VersionTag(self.gl)
+
+        # Check if we're finalizing a pre-release
+        is_finalizing_prerelease = vt.is_prerelease
+        base_version = vt.current_base if is_finalizing_prerelease else None
+
         # Return empty dict if nothing to update
         latest, entries = self._get_entries(last_hash)
-        if not entries:
+
+        # When finalizing a pre-release, we may not have new entries but still need to
+        # consolidate the changelog sections
+        if not entries and not is_finalizing_prerelease:
             return "", {}
 
         lines: list[str] = []
@@ -264,13 +316,23 @@ class ReleaseGen:
                 verbose(f"Adding - {merge.to_markdown()}")
                 next_category = min(next_category, category)
 
-        vt = VersionTag(self.gl)
         next_version = vt.next(_Category.version_type(next_category))
 
-        header = [f"[//]: # ({latest.hash})", "", "# DataEval Change Log", "", f"## {next_version}"]
+        # Get the latest hash - use current if no new entries (finalizing without new MRs)
+        latest_hash = latest.hash if entries else last_hash
+
+        header = [f"[//]: # ({latest_hash})", "", "# DataEval Change Log", "", f"## {next_version}"]
         content = "\n".join(header + lines) + "\n"
 
-        for oldline in current[3:]:
+        # Get remaining changelog content (after the header lines)
+        remaining_lines = current[3:]
+
+        # If finalizing a pre-release, consolidate all rc sections into this release
+        if is_finalizing_prerelease and base_version:
+            verbose(f"Finalizing pre-release: consolidating {base_version}-rcX sections into {next_version}")
+            remaining_lines = self._consolidate_prerelease_sections(remaining_lines, base_version)
+
+        for oldline in remaining_lines:
             content += oldline
 
         return next_version, {
@@ -455,3 +517,66 @@ class ReleaseGen:
         actions.append(changelog_action)
 
         return version, [action for action in actions if action]
+
+    def get_version_type(self) -> Literal["MAJOR", "MINOR", "PATCH"]:
+        """
+        Determine the version bump type based on merged MR labels.
+        Returns the highest priority version type found.
+        """
+        current = self._read_changelog()
+        last_hash = self._get_last_hash(current[0]) if current else ""
+        _, entries = self._get_entries(last_hash)
+
+        if not entries:
+            return "MINOR"  # Default to MINOR if no entries
+
+        # Find the highest priority (lowest enum value) category
+        next_category = _Category.UNKNOWN
+        for category in entries:
+            if category != _Category.UNKNOWN:
+                next_category = min(next_category, category)
+
+        return _Category.version_type(next_category)
+
+    def generate_prerelease(self, version: str) -> tuple[str, list[dict[str, str]]]:
+        """
+        Generate changelog for a pre-release version.
+        Similar to generate() but uses provided version instead of calculating it.
+        Does not update jupyter cache or doc links for pre-releases.
+        """
+        current = self._read_changelog()
+        last_hash = self._get_last_hash(current[0]) if current else ""
+
+        latest, entries = self._get_entries(last_hash)
+        if not entries:
+            return "", []
+
+        lines: list[str] = []
+
+        categories = sorted(entries)
+        for category in categories:
+            if category == _Category.UNKNOWN:
+                continue
+            merges = entries[category]
+            lines.append("")
+            lines.append(_Category.to_markdown(category))
+            for merge in merges:
+                if merge.hash == last_hash:
+                    break
+                lines.append(merge.to_markdown())
+                verbose(f"Adding - {merge.to_markdown()}")
+
+        header = [f"[//]: # ({latest.hash})", "", "# DataEval Change Log", "", f"## {version}"]
+        content = "\n".join(header + lines) + "\n"
+
+        for oldline in current[3:]:
+            content += oldline
+
+        changelog_action = {
+            "action": "update",
+            "file_path": CHANGELOG_FILE,
+            "encoding": "text",
+            "content": content,
+        }
+
+        return version, [changelog_action]

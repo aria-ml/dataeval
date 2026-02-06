@@ -22,6 +22,8 @@ workflow:
   rules:
     # Release Workflow
     - if: $CI_PIPELINE_SOURCE == 'schedule' && $CREATE_NEW_RELEASE
+    # Pre-release Workflow
+    - if: $CI_PIPELINE_SOURCE == 'schedule' && $CREATE_PRE_RELEASE
     # Nightly Docs Cache Update Workflow
     - if: $CI_PIPELINE_SOURCE == 'schedule' && $DOCS_NIGHTLY
     # Merge Request Workflow
@@ -132,7 +134,7 @@ stages:
 
 .rules_main_mr:
   rules:
-    - if: $CREATE_NEW_RELEASE
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
@@ -145,7 +147,7 @@ stages:
 .rules_main_mr_code:
   rules:
     - !reference [.rules_skip_on_cache_update, rules]
-    - if: $CREATE_NEW_RELEASE
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
@@ -158,7 +160,7 @@ stages:
 .rules_main_mr_deps:
   rules:
     - !reference [.rules_skip_on_cache_update, rules]
-    - if: $CREATE_NEW_RELEASE
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
@@ -169,7 +171,7 @@ stages:
 
 .rules_main_mr_docs:
   rules:
-    - if: $CREATE_NEW_RELEASE
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE
       when: never
     - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE != $UPDATE_CACHE_MESSAGE
       variables:
@@ -185,7 +187,7 @@ stages:
 
 .rules_mr_docs:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CI_COMMIT_BRANCH == 'main'
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CI_COMMIT_BRANCH == 'main'
       when: never
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
       changes:
@@ -198,7 +200,7 @@ stages:
 .rules_main_mr_docs_skip_cache_update:
   rules:
     - !reference [.rules_skip_on_cache_update, rules]
-    - if: $CREATE_NEW_RELEASE
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE
       when: never
     - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE != $UPDATE_CACHE_MESSAGE
       variables:
@@ -213,13 +215,13 @@ stages:
 
 .rules_mr_only:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CI_COMMIT_BRANCH == 'main'
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CI_COMMIT_BRANCH == 'main'
       when: never
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
 
 .rules_main_only:
   rules:
-    - if: $CREATE_NEW_RELEASE
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
 
@@ -227,13 +229,17 @@ stages:
   rules:
     - if: $CREATE_NEW_RELEASE
 
+.rules_prerelease_only:
+  rules:
+    - if: $CREATE_PRE_RELEASE
+
 .rules_release_branch_only:
   rules:
     - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
 
 .rules_docs_nightly_cache_update:
   rules:
-    - if: $CREATE_NEW_RELEASE
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE
       when: never
     - if: $CI_COMMIT_BRANCH == 'main' && $DOCS_NIGHTLY
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
