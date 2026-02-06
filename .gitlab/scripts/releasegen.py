@@ -250,20 +250,17 @@ class ReleaseGen:
         """
         result: list[str] = []
         prerelease_pattern = re.compile(rf"^## {re.escape(base_version)}-rc\d+$")
-        in_prerelease_section = False
         skip_next_empty = False
 
         for line in lines:
             # Check if this is a pre-release header for our base version
             if prerelease_pattern.match(line.strip()):
-                in_prerelease_section = True
                 skip_next_empty = True
                 verbose(f"Consolidating pre-release section: {line.strip()}")
                 continue
 
             # Check if we've hit a new version section (not a pre-release of our version)
             if line.strip().startswith("## v") and not prerelease_pattern.match(line.strip()):
-                in_prerelease_section = False
                 skip_next_empty = False
 
             # Skip empty line immediately after pre-release header
