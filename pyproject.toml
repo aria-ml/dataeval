@@ -11,7 +11,7 @@ authors = [
   { name = "Ryan Wood", email = "ryan.wood@ariacoustics.com" },
   { name = "Scott Swan", email = "scott.swan@ariacoustics.com" },
 ]
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.10"
 readme = "README.md"
 license = "MIT"
 maintainers = [
@@ -26,21 +26,26 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Scientific/Engineering",
 ]
 dependencies = [
+  "llvmlite>=0.44.0; python_version<'3.14'",
+  "llvmlite>=0.46.0; python_version>='3.14'",
   "numba>=0.61.0",
   "lightgbm>=4",
-  "numpy>=1.24.2,<2.3; python_version<'3.12'",
-  "numpy>=1.26.2,<2.3; python_version>='3.12,<3.13'",
-  "numpy>=2.1.0,<2.3; python_version>='3.13'",
+  "numpy>=1.24.2; python_version<'3.12'",
+  "numpy>=1.26.2; python_version>='3.12,<3.13'",
+  "numpy>=2.1.0; python_version>='3.13'",
   "polars>=1.0.0",
-  "pydantic>=2.8",
+  "pydantic>=2.8; python_version<'3.14'",
+  "pydantic>=2.12; python_version>='3.14'",
   "scikit-learn>=1.5.0; python_version<'3.13'",
   "scikit-learn>=1.5.2; python_version>='3.13'",
   "scipy>=1.10.0; python_version<'3.12'",
   "scipy>=1.11.2; python_version>='3.12,<3.13'",
-  "scipy>=1.14.1; python_version>='3.13'",
+  "scipy>=1.14.1; python_version>='3.13,<3.14'",
+  "scipy>=1.16.1; python_version>='3.14'",
   "torch>=2.2.0",
   "typing-extensions>=4.12",
   "xxhash>=3.4",
@@ -53,8 +58,18 @@ cu118 = ["torch>=2.2.0"]
 cu124 = ["torch>=2.2.0"]
 cu128 = ["torch>=2.2.0"]
 opencv = ["opencv-python-headless>=4.8.0"]
-onnx = ["onnx", "onnxruntime>=1.14.0"]
-onnx-gpu = ["onnx", "onnxruntime-gpu>=1.14.0"]
+onnx = [
+  "onnx",
+  "onnxruntime>=1.14.0,<1.24.1; python_version=='3.10'",
+  "onnxruntime>=1.14.0; python_version>='3.11'",
+  "onnxruntime>=1.24.1; python_version>='3.14'"
+]
+onnx-gpu = [
+  "onnx",
+  "onnxruntime-gpu>=1.14.0,<1.24.1; python_version=='3.10'",
+  "onnxruntime-gpu>=1.14.0; python_version>='3.11'",
+  "onnxruntime-gpu>=1.24.1; python_version>='3.14'"
+]
 
 [project.urls]
 Homepage = "https://dataeval.ai/"
@@ -68,7 +83,7 @@ base = [
 lock = [
   { include-group = "base" },
   "pyproject2conda>=0.22",
-  "poetry>=2",
+  "poetry>=2; python_version<'3.14'",
 ]
 lint = [
   "ruff>=0.11",
@@ -93,7 +108,7 @@ type = [
 docs = [
   "numpy>=2.0.2",
   "certifi>=2024.07.04",
-  "dataeval-plots[plotly]>=0.0.5a",
+  "dataeval-plots[plotly]>=0.0.6",
   "ipykernel>=6.26.0",
   "ipywidgets>=8.1.1",
   "jinja2>=3.1.6",
@@ -185,7 +200,7 @@ version-file = "src/dataeval/_version.py"
 version = "0.0.0"  # unused
 
 [tool.pyproject2conda.dependencies]
-numpy = { skip = true, packages = "numpy<2.3,>=1.24.2" }
+numpy = { skip = true, packages = "numpy>=1.24.2" }
 scikit-learn = { skip = true, packages = "scikit-learn>=1.5.0" }
 scipy = { skip = true, packages = "scipy>=1.10.0" }
 torch = { pip = true }  # PyTorch is no longer maintained on conda-forge
