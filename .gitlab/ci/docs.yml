@@ -5,11 +5,15 @@ docs:
   extends:
     - .nox
     - .rules_main_mr_docs
+  image: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
   needs: []
   tags:
     - $DOCS_RUNNER_TAG
+  before_script:
+    - apt update && apt install curl git graphviz -y
+    - curl -LsSf https://astral.sh/uv/install.sh | sh
+    - uv tool install nox --with nox-uv
   script:
-    - apt update && apt install graphviz -y
     - uvx nox -e docs $DOCS_CLEAN
   artifacts:
     paths:
@@ -17,6 +21,9 @@ docs:
       - output/docs/html/
     when: always
   variables:
+    UV_INSTALL_DIR: /usr/local/bin
+    UV_COMPILE_BYTECODE: 1
+    UV_NO_PROGRESS: true
     DATAEVAL_NOX_UV_EXTRAS_OVERRIDE: cu124
 
 doclint:
