@@ -14,7 +14,7 @@ docs:
     - curl -LsSf https://astral.sh/uv/install.sh | sh
     - uv tool install nox --with nox-uv
   script:
-    - uvx nox -e docs $DOCS_CLEAN
+    - uvx nox -P 3.13 -e docs $DOCS_CLEAN
   artifacts:
     paths:
       - output/docs/.jupyter_cache/

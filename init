@@ -6,7 +6,7 @@ echo
 # Check for uv
 if ! $(which uv 1> /dev/null); then echo "Install uv to continue: https://docs.astral.sh/uv/"; exit 1; fi
 
-allowed=(3.10 3.11 3.12 3.13)
+allowed=(3.10 3.11 3.12 3.13 3.14)
 default=3.11
 cuda_allowed=(cpu cu118 cu124 cu128)
 cuda_default=cu118
