@@ -111,6 +111,17 @@ create release:
   script:
     - .gitlab/scripts/create_release.py
 
+# This job creates a pre-release version tag (e.g., v1.0.0-rc0, v1.0.0-rc1)
+# Triggered by setting CREATE_PRE_RELEASE=true in scheduled pipeline
+create pre-release:
+  stage: release
+  extends: .rules_prerelease_only
+  needs: []
+  before_script:
+    - uv pip install requests --system
+  script:
+    - .gitlab/scripts/create_prerelease.py
+
 export-merged-sbom:
   stage: release
   extends: .rules_release_only

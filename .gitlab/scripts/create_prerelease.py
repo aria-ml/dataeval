@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+"""
+Creates a pre-release version tag (e.g., v1.0.0-rc0, v1.0.0-rc1).
+
+Trigger by setting CREATE_PRE_RELEASE=true in a scheduled pipeline.
+
+Behavior:
+- If current version is a pre-release (v1.0.0-rc0), increments to v1.0.0-rc1
+- If current version is a standard release (v0.99.0), creates v1.0.0-rc0
+  based on MR labels (MAJOR/MINOR/PATCH)
+- Does NOT create a release branch (that happens on final release)
+- Updates CHANGELOG.md with the pre-release version
+"""
+
+if __name__ == "__main__":
+    from gitlab import Gitlab
+    from releasegen import ReleaseGen
+    from versiontag import VersionTag
+
+    gl = Gitlab(verbose=True)
+    rg = ReleaseGen(gl)
+    vt = VersionTag(gl)
+
+    # Get the version type from MR labels
+    version_type = rg.get_version_type()
+
+    # Calculate next pre-release version
+    version_tag = vt.next_prerelease(version_type)
+
+    # Generate changelog with pre-release version
+    _, payload = rg.generate_prerelease(version_tag)
+
+    if version_tag and payload:
+        print(f"Creating pre-release {version_tag}:")
+        commit_id = gl.commit("main", f"Pre-release {version_tag}", payload)["id"]
+        # Don't create release branch for pre-releases
+        gl.add_tag(version_tag, commit_id, message=f"DataEval {version_tag} (pre-release)")
+        print(f"Successfully created pre-release tag: {version_tag}")
+    else:
+        print("No changes to commit and tag.")
