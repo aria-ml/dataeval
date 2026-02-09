@@ -15,9 +15,9 @@ docs:
     - uv tool install nox --with nox-uv
   script:
     - uvx nox -P 3.13 -e docs $DOCS_CLEAN
+    - bash docs/push-docs-cache.sh
   artifacts:
     paths:
-      - output/docs/.jupyter_cache/
       - output/docs/html/
     when: always
   variables:
@@ -25,6 +25,7 @@ docs:
     UV_COMPILE_BYTECODE: 1
     UV_NO_PROGRESS: true
     DATAEVAL_NOX_UV_EXTRAS_OVERRIDE: cu124
+    GIT_STRATEGY: clone  # Full clone needed for artifact branch operations
 
 doclint:
   stage: docs

@@ -1,6 +1,7 @@
 from os import remove
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import quote
 from uuid import uuid4
 from zipfile import ZipFile
 
@@ -146,6 +147,49 @@ class Gitlab(RestWrapper):
         https://docs.gitlab.com/ee/api/branches.html#create-repository-branch
         """
         return self._request(post, BRANCHES, {"branch": branch, "ref": ref})
+
+    def list_branches(self, search: str | None = None) -> list[dict[str, Any]]:
+        """
+        List project repository branches
+
+        Parameters
+        ----------
+        search : str | None, default None
+            Filter branches by search string
+
+        Returns
+        -------
+        List[Dict[str, Any]]
+            List of repository branches
+
+        Note
+        ----
+        https://docs.gitlab.com/ee/api/branches.html#list-repository-branches
+        """
+        params = {"per_page": "100"}
+        if search is not None:
+            params["search"] = search
+        return self._request(get, BRANCHES, params)
+
+    def delete_branch(self, branch: str) -> None:
+        """
+        Delete a repository branch
+
+        Parameters
+        ----------
+        branch : str
+            The name of the branch to delete (will be URL-encoded)
+
+        Note
+        ----
+        https://docs.gitlab.com/ee/api/branches.html#delete-repository-branch
+        """
+        try:
+            self._request(delete, f"{BRANCHES}/{quote(branch, safe='')}")
+        except ConnectionError as e:
+            status_code = int(str(e))
+            if status_code != 404:
+                raise e
 
     def list_merge_requests(
         self,

@@ -309,7 +309,7 @@ In practice, both approaches can be complementary:
 
 For hands-on examples and detailed comparisons:
 
-- [Identify Out-of-Distribution Samples Tutorial](../notebooks/tt_identify_ood_samples.ipynb) -
+- [Identify Out-of-Distribution Samples Tutorial](../notebooks/tt_identify_ood_samples.md) -
   Comprehensive comparison of all methods on MNIST digits
 
 For related concepts:

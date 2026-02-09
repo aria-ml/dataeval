@@ -17,7 +17,7 @@ predictions are less confident. -->
 This page explains uncertainty-based drift detection (UBDD), a method that
 monitors changes in model prediction confidence to identify drift that is likely
 to degrade performance. For examples using UBDD in practice, see our
-[Monitoring Guide](../notebooks/tt_monitor_shift.ipynb).
+[Monitoring Guide](../notebooks/tt_monitor_shift.md).
 
 ## What is uncertainty-based drift detection?
 
@@ -122,7 +122,7 @@ outputs class probabilities and compares prediction entropy distributions
 between reference and test datasets.
 
 To see how {class}`.DriftUncertainty` works in practice, refer to our
-[Monitoring Guide](../notebooks/tt_monitor_shift.ipynb).
+[Monitoring Guide](../notebooks/tt_monitor_shift.md).
 
 ## References
 

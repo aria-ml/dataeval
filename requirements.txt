@@ -908,6 +908,9 @@ jupyterlab-widgets==3.0.16 \
     --hash=sha256:423da05071d55cf27a9e602216d35a3a65a3e41cdf9c5d3b643b814ce38c19e0 \
     --hash=sha256:45fa36d9c6422cf2559198e4db481aa243c7a32d9926b500781c830c80f7ecf8
     # via ipywidgets
+jupytext==1.19.1 \
+    --hash=sha256:82587c07e299173c70ed5e8ec7e75183edf1be289ed518bab49ad0d4e3d5f433 \
+    --hash=sha256:d8975035155d034bdfde5c0c37891425314b7ea8d3a6c4b5d18c294348714cd9
 kiwisolver==1.4.9 \
     --hash=sha256:0749fd8f4218ad2e851e11cc4dc05c7cbc0cbc4267bdfdb31782e65aace4ee9c \
     --hash=sha256:0763515d4df10edf6d06a3c19734e2566368980d21ebec439f33f9eb936c07b7 \
@@ -1063,12 +1066,14 @@ markdown-it-py==3.0.0 ; python_full_version < '3.11' \
     --hash=sha256:355216845c60bd96232cd8d8c40e8f9765cc86f46880e43a8fd22dc1a1a8cab1 \
     --hash=sha256:e3f60a94fa066dc52ec76661e37c851cb232d92f9886b15cb560aaada2df8feb
     # via
+    #   jupytext
     #   mdit-py-plugins
     #   myst-parser
 markdown-it-py==4.0.0 ; python_full_version >= '3.11' \
     --hash=sha256:87327c59b172c5011896038353a81343b6754500a08cd7a4973bb48c6d578147 \
     --hash=sha256:cb0a2b4aa34f932c007117b194e945bd74e0ec24133ceb5bac59009cda1cb9f3
     # via
+    #   jupytext
     #   mdit-py-plugins
     #   myst-parser
 markupsafe==3.0.1 \
@@ -1193,7 +1198,9 @@ matplotlib-inline==0.2.1 \
 mdit-py-plugins==0.5.0 \
     --hash=sha256:07a08422fc1936a5d26d146759e9155ea466e842f5ab2f7d2266dd084c8dab1f \
     --hash=sha256:f4918cb50119f50446560513a8e311d574ff6aaed72606ddae6d35716fe809c6
-    # via myst-parser
+    # via
+    #   jupytext
+    #   myst-parser
 mdurl==0.1.2 \
     --hash=sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8 \
     --hash=sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba
@@ -1277,6 +1284,7 @@ nbformat==5.10.4 \
     # via
     #   jupyter-cache
     #   jupyter-server
+    #   jupytext
     #   myst-nb
     #   nbclient
     #   nbconvert
@@ -1557,6 +1565,7 @@ packaging==26.0 \
     #   jupyter-server
     #   jupyterlab
     #   jupyterlab-server
+    #   jupytext
     #   lightning-utilities
     #   matplotlib
     #   nbconvert
@@ -2011,6 +2020,7 @@ pyyaml==6.0.3 \
     # via
     #   jupyter-cache
     #   jupyter-events
+    #   jupytext
     #   myst-nb
     #   myst-parser
     #   sphinx-autoapi
@@ -2677,6 +2687,7 @@ tomli==2.4.0 ; python_full_version <= '3.11' \
     #   coverage
     #   dependency-groups
     #   jupyterlab
+    #   jupytext
     #   nox
     #   pytest
     #   sphinx

@@ -1061,6 +1061,7 @@ dev = [
     { name = "jupyter" },
     { name = "jupyter-cache" },
     { name = "jupyter-client" },
+    { name = "jupytext" },
     { name = "maite-datasets" },
     { name = "markupsafe" },
     { name = "myst-nb" },
@@ -1099,10 +1100,10 @@ doclint = [
     { name = "jinja2" },
     { name = "jupyter-cache" },
     { name = "jupyter-client" },
+    { name = "jupytext" },
     { name = "maite-datasets" },
     { name = "markupsafe" },
     { name = "myst-nb" },
-    { name = "nbconvert" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
     { name = "opencv-python-headless" },
@@ -1130,6 +1131,7 @@ docs = [
     { name = "jinja2" },
     { name = "jupyter-cache" },
     { name = "jupyter-client" },
+    { name = "jupytext" },
     { name = "maite-datasets" },
     { name = "markupsafe" },
     { name = "myst-nb" },
@@ -1221,6 +1223,7 @@ dev = [
     { name = "jupyter" },
     { name = "jupyter-cache", specifier = ">=1.0" },
     { name = "jupyter-client", specifier = ">=8.6.0" },
+    { name = "jupytext", specifier = ">=1.19.1" },
     { name = "maite-datasets", specifier = ">=0.0.10" },
     { name = "markupsafe", specifier = ">=3,<3.0.2" },
     { name = "myst-nb", specifier = ">=1.0" },
@@ -1254,10 +1257,10 @@ doclint = [
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "jupyter-cache", specifier = ">=1.0" },
     { name = "jupyter-client", specifier = ">=8.6.0" },
+    { name = "jupytext", specifier = ">=1.19.1" },
     { name = "maite-datasets", specifier = ">=0.0.10" },
     { name = "markupsafe", specifier = ">=3,<3.0.2" },
     { name = "myst-nb", specifier = ">=1.0" },
-    { name = "nbconvert", specifier = ">=7.0" },
     { name = "numpy", specifier = ">=2.0.2" },
     { name = "opencv-python-headless", specifier = ">=4.8.0" },
     { name = "plotly", specifier = ">=6.2.0" },
@@ -1280,6 +1283,7 @@ docs = [
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "jupyter-cache", specifier = ">=1.0" },
     { name = "jupyter-client", specifier = ">=8.6.0" },
+    { name = "jupytext", specifier = ">=1.19.1" },
     { name = "maite-datasets", specifier = ">=0.0.10" },
     { name = "markupsafe", specifier = ">=3,<3.0.2" },
     { name = "myst-nb", specifier = ">=1.0" },
@@ -2299,6 +2303,24 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/26/2d/ef58fed122b268c69c0aa099da20bc67657cdfb2e222688d5731bd5b971d/jupyterlab_widgets-3.0.16.tar.gz", hash = "sha256:423da05071d55cf27a9e602216d35a3a65a3e41cdf9c5d3b643b814ce38c19e0", size = 897423, upload-time = "2025-11-01T21:11:29.724Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ab/b5/36c712098e6191d1b4e349304ef73a8d06aed77e56ceaac8c0a306c7bda1/jupyterlab_widgets-3.0.16-py3-none-any.whl", hash = "sha256:45fa36d9c6422cf2559198e4db481aa243c7a32d9926b500781c830c80f7ecf8", size = 914926, upload-time = "2025-11-01T21:11:28.008Z" },
+]
+
+[[package]]
+name = "jupytext"
+version = "1.19.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markdown-it-py", version = "3.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
+    { name = "markdown-it-py", version = "4.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
+    { name = "mdit-py-plugins" },
+    { name = "nbformat" },
+    { name = "packaging" },
+    { name = "pyyaml" },
+    { name = "tomli", marker = "python_full_version < '3.11' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/13/a5/80c02f307c8ce863cb33e27daf049315e9d96979e14eead700923b5ec9cc/jupytext-1.19.1.tar.gz", hash = "sha256:82587c07e299173c70ed5e8ec7e75183edf1be289ed518bab49ad0d4e3d5f433", size = 4307829, upload-time = "2026-01-25T21:35:13.276Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/16/5a/736dd2f4535dbf3bf26523f9158c011389ef88dd06ec2eef67fd744f1c7b/jupytext-1.19.1-py3-none-any.whl", hash = "sha256:d8975035155d034bdfde5c0c37891425314b7ea8d3a6c4b5d18c294348714cd9", size = 170478, upload-time = "2026-01-25T21:35:11.17Z" },
 ]
 
 [[package]]
