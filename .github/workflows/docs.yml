@@ -29,8 +29,12 @@ jobs:
   docs-build:
     name: Build Documentation
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required to push to artifact branches
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for artifact branch operations
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -65,13 +69,14 @@ jobs:
           path: output/docs/html/
           retention-days: 30
 
-      - name: Upload Jupyter cache
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: docs-jupyter-cache
-          path: output/docs/.jupyter_cache/
-          retention-days: 7
+      # Disabled: CI is primarily operated on GitLab and mirrored to GitHub
+      # - name: Push Jupyter cache to artifact branch
+      #   if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))
+      #   run: bash scripts/push-docs-cache.sh
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     GIT_AUTHOR_NAME: github-actions[bot]
+      #     GIT_AUTHOR_EMAIL: github-actions[bot]@users.noreply.github.com
 
   doclint:
     name: Documentation Lint

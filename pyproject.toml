@@ -91,7 +91,6 @@ lint = [
 ]
 doclint = [
   { include-group = "docs"},
-  "nbconvert>=7.0",
   "ruff>=0.11",
   "pyright[nodejs]>=1.1.400",
 ]
@@ -127,6 +126,7 @@ docs = [
   "torchmetrics>=1.0.0",
   "torchvision>=0.17.0",
   "markupsafe>=3,<3.0.2",
+  "jupytext>=1.19.1",
 ]
 dev = [
   { include-group = "base" },
@@ -259,7 +259,6 @@ exclude = [
 line-length = 120
 indent-width = 4
 target-version = "py310"
-extend-include = ["*.ipynb"]
 
 [tool.ruff.lint]
 select = ["A", "ANN", "C4", "C90", "E", "F", "I", "NPY", "S", "SIM", "RET", "RUF100", "UP"]
@@ -267,7 +266,7 @@ ignore = ["ANN401", "NPY002"]
 fixable = ["ALL"]
 unfixable = []
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-per-file-ignores = { "*.ipynb" = ["E402"],  "!src/*" = ["ANN", "S", "RET"]}
+per-file-ignores = { "!src/*" = ["ANN", "S", "RET"]}
 
 [tool.ruff.lint.isort]
 known-first-party = ["dataeval"]

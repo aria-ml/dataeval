@@ -72,20 +72,20 @@ model to determine if the provided data and model are satisfactory.
 
 #### DataEval in Planning
 
-The Data Scientist begins with [data cleaning](../../notebooks/tt_clean_dataset.ipynb)
+The Data Scientist begins with [data cleaning](../../notebooks/tt_clean_dataset.md)
 to ensure that the dataset is free of duplicates and errors. They follow this up
-with an analysis of the dataset for [bias or correlations](../../notebooks/tt_identify_bias.ipynb).
-They then [assess the data space](../../notebooks/tt_assess_data_space.ipynb)
+with an analysis of the dataset for [bias or correlations](../../notebooks/tt_identify_bias.md).
+They then [assess the data space](../../notebooks/tt_assess_data_space.md)
 for coverage and completeness. Next they assess whether the required performance
-as currently constituted for the project is [feasible](../../notebooks/h2_measure_ic_feasibility.ipynb).
+as currently constituted for the project is [feasible](../../notebooks/h2_measure_ic_feasibility.md).
 After running this final assessment, they generate a report for the manager which
 shows that the required performance is feasible, but the dataset has severe
 class imbalance and there is a lack of data in a nighttime environment.
 
-The ML Engineer begins by [generating a set of dataset splits](../../notebooks/h2_dataset_splits.ipynb)
+The ML Engineer begins by [generating a set of dataset splits](../../notebooks/h2_dataset_splits.md)
 with the cleaned dataset from the Data Scientist. Then they test the model by finetuning
 on the new data train split and test against the test split. They also assess
-the [dataset's sufficiency](../../notebooks/h2_measure_ic_sufficiency.ipynb)
+the [dataset's sufficiency](../../notebooks/h2_measure_ic_sufficiency.md)
 given this specific model. After performing these assessments, they generate a
 report for the manager which shows that the existing model does not meet performance
 with the provided dataset, but could potentially reach the target performance
@@ -104,19 +104,19 @@ can now begin data analysis on the full dataset and model development.
 #### DataEval in Development
 
 To begin phase 2, the Data Scientist curates the dataset by repeating the process
-from phase 1. They [clean the data](../../notebooks/tt_clean_dataset.ipynb),
-analyze the dataset for [bias or correlations](../../notebooks/tt_identify_bias.ipynb),
-and [assess the data space](../../notebooks/tt_assess_data_space.ipynb).
-After curating the dataset, they [split the dataset](../../notebooks/h2_dataset_splits.ipynb)
+from phase 1. They [clean the data](../../notebooks/tt_clean_dataset.md),
+analyze the dataset for [bias or correlations](../../notebooks/tt_identify_bias.md),
+and [assess the data space](../../notebooks/tt_assess_data_space.md).
+After curating the dataset, they [split the dataset](../../notebooks/h2_dataset_splits.md)
 into a training, validation and a hold out test set. Again, they generate a report
 for the manager, this time showing the images removed and the potential lack of
 coverage for a specific type of truck.
 
 To begin phase 2, the ML Engineer selects a couple of additional models to test
 in addition to the provided model. Once they receive the data splits, they train
-each model and test against the validation set. They even perform a [data sufficiency](../../notebooks/h2_measure_ic_sufficiency.ipynb)
+each model and test against the validation set. They even perform a [data sufficiency](../../notebooks/h2_measure_ic_sufficiency.md)
 test with each model to get a better idea of how quickly each model is nearing
-its maximum performance. They then [perform an error analysis](../../notebooks/tt_error_analysis.ipynb)
+its maximum performance. They then [perform an error analysis](../../notebooks/tt_error_analysis.md)
 to determine what objects each model is struggling with. After performing the analysis,
 they discover that the models consistently fail on a specific type of truck.
 Again, they generate a report for the manager, this time detailing out how well
@@ -138,11 +138,11 @@ for final testing.
 #### DataEval in T&E
 
 The T&E Engineer receives the held out test set from the Data Scientist for testing
-the two candidate models. They begin by analyzing the [divergence](../../notebooks/h2_measure_divergence.ipynb)
+the two candidate models. They begin by analyzing the [divergence](../../notebooks/h2_measure_divergence.md)
 of the data distributions between the test set and the train and validation sets.
 After the test set is adequately divergent from both the train and validation sets,
 the T&E Engineer focuses on identifying the edge cases in the dataset. They use
-a combination of [imagestats](../../notebooks/h2_visualize_cleaning_issues.ipynb),
+a combination of [imagestats](../../notebooks/h2_visualize_cleaning_issues.md),
 {func}`.labelstats`, [coverage](../Coverage.md) and the
 [out-of-distribution (OOD) detectors](../OOD.md). After identifying the edge cases,
 they test both models on the entire test set, noting the performance of each model
@@ -164,7 +164,7 @@ that the model be used only in close detection scenarios.
 Now that a model is being deployed, the ML Engineer is tasked with monitoring the
 model to ensure that the model continues to meet the performance requirements.
 To do this, the ML Engineer collects periodic batches of operational data.
-Testing it using both [data drift detection](../../notebooks/tt_monitor_shift.ipynb)
+Testing it using both [data drift detection](../../notebooks/tt_monitor_shift.md)
 methods and [OOD detectors](../OOD.md). Having established specific drift and OOD
 thresholds, the ML Engineer is ready to initiate a retrain should the data begin
 to shift from the training distribution.

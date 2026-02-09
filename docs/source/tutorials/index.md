@@ -24,24 +24,24 @@ To run the tutorial interactively in Google Colab, click the
 ```{toctree}
 :hidden:
 
-../notebooks/tt_clean_dataset.ipynb
-../notebooks/tt_assess_data_space.ipynb
-../notebooks/tt_identify_bias.ipynb
+../notebooks/tt_clean_dataset.md
+../notebooks/tt_assess_data_space.md
+../notebooks/tt_identify_bias.md
 ```
 
 ```{list-table}
 :widths: 20 60 20
 :header-rows: 0
 
-* - [](../notebooks/tt_clean_dataset.ipynb)
+* - [](../notebooks/tt_clean_dataset.md)
   - Learn about the impacts of unstructured, raw data and how to transform it
     into a reliable, robust dataset.
   - [![Open In Colab][colab-badge]][eda-colab]
-* - [](../notebooks/tt_assess_data_space.ipynb)
+* - [](../notebooks/tt_assess_data_space.md)
   - Learn how to fix and prevent gaps in data to develop more reliable and
     robust models.
   - [![Open In Colab][colab-badge]][dataspace-colab]
-* - [](../notebooks/tt_identify_bias.ipynb)
+* - [](../notebooks/tt_identify_bias.md)
   - Learn how correlations in your data and metadata can affect model
     performance and what can be done to remove that bias.
   - [![Open In Colab][colab-badge]][bias-colab]
@@ -65,20 +65,20 @@ To run the tutorial interactively in Google Colab, click the
 :hidden:
 :caption: Monitoring
 
-../notebooks/tt_monitor_shift.ipynb
-../notebooks/tt_error_analysis.ipynb
-../notebooks/tt_identify_ood_samples.ipynb
+../notebooks/tt_monitor_shift.md
+../notebooks/tt_error_analysis.md
+../notebooks/tt_identify_ood_samples.md
 ```
 
 ```{list-table}
 :widths: 20 60 20
 :header-rows: 0
 
-* - [](../notebooks/tt_monitor_shift.ipynb)
+* - [](../notebooks/tt_monitor_shift.md)
   - Learn how to analyze incoming data against training data to ensure deployed
     models stay reliable and robust.
   - [![Open In Colab][colab-badge]][monitoring-colab]
-* - [](../notebooks/tt_identify_ood_samples.ipynb)
+* - [](../notebooks/tt_identify_ood_samples.md)
   - Identify out-of-distribution samples in incoming data
   - [![Open In Colab][colab-badge]][iood-colab]
 ```

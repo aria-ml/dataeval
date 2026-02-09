@@ -27,6 +27,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
+import jupytext
 import nbformat
 
 
@@ -39,7 +40,7 @@ def compute_notebook_hash(nb_path: Path) -> str:
     """
     import copy
 
-    nb = nbformat.read(nb_path, as_version=4)
+    nb = jupytext.read(nb_path)
 
     # Copy and normalize the notebook (same as jupyter-cache)
     nb = copy.deepcopy(nb)
@@ -95,7 +96,7 @@ def check_cache_status(docs_source_dir: Path = Path("docs/source")):
         print(f"Error: {notebooks_dir} does not exist", file=sys.stderr)
         return False
 
-    notebooks = sorted(notebooks_dir.glob("*.ipynb"))
+    notebooks = sorted(notebooks_dir.glob("*.md"))
 
     if not notebooks:
         print(f"Warning: No notebooks found in {notebooks_dir}", file=sys.stderr)
@@ -181,7 +182,7 @@ def clean_stale_cache(docs_source_dir: Path = Path("docs/source"), dry_run: bool
         print(f"Cache directory does not exist: {cache_dir}")
         return 0
 
-    notebooks = sorted(notebooks_dir.glob("*.ipynb"))
+    notebooks = sorted(notebooks_dir.glob("*.md"))
 
     if not notebooks:
         print(f"Warning: No notebooks found in {notebooks_dir}", file=sys.stderr)

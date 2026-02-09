@@ -69,7 +69,7 @@ set of data for training or Test and Evaluation (T&E).  When it is
 appropriate to subsample a dataset, prioritization identifies a
 representative subset that is used for rapid iterative model development.
 Prioritization is conducted during [Exploratory Data Analysis
-(EDA)](../notebooks/tt_clean_dataset.ipynb) stages after initial
+(EDA)](../notebooks/tt_clean_dataset.md) stages after initial
 [cleaning](DataCleaning.md) and {class}`.Outliers`.
 
 2. **After collecting new data**:

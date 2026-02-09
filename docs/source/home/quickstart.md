@@ -36,7 +36,7 @@ functionality that you can try yourself!
 ::::{grid} 1 1 2 2
 :gutter: 4
 
-:::{grid-item-card} [Bayes Error Rate](../notebooks/h2_measure_ic_feasibility.ipynb){.font-title}
+:::{grid-item-card} [Bayes Error Rate](../notebooks/h2_measure_ic_feasibility.md){.font-title}
 :text-align: center
 :link: ../notebooks/h2_measure_ic_feasibility
 :link-type: doc
@@ -51,7 +51,7 @@ Accurately calculate the maximum performance of your dataset.
 
 :::
 
-:::{grid-item-card} [Model Sufficiency](../notebooks/h2_measure_ic_sufficiency.ipynb){.font-title}
+:::{grid-item-card} [Model Sufficiency](../notebooks/h2_measure_ic_sufficiency.md){.font-title}
 :text-align: center
 :link: ../notebooks/h2_measure_ic_sufficiency
 :link-type: doc

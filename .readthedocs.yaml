@@ -12,6 +12,8 @@ build:
   apt_packages:
     - graphviz
   jobs:
+    post_checkout:
+      - bash docs/fetch-docs-cache.sh
     create_environment:
       - asdf plugin add uv
       - asdf install uv latest

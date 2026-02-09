@@ -137,7 +137,7 @@ DataEval's data cleaning functions and classes:
 ```
 
 To see data cleaning in action using DataEval, check out our
-[Data Cleaning Guide](../notebooks/tt_clean_dataset.ipynb).
+[Data Cleaning Guide](../notebooks/tt_clean_dataset.md).
 
 See the [Image Stats](ImageStats.md) concept page to learn more about the
 algorithms/methods used by the functions above.

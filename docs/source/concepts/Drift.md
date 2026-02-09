@@ -168,7 +168,7 @@ provided to `DriftUnivariate` for drift detection based on the model's
 uncertainty.
 
 To see how these detectors work in practice, refer to our
-[Monitoring Guide](../notebooks/tt_monitor_shift.ipynb), where you can explore
+[Monitoring Guide](../notebooks/tt_monitor_shift.md), where you can explore
 real-world examples of drift detection using DataEval.
 
 ## Understanding the drift detectors

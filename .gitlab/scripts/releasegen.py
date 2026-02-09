@@ -1,10 +1,8 @@
 import re
-from base64 import b64encode
 from collections import defaultdict
 from datetime import UTC, datetime
 from enum import IntEnum
-from os import path, remove, walk
-from shutil import move, rmtree
+from os import path, remove
 from typing import Any, Literal
 
 from gitlab import Gitlab
@@ -15,8 +13,6 @@ CHANGELOG_FILE = "CHANGELOG.md"
 # need to read this to update the doc links
 HOWTO_INDEX_FILE = "docs/source/how_to/index.md"
 TUTORIAL_INDEX_FILE = "docs/source/tutorials/index.md"
-NOTEBOOK_DIRECTORY = "docs/source/how_to"
-TUTORIAL_DIRECTORY = "docs/source/tutorials"
 TAB = "    "
 
 # Pattern to match versions with optional pre-release suffix (e.g., v1.0.0 or v1.0.0-rc0)
@@ -180,8 +176,7 @@ class _Merge:
 
 class ReleaseGen:
     """
-    Generates commit payload for changes for used in the documentation cache
-    and changelog updates
+    Generates commit payload for changelog and documentation link updates
     """
 
     def __init__(self, gitlab: Gitlab) -> None:
@@ -339,70 +334,6 @@ class ReleaseGen:
             "content": content,
         }
 
-    def _is_binary_file(self, file: str) -> bool:
-        try:
-            with open(file) as f:
-                f.read()
-                return False
-        except Exception:
-            return True
-
-    def _generate_actions(self, old_files: list[str], new_files: list[str]) -> list[dict[str, str]]:
-        actions: list[dict[str, str]] = []
-        # will need this as an input for permanent solution
-        # current_tag = pending_version
-
-        for old_file in old_files:
-            if old_file not in new_files:
-                actions.append(
-                    {
-                        "action": "delete",
-                        "file_path": old_file,
-                    }
-                )
-
-        for new_file in new_files:
-            if self._is_binary_file(new_file):
-                encoding = "base64"
-                with open(new_file, "rb") as f:
-                    content = b64encode(f.read()).decode()
-            else:
-                encoding = "text"
-                with open(new_file) as f:
-                    content = f.read()
-                # comment out this code for now. Will need for permanent solution.
-                # if new_file.endswith("ipynb"):
-                #    content = self._update_cache_file_path(new_file, current_tag=current_tag)
-            if new_file in old_files:
-                if content:
-                    actions.append(
-                        {
-                            "action": "update",
-                            "file_path": new_file,
-                            "encoding": encoding,
-                            "content": content,
-                        }
-                    )
-            else:
-                if content:
-                    actions.append(
-                        {
-                            "action": "create",
-                            "file_path": new_file,
-                            "encoding": encoding,
-                            "content": content,
-                        }
-                    )
-
-        return actions
-
-    def _get_files(self, file_path: str) -> list[str]:
-        file_paths: list[str] = []
-        for root, _, files in walk(file_path):
-            for filename in files:
-                file_paths.append(path.join(root, filename))
-        return file_paths
-
     def _generate_index_markdown_update_action(self, file_name: str, pending_version: str) -> dict[str, str]:
         howto_index_file = self._read_doc_file(file_name)
         if howto_index_file:
@@ -419,98 +350,14 @@ class ReleaseGen:
             }
         return {}
 
-    def _update_cache_file_path(self, file_name: str, current_tag: str) -> None | str:
-        search_pattern = r"(%|\!)+(pip install -q dataeval){1}(\[\w+\])*"
-        if path.isfile(file_name):
-            new_list: list[str] = []
-            lines = self._read_doc_file(file_name)  # return none if file is unreadable.
-            if lines:
-                for line in lines:
-                    result = re.search(search_pattern, line)
-                    if result:
-                        pos = result.string.find("==v")
-                        if pos == -1:
-                            new_string = (
-                                result.string[0 : result.regs[0][1]]
-                                + "=="
-                                + current_tag
-                                + result.string[result.regs[0][1] :]
-                            )
-                        else:
-                            new_string = result.string[0:pos] + "==" + current_tag + '\\n",\n'
-                        new_list.append(new_string)
-                    else:
-                        new_list.append(line)
-                content = "".join(new_list)
-            else:
-                content = None
-        else:
-            content = None
-        return content
-
-    def _generate_notebook_update_actions(self, pending_version: str) -> list[dict[str, str]]:
-        # get all the ipynb file from the notebook directory
-        # may need to read .jupytercache files and update them instead of the original files.
-        file_path = NOTEBOOK_DIRECTORY
-        files: list[str] = []
-        notebook_files = self._get_files(file_path)
-        for f in notebook_files:
-            if f.lower().endswith("ipynb"):
-                files.append(f)
-        # get the notebooks in the docs/tutorials directory
-        more_file_path = TUTORIAL_DIRECTORY
-        more_files = self._get_files(more_file_path)
-        # add them to the list if they are notebook files.
-        for f in more_files:
-            if f.lower().endswith("ipynb"):
-                files.append(f)
-        current_tag = pending_version
-        action_list: list[dict[str, str]] = []
-        for file_name in files:
-            content = self._update_cache_file_path(file_name, current_tag=current_tag)
-            new_action = {
-                "action": "update",
-                "file_path": file_name,
-                "encoding": "text",
-                "content": content,
-            }
-            action_list.append(new_action)
-
-        return action_list
-
-    # removed pending version. Will need to add back for permanant solution.
-    def _generate_jupyter_cache_actions(self) -> list[dict[str, str]]:
-        # cannot use 'latest-known-good' because 404 on download - investigate
-        ref = "main"
-        cache_path = "docs/source/.jupyter_cache"
-        output_path = "output/docs/.jupyter_cache"
-        self.gl.get_artifacts(job="docs", dest="./", ref=ref)
-        if not path.exists(output_path):
-            raise FileNotFoundError(f"Artifacts downloaded from {ref} does not contain {output_path}")
-        if not path.exists(cache_path):
-            raise FileNotFoundError(f"Current path does not contain {cache_path}")
-
-        old_files = self._get_files(cache_path)
-        rmtree(cache_path)
-        move(output_path, cache_path)
-        # removed pending version for now. will need for permanent solution.
-        return self._generate_actions(old_files, self._get_files(cache_path))
-
     def generate(self) -> tuple[str, list[dict[str, str]]]:
         version, changelog_action = self._generate_version_and_changelog_action()
         if not changelog_action:
             return "", []
 
-        # creating actions for updating notebook cache, documentation links, and changelog content
-        actions = self._generate_jupyter_cache_actions()
-        actions.extend(
-            [self._generate_index_markdown_update_action(f, version) for f in [HOWTO_INDEX_FILE, TUTORIAL_INDEX_FILE]]
-        )
-
-        # comment out for now - will need for permanent solution
-        # creating actions for updating python notebook pip install statements
-        # actions.extend(self._generate_notebook_update_actions(pending_version=version))
-
+        actions = [
+            self._generate_index_markdown_update_action(f, version) for f in [HOWTO_INDEX_FILE, TUTORIAL_INDEX_FILE]
+        ]
         actions.append(changelog_action)
 
         return version, [action for action in actions if action]

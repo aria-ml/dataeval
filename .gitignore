@@ -12,6 +12,10 @@ docs/build/
 docs/source/reference/autoapi
 docs/source/tutorials/notebooks/checkpoints/
 
+# Jupyter cache is stored in orphan branches (docs-artifacts/<branch>)
+# See scripts/README.md for details
+.jupyter_cache/
+
 output/
 .coverage*
 

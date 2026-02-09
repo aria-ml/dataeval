@@ -18,7 +18,7 @@ dataset. Whether you are tasked with trying to find the right dataset to train
 a model or with verifying someone else's stuff, the Outliers class helps you
 gain an understanding of the data.
 
-The [Data Cleaning Guide](../notebooks/tt_clean_dataset.ipynb) shows how
+The [Data Cleaning Guide](../notebooks/tt_clean_dataset.md) shows how
 the Outliers class can be used in conjunction with other DataEval classes to
 explore and clean a dataset.
 

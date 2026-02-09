@@ -97,11 +97,7 @@ DOCS_ENVS = {"LANG": "C", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
 DOCTEST_ENVS = {"NB_EXECUTION_MODE_OVERRIDE": "off"}
 RESTORE_CMD = """
 if (which git) > /dev/null; then
-    git restore ./reference/autoapi/dataeval/index.rst
-    if [[ ! $(git status --porcelain | grep docs/source/.jupyter_cache | grep --invert-match global.db) ]]; then
-        echo "No cache changes - reverting global.db";
-        git restore ./.jupyter_cache/global.db;
-    fi;
+    git restore ./reference/autoapi/dataeval/index.rst;
 fi
 """
 
@@ -227,10 +223,21 @@ def docs(session: nox.Session) -> None:
             session.warn(f"⚠️  Chart generation failed: {e}")
             session.log("Continuing with documentation build...")
 
+    # Convert markdown notebooks to ipynb (always md -> ipynb, ignores timestamps)
+    notebook_dir = "docs/source/notebooks"
+    session.run("jupytext", "--to", "notebook", "--update", notebook_dir + "/*.md")
+    if IS_CI:
+        session.run("git", "diff", "--exit-code", notebook_dir, external=True)
+
+    if {"synconly", "sync-only"} & set(session.posargs):
+        session.log("Sync-only mode: notebooks have been synced but docs build is skipped.")
+        return
+
+    # Fetch cached notebook results from orphan artifact branch
+    session.run("bash", "docs/fetch-docs-cache.sh", external=True)
+
+    session.run("rm", "-rf", "output/docs", external=True)
     session.chdir("docs/source")
-    session.run("rm", "-rf", "../../output/docs", external=True)
-    if "clean" in session.posargs:
-        session.run("rm", "-rf", ".jupyter_cache", external=True)
     # Fix any inconsistent cache state before building (e.g., db records without folders or vice versa)
     session.run("python", "../../docs/check_notebook_cache.py", "--fix")
     session.run(
@@ -251,7 +258,6 @@ def docs(session: nox.Session) -> None:
     )
     # Clean up stale cache entries after sphinx-build updates the cache
     session.run("python", "../../docs/check_notebook_cache.py", "--clean")
-    session.run("cp", "-R", ".jupyter_cache", "../../output/docs", external=True)
     session.run_always("bash", "-c", RESTORE_CMD, external=True)
 
 
@@ -266,7 +272,7 @@ def lock(session: nox.Session) -> None:
 
 
 def _clean_notebook_script(script_path: str) -> None:
-    """Remove IPython magics and markdown from converted notebook script."""
+    """Remove IPython magics, cell markers, and markdown from converted notebook script."""
     script = Path(script_path)
     if not script.exists():
         return
@@ -274,15 +280,27 @@ def _clean_notebook_script(script_path: str) -> None:
     content = script.read_text()
     lines = content.split("\n")
     cleaned_lines = []
+    in_markdown_cell = False
 
     for line in lines:
+        stripped = line.strip()
         # Skip IPython magic commands
-        if line.strip().startswith("%") or line.strip().startswith("!"):
+        if stripped.startswith("%") or stripped.startswith("!"):
             continue
-        if line.strip().startswith("get_ipython()"):
+        if stripped.startswith("get_ipython()"):
             continue
-        # Skip markdown comment blocks
-        if line.strip().startswith("# ##") or line.strip().startswith("# %%"):
+        # Track markdown cell blocks (jupytext percent format)
+        if stripped.startswith("# %% [markdown]"):
+            in_markdown_cell = True
+            continue
+        if stripped.startswith("# %%"):
+            in_markdown_cell = False
+            continue
+        # Skip markdown content lines (commented text inside markdown cells)
+        if in_markdown_cell:
+            continue
+        # Skip jupytext header block (lines starting with "# ---" or "# jupyter:")
+        if stripped.startswith("# ---") or stripped.startswith("# jupyter:"):
             continue
         cleaned_lines.append(line)
 
@@ -321,19 +339,19 @@ def doclint(session: nox.Session) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Find all notebooks in docs/source
-    notebooks = glob.glob("docs/source/**/*.ipynb", recursive=True)
+    notebooks = glob.glob("docs/source/notebooks/*.md")
     if not notebooks:
-        session.warn("No notebooks found in docs/source/")
+        session.warn("No notebooks found in docs/source/notebooks/")
         return
 
     session.log(f"Found {len(notebooks)} notebooks to process")
 
-    # Convert notebooks to Python scripts
+    # Convert notebooks to Python scripts using jupytext
     for notebook in notebooks:
         nb_path = Path(notebook)
         output_script = output_dir / f"{nb_path.stem}.py"
         session.log(f"Converting {nb_path.name} -> {output_script.name}")
-        session.run("jupyter", "nbconvert", "--to", "script", "--output-dir", str(output_dir), str(nb_path))
+        session.run("jupytext", "--to", "py:percent", "--output", str(output_script), str(nb_path))
         _clean_notebook_script(str(output_script))
 
     # Get all generated Python scripts

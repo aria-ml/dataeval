@@ -6,6 +6,7 @@
     "ms-vscode-remote.remote-containers",
     "charliermarsh.ruff",
     "tamasfe.even-better-toml",
-    "DavidAnson.vscode-markdownlint"
+    "DavidAnson.vscode-markdownlint",
+    "caenrigen.jupytext-sync"
   ]
 }

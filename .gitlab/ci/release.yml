@@ -26,26 +26,6 @@ coverage:
   variables:
     ENV_JOB: coverage
 
-update cache:
-  stage: release
-  extends: .rules_docs_nightly_cache_update
-  needs:
-    - job: docs
-      artifacts: true
-  script: |
-    git fetch --all --depth 1
-    git switch --force ${CI_COMMIT_BRANCH}${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}
-    rm -rf docs/source/.jupyter_cache
-    mkdir -p docs/source/.jupyter_cache
-    cp -R output/docs/.jupyter_cache/* docs/source/.jupyter_cache
-    if [[ ! $(git status --porcelain | tee /dev/stderr | grep docs/source/.jupyter_cache | grep --invert-match global.db) ]]; then echo "No cache changes"; exit 0; fi
-    git add docs/source/.jupyter_cache/*
-    git config --global http.postBuffer 100m
-    git config --global user.email "${GITLAB_USER_EMAIL}"
-    git config --global user.name "${GITLAB_USER_NAME}"
-    git commit --message "${UPDATE_CACHE_MESSAGE}"
-    git push https://dataeval-bot:${DATAEVAL_BUILD_PAT}@gitlab.jatic.net/jatic/aria/dataeval.git
-
 pages preview:
   extends: 
     - .publish_merge_request_env
@@ -97,6 +77,18 @@ remove image tags:
     - uv pip install requests --system
   script:
     - .gitlab/scripts/remove_image_tags.py
+  allow_failure: true
+
+# This job cleans up orphan docs-artifacts/* branches
+# associated with merged branches.
+remove docs artifact branches:
+  stage: release
+  extends: .rules_main_only
+  needs: []
+  before_script:
+    - uv pip install requests --system
+  script:
+    - .gitlab/scripts/remove_docs_artifact_branches.py
   allow_failure: true
 
 # This job updates the changelog and tags the commit hash with a

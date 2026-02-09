@@ -10,7 +10,7 @@ from os import getenv
 # -----------------------------------------------------------------------------
 
 project = "DataEval"
-copyright = "2025, ARiA"  # noqa: A001
+copyright = "2026, ARiA"  # noqa: A001
 author = "ARiA"
 
 site_url = "https://github.com/aria-ml/dataeval/"
@@ -54,6 +54,8 @@ exclude_patterns = [
     # Specific directories -- relative to source directories
     ".jupyter_cache",
     "build",
+    # ipynb files are paired with MyST Markdown via jupytext - md is the source of truth
+    "**/*.ipynb",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -234,7 +236,7 @@ def setup(app):
             cache_dir = docs_source_dir / ".jupyter_cache" / "executed"
 
             if notebooks_dir.exists() and cache_dir.exists():
-                notebooks = sorted(notebooks_dir.glob("*.ipynb"))
+                notebooks = sorted(notebooks_dir.glob("*.md"))
                 {p.name for p in cache_dir.iterdir() if p.is_dir()}
 
                 for nb_path in notebooks:

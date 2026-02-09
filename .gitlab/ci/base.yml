@@ -236,16 +236,3 @@ stages:
 .rules_release_branch_only:
   rules:
     - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
-
-.rules_docs_nightly_cache_update:
-  rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE
-      when: never
-    - if: $CI_COMMIT_BRANCH == 'main' && $DOCS_NIGHTLY
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-      changes:
-        paths:
-          - src/**/*
-          - docs/**/*
-          - uv.lock
-          - '*.md'
