@@ -337,8 +337,10 @@ class ReleaseGen:
     def _generate_index_markdown_update_action(self, file_name: str, pending_version: str) -> dict[str, str]:
         howto_index_file = self._read_doc_file(file_name)
         if howto_index_file:
-            pattern = re.compile(r"aria-ml/dataeval/blob/v([0-9]+)\.([0-9]+)\.([0-9]+)(?:-rc[0-9]+)?/docs")
-            new_path = f"aria-ml/dataeval/blob/{pending_version}/docs"
+            pattern = re.compile(
+                r"aria-ml/dataeval/blob/docs-artifacts/(?:main|v[0-9]+\.[0-9]+\.[0-9]+(?:-rc[0-9]+)?)/notebooks"
+            )
+            new_path = f"aria-ml/dataeval/blob/docs-artifacts/{pending_version}/notebooks"
 
             verbose(f"Substituting markdown links for new version {pending_version}")
             content = "".join([re.sub(pattern, new_path, line) for line in howto_index_file])

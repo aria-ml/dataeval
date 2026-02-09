@@ -328,15 +328,19 @@ def _run_doclint_tests(session: nox.Session, output_dir: str, scripts: list) -> 
 
 @session(uv_only_groups=["docsync"], uv_no_install_project=True)
 def docsync(session: nox.Session) -> None:
-    """Sync notebook pairs and format markdown. Generates .md for orphan .ipynb files."""
+    """Sync notebook .md/.ipynb pairs and format markdown."""
     notebook_dir = "docs/source/notebooks"
 
     # Generate .md for any new .ipynb files without a markdown pair
     ipynb_stems = {Path(f).stem for f in glob.glob(f"{notebook_dir}/*.ipynb")}
     md_stems = {Path(f).stem for f in glob.glob(f"{notebook_dir}/*.md")}
     for stem in sorted(ipynb_stems - md_stems):
-        session.log(f"Generating markdown for unpaired notebook: {stem}.ipynb")
+        session.log(f"Generating markdown for new notebook: {stem}.ipynb")
         session.run("jupytext", "--to", "myst", f"{notebook_dir}/{stem}.ipynb")
+
+    # Bidirectional sync: updates whichever side is stale (uses jupytext.toml pairing)
+    # If ipynb is newer -> updates md; if md is newer -> updates ipynb
+    session.run("jupytext", "--sync", notebook_dir + "/*.md")
 
     # Format markdown notebooks (fix locally, check in CI)
     mdformat_args = ["mdformat", "--wrap", "120"]
@@ -344,10 +348,8 @@ def docsync(session: nox.Session) -> None:
         mdformat_args.append("--check")
     session.run(*mdformat_args, notebook_dir)
 
-    # Regenerate .ipynb from .md and fail if out of sync (CI only)
+    # Regenerate ipynb to match formatted md (mdformat may have modified md)
     session.run("jupytext", "--to", "notebook", "--update", notebook_dir + "/*.md")
-    if IS_CI:
-        session.run("git", "diff", "--exit-code", notebook_dir, external=True)
 
 
 @session(uv_only_groups=["doclint"])

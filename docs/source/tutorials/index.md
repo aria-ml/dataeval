@@ -51,9 +51,9 @@ To run the tutorial interactively in Google Colab, click the
 
 <!-- markdownlint-disable MD053 -->
 
-[eda-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.95.0/docs/source/notebooks/tt_clean_dataset.ipynb
-[dataspace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.95.0/docs/source/notebooks/tt_assess_data_space.ipynb
-[bias-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.95.0/docs/source/notebooks/tt_identify_bias.ipynb
+[eda-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/main/notebooks/tt_clean_dataset.ipynb
+[dataspace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/main/notebooks/tt_assess_data_space.ipynb
+[bias-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/main/notebooks/tt_identify_bias.ipynb
 
 <!-- markdownlint-enable MD053 -->
 
@@ -87,8 +87,8 @@ To run the tutorial interactively in Google Colab, click the
 
 <!-- markdownlint-disable MD053 -->
 
-[monitoring-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.95.0/docs/source/tutorials/notebooks/tt_monitor_shift.ipynb
-[iood-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/v0.95.0/docs/source/notebooks/tt_identify_ood_samples.ipynb
+[monitoring-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/main/notebooks/tt_monitor_shift.ipynb
+[iood-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/main/notebooks/tt_identify_ood_samples.ipynb
 
 <!-- markdownlint-enable MD053 -->
 

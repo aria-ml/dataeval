@@ -16,6 +16,9 @@ docs/source/tutorials/notebooks/checkpoints/
 # See scripts/README.md for details
 .jupyter_cache/
 
+# Generated notebook files - stored in docs-artifacts branches for Colab
+docs/source/notebooks/*.ipynb
+
 output/
 .coverage*
 

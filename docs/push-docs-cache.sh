@@ -1,5 +1,6 @@
 #!/bin/bash
-# Push .jupyter_cache to orphan branch docs-artifacts/<branch-name>
+# Push .jupyter_cache and notebook .ipynb files to orphan branch docs-artifacts/<branch-name>
+# If HEAD has a version tag, also pushes to docs-artifacts/<tag> for Colab links.
 #
 # Usage: ./push-docs-cache.sh [branch-name]
 #   If branch-name is not provided, uses current branch name
@@ -82,6 +83,15 @@ git config http.postBuffer 100m
 echo "Copying cache files..."
 cp -r "$OLDPWD/$SOURCE_CACHE_DIR" .jupyter_cache/
 
+# Copy notebook ipynb files (generated during docs build by jupytext)
+NOTEBOOK_DIR="$OLDPWD/docs/source/notebooks"
+if [ -d "$NOTEBOOK_DIR" ]; then
+    mkdir -p notebooks/
+    cp "$NOTEBOOK_DIR"/*.ipynb notebooks/ 2>/dev/null || true
+    NB_COUNT=$(find notebooks -name "*.ipynb" 2>/dev/null | wc -l)
+    echo "Copied $NB_COUNT notebook files to notebooks/"
+fi
+
 # Create README for the artifact branch
 cat > README.md <<EOF
 # Documentation Artifacts: $BRANCH_NAME
@@ -91,6 +101,7 @@ This orphan branch stores build artifacts for the \`$BRANCH_NAME\` branch.
 ## Contents
 
 - \`.jupyter_cache/\`: Cached Jupyter notebook execution results
+- \`notebooks/\`: Generated .ipynb files for Google Colab
 
 ## Purpose
 
@@ -139,3 +150,19 @@ cd "$OLDPWD"
 echo "================================================"
 echo "✓ Cache pushed successfully to $ARTIFACT_BRANCH"
 echo "================================================"
+
+# If HEAD has a version tag, also push to docs-artifacts/<tag> for Colab links
+git fetch --tags origin 2>/dev/null || true
+VERSION_TAG=$(git tag --points-at HEAD 2>/dev/null | grep '^v[0-9]' | head -1)
+if [ -n "$VERSION_TAG" ]; then
+    VERSION_ARTIFACT_BRANCH="docs-artifacts/$VERSION_TAG"
+    echo ""
+    echo "================================================"
+    echo "Detected version tag: $VERSION_TAG"
+    echo "Also pushing to $VERSION_ARTIFACT_BRANCH..."
+    echo "================================================"
+    cd "$TEMP_DIR"
+    git push --force "$REPO_URL" HEAD:"refs/heads/$VERSION_ARTIFACT_BRANCH"
+    cd "$OLDPWD"
+    echo "✓ Also pushed to $VERSION_ARTIFACT_BRANCH"
+fi

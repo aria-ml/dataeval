@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import re
+
 if __name__ == "__main__":
     from gitlab import Gitlab
 
@@ -19,6 +21,9 @@ if __name__ == "__main__":
         if not branch_name.startswith("docs-artifacts/"):
             continue
         source_branch = branch_name[len("docs-artifacts/") :]
+        # Preserve versioned artifact branches (used for Colab links)
+        if re.match(r"^v\d+\.\d+\.\d+", source_branch):
+            continue
         if source_branch in delete_set:
             print(f"Removing artifact branch: {branch_name}")
             gl.delete_branch(branch_name)
