@@ -170,14 +170,18 @@ metadata of the first image.
 metadata.raw[0]
 ```
 
-:::\{note} `Metadata` is unable to process nested lists. For this dataset, _part_ is a factor that describes certain
+:::{note}
+`Metadata` is unable to process nested lists. For this dataset, _part_ is a factor that describes certain
 parts of a _person_ object (such as _head_, _foot_ and _hand_), each with separate bounding box coordinates. You will
-ignore this information for this example. :::
+ignore this information for this example.
+:::
 
 +++
 
-:::\{note} The nested objects _horse_ and _person_ from the first metadata entry will be expanded to a complete metadata
-entry for each object. :::
+:::{note}
+The nested objects _horse_ and _person_ from the first metadata entry will be expanded to a complete metadata
+entry for each object.
+:::
 
 +++
 

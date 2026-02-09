@@ -67,6 +67,11 @@ trap "rm -rf $TEMP_DIR" EXIT
 
 cd "$TEMP_DIR"
 
+# Clear git environment variables that may leak from CI runners.
+# If GIT_DIR or GIT_WORK_TREE point to the original repo, git operations
+# here would use the original repo's .gitignore (which ignores .jupyter_cache/).
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_CEILING_DIRECTORIES
+
 # Initialize new orphan branch
 git init
 git config user.name "$GIT_USER_NAME"
@@ -107,8 +112,18 @@ Size: $CACHE_SIZE
 Do not merge this branch into main or other working branches.
 EOF
 
-# Add and commit
-git add .
+# Verify cache has files before committing
+COPIED_COUNT=$(find .jupyter_cache -type f 2>/dev/null | wc -l)
+if [ "$COPIED_COUNT" -eq 0 ]; then
+    echo "Error: .jupyter_cache has no files after copy"
+    echo "Contents of temp dir:"
+    find . -not -path './.git/*' -not -path './.git'
+    exit 1
+fi
+echo "Verified: $COPIED_COUNT files in .jupyter_cache"
+
+# Add and commit (--force bypasses any inherited .gitignore rules)
+git add --force .
 git commit -m "Update docs cache for $BRANCH_NAME
 
 Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
