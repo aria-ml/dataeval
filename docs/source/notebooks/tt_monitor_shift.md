@@ -59,8 +59,9 @@ distributions.
 You'll begin by importing the necessary libraries for this tutorial.
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 try:
     import google.colab  # noqa: F401
 
@@ -92,8 +93,8 @@ torch.set_default_device(device)
 > **More on device**
 >
 > The device is set above as it will be used in subsequent steps. The device is the piece of hardware where the model,
-> data, and other related objects are stored in memory. If a GPU is available, this notebook will use that hardware rather
-> than the CPU. To force running only on the CPU, change `device` to `"cpu"` For more information, see the
+> data, and other related objects are stored in memory. If a GPU is available, this notebook will use that hardware
+> rather than the CPU. To force running only on the CPU, change `device` to `"cpu"` For more information, see the
 > [PyTorch device page](https://pytorch.org/tutorials/recipes/recipes/changing_default_device.html).
 
 +++
@@ -305,7 +306,7 @@ parity can affect a model's ability to achieve performance recorded during model
 or the label distributions lack parity, it is a good idea to consider retraining the model and incorporating operational
 data into the dataset.
 
----
+______________________________________________________________________
 
 ## What's next
 

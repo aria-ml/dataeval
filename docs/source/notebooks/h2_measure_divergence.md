@@ -36,7 +36,7 @@ example, if you would like to measure operational drift.
 1. A Python environment with the following packages installed:
    - dataeval
    - maite-datasets
-2. A set of image embeddings for each dataset (usually obtained with an AutoEncoder)
+1. A set of image embeddings for each dataset (usually obtained with an AutoEncoder)
 
 +++
 
@@ -45,8 +45,9 @@ example, if you would like to measure operational drift.
 Let's import the required libraries needed to set up a minimal working example
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 # Google Colab Only
 try:
     import google.colab  # noqa: F401
@@ -132,8 +133,9 @@ print(div)
 ```
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 ### TEST ASSERTION CELL ###
 assert div["divergence"] > 0.95
 ```

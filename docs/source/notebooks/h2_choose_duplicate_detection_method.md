@@ -18,7 +18,7 @@ kernelspec:
 DataEval offers multiple approaches for detecting duplicate images:
 
 1. **Hash-based methods** (phash_d4, dhash_d4) - Fast perceptual hashing with rotation/flip invariance
-2. **Embedding-based methods** (BoVWExtractor) - SIFT-based Bag of Visual Words for semantic similarity
+1. **Embedding-based methods** (BoVWExtractor) - SIFT-based Bag of Visual Words for semantic similarity
 
 This notebook compares these approaches to help you choose the right method for your use case.
 
@@ -43,7 +43,7 @@ features is invariant to **any** rotation angle, making it better for detecting 
    - `dataeval`
    - `opencv-python` or `opencv-python-headless`
    - `matplotlib`
-2. Sample images to analyze
+1. Sample images to analyze
 
 +++
 
@@ -52,8 +52,9 @@ features is invariant to **any** rotation angle, making it better for detecting 
 Let's import the required libraries.
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 # Google Colab Only
 try:
     import google.colab  # noqa: F401
@@ -83,10 +84,10 @@ config.set_seed(67)  # six seven
 We'll create a synthetic dataset with different types of "duplicates" to test each method's capabilities:
 
 1. **Original images** - Base images with texture (for SIFT detection)
-2. **90° rotations** - 90°, 180°, 270° rotations (D4 hashes can detect these)
-3. **Diagonal rotations** - 45°, 135° rotations (only BoVW can detect these!)
-4. **Flipped copies** - Horizontal and vertical flips
-5. **Unique images** - Should NOT be detected as duplicates
+1. **90° rotations** - 90°, 180°, 270° rotations (D4 hashes can detect these)
+1. **Diagonal rotations** - 45°, 135° rotations (only BoVW can detect these!)
+1. **Flipped copies** - Horizontal and vertical flips
+1. **Unique images** - Should NOT be detected as duplicates
 
 ```{code-cell} ipython3
 def create_textured_image(seed: int, size: int = 128) -> np.ndarray:
@@ -385,8 +386,9 @@ The key difference demonstrated in this notebook is **diagonal rotation handling
 If your dataset may contain images rotated at arbitrary angles, BoVWExtractor is the better choice despite being slower.
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 ### TEST ASSERTION CELL ###
 # D4 hashes should detect 90° rotations but NOT diagonal rotations
 assert d4_results.items.near is not None, "D4 should find some near duplicates"

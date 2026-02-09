@@ -89,6 +89,10 @@ lint = [
   "ruff>=0.11",
   "codespell[toml]>=2.3",
 ]
+docsync = [
+  "jupytext>=1.19.1",
+  "mdformat-myst",
+]
 doclint = [
   { include-group = "docs"},
   "ruff>=0.11",

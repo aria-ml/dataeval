@@ -40,7 +40,7 @@ Use this approach when you need fine-grained control over which statistics to co
 ### _What you will need_
 
 1. An object detection dataset (we'll use SeaDrone from maite-datasets)
-2. A Python environment with the following packages installed:
+1. A Python environment with the following packages installed:
    - `dataeval`
    - `maite-datasets`
 
@@ -183,11 +183,12 @@ From this analysis, we've learned:
 1. **Custom Statistics Selection**: The {class}`.ImageStats` flags allow fine-grained control over which statistics to
    compute, optimizing performance by avoiding unnecessary calculations.
 
-2. **Granular Analysis**: Using `per_image` and `per_target` parameters, we can analyze statistics at different levels:
+1. **Granular Analysis**: Using `per_image` and `per_target` parameters, we can analyze statistics at different levels:
+
    - Full images provide context about overall scene properties
    - Bounding boxes reveal properties of individual objects
 
-3. **SourceIndex Tracking**: The {class}`.SourceIndex` objects allow us to precisely track which image, box, and channel
+1. **SourceIndex Tracking**: The {class}`.SourceIndex` objects allow us to precisely track which image, box, and channel
    each statistic corresponds to.
 
 +++

@@ -91,7 +91,7 @@ os.environ.setdefault("UV_VENV_CLEAR", "1")
 
 # Standard nox options
 nox.options.default_venv_backend = "uv" if nox_uv is not None else "virtualenv"
-nox.options.sessions = ["test", "type", "deps", "lint", "doclint", "doctest", "check"]
+nox.options.sessions = ["test", "type", "deps", "lint", "docsync", "doclint", "doctest", "check"]
 
 DOCS_ENVS = {"LANG": "C", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True", "PYDEVD_DISABLE_FILE_VALIDATION": "1"}
 DOCTEST_ENVS = {"NB_EXECUTION_MODE_OVERRIDE": "off"}
@@ -223,11 +223,9 @@ def docs(session: nox.Session) -> None:
             session.warn(f"⚠️  Chart generation failed: {e}")
             session.log("Continuing with documentation build...")
 
-    # Convert markdown notebooks to ipynb (always md -> ipynb, ignores timestamps)
+    # Convert markdown notebooks to ipynb (md is source of truth, ignores timestamps)
     notebook_dir = "docs/source/notebooks"
     session.run("jupytext", "--to", "notebook", "--update", notebook_dir + "/*.md")
-    if IS_CI:
-        session.run("git", "diff", "--exit-code", notebook_dir, external=True)
 
     if {"synconly", "sync-only"} & set(session.posargs):
         session.log("Sync-only mode: notebooks have been synced but docs build is skipped.")
@@ -326,6 +324,30 @@ def _run_doclint_tests(session: nox.Session, output_dir: str, scripts: list) -> 
         test_failures.append(("pyright", str(e)))
 
     return test_failures
+
+
+@session(uv_only_groups=["docsync"], uv_no_install_project=True)
+def docsync(session: nox.Session) -> None:
+    """Sync notebook pairs and format markdown. Generates .md for orphan .ipynb files."""
+    notebook_dir = "docs/source/notebooks"
+
+    # Generate .md for any new .ipynb files without a markdown pair
+    ipynb_stems = {Path(f).stem for f in glob.glob(f"{notebook_dir}/*.ipynb")}
+    md_stems = {Path(f).stem for f in glob.glob(f"{notebook_dir}/*.md")}
+    for stem in sorted(ipynb_stems - md_stems):
+        session.log(f"Generating markdown for unpaired notebook: {stem}.ipynb")
+        session.run("jupytext", "--to", "myst", f"{notebook_dir}/{stem}.ipynb")
+
+    # Format markdown notebooks (fix locally, check in CI)
+    mdformat_args = ["mdformat", "--wrap", "120"]
+    if IS_CI:
+        mdformat_args.append("--check")
+    session.run(*mdformat_args, notebook_dir)
+
+    # Regenerate .ipynb from .md and fail if out of sync (CI only)
+    session.run("jupytext", "--to", "notebook", "--update", notebook_dir + "/*.md")
+    if IS_CI:
+        session.run("git", "diff", "--exit-code", notebook_dir, external=True)
 
 
 @session(uv_only_groups=["doclint"])

@@ -36,7 +36,7 @@ specific to metadata of interest that is not present natively in the dataset met
 ### _What you will need_
 
 1. A dataset to analyze
-2. A Python environment with the following packages installed:
+1. A Python environment with the following packages installed:
    - `dataeval`
    - `dataeval-plots[plotly]`
    - `maite-datasets`
@@ -48,8 +48,9 @@ specific to metadata of interest that is not present natively in the dataset met
 First import the required libraries needed to set up the example.
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 try:
     import google.colab  # noqa: F401
 

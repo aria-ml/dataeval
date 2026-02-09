@@ -36,7 +36,7 @@ The Duplicates class should be used if you need to find duplicate images in your
 1. A python envornment with following packages installed:
    - dataeval
    - maite-datasets
-2. A dataset to analyze
+1. A dataset to analyze
 
 +++
 
@@ -45,8 +45,9 @@ The Duplicates class should be used if you need to find duplicate images in your
 Let's import the required libraries needed to set up a minimal working example
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 # Google Colab Only
 try:
     import google.colab  # noqa: F401
@@ -131,8 +132,9 @@ It also found several sets of images that are very closely related to each other
 digits we would expect it to find some images that were nearly identical.
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 ### TEST ASSERTION CELL ###
 assert results.items.exact is not None
 assert len(results.items.exact) == len(duplicates)

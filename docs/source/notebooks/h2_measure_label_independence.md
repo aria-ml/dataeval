@@ -35,8 +35,8 @@ statistically independent labels.
 
 1. A Python environment with the following packages installed:
    - dataeval
-2. A labeled training image dataset
-3. A labeled test image dataset to evaluate the label distribution of
+1. A labeled training image dataset
+1. A labeled test image dataset to evaluate the label distribution of
 
 +++
 
@@ -45,8 +45,9 @@ statistically independent labels.
 Let's import the required libraries needed to set up a minimal working example
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 # Google Colab Only
 try:
     import google.colab  # noqa: F401
@@ -96,8 +97,9 @@ print(
 ```
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 ### TEST ASSERTION CELL ###
 assert 0 <= results["chi_squared"] < 4
 assert 0.9 < results["p_value"] <= 1.0

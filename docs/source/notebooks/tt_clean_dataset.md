@@ -36,7 +36,7 @@ Part 1 of our introduction to exploratory data analysis guide
 - Environment Requirements
   - `dataeval` or `dataeval[all]`
 
----
+______________________________________________________________________
 
 +++
 
@@ -64,8 +64,9 @@ This guide will walk through how to use DataEval to perform basic data cleaning.
 You'll begin by importing the necessary libraries to walk through this guide.
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 try:
     import google.colab  # noqa: F401
 
@@ -641,7 +642,7 @@ comprehensive but also aligned with your specific goals and requirements.
 
 Good luck with your data!
 
----
+______________________________________________________________________
 
 +++
 

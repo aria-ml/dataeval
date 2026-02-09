@@ -42,12 +42,12 @@ The clustering workflow can be used during the EDA process to perform the follow
 ### _What you will need_
 
 1. A 2 dimensional dataset (samples, features)
-2. A Python environment with the following packages installed:
+1. A Python environment with the following packages installed:
    - `dataeval`
    - `matplotlib`
 
 This could be a set of flattened images or image embeddings. We recommend using image embeddings (with the feature
-dimension being <=1000).
+dimension being \<=1000).
 
 +++
 
@@ -56,8 +56,9 @@ dimension being <=1000).
 Let's import the required libraries needed to set up a minimal working example.
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 try:
     import google.colab  # noqa: F401
 
@@ -131,7 +132,7 @@ print("Array shape:", test_data.ndim)
 
 ## Cluster the data
 
-We are now ready to cluster the data and inspect the results.  
+We are now ready to cluster the data and inspect the results.\
 There are two different clustering methods, "kmeans" and "hdbscan". These are selected via the _algorithm_ parameter,
 with "hdbscan" being the default.
 
@@ -145,8 +146,9 @@ clusters["clusters"]
 ```
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 ### TEST ASSERTION CELL ###
 assert clusters["clusters"].max() == 4
 assert clusters["clusters"].min() == -1
@@ -188,8 +190,9 @@ We can see that there was one outlier and there are also 2 sets of near duplicat
 points).
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 ### TEST ASSERTION CELL ###
 assert len(outliers_result.issues) == 1
 assert duplicates_result.items.near is not None

@@ -48,9 +48,9 @@ Relevant personas: Data Engineer, T&E Engineer
 ## Introduction
 
 Identifying any biases or correlations present in a dataset is essential to accurately interpreting your model's
-performance and its ability to generalize to new data. A common cause of poor generalization is shortcut learning
-&mdash; where a model uses secondary or background information to make predictions &mdash; which is enabled or
-exacerbated by dataset sampling biases.
+performance and its ability to generalize to new data. A common cause of poor generalization is shortcut learning —
+where a model uses secondary or background information to make predictions — which is enabled or exacerbated by dataset
+sampling biases.
 
 ### Bias and correlations
 
@@ -63,8 +63,8 @@ Not all forms of bias directly affect the dataset and in order to address the bi
 assumptions:
 
 1. All desired classes are present.
-2. All available metadata is provided.
-3. The metadata has been recorded correctly.
+1. All available metadata is provided.
+1. The metadata has been recorded correctly.
 
 If any of the above assumptions are violated, then the analysis will not be accurate. When using your own data, you
 should verify the above assumptions.
@@ -95,8 +95,9 @@ and leakage between training and testing sets.
 You'll begin by importing the necessary libraries to walk through this guide.
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 try:
     import google.colab  # noqa: F401
 
@@ -169,18 +170,14 @@ metadata of the first image.
 metadata.raw[0]
 ```
 
-:::{note}
-`Metadata` is unable to process nested lists. For this dataset, _part_ is a factor that describes certain
+:::\{note} `Metadata` is unable to process nested lists. For this dataset, _part_ is a factor that describes certain
 parts of a _person_ object (such as _head_, _foot_ and _hand_), each with separate bounding box coordinates. You will
-ignore this information for this example.
-:::
+ignore this information for this example. :::
 
 +++
 
-:::{note}
-The nested objects _horse_ and _person_ from the first metadata entry will be expanded to a complete metadata
-entry for each object.
-:::
+:::\{note} The nested objects _horse_ and _person_ from the first metadata entry will be expanded to a complete metadata
+entry for each object. :::
 
 +++
 
@@ -314,8 +311,8 @@ What needs to be further investigated are things like whether the _sofa_ class s
 diversity value of 0.4 means that a few of the images do while others do not.
 
 Also, the _cat_ class has a low score signifying that most of the images fall into one or two categories rather than
-being spread even across the categories. This highlights an error in the data collection process &mdash; the value was
-not specified for most _cat_ images and therefore defaulted to "Unspecified".
+being spread even across the categories. This highlights an error in the data collection process — the value was not
+specified for most _cat_ images and therefore defaulted to "Unspecified".
 
 An alternative error would be a dataset in which the _cat_ images have most cats facing a specific direction, which
 would require additional data to overcome the bias, but that is not the case for this dataset. It has plenty of cats
@@ -378,7 +375,7 @@ strengths and limitations. It is designed to help you create representative and 
 
 Good luck with your data!
 
----
+______________________________________________________________________
 
 +++
 

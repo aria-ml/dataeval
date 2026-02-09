@@ -228,7 +228,7 @@ version = "25.4.0"
 description = "Classes Without Boilerplate"
 optional = false
 python-versions = ">=3.9"
-groups = ["dev", "doclint", "docs"]
+groups = ["dev", "doclint", "docs", "docsync"]
 files = [
     {file = "attrs-25.4.0-py3-none-any.whl", hash = "sha256:adcf7e2a1fb3b36ac48d97835bb6d8ade15b8dcce26aba8bf1d14847b57a3373"},
     {file = "attrs-25.4.0.tar.gz", hash = "sha256:16d5969b87f0859ef33a48b35d55ac1be6e42ae49d5e853b597db70c35c57e11"},
@@ -1343,7 +1343,7 @@ version = "2.21.2"
 description = "Fastest Python implementation of JSON schema"
 optional = false
 python-versions = "*"
-groups = ["dev", "doclint", "docs", "lock"]
+groups = ["dev", "doclint", "docs", "docsync", "lock"]
 files = [
     {file = "fastjsonschema-2.21.2-py3-none-any.whl", hash = "sha256:1c797122d0a86c5cace2e54bf4e819c36223b552017172f32c5c024a6b77e463"},
     {file = "fastjsonschema-2.21.2.tar.gz", hash = "sha256:b1eb43748041c880796cd077f1a07c3d94e93ae84bba5ed36800a33554ae05de"},
@@ -2099,7 +2099,7 @@ version = "4.26.0"
 description = "An implementation of JSON Schema validation for Python"
 optional = false
 python-versions = ">=3.10"
-groups = ["dev", "doclint", "docs"]
+groups = ["dev", "doclint", "docs", "docsync"]
 files = [
     {file = "jsonschema-4.26.0-py3-none-any.whl", hash = "sha256:d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce"},
     {file = "jsonschema-4.26.0.tar.gz", hash = "sha256:0c26707e2efad8aa1bfc5b7ce170f3fccc2e4918ff85989ba9ffa9facb2be326"},
@@ -2130,7 +2130,7 @@ version = "2025.9.1"
 description = "The JSON Schema meta-schemas and vocabularies, exposed as a Registry"
 optional = false
 python-versions = ">=3.9"
-groups = ["dev", "doclint", "docs"]
+groups = ["dev", "doclint", "docs", "docsync"]
 files = [
     {file = "jsonschema_specifications-2025.9.1-py3-none-any.whl", hash = "sha256:98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe"},
     {file = "jsonschema_specifications-2025.9.1.tar.gz", hash = "sha256:b540987f239e745613c7a9176f3edb72b832a4ac465cf02712288397832b5e8d"},
@@ -2242,7 +2242,7 @@ version = "5.9.1"
 description = "Jupyter core package. A base package on which Jupyter projects rely."
 optional = false
 python-versions = ">=3.10"
-groups = ["dev", "doclint", "docs"]
+groups = ["dev", "doclint", "docs", "docsync"]
 files = [
     {file = "jupyter_core-5.9.1-py3-none-any.whl", hash = "sha256:ebf87fdc6073d142e114c72c9e29a9d7ca03fad818c5d300ce2adc1fb0743407"},
     {file = "jupyter_core-5.9.1.tar.gz", hash = "sha256:4d09aaff303b9566c3ce657f580bd089ff5c91f5f89cf7d8846c3cdf465b5508"},
@@ -2446,7 +2446,7 @@ version = "1.19.1"
 description = "Jupyter notebooks as Markdown documents, Julia, Python or R scripts"
 optional = false
 python-versions = ">=3.9"
-groups = ["dev", "doclint", "docs"]
+groups = ["dev", "doclint", "docs", "docsync"]
 files = [
     {file = "jupytext-1.19.1-py3-none-any.whl", hash = "sha256:d8975035155d034bdfde5c0c37891425314b7ea8d3a6c4b5d18c294348714cd9"},
     {file = "jupytext-1.19.1.tar.gz", hash = "sha256:82587c07e299173c70ed5e8ec7e75183edf1be289ed518bab49ad0d4e3d5f433"},
@@ -2761,7 +2761,7 @@ version = "3.0.0"
 description = "Python port of markdown-it. Markdown parsing, done right!"
 optional = false
 python-versions = ">=3.8"
-groups = ["dev", "doclint", "docs", "lock"]
+groups = ["dev", "doclint", "docs", "docsync", "lock"]
 files = [
     {file = "markdown-it-py-3.0.0.tar.gz", hash = "sha256:e3f60a94fa066dc52ec76661e37c851cb232d92f9886b15cb560aaada2df8feb"},
     {file = "markdown_it_py-3.0.0-py3-none-any.whl", hash = "sha256:355216845c60bd96232cd8d8c40e8f9765cc86f46880e43a8fd22dc1a1a8cab1"},
@@ -2949,12 +2949,111 @@ traitlets = "*"
 test = ["flake8", "nbdime", "nbval", "notebook", "pytest"]
 
 [[package]]
+name = "mdformat"
+version = "1.0.0"
+description = "CommonMark compliant Markdown formatter"
+optional = false
+python-versions = ">=3.10"
+groups = ["docsync"]
+files = [
+    {file = "mdformat-1.0.0-py3-none-any.whl", hash = "sha256:bca015d65a1d063a02e885a91daee303057bc7829c2cd37b2075a50dbb65944b"},
+    {file = "mdformat-1.0.0.tar.gz", hash = "sha256:4954045fcae797c29f86d4ad879e43bb151fa55dbaf74ac6eaeacf1d45bb3928"},
+]
+
+[package.dependencies]
+markdown-it-py = ">=1,<5"
+tomli = {version = ">=1.1.0", markers = "python_version < \"3.11\""}
+
+[[package]]
+name = "mdformat-footnote"
+version = "0.1.3"
+description = "An mdformat plugin for parsing/validating footnotes"
+optional = false
+python-versions = ">=3.10"
+groups = ["docsync"]
+files = [
+    {file = "mdformat_footnote-0.1.3-py3-none-any.whl", hash = "sha256:3033184237cbaf2a71cc02a4c37f043a97c1f16d3ed6939bc104964e77aad0b3"},
+    {file = "mdformat_footnote-0.1.3.tar.gz", hash = "sha256:70617e61af87f59d7dea93a392c5093089a6d4551126fa18025c6fddb18bf742"},
+]
+
+[package.dependencies]
+mdformat = ">=0.7.0"
+mdit-py-plugins = ">=0.4.0"
+
+[package.extras]
+dev = ["pre-commit"]
+test = ["pytest (>=8.0.0)", "pytest-cov (>=7.0.0)"]
+
+[[package]]
+name = "mdformat-front-matters"
+version = "2.0.0"
+description = "An mdformat plugin to format YAML, TOML, or JSON front matter"
+optional = false
+python-versions = ">=3.10.0"
+groups = ["docsync"]
+files = [
+    {file = "mdformat_front_matters-2.0.0-py3-none-any.whl", hash = "sha256:8ea92d23d1e9427fe6548b9044e5fbf7bcf6c217941f1a9442e0efd8b0a76e61"},
+    {file = "mdformat_front_matters-2.0.0.tar.gz", hash = "sha256:46efabe93707699120c67d4b33b51fdb4cfe0e040acfb0f8212eb33c9a3e8a9a"},
+]
+
+[package.dependencies]
+mdformat = ">=0.7.19"
+mdit-py-plugins = ">=0.4.1"
+ruamel-yaml = ">=0.18.16"
+toml = ">=0.10.0"
+
+[package.extras]
+test = ["pytest (>=9.0.1)", "pytest-beartype (>=0.2.0)", "pytest-cov (>=7.0.0)", "typing-extensions (>=4.15.0)"]
+
+[[package]]
+name = "mdformat-gfm"
+version = "1.0.0"
+description = "Mdformat plugin for GitHub Flavored Markdown compatibility"
+optional = false
+python-versions = ">=3.10"
+groups = ["docsync"]
+files = [
+    {file = "mdformat_gfm-1.0.0-py3-none-any.whl", hash = "sha256:7305a50efd2a140d7c83505b58e3ac5df2b09e293f9bbe72f6c7bee8c678b005"},
+    {file = "mdformat_gfm-1.0.0.tar.gz", hash = "sha256:d1d49a409a6acb774ce7635c72d69178df7dce1dc8cdd10e19f78e8e57b72623"},
+]
+
+[package.dependencies]
+markdown-it-py = "*"
+mdformat = ">=0.7.5"
+mdit-py-plugins = ">=0.2.0"
+wcwidth = ">=0.2.13"
+
+[[package]]
+name = "mdformat-myst"
+version = "0.3.0"
+description = "Mdformat plugin for MyST compatibility."
+optional = false
+python-versions = ">=3.10"
+groups = ["docsync"]
+files = [
+    {file = "mdformat_myst-0.3.0-py3-none-any.whl", hash = "sha256:45e305cb1e742e712c0a8410315c351f3ab43e702d979d4f0eea9d9831245adc"},
+    {file = "mdformat_myst-0.3.0.tar.gz", hash = "sha256:8195dec075683cac689c5586a5e4c6700ec8d6df0f9bc34a1e2f3514d5e745b0"},
+]
+
+[package.dependencies]
+mdformat = ">=0.7.0"
+mdformat-footnote = ">=0.1.1"
+mdformat-front-matters = ">=1.0.0"
+mdformat-gfm = ">=1.0.0"
+mdit-py-plugins = ">=0.3.0"
+"ruamel.yaml" = ">=0.16.0"
+
+[package.extras]
+dev = ["pre-commit"]
+test = ["pytest (>=8.0.0)", "pytest-cov (>=7.0.0)"]
+
+[[package]]
 name = "mdit-py-plugins"
 version = "0.5.0"
 description = "Collection of plugins for markdown-it-py"
 optional = false
 python-versions = ">=3.10"
-groups = ["dev", "doclint", "docs"]
+groups = ["dev", "doclint", "docs", "docsync"]
 files = [
     {file = "mdit_py_plugins-0.5.0-py3-none-any.whl", hash = "sha256:07a08422fc1936a5d26d146759e9155ea466e842f5ab2f7d2266dd084c8dab1f"},
     {file = "mdit_py_plugins-0.5.0.tar.gz", hash = "sha256:f4918cb50119f50446560513a8e311d574ff6aaed72606ddae6d35716fe809c6"},
@@ -2974,7 +3073,7 @@ version = "0.1.2"
 description = "Markdown URL utilities"
 optional = false
 python-versions = ">=3.7"
-groups = ["dev", "doclint", "docs", "lock"]
+groups = ["dev", "doclint", "docs", "docsync", "lock"]
 files = [
     {file = "mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8"},
     {file = "mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba"},
@@ -3307,7 +3406,7 @@ version = "5.10.4"
 description = "The Jupyter Notebook format"
 optional = false
 python-versions = ">=3.8"
-groups = ["dev", "doclint", "docs"]
+groups = ["dev", "doclint", "docs", "docsync"]
 files = [
     {file = "nbformat-5.10.4-py3-none-any.whl", hash = "sha256:3b48d6c8fbca4b299bf3982ea7db1af21580e4fec269ad087b9e81588891200b"},
     {file = "nbformat-5.10.4.tar.gz", hash = "sha256:322168b14f937a5d11362988ecac2a4952d3d8e3a2cbeb2319584631226d5b3a"},
@@ -4041,7 +4140,7 @@ version = "25.0"
 description = "Core utilities for Python packages"
 optional = false
 python-versions = ">=3.8"
-groups = ["main", "dev", "doclint", "docs", "lock", "test"]
+groups = ["main", "dev", "doclint", "docs", "docsync", "lock", "test"]
 files = [
     {file = "packaging-25.0-py3-none-any.whl", hash = "sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484"},
     {file = "packaging-25.0.tar.gz", hash = "sha256:d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f"},
@@ -4257,7 +4356,7 @@ version = "4.5.1"
 description = "A small Python package for determining appropriate platform-specific dirs, e.g. a `user data dir`."
 optional = false
 python-versions = ">=3.10"
-groups = ["dev", "doclint", "docs", "lock"]
+groups = ["dev", "doclint", "docs", "docsync", "lock"]
 files = [
     {file = "platformdirs-4.5.1-py3-none-any.whl", hash = "sha256:d03afa3963c806a9bed9d5125c8f4cb2fdaf74a55ab60e5d59b3fde758104d31"},
     {file = "platformdirs-4.5.1.tar.gz", hash = "sha256:61d5cdcc6065745cdd94f0f878977f8de9437be93de97c1c12f853c9c0cdcbda"},
@@ -4935,7 +5034,7 @@ version = "6.0.3"
 description = "YAML parser and emitter for Python"
 optional = false
 python-versions = ">=3.8"
-groups = ["dev", "doclint", "docs"]
+groups = ["dev", "doclint", "docs", "docsync"]
 files = [
     {file = "PyYAML-6.0.3-cp38-cp38-macosx_10_13_x86_64.whl", hash = "sha256:c2514fceb77bc5e7a2f7adfaa1feb2fb311607c9cb518dbc378688ec73d8292f"},
     {file = "PyYAML-6.0.3-cp38-cp38-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:9c57bb8c96f6d1808c030b1687b9b5fb476abaa47f0db9c0101f5e9f394e97f4"},
@@ -5220,7 +5319,7 @@ version = "0.37.0"
 description = "JSON Referencing + Python"
 optional = false
 python-versions = ">=3.10"
-groups = ["dev", "doclint", "docs"]
+groups = ["dev", "doclint", "docs", "docsync"]
 files = [
     {file = "referencing-0.37.0-py3-none-any.whl", hash = "sha256:381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231"},
     {file = "referencing-0.37.0.tar.gz", hash = "sha256:44aefc3142c5b842538163acb373e24cce6632bd54bdb01b21ad5863489f50d8"},
@@ -5369,7 +5468,7 @@ version = "0.30.0"
 description = "Python bindings to Rust's persistent data structures (rpds)"
 optional = false
 python-versions = ">=3.10"
-groups = ["dev", "doclint", "docs"]
+groups = ["dev", "doclint", "docs", "docsync"]
 files = [
     {file = "rpds_py-0.30.0-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:679ae98e00c0e8d68a7fda324e16b90fd5260945b45d3b824c892cec9eea3288"},
     {file = "rpds_py-0.30.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:4cc2206b76b4f576934f0ed374b10d7ca5f457858b157ca52064bdfc26b9fc00"},
@@ -5487,6 +5586,24 @@ files = [
     {file = "rpds_py-0.30.0-pp311-pypy311_pp73-musllinux_1_2_x86_64.whl", hash = "sha256:ac37f9f516c51e5753f27dfdef11a88330f04de2d564be3991384b2f3535d02e"},
     {file = "rpds_py-0.30.0.tar.gz", hash = "sha256:dd8ff7cf90014af0c0f787eea34794ebf6415242ee1d6fa91eaba725cc441e84"},
 ]
+
+[[package]]
+name = "ruamel-yaml"
+version = "0.19.1"
+description = "ruamel.yaml is a YAML parser/emitter that supports roundtrip preservation of comments, seq/map flow style, and map key order"
+optional = false
+python-versions = ">=3.9"
+groups = ["docsync"]
+files = [
+    {file = "ruamel_yaml-0.19.1-py3-none-any.whl", hash = "sha256:27592957fedf6e0b62f281e96effd28043345e0e66001f97683aa9a40c667c93"},
+    {file = "ruamel_yaml-0.19.1.tar.gz", hash = "sha256:53eb66cd27849eff968ebf8f0bf61f46cdac2da1d1f3576dd4ccee9b25c31993"},
+]
+
+[package.extras]
+docs = ["mercurial (>5.7)", "ryd"]
+jinja2 = ["ruamel.yaml.jinja2 (>=0.2)"]
+libyaml = ["ruamel.yaml.clibz (>=0.3.7) ; platform_python_implementation == \"CPython\""]
+oldlibyaml = ["ruamel.yaml.clib ; platform_python_implementation == \"CPython\""]
 
 [[package]]
 name = "ruff"
@@ -6329,12 +6446,24 @@ doc = ["sphinx", "sphinx_rtd_theme"]
 test = ["pytest", "ruff"]
 
 [[package]]
+name = "toml"
+version = "0.10.2"
+description = "Python Library for Tom's Obvious, Minimal Language"
+optional = false
+python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
+groups = ["docsync"]
+files = [
+    {file = "toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b"},
+    {file = "toml-0.10.2.tar.gz", hash = "sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f"},
+]
+
+[[package]]
 name = "tomli"
 version = "2.4.0"
 description = "A lil' TOML parser"
 optional = false
 python-versions = ">=3.8"
-groups = ["dev", "doclint", "docs", "lint", "lock", "test"]
+groups = ["dev", "doclint", "docs", "docsync", "lint", "lock", "test"]
 markers = "python_version == \"3.10\""
 files = [
     {file = "tomli-2.4.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:b5ef256a3fd497d4973c11bf142e9ed78b150d36f5773f1ca6088c230ffc5867"},
@@ -6563,7 +6692,7 @@ version = "5.14.3"
 description = "Traitlets Python configuration system"
 optional = false
 python-versions = ">=3.8"
-groups = ["dev", "doclint", "docs"]
+groups = ["dev", "doclint", "docs", "docsync"]
 files = [
     {file = "traitlets-5.14.3-py3-none-any.whl", hash = "sha256:b74e89e397b1ed28cc831db7aea759ba6640cb3de13090ca145426688ff1ac4f"},
     {file = "traitlets-5.14.3.tar.gz", hash = "sha256:9ed0579d3502c94b4b3732ac120375cda96f923114522847de4b3bb98b96b6b7"},
@@ -6635,11 +6764,12 @@ version = "4.15.0"
 description = "Backported and Experimental Type Hints for Python 3.9+"
 optional = false
 python-versions = ">=3.9"
-groups = ["main", "dev", "doclint", "docs", "lock", "test", "type"]
+groups = ["main", "dev", "doclint", "docs", "docsync", "lock", "test", "type"]
 files = [
     {file = "typing_extensions-4.15.0-py3-none-any.whl", hash = "sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548"},
     {file = "typing_extensions-4.15.0.tar.gz", hash = "sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466"},
 ]
+markers = {docsync = "python_version < \"3.13\""}
 
 [[package]]
 name = "typing-inspection"
@@ -6760,7 +6890,7 @@ version = "0.2.14"
 description = "Measures the displayed width of unicode strings in a terminal"
 optional = false
 python-versions = ">=3.6"
-groups = ["dev", "doclint", "docs"]
+groups = ["dev", "doclint", "docs", "docsync"]
 files = [
     {file = "wcwidth-0.2.14-py2.py3-none-any.whl", hash = "sha256:a7bb560c8aee30f9957e5f9895805edd20602f2d7f720186dfd906e82b4982e1"},
     {file = "wcwidth-0.2.14.tar.gz", hash = "sha256:4d478375d31bc5395a3c55c40ccdf3354688364cd61c4f6adacaa9215d0b3605"},
@@ -7165,4 +7295,4 @@ opencv = ["opencv-python-headless"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10"
-content-hash = "e9bd4a8fb4b0388a17f91c4104aed5edc15f6249335d803b8704e7256960de36"
+content-hash = "d9b35485e5494e29a3e54f1a086fb5d36d055db496eeeae1a3a6d336b189b6b5"

@@ -6,4 +6,4 @@
 docs/source/notebooks/models/ae binary
 *.db binary
 docs/** linguist-documentation
-docs/source/notebooks/*.ipynb linguist-generated -diff
+docs/source/notebooks/*.ipynb linguist-generated gitlab-generated -diff

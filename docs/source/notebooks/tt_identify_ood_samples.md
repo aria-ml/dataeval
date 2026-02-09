@@ -54,9 +54,9 @@ six different approaches to OOD detection:
 **Reconstruction-Based Methods:**
 
 1. **Standard Autoencoder (AE)**: Simple reconstruction-based detection using mean squared error
-2. **Variational Autoencoder (VAE)**: Probabilistic approach with regularized latent space
-3. **AE with GMM**: Enhanced detection by modeling latent space with Gaussian Mixture Models
-4. **VAE with GMM**: Combining probabilistic encoding with GMM for robust detection
+1. **Variational Autoencoder (VAE)**: Probabilistic approach with regularized latent space
+1. **AE with GMM**: Enhanced detection by modeling latent space with Gaussian Mixture Models
+1. **VAE with GMM**: Combining probabilistic encoding with GMM for robust detection
 
 **Distance-Based Methods**: 5. **K-Nearest Neighbors (KNN) - Raw Pixels**: Detects OOD by measuring distance in pixel
 space 6. **K-Nearest Neighbors (KNN) - Embeddings**: Uses learned embeddings for better similarity
@@ -482,8 +482,8 @@ normalized) and combined with configurable weighting.
 multiple groups.
 
 > **⚠️ Important**: GMM fusion parameters (`gmm_weight` and `gmm_score_mode`) significantly impact performance. The
-> default `gmm_weight=0.7` favors the GMM component, which typically works well. Experiment with values in [0.5, 0.9] for
-> your data.
+> default `gmm_weight=0.7` favors the GMM component, which typically works well. Experiment with values in [0.5, 0.9]
+> for your data.
 
 ```{code-cell} ipython3
 # Create AE with GMM density network
@@ -624,10 +624,10 @@ plt.show()
 ### Key Observations
 
 1. In-distribution accuracy should be close to threshold (95%)
-2. KNN (Pixels) provides a fast baseline without neural network training
-3. KNN (Embeddings) shows how learned representations improve distance-based methods
-4. GMM models add latent density information for better separation
-5. All models show some OOD detection capability
+1. KNN (Pixels) provides a fast baseline without neural network training
+1. KNN (Embeddings) shows how learned representations improve distance-based methods
+1. GMM models add latent density information for better separation
+1. All models show some OOD detection capability
 
 Note: Digits 8 and 9 share features with 0-7 (circles, curves), making this a challenging OOD scenario. Lower detection
 rates (20-70%) are expected and realistic for this hard case.
@@ -804,7 +804,7 @@ This comparison uses:
 The simple models used here serve as examples—real applications should use architectures targeted to the specific
 scenario.
 
----
+______________________________________________________________________
 
 Let's test each method on different OOD scenarios to understand their strengths and weaknesses in this limited-training
 setting.
@@ -812,8 +812,8 @@ setting.
 We'll create three different OOD scenarios with increasing difficulty:
 
 1. **Easy OOD**: CIFAR10 natural images (converted to grayscale 28x28) - completely different from digits
-2. **Medium OOD**: Rotated digits - same objects, different orientation
-3. **Hard OOD**: Digits 8-9 - similar features to training data (current scenario)
+1. **Medium OOD**: Rotated digits - same objects, different orientation
+1. **Hard OOD**: Digits 8-9 - similar features to training data (current scenario)
 
 ```{code-cell} ipython3
 # Create different OOD scenarios
@@ -973,10 +973,10 @@ methods (AE) provide reliable baselines.
 #### Summary Observations
 
 1. **KNN with learned embeddings** consistently outperformed reconstruction-based methods
-2. **GMM score fusion is critical**: Proper `gmm_weight` (0.6-0.8) significantly impacts performance
-3. **VAE underperforms** with limited training - requires 10-20x more epochs to converge
-4. **Simpler methods (AE) provide reliable baselines** with minimal tuning
-5. **Performance gap narrows** as OOD difficulty decreases (all methods work well on easy OOD)
+1. **GMM score fusion is critical**: Proper `gmm_weight` (0.6-0.8) significantly impacts performance
+1. **VAE underperforms** with limited training - requires 10-20x more epochs to converge
+1. **Simpler methods (AE) provide reliable baselines** with minimal tuning
+1. **Performance gap narrows** as OOD difficulty decreases (all methods work well on easy OOD)
 
 +++
 
@@ -1080,10 +1080,10 @@ config = OODReconstruction.Config(
 **What Matters Most:**
 
 1. **Embedding quality (KNN)**: Use pretrained models (ResNet, ViT, CLIP) or train task-specific embeddings
-2. **Architecture design (AE/VAE)**: Generic models shown here are examples - customize for your data
-3. **GMM configuration**: `gmm_weight` parameter critically impacts performance (0.6-0.8 range)
-4. **Training investment**: VAE needs 10-20x more epochs than shown here to reach potential
-5. **Threshold selection**: Balance false positives vs detection rate for your use case
+1. **Architecture design (AE/VAE)**: Generic models shown here are examples - customize for your data
+1. **GMM configuration**: `gmm_weight` parameter critically impacts performance (0.6-0.8 range)
+1. **Training investment**: VAE needs 10-20x more epochs than shown here to reach potential
+1. **Threshold selection**: Balance false positives vs detection rate for your use case
 
 ### Performance Expectations
 

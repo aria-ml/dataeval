@@ -35,7 +35,7 @@ functions.
 ### _What you will need_
 
 1. A Python environment with dataeval installed
-2. Basic understanding of Python's logging module
+1. Basic understanding of Python's logging module
 
 +++
 
@@ -110,8 +110,9 @@ print(f"\nResult: {result}")
 For more detailed information, you can enable DEBUG level logging:
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 # Clear previous handlers
 for handler in dataeval_logger.handlers[:]:
     dataeval_logger.removeHandler(handler)
@@ -182,8 +183,9 @@ if os.path.exists(log_file):
 You can log to both console and file simultaneously:
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 # Clear previous handlers
 for handler in logging.root.handlers[:]:
     logging.root.removeHandler(handler)
@@ -254,12 +256,13 @@ print(f"Result: {result}")
 
 1. **Configure logging early**: Set up logging configuration at the start of your script or notebook
 
-2. **Use file logging for production**: Console logging is great for development, but file logging is better for
+1. **Use file logging for production**: Console logging is great for development, but file logging is better for
    production environments
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 # Clean up log files created during the notebook execution
 log_files = ["dataeval_operations.log", "dataeval_detailed.log"]
 for log_file in log_files:

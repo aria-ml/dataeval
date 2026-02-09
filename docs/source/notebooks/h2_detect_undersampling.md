@@ -34,8 +34,8 @@ regimes/labels.
 ### _What you will need_
 
 1. Image classification dataset.
-2. Autoencoder trained on image classification dataset for dimension reduction.
-3. A Python environment with the following packages installed:
+1. Autoencoder trained on image classification dataset for dimension reduction.
+1. A Python environment with the following packages installed:
    - `dataeval`
    - `tabulate`
 
@@ -46,8 +46,9 @@ regimes/labels.
 Let's import the required libraries needed to set up a minimal working example
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 # Google Colab Only
 try:
     import base64
@@ -241,8 +242,9 @@ for more info.
 -->
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 ### TEST ASSERTION CELL ###
 wonky = sum(labels[i] == 2 or labels[i] == 7 for idx, i in enumerate(cvrg["uncovered_indices"]) if idx < 20)
 print(wonky)

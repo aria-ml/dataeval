@@ -64,8 +64,9 @@ groups, you can build more robust and reliable models that generalize well in re
 You'll begin by importing the necessary libraries for this tutorial.
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 try:
     import google.colab  # noqa: F401
 
@@ -98,7 +99,7 @@ dep.set_default_backend("plotly")
 pio.renderers.default = "notebook"
 ```
 
-:::{note}
+:::\{note}
 
 The device is the piece of hardware where the model, data, and other related objects are stored in memory. If a GPU is
 available, this notebook will use that hardware rather than the CPU. To force running only on the CPU, change `device`
@@ -408,7 +409,7 @@ algorithms to find outliers, to check for gaps in coverage, and to make decision
 
 Good luck with your data!
 
----
+______________________________________________________________________
 
 ## What's next
 

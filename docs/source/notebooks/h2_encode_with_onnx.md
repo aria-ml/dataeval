@@ -38,8 +38,8 @@ Use the `OnnxExtractor` when you want to:
 ### _What you will need_
 
 1. An image dataset (we'll use VOC2012)
-2. An ONNX model that outputs embeddings
-3. A Python environment with the following packages installed:
+1. An ONNX model that outputs embeddings
+1. A Python environment with the following packages installed:
    - `dataeval`
    - `onnxruntime` (or `onnxruntime-gpu` for GPU support)
    - `onnx` (for model preparation utilities)
@@ -171,8 +171,9 @@ The embeddings have shape `(N, D)` where:
 - `D` is the embedding dimension (2048 for ResNet50)
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 ### TEST ASSERTION CELL ###
 assert embeddings.shape[0] == 100
 assert embeddings.shape[1] == 2048

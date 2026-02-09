@@ -57,9 +57,9 @@ if you have a small dataset, and would like to know if it is worthwhile to colle
 ### _What you will need_
 
 1. A particular model architecture.
-2. Metric(s) that we would like to evaluate.
-3. A dataset of interest.
-4. A Python environment with the following packages installed:
+1. Metric(s) that we would like to evaluate.
+1. A dataset of interest.
+1. A Python environment with the following packages installed:
    - `tabulate`
 
 +++
@@ -69,8 +69,9 @@ if you have a small dataset, and would like to know if it is worthwhile to colle
 Let's import the required libraries needed to set up a minimal working example
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 # Google Colab Only
 try:
     import google.colab  # noqa: F401
@@ -191,7 +192,7 @@ metrics, loss functions, optimizers, model architectures, input sizes, etc.
 
 To allow the Sufficiency class to handle this situation, DataEval uses
 [_Protocols_](https://typing.python.org/en/latest/spec/protocol.html). Sufficiency requires two specific protocols
-called {class}`.TrainingStrategy` and {class}`.EvaluationStrategy`.  
+called {class}`.TrainingStrategy` and {class}`.EvaluationStrategy`.\
 Below we will define the strategies that align with this notebook and combine them into a {class}`.Sufficiency.Config`
 that can be given to the `Sufficiency` class.
 

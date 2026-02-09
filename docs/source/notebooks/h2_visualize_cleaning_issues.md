@@ -35,7 +35,7 @@ data in your dataset.
 ### _What you will need_
 
 1. A dataset to analyze
-2. A Python environment with the following packages installed:
+1. A Python environment with the following packages installed:
    - `dataeval`
    - `maite-datasets`
 
@@ -46,8 +46,9 @@ data in your dataset.
 Let's import the required libraries needed to set up a minimal working example
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 try:
     import google.colab  # noqa: F401
 
@@ -119,8 +120,9 @@ results.aggregate_by_class(Metadata(testing_dataset))
 ```
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 ### TEST ASSERTION CELL ###
 assert results.issues.shape[0] == 499
 ```

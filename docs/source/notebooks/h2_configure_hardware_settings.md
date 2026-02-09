@@ -39,8 +39,9 @@ shows how to configure the default PyTorch device and the maximum number of work
 ## _Getting Started_
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 # Google Colab Only
 try:
     import google.colab  # noqa: F401

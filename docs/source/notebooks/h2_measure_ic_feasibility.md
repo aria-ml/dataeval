@@ -39,7 +39,7 @@ that your data is noisy.
 
 1. A set of image embeddings and their corresponding class labels. This requires training an autoencoder to compress the
    images.
-2. A Python environment with the following packages installed:
+1. A Python environment with the following packages installed:
    - `dataeval`
 
 +++
@@ -49,8 +49,9 @@ that your data is noisy.
 Let's import the required libraries needed to set up a minimal working example
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 # Google Colab Only
 try:
     import google.colab  # noqa: F401
@@ -136,8 +137,9 @@ print("The bayes error rate estimation:", ber_result["upper_bound"])
 ```
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 ### TEST ASSERTION CELL ###
 assert 0.93 < 1 - ber_result["upper_bound"] < 0.96
 ```
@@ -176,8 +178,9 @@ print("The bayes error rate estimation:", new_result["upper_bound"])
 ```
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 ### TEST ASSERTION CELL ###
 assert 0.99 < 1 - new_result["upper_bound"] < 0.995
 ```
