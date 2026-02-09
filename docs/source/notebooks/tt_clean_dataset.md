@@ -36,8 +36,6 @@ Part 1 of our introduction to exploratory data analysis guide
 - Environment Requirements
   - `dataeval` or `dataeval[all]`
 
-______________________________________________________________________
-
 +++
 
 ## Introduction
@@ -642,17 +640,15 @@ comprehensive but also aligned with your specific goals and requirements.
 
 Good luck with your data!
 
-______________________________________________________________________
-
 +++
 
 ## What's Next
 
 Learn how to do the following:
 
-- [Assess the data space](./tt_assess_data_space.ipynb)
-- [Identify bias and correlations](./tt_identify_bias.ipynb)
-- [Monitor shifting operational data](./tt_monitor_shift.ipynb)
+- [Assess the data space](./tt_assess_data_space.md)
+- [Identify bias and correlations](./tt_identify_bias.md)
+- [Monitor shifting operational data](./tt_monitor_shift.md)
 
 To learn more about specific functions or classes, see the [API Reference](../reference/autoapi/dataeval/index.rst)
 section. To learn more about data cleaning, see the [Data Cleaning](../concepts/DataCleaning.md) explanation page.

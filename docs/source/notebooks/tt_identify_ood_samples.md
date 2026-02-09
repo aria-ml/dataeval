@@ -804,8 +804,6 @@ This comparison uses:
 The simple models used here serve as examples—real applications should use architectures targeted to the specific
 scenario.
 
-______________________________________________________________________
-
 Let's test each method on different OOD scenarios to understand their strengths and weaknesses in this limited-training
 setting.
 
@@ -1101,8 +1099,8 @@ data distributions.
 To learn more about OOD detection and related concepts:
 
 - Read the [OOD Detection concept page](../concepts/OOD.md)
-- Learn about [monitoring operational data](./tt_monitor_shift.ipynb)
-- Try the [data cleaning tutorial](./tt_clean_dataset.ipynb)
+- Learn about [monitoring operational data](./tt_monitor_shift.md)
+- Try the [data cleaning tutorial](./tt_clean_dataset.md)
 
 ### Try It Yourself
 

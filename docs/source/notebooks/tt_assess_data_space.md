@@ -329,7 +329,7 @@ cleaning step:
    - **Examples**: Data collection, processing, and visualization can cause discoloration, blurriness, etc
    - **Solution**: Ensure images are normalized with the right values, channel order is correct, color scheme is
      consistent
-   - See our in-depth [Data Cleaning](./tt_clean_dataset.ipynb) tutorial to explore these types of outliers
+   - See our in-depth [Data Cleaning](./tt_clean_dataset.md) tutorial to explore these types of outliers
 1. Do you have enough data?
    - **Examples**: Less data points in each cluster can lead to higher deviation and more outliers
    - **Solution**: Adding more data can help make the clusters more robust to the variations in images
@@ -409,15 +409,13 @@ algorithms to find outliers, to check for gaps in coverage, and to make decision
 
 Good luck with your data!
 
-______________________________________________________________________
-
 ## What's next
 
 In addition to exploring a dataset in its feature space, DataEval offers additional tutorials on exploratory data
 analysis:
 
-- Clean a dataset with the labels in the [Data Cleaning Guide](./tt_clean_dataset.ipynb)
-- [Identify Bias and Correlations](./tt_identify_bias.ipynb) in your metadata
+- Clean a dataset with the labels in the [Data Cleaning Guide](./tt_clean_dataset.md)
+- [Identify Bias and Correlations](./tt_identify_bias.md) in your metadata
 
 Explore deeper explanations on topics such as [clustering](../concepts/Clustering.md),
 [coverage](../concepts/Coverage.md), and [outliers](../concepts/Outliers.md) in the

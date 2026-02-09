@@ -379,8 +379,6 @@ strengths and limitations. It is designed to help you create representative and 
 
 Good luck with your data!
 
-______________________________________________________________________
-
 +++
 
 ## What's next
@@ -388,9 +386,9 @@ ______________________________________________________________________
 In addition to identifying bias and correlations in a dataset, DataEval offers additional tutorials to help you learn
 about dataset analysis:
 
-- To clean a dataset use the [Data Cleaning Guide](tt_clean_dataset.ipynb).
-- To identify coverage gaps and outliers use the [Assessing the Data Space Guide](tt_assess_data_space.ipynb).
-- To monitor data for shifts during operation use the [Data Monitoring Guide](tt_monitor_shift.ipynb).
+- To clean a dataset use the [Data Cleaning Guide](tt_clean_dataset.md).
+- To identify coverage gaps and outliers use the [Assessing the Data Space Guide](tt_assess_data_space.md).
+- To monitor data for shifts during operation use the [Data Monitoring Guide](tt_monitor_shift.md).
 
 To learn more about the balance, diversity and parity evaluators, see the [Balance](../concepts/Balance.md),
 [Diversity](../concepts/Diversity.md) and [Parity](../concepts/Parity.md) concept pages.
