@@ -227,10 +227,6 @@ def docs(session: nox.Session) -> None:
     notebook_dir = "docs/source/notebooks"
     session.run("jupytext", "--to", "notebook", "--update", notebook_dir + "/*.md")
 
-    if {"synconly", "sync-only"} & set(session.posargs):
-        session.log("Sync-only mode: notebooks have been synced but docs build is skipped.")
-        return
-
     # Fetch cached notebook results from orphan artifact branch
     session.run("bash", "docs/fetch-docs-cache.sh", external=True)
 

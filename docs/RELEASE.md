@@ -58,8 +58,6 @@ nox -e docsync    # generates .ipynb files from .md source
 4. Pushes updated cache and generated `.ipynb` files to the artifact branch
    (`docs/push-docs-cache.sh`)
 
-Use `nox -e docs -- sync-only` to just generate `.ipynb` files without building.
-
 ## Artifact Branches (`docs-artifacts/*`)
 
 Orphan branches named `docs-artifacts/<ref>` store build artifacts that are too large or too
