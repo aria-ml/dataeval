@@ -68,19 +68,15 @@ jobs:
         run: uvx nox -e lint
 
   minimum-dependencies:
-    name: Minimum Dependencies (Python ${{ matrix.python-version }})
+    name: Minimum Dependencies
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.10'
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -88,19 +84,11 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
 
-      - name: Cache compiled wheels
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/uv
-          key: wheels-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('uv.lock') }}
-          restore-keys: |
-            wheels-${{ runner.os }}-py${{ matrix.python-version }}-
-
       - name: Install dependencies
         run: uv tool install nox --with nox-uv
 
       - name: Run minimum install test
-        run: uvx nox -e deps -P ${{ matrix.python-version }}
+        run: uvx nox -e deps -P 3.10
 
   typecheck:
     name: Type Check (Python ${{ matrix.python-version }})

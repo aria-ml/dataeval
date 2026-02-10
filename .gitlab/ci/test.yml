@@ -9,8 +9,10 @@ lint:
 
 minimum install:
   extends:
-    - .nox_all
+    - .nox
     - .rules_main_mr_code
+  variables:
+    PYTHON_VERSION: '3.10'
   script:
     - uvx nox -e deps
 

@@ -69,7 +69,7 @@ def session(**kwargs):
 
 
 PYTHON_VERSION = f"{version_info[0]}.{version_info[1]}"
-PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13"]
+PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
 PYTHON_RE_PATTERN = re.compile(r"\d\.\d{1,2}")
 IS_CI = bool(os.environ.get("CI"))
 DATAEVAL_NOX_UV_EXTRAS_OVERRIDE = os.environ.get("DATAEVAL_NOX_UV_EXTRAS_OVERRIDE", "")
@@ -172,9 +172,9 @@ def type(session: nox.Session) -> None:  # noqa: A001
     session.run("pyright", "--ignoreexternal", "--verifytypes", "dataeval")
 
 
-@session(uv_only_groups=["base"], reuse_venv=False)
+@session(python=PYTHON_VERSIONS[0], uv_only_groups=["base"], reuse_venv=False)
 def deps(session: nox.Session) -> None:
-    """Run unit tests against standard installation."""
+    """Run unit tests against minimum supported Python with lowest declared dependencies."""
     session.run_install("uv", "pip", "install", ".[cpu]", "--resolution=lowest-direct")
     session.run_install("uv", "pip", "install", "pytest")
     session.run("pytest", "-m", "not (optional)")
