@@ -99,7 +99,7 @@ dep.set_default_backend("plotly")
 pio.renderers.default = "notebook"
 ```
 
-:::\{note}
+:::{note}
 
 The device is the piece of hardware where the model, data, and other related objects are stored in memory. If a GPU is
 available, this notebook will use that hardware rather than the CPU. To force running only on the CPU, change `device`

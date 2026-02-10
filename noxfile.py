@@ -326,6 +326,56 @@ def _run_doclint_tests(session: nox.Session, output_dir: str, scripts: list) -> 
     return test_failures
 
 
+def _protect_colon_fences(md_files: list[str]) -> dict[str, list[str]]:
+    """Save MyST colon fence blocks and replace with placeholders.
+
+    mdformat-myst doesn't support colon fences (``:::{directive}``), causing it
+    to escape braces and collapse directives. This protects them from damage.
+    See: https://github.com/executablebooks/mdformat-myst/issues/13
+    """
+    saved: dict[str, list[str]] = {}
+    for filepath in md_files:
+        text = Path(filepath).read_text()
+        lines = text.splitlines(keepends=True)
+        result: list[str] = []
+        blocks: list[str] = []
+        fence_buf: list[str] = []
+        fence_colons = ""
+
+        for line in lines:
+            stripped = line.strip()
+            if not fence_colons:
+                m = re.match(r"^(:::+)\{", stripped)
+                if m:
+                    fence_colons = m.group(1)
+                    fence_buf = [line]
+                    continue
+                result.append(line)
+            else:
+                fence_buf.append(line)
+                if stripped == fence_colons:
+                    blocks.append("".join(fence_buf))
+                    result.append(f"<!-- COLON_FENCE_{len(blocks) - 1} -->\n")
+                    fence_colons = ""
+                    fence_buf = []
+
+        if fence_colons:
+            result.extend(fence_buf)
+        if blocks:
+            Path(filepath).write_text("".join(result))
+            saved[filepath] = blocks
+    return saved
+
+
+def _restore_colon_fences(saved: dict[str, list[str]]) -> None:
+    """Restore colon fence blocks from placeholders after mdformat."""
+    for filepath, blocks in saved.items():
+        text = Path(filepath).read_text()
+        for i, block in enumerate(blocks):
+            text = text.replace(f"<!-- COLON_FENCE_{i} -->\n", block)
+        Path(filepath).write_text(text)
+
+
 @session(uv_only_groups=["docsync"], uv_no_install_project=True)
 def docsync(session: nox.Session) -> None:
     """Sync notebook .md/.ipynb pairs and format markdown."""
@@ -343,10 +393,18 @@ def docsync(session: nox.Session) -> None:
     session.run("jupytext", "--sync", notebook_dir + "/*.md")
 
     # Format markdown notebooks (fix locally, check in CI)
+    # Protect MyST colon fence blocks from mdformat (mdformat-myst doesn't support them)
+    # See: https://github.com/executablebooks/mdformat-myst/issues/13
+    md_files = glob.glob(f"{notebook_dir}/*.md")
+    saved_fences = _protect_colon_fences(md_files)
+
     mdformat_args = ["mdformat", "--wrap", "120"]
     if IS_CI:
         mdformat_args.append("--check")
     session.run(*mdformat_args, notebook_dir)
+
+    # Restore colon fence blocks after mdformat
+    _restore_colon_fences(saved_fences)
 
     # Regenerate ipynb to match formatted md (mdformat may have modified md)
     session.run("jupytext", "--to", "notebook", "--update", notebook_dir + "/*.md")
