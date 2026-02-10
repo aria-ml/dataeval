@@ -53,10 +53,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-cpu = ["torch>=2.2.0"]
-cu118 = ["torch>=2.2.0"]
-cu124 = ["torch>=2.2.0"]
-cu128 = ["torch>=2.2.0"]
+cpu = ["torch>=2.2.0", "torchvision>=0.17.0"]
+cu118 = ["torch>=2.2.0", "torchvision>=0.17.0"]
+cu124 = ["torch>=2.2.0", "torchvision>=0.17.0"]
+cu128 = ["torch>=2.2.0", "torchvision>=0.17.0"]
 opencv = ["opencv-python-headless>=4.8.0"]
 onnx = [
   "onnx",

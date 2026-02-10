@@ -1022,15 +1022,19 @@ dependencies = [
 cpu = [
     { name = "torch", version = "2.10.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform == 'darwin' and extra == 'extra-8-dataeval-cpu') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
     { name = "torch", version = "2.10.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform != 'darwin' and extra == 'extra-8-dataeval-cpu') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu118') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu124') or (extra == 'extra-8-dataeval-cu118' and extra == 'extra-8-dataeval-cu128') or (extra == 'extra-8-dataeval-cu124' and extra == 'extra-8-dataeval-cu128')" },
+    { name = "torchvision", version = "0.25.0", source = { registry = "https://pypi.org/simple" } },
 ]
 cu118 = [
     { name = "torch", version = "2.6.0+cu118", source = { registry = "https://download.pytorch.org/whl/cu118" } },
+    { name = "torchvision", version = "0.21.0", source = { registry = "https://pypi.org/simple" } },
 ]
 cu124 = [
     { name = "torch", version = "2.6.0+cu124", source = { registry = "https://download.pytorch.org/whl/cu124" } },
+    { name = "torchvision", version = "0.21.0", source = { registry = "https://pypi.org/simple" } },
 ]
 cu128 = [
     { name = "torch", version = "2.10.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" } },
+    { name = "torchvision", version = "0.25.0", source = { registry = "https://pypi.org/simple" } },
 ]
 onnx = [
     { name = "onnx" },
@@ -1209,6 +1213,10 @@ requires-dist = [
     { name = "torch", marker = "extra == 'cu118'", specifier = ">=2.2.0", index = "https://download.pytorch.org/whl/cu118", conflict = { package = "dataeval", extra = "cu118" } },
     { name = "torch", marker = "extra == 'cu124'", specifier = ">=2.2.0", index = "https://download.pytorch.org/whl/cu124", conflict = { package = "dataeval", extra = "cu124" } },
     { name = "torch", marker = "extra == 'cu128'", specifier = ">=2.2.0", index = "https://download.pytorch.org/whl/cu128", conflict = { package = "dataeval", extra = "cu128" } },
+    { name = "torchvision", marker = "extra == 'cpu'", specifier = ">=0.17.0" },
+    { name = "torchvision", marker = "extra == 'cu118'", specifier = ">=0.17.0" },
+    { name = "torchvision", marker = "extra == 'cu124'", specifier = ">=0.17.0" },
+    { name = "torchvision", marker = "extra == 'cu128'", specifier = ">=0.17.0" },
     { name = "typing-extensions", specifier = ">=4.12" },
     { name = "xxhash", specifier = ">=3.4" },
 ]
@@ -6557,6 +6565,10 @@ wheels = [
     { url = "https://download.pytorch.org/whl/cpu/torch-2.10.0-1-cp311-none-macosx_11_0_arm64.whl", hash = "sha256:0826ac8e409551e12b2360ac18b4161a838cbd111933e694752f351191331d09" },
     { url = "https://download.pytorch.org/whl/cpu/torch-2.10.0-1-cp312-none-macosx_11_0_arm64.whl", hash = "sha256:7fbbf409143a4fe0812a40c0b46a436030a7e1d14fe8c5234dfbe44df47f617e" },
     { url = "https://download.pytorch.org/whl/cpu/torch-2.10.0-1-cp313-none-macosx_11_0_arm64.whl", hash = "sha256:b39cafff7229699f9d6e172cac74d85fd71b568268e439e08d9c540e54732a3e" },
+    { url = "https://download.pytorch.org/whl/cpu/torch-2.10.0-2-cp310-none-macosx_11_0_arm64.whl", hash = "sha256:7417ef370d7c3969dd509dae8d5c7daeb945af335ab76dd38358ba30a91251c1" },
+    { url = "https://download.pytorch.org/whl/cpu/torch-2.10.0-2-cp311-none-macosx_11_0_arm64.whl", hash = "sha256:90821a3194b8806d9fa9fdaa9308c1bc73df0c26808274b14129a97c99f35794" },
+    { url = "https://download.pytorch.org/whl/cpu/torch-2.10.0-2-cp312-none-macosx_11_0_arm64.whl", hash = "sha256:358bd7125cbec6e692d60618a5eec7f55a51b29e3652a849fd42af021d818023" },
+    { url = "https://download.pytorch.org/whl/cpu/torch-2.10.0-2-cp313-none-macosx_11_0_arm64.whl", hash = "sha256:470de4176007c2700735e003a830828a88d27129032a3add07291da07e2a94e8" },
     { url = "https://download.pytorch.org/whl/cpu/torch-2.10.0-cp310-none-macosx_11_0_arm64.whl", hash = "sha256:2d16abfce6c92584ceeb00c3b2665d5798424dd9ed235ea69b72e045cd53ae97" },
     { url = "https://download.pytorch.org/whl/cpu/torch-2.10.0-cp311-none-macosx_11_0_arm64.whl", hash = "sha256:4584ab167995c0479f6821e3dceaf199c8166c811d3adbba5d8eedbbfa6764fd" },
     { url = "https://download.pytorch.org/whl/cpu/torch-2.10.0-cp312-none-macosx_11_0_arm64.whl", hash = "sha256:45a1c5057629444aeb1c452c18298fa7f30f2f7aeadd4dc41f9d340980294407" },

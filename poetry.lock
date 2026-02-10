@@ -4219,7 +4219,7 @@ version = "12.1.0"
 description = "Python Imaging Library (fork)"
 optional = false
 python-versions = ">=3.10"
-groups = ["dev", "doclint", "docs"]
+groups = ["main", "dev", "doclint", "docs"]
 files = [
     {file = "pillow-12.1.0-cp310-cp310-macosx_10_10_x86_64.whl", hash = "sha256:fb125d860738a09d363a88daa0f59c4533529a90e564785e20fe875b200b6dbd"},
     {file = "pillow-12.1.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:cad302dc10fac357d3467a74a9561c90609768a6f73a1923b0fd851b6486f8b0"},
@@ -4313,6 +4313,7 @@ files = [
     {file = "pillow-12.1.0-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:75af0b4c229ac519b155028fa1be632d812a519abba9b46b20e50c6caa184f19"},
     {file = "pillow-12.1.0.tar.gz", hash = "sha256:5c5ae0a06e9ea030ab786b0251b32c7e4ce10e58d983c0d5c56029455180b5b9"},
 ]
+markers = {main = "extra == \"cpu\" or extra == \"cu118\" or extra == \"cu124\" or extra == \"cu128\""}
 
 [package.extras]
 docs = ["furo", "olefile", "sphinx (>=8.2)", "sphinx-autobuild", "sphinx-copybutton", "sphinx-inline-tabs", "sphinxext-opengraph"]
@@ -6627,7 +6628,7 @@ version = "0.22.0"
 description = "image and video datasets and models for torch deep learning"
 optional = false
 python-versions = ">=3.9"
-groups = ["dev", "doclint", "docs"]
+groups = ["main", "dev", "doclint", "docs"]
 files = [
     {file = "torchvision-0.22.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:72256f1d7ff510b16c9fb4dd488584d0693f40c792f286a9620674438a81ccca"},
     {file = "torchvision-0.22.0-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:810ea4af3bc63cf39e834f91f4218ff5999271caaffe2456247df905002bd6c0"},
@@ -6654,6 +6655,7 @@ files = [
     {file = "torchvision-0.22.0-cp39-cp39-manylinux_2_28_x86_64.whl", hash = "sha256:0dc9b97fea14e7a8d047d0d21d8bfde6afd655c41a9a86207c9d3a7605319fcd"},
     {file = "torchvision-0.22.0-cp39-cp39-win_amd64.whl", hash = "sha256:3548d594ed7d0b7bc59486d642e2dd437f37910e52ab67e5f01567f12ed767dc"},
 ]
+markers = {main = "extra == \"cpu\" or extra == \"cu118\" or extra == \"cu124\" or extra == \"cu128\""}
 
 [package.dependencies]
 numpy = "*"
@@ -7284,10 +7286,10 @@ files = [
 cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and python_version < \"3.14\"", "cffi (>=2.0.0b0) ; platform_python_implementation != \"PyPy\" and python_version >= \"3.14\""]
 
 [extras]
-cpu = ["torch"]
-cu118 = ["torch"]
-cu124 = ["torch"]
-cu128 = ["torch"]
+cpu = ["torch", "torchvision"]
+cu118 = ["torch", "torchvision"]
+cu124 = ["torch", "torchvision"]
+cu128 = ["torch", "torchvision"]
 onnx = ["onnx", "onnxruntime", "onnxruntime", "onnxruntime"]
 onnx-gpu = ["onnx", "onnxruntime-gpu", "onnxruntime-gpu", "onnxruntime-gpu"]
 opencv = ["opencv-python-headless"]
@@ -7295,4 +7297,4 @@ opencv = ["opencv-python-headless"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10"
-content-hash = "d9b35485e5494e29a3e54f1a086fb5d36d055db496eeeae1a3a6d336b189b6b5"
+content-hash = "601face2ea009b3334118c6458cf1039a58ba37714f2a34e28dc72e23644301a"
