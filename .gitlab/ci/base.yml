@@ -7,7 +7,6 @@ variables:
   UV_IMAGE: ghcr.io/astral-sh/uv
   UV_BASE_LAYER: bookworm
   FORCE_COLOR: '1'
-  UPDATE_CACHE_MESSAGE: 'Update documentation jupyter-cache'
   ENV_AUTO_STOP_IN: '1 week'
   RELEASE_BRANCH_PATTERN: '/^release\/v.*/'
 
@@ -126,12 +125,6 @@ stages:
 
 ### SHARED RULE TEMPLATES ###
 
-# Common skip rule for cache update commits (applies to both main and MRs)
-.rules_skip_on_cache_update:
-  rules:
-    - if: $CI_COMMIT_TITLE == $UPDATE_CACHE_MESSAGE
-      when: never
-
 .rules_main_mr:
   rules:
     - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE
@@ -139,14 +132,8 @@ stages:
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
-.rules_main_mr_skip_cache_update:
-  rules:
-    - !reference [.rules_skip_on_cache_update, rules]
-    - !reference [.rules_main_mr, rules]
-
 .rules_main_mr_code:
   rules:
-    - !reference [.rules_skip_on_cache_update, rules]
     - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
@@ -159,7 +146,6 @@ stages:
 
 .rules_main_mr_deps:
   rules:
-    - !reference [.rules_skip_on_cache_update, rules]
     - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
@@ -173,10 +159,9 @@ stages:
   rules:
     - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE
       when: never
-    - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE != $UPDATE_CACHE_MESSAGE
+    - if: $CI_COMMIT_BRANCH == 'main'
       variables:
         DOCS_CLEAN: '-- clean'
-    - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
       changes:
         paths:
@@ -189,22 +174,6 @@ stages:
   rules:
     - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CI_COMMIT_BRANCH == 'main'
       when: never
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-      changes:
-        paths:
-          - src/**/*
-          - docs/**/*
-          - uv.lock
-          - '*.md'
-
-.rules_main_mr_docs_skip_cache_update:
-  rules:
-    - !reference [.rules_skip_on_cache_update, rules]
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE
-      when: never
-    - if: $CI_COMMIT_BRANCH == 'main' && $CI_COMMIT_TITLE != $UPDATE_CACHE_MESSAGE
-      variables:
-        DOCS_CLEAN: '-- clean'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
       changes:
         paths:

@@ -3,7 +3,7 @@
 lint:
   extends:
     - .nox
-    - .rules_main_mr_skip_cache_update
+    - .rules_main_mr
   script:
     - uvx nox -e lint
 
