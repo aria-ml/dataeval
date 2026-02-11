@@ -124,10 +124,9 @@ publish verification:
   needs: []
   before_script:
     - uv tool install nox --with nox-uv
-    - uv pip install pyyaml requests --system
+    - uv pip install requests --system
   script:
     - uvx nox -e verify
-    - python verification/generate_metarepo.py
     - .gitlab/scripts/push_verification.py
   artifacts:
     paths:

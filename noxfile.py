@@ -176,6 +176,7 @@ def verify(session: nox.Session) -> None:
         f"--junitxml=output/verify.{python_version}.xml",
         *session.posargs,
     )
+    session.run("python", "verification/generate_metarepo.py")
 
 
 @session(uv_groups=["type"], uv_extras=with_onnx(["cpu"]))

@@ -179,7 +179,7 @@ def generate_vcrm(registry: dict, report: dict | None) -> str:
     header = "| Requirement ID | Requirement Origin | Coverage | " + " | ".join(tc_headers) + " |"
 
     # --- Separator row ---
-    sep_parts = [":--------------|", ":-------------------|", ":--------:"]
+    sep_parts = [":--------------", ":-------------------", ":--------:"]
     for _ in all_tc_ids:
         sep_parts.append(":-------------:")
     separator = "| " + " | ".join(sep_parts) + " |"
