@@ -42,6 +42,18 @@ conda:
   script:
     - pytest -m 'not optional'
 
+verify:
+  extends:
+    - .nox_all
+    - .rules_main_mr
+  script:
+    - uvx nox -e verify
+  artifacts:
+    reports:
+      junit: output/verify.*.xml
+    paths:
+      - output/verification_report.json
+
 verify lock:
   extends:
     - .nox

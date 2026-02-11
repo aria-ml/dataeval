@@ -1,0 +1,336 @@
+# Verification Registry
+#
+# Static metadata for generating meta repo artifacts (test case markdown files
+# and VCRM) from automated verification test results.
+#
+# Structure:
+#   metarepo     - GitLab project ID for the meta repo
+#   requirements - FR/NFR definitions with epic links and test case mappings
+#   test_cases   - Test case definitions with descriptive metadata
+
+metarepo:
+  project_id: 409
+
+# ---------------------------------------------------------------------------
+# Requirements — rows in the VCRM
+# ---------------------------------------------------------------------------
+requirements:
+  FR-1:
+    name: Installation & Cross-Environment Compatibility
+    origin: DR-1.5
+    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
+    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/85
+    test_cases: ["1-1", "1-2", "1-7"]
+
+  FR-2:
+    name: Bias Analysis Suite
+    origin: DR-1.5
+    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
+    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/94
+    test_cases: ["2-1"]
+
+  FR-3:
+    name: Data Quality Analysis
+    origin: DR-1.5
+    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
+    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/95
+    test_cases: ["3-1"]
+
+  FR-4:
+    name: Distribution Shift Detection
+    origin: DR-1.5
+    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
+    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/96
+    test_cases: ["4-1"]
+
+  FR-5:
+    name: Out-of-Distribution Detection
+    origin: DR-1.5
+    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
+    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/97
+    test_cases: ["5-1"]
+
+  FR-6:
+    name: Dataset Selection & Filtering
+    origin: DR-1.5
+    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
+    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/98
+    test_cases: ["6-1"]
+
+  FR-7:
+    name: Feature Extraction
+    origin: DR-1.5
+    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
+    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/99
+    test_cases: ["7-1"]
+
+  FR-8:
+    name: Data Sufficiency Analysis
+    origin: DR-1.5
+    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
+    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/100
+    test_cases: ["8-1"]
+
+  FR-9:
+    name: Metadata & Embeddings Management
+    origin: DR-1.5
+    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
+    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/101
+    test_cases: ["9-1"]
+
+  NFR-1:
+    name: Python Version Compatibility
+    origin: DR-1.5
+    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
+    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/85
+    test_cases: ["1-1"]
+
+  NFR-2:
+    name: Packaging & Distribution
+    origin: DR-1.5
+    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
+    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/85
+    test_cases: ["1-7"]
+
+  NFR-3:
+    name: Type Safety
+    origin: DR-1.5
+    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
+    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/85
+    test_cases: ["10-1"]
+
+  NFR-4:
+    name: Configuration & Reproducibility
+    origin: DR-1.5
+    origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/documentation/program-doc-requirements/#dr-15-product-requirements-definitions
+    epic_link: https://gitlab.jatic.net/groups/jatic/aria/-/epics/85
+    test_cases: ["11-1"]
+
+# ---------------------------------------------------------------------------
+# Test Cases — columns in the VCRM, individual markdown files
+# ---------------------------------------------------------------------------
+test_cases:
+  "1-1":
+    name: Python Version Compatibility
+    test_type: Core Functionality
+    business_case: >-
+      Verify that DataEval installs and functions correctly across all
+      supported Python versions (3.10 through 3.14) to ensure broad
+      compatibility and reliable operation across different environments.
+    initial_conditions:
+      - Clean Python environment for the target version
+      - Network access for pip/uv package installation
+    expected_results:
+      - Package imports without errors on the current Python version
+      - Version string is set and valid (not "unknown")
+      - All core modules and subpackages are discoverable and importable
+      - Key user-facing classes (Embeddings, Metadata, Balance, etc.) exist
+      - Protocol types are exported from dataeval.protocols
+      - Package metadata (name, requires-python, license, project URLs) is correctly set
+
+  "1-2":
+    name: Dependency Resolution
+    test_type: Core Functionality
+    business_case: >-
+      Verify that optional dependency extras (torch, torchvision, onnxruntime,
+      opencv) install without conflicts and enable their corresponding features
+      in the DataEval package.
+    initial_conditions:
+      - Clean Python environment with DataEval installed
+      - Optional extras installed (cpu, onnx, opencv)
+    expected_results:
+      - torch is importable with a valid version
+      - torchvision is importable (or gracefully skipped on version mismatch)
+      - onnxruntime is importable with a valid version
+      - opencv (cv2) is importable with a valid version
+      - Torch-based, ONNX-based, and OpenCV-based extractors are discoverable
+
+  "1-7":
+    name: Package Manager Installation
+    test_type: Core Functionality
+    business_case: >-
+      Verify that DataEval installs correctly via pip/uv, that the distributed
+      wheel contains all expected subpackages, and that no test files leak into
+      the installed package.
+    initial_conditions:
+      - Clean Python environment
+      - Network access for pip/uv package installation
+    expected_results:
+      - Package imports and basic computation completes without error
+      - py.typed marker is present (PEP 561)
+      - All documented subpackages (bias, core, quality, selection, shift, extractors, utils) are installed
+      - No test files are included in the distributed package
+      - Optional extras install and expose expected functionality
+
+  "2-1":
+    name: Bias Analysis Suite
+    test_type: Core Functionality
+    business_case: >-
+      Verify that Balance, Diversity, and Parity evaluators produce correctly
+      typed outputs with expected DataFrame attributes, flag columns, and
+      support for multiple analysis methods.
+    initial_conditions:
+      - DataEval installed with core dependencies (polars)
+      - Metadata object with class labels, factor data, and factor names
+    expected_results:
+      - Balance returns BalanceOutput with balance, factors, and classwise DataFrames
+      - Balance classwise DataFrame includes is_imbalanced flag column
+      - Diversity returns DiversityOutput with factors and classwise DataFrames
+      - Diversity factors DataFrame includes is_low_diversity flag column
+      - Diversity supports shannon method
+      - Parity returns ParityOutput with factors DataFrame and insufficient_data dict
+      - Parity factors DataFrame includes is_correlated flag column
+      - All bias outputs support meta() method
+
+  "3-1":
+    name: Data Quality Analysis
+    test_type: Core Functionality
+    business_case: >-
+      Verify that Duplicates and Outliers evaluators correctly identify data
+      quality issues, support multiple detection methods, and produce properly
+      structured output objects.
+    initial_conditions:
+      - DataEval installed with core dependencies (polars)
+      - Numpy image arrays for evaluation
+    expected_results:
+      - Duplicates detects exact copies and returns items and targets attributes
+      - Duplicates items has exact field for exact duplicate detection
+      - Outliers returns issues as a polars DataFrame
+      - Outliers supports zscore detection method
+      - Outliers supports iqr detection method
+      - All quality outputs support meta() method
+
+  "4-1":
+    name: Distribution Shift Detection
+    test_type: Core Functionality
+    business_case: >-
+      Verify that DriftUnivariate and DriftMMD detectors correctly identify
+      distribution shifts in embedding space and produce properly structured
+      output with per-feature breakdown.
+    initial_conditions:
+      - DataEval installed with core dependencies
+      - Reference and test embedding arrays
+    expected_results:
+      - DriftUnivariate returns output with drifted, p_val, and distance attributes
+      - DriftUnivariate detects clear shift between different distributions
+      - DriftUnivariate does not false-alarm on same distribution
+      - DriftUnivariate provides per-feature results (feature_drift, p_vals, distances)
+      - DriftUnivariate supports KS and CVM test methods
+      - DriftMMD returns output with drifted, p_val, distance, and distance_threshold
+      - DriftMMD detects clear shift between different distributions
+
+  "5-1":
+    name: Out-of-Distribution Detection
+    test_type: Core Functionality
+    business_case: >-
+      Verify that the OODKNeighbors detector correctly scores and classifies
+      out-of-distribution samples using k-nearest neighbor distance in
+      embedding space.
+    initial_conditions:
+      - DataEval installed with scikit-learn
+      - Reference embedding array fitted to the detector
+    expected_results:
+      - OODKNeighbors score returns OODScoreOutput with instance_score array
+      - OODKNeighbors predict returns OODOutput with is_ood and instance_score
+      - OODKNeighbors correctly flags far-away samples as OOD
+      - OODKNeighbors supports euclidean distance metric
+
+  "6-1":
+    name: Dataset Selection & Filtering
+    test_type: Core Functionality
+    business_case: >-
+      Verify that Select and its composable selection operators (Limit, Indices,
+      Shuffle, Reverse) correctly transform datasets and support chaining
+      multiple operations.
+    initial_conditions:
+      - DataEval installed
+      - Dataset object implementing __getitem__ and __len__
+    expected_results:
+      - Select with Limit restricts dataset length correctly
+      - Select with Indices selects specified indices
+      - Select with Shuffle preserves dataset length while reordering
+      - Select with Reverse reverses item order
+      - Select composes multiple operations (e.g., Limit + Shuffle)
+      - Select result is iterable
+
+  "7-1":
+    name: Feature Extraction
+    test_type: Core Functionality
+    business_case: >-
+      Verify that FlattenExtractor produces correctly shaped embeddings and
+      that optional backend extractors (Torch, ONNX, BoVW) are importable
+      when their dependencies are available.
+    initial_conditions:
+      - DataEval installed with numpy
+      - Optional backends (torch, onnxruntime, opencv) available for import tests
+    expected_results:
+      - FlattenExtractor produces embeddings with correct sample count
+      - FlattenExtractor flattens spatial dimensions to 1D per image
+      - TorchExtractor is importable when torch is installed
+      - OnnxExtractor is importable when onnxruntime is installed
+      - BoVWExtractor is importable when opencv is installed
+      - All extractor classes are listed in the extractors module
+
+  "8-1":
+    name: Data Sufficiency Analysis
+    test_type: Core Functionality
+    business_case: >-
+      Verify that the Sufficiency class is importable, configurable, and
+      provides expected configuration fields for data sufficiency analysis.
+    initial_conditions:
+      - DataEval installed with performance module available
+    expected_results:
+      - Sufficiency class is importable from dataeval.performance
+      - SufficiencyOutput class is importable from dataeval.performance
+      - Sufficiency has a Config inner class
+      - Sufficiency.Config has runs and substeps fields
+
+  "9-1":
+    name: Metadata & Embeddings Management
+    test_type: Core Functionality
+    business_case: >-
+      Verify that the top-level Metadata and Embeddings classes are importable,
+      integrate with feature extractors, and support standard collection
+      operations (len, indexing).
+    initial_conditions:
+      - DataEval installed with numpy
+      - FlattenExtractor available as embedding backend
+    expected_results:
+      - Metadata class is importable from dataeval
+      - Embeddings class is importable from dataeval
+      - Embeddings with FlattenExtractor produces correct output shape
+      - Embeddings supports len() returning sample count
+      - Embeddings supports indexing to retrieve individual items
+      - Metadata protocol attributes (factor_names, factor_data, class_labels, is_discrete) are present
+
+  "10-1":
+    name: Type Safety Infrastructure
+    test_type: Non-Functional
+    business_case: >-
+      Verify that DataEval provides PEP 561 type safety infrastructure,
+      exports protocol types for downstream type checking, and defines
+      __all__ for public API clarity.
+    initial_conditions:
+      - DataEval installed
+    expected_results:
+      - py.typed marker file exists (PEP 561 compliance)
+      - protocols module exports Array, FeatureExtractor, Dataset, AnnotatedDataset
+      - types module exports Output and DictOutput base classes
+      - Top-level dataeval module defines __all__ with entries
+
+  "11-1":
+    name: Configuration & Reproducibility
+    test_type: Non-Functional
+    business_case: >-
+      Verify that DataEval's global configuration functions (seed, device,
+      max_processes) work correctly with both direct setters and context
+      managers, and that setting a seed produces reproducible results.
+    initial_conditions:
+      - DataEval installed
+    expected_results:
+      - set_seed/get_seed correctly store and retrieve seed values
+      - set_device/get_device correctly store and retrieve device strings
+      - use_device context manager restores original device on exit
+      - set_max_processes/get_max_processes correctly store and retrieve values
+      - use_max_processes context manager restores original value on exit
+      - Setting the same seed produces identical results across runs

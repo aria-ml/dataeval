@@ -86,6 +86,10 @@ test = [
   "pytest-cov>=6.1",
   "pytest-xdist>=3.6.1",
 ]
+verify = [
+  "pytest>=8.3",
+  "pyyaml>=6.0",
+]
 type = [
   "pyright[nodejs]>=1.1.400",
 ]

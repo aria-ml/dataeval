@@ -165,6 +165,19 @@ def test(session: nox.Session) -> None:
     session.run("mv", ".coverage", f"output/.coverage.{python_version}", external=True)
 
 
+@session(uv_groups=["verify"], uv_extras=["cpu", "onnx", "opencv"])
+def verify(session: nox.Session) -> None:
+    """Run verification tests for FR/NFR compliance. Specify version using `nox -P {version} -e verify`."""
+    python_version = get_python_version(session)
+    session.run(
+        "pytest",
+        "verification/",
+        "--tb=short",
+        f"--junitxml=output/verify.{python_version}.xml",
+        *session.posargs,
+    )
+
+
 @session(uv_groups=["type"], uv_extras=with_onnx(["cpu"]))
 def type(session: nox.Session) -> None:  # noqa: A001
     """Run type checks and verify external types. Specify version using `nox -P {version} -e type`."""

@@ -114,6 +114,25 @@ create pre-release:
   script:
     - .gitlab/scripts/create_prerelease.py
 
+# This job runs verification tests, generates test case markdown files and
+# VCRM, and pushes the artifacts to the DataEval meta repo (project 409).
+publish verification:
+  stage: release
+  extends:
+    - .nox
+    - .rules_release_only
+  needs: []
+  before_script:
+    - uv tool install nox --with nox-uv
+    - uv pip install pyyaml requests --system
+  script:
+    - uvx nox -e verify
+    - python verification/generate_metarepo.py
+    - .gitlab/scripts/push_verification.py
+  artifacts:
+    paths:
+      - output/metarepo/
+
 export-merged-sbom:
   stage: release
   extends: .rules_release_only
