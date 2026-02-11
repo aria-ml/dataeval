@@ -214,7 +214,7 @@ def generate_vcrm(registry: dict, report: dict | None) -> str:
             verification_cells.append("Pass" if status == "passed" else "Fail")
         else:
             verification_cells.append("Pending")
-    verification_row = "|**Verification**|--------------------|----------| " + " | ".join(verification_cells) + " |"
+    verification_row = "| **Verification** | | | " + " | ".join(verification_cells) + " |"
 
     # --- Reference links ---
     # Test case links

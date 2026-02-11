@@ -168,6 +168,9 @@ def test(session: nox.Session) -> None:
 @session(uv_groups=["verify"], uv_extras=["cpu", "onnx", "opencv"])
 def verify(session: nox.Session) -> None:
     """Run verification tests for FR/NFR compliance. Specify version using `nox -P {version} -e verify`."""
+    # uv sync doesn't trigger hatch-vcs build hook, so _version.py may not exist.
+    # Force an editable install to generate it via the build hook.
+    session.run_install("uv", "pip", "install", "-e", ".", "--no-deps")
     python_version = get_python_version(session)
     session.run(
         "pytest",

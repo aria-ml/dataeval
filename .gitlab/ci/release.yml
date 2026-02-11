@@ -122,6 +122,8 @@ publish verification:
     - .nox
     - .rules_release_only
   needs: []
+  variables:
+    GIT_DEPTH: 0
   before_script:
     - uv tool install nox --with nox-uv
     - uv pip install requests --system
