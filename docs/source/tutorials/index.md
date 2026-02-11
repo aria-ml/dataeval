@@ -27,6 +27,7 @@ To run the tutorial interactively in Google Colab, click the
 ../notebooks/tt_clean_dataset.md
 ../notebooks/tt_assess_data_space.md
 ../notebooks/tt_identify_bias.md
+../notebooks/tt_augmentation_duplicates.md
 ```
 
 ```{list-table}
@@ -45,6 +46,10 @@ To run the tutorial interactively in Google Colab, click the
   - Learn how correlations in your data and metadata can affect model
     performance and what can be done to remove that bias.
   - [![Open In Colab][colab-badge]][bias-colab]
+* - [](../notebooks/tt_augmentation_duplicates.ipynb)
+  - Learn how common torchvision augmentations like rotations, flips, and color
+    jitter can be detected as near duplicates using D4 hashes and BoVW embeddings.
+  - [![Open In Colab][colab-badge]][augs-colab]
 ```
 
 <!-- Ref links -->
@@ -54,6 +59,7 @@ To run the tutorial interactively in Google Colab, click the
 [eda-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/main/notebooks/tt_clean_dataset.ipynb
 [dataspace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/main/notebooks/tt_assess_data_space.ipynb
 [bias-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/main/notebooks/tt_identify_bias.ipynb
+[augs-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/main/notebooks/tt_augmentation_duplicates.ipynb
 
 <!-- markdownlint-enable MD053 -->
 

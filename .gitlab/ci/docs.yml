@@ -53,6 +53,9 @@ linkchecker:
   script:
     - markdown-link-check --config docs/.markdown-link-check.json *.md
     - markdown-link-check --config docs/.markdown-link-check.json ./docs/source
+  # Allow failures in link checking to avoid blocking merges due to transient issues
+  # and anti-scraping measures on some sites. Warnings should be reviewed and addressed.
+  allow_failure: true
 
 markdownlint:
   stage: docs
