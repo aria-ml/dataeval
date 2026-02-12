@@ -180,19 +180,21 @@ def to_numpy(
     if array is None:
         _array = np.array([], dtype=dtype)
     elif isinstance(array, np.ndarray | np.memmap):
-        _array = array.copy().astype(dtype) if copy else array
+        numpy = array.copy() if copy else array
+        _array = numpy.astype(dtype) if dtype is not None else numpy
     elif array.__class__.__module__.startswith("tensorflow"):  # pragma: no cover - removed tf from deps
         tf = _try_import("tensorflow")
         if tf and tf.is_tensor(array):
             _logger.log(logging.INFO, "Converting Tensorflow array to NumPy array.")
-            _array = array.numpy().copy().astype(dtype) if copy else array.numpy().astype(dtype)  # type: ignore
+            numpy = array.numpy().copy() if copy else array.numpy()  # type: ignore
+            _array = numpy.astype(dtype) if dtype is not None else numpy
     elif array.__class__.__module__.startswith("torch"):
         torch = _try_import("torch")
         if torch and isinstance(array, torch.Tensor):
             _logger.log(logging.INFO, "Converting PyTorch array to NumPy array.")
             numpy = array.detach().cpu().numpy().copy() if copy else array.detach().cpu().numpy()  # type: ignore
             _logger.log(logging.DEBUG, LogMessage(lambda: f"{str(array)} -> {str(numpy)}"))
-            _array = numpy.astype(dtype)
+            _array = numpy.astype(dtype) if dtype is not None else numpy
 
     # If the array was not converted yet, let numpy create the array directly
     if _array is None:
