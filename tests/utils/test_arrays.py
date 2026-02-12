@@ -21,6 +21,7 @@ class TestInterop:
         t = torch.tensor([1, 2, 3, 4, 5])
         n = to_numpy(t)
         assert list(n) == list(t)
+        assert n.dtype == np.int64
 
     def test_torch_non_tensor_to_numpy(self):
         t = torch.int
