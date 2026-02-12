@@ -184,7 +184,7 @@ def label_stats(
     if index2label is None:
         result_index2label: dict[int, str] = {cls: str(cls) for cls in unique_classes}
     else:
-        result_index2label = {cls: index2label[cls] for cls in unique_classes}
+        result_index2label = {cls: index2label.get(cls, str(cls)) for cls in unique_classes}
 
     _logger.info(
         "Label stats calculation complete: %d images, %d classes, %d total labels, %d empty images",

@@ -231,3 +231,19 @@ class TestLabelStats:
         assert stats["image_count"] == 6
         assert stats["empty_image_indices"] == [1, 3, 4]
         assert stats["empty_image_count"] == 3
+
+    def test_label_stats_index2label_missing_class(self):
+        """Test that classes not in index2label fall back to str(cls)."""
+        # Data contains class 3, but index2label only maps 0, 1, 2
+        class_labels = [0, 1, 2, 3]
+        index2label = {0: "cat", 1: "dog", 2: "bird"}
+        stats = label_stats(class_labels, index2label=index2label)
+
+        # Known classes should use their mapped names
+        assert stats["index2label"][0] == "cat"
+        assert stats["index2label"][1] == "dog"
+        assert stats["index2label"][2] == "bird"
+        # Unknown class should fall back to str(cls)
+        assert stats["index2label"][3] == "3"
+        assert stats["class_count"] == 4
+        assert stats["label_count"] == 4
