@@ -11,11 +11,11 @@ kernelspec:
   name: python3
 ---
 
-# Configuring Python Logging with DataEval
+# How to configuring logging with DataEval
 
 +++
 
-## Problem Statement
+## Problem statement
 
 DataEval uses Python's standard logging module to provide visibility into operations and debugging information. This
 guide demonstrates how to configure logging to display messages in the console or save them to disk when using DataEval
@@ -23,7 +23,7 @@ functions.
 
 +++
 
-### _When to use_
+### When to use
 
 - You want to see detailed information about DataEval operations
 - You need to debug issues or understand internal processing
@@ -32,14 +32,14 @@ functions.
 
 +++
 
-### _What you will need_
+### What you will need
 
 1. A Python environment with dataeval installed
 1. Basic understanding of Python's logging module
 
 +++
 
-## _Getting Started_
+## Getting started
 
 ```{code-cell} ipython3
 # Google Colab Only
@@ -61,7 +61,7 @@ import sklearn.datasets as dsets
 from dataeval.core._ber import ber_knn, ber_mst
 ```
 
-## Understanding Logging Levels
+## Understanding logging levels
 
 Python's logging module supports several severity levels:
 
@@ -75,13 +75,13 @@ DataEval primarily uses **DEBUG**, **INFO**, and **WARNING** levels for normal o
 
 +++
 
-## Logging to Console
+## Logging to console
 
 This example demonstrates how to configure logging to display DataEval messages in the console.
 
 +++
 
-### Basic Console Logging (INFO level)
+### Basic console logging (INFO level)
 
 ```{code-cell} ipython3
 # Create console handler with formatting
@@ -105,7 +105,7 @@ result = ber_knn(embeddings, labels, k=3)
 print(f"\nResult: {result}")
 ```
 
-### Detailed Console Logging (DEBUG level)
+### Detailed console logging (DEBUG level)
 
 For more detailed information, you can enable DEBUG level logging:
 
@@ -131,13 +131,13 @@ result = ber_mst(embeddings, labels)
 print(f"\nResult: {result}")
 ```
 
-## Logging to Disk
+## Logging to disk
 
 This example demonstrates how to save DataEval logs to a file for later analysis.
 
 +++
 
-### Basic File Logging
+### Basic file logging
 
 Add the filename and filemode parameters to `logging.basicConfig`.
 
@@ -178,7 +178,7 @@ if os.path.exists(log_file):
         print(f.read())
 ```
 
-### Combined Console and File Logging
+### Combined console and file logging
 
 You can log to both console and file simultaneously:
 
@@ -227,7 +227,7 @@ if os.path.exists(log_file):
         print(f.read())
 ```
 
-## Temporarily Disabling Logs
+## Temporarily disabling logs
 
 ```{code-cell} ipython3
 # Disable all logging at CRITICAL level and below
@@ -252,7 +252,7 @@ result = ber_mst(embeddings, labels)
 print(f"Result: {result}")
 ```
 
-## Best Practices
+## Best practices
 
 1. **Configure logging early**: Set up logging configuration at the start of your script or notebook
 

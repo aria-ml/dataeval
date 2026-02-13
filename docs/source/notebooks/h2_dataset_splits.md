@@ -7,10 +7,10 @@ jupytext:
     jupytext_version: 1.19.1
 ---
 
-# How to Split your Dataset
+# How to split your dataset
 
 +++
 
-## Coming Soon
+## Coming soon
 
 This page is under development - reach out to us for more information.

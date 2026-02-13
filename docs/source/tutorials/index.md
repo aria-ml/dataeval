@@ -46,7 +46,7 @@ To run the tutorial interactively in Google Colab, click the
   - Learn how correlations in your data and metadata can affect model
     performance and what can be done to remove that bias.
   - [![Open In Colab][colab-badge]][bias-colab]
-* - [](../notebooks/tt_augmentation_duplicates.ipynb)
+* - [](../notebooks/tt_augmentation_duplicates.md)
   - Learn how common torchvision augmentations like rotations, flips, and color
     jitter can be detected as near duplicates using D4 hashes and BoVW embeddings.
   - [![Open In Colab][colab-badge]][augs-colab]

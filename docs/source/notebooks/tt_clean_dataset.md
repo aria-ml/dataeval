@@ -11,9 +11,15 @@ kernelspec:
   name: python3
 ---
 
-# Introduction to Data Cleaning
+# Introduction to data cleaning
 
 Part 1 of our introduction to exploratory data analysis guide
+
+Estimated time to complete: 15 minutes
+
+Relevant ML stages: [Data Engineering](../concepts/users/ML_Lifecycle.md#data-engineering)
+
+Relevant personas: Data Engineer, ML Engineer
 
 +++
 
@@ -45,13 +51,14 @@ incongruencies in the data. Before diving into machine learning or statistical m
 data you are working with. EDA helps in understanding the patterns, detecting anomalies, checking assumptions, and
 determining relationships in the data.
 
-One of the most important aspects of EDA is data cleaning. A portion of DataEval is dedicated to being able to identify
-duplicates and outliers as well as data points that have missing or too many extreme values. These techniques help
+One of the most important aspects of EDA is [data cleaning](../concepts/DataCleaning.md). A portion of DataEval is
+dedicated to being able to identify duplicates and [outliers](../concepts/Outliers.md) as well as data points that have
+missing or too many extreme values. These techniques help
 ensure that you only include high quality data for your projects.
 
 +++
 
-### Step-by-Step Guide
+### Step-by-step guide
 
 This guide will walk through how to use DataEval to perform basic data cleaning.
 
@@ -62,8 +69,9 @@ This guide will walk through how to use DataEval to perform basic data cleaning.
 You'll begin by importing the necessary libraries to walk through this guide.
 
 ```{code-cell} ipython3
-:tags: [remove_cell]
-
+---
+tags: [remove_cell]
+---
 try:
     import google.colab  # noqa: F401
 
@@ -223,11 +231,11 @@ def plot_sample_outlier_images_by_metric(dataset, outlier_class, outlier_result,
     plt.show()
 ```
 
-## Step 1: Understand the Data
+## Step 1: Understand the data
 
 +++
 
-### Load the Data
+### Load the data
 
 You are going to work with the PASCAL VOC 2012 dataset. This dataset is a small curated dataset that was used for a
 computer vision competition. The images were used for classification, object detection, and segmentation. This dataset
@@ -245,7 +253,7 @@ ds = VOCDetection("./data", image_set="train", year="2012", download=True)
 print(ds)
 ```
 
-### Inspect the Data
+### Inspect the data
 
 As this data was used for a computer vision competition, it will most likely have very few issues, but it is always
 worth it to check. Many of the large webscraped datasets available for use do contain image issues. Verifying in the
@@ -282,7 +290,8 @@ This table helps point out the wide variation in
 - the number of objects per image,
 - and the number of objects of each class per image.
 
-This highlights an important concept - class balance. A dataset that is imbalanced can result in a model that chooses
+This highlights an important concept - [class balance](../concepts/ClassBalancing.md). A dataset that is imbalanced can
+result in a model that chooses
 the more prominent class more often just because there are more samples in that class. To explore this concept further,
 see the bias tutorial in the [What's Next](#whats-next) section at the end of this tutorial.
 
@@ -310,11 +319,11 @@ Now, you can move on to identifying which images have a statistical difference f
 
 +++
 
-## Step 2: Identify any Outlying Data Points
+## Step 2: Identify any outlying data points
 
 +++
 
-### Extreme/Missing Values
+### Extreme/missing values
 
 Here you will detect and identify the images associated with the extreme values from DataEval's stat functions. To
 detect these extreme values, you will use the :class:`.Outliers` class. The `Outliers` class has multiple methods to
@@ -435,7 +444,7 @@ as outliers.
 
 +++
 
-### Aspect Ratio
+### Aspect ratio
 
 ```{code-cell} ipython3
 # Plot images flagged for "aspect_ratio"
@@ -496,7 +505,7 @@ to prevent biases.
 
 +++
 
-## Cleaning Summary
+## Cleaning summary
 
 The Outliers class identifies images that deviate significantly from the dataset's overall distribution. While it cannot
 determine operational relevance, it highlights patterns that may require further investigation.
@@ -641,7 +650,7 @@ Good luck with your data!
 
 +++
 
-## What's Next
+## What's next
 
 Learn how to do the following:
 

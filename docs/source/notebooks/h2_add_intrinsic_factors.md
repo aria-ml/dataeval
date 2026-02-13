@@ -15,9 +15,10 @@ kernelspec:
 
 +++
 
-## Problem Statement
+## Problem statement
 
-When performing analysis on datasets, metadata may sometimes be sparse or unavailable. Adding metadata to a dataset for
+When performing analysis on datasets, [metadata](../concepts/Metadata.md) may sometimes be sparse or unavailable.
+Adding metadata to a dataset for
 analysis may be necessary at times, and can come in the forms of calculated intrinsic values or additional information
 originally unavailable on the source dataset.
 
@@ -26,14 +27,14 @@ metadata for bias analysis.
 
 +++
 
-### _When to use_
+### When to use
 
 Adding metadata factors should be done when little or no metadata is available on the dataset, or to gain insights
 specific to metadata of interest that is not present natively in the dataset metadata.
 
 +++
 
-### _What you will need_
+### What you will need
 
 1. A dataset to analyze
 1. A Python environment with the following packages installed:
@@ -43,7 +44,7 @@ specific to metadata of interest that is not present natively in the dataset met
 
 +++
 
-## _Getting Started_
+## Getting started
 
 First import the required libraries needed to set up the example.
 

@@ -15,24 +15,25 @@ kernelspec:
 
 +++
 
-## Problem Statement
+## Problem statement
 
 Exploratory data analysis (EDA) can be overwhelming. There are so many things to check. Duplicates in your dataset,
 bad/corrupted images in the set, blurred or bright/dark images, the list goes on.
 
-DataEval created a cleaning class to assist you with your EDA so you can start training your models on high quality
+DataEval created a [data cleaning](../concepts/DataCleaning.md) class to assist you with your EDA so you can start
+training your models on high quality
 data.
 
 +++
 
-### _When to use_
+### When to use
 
 The cleaning class should be used during the initial EDA process or if you are trying to verify that you have the right
 data in your dataset.
 
 +++
 
-### _What you will need_
+### What you will need
 
 1. A dataset to analyze
 1. A Python environment with the following packages installed:
@@ -41,7 +42,7 @@ data in your dataset.
 
 +++
 
-## _Getting Started_
+## Getting started
 
 Let's import the required libraries needed to set up a minimal working example
 
@@ -80,7 +81,7 @@ this demonstration, we are just going to use the test set.
 testing_dataset = CIFAR10("./data", image_set="test", download=True)
 ```
 
-## Cleaning the Dataset
+## Cleaning the dataset
 
 Now we can begin finding those images which are significantly different from the rest of the data.
 
