@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,104,42
+/aria-ml/dataeval/tree/main/src/dataeval,38,9
+/aria-ml/dataeval/actions,17,2
+/aria-ml/dataeval/tree/main/src,14,9
+/aria-ml/dataeval/tree/main,9,8
+/aria-ml/dataeval/pulls,9,6
+/aria-ml/dataeval/tree/main/src/dataeval/core,8,3
+/aria-ml/dataeval/blob/main/src/dataeval/_metadata.py,7,2
+/aria-ml/dataeval/actions/workflows/ci.yml,7,1
+/aria-ml/dataeval/pull/1,6,5
