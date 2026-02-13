@@ -53,7 +53,7 @@ def _rank_base(
     max_cluster_size: int | None = None,
     reference: NDArray[np.floating[Any]] | None = None,
 ) -> RankResult:
-    """Internal function that performs the core ranking without policy application."""
+    """Perform the core ranking without policy application."""
     _logger.info(
         "Starting rank with method=%s, k=%s, c=%s, reference=%s",
         method,
@@ -286,7 +286,11 @@ def rank_hdbscan_distance(
     >>> result = rank_hdbscan_distance(embeddings, c=10)
     """
     return _rank_base(
-        embeddings, method="hdbscan_distance", c=c, max_cluster_size=max_cluster_size, reference=reference
+        embeddings,
+        method="hdbscan_distance",
+        c=c,
+        max_cluster_size=max_cluster_size,
+        reference=reference,
     )
 
 
@@ -334,12 +338,18 @@ def rank_hdbscan_complexity(
     >>> result = rank_hdbscan_complexity(embeddings, c=10)
     """
     return _rank_base(
-        embeddings, method="hdbscan_complexity", c=c, max_cluster_size=max_cluster_size, reference=reference
+        embeddings,
+        method="hdbscan_complexity",
+        c=c,
+        max_cluster_size=max_cluster_size,
+        reference=reference,
     )
 
 
 def _select_ordered_by_label(labels: NDArray[np.integer[Any]]) -> NDArray[np.intp]:
     """
+    Rerank labels sorted with decreasing priority for approximate class/group balance.
+
     Given labels (class, group, bin, etc) sorted with decreasing priority,
     rerank so that we have approximate class/group balance.
 
@@ -469,7 +479,7 @@ def rank_result_stratified(
     if result["scores"] is None:
         raise ValueError(
             "Ranking scores are necessary for stratified policy. "
-            "Use rank_knn, rank_kmeans_distance, or rank_hdbscan_distance methods."
+            "Use rank_knn, rank_kmeans_distance, or rank_hdbscan_distance methods.",
         )
 
     _logger.debug(

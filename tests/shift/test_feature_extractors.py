@@ -1,6 +1,4 @@
-"""
-Tests for drift feature extractors.
-"""
+"""Tests for drift feature extractors."""
 
 from unittest.mock import patch
 
@@ -110,7 +108,10 @@ class TestUncertaintyFeatureExtractor:
 
         with patch("dataeval.extractors._uncertainty.predict", return_value=mock_probs):
             extractor = ClassifierUncertaintyExtractor(
-                model=model, preds_type="probs", transforms=transform_fn, device="cpu"
+                model=model,
+                preds_type="probs",
+                transforms=transform_fn,
+                device="cpu",
             )
             result = extractor(data)
 

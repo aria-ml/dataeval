@@ -209,7 +209,7 @@ class MNISTTrainingStrategy:
         # Define the dataloader for training
         dataloader = DataLoader(Subset(cast(TorchDataset, dataset), indices), batch_size=8)
 
-        for epoch in range(epochs):
+        for _epoch in range(epochs):
             for batch in dataloader:
                 # Load data/images to device
                 X = torch.Tensor(batch[0]).to(device)

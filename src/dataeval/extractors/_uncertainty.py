@@ -1,6 +1,4 @@
-"""
-Uncertainty-based feature extractor for drift detection.
-"""
+"""Uncertainty-based feature extractor for drift detection."""
 
 __all__ = []
 

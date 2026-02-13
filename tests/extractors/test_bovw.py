@@ -183,7 +183,6 @@ class TestBoVWExtractor:
 
     def test_reproducibility_with_seed(self, rgb_images):
         """Test that results are reproducible when seed is set."""
-
         orig = get_seed()
 
         set_seed(42)

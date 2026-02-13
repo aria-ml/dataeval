@@ -41,8 +41,8 @@ class TestMDPreprocessingUnit:
             to_metadata(factors, labels)._bin()
         assert err_msg in caplog.text
 
-    @pytest.mark.parametrize("factors", ({"a": [1, 2, 3], "b": [1, 2, 3]}, {"a": [1, 2, 3]}))
-    @pytest.mark.parametrize("bincounts", ({"a": 1, "b": 1}, {"a": 1}, None))
+    @pytest.mark.parametrize("factors", [{"a": [1, 2, 3], "b": [1, 2, 3]}, {"a": [1, 2, 3]}])
+    @pytest.mark.parametrize("bincounts", [{"a": 1, "b": 1}, {"a": 1}, None])
     def test_exclude_raw_metadata_only(self, factors, bincounts):
         labels = [0, 0, 0]
         output = to_metadata(factors, labels, bincounts, exclude=["b"])

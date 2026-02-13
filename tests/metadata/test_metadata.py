@@ -34,12 +34,10 @@ def mock_metadata(mock_ds) -> Metadata:
 
 @pytest.mark.required
 class TestMetadata:
-    """
-    Test collate aggregates MAITE style data into separate collections from tuple return
-    """
+    """Test collate aggregates MAITE style data into separate collections from tuple return."""
 
     @pytest.mark.parametrize(
-        "data, labels, metadata, factors",
+        ("data", "labels", "metadata", "factors"),
         [
             (np.ones((10, 3, 3)), np.ones((10, 3)), [{str(i): i} for i in range(10)], 10),
             (
@@ -57,7 +55,7 @@ class TestMetadata:
         ],
     )
     def test_mock_inputs(self, data, labels, metadata, factors):
-        """Tests common (input, target, metadata) dataset output"""
+        """Tests common (input, target, metadata) dataset output."""
         ds = MockDataset(data, labels, metadata)
         md = Metadata(ds)
 
@@ -98,10 +96,16 @@ class TestMetadata:
         assert stats["label_counts_per_image"] == [2, 0, 2, 2, 2, 0, 2, 2, 2, 2]
 
         imgstats = calculate(
-            *unzip_dataset(mock_ds, False), stats=ImageStats.PIXEL | ImageStats.VISUAL, per_image=True, per_target=False
+            *unzip_dataset(mock_ds, False),
+            stats=ImageStats.PIXEL | ImageStats.VISUAL,
+            per_image=True,
+            per_target=False,
         )
         boxstats = calculate(
-            *unzip_dataset(mock_ds, True), stats=ImageStats.PIXEL | ImageStats.VISUAL, per_image=False, per_target=True
+            *unzip_dataset(mock_ds, True),
+            stats=ImageStats.PIXEL | ImageStats.VISUAL,
+            per_image=False,
+            per_target=True,
         )
         ratiostats = calculate_ratios(imgstats, target_stats_output=boxstats)
         assert len(imgstats["source_index"]) == 10
@@ -208,7 +212,7 @@ class TestMetadata:
             [
                 (np.zeros((3, 16, 16)), np.zeros((3,)), {"id": 0}),
                 (np.zeros((3, 16, 16)), ObjectDetectionTarget([[0, 0, 0, 0]], [0], [0, 0, 0]), {"id": 0}),
-            ]  # type: ignore
+            ],  # type: ignore
         )
         with pytest.raises(ValueError, match="Encountered unexpected target type in dataset"):
             md._structure()
@@ -275,7 +279,7 @@ class TestMetadata:
         assert md.raw_data.size == 0
 
     @pytest.mark.parametrize(
-        "is_binned, exists",
+        ("is_binned", "exists"),
         [
             (True, True),
             (True, False),
@@ -296,7 +300,7 @@ class TestMetadata:
         assert exists if factor_info is None else not factor_info.is_binned
 
     def test_structure_progress_callback(self, mock_ds):
-        """Test that _structure calls progress_callback with correct values"""
+        """Test that _structure calls progress_callback with correct values."""
         from unittest.mock import Mock
 
         md = Metadata(mock_ds)
@@ -309,7 +313,7 @@ class TestMetadata:
         callback.assert_called_with(len(mock_ds) - 1, total=len(mock_ds))
 
     def test_bin_progress_callback(self, RNG: np.random.Generator):
-        """Test that _bin calls progress_callback with correct values"""
+        """Test that _bin calls progress_callback with correct values."""
         from unittest.mock import Mock
 
         md = Metadata(None)  # type: ignore
@@ -395,7 +399,7 @@ class TestMetadata:
                     "image_factor": f"img_{i}",
                     "shared_factor": i,
                     "target_factor": [f"tgt_{i}_0", f"tgt_{i}_1"],  # 2 target-level values
-                }
+                },
             )
 
         ds = get_mock_od_dataset(images, labels, bboxes, metadata=metadata)
@@ -437,7 +441,7 @@ class TestMetadata:
         assert final_binned_shape[1] == len(final_factor_names)
 
     def test_get_image_factors_not_found(self, get_od_dataset):
-        """Test get_image_factors with non-existent image_idx (line 598)"""
+        """Test get_image_factors with non-existent image_idx (line 598)."""
         images = np.random.random((3, 3, 16, 16))
         dataset = get_od_dataset(images, 2, True)
 
@@ -447,7 +451,7 @@ class TestMetadata:
             md.get_image_factors(999)
 
     def test_get_target_factors_not_found(self, get_od_dataset):
-        """Test get_target_factors with non-existent indices (line 629)"""
+        """Test get_target_factors with non-existent indices (line 629)."""
         images = np.random.random((3, 3, 16, 16))
         dataset = get_od_dataset(images, 2, True)
 
@@ -460,7 +464,7 @@ class TestMetadata:
             md.get_target_factors(0, 999)
 
     def test_infer_factor_level_errors(self, get_od_dataset):
-        """Test _infer_factor_level error conditions (lines 777, 783)"""
+        """Test _infer_factor_level error conditions (lines 777, 783)."""
         images = np.random.random((5, 3, 16, 16))
         dataset = get_od_dataset(images, 2, True)
 
@@ -473,7 +477,7 @@ class TestMetadata:
             md._infer_factor_level({"a": [1, 2, 3]}, num_image_rows=5, num_target_rows=10)
 
     def test_validate_factor_lengths_invalid_level(self, get_od_dataset):
-        """Test _validate_factor_lengths with invalid level (line 803)"""
+        """Test _validate_factor_lengths with invalid level (line 803)."""
         images = np.random.random((5, 3, 16, 16))
         dataset = get_od_dataset(images, 2, True)
 
@@ -488,7 +492,7 @@ class TestMetadata:
             )
 
     def test_filter_by_factor_with_condition(self, get_od_dataset):
-        """Test filter_by_factor returns filtered results (line 1199)"""
+        """Test filter_by_factor returns filtered results (line 1199)."""
         images = np.random.random((5, 3, 16, 16))
         metadata = [{"continuous_val": float(i * 10.0), "categorical_val": f"cat_{i}"} for i in range(5)]
 

@@ -1,5 +1,4 @@
 import math
-import warnings
 
 import numpy as np
 import pytest
@@ -11,30 +10,30 @@ from dataeval.core._coverage import coverage_adaptive, coverage_naive
 class TestCoverageUnit:
     def test_n_too_small(self):
         embs = np.zeros((3, 2))
-        with pytest.raises(ValueError), warnings.catch_warnings():
+        with pytest.raises(ValueError, match="less than or equal to"):
             coverage_naive(embs, num_observations=3)
 
     def test_naive(self):
-        """Checks pvals, crit, rho are all acceptable values"""
+        """Checks pvals, crit, rho are all acceptable values."""
         embs = np.zeros((3, 2))
         result = coverage_naive(embs, num_observations=1)
         assert abs(result["coverage_radius"] - math.sqrt(2 / 3) / math.sqrt(math.pi)) < 0.01
 
     def test_adaptive(self):
-        """Checks pvals, crit, rho are all acceptable values"""
+        """Checks pvals, crit, rho are all acceptable values."""
         embs = np.zeros((100, 2))
         result = coverage_adaptive(embs, num_observations=1, percent=0.01)
         np.testing.assert_array_equal(result["critical_value_radii"], np.zeros(100))
 
     def test_high_dim_data_valueerror(self):
-        """High dimensional data should raise valueerror"""
+        """High dimensional data should raise valueerror."""
         embs = np.random.random(size=(100, 16, 16))
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="expected 2"):
             coverage_naive(embs, 20)
 
     def test_non_unit_interval(self):
-        embs = np.random.random(size=(100, 16, 16)) * 2
-        with pytest.raises(ValueError):
+        embs = np.random.random(size=(16, 16)) * 2
+        with pytest.raises(ValueError, match="must be unit"):
             coverage_naive(embs, 20)
 
 

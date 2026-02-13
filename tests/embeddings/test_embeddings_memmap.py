@@ -1,6 +1,5 @@
 """Tests for Embeddings class memory management, caching, and persistence."""
 
-from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
@@ -30,7 +29,7 @@ def encoder():
 
 
 @pytest.fixture
-def memmap_embeddings(tmp_path) -> Generator[tuple[Embeddings, NDArray[Any]], None, None]:
+def memmap_embeddings(tmp_path) -> tuple[Embeddings, NDArray[Any]]:
     """Create temporary memmap-backed embeddings for testing."""
     cache_path = tmp_path / "test_embeddings.npy"
     shape = (1000, 128)
@@ -45,22 +44,22 @@ def memmap_embeddings(tmp_path) -> Generator[tuple[Embeddings, NDArray[Any]], No
     emb._cached_idx = set(range(shape[0]))
     emb._dataset = data
 
-    yield emb, data
+    return emb, data
 
 
 @pytest.fixture
-def lazy_embeddings(simple_dataset, tmp_path, encoder) -> Generator[tuple[Embeddings, SimpleDataset, Path], None, None]:
+def lazy_embeddings(simple_dataset, tmp_path, encoder) -> tuple[Embeddings, SimpleDataset, Path]:
     """Create embeddings with lazy evaluation for testing compute()."""
     cache_path = tmp_path / "lazy_embeddings.npy"
     emb = Embeddings(simple_dataset, extractor=encoder, path=cache_path)
-    yield emb, simple_dataset, cache_path
+    return emb, simple_dataset, cache_path
 
 
 @pytest.fixture
-def in_memory_embeddings(simple_dataset, encoder) -> Generator[tuple[Embeddings, SimpleDataset], None, None]:
+def in_memory_embeddings(simple_dataset, encoder) -> tuple[Embeddings, SimpleDataset]:
     """Create in-memory embeddings (no path) for testing."""
     emb = Embeddings(simple_dataset, extractor=encoder, path=None)
-    yield emb, simple_dataset
+    return emb, simple_dataset
 
 
 class TestMemmapPreservation:
@@ -249,7 +248,11 @@ class TestShouldUseMemmap:
         assert result is False
 
     def test_should_use_memmap_small_data_with_path(
-        self, simple_dataset: SimpleDataset, tmp_path: Path, encoder, monkeypatch
+        self,
+        simple_dataset: SimpleDataset,
+        tmp_path: Path,
+        encoder,
+        monkeypatch,
     ):
         """_should_use_memmap should return False when estimated size is below threshold."""
 
@@ -264,7 +267,11 @@ class TestShouldUseMemmap:
         assert result is False
 
     def test_should_use_memmap_large_data_with_path(
-        self, simple_dataset: SimpleDataset, tmp_path: Path, encoder, monkeypatch
+        self,
+        simple_dataset: SimpleDataset,
+        tmp_path: Path,
+        encoder,
+        monkeypatch,
     ):
         """_should_use_memmap should return True when estimated size exceeds threshold."""
 
@@ -301,7 +308,11 @@ class TestInitializeStorage:
         assert cache_path.exists()
 
     def test_initialize_storage_creates_in_memory_array(
-        self, simple_dataset: SimpleDataset, tmp_path, encoder, monkeypatch
+        self,
+        simple_dataset: SimpleDataset,
+        tmp_path,
+        encoder,
+        monkeypatch,
     ):
         """Test _initialize_storage creates in-memory array when below threshold."""
 

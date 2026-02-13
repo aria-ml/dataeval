@@ -1,6 +1,7 @@
 """
-DataEval provides a simple interface to characterize image data and its impact on model performance
-across classification and object-detection tasks. It also provides capabilities to select and curate
+DataEval provides a simple interface to characterize image data and its impact on model performance.
+
+It works across classification and object-detection tasks. It also provides capabilities to select and curate
 datasets to test and train performant, robust, unbiased and reliable AI models and monitor for data
 shifts that impact performance of deployed models.
 """
@@ -35,7 +36,7 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 def log(level: int = logging.DEBUG, handler: logging.Handler | None = None) -> None:
     """
-    Helper for quickly adding a StreamHandler to the logger. Useful for debugging.
+    Add a StreamHandler to the logger quickly for debugging.
 
     Parameters
     ----------
@@ -52,10 +53,9 @@ def log(level: int = logging.DEBUG, handler: logging.Handler | None = None) -> N
         handler = logging.StreamHandler() if handler is None else handler
         handler.setFormatter(
             logging.Formatter(
-                "%(asctime)s %(levelname)-8s %(name)s.%(filename)s:%(lineno)s - %(funcName)10s() | %(message)s"
-            )
+                "%(asctime)s %(levelname)-8s %(name)s.%(filename)s:%(lineno)s - %(funcName)10s() | %(message)s",
+            ),
         )
     logger.addHandler(handler)
     logger.setLevel(level)
-    logging.DEBUG
     logger.debug(f"Added logging handler {handler} to logger: {__name__}")

@@ -1,5 +1,5 @@
 """
-Adapted for Pytorch from
+Adapted for Pytorch from.
 
 Source code derived from Alibi-Detect 0.11.4
 https://github.com/SeldonIO/alibi-detect/tree/v0.11.4
@@ -32,7 +32,8 @@ TGMMData = TypeVar("TGMMData")
 
 @dataclass
 class GaussianMixtureModelParams:
-    """
+    """Parameters for a Gaussian Mixture Model.
+
     phi : torch.Tensor
         Mixture component distribution weights.
     mu : torch.Tensor
@@ -68,11 +69,10 @@ def gmm_params(z: torch.Tensor, gamma: torch.Tensor) -> GaussianMixtureModelPara
     GaussianMixtureModelParams(phi, mu, cov, L, log_det_cov)
         The parameters used to calculate energy.
     """
-
     # compute gmm parameters phi, mu and cov
-    N = gamma.shape[0]  # nb of samples in batch
+    n_samples = gamma.shape[0]  # nb of samples in batch
     sum_gamma = torch.sum(gamma, 0)  # K
-    phi = sum_gamma / N  # K
+    phi = sum_gamma / n_samples  # K
     # K x D (D = latent_dim)
     mu = torch.sum(torch.unsqueeze(gamma, -1) * torch.unsqueeze(z, 1), 0) / torch.unsqueeze(sum_gamma, -1)
     z_mu = torch.unsqueeze(z, 1) - torch.unsqueeze(mu, 0)  # N x K x D
@@ -80,20 +80,21 @@ def gmm_params(z: torch.Tensor, gamma: torch.Tensor) -> GaussianMixtureModelPara
 
     # K x D x D
     cov = torch.sum(torch.unsqueeze(torch.unsqueeze(gamma, -1), -1) * z_mu_outer, 0) / torch.unsqueeze(
-        torch.unsqueeze(sum_gamma, -1), -1
+        torch.unsqueeze(sum_gamma, -1),
+        -1,
     )
 
     # cholesky decomposition of covariance and determinant derivation
-    D = cov.shape[1]
+    d = cov.shape[1]
     # Use adaptive epsilon that scales with covariance magnitude to ensure numerical stability
     # For high-dimensional spaces or collapsed latent dimensions, a larger epsilon is needed
     # Use the maximum diagonal element as a reference scale, with a minimum of 1e-6
     max_diag = torch.max(torch.diagonal(cov, dim1=-2, dim2=-1))
     adaptive_epsilon = torch.maximum(max_diag * 1e-6, torch.tensor(1e-6))
-    L = torch.linalg.cholesky(cov + torch.eye(D) * adaptive_epsilon)  # K x D x D
-    log_det_cov = 2.0 * torch.sum(torch.log(torch.diagonal(L, dim1=-2, dim2=-1)), 1)  # K
+    chol = torch.linalg.cholesky(cov + torch.eye(d) * adaptive_epsilon)  # K x D x D
+    log_det_cov = 2.0 * torch.sum(torch.log(torch.diagonal(chol, dim1=-2, dim2=-1)), 1)  # K
 
-    return GaussianMixtureModelParams(phi, mu, cov, L, log_det_cov)
+    return GaussianMixtureModelParams(phi, mu, cov, chol, log_det_cov)
 
 
 def gmm_energy(
@@ -118,14 +119,14 @@ def gmm_energy(
     cov_diag
         The inverse sum of the diagonal components of the covariance matrix.
     """
-    D = params.cov.shape[1]
+    d = params.cov.shape[1]
     z_mu = torch.unsqueeze(z, 1) - torch.unsqueeze(params.mu, 0)  # N x K x D
-    z_mu_T = torch.permute(z_mu, dims=[1, 2, 0])  # K x D x N
-    v = torch.linalg.solve_triangular(params.L, z_mu_T, upper=False)  # K x D x D
+    z_mu_t = torch.permute(z_mu, dims=[1, 2, 0])  # K x D x N
+    v = torch.linalg.solve_triangular(params.L, z_mu_t, upper=False)  # K x D x D
 
     # rewrite sample energy in logsumexp format for numerical stability
     logits = torch.log(torch.unsqueeze(params.phi, -1)) - 0.5 * (
-        torch.sum(torch.square(v), 1) + float(D) * np.log(2.0 * np.pi) + torch.unsqueeze(params.log_det_cov, -1)
+        torch.sum(torch.square(v), 1) + float(d) * np.log(2.0 * np.pi) + torch.unsqueeze(params.log_det_cov, -1)
     )  # K x N
     sample_energy = -torch.logsumexp(logits, 0)  # N
 
@@ -305,7 +306,9 @@ class OODReconstruction:
         return hasattr(model, "gmm_density_net") and model.gmm_density_net is not None
 
     def _auto_detect_model_type(
-        self, model: torch.nn.Module, use_gmm_hint: bool | None
+        self,
+        model: torch.nn.Module,
+        use_gmm_hint: bool | None,
     ) -> tuple[Literal["ae", "vae"], bool]:
         """
         Auto-detect model type and GMM usage from model structure.
@@ -331,28 +334,28 @@ class OODReconstruction:
 
         return model_type, use_gmm
 
-    def _get_data_info(self, X: NDArray) -> tuple[tuple, type]:
+    def _get_data_info(self, x: NDArray) -> tuple[tuple, type]:
         """Validate and extract shape and dtype information from data."""
-        if not isinstance(X, np.ndarray):
+        if not isinstance(x, np.ndarray):
             raise TypeError("Dataset should be of type: `NDArray`.")
-        if np.min(X) < 0 or np.max(X) > 1:
+        if np.min(x) < 0 or np.max(x) > 1:
             raise ValueError("Data must be on the unit interval [0-1].")
-        return X.shape[1:], X.dtype.type
+        return x.shape[1:], x.dtype.type
 
-    def _validate(self, X: NDArray) -> None:
+    def _validate(self, x: NDArray) -> None:
         """Validate that input data matches expected shape and dtype."""
-        check_data_info = self._get_data_info(X)
+        check_data_info = self._get_data_info(x)
         if self._data_info is not None and check_data_info != self._data_info:
             raise RuntimeError(
                 f"Expect data of type: {self._data_info[1]} and shape: {self._data_info[0]}. "
-                f"Provided data is type: {check_data_info[1]} and shape: {check_data_info[0]}."
+                f"Provided data is type: {check_data_info[1]} and shape: {check_data_info[0]}.",
             )
 
-    def _validate_state(self, X: NDArray) -> None:
+    def _validate_state(self, x: NDArray) -> None:
         """Validate that detector has been fitted and data is valid."""
         if not hasattr(self, "_ref_score") or not hasattr(self, "_threshold_perc"):
             raise RuntimeError("Detector needs to be `fit` before calling predict or score.")
-        self._validate(X)
+        self._validate(x)
 
     def _validate_gmm_output(self, x_ref: ArrayLike) -> None:
         """Validate that model output format is correct for GMM usage."""
@@ -366,12 +369,12 @@ class OODReconstruction:
         if not isinstance(sample_output, tuple):
             raise ValueError(
                 "When use_gmm=True, model must return a tuple of (reconstruction, z, gamma), "
-                f"but got {type(sample_output).__name__}"
+                f"but got {type(sample_output).__name__}",
             )
         if len(sample_output) < 3:
             raise ValueError(
                 "When use_gmm=True, model must return tuple of at least 3 elements: (reconstruction, z, gamma), "
-                f"but got {len(sample_output)} elements"
+                f"but got {len(sample_output)} elements",
             )
 
         # Validate the shapes and types of z and gamma
@@ -381,24 +384,24 @@ class OODReconstruction:
         # Validate z (latent representation)
         if not isinstance(z_test, torch.Tensor):
             raise ValueError(
-                f"When use_gmm=True, model's second output (z) must be a torch.Tensor, got {type(z_test).__name__}"
+                f"When use_gmm=True, model's second output (z) must be a torch.Tensor, got {type(z_test).__name__}",
             )
         if z_test.ndim != 2:
             raise ValueError(
                 f"When use_gmm=True, model's second output (z) must be 2D with shape (batch_size, latent_dim), "
-                f"got shape {z_test.shape}"
+                f"got shape {z_test.shape}",
             )
 
         # Validate gamma (mixture probabilities)
         if not isinstance(gamma_test, torch.Tensor):
             raise ValueError(
                 f"When use_gmm=True, model's third output (gamma) must be a torch.Tensor, "
-                f"got {type(gamma_test).__name__}"
+                f"got {type(gamma_test).__name__}",
             )
         if gamma_test.ndim != 2:
             raise ValueError(
                 f"When use_gmm=True, model's third output (gamma) must be 2D with shape (batch_size, n_gmm), "
-                f"got shape {gamma_test.shape}"
+                f"got shape {gamma_test.shape}",
             )
 
         # Check gamma sums to approximately 1 (it's a probability distribution)
@@ -409,7 +412,7 @@ class OODReconstruction:
             raise ValueError(
                 "When use_gmm=True, model's third output (gamma) must be a probability distribution "
                 f"(sum to 1 along last dimension). Got sums with min={min_sum:.6f}, max={max_sum:.6f}. "
-                "Consider using nn.Softmax(dim=-1) as the final layer of your GMM density network."
+                "Consider using nn.Softmax(dim=-1) as the final layer of your GMM density network.",
             )
 
     def fit(
@@ -489,7 +492,10 @@ class OODReconstruction:
                 base_mse = torch.nn.MSELoss()
 
                 def gmm_reconstruction_loss(
-                    x: torch.Tensor, x_recon: torch.Tensor, z: torch.Tensor, gamma: torch.Tensor
+                    x: torch.Tensor,
+                    x_recon: torch.Tensor,
+                    _z: torch.Tensor,
+                    _gamma: torch.Tensor,
                 ) -> Any:
                     """Loss for GMM models - uses only reconstruction error."""
                     return base_mse(x, x_recon)
@@ -533,8 +539,8 @@ class OODReconstruction:
             self._gmm_energy_ref_std = float(ref_gmm_energy_np.std())
 
             # Compute reconstruction error statistics on reference data
-            X_recon = model_output[0].detach().cpu().numpy()
-            fscore = np.power(x_ref_np - X_recon, 2)
+            x_recon = model_output[0].detach().cpu().numpy()
+            fscore = np.power(x_ref_np - x_recon, 2)
             fscore_flat = fscore.reshape(fscore.shape[0], -1)
             n_score_features = int(np.ceil(fscore_flat.shape[1]))
             sorted_fscore = np.sort(fscore_flat, axis=1)
@@ -616,7 +622,7 @@ class OODReconstruction:
         # Final score is probability of being OOD
         return 1.0 - ((1.0 - recon_percentile) * (1.0 - gmm_percentile))
 
-    def _score(self, X: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput:
+    def _score(self, x: NDArray[np.float32], batch_size: int = int(1e10)) -> OODScoreOutput:
         """
         Compute OOD scores for the input data.
 
@@ -625,21 +631,21 @@ class OODReconstruction:
         For models with GMM, combines reconstruction error with GMM energy in latent space.
         """
         # Get model outputs
-        model_output = predict(X, self.model, batch_size=batch_size)
+        model_output = predict(x, self.model, batch_size=batch_size)
 
         # Extract reconstruction based on model type
         if self.model_type == "ae" and not self.use_gmm:
             model_output = model_output[0] if isinstance(model_output, tuple) else model_output
-            X_recon = model_output.detach().cpu().numpy()
+            x_recon = model_output.detach().cpu().numpy()
         else:  # vae or using gmm
             # Extract reconstruction (first element of tuple)
             if isinstance(model_output, tuple):
-                X_recon = model_output[0].detach().cpu().numpy()
+                x_recon = model_output[0].detach().cpu().numpy()
             else:
-                X_recon = model_output.detach().cpu().numpy()
+                x_recon = model_output.detach().cpu().numpy()
 
         # Compute reconstruction-based feature and instance level scores
-        fscore = np.power(X - X_recon, 2)
+        fscore = np.power(x - x_recon, 2)
         fscore_flat = fscore.reshape(fscore.shape[0], -1).copy()
         n_score_features = int(np.ceil(fscore_flat.shape[1]))
         sorted_fscore = np.sort(fscore_flat, axis=1)
@@ -666,19 +672,19 @@ class OODReconstruction:
 
             else:
                 raise ValueError(
-                    "When use_gmm=True, model must return tuple with latent representation as second element"
+                    "When use_gmm=True, model must return tuple with latent representation as second element",
                 )
 
         return OODScoreOutput(iscore, fscore)
 
     @set_metadata
-    def score(self, X: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
+    def score(self, x: ArrayLike, batch_size: int = int(1e10)) -> OODScoreOutput:
         """
         Compute the :term:`out of distribution<Out-of-distribution (OOD)>` scores for a given dataset.
 
         Parameters
         ----------
-        X : ArrayLike
+        x : ArrayLike
             Input data to score.
         batch_size : int, default 1e10
             Number of instances to process in each batch.
@@ -687,16 +693,16 @@ class OODReconstruction:
         Raises
         ------
         ValueError
-            X input data must be unit interval [0-1].
+            x input data must be unit interval [0-1].
 
         Returns
         -------
         OODScoreOutput
             An object containing the instance-level and feature-level OOD scores.
         """
-        X_np = as_numpy(X).astype(np.float32)
-        self._validate(X_np)
-        return self._score(X_np, batch_size)
+        x_np = as_numpy(x).astype(np.float32)
+        self._validate(x_np)
+        return self._score(x_np, batch_size)
 
     def _threshold_score(self, ood_type: Literal["feature", "instance"] = "instance") -> np.floating:
         """Get the threshold score for a given OOD type."""
@@ -705,7 +711,7 @@ class OODReconstruction:
     @set_metadata
     def predict(
         self,
-        X: ArrayLike,
+        x: ArrayLike,
         batch_size: int = int(1e10),
         ood_type: Literal["feature", "instance"] = "instance",
     ) -> OODOutput:
@@ -714,7 +720,7 @@ class OODReconstruction:
 
         Parameters
         ----------
-        X : ArrayLike
+        x : ArrayLike
             Input data for out-of-distribution prediction.
         batch_size : int, default 1e10
             Number of instances to process in each batch.
@@ -724,7 +730,7 @@ class OODReconstruction:
         Raises
         ------
         ValueError
-            X input data must be unit interval [0-1].
+            x input data must be unit interval [0-1].
 
         Returns
         -------
@@ -732,10 +738,10 @@ class OODReconstruction:
             Dictionary containing the outlier predictions for the selected level,
             and the OOD scores for the data including both 'instance' and 'feature' (if present) level scores.
         """
-        X_np = to_numpy(X).astype(np.float32)
-        self._validate_state(X_np)
+        x_np = to_numpy(x).astype(np.float32)
+        self._validate_state(x_np)
 
         # Compute outlier scores
-        score = self.score(X_np, batch_size=batch_size)
+        score = self.score(x_np, batch_size=batch_size)
         ood_pred = score.get(ood_type) > self._threshold_score(ood_type)
         return OODOutput(is_ood=ood_pred, **score.data())

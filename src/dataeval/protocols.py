@@ -1,6 +1,4 @@
-"""
-Common type protocols used for interoperability with DataEval.
-"""
+"""Common type protocols used for interoperability with DataEval."""
 
 __all__ = [
     "AnnotatedDataset",
@@ -95,11 +93,25 @@ class Array(Protocol):
     """
 
     @property
-    def shape(self) -> tuple[int, ...]: ...
-    def __array__(self) -> NDArray[Any]: ...
-    def __getitem__(self, key: Any, /) -> Any: ...
-    def __iter__(self) -> Iterator[Any]: ...
-    def __len__(self) -> int: ...
+    def shape(self) -> tuple[int, ...]:
+        """Shape of the array."""
+        ...
+
+    def __array__(self) -> NDArray[Any]:
+        """Convert to numpy array."""
+        ...
+
+    def __getitem__(self, key: Any, /) -> Any:
+        """Return item at key."""
+        ...
+
+    def __iter__(self) -> Iterator[Any]:
+        """Return iterator."""
+        ...
+
+    def __len__(self) -> int:
+        """Return length."""
+        ...
 
 
 _T = TypeVar("_T")
@@ -179,19 +191,6 @@ class Metadata(Protocol):
 
     Attributes
     ----------
-    factor_names : Sequence[str]
-        Names of the metadata factors.
-    factor_data : NDArray[np.int64]
-        Metadata factors in array of shape (n_samples, n_factors).
-        Continuous factors or non-integer data should be preprocessed into
-        discrete integer bins before being returned here.
-    class_labels : NDArray[np.intp]
-        Flat array of class labels with one entry per target/detection.
-        For image classification, length equals number of images.
-        For object detection, length equals total detections across all images.
-    is_discrete : Sequence[bool]
-        Whether each factor is discrete (True) or continuous (False).
-        Must have the same length as factor_names.
     index2label : NotRequired[Mapping[int, str]]
         Optional mapping from class label indices to human-readable names.
     item_indices : NotRequired[NDArray[np.intp]]
@@ -239,16 +238,38 @@ class Metadata(Protocol):
     """
 
     @property
-    def factor_names(self) -> SequenceLike[str]: ...
+    def factor_names(self) -> SequenceLike[str]:
+        """Names of the metadata factors."""
+        ...
 
     @property
-    def factor_data(self) -> NDArray[np.int64]: ...
+    def factor_data(self) -> NDArray[np.int64]:
+        """
+        Metadata factors in array of shape (n_samples, n_factors).
+
+        Continuous factors or non-integer data should be preprocessed into
+        discrete integer bins before being returned here.
+        """
+        ...
 
     @property
-    def class_labels(self) -> NDArray[np.intp]: ...
+    def class_labels(self) -> NDArray[np.intp]:
+        """
+        Flat array of class labels with one entry per target/detection.
+
+        For image classification, length equals number of images.
+        For object detection, length equals total detections across all images.
+        """
+        ...
 
     @property
-    def is_discrete(self) -> Sequence[bool]: ...
+    def is_discrete(self) -> Sequence[bool]:
+        """
+        Whether each factor is discrete (True) or continuous (False).
+
+        Must have the same length as factor_names.
+        """
+        ...
 
 
 # ========== DATASETS ==========
@@ -267,18 +288,19 @@ class Dataset(Protocol[_T_co]):
         Returns dataset length.
     """
 
-    def __getitem__(self, index: int, /) -> _T_co: ...
-    def __len__(self) -> int: ...
+    def __getitem__(self, index: int, /) -> _T_co:
+        """Return item at index."""
+        ...
+
+    def __len__(self) -> int:
+        """Return length."""
+        ...
 
 
 @runtime_checkable
 class AnnotatedDataset(Dataset[_T_co], Protocol[_T_co]):
     """
     Protocol for a generic `AnnotatedDataset`.
-
-    Attributes
-    ----------
-    metadata : :class:`.DatasetMetadata` or derivatives.
 
     Methods
     -------
@@ -293,7 +315,9 @@ class AnnotatedDataset(Dataset[_T_co], Protocol[_T_co]):
     """
 
     @property
-    def metadata(self) -> DatasetMetadata: ...
+    def metadata(self) -> DatasetMetadata:
+        """:class:`.DatasetMetadata` or derivatives."""
+        ...
 
 
 # ========== IMAGE CLASSIFICATION DATASETS ==========
@@ -319,24 +343,22 @@ Type alias for an :class:`AnnotatedDataset` of :class:`ImageClassificationDatum`
 
 @runtime_checkable
 class ObjectDetectionTarget(Protocol):
-    """
-    Protocol for targets in an Object Detection dataset.
-
-    Attributes
-    ----------
-    boxes : :class:`ArrayLike` of shape (N, 4)
-    labels : :class:`ArrayLike` of shape (N,)
-    scores : :class:`ArrayLike` of shape (N, M)
-    """
+    """Protocol for targets in an Object Detection dataset."""
 
     @property
-    def boxes(self) -> ArrayLike: ...
+    def boxes(self) -> ArrayLike:
+        """:class:`ArrayLike` of shape (N, 4) bounding boxes."""
+        ...
 
     @property
-    def labels(self) -> ArrayLike: ...
+    def labels(self) -> ArrayLike:
+        """:class:`ArrayLike` of shape (N,) class labels."""
+        ...
 
     @property
-    def scores(self) -> ArrayLike: ...
+    def scores(self) -> ArrayLike:
+        """:class:`ArrayLike` of shape (N, M) prediction scores."""
+        ...
 
 
 ObjectDetectionDatum: TypeAlias = tuple[ArrayLike, ObjectDetectionTarget, DatumMetadata]
@@ -360,24 +382,22 @@ Type alias for an :class:`AnnotatedDataset` of :class:`ObjectDetectionDatum` ele
 
 @runtime_checkable
 class SegmentationTarget(Protocol):
-    """
-    Protocol for targets in a Segmentation dataset.
-
-    Attributes
-    ----------
-    mask : :class:`ArrayLike`
-    labels : :class:`ArrayLike`
-    scores : :class:`ArrayLike`
-    """
+    """Protocol for targets in a Segmentation dataset."""
 
     @property
-    def mask(self) -> ArrayLike: ...
+    def mask(self) -> ArrayLike:
+        """:class:`ArrayLike` segmentation mask."""
+        ...
 
     @property
-    def labels(self) -> ArrayLike: ...
+    def labels(self) -> ArrayLike:
+        """:class:`ArrayLike` class labels."""
+        ...
 
     @property
-    def scores(self) -> ArrayLike: ...
+    def scores(self) -> ArrayLike:
+        """:class:`ArrayLike` prediction scores."""
+        ...
 
 
 SegmentationDatum: TypeAlias = tuple[ArrayLike, SegmentationTarget, DatumMetadata]
@@ -424,7 +444,9 @@ class Transform(Protocol[_T]):
     array([0.004, 0.008, 0.012])
     """
 
-    def __call__(self, data: _T, /) -> _T: ...
+    def __call__(self, data: _T, /) -> _T:
+        """Apply transform to data."""
+        ...
 
 
 @runtime_checkable
@@ -508,9 +530,7 @@ class FeatureExtractor(Protocol):
 
 @runtime_checkable
 class AnnotatedModel(Protocol):
-    """
-    Protocol for an annotated model.
-    """
+    """Protocol for an annotated model."""
 
     @property
     def metadata(self) -> ModelMetadata: ...
@@ -765,11 +785,11 @@ class EvaluationStrategy(Protocol[_T_cn]):
             Mapping of metric names to values. Each value is either:
             - A scalar (float) for single-class metrics
             - An array (np.ndarray) for per-class or per-sample metrics
+            - Examples:
 
-            Examples:
-            - {"accuracy": 0.95}  # Single metric
-            - {"accuracy": 0.95, "precision": 0.93, "recall": 0.94}  # Multiple metrics
-            - {"accuracy": np.array([0.9, 0.85, 0.92])}  # Per-class metrics
+                `{"accuracy": 0.95}`  # Single metric
+                `{"accuracy": 0.95, "precision": 0.93, "recall": 0.94}`  # Multiple metrics
+                `{"accuracy": np.array([0.9, 0.85, 0.92])}`  # Per-class metrics
 
         Notes
         -----
@@ -873,7 +893,9 @@ class UpdateStrategy(Protocol):
     ReservoirSamplingUpdate : Built-in strategy using reservoir sampling
     """
 
-    def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32]) -> NDArray[np.float32]: ...
+    def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32]) -> NDArray[np.float32]:
+        """Return updated reference data."""
+        ...
 
 
 @runtime_checkable
@@ -948,7 +970,9 @@ class LossFn(Protocol):
     True
     """
 
-    def __call__(self, *args: torch.Tensor, **kwargs: torch.Tensor) -> torch.Tensor: ...
+    def __call__(self, *args: torch.Tensor, **kwargs: torch.Tensor) -> torch.Tensor:
+        """Compute loss."""
+        ...
 
 
 @runtime_checkable

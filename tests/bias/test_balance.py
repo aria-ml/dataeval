@@ -49,7 +49,7 @@ def simple_metadata():
 
 @pytest.mark.required
 class TestBalanceUnit:
-    """Test the Balance class interface"""
+    """Test the Balance class interface."""
 
     def test_initialization_defaults(self):
         balance_obj = Balance()
@@ -72,7 +72,7 @@ class TestBalanceUnit:
             index2label={},
         )
         balance_obj = Balance()
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="No factors found"):
             balance_obj.evaluate(mock_metadata)
 
     def test_metadata_stored(self, metadata_results):
@@ -83,7 +83,7 @@ class TestBalanceUnit:
         assert balance_obj.metadata.factor_names == metadata_results.factor_names
 
     def test_threshold_parameters(self, simple_metadata):
-        """Test that custom thresholds affect the output"""
+        """Test that custom thresholds affect the output."""
         balance_obj1 = Balance(class_imbalance_threshold=0.1, factor_correlation_threshold=0.1)
         result1 = balance_obj1.evaluate(simple_metadata)
 

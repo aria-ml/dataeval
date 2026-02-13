@@ -140,8 +140,7 @@ class CalculatorCache:
 
 class PoolWrapper:
     """
-    Wraps `multiprocessing.Pool` to allow for easy switching between
-    multiprocessing and single-threaded execution.
+    Wrap `multiprocessing.Pool` to allow for easy switching between multiprocessing and single-threaded execution.
 
     This helps with debugging and profiling, as well as usage with Jupyter notebooks
     in VS Code, which does not support subprocess debugging.
@@ -157,7 +156,7 @@ class PoolWrapper:
     def __enter__(self, *args: Any, **kwargs: Any) -> Self:
         return self
 
-    def __exit__(self, *args: Any) -> None:
+    def __exit__(self, *args: object) -> None:
         if self.pool is not None:
             self.pool.close()
             self.pool.join()
@@ -209,7 +208,7 @@ def _determine_channel_indices(calculator_output: list[dict[str, list[Any]]], nu
             # Unexpected case
             raise ValueError(
                 f"Processor produced {num_elements} values but image has {num_channels} channels. "
-                f"Expected either 1 (image-level) or {num_channels} (per-channel) values."
+                f"Expected either 1 (image-level) or {num_channels} (per-channel) values.",
             )
 
     # Return ordered list of channel indices (None first, then 0,1,2,...)
@@ -486,15 +485,15 @@ def calculate(
     image_count: int = 0
     warning_list: list[str] = []
 
-    isObjectDetectionDataset: bool = False
+    is_object_detection_dataset: bool = False
 
     if isinstance(data, Dataset) and len(data) > 0 and isinstance(data[0], tuple):
         datum = cast(tuple, data[0])
         if len(datum) == 3:
-            isObjectDetectionDataset = isinstance(datum[1], ObjectDetectionTarget)
+            is_object_detection_dataset = isinstance(datum[1], ObjectDetectionTarget)
 
     # `per_target` is True only if boxes are provided or data is an ObjectDetectionDataset
-    per_target = per_target and (isObjectDetectionDataset or boxes is not None)
+    per_target = per_target and (is_object_detection_dataset or boxes is not None)
 
     # Validate parameters
     if not per_image and not per_target:

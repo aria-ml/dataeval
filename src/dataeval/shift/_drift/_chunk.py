@@ -89,7 +89,7 @@ class IndexChunk(Chunk):
         return result
 
     def dict(self) -> dict[str, Any]:
-        return dict(zip(self.KEYS, (self.key, self.index, self.start_index, self.end_index)))
+        return dict(zip(self.KEYS, (self.key, self.index, self.start_index, self.end_index), strict=False))
 
 
 class PeriodChunk(Chunk):
@@ -129,7 +129,8 @@ class PeriodChunk(Chunk):
         return result
 
     def dict(self) -> dict[str, Any]:
-        return dict(zip(self.KEYS, (self.key, self.index, self.start_datetime, self.end_datetime, self.chunk_size)))
+        values = (self.key, self.index, self.start_datetime, self.end_datetime, self.chunk_size)
+        return dict(zip(self.KEYS, values, strict=False))
 
 
 TChunk = TypeVar("TChunk", bound=Chunk)
@@ -144,7 +145,7 @@ class Chunker(Generic[TChunk]):
     """
 
     def split(self, data: pl.DataFrame) -> list[TChunk]:
-        """Splits a given data frame into a list of chunks.
+        """Split a given data frame into a list of chunks.
 
         This method provides a uniform interface across Chunker implementations to keep them interchangeable.
 
@@ -177,10 +178,9 @@ class Chunker(Generic[TChunk]):
             # Keep the values already set during chunk creation
 
         if len(chunks) < 6:
-            # TODO wording
             _logger.warning(
                 "The resulting number of chunks is too low. "
-                "Please consider splitting your data in a different way or continue at your own risk."
+                "Please consider splitting your data in a different way or continue at your own risk.",
             )
 
         return chunks
@@ -207,7 +207,7 @@ class PeriodBasedChunker(Chunker[PeriodChunk]):
     """
 
     def __init__(self, timestamp_column_name: str, offset: str = "W") -> None:
-        """Creates a new PeriodBasedChunker."""
+        """Create a new PeriodBasedChunker."""
         self.timestamp_column_name = timestamp_column_name
         self.offset = offset
 
@@ -231,7 +231,7 @@ class PeriodBasedChunker(Chunker[PeriodChunk]):
                 .dt.truncate(polars_offset)
                 .dt.offset_by(polars_offset)
                 .alias("_period_end"),
-            ]
+            ],
         )
 
         for (period_start, period_end), group_df in data_with_period.group_by(["_period_start", "_period_end"]):
@@ -245,7 +245,7 @@ class PeriodBasedChunker(Chunker[PeriodChunk]):
                 {
                     "start_time": period_start,
                     "end_time": period_end,
-                    "__str__": lambda self, s=period_start: str(s),  # Capture period_start in closure
+                    "__str__": lambda _self, s=period_start: str(s),  # Capture period_start in closure
                 },
             )()
 
@@ -364,7 +364,7 @@ class CountBasedChunker(Chunker[IndexChunk]):
         chunk_number: int,
         incomplete: Literal["append", "drop", "keep"] = "keep",
     ) -> None:
-        """Creates a new CountBasedChunker."""
+        """Create a new CountBasedChunker."""
         if not isinstance(chunk_number, int) or chunk_number <= 0:
             raise ValueError(f"given chunk_number {chunk_number} is invalid - provide an integer greater than 0")
         if incomplete not in ("append", "drop", "keep"):

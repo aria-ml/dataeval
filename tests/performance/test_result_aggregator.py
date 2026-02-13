@@ -102,7 +102,7 @@ class TestResultAggregatorArrayMetrics:
             [
                 [[1.0, 2.0]],  # Run 0, step 0
                 [[3.0, 4.0]],  # Run 1, step 0
-            ]
+            ],
         )
         assert_array_equal(results["per_class"], expected)
 

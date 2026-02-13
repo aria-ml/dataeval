@@ -55,7 +55,7 @@ class TestSorters:
         assert sorter._k == int(np.sqrt(len(self.embeddings)))
 
     def test_knn_sorter_with_k_greater_than_samples_raises_valueerror(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="should be less than dataset size"):
             _KNNSorter(k=10, samples=10)
 
     def test_knn_sorter_with_k_greater_than_recommended_warns(self, caplog):
@@ -91,7 +91,7 @@ class TestSorters:
         assert sorter._clusterer._c == int(np.sqrt(len(self.embeddings)))  # type: ignore
 
     def test_kmeans_sorter_with_c_greater_than_samples_raises_valueerror(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="should be less than dataset size"):
             _ComplexitySorter(samples=10, algorithm="kmeans", c=10)
 
     @patch("dataeval.core._clusterer.KMeans")
@@ -100,7 +100,7 @@ class TestSorters:
         mock_kmeans.labels_ = None
         mock_kmeans.cluster_centers_ = None
         sorter = _DistanceSorter(samples=len(self.embeddings), algorithm="kmeans", c=2)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Clustering failed to produce"):
             sorter._sort(self.embeddings)
 
     @patch("dataeval.core._clusterer._HDBSCAN")
@@ -109,5 +109,5 @@ class TestSorters:
         mock_hdbscan.labels_ = None
         mock_hdbscan.cluster_centers_ = None
         sorter = _DistanceSorter(samples=len(self.embeddings), algorithm="hdbscan", c=2)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Clustering failed to produce"):
             sorter._sort(self.embeddings)

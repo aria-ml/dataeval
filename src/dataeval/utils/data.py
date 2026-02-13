@@ -1,6 +1,4 @@
-"""
-Utility functions for dataset splitting and data and metadata manipulation.
-"""
+"""Utility functions for dataset splitting and data and metadata manipulation."""
 
 __all__ = ["split_dataset", "unzip_dataset", "TrainValSplit", "DatasetSplits", "flatten_metadata", "merge_metadata"]
 
@@ -46,8 +44,9 @@ def _simplify_type(data: str) -> int | float | str: ...
 
 def _simplify_type(data: list[str] | str) -> list[int] | list[float] | list[str] | int | float | str:
     """
-    Simplifies a value or a list of values to the simplest form possible,
-    in preferred order of `int`, `float`, or `string`.
+    Simplify a value or a list of values to the simplest form possible.
+
+    In preferred order of `int`, `float`, or `string`.
 
     Parameters
     ----------
@@ -79,7 +78,7 @@ def _simplify_type(data: list[str] | str) -> list[int] | list[float] | list[str]
 
 def _get_key_indices(keys: Iterable[tuple[str, ...]]) -> dict[tuple[str, ...], int]:
     """
-    Finds indices to minimize unique tuple keys
+    Find indices to minimize unique tuple keys.
 
     Parameters
     ----------
@@ -257,13 +256,19 @@ def _flatten_for_merge(
     targets: int | None,
 ) -> tuple[dict[str, list[Any]] | dict[str, Any], int, dict[str, list[str]]]:
     flattened, image_repeats, dropped_inner = flatten_metadata(
-        metadatum, return_dropped=True, ignore_lists=ignore_lists, fully_qualified=fully_qualified
+        metadatum,
+        return_dropped=True,
+        ignore_lists=ignore_lists,
+        fully_qualified=fully_qualified,
     )
     if targets is not None:
         # check for mismatch in targets per image and force ignore_lists
         if not ignore_lists and targets != image_repeats:
             flattened, image_repeats, dropped_inner = flatten_metadata(
-                metadatum, return_dropped=True, ignore_lists=True, fully_qualified=fully_qualified
+                metadatum,
+                return_dropped=True,
+                ignore_lists=True,
+                fully_qualified=fully_qualified,
             )
         if targets != image_repeats:
             flattened = {k: [v] * targets for k, v in flattened.items()}
@@ -302,7 +307,8 @@ def _merge(
     else:
         image_ids = np.arange(image_repeats.size)
         image_data = np.concatenate(
-            [np.repeat(image_ids[i], image_repeats[i]) for i in range(image_ids.size)], dtype=np.intp
+            [np.repeat(image_ids[i], image_repeats[i]) for i in range(image_ids.size)],
+            dtype=np.intp,
         )
         _, image_unsorted = np.unique(image_data, return_inverse=True)
         image_indices = np.sort(image_unsorted)
@@ -374,8 +380,7 @@ def merge_metadata(
     image_index_key: str = "_image_index",
 ):
     """
-    Merges a collection of metadata dictionaries into a single flattened
-    dictionary of keys and values.
+    Merge a collection of metadata dictionaries into a single flattened dictionary.
 
     Nested dictionaries are flattened, and lists are expanded. Nested lists are
     dropped as the expanding into multiple hierarchical trees is not supported.
@@ -420,7 +425,6 @@ def merge_metadata(
     >>> dropped_keys
     {'target_c': ['inconsistent_key']}
     """
-
     dicts: list[Mapping[str, Any]] = list(metadata)
 
     if targets_per_image is not None and len(dicts) != len(targets_per_image):
@@ -478,10 +482,10 @@ class DatasetSplits:
 
 
 class KFoldSplitter(Protocol):
-    """Protocol covering sklearn KFold variant splitters"""
+    """Protocol covering sklearn KFold variant splitters."""
 
     def __init__(self, n_splits: int) -> None: ...
-    def split(self, X: Any, y: Any, groups: Any) -> Iterator[tuple[NDArray[Any], NDArray[Any]]]: ...
+    def split(self, X: Any, y: Any, groups: Any) -> Iterator[tuple[NDArray[Any], NDArray[Any]]]: ...  # noqa: N803
 
 
 KFOLD_GROUP_STRATIFIED_MAP: dict[tuple[bool, bool], type[KFoldSplitter]] = {
@@ -547,7 +551,7 @@ def calculate_validation_fraction(num_folds: int, test_frac: float, val_frac: fl
 
 def validate_labels(labels: NDArray[np.intp], total_partitions: int) -> None:
     """
-    Check to make sure there is more input data than the total number of partitions requested
+    Check to make sure there is more input data than the total number of partitions requested.
 
     Parameters
     ----------
@@ -565,11 +569,10 @@ def validate_labels(labels: NDArray[np.intp], total_partitions: int) -> None:
         mean that floats are not accepted as a label format. Rather, this implies that
         there are too many unique values in the set relative to its cardinality.
     """
-
     if len(labels) <= total_partitions:
         raise ValueError(
             "Total number of labels must be greater than the total number of partitions. "
-            f"Got {len(labels)} labels and {total_partitions} total [train, val, test] partitions."
+            f"Got {len(labels)} labels and {total_partitions} total [train, val, test] partitions.",
         )
 
     if type_of_target(labels) == "continuous":
@@ -578,7 +581,7 @@ def validate_labels(labels: NDArray[np.intp], total_partitions: int) -> None:
 
 def validate_stratifiable(labels: NDArray[np.intp], num_partitions: int) -> None:
     """
-    Check if the dataset can be stratified by class label over the given number of partitions
+    Check if the dataset can be stratified by class label over the given number of partitions.
 
     Parameters
     ----------
@@ -598,20 +601,20 @@ def validate_stratifiable(labels: NDArray[np.intp], num_partitions: int) -> None
         If the dataset cannot be stratified due to the total number of [train, val, test]
         partitions exceeding the number of instances of the rarest class label.
     """
-
     # Get the minimum count of all labels
     lowest_label_count = np.unique(labels, return_counts=True)[1].min()
     if lowest_label_count < num_partitions:
         raise ValueError(
             f"Unable to stratify due to label frequency. The lowest label count ({lowest_label_count}) is fewer "
-            f"than the total number of partitions ({num_partitions}) requested."
+            f"than the total number of partitions ({num_partitions}) requested.",
         )
 
 
 def validate_groupable(groups: NDArray[np.intp], num_partitions: int) -> None:
     """
-    Warns user if the number of unique group_ids is incompatible with a grouped partition containing
-    num_folds folds. If this is the case, returns groups=None, which tells the partitioner not to
+    Warn user if the number of unique group_ids is incompatible with a grouped partition.
+
+    If this is the case, returns groups=None, which tells the partitioner not to
     group the input data.
 
     Parameters
@@ -633,7 +636,6 @@ def validate_groupable(groups: NDArray[np.intp], num_partitions: int) -> None:
     ValueError
         If there are fewer groups than the requested number of partitions plus one
     """
-
     num_unique_groups = len(np.unique(groups))
     # Cannot separate if only one group exists
     if num_unique_groups == 1:
@@ -645,7 +647,7 @@ def validate_groupable(groups: NDArray[np.intp], num_partitions: int) -> None:
 
 def get_groups(metadata: Metadata, split_on: Sequence[str] | None) -> NDArray[np.intp] | None:
     """
-    Returns individual group numbers based on a subset of metadata defined by groupnames
+    Return individual group numbers based on a subset of metadata defined by groupnames.
 
     Parameters
     ----------
@@ -710,8 +712,8 @@ def make_splits(
         _logger.log(
             logging.DEBUG,
             f"attempt={attempts}: splitter.split("
-            + f"index=arr(len={len(index)}, unique={np.unique(index)}), "
-            + f"labels=arr(len={len(index)}, unique={np.unique(index)}), "
+            f"index=arr(len={len(index)}, unique={np.unique(index)}), "
+            f"labels=arr(len={len(index)}, unique={np.unique(index)}), "
             + ("groups=None" if groups is None else f"groups=arr(len={len(groups)}, unique={np.unique(groups)}))"),
         )
         splits = splitter.split(index, labels, groups)
@@ -728,12 +730,16 @@ def make_splits(
 
 
 def find_best_split(
-    labels: NDArray[np.intp], split_defs: list[TrainValSplit], stratified: bool, split_frac: float
+    labels: NDArray[np.intp],
+    split_defs: list[TrainValSplit],
+    stratified: bool,
+    split_frac: float,
 ) -> TrainValSplit:
     """
-    Finds the split that most closely satisfies a criterion determined by the arguments passed.
+    Find the split that most closely satisfies a criterion determined by the arguments passed.
+
     If stratified is True, returns the split whose class balance most closely resembles the overall
-    class balance. If false, returns the split with the size closest to the desired split_frac
+    class balance. If false, returns the split with the size closest to the desired split_frac.
 
     Parameters
     ----------
@@ -792,8 +798,9 @@ def single_split(
     stratified: bool = False,
 ) -> TrainValSplit:
     """
-    Handles the special case where only 1 partition of the data is desired (such as when
-    generating the test holdout split). In this case, the desired fraction of the data to be
+    Handle the special case where only 1 partition of the data is desired.
+
+    Such as when generating the test holdout split. In this case, the desired fraction of the data to be
     partitioned into the test data must be specified, and a single [train, val] pair is returned.
 
     Parameters
@@ -814,7 +821,6 @@ def single_split(
     TrainValSplit
         Indices of data partitioned for training and evaluation
     """
-
     unique_groups = 2 if groups is None else len(np.unique(groups))
     max_folds = min(min(np.unique(labels, return_counts=True)[1]), unique_groups) if stratified else unique_groups
 
@@ -867,7 +873,6 @@ def split_dataset(
     When specifying groups and/or stratification, ratios for test and validation splits can vary
     as the stratification and grouping take higher priority than the percentages
     """
-
     val_frac = calculate_validation_fraction(num_folds, test_frac, val_frac)
     total_partitions = num_folds + 1 if test_frac else num_folds
 
@@ -923,7 +928,8 @@ class SizedIterator:
 
 
 def unzip_dataset(
-    dataset: Dataset[Any] | Dataset[tuple[Any, Any, Any]], per_target: bool
+    dataset: Dataset[Any] | Dataset[tuple[Any, Any, Any]],
+    per_target: bool,
 ) -> tuple[Iterator[NDArray[Any]], Iterator[list[BoundingBox] | None] | None]:
     """
     Unzips a dataset into separate generators for images and targets.
@@ -952,8 +958,8 @@ def unzip_dataset(
                 try:
                     boxes = d[1].boxes if isinstance(d[1].boxes, Array) else as_numpy(d[1].boxes)
                     target = [BoundingBox(box[0], box[1], box[2], box[3], image_shape=image.shape) for box in boxes]
-                except (ValueError, IndexError):
-                    raise ValueError(f"Invalid bounding box format for image {i}: {d[1].boxes}")
+                except (ValueError, IndexError) as err:
+                    raise ValueError(f"Invalid bounding box format for image {i}: {d[1].boxes}") from err
             else:
                 target = None
             yield image, target

@@ -1,6 +1,7 @@
 """
-Source code derived from Alibi-Detect 0.11.4
-https://github.com/SeldonIO/alibi-detect/tree/v0.11.4
+Source code derived from Alibi-Detect 0.11.4.
+
+https://github.com/SeldonIO/alibi-detect/tree/v0.11.4.
 
 Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
@@ -298,9 +299,10 @@ class DriftMMD(BaseDrift):
 
     def score(self, data: Array) -> tuple[float, float, float]:
         """
-        Compute the :term:`p-value<P-Value>` resulting from a permutation test using the maximum mean
-        discrepancy as a distance measure between the reference data and the data to
-        be tested.
+        Compute the p-value resulting from a permutation test using the maximum mean discrepancy.
+
+        The maximum mean discrepancy is used as a distance measure between the reference data
+        and the data to be tested.
 
         Parameters
         ----------
@@ -338,8 +340,9 @@ class DriftMMD(BaseDrift):
     @update_strategy
     def predict(self, data: Array) -> DriftMMDOutput:
         """
-        Predict whether a batch of data has drifted from the reference data and then
-        updates reference data using specified strategy.
+        Predict whether a batch of data has drifted from the reference data.
+
+        Then updates reference data using specified strategy.
 
         Parameters
         ----------
@@ -362,7 +365,9 @@ class DriftMMD(BaseDrift):
 
 @torch.jit.script
 def _squared_pairwise_distance(
-    x: torch.Tensor, y: torch.Tensor, a_min: float = 1e-30
+    x: torch.Tensor,
+    y: torch.Tensor,
+    a_min: float = 1e-30,
 ) -> torch.Tensor:  # pragma: no cover - torch.jit.script code is compiled and copied
     """
     PyTorch pairwise squared Euclidean distance between samples x and y.
@@ -389,7 +394,7 @@ def _squared_pairwise_distance(
 
 def sigma_median(x: torch.Tensor, y: torch.Tensor, dist: torch.Tensor) -> torch.Tensor:
     """
-    Bandwidth estimation using the median heuristic `Gretton2012`
+    Bandwidth estimation using the median heuristic `Gretton2012`.
 
     Parameters
     ----------
@@ -477,7 +482,7 @@ class GaussianRBF(torch.nn.Module):
             self.init_required: bool = False
 
         gamma = 1.0 / (2.0 * self.sigma**2)  # [Ns,]
-        # TODO: do matrix multiplication after all?
+        # Consider using matrix multiplication for potential performance improvement
         kernel_mat = torch.exp(-torch.cat([(g * dist)[None, :, :] for g in gamma], dim=0))  # [Ns, Nx, Ny]
         return kernel_mat.mean(dim=0)  # [Nx, Ny]
 
@@ -490,8 +495,9 @@ def mmd2_from_kernel_matrix(
     permutation_batch_size: int | None = None,
 ) -> torch.Tensor:
     """
-    Compute maximum mean discrepancy (MMD^2) between 2 samples x and y from the
-    full kernel matrix between the samples.
+    Compute maximum mean discrepancy (MMD^2) between 2 samples x and y.
+
+    Computed from the full kernel matrix between the samples.
 
     Parameters
     ----------
@@ -546,7 +552,8 @@ def mmd2_from_kernel_matrix(
             for i in range(0, n_permutations, permutation_batch_size):
                 batch_perms = min(permutation_batch_size, n_permutations - i)
                 perm_indices = torch.argsort(
-                    torch.rand(batch_perms, kernel_mat.shape[0], device=kernel_mat.device), dim=1
+                    torch.rand(batch_perms, kernel_mat.shape[0], device=kernel_mat.device),
+                    dim=1,
                 )
                 kernel_mat_batch = kernel_mat[perm_indices[:, :, None], perm_indices[:, None, :]]
                 k_xx, k_yy, k_xy = (

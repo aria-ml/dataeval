@@ -16,7 +16,7 @@ CONTINUOUS_MIN_SAMPLE_SIZE = 20
 
 def get_counts(data: NDArray[np.intp], min_num_bins: int | None = None) -> NDArray[np.intp]:
     """
-    Returns columnwise unique counts for discrete data.
+    Return columnwise unique counts for discrete data.
 
     Parameters
     ----------
@@ -54,11 +54,10 @@ def digitize_data(data: list[Any] | NDArray[Any], bins: int | Iterable[float]) -
     NDArray[np.intp]
         The digitized values
     """
-
     if not np.all([np.issubdtype(type(n), np.number) for n in data]):
         raise TypeError(
             "Encountered a data value with non-numeric type when digitizing a factor. "
-            "Ensure all occurrences of continuous factors are numeric types."
+            "Ensure all occurrences of continuous factors are numeric types.",
         )
     if isinstance(bins, int):
         _, bin_edges = np.histogram(data, bins=bins)
@@ -70,9 +69,7 @@ def digitize_data(data: list[Any] | NDArray[Any], bins: int | Iterable[float]) -
 
 
 def bin_data(data: NDArray[Any], bin_method: str) -> NDArray[np.intp]:
-    """
-    Bins continuous data through either equal width bins, equal amounts in each bin, or by clusters.
-    """
+    """Bins continuous data through either equal width bins, equal amounts in each bin, or by clusters."""
     if bin_method == "clusters":
         bin_edges = _bin_by_clusters(data)
 
@@ -97,7 +94,7 @@ def bin_data(data: NDArray[Any], bin_method: str) -> NDArray[np.intp]:
 
 def is_continuous(data: NDArray[np.number[Any]], image_indices: NDArray[np.number[Any]] | None = None) -> bool:
     """
-    Determines whether the data is continuous or discrete using the Wasserstein distance.
+    Determine whether the data is continuous or discrete using the Wasserstein distance.
 
     Given a 1D sample, we consider the intervals between adjacent points. For a continuous distribution,
     a point is equally likely to lie anywhere in the interval bounded by its two neighbors. Furthermore,
@@ -132,15 +129,15 @@ def is_continuous(data: NDArray[np.number[Any]], image_indices: NDArray[np.numbe
     if xu.size < 3:
         return False
 
-    Xs = np.sort(data)
+    xs = np.sort(data)
 
-    X0, X1 = Xs[0:-2], Xs[2:]  # left and right neighbors
+    x0, x1 = xs[0:-2], xs[2:]  # left and right neighbors
 
     dx = np.zeros(n_examples - 2)  # no dx at end points
-    gtz = (X1 - X0) > 0  # check for dups; dx will be zero for them
+    gtz = (x1 - x0) > 0  # check for dups; dx will be zero for them
     dx[np.logical_not(gtz)] = 0.0
 
-    dx[gtz] = (Xs[1:-1] - X0)[gtz] / (X1 - X0)[gtz]  # the core idea: dx is NNN samples.
+    dx[gtz] = (xs[1:-1] - x0)[gtz] / (x1 - x0)[gtz]  # the core idea: dx is NNN samples.
 
     shift = wasserstein_distance(dx, np.linspace(0, 1, dx.size))  # how far is dx from uniform, for this feature?
 
@@ -149,8 +146,9 @@ def is_continuous(data: NDArray[np.number[Any]], image_indices: NDArray[np.numbe
 
 def _bin_by_clusters(data: NDArray[np.number[Any]]) -> NDArray[np.float64]:
     """
-    Bins continuous data by using the Clusterer to identify clusters
-    and incorporates outliers by adding them to the nearest bin.
+    Bin continuous data by using the Clusterer to identify clusters.
+
+    Incorporates outliers by adding them to the nearest bin.
     """
     # Delay load numba compiled functions
     from dataeval.core._clusterer import cluster

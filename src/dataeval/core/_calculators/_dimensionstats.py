@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 class DimensionStatCalculator(Calculator[ImageStats]):
     """Calculator for dimension and geometry statistics."""
 
-    def __init__(self, datum: NDArray[Any], cache: "CalculatorCache", per_channel: bool = False) -> None:
+    def __init__(self, datum: NDArray[Any], cache: "CalculatorCache", per_channel: bool = False) -> None:  # noqa: ARG002
         self.datum = datum
         self.cache = cache
         # Check if this is spatial data (has width and height dimensions)
@@ -91,9 +91,9 @@ class DimensionStatCalculator(Calculator[ImageStats]):
             float(
                 np.sqrt(
                     np.square(((box.x0 + box.x1) / 2) - (raw.shape[-1] / 2))
-                    + np.square(((box.y0 + box.y1) / 2) - (raw.shape[-2] / 2))
-                )
-            )
+                    + np.square(((box.y0 + box.y1) / 2) - (raw.shape[-2] / 2)),
+                ),
+            ),
         ]
 
     def _distance_edge(self) -> list[float]:
@@ -110,9 +110,9 @@ class DimensionStatCalculator(Calculator[ImageStats]):
                         np.abs(box.y0),
                         np.abs(box.x1 - raw.shape[-1]),
                         np.abs(box.y1 - raw.shape[-2]),
-                    ]
-                )
-            )
+                    ],
+                ),
+            ),
         ]
 
     def _invalid_box(self) -> list[bool]:

@@ -11,9 +11,7 @@ VERSION_PATTERN = re.compile(r"v([0-9]+)\.([0-9]+)\.([0-9]+)$")
 
 
 class VersionTag:
-    """
-    Provides current and pending/next version number for DataEval
-    """
+    """Provides current and pending/next version number for DataEval."""
 
     def __init__(self, gitlab: Gitlab) -> None:
         self.gl = gitlab

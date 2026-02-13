@@ -110,6 +110,7 @@ except Exception:
 ```{code-cell} ipython3
 import dataeval_plots as dep
 import plotly.io as pio
+from IPython.display import display
 from maite_datasets.object_detection import VOCDetection
 
 # Load the functions from DataEval that are helpful for bias
@@ -348,7 +349,7 @@ The {class}`.ParityOutput` class contains a `to_dataframe` function to format th
 DataFrame.
 
 ```{code-cell} ipython3
-par.factors
+display(par.factors)
 ```
 
 According to the results, all metadata are correlated with _class_ labels. However, `parity` is based on the idea of an

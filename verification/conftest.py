@@ -110,7 +110,7 @@ def pytest_sessionfinish(session, exitstatus):
                         "test": item.nodeid,
                         "file": str(Path(item.fspath).relative_to(VERIFICATION_DIR)),
                         "status": status,
-                    }
+                    },
                 )
 
     if not results:
@@ -157,7 +157,7 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
         f"Test Cases: {summary['total_test_cases']} total, "
         f"{summary['passed']} passed, "
         f"{summary['failed']} failed, "
-        f"{summary['skipped']} skipped"
+        f"{summary['skipped']} skipped",
     )
     terminalreporter.write_line(f"Report: {report_path}")
 

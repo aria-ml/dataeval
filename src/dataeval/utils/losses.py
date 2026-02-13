@@ -11,7 +11,7 @@ Licensed under Apache Software License (Apache 2.0)
 __all__ = ["ELBOLoss"]
 
 import torch
-import torch.nn.functional as F
+import torch.nn.functional as f
 
 
 class ELBOLoss:
@@ -107,7 +107,7 @@ class ELBOLoss:
             Scalar loss value
         """
         # Reconstruction loss (MSE)
-        recon_loss = F.mse_loss(
+        recon_loss = f.mse_loss(
             x_recon.view(len(x), -1),
             x.view(len(x), -1),
             reduction=self.reduction,

@@ -1,6 +1,7 @@
 """
-Source code derived from Alibi-Detect 0.11.4
-https://github.com/SeldonIO/alibi-detect/tree/v0.11.4
+Source code derived from Alibi-Detect 0.11.4.
+
+https://github.com/SeldonIO/alibi-detect/tree/v0.11.4.
 
 Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
@@ -104,7 +105,7 @@ class DriftOutput(DriftBaseOutput):
 
 
 def update_strategy(fn: Callable[..., R]) -> Callable[..., R]:
-    """Decorator to update x_ref with x using selected update methodology"""
+    """Update x_ref with x using selected update methodology."""
 
     @wraps(fn)
     def _(self: BaseDrift, data: Array, *args: tuple[Any, ...], **kwargs: dict[str, Any]) -> R:
@@ -441,12 +442,18 @@ class BaseDriftUnivariate(BaseDrift):
             Complete drift detection results including overall :term:`drift<Drift>` prediction,
             corrected thresholds, feature-level analysis, and summary :term:`statistics<Statistics>`.
         """
-
         # compute drift scores
         p_vals, dist = self.score(data)
 
         feature_drift = (p_vals < self.p_val).astype(np.bool_)
         drift_pred, threshold = self._apply_correction(p_vals)
         return DriftOutput(
-            drift_pred, threshold, float(np.mean(p_vals)), float(np.mean(dist)), feature_drift, self.p_val, p_vals, dist
+            drift_pred,
+            threshold,
+            float(np.mean(p_vals)),
+            float(np.mean(dist)),
+            feature_drift,
+            self.p_val,
+            p_vals,
+            dist,
         )

@@ -64,6 +64,7 @@ except Exception:
 import dataeval_plots as dep
 import plotly.io as pio
 import polars as pl
+from IPython.display import display
 from maite_datasets.image_classification import CIFAR10
 
 from dataeval import Metadata
@@ -179,7 +180,7 @@ sensitivity to binning strategy.
 
 ```{code-cell} ipython3
 parity_output = Parity().evaluate(metadata)
-parity_output.factors
+display(parity_output.factors)
 ```
 
 You can now augment your datasets with additional metadata information, either from additional sources or using

@@ -1,6 +1,7 @@
 """
-Source code derived from Alibi-Detect 0.11.4
-https://github.com/SeldonIO/alibi-detect/tree/v0.11.4
+Source code derived from Alibi-Detect 0.11.4.
+
+https://github.com/SeldonIO/alibi-detect/tree/v0.11.4.
 
 Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
@@ -35,7 +36,7 @@ class OODScoreOutput(DictOutput):
 
     def get(self, ood_type: Literal["instance", "feature"]) -> NDArray[np.float32]:
         """
-        Returns either the instance or feature score.
+        Return either the instance or feature score.
 
         Parameters
         ----------

@@ -1,6 +1,6 @@
 """
 Source code derived from Alibi-Detect 0.11.4
-https://github.com/SeldonIO/alibi-detect/tree/v0.11.4
+https://github.com/SeldonIO/alibi-detect/tree/v0.11.4.
 
 Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
@@ -32,7 +32,7 @@ class TestKSDrift:
             alternative,
             correction,
             update_strategy,
-        )
+        ),
     )
     n_tests = len(tests_ksdrift)
 
@@ -42,7 +42,6 @@ class TestKSDrift:
         mock.__getitem__.side_effect = lambda idx: mock._data[idx]
         mock.__len__.return_value = n
         mock.__array__.return_value = mock._data
-        setattr(mock, "__class__", Embeddings)
         return mock
 
     @pytest.fixture(scope="class")
@@ -125,7 +124,8 @@ class TestCVMDrift:
 
         # Test predict on reference data
         preds = cd.predict(ref_emb)
-        assert not preds.drifted and (preds.p_vals >= cd.p_val).any()
+        assert not preds.drifted
+        assert (preds.p_vals >= cd.p_val).any()
 
         # Test predict on heavily drifted data
         x = self.get_embeddings(self.n_test, value=0.5)
@@ -161,7 +161,8 @@ class TestMWUDrift:
 
         # Test predict on reference data
         preds = cd.predict(ref_emb)
-        assert not preds.drifted and (preds.p_vals >= cd.p_val).any()
+        assert not preds.drifted
+        assert (preds.p_vals >= cd.p_val).any()
 
         # Test predict on heavily drifted data
         x = self.get_embeddings(self.n_test, value=0.5)
@@ -199,7 +200,8 @@ class TestAndersonDrift:
         # Test predict on reference data - should not detect drift
         np.random.seed(42)
         preds = cd.predict(ref_emb)
-        assert not preds.drifted and (preds.p_vals >= cd.p_val).any()
+        assert not preds.drifted
+        assert (preds.p_vals >= cd.p_val).any()
 
         # Test predict on heavily drifted data (shifted distribution)
         np.random.seed(43)
@@ -244,7 +246,8 @@ class TestBWSDrift:
 
         # Test predict on reference data
         preds = cd.predict(ref_emb)
-        assert not preds.drifted and (preds.p_vals >= cd.p_val).any()
+        assert not preds.drifted
+        assert (preds.p_vals >= cd.p_val).any()
 
         # Test predict on heavily drifted data
         x = self.get_embeddings(self.n_test, value=0.5)

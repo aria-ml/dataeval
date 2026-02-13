@@ -13,17 +13,17 @@ np.random.seed(0)
 
 @pytest.mark.required
 class TestDivergenceCore:
-    """Tests the core divergence calculation functions"""
+    """Tests the core divergence calculation functions."""
 
     @pytest.mark.parametrize(
-        "method, expected_errors",
+        ("method", "expected_errors"),
         [
             (_compute_mst_errors, 9),  # all 9 edges of MST will connect different labels
             (_compute_fnn_errors, 10),  # FNN gets every sample in this case.
         ],
     )
     def test_divergence_error_funcs(self, method, expected_errors):
-        """Test error calculation funcs give deterministic error outputs"""
+        """Test error calculation funcs give deterministic error outputs."""
         images = np.ones((10, 3, 3))
         labels = np.arange(10)
 
@@ -37,14 +37,14 @@ class TestDivergenceCore:
         ],
     )
     def test_error_func_flatten(self, method):
-        """3x3 is equal to 9x1 when flattened, so errors should be equal as well"""
+        """3x3 is equal to 9x1 when flattened, so errors should be equal as well."""
         images = np.random.random(size=(10, 3, 3))
         labels = np.arange(10)
 
         assert method(images, labels) == method(images.reshape((10, -1)), labels)
 
     @pytest.mark.parametrize(
-        "method, output",
+        ("method", "output"),
         [
             (divergence_mst, {"divergence": 0.9899996399870395, "errors": 5}),
             (divergence_fnn, {"divergence": 1.0, "errors": 0}),
@@ -52,7 +52,7 @@ class TestDivergenceCore:
     )
     @pytest.mark.optional
     def test_divergence_mock_data(self, method, output):
-        """Unit testing of Divergence with mock data"""
+        """Unit testing of Divergence with mock data."""
         rng = np.random.default_rng(3)
         labels = np.concatenate([rng.choice(10, 500), np.arange(10).repeat(50)])
         covariates = np.ones((1000, 28, 28)) * labels[:, np.newaxis, np.newaxis]

@@ -20,7 +20,9 @@ np.random.seed(0)
 @pytest.fixture(scope="module")
 def so_single_averaged_inputs() -> SufficiencyOutput:
     output = SufficiencyOutput(
-        steps=np.array([10, 100, 1000]), averaged_measures={"test1": np.array([0.2, 0.6, 0.9])}, measures={}
+        steps=np.array([10, 100, 1000]),
+        averaged_measures={"test1": np.array([0.2, 0.6, 0.9])},
+        measures={},
     )
     output._params = {1000: {"test1": np.array([-0.1, -1.0, 1.0])}}
     return output
@@ -36,8 +38,8 @@ def so_single_unaveraged_inputs() -> SufficiencyOutput:
                     [0.2, 0.5, 0.9],
                     [0.1, 0.6, 0.9],
                     [0.3, 0.7, 0.9],
-                ]
-            )
+                ],
+            ),
         },
     )
     output._params = {1000: {"test1": np.array([-0.1, -1.0, 0.02])}}
@@ -65,8 +67,8 @@ def so_multi_unaveraged_inputs() -> SufficiencyOutput:
                     [[0.2, 0.1], [0.5, 0.4], [0.9, 0.7]],
                     [[0.1, 0.3], [0.6, 0.4], [0.9, 0.8]],
                     [[0.3, 0.5], [0.7, 0.4], [0.9, 0.9]],
-                ]
-            )
+                ],
+            ),
         },
     )
     output._params = {1000: {"test1": np.array([[-0.1, -1.0, 0.5], [-0.1, -1.0, 1.0]])}}
@@ -81,7 +83,7 @@ def so_mixed_averaged_inputs() -> SufficiencyOutput:
         measures={},
     )
     output._params = {
-        1000: {"test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 1.0]]), "test2": np.array([-0.1, -1.0, 1.0])}
+        1000: {"test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 1.0]]), "test2": np.array([-0.1, -1.0, 1.0])},
     }
     return output
 
@@ -96,20 +98,19 @@ def so_mixed_unaveraged_inputs() -> SufficiencyOutput:
                     [[0.2, 0.1], [0.5, 0.4], [0.9, 0.7]],
                     [[0.1, 0.3], [0.6, 0.4], [0.9, 0.8]],
                     [[0.3, 0.5], [0.7, 0.4], [0.9, 0.9]],
-                ]
+                ],
             ),
             "test2": np.array([[0.1, 0.5, 0.9], [0.2, 0.6, 0.9], [0.3, 0.7, 0.9]]),
         },
     )
     output._params = {
-        1000: {"test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 0.5]]), "test2": np.array([-0.1, -1.0, 1.0])}
+        1000: {"test1": np.array([[-0.1, -1.0, 1.0], [-0.1, -1.0, 0.5]]), "test2": np.array([-0.1, -1.0, 1.0])},
     }
     return output
 
 
 def find_horizontal_line(ax):
-    """Find and return horizontal asymptote y value"""
-
+    """Find and return horizontal asymptote y value."""
     for line in ax.lines:
         ydata = line.get_ydata()
         if all(abs(y - ydata[0]) == 0 for y in ydata):
@@ -118,7 +119,7 @@ def find_horizontal_line(ax):
 
 
 def find_error_bars(ax, mcoll):
-    """Return plotted error for each point"""
+    """Return plotted error for each point."""
     err = []
     for coll in ax.collections:
         if isinstance(coll, mcoll.LineCollection):
@@ -136,13 +137,15 @@ def find_error_bars(ax, mcoll):
 @pytest.mark.required
 class TestSufficiencyProject:
     def test_measure_length_invalid(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="does not contain the expected number"):
             SufficiencyOutput(
-                steps=np.array([10, 100]), averaged_measures={"test1": np.array([0.2, 0.6, 0.9])}, measures={}
+                steps=np.array([10, 100]),
+                averaged_measures={"test1": np.array([0.2, 0.6, 0.9])},
+                measures={},
             )
 
     def test_unaveraged_inputs_measure_length_invalid(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="does not contain the expected number"):
             SufficiencyOutput(
                 steps=np.array([10, 100]),
                 measures={"test1": np.array([[0.2, 0.6, 0.9], [0.2, 0.6, 0.9], [0.2, 0.6, 0.9]])},
@@ -155,7 +158,7 @@ class TestSufficiencyProject:
         npt.assert_almost_equal(result["test1"].to_numpy(), [10.0], decimal=4)
 
     def test_project_invalid_steps(self, so_single_averaged_inputs):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="must consist of numerical values"):
             so_single_averaged_inputs.project("not a number")  # type: ignore
 
     def test_project_classwise(self, so_multi_averaged_inputs):
@@ -246,9 +249,7 @@ class TestSufficiencyProject:
 @pytest.mark.required
 class TestSufficiencyInverseProject:
     def test_empty_data(self):
-        """
-        Verifies that inv_project returns empty DataFrame when fed empty data
-        """
+        """Verifies that inv_project returns empty DataFrame when fed empty data."""
         data = SufficiencyOutput(np.array([]), measures={}, averaged_measures={})
         desired_accuracies = {}
         result = data.inv_project(desired_accuracies)
@@ -256,9 +257,7 @@ class TestSufficiencyInverseProject:
         assert len(result) == 0
 
     def test_unaveraged_inputs_empty_data(self):
-        """
-        Verifies that inv_project returns empty DataFrame when fed empty data and initialized with unaveraged measures
-        """
+        """Verifies inv_project returns empty DataFrame when fed empty data with unaveraged measures."""
         data = SufficiencyOutput(np.array([]), measures={})
         desired_accuracies = {}
         result = data.inv_project(desired_accuracies)
@@ -266,9 +265,7 @@ class TestSufficiencyInverseProject:
         assert len(result) == 0
 
     def test_can_invert_sufficiency(self):
-        """
-        Tests metric projection output can be inversed
-        """
+        """Tests metric projection output can be inversed."""
         num_samples = np.arange(20, 80, step=10, dtype=np.intp)
         accuracies = num_samples / 100.0
 
@@ -283,15 +280,13 @@ class TestSufficiencyInverseProject:
         npt.assert_array_equal(needed_data, target_needed_data)
 
     def test_unaveraged_inputs_can_invert_sufficiency(self):
-        """
-        Tests metric projection output can be inversed
-        """
+        """Tests metric projection output can be inversed."""
         accuracies = np.array(
             [
                 np.arange(10, 70, step=10, dtype=np.uint32) / 100,
                 np.arange(20, 80, step=10, dtype=np.uint32) / 100,
                 np.arange(30, 90, step=10, dtype=np.uint32) / 100,
-            ]
+            ],
         )
         num_samples = accuracies[1] * 100
         data = SufficiencyOutput(steps=num_samples, measures={"Accuracy": accuracies})
@@ -305,10 +300,7 @@ class TestSufficiencyInverseProject:
         npt.assert_array_equal(needed_data, target_needed_data)
 
     def test_f_inv_out(self):
-        """
-        Tests that f_inv_out exactly inverts f_out.
-        """
-
+        """Tests that f_inv_out exactly inverts f_out."""
         n_i = np.array([1.234])
         x = np.array([1.1, 2.2, 3.3])
         # Predict y from n_i evaluated on curve defined by x
@@ -320,9 +312,7 @@ class TestSufficiencyInverseProject:
         npt.assert_equal(np.uint32(n_i[0]), n_i_recovered[0])
 
     def test_inv_project_steps(self):
-        """
-        Verifies that inv_project_steps is the inverse of project_steps
-        """
+        """Verifies that inv_project_steps is the inverse of project_steps."""
         projection = np.array([1, 2, 3])
         # Pre-calculated from other runs (not strict)
         params = np.array([-1.0, -1.0, 4.0])
@@ -336,9 +326,7 @@ class TestSufficiencyInverseProject:
         npt.assert_array_equal(projection, predicted_proj)
 
     def test_f_inv_out_unachievable_targets(self, caplog):
-        """
-        Verifies that f_inv_out handles unachievable targets
-        """
+        """Verifies that f_inv_out handles unachievable targets."""
         import logging
 
         num_samples = np.arange(20, 80, step=10, dtype=np.intp)

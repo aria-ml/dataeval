@@ -1,6 +1,4 @@
-"""
-Utility functions for training and inference with PyTorch models.
-"""
+"""Utility functions for training and inference with PyTorch models."""
 
 __all__ = ["train", "predict"]
 

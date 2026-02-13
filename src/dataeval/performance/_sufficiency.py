@@ -218,7 +218,7 @@ class Sufficiency(Evaluator, Generic[T, M]):
         if _reset_strategy is None:
             raise ValueError(
                 "reset_strategy is required. Provide a callable that takes the model "
-                "and returns a reset model (e.g., with re-initialized weights)."
+                "and returns a reset model (e.g., with re-initialized weights).",
             )
         self.reset_strategy = _reset_strategy
 
@@ -231,7 +231,7 @@ class Sufficiency(Evaluator, Generic[T, M]):
     @property
     def train_ds(self) -> Dataset[T]:
         """
-        Training dataset (read-only)
+        Training dataset (read-only).
 
         Notes
         -----
@@ -242,7 +242,7 @@ class Sufficiency(Evaluator, Generic[T, M]):
     @property
     def test_ds(self) -> Dataset[T]:
         """
-        Test dataset (read-only)
+        Test dataset (read-only).
 
         Notes
         -----
@@ -363,7 +363,6 @@ class Sufficiency(Evaluator, Generic[T, M]):
         ...         return np.arange(0, 101, 20)
         >>> output = sufficiency.evaluate(schedule=LinearSchedule())
         """
-
         # Create evaluation schedule
         schedule_obj = self._create_schedule(schedule=schedule)
         steps = schedule_obj.get_steps(self._length)

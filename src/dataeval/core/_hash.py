@@ -232,8 +232,8 @@ def phash_d4(image: Array3D[Any]) -> str:
 
     from dataeval.utils.preprocessing import normalize_image_shape, resize, to_canonical_grayscale
 
-    HASH_SIZE = 8
-    MAX_FACTOR = 4
+    hash_size = 8
+    max_factor = 4
 
     image_np = as_numpy(image)
 
@@ -242,7 +242,7 @@ def phash_d4(image: Array3D[Any]) -> str:
         return ""
 
     min_dim = min(image_np.shape[-2:])
-    if min_dim < HASH_SIZE + 1:
+    if min_dim < hash_size + 1:
         return ""
 
     # Prepare grayscale image
@@ -250,7 +250,7 @@ def phash_d4(image: Array3D[Any]) -> str:
     grayscale = to_canonical_grayscale(normalized)
 
     # Compute resize dimension
-    resize_dim = HASH_SIZE * min((min_dim - 1) // HASH_SIZE, MAX_FACTOR)
+    resize_dim = hash_size * min((min_dim - 1) // hash_size, max_factor)
 
     # Compute hash for each D4 transformation
     hashes: list[str] = []
@@ -259,7 +259,7 @@ def phash_d4(image: Array3D[Any]) -> str:
         im = resize(transformed, resize_dim)
 
         # DCT transform
-        transform = dct(dct(im.T).T)[:HASH_SIZE, :HASH_SIZE]
+        transform = dct(dct(im.T).T)[:hash_size, :hash_size]
 
         # Binarize against median
         diff = transform > np.median(transform)
@@ -311,7 +311,7 @@ def dhash_d4(image: Array3D[Any]) -> str:
     """
     from dataeval.utils.preprocessing import normalize_image_shape, resize, to_canonical_grayscale
 
-    HASH_SIZE = 8
+    hash_size = 8
 
     image_np = as_numpy(image)
 
@@ -320,7 +320,7 @@ def dhash_d4(image: Array3D[Any]) -> str:
         return ""
 
     min_dim = min(image_np.shape[-2:])
-    if min_dim < HASH_SIZE + 1:
+    if min_dim < hash_size + 1:
         return ""
 
     # Prepare grayscale image
@@ -331,8 +331,8 @@ def dhash_d4(image: Array3D[Any]) -> str:
     hashes: list[str] = []
     for transformed in _get_d4_transforms(grayscale):
         # Resize to 9x8 (9 wide to get 8 horizontal differences)
-        im = resize(transformed, HASH_SIZE + 1)
-        im = im[:HASH_SIZE, : HASH_SIZE + 1]
+        im = resize(transformed, hash_size + 1)
+        im = im[:hash_size, : hash_size + 1]
 
         # Compute horizontal gradient
         diff = im[:, :-1] > im[:, 1:]

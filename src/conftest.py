@@ -193,12 +193,15 @@ class ImageDataset:
 
     @property
     def metadata(self) -> dict[str, Any]:
+        """Return dataset metadata."""
         return self._metadata
 
     def __len__(self) -> int:
+        """Return number of images."""
         return len(self._images)
 
     def __getitem__(self, key: int | slice) -> tuple[Any, NDArray[np.float32], dict[str, Any]] | Self:
+        """Return datum at given index or slice."""
         if isinstance(key, slice):
             start, stop, step = key.indices(len(self._images))
             indices = range(start, stop, step)
@@ -240,9 +243,11 @@ class ObjectDetectionDataset:
 
     @property
     def metadata(self) -> dict[str, Any]:
+        """Return dataset metadata."""
         return self._metadata
 
     def __len__(self) -> int:
+        """Return number of images."""
         return len(self._images)
 
     def _get_target(self, idx: int) -> MagicMock:
@@ -261,6 +266,7 @@ class ObjectDetectionDataset:
         return target
 
     def __getitem__(self, key: int | slice) -> tuple[Any, MagicMock, dict[str, Any]] | Self:
+        """Return datum at given index or slice."""
         if isinstance(key, slice):
             start, stop, step = key.indices(len(self._images))
             indices = range(start, stop, step)
@@ -275,9 +281,11 @@ class ObjectDetectionDataset:
         return self._images[key], self._get_target(key), self._image_metadata[key]
 
     def __str__(self) -> str:
+        """Return string representation."""
         return f"ObjectDetectionDataset(n_images={len(self)}, classes={self._classes})"
 
     def __repr__(self) -> str:
+        """Return detailed string representation."""
         return self.__str__()
 
 
@@ -306,7 +314,7 @@ def _create_model() -> torch.nn.Module:
 # =============================================================================
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(autouse=True)
 def reset_config() -> Any:
     """Reset config state before each test for deterministic behavior."""
     # Save original config state
@@ -456,7 +464,7 @@ def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:
         def __init__(self, batch_size: int = 16) -> None:
             self.batch_size = batch_size
 
-        def evaluate(self, model: Any, dataset: Any) -> dict[str, float]:
+        def evaluate(self, _model: Any, _dataset: Any) -> dict[str, float]:
             return {"test": 1.0}
 
     class TrainingStrategy:

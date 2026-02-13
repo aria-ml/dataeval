@@ -11,8 +11,9 @@ import torch.nn as nn
 
 class GMMDensityNet(nn.Module):
     """
-    Gaussian Mixture Model (GMM) density network for converting latent representations
-    to mixture assignment probabilities.
+    Gaussian Mixture Model (GMM) density network for converting latent representations.
+
+    Converts latent representations to mixture assignment probabilities.
 
     This network can be appended to AE or VAE models to enable GMM-based OOD detection
     by producing gamma (mixture assignment probabilities) from the latent representation.
@@ -269,7 +270,7 @@ class AE(nn.Module):
             raise ValueError(
                 f"GMMDensityNet latent_dim ({self.gmm_density_net.latent_dim}) must match "
                 f"encoder encoding_dim ({encoding_dim}). Either create GMMDensityNet with "
-                f"latent_dim={encoding_dim}, or let AE auto-create it by passing n_gmm instead."
+                f"latent_dim={encoding_dim}, or let AE auto-create it by passing n_gmm instead.",
             )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -483,7 +484,7 @@ class VAE(nn.Module):
         if self.gmm_density_net is not None and self.gmm_density_net.latent_dim != latent_dim:
             raise ValueError(
                 f"GMMDensityNet latent_dim ({self.gmm_density_net.latent_dim}) must match "
-                f"VAE latent_dim ({latent_dim}). Create GMMDensityNet with latent_dim={latent_dim}."
+                f"VAE latent_dim ({latent_dim}). Create GMMDensityNet with latent_dim={latent_dim}.",
             )
 
     def reparameterize(self, mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:

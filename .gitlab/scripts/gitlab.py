@@ -27,9 +27,7 @@ LATEST_KNOWN_GOOD = "latest-known-good"
 
 
 class Gitlab(RestWrapper):
-    """
-    Helper class wrapping Gitlab REST API calls
-    """
+    """Helper class wrapping Gitlab REST API calls."""
 
     def __init__(
         self,
@@ -42,7 +40,7 @@ class Gitlab(RestWrapper):
 
     def list_tags(self) -> list[dict[str, Any]]:
         """
-        List project tags
+        List project tags.
 
         Returns
         -------
@@ -57,7 +55,7 @@ class Gitlab(RestWrapper):
 
     def add_tag(self, tag_name: str, ref: str = "main", message: str | None = None) -> dict[str, Any]:
         """
-        Create a new tag
+        Create a new tag.
 
         Parameters
         ----------
@@ -84,7 +82,7 @@ class Gitlab(RestWrapper):
 
     def delete_tag(self, tag_name: str) -> None:
         """
-        Delete a tag
+        Delete a tag.
 
         Parameters
         ----------
@@ -99,7 +97,6 @@ class Gitlab(RestWrapper):
         ----
         https://docs.gitlab.com/ee/api/tags.html#delete-a-tag
         """
-
         try:
             self._request(delete, f"{TAGS}/{tag_name}")
         except ConnectionError as e:
@@ -110,7 +107,7 @@ class Gitlab(RestWrapper):
 
     def get_single_repository_branch(self, branch: str) -> dict[str, Any]:
         """
-        Get a single repository branch
+        Get a single repository branch.
 
         Parameters
         ----------
@@ -130,7 +127,7 @@ class Gitlab(RestWrapper):
 
     def create_repository_branch(self, branch: str, ref: str) -> dict[str, Any]:
         """
-        Create a repository branch
+        Create a repository branch.
 
         Parameters
         ----------
@@ -150,7 +147,7 @@ class Gitlab(RestWrapper):
 
     def list_branches(self, search: str | None = None) -> list[dict[str, Any]]:
         """
-        List project repository branches
+        List project repository branches.
 
         Parameters
         ----------
@@ -173,7 +170,7 @@ class Gitlab(RestWrapper):
 
     def delete_branch(self, branch: str) -> None:
         """
-        Delete a repository branch
+        Delete a repository branch.
 
         Parameters
         ----------
@@ -200,7 +197,7 @@ class Gitlab(RestWrapper):
         order_by: Literal["created_at", "title", "merged_at", "updated_at"] | None = None,
     ) -> list[dict[str, Any]]:
         """
-        List merge requests
+        List merge requests.
 
         Returns
         -------
@@ -232,7 +229,7 @@ class Gitlab(RestWrapper):
         target_branch: str = "main",
     ) -> dict[str, Any]:
         """
-        Create a merge request
+        Create a merge request.
 
         Parameters
         ----------
@@ -268,7 +265,7 @@ class Gitlab(RestWrapper):
 
     def update_merge_request(self, mr_iid: int, title: str, description: str) -> dict[str, Any]:
         """
-        Updates a merge request
+        Updates a merge request.
 
         Parameters
         ----------
@@ -297,7 +294,7 @@ class Gitlab(RestWrapper):
 
     def get_file(self, filepath: str, dest: str, ref: str = "main") -> None:
         """
-        Gets the raw file content from the repository
+        Gets the raw file content from the repository.
 
         Parameters
         ----------
@@ -318,7 +315,7 @@ class Gitlab(RestWrapper):
 
     def get_file_info(self, filepath: str, ref: str = "develop") -> dict[str, Any]:
         """
-        Gets the file information from the repository
+        Gets the file information from the repository.
 
         Parameters
         ----------
@@ -340,7 +337,7 @@ class Gitlab(RestWrapper):
 
     def push_file(self, filepath: str, branch: str, commit_message: str, content: str) -> dict[str, Any]:
         """
-        Update a file in the repository
+        Update a file in the repository.
 
         Parameters
         ----------
@@ -375,7 +372,7 @@ class Gitlab(RestWrapper):
 
     def cherry_pick(self, sha: str, branch: str = "main") -> dict[str, Any]:
         """
-        Cherry pick a commit
+        Cherry pick a commit.
 
         Parameters
         ----------
@@ -397,7 +394,7 @@ class Gitlab(RestWrapper):
 
     def get_artifacts(self, job: str, dest: str, ref: str = "main") -> None:
         """
-        Gets the artifacts from the last successful pipeline run for the ref specified
+        Gets the artifacts from the last successful pipeline run for the ref specified.
 
         Parameters
         ----------
@@ -423,7 +420,7 @@ class Gitlab(RestWrapper):
 
     def commit(self, branch: str, commit_message: str, actions: list[dict[str, str]]):
         """
-        Commits the specified actions to the repository at the branch specified
+        Commits the specified actions to the repository at the branch specified.
 
         Parameters
         ----------

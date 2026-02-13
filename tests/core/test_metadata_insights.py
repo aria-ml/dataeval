@@ -15,9 +15,9 @@ from dataeval.core._metadata_insights import (
 class TestCalcMedianDeviations:
     """Tests for the _calc_median_deviations helper function."""
 
-    @pytest.mark.parametrize("samples_ref", (1, 5, 10, 100))
-    @pytest.mark.parametrize("samples_tst", (1, 5, 10, 100))
-    @pytest.mark.parametrize("factors", (1, 5, 10))
+    @pytest.mark.parametrize("samples_ref", [1, 5, 10, 100])
+    @pytest.mark.parametrize("samples_tst", [1, 5, 10, 100])
+    @pytest.mark.parametrize("factors", [1, 5, 10])
     def test_output_shape(self, samples_ref, samples_tst, factors):
         """Tests that output shape is (n_test, n_factors) for all input combinations."""
         reference = np.arange(samples_ref * factors).reshape(samples_ref, factors)
@@ -132,7 +132,7 @@ class TestFindDeviatedFactors:
         with pytest.raises(ValueError, match="All test factor arrays must have the same length"):
             factor_deviation(reference_factors, test_factors, [0])
 
-    @pytest.mark.parametrize("n_ref", (0, 1, 2))
+    @pytest.mark.parametrize("n_ref", [0, 1, 2])
     def test_insufficient_reference_samples_warns(self, n_ref, caplog):
         """Tests that less than 3 reference samples raises warning and returns empty list."""
         import logging

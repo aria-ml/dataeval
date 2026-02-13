@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def mock_model():
     """
     Generic mock model for tests.

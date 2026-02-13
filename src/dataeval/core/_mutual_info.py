@@ -40,13 +40,13 @@ def _validate_num_neighbors(num_neighbors: int) -> int:
         raise TypeError(
             f"Variable {num_neighbors} is not real-valued numeric type."
             "num_neighbors should be an int, greater than 0 and less than"
-            "the number of samples in the dataset"
+            "the number of samples in the dataset",
         )
     if num_neighbors < 1:
         raise ValueError(
             f"Invalid value for {num_neighbors}."
             "Choose a value greater than 0 and less than number of samples"
-            "in the dataset."
+            "in the dataset.",
         )
     if isinstance(num_neighbors, float):
         num_neighbors = int(num_neighbors)
@@ -56,7 +56,9 @@ def _validate_num_neighbors(num_neighbors: int) -> int:
 
 
 def _merge_labels_and_factors(
-    class_labels: NDArray[np.intp], factor_data: NDArray[np.intp], discrete_features: Iterable[bool] | None
+    class_labels: NDArray[np.intp],
+    factor_data: NDArray[np.intp],
+    discrete_features: Iterable[bool] | None,
 ) -> tuple[NDArray[np.intp], list[bool]]:
     discrete_features = [True] + (
         [not is_continuous(d) for d in factor_data.T] if discrete_features is None else list(discrete_features)
@@ -79,8 +81,9 @@ def mutual_info(
     num_neighbors: int = 5,
 ) -> MutualInfoResult:
     """
-    Mutual information between factors (class label, metadata, label/image properties),
-    transformed to lie in [0, 1].
+    Compute mutual information between factors, transformed to lie in [0, 1].
+
+    Factors include class label, metadata, and label/image properties.
 
     Parameters
     ----------
@@ -212,8 +215,9 @@ def mutual_info_classwise(
     num_neighbors: int = 5,
 ) -> NDArray[np.float64]:
     """
-    Mutual information (MI) between factors (class label, metadata, label/image properties),
-    transformed to lie in [0, 1].
+    Compute mutual information (MI) between factors, transformed to lie in [0, 1].
+
+    Factors include class label, metadata, and label/image properties.
 
     Parameters
     ----------

@@ -1,6 +1,4 @@
-"""
-Utility functions for preprocessing images and bounding boxes.
-"""
+"""Utility functions for preprocessing images and bounding boxes."""
 
 __all__ = [
     "BoundingBox",
@@ -247,7 +245,7 @@ BoxLike = BoundingBox | Box | Iterable[int | float] | None
 
 def to_bounding_box(boxlike: BoxLike, image_shape: tuple[int, ...] | None = None) -> BoundingBox:
     """
-    Converts a box-like input to a BoundingBox instance.
+    Convert a box-like input to a BoundingBox instance.
 
     Parameters
     ----------
@@ -278,7 +276,7 @@ def to_bounding_box(boxlike: BoxLike, image_shape: tuple[int, ...] | None = None
 
 def to_int_box(box: Box) -> IntBox:
     """
-    Converts a bounding box from float to int format.
+    Convert a bounding box from float to int format.
 
     Parameters
     ----------
@@ -408,7 +406,7 @@ def rescale(image: NDArray[Any], depth: int = 1) -> NDArray[Any]:
 
 def normalize_image_shape(image: NDArray[Any]) -> NDArray[Any]:
     """
-    Normalizes the image shape into (C,H,W) format.
+    Normalize the image shape into (C,H,W) format.
 
     Parameters
     ----------
@@ -438,7 +436,7 @@ def normalize_image_shape(image: NDArray[Any]) -> NDArray[Any]:
 
 def edge_filter(image: NDArray[Any], offset: float = 0.5) -> NDArray[np.uint8]:
     """
-    Returns the image filtered using a 3x3 edge detection kernel.
+    Return the image filtered using a 3x3 edge detection kernel.
 
     The kernel used is:
         [[ -1, -1, -1 ],
@@ -464,8 +462,9 @@ def edge_filter(image: NDArray[Any], offset: float = 0.5) -> NDArray[np.uint8]:
 
 def clip_and_pad(image: NDArray[Any], box: Box) -> NDArray[Any]:
     """
-    Extract a region from an image based on a bounding box, clipping to image boundaries
-    and padding out-of-bounds areas with np.nan.
+    Extract a region from an image based on a bounding box.
+
+    Clips to image boundaries and pads out-of-bounds areas with np.nan.
 
     Parameters
     ----------
@@ -528,8 +527,9 @@ def resize(image: NDArray[np.uint8], resize_dim: int, use_pil: bool = True) -> N
 
 def to_canonical_grayscale(image: NDArray[Any]) -> NDArray[np.uint8]:
     """
-    Converts an image of arbitrary channels (CHW) to a single-channel
-    uint8 grayscale image (HW) using color-space-aware heuristics.
+    Convert an image of arbitrary channels (CHW) to a single-channel uint8 grayscale image (HW).
+
+    Uses color-space-aware heuristics.
 
     Parameters
     ----------

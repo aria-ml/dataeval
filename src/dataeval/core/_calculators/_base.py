@@ -8,7 +8,7 @@ from typing import Any, Generic, TypeVar
 TFlag = TypeVar("TFlag", bound=Flag)
 
 
-class Calculator(Generic[TFlag], ABC):
+class Calculator(ABC, Generic[TFlag]):
     """
     Abstract base class for stateful statistics calculators.
 

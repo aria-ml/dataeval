@@ -29,7 +29,7 @@ def _mock_reset(model: Any) -> Any:
     return model
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def mock_reset():
     """
     Mock reset strategy for testing with non-PyTorch models.
@@ -42,42 +42,39 @@ def mock_reset():
 # ========== STRATEGY FIXTURES ==========
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def mock_train() -> TrainingStrategy[DatumType]:
     """
     Mock training strategy for testing.
 
     Returns a Mock conforming to TrainingStrategy protocol.
     """
-
     strategy = MagicMock(spec=TrainingStrategy)
     strategy.train = MagicMock(return_value=None)
     return strategy
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def mock_eval() -> EvaluationStrategy[DatumType]:
     """
     Mock evaluation strategy for testing.
 
     Returns a Mock conforming to EvaluationStrategy protocol.
     """
-
     strategy = MagicMock(spec=EvaluationStrategy)
     strategy.evaluate = MagicMock(return_value={"accuracy": 0.95})
     return strategy
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def mock_eval_mixed_metric_strategy() -> EvaluationStrategy[DatumType]:
-    """Mock evaluation strategy with multiple metrics including a per-class metric"""
-
+    """Mock evaluation strategy with multiple metrics including a per-class metric."""
     eval_strategy = MagicMock(spec=EvaluationStrategy)
     eval_strategy.evaluate = MagicMock(return_value={"Accuracy": 0.95, "Precision": [1.0, 2.0]})
     return eval_strategy
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def mock_eval_scalar_metrics_strategy() -> EvaluationStrategy[DatumType]:
     """
     Mock evaluation strategy returning multiple scalar metrics only.
@@ -92,15 +89,15 @@ def mock_eval_scalar_metrics_strategy() -> EvaluationStrategy[DatumType]:
     return strategy
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def mock_eval_classwise() -> EvaluationStrategy[DatumType]:
     """
-    Mock evaluation strategy retuning a single classwise metric
+    Mock evaluation strategy retuning a single classwise metric.
 
     Returns
     -------
-    - Accuracy: array ([0.2, 0.4, 0.6, 0.8]) - 4 classes"""
-
+    - Accuracy: array ([0.2, 0.4, 0.6, 0.8]) - 4 classes
+    """
     strategy = MagicMock(spec=EvaluationStrategy)
     strategy.evaluate = MagicMock(return_value={"Accuracy": [0.2, 0.4, 0.6, 0.8]})
     return strategy
@@ -109,7 +106,7 @@ def mock_eval_classwise() -> EvaluationStrategy[DatumType]:
 # ========== CONFIG FIXTURES ==========
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def basic_config(mock_train, mock_eval, mock_reset) -> Sufficiency.Config[DatumType, Any]:
     """
     Basic Sufficiency.Config with default parameters.
@@ -117,7 +114,6 @@ def basic_config(mock_train, mock_eval, mock_reset) -> Sufficiency.Config[DatumT
     Uses runs=1, substeps=5 (defaults).
     Includes a mock reset_strategy for use with non-PyTorch mock models.
     """
-
     return Sufficiency.Config(
         training_strategy=mock_train,
         evaluation_strategy=mock_eval,
@@ -127,7 +123,7 @@ def basic_config(mock_train, mock_eval, mock_reset) -> Sufficiency.Config[DatumT
     )
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def multi_run_config(mock_train, mock_eval, mock_reset) -> Sufficiency.Config[DatumType, Any]:
     """
     Config for multiple runs (faster testing).
@@ -135,7 +131,6 @@ def multi_run_config(mock_train, mock_eval, mock_reset) -> Sufficiency.Config[Da
     Uses runs=3, substeps=2.
     Includes a mock reset_strategy for use with non-PyTorch mock models.
     """
-
     return Sufficiency.Config(
         training_strategy=mock_train,
         evaluation_strategy=mock_eval,
@@ -145,7 +140,7 @@ def multi_run_config(mock_train, mock_eval, mock_reset) -> Sufficiency.Config[Da
     )
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def non_callable_sufficiency_config(mock_reset) -> Sufficiency.Config[DatumType, Any]:
     return Sufficiency.Config(
         training_strategy=NonCallableMagicMock(),
@@ -157,13 +152,13 @@ def non_callable_sufficiency_config(mock_reset) -> Sufficiency.Config[DatumType,
 # ========== LEGACY API FIXTURES ==========
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def mock_train_fn():
     """Mock training function for legacy API tests."""
     return MagicMock(return_value=None)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def mock_eval_fn():
     """Mock evaluation function for legacy API tests."""
     return MagicMock(return_value={"accuracy": 0.95})

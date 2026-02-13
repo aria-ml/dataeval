@@ -33,9 +33,7 @@ class Net(nn.Module):
 
 
 def linear_fit_manual(x, y):
-    """
-    Basic helper for linear regression
-    """
+    """Basic helper for linear regression."""
     n = len(x)
     sum_x = np.sum(x)
     sum_y = np.sum(y)
@@ -102,7 +100,7 @@ class TestSufficiencyUtils:
                 0.149333,
                 0.141333,
                 0.137333,
-            ]
+            ],
         )
         n_i = np.geomspace(30, 3000, 20).astype(np.intp)
         answer = [3.2633, 0.4160, 0.0053]
@@ -111,9 +109,7 @@ class TestSufficiencyUtils:
         npt.assert_almost_equal(output, answer, decimal=3)
 
     def test_linear_initialization_increasing(self):
-        """
-        Tests linear initialization for increasing power law curve
-        """
+        """Tests linear initialization for increasing power law curve."""
         metric = np.array([0.8, 0.6, 0.4, 0.2, 0.0])
         steps = np.array([20, 200, 2000, 2500, 3000])
         bounds = Constraints(scale=(None, None), negative_exponent=(0, None), asymptote=(None, None))
@@ -138,9 +134,7 @@ class TestSufficiencyUtils:
         npt.assert_almost_equal(x0[2], 0, decimal=5)
 
     def test_linear_initialization_increasing_bounded(self):
-        """
-        Tests linear initialization for increasing power law curve with c0 bounded [0,1]
-        """
+        """Tests linear initialization for increasing power law curve with c0 bounded [0,1]."""
         metric = np.array([0.8, 0.6, 0.4, 0.2, 0.0])
         steps = np.array([20, 200, 2000, 2500, 3000])
         bounds = Constraints(scale=(None, None), negative_exponent=(0, None), asymptote=(0, 1))
@@ -159,9 +153,7 @@ class TestSufficiencyUtils:
         )
 
     def test_linear_initialization_decreasing(self):
-        """
-        Tests linear initialization for decreasing power law curve
-        """
+        """Tests linear initialization for decreasing power law curve."""
         metric = np.array([0.2, 0.4, 0.6, 0.8, 1.0])
         steps = np.array([20, 200, 2000, 2500, 3000])
         bounds = Constraints(scale=(None, None), negative_exponent=(0, None), asymptote=(None, None))
@@ -188,9 +180,7 @@ class TestSufficiencyUtils:
         npt.assert_almost_equal(x0[2], 1, decimal=5)
 
     def test_linear_initialization_decreasing_unbounded(self):
-        """
-        Tests linear initialization for decreasing power law curve with c0 bounded [0,1]
-        """
+        """Tests linear initialization for decreasing power law curve with c0 bounded [0,1]."""
         metric = np.array([0.2, 0.4, 0.6, 0.8, 1.0])
         steps = np.array([20, 200, 2000, 2500, 3000])
         bounds = Constraints(scale=(None, None), negative_exponent=(0, None), asymptote=(0, 1))
@@ -208,9 +198,7 @@ class TestSufficiencyUtils:
         )
 
     def test_linear_initialization_default(self, caplog):
-        """
-        Tests that with initialization failure, initial guess defaults to [0.5,0.5,1]
-        """
+        """Tests that with initialization failure, initial guess defaults to [0.5,0.5,1]."""
         metric = np.array([0, 0.2, 0.4, 0.6, 0.8])
         steps = np.array([0, 200, 2000, 2500, 3000])
         bounds = Constraints(scale=(None, None), negative_exponent=(0, None), asymptote=(0, 1))

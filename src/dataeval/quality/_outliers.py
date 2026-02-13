@@ -48,7 +48,7 @@ class OutliersOutput(Output[TDataFrame]):
     issues: TDataFrame
 
     def data(self) -> TDataFrame:
-        """Returns the underlying DataFrame(s)."""
+        """Return the underlying DataFrame(s)."""
         return self.issues
 
     def __len__(self) -> int:
@@ -63,7 +63,7 @@ class OutliersOutput(Output[TDataFrame]):
 
     def aggregate_by_class(self, metadata: Metadata) -> pl.DataFrame:
         """
-        Returns a Polars DataFrame summarizing outliers per class and metric.
+        Return a Polars DataFrame summarizing outliers per class and metric.
 
         Creates a pivot table showing the count of outlier images for each combination
         of class and metric. Includes a Total row showing the total number of
@@ -166,7 +166,7 @@ class OutliersOutput(Output[TDataFrame]):
 
     def aggregate_by_metric(self) -> pl.DataFrame:
         """
-        Returns a Polars DataFrame summarizing outlier counts per metric.
+        Return a Polars DataFrame summarizing outlier counts per metric.
 
         Returns
         -------
@@ -212,7 +212,7 @@ class OutliersOutput(Output[TDataFrame]):
 
     def aggregate_by_item(self) -> pl.DataFrame:
         """
-        Returns a Polars DataFrame summarizing outliers per item (item_id, target_id pair) and metric.
+        Return a Polars DataFrame summarizing outliers per item (item_id, target_id pair) and metric.
 
         Creates a pivot table showing whether each item is flagged by each metric (1 if flagged, 0 if not).
         Includes a Total column showing the total number of metrics that flagged each item.
@@ -282,11 +282,11 @@ class OutliersOutput(Output[TDataFrame]):
         )
 
         # Note: Polars 1.0.0 pivot cannot handle null values in index columns, so we use a placeholder
-        TEMP_NULL_PLACEHOLDER = -1
+        temp_null_placeholder = -1
 
         # Replace null target_id with placeholder before pivot (if target_id exists)
         if has_target_id:
-            grouped = grouped.with_columns(pl.col("target_id").fill_null(TEMP_NULL_PLACEHOLDER))
+            grouped = grouped.with_columns(pl.col("target_id").fill_null(temp_null_placeholder))
 
         pivoted = grouped.pivot(on="metric_name", index=index_cols, values="flagged")
 
@@ -297,10 +297,10 @@ class OutliersOutput(Output[TDataFrame]):
         expressions = []
         if has_target_id:
             expressions.append(
-                pl.when(pl.col("target_id") == TEMP_NULL_PLACEHOLDER)
+                pl.when(pl.col("target_id") == temp_null_placeholder)
                 .then(None)
                 .otherwise(pl.col("target_id"))
-                .alias("target_id")
+                .alias("target_id"),
             )
 
         if metric_cols:
@@ -346,7 +346,9 @@ def _get_iqr_mask(values: NDArray[np.float64], threshold: float | None) -> NDArr
 
 
 def _get_outlier_mask(
-    values: NDArray[Any], method: Literal["zscore", "modzscore", "iqr"], threshold: float | None
+    values: NDArray[Any],
+    method: Literal["zscore", "modzscore", "iqr"],
+    threshold: float | None,
 ) -> NDArray[np.bool_]:
     if len(values) == 0:
         return np.array([], dtype=bool)
@@ -544,7 +546,9 @@ class Outliers(Evaluator):
                     if np.any(image_level_mask_idx):
                         image_level_values = values[image_level_mask_idx]
                         image_level_outlier_mask = _get_outlier_mask(
-                            image_level_values.astype(np.float64), self.outlier_method, self.outlier_threshold
+                            image_level_values.astype(np.float64),
+                            self.outlier_method,
+                            self.outlier_threshold,
                         )
 
                         if np.any(image_level_outlier_mask):
@@ -563,7 +567,9 @@ class Outliers(Evaluator):
                     if np.any(target_level_mask_idx):
                         target_level_values = values[target_level_mask_idx]
                         target_level_outlier_mask = _get_outlier_mask(
-                            target_level_values.astype(np.float64), self.outlier_method, self.outlier_threshold
+                            target_level_values.astype(np.float64),
+                            self.outlier_method,
+                            self.outlier_threshold,
                         )
 
                         if np.any(target_level_outlier_mask):
@@ -585,7 +591,7 @@ class Outliers(Evaluator):
                     "target_id": pl.Int64,
                     "metric_name": pl.Categorical("lexical"),
                     "metric_value": pl.Float64,
-                }
+                },
             )
 
         return pl.DataFrame(
@@ -594,7 +600,7 @@ class Outliers(Evaluator):
                 "target_id": pl.Series(target_ids, dtype=pl.Int64),
                 "metric_name": pl.Series(metric_names, dtype=pl.Categorical("lexical")),
                 "metric_value": pl.Series(metric_values, dtype=pl.Float64),
-            }
+            },
         ).sort(["item_id", "target_id", "metric_name"])
 
     @overload
@@ -605,10 +611,11 @@ class Outliers(Evaluator):
 
     @set_metadata(state=["outlier_method", "outlier_threshold"])
     def from_stats(
-        self, stats: CalculationResult | Sequence[CalculationResult]
+        self,
+        stats: CalculationResult | Sequence[CalculationResult],
     ) -> OutliersOutput[pl.DataFrame] | OutliersOutput[list[pl.DataFrame]]:
         """
-        Returns indices of Outliers with the issues identified for each.
+        Return indices of Outliers with the issues identified for each.
 
         Parameters
         ----------
@@ -694,7 +701,7 @@ class Outliers(Evaluator):
                         "target_id": pl.Series(dataset_target_ids, dtype=pl.Int64),
                         "metric_name": pl.Series(dataset_metric_names, dtype=pl.Categorical("lexical")),
                         "metric_value": pl.Series(dataset_metric_values, dtype=pl.Float64),
-                    }
+                    },
                 ).sort(["item_id", "target_id", "metric_name"], descending=[False, False, False])
 
                 # Drop target_id column if all values are None
@@ -710,8 +717,8 @@ class Outliers(Evaluator):
                             "target_id": pl.Int64,
                             "metric_name": pl.Categorical("lexical"),
                             "metric_value": pl.Float64,
-                        }
-                    )
+                        },
+                    ),
                 )
 
         return OutliersOutput(output_list)
@@ -844,7 +851,7 @@ class Outliers(Evaluator):
                     "item_id": pl.Int64,
                     "metric_name": pl.Categorical("lexical"),
                     "metric_value": pl.Float64,
-                }
+                },
             )
 
         item_ids: list[int] = []
@@ -868,7 +875,7 @@ class Outliers(Evaluator):
                 "item_id": pl.Series(item_ids, dtype=pl.Int64),
                 "metric_name": pl.Series(["cluster_distance"] * len(item_ids), dtype=pl.Categorical("lexical")),
                 "metric_value": pl.Series(metric_values, dtype=pl.Float64),
-            }
+            },
         ).sort(["item_id", "metric_name"], descending=[False, False])
 
     @set_metadata(
@@ -879,7 +886,7 @@ class Outliers(Evaluator):
             "cluster_threshold",
             "cluster_algorithm",
             "n_clusters",
-        ]
+        ],
     )
     def evaluate(
         self,
@@ -889,7 +896,7 @@ class Outliers(Evaluator):
         per_target: bool = True,
     ) -> OutliersOutput[pl.DataFrame]:
         """
-        Returns indices of Outliers with the issues identified for each.
+        Return indices of Outliers with the issues identified for each.
 
         Computes outliers using image statistics and/or cluster-based detection,
         depending on configuration. When both methods are enabled, results are
@@ -1010,7 +1017,7 @@ class Outliers(Evaluator):
                     "target_id": pl.Int64,
                     "metric_name": pl.Categorical("lexical"),
                     "metric_value": pl.Float64,
-                }
+                },
             )
         elif len(outliers_dfs) == 1:
             outliers = outliers_dfs[0]

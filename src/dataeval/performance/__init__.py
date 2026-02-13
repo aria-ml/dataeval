@@ -1,6 +1,4 @@
-"""
-Determine whether a problem is feasible and how much data is needed.
-"""
+"""Determine whether a problem is feasible and how much data is needed."""
 
 __all__ = [
     "Sufficiency",

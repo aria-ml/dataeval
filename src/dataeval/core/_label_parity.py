@@ -58,7 +58,6 @@ def _normalize_expected_dist(expected_dist: NDArray[Any], observed_dist: NDArray
     The function ensures that the total number of labels in the expected distribution matches the total
     number of labels in the observed distribution by scaling the expected distribution.
     """
-
     exp_sum = np.sum(expected_dist)
     obs_sum = np.sum(observed_dist)
 
@@ -66,7 +65,7 @@ def _normalize_expected_dist(expected_dist: NDArray[Any], observed_dist: NDArray
         raise ValueError(
             f"Expected label distribution {expected_dist} is all zeros. "
             "Ensure that Parity.expected_dist is set to a list "
-            "with at least one nonzero element"
+            "with at least one nonzero element",
         )
 
     # Renormalize expected distribution to have the same total number of labels as the observed dataset
@@ -78,8 +77,9 @@ def _normalize_expected_dist(expected_dist: NDArray[Any], observed_dist: NDArray
 
 def _validate_dist(label_dist: NDArray[Any], label_name: str) -> None:
     """
-    Verifies that the given label distribution has labels and checks if
-    any labels have frequencies less than 5.
+    Verify that the given label distribution has labels.
+
+    Also checks if any labels have frequencies less than 5.
 
     Parameters
     ----------
@@ -95,7 +95,6 @@ def _validate_dist(label_dist: NDArray[Any], label_name: str) -> None:
     Warning
         If any elements of label_dist are less than 5
     """
-
     if not len(label_dist):
         raise ValueError(f"No labels found in the {label_name} dataset")
     if np.any(label_dist < 5):
@@ -113,9 +112,9 @@ def label_parity(
     num_classes: int | None = None,
 ) -> LabelParityResult:
     """
-    Calculate the chi-square statistic to assess the :term:`parity<Parity>` \
-    between expected and observed label distributions.
+    Calculate the chi-square statistic to assess label distribution parity.
 
+    Assess the :term:`parity<Parity>` between expected and observed label distributions.
     This function computes the frequency distribution of classes in both expected and observed labels, normalizes
     the expected distribution to match the total number of observed labels, and then calculates the chi-square
     statistic to determine if there is a significant difference between the two distributions.
@@ -197,7 +196,7 @@ def label_parity(
             "This can happen when some class ids have zero instances in one dataset but "
             "not in the other. When initializing Parity, try setting the num_classes "
             "parameter to the known number of unique class ids, so that classes with "
-            "zero instances are still included in the distributions."
+            "zero instances are still included in the distributions.",
         )
 
     cs, p = chisquare(f_obs=observed_dist, f_exp=expected_dist)

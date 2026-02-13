@@ -32,7 +32,8 @@ class Shuffle(Selection[Any]):
     stage = SelectionStage.ORDER
 
     def __init__(
-        self, seed: int | Sequence[int] | Array | SeedSequence | BitGenerator | Generator | None = None
+        self,
+        seed: int | Sequence[int] | Array | SeedSequence | BitGenerator | Generator | None = None,
     ) -> None:
         _seed = get_seed() if seed is None else seed
         self.seed = as_numpy(_seed) if isinstance(_seed, Sequence | Array) else _seed

@@ -1,6 +1,4 @@
-"""
-Detect changes in data between different datasets.
-"""
+"""Detect changes in data between different datasets."""
 
 __all__ = [
     "DriftMMD",

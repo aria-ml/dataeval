@@ -68,7 +68,8 @@ class TestSelectionClasses:
             label = int(np.argmax(target))
             counts[label] += 1
         # Check that classes 0 and 1 are present
-        assert counts[0] > 0 and counts[1] > 0
+        assert counts[0] > 0
+        assert counts[1] > 0
         assert "ClassFilter(classes=[0, 1]" in str(select)
         assert "ClassBalance(" in str(select)
 
@@ -112,7 +113,8 @@ class TestSelectionClasses:
         limit = Limit(size=5)
         select = Select(mock_dataset, selections=[limit, class_filter, class_balance])
         # After limit, filter, and balance, check we get results
-        assert len(select) > 0 and len(select) <= 5
+        assert len(select) > 0
+        assert len(select) <= 5
         counts = {0: 0, 1: 0, 2: 0}
         for _, target, _ in select:
             label = int(np.argmax(target))

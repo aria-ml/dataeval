@@ -320,7 +320,7 @@ class TestOnnxExtractorImportError:
         with patch("dataeval.extractors._onnx._get_inference_session") as mock_get:
             mock_get.side_effect = ImportError(
                 "onnxruntime is required for OnnxExtractor. "
-                "Install it with: pip install onnxruntime (CPU) or pip install onnxruntime-gpu (GPU)"
+                "Install it with: pip install onnxruntime (CPU) or pip install onnxruntime-gpu (GPU)",
             )
 
             extractor = OnnxExtractor(simple_onnx_model)

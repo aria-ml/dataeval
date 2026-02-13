@@ -11,10 +11,7 @@ class TestResultsEdgeCases:
             combine_results([])
 
     def test_get_dataset_step_oob(self):
-        """
-        Covers get_dataset_step_from_idx when index is out of bounds.
-
-        """
+        """Covers get_dataset_step_from_idx when index is out of bounds."""
         steps = [10, 20]  # Dataset 0 ends at 10, Dataset 1 ends at 20
         idx = 25  # Out of bounds
 

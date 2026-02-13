@@ -19,7 +19,7 @@ def metadata_results():
 
 @pytest.mark.required
 class TestDiversityUnit:
-    """Test the Diversity class interface"""
+    """Test the Diversity class interface."""
 
     def test_initialization_defaults(self):
         diversity_obj = Diversity()
@@ -34,7 +34,7 @@ class TestDiversityUnit:
     @pytest.mark.parametrize("met", ["Simpson", "ShANnOn"])
     def test_invalid_method(self, metadata_results, met):
         diversity_obj = Diversity(method=met)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Invalid method"):
             diversity_obj.evaluate(metadata_results)
 
     @pytest.mark.parametrize("met", ["simpson", "shannon"])
@@ -92,7 +92,7 @@ class TestDiversityUnit:
             index2label={},
         )
         diversity_obj = Diversity()
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="No factors found"):
             diversity_obj.evaluate(mock_metadata)
 
     def test_metadata_stored(self, metadata_results):
@@ -103,7 +103,7 @@ class TestDiversityUnit:
         assert diversity_obj.metadata.factor_names == metadata_results.factor_names
 
     def test_threshold_parameters(self):
-        """Test that custom thresholds affect bias detection"""
+        """Test that custom thresholds affect bias detection."""
         metadata = to_metadata({"factor1": [1, 1, 1, 2, 2, 3]}, [0, 0, 0, 1, 1, 1], {})
 
         diversity_obj1 = Diversity(threshold=1.0)
@@ -120,10 +120,10 @@ class TestDiversityUnit:
 
 @pytest.mark.optional
 class TestDiversityFunctional:
-    """Test functional behavior of Diversity class"""
+    """Test functional behavior of Diversity class."""
 
     @pytest.mark.parametrize(
-        "metadata, expected_diversity, expected_classwise",
+        ("metadata", "expected_diversity", "expected_classwise"),
         [
             (
                 to_metadata({"factor1": [5, 5, 5, 6, 6, 6]}, [0, 0, 0, 1, 1, 1], {}),
@@ -156,7 +156,7 @@ class TestDiversityFunctional:
             np.testing.assert_almost_equal(val, expected_classwise)
 
     @pytest.mark.parametrize(
-        "metadata, expected_diversity, expected_classwise",
+        ("metadata", "expected_diversity", "expected_classwise"),
         [
             (
                 to_metadata({"factor1": [5, 5, 5, 6, 6, 6]}, [0, 0, 0, 1, 1, 1], {}),

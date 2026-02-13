@@ -13,7 +13,8 @@ IGNORE_KEYS = {"self", "config", "__class__"}
 
 def get_overrides(local_vars: dict[str, Any], exclude: set[str] | None = None) -> dict[str, Any]:
     """
-    Extracts explicit arguments from locals() to create a config override dictionary.
+    Extract explicit arguments from locals() to create a config override dictionary.
+
     Removes 'self', 'config', and any variable that is None.
     """
     # 1. Standard things to always ignore in __init__
@@ -22,11 +23,9 @@ def get_overrides(local_vars: dict[str, Any], exclude: set[str] | None = None) -
 
 
 def apply_config(obj: Any, config: BaseModel, exclude: set[str] | None = None) -> None:
-    """
-    Applies attributes onto obj from config, excluding specified keys.
-    """
+    """Apply attributes onto obj from config, excluding specified keys."""
     exclude = IGNORE_KEYS | (exclude or set())
-    setattr(obj, "config", config)
+    obj.config = config
     for key, value in config.model_dump().items():
         if key not in exclude:
             setattr(obj, key, value)

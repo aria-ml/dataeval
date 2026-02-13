@@ -29,14 +29,14 @@ class TestPrioritize:
         return Embeddings(self.get_dataset(n), extractor=extractor)
 
     @pytest.mark.parametrize(
-        "method, method_kwargs",
-        (
+        ("method", "method_kwargs"),
+        [
             ("knn", {"k": 10}),
             ("kmeans_distance", {"c": 100}),
             ("kmeans_complexity", {"c": 100}),
             ("hdbscan_distance", {"c": 10}),
             ("hdbscan_complexity", {"c": 10}),
-        ),
+        ],
     )
     def test_prioritize_evaluate(self, extractor, method, method_kwargs):
         dataset = self.get_dataset()
@@ -53,7 +53,7 @@ class TestPrioritize:
         elif method == "hdbscan_complexity":
             p = Prioritize.hdbscan_complexity(extractor, **method_kwargs)
         else:
-            assert False, f"Unknown method: {method}"
+            raise AssertionError(f"Unknown method: {method}")
 
         # Evaluate (Measure) then Apply Policy (Cut)
         result = p.evaluate(dataset).hard_first()
@@ -64,10 +64,10 @@ class TestPrioritize:
         assert result.method == method
         assert result.order == "hard_first"
         # Check that indices are actually different from default order
-        assert any(i != j for i, j in zip(result.indices, range(1000)))
+        assert any(i != j for i, j in zip(result.indices, range(1000), strict=False))
 
     @pytest.mark.parametrize(
-        "order,policy",
+        ("order", "policy"),
         [
             ("hard_first", "difficulty"),
             ("easy_first", "difficulty"),
@@ -98,7 +98,7 @@ class TestPrioritize:
         assert result.policy == policy
         assert result.method == "knn"
         assert len(result.indices) == 1000
-        assert any(i != j for i, j in zip(result.indices, range(1000)))
+        assert any(i != j for i, j in zip(result.indices, range(1000), strict=False))
 
     def test_prioritize_encoder_required(self):
         """Test that extractor must be provided."""
@@ -145,14 +145,14 @@ class TestPrioritize:
     @pytest.mark.parametrize("use_embeddings", [False, True])
     @pytest.mark.parametrize("use_reference", [False, True])
     @pytest.mark.parametrize(
-        "method, method_kwargs",
-        (
+        ("method", "method_kwargs"),
+        [
             ("knn", {"k": 10}),
             ("kmeans_distance", {"c": 100}),
             ("kmeans_complexity", {"c": 100}),
             ("hdbscan_distance", {"c": 10}),
             ("hdbscan_complexity", {"c": 10}),
-        ),
+        ],
     )
     def test_prioritize_with_embeddings(self, extractor, method, method_kwargs, use_embeddings, use_reference):
         # Setup reference if needed
@@ -173,7 +173,7 @@ class TestPrioritize:
         elif method == "hdbscan_complexity":
             p = Prioritize.hdbscan_complexity(extractor, reference=reference, **method_kwargs)
         else:
-            assert False, f"Unknown method: {method}"
+            raise AssertionError(f"Unknown method: {method}")
 
         # Test flow: Evaluate -> Rebucket
         result = p.evaluate(dataset).hard_first()
@@ -182,7 +182,7 @@ class TestPrioritize:
         assert len(result.indices) == 1000
         assert result.method == method
         assert result.order == "hard_first"
-        assert any(i != j for i, j in zip(result.indices, range(1000)))
+        assert any(i != j for i, j in zip(result.indices, range(1000), strict=False))
 
     def test_prioritize_with_precomputed_embeddings(self, extractor):
         """Test that we can pass Embeddings directly as the dataset."""

@@ -38,7 +38,7 @@ def _validate_inputs(embeddings: NDArray[np.float64], num_observations: int) -> 
     if len(embeddings) <= num_observations:
         raise ValueError(
             f"Length of embeddings ({len(embeddings)}) is less than or equal to the specified number of \
-                observations ({num_observations})."
+                observations ({num_observations}).",
         )
     return embeddings
 
@@ -110,7 +110,7 @@ def coverage_naive(
     coverage_radius = float(
         (1 / math.sqrt(math.pi))
         * ((2 * num_observations * math.gamma(embeddings_np.shape[1] / 2 + 1)) / (len(embeddings_np)))
-        ** (1 / embeddings_np.shape[1])
+        ** (1 / embeddings_np.shape[1]),
     )
     uncovered_indices = np.where(critical_value_radii > coverage_radius)[0]
 
@@ -183,7 +183,9 @@ def coverage_adaptive(
     [1] Seymour Sudman. 1976. Applied sampling. Academic Press New York (1976).
     """
     _logger.info(
-        "Starting coverage_adaptive calculation with num_observations=%d, percent=%.2f", num_observations, percent
+        "Starting coverage_adaptive calculation with num_observations=%d, percent=%.2f",
+        num_observations,
+        percent,
     )
 
     embeddings = _validate_inputs(as_numpy(embeddings, dtype=np.float64, required_ndim=2), num_observations)

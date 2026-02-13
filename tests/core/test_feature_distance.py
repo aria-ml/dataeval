@@ -22,7 +22,6 @@ def mock_metadata(
     Creates a magic mock method that contains discrete and continuous data and factors
     but has no hard dependency on Metadata.
     """
-
     m = MagicMock(spec=Metadata)
 
     _factors = {}
@@ -49,10 +48,10 @@ def mock_metadata(
 
 @pytest.mark.required
 class TestFeatureDistance:
-    """Tests valid combinations of input metadata run without errors"""
+    """Tests valid combinations of input metadata run without errors."""
 
     @pytest.mark.parametrize(
-        "factors, shape1, shape2",
+        ("factors", "shape1", "shape2"),
         [
             pytest.param(["a"], (1, 1), (1, 1), id="1 sample, 1 factor"),
             pytest.param(["a"], (3, 1), (3, 1), id="multi samples, 1 factor"),
@@ -72,8 +71,7 @@ class TestFeatureDistance:
         assert isinstance(result[0]["statistic"], float)
 
     def test_no_warn_on_many_samples(self, RNG: Generator):
-        """Solving the equation where N==M brings the sample count to 32 to make a valid solution"""
-
+        """Solving the equation where N==M brings the sample count to 32 to make a valid solution."""
         c1 = RNG.random((32, 1))
         c2 = RNG.random((32, 1))
 
@@ -84,20 +82,18 @@ class TestFeatureDistance:
 
     def test_empty_inputs(self):
         """
-        Test an empty array produces no value, but does not error
+        Test an empty array produces no value, but does not error.
 
         While there seems to be a DivisionByZero, the np.atleast_2d forces the array to have an empty
         length of 1, rather than 0
         """
-
         c1 = np.array([])
         c2 = np.array([])
 
         assert feature_distance(c1, c2) == []
 
     def test_min_equals_max(self):
-        """Test that any factors that have no deviation return an empty MetadataDistanceValues"""
-
+        """Test that any factors that have no deviation return an empty MetadataDistanceValues."""
         c1 = np.ones((32, 1))
         c2 = np.ones((32, 1))
 
@@ -106,19 +102,18 @@ class TestFeatureDistance:
         assert list(result[0].values()) == [0.0, 0.0, 0.0, 1.0]
 
     def test_inconsistent_features(self):
-        """Test that value error is raised with inconsistent number of features"""
+        """Test that value error is raised with inconsistent number of features."""
         c1 = np.ones((32, 1))
         c2 = np.ones((32, 2))
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="same numbers of features"):
             feature_distance(c1, c2)
 
 
 @pytest.mark.required
 class TestCalculateDrift:
     def test_valid_X(self):
-        """When IQR is not zero, scale distance by IQR"""
-
+        """When IQR is not zero, scale distance by IQR."""
         # IQR = 1.5, distance = 1.5
         res = _calculate_drift(np.arange(4), np.arange(4) + 1.5)
 
@@ -126,8 +121,7 @@ class TestCalculateDrift:
         assert res == 1.0
 
     def test_min_eq_max(self):
-        """When IQR is zero and min equals max, return distance"""
-
+        """When IQR is zero and min equals max, return distance."""
         # Array with identical values has an iqr of 0.0, return emd
         res = _calculate_drift([1.0, 1.0, 1.0], np.zeros(3))
 
@@ -135,7 +129,7 @@ class TestCalculateDrift:
         assert np.isclose(res, 1.0)
 
     def test_min_neq_max(self):
-        """When IQR is 0 and min does not equal max, return scaled distance"""
+        """When IQR is 0 and min does not equal max, return scaled distance."""
         res = _calculate_drift([0.0, 1.0, 1.0, 1.0, 2.0], np.ones(5))
 
         assert isinstance(res, float)

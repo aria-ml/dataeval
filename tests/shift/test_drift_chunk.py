@@ -74,7 +74,7 @@ def sample_chunk_data() -> pl.DataFrame:
     # Add period column
     data = data.with_columns(pl.lit("reference").alias("period"))
     data = data.with_columns(
-        pl.when(pl.col("week") >= 11).then(pl.lit("analysis")).otherwise(pl.col("period")).alias("period")
+        pl.when(pl.col("week") >= 11).then(pl.lit("analysis")).otherwise(pl.col("period")).alias("period"),
     )
 
     # Add random columns
@@ -87,7 +87,7 @@ def sample_chunk_data() -> pl.DataFrame:
             pl.Series("f4", np.random.randint(20, size=n_rows), dtype=pl.Int64),
             pl.Series("y_pred", np.random.randint(2, size=n_rows)),
             pl.Series("y_true", np.random.randint(2, size=n_rows)),
-        ]
+        ],
     )
     data = data.with_columns(pl.col("ordered_at").alias("timestamp"))
 
@@ -98,7 +98,7 @@ def sample_chunk_data() -> pl.DataFrame:
         pl.when(pl.col("week") < 16)
         .then(pl.col("f3").replace(rule1a))
         .otherwise(pl.col("f3").replace(rule1b))
-        .alias("f3")
+        .alias("f3"),
     )
 
     # Rule 2b is the shifted feature
@@ -121,13 +121,13 @@ def sample_chunk_data() -> pl.DataFrame:
         pl.when(pl.col("week") < 16)
         .then(pl.col("f4").replace_strict(rule2a, return_dtype=pl.Utf8))
         .otherwise(pl.col("f4").replace_strict(rule2b, return_dtype=pl.Utf8))
-        .alias("f4")
+        .alias("f4"),
     )
 
     data = data.with_columns(pl.when(pl.col("week") >= 16).then(pl.col("f1") + 0.6).otherwise(pl.col("f1")).alias("f1"))
 
     data = data.with_columns(
-        pl.when(pl.col("week") >= 16).then(pl.col("f2").sqrt()).otherwise(pl.col("f2")).alias("f2")
+        pl.when(pl.col("week") >= 16).then(pl.col("f2").sqrt()).otherwise(pl.col("f2")).alias("f2"),
     )
 
     return data
@@ -228,17 +228,17 @@ def test_chunker_should_fail_when_timestamp_column_is_not_present(sample_chunk_d
 
 
 def test_size_based_chunker_raises_exception_when_passed_nan_size(sample_chunk_data):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="chunk_size=.* is invalid"):
         SizeBasedChunker(chunk_size="size?")  # type: ignore
 
 
 def test_size_based_chunker_raises_exception_when_passed_negative_size(sample_chunk_data):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="chunk_size=.* is invalid"):
         SizeBasedChunker(chunk_size=-1)
 
 
 def test_size_based_chunker_raises_exception_when_passed_zero_size(sample_chunk_data):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="chunk_size=.* is invalid"):
         SizeBasedChunker(chunk_size=0)
 
 
@@ -320,17 +320,17 @@ def test_size_based_chunker_assigns_observation_range_to_chunk_keys(sample_chunk
 
 
 def test_count_based_chunker_raises_exception_when_passed_nan_size(sample_chunk_data):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="given chunk_number .* is invalid"):
         _ = CountBasedChunker(chunk_number="size?")  # type: ignore
 
 
 def test_count_based_chunker_raises_exception_when_passed_negative_size(sample_chunk_data):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="given chunk_number .* is invalid"):
         _ = CountBasedChunker(chunk_number=-1)
 
 
 def test_count_based_chunker_raises_exception_when_passed_zero_size(sample_chunk_data):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="given chunk_number .* is invalid"):
         _ = CountBasedChunker(chunk_number=0)
 
 

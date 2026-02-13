@@ -1,3 +1,5 @@
+"""Evaluation schedule implementations for sufficiency analysis."""
+
 __all__ = ["GeometricSchedule", "ManualSchedule"]
 
 from collections.abc import Iterable
@@ -83,6 +85,6 @@ class ManualSchedule:
 
         self.eval_points = arr
 
-    def get_steps(self, dataset_length: int) -> NDArray[np.intp]:
+    def get_steps(self, dataset_length: int) -> NDArray[np.intp]:  # noqa: ARG002
         """Return the pre-specified evaluation points."""
         return self.eval_points

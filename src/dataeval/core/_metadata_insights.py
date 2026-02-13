@@ -24,7 +24,7 @@ which is what many library functions return, multiply it by _NATS2BITS to get it
 
 def _calc_median_deviations(reference: NDArray[Any], test: NDArray[Any]) -> NDArray[Any]:
     """
-    Calculates deviations of the test data from the median of the reference data
+    Calculate deviations of the test data from the median of the reference data.
 
     Parameters
     ----------
@@ -43,7 +43,6 @@ def _calc_median_deviations(reference: NDArray[Any], test: NDArray[Any]) -> NDAr
     -----
     All return values are in the range [0, pos_inf]
     """
-
     # Take median over samples (rows)
     ref_median = np.median(reference, axis=0)  # (F, )
 
@@ -120,7 +119,6 @@ def factor_deviation(
     >>> factor_deviation(reference_factors, test_factors, indices)
     [{'time': 10.0, 'altitude': 1.4}, {'altitude': 79.0, 'time': 2.0}]
     """
-
     # Early return if no samples
     if not indices:
         return []
@@ -174,7 +172,9 @@ def factor_deviation(
     results = []
     for sample_devs in selected_deviations:
         # Create dict with factors and their deviations
-        factor_dict = {factor_name: float(dev_value) for factor_name, dev_value in zip(factor_names, sample_devs)}
+        factor_dict = {
+            factor_name: float(dev_value) for factor_name, dev_value in zip(factor_names, sample_devs, strict=False)
+        }
         # Sort dictionary by deviation value (descending order)
         sorted_dict = dict(sorted(factor_dict.items(), key=lambda item: item[1], reverse=True))
         results.append(sorted_dict)
@@ -188,7 +188,7 @@ def factor_predictors(
     discrete_features: list[bool] | None = None,
 ) -> Mapping[str, float]:
     """
-    Computes mutual information between metadata factors and flagged sample indices.
+    Compute mutual information between metadata factors and flagged sample indices.
 
     Given a set of metadata factors per sample and indices of flagged samples, this function
     calculates the mutual information between each factor and the flagged status.
@@ -231,7 +231,6 @@ def factor_predictors(
     >>> factor_predictors(factors, indices)
     {'time': 0.8415720833333329, 'altitude': 0.0}
     """
-
     if not factors:
         raise ValueError("factors dictionary cannot be empty")
 
@@ -263,7 +262,7 @@ def factor_predictors(
 
     if len(discrete_features) != len(factor_names):
         raise ValueError(
-            f"discrete_features length ({len(discrete_features)}) must match number of factors ({len(factor_names)})"
+            f"discrete_features length ({len(discrete_features)}) must match number of factors ({len(factor_names)})",
         )
 
     mutual_info_values = (

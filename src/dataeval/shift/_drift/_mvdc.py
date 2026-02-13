@@ -150,7 +150,7 @@ class _DomainClassifierCalculator:
         chunker: Chunker | None = None,
         cv_folds_num: int = 5,
         hyperparameters: dict[str, Any] | None = None,
-        threshold: Threshold = ConstantThreshold(lower=0.45, upper=0.65),
+        threshold: Threshold | None = None,
         logger_instance: Logger | None = None,
     ) -> None:
         """Create a new DomainClassifierCalculator instance.
@@ -163,7 +163,7 @@ class _DomainClassifierCalculator:
             Number of cross-validation folds to use when calculating DC discrimination value.
         hyperparameters : dict[str, Any], default = None
             A dictionary used to provide your own custom hyperparameters when training the discrimination model.
-        threshold: Threshold, default=ConstantThreshold
+        threshold: Threshold, default=ConstantThreshold(lower=0.45, upper=0.65)
             The threshold you wish to evaluate values on.
         logger_instance: Logger, default=None
             Logger instance to use for logging. If None, uses the module logger.
@@ -175,7 +175,7 @@ class _DomainClassifierCalculator:
 
         self.cv_folds_num = cv_folds_num
         self.hyperparameters = DEFAULT_LGBM_HYPERPARAMS if hyperparameters is None else hyperparameters
-        self.threshold = threshold
+        self.threshold = threshold if threshold is not None else ConstantThreshold(lower=0.45, upper=0.65)
 
     def fit(self, reference_data: pl.DataFrame) -> Self:
         """Train the calculator using reference data."""
@@ -234,20 +234,20 @@ class _DomainClassifierCalculator:
         """Calculate AUROC for a single chunk."""
         if self.result is None:
             # Use chunk indices to identify reference chunk's location
-            df_X = self._x_ref
-            y = np.zeros(len(df_X), dtype=np.intp)
+            df_x = self._x_ref
+            y = np.zeros(len(df_x), dtype=np.intp)
             y[chunk.start_index : chunk.end_index + 1] = 1
         else:
-            chunk_X = chunk.data
-            reference_X = self._x_ref
-            chunk_y = np.ones(len(chunk_X), dtype=np.intp)
-            reference_y = np.zeros(len(reference_X), dtype=np.intp)
-            df_X = pl.concat([reference_X, chunk_X])
+            chunk_x = chunk.data
+            reference_x = self._x_ref
+            chunk_y = np.ones(len(chunk_x), dtype=np.intp)
+            reference_y = np.zeros(len(reference_x), dtype=np.intp)
+            df_x = pl.concat([reference_x, chunk_x])
             y = np.concatenate([reference_y, chunk_y])
 
         # Extract feature names from Polars DataFrame and convert to numpy
-        feature_names = df_X.columns
-        X_numpy = df_X.to_numpy()
+        feature_names = df_x.columns
+        x_numpy = df_x.to_numpy()
 
         skf = StratifiedKFold(n_splits=self.cv_folds_num)
         all_preds: list[NDArray[np.float32]] = []
@@ -259,10 +259,10 @@ class _DomainClassifierCalculator:
         # This is expected behavior - we maintain feature order consistency via array indexing.
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message="X does not have valid feature names")
-            for train_index, test_index in skf.split(X_numpy, y):
-                _trx = X_numpy[train_index]
+            for train_index, test_index in skf.split(x_numpy, y):
+                _trx = x_numpy[train_index]
                 _try = y[train_index]
-                _tsx = X_numpy[test_index]
+                _tsx = x_numpy[test_index]
                 _tsy = y[test_index]
                 model = LGBMClassifier(
                     **self.hyperparameters,
@@ -294,19 +294,19 @@ class _DomainClassifierCalculator:
             [
                 pl.lit(self._threshold_values[1]).alias("domain_classifier_auroc_upper_threshold"),
                 pl.lit(self._threshold_values[0]).alias("domain_classifier_auroc_lower_threshold"),
-            ]
+            ],
         )
 
         return result_data.with_columns(
             (
                 (pl.col("domain_classifier_auroc_value") > pl.col("domain_classifier_auroc_upper_threshold"))
                 | (pl.col("domain_classifier_auroc_value") < pl.col("domain_classifier_auroc_lower_threshold"))
-            ).alias("domain_classifier_auroc_alert")
+            ).alias("domain_classifier_auroc_alert"),
         )
 
 
 class DriftMVDC:
-    """Multivariant Domain Classifier
+    """Multivariant Domain Classifier.
 
     Parameters
     ----------
@@ -383,7 +383,7 @@ class DriftMVDC:
 
     def fit(self, x_ref: ArrayLike) -> Self:
         """
-        Fit the domain classifier on the training dataframe
+        Fit the domain classifier on the training dataframe.
 
         Parameters
         ----------
@@ -403,7 +403,7 @@ class DriftMVDC:
 
     def predict(self, x: ArrayLike) -> DriftMVDCOutput:
         """
-        Perform :term:`inference<Inference>` on the test dataframe
+        Perform :term:`inference<Inference>` on the test dataframe.
 
         Parameters
         ----------

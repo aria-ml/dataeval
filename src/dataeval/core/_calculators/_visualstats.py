@@ -66,7 +66,8 @@ class VisualStatCalculator(Calculator[ImageStats]):
         # 3D+ data with channels
         if self.per_channel_mode:
             return np.nanstd(
-                np.vectorize(edge_filter, signature="(m,n)->(m,n)")(self.cache.image), axis=(1, 2)
+                np.vectorize(edge_filter, signature="(m,n)->(m,n)")(self.cache.image),
+                axis=(1, 2),
             ).tolist()
         return [float(np.nanstd(edge_filter(np.mean(self.cache.image, axis=0))))]
 

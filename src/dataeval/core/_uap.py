@@ -1,7 +1,7 @@
 """
-This module contains the implementation of the
-FR Test Statistic based estimate for the :term:`upper-bound
-average precision<Upper-Bound Average Precision (UAP)>` using empirical mean precision
+FR Test Statistic based estimate for :term:`upper-bound average precision<Upper-Bound Average Precision (UAP)>`.
+
+Uses empirical mean precision to estimate the upper-bound average precision.
 """
 
 __all__ = []
@@ -18,8 +18,9 @@ _logger = logging.getLogger(__name__)
 
 def uap(labels: Array2D[int], scores: Array2D[float]) -> float:
     """
-    FR Test Statistic based estimate of the empirical mean precision for the \
-    upperbound average precision.
+    Estimate the empirical mean precision for the upperbound average precision.
+
+    Uses the FR Test Statistic based approach.
 
     Parameters
     ----------

@@ -253,24 +253,30 @@ exclude = [
   "build",
   ".nox",
   ".tox",
+  "src/dataeval/_version.py",
 ]
 line-length = 120
 indent-width = 4
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["A", "ANN", "C4", "C90", "E", "F", "I", "NPY", "S", "SIM", "RET", "RUF100", "UP"]
-ignore = ["ANN401", "NPY002"]
+select = ["F", "E", "W", "C90", "I", "N", "D", "UP", "YTT", "ANN", "S", "BLE", "B", "A",
+          "COM", "C4", "T10", "ISC", "ICN", "PYI", "PT", "Q", "RSE", "RET", "SLF", "SIM",
+          "TID252", "ARG", "FIX", "PD", "FLY", "NPY", "RUF100", "PERF"]
+ignore = ["ANN401", "COM812", "NPY002", "SLF001"]
 fixable = ["ALL"]
 unfixable = []
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-per-file-ignores = { "!src/*" = ["ANN", "S", "RET"]}
+per-file-ignores = { "!src/*" = ["ANN", "ARG", "BLE", "S", "SLF", "RET", "C90", "D", "FIX", "N", "PERF"], "docs/*" = ["B904"] }
+
+[tool.ruff.lint.flake8-builtins]
+builtins-strict-checking = false
 
 [tool.ruff.lint.isort]
 known-first-party = ["dataeval"]
 
-[tool.ruff.lint.flake8-builtins]
-builtins-strict-checking = false
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
 
 [tool.ruff.format]
 quote-style = "double"

@@ -19,7 +19,7 @@ from dataeval.core._nullmodel import (
 @pytest.mark.required
 class TestMetricEstimators:
     @pytest.mark.parametrize(
-        "class_probs, model_probs, expected_accuracy",
+        ("class_probs", "model_probs", "expected_accuracy"),
         [
             ([0, 0, 0], [0, 0, 0], 0),
             ([1, 0, 0], [0, 1, 0], 0),
@@ -29,11 +29,11 @@ class TestMetricEstimators:
         ],
     )
     def test_calculate_multiclass_accuracy(self, class_probs, model_probs, expected_accuracy):
-        """Tests multiclass accuracy estimator"""
+        """Tests multiclass accuracy estimator."""
         assert _calculate_multiclass_accuracy(class_probs, model_probs) == expected_accuracy
 
     @pytest.mark.parametrize(
-        "counts, expected_accuracy",
+        ("counts", "expected_accuracy"),
         [
             ([1, 0, 1, 0], 1),
             ([0, 0, 0, 20], 0),
@@ -43,11 +43,11 @@ class TestMetricEstimators:
         ],
     )
     def test_calculate_accuracy(self, counts, expected_accuracy):
-        """Tests binary accuracy estimator"""
+        """Tests binary accuracy estimator."""
         assert _calculate_accuracy(counts) == expected_accuracy
 
     @pytest.mark.parametrize(
-        "counts, expected_precision",
+        ("counts", "expected_precision"),
         [
             ([0, 0, 0, 1], 0),
             ([0, 0, 0, 0], 1),
@@ -58,11 +58,11 @@ class TestMetricEstimators:
         ],
     )
     def test_calculate_precision(self, counts, expected_precision):
-        """Tests binary precision estimator"""
+        """Tests binary precision estimator."""
         assert _calculate_precision(counts) == expected_precision
 
     @pytest.mark.parametrize(
-        "counts, expected_false_positive_rate",
+        ("counts", "expected_false_positive_rate"),
         [
             ([1, 0, 0, 10], 0),
             ([0, 1, 0, 20], 1),
@@ -72,11 +72,11 @@ class TestMetricEstimators:
         ],
     )
     def test_calculate_false_positive_rate(self, counts, expected_false_positive_rate):
-        """Tests binary false positive rate estimator"""
+        """Tests binary false positive rate estimator."""
         assert _calculate_fpr(counts) == expected_false_positive_rate
 
     @pytest.mark.parametrize(
-        "counts, expected_true_positive_rate",
+        ("counts", "expected_true_positive_rate"),
         [
             ([0, 1, 0, 0], 0),
             ([0, 0, 0, 0], 1),
@@ -87,11 +87,11 @@ class TestMetricEstimators:
         ],
     )
     def test_calculate_true_positive_rate(self, counts, expected_true_positive_rate):
-        """Tests binary true positive rate estimator"""
+        """Tests binary true positive rate estimator."""
         assert _calculate_recall(counts) == expected_true_positive_rate
 
     @pytest.mark.parametrize(
-        "class_probs_1vR, prediction_probs_1vR, expected_cm_results",
+        ("class_probs_1vR", "prediction_probs_1vR", "expected_cm_results"),
         [
             ([1, 0], [1, 0], np.array([1, 0, 0, 0])),
             ([0, 1], [0, 1], np.array([0, 0, 1, 0])),
@@ -104,14 +104,14 @@ class TestMetricEstimators:
         ],
     )
     def test_get_tpfptnfn(self, class_probs_1vR, prediction_probs_1vR, expected_cm_results):
-        """Tests classification results estimator"""
+        """Tests classification results estimator."""
         assert all(_to_confusion_matrix(class_probs_1vR, prediction_probs_1vR) == expected_cm_results)
 
 
 @pytest.mark.required
 class TestReducers:
     @pytest.mark.parametrize(
-        "method, counts, expected_value",
+        ("method", "counts", "expected_value"),
         [
             (_calculate_accuracy, [[1, 0, 0, 0], [0, 0, 1, 0]], 1),
             (_calculate_precision, [[1, 0, 0, 0], [0, 0, 0, 0]], 1),
@@ -120,11 +120,11 @@ class TestReducers:
         ],
     )
     def test_micro_reducer(self, method, counts, expected_value):
-        """Tests micro reducer with each callable estimator"""
+        """Tests micro reducer with each callable estimator."""
         assert _reduce_micro(method, counts) == expected_value
 
     @pytest.mark.parametrize(
-        "method, counts, expected_value",
+        ("method", "counts", "expected_value"),
         [
             (_calculate_accuracy, [[1, 0, 1, 0], [0, 1, 0, 1]], 0.5),
             (_calculate_precision, [[1, 0, 0, 0], [0, 0, 1, 1]], 0.5),
@@ -133,14 +133,14 @@ class TestReducers:
         ],
     )
     def test_macro_reducer(self, method, counts, expected_value):
-        """Tests macro reducer with each callable estimator"""
+        """Tests macro reducer with each callable estimator."""
         assert _reduce_macro(method, counts) == expected_value
 
 
 @pytest.mark.required
 class TestNullModelMetrics:
     @pytest.mark.parametrize(
-        "test_labels, train_labels, expected_models, expected_metrics",
+        ("test_labels", "train_labels", "expected_models", "expected_metrics"),
         [
             # binary, no train set
             (np.random.randint(1, 3, size=100), None, 1, 8),
@@ -167,7 +167,7 @@ class TestNullModelMetrics:
         ],
     )
     def test_null_model_inputs(self, test_labels, train_labels, expected_models, expected_metrics):
-        """Tests expected models and expected metrics for binary and multiclass label sets"""
+        """Tests expected models and expected metrics for binary and multiclass label sets."""
         output = nullmodel_metrics(test_labels, train_labels)
         # Count only the models that are present in the output
         assert len(output) == expected_models
@@ -179,7 +179,7 @@ class TestNullModelMetrics:
             assert metrics_count == expected_metrics
 
     def test_invalid_inputs(self):
-        """Tests that invalid data properly raises exceptions"""
+        """Tests that invalid data properly raises exceptions."""
         test_labels = []
         with pytest.raises(ValueError, match="Empty or null test labels provided"):
             output = nullmodel_metrics(test_labels)
