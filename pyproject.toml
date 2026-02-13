@@ -196,6 +196,15 @@ torch = { pip = true }  # PyTorch is no longer maintained on conda-forge
 xxhash = { skip = true, packages = "python-xxhash>=3.3" }
 
 [tool.pyright]
+include = ["src", "tests"]
+exclude = [
+  "**/__pycache__",
+  ".nox",
+  ".tox",
+  "build",
+  "output",
+  "*env*",
+]
 reportMissingImports = false
 
 [tool.pytest.ini_options]
