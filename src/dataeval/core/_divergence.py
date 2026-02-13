@@ -20,7 +20,7 @@ _logger = logging.getLogger(__name__)
 
 class DivergenceResult(TypedDict):
     """
-    Result mapping for :func:`.divergence` estimator metric.
+    Type definition for divergence output.
 
     Attributes
     ----------
