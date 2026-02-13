@@ -271,7 +271,7 @@ def docs(session: nox.Session) -> None:
     session.run_always("bash", "-c", RESTORE_CMD, external=True)
 
 
-@session(uv_only_groups=["lock"], uv_sync_locked=False)
+@session(python=PYTHON_VERSIONS[0], uv_only_groups=["lock"], uv_sync_locked=False)
 def lock(session: nox.Session) -> None:
     """Lock dependencies in "uv.lock". Update dependencies by calling `nox -e lock -- upgrade`."""
     upgrade_args = ["--upgrade"] if "upgrade" in session.posargs else []
@@ -465,7 +465,7 @@ def doclint(session: nox.Session) -> None:
         )
 
 
-@session(uv_only_groups=["lock"])
+@session(python=PYTHON_VERSIONS[0], uv_only_groups=["lock"])
 def check(session: nox.Session) -> None:
     """Validate lock file and exported dependency files are up to date."""
     session.run("uv", "lock", "--check")
