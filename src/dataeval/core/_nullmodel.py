@@ -57,7 +57,7 @@ class NullModelMetrics(TypedDict):
 
 class NullModelMetricsResult(TypedDict):
     """
-    Result mapping for null model metrics evaluation.
+    Type definition for null model metrics output.
 
     Attributes
     ----------

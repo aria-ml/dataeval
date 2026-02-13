@@ -21,7 +21,7 @@ _logger = logging.getLogger(__name__)
 
 class RankResult(TypedDict):
     """
-    Results from ranking data according to a specified method.
+    Type definition for rank output.
 
     Attributes
     ----------

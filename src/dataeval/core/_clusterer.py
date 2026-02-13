@@ -486,7 +486,7 @@ class _HDBSCAN:
 
 class ClusterResult(TypedDict):
     """
-    Cluster output data structure.
+    Type definition for cluster output.
 
     Attributes
     ----------

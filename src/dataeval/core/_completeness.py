@@ -15,7 +15,7 @@ _logger = logging.getLogger(__name__)
 
 class CompletenessResult(TypedDict):
     """
-    Result mapping for :func:`.completeness` metric.
+    Type definition for completeness output.
 
     Attributes
     ----------
@@ -32,17 +32,18 @@ class CompletenessResult(TypedDict):
 
 def completeness(embeddings: Array) -> CompletenessResult:
     """
-    Measure the dimensional utilization of embeddings.
+    Measure the dimensional utilization of :term:`embeddings<Embeddings>`.
 
-    Measures how effectively the data explores all available dimensions in its embedding space.
-    This implementation uses a directional diversity approach based on eigenvalue entropy,
-    which is more robust for high-dimensional data than traditional box-counting or
-    neighbor-distance-based methods.
+    Completeness measures how effectively the data explores all available dimensions in
+    its embedding space. This implementation uses a directional diversity approach based
+    on eigenvalue entropy, which is more robust for high-dimensional data than traditional
+    box-counting or neighbor-distance-based methods.
 
     Parameters
     ----------
     embeddings : Array
-        Array of embedding vectors, shape (n_samples, n_dimensions)
+        Array of image :term:`embeddings<Embeddings>`, shape (n_samples, n_dimensions).
+        Can be a 2D list, array-like object, or tensor.
 
     Returns
     -------
@@ -50,9 +51,35 @@ def completeness(embeddings: Array) -> CompletenessResult:
         Mapping with keys:
 
         - completeness: float - Completeness score between 0 and 1
-        - nearest_neighbor_pairs: Sequence[tuple[int, int]] - Sequence of tuples (i, j)
-          representing point indices and their nearest neighbors, sorted by decreasing
-          nearest neighbor distance. Each pair appears only once.
+        - nearest_neighbor_pairs: Sequence[tuple[int, int]] - Pairs of point indices
+          and their nearest neighbors, sorted by decreasing distance
+
+    Raises
+    ------
+    ValueError
+        If embeddings are not 2D
+    ValueError
+        If embeddings have a zero dimension
+
+    Examples
+    --------
+    Well-spread data across 3 dimensions:
+
+    >>> rng = np.random.default_rng(42)
+    >>> embeddings = rng.random((50, 3))
+    >>> result = completeness(embeddings)
+    >>> result["completeness"]
+    0.9963684026790749
+
+    Single plane data across 3 dimensions:
+
+    >>> directions = rng.normal(size=(2, 3))  # 2 random lines
+    >>> directions /= np.linalg.norm(directions, axis=1, keepdims=True)
+    >>> t = np.random.uniform(0, 0.5, (len(directions), 25, 1))
+    >>> embeddings = ([0.5] * 3 + t * directions[:, np.newaxis, :]).reshape(-1, 3)
+    >>> result = completeness(embeddings)
+    >>> result["completeness"]
+    0.6001089325287554
     """
     _logger.info("Starting completeness calculation")
 

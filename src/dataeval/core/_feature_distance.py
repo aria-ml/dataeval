@@ -23,7 +23,7 @@ class KSType(NamedTuple):
 
 class FeatureDistanceResult(TypedDict):
     """
-    Type definition for a single feature distance test result.
+    Type definition for feature distance output.
 
     Attributes
     ----------

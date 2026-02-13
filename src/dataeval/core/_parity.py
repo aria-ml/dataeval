@@ -17,7 +17,7 @@ _logger = logging.getLogger(__name__)
 
 class ParityResult(TypedDict):
     """
-    Type definition for the output of the parity function.
+    Type definition for parity output.
 
     Attributes
     ----------

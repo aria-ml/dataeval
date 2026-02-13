@@ -19,7 +19,7 @@ _logger = logging.getLogger(__name__)
 
 class MutualInfoResult(TypedDict):
     """
-    Type definition for mutual information function output.
+    Type definition for mutual information output.
 
     Attributes
     ----------
