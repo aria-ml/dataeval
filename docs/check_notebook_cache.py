@@ -71,7 +71,7 @@ def compute_notebook_hash(nb_path: Path) -> str:
                 for cell in nb.cells
                 if cell.cell_type == "code"
             ],
-        }
+        },
     )
 
     # Hash using NO_CONVERT mode (same as jupyter-cache)
@@ -86,7 +86,8 @@ def check_cache_status(docs_source_dir: Path = Path("docs/source")):
     Args:
         docs_source_dir: Path to the docs/source directory containing notebooks/
 
-    Returns:
+    Returns
+    -------
         True if all notebooks are cached, False otherwise
     """
     notebooks_dir = docs_source_dir / "notebooks"
@@ -155,9 +156,8 @@ def check_cache_status(docs_source_dir: Path = Path("docs/source")):
         print("\nTo update the cache, run: nox -e docs")
         print("To clear the cache completely, run: nox -e docs -- clean")
         return False
-    else:
-        print("\n✓ All notebooks are cached and up to date!")
-        return True
+    print("\n✓ All notebooks are cached and up to date!")
+    return True
 
 
 def clean_stale_cache(docs_source_dir: Path = Path("docs/source"), dry_run: bool = False) -> int:
@@ -168,7 +168,8 @@ def clean_stale_cache(docs_source_dir: Path = Path("docs/source"), dry_run: bool
         docs_source_dir: Path to the docs/source directory containing notebooks/
         dry_run: If True, only report what would be deleted without actually deleting
 
-    Returns:
+    Returns
+    -------
         Number of stale cache entries removed (or would be removed if dry_run)
     """
     notebooks_dir = docs_source_dir / "notebooks"
@@ -221,7 +222,10 @@ def clean_stale_cache(docs_source_dir: Path = Path("docs/source"), dry_run: bool
 
 
 def _remove_orphan_db_records(
-    cursor: sqlite3.Cursor, executed_dir: Path, db_hashes: dict[str, tuple[int, str]], dry_run: bool
+    cursor: sqlite3.Cursor,
+    executed_dir: Path,
+    db_hashes: dict[str, tuple[int, str]],
+    dry_run: bool,
 ) -> int:
     """Remove database records that don't have corresponding folders on disk."""
     orphan_records = [
@@ -232,7 +236,7 @@ def _remove_orphan_db_records(
         return 0
 
     print(f"Found {len(orphan_records)} database records without folders on disk:")
-    for pk, hashkey, uri in orphan_records:
+    for _pk, hashkey, uri in orphan_records:
         nb_name = Path(uri).name if uri else "unknown"
         print(f"  - {hashkey[:12]}... ({nb_name})")
 
@@ -286,7 +290,8 @@ def fix_cache_state(docs_source_dir: Path = Path("docs/source"), dry_run: bool =
         docs_source_dir: Path to the docs/source directory
         dry_run: If True, only report what would be fixed without actually fixing
 
-    Returns:
+    Returns
+    -------
         Number of issues fixed (or would be fixed if dry_run)
     """
     cache_dir = docs_source_dir / ".jupyter_cache"
@@ -326,7 +331,8 @@ def find_docs_source_dir() -> Path | None:
     """
     Find the docs/source directory by searching up from the script location.
 
-    Returns:
+    Returns
+    -------
         Path to docs/source directory, or None if not found
     """
     script_dir = Path(__file__).resolve().parent
@@ -394,12 +400,11 @@ def main():
     if args.fix:
         fixed = fix_cache_state(docs_source_dir, dry_run=args.dry_run)
         return 0 if fixed >= 0 else 1
-    elif args.clean:
+    if args.clean:
         removed = clean_stale_cache(docs_source_dir, dry_run=args.dry_run)
         return 0 if removed >= 0 else 1
-    else:
-        all_cached = check_cache_status(docs_source_dir)
-        return 0 if all_cached else 1
+    all_cached = check_cache_status(docs_source_dir)
+    return 0 if all_cached else 1
 
 
 if __name__ == "__main__":

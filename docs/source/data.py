@@ -4,7 +4,7 @@ from os import chdir, getcwd, makedirs, path
 
 @contextmanager
 def cd(rel_path: str):
-    """Change folder relative to current file"""
+    """Change folder relative to current file."""
     cur_path = getcwd()
     new_path = path.join(path.dirname(__file__), rel_path)
     print(f"push: {cur_path} -> {new_path}")

@@ -142,7 +142,7 @@ dataset = VOCDetection(root="./data", year="2012", image_set="train", download=T
 
 print(dataset)
 
-dataset[0][0].shape
+print(dataset[0][0].shape)
 ```
 
 It is good to notice a few points about each dataset:
@@ -170,7 +170,7 @@ extractor = TorchExtractor(
 # Extract embeddings from the dataset using the ResNet18 model after applying transforms
 embeddings = Embeddings(dataset=dataset, extractor=extractor, batch_size=64)[:]
 
-embeddings.shape
+print(embeddings.shape)
 ```
 
 The shape has been reduced to (128,). This will greatly improve the performance of the upcoming algorithms without

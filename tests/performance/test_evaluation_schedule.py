@@ -103,7 +103,6 @@ class TestManualSchedule:
 
     def test_rejects_non_numeric(self):
         """Verify ManualSchedule validates input types."""
-
         # Mainly verifies call to `to_numpy`
         with pytest.raises(ValueError, match="invalid literal"):
             ManualSchedule(["a", "b", "c"])  # pyright: ignore[reportArgumentType] --> testing incorrect type

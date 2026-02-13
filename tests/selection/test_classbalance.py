@@ -110,7 +110,8 @@ class TestClassBalanceInterclass:
             counts[label] += 1
         # Background class should not be sampled
         assert counts[2] == 0
-        assert counts[0] > 0 and counts[1] > 0
+        assert counts[0] > 0
+        assert counts[1] > 0
 
 
 @pytest.mark.required

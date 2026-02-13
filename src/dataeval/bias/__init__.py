@@ -1,6 +1,7 @@
 """
-Check for skewed or imbalanced datasets and incomplete feature \
-representation which may impact model performance.
+Check for skewed or imbalanced datasets and incomplete feature representation.
+
+This may impact model performance.
 """
 
 __all__ = [

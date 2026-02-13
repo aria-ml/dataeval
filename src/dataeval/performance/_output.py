@@ -23,7 +23,7 @@ LRU_CACHE_SIZE = 10
 @dataclass
 class Constraints:
     """
-    Dataclass containing constraints for the coefficients of the power law: f[n] = c * n**(-m) + c0
+    Dataclass containing constraints for the coefficients of the power law: f[n] = c * n**(-m) + c0.
 
     Attributes
     ----------
@@ -35,9 +35,9 @@ class Constraints:
         high and low constraints for asymptote c0
     """
 
-    scale: tuple[Literal[None], Literal[None]] = (None, None)
-    negative_exponent: tuple[Literal[0], Literal[None]] = (0, None)
-    asymptote: tuple[Literal[None, 0], Literal[None, 1]] = (None, None)
+    scale: tuple[None, None] = (None, None)
+    negative_exponent: tuple[Literal[0], None] = (0, None)
+    asymptote: tuple[(Literal[0] | None), (Literal[1] | None)] = (None, None)
     """
     returns list of coefficient constraints
     """
@@ -248,7 +248,6 @@ class SufficiencyOutput(DictOutput):
         pl.DataFrame
             DataFrame with step column and one column per metric.
         """
-
         return self._build_dataframe(self.steps, self.averaged_measures)
 
     @staticmethod
@@ -273,7 +272,7 @@ class SufficiencyOutput(DictOutput):
 
 def f_out(n_i: NDArray[Any], x: NDArray[Any]) -> NDArray[Any]:
     """
-    Calculates the line of best fit based on its free parameters
+    Calculate the line of best fit based on its free parameters.
 
     Parameters
     ----------
@@ -291,7 +290,7 @@ def f_out(n_i: NDArray[Any], x: NDArray[Any]) -> NDArray[Any]:
 
 
 def project_steps(params: NDArray[Any], projection: NDArray[Any]) -> NDArray[Any]:
-    """Projects the measures for each value of X
+    """Projects the measures for each value of X.
 
     Parameters
     ----------
@@ -311,7 +310,7 @@ def project_steps(params: NDArray[Any], projection: NDArray[Any]) -> NDArray[Any
 
 def f_inv_out(y_i: NDArray[Any], x: NDArray[Any]) -> NDArray[np.int64]:
     """
-    Inverse function for f_out()
+    Inverse function for f_out().
 
     Parameters
     ----------
@@ -346,7 +345,7 @@ def f_inv_out(y_i: NDArray[Any], x: NDArray[Any]) -> NDArray[np.int64]:
 
 
 def inv_project_steps(params: NDArray[Any], targets: NDArray[Any]) -> NDArray[np.int64]:
-    """Inverse function for project_steps()
+    """Inverse function for project_steps().
 
     Parameters
     ----------
@@ -366,7 +365,7 @@ def inv_project_steps(params: NDArray[Any], targets: NDArray[Any]) -> NDArray[np
 
 def linear_initialization(metric: NDArray[Any], sizes: NDArray[Any], bounds: Constraints) -> NDArray[np.float64]:
     """
-    linear initialization of x for power law: f[n] = x[0] * n**(-x[1]) + x[2]
+    Linear initialization of x for power law: f[n] = x[0] * n**(-x[1]) + x[2].
 
     Parameters
     ----------
@@ -408,7 +407,8 @@ def linear_initialization(metric: NDArray[Any], sizes: NDArray[Any], bounds: Con
 
 def calc_params(p_i: NDArray[Any], n_i: NDArray[Any], niter: int, unit_interval: bool) -> NDArray[np.float64]:
     """
-    Retrieves the inverse power curve coefficients for the line of best fit.
+    Retrieve the inverse power curve coefficients for the line of best fit.
+
     Global minimization is done via basin hopping. More info on this algorithm
     can be found here: https://arxiv.org/abs/cond-mat/9803344 .
 
@@ -430,17 +430,19 @@ def calc_params(p_i: NDArray[Any], n_i: NDArray[Any], niter: int, unit_interval:
         Array of parameters to recreate line of best fit
     """
     bounds = Constraints(
-        scale=(None, None), negative_exponent=(0, None), asymptote=((0, 1) if (unit_interval) else (None, None))
+        scale=(None, None),
+        negative_exponent=(0, None),
+        asymptote=((0, 1) if (unit_interval) else (None, None)),
     )
 
     def is_valid(
         bounds: Constraints,
     ) -> Callable[[float, NDArray[np.floating], float, NDArray[np.floating]], bool]:
-        def accept_test(f_new, x_new, f_old, x_old) -> bool:  # noqa: ANN001
+        def accept_test(f_new, x_new, f_old, x_old) -> bool:  # noqa: ANN001, ARG001
             constraints_list = bounds.to_list()
             in_bounds = all(
                 low is None or low <= val and high is None or high >= val
-                for val, (low, high) in zip(x_new, constraints_list)
+                for val, (low, high) in zip(x_new, constraints_list, strict=False)
             )
             is_nan = np.isnan(f_new)
             if not in_bounds or is_nan:
@@ -475,16 +477,17 @@ def calc_params(p_i: NDArray[Any], n_i: NDArray[Any], niter: int, unit_interval:
 
 
 def get_curve_params(
-    averaged_measures: MutableMapping[str, NDArray[Any]], ranges: NDArray[Any], niter: int, unit_interval: bool
+    averaged_measures: MutableMapping[str, NDArray[Any]],
+    ranges: NDArray[Any],
+    niter: int,
+    unit_interval: bool,
 ) -> Mapping[str, NDArray[np.float64]]:
-    """Calculates and aggregates parameters for both single and multiclass metrics"""
+    """Calculate and aggregate parameters for both single and multiclass metrics."""
     output = {}
     for name, measure in averaged_measures.items():
         measure = cast(np.ndarray, measure)
         if measure.ndim > 1:
-            result = []
-            for value in measure:
-                result.append(calc_params(1 - value, ranges, niter, unit_interval))
+            result = [calc_params(1 - value, ranges, niter, unit_interval) for value in measure]
             output[name] = np.array(result)
         else:
             output[name] = calc_params(1 - measure, ranges, niter, unit_interval)

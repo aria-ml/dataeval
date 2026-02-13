@@ -1,6 +1,4 @@
-"""
-Embeddings class for extracting and managing image embeddings.
-"""
+"""Embeddings class for extracting and managing image embeddings."""
 
 __all__ = []
 
@@ -349,7 +347,7 @@ class Embeddings(Array, FeatureExtractor):
             _logger.info(
                 f"Using memory-mapped storage: estimated size {estimated_bytes / 1e9:.2f}GB "
                 f"exceeds {self.memory_threshold * 100:.0f}% of available memory "
-                f"({available_memory / 1e9:.2f}GB)"
+                f"({available_memory / 1e9:.2f}GB)",
             )
 
         return use_memmap
@@ -505,7 +503,7 @@ class Embeddings(Array, FeatureExtractor):
             out_of_range = set(uncached) - set(range(len(self._dataset)))
             if out_of_range:
                 raise IndexError(
-                    f"Indices {sorted(out_of_range)} are out of range for dataset of size {len(self._dataset)}"
+                    f"Indices {sorted(out_of_range)} are out of range for dataset of size {len(self._dataset)}",
                 )
 
             # Process in batches
@@ -552,7 +550,7 @@ class Embeddings(Array, FeatureExtractor):
         from collections import deque
 
         # 1. Validation and Index Normalization
-        if isinstance(key, (int, np.integer)):
+        if isinstance(key, int | np.integer):
             # Fast path for single integer
             if self._embeddings.size > 0 and int(key) in self._cached_idx:
                 return self._embeddings[key]

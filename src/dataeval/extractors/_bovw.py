@@ -1,6 +1,4 @@
-"""
-Bag of Visual Words feature extractor for rotation-invariant image embeddings.
-"""
+"""Bag of Visual Words feature extractor for rotation-invariant image embeddings."""
 
 __all__ = []
 
@@ -124,7 +122,7 @@ class BoVWExtractor:
         except ImportError as e:
             raise ImportError(
                 "BoVWExtractor requires 'opencv-python' or related package. "
-                "Please install it via 'pip install opencv-python' or using the extra `dataeval[opencv]`."
+                "Please install it via 'pip install opencv-python' or using the extra `dataeval[opencv]`.",
             ) from e
 
         if vocab_size < 1:

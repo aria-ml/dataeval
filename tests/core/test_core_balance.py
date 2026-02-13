@@ -22,17 +22,21 @@ FACTOR_DATA = np.array(
         [3, 1, 7],
         [4, 1, 8],
         [4, 1, 9],
-    ]
+    ],
 )
 
 
 @pytest.mark.required
 class TestBalanceValidateNumNeighbors:
     @pytest.mark.parametrize(
-        "test_param, expected_exception, err_msg",
+        ("test_param", "expected_exception", "err_msg"),
         [
-            ("7", pytest.raises(TypeError), "Variable 7 is not real-valued numeric type."),
-            (0, pytest.raises(ValueError), "Invalid value for 0."),
+            (
+                "7",
+                pytest.raises(TypeError, match="not real-valued numeric type"),
+                "Variable 7 is not real-valued numeric type.",
+            ),
+            (0, pytest.raises(ValueError, match="Invalid value for"), "Invalid value for 0."),
         ],
     )
     def test_validate_num_neighbors_type_errors(self, test_param, expected_exception, err_msg):

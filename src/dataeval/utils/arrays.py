@@ -1,6 +1,4 @@
-"""
-Utility functions for array conversion and manipulation across different frameworks.
-"""
+"""Utility functions for array conversion and manipulation across different frameworks."""
 
 __all__ = [
     "as_numpy",
@@ -55,7 +53,7 @@ def opt_as_numpy(
     required_shape: tuple[int, ...] | None = None,
 ) -> NDArray[_np_dtype] | None:
     """
-    Converts an ArrayLike to Numpy array without copying (if possible), returns None if input is None.
+    Convert an ArrayLike to Numpy array without copying (if possible), returns None if input is None.
 
     Parameters
     ----------
@@ -85,7 +83,7 @@ def opt_to_numpy(
     copy: bool = True,
 ) -> NDArray[_np_dtype] | None:
     """
-    Converts an ArrayLike to Numpy array, returns None if input is None.
+    Convert an ArrayLike to Numpy array, returns None if input is None.
 
     Parameters
     ----------
@@ -120,7 +118,7 @@ def as_numpy(
     required_shape: tuple[int, ...] | None = None,
 ) -> NDArray[_np_dtype]:
     """
-    Converts an ArrayLike to Numpy array without copying (if possible).
+    Convert an ArrayLike to Numpy array without copying (if possible).
 
     Parameters
     ----------
@@ -150,7 +148,7 @@ def to_numpy(
     copy: bool = True,
 ) -> NDArray[_np_dtype]:
     """
-    Converts an ArrayLike to new Numpy array.
+    Convert an ArrayLike to new Numpy array.
 
     Parameters
     ----------
@@ -212,7 +210,7 @@ def to_numpy(
 
 def to_numpy_iter(iterable: Iterable[ArrayLike]) -> Iterator[NDArray[Any]]:
     """
-    Yields an iterator of numpy arrays from an ArrayLike iterable.
+    Yield an iterator of numpy arrays from an ArrayLike iterable.
 
     Parameters
     ----------
@@ -288,7 +286,7 @@ def ensure_embeddings(
     unit_interval: Literal[True, False, "force"] = False,
 ) -> torch.Tensor | NDArray[_np_dtype] | T:
     """
-    Validates the embeddings array and converts it to the specified type.
+    Validate the embeddings array and convert it to the specified type.
 
     Parameters
     ----------
@@ -367,11 +365,13 @@ def flatten_samples(array: SequenceLike[Any] | torch.Tensor) -> NDArray[Any] | t
     """
     if isinstance(array, torch.Tensor):
         return torch.flatten(array, start_dim=1)
+    if isinstance(array, str | bytes):
+        raise TypeError(f"Unsupported array type {type(array)}.")
     try:
         nparr = as_numpy(array)
         return nparr.reshape((nparr.shape[0], -1))
-    except Exception as e:
-        raise TypeError(f"Unsupported array type {type(array)}: {e}.")
+    except (TypeError, ValueError) as e:
+        raise TypeError(f"Unsupported array type {type(array)}: {e}.") from e
 
 
 _TArray = TypeVar("_TArray", bound=Array)
@@ -379,7 +379,7 @@ _TArray = TypeVar("_TArray", bound=Array)
 
 def channels_first_to_last(array: _TArray) -> _TArray:
     """
-    Converts array from channels first to channels last format.
+    Convert array from channels first to channels last format.
 
     Parameters
     ----------

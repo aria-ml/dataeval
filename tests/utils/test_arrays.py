@@ -59,13 +59,13 @@ array_expected = np.asarray(array_native)
 @pytest.mark.optional
 class TestInteropArrayLike:
     @pytest.mark.parametrize(
-        "param, expected",
-        (
+        ("param", "expected"),
+        [
             (array_native, array_expected),
             (np.array(array_native), array_expected),
             (torch.Tensor(array_native), array_expected),
             (None, np.array([])),
-        ),
+        ],
     )
     def test_to_numpy(self, param, expected):
         actual = to_numpy(param)
@@ -87,7 +87,7 @@ class TestEnsureEmbeddings:
         assert type(emb) is torch.Tensor
 
     def test_ensure_embeddings_torch_unit_interval(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Embeddings must be unit interval"):
             ensure_embeddings(self.tt, dtype=torch.int64, unit_interval=True)
 
     def test_ensure_embeddings_torch_force_unit_interval(self):
@@ -106,7 +106,7 @@ class TestEnsureEmbeddings:
         assert type(emb) is np.ndarray
 
     def test_ensure_embeddings_numpy_unit_interval(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Embeddings must be unit interval"):
             ensure_embeddings(self.na, dtype=np.int64, unit_interval=True)
 
     def test_ensure_embeddings_numpy_force_unit_interval(self):

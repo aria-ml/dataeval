@@ -27,7 +27,7 @@ class TestMst:
                 [11, 0],
                 [10, 1],
                 [15, 0],
-            ]
+            ],
         ).astype(np.float64)
         mst = minimum_spanning_tree(X)
 
@@ -53,8 +53,8 @@ class TestMst:
         images_0 = np.zeros((10, 3, 3))
         images_1 = np.ones((10, 3, 3))
 
-        with pytest.raises(ValueError):
-            compute_neighbors(images_0, images_1, k=0).shape
+        with pytest.raises(ValueError, match="k must be >= 1"):
+            compute_neighbors(images_0, images_1, k=0)
 
     def test_compute_neighbors_k2(self):
         from dataeval.core._mst import compute_neighbors
@@ -79,10 +79,10 @@ class TestMst:
         assert compute_neighbors(images_0, images_1, algorithm="ball_tree").shape == (10,)
 
     def test_compute_neighbors_invalid_alg(self):
-        """Brute algorithm is valid for sklearn.NearestNeighbor, but is invalid for DataEval"""
+        """Brute algorithm is valid for sklearn.NearestNeighbor, but is invalid for DataEval."""
         from dataeval.core._mst import compute_neighbors
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Algorithm must be"):
             compute_neighbors(MagicMock(), MagicMock(), algorithm="brute")  # type: ignore #
 
     def test_knn_exhaustion_warning(self, caplog):

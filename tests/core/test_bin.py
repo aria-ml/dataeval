@@ -24,13 +24,13 @@ class TestDigitizeDataUnit:
     def test_crashes_with_negative_nbins(self):
         factors = [0.1, 1.1, 1.2]
         bincounts = -10
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="bins"):
             digitize_data(factors, bincounts)
 
     def test_crashes_with_wrong_order(self):
         factors = [0.1, 1.1, 1.2]
         bin_edges = [np.inf, 1, 2]
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="monotonically"):
             digitize_data(factors, bin_edges)
 
     def test_mixed_type(self):
@@ -72,7 +72,7 @@ class TestDigitizeDataFunctional:
 @pytest.mark.optional
 class TestBinDataFunctional:
     @pytest.mark.parametrize(
-        "method, data, expected_result",
+        ("method", "data", "expected_result"),
         [
             ("uniform_width", np.array([0, 4, 8, 5, 6, 15] * 300), 6),
             ("uniform_width", np.concatenate([np.arange(2), np.arange(140, 1500)]), 10),
@@ -93,7 +93,7 @@ class TestBinDataFunctional:
 @pytest.mark.required
 class TestIsContinuousFunctional:
     @pytest.mark.parametrize(
-        "data, repeats",
+        ("data", "repeats"),
         [
             (np.array([0, 4, 3, 5, 6, 8] * 15), np.arange(15 * 6)),
             (np.array([0, 1, 9, 4, 3, 5, 2, 7, 8] * 10), np.array([0, 4, 3, 5, 6, 8] * 15)),
@@ -106,13 +106,13 @@ class TestIsContinuousFunctional:
                     [
                         np.repeat(val, 3)
                         for val in [0, 5, 13, 18, 2, 14, 1, 19, 16, 7, 15, 17, 4, 9, 10, 8, 12, 6, 11, 3]
-                    ]
+                    ],
                 ),
                 np.concatenate(
                     [
                         np.repeat(val, 3)
                         for val in [0, 5, 13, 18, 2, 14, 1, 19, 16, 7, 15, 17, 4, 9, 10, 8, 12, 6, 11, 3]
-                    ]
+                    ],
                 ),
             ),
         ],
@@ -223,7 +223,7 @@ class TestBinByClustersUnit:
                     [4, 6, 7],
                     [0, 1, 4],
                     [1, 5, 6],  # outliers (indices 6, 7)
-                ]
+                ],
             ),
         }
         mock_cluster.return_value = mock_cluster_result
@@ -252,7 +252,7 @@ class TestBinByClustersUnit:
                     [0, 1, 2],
                     [0, 1, 2],
                     [0, 1, 2],  # all outliers point to same neighbor
-                ]
+                ],
             ),
         }
         mock_cluster.return_value = mock_cluster_result
@@ -277,7 +277,7 @@ class TestBinByClustersUnit:
                     [2, 4, 5],  # non-outliers
                     [0, 1, 2],
                     [0, 1, 2],  # outliers point to same neighbor
-                ]
+                ],
             ),
         }
         mock_cluster.return_value = mock_cluster_result
@@ -316,7 +316,7 @@ class TestBinByClustersUnit:
                     [0, 2, 3],  # non-outliers
                     [2, 3, 0],
                     [2, 3, 1],  # outliers pointing to other outliers and non-outliers
-                ]
+                ],
             ),
         }
         mock_cluster.return_value = mock_cluster_result

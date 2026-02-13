@@ -295,7 +295,9 @@ class Duplicates(Evaluator):
         super().__init__(locals())
 
     def _get_duplicates(
-        self, stats: StatsMap, source_index: Sequence[SourceIndex]
+        self,
+        stats: StatsMap,
+        source_index: Sequence[SourceIndex],
     ) -> tuple[DuplicateDetectionResult[int], DuplicateDetectionResult[SourceIndex]]:
         """
         Extract duplicate groups from hash statistics, separating items and targets.
@@ -329,7 +331,10 @@ class Duplicates(Evaluator):
         return item_result, target_result
 
     def _find_item_duplicates(
-        self, stats: StatsMap, source_index: Sequence[SourceIndex], item_indices: list[int]
+        self,
+        stats: StatsMap,
+        source_index: Sequence[SourceIndex],
+        item_indices: list[int],
     ) -> DuplicateDetectionResult[int]:
         """
         Find item-level duplicates from hash statistics.
@@ -364,8 +369,10 @@ class Duplicates(Evaluator):
 
         for method in methods:
             if method in stats:
-                for group in self._find_hash_duplicates(stats, method, source_index, item_indices, item_exact):
-                    method_groups.append((group, method))
+                method_groups.extend(
+                    (group, method)
+                    for group in self._find_hash_duplicates(stats, method, source_index, item_indices, item_exact)
+                )
 
         # Merge or keep separate based on configuration
         available_stats = set(stats.keys()) & set(methods)
@@ -417,7 +424,10 @@ class Duplicates(Evaluator):
         ]
 
     def _find_target_duplicates(
-        self, stats: StatsMap, source_index: Sequence[SourceIndex], target_indices: list[int]
+        self,
+        stats: StatsMap,
+        source_index: Sequence[SourceIndex],
+        target_indices: list[int],
     ) -> DuplicateDetectionResult[SourceIndex]:
         """
         Find target-level duplicates from hash statistics.
@@ -452,10 +462,16 @@ class Duplicates(Evaluator):
 
         for method in methods:
             if method in stats:
-                for group in self._find_target_hash_duplicates(
-                    stats, method, source_index, target_indices, target_exact
-                ):
-                    method_groups.append((group, method))
+                method_groups.extend(
+                    (group, method)
+                    for group in self._find_target_hash_duplicates(
+                        stats,
+                        method,
+                        source_index,
+                        target_indices,
+                        target_exact,
+                    )
+                )
 
         # Merge or keep separate based on configuration
         available_stats = set(stats.keys()) & set(methods)
@@ -907,7 +923,7 @@ class Duplicates(Evaluator):
         if not has_hash_detection and not has_cluster_detection:
             raise ValueError(
                 "Either flags must contain hash stats, or both extractor and "
-                "cluster_threshold must be provided for cluster-based detection."
+                "cluster_threshold must be provided for cluster-based detection.",
             )
 
         # Initialize results
@@ -988,8 +1004,7 @@ class Duplicates(Evaluator):
         if hash_result.near:
             for g in hash_result.near:
                 # Each hash group may have multiple methods already
-                for method in g.methods:
-                    hash_method_groups.append((list(g.indices), method))
+                hash_method_groups.extend((list(g.indices), method) for method in g.methods)
 
         all_method_groups = hash_method_groups + cluster_method_groups
         merged_near = self._build_near_duplicate_groups(all_method_groups, available_stats)

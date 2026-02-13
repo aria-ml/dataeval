@@ -204,7 +204,7 @@ class Parity(Evaluator):
         if insufficient_data:
             _logger.warning(
                 f"Factors {list(insufficient_data)} did not meet the recommended "
-                "5 occurrences for each value-label combination."
+                "5 occurrences for each value-label combination.",
             )
 
         # Create factors DataFrame - build as columnar data

@@ -1,6 +1,6 @@
 """
 Source code derived from Alibi-Detect 0.11.4
-https://github.com/SeldonIO/alibi-detect/tree/v0.11.4
+https://github.com/SeldonIO/alibi-detect/tree/v0.11.4.
 
 Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
@@ -55,7 +55,7 @@ class TestFunctionalClassifierUncertainty:
             preds_type,
             update_strategy,
             transforms,
-        )
+        ),
     )
     n_tests = len(test_params)
 
@@ -143,5 +143,5 @@ class TestClassifierUncertainty:
             _classifier_uncertainty(torch.empty([]), "invalid")  # type: ignore
 
     def test_classifier_uncertainty_valueerror(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Probabilities across labels should sum to 1"):
             _classifier_uncertainty(torch.empty([]), "probs")

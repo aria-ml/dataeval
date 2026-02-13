@@ -62,9 +62,8 @@ This guide will walk through how to use DataEval to perform basic data cleaning.
 You'll begin by importing the necessary libraries to walk through this guide.
 
 ```{code-cell} ipython3
----
-tags: [remove_cell]
----
+:tags: [remove_cell]
+
 try:
     import google.colab  # noqa: F401
 
@@ -106,7 +105,7 @@ def plot_sample_images_by_class(dataset, image_indices_per_class) -> None:
     # Plot random images from each category
     _, axs = plt.subplots(5, 4, figsize=(8, 10))
 
-    for ax, (category, indices) in zip(axs.flat, image_indices_per_class.items()):
+    for ax, (category, indices) in zip(axs.flat, image_indices_per_class.items(), strict=False):
         # Randomly select an index from the list of indices
         ax.imshow(dataset[rng.choice(indices)][0].transpose(1, 2, 0))
         ax.set_title(dataset.metadata["index2label"][category])
@@ -207,7 +206,7 @@ def plot_sample_outlier_images_by_metric(dataset, outlier_class, outlier_result,
 
     # Add quantile markers on colorbar
     quantile_labels = ["Min (Q0)", "Q1 (25%)", "Median (Q2)", "Q3 (75%)", "Max (Q4)"]
-    for q_val, q_label in zip(quantiles, quantile_labels):
+    for q_val, q_label in zip(quantiles, quantile_labels, strict=False):
         cbar.ax.axhline(q_val, color="black", linestyle="--", linewidth=0.8, alpha=0.7)
         cbar.ax.text(
             1.5,
@@ -332,7 +331,7 @@ each flagged outlier.
 outliers = Outliers(outlier_method="zscore")
 
 # Find the extreme images
-outlier_imgs = outliers.evaluate(ds)
+outlier_imgs = outliers.evaluate(ds, per_target=False)
 
 # View the number of extreme images
 print(f"Number of images with extreme values: {len(outlier_imgs)}")
@@ -540,7 +539,7 @@ in a variety of ways:
 dups = Duplicates(ImageStats.HASH)
 
 # Find the duplicates
-results = dups.evaluate(ds)
+results = dups.evaluate(ds, per_target=False)
 ```
 
 ```{code-cell} ipython3

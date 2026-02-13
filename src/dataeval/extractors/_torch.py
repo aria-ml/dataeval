@@ -1,6 +1,4 @@
-"""
-PyTorch-based feature extractor.
-"""
+"""PyTorch-based feature extractor."""
 
 __all__ = []
 
@@ -101,7 +99,8 @@ class TorchExtractor:
         return self._use_output
 
     def _normalize_transforms(
-        self, transforms: Transform[torch.Tensor] | Iterable[Transform[torch.Tensor]] | None
+        self,
+        transforms: Transform[torch.Tensor] | Iterable[Transform[torch.Tensor]] | None,
     ) -> list[Transform[torch.Tensor]]:
         """Normalize transforms to a list."""
         if transforms is None:

@@ -34,9 +34,7 @@ def replace_long_strings(d, max_length, replacement=None):
 
 
 class RestWrapper:
-    """
-    Helper class wrapping generic REST API calls
-    """
+    """Helper class wrapping generic REST API calls."""
 
     def __init__(
         self,
@@ -59,7 +57,7 @@ class RestWrapper:
             return ""
         return "&".join({f"{k}={v}" for k, v in params.items()})
 
-    def _request(  # noqa: C901
+    def _request(
         self,
         fncall: Callable,
         resource: str | Sequence[str],
@@ -68,7 +66,7 @@ class RestWrapper:
         raw_data: bool = False,
     ) -> Any:
         """
-        Sends requests to REST API endpoint
+        Sends requests to REST API endpoint.
 
         Calling with the following example:
         _request(put, ["resource1", "subpath1"], {"pkey": "pvalue"}, {"dkey": "dvalue"})

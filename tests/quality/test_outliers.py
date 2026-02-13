@@ -58,7 +58,7 @@ class TestOutliers:
         np.testing.assert_array_equal(mask_value, mask_none)
 
     def test_get_outlier_mask_valueerror(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Outlier method must be"):
             _get_outlier_mask(np.random.random((10, 1, 16, 16)), "error", None)  # type: ignore
 
     def test_get_outlier_mask_all_nan(self):
@@ -80,7 +80,9 @@ class TestOutliers:
 
         with use_max_processes(1):
             stats = calculate(
-                *unzip_dataset(dataset, True), stats=ImageStats.PIXEL | ImageStats.VISUAL, per_target=True
+                *unzip_dataset(dataset, True),
+                stats=ImageStats.PIXEL | ImageStats.VISUAL,
+                per_target=True,
             )
         outliers = Outliers()
         results = outliers.from_stats(stats)
@@ -111,16 +113,16 @@ class TestOutliers:
 
     def test_outliers_all_false(self):
         outliers = Outliers(flags=ImageStats(0))
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Either flags must not be ImageStats.NONE or extractor must be provided."):
             outliers.evaluate(np.zeros([]), per_image=False, per_target=False)
 
     @pytest.mark.parametrize(
-        "flags, expected, not_expected",
-        (
+        ("flags", "expected", "not_expected"),
+        [
             (ImageStats.DIMENSION, "width", {"mean", "brightness"}),
             (ImageStats.PIXEL, "mean", {"width", "brightness"}),
             (ImageStats.VISUAL, "brightness", {"width", "mean"}),
-        ),
+        ],
     )
     def test_outliers_use_flags(self, flags, expected, not_expected):
         outliers = Outliers(flags=flags)
@@ -129,7 +131,7 @@ class TestOutliers:
         assert not not_expected & set(outliers.stats["stats"])
 
     def test_outliers_per_image_per_target(self, get_od_dataset):
-        """Test that per_image and per_target parameters are properly passed to calculate"""
+        """Test that per_image and per_target parameters are properly passed to calculate."""
         images = np.random.random((10, 3, 64, 64))
         # Create dataset with some bounding boxes
         dataset = get_od_dataset(images, 2, True, {0: [(10, 10, 30, 30)], 5: [(20, 20, 40, 40)]})
@@ -141,7 +143,8 @@ class TestOutliers:
         source_indices1 = outliers1.stats["source_index"]
         has_image_level = any(idx.target is None for idx in source_indices1)
         has_target_level = any(idx.target is not None for idx in source_indices1)
-        assert has_image_level and has_target_level
+        assert has_image_level
+        assert has_target_level
 
         # Test with per_image=True, per_target=False
         outliers2 = Outliers(flags=ImageStats.DIMENSION)
@@ -158,8 +161,7 @@ class TestOutliers:
         assert all(idx.target is not None for idx in source_indices3)
 
     def test_outliers_from_clusters_basic(self):
-        """Test basic cluster-based outlier detection"""
-
+        """Test basic cluster-based outlier detection."""
         # Create simple embeddings
         embeddings = np.random.randn(10, 5)
 
@@ -184,8 +186,7 @@ class TestOutliers:
         assert len(result.issues) >= 0
 
     def test_outliers_from_clusters_threshold_variations(self):
-        """Test that different thresholds produce different numbers of outliers"""
-
+        """Test that different thresholds produce different numbers of outliers."""
         # Create embeddings where some points are far from cluster center
         main_cluster = np.random.randn(8, 5) * 0.5
         outlier_points = np.random.randn(2, 5) * 2.0 + 5.0
@@ -212,7 +213,7 @@ class TestOutliers:
         assert len(result_strict.issues) >= len(result_permissive.issues)
 
     def test_outliers_target_id_column_dropped_when_per_target_false(self):
-        """Test that target_id column is dropped when per_target=False"""
+        """Test that target_id column is dropped when per_target=False."""
         # Test with per_target=False (image-level only)
         outliers = Outliers(flags=ImageStats.PIXEL)
         result = outliers.evaluate(np.random.random((20, 3, 16, 16)), per_target=False)
@@ -224,7 +225,7 @@ class TestOutliers:
         assert "metric_value" in result.issues.columns
 
     def test_outliers_target_id_column_kept_when_has_values(self, get_od_dataset):
-        """Test that target_id column is kept when there are target-level outliers"""
+        """Test that target_id column is kept when there are target-level outliers."""
         images = np.random.random((10, 3, 64, 64))
         # Create dataset with bounding boxes
         dataset = get_od_dataset(images, 2, True, {0: [(0, 0, 64, 64)], 5: [(0, 0, 64, 64)]})
@@ -239,7 +240,7 @@ class TestOutliers:
         assert result.issues["target_id"].null_count() < len(result.issues)
 
     def test_outliers_from_clusters_drops_target_id(self):
-        """Test that from_clusters drops target_id column (always image-level)"""
+        """Test that from_clusters drops target_id column (always image-level)."""
         embeddings = np.random.randn(10, 5)
 
         mock_cluster_result: ClusterResult = {
@@ -259,8 +260,7 @@ class TestOutliers:
         assert "item_id" in result.issues.columns
 
     def test_outliers_from_clusters_no_outliers(self):
-        """Test with well-clustered data that has no clear outliers"""
-
+        """Test with well-clustered data that has no clear outliers."""
         # Create tight cluster
         embeddings = np.random.randn(10, 5) * 0.1
 
@@ -293,7 +293,7 @@ class TestOutliersOutput:
             {"item_id": 3, "target_id": None, "metric_name": "b", "metric_value": 1.0},
             {"item_id": 5, "target_id": None, "metric_name": "a", "metric_value": 1.0},
             {"item_id": 5, "target_id": None, "metric_name": "b", "metric_value": 1.0},
-        ]
+        ],
     )
     outlier2 = pl.DataFrame(
         [
@@ -303,7 +303,7 @@ class TestOutliersOutput:
             {"item_id": 6, "target_id": None, "metric_name": "d", "metric_value": 1.0},
             {"item_id": 7, "target_id": None, "metric_name": "a", "metric_value": 0.5},
             {"item_id": 7, "target_id": None, "metric_name": "c", "metric_value": 0.5},
-        ]
+        ],
     )
     lstat: LabelStatsResult = {
         "label_counts_per_class": {0: 3, 1: 4, 2: 3},
@@ -328,7 +328,7 @@ class TestOutliersOutput:
         assert len(output) == 6
 
     def test_aggregate_by_metric(self):
-        """Test aggregate_by_metric returns correct counts"""
+        """Test aggregate_by_metric returns correct counts."""
         output = OutliersOutput(self.outlier)
         result = output.aggregate_by_metric()
 
@@ -343,7 +343,7 @@ class TestOutliersOutput:
         assert result["metric_name"].to_list() == ["a", "b"]
 
     def test_aggregate_by_metric_different_counts(self):
-        """Test aggregate_by_metric with varying counts per metric"""
+        """Test aggregate_by_metric with varying counts per metric."""
         df = pl.DataFrame(
             [
                 {"item_id": 1, "target_id": None, "metric_name": "contrast", "metric_value": 1.0},
@@ -352,7 +352,7 @@ class TestOutliersOutput:
                 {"item_id": 4, "target_id": None, "metric_name": "skew", "metric_value": 1.0},
                 {"item_id": 5, "target_id": None, "metric_name": "skew", "metric_value": 1.0},
                 {"item_id": 6, "target_id": None, "metric_name": "skew", "metric_value": 1.0},
-            ]
+            ],
         )
         output = OutliersOutput(df)
         result = output.aggregate_by_metric()
@@ -365,13 +365,13 @@ class TestOutliersOutput:
         assert result["Total"].to_list() == [3, 2, 1]
 
     def test_aggregate_by_metric_raises_on_list(self):
-        """Test aggregate_by_metric raises error for multiple datasets"""
+        """Test aggregate_by_metric raises error for multiple datasets."""
         output = OutliersOutput([self.outlier, self.outlier2])
         with pytest.raises(ValueError, match="only works with output from a single dataset"):
             output.aggregate_by_metric()
 
     def test_aggregate_by_class(self):
-        """Test aggregate_by_class returns correct pivot table"""
+        """Test aggregate_by_class returns correct pivot table."""
         metadata = make_mock_metadata(self.lstat)
 
         # Create outliers DataFrame matching the test data
@@ -385,7 +385,7 @@ class TestOutliersOutput:
                 {"item_id": 3, "target_id": None, "metric_name": "skew", "metric_value": 1.0},  # horse
                 {"item_id": 4, "target_id": None, "metric_name": "skew", "metric_value": 1.0},  # dog
                 {"item_id": 6, "target_id": None, "metric_name": "contrast", "metric_value": 1.0},  # dog
-            ]
+            ],
         )
         output = OutliersOutput(df)
         result = output.aggregate_by_class(metadata)
@@ -409,7 +409,7 @@ class TestOutliersOutput:
             assert result[col].dtype == pl.UInt32
 
     def test_aggregate_by_class_raises_on_list(self):
-        """Test aggregate_by_class raises error for multiple datasets"""
+        """Test aggregate_by_class raises error for multiple datasets."""
         metadata = make_mock_metadata(self.lstat)
 
         output = OutliersOutput([self.outlier, self.outlier2])
@@ -417,7 +417,7 @@ class TestOutliersOutput:
             output.aggregate_by_class(metadata)
 
     def test_aggregate_by_item(self):
-        """Test aggregate_by_item returns correct pivot table"""
+        """Test aggregate_by_item returns correct pivot table."""
         # Create test data with known structure
         df = pl.DataFrame(
             [
@@ -427,7 +427,7 @@ class TestOutliersOutput:
                 {"item_id": 1, "target_id": None, "metric_name": "contrast", "metric_value": 1.0},
                 {"item_id": 2, "target_id": None, "metric_name": "depth", "metric_value": 1.0},
                 {"item_id": 2, "target_id": None, "metric_name": "skew", "metric_value": 1.0},
-            ]
+            ],
         )
         output = OutliersOutput(df)
         result = output.aggregate_by_item()
@@ -458,7 +458,7 @@ class TestOutliersOutput:
             assert all(v in [0, 1] for v in values)
 
     def test_aggregate_by_item_sparse_metrics(self):
-        """Test aggregate_by_item with items having different metrics"""
+        """Test aggregate_by_item with items having different metrics."""
         df = pl.DataFrame(
             [
                 {"item_id": 0, "target_id": None, "metric_name": "a", "metric_value": 1.0},
@@ -466,7 +466,7 @@ class TestOutliersOutput:
                 {"item_id": 1, "target_id": None, "metric_name": "c", "metric_value": 1.0},
                 {"item_id": 2, "target_id": None, "metric_name": "a", "metric_value": 1.0},
                 {"item_id": 2, "target_id": None, "metric_name": "c", "metric_value": 1.0},
-            ]
+            ],
         )
         output = OutliersOutput(df)
         result = output.aggregate_by_item()
@@ -497,14 +497,14 @@ class TestOutliersOutput:
         assert row_2["Total"][0] == 2
 
     def test_aggregate_by_item_empty(self):
-        """Test aggregate_by_item with empty DataFrame"""
+        """Test aggregate_by_item with empty DataFrame."""
         df = pl.DataFrame(
             schema={
                 "item_id": pl.Int64,
                 "target_id": pl.Int64,
                 "metric_name": pl.Categorical("lexical"),
                 "metric_value": pl.Float64,
-            }
+            },
         )
         output = OutliersOutput(df)
         result = output.aggregate_by_item()
@@ -516,13 +516,13 @@ class TestOutliersOutput:
         assert "Total" in result.columns
 
     def test_aggregate_by_item_raises_on_list(self):
-        """Test aggregate_by_item raises error for multiple datasets"""
+        """Test aggregate_by_item raises error for multiple datasets."""
         output = OutliersOutput([self.outlier, self.outlier2])
         with pytest.raises(ValueError, match="only works with output from a single dataset"):
             output.aggregate_by_item()
 
     def test_aggregate_by_item_with_targets(self):
-        """Test aggregate_by_item with actual target_ids (object detection)"""
+        """Test aggregate_by_item with actual target_ids (object detection)."""
         df = pl.DataFrame(
             [
                 {"item_id": 0, "target_id": 0, "metric_name": "contrast", "metric_value": 1.0},
@@ -530,7 +530,7 @@ class TestOutliersOutput:
                 {"item_id": 0, "target_id": 1, "metric_name": "contrast", "metric_value": 1.0},
                 {"item_id": 1, "target_id": None, "metric_name": "contrast", "metric_value": 1.0},  # image-level
                 {"item_id": 1, "target_id": 0, "metric_name": "depth", "metric_value": 1.0},
-            ]
+            ],
         )
         output = OutliersOutput(df)
         result = output.aggregate_by_item()
@@ -557,14 +557,14 @@ class TestOutliersOutput:
         assert result["target_id"].dtype == pl.Int64
 
     def test_aggregate_by_metric_empty(self):
-        """Test aggregate_by_metric with empty DataFrame"""
+        """Test aggregate_by_metric with empty DataFrame."""
         df = pl.DataFrame(
             schema={
                 "item_id": pl.Int64,
                 "target_id": pl.Int64,
                 "metric_name": pl.Categorical("lexical"),
                 "metric_value": pl.Float64,
-            }
+            },
         )
         output = OutliersOutput(df)
         result = output.aggregate_by_metric()
@@ -577,7 +577,7 @@ class TestOutliersOutput:
         assert result["Total"].dtype == pl.UInt32
 
     def test_aggregate_by_item_without_target_id(self):
-        """Test aggregate_by_item when target_id column is not present"""
+        """Test aggregate_by_item when target_id column is not present."""
         # Create DataFrame without target_id column (image-level only)
         df = pl.DataFrame(
             [
@@ -587,7 +587,7 @@ class TestOutliersOutput:
                 {"item_id": 1, "metric_name": "contrast", "metric_value": 1.0},
                 {"item_id": 2, "metric_name": "depth", "metric_value": 1.0},
                 {"item_id": 2, "metric_name": "skew", "metric_value": 1.0},
-            ]
+            ],
         )
         output = OutliersOutput(df)
         result = output.aggregate_by_item()
@@ -607,7 +607,7 @@ class TestOutliersOutput:
         assert result["item_id"].to_list() == [0, 1, 2]
 
     def test_aggregate_by_class_empty(self):
-        """Test aggregate_by_class with empty DataFrame"""
+        """Test aggregate_by_class with empty DataFrame."""
         metadata = make_mock_metadata(self.lstat)
 
         df = pl.DataFrame(
@@ -616,7 +616,7 @@ class TestOutliersOutput:
                 "target_id": pl.Int64,
                 "metric_name": pl.Categorical("lexical"),
                 "metric_value": pl.Float64,
-            }
+            },
         )
         output = OutliersOutput(df)
         result = output.aggregate_by_class(metadata)
@@ -631,10 +631,10 @@ class TestOutliersOutput:
 
 @pytest.mark.required
 class TestOutliersCoverageImprovements:
-    """Additional tests to improve coverage in _outliers.py"""
+    """Additional tests to improve coverage in _outliers.py."""
 
     def test_outliers_get_outliers_with_no_outliers_found(self):
-        """Test _get_outliers when no outliers are detected (line 509)"""
+        """Test _get_outliers when no outliers are detected (line 509)."""
         # Create data with very small variation (no outliers expected)
         images = np.ones((20, 3, 16, 16)) * 0.5
         # Add tiny variation to avoid completely constant data
@@ -650,7 +650,7 @@ class TestOutliersCoverageImprovements:
         assert "metric_value" in result.issues.columns
 
     def test_outliers_evaluate_with_per_target_false_no_boxes(self):
-        """Test evaluate with no boxes (line 461-509, 851)"""
+        """Test evaluate with no boxes (line 461-509, 851)."""
         images = np.random.random((10, 3, 16, 16))
         images[5] = 1.0  # Make one image an outlier
 
@@ -670,7 +670,7 @@ class TestOutliersCoverageImprovements:
         assert all(idx.target is None for idx in outliers.stats["source_index"])
 
     def test_outliers_from_stats_with_empty_result(self):
-        """Test from_stats when no outliers are found (line 606-641)"""
+        """Test from_stats when no outliers are found (line 606-641)."""
         # Create data with no outliers
         images1 = np.ones((20, 3, 16, 16)) * 0.5
         images2 = np.ones((20, 3, 16, 16)) * 0.5
@@ -735,10 +735,7 @@ class TestOutliersEdgeCases:
             out_list.aggregate_by_item()
 
     def test_evaluate_drops_null_target_id(self):
-        """
-        Covers evaluate logic dropping 'target_id' column if all null.
-
-        """
+        """Covers evaluate logic dropping 'target_id' column if all null."""
         # Use zscore with threshold 1.0
         # With values [100.0, 1.0, 100.0]:
         # - Mean = 67.0, Std ≈ 46.67
@@ -813,7 +810,7 @@ class TestOutliersEdgeCases:
         assert not np.any(res)
 
         # Invalid method
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Outlier method must be"):
             _get_outlier_mask(np.array([1, 2]), "invalid_method", 3.0)  # type: ignore
 
     def test_evaluate_with_tuple_dataset(self, get_mock_ic_dataset):

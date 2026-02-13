@@ -2,6 +2,8 @@ from dataeval.selection._select import Select, Selection, SelectionStage, Subsel
 
 
 class MockDataset:
+    metadata = {"id": "MockDataset"}
+
     def __init__(self, size=5):
         self._size = size
 
@@ -19,7 +21,7 @@ class TestSelect:
 
     def test_init_with_metadata(self):
         m = MockDataset()
-        setattr(m, "metadata", {"id": "ManualMockDataset"})
+        m.metadata = {"id": "ManualMockDataset"}
         s = Select(m)  # type: ignore
         assert s._metadata["id"] == "ManualMockDataset"
 

@@ -61,7 +61,7 @@ def _result_char(status: str) -> str:
     return "F"
 
 
-def generate_test_case_md(tc_id: str, tc_meta: dict, report: dict | None) -> str:  # noqa: C901
+def generate_test_case_md(tc_id: str, tc_meta: dict, report: dict | None) -> str:
     """Generate a single test case markdown file."""
     tc_key = f"test-case-{tc_id}"
     today = datetime.now(tz=timezone.utc).strftime("%m/%d/%Y")
@@ -108,7 +108,7 @@ def generate_test_case_md(tc_id: str, tc_meta: dict, report: dict | None) -> str
             for i, er in enumerate(tc_meta["expected_results"], 1):
                 lines.append(f"{i}. Verify: {er}")
             lines.append(
-                f"{len(tc_meta['expected_results']) + 1}. Confirm the Expected Results by validating all steps pass"
+                f"{len(tc_meta['expected_results']) + 1}. Confirm the Expected Results by validating all steps pass",
             )
     lines.append("")
 
@@ -276,7 +276,7 @@ def main() -> None:
         s = report["summary"]
         print(
             f"Loaded verification report: {s['total_test_cases']} test cases "
-            f"({s['passed']} passed, {s['failed']} failed, {s['skipped']} skipped)"
+            f"({s['passed']} passed, {s['failed']} failed, {s['skipped']} skipped)",
         )
     else:
         print("No verification report found — generating templates only")

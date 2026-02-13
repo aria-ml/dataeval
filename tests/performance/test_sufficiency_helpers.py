@@ -53,7 +53,11 @@ class TestExecuteRunHelper:
         mock_eval.evaluate.return_value = {"accuracy": 0.95}
 
         config = Sufficiency.Config(
-            training_strategy=mock_train, evaluation_strategy=mock_eval, reset_strategy=mock_reset, runs=1, substeps=3
+            training_strategy=mock_train,
+            evaluation_strategy=mock_eval,
+            reset_strategy=mock_reset,
+            runs=1,
+            substeps=3,
         )
         model = nn.Linear(10, 2)
         suff = Sufficiency(model, simple_dataset, simple_dataset, config=config)
@@ -74,7 +78,11 @@ class TestExecuteRunHelper:
         mock_eval.evaluate.return_value = {"accuracy": 0.95}
 
         config = Sufficiency.Config(
-            training_strategy=mock_train, evaluation_strategy=mock_eval, reset_strategy=mock_reset, runs=1, substeps=2
+            training_strategy=mock_train,
+            evaluation_strategy=mock_eval,
+            reset_strategy=mock_reset,
+            runs=1,
+            substeps=2,
         )
         model = nn.Linear(10, 2)
         suff = Sufficiency(model, simple_dataset, simple_dataset, config=config)
@@ -97,7 +105,11 @@ class TestExecuteRunHelper:
         mock_eval.evaluate.return_value = {"accuracy": 0.95}
 
         config = Sufficiency.Config(
-            training_strategy=mock_train, evaluation_strategy=mock_eval, reset_strategy=mock_reset, runs=1, substeps=1
+            training_strategy=mock_train,
+            evaluation_strategy=mock_eval,
+            reset_strategy=mock_reset,
+            runs=1,
+            substeps=1,
         )
         model = nn.Linear(10, 2)
         suff = Sufficiency(model, simple_dataset, simple_dataset, config=config)
@@ -117,7 +129,11 @@ class TestExecuteRunHelper:
         mock_eval.evaluate.return_value = {"accuracy": 0.95}
 
         config = Sufficiency.Config(
-            training_strategy=mock_train, evaluation_strategy=mock_eval, reset_strategy=mock_reset, runs=1, substeps=1
+            training_strategy=mock_train,
+            evaluation_strategy=mock_eval,
+            reset_strategy=mock_reset,
+            runs=1,
+            substeps=1,
         )
         model = nn.Linear(10, 2)
         test_ds = simple_dataset
@@ -138,7 +154,11 @@ class TestExecuteRunHelper:
         mock_eval.evaluate.return_value = {"accuracy": 0.95, "loss": 0.05}
 
         config = Sufficiency.Config(
-            training_strategy=mock_train, evaluation_strategy=mock_eval, reset_strategy=mock_reset, runs=1, substeps=2
+            training_strategy=mock_train,
+            evaluation_strategy=mock_eval,
+            reset_strategy=mock_reset,
+            runs=1,
+            substeps=2,
         )
         model = nn.Linear(10, 2)
         suff = Sufficiency(model, simple_dataset, simple_dataset, config=config)

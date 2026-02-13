@@ -198,6 +198,7 @@ class ExecutionMetadata:
 
     @classmethod
     def empty(cls) -> Self:
+        """Return an empty ExecutionMetadata instance."""
         return cls(
             name="",
             execution_time=datetime.min,
@@ -229,7 +230,7 @@ class Output(Generic[T]):
 class DictOutput(Output[dict[str, Any]]):
     def data(self) -> dict[str, Any]:
         """
-        The output data as a dictionary.
+        Return the output data as a dictionary.
 
         Returns
         -------
@@ -246,7 +247,7 @@ class BaseCollectionMixin(Collection[Any]):
 
     def data(self) -> Any:
         """
-        The output data as a collection.
+        Return the output data as a collection.
 
         Returns
         -------
@@ -300,8 +301,7 @@ R = TypeVar("R", bound=Output)
 
 
 def set_metadata(fn: Callable[P, R] | None = None, *, state: Sequence[str] | None = None) -> Callable[P, R]:
-    """Decorator to stamp Output classes with runtime metadata"""
-
+    """Stamp Output classes with runtime metadata."""
     if fn is None:
         return partial(set_metadata, state=state)  # type: ignore
 
@@ -311,7 +311,7 @@ def set_metadata(fn: Callable[P, R] | None = None, *, state: Sequence[str] | Non
             if np.isscalar(v):
                 return v
             if hasattr(v, "shape"):
-                return f"{v.__class__.__name__}: shape={getattr(v, 'shape')}"
+                return f"{v.__class__.__name__}: shape={v.shape}"
             if hasattr(v, "__len__"):
                 return f"{v.__class__.__name__}: len={len(v)}"
             return f"{v.__class__.__name__}"
@@ -320,7 +320,7 @@ def set_metadata(fn: Callable[P, R] | None = None, *, state: Sequence[str] | Non
         # set all params with defaults then update params with mapped arguments and explicit keyword args
         fn_params = inspect.signature(fn).parameters
         arguments = {k: None if v.default is inspect.Parameter.empty else v.default for k, v in fn_params.items()}
-        arguments.update(zip(fn_params, args))
+        arguments.update(zip(fn_params, args, strict=False))
         arguments.update(kwargs)
         arguments = {k: fmt(v) for k, v in arguments.items()}
         is_method = "self" in arguments

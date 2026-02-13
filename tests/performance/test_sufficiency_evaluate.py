@@ -1,6 +1,4 @@
-"""
-Tests for evaluate() method using strategy pattern.
-"""
+"""Tests for evaluate() method using strategy pattern."""
 
 import torch.nn as nn
 
@@ -41,7 +39,6 @@ class TestEvaluateUsesStrategies:
     # @patch("dataeval.performance._sufficiency.reset_parameters")
     def test_evaluate_passes_model_to_training(self, basic_config, simple_dataset):
         """Verify evaluate passes model to training strategy."""
-
         model = nn.Linear(16, 16)
         suff = Sufficiency(
             model=model,

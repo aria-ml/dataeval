@@ -1,6 +1,4 @@
-"""
-NumPy-based feature extractor using simple flattening.
-"""
+"""NumPy-based feature extractor using simple flattening."""
 
 __all__ = []
 

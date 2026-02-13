@@ -151,7 +151,9 @@ def _update_tree(
 
 @numba.njit(locals={"i": numba.types.uint32}, cache=True)
 def _cluster_edges(
-    tracker: NDArray[np.int64], final_merge_idx: int, cluster_distances: NDArray[np.float32]
+    tracker: NDArray[np.int64],
+    final_merge_idx: int,
+    cluster_distances: NDArray[np.float32],
 ) -> list[NDArray[np.int64]]:
     """
     Identify edge points in each cluster based on distance statistics.
@@ -220,7 +222,8 @@ def _cluster_edges(
 
 @numba.njit(cache=True)
 def _flatten_and_sort(
-    neighbors: NDArray[np.int64], distances: NDArray[np.float32]
+    neighbors: NDArray[np.int64],
+    distances: NDArray[np.float32],
 ) -> tuple[NDArray[np.int64], NDArray[np.float32], NDArray[np.int64]]:
     """
     Flattens and sorts both the neighbors and distances arrays based on the sorted distance array.
@@ -260,7 +263,9 @@ def _flatten_and_sort(
 
 @numba.njit(locals={"i": numba.types.int32}, cache=True)
 def compare_links_to_cluster_std(
-    mst: NDArray[np.float32], clusters: NDArray[np.int64], cluster_threshold: float = 1.0
+    mst: NDArray[np.float32],
+    clusters: NDArray[np.int64],
+    cluster_threshold: float = 1.0,
 ) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
     """
     Identify exact and near duplicate pairs based on MST edge distances and cluster statistics.

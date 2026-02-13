@@ -535,7 +535,11 @@ class TestCalculateRatiosSeparateInputs:
 
         img_stats = calculate(images1, None, stats=ImageStats.DIMENSION, per_image=True, per_target=False)
         tgt_stats = calculate(
-            images2, [boxes[0], boxes[0]], stats=ImageStats.DIMENSION, per_image=False, per_target=True
+            images2,
+            [boxes[0], boxes[0]],
+            stats=ImageStats.DIMENSION,
+            per_image=False,
+            per_target=True,
         )
 
         with pytest.raises(ValueError, match="Image count mismatch"):
@@ -548,7 +552,12 @@ class TestCalculateRatiosSeparateInputs:
 
         img_stats = calculate(images, boxes, stats=ImageStats.PIXEL, per_image=True, per_target=False, per_channel=True)
         tgt_stats = calculate(
-            images, boxes, stats=ImageStats.PIXEL, per_image=False, per_target=True, per_channel=False
+            images,
+            boxes,
+            stats=ImageStats.PIXEL,
+            per_image=False,
+            per_target=True,
+            per_channel=False,
         )
 
         with pytest.raises(ValueError, match="Channel mismatch"):

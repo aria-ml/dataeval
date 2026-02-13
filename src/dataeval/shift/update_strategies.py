@@ -1,6 +1,7 @@
 """
-Update strategies inform how the :term:`drift<Drift>` detector classes update the reference data when monitoring.
-for drift.
+Update strategies inform how the drift detector classes update the reference data.
+
+These strategies are used when monitoring for drift.
 """
 
 __all__ = ["LastSeenUpdateStrategy", "ReservoirSamplingUpdateStrategy"]
@@ -27,6 +28,7 @@ class LastSeenUpdateStrategy(UpdateStrategy):
         self.n = n
 
     def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32]) -> NDArray[np.float32]:
+        """Update reference data using last seen instances."""
         return np.concatenate([x_ref, flatten_samples(x_new)], axis=0)[-self.n :]
 
 
@@ -45,6 +47,7 @@ class ReservoirSamplingUpdateStrategy(UpdateStrategy):
         self._count = 0
 
     def __call__(self, x_ref: NDArray[np.float32], x_new: NDArray[np.float32]) -> NDArray[np.float32]:
+        """Update reference data using reservoir sampling."""
         if x_new.shape[0] + self._count <= self.n:
             self._count += x_new.shape[0]
             result = np.concatenate([x_ref, flatten_samples(x_new)], axis=0)

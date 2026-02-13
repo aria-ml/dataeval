@@ -105,7 +105,8 @@ def _compute_nearest_neighbors(
 
 
 def _compute_cluster_neighbors(
-    data: NDArray[Any], cluster_labels: NDArray[np.int64]
+    data: NDArray[Any],
+    cluster_labels: NDArray[np.int64],
 ) -> tuple[NDArray[np.int64], NDArray[np.float32]]:
     """
     Rerun nearest neighbor computation based on clusters.
@@ -162,7 +163,9 @@ def _compute_cluster_neighbors(
 
 
 def minimum_spanning_tree_edges(
-    data: NDArray[Any], neighbors: NDArray[np.int64], distances: NDArray[np.float32]
+    data: NDArray[Any],
+    neighbors: NDArray[np.int64],
+    distances: NDArray[np.float32],
 ) -> NDArray[np.float32]:
     """
     Compute minimum spanning tree edges from k-nearest neighbor graph.
@@ -219,7 +222,13 @@ def minimum_spanning_tree_edges(
     # Update tree
     merge_idx = 0
     tree, total_edge, tree_disjoint_set, merge_tracker[merge_idx] = _update_tree(
-        tree, total_edge, tree_disjoint_set, merge_tracker[merge_idx], nbrs_sorted, dist_sorted, point_sorted
+        tree,
+        total_edge,
+        tree_disjoint_set,
+        merge_tracker[merge_idx],
+        nbrs_sorted,
+        dist_sorted,
+        point_sorted,
     )
 
     # Identify clusters
@@ -241,7 +250,13 @@ def minimum_spanning_tree_edges(
         # Update clusters
         merge_idx += 1
         tree, total_edge, tree_disjoint_set, merge_tracker[merge_idx] = _update_tree(
-            tree, total_edge, tree_disjoint_set, merge_tracker[merge_idx], nbrs_sorted, dist_sorted, point_sorted
+            tree,
+            total_edge,
+            tree_disjoint_set,
+            merge_tracker[merge_idx],
+            nbrs_sorted,
+            dist_sorted,
+            point_sorted,
         )
 
         cluster_ids = np.unique(merge_tracker[merge_idx])
@@ -312,7 +327,9 @@ def minimum_spanning_tree(embeddings: ArrayND[float], k: int = 15) -> MSTResult:
 
 
 def compute_neighbor_distances(
-    embeddings: ArrayND[float], neighbor_embeddings: ArrayND[float] | None = None, k: int = 10
+    embeddings: ArrayND[float],
+    neighbor_embeddings: ArrayND[float] | None = None,
+    k: int = 10,
 ) -> tuple[NDArray[np.int64], NDArray[np.float32]]:
     """
     Compute k nearest neighbors for each point in data (self-query, excluding self).

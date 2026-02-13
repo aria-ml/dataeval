@@ -126,9 +126,9 @@ class PrioritizeOutput(Output[NDArray[np.intp]]):
 
     @property
     def method(self) -> MethodType:
-        """
-        {"knn", "kmeans_distance", "kmeans_complexity", "hdbscan_distance", "hdbscan_complexity"} :
-        The ranking method that was used.
+        """The ranking method that was used.
+
+        {"knn", "kmeans_distance", "kmeans_complexity", "hdbscan_distance", "hdbscan_complexity"}
         """
         return self._method
 
@@ -666,7 +666,11 @@ class Prioritize(Evaluator):
         >>> result = Prioritize.hdbscan_distance(extractor, c=15).evaluate(unlabeled_data)
         """
         return cls(
-            extractor=extractor, method="hdbscan_distance", c=c, max_cluster_size=max_cluster_size, reference=reference
+            extractor=extractor,
+            method="hdbscan_distance",
+            c=c,
+            max_cluster_size=max_cluster_size,
+            reference=reference,
         )
 
     @classmethod
@@ -767,7 +771,7 @@ class Prioritize(Evaluator):
         # Validate stratified + complexity method combinations
         if self.policy == "stratified" and self.method in ("kmeans_complexity", "hdbscan_complexity"):
             raise ValueError(
-                f"stratified policy is not available with {self.method} method ({self.method} does not produce scores)"
+                f"stratified policy is not available with {self.method} method ({self.method} does not produce scores)",
             )
 
         # Check if dataset is an Array (pre-computed) or AnnotatedDataset
@@ -785,7 +789,7 @@ class Prioritize(Evaluator):
                     class_labels = self._metadata.class_labels
             except Exception as e:
                 raise TypeError(
-                    f"dataset must be either an AnnotatedDataset or Array, but got {type(dataset).__name__}"
+                    f"dataset must be either an AnnotatedDataset or Array, but got {type(dataset).__name__}",
                 ) from e
 
         if self._reference is None:
@@ -801,7 +805,7 @@ class Prioritize(Evaluator):
         if self.policy == "class_balanced" and class_labels is None:
             raise ValueError(
                 "Policy 'class_balanced' requires an AnnotatedDataset with metadata. "
-                "For raw arrays, use result.class_balanced(labels) instead."
+                "For raw arrays, use result.class_balanced(labels) instead.",
             )
         result = self._perform_ranking(embeddings_array, reference_array)
 
@@ -828,10 +832,16 @@ class Prioritize(Evaluator):
             return rank_kmeans_complexity(embeddings_array, c=self.c, n_init=self.n_init, reference=reference_array)
         if self.method == "hdbscan_distance":
             return rank_hdbscan_distance(
-                embeddings_array, c=self.c, max_cluster_size=self.max_cluster_size, reference=reference_array
+                embeddings_array,
+                c=self.c,
+                max_cluster_size=self.max_cluster_size,
+                reference=reference_array,
             )
         if self.method == "hdbscan_complexity":
             return rank_hdbscan_complexity(
-                embeddings_array, c=self.c, max_cluster_size=self.max_cluster_size, reference=reference_array
+                embeddings_array,
+                c=self.c,
+                max_cluster_size=self.max_cluster_size,
+                reference=reference_array,
             )
         raise ValueError(f"Invalid method: {self.method}")

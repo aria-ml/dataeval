@@ -4,9 +4,7 @@ from collections.abc import Callable
 
 
 class LogMessage:
-    """
-    Deferred message callback for logging expensive messages.
-    """
+    """Deferred message callback for logging expensive messages."""
 
     def __init__(self, fn: Callable[..., str]) -> None:
         self._fn = fn

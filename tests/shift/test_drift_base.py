@@ -1,6 +1,6 @@
 """
 Source code derived from Alibi-Detect 0.11.4
-https://github.com/SeldonIO/alibi-detect/tree/v0.11.4
+https://github.com/SeldonIO/alibi-detect/tree/v0.11.4.
 
 Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
@@ -31,11 +31,11 @@ class TestBaseDrift:
         return mock
 
     def test_base_init_update_x_ref_valueerror(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="not a valid UpdateStrategy"):
             BaseDriftUnivariate(self.data, update_strategy="invalid")  # type: ignore
 
     def test_base_init_correction_valueerror(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="must be `bonferroni` or `fdr`"):
             BaseDriftUnivariate(self.data, n_features=2, correction="invalid")  # type: ignore
 
     def test_base_init_infer_n_features(self):
@@ -52,5 +52,5 @@ class TestBaseDrift:
         mock_score.return_value = (np.array(0.5), np.array(0.5))
         base.score = mock_score
         base.correction = "invalid"  # type: ignore
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="needs to be either `bonferroni` or `fdr`"):
             base.predict(np.empty([]))

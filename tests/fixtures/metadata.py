@@ -10,9 +10,7 @@ BIG_FEATURE_NAMES = ["DJIA", "temperature", "uptime"]
 
 @pytest.fixture(scope="module")
 def metadata_ref_big(RNG) -> Metadata:
-    """
-    Higher count Metadata values with a normal distribution
-    """
+    """Higher count Metadata values with a normal distribution."""
     shape = (BIG_SAMPLES_COUNT, len(BIG_FEATURE_NAMES))
 
     # Generate data samples
@@ -34,7 +32,7 @@ def metadata_ref_big(RNG) -> Metadata:
 def metadata_tst_big(RNG) -> Metadata:
     """
     Higher count Metadata values with two added random normal
-    distributions in the first half and second half respectively
+    distributions in the first half and second half respectively.
     """
     bigdata_size = (BIG_SAMPLES_COUNT, len(BIG_FEATURE_NAMES))
 

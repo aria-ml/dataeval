@@ -75,10 +75,13 @@ class NullModelMetricsResult(TypedDict):
 
 
 def nullmodel_accuracy(
-    class_prob: Array1D[float], model_prob: Array1D[float], *, multiclass: bool = False
+    class_prob: Array1D[float],
+    model_prob: Array1D[float],
+    *,
+    multiclass: bool = False,
 ) -> np.float64:
     """
-    Calculates accuracy from binary classification results.
+    Calculate accuracy from binary classification results.
 
     Parameters
     ----------
@@ -108,13 +111,14 @@ def _calculate_accuracy(counts: ConfusionMatrix) -> np.float64:
 
 def _calculate_multiclass_accuracy(class_prob: Array1D[float], model_prob: Array1D[float]) -> np.float64:
     return np.dot(
-        as_numpy(model_prob, dtype=np.float64, required_ndim=1), as_numpy(class_prob, dtype=np.float64, required_ndim=1)
+        as_numpy(model_prob, dtype=np.float64, required_ndim=1),
+        as_numpy(class_prob, dtype=np.float64, required_ndim=1),
     )
 
 
 def nullmodel_precision(class_prob: Array1D[float], model_prob: Array1D[float]) -> np.float64:
     """
-    Calculates precision from binary classification results.
+    Calculate precision from binary classification results.
 
     Parameters
     ----------
@@ -142,7 +146,7 @@ def _calculate_precision(counts: ConfusionMatrix) -> np.float64:
 
 def nullmodel_recall(class_prob: Array1D[float], model_prob: Array1D[float]) -> np.float64:
     """
-    Calculates recall (True Positive Rate) from binary classification results.
+    Calculate recall (True Positive Rate) from binary classification results.
 
     Parameters
     ----------
@@ -170,7 +174,7 @@ def _calculate_recall(counts: ConfusionMatrix) -> np.float64:
 
 def nullmodel_fpr(class_prob: Array1D[float], model_prob: Array1D[float]) -> np.float64:
     """
-    Calculates FPR (False Positive Rate) from binary classification results.
+    Calculate FPR (False Positive Rate) from binary classification results.
 
     Parameters
     ----------
@@ -194,7 +198,7 @@ def _calculate_fpr(counts: ConfusionMatrix) -> np.float64:
 
 def _to_confusion_matrix(class_prob: Array1D[float], pred_prob: Array1D[float]) -> ConfusionMatrix:
     """
-    Calculates confusion matrix values from class probabilities and null model probabilities.
+    Calculate confusion matrix values from class probabilities and null model probabilities.
 
     Parameters
     ----------
@@ -209,7 +213,8 @@ def _to_confusion_matrix(class_prob: Array1D[float], pred_prob: Array1D[float]) 
         Calculated confusion matrix values [True Positive, False Positive, True Negative, False Negative]
     """
     confusion_matrix = np.outer(
-        as_numpy(class_prob, dtype=np.float64, required_ndim=1), as_numpy(pred_prob, dtype=np.float64, required_ndim=1)
+        as_numpy(class_prob, dtype=np.float64, required_ndim=1),
+        as_numpy(pred_prob, dtype=np.float64, required_ndim=1),
     )
     return confusion_matrix[0, 0], confusion_matrix[1, 0], confusion_matrix[1, 1], confusion_matrix[0, 1]
 
@@ -226,6 +231,7 @@ def _reduce_micro(method: BinaryClassMetricFunction, counts: Sequence[ConfusionM
         Metric-calculating method to perform on summed data
     counts : Sequence[ConfusionMatrix]
         2D array of classification results for each class
+
     Returns
     -------
     np.float64
@@ -246,6 +252,7 @@ def _reduce_macro(method: BinaryClassMetricFunction, counts: Sequence[ConfusionM
         Metric-calculating method to perform on summed data
     counts : Sequence[ConfusionMatrix]
         2D array of classification results for each class
+
     Returns
     -------
     np.float64
@@ -272,7 +279,8 @@ _AVERAGES: dict[str, Callable[[BinaryClassMetricFunction, Sequence[ConfusionMatr
 
 
 def _prepare_probability_distributions(
-    test_labels: ArrayLike, train_labels: ArrayLike | None
+    test_labels: ArrayLike,
+    train_labels: ArrayLike | None,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """
     Validate inputs and prepare probability distributions from label arrays.
@@ -358,10 +366,10 @@ def _calculate_null_model_metrics(
         "recall_macro": float(_AVERAGES["macro"](_BASE_METRICS["recall"], confusion_matrices)),
         "recall_micro": float(_AVERAGES["micro"](_BASE_METRICS["recall"], confusion_matrices)),
         "false_positive_rate_macro": float(
-            _AVERAGES["macro"](_BASE_METRICS["false_positive_rate"], confusion_matrices)
+            _AVERAGES["macro"](_BASE_METRICS["false_positive_rate"], confusion_matrices),
         ),
         "false_positive_rate_micro": float(
-            _AVERAGES["micro"](_BASE_METRICS["false_positive_rate"], confusion_matrices)
+            _AVERAGES["micro"](_BASE_METRICS["false_positive_rate"], confusion_matrices),
         ),
     }
 

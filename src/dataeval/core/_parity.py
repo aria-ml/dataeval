@@ -119,7 +119,7 @@ def parity(
         # Determines if any frequencies are too low
         counts = np.nonzero(contingency_matrix < 5)
         unique_factor_values = np.unique(col_data)
-        for _factor, _class in zip(counts[0], counts[1]):
+        for _factor, _class in zip(counts[0], counts[1], strict=False):
             int_factor, int_class = int(_factor), int(_class)
             if contingency_matrix[int_factor, int_class] > 0:
                 factor_category = unique_factor_values[int_factor].item()

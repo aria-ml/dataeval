@@ -19,7 +19,7 @@ class CalculatorRegistry:
     @classmethod
     def register(cls, flag_type: type[Flag]) -> Any:
         """
-        Decorator to register a calculator with a flag type.
+        Register a calculator with a flag type.
 
         Parameters
         ----------

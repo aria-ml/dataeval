@@ -16,7 +16,6 @@ class TestSufficiencyConfigConstruction:
 
     def test_config_stores_strategies(self, mock_train, mock_eval):
         """Verify config correctly stores strategy objects."""
-
         config = Sufficiency.Config(
             training_strategy=mock_train,
             evaluation_strategy=mock_eval,
@@ -27,7 +26,6 @@ class TestSufficiencyConfigConstruction:
 
     def test_config_stores_run_parameters(self, mock_train, mock_eval):
         """Verify config stores runs and substeps."""
-
         config = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, runs=5, substeps=10)
 
         assert config.runs == 5
@@ -35,7 +33,6 @@ class TestSufficiencyConfigConstruction:
 
     def test_config_default_values(self, mock_train, mock_eval):
         """Verify config applies correct default values."""
-
         config = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval)
 
         assert config.runs == 1
@@ -44,7 +41,6 @@ class TestSufficiencyConfigConstruction:
 
     def test_config_with_custom_unit_interval(self, mock_train, mock_eval):
         """Verify config accepts custom unit_interval value."""
-
         config = Sufficiency.Config(
             training_strategy=mock_train,
             evaluation_strategy=mock_eval,
@@ -60,7 +56,6 @@ class TestSufficiencyConfigValidation:
     @pytest.mark.parametrize("runs", [-1, 0])
     def test_config_rejects_negative_runs(self, mock_train, mock_eval, runs):
         """Verify config validates runs is positive."""
-
         with pytest.raises(ValueError, match="must be positive"):
             Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, runs=runs)
 
@@ -72,7 +67,6 @@ class TestSufficiencyConfigValidation:
 
     def test_config_accepts_positive_values(self, mock_train, mock_eval):
         """Verify config accepts valid positive values."""
-
         config = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, runs=10, substeps=20)
 
         assert config.runs == 10
@@ -84,7 +78,6 @@ class TestSufficiencyConfigTypeChecking:
 
     def test_config_accepts_training_strategy(self, mock_train, mock_eval):
         """Verify config accepts objects conforming to TrainingStrategy."""
-
         # Should not raise
         config = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval)
 
@@ -92,7 +85,6 @@ class TestSufficiencyConfigTypeChecking:
 
     def test_config_accepts_evaluation_strategy(self, mock_train, mock_eval):
         """Verify config accepts objects conforming to EvaluationStrategy."""
-
         # Should not raise
         config = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval)
 
@@ -104,7 +96,6 @@ class TestSufficiencyConfigEquality:
 
     def test_config_equality_with_same_values(self, mock_train, mock_eval):
         """Verify configs with same values are equal."""
-
         config1 = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, runs=3, substeps=5)
         config2 = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, runs=3, substeps=5)
 
@@ -113,7 +104,6 @@ class TestSufficiencyConfigEquality:
 
     def test_config_inequality_with_different_runs(self, mock_train, mock_eval):
         """Verify configs with different runs are not equal."""
-
         config1 = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, runs=3)
         config2 = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, runs=5)
 
@@ -121,7 +111,6 @@ class TestSufficiencyConfigEquality:
 
     def test_config_repr(self, mock_train, mock_eval):
         """Verify config has useful string representation."""
-
         config = Sufficiency.Config(training_strategy=mock_train, evaluation_strategy=mock_eval, runs=3, substeps=10)
         repr_str = repr(config)
 

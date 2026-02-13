@@ -102,7 +102,7 @@ if __name__ == "__main__":
         [
             rg._generate_index_markdown_update_action(HOWTO_INDEX_FILE, next_version),
             rg._generate_index_markdown_update_action(TUTORIAL_INDEX_FILE, next_version),
-        ]
+        ],
     )
 
     # Add changelog update
@@ -112,7 +112,7 @@ if __name__ == "__main__":
             "file_path": CHANGELOG_FILE,
             "encoding": "text",
             "content": changelog_content,
-        }
+        },
     )
 
     # Filter out empty actions

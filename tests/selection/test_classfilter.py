@@ -15,7 +15,7 @@ class TestTryMaskObject:
     mask = np.array([True, False, False, True])
 
     @pytest.mark.parametrize(
-        "obj, expected",
+        ("obj", "expected"),
         [
             ("test", "test"),
             (np.array([1, 2, 3, 4]), np.array([1, 4])),

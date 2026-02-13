@@ -83,13 +83,13 @@ def test_knn_fit_validation(reference_embeddings):
     # Test with empty embeddings - create one with empty array
     empty_embeddings = np.array([]).reshape(0, embedding_dim)
 
-    with pytest.raises(ValueError):  # Any ValueError is fine
+    with pytest.raises(ValueError, match="must be less than number of reference embeddings"):
         knn.fit(empty_embeddings)
 
     # Test with k too large for non-empty embeddings
     small_embeddings = np.random.randn(5, embedding_dim)  # Only 5 embeddings
     knn_large_k = OODKNeighbors(k=10)  # k=10 > 5 embeddings
-    with pytest.raises(ValueError):  # Any ValueError is fine
+    with pytest.raises(ValueError, match="must be less than number of reference embeddings"):
         knn_large_k.fit(small_embeddings)
 
     # Test with k equal to number of embeddings (should also fail)

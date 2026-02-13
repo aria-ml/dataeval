@@ -41,7 +41,7 @@ F = TypeVar("F", bound=Callable[..., None])
 
 
 def print_elapsed(description: str) -> Callable[[F], F]:
-    """Decorator that prints elapsed time for a function and handles errors."""
+    """Decorate function to print elapsed time and handle errors."""
 
     def decorator(func: F) -> F:
         @wraps(func)
@@ -52,7 +52,7 @@ def print_elapsed(description: str) -> Callable[[F], F]:
                 func(*args, **kwargs)
                 elapsed = time.perf_counter() - start
                 print(f" ({elapsed:.2f}s)")
-            except Exception:
+            except (RuntimeError, TypeError, ValueError):
                 print(" (warning: skipped)")
 
         return wrapper  # type: ignore[return-value]
@@ -80,7 +80,13 @@ def warm_mst_construction() -> None:
     disjoint_set = (np.array([0, 0, 2, 3, 4, 5, 6, 7, 8, 9]), np.array([1, 0, 0, 0, 0, 0, 0, 0, 0, 0]))
     merge_tracker = np.full((n_neighbors.shape[1] + 1, n_neighbors.shape[0]), -1, dtype=np.int64)
     tree, total_edge, _, merge_tracker[0] = _update_tree(
-        tree, total_edge, disjoint_set, merge_tracker[0], nbrs_sorted, dist_sorted, point_sorted
+        tree,
+        total_edge,
+        disjoint_set,
+        merge_tracker[0],
+        nbrs_sorted,
+        dist_sorted,
+        point_sorted,
     )
 
 

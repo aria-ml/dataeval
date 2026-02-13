@@ -1,6 +1,6 @@
 """
 Source code derived from Alibi-Detect 0.11.4
-https://github.com/SeldonIO/alibi-detect/tree/v0.11.4
+https://github.com/SeldonIO/alibi-detect/tree/v0.11.4.
 
 Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
@@ -824,10 +824,16 @@ def test_gmm_reconstruction_loss_path():
         def __init__(self):
             super().__init__()
             self.encoder = torch.nn.Sequential(
-                torch.nn.Flatten(), torch.nn.Linear(64, 32), torch.nn.ReLU(), torch.nn.Linear(32, 10)
+                torch.nn.Flatten(),
+                torch.nn.Linear(64, 32),
+                torch.nn.ReLU(),
+                torch.nn.Linear(32, 10),
             )
             self.decoder = torch.nn.Sequential(
-                torch.nn.Linear(10, 32), torch.nn.ReLU(), torch.nn.Linear(32, 64), torch.nn.Unflatten(1, input_shape)
+                torch.nn.Linear(10, 32),
+                torch.nn.ReLU(),
+                torch.nn.Linear(32, 64),
+                torch.nn.Unflatten(1, input_shape),
             )
             self.gmm_net = torch.nn.Linear(10, 3)
 
@@ -865,10 +871,16 @@ def test_gmm_params_computed_after_fit():
         def __init__(self):
             super().__init__()
             self.encoder = torch.nn.Sequential(
-                torch.nn.Flatten(), torch.nn.Linear(64, 32), torch.nn.ReLU(), torch.nn.Linear(32, 10)
+                torch.nn.Flatten(),
+                torch.nn.Linear(64, 32),
+                torch.nn.ReLU(),
+                torch.nn.Linear(32, 10),
             )
             self.decoder = torch.nn.Sequential(
-                torch.nn.Linear(10, 32), torch.nn.ReLU(), torch.nn.Linear(32, 64), torch.nn.Unflatten(1, input_shape)
+                torch.nn.Linear(10, 32),
+                torch.nn.ReLU(),
+                torch.nn.Linear(32, 64),
+                torch.nn.Unflatten(1, input_shape),
             )
             self.gmm_net = torch.nn.Linear(10, 3)
 
@@ -904,10 +916,16 @@ def test_gmm_scoring_with_energy():
         def __init__(self):
             super().__init__()
             self.encoder = torch.nn.Sequential(
-                torch.nn.Flatten(), torch.nn.Linear(64, 32), torch.nn.ReLU(), torch.nn.Linear(32, 10)
+                torch.nn.Flatten(),
+                torch.nn.Linear(64, 32),
+                torch.nn.ReLU(),
+                torch.nn.Linear(32, 10),
             )
             self.decoder = torch.nn.Sequential(
-                torch.nn.Linear(10, 32), torch.nn.ReLU(), torch.nn.Linear(32, 64), torch.nn.Unflatten(1, input_shape)
+                torch.nn.Linear(10, 32),
+                torch.nn.ReLU(),
+                torch.nn.Linear(32, 64),
+                torch.nn.Unflatten(1, input_shape),
             )
             self.gmm_net = torch.nn.Linear(10, 3)
 
@@ -987,10 +1005,16 @@ def test_gmm_z_normalization_prevents_covariance_error():
         def __init__(self):
             super().__init__()
             self.encoder = torch.nn.Sequential(
-                torch.nn.Flatten(), torch.nn.Linear(64, 32), torch.nn.ReLU(), torch.nn.Linear(32, 10)
+                torch.nn.Flatten(),
+                torch.nn.Linear(64, 32),
+                torch.nn.ReLU(),
+                torch.nn.Linear(32, 10),
             )
             self.decoder = torch.nn.Sequential(
-                torch.nn.Linear(10, 32), torch.nn.ReLU(), torch.nn.Linear(32, 64), torch.nn.Unflatten(1, input_shape)
+                torch.nn.Linear(10, 32),
+                torch.nn.ReLU(),
+                torch.nn.Linear(32, 64),
+                torch.nn.Unflatten(1, input_shape),
             )
             self.gmm_net = torch.nn.Linear(10, 3)
 
@@ -1043,10 +1067,16 @@ def test_combine_gmm_percentile():
         def __init__(self):
             super().__init__()
             self.encoder = torch.nn.Sequential(
-                torch.nn.Flatten(), torch.nn.Linear(64, 32), torch.nn.ReLU(), torch.nn.Linear(32, 10)
+                torch.nn.Flatten(),
+                torch.nn.Linear(64, 32),
+                torch.nn.ReLU(),
+                torch.nn.Linear(32, 10),
             )
             self.decoder = torch.nn.Sequential(
-                torch.nn.Linear(10, 32), torch.nn.ReLU(), torch.nn.Linear(32, 64), torch.nn.Unflatten(1, input_shape)
+                torch.nn.Linear(10, 32),
+                torch.nn.ReLU(),
+                torch.nn.Linear(32, 64),
+                torch.nn.Unflatten(1, input_shape),
             )
             self.gmm_net = torch.nn.Linear(10, 3)
 
@@ -1108,10 +1138,16 @@ def test_combine_gmm_percentile_direct():
         def __init__(self):
             super().__init__()
             self.encoder = torch.nn.Sequential(
-                torch.nn.Flatten(), torch.nn.Linear(64, 32), torch.nn.ReLU(), torch.nn.Linear(32, 10)
+                torch.nn.Flatten(),
+                torch.nn.Linear(64, 32),
+                torch.nn.ReLU(),
+                torch.nn.Linear(32, 10),
             )
             self.decoder = torch.nn.Sequential(
-                torch.nn.Linear(10, 32), torch.nn.ReLU(), torch.nn.Linear(32, 64), torch.nn.Unflatten(1, input_shape)
+                torch.nn.Linear(10, 32),
+                torch.nn.ReLU(),
+                torch.nn.Linear(32, 64),
+                torch.nn.Unflatten(1, input_shape),
             )
             self.gmm_net = torch.nn.Linear(10, 3)
 
@@ -1156,18 +1192,22 @@ def test_combine_gmm_percentile_direct():
 
 @pytest.mark.required
 def test_gmm_score_mode_config_parameter():
-    """
-    Test that gmm_score_mode configuration parameter is properly used.
-    """
+    """Test that gmm_score_mode configuration parameter is properly used."""
 
     class SimpleGMMModel(torch.nn.Module):
         def __init__(self):
             super().__init__()
             self.encoder = torch.nn.Sequential(
-                torch.nn.Flatten(), torch.nn.Linear(64, 32), torch.nn.ReLU(), torch.nn.Linear(32, 10)
+                torch.nn.Flatten(),
+                torch.nn.Linear(64, 32),
+                torch.nn.ReLU(),
+                torch.nn.Linear(32, 10),
             )
             self.decoder = torch.nn.Sequential(
-                torch.nn.Linear(10, 32), torch.nn.ReLU(), torch.nn.Linear(32, 64), torch.nn.Unflatten(1, input_shape)
+                torch.nn.Linear(10, 32),
+                torch.nn.ReLU(),
+                torch.nn.Linear(32, 64),
+                torch.nn.Unflatten(1, input_shape),
             )
             self.gmm_net = torch.nn.Linear(10, 3)
 

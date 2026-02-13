@@ -1,6 +1,4 @@
-"""
-Identify potential issues in training and test data.
-"""
+"""Identify potential issues in training and test data."""
 
 __all__ = [
     "Duplicates",

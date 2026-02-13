@@ -1,6 +1,6 @@
 """
 Source code derived from Alibi-Detect 0.11.4
-https://github.com/SeldonIO/alibi-detect/tree/v0.11.4
+https://github.com/SeldonIO/alibi-detect/tree/v0.11.4.
 
 Original code Copyright (c) 2023 Seldon Technologies Ltd
 Licensed under Apache Software License (Apache 2.0)
@@ -103,7 +103,8 @@ class TestMMDDrift:
             device="cpu",
         )
         preds = cd.predict(x_ref)
-        assert not preds.drifted and preds.p_val >= cd.p_val
+        assert not preds.drifted
+        assert preds.p_val >= cd.p_val
         if isinstance(update_strategy, dict):
             k = list(update_strategy.keys())[0]
             assert cd.n == self.n + self.n
@@ -281,7 +282,7 @@ class TestMMDKernelMatrix:
         # Compute with loop (old method)
         torch.manual_seed(42)
         mmd_loop = torch.tensor(
-            [mmd2_from_kernel_matrix(kernel_mat, m, zero_diag=False, n_permutations=1).item() for _ in range(n_perms)]
+            [mmd2_from_kernel_matrix(kernel_mat, m, zero_diag=False, n_permutations=1).item() for _ in range(n_perms)],
         )
 
         # Should match within numerical precision
@@ -326,7 +327,11 @@ class TestMMDKernelMatrix:
         # Compute with batched permutations
         torch.manual_seed(42)
         mmd_batched = mmd2_from_kernel_matrix(
-            kernel_mat, m, zero_diag=False, n_permutations=n_perms, permutation_batch_size=10
+            kernel_mat,
+            m,
+            zero_diag=False,
+            n_permutations=n_perms,
+            permutation_batch_size=10,
         )
 
         # Results should match
@@ -336,7 +341,11 @@ class TestMMDKernelMatrix:
         for batch_size in [1, 5, 25, 50]:
             torch.manual_seed(42)
             mmd_test = mmd2_from_kernel_matrix(
-                kernel_mat, m, zero_diag=False, n_permutations=n_perms, permutation_batch_size=batch_size
+                kernel_mat,
+                m,
+                zero_diag=False,
+                n_permutations=n_perms,
+                permutation_batch_size=batch_size,
             )
             torch.testing.assert_close(mmd_full, mmd_test, rtol=1e-5, atol=1e-7)
 
@@ -350,7 +359,7 @@ def test_drift_get_device(device):
 @pytest.mark.required
 def test_gaussianrbf_forward_valueerror():
     g = GaussianRBF(trainable=True)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Gradients cannot be computed w.r.t. an inferred sigma"):
         g.forward(np.zeros((2, 2)), np.zeros((2, 2)), infer_sigma=True)
 
 
@@ -359,7 +368,9 @@ class TestAutoDetectBatchSize:
     def test_auto_detect_returns_one_for_cpu(self):
         """Auto-detection should return 1 (no batching) for CPU devices."""
         batch_size = _auto_detect_permutation_batch_size(
-            kernel_mat_size=500, n_permutations=100, device=torch.device("cpu")
+            kernel_mat_size=500,
+            n_permutations=100,
+            device=torch.device("cpu"),
         )
         assert batch_size == 1
 
@@ -367,7 +378,9 @@ class TestAutoDetectBatchSize:
         """Auto-detection should return 1 (no batching) when all permutations fit in memory."""
         # Small matrix that should fit in memory even with all permutations
         batch_size = _auto_detect_permutation_batch_size(
-            kernel_mat_size=50, n_permutations=100, device=torch.device("cpu")
+            kernel_mat_size=50,
+            n_permutations=100,
+            device=torch.device("cpu"),
         )
         assert batch_size == 1
 
@@ -379,23 +392,29 @@ class TestAutoDetectBatchSize:
 
         # Large matrix that would require significant memory
         batch_size = _auto_detect_permutation_batch_size(
-            kernel_mat_size=2000, n_permutations=1000, device=torch.device("cuda")
+            kernel_mat_size=2000,
+            n_permutations=1000,
+            device=torch.device("cuda"),
         )
         # Should always return a positive integer
-        assert isinstance(batch_size, int) and batch_size > 0
+        assert isinstance(batch_size, int)
+        assert batch_size > 0
 
     def test_auto_detect_batch_size_is_positive(self):
         """Auto-detection always returns a positive integer."""
         # Use a scenario on CPU
         batch_size = _auto_detect_permutation_batch_size(
-            kernel_mat_size=1000, n_permutations=500, device=torch.device("cpu")
+            kernel_mat_size=1000,
+            n_permutations=500,
+            device=torch.device("cpu"),
         )
         # Should always return a positive integer
-        assert isinstance(batch_size, int) and batch_size > 0
+        assert isinstance(batch_size, int)
+        assert batch_size > 0
 
     @pytest.mark.cuda
     def test_auto_detect_batch_size_cuda_fallback(self):
-        """Test auto-detection fallback when CUDA memory info unavailable (line 94-99)"""
+        """Test auto-detection fallback when CUDA memory info unavailable (line 94-99)."""
         if not torch.cuda.is_available():
             pytest.skip("CUDA not available")
 
@@ -407,11 +426,12 @@ class TestAutoDetectBatchSize:
         )
 
         # Should return a positive integer
-        assert isinstance(batch_size, int) and batch_size > 0
+        assert isinstance(batch_size, int)
+        assert batch_size > 0
 
     @pytest.mark.cuda
     def test_auto_detect_small_matrix_cuda(self):
-        """Test auto-detection with small matrix on CUDA returns 1 (line 97-99)"""
+        """Test auto-detection with small matrix on CUDA returns 1 (line 97-99)."""
         if not torch.cuda.is_available():
             pytest.skip("CUDA not available")
 
@@ -423,7 +443,8 @@ class TestAutoDetectBatchSize:
         )
 
         # Small matrices might return 1 (no batching) or a reasonable batch size
-        assert isinstance(batch_size, int) and batch_size > 0
+        assert isinstance(batch_size, int)
+        assert batch_size > 0
 
 
 @pytest.fixture
@@ -478,10 +499,11 @@ class TestAutoDetectBatchSizeMocked:
 
     def test_cpu_device_returns_one(self, mock_cuda_memory):
         """CPU device should always return 1 without calling CUDA functions."""
-
         with mock_cuda_memory() as (mock_props, mock_reserved):
             batch_size = _auto_detect_permutation_batch_size(
-                kernel_mat_size=1000, n_permutations=100, device=torch.device("cpu")
+                kernel_mat_size=1000,
+                n_permutations=100,
+                device=torch.device("cpu"),
             )
 
             # Should return 1 for CPU
@@ -495,7 +517,9 @@ class TestAutoDetectBatchSizeMocked:
         # Mock device properties with large total memory (16 GB)
         with mock_cuda_memory(total_memory=16 * 1024**3, reserved_memory=1 * 1024**3):
             batch_size = _auto_detect_permutation_batch_size(
-                kernel_mat_size=100, n_permutations=100, device=torch.device("cuda:0")
+                kernel_mat_size=100,
+                n_permutations=100,
+                device=torch.device("cuda:0"),
             )
 
             # With small kernel matrix and lots of memory, should return 1
@@ -507,7 +531,9 @@ class TestAutoDetectBatchSizeMocked:
         with mock_cuda_memory(total_memory=2 * 1024**3, reserved_memory=1 * 1024**3):
             # Large kernel matrix requiring significant memory
             batch_size = _auto_detect_permutation_batch_size(
-                kernel_mat_size=2000, n_permutations=100, device=torch.device("cuda:0")
+                kernel_mat_size=2000,
+                n_permutations=100,
+                device=torch.device("cuda:0"),
             )
 
             # Should suggest batching (return value < n_permutations and > 1)
@@ -528,7 +554,9 @@ class TestAutoDetectBatchSizeMocked:
             n_permutations = 1000
 
             batch_size = _auto_detect_permutation_batch_size(
-                kernel_mat_size=kernel_mat_size, n_permutations=n_permutations, device=torch.device("cuda:0")
+                kernel_mat_size=kernel_mat_size,
+                n_permutations=n_permutations,
+                device=torch.device("cuda:0"),
             )
 
             # With 3GB available and ~8MB per permutation:
@@ -547,7 +575,9 @@ class TestAutoDetectBatchSizeMocked:
 
         with mock_cuda_memory(total_memory=total_memory, reserved_memory=reserved_memory):
             batch_size = _auto_detect_permutation_batch_size(
-                kernel_mat_size=1000, n_permutations=100, device=torch.device("cuda:0")
+                kernel_mat_size=1000,
+                n_permutations=100,
+                device=torch.device("cuda:0"),
             )
 
             # With very little available memory, should still return at least 1
@@ -558,7 +588,9 @@ class TestAutoDetectBatchSizeMocked:
         with mock_cuda_memory(get_props_side_effect=RuntimeError("CUDA error")):
             # Large matrix should trigger fallback heuristic: return 10
             batch_size = _auto_detect_permutation_batch_size(
-                kernel_mat_size=600, n_permutations=100, device=torch.device("cuda:0")
+                kernel_mat_size=600,
+                n_permutations=100,
+                device=torch.device("cuda:0"),
             )
 
             assert batch_size == 10
@@ -568,7 +600,9 @@ class TestAutoDetectBatchSizeMocked:
         with mock_cuda_memory(get_props_side_effect=AttributeError("No CUDA support")):
             # Small matrix should trigger fallback: return 1
             batch_size = _auto_detect_permutation_batch_size(
-                kernel_mat_size=400, n_permutations=100, device=torch.device("cuda:0")
+                kernel_mat_size=400,
+                n_permutations=100,
+                device=torch.device("cuda:0"),
             )
 
             assert batch_size == 1
@@ -577,11 +611,15 @@ class TestAutoDetectBatchSizeMocked:
         """Test fallback returns 10 for large matrices (>500)."""
         # Mock get_device_properties to succeed but memory_reserved to fail
         with mock_cuda_memory(
-            total_memory=16 * 1024**3, reserved_memory=None, mem_reserved_side_effect=RuntimeError("CUDA error")
+            total_memory=16 * 1024**3,
+            reserved_memory=None,
+            mem_reserved_side_effect=RuntimeError("CUDA error"),
         ):
             # kernel_mat_size > 500 should return 10
             batch_size = _auto_detect_permutation_batch_size(
-                kernel_mat_size=1000, n_permutations=100, device=torch.device("cuda:0")
+                kernel_mat_size=1000,
+                n_permutations=100,
+                device=torch.device("cuda:0"),
             )
 
             assert batch_size == 10
@@ -590,11 +628,15 @@ class TestAutoDetectBatchSizeMocked:
         """Test fallback returns 1 for small matrices (<=500)."""
         # Mock get_device_properties to succeed but memory_reserved to fail
         with mock_cuda_memory(
-            total_memory=16 * 1024**3, reserved_memory=None, mem_reserved_side_effect=RuntimeError("CUDA error")
+            total_memory=16 * 1024**3,
+            reserved_memory=None,
+            mem_reserved_side_effect=RuntimeError("CUDA error"),
         ):
             # kernel_mat_size <= 500 should return 1
             batch_size = _auto_detect_permutation_batch_size(
-                kernel_mat_size=500, n_permutations=100, device=torch.device("cuda:0")
+                kernel_mat_size=500,
+                n_permutations=100,
+                device=torch.device("cuda:0"),
             )
 
             assert batch_size == 1
@@ -656,10 +698,10 @@ class TestAutoDetectBatchSizeMocked:
 
 @pytest.mark.required
 class TestMMDKernelMatrixEdgeCases:
-    """Additional tests for MMD kernel matrix edge cases"""
+    """Additional tests for MMD kernel matrix edge cases."""
 
     def test_mmd_from_kernel_matrix_batched_exact_division(self):
-        """Test batched permutations when n_permutations divides evenly"""
+        """Test batched permutations when n_permutations divides evenly."""
         n, m, n_perms = 50, 30, 20
         batch_size = 10  # Divides evenly into 20
         kernel_mat = torch.rand(n + m, n + m)
@@ -667,14 +709,18 @@ class TestMMDKernelMatrixEdgeCases:
 
         torch.manual_seed(42)
         mmd_batched = mmd2_from_kernel_matrix(
-            kernel_mat, m, zero_diag=False, n_permutations=n_perms, permutation_batch_size=batch_size
+            kernel_mat,
+            m,
+            zero_diag=False,
+            n_permutations=n_perms,
+            permutation_batch_size=batch_size,
         )
 
         # Should return correct number of permutations
         assert mmd_batched.shape == (n_perms,)
 
     def test_mmd_from_kernel_matrix_batched_partial_batch(self):
-        """Test batched permutations with remainder (line 499-514)"""
+        """Test batched permutations with remainder (line 499-514)."""
         n, m, n_perms = 50, 30, 25
         batch_size = 10  # Last batch will have 5 permutations
         kernel_mat = torch.rand(n + m, n + m)
@@ -682,14 +728,18 @@ class TestMMDKernelMatrixEdgeCases:
 
         torch.manual_seed(42)
         mmd_batched = mmd2_from_kernel_matrix(
-            kernel_mat, m, zero_diag=False, n_permutations=n_perms, permutation_batch_size=batch_size
+            kernel_mat,
+            m,
+            zero_diag=False,
+            n_permutations=n_perms,
+            permutation_batch_size=batch_size,
         )
 
         # Should still return correct number of permutations
         assert mmd_batched.shape == (n_perms,)
 
     def test_mmd_from_kernel_matrix_no_permutations(self):
-        """Test mmd2_from_kernel_matrix with n_permutations=0 (line 524-527)"""
+        """Test mmd2_from_kernel_matrix with n_permutations=0 (line 524-527)."""
         n, m = 50, 30
         kernel_mat = torch.rand(n + m, n + m)
         kernel_mat -= torch.diag(kernel_mat.diag())

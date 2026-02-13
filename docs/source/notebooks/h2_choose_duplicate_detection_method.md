@@ -52,9 +52,8 @@ features is invariant to **any** rotation angle, making it better for detecting 
 Let's import the required libraries.
 
 ```{code-cell} ipython3
----
-tags: [remove_cell]
----
+:tags: [remove_cell]
+
 # Google Colab Only
 try:
     import google.colab  # noqa: F401
@@ -216,7 +215,7 @@ for i, label in enumerate(labels):
 fig, axes = plt.subplots(3, 5, figsize=(12, 6))
 axes = axes.flatten()
 
-for i, (img, label) in enumerate(zip(images, labels)):
+for i, (img, label) in enumerate(zip(images, labels, strict=False)):
     if i < len(axes):
         # Convert CHW to HWC for display
         img_display = np.transpose(img, (1, 2, 0))
@@ -386,9 +385,8 @@ The key difference demonstrated in this notebook is **diagonal rotation handling
 If your dataset may contain images rotated at arbitrary angles, BoVWExtractor is the better choice despite being slower.
 
 ```{code-cell} ipython3
----
-tags: [remove_cell]
----
+:tags: [remove_cell]
+
 ### TEST ASSERTION CELL ###
 # D4 hashes should detect 90° rotations but NOT diagonal rotations
 assert d4_results.items.near is not None, "D4 should find some near duplicates"

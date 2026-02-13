@@ -277,9 +277,8 @@ def _get_dataset(
             for i, boxes in override_dict.items():
                 bboxes[i] = boxes
         return MockODDataset(images, labels, bboxes, metadata=metadata)
-    else:
-        labels = [0 for _ in range(length)]
-        return MockICDataset(images, labels, metadata=metadata)
+    labels = [0 for _ in range(length)]
+    return MockICDataset(images, labels, metadata=metadata)
 
 
 def _get_mock_ic_dataset(

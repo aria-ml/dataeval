@@ -16,7 +16,8 @@ _logger = logging.getLogger(__name__)
 SOURCE_INDEX_KEY = "source_index"
 
 OverrideFunctionMap: TypeAlias = Mapping[
-    str, Callable[[Mapping[str, NDArray[Any]], Mapping[str, NDArray[Any]]], NDArray[Any]]
+    str,
+    Callable[[Mapping[str, NDArray[Any]], Mapping[str, NDArray[Any]]], NDArray[Any]],
 ]
 """
 Mapping of stat names to custom ratio calculation functions.
@@ -46,13 +47,13 @@ def _default_ratio_map() -> OverrideFunctionMap:
         "offset_x": lambda box, img: box["offset_x"] / (img["width"] + EPSILON),
         "offset_y": lambda box, img: box["offset_y"] / (img["height"] + EPSILON),
         # Keep these values unchanged from box stats
-        "aspect_ratio": lambda box, img: box["aspect_ratio"],
-        "channels": lambda box, img: box["channels"],
-        "depth": lambda box, img: box["depth"],
+        "aspect_ratio": lambda box, _img: box["aspect_ratio"],
+        "channels": lambda box, _img: box["channels"],
+        "depth": lambda box, _img: box["depth"],
         # Hash stats should be kept as-is (they're strings, not numeric)
-        "xxhash": lambda box, img: box["xxhash"],
-        "phash": lambda box, img: box["phash"],
-        "dhash": lambda box, img: box["dhash"],
+        "xxhash": lambda box, _img: box["xxhash"],
+        "phash": lambda box, _img: box["phash"],
+        "dhash": lambda box, _img: box["dhash"],
         # Normalize distance to center by half-diagonal of image
         "distance_center": lambda box, img: (
             box["distance_center"] / (np.sqrt(np.square(img["width"]) + np.square(img["height"])) / 2 + EPSILON)
@@ -175,7 +176,7 @@ def _validate_separate_inputs(
     if stats_output["image_count"] != box_stats_output["image_count"]:
         raise ValueError(
             f"Image count mismatch: stats_output has {stats_output['image_count']} images, "
-            f"but box_stats_output has {box_stats_output['image_count']} images."
+            f"but box_stats_output has {box_stats_output['image_count']} images.",
         )
 
     # Validate that stats_output has only image entries
@@ -184,7 +185,7 @@ def _validate_separate_inputs(
         raise ValueError(
             "When using box_stats_output parameter, stats_output should contain only "
             "image-level statistics (per_image=True, per_target=False). "
-            f"Found {sum(1 for si in img_source_indices if si.target is not None)} box entries."
+            f"Found {sum(1 for si in img_source_indices if si.target is not None)} box entries.",
         )
 
     # Validate that box_stats_output has only box entries
@@ -193,7 +194,7 @@ def _validate_separate_inputs(
         raise ValueError(
             "When using box_stats_output parameter, it should contain only "
             "box-level statistics (per_image=False, per_target=True). "
-            f"Found {sum(1 for si in box_source_indices if si.target is None)} image entries."
+            f"Found {sum(1 for si in box_source_indices if si.target is None)} image entries.",
         )
 
     # Validate channel compatibility
@@ -202,7 +203,7 @@ def _validate_separate_inputs(
     if img_has_channels != box_has_channels:
         raise ValueError(
             "Channel mismatch: Both stats_output and box_stats_output must have matching "
-            "per_channel settings (both True or both False)."
+            "per_channel settings (both True or both False).",
         )
 
     # Validate that stats dictionaries have overlapping keys
@@ -215,7 +216,7 @@ def _validate_separate_inputs(
             "No overlapping statistics found between stats_output and box_stats_output. "
             f"stats_output has keys: {sorted(img_stats_keys)}, "
             f"box_stats_output has keys: {sorted(box_stats_keys)}. "
-            "Ensure both outputs were computed with the same statistics flags."
+            "Ensure both outputs were computed with the same statistics flags.",
         )
 
     return img_source_indices, box_source_indices
@@ -229,14 +230,14 @@ def _validate_unified_input(source_indices: Sequence[SourceIndex]) -> None:
     if not has_image_entries:
         raise ValueError(
             "stats_output must contain image-level statistics (entries with box=None). "
-            "Ensure per_image=True when calling calculate(), or provide box_stats_output parameter."
+            "Ensure per_image=True when calling calculate(), or provide box_stats_output parameter.",
         )
 
     if not has_target_entries:
         raise ValueError(
             "stats_output must contain box-level statistics (entries with box!=None). "
             "Ensure per_target=True and boxes are provided when calling calculate(), "
-            "or provide box_stats_output parameter."
+            "or provide box_stats_output parameter.",
         )
 
 
@@ -397,7 +398,7 @@ def calculate_ratios(
             raise ValueError(
                 f"Cannot find image-level stats for box at image={source_idx.item}, "
                 f"channel={source_idx.channel}. Ensure both stats_output and box_stats_output "
-                f"were computed on the same dataset with matching per_channel settings."
+                f"were computed on the same dataset with matching per_channel settings.",
             )
 
         img_idx = img_lookup[img_key]
@@ -412,7 +413,7 @@ def calculate_ratios(
         img_stat_values = img_calc_result["stats"][stat_name]
 
         ratio_values: list[Any] = []
-        for box_idx, img_idx in zip(box_indices, img_indices):
+        for box_idx, img_idx in zip(box_indices, img_indices, strict=False):
             # Build context dicts for custom override functions
             box_stats: dict[str, NDArray[Any]] = {k: v[box_idx] for k, v in box_calc_result["stats"].items()}
             img_stats: dict[str, NDArray[Any]] = {k: v[img_idx] for k, v in img_calc_result["stats"].items()}

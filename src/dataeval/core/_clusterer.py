@@ -137,7 +137,8 @@ class _Sorter(ABC):
 
     scores: NDArray[np.float32] | None = None
 
-    def __init__(self, *args: int, **kwargs: int | Literal["auto"] | Literal["kmeans", "hdbscan"] | None) -> None: ...
+    @abstractmethod
+    def __init__(self, *args: int, **kwargs: Literal["auto", "kmeans", "hdbscan"] | int | None) -> None: ...
 
     @abstractmethod
     def _sort(self, embeddings: NDArray[Any], reference: NDArray[Any] | None = None) -> NDArray[np.intp]: ...
@@ -155,7 +156,7 @@ class _KNNSorter(_Sorter):
         elif k >= samples / 10 and k > np.sqrt(samples):
             _logger.warning(
                 f"Variable k={k} is large with respect to dataset size but valid; "
-                + f"a nominal recommendation is k={int(np.sqrt(samples))}"
+                f"a nominal recommendation is k={int(np.sqrt(samples))}",
             )
         self._k = k
 
@@ -213,7 +214,7 @@ class _HDBSCANSorter:
         samples: int,
         n_expected_clusters: int | None = None,
         max_cluster_size: int | None = None,
-        **kwargs: Any,
+        **_kwargs: Any,
     ) -> None:
         if n_expected_clusters is not None and n_expected_clusters >= samples:
             raise ValueError(f"n_expected_clusters={n_expected_clusters} should be less than dataset size ({samples})")
@@ -228,7 +229,8 @@ class _HDBSCANSorter:
             raise ValueError("Clustering failed to produce labels or cluster centers")
         if (clst.labels_ == -1).any():
             all_distances = np.linalg.norm(
-                embeddings[:, np.newaxis, :] - clst.cluster_centers_[np.newaxis, :, :], axis=2
+                embeddings[:, np.newaxis, :] - clst.cluster_centers_[np.newaxis, :, :],
+                axis=2,
             )
             # Get nearest cluster index for each point
             labels = np.argmin(all_distances, axis=1)
@@ -309,8 +311,7 @@ _SORTER_MAP: dict[str, type[_Sorter]] = {
 
 class _HDBSCAN:
     """
-    Uses hierarchical clustering on the flattened data and returns clustering
-    information.
+    Use hierarchical clustering on the flattened data and return clustering information.
 
     Parameters
     ----------
@@ -422,7 +423,10 @@ class _HDBSCAN:
         cluster_tree = cluster_tree_from_condensed_tree(condensed_tree)
 
         selected_clusters = extract_eom_clusters(
-            condensed_tree, cluster_tree, max_cluster_size=max_num, allow_single_cluster=self.single_cluster
+            condensed_tree,
+            cluster_tree,
+            max_cluster_size=max_num,
+            allow_single_cluster=self.single_cluster,
         )
 
         # Uncomment if cluster_selection_method is made a parameter
@@ -645,8 +649,7 @@ def cluster(
     n_init: int | Literal["auto"] = "auto",
 ) -> ClusterResult:
     """
-    Uses hierarchical clustering on the flattened data and returns clustering
-    information.
+    Use hierarchical clustering on the flattened data and return clustering information.
 
     Parameters
     ----------

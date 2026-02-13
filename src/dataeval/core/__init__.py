@@ -1,6 +1,4 @@
-"""
-Core stateless functions for performing dataset, metadata and model evaluation.
-"""
+"""Core stateless functions for performing dataset, metadata and model evaluation."""
 
 __all__ = [
     "ber_knn",

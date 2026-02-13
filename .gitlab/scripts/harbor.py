@@ -12,9 +12,7 @@ TAGS = "tags"
 
 
 class Harbor(RestWrapper):
-    """
-    Helper class wrapping Harbor REST API calls
-    """
+    """Helper class wrapping Harbor REST API calls."""
 
     def __init__(
         self,
@@ -27,7 +25,7 @@ class Harbor(RestWrapper):
 
     def list_artifacts(self, repository_name: str, tag_filter: str | None = None) -> list[dict[str, Any]]:
         """
-        List artifacts
+        List artifacts.
 
         Returns
         -------
@@ -46,7 +44,7 @@ class Harbor(RestWrapper):
 
     def delete_tag(self, repository_name: str, tag_name: str) -> None:
         """
-        Delete a tag 'repository_name:tag_name'
+        Delete a tag 'repository_name:tag_name'.
 
         Parameters
         ----------
@@ -63,7 +61,6 @@ class Harbor(RestWrapper):
         ----
         https://harbor.jatic.net/#/artifact/deleteTag
         """
-
         try:
             self._request(delete, [REPOSITORIES, repository_name, ARTIFACTS, tag_name, TAGS, tag_name])
         except ConnectionError as e:

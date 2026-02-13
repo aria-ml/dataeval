@@ -1,6 +1,4 @@
-"""
-Global configuration settings for DataEval.
-"""
+"""Global configuration settings for DataEval."""
 
 __all__ = [
     "get_device",
@@ -66,6 +64,7 @@ class GlobalConfig(BaseModel):
     @field_validator("max_processes")
     @classmethod
     def validate_max_processes(cls, v: int | None) -> int | None:
+        """Validate that max_processes is not zero."""
         if v == 0:
             raise ValueError("max_processes cannot be zero; use None to default to CPU count.")
         return v
@@ -73,6 +72,7 @@ class GlobalConfig(BaseModel):
     @field_validator("batch_size")
     @classmethod
     def validate_batch_size(cls, v: int | None) -> int | None:
+        """Validate that batch_size is greater than zero."""
         if v is not None and v < 1:
             raise ValueError("batch_size must be greater than 0.")
         return v
@@ -97,7 +97,7 @@ class _ConfigContextManager:
         self._old = getattr(_config, self._attr_name)
         setattr(_config, self._attr_name, self._value)
 
-    def __exit__(self, *args: tuple[Any, ...]) -> None:
+    def __exit__(self, *args: object) -> None:
         setattr(_config, self._attr_name, self._old)
 
 
@@ -110,7 +110,7 @@ def _todevice(device: DeviceLike) -> torch.device:
 
 def set_device(device: DeviceLike | None) -> None:
     """
-    Sets the default device to use when executing against a PyTorch backend.
+    Set the default device to use when executing against a PyTorch backend.
 
     Parameters
     ----------
@@ -126,7 +126,7 @@ def set_device(device: DeviceLike | None) -> None:
 
 def get_device(override: DeviceLike | None = None) -> torch.device:
     """
-    Returns the PyTorch device to use.
+    Return the PyTorch device to use.
 
     Parameters
     ----------
@@ -175,7 +175,7 @@ def use_device(device: DeviceLike) -> _ConfigContextManager:
 
 def set_batch_size(batch_size: int | None) -> None:
     """
-    Sets the default batch size to use when processing data.
+    Set the default batch size to use when processing data.
 
     Parameters
     ----------
@@ -192,7 +192,7 @@ def set_batch_size(batch_size: int | None) -> None:
 
 def get_batch_size(override: int | None = None) -> int:
     """
-    Returns the batch size to use.
+    Return the batch size to use.
 
     Parameters
     ----------
@@ -219,7 +219,7 @@ def get_batch_size(override: int | None = None) -> int:
     if _config.batch_size is None:
         raise ValueError(
             "No batch_size provided. Either pass batch_size as a parameter to the call "
-            "or set a global batch_size using dataeval.config.set_batch_size()."
+            "or set a global batch_size using dataeval.config.set_batch_size().",
         )
     return _config.batch_size
 
@@ -243,7 +243,7 @@ def use_batch_size(batch_size: int) -> _ConfigContextManager:
 
 def set_max_processes(processes: int | None) -> None:
     """
-    Sets the maximum number of worker processes to use when running tasks that support parallel processing.
+    Set the maximum number of worker processes to use when running tasks that support parallel processing.
 
     Parameters
     ----------
@@ -268,7 +268,7 @@ def set_max_processes(processes: int | None) -> None:
 
 def get_max_processes() -> int | None:
     """
-    Returns the maximum number of worker processes to use when running tasks that support parallel processing.
+    Return the maximum number of worker processes to use when running tasks that support parallel processing.
 
     Returns
     -------
@@ -301,7 +301,7 @@ def use_max_processes(processes: int) -> _ConfigContextManager:
 
 def set_seed(seed: int | None, all_generators: bool = False) -> None:
     """
-    Sets the seed for use by classes that allow for a random state or seed.
+    Set the seed for use by classes that allow for a random state or seed.
 
     Parameters
     ----------
@@ -324,7 +324,7 @@ def set_seed(seed: int | None, all_generators: bool = False) -> None:
 
 def get_seed() -> int | None:
     """
-    Returns the seed for random state or seed.
+    Return the seed for random state or seed.
 
     Returns
     -------

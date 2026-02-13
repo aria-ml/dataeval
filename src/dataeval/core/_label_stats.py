@@ -59,7 +59,7 @@ def label_stats(
     image_count: int | None = None,
 ) -> LabelStatsResult:
     """
-    Calculates statistics for data labels.
+    Calculate statistics for data labels.
 
     This function computes counting metrics (e.g., total per class, total per image)
     on the labels. This is a core computation function that operates on basic data
@@ -141,7 +141,7 @@ def label_stats(
         item_indices_list = list(item_indices)
         if len(item_indices_list) != total_labels:
             raise ValueError(
-                f"item_indices length ({len(item_indices_list)}) must match class_labels length ({total_labels})"
+                f"item_indices length ({len(item_indices_list)}) must match class_labels length ({total_labels})",
             )
         inferred_image_count = max(item_indices_list) + 1 if item_indices_list else 0
 
@@ -156,7 +156,7 @@ def label_stats(
     classes_seen_per_image: list[set[int]] = [set() for _ in range(img_count)]
 
     # Single pass through the data
-    for label, img_idx in zip(class_labels_list, item_indices_list):
+    for label, img_idx in zip(class_labels_list, item_indices_list, strict=False):
         # Ensure label is always native int type
         label = int(label)
         img_idx = int(img_idx)

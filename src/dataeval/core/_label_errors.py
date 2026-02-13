@@ -34,10 +34,12 @@ class LabelErrorResult(TypedDict):
 
 
 def _compute_label_scores(
-    embeddings: NDArray[Any], labels: NDArray[np.int64], k: int = 50
+    embeddings: NDArray[Any],
+    labels: NDArray[np.int64],
+    k: int = 50,
 ) -> tuple[NDArray[np.float32], NDArray[np.int64]]:
     """
-    Computes label quality scores based on the ratio of intra-class to extra-class distances.
+    Compute label quality scores based on the ratio of intra-class to extra-class distances.
 
     For each sample, this calculates the ratio between the average distance to its nearest
     neighbors within the same class (intra) and the average distance to its nearest neighbors
@@ -102,7 +104,10 @@ def _compute_label_scores(
 
 
 def _suggest_labels(
-    neighbor_labels: NDArray[np.int64], num_classes: int, min_confidence: float = 0.4, ambiguity_threshold: float = 0.2
+    neighbor_labels: NDArray[np.int64],
+    num_classes: int,
+    min_confidence: float = 0.4,
+    ambiguity_threshold: float = 0.2,
 ) -> list[list[int]]:
     """
     Suggests alternative labels for samples based on rank-weighted voting of their neighbors.
@@ -184,7 +189,7 @@ def _suggest_labels(
 
 def label_errors(embeddings: NDArray[Any], labels: NDArray[np.int64], k: int = 50) -> LabelErrorResult:
     """
-    Identifies potential label errors in a dataset using embedding geometry.
+    Identify potential label errors in a dataset using embedding geometry.
 
     Calculates an "Intra/Extra Class Distance Ratio" for every sample. Samples are flagged
     as errors if they are significantly closer to samples of a different class than to

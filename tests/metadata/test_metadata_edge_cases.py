@@ -81,7 +81,12 @@ class TestMetadataFactorValueTypes:
         factor_values = (1.0, 2.0, 3.0)
         srcidx = np.array([0, 0, 1, 1, 2])
         result = metadata._get_target_factor_values(
-            "test", factor_values, srcidx, True, {"test"}, {"test": factor_values}
+            "test",
+            factor_values,
+            srcidx,
+            True,
+            {"test"},
+            {"test": factor_values},
         )
         assert len(result) == 5
         assert result == [1.0, 1.0, 2.0, 2.0, 3.0]

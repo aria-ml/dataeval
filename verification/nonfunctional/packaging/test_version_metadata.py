@@ -36,4 +36,5 @@ class TestVersionMetadata:
     def test_project_urls_set(self):
         meta = metadata("dataeval")
         urls = meta.get_all("Project-URL")
-        assert urls is not None and len(urls) > 0
+        assert urls is not None
+        assert len(urls) > 0

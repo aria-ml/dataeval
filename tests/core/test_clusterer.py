@@ -7,16 +7,16 @@ import sklearn.datasets as dsets
 class TestMatrixOps:
     @pytest.mark.parametrize(
         "shape",
-        (
+        [
             (2, 1),  # Minimum size
             (4, 4),  # Square small
             (100, 2),  # High sample, low features
             (2, 100),  # Low samples, high features
             (100, 100),  # Square large
-        ),
+        ],
     )
     def test_matrices(self, shape):
-        """Sample size (rows), feature size (cols) and non-uniform shapes can create matrix"""
+        """Sample size (rows), feature size (cols) and non-uniform shapes can create matrix."""
         # import on runtime to minimize load times
         from dataeval.core._clusterer import cluster
 
@@ -44,7 +44,7 @@ class TestMatrixOps:
 @pytest.mark.required
 class TestClustererValidate:
     @pytest.mark.parametrize(
-        "data, error, error_msg",
+        ("data", "error", "error_msg"),
         [
             (
                 np.array([[[0]]]),
@@ -110,7 +110,7 @@ def outlier_data():
 
 @pytest.mark.required
 class TestClusterer:
-    """Tests all functions related to and including the `create_clusters` method"""
+    """Tests all functions related to and including the `create_clusters` method."""
 
     @pytest.mark.parametrize("data_func", ["functional_data", "duplicate_data", "outlier_data"])
     def test_create_clusters(self, data_func, request):
@@ -118,12 +118,12 @@ class TestClusterer:
         1. All keys are present in outer and inner dicts
         2. Max level and max clusters are correct
         3. Distances are all positive
-        4. All samples have a cluster
+        4. All samples have a cluster.
         """
         from dataeval.core._clusterer import cluster
 
         dataset = request.getfixturevalue(data_func)
-        for alg in ["hdbscan", "kmeans"]:
+        for _alg in ["hdbscan", "kmeans"]:
             cl = cluster(dataset)
 
             # clusters are counting numbers >= -1
@@ -131,7 +131,7 @@ class TestClusterer:
             assert np.issubdtype(cl["clusters"].dtype, np.integer)
 
     def test_hdbscan_functional(self, functional_data):
-        """The results of evaluate are equivalent to the known outputs"""
+        """The results of evaluate are equivalent to the known outputs."""
         from dataeval.core._clusterer import cluster
 
         cl = cluster(functional_data, algorithm="hdbscan")
@@ -145,12 +145,12 @@ class TestClusterer:
             2, 1, 2, 1, 3, 4, 0, 4, 2, 1, 4, 4, 1, 3, 2, 3, 1, 4, 1, 1, 3, 1,
             3, 3, 2, 4, 3, 1, 4, 4, 4, 3, 1, 4, 0, 2, 0, 1, 3, 3, 1, 0, 4, 3,
             2, 2, 1, 0, 4, 0, 1, 3, 4, 4, 4, 0, 0, 2, 0, 0, 0, 0, 1, 0, 1, 2,
-            1, 1, 3, 0, 4, 0, 4, 2, 1, 0, 0, 2
+            1, 1, 3, 0, 4, 0, 4, 2, 1, 0, 0, 2,
         ]
         # fmt: on
 
     def test_kmeans_functional(self, functional_data):
-        """The results of evaluate are equivalent to the known outputs"""
+        """The results of evaluate are equivalent to the known outputs."""
         from dataeval.core._clusterer import cluster
 
         cl = cluster(functional_data, algorithm="kmeans", n_clusters=5)
@@ -164,7 +164,7 @@ class TestClusterer:
             3, 0, 3, 0, 4, 1, 2, 1, 3, 0, 1, 1, 0, 4, 3, 4, 0, 1, 0, 0, 4, 0,
             4, 4, 3, 1, 4, 0, 1, 1, 1, 4, 0, 1, 2, 3, 2, 0, 4, 4, 0, 2, 1, 4,
             3, 3, 0, 2, 4, 2, 0, 4, 1, 1, 1, 2, 2, 3, 2, 2, 2, 2, 0, 2, 0, 3,
-            0, 0, 4, 2, 1, 2, 1, 3, 0, 2, 2, 3
+            0, 0, 4, 2, 1, 2, 1, 3, 0, 2, 2, 3,
         ]
         # fmt: on
 

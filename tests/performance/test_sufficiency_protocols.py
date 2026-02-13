@@ -1,5 +1,5 @@
 """
-Tests for TrainingStrategy and EvaluationStrategy protocols
+Tests for TrainingStrategy and EvaluationStrategy protocols.
 
 These tests verify that the protocol structure is correct and that
 conforming classes are properly recognized.
@@ -17,7 +17,7 @@ from dataeval.protocols import EvaluationStrategy, TrainingStrategy
 
 class SimpleDataset(Dataset):
     """
-    Mock dataset for testing
+    Mock dataset for testing.
 
     TODO: Replace with DataEval pytest fixture
     TODO: Confirm use for IC and OD
@@ -49,16 +49,16 @@ class SimpleModel(nn.Module):
 
 
 class TestTrainingStrategyProtocol:
-    """Test that TrainingStrategy protocol is properly defined"""
+    """Test that TrainingStrategy protocol is properly defined."""
 
     def test_training_protocol_accepts_conforming_class(self):
         """Verify that classes matching the Protocol structure are accepted."""
 
         class SimpleTrainer:
-            """Minimal conforming implementation"""
+            """Minimal conforming implementation."""
 
             def train(self, model: nn.Module, dataset: Dataset, indices: list[int]):
-                """Dummy training implementation"""
+                """Dummy training implementation."""
                 pass
 
         trainer = SimpleTrainer()
@@ -181,7 +181,7 @@ class TestProtocolIntegration:
     """Test that protocols work together in realistic scenarios."""
 
     def test_can_create_custom_strategies(self):
-        """Verify users can create custom strategy implementations with user-defined initialization"""
+        """Verify users can create custom strategy implementations with user-defined initialization."""
 
         class CustomTrainer:
             def __init__(self, learning_rate: float, epochs: int):
@@ -190,7 +190,7 @@ class TestProtocolIntegration:
 
             def train(self, model: nn.Module, dataset: Dataset, indices: list[int]) -> None:
                 # Simplified training simulation
-                for epoch in range(self.epochs):
+                for _epoch in range(self.epochs):
                     # Would do actual training here
                     pass
 

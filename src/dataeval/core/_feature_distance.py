@@ -14,7 +14,7 @@ _logger = logging.getLogger(__name__)
 
 
 class KSType(NamedTuple):
-    """Used to typehint scipy's internal hidden ks_2samp output"""
+    """Used to typehint scipy's internal hidden ks_2samp output."""
 
     statistic: float
     statistic_location: float
@@ -44,15 +44,14 @@ class FeatureDistanceResult(TypedDict):
 
 
 def _calculate_drift(x1: Array1D[float] | Array2D[float], x2: Array1D[float] | Array2D[float]) -> float:
-    """Calculates the shift magnitude between x1 and x2 scaled by x1"""
-
+    """Calculate the shift magnitude between x1 and x2 scaled by x1."""
     distance = wasserstein_distance(x1, x2)
 
-    X = iqr(x1)
+    x_iqr = iqr(x1)
 
     # Preferred scaling of x1
-    if X:
-        return distance / X
+    if x_iqr:
+        return distance / x_iqr
 
     # Return if single-valued, else scale
     xmin, xmax = np.min(as_numpy(x1)), np.max(as_numpy(x1))
@@ -64,9 +63,9 @@ def feature_distance(
     continuous_data_2: Array1D[float] | Array2D[float],
 ) -> Sequence[FeatureDistanceResult]:
     """
-    Measures the feature-wise distance between two continuous distributions and computes a
-    p-value to evaluate its significance.
+    Measure the feature-wise distance between two continuous distributions.
 
+    Computes a p-value to evaluate its significance.
     Uses the Earth Mover's Distance and the Kolmogorov-Smirnov two-sample test, featurewise.
 
     Parameters
@@ -102,13 +101,13 @@ def feature_distance(
     if len(cont1.T) != len(cont2.T):
         raise ValueError(f"Data must have the same numbers of features. ({len(cont1.T)} != {len(cont2.T)})")
 
-    N = len(cont1)
-    M = len(cont2)
+    n = len(cont1)
+    m = len(cont2)
 
-    # This is a simplified version of sqrt(N*M / N+M) < 4
-    if (N - 16) * (M - 16) < 256:
+    # This is a simplified version of sqrt(n*m / n+m) < 4
+    if (n - 16) * (m - 16) < 256:
         _logger.warning(
-            f"Sample sizes of {N}, {M} will yield unreliable p-values from the KS test. "
+            f"Sample sizes of {n}, {m} will yield unreliable p-values from the KS test. "
             f"Recommended 32 samples per factor or at least 16 if one set has many more.",
         )
 

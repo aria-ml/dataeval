@@ -11,7 +11,7 @@ from tests.conftest import MockMetadata, to_metadata
 
 @pytest.mark.required
 class TestParityUnit:
-    """Test the Parity class interface"""
+    """Test the Parity class interface."""
 
     def test_initialization_defaults(self):
         parity_obj = Parity()
@@ -73,7 +73,7 @@ class TestParityUnit:
             index2label={},
         )
         parity_obj = Parity()
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="No factors found"):
             parity_obj.evaluate(mock_metadata)
 
     def test_metadata_stored(self):
@@ -87,7 +87,7 @@ class TestParityUnit:
         assert parity_obj.metadata.factor_names == metadata.factor_names
 
     def test_threshold_parameters(self):
-        """Test that custom thresholds affect correlation detection"""
+        """Test that custom thresholds affect correlation detection."""
         labels = [0] * 5 + [1] * 5
         factors = {"factor1": ["a"] * 5 + ["b"] * 5}
         metadata = to_metadata(factors, labels)
@@ -105,7 +105,7 @@ class TestParityUnit:
 
 
 class TestParityFunctional:
-    """Test functional behavior of Parity class"""
+    """Test functional behavior of Parity class."""
 
     def test_correlated_factors(self):
         """

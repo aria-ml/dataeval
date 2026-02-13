@@ -187,8 +187,7 @@ class TestDuplicates:
         assert results is not None
 
     def test_duplicates_from_clusters_basic(self):
-        """Test basic cluster-based duplicate detection"""
-
+        """Test basic cluster-based duplicate detection."""
         # Create ClusterResult with MST and cluster assignments
         # Create a simple MST structure (edges with distances)
         # Format: [node1, node2, distance]
@@ -219,8 +218,7 @@ class TestDuplicates:
         assert result.targets.near is None
 
     def test_duplicates_from_clusters_with_near(self):
-        """Test cluster-based detection treats all duplicates as near duplicates"""
-
+        """Test cluster-based detection treats all duplicates as near duplicates."""
         # Create ClusterResult with zero-distance edge and edges that will
         # produce near duplicates. Near duplicates are edges with distance < cluster std.
         # With distances [0.0, 0.01, 0.05, 0.1], std is ~0.042, so 0.01 will be a near dup.
@@ -249,8 +247,7 @@ class TestDuplicates:
         assert result.targets.near is None
 
     def test_duplicates_from_clusters_no_duplicates(self):
-        """Test with data that has no duplicates"""
-
+        """Test with data that has no duplicates."""
         # Create ClusterResult with no zero-distance edges
         mock_cluster_result: ClusterResult = {
             "mst": np.array([[0, 1, 0.5], [1, 2, 0.3], [2, 3, 0.4]], dtype=np.float32),
@@ -321,7 +318,7 @@ class TestDuplicates:
         images = [image]
         labels = [[0, 1]]
         bboxes = [
-            [[0, 0, 50, 50], [50, 50, 100, 100]]  # white region  # black region
+            [[0, 0, 50, 50], [50, 50, 100, 100]],  # white region  # black region
         ]
 
         dataset = get_mock_od_dataset(images, labels, bboxes)
@@ -530,10 +527,7 @@ class TestDuplicatesEdgeCases:
             detector.evaluate(data)
 
     def test_merge_duplicate_groups_logic(self):
-        """
-        Covers _merge_duplicate_groups logic for overlapping and disjoint sets.
-
-        """
+        """Covers _merge_duplicate_groups logic for overlapping and disjoint sets."""
         detector = Duplicates()
 
         # Case 1: Disjoint groups
@@ -562,7 +556,8 @@ class TestDuplicatesEdgeCases:
 
         # Both None/Empty
         res = detector._merge_item_results(None, [], [], set())
-        assert res.exact is None and res.near is None
+        assert res.exact is None
+        assert res.near is None
 
         # Only hash result provided
         mock_hash_result = DuplicateDetectionResult(exact=[[1, 2]], near=None)

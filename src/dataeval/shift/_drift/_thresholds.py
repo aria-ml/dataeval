@@ -1,6 +1,7 @@
 """
-Source code derived from NannyML 0.13.0
-https://github.com/NannyML/nannyml/blob/main/nannyml/thresholds.py
+Source code derived from NannyML 0.13.0.
+
+https://github.com/NannyML/nannyml/blob/main/nannyml/thresholds.py.
 
 Licensed under Apache Software License (Apache 2.0)
 """
@@ -42,30 +43,34 @@ class Threshold(ABC):
 
     @abstractmethod
     def thresholds(self, data: np.ndarray) -> tuple[float | None, float | None]:
-        """Returns lower and upper threshold values when given one or more np.ndarray instances.
+        """Return lower and upper threshold values when given one or more np.ndarray instances.
 
-        Parameters:
+        Parameters
+        ----------
             data: np.ndarray
                 An array of values used to calculate the thresholds on. This will most often represent a metric
                 calculated on one or more sets of data, e.g. a list of F1 scores of multiple data chunks.
             kwargs: dict[str, Any]
                 Optional keyword arguments passed to the implementing subclass.
 
-        Returns:
+        Returns
+        -------
             lower, upper: tuple[Optional[float], Optional[float]]
                 The lower and upper threshold values. One or both might be `None`.
         """
 
     @classmethod
     def parse_object(cls, obj: dict[str, Any]) -> Self:
-        """Parse object as :class:`Threshold`"""
+        """Parse object as :class:`Threshold`."""
         class_name = obj.pop("type", "")
 
         try:
             threshold_cls = cls._registry[class_name]
-        except KeyError:
+        except KeyError as err:
             accepted_values = ", ".join(map(repr, cls._registry))
-            raise ValueError(f"Expected one of {accepted_values} for threshold type, but received '{class_name}'")
+            raise ValueError(
+                f"Expected one of {accepted_values} for threshold type, but received '{class_name}'",
+            ) from err
 
         return threshold_cls(**obj)
 
@@ -103,14 +108,13 @@ class Threshold(ABC):
             An optional Logger instance. When provided a warning will be logged when a calculated threshold value
             gets overridden by a threshold value limit.
         """
-
         lower_value, upper_value = self.thresholds(data)
 
         if lower_limit is not None and lower_value is not None and lower_value <= lower_limit:
             override_value = None if override_using_none else lower_limit
             if logger:
                 logger.warning(
-                    f"lower threshold value {lower_value} overridden by lower threshold value limit {override_value}"
+                    f"lower threshold value {lower_value} overridden by lower threshold value limit {override_value}",
                 )
             lower_value = override_value
 
@@ -118,7 +122,7 @@ class Threshold(ABC):
             override_value = None if override_using_none else upper_limit
             if logger:
                 logger.warning(
-                    f"upper threshold value {upper_value} overridden by upper threshold value limit {override_value}"
+                    f"upper threshold value {upper_value} overridden by upper threshold value limit {override_value}",
                 )
             upper_value = override_value
 
@@ -128,25 +132,28 @@ class Threshold(ABC):
 class ConstantThreshold(Threshold, threshold_type="constant"):
     """A `Thresholder` implementation that returns a constant lower and or upper threshold value.
 
-    Attributes:
+    Attributes
+    ----------
         lower: Optional[float]
             The constant lower threshold value. Defaults to `None`, meaning there is no lower threshold.
         upper: Optional[float]
             The constant upper threshold value. Defaults to `None`, meaning there is no upper threshold.
 
-    Raises:
+    Raises
+    ------
         ValueError: raised when an argument was given using an incorrect type or name
         ValueError: raised when the ConstantThreshold could not be created using the given argument values
 
-    Examples:
+    Examples
+    --------
         >>> data = np.array(range(10))
         >>> t = ConstantThreshold(lower=None, upper=0.1)
         >>> t.calculate(data)
         (None, 0.1)
     """
 
-    def __init__(self, lower: float | int | None = None, upper: float | int | None = None) -> None:
-        """Creates a new ConstantThreshold instance.
+    def __init__(self, lower: float | None = None, upper: float | None = None) -> None:
+        """Create a new ConstantThreshold instance.
 
         Args:
             lower: Optional[Union[float, int]], default=None
@@ -154,7 +161,8 @@ class ConstantThreshold(Threshold, threshold_type="constant"):
             upper: Optional[Union[float, int]], default=None
                 The constant upper threshold value. Defaults to `None`, meaning there is no upper threshold.
 
-        Raises:
+        Raises
+        ------
             ValueError: raised when an argument was given using an incorrect type or name
             ValueError: raised when the ConstantThreshold could not be created using the given argument values
         """
@@ -163,11 +171,11 @@ class ConstantThreshold(Threshold, threshold_type="constant"):
         self.lower = lower
         self.upper = upper
 
-    def thresholds(self, data: np.ndarray) -> tuple[float | None, float | None]:
+    def thresholds(self, data: np.ndarray) -> tuple[float | None, float | None]:  # noqa: ARG002
         return self.lower, self.upper
 
     @staticmethod
-    def _validate_inputs(lower: float | int | None = None, upper: float | int | None = None) -> None:
+    def _validate_inputs(lower: float | None = None, upper: float | None = None) -> None:
         if lower is not None and not isinstance(lower, float | int) or isinstance(lower, bool):
             raise ValueError(f"expected type of 'lower' to be 'float', 'int' or None but got '{type(lower).__name__}'")
 
@@ -186,11 +194,13 @@ class StandardDeviationThreshold(Threshold, threshold_type="standard_deviation")
     to get the upper and lower threshold values.
     This offset is calculated as a multiplier, by default 3, times the standard deviation of the given array.
 
-    Attributes:
+    Attributes
+    ----------
         std_lower_multiplier: float
         std_upper_multiplier: float
 
-    Examples:
+    Examples
+    --------
         >>> data = np.array(range(10))
         >>> t = StandardDeviationThreshold(std_lower_multiplier=2, std_upper_multiplier=2.5)
         >>> t.calculate(data)
@@ -199,11 +209,11 @@ class StandardDeviationThreshold(Threshold, threshold_type="standard_deviation")
 
     def __init__(
         self,
-        std_lower_multiplier: float | int | None = 3,
-        std_upper_multiplier: float | int | None = 3,
+        std_lower_multiplier: float | None = 3,
+        std_upper_multiplier: float | None = 3,
         offset_from: Callable[[np.ndarray], Any] = np.nanmean,
     ) -> None:
-        """Creates a new StandardDeviationThreshold instance.
+        """Create a new StandardDeviationThreshold instance.
 
         Args:
             std_lower_multiplier: float, default=3
@@ -219,7 +229,6 @@ class StandardDeviationThreshold(Threshold, threshold_type="standard_deviation")
                 Adding the upper offset to this value will yield the upper threshold, subtracting the lower offset
                 will yield the lower threshold.
         """
-
         self._validate_inputs(std_lower_multiplier, std_upper_multiplier)
 
         self.std_lower_multiplier = std_lower_multiplier
@@ -238,7 +247,8 @@ class StandardDeviationThreshold(Threshold, threshold_type="standard_deviation")
 
     @staticmethod
     def _validate_inputs(
-        std_lower_multiplier: float | int | None = 3, std_upper_multiplier: float | int | None = 3
+        std_lower_multiplier: float | None = 3,
+        std_upper_multiplier: float | None = 3,
     ) -> None:
         if (
             std_lower_multiplier is not None
@@ -247,7 +257,7 @@ class StandardDeviationThreshold(Threshold, threshold_type="standard_deviation")
         ):
             raise ValueError(
                 f"expected type of 'std_lower_multiplier' to be 'float', 'int' or None "
-                f"but got '{type(std_lower_multiplier).__name__}'"
+                f"but got '{type(std_lower_multiplier).__name__}'",
             )
 
         if std_lower_multiplier and std_lower_multiplier < 0:
@@ -260,7 +270,7 @@ class StandardDeviationThreshold(Threshold, threshold_type="standard_deviation")
         ):
             raise ValueError(
                 f"expected type of 'std_upper_multiplier' to be 'float', 'int' or None "
-                f"but got '{type(std_upper_multiplier).__name__}'"
+                f"but got '{type(std_upper_multiplier).__name__}'",
             )
 
         if std_upper_multiplier and std_upper_multiplier < 0:

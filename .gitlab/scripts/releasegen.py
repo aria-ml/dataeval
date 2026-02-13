@@ -48,9 +48,7 @@ release_notes_pattern = re.compile(
 
 
 def _get_version_tuple(version: str) -> tuple[int, int, int, int | None] | None:
-    """
-    Parse version string into tuple. Returns (major, minor, patch, rc) where rc is None for non-prerelease.
-    """
+    """Parse version string into tuple. Returns (major, minor, patch, rc) where rc is None for non-prerelease."""
     result = version_pattern.match(version)
     groups = None if result is None else result.groups()
     if groups is None or len(groups) < 3:
@@ -146,9 +144,7 @@ class _Tag:
 
 
 class _Merge:
-    """
-    Extracts elements of merge commits to create the change history contents.
-    """
+    """Extracts elements of merge commits to create the change history contents."""
 
     def __init__(self, response: dict[str, Any]) -> None:
         self.time: datetime = datetime.strptime(response["merged_at"][0:19], "%Y-%m-%dT%H:%M:%S").astimezone(UTC)
@@ -175,9 +171,7 @@ class _Merge:
 
 
 class ReleaseGen:
-    """
-    Generates commit payload for changelog and documentation link updates
-    """
+    """Generates commit payload for changelog and documentation link updates."""
 
     def __init__(self, gitlab: Gitlab) -> None:
         self.gl = gitlab
@@ -338,7 +332,7 @@ class ReleaseGen:
         howto_index_file = self._read_doc_file(file_name)
         if howto_index_file:
             pattern = re.compile(
-                r"aria-ml/dataeval/blob/docs-artifacts/(?:main|v[0-9]+\.[0-9]+\.[0-9]+(?:-rc[0-9]+)?)/notebooks"
+                r"aria-ml/dataeval/blob/docs-artifacts/(?:main|v[0-9]+\.[0-9]+\.[0-9]+(?:-rc[0-9]+)?)/notebooks",
             )
             new_path = f"aria-ml/dataeval/blob/docs-artifacts/{pending_version}/notebooks"
 

@@ -31,21 +31,22 @@ class BERResult(TypedDict):
 
 
 def _validate_inputs(
-    embeddings: ArrayND[float], class_labels: Array1D[int]
+    embeddings: ArrayND[float],
+    class_labels: Array1D[int],
 ) -> tuple[NDArray[np.float32], NDArray[np.intp]]:
     embeddings = as_numpy(embeddings, dtype=np.float32)
     class_labels = as_numpy(class_labels, dtype=np.intp, required_ndim=1)
 
     if len(embeddings) != len(class_labels):
         raise ValueError(
-            f"Length of embeddings ({len(embeddings)}) does not match length of class_labels ({len(class_labels)})."
+            f"Length of embeddings ({len(embeddings)}) does not match length of class_labels ({len(class_labels)}).",
         )
 
     return embeddings, class_labels
 
 
 def _knn_lowerbound(value: float, classes: int, k: int) -> float:
-    """Several cases for computing the BER lower bound"""
+    """Several cases for computing the BER lower bound."""
     if value <= EPSILON:
         return 0.0
 
@@ -66,17 +67,18 @@ def _knn_lowerbound(value: float, classes: int, k: int) -> float:
 
 def _get_classes_counts(labels: NDArray[np.intp]) -> tuple[int, int]:
     classes, counts = np.unique(labels, return_counts=True)
-    M = len(classes)
-    if M < 2:
+    m = len(classes)
+    if m < 2:
         raise ValueError("Label vector contains less than 2 classes!")
-    N = int(np.sum(counts))
-    return M, N
+    n = int(np.sum(counts))
+    return m, n
 
 
 def ber_mst(embeddings: ArrayND[float], class_labels: Array1D[int]) -> BERResult:
     """
-    An estimator for Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` \
-    using FR with a minimum spanning tree (MST) test statistic basis.
+    Estimate Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` using a minimum spanning tree.
+
+    Uses FR with a minimum spanning tree (MST) test statistic basis.
 
     Parameters
     ----------
@@ -112,19 +114,19 @@ def ber_mst(embeddings: ArrayND[float], class_labels: Array1D[int]) -> BERResult
 
     data_np, labels_np = _validate_inputs(embeddings, class_labels)
 
-    M, N = _get_classes_counts(labels_np)
-    _logger.debug("Number of classes: %d, Number of samples: %d", M, N)
+    m, n = _get_classes_counts(labels_np)
+    _logger.debug("Number of classes: %d, Number of samples: %d", m, n)
 
     # Get MST
     mst_result = minimum_spanning_tree(data_np)
     source, target = mst_result["source"], mst_result["target"]
     # MST forces every group to connect, so remove the minimum number of forced connections
-    mismatches = np.sum(labels_np[source] != labels_np[target]) - (M - 1)
+    mismatches = np.sum(labels_np[source] != labels_np[target]) - (m - 1)
     # BER sample scaling
-    deltas = mismatches / (2 * N)
+    deltas = mismatches / (2 * n)
     # Get BER upper and lower values
     upper = float(2 * deltas)
-    lower = float(((M - 1) / (M)) * (1 - max(1 - 2 * ((M) / (M - 1)) * deltas, 0) ** 0.5))
+    lower = float(((m - 1) / (m)) * (1 - max(1 - 2 * ((m) / (m - 1)) * deltas, 0) ** 0.5))
 
     _logger.info("BER_mst complete: upper_bound=%.4f, lower_bound=%.4f, mismatches=%d", upper, lower, mismatches)
 
@@ -133,8 +135,9 @@ def ber_mst(embeddings: ArrayND[float], class_labels: Array1D[int]) -> BERResult
 
 def ber_knn(embeddings: ArrayND[float], class_labels: Array1D[int], k: int) -> BERResult:
     """
-    An estimator for Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` \
-    using KNN test statistic basis.
+    Estimate Multi-class :term:`Bayes error rate<Bayes Error Rate (BER)>` using KNN.
+
+    Uses KNN test statistic basis.
 
     Parameters
     ----------
@@ -172,8 +175,8 @@ def ber_knn(embeddings: ArrayND[float], class_labels: Array1D[int], k: int) -> B
 
     data_np, labels_np = _validate_inputs(embeddings, class_labels)
 
-    M, N = _get_classes_counts(labels_np)
-    _logger.debug("Number of classes: %d, Number of samples: %d", M, N)
+    m, n = _get_classes_counts(labels_np)
+    _logger.debug("Number of classes: %d, Number of samples: %d", m, n)
 
     # Get k neareset neighbors
     nn_indices = compute_neighbors(data_np, k=k)
@@ -183,8 +186,8 @@ def ber_knn(embeddings: ArrayND[float], class_labels: Array1D[int], k: int) -> B
     # Get sample/neighbor mismatches
     misclassified = np.count_nonzero(modal_class - class_labels)
     # Get BER upper and lower values
-    upper = float(misclassified / N)
-    lower = _knn_lowerbound(upper, M, k)
+    upper = float(misclassified / n)
+    lower = _knn_lowerbound(upper, m, k)
 
     _logger.info("BER_knn complete: upper_bound=%.4f, lower_bound=%.4f, misclassified=%d", upper, lower, misclassified)
 

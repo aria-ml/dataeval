@@ -39,7 +39,10 @@ class TestSufficiencyResetStrategy:
         assert suff.reset_strategy is custom_reset
 
     def test_raises_error_for_non_torch_model_without_reset_strategy(
-        self, mock_train, mock_eval, simple_dataset: SimpleDataset
+        self,
+        mock_train,
+        mock_eval,
+        simple_dataset: SimpleDataset,
     ):
         """Verify error is raised for non-PyTorch model without reset_strategy."""
         non_torch_model = MagicMock()  # Not an nn.Module

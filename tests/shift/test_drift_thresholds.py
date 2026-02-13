@@ -6,7 +6,7 @@ import pytest
 from dataeval.shift._drift._thresholds import ConstantThreshold, StandardDeviationThreshold, Threshold
 
 
-@pytest.mark.parametrize("lower, upper", [(0.0, 1.0), (0, 1), (-1, 1), (None, 1.0), (0.1, None), (None, None)])
+@pytest.mark.parametrize(("lower", "upper"), [(0.0, 1.0), (0, 1), (-1, 1), (None, 1.0), (0.1, None), (None, None)])
 def test_constant_threshold_init_sets_instance_attributes(lower, upper):
     sut = ConstantThreshold(lower, upper)
 
@@ -21,14 +21,14 @@ def test_constant_threshold_init_sets_default_instance_attributes():
     assert sut.upper is None
 
 
-@pytest.mark.parametrize("lower, upper", [(1.0, 0.0), (0.0, -1.0), (2.1, 2.1)])
+@pytest.mark.parametrize(("lower", "upper"), [(1.0, 0.0), (0.0, -1.0), (2.1, 2.1)])
 def test_constant_threshold_init_raises_threshold_exception_when_breaking_lower_upper_strict_order(lower, upper):
     with pytest.raises(ValueError, match=f"lower threshold {lower} must be less than upper threshold {upper}"):
         _ = ConstantThreshold(lower, upper)
 
 
 @pytest.mark.parametrize(
-    "lower, upper, param, param_type",
+    ("lower", "upper", "param", "param_type"),
     [
         ("0.0", 1.0, "lower", "str"),
         (0.0, "1.0", "upper", "str"),
@@ -38,7 +38,10 @@ def test_constant_threshold_init_raises_threshold_exception_when_breaking_lower_
     ],
 )
 def test_constant_threshold_init_raises_invalid_arguments_exception_when_given_wrongly_typed_arguments(
-    upper, lower, param, param_type
+    upper,
+    lower,
+    param,
+    param_type,
 ):
     with pytest.raises(
         ValueError,
@@ -47,7 +50,7 @@ def test_constant_threshold_init_raises_invalid_arguments_exception_when_given_w
         _ = ConstantThreshold(lower, upper)
 
 
-@pytest.mark.parametrize("lower, upper", [(0.0, 1.0), (0, 1), (-1, 1), (None, 1.0), (0.1, None), (None, None)])
+@pytest.mark.parametrize(("lower", "upper"), [(0.0, 1.0), (0, 1), (-1, 1), (None, 1.0), (0.1, None), (None, None)])
 def test_constant_threshold_returns_correct_threshold_values(lower, upper):
     t = ConstantThreshold(lower, upper)
     lt, ut = t.thresholds(np.ndarray(range(10)))
@@ -57,7 +60,7 @@ def test_constant_threshold_returns_correct_threshold_values(lower, upper):
 
 
 @pytest.mark.parametrize(
-    "lower_multiplier, upper_multiplier, offset_from",
+    ("lower_multiplier", "upper_multiplier", "offset_from"),
     [(1, 1, np.median), (1, None, np.median), (None, 1, np.median), (None, None, np.median)],
 )
 def test_standard_deviation_threshold_init_sets_instance_attributes(lower_multiplier, upper_multiplier, offset_from):
@@ -77,7 +80,7 @@ def test_standard_deviation_threshold_init_sets_default_instance_attributes():
 
 
 @pytest.mark.parametrize(
-    "lower_multiplier, upper_multiplier, param, param_type",
+    ("lower_multiplier", "upper_multiplier", "param", "param_type"),
     [
         ("0.0", 1.0, "std_lower_multiplier", "str"),
         (0.0, "1.0", "std_upper_multiplier", "str"),
@@ -87,7 +90,10 @@ def test_standard_deviation_threshold_init_sets_default_instance_attributes():
     ],
 )
 def test_standard_deviation_threshold_init_raises_invalid_arguments_exception_when_given_wrongly_typed_arguments(
-    lower_multiplier, upper_multiplier, param, param_type
+    lower_multiplier,
+    upper_multiplier,
+    param,
+    param_type,
 ):
     with pytest.raises(
         ValueError,
@@ -96,7 +102,7 @@ def test_standard_deviation_threshold_init_raises_invalid_arguments_exception_wh
         _ = StandardDeviationThreshold(std_lower_multiplier=lower_multiplier, std_upper_multiplier=upper_multiplier)
 
 
-@pytest.mark.parametrize("offset_from, expected", [(np.min, -1), (np.max, 1), (np.median, 0), (np.mean, 0)])
+@pytest.mark.parametrize(("offset_from", "expected"), [(np.min, -1), (np.max, 1), (np.median, 0), (np.mean, 0)])
 def test_standard_deviation_threshold_applies_offset_from(offset_from, expected):
     t = StandardDeviationThreshold(std_lower_multiplier=0, std_upper_multiplier=0, offset_from=offset_from)
 
@@ -107,7 +113,8 @@ def test_standard_deviation_threshold_applies_offset_from(offset_from, expected)
 
 
 @pytest.mark.parametrize(
-    "std_lower_multiplier, expected_threshold", [(1, -1.8660254037844386), (0, -1), (2, -2.732050807568877)]
+    ("std_lower_multiplier", "expected_threshold"),
+    [(1, -1.8660254037844386), (0, -1), (2, -2.732050807568877)],
 )
 def test_standard_deviation_threshold_correctly_applies_std_lower_multiplier(std_lower_multiplier, expected_threshold):
     t = StandardDeviationThreshold(std_lower_multiplier=std_lower_multiplier, offset_from=np.min)
@@ -116,11 +123,14 @@ def test_standard_deviation_threshold_correctly_applies_std_lower_multiplier(std
 
 
 @pytest.mark.parametrize(
-    "std_lower_multiplier, std_upper_multiplier, exp_lower_threshold, exp_upper_threshold",
+    ("std_lower_multiplier", "std_upper_multiplier", "exp_lower_threshold", "exp_upper_threshold"),
     [(None, 0, None, -1.0), (0, None, -1.0, None), (None, None, None, None)],
 )
 def test_standard_deviation_threshold_treats_none_multiplier_as_no_threshold(
-    std_lower_multiplier, std_upper_multiplier, exp_lower_threshold, exp_upper_threshold
+    std_lower_multiplier,
+    std_upper_multiplier,
+    exp_lower_threshold,
+    exp_upper_threshold,
 ):
     t = StandardDeviationThreshold(std_lower_multiplier, std_upper_multiplier, offset_from=np.min)
     lt, ut = t.thresholds(np.asarray([-1, 1, 1, 1]))
@@ -130,14 +140,18 @@ def test_standard_deviation_threshold_treats_none_multiplier_as_no_threshold(
 
 
 @pytest.mark.parametrize(
-    "low_mult, up_mult, offset_from, exp_low_threshold, exp_up_threshold",
+    ("low_mult", "up_mult", "offset_from", "exp_low_threshold", "exp_up_threshold"),
     [
         (1.4, 2, np.median, 2.382381972241136, 31.81088289679838),
         (0.3, 3.1, np.min, -2.5966324345197567, 26.83186849003749),
     ],
 )
 def test_standard_deviation_threshold_correctly_returns_thresholds(
-    low_mult, up_mult, offset_from, exp_low_threshold, exp_up_threshold
+    low_mult,
+    up_mult,
+    offset_from,
+    exp_low_threshold,
+    exp_up_threshold,
 ):
     t = StandardDeviationThreshold(low_mult, up_mult, offset_from)
     lt, ut = t.thresholds(np.asarray(range(30)))
@@ -166,7 +180,7 @@ def test_standard_deviation_threshold_deals_with_nan_values():
 
 
 @pytest.mark.parametrize(
-    "threshold, obj_dict",
+    ("threshold", "obj_dict"),
     [
         (
             ConstantThreshold(0.5, 0.7),
@@ -207,7 +221,7 @@ def test_parse_object_raises_exception_when_threshold_type_is_not_supported():
 
 
 @pytest.mark.parametrize(
-    "lower, upper, expected, override, logger",
+    ("lower", "upper", "expected", "override", "logger"),
     [
         (0.3, None, (0.3, 0.8), False, False),
         (None, 0.7, (0.2, 0.7), False, False),
@@ -221,7 +235,11 @@ def test_calculate_lower_limit(lower, upper, expected, override, logger):
     t = MockThreshold()
     logger = MagicMock() if logger else None
     thresholds = t.calculate(
-        np.array([]), lower_limit=lower, upper_limit=upper, override_using_none=override, logger=logger
+        np.array([]),
+        lower_limit=lower,
+        upper_limit=upper,
+        override_using_none=override,
+        logger=logger,
     )
     assert thresholds == expected
     expected_call_count = (lower is not None) + (upper is not None)

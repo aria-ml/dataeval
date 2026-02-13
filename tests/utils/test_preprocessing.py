@@ -97,7 +97,7 @@ class TestBoundingBox:
     def test_image_hw_without_shape(self):
         bbox = BoundingBox(10, 20, 30, 40)
         with pytest.raises(ValueError, match="Image shape is required"):
-            bbox.image_hw
+            _ = bbox.image_hw
 
     def test_area(self):
         bbox = BoundingBox(10, 20, 30, 40)
@@ -284,7 +284,7 @@ class TestImageUtils:
 
     def test_normalize_image_valueerror(self):
         image = np.zeros(10)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="2 or more dimensions"):
             normalize_image_shape(image)
 
     def testedge_filter(self):

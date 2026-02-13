@@ -1,6 +1,7 @@
 """
-This module contains the implementation of HP :term:`divergence<Divergence>`
-using the Fast Nearest Neighbor and Minimum Spanning Tree algorithms
+HP :term:`divergence<Divergence>` implementation.
+
+Uses the Fast Nearest Neighbor and Minimum Spanning Tree algorithms.
 """
 
 __all__ = []
@@ -38,25 +39,25 @@ def _compute_divergence(
     emb_b: ArrayND[float],
     error_fn: Callable[[ArrayND[float], ArrayND[int]], int],
 ) -> DivergenceResult:
-    """Generic divergence computation using a custom error function."""
+    """Compute generic divergence using a custom error function."""
     _logger.debug("Computing divergence using error function: %s", error_fn.__name__)
 
     a = as_numpy(emb_a, dtype=np.float64)
     b = as_numpy(emb_b, dtype=np.float64)
-    N = a.shape[0]
-    M = b.shape[0]
+    n_a = a.shape[0]
+    n_b = b.shape[0]
 
     _logger.debug("Dataset A shape: %s, Dataset B shape: %s", a.shape, b.shape)
 
     stacked_data = np.vstack((a, b))
-    labels = np.zeros((N + M,), dtype=np.intp)
-    labels[N:] = 1
+    labels = np.zeros((n_a + n_b,), dtype=np.intp)
+    labels[n_a:] = 1
 
     errors = error_fn(stacked_data, labels)
     # A MST between two completely separate distributions results in 1 error
     if error_fn == _compute_mst_errors:
         errors -= 1
-    dp = max(0.0, 1 - ((N + M) / (2 * N * M)) * errors)
+    dp = max(0.0, 1 - ((n_a + n_b) / (2 * n_a * n_b)) * errors)
 
     _logger.info("Divergence computation complete: divergence=%.4f, errors=%d", dp, errors)
 
@@ -80,8 +81,7 @@ def _compute_fnn_errors(embeddings: ArrayND[float], labels: ArrayND[int]) -> int
 
 def divergence_mst(emb_a: ArrayND[float], emb_b: ArrayND[float]) -> DivergenceResult:
     """
-    Calculates the :term:`divergence` by counting the number of "between dataset" edges in the
-    minimum spanning tree.
+    Calculate the :term:`divergence` by counting "between dataset" edges in the minimum spanning tree.
 
     Parameters
     ----------
@@ -135,8 +135,9 @@ def divergence_mst(emb_a: ArrayND[float], emb_b: ArrayND[float]) -> DivergenceRe
 
 def divergence_fnn(emb_a: ArrayND[float], emb_b: ArrayND[float]) -> DivergenceResult:
     """
-    Calculates the :term:`divergence` by counting the label disagreements between nearest neighbors
-    in the datasets.
+    Calculate the :term:`divergence` by counting label disagreements between nearest neighbors.
+
+    Counts the label disagreements between nearest neighbors in the datasets.
 
     Parameters
     ----------

@@ -194,7 +194,7 @@ class Metadata(Array, FeatureExtractor):
         return self.factor_data
 
     def __len__(self) -> int:
-        """Number of items in the bound dataset.
+        """Return the number of items in the bound dataset.
 
         Returns
         -------
@@ -960,7 +960,12 @@ class Metadata(Array, FeatureExtractor):
         # Add factor values to target rows
         for factor_name, factor_values in factor_dict.items():
             target_rows[factor_name] = self._get_target_factor_values(
-                factor_name, factor_values, srcidx, is_od, image_factor_names, image_factor_dict
+                factor_name,
+                factor_values,
+                srcidx,
+                is_od,
+                image_factor_names,
+                image_factor_dict,
             )
         return target_rows
 
@@ -1033,7 +1038,10 @@ class Metadata(Array, FeatureExtractor):
         return combined_rows
 
     def _infer_factor_level(
-        self, factors: Mapping[str, Array1D[Any]], num_image_rows: int, num_target_rows: int
+        self,
+        factors: Mapping[str, Array1D[Any]],
+        num_image_rows: int,
+        num_target_rows: int,
     ) -> Literal["image", "target"]:
         """Infer factor level based on array lengths."""
         factor_lengths = {len(v) for v in factors.values()}
@@ -1048,11 +1056,15 @@ class Metadata(Array, FeatureExtractor):
         raise ValueError(
             "The lists/arrays in the provided factors have a different length "
             f"than the current metadata factors. Expected {num_image_rows} (image count) "
-            f"or {num_target_rows} (target count), got {factor_len}."
+            f"or {num_target_rows} (target count), got {factor_len}.",
         )
 
     def _validate_factor_lengths(
-        self, factors: Mapping[str, Array1D[Any]], level: str, num_image_rows: int, num_target_rows: int
+        self,
+        factors: Mapping[str, Array1D[Any]],
+        level: str,
+        num_image_rows: int,
+        num_target_rows: int,
     ) -> None:
         """Validate that factor lengths match the specified level."""
         if level == "image":
@@ -1143,7 +1155,11 @@ class Metadata(Array, FeatureExtractor):
         return is_od
 
     def _merge_od_metadata(
-        self, raw: Sequence[Mapping[str, Any]], datum_count: int, srcidx: NDArray[np.intp], reserved: list[str]
+        self,
+        raw: Sequence[Mapping[str, Any]],
+        datum_count: int,
+        srcidx: NDArray[np.intp],
+        reserved: list[str],
     ) -> tuple[dict[str, Any], dict[str, Any], dict[str, list[str]]]:
         """Merge OD metadata at both target and image levels.
 
@@ -1156,7 +1172,10 @@ class Metadata(Array, FeatureExtractor):
 
         # Target-level merge
         merged_target_level = merge_metadata(
-            raw, return_dropped=True, ignore_lists=False, targets_per_image=targets_per_image
+            raw,
+            return_dropped=True,
+            ignore_lists=False,
+            targets_per_image=targets_per_image,
         )
         target_factor_dict = {
             f"metadata_{k}" if k in reserved else k: v for k, v in merged_target_level[0].items() if k != "_image_index"
@@ -1248,10 +1267,20 @@ class Metadata(Array, FeatureExtractor):
         # Build target-level and image-level rows
         if self._has_targets:
             target_factor_dict, image_factor_dict, dropped_factors = self._merge_od_metadata(
-                raw, datum_count, srcidx, reserved
+                raw,
+                datum_count,
+                srcidx,
+                reserved,
             )
             combined_rows = self._build_od_rows(
-                srcidx, target_idx, labels, scores, bboxes, target_factor_dict, image_factor_dict, datum_count
+                srcidx,
+                target_idx,
+                labels,
+                scores,
+                bboxes,
+                target_factor_dict,
+                image_factor_dict,
+                datum_count,
             )
             self._dropped_factors = dropped_factors
             self._target_factors = set(target_factor_dict)
@@ -1265,7 +1294,13 @@ class Metadata(Array, FeatureExtractor):
                 if k != "_image_index"
             }
             target_rows = self._build_target_rows(
-                srcidx, target_idx, labels, scores, bboxes, image_factor_dict, bool(self._has_targets)
+                srcidx,
+                target_idx,
+                labels,
+                scores,
+                bboxes,
+                image_factor_dict,
+                bool(self._has_targets),
             )
             combined_rows = target_rows
             self._dropped_factors = merged_image_level[1]
@@ -1292,7 +1327,12 @@ class Metadata(Array, FeatureExtractor):
         return df.with_columns(pl.Series(name=col_name, values=values))
 
     def _process_binned_factor(
-        self, df: pl.DataFrame, col: str, data: NDArray, bins: int | Sequence[float], is_od: bool
+        self,
+        df: pl.DataFrame,
+        col: str,
+        data: NDArray,
+        bins: int | Sequence[float],
+        is_od: bool,
     ) -> tuple[pl.DataFrame, FactorInfo]:
         """Process a factor with user-provided bins."""
         col_bn = _binned(col)
@@ -1301,7 +1341,11 @@ class Metadata(Array, FeatureExtractor):
         return df, FactorInfo("continuous", is_binned=True)
 
     def _process_categorical_factor(
-        self, df: pl.DataFrame, col: str, ordinal: NDArray, is_od: bool
+        self,
+        df: pl.DataFrame,
+        col: str,
+        ordinal: NDArray,
+        is_od: bool,
     ) -> tuple[pl.DataFrame, FactorInfo]:
         """Process a non-numeric categorical factor."""
         col_dg = _digitized(col)
@@ -1309,14 +1353,18 @@ class Metadata(Array, FeatureExtractor):
         return df, FactorInfo("categorical", is_digitized=True)
 
     def _process_continuous_factor(
-        self, df: pl.DataFrame, col: str, data: NDArray, is_od: bool
+        self,
+        df: pl.DataFrame,
+        col: str,
+        data: NDArray,
+        is_od: bool,
     ) -> tuple[pl.DataFrame, FactorInfo]:
         """Process a continuous numeric factor with automatic binning."""
         _logger.warning(
             f"A user defined binning was not provided for {col}. "
             f"Using the {self.auto_bin_method} method to discretize the data. "
             "It is recommended that the user rerun and supply the desired "
-            "bins using the continuous_factor_bins parameter."
+            "bins using the continuous_factor_bins parameter.",
         )
         binned_data = bin_data(data, self.auto_bin_method)
         col_bn = _binned(col)
@@ -1324,7 +1372,12 @@ class Metadata(Array, FeatureExtractor):
         return df, FactorInfo("continuous", is_binned=True)
 
     def _process_factor(
-        self, df: pl.DataFrame, col: str, data: NDArray, factor_bins: Mapping[str, int | Sequence[float]], is_od: bool
+        self,
+        df: pl.DataFrame,
+        col: str,
+        data: NDArray,
+        factor_bins: Mapping[str, int | Sequence[float]],
+        is_od: bool,
     ) -> tuple[pl.DataFrame, FactorInfo]:
         """Process a single factor based on its type."""
         if col in factor_bins:
@@ -1359,7 +1412,7 @@ class Metadata(Array, FeatureExtractor):
         if invalid_keys:
             _logger.warning(
                 f"The keys - {invalid_keys} - are present in the `continuous_factor_bins` dictionary "
-                "but are not columns in the metadata DataFrame. Unknown keys will be ignored."
+                "but are not columns in the metadata DataFrame. Unknown keys will be ignored.",
             )
 
         column_set = set(df.columns)
@@ -1380,7 +1433,9 @@ class Metadata(Array, FeatureExtractor):
         self._is_binned = True
 
     def add_factors(
-        self, factors: Mapping[str, Array1D[Any]], level: Literal["image", "target", "auto"] = "auto"
+        self,
+        factors: Mapping[str, Array1D[Any]],
+        level: Literal["image", "target", "auto"] = "auto",
     ) -> None:
         """Add additional factors to metadata collection.
 
@@ -1454,7 +1509,7 @@ class Metadata(Array, FeatureExtractor):
             self._build_factors()
 
     def filter_by_factor(self, condition: Callable[[str, FactorInfo], bool]) -> NDArray[np.float64]:
-        """Filters metadata factors by factor name or FactorInfo.
+        """Filter metadata factors by factor name or FactorInfo.
 
         Parameters
         ----------
@@ -1475,9 +1530,10 @@ class Metadata(Array, FeatureExtractor):
         return self.dataframe[filtered].to_numpy().astype(np.float64)
 
     def filter_by_factor_type(
-        self, factor_type: Literal["categorical", "discrete", "continuous"]
+        self,
+        factor_type: Literal["categorical", "discrete", "continuous"],
     ) -> NDArray[np.float64]:
-        """Filters metadata factors by factor type.
+        """Filter metadata factors by factor type.
 
         Parameters
         ----------

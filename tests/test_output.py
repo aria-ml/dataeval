@@ -82,7 +82,13 @@ class TestOutputMetadata:
             return MockOutput(1, True, "hello")
 
         result = mock_metric(
-            np.array([[1, 2], [3, 4], [5, 6]]), [1, 2, 3], {1: 1, 2: 2}, range(5), (1, 2, 3, 4), b"bytes", MockMetric()
+            np.array([[1, 2], [3, 4], [5, 6]]),
+            [1, 2, 3],
+            {1: 1, 2: 2},
+            range(5),
+            (1, 2, 3, 4),
+            b"bytes",
+            MockMetric(),
         )
 
         meta = result.meta()

@@ -51,8 +51,9 @@ class DiversityOutput(DictOutput):
 
 class Diversity(Evaluator):
     """
-    Computes diversity and classwise diversity for discrete/categorical variables through
-    standard histogram binning, for continuous variables.
+    Computes diversity and classwise diversity for discrete/categorical variables.
+
+    Through standard histogram binning, for continuous variables.
 
     The method specified defines diversity as the inverse Simpson diversity index linearly rescaled to
     the unit interval, or the normalized form of the Shannon entropy.

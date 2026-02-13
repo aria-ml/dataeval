@@ -41,7 +41,7 @@ def create_chart(chart_data: list[dict[str, Any]], chart_layout: dict[str, Any])
                     mode=trace.get("mode", "lines+markers"),
                     line=trace.get("line", {}),
                     marker=trace.get("marker", {}),
-                )
+                ),
             )
         elif trace_type == "bar":
             fig.add_trace(
@@ -51,7 +51,7 @@ def create_chart(chart_data: list[dict[str, Any]], chart_layout: dict[str, Any])
                     name=trace["name"],
                     marker=trace.get("marker", {}),
                     opacity=trace.get("marker", {}).get("opacity", 0.8),
-                )
+                ),
             )
 
     # Enhanced layout configuration
@@ -108,20 +108,26 @@ def generate_chart_html(data_file: Path, output_dir: Path, chart_key: str, inclu
     except KeyError:
         raise KeyError(
             f"Chart key '{chart_key}' not found in data file. "
-            + f"Available keys: {list(chart_data.get('charts', {}).keys())}"
+            f"Available keys: {list(chart_data.get('charts', {}).keys())}",
         )
     except Exception as e:
         raise Exception(f"Failed to generate chart '{chart_key}': {e}")
 
 
-def main() -> int:  # noqa: C901
+def main() -> int:
     """Generate all chart HTML files."""
     parser = argparse.ArgumentParser(description="Generate interactive charts for Sphinx documentation")
     parser.add_argument(
-        "--data-file", type=Path, default=Path("docs/source/_static/stats_perf.json"), help="Path to JSON data file"
+        "--data-file",
+        type=Path,
+        default=Path("docs/source/_static/stats_perf.json"),
+        help="Path to JSON data file",
     )
     parser.add_argument(
-        "--output-dir", type=Path, default=Path("docs/source/_static/charts"), help="Output directory for HTML charts"
+        "--output-dir",
+        type=Path,
+        default=Path("docs/source/_static/charts"),
+        help="Output directory for HTML charts",
     )
     parser.add_argument(
         "--include-js",

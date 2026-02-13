@@ -26,8 +26,7 @@ def mock_ds(length: int | None):
 @pytest.mark.required
 class TestSufficiency:
     def test_mock_run(self, basic_config: Sufficiency.Config, simple_dataset: SimpleDataset) -> None:
-        """Verify return value of evaluate is the correct output type"""
-
+        """Verify return value of evaluate is the correct output type."""
         suff = Sufficiency(
             model=MagicMock(),
             train_ds=simple_dataset,
@@ -39,20 +38,17 @@ class TestSufficiency:
         assert isinstance(results, SufficiencyOutput)
 
     def test_mock_run_at_value(self, basic_config: Sufficiency.Config, simple_dataset: SimpleDataset) -> None:
-        """Verify return value of evaluate is the correct output type when run at a specific substep"""
-
+        """Verify return value of evaluate is the correct output type when run at a specific substep."""
         suff = Sufficiency(model=MagicMock(), train_ds=simple_dataset, test_ds=simple_dataset, config=basic_config)
 
         results = suff.evaluate(schedule=np.array([1]))
         assert isinstance(results, SufficiencyOutput)
 
     def test_run_with_invalid_schedule(self, basic_config: Sufficiency.Config, simple_dataset: SimpleDataset) -> None:
-        """
-        Verifies an invalid schedule type raises a ValueError due to CustomSchedule auto-numpy conversion
-        """
+        """Verifies an invalid schedule type raises a ValueError due to CustomSchedule auto-numpy conversion."""
         suff = Sufficiency(model=MagicMock(), train_ds=simple_dataset, test_ds=simple_dataset, config=basic_config)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="invalid literal"):
             suff.evaluate(schedule="hello world")  # type: ignore
 
     def test_multiple_runs_multiple_metrics(
@@ -62,7 +58,7 @@ class TestSufficiency:
         mock_eval_mixed_metric_strategy: EvaluationStrategy,
         mock_reset,
     ) -> None:
-        """Verifies multiple runs, multiple steps, and multiple mixed metrics have the proper output shape"""
+        """Verifies multiple runs, multiple steps, and multiple mixed metrics have the proper output shape."""
         patch("torch.utils.data.DataLoader").start()
 
         RUNS = 5
@@ -107,7 +103,7 @@ class TestSufficiency:
         mock_eval_scalar_metrics_strategy: EvaluationStrategy,
         mock_reset,
     ) -> None:
-        """Verifies single run with multiple scalar runs has proper output shape"""
+        """Verifies single run with multiple scalar runs has proper output shape."""
         patch("torch.utils.data.DataLoader").start()
 
         RUNS = 1
@@ -149,7 +145,7 @@ class TestSufficiency:
         mock_eval_classwise: EvaluationStrategy,
         mock_reset,
     ) -> None:
-        """Verifies single run with classwise array metric has proper shape"""
+        """Verifies single run with classwise array metric has proper shape."""
         patch("torch.utils.data.DataLoader").start()
 
         RUNS = 1
@@ -185,7 +181,7 @@ class TestSufficiency:
         assert output.averaged_measures["Accuracy"].shape == (CLASSES, SUBSTEPS)
 
     @pytest.mark.parametrize(
-        "train_ds_len, test_ds_len, expected_error",
+        ("train_ds_len", "test_ds_len", "expected_error"),
         [
             (None, 1, TypeError),
             (1, None, TypeError),
@@ -197,13 +193,16 @@ class TestSufficiency:
     def test_dataset_len(
         self,
         basic_config: Sufficiency.Config,
-        train_ds_len: None | Literal[1] | Literal[0],
-        test_ds_len: None | Literal[1] | Literal[0],
+        train_ds_len: Literal[1, 0] | None,
+        test_ds_len: Literal[1, 0] | None,
         expected_error: type[TypeError] | type[ValueError] | None,
     ):
         def call_suff(train_ds_len, test_ds_len):
             Sufficiency(
-                model=MagicMock(), train_ds=mock_ds(train_ds_len), test_ds=mock_ds(test_ds_len), config=basic_config
+                model=MagicMock(),
+                train_ds=mock_ds(train_ds_len),
+                test_ds=mock_ds(test_ds_len),
+                config=basic_config,
             )
 
         if expected_error is None:
@@ -218,7 +217,10 @@ class TestDatasetImmutability:
     """Test that datasets are immutable after construction."""
 
     def test_train_ds_has_no_setter(
-        self, mock_model: MagicMock, simple_dataset: SimpleDataset, basic_config: Sufficiency.Config[DatumType, Any]
+        self,
+        mock_model: MagicMock,
+        simple_dataset: SimpleDataset,
+        basic_config: Sufficiency.Config[DatumType, Any],
     ):
         """Verify train_ds property is read-only."""
         suff = Sufficiency(mock_model, simple_dataset, simple_dataset, config=basic_config)
@@ -228,7 +230,10 @@ class TestDatasetImmutability:
             suff.train_ds = simple_dataset  # pyright: ignore[reportAttributeAccessIssue]
 
     def test_test_ds_has_no_setter(
-        self, mock_model: MagicMock, simple_dataset: SimpleDataset, basic_config: Sufficiency.Config[DatumType, Any]
+        self,
+        mock_model: MagicMock,
+        simple_dataset: SimpleDataset,
+        basic_config: Sufficiency.Config[DatumType, Any],
     ):
         """Verify test_ds property is read-only."""
         suff = Sufficiency(mock_model, simple_dataset, simple_dataset, config=basic_config)
@@ -238,7 +243,10 @@ class TestDatasetImmutability:
             suff.test_ds = simple_dataset  # pyright: ignore[reportAttributeAccessIssue]
 
     def test_can_read_train_ds(
-        self, mock_model: MagicMock, simple_dataset: SimpleDataset, basic_config: Sufficiency.Config[DatumType, Any]
+        self,
+        mock_model: MagicMock,
+        simple_dataset: SimpleDataset,
+        basic_config: Sufficiency.Config[DatumType, Any],
     ):
         """Verify train_ds is still readable."""
         suff = Sufficiency(mock_model, simple_dataset, simple_dataset, config=basic_config)
@@ -246,7 +254,10 @@ class TestDatasetImmutability:
         assert suff.train_ds is simple_dataset
 
     def test_can_read_test_ds(
-        self, mock_model: MagicMock, simple_dataset: SimpleDataset, basic_config: Sufficiency.Config[DatumType, Any]
+        self,
+        mock_model: MagicMock,
+        simple_dataset: SimpleDataset,
+        basic_config: Sufficiency.Config[DatumType, Any],
     ):
         """Verify test_ds is still readable."""
         suff = Sufficiency(mock_model, simple_dataset, simple_dataset, config=basic_config)

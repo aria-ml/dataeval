@@ -38,7 +38,8 @@ if __name__ == "__main__":
     # Check if this is a merge commit by seeing if it has 2 parents
     try:
         parents_output = subprocess.check_output(
-            ["git", "rev-list", "--parents", "-n", "1", commit_sha], text=True
+            ["git", "rev-list", "--parents", "-n", "1", commit_sha],
+            text=True,
         ).strip()
         parent_count = len(parents_output.split()) - 1  # First element is the commit itself
 
@@ -133,7 +134,8 @@ if __name__ == "__main__":
         # Check if the commit already exists in the release branch
         try:
             check_result = subprocess.run(
-                ["git", "merge-base", "--is-ancestor", commit_sha, release_branch], capture_output=True
+                ["git", "merge-base", "--is-ancestor", commit_sha, release_branch],
+                capture_output=True,
             )
 
             if check_result.returncode == 0:
@@ -143,7 +145,7 @@ if __name__ == "__main__":
                         "release_branch": release_branch,
                         "status": "skipped",
                         "reason": "Commit already exists in release branch",
-                    }
+                    },
                 )
                 continue
         except Exception as e:
@@ -164,7 +166,7 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"ERROR: Could not create branch {cherry_pick_branch}: {e}")
             results.append(
-                {"release_branch": release_branch, "status": "failed", "reason": f"Failed to create branch: {e}"}
+                {"release_branch": release_branch, "status": "failed", "reason": f"Failed to create branch: {e}"},
             )
             continue
 
@@ -177,7 +179,7 @@ if __name__ == "__main__":
             error_msg = str(e)
             print(f"✗ Failed to cherry-pick: {error_msg}")
             results.append(
-                {"release_branch": release_branch, "status": "failed", "reason": f"Cherry-pick failed: {error_msg}"}
+                {"release_branch": release_branch, "status": "failed", "reason": f"Cherry-pick failed: {error_msg}"},
             )
             continue
 
@@ -201,7 +203,9 @@ This MR cherry-picks a fix from main to the {release_branch} release branch.
 
         # Check if MR already exists
         existing_mrs = gl.list_merge_requests(
-            state="opened", source_branch=cherry_pick_branch, target_branch=release_branch
+            state="opened",
+            source_branch=cherry_pick_branch,
+            target_branch=release_branch,
         )
 
         try:
@@ -213,7 +217,7 @@ This MR cherry-picks a fix from main to the {release_branch} release branch.
                 mr_url = existing_mrs[0]["web_url"]
                 print(f"✓ Updated MR: {mr_url}")
                 results.append(
-                    {"release_branch": release_branch, "status": "updated", "mr_url": mr_url, "mr_iid": mr_iid}
+                    {"release_branch": release_branch, "status": "updated", "mr_url": mr_url, "mr_iid": mr_iid},
                 )
             else:
                 # Create new MR
@@ -227,12 +231,12 @@ This MR cherry-picks a fix from main to the {release_branch} release branch.
                 mr_url = mr["web_url"]
                 print(f"✓ Created MR: {mr_url}")
                 results.append(
-                    {"release_branch": release_branch, "status": "created", "mr_url": mr_url, "mr_iid": mr["iid"]}
+                    {"release_branch": release_branch, "status": "created", "mr_url": mr_url, "mr_iid": mr["iid"]},
                 )
         except Exception as e:
             print(f"✗ Failed to create/update MR: {e}")
             results.append(
-                {"release_branch": release_branch, "status": "failed", "reason": f"Failed to create MR: {e}"}
+                {"release_branch": release_branch, "status": "failed", "reason": f"Failed to create MR: {e}"},
             )
 
     # Print summary

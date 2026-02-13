@@ -57,8 +57,8 @@ class TestPixelStats:
                     [[np.nan, 1.0], [1.0, 1.0]],  # Channel 0: 1 NaN
                     [[np.nan, np.nan], [1.0, 1.0]],  # Channel 1: 2 NaNs
                     [[1.0, 1.0], [1.0, 1.0]],  # Channel 2: 0 NaNs
-                ]
-            )
+                ],
+            ),
         ]
 
         result = calculate(images, None, stats=ImageStats.PIXEL_MISSING, per_channel=False)
@@ -76,8 +76,8 @@ class TestPixelStats:
                     [[np.nan, 1.0], [1.0, 1.0]],  # Channel 0: 1 NaN / 4 = 0.25
                     [[np.nan, np.nan], [1.0, 1.0]],  # Channel 1: 2 NaN / 4 = 0.5
                     [[1.0, 1.0], [1.0, 1.0]],  # Channel 2: 0 NaN / 4 = 0.0
-                ]
-            )
+                ],
+            ),
         ]
 
         result = calculate(images, None, stats=ImageStats.PIXEL_MISSING, per_channel=True)
@@ -116,8 +116,8 @@ class TestPixelStats:
                     [[0.0, 1.0], [1.0, 1.0]],  # Channel 0: 1 zero
                     [[0.0, 0.0], [1.0, 1.0]],  # Channel 1: 2 zeros
                     [[1.0, 1.0], [1.0, 1.0]],  # Channel 2: 0 zeros
-                ]
-            )
+                ],
+            ),
         ]
 
         result = calculate(images, None, stats=ImageStats.PIXEL_ZEROS, per_channel=False)
@@ -135,8 +135,8 @@ class TestPixelStats:
                     [[0.0, 1.0], [1.0, 1.0]],  # Channel 0: 1 zero / 4 = 0.25
                     [[0.0, 0.0], [1.0, 1.0]],  # Channel 1: 2 zeros / 4 = 0.5
                     [[1.0, 1.0], [1.0, 1.0]],  # Channel 2: 0 zeros / 4 = 0.0
-                ]
-            )
+                ],
+            ),
         ]
 
         result = calculate(images, None, stats=ImageStats.PIXEL_ZEROS, per_channel=True)
@@ -393,7 +393,12 @@ class TestPerImagePerBox:
         images = [np.random.random((3, 10, 10))]
 
         result = calculate(
-            images, None, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=False
+            images,
+            None,
+            stats=ImageStats.PIXEL_MEAN,
+            per_image=True,
+            per_target=True,
+            per_channel=False,
         )
 
         # Should have 1 result (full image)
@@ -410,11 +415,16 @@ class TestPerImagePerBox:
             [
                 BoundingBox(0, 0, 50, 50, image_shape=(3, 100, 100)),
                 BoundingBox(50, 50, 100, 100, image_shape=(3, 100, 100)),
-            ]
+            ],
         ]
 
         result = calculate(
-            images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=False
+            images,
+            boxes,
+            stats=ImageStats.PIXEL_MEAN,
+            per_image=True,
+            per_target=True,
+            per_channel=False,
         )
 
         # Should have 3 results: full image + 2 boxes
@@ -438,11 +448,16 @@ class TestPerImagePerBox:
             [
                 BoundingBox(0, 0, 50, 50, image_shape=(3, 100, 100)),
                 BoundingBox(50, 50, 100, 100, image_shape=(3, 100, 100)),
-            ]
+            ],
         ]
 
         result = calculate(
-            images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=False, per_target=True, per_channel=False
+            images,
+            boxes,
+            stats=ImageStats.PIXEL_MEAN,
+            per_image=False,
+            per_target=True,
+            per_channel=False,
         )
 
         # Should have 2 results: only boxes
@@ -462,11 +477,16 @@ class TestPerImagePerBox:
             [
                 BoundingBox(0, 0, 50, 50, image_shape=(3, 100, 100)),
                 BoundingBox(50, 50, 100, 100, image_shape=(3, 100, 100)),
-            ]
+            ],
         ]
 
         result = calculate(
-            images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=False, per_channel=False
+            images,
+            boxes,
+            stats=ImageStats.PIXEL_MEAN,
+            per_image=True,
+            per_target=False,
+            per_channel=False,
         )
 
         # Should have 1 result: only full image (boxes ignored)
@@ -483,7 +503,12 @@ class TestPerImagePerBox:
         boxes = [[BoundingBox(0, 0, 50, 50, image_shape=(3, 100, 100))]]
 
         result = calculate(
-            images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=True
+            images,
+            boxes,
+            stats=ImageStats.PIXEL_MEAN,
+            per_image=True,
+            per_target=True,
+            per_channel=True,
         )
 
         # Should have 6 results: (full image + 1 box) × 3 channels = 6
@@ -529,7 +554,12 @@ class TestPerImagePerBox:
         ]
 
         result = calculate(
-            images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=False
+            images,
+            boxes,
+            stats=ImageStats.PIXEL_MEAN,
+            per_image=True,
+            per_target=True,
+            per_channel=False,
         )
 
         # Should have 5 results: image0 (1 full + 1 box) + image1 (1 full + 2 boxes)
@@ -570,11 +600,16 @@ class TestPerImagePerBox:
             [
                 BoundingBox(0, 0, 50, 50, image_shape=(3, 100, 100)),
                 BoundingBox(50, 50, 100, 100, image_shape=(3, 100, 100)),
-            ]
+            ],
         ]
 
         result = calculate(
-            images, boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=False
+            images,
+            boxes,
+            stats=ImageStats.PIXEL_MEAN,
+            per_image=True,
+            per_target=True,
+            per_channel=False,
         )
 
         # Object count should be 2 (number of boxes)
@@ -968,7 +1003,12 @@ class TestImageClassificationDataset:
         ]
 
         result = calculate(
-            dataset, boxes=boxes, stats=ImageStats.PIXEL_MEAN, per_image=True, per_target=True, per_channel=False
+            dataset,
+            boxes=boxes,
+            stats=ImageStats.PIXEL_MEAN,
+            per_image=True,
+            per_target=True,
+            per_channel=False,
         )
 
         # Should process boxes since they are explicitly provided
@@ -1263,7 +1303,7 @@ class TestProgressCallback:
     """Test suite for progress_callback functionality in calculate."""
 
     def test_progress_callback_called_during_calculate(self):
-        """Test that progress_callback is called during calculation"""
+        """Test that progress_callback is called during calculation."""
         images = [np.random.random((3, 10, 10)) for _ in range(5)]
         callback_calls = []
 
@@ -1282,7 +1322,7 @@ class TestProgressCallback:
             assert call["total"] == 5
 
     def test_progress_callback_not_called_when_none(self):
-        """Test that no error occurs when progress_callback is None"""
+        """Test that no error occurs when progress_callback is None."""
         images = [np.random.random((3, 10, 10)) for _ in range(3)]
 
         result = calculate(images, None, stats=ImageStats.PIXEL, progress_callback=None)
@@ -1291,7 +1331,7 @@ class TestProgressCallback:
         assert result["image_count"] == 3
 
     def test_progress_callback_with_boxes(self):
-        """Test that progress_callback works with bounding boxes"""
+        """Test that progress_callback works with bounding boxes."""
         images = [np.random.random((3, 100, 100)) for _ in range(3)]
         boxes = [[[10, 10, 50, 50], [20, 20, 60, 60]] for _ in range(3)]
         callback_calls = []
@@ -1311,7 +1351,7 @@ class TestProgressCallback:
             assert call["total"] == 3
 
     def test_progress_callback_with_dataset(self, get_mock_od_dataset):
-        """Test that progress_callback works with Dataset input"""
+        """Test that progress_callback works with Dataset input."""
         images = [np.random.random((3, 100, 100)) for _ in range(4)]
         labels = [[0, 1] for _ in range(4)]
         bboxes = [[[10, 10, 50, 50], [20, 20, 60, 60]] for _ in range(4)]
@@ -1333,7 +1373,7 @@ class TestProgressCallback:
             assert call["total"] == 4
 
     def test_progress_callback_incremental_steps(self):
-        """Test that progress_callback receives incremental step counts"""
+        """Test that progress_callback receives incremental step counts."""
         images = [np.random.random((3, 10, 10)) for _ in range(10)]
         callback_calls = []
 
@@ -1346,7 +1386,7 @@ class TestProgressCallback:
         assert callback_calls == list(range(1, 11))
 
     def test_calculate_with_empty_dataset(self):
-        """Test calculate with empty dataset"""
+        """Test calculate with empty dataset."""
         images = []
         result = calculate(images, None, stats=ImageStats.PIXEL)
 
@@ -1356,7 +1396,7 @@ class TestProgressCallback:
         assert len(result["invalid_box_count"]) == 0
 
     def test_calculate_determine_channel_indices_error(self):
-        """Test _determine_channel_indices raises error for unexpected output (line 190)"""
+        """Test _determine_channel_indices raises error for unexpected output (line 190)."""
         from dataeval.core._calculate import _determine_channel_indices
 
         # Create calculator output with unexpected number of elements

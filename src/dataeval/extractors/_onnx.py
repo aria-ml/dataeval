@@ -1,6 +1,4 @@
-"""
-ONNX Runtime-based feature extractor.
-"""
+"""ONNX Runtime-based feature extractor."""
 
 __all__ = []
 
@@ -25,7 +23,7 @@ _logger = logging.getLogger(__name__)
 
 _ort_import_error = ImportError(
     "onnxruntime is required for OnnxExtractor. "
-    "Install it with: pip install onnxruntime (CPU) or pip install onnxruntime-gpu (GPU)"
+    "Install it with: pip install onnxruntime (CPU) or pip install onnxruntime-gpu (GPU)",
 )
 
 
@@ -38,7 +36,7 @@ def _get_ort() -> ModuleType:
     except ImportError as e:
         raise ImportError(
             "onnxruntime is required for OnnxExtractor. "
-            "Install it with: pip install onnxruntime (CPU) or pip install onnxruntime-gpu (GPU)"
+            "Install it with: pip install onnxruntime (CPU) or pip install onnxruntime-gpu (GPU)",
         ) from e
 
 
@@ -145,7 +143,8 @@ class OnnxExtractor:
         return self._output_name
 
     def _normalize_transforms(
-        self, transforms: Transform[NDArray[Any]] | Sequence[Transform[NDArray[Any]]] | None
+        self,
+        transforms: Transform[NDArray[Any]] | Sequence[Transform[NDArray[Any]]] | None,
     ) -> list[Transform[NDArray[Any]]]:
         """Normalize transforms to a list."""
         if transforms is None:
@@ -156,18 +155,18 @@ class OnnxExtractor:
 
     def _load_model(self) -> None:
         """Load the ONNX model and validate configuration."""
-        InferenceSession = _get_inference_session()
+        session_cls = _get_inference_session()
         providers = _get_execution_providers()
 
         if self._model_bytes is not None:
             _logger.debug(f"Loading ONNX model from bytes with providers: {providers}")
-            self._session = InferenceSession(self._model_bytes, providers=providers)
+            self._session = session_cls(self._model_bytes, providers=providers)
             model_source = "bytes"
         else:
             if self._model_path is None or not self._model_path.exists():
                 raise FileNotFoundError(f"Model not found: {self._model_path}")
             _logger.debug(f"Loading ONNX model from {self._model_path} with providers: {providers}")
-            self._session = InferenceSession(str(self._model_path), providers=providers)
+            self._session = session_cls(str(self._model_path), providers=providers)
             model_source = str(self._model_path)
 
         if self._session is None:
@@ -189,14 +188,14 @@ class OnnxExtractor:
         if self._output_name is not None and self._output_name not in self._output_names:
             raise ValueError(
                 f"Specified output_name '{self._output_name}' not found in model outputs.\n"
-                f"  Available outputs: {self._output_names}"
+                f"  Available outputs: {self._output_names}",
             )
 
         # Multi-output models require explicit output_name
         if len(self._output_names) > 1 and self._output_name is None:
             raise ValueError(
                 f"Model has {len(self._output_names)} outputs: {self._output_names}.\n"
-                f"Specify 'output_name' to indicate which output produces embeddings."
+                f"Specify 'output_name' to indicate which output produces embeddings.",
             )
 
         _logger.debug(f"ONNX model loaded. Input: {self._input_name}, Outputs: {self._output_names}")

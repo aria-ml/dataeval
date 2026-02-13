@@ -32,9 +32,9 @@ class CompletenessResult(TypedDict):
 
 def completeness(embeddings: Array) -> CompletenessResult:
     """
-    Measures the dimensional utilization of embeddings - how effectively the data
-    explores all available dimensions in its embedding space.
+    Measure the dimensional utilization of embeddings.
 
+    Measures how effectively the data explores all available dimensions in its embedding space.
     This implementation uses a directional diversity approach based on eigenvalue entropy,
     which is more robust for high-dimensional data than traditional box-counting or
     neighbor-distance-based methods.
@@ -60,8 +60,8 @@ def completeness(embeddings: Array) -> CompletenessResult:
     embeddings = ensure_embeddings(embeddings, dtype=np.float64, unit_interval=False)
 
     # Get data dimensions
-    n, D = embeddings.shape
-    _logger.debug("Embeddings shape: (%d samples, %d dimensions)", n, D)
+    n, d = embeddings.shape
+    _logger.debug("Embeddings shape: (%d samples, %d dimensions)", n, d)
 
     # Get normed ranks from 1/2n to (1-1/2n), then center them
     centered_normed_ranks = (np.argsort(np.argsort(embeddings, axis=0), axis=0) + 0.5) / n - 0.5
@@ -87,7 +87,7 @@ def completeness(embeddings: Array) -> CompletenessResult:
 
     # Calculate completeness as ratio of effective to total dimensions
     # This is equivalent to the Nth root of the "occupied fraction" in traditional approaches
-    completeness_score = effective_dim / D
+    completeness_score = effective_dim / d
 
     _logger.debug("Effective dimensionality: %.2f, Completeness score: %.4f", effective_dim, completeness_score)
 

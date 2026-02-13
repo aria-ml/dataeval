@@ -11,8 +11,7 @@ from dataeval.shift._drift._thresholds import ConstantThreshold
 
 @pytest.fixture
 def tst_data():
-    """Zeros as test data, just needs to be really different from the Gaussian training data"""
-
+    """Zeros as test data, just needs to be really different from the Gaussian training data."""
     n_samples, n_features = 100, 4
     tstData = np.zeros((n_samples, n_features))
     return tstData
@@ -20,8 +19,7 @@ def tst_data():
 
 @pytest.fixture
 def trn_data():
-    """Gaussian distribution, 0 mean, unit :term:`variance<Variance>` training data"""
-
+    """Gaussian distribution, 0 mean, unit :term:`variance<Variance>` training data."""
     n_samples, n_features, mean, std_dev = 100, 4, 0, 1
     size = n_samples * n_features
     x = np.linspace(-3, 3, size)
@@ -45,15 +43,14 @@ def result_df():
             "domain_classifier_auroc_upper_threshold": [0.65 for _ in range(10)],
             "domain_classifier_auroc_lower_threshold": [0.45 for _ in range(10)],
             "domain_classifier_auroc_alert": [i >= 5 for i in range(10)],
-        }
+        },
     )
 
 
 @pytest.mark.required
 class TestMVDC:
     def test_init(self):
-        """Test that the detector is instantiated correctly"""
-
+        """Test that the detector is instantiated correctly."""
         dc = DriftMVDC(n_folds=2, chunk_size=10, threshold=(0.6, 0.9))
         assert dc._calc.cv_folds_num == 2
         threshold = dc._calc.threshold
@@ -80,17 +77,17 @@ class TestMVDC:
     def test_predict_xtest_mismatch_features(self, tst_data):
         dc = DriftMVDC(n_folds=2, chunk_size=10, threshold=(0.6, 0.9))
         dc.n_features = 5
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="different number of features"):
             dc.predict(tst_data)
 
     def test_validate_empty(self):
         df = pl.DataFrame([])
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="data contains no rows"):
             _validate(df)
 
     def test_validate_feature_mismatch(self):
         df = pl.DataFrame({"col1": [1, 2]})
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="expected '2' features"):
             _validate(df, expected_features=2)
 
     def test_calculate_before_fit(self):
@@ -100,8 +97,7 @@ class TestMVDC:
 
     @pytest.mark.optional
     def test_sequence(self, trn_data, tst_data):
-        """Sequential tests, each step is required before proceeding to the next"""
-
+        """Sequential tests, each step is required before proceeding to the next."""
         dc = DriftMVDC(n_folds=2, chunk_count=5)
         with use_max_processes(4):
             dc.fit(trn_data)
@@ -142,7 +138,7 @@ class TestDriftMVDCOutput:
 
     def test_output_filter_invalid_metric_raises(self, result_df):
         output = DriftMVDCOutput(result_df)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="not a valid metric"):
             output.filter(metrics=1)  # type: ignore
 
     def test_output_filter_no_metric(self, result_df):

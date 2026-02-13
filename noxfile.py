@@ -26,44 +26,43 @@ def session(**kwargs):
         if nox_uv is not None:
             # If nox-uv is installed, pass everything through directly
             return nox_uv.session(**kwargs)(func)
-        else:
-            # Extract uv_* options (use .get() to avoid mutating kwargs)
-            uv_groups = kwargs.get("uv_groups", [])
-            uv_extras = kwargs.get("uv_extras", [])
-            uv_only_groups = kwargs.get("uv_only_groups", [])
-            uv_no_install_project = kwargs.get("uv_no_install_project", False)
-            # Strip all uv_* args to avoid kwargs errors in standard nox
-            clean_kwargs = {k: v for k, v in kwargs.items() if not k.startswith("uv_")}
+        # Extract uv_* options (use .get() to avoid mutating kwargs)
+        uv_groups = kwargs.get("uv_groups", [])
+        uv_extras = kwargs.get("uv_extras", [])
+        uv_only_groups = kwargs.get("uv_only_groups", [])
+        uv_no_install_project = kwargs.get("uv_no_install_project", False)
+        # Strip all uv_* args to avoid kwargs errors in standard nox
+        clean_kwargs = {k: v for k, v in kwargs.items() if not k.startswith("uv_")}
 
-            # Define a wrapper that runs the install command before the actual session
-            @functools.wraps(func)
-            def wrapper(session: nox.Session):
-                # Ensure pip >= 25.1 for --group support (PEP 735)
-                session.install("pip>=25.1")
+        # Define a wrapper that runs the install command before the actual session
+        @functools.wraps(func)
+        def wrapper(session: nox.Session):
+            # Ensure pip >= 25.1 for --group support (PEP 735)
+            session.install("pip>=25.1")
 
-                # Build install command for the project with extras
-                if not uv_no_install_project and not uv_only_groups:
-                    # Install the project itself, optionally with extras
-                    if uv_extras:
-                        extras_str = ",".join(uv_extras)
-                        session.install("-e", f".[{extras_str}]")
-                    else:
-                        session.install("-e", ".")
+            # Build install command for the project with extras
+            if not uv_no_install_project and not uv_only_groups:
+                # Install the project itself, optionally with extras
+                if uv_extras:
+                    extras_str = ",".join(uv_extras)
+                    session.install("-e", f".[{extras_str}]")
+                else:
+                    session.install("-e", ".")
 
-                # Handle dependency groups (uv_groups installs project + groups,
-                # uv_only_groups installs only the groups without the project)
-                groups = uv_only_groups if uv_only_groups else uv_groups
-                if groups:
-                    group_args = []
-                    for group in groups:
-                        group_args.extend(["--group", group])
-                    session.install(*group_args)
+            # Handle dependency groups (uv_groups installs project + groups,
+            # uv_only_groups installs only the groups without the project)
+            groups = uv_only_groups if uv_only_groups else uv_groups
+            if groups:
+                group_args = []
+                for group in groups:
+                    group_args.extend(["--group", group])
+                session.install(*group_args)
 
-                # Run the original function
-                return func(session)
+            # Run the original function
+            return func(session)
 
-            # Register the wrapper with standard nox
-            return nox.session(**clean_kwargs)(wrapper)
+        # Register the wrapper with standard nox
+        return nox.session(**clean_kwargs)(wrapper)
 
     return decorator
 
@@ -462,7 +461,7 @@ def doclint(session: nox.Session) -> None:
     if test_failures:
         session.error(
             f"Doclint failed with {len(test_failures)} test failure(s):\n"
-            + "\n  - ".join(f"{test_name}: {error}" for test_name, error in test_failures)
+            + "\n  - ".join(f"{test_name}: {error}" for test_name, error in test_failures),
         )
 
 

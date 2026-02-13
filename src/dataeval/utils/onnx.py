@@ -68,7 +68,7 @@ def find_embedding_layer(model_path: str | Path) -> str:
 
     raise ValueError(
         "Could not identify the embedding layer. "
-        "The model must have a Gemm (fully-connected) or GlobalAveragePool layer."
+        "The model must have a Gemm (fully-connected) or GlobalAveragePool layer.",
     )
 
 

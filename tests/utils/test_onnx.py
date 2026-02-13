@@ -72,7 +72,7 @@ class TestFindEmbeddingLayer:
         """Test that it raises FileNotFoundError for missing file."""
         from dataeval.utils.onnx import find_embedding_layer
 
-        with pytest.raises(Exception):  # Could be FileNotFoundError or onnx error
+        with pytest.raises(FileNotFoundError, match="nonexistent.onnx"):
             find_embedding_layer(tmp_path / "nonexistent.onnx")
 
 

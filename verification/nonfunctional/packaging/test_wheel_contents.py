@@ -15,7 +15,6 @@ class TestWheelContents:
 
     def test_py_typed_marker_exists(self):
         """PEP 561: py.typed marker must be present for type checker support."""
-
         package_dir = importlib.resources.files("dataeval")
         py_typed = package_dir / "py.typed"
         assert py_typed.is_file(), "py.typed marker not found in installed package"
@@ -37,7 +36,6 @@ class TestWheelContents:
 
     def test_no_test_files_in_package(self):
         """Test files should not be included in the distributed package."""
-
         package_dir = importlib.resources.files("dataeval")
         # Walk the package tree looking for test files
         test_files = []

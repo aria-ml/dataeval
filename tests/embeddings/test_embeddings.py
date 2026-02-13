@@ -70,7 +70,7 @@ def torch_ic_ds():
 
 @pytest.fixture(scope="module")
 def sequential_model():
-    """Fixture providing a multi-layer sequential model for layer extraction tests"""
+    """Fixture providing a multi-layer sequential model for layer extraction tests."""
     return torch.nn.Sequential(
         torch.nn.Conv2d(1, 4, 3, padding=1),  # layer "0"
         torch.nn.ReLU(),  # layer "1"
@@ -81,7 +81,7 @@ def sequential_model():
 
 @pytest.fixture(scope="module")
 def model_with_functional_ops():
-    """Model where functional operations exist between named layers (output != input case)"""
+    """Model where functional operations exist between named layers (output != input case)."""
 
     class ModelWithFunctionalOps(torch.nn.Module):
         def __init__(self):
@@ -102,58 +102,56 @@ def model_with_functional_ops():
 
 @pytest.fixture
 def identity_extractor():
-    """Fixture providing an identity model extractor"""
+    """Fixture providing an identity model extractor."""
     return TorchExtractor(IdentityModel(), device="cpu")
 
 
 @pytest.fixture
 def numpy_extractor():
-    """Fixture providing a numpy flatten extractor"""
+    """Fixture providing a numpy flatten extractor."""
     return FlattenExtractor()
 
 
 @pytest.mark.required
 class TestEmbeddings:
-    """
-    Test collate aggregates MAITE style data into separate collections from tuple return
-    """
+    """Test collate aggregates MAITE style data into separate collections from tuple return."""
 
     @pytest.mark.parametrize(
-        "data, labels, metadata",
+        ("data", "labels", "metadata"),
         [
-            [[0, 1, 2], [3, 4, 5], None],
-            [np.ones((10, 3, 3)), np.ones((10,)), None],
-            [np.ones((10, 3, 3)), np.ones((10, 3, 3)), None],
-            [np.ones((10, 3, 3)), np.ones((10, 3)), [{i: i} for i in range(10)]],
-            [
+            ([0, 1, 2], [3, 4, 5], None),
+            (np.ones((10, 3, 3)), np.ones((10,)), None),
+            (np.ones((10, 3, 3)), np.ones((10, 3, 3)), None),
+            (np.ones((10, 3, 3)), np.ones((10, 3)), [{i: i} for i in range(10)]),
+            (
                 np.ones((10, 3, 3)),
                 [ObjectDetectionTarget([[0, 1, 2, 3], [4, 5, 6, 7]], [0, 1], [1, 0]) for _ in range(10)],
                 [{i: i} for i in range(10)],
-            ],
+            ),
         ],
     )
     def test_mock_inputs(self, data, labels, metadata, numpy_extractor):
-        """Tests common (input, target, metadata) dataset output"""
+        """Tests common (input, target, metadata) dataset output."""
         ds = MockDataset(data, labels, metadata)
         em = Embeddings(ds, extractor=numpy_extractor)
 
         assert len(ds) == len(em)
 
     @pytest.mark.parametrize(
-        "data, targets",
+        ("data", "targets"),
         [
-            [
+            (
                 torch.ones((10, 1, 3, 3)),
                 torch.nn.functional.one_hot(torch.arange(10)),
-            ],
-            [
+            ),
+            (
                 torch.ones((10, 1, 3, 3)),
                 [ObjectDetectionTarget(torch.ones(10, 4), torch.zeros(10), torch.zeros(10)) for _ in range(10)],
-            ],
+            ),
         ],
     )
     def test_with_model_encode(self, data, targets, identity_extractor):
-        """Tests with basic identity model"""
+        """Tests with basic identity model."""
         ds = TorchDataset(data, targets)
         em = Embeddings(ds, extractor=identity_extractor)
 
@@ -213,7 +211,7 @@ class TestEmbeddings:
         assert mini_embs._extractor == embs._extractor
 
     def test_embeddings_layer_name_extraction(self, torch_ic_ds, sequential_model):
-        """Test that layer_name correctly extracts embeddings from specified layer"""
+        """Test that layer_name correctly extracts embeddings from specified layer."""
         # Test extracting from the flatten layer (layer "2")
         extractor = TorchExtractor(sequential_model, layer_name="2", device="cpu")
         embs = Embeddings(torch_ic_ds, extractor=extractor)
@@ -226,13 +224,13 @@ class TestEmbeddings:
         assert isinstance(result, np.ndarray)
 
     def test_embeddings_layer_name_not_found(self, sequential_model):
-        """Test that layer_name raises ValueError when layer doesn't exist"""
+        """Test that layer_name raises ValueError when layer doesn't exist."""
         # Try to use a non-existent layer name
         with pytest.raises(ValueError, match="Invalid layer.*nonexistent"):
             TorchExtractor(sequential_model, layer_name="nonexistent", device="cpu")
 
     def test_embeddings_layer_name_vs_normal_output(self, torch_ic_ds, sequential_model):
-        """Test that layer_name extraction gives different results than normal model output"""
+        """Test that layer_name extraction gives different results than normal model output."""
         # Normal embeddings (final output)
         normal_extractor = TorchExtractor(sequential_model, device="cpu")
         normal_embs = Embeddings(torch_ic_ds, extractor=normal_extractor)
@@ -250,7 +248,7 @@ class TestEmbeddings:
         assert not np.allclose(normal_result, layer_result[:10])  # Different values
 
     def test_embeddings_use_output_parameter(self, torch_ic_ds, sequential_model):
-        """Test that use_output parameter correctly captures input vs output of layer"""
+        """Test that use_output parameter correctly captures input vs output of layer."""
         # Capture output from flatten layer (default behavior)
         extractor_output = TorchExtractor(sequential_model, layer_name="2", use_output=True, device="cpu")
         embs_output = Embeddings(torch_ic_ds, extractor=extractor_output)
@@ -271,7 +269,7 @@ class TestEmbeddings:
         assert np.allclose(output_result, input_result.flatten())
 
     def test_hook_fn_captures_output(self, sequential_model):
-        """Test that _hook_fn correctly captures output when use_output=True"""
+        """Test that _hook_fn correctly captures output when use_output=True."""
         extractor = TorchExtractor(sequential_model, layer_name="2", use_output=True, device="cpu")
 
         # Simulate what happens during forward pass
@@ -290,7 +288,7 @@ class TestEmbeddings:
         assert not extractor._captured_output.requires_grad
 
     def test_hook_fn_captures_input(self, sequential_model):
-        """Test that _hook_fn correctly captures input when use_output=False"""
+        """Test that _hook_fn correctly captures input when use_output=False."""
         extractor = TorchExtractor(sequential_model, layer_name="2", use_output=False, device="cpu")
 
         # Simulate what happens during forward pass
@@ -307,7 +305,7 @@ class TestEmbeddings:
         assert not extractor._captured_output.requires_grad
 
     def test_get_valid_layer_returns_module(self, sequential_model):
-        """Test that _get_valid_layer returns correct module"""
+        """Test that _get_valid_layer returns correct module."""
         extractor = TorchExtractor(sequential_model, device="cpu")
 
         # Get the flatten layer
@@ -319,12 +317,12 @@ class TestEmbeddings:
         assert isinstance(layer, torch.nn.Conv2d)
 
     def test_get_valid_layer_invalid_layer(self, sequential_model):
-        """Test that _get_valid_layer raises ValueError for invalid layer"""
+        """Test that _get_valid_layer raises ValueError for invalid layer."""
         with pytest.raises(ValueError, match="Invalid layer 'invalid_layer'.*Available layers"):
             TorchExtractor(sequential_model, layer_name="invalid_layer", device="cpu")
 
     def test_call_without_layer_name(self, torch_ic_ds):
-        """Test that __call__ returns normal model output when layer_name is None"""
+        """Test that __call__ returns normal model output when layer_name is None."""
         model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(9, 5))
         extractor = TorchExtractor(model, layer_name=None, device="cpu")
 
@@ -337,7 +335,7 @@ class TestEmbeddings:
         assert isinstance(result, np.ndarray)
 
     def test_call_with_layer_name(self, torch_ic_ds, sequential_model):
-        """Test that __call__ returns hooked output when layer_name is set"""
+        """Test that __call__ returns hooked output when layer_name is set."""
         extractor = TorchExtractor(sequential_model, layer_name="2", use_output=True, device="cpu")
 
         # Extract features from images
@@ -352,7 +350,7 @@ class TestEmbeddings:
         assert extractor._captured_output is not None
 
     def test_call_preserves_batch_dimension(self, torch_ic_ds, sequential_model):
-        """Test that __call__ correctly handles different batch sizes"""
+        """Test that __call__ correctly handles different batch sizes."""
         extractor = TorchExtractor(sequential_model, layer_name="2", device="cpu")
 
         # Test with different batch sizes
@@ -364,7 +362,14 @@ class TestEmbeddings:
             assert result.shape[1:] == (36,)
 
     @pytest.mark.parametrize(
-        "model_fixture, output_layer, input_layer, expected_output_shape, expected_input_shape, shapes_match",
+        (
+            "model_fixture",
+            "output_layer",
+            "input_layer",
+            "expected_output_shape",
+            "expected_input_shape",
+            "shapes_match",
+        ),
         [
             (
                 "sequential_model",
@@ -395,7 +400,7 @@ class TestEmbeddings:
         shapes_match,
         request,
     ):
-        """Test both cases: where layer[i] output equals and doesn't equal layer[i+1] input"""
+        """Test both cases: where layer[i] output equals and doesn't equal layer[i+1] input."""
         model = request.getfixturevalue(model_fixture)
 
         # Capture output of layer N
@@ -414,7 +419,7 @@ class TestEmbeddings:
         assert (output_result.shape == input_result.shape) == shapes_match
 
     def test_embeddings_layer_logging(self, sequential_model, caplog):
-        """Test that TorchExtractor logs layer extraction info"""
+        """Test that TorchExtractor logs layer extraction info."""
         with caplog.at_level(logging.DEBUG):
             _ = TorchExtractor(
                 sequential_model,
@@ -426,7 +431,7 @@ class TestEmbeddings:
             assert "Capturing output data from layer 2" in caplog.text
 
     def test_empty_dataset_shape(self, identity_extractor):
-        """Test that shape property handles empty dataset (line 149)"""
+        """Test that shape property handles empty dataset (line 149)."""
         empty_ds = MockDataset([], [], [])
         embs = Embeddings(empty_ds, extractor=identity_extractor)
 
@@ -434,7 +439,7 @@ class TestEmbeddings:
         assert embs.shape == (0,)
 
     def test_hash_with_dataset_model_transforms(self, torch_ic_ds, identity_extractor):
-        """Test __hash__ for regular embeddings with dataset, model, and transforms (lines 228-231)"""
+        """Test __hash__ for regular embeddings with dataset, model, and transforms (lines 228-231)."""
         embs = Embeddings(torch_ic_ds, extractor=identity_extractor)
 
         # Should hash based on dataset and extractor
@@ -447,7 +452,7 @@ class TestEmbeddings:
         assert hash1 == hash2
 
     def test_hash_different_extractors(self, torch_ic_ds):
-        """Test __hash__ with different extractors produces different hash"""
+        """Test __hash__ with different extractors produces different hash."""
         from dataeval.extractors import FlattenExtractor
 
         extractor1 = TorchExtractor(IdentityModel(), device="cpu")
@@ -464,10 +469,10 @@ class TestEmbeddings:
 
 
 class TestPathProperty:
-    """Test suite for path property getter and setter"""
+    """Test suite for path property getter and setter."""
 
     def test_path_getter(self, tmp_path):
-        """Test path property getter"""
+        """Test path property getter."""
         from pathlib import Path
 
         path = tmp_path / "test_embeddings.npy"
@@ -479,7 +484,7 @@ class TestPathProperty:
         assert isinstance(embs.path, Path)
 
     def test_path_getter_none(self):
-        """Test path property getter when path is None"""
+        """Test path property getter when path is None."""
         ds = get_dataset(10)
         embs = Embeddings(ds, path=None)
 
@@ -487,7 +492,7 @@ class TestPathProperty:
         assert embs.path is None
 
     def test_path_setter_new_path_saves_embeddings(self, tmp_path):
-        """Test path setter with new path saves current embeddings"""
+        """Test path setter with new path saves current embeddings."""
         old_path = tmp_path / "old.npy"
         new_path = tmp_path / "new.npy"
 
@@ -504,7 +509,7 @@ class TestPathProperty:
         assert new_path.exists()
 
     def test_path_setter_same_path_no_save(self, tmp_path):
-        """Test path setter with same path doesn't trigger save"""
+        """Test path setter with same path doesn't trigger save."""
         path = tmp_path / "test.npy"
 
         ds = get_dataset(10)
@@ -517,10 +522,10 @@ class TestPathProperty:
 
 
 class TestResolvePath:
-    """Test suite for _resolve_path method"""
+    """Test suite for _resolve_path method."""
 
     def test_resolve_path_string_to_path(self, tmp_path):
-        """Test _resolve_path converts string to absolute Path"""
+        """Test _resolve_path converts string to absolute Path."""
         ds = get_dataset(10)
         embs = Embeddings(ds)
 
@@ -531,7 +536,7 @@ class TestResolvePath:
         assert resolved.is_absolute()
 
     def test_resolve_path_directory_adds_filename(self, tmp_path):
-        """Test _resolve_path adds filename for directory path"""
+        """Test _resolve_path adds filename for directory path."""
         ds = TorchDataset(torch.ones((10, 1, 3, 3)), torch.nn.functional.one_hot(torch.arange(10)))
         embs = Embeddings(ds)
 
@@ -544,7 +549,7 @@ class TestResolvePath:
         assert "emb-" in resolved.name
 
     def test_resolve_path_no_suffix_adds_filename(self, tmp_path):
-        """Test _resolve_path adds filename for path without suffix"""
+        """Test _resolve_path adds filename for path without suffix."""
         ds = get_dataset(10)
         embs = Embeddings(ds)
 
@@ -558,10 +563,10 @@ class TestResolvePath:
 
 
 class TestProgressCallback:
-    """Test suite for progress_callback functionality"""
+    """Test suite for progress_callback functionality."""
 
     def test_progress_callback_called_during_compute(self):
-        """Test that progress_callback is called during embedding computation"""
+        """Test that progress_callback is called during embedding computation."""
         ds = get_dataset(10)
         callback_calls = []
 
@@ -581,14 +586,14 @@ class TestProgressCallback:
             assert call["total"] == 10  # Total should be the dataset length
 
     def test_progress_callback_not_called_when_none(self):
-        """Test that no error occurs when progress_callback is None"""
+        """Test that no error occurs when progress_callback is None."""
         ds = get_dataset(10)
         extractor = TorchExtractor(torch.nn.Identity(), device="cpu")
         embs = Embeddings(ds, extractor=extractor, batch_size=2, progress_callback=None)
         _ = embs[:]  # Should work without error
 
     def test_progress_callback_with_getitem(self):
-        """Test that progress_callback works with __getitem__"""
+        """Test that progress_callback works with __getitem__."""
         ds = get_dataset(10)
         callback_calls = []
 
@@ -603,7 +608,7 @@ class TestProgressCallback:
         assert len(callback_calls) > 0
 
     def test_progress_callback_with_compute(self):
-        """Test that progress_callback works with compute method"""
+        """Test that progress_callback works with compute method."""
         ds = get_dataset(10)
         callback_calls = []
 
@@ -621,7 +626,7 @@ class TestProgressCallback:
             assert call["total"] == 10
 
     def test_progress_callback_preserved_in_new(self, torch_ic_ds):
-        """Test that progress_callback is preserved when creating new embeddings"""
+        """Test that progress_callback is preserved when creating new embeddings."""
         callback_calls = []
 
         def callback(step: int, *, total: int | None = None, desc: str | None = None, extra_info: dict | None = None):

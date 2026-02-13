@@ -113,7 +113,8 @@ class Select(AnnotatedDataset[_TDatum]):
         return f"{title}\n{sep}{nt}{selections}{nt}Selected Size: {len(self)}\n\n{self._dataset}"
 
     def _sort_selections(
-        self, selections: Selection[_TDatum] | Sequence[Selection[_TDatum]] | None
+        self,
+        selections: Selection[_TDatum] | Sequence[Selection[_TDatum]] | None,
     ) -> list[Selection[_TDatum]]:
         if not selections:
             return []

@@ -6,10 +6,10 @@ from dataeval.core._ber import _get_classes_counts, _knn_lowerbound, ber_knn, be
 
 @pytest.mark.required
 class TestBERCore:
-    """Tests the core BER calculation functions"""
+    """Tests the core BER calculation functions."""
 
     @pytest.mark.parametrize(
-        "method, k, expected_upper, expected_lower",
+        ("method", "k", "expected_upper", "expected_lower"),
         [
             (ber_mst, None, 0.0, 0.0),
             (ber_knn, 1, 0.0, 0.0),
@@ -17,7 +17,7 @@ class TestBERCore:
         ],
     )
     def test_ber_on_mock_data(self, method, k, expected_upper, expected_lower):
-        """Core methods correctly calculate BER with given params"""
+        """Core methods correctly calculate BER with given params."""
         rng = np.random.default_rng(3)
         labels = np.concatenate([rng.choice(10, 500), np.arange(10).repeat(50)])
         data = np.ones((1000, 784)) * labels[:, np.newaxis]
@@ -29,7 +29,7 @@ class TestBERCore:
         assert result["lower_bound"] == expected_lower
 
     @pytest.mark.parametrize(
-        "method, k, expected_upper, expected_lower",
+        ("method", "k", "expected_upper", "expected_lower"),
         [
             (ber_mst, None, 0.01, 0.00501396658942207),
             (ber_knn, 1, 0.011, 0.005516909047465568),
@@ -37,7 +37,7 @@ class TestBERCore:
         ],
     )
     def test_ber_on_mock_data_with_mismatch(self, method, k, expected_upper, expected_lower):
-        """Core methods correctly calculate BER with given params"""
+        """Core methods correctly calculate BER with given params."""
         rng = np.random.default_rng(3)
         labels = np.concatenate([rng.choice(10, 500), np.arange(10).repeat(50)])
         data = np.ones((1000, 784)) * labels[:, np.newaxis]
@@ -50,7 +50,7 @@ class TestBERCore:
         assert result["lower_bound"] == expected_lower
 
     @pytest.mark.parametrize(
-        "value, classes, k, expected",
+        ("value", "classes", "k", "expected"),
         [
             (0.0, 5, 1, 0.0),
             (0.5, 2, 1, 0.5),
@@ -62,19 +62,19 @@ class TestBERCore:
         ],
     )
     def test_knn_lower_bound_2_classes(self, value, classes, k, expected):
-        """All logical pathways are correctly calculated"""
+        """All logical pathways are correctly calculated."""
         result = _knn_lowerbound(value, classes, k)
         assert result == expected
 
     @pytest.mark.parametrize(
-        "method, k",
+        ("method", "k"),
         [
             (ber_mst, None),
             (ber_knn, 1),
         ],
     )
     def test_ber_redundant_shape(self, method, k):
-        """Unflattened and flattened input should have equivalent outputs"""
+        """Unflattened and flattened input should have equivalent outputs."""
         images = np.random.random(size=(10, 3, 3))
         labels = np.arange(10)
 
@@ -84,6 +84,6 @@ class TestBERCore:
         assert method(*args) == method(*args_flat)
 
     def test_class_min(self):
-        """Test minimum class count validation"""
-        with pytest.raises(ValueError):
+        """Test minimum class count validation."""
+        with pytest.raises(ValueError, match="less than 2 classes"):
             _get_classes_counts(np.ones(1, dtype=np.intp))

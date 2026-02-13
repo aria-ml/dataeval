@@ -14,7 +14,6 @@ class TestSufficiencyConfigConstructor:
 
     def test_sufficiency_reads_from_config(self, mock_model, simple_dataset, basic_config):
         """Verify constructor stores params and Sufficiency.Config."""
-
         suff = Sufficiency(
             model=mock_model,
             train_ds=simple_dataset,
@@ -38,7 +37,6 @@ class TestSufficiencyConfigConstructor:
         mock_reset,
     ):
         """Verify constructor stores config objects."""
-
         config = Sufficiency.Config(
             training_strategy=mock_train,
             evaluation_strategy=mock_eval,
@@ -53,7 +51,6 @@ class TestSufficiencyConfigConstructor:
 
     def test_sufficiency_object_delegates_to_config(self, mock_model, simple_dataset, multi_run_config):
         """Verify new constructor delegates properties to config."""
-
         suff = Sufficiency(mock_model, simple_dataset, simple_dataset, config=multi_run_config)
 
         # Should delegate to config

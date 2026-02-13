@@ -60,7 +60,7 @@ class ClassBalance(Selection[Any]):
         method: Literal["global", "interclass"],
         num_samples: int | None = None,
         background_class: int | str | None = None,
-        num_empty: int | float | None = None,
+        num_empty: float | None = None,
         aggregation_func: Literal["mean", "max"] = "mean",
         oversample_factor: float = 1.0,
         minimize_duplicates: bool = False,
@@ -101,7 +101,8 @@ class ClassBalance(Selection[Any]):
                     yield (int(as_numpy(lbl)), img_idx)
 
     def _compute_label_stats(
-        self, dataset: Select[Any]
+        self,
+        dataset: Select[Any],
     ) -> tuple[dict[int, list[int]], dict[int, list[int]], dict[int, float], list[int]]:
         """
         Compute label statistics for the dataset using core label_stats.
@@ -221,16 +222,16 @@ class ClassBalance(Selection[Any]):
             imgs_to_get = (
                 self.num_samples - self._empty if self.num_samples is not None else self._num_images - self._empty
             )
-            for i in range(self._num_images):
-                img_prob.append(
-                    0
-                    if i in empty_image_set
-                    else (
-                        np.mean([class_repeat_factor[lbl] for lbl in self._cls_per_img[i]])
-                        if self.aggregation_func == "mean"
-                        else np.max([class_repeat_factor[lbl] for lbl in self._cls_per_img[i]])
-                    )
+            img_prob.extend(
+                0
+                if i in empty_image_set
+                else (
+                    np.mean([class_repeat_factor[lbl] for lbl in self._cls_per_img[i]])
+                    if self.aggregation_func == "mean"
+                    else np.max([class_repeat_factor[lbl] for lbl in self._cls_per_img[i]])
                 )
+                for i in range(self._num_images)
+            )
         else:
             imgs_to_get = self._num_images if self.num_samples is not None else self._num_images
             img_prob = (
@@ -248,7 +249,10 @@ class ClassBalance(Selection[Any]):
         return self._rng.choice(self._num_images, size=imgs_to_get, replace=True, p=img_prob).tolist()
 
     def _calculate_selection_probability(
-        self, imgs: Sequence[int], cls: int, current_list: Sequence[int]
+        self,
+        imgs: Sequence[int],
+        cls: int,
+        current_list: Sequence[int],
     ) -> list[float]:
         """
         Calculate normalized selection probabilities for images to minimize duplicates.
