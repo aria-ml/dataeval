@@ -11,16 +11,55 @@ kernelspec:
   name: python3
 ---
 
-# Detecting Common Augmentations as Near Duplicates
+# Detecting common augmentations as duplicates
 
-## Problem Statement
+This tutorial demonstrates how DataEval's duplicate detection methods handle common torchvision augmentations.
+
+Estimated time to complete: 10 minutes
+
+Relevant ML stages: [Data Engineering](../concepts/users/ML_Lifecycle.md#data-engineering)
+
+Relevant personas: Data Engineer, ML Engineer
+
+## What you'll do
+
+- Create synthetic test images and apply 30+ torchvision transformations
+- Run both D4 hash-based and BoVW embedding-based duplicate detection
+- Compare which transformations each method catches or misses
+- Tune detection sensitivity with the `cluster_threshold` parameter
+
+## What you'll learn
+
+- Which augmentation types are detectable as near-duplicates (and which aren't)
+- When to use D4 hashes vs BoVW embeddings for duplicate detection
+- How D4 and BoVW have complementary strengths that improve coverage when combined
+
+### Quick reference: detection methods
+
+| Method                             | Best For                                  | Speed   | Rotation Invariant      |
+| ---------------------------------- | ----------------------------------------- | ------- | ----------------------- |
+| **D4 Hashes** (phash_d4, dhash_d4) | Detecting rotated/flipped copies          | Fast    | **Only 90° increments** |
+| **BoVWExtractor**                  | Semantic similarity, different viewpoints | Slower  | **Any angle**           |
+| **Basic Hashes** (phash, dhash)    | Same-orientation near-duplicates          | Fastest | No                      |
+
+**Key insight:** D4 hashes only handle the 8 symmetries of a square (0°, 90°, 180°, 270° + flips). BoVW using SIFT
+features is invariant to **any** rotation angle, making it better for detecting arbitrarily rotated duplicates.
+
+## What you'll need
+
+- A Python environment with the following packages installed:
+  - `dataeval`
+  - `opencv-python` or `opencv-python-headless`
+  - `torchvision`
+  - `matplotlib`
+
++++
+
+## Introduction
 
 Data augmentation is a common technique in deep learning, but augmented images can inadvertently appear in both training
-and test sets, or be saved as "new" images when they're really transformations of existing ones.
-
-This notebook demonstrates which typical torchvision transformations can be detected as "near duplicates" using
-DataEval's `BoVWExtractor` (Bag of Visual Words) and D4 hashing combined with the `Duplicates` class. Understanding
-these detection capabilities helps you:
+and test sets, or be saved as "new" images when they're really transformations of existing ones. Understanding which
+augmentations are detectable as near-duplicates helps you:
 
 1. **Identify data leakage** - Find augmented copies that leaked between train/test splits
 1. **Clean datasets** - Remove redundant transformed images
@@ -28,18 +67,7 @@ these detection capabilities helps you:
 
 +++
 
-### What you will need
-
-1. A Python environment with the following packages installed:
-   - `dataeval`
-   - `opencv-python` or `opencv-python-headless`
-   - `torchvision`
-   - `matplotlib`
-1. Sample images to analyze
-
-+++
-
-## Getting Started
+## Getting started
 
 Let's import the required libraries.
 
@@ -74,7 +102,7 @@ from dataeval.quality import Duplicates
 config.set_seed(42)
 ```
 
-## Creating Test Data
+## Creating test data
 
 We'll create a synthetic image with rich texture patterns that SIFT can detect. Then we'll apply various torchvision
 transformations to test detection capabilities.
@@ -162,7 +190,7 @@ plt.tight_layout()
 plt.show()
 ```
 
-## Defining Torchvision Transformations
+## Defining Torchvision transformations
 
 We'll test a comprehensive set of common torchvision transformations, organized by category:
 
@@ -309,7 +337,7 @@ plt.suptitle("Sample of Torchvision Transformations Applied to Base Image", y=1.
 plt.show()
 ```
 
-## Running Near-Duplicate Detection
+## Running near-duplicate detection
 
 We'll use both hash-based detection (D4 hashes) and BoVWExtractor to compare their effectiveness on different
 transformations.
@@ -380,7 +408,7 @@ else:
     print("  None found")
 ```
 
-## Analyzing Detection Results by Transformation Type
+## Analyzing detection results by transformation type
 
 Let's analyze which transformations were detected as near-duplicates.
 
@@ -431,7 +459,7 @@ for i in range(len(images) - 2, len(images)):
     print(f"  {labels[i]}: D4={d4_status}, BoVW={bovw_status}, Combined={combined_status}")
 ```
 
-## Visualizing Detected vs Missed Transformations
+## Visualizing detected vs missed transformations
 
 ```{code-cell} ipython3
 # Categorize results
@@ -499,7 +527,7 @@ visualize_category(detected_by_bovw_only, "Detected by BoVW ONLY (D4 missed thes
 visualize_category(missed_by_both, "MISSED by Both Methods")
 ```
 
-## Adjusting Detection Sensitivity
+## Adjusting detection sensitivity
 
 The `cluster_threshold` parameter controls how strict the near-duplicate detection is. Let's see how different
 thresholds affect detection.
@@ -541,9 +569,9 @@ for i in range(1, len(images) - 2):
 print("=" * 90)
 ```
 
-## Key Findings and Recommendations
+## Key findings and recommendations
 
-### Transformations Detected as Near-Duplicates
+### Transformations detected as near-duplicates
 
 | Transformation Type                    | D4 Hash | BoVW    | Notes                                                                     |
 | -------------------------------------- | ------- | ------- | ------------------------------------------------------------------------- |
@@ -559,7 +587,7 @@ print("=" * 90)
 | **Gaussian Blur (strong)**             | Yes     | No      | D4 hashes are more resilient to strong blur than SIFT                     |
 | **Resize Down+Up**                     | No      | Yes     | BoVW detects mild resolution loss; both miss severe downsampling          |
 
-### Transformations Missed by Both Methods
+### Transformations missed by both methods
 
 | Transformation Type              | Why Missed                                                                        |
 | -------------------------------- | --------------------------------------------------------------------------------- |
@@ -569,7 +597,7 @@ print("=" * 90)
 | **Random erasing**               | Destroys local features in erased regions                                         |
 | **Affine (rotate+scale)**        | Combined scaling with rotation changes SIFT descriptor distributions              |
 
-### Complementary Strengths
+### Complementary strengths
 
 A key finding is that D4 hashes and BoVW have **complementary** detection strengths:
 

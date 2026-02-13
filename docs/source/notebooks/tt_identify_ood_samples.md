@@ -11,9 +11,10 @@ kernelspec:
   name: python3
 ---
 
-# Identify Out-of-Distribution Samples
+# Identify out-of-distribution samples
 
-This guide demonstrates how to identify out-of-distribution (OOD) samples using reconstruction-based methods with
+This guide demonstrates how to identify [out-of-distribution](../concepts/OOD.md) (OOD) samples using
+reconstruction-based methods with
 different model architectures.
 
 Estimated time to complete: 10-15 minutes
@@ -59,7 +60,8 @@ six different approaches to OOD detection:
 1. **VAE with GMM**: Combining probabilistic encoding with GMM for robust detection
 
 **Distance-Based Methods**: 5. **K-Nearest Neighbors (KNN) - Raw Pixels**: Detects OOD by measuring distance in pixel
-space 6. **K-Nearest Neighbors (KNN) - Embeddings**: Uses learned embeddings for better similarity
+space 6. **K-Nearest Neighbors (KNN) - Embeddings**: Uses learned [embeddings](../concepts/Embeddings.md) for better
+similarity
 
 For this tutorial, you'll use the MNIST dataset of handwritten digits. You'll train models to recognize digits 0-7 and
 test their ability to detect digits 8-9 as out-of-distribution samples.
@@ -72,7 +74,7 @@ First, install the required packages and import necessary libraries.
 
 +++
 
-### Important Note on Expected Results
+### Important note on expected results
 
 OOD detection performance depends heavily on **how different** the OOD data is from the in-distribution data:
 
@@ -129,7 +131,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 ```
 
-## Prepare the Data
+## Prepare the data
 
 You'll load the MNIST dataset and split it into in-distribution (digits 0-7) and out-of-distribution (digits 8-9)
 samples.
@@ -217,7 +219,7 @@ plt.tight_layout()
 plt.show()
 ```
 
-## K-Nearest Neighbors (KNN) for OOD Detection
+## K-nearest neighbors (KNN) for OOD detection
 
 KNN-based OOD detection is a simple yet effective approach that utilizes a pretrained model to create learned
 embeddings. It works by measuring how far test samples are from their nearest neighbors in the training data. Samples
@@ -359,7 +361,7 @@ print(f"Average score (in-dist): {knn_result_in.instance_score.mean():.4f}")
 print(f"Average score (OOD): {knn_result_ood.instance_score.mean():.4f}")
 ```
 
-## Standard Autoencoder (AE) for OOD Detection
+## Standard autoencoder (AE) for OOD detection
 
 The simplest approach uses a standard autoencoder that learns to reconstruct normal (in-distribution) images. When
 presented with OOD data, reconstruction error increases, signaling anomalous samples.
@@ -431,7 +433,7 @@ else:
     print(f"⚠ Note: Expected ~95% in-dist accuracy, got {in_acc_ae:.1f}%")
 ```
 
-## Variational Autoencoder (VAE) for OOD Detection
+## Variational autoencoder (VAE) for OOD detection
 
 VAEs learn a probabilistic latent representation, which provides better generalization and more structured latent spaces
 compared to standard AEs. This can improve OOD detection, especially when in-distribution data has high variability.
@@ -471,7 +473,7 @@ print(f"Average score (in-dist): {vae_result_in.instance_score.mean():.4f}")
 print(f"Average score (OOD): {vae_result_ood.instance_score.mean():.4f}")
 ```
 
-## Autoencoder with GMM for Enhanced OOD Detection
+## Autoencoder with GMM for enhanced OOD detection
 
 Adding a Gaussian Mixture Model (GMM) to the latent space provides an additional signal for OOD detection. The GMM
 models the density of the latent representations, and samples with low density are likely to be OOD. This combines
@@ -534,7 +536,7 @@ print(f"Average score (in-dist): {ae_gmm_result_in.instance_score.mean():.4f}")
 print(f"Average score (OOD): {ae_gmm_result_ood.instance_score.mean():.4f}")
 ```
 
-## VAE with GMM for Maximum Robustness
+## VAE with GMM for maximum robustness
 
 Combining VAE's probabilistic latent space with GMM density estimation provides the most sophisticated OOD detection
 approach. This is particularly effective when you need high reliability and have sufficient computational resources.
@@ -581,7 +583,7 @@ print(f"Average score (in-dist): {vae_gmm_result_in.instance_score.mean():.4f}")
 print(f"Average score (OOD): {vae_gmm_result_ood.instance_score.mean():.4f}")
 ```
 
-## Compare All Methods
+## Compare all methods
 
 Now let's visualize and compare the performance of all six approaches.
 
@@ -621,7 +623,7 @@ plt.tight_layout()
 plt.show()
 ```
 
-### Key Observations
+### Key observations
 
 1. In-distribution accuracy should be close to threshold (95%)
 1. KNN (Pixels) provides a fast baseline without neural network training
@@ -668,7 +670,7 @@ plt.tight_layout()
 plt.show()
 ```
 
-### Interpreting Score Distributions
+### Interpreting score distributions
 
 What to look for:
 
@@ -685,7 +687,7 @@ Expected behavior:
 
 +++
 
-## Visualize Reconstructions
+## Visualize reconstructions
 
 Let's examine how reconstruction-based models reconstruct in-distribution vs out-of-distribution samples. Good OOD
 detection should show clear degradation in reconstruction quality for OOD samples.
@@ -753,7 +755,7 @@ plt.tight_layout()
 plt.show()
 ```
 
-### Understanding Reconstructions
+### Understanding reconstructions
 
 What to observe:
 
@@ -774,7 +776,7 @@ Note: The degree of degradation depends on similarity between in-dist and OOD:
 
 +++
 
-## Comparing Use Cases - When Does Each Method Excel?
+## Comparing use cases - when does each method excel?
 
 > **⚠️ IMPORTANT**: Results Reflect Limited Training & Generic Models
 
@@ -940,13 +942,13 @@ methods (AE) provide reliable baselines.
 
 +++
 
-### Analysis: What the Results Show
+### Analysis: what the results show
 
 > **⚠️ Important Context**: These results are based on limited training (3 epochs) with small datasets (10K train, 3K
 > test) and generic model architectures. Performance patterns will differ significantly with more training, larger
 > datasets, and architectures optimized for your specific problem.
 
-#### Performance by OOD Difficulty
+#### Performance by OOD difficulty
 
 **Easy OOD (CIFAR10 - completely different domain):**
 
@@ -968,7 +970,7 @@ methods (AE) provide reliable baselines.
 - **GMM methods**: Competitive with tuning (10-20%) - sensitive to `gmm_weight` parameter
 - **VAE**: Struggles (5-10%) - needs extensive training to show advantages
 
-#### Summary Observations
+#### Summary observations
 
 1. **KNN with learned embeddings** consistently outperformed reconstruction-based methods
 1. **GMM score fusion is critical**: Proper `gmm_weight` (0.6-0.8) significantly impacts performance
@@ -983,12 +985,12 @@ methods (AE) provide reliable baselines.
 In this tutorial, you learned how to use DataEval's OOD detection capabilities with five different approaches: KNN (with
 embeddings), Standard AE, VAE, AE+GMM, and VAE+GMM.
 
-### Method Selection Guide
+### Method selection guide
 
 Based on the comparative analysis across three OOD difficulty levels, here's how to choose the right method for your use
 case:
 
-#### **Quick Decision Table:**
+#### **Quick decision table:**
 
 | Your Situation                           | Recommended Method   | Why                                                  |
 | ---------------------------------------- | -------------------- | ---------------------------------------------------- |
@@ -998,7 +1000,7 @@ case:
 | Maximum accuracy (can train extensively) | **KNN or VAE + GMM** | KNN for strong embeddings, VAE+GMM for 30-50+ epochs |
 | Limited computational resources          | **Standard AE**      | Fastest training, good baseline                      |
 
-#### **By Application Domain:**
+#### **By application domain:**
 
 | Domain               | Best Method        | Rationale                                                         |
 | -------------------- | ------------------ | ----------------------------------------------------------------- |
@@ -1008,9 +1010,9 @@ case:
 | Autonomous systems   | KNN                | Complex scenarios, use pretrained vision models                   |
 | Research/Prototyping | KNN or Standard AE | Quick iteration, establish baseline                               |
 
-### Implementation Recommendations
+### Implementation recommendations
 
-#### **For KNN (Best Overall)**
+#### **For KNN (best overall)**
 
 ```python
 # Train embedding model or use pretrained
@@ -1028,7 +1030,7 @@ result = ood_knn.predict(test_emb)
 
 **Key Success Factor**: Embedding quality - invest in domain-specific pretrained models
 
-#### **For Standard AE (Reliable Baseline)**
+#### **For standard AE (reliable baseline)**
 
 ```python
 config = OODReconstruction.Config(
@@ -1041,7 +1043,7 @@ ood_ae = OODReconstruction(your_ae_model, device=device, config=config)
 
 **Key Success Factor**: Architecture design - match to your data type
 
-#### **For GMM Methods (Advanced)**
+#### **For GMM methods (advanced)**
 
 ```python
 # Add GMM to your model
@@ -1064,7 +1066,7 @@ config = OODReconstruction.Config(
 - Match `n_gmm` to natural data clusters
 - More training epochs than standard AE/VAE
 
-### Critical Takeaways
+### Critical takeaways
 
 **⚠️ Results Context:**
 
@@ -1083,7 +1085,7 @@ config = OODReconstruction.Config(
 1. **Training investment**: VAE needs 10-20x more epochs than shown here to reach potential
 1. **Threshold selection**: Balance false positives vs detection rate for your use case
 
-### Performance Expectations
+### Performance expectations
 
 Based on OOD similarity to in-distribution data:
 
@@ -1094,7 +1096,7 @@ Based on OOD similarity to in-distribution data:
 Remember: Digits 8-9 vs 0-7 is a **hard** OOD case (shared features). Real-world performance depends on your specific
 data distributions.
 
-### What's Next
+### What's next
 
 To learn more about OOD detection and related concepts:
 
@@ -1102,7 +1104,7 @@ To learn more about OOD detection and related concepts:
 - Learn about [monitoring operational data](./tt_monitor_shift.md)
 - Try the [data cleaning tutorial](./tt_clean_dataset.md)
 
-### Try It Yourself
+### Try it yourself
 
 Experiment with:
 

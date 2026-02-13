@@ -15,17 +15,18 @@ kernelspec:
 
 +++
 
-## _Problem Statement_
+## Problem statement
 
-When working with image datasets, generating embeddings is a common first step for many analysis tasks like clustering,
-duplicate detection, and coverage analysis. While PyTorch models are widely used, ONNX (Open Neural Network Exchange)
+When working with image datasets, generating [embeddings](../concepts/Embeddings.md) is a common first step for many
+analysis tasks like [clustering](../concepts/Clustering.md), duplicate detection, and
+[coverage](../concepts/Coverage.md) analysis. While PyTorch models are widely used, ONNX (Open Neural Network Exchange)
 provides a framework-agnostic format that offers portability and often better inference performance.
 
 DataEval's `OnnxExtractor` allows you to use any ONNX model to generate embeddings from your image datasets.
 
 +++
 
-### _When to use_
+### When to use
 
 Use the `OnnxExtractor` when you want to:
 
@@ -35,7 +36,7 @@ Use the `OnnxExtractor` when you want to:
 
 +++
 
-### _What you will need_
+### What you will need
 
 1. An image dataset (we'll use VOC2012)
 1. An ONNX model that outputs embeddings
@@ -47,7 +48,7 @@ Use the `OnnxExtractor` when you want to:
 
 +++
 
-## _Getting Started_
+## Getting started
 
 Let's import the required libraries needed to set up a minimal working example.
 

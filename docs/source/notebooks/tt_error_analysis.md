@@ -7,10 +7,10 @@ jupytext:
     jupytext_version: 1.19.1
 ---
 
-# Performing a Model Error Analysis
+# Performing a model error analysis
 
 +++
 
-## Coming Soon
+## Coming soon
 
 This page is under development - reach out to us for more information.

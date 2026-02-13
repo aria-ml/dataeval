@@ -15,23 +15,23 @@ kernelspec:
 
 +++
 
-## _Problem Statement_
+## Problem statement
 
 For most computer vision tasks like **image classification** and **object detection**, we often have a lot of images,
 but certain subsets of the images can be undersampled, such as label, style within a label, etc. A way to detect this
-regional sparsity is through coverage analysis.
+regional sparsity is through [coverage](../concepts/Coverage.md) analysis.
 
 To help with this, DataEval has introduced a {func}`.coverage` function, that provides a user with example images which
 have few similar instances within the provided dataset.
 
 +++
 
-### _When to use_
+### When to use
 
 The `coverage` function should be used when you have lots of images, but only a small fraction from certain
 regimes/labels.
 
-### _What you will need_
+### What you will need
 
 1. Image classification dataset.
 1. Autoencoder trained on image classification dataset for dimension reduction.
@@ -41,7 +41,7 @@ regimes/labels.
 
 +++
 
-### _Setting up_
+### Getting started
 
 Let's import the required libraries needed to set up a minimal working example
 

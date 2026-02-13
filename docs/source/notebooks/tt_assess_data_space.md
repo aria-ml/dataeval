@@ -25,9 +25,9 @@ Relevant personas: Data Engineer, Data Scientist
 
 ## What you'll do
 
-- Construct embeddings by inferencing the PASCAL VOC 2012 through a model
-- Analyze clustered embeddings to find outliers
-- Run additional analysis to find gaps in data coverage
+- Construct [embeddings](../concepts/Embeddings.md) by inferencing the PASCAL VOC 2012 through a model
+- Analyze clustered embeddings to find [outliers](../concepts/Outliers.md)
+- Run additional analysis to find gaps in data [coverage](../concepts/Coverage.md)
 
 ## What you'll learn
 
@@ -51,7 +51,8 @@ or expensive annotations, analysis can still be done on the images alone. We do 
 geometric points in a high-dimensional abstract space called _feature space_. By understanding how the data examples are
 distributed in feature space, you will become able to make the assessments you need.
 
-Specifically by grouping data points (i.e. images) into clusters, you can explore the natural structure of the dataset
+Specifically by grouping data points (i.e. images) into [clusters](../concepts/Clustering.md), you can explore the
+natural structure of the dataset
 to reveal hidden patterns and potential anomalies. Measuring coverage goes a step further by quantifying how well the
 clusters represent the entire dataset to ensure that no significant portion of the feature space is being overlooked.
 
@@ -110,7 +111,7 @@ to `"cpu"` For more information, see the
 
 +++
 
-## Constructing Embeddings
+## Constructing embeddings
 
 An important concept in many aspects of machine learning is {term}`Dimensionality Reduction`. While this step is not
 always necessary, it is good practice to use embeddings over raw images to improve the speed and memory efficiency of
@@ -183,7 +184,7 @@ improvement in performance of downstream tasks.
 
 +++
 
-## Cluster the Embeddings
+## Cluster the embeddings
 
 +++
 

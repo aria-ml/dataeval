@@ -15,23 +15,24 @@ kernelspec:
 
 +++
 
-## _Problem Statement_
+## Problem statement
 
 When evaluating new testing data, or comparing two datasets, we often want to have a quantitative way of comparing and
-evaluating shifts in covariates. HP divergence is a nonparametric divergence metric which gives the distance between two
+evaluating shifts in covariates. HP [divergence](../concepts/Divergence.md) is a nonparametric divergence metric which
+gives the distance between two
 datasets. A divergence of 0 means that the two datasets are approximately identically distributed. A divergence of 1
 means the two datasets are completely separable.
 
 +++
 
-### _When to use_
+### When to use
 
 The `Divergence` class should be used when you would like to know how far two datasets are diverged for one another. For
-example, if you would like to measure operational drift.
+example, if you would like to measure [operational drift](../concepts/Drift.md).
 
 +++
 
-### _What you will need_
+### What you will need
 
 1. A Python environment with the following packages installed:
    - dataeval
@@ -40,7 +41,7 @@ example, if you would like to measure operational drift.
 
 +++
 
-### _Setting up_
+### Getting started
 
 Let's import the required libraries needed to set up a minimal working example
 

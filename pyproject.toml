@@ -287,7 +287,7 @@ docstring-code-format = true
 docstring-code-line-length = "dynamic"
 
 [tool.codespell]
-skip = './*env*,./output,./docs/build,./docs/source/.jupyter_cache,./docs/source/*/data,CHANGELOG.md,uv.lock,requirements.txt,*.html,*.lock'
+skip = './*env*,./output,./docs/build,./docs/source/.jupyter_cache,./docs/source/*/data,CHANGELOG.md,uv.lock,requirements.txt,*.html,*.lock,*.ipynb'
 ignore-words-list = ["Hart","FPR"]
 
 [build-system]

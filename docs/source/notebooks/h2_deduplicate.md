@@ -15,7 +15,7 @@ kernelspec:
 
 +++
 
-## Problem Statement
+## Problem statement
 
 One of the first steps in Exploratory Data Analysis (EDA) is to check for duplicates. Duplicates add no new information
 and can distort model training by over-emphasizing features that in appear in the duplicates.
@@ -25,13 +25,13 @@ quality data.
 
 +++
 
-### _When to use_
+### When to use
 
 The Duplicates class should be used if you need to find duplicate images in your dataset.
 
 +++
 
-### _What you will need_
+### What you will need
 
 1. A python envornment with following packages installed:
    - dataeval
@@ -40,7 +40,7 @@ The Duplicates class should be used if you need to find duplicate images in your
 
 +++
 
-## _Getting Started_
+## Getting started
 
 Let's import the required libraries needed to set up a minimal working example
 
@@ -102,7 +102,7 @@ indices_with_duplicates = [duplicates.get(i, i) for i in range(len(testing_datas
 duplicates_ds = Select(testing_dataset, Indices(indices_with_duplicates))
 ```
 
-## Finding the Duplicates
+## Finding the duplicates
 
 Now we are asking our Duplicates class to find the needle in the haystack. There are only 4 exact duplicates.
 

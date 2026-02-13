@@ -11,37 +11,37 @@ kernelspec:
   name: python3
 ---
 
-# Configuring hardware: PyTorch devices and cpu processes
+# How to configure global hardware configuration defaults in DataEval
 
 +++
 
-## Problem Statement
+## Problem statement
 
 DataEval provides global configuration settings to control computational resources and hardware acceleration. This guide
-shows how to configure the default PyTorch device and the maximum number of worker processes.
+shows how to configure the default PyTorch device, batch size, and the maximum number of worker processes.
 
 +++
 
-### _When to use_
+### When to use
 
 - You need to specify GPU or CPU execution for PyTorch-based operations
+- You want to set a global default batch size for data processing operations
 - You want to control the number of parallel worker processes
 - You need to optimize performance for your hardware configuration
 
 +++
 
-### _What you will need_
+### What you will need
 
 1. A Python environment with dataeval installed
 
 +++
 
-## _Getting Started_
+## Getting started
 
 ```{code-cell} ipython3
----
-tags: [remove_cell]
----
+:tags: [remove_cell]
+
 # Google Colab Only
 try:
     import google.colab  # noqa: F401
@@ -97,6 +97,35 @@ dataeval.config.set_device(None)
 print(f"Current device for DataEval: {dataeval.config.get_device()}")
 ```
 
+## Configuring the default batch size
+
++++
+
+DataEval allows setting a global default batch size for operations that process data in batches. The batch size must be
+a positive integer.
+
+Note that functions and methods that require a `batch_size` will fail if not provided and a global batch size is
+not set.
+
++++
+
+### Set the default batch size
+
+```{code-cell} ipython3
+dataeval.config.set_batch_size(64)
+
+print(f"Current batch size: {dataeval.config.get_batch_size()}")
+```
+
+### Reset the batch size to unset
+
+```{code-cell} ipython3
+dataeval.config.set_batch_size(None)
+
+# When no batch size is set, get_batch_size() requires an explicit value
+print("Batch size has been unset")
+```
+
 ## Configuring maximum worker processes
 
 +++
@@ -132,7 +161,18 @@ print(f"Max processes: {dataeval.config.get_max_processes()}")
 
 +++
 
-Temporarily override the max processes setting using a context manager:
+Temporarily override configuration settings using context managers:
+
+```{code-cell} ipython3
+dataeval.config.set_batch_size(64)
+print(f"Before context: {dataeval.config.get_batch_size()}")
+
+with dataeval.config.use_batch_size(16):
+    print(f"Inside context: {dataeval.config.get_batch_size()}")
+    # Perform operations with batch_size=16
+
+print(f"After context: {dataeval.config.get_batch_size()}")
+```
 
 ```{code-cell} ipython3
 dataeval.config.set_max_processes(8)

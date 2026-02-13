@@ -13,8 +13,7 @@ kernelspec:
 
 # How to measure dataset sufficiency for image classification
 
-This guide provides a beginner friendly how-to guide to analyze an image classification model's hypothetical
-performance.
+This guide walks you through analyzing an image classification model's hypothetical performance.
 
 Estimated time to complete: 10 minutes
 
@@ -24,37 +23,24 @@ Relevant personas: ML Engineer
 
 +++
 
-## _What you'll do_
-
-- Evaluate an image classification model's performance with the MNIST dataset
-- Define a custom evaluation function with metrics of interest
-- Project the model's performance over increasing sample sizes
-
-## _What you'll learn_
-
-- Learn to evaluate a model's limits for different metrics with the MNIST dataset
-- Learn to determine how many samples are required to reach specific performance thresholds
-
-+++
-
-## _Problem Statement_
+## Problem statement
 
 For machine learning tasks, often we would like to evaluate the performance of a model on a small, preliminary dataset.
 In situations where data collection is expensive, we would like to extrapolate hypothetical performance out to a larger
 dataset.
 
-DataEval has introduced a method projecting performance via _sufficiency curves_.
+DataEval has introduced a method projecting performance via _[sufficiency](../concepts/Sufficiency.md) curves_.
 
 +++
 
-### _When to use_
+### When to use
 
 The {class}`.Sufficiency` class should be used when you would like to extrapolate hypothetical performance. For example,
 if you have a small dataset, and would like to know if it is worthwhile to collect more data.
 
 +++
 
-### _What you will need_
+### What you will need
 
 1. A particular model architecture.
 1. Metric(s) that we would like to evaluate.
@@ -64,7 +50,7 @@ if you have a small dataset, and would like to know if it is worthwhile to colle
 
 +++
 
-### _Setting up_
+### Getting started
 
 Let's import the required libraries needed to set up a minimal working example
 
@@ -185,7 +171,7 @@ class Net(nn.Module):
 model: Net = cast(Net, torch.compile(Net().to(device)))
 ```
 
-## Strategy Protocols
+## Strategy protocols
 
 Training and evaluation functions are heavily dependent on the hyperparameters defined by a user. These can include
 metrics, loss functions, optimizers, model architectures, input sizes, etc.
@@ -311,7 +297,7 @@ suff = Sufficiency(
 )
 ```
 
-## Evaluate Sufficiency
+## Evaluate sufficiency
 
 Now we can evaluate the metric to train the models and produce the learning curve.
 

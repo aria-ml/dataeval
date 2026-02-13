@@ -15,12 +15,13 @@ kernelspec:
 
 +++
 
-## _Problem Statement_
+## Problem statement
 
 Data does not typically come labeled and labeling/verifying labels is a time and resource intensive process. Exploratory
 data analysis (EDA) can often be enhanced by splitting data into similar groups.
 
-Clustering is a method which groups data in the format of (samples, features). This can be used with images or image
+[Clustering](../concepts/Clustering.md) is a method which groups data in the format of (samples, features). This can be
+used with images or image
 embeddings as long as the arrays are flattened to only contain 2 dimensions.
 
 The `cluster` function utilizes a clustering algorithm based on the HDBSCAN algorithm. The `Outliers` and `Duplicates`
@@ -28,18 +29,18 @@ detectors can then analyze the cluster results to identify outliers and duplicat
 
 +++
 
-### _When to use_
+### When to use
 
 The clustering workflow can be used during the EDA process to perform the following:
 
 - group a dataset into clusters
 - verify labeling as a quality control
-- identify outliers in your dataset using the `Outliers` detector
+- identify [outliers](../concepts/Outliers.md) in your dataset using the `Outliers` detector
 - identify duplicates in your dataset using the `Duplicates` detector
 
 +++
 
-### _What you will need_
+### What you will need
 
 1. A 2 dimensional dataset (samples, features)
 1. A Python environment with the following packages installed:
@@ -51,7 +52,7 @@ dimension being \<=1000).
 
 +++
 
-## _Getting Started_
+## Getting started
 
 Let's import the required libraries needed to set up a minimal working example.
 

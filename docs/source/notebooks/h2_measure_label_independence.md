@@ -15,23 +15,24 @@ kernelspec:
 
 +++
 
-## _Problem Statement_
+## Problem statement
 
 For machine learning tasks, a discrepancy in label frequencies between train and test datasets can result in poor model
 performance.
 
-To help with this, DataEval has a tool that compares the label distributions of two datasets.
+To help with this, DataEval has a [label parity](../concepts/LabelParity.md) tool that compares the label distributions
+of two datasets.
 
 +++
 
-### _When to use_
+### When to use
 
 DataEval provides a {func}`.label_parity` function to use when you would like to determine if two datasets have
 statistically independent labels.
 
 +++
 
-### _What you will need_
+### What you will need
 
 1. A Python environment with the following packages installed:
    - dataeval
@@ -40,7 +41,7 @@ statistically independent labels.
 
 +++
 
-### _Setting up_
+### Getting started
 
 Let's import the required libraries needed to set up a minimal working example
 

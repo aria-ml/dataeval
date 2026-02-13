@@ -15,17 +15,17 @@ kernelspec:
 
 +++
 
-## _Problem Statement_
+## Problem statement
 
 For classification machine learning tasks, there is an _inherent difficulty_ associated with signal to noise ratio in
-the images. One way of quantifying this difficulty is the Bayes Error Rate, or irreducable error. This metric tells you
-if it would be _feasible_ to use a given feature set to predict a target variable.
+the images. One way of quantifying this difficulty is the [Bayes Error Rate](../concepts/BER.md), or irreducable
+error. This metric tells you if it would be _feasible_ to use a given feature set to predict a target variable.
 
 DataEval has introduced a method of calculating this error rate that uses image embeddings.
 
 +++
 
-### _When to use_
+### When to use
 
 The `BER` metric should be used when you would like to measure the feasibility of a machine learning task. For example,
 if you have an operational accuracy requirement of 80%, and would like to know if this is feasibly achievable given the
@@ -35,16 +35,17 @@ that your data is noisy.
 
 +++
 
-### _What you will need_
+### What you will need
 
-1. A set of image embeddings and their corresponding class labels. This requires training an autoencoder to compress the
+1. A set of image [embeddings](../concepts/Embeddings.md) and their corresponding class labels. This requires training
+   an autoencoder to compress the
    images.
 1. A Python environment with the following packages installed:
    - `dataeval`
 
 +++
 
-### _Setting up_
+### Getting started
 
 Let's import the required libraries needed to set up a minimal working example
 

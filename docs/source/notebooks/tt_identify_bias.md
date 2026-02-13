@@ -13,11 +13,12 @@ kernelspec:
 
 # Identify bias and correlations
 
-This guide provides a beginner friendly introduction to dataset bias, including balance, diversity and parity.
+This guide provides a beginner friendly introduction to dataset bias, including [balance](../concepts/Balance.md),
+[diversity](../concepts/Diversity.md) and [parity](../concepts/Parity.md).
 
 Estimated time to complete: 15 minutes
 
-Relevant ML stages: Data Engineering
+Relevant ML stages: [Data Engineering](../concepts/users/ML_Lifecycle.md#data-engineering)
 
 Relevant personas: Data Engineer, T&E Engineer
 
@@ -40,7 +41,7 @@ Relevant personas: Data Engineer, T&E Engineer
 ## What you'll need
 
 - Basic familiarity with Python
-- Basic understanding of your dataset structure, including but not limited to its metadata
+- Basic understanding of your dataset structure, including but not limited to its [metadata](../concepts/Metadata.md)
 - An environment with DataEval installed
 
 +++

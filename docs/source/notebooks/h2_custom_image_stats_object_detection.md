@@ -15,9 +15,10 @@ kernelspec:
 
 +++
 
-## Problem Statement
+## Problem statement
 
-When working with object detection datasets, you often need to analyze statistics at different granularities:
+When working with object detection datasets, you often need to analyze
+[image statistics](../concepts/ImageStats.md) at different granularities:
 
 - Image-level statistics: Properties of entire images
 - Box-level statistics: Properties of individual bounding boxes within images
@@ -27,7 +28,7 @@ full images and individual bounding boxes.
 
 +++
 
-### _When to use_
+### When to use
 
 Use this approach when you need fine-grained control over which statistics to compute, especially when:
 
@@ -37,7 +38,7 @@ Use this approach when you need fine-grained control over which statistics to co
 
 +++
 
-### _What you will need_
+### What you will need
 
 1. An object detection dataset (we'll use SeaDrone from maite-datasets)
 1. A Python environment with the following packages installed:
@@ -46,7 +47,7 @@ Use this approach when you need fine-grained control over which statistics to co
 
 +++
 
-## _Getting Started_
+## Getting started
 
 First import the required libraries needed to set up the example.
 

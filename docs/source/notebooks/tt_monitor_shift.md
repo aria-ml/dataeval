@@ -23,7 +23,7 @@ Relevant personas: Machine Learning Engineer, T&E Engineer
 
 ## What you'll do
 
-- Construct embeddings by training a simple neural network
+- Construct [embeddings](../concepts/Embeddings.md) by training a simple neural network
 - Compare the embeddings between a training and operational set
 - Compare the label distributions between a training and operational set
 
@@ -42,14 +42,16 @@ Relevant personas: Machine Learning Engineer, T&E Engineer
 ## Introduction
 
 Monitoring is a critical step in the [AI/ML lifecycle](../concepts/users/ML_Lifecycle.md). When a model is deployed,
-data can, and generally will, drift from the distribution on which the model was originally trained. One critical step
+data can, and generally will, [drift](../concepts/Drift.md) from the distribution on which the model was originally
+trained. One critical step
 in AI T&E is the detection of changes in the operational distribution so that they may be proactively addressed. While
 some change might not affect performance, significant deviation is often associated with model degradation.
 
 For this tutorial, you will use the popular
 [2012 VOC](https://huggingface.co/datasets/HuggingFaceM4/pascal_voc/tree/main) computer vision dataset to detect drift
 between the image distribution of the `train` split and the `val` split, which will represent an operational dataset in
-this guide. You will then determine if the labels within these two datasets has high parity, or equivalent label
+this guide. You will then determine if the labels within these two datasets has high
+[parity](../concepts/LabelParity.md), or equivalent label
 distributions.
 
 +++
@@ -99,7 +101,7 @@ torch.set_default_device(device)
 
 +++
 
-## Constructing Embeddings
+## Constructing embeddings
 
 An important concept in many aspects of machine learning is {term}`Dimensionality Reduction`. While this step is not
 always necessary, it is good practice to use embeddings over raw images to improve the speed and memory efficiency of
@@ -147,7 +149,7 @@ size by creating model embeddings for each image to reduce this impact.
 
 +++
 
-### Extract Embeddings
+### Extract embeddings
 
 Now it is time to process the datasets through your model. Aggregating the model outputs gives you the embeddings of the
 data. This will be helpful in determining drift between the training and operational splits.
@@ -274,7 +276,7 @@ Next you will look at the labels' distributions.
 
 +++
 
-## Evaluate Parity
+## Evaluate parity
 
 +++
 
