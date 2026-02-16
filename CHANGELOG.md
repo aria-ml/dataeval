@@ -1,6 +1,17 @@
-[//]: # (ed11b75a6071f526df95e973ede0829dc3a82f10)
+[//]: # (9a9eb12ba32e0fa0109f3b9b23c2f46e6ed09331)
 
 # DataEval Change Log
+
+## v1.0.0-rc1
+
+👾 **Fixes**
+- `613a3c57` - [fix] Fallback to class label value if not present in index2label
+- `fdea0473` - Fixed unwanted dtype conversion in to_numpy for int arrays
+
+📝 **Miscellaneous**
+- `9a9eb12b` - Expose core function result types and completeness
+- `5de0d7c3` - [docs] Clean up documentation headers and structure and delete redundant how-to
+- `68c7c48e` - Add augmentation duplicate detection notebook
 
 ## v1.0.0-rc0
 
