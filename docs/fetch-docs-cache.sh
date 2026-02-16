@@ -9,6 +9,9 @@ set -e
 # Determine target branch
 if [ -n "$1" ]; then
     BRANCH_NAME="$1"
+elif [ -n "$READTHEDOCS_GIT_IDENTIFIER" ]; then
+    # ReadTheDocs (detached HEAD, so we need the env var)
+    BRANCH_NAME="$READTHEDOCS_GIT_IDENTIFIER"
 elif [ -n "$CI_COMMIT_REF_NAME" ]; then
     # GitLab CI
     BRANCH_NAME="$CI_COMMIT_REF_NAME"
