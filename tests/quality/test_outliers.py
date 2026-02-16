@@ -734,6 +734,35 @@ class TestOutliersEdgeCases:
         with pytest.raises(ValueError, match="only works with output from a single dataset"):
             out_list.aggregate_by_item()
 
+    def test_from_stats_skips_non_numeric_stats(self):
+        """Regression test: hash stats (string dtype) should be skipped in outlier detection.
+
+        Previously, stats like 'xxhash' containing hex strings (e.g. '9cca8a3736741ab7')
+        would cause a ValueError when _get_outliers tried to cast them to float64.
+        """
+        detector = Outliers(outlier_method="zscore", outlier_threshold=1.0)
+
+        # Simulate stats containing both numeric and non-numeric (hash) values
+        mock_stats = {
+            "stats": {
+                "mean": np.array([100.0, 1.0, 100.0]),
+                "xxhash": np.array(["9cca8a3736741ab7", "a1b2c3d4e5f60718", "ff00ff00ff00ff00"], dtype=object),
+                "phash": np.array(["abcd1234", "efgh5678", "ijkl9012"], dtype=object),
+            },
+            "source_index": [
+                SourceIndex(0, None, None),
+                SourceIndex(1, None, None),
+                SourceIndex(2, None, None),
+            ],
+        }
+
+        # Should not raise ValueError on string-to-float conversion
+        output = detector.from_stats(mock_stats)  # type: ignore
+        assert isinstance(output.issues, pl.DataFrame)
+        # Only numeric stats should produce outliers — hash stats should be silently skipped
+        assert all(name != "xxhash" for name in output.issues["metric_name"].to_list())
+        assert all(name != "phash" for name in output.issues["metric_name"].to_list())
+
     def test_evaluate_drops_null_target_id(self):
         """Covers evaluate logic dropping 'target_id' column if all null."""
         # Use zscore with threshold 1.0
