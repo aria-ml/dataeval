@@ -29,6 +29,8 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
       variables:
         ENV_PREFIX: '$CI_MERGE_REQUEST_IID/'
+    # API-triggered pipelines on release branches (from release scripts for docs builds)
+    - if: $CI_PIPELINE_SOURCE == 'api' && $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
     # Skip CHANGELOG.md updates
     - if: $CI_COMMIT_BRANCH == 'main'
       changes: ['CHANGELOG.md']
