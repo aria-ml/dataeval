@@ -162,6 +162,7 @@ stages:
     - if: $CI_COMMIT_BRANCH == 'main'
       variables:
         DOCS_CLEAN: '-- clean'
+    - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
       changes:
         paths:

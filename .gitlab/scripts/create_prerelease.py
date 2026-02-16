@@ -8,7 +8,7 @@ Behavior:
 - If current version is a pre-release (v1.0.0-rc0), increments to v1.0.0-rc1
 - If current version is a standard release (v0.99.0), creates v1.0.0-rc0
   based on MR labels (MAJOR/MINOR/PATCH)
-- Does NOT create a release branch (that happens on final release)
+- Creates a release branch (release/vX.Y) if one does not already exist
 - Updates CHANGELOG.md with the pre-release version
 """
 
@@ -33,7 +33,14 @@ if __name__ == "__main__":
     if version_tag and payload:
         print(f"Creating pre-release {version_tag}:")
         commit_id = gl.commit("main", f"Pre-release {version_tag}", payload)["id"]
-        # Don't create release branch for pre-releases
+        # Create release branch with vX.Y format (strip patch version and rc suffix)
+        major_minor = ".".join(version_tag.split("-")[0].split(".")[:2])
+        release_branch = f"release/{major_minor}"
+        try:
+            gl.create_repository_branch(release_branch, commit_id)
+            print(f"Created release branch: {release_branch}")
+        except ConnectionError:
+            print(f"Release branch '{release_branch}' already exists, skipping creation")
         gl.add_tag(version_tag, commit_id, message=f"DataEval {version_tag} (pre-release)")
         print(f"Successfully created pre-release tag: {version_tag}")
     else:
