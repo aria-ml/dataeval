@@ -452,5 +452,25 @@ class Gitlab(RestWrapper):
     def create_merge_request_note(self, merge_request_iid: int, body: str):
         return self._request(post, [MERGE_REQUESTS, str(merge_request_iid), NOTES], {"body": body})
 
+    def create_pipeline(self, ref: str) -> dict[str, Any]:
+        """
+        Create a new pipeline for the given branch or tag.
+
+        Parameters
+        ----------
+        ref : str
+            The branch or tag to run the pipeline for
+
+        Returns
+        -------
+        Dict[str, Any]:
+            The response received after issuing the request
+
+        Note
+        ----
+        https://docs.gitlab.com/ee/api/pipelines.html#create-a-new-pipeline
+        """
+        return self._request(post, "pipeline", None, {"ref": ref})
+
     def run_pipeline(self, pipeline_id: int):
         return self._request(post, ["pipeline_schedules", str(pipeline_id), "play"])

@@ -41,6 +41,9 @@ if __name__ == "__main__":
             print(f"Created release branch: {release_branch}")
         except ConnectionError:
             print(f"Release branch '{release_branch}' already exists, skipping creation")
+        # Trigger pipeline on release branch for docs build and artifact publishing
+        gl.create_pipeline(release_branch)
+        print(f"Triggered pipeline on {release_branch}")
         gl.add_tag(version_tag, commit_id, message=f"DataEval {version_tag} (pre-release)")
         print(f"Successfully created pre-release tag: {version_tag}")
     else:
