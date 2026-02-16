@@ -537,7 +537,7 @@ class Outliers(Evaluator):
             is_target_level = ~is_image_level
 
             for stat, values in stats.items():
-                if values.ndim == 1:
+                if values.ndim == 1 and np.issubdtype(values.dtype, np.number):
                     # Use boolean indexing instead of list comprehensions
                     image_level_mask_idx = is_image_level
                     target_level_mask_idx = is_target_level
