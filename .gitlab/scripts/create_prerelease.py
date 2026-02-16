@@ -41,10 +41,11 @@ if __name__ == "__main__":
             print(f"Created release branch: {release_branch}")
         except ConnectionError:
             print(f"Release branch '{release_branch}' already exists, skipping creation")
+        # Tag before triggering pipeline so push-docs-cache.sh can detect the version tag
+        gl.add_tag(version_tag, commit_id, message=f"DataEval {version_tag} (pre-release)")
+        print(f"Created pre-release tag: {version_tag}")
         # Trigger pipeline on release branch for docs build and artifact publishing
         gl.create_pipeline(release_branch)
         print(f"Triggered pipeline on {release_branch}")
-        gl.add_tag(version_tag, commit_id, message=f"DataEval {version_tag} (pre-release)")
-        print(f"Successfully created pre-release tag: {version_tag}")
     else:
         print("No changes to commit and tag.")
