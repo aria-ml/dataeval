@@ -1,6 +1,11 @@
-[//]: # (9a9eb12ba32e0fa0109f3b9b23c2f46e6ed09331)
+[//]: # (4607cedc057e070e2b15d742ff9a0946c020d5d4)
 
 # DataEval Change Log
+
+## v1.0.0-rc2
+
+👾 **Fixes**
+- `4607cedc` - Exclude non-numeric values from outlier calculation
 
 ## v1.0.0-rc1
 
