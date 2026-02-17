@@ -1,6 +1,14 @@
-[//]: # (4607cedc057e070e2b15d742ff9a0946c020d5d4)
+[//]: # (82c2b1e178017f5cbcafd4f3115116dca9ccc954)
 
 # DataEval Change Log
+
+## v1.0.0-rc3
+
+👾 **Fixes**
+- `28faf1d5` - Fix split_dataset to work with OD datasets
+
+📝 **Miscellaneous**
+- `8f75bcdf` - Improve logging output
 
 ## v1.0.0-rc2
 
