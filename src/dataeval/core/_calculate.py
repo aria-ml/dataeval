@@ -167,27 +167,32 @@ def _collect_calculator_stats(
     datum: NDArray[Any],
     box: BoundingBox | None,
     per_channel: bool,
-) -> tuple[list[dict[str, list[Any]]], dict[str, Any]]:
+) -> tuple[list[dict[str, list[Any]]], dict[str, Any], list[str]]:
     """
     Collect stats from all calculators.
 
     Returns
     -------
-    tuple[list[dict[str, list[Any]]], dict[str, Any]]
-        A tuple of (stats_list, empty_values_map) where:
+    tuple[list[dict[str, list[Any]]], dict[str, Any], list[str]]
+        A tuple of (stats_list, empty_values_map, warnings) where:
         - stats_list: List of computed stats from each calculator
         - empty_values_map: Mapping of stat names to their empty values (defaults to np.nan)
+        - warnings: List of warning messages from calculators
     """
     stats_list = []
     empty_values_map: dict[str, Any] = {}
+    warnings: list[str] = []
     processor = CalculatorCache(datum, box, per_channel)
     for calculator_cls, flags in calculators:
         calculator = calculator_cls(datum, processor, per_channel)
         stats_list.append(calculator.compute(flags))
         # Collect empty values from this calculator
         empty_values_map.update(calculator.get_empty_values())
+        # Collect warnings from this calculator
+        if hasattr(calculator, "warnings"):
+            warnings.extend(calculator.warnings)
         del calculator
-    return stats_list, empty_values_map
+    return stats_list, empty_values_map, warnings
 
 
 def _determine_channel_indices(calculator_output: list[dict[str, list[Any]]], num_channels: int) -> list[int | None]:
@@ -303,10 +308,18 @@ def _calculate_datum(
             box_count += 1
             if not box.is_clippable():
                 invalid_box_count += 1
-                warnings_list.append(f"Bounding box [{i}][{i_b}]: {box} for datum shape {datum.shape} is invalid.")
+                source = f"{i}[{i_b}]"
+                warnings_list.append(f"{source}: Bounding box {box} for datum shape {datum.shape} is invalid")
 
         # Collect stats from all calculators
-        calculator_stats, empty_values_map = _collect_calculator_stats(calculators, datum, box, per_channel)
+        calculator_stats, empty_values_map, calc_warnings = _collect_calculator_stats(
+            calculators, datum, box, per_channel
+        )
+
+        # Thread calculator warnings with index context
+        for w in calc_warnings:
+            source = f"{i}" if box is None else f"{i}[{i_b}]"
+            warnings_list.append(f"{source}: {w}")
 
         # Determine what channel indices are needed
         sorted_channels = _determine_channel_indices(calculator_stats, num_channels)
@@ -505,8 +518,14 @@ def calculate(
     # Get calculators from registry based on flags
     calculators = CalculatorRegistry.get_calculators(stats)
 
+    # Log the individual flags that will be computed
+    resolved_names = [
+        f.name for f in type(stats) if f in stats and f.name and f.value and (f.value & (f.value - 1)) == 0
+    ]
     _logger.info(
-        "Starting calculate with per_image=%s, per_target=%s, per_channel=%s",
+        "Starting calculate: %d stats [%s], per_image=%s, per_target=%s, per_channel=%s",
+        len(resolved_names),
+        ", ".join(resolved_names),
         per_image,
         per_target,
         per_channel,
@@ -543,8 +562,13 @@ def calculate(
             if progress_callback:
                 progress_callback(image_count, total=total_images)
 
+    # Aggregate warnings by message type, collecting indices per type
+    grouped_warnings: dict[str, list[str]] = {}
     for w in warning_list:
-        _logger.warning(w)
+        idx, _, msg = w.partition(": ")
+        grouped_warnings.setdefault(msg, []).append(idx)
+    for msg, indices in grouped_warnings.items():
+        _logger.warning("%s — indices: %s", msg, ", ".join(indices))
 
     _logger.debug("Sorting %d source indices and %d stats", len(source_indices), len(aggregated_stats))
     sorted_source_indices, sorted_aggregated_stats = _sort(source_indices, aggregated_stats)

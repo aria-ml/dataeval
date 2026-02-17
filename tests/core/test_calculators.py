@@ -368,12 +368,12 @@ class TestDimensionStatsCalculator:
 
 
 class TestHashStatsCalculator:
-    @patch("dataeval.core._hash.xxhash")
-    @patch("dataeval.core._hash.phash")
+    @patch("dataeval.core._hash._xxhash")
+    @patch("dataeval.core._hash._phash")
     def test_process_hashes(self, mock_phash, mock_xxhash):
         """Test hash statistics calculation."""
-        mock_xxhash.return_value = "xxhash_result"
-        mock_phash.return_value = "phash_result"
+        mock_xxhash.return_value = ("xxhash_result", None)
+        mock_phash.return_value = ("phash_result", None)
 
         image = np.random.rand(3, 50, 50)
         datum_calculator = CalculatorCache(image, None)
@@ -866,12 +866,12 @@ class TestLowerDimensionalDimensionStats:
 class TestLowerDimensionalHashStats:
     """Test hash statistics with lower dimensional data (1D and 2D)."""
 
-    @patch("dataeval.core._hash.xxhash")
-    @patch("dataeval.core._hash.phash")
+    @patch("dataeval.core._hash._xxhash")
+    @patch("dataeval.core._hash._phash")
     def test_1d_data_hashes(self, mock_phash, mock_xxhash):
         """Test hash statistics calculation with 1D data."""
-        mock_xxhash.return_value = "xxhash_1d_result"
-        mock_phash.return_value = "phash_1d_result"
+        mock_xxhash.return_value = ("xxhash_1d_result", None)
+        mock_phash.return_value = ("phash_1d_result", None)
 
         data = np.random.rand(50)
         datum_calculator = CalculatorCache(data, None)
@@ -882,12 +882,12 @@ class TestLowerDimensionalHashStats:
         assert stats["xxhash"][0] == "xxhash_1d_result"
         assert stats["phash"][0] == "phash_1d_result"
 
-    @patch("dataeval.core._hash.xxhash")
-    @patch("dataeval.core._hash.phash")
+    @patch("dataeval.core._hash._xxhash")
+    @patch("dataeval.core._hash._phash")
     def test_2d_data_hashes(self, mock_phash, mock_xxhash):
         """Test hash statistics calculation with 2D data."""
-        mock_xxhash.return_value = "xxhash_2d_result"
-        mock_phash.return_value = "phash_2d_result"
+        mock_xxhash.return_value = ("xxhash_2d_result", None)
+        mock_phash.return_value = ("phash_2d_result", None)
 
         data = np.random.rand(10, 10)
         datum_calculator = CalculatorCache(data, None)
@@ -898,12 +898,12 @@ class TestLowerDimensionalHashStats:
         assert stats["xxhash"][0] == "xxhash_2d_result"
         assert stats["phash"][0] == "phash_2d_result"
 
-    @patch("dataeval.core._hash.xxhash")
-    @patch("dataeval.core._hash.phash")
+    @patch("dataeval.core._hash._xxhash")
+    @patch("dataeval.core._hash._phash")
     def test_calculate_1d_hash_stats(self, mock_phash, mock_xxhash):
         """Test hash statistics via calculate() with 1D data."""
-        mock_xxhash.return_value = "xxhash_calc_result"
-        mock_phash.return_value = "phash_calc_result"
+        mock_xxhash.return_value = ("xxhash_calc_result", None)
+        mock_phash.return_value = ("phash_calc_result", None)
 
         data = [np.random.random(100)]
 
@@ -914,18 +914,15 @@ class TestLowerDimensionalHashStats:
         assert result["stats"]["xxhash"][0] == "xxhash_calc_result"
         assert result["stats"]["phash"][0] == "phash_calc_result"
 
-    def test_1d_data_phash_warning(self, caplog):
-        """Test that phash emits a warning for 1D data."""
-        import logging
-
+    def test_1d_data_phash_warning(self):
+        """Test that phash collects a warning for 1D data."""
         data = np.random.rand(50)
         datum_calculator = CalculatorCache(data, None)
         calculator = HashStatCalculator(data, datum_calculator)
 
-        with caplog.at_level(logging.WARNING):
-            stats = calculator.compute(ImageStats.HASH)
+        stats = calculator.compute(ImageStats.HASH)
 
-        assert "Perceptual hashing requires spatial data" in caplog.text
+        assert any("Perceptual hashing requires spatial data" in w for w in calculator.warnings)
 
         # phash should return empty string for 1D data
         assert stats["phash"][0] == ""
@@ -947,19 +944,16 @@ class TestLowerDimensionalHashStats:
         # xxhash should still work
         assert result["stats"]["xxhash"][0] != ""
 
-    def test_2d_small_image_phash_warning(self, caplog):
-        """Test that phash emits a warning for images smaller than 9x9."""
-        import logging
-
+    def test_2d_small_image_phash_warning(self):
+        """Test that phash collects a warning for images smaller than 9x9."""
         # Create a 5x5 image (smaller than required 9x9)
         data = np.random.rand(5, 5)
         datum_calculator = CalculatorCache(data, None)
         calculator = HashStatCalculator(data, datum_calculator)
 
-        with caplog.at_level(logging.WARNING):
-            stats = calculator.compute(ImageStats.HASH)
+        stats = calculator.compute(ImageStats.HASH)
 
-        assert "Image too small for perceptual hashing" in caplog.text
+        assert any("Image too small for perceptual hashing" in w for w in calculator.warnings)
 
         # phash should return empty string for small images
         assert stats["phash"][0] == ""

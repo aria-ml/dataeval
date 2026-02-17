@@ -1250,6 +1250,7 @@ class Metadata(Array, FeatureExtractor):
         scores = []
         srcidx = []
         datum_count = len(self._dataset)
+        _logger.info("Processing metadata for %d dataset items", datum_count)
 
         self._has_targets = self._process_targets(raw, labels, bboxes, scores, srcidx, datum_count, progress_callback)
 
@@ -1258,6 +1259,21 @@ class Metadata(Array, FeatureExtractor):
         scores = np_asarray(scores, dtype=np.float32)
         bboxes = np_asarray(bboxes, dtype=np.float32) if self._has_targets else None
         srcidx = np.asarray(srcidx, dtype=np.intp)
+
+        n_classes = len(np.unique(labels)) if len(labels) else 0
+        if self._has_targets:
+            _logger.info(
+                "Object Detection dataset: %d images, %d classes, %d detections",
+                datum_count,
+                n_classes,
+                len(labels),
+            )
+        else:
+            _logger.info(
+                "Image Classification dataset: %d images, %d classes",
+                datum_count,
+                n_classes,
+            )
 
         index2label = self._dataset.metadata.get("index2label", {i: str(i) for i in np.unique(labels)})
         target_idx = self._compute_target_indices(srcidx, datum_count, bool(self._has_targets))
@@ -1314,6 +1330,12 @@ class Metadata(Array, FeatureExtractor):
 
         self._dataframe = pl.DataFrame(combined_rows)
         self._is_structured = True
+        _logger.debug(
+            "Metadata structured: %d image factors, %d target factors, %d dropped",
+            len(self._image_factors),
+            len(self._target_factors),
+            sum(len(v) for v in self._dropped_factors.values()),
+        )
 
         # Build _factors dict from stored factor dictionaries
         self._build_factors()
