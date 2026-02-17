@@ -141,15 +141,21 @@ Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 Files: $FILE_COUNT
 Size: $CACHE_SIZE"
 
-# Push to artifact branch (force push since it's orphan)
-echo "Pushing to $ARTIFACT_BRANCH..."
-git push --force "$REPO_URL" HEAD:"refs/heads/$ARTIFACT_BRANCH"
+# Release branches (release/v*) only push to docs-artifacts/<tag>, never to
+# docs-artifacts/release/v* which would be an orphan nobody fetches from.
+if [[ "$BRANCH_NAME" =~ ^release/v ]]; then
+    echo "Release branch detected — skipping push to $ARTIFACT_BRANCH"
+    echo "Will only push to versioned artifact branch if a tag exists on HEAD"
+else
+    # Push to artifact branch (force push since it's orphan)
+    echo "Pushing to $ARTIFACT_BRANCH..."
+    git push --force "$REPO_URL" HEAD:"refs/heads/$ARTIFACT_BRANCH"
+    echo "================================================"
+    echo "✓ Cache pushed successfully to $ARTIFACT_BRANCH"
+    echo "================================================"
+fi
 
 cd "$OLDPWD"
-
-echo "================================================"
-echo "✓ Cache pushed successfully to $ARTIFACT_BRANCH"
-echo "================================================"
 
 # If HEAD has a version tag, also push to docs-artifacts/<tag> for Colab links
 git fetch --tags origin 2>/dev/null || true
@@ -159,10 +165,14 @@ if [ -n "$VERSION_TAG" ]; then
     echo ""
     echo "================================================"
     echo "Detected version tag: $VERSION_TAG"
-    echo "Also pushing to $VERSION_ARTIFACT_BRANCH..."
+    echo "Pushing to $VERSION_ARTIFACT_BRANCH..."
     echo "================================================"
     cd "$TEMP_DIR"
     git push --force "$REPO_URL" HEAD:"refs/heads/$VERSION_ARTIFACT_BRANCH"
     cd "$OLDPWD"
-    echo "✓ Also pushed to $VERSION_ARTIFACT_BRANCH"
+    echo "✓ Pushed to $VERSION_ARTIFACT_BRANCH"
+elif [[ "$BRANCH_NAME" =~ ^release/v ]]; then
+    echo ""
+    echo "⚠ Release branch has no version tag on HEAD — no artifact branch pushed"
+    echo "  Artifacts will be pushed when create_patch_release.py tags this commit"
 fi

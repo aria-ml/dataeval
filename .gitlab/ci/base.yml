@@ -29,8 +29,8 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
       variables:
         ENV_PREFIX: '$CI_MERGE_REQUEST_IID/'
-    # API-triggered pipelines on release branches (from release scripts for docs builds)
-    - if: $CI_PIPELINE_SOURCE == 'api' && $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
+    # API-triggered pipelines on release branches or main (from release scripts for docs builds)
+    - if: $CI_PIPELINE_SOURCE == 'api' && ($CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN || $CI_COMMIT_BRANCH == 'main')
     # Skip CHANGELOG.md updates
     - if: $CI_COMMIT_BRANCH == 'main'
       changes: ['CHANGELOG.md']
@@ -129,14 +129,14 @@ stages:
 
 .rules_main_mr:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
 .rules_main_mr_code:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
@@ -148,7 +148,7 @@ stages:
 
 .rules_main_mr_deps:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
@@ -159,7 +159,7 @@ stages:
 
 .rules_main_mr_docs:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
       variables:
@@ -175,7 +175,7 @@ stages:
 
 .rules_mr_docs:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CI_COMMIT_BRANCH == 'main'
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH || $CI_COMMIT_BRANCH == 'main'
       when: never
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
       changes:
@@ -187,13 +187,13 @@ stages:
 
 .rules_mr_only:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CI_COMMIT_BRANCH == 'main'
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH || $CI_COMMIT_BRANCH == 'main'
       when: never
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
 
 .rules_main_only:
   rules:
-    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE
+    - if: $CREATE_NEW_RELEASE || $CREATE_PRE_RELEASE || $CREATE_RELEASE_BRANCH
       when: never
     - if: $CI_COMMIT_BRANCH == 'main'
 
