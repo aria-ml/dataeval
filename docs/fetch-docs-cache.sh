@@ -40,7 +40,9 @@ fetch_cache() {
     echo "✓ Artifact branch '$branch' exists on remote"
     git fetch --depth=1 origin "$branch"
 
-    if ! git show "origin/$branch:.jupyter_cache" >/dev/null 2>&1; then
+    # Use FETCH_HEAD instead of origin/$branch because single-branch clones
+    # (e.g., ReadTheDocs) don't create remote tracking refs for other branches
+    if ! git show "FETCH_HEAD:.jupyter_cache" >/dev/null 2>&1; then
         echo "  No .jupyter_cache found in '$branch'"
         return 1
     fi
@@ -50,12 +52,12 @@ fetch_cache() {
     CACHE_SOURCE_FILE="$CACHE_DIR/.cache_source"
     if [ -d "$CACHE_DIR" ] && [ -f "$CACHE_SOURCE_FILE" ] && [ "$(cat "$CACHE_SOURCE_FILE")" = "$branch" ]; then
         echo "  Cache source matches '$branch', preserving newer local files"
-        git archive "origin/$branch" .jupyter_cache | tar -x --keep-newer-files -C docs/source/
+        git archive "FETCH_HEAD" .jupyter_cache | tar -x --keep-newer-files -C docs/source/
     else
         echo "  Replacing cache (source branch changed or no prior cache)"
         rm -rf "$CACHE_DIR"
         mkdir -p "$CACHE_DIR"
-        git archive "origin/$branch" .jupyter_cache | tar -x -C docs/source/
+        git archive "FETCH_HEAD" .jupyter_cache | tar -x -C docs/source/
     fi
     echo "$branch" > "$CACHE_SOURCE_FILE"
 

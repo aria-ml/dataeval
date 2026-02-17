@@ -40,7 +40,10 @@ if __name__ == "__main__":
             gl.create_repository_branch(release_branch, commit_id)
             print(f"Created release branch: {release_branch}")
         except ConnectionError:
-            print(f"Release branch '{release_branch}' already exists, skipping creation")
+            print(f"Release branch '{release_branch}' already exists, updating to new commit")
+            gl.delete_branch(release_branch)
+            gl.create_repository_branch(release_branch, commit_id)
+            print(f"Updated release branch: {release_branch}")
         # Tag before triggering pipeline so push-docs-cache.sh can detect the version tag
         gl.add_tag(version_tag, commit_id, message=f"DataEval {version_tag} (pre-release)")
         print(f"Created pre-release tag: {version_tag}")

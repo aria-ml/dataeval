@@ -93,10 +93,6 @@ if __name__ == "__main__":
     # Create actions list
     actions = []
 
-    # Update jupyter cache
-    jupyter_cache_actions = rg._generate_jupyter_cache_actions()
-    actions.extend(jupyter_cache_actions)
-
     # Update documentation index files
     actions.extend(
         [

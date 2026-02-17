@@ -24,6 +24,9 @@ if __name__ == "__main__":
         # Preserve versioned artifact branches (used for Colab links)
         if re.match(r"^v\d+\.\d+\.\d+", source_branch):
             continue
+        # Preserve main and release artifact branches
+        if source_branch == "main" or source_branch.startswith("release/"):
+            continue
         if source_branch in delete_set:
             print(f"Removing artifact branch: {branch_name}")
             gl.delete_branch(branch_name)
