@@ -151,6 +151,18 @@ export-merged-sbom:
   variables:
     PRIVATE_TOKEN: $DATAEVAL_BUILD_PAT
 
+# This job creates a release branch on-demand from the latest matching tag.
+# Triggered by setting CREATE_RELEASE_BRANCH=vX.Y in a web pipeline.
+create release branch:
+  stage: release
+  needs: []
+  rules:
+    - if: $CREATE_RELEASE_BRANCH
+  before_script:
+    - uv pip install requests --system
+  script:
+    - .gitlab/scripts/create_release_branch.py
+
 # This job runs automatically on commits to release/v* branches
 # and creates patch releases by updating changelog and tagging
 create patch release:
