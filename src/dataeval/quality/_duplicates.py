@@ -2,7 +2,7 @@
 
 __all__ = []
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any, Generic, Literal, NamedTuple, TypeVar, overload
 
@@ -74,6 +74,9 @@ class NearDuplicateGroup(Generic[TIndexType]):
     indices: Sequence[TIndexType]
     methods: frozenset[str]
     orientation: Literal["rotated", "same"] | None = None
+
+    def __iter__(self) -> Iterator[TIndexType]:
+        yield from self.indices
 
     def __repr__(self) -> str:
         orientation = f", orientation={self.orientation}" if self.orientation else ""

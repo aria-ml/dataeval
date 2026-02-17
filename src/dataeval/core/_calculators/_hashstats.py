@@ -28,35 +28,42 @@ class HashStatCalculator(Calculator):
     def __init__(self, datum: NDArray[Any], cache: "CalculatorCache", per_channel: bool = False) -> None:  # noqa: ARG002
         self.datum = datum
         self.cache = cache
+        self.warnings: list[str] = []
 
     def get_applicable_flags(self) -> ImageStats:
         """Return which flags this calculator handles."""
         return ImageStats.HASH
 
-    def _xxhash(self) -> list[str]:
-        from dataeval.core._hash import xxhash
+    def _collect(self, result: tuple[str, str | None]) -> list[str]:
+        hash_value, warning = result
+        if warning:
+            self.warnings.append(warning)
+        return [hash_value]
 
-        return [xxhash(self.cache.image)]
+    def _compute_xxhash(self) -> list[str]:
+        from dataeval.core._hash import _xxhash
 
-    def _phash(self) -> list[str]:
-        from dataeval.core._hash import phash
+        return self._collect(_xxhash(self.cache.image))
 
-        return [phash(self.cache.image)]
+    def _compute_phash(self) -> list[str]:
+        from dataeval.core._hash import _phash
 
-    def _phash_d4(self) -> list[str]:
-        from dataeval.core._hash import phash_d4
+        return self._collect(_phash(self.cache.image))
 
-        return [phash_d4(self.cache.image)]
+    def _compute_phash_d4(self) -> list[str]:
+        from dataeval.core._hash import _phash_d4
 
-    def _dhash(self) -> list[str]:
-        from dataeval.core._hash import dhash
+        return self._collect(_phash_d4(self.cache.image))
 
-        return [dhash(self.cache.image)]
+    def _compute_dhash(self) -> list[str]:
+        from dataeval.core._hash import _dhash
 
-    def _dhash_d4(self) -> list[str]:
-        from dataeval.core._hash import dhash_d4
+        return self._collect(_dhash(self.cache.image))
 
-        return [dhash_d4(self.cache.image)]
+    def _compute_dhash_d4(self) -> list[str]:
+        from dataeval.core._hash import _dhash_d4
+
+        return self._collect(_dhash_d4(self.cache.image))
 
     def get_empty_values(self) -> dict[str, Any]:
         """Return empty values for hash statistics."""
@@ -71,9 +78,9 @@ class HashStatCalculator(Calculator):
     def get_handlers(self) -> dict[ImageStats, tuple[str, Callable[[], list[Any]]]]:
         """Return mapping of flags to (stat_name, handler_function)."""
         return {
-            ImageStats.HASH_XXHASH: ("xxhash", self._xxhash),
-            ImageStats.HASH_PHASH: ("phash", self._phash),
-            ImageStats.HASH_DHASH: ("dhash", self._dhash),
-            ImageStats.HASH_PHASH_D4: ("phash_d4", self._phash_d4),
-            ImageStats.HASH_DHASH_D4: ("dhash_d4", self._dhash_d4),
+            ImageStats.HASH_XXHASH: ("xxhash", self._compute_xxhash),
+            ImageStats.HASH_PHASH: ("phash", self._compute_phash),
+            ImageStats.HASH_DHASH: ("dhash", self._compute_dhash),
+            ImageStats.HASH_PHASH_D4: ("phash_d4", self._compute_phash_d4),
+            ImageStats.HASH_DHASH_D4: ("dhash_d4", self._compute_dhash_d4),
         }
