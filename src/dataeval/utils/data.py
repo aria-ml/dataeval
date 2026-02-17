@@ -496,6 +496,163 @@ KFOLD_GROUP_STRATIFIED_MAP: dict[tuple[bool, bool], type[KFoldSplitter]] = {
 }
 
 
+def _build_multilabel_matrix(
+    class_labels: NDArray[np.intp],
+    item_indices: NDArray[np.intp],
+    n_images: int,
+) -> NDArray[np.int8]:
+    """Build a binary multi-label matrix from detection-level labels.
+
+    Parameters
+    ----------
+    class_labels : NDArray[np.intp]
+        Per-detection class labels
+    item_indices : NDArray[np.intp]
+        Per-detection source image indices
+    n_images : int
+        Total number of images
+
+    Returns
+    -------
+    NDArray[np.int8]
+        Binary matrix of shape (n_images, n_classes) where entry (i, j) = 1
+        if image i contains at least one detection of class j
+    """
+    n_classes = int(class_labels.max()) + 1
+    matrix = np.zeros((n_images, n_classes), dtype=np.int8)
+    matrix[item_indices, class_labels] = 1
+    return matrix
+
+
+class _IterativeStratifiedKFold:
+    """Multi-label stratified K-fold cross-validation.
+
+    Implements the iterative stratification algorithm from
+    Sechidis et al. "On the Stratification of Multi-Label Data" (ECML-PKDD 2011).
+
+    Assigns samples to folds by processing labels from rarest to most common,
+    greedily placing each sample in the fold that most needs that label.
+    """
+
+    def __init__(self, n_splits: int) -> None:
+        self.n_splits = n_splits
+
+    def split(
+        self,
+        X: Any,  # noqa: ARG002, N803
+        y: NDArray[Any],
+        groups: Any = None,  # noqa: ARG002
+    ) -> Iterator[tuple[NDArray[np.intp], NDArray[np.intp]]]:
+        fold_assignment = self._assign_folds(np.asarray(y))
+        for fold_idx in range(self.n_splits):
+            test_mask = fold_assignment == fold_idx
+            yield (
+                np.where(~test_mask)[0].astype(np.intp),
+                np.where(test_mask)[0].astype(np.intp),
+            )
+
+    def _assign_folds(self, y: NDArray[Any]) -> NDArray[np.intp]:
+        n_samples = y.shape[0]
+        assignment = np.full(n_samples, -1, dtype=np.intp)
+        desired = np.ones(self.n_splits) / self.n_splits
+
+        # Process labels from rarest to most common
+        label_order = np.argsort(y.sum(axis=0))
+
+        for label_idx in label_order:
+            has_label = y[:, label_idx].astype(bool)
+            candidates = np.where(has_label & (assignment == -1))[0]
+
+            if len(candidates) == 0:
+                continue
+
+            # Current per-fold count of this label
+            assigned_mask = has_label & (assignment != -1)
+            fold_counts = np.zeros(self.n_splits, dtype=np.float64)
+            for k in range(self.n_splits):
+                fold_counts[k] = np.sum(assignment[assigned_mask] == k)
+
+            desired_counts = desired * float(has_label.sum())
+
+            for sample in candidates:
+                need = desired_counts - fold_counts
+                fold_sizes = np.array(
+                    [np.sum(assignment == k) for k in range(self.n_splits)],
+                    dtype=np.float64,
+                )
+                # Primary: most need for this label; secondary: smallest fold
+                best = int(np.lexsort((fold_sizes, -need))[0])
+                assignment[sample] = best
+                fold_counts[best] += 1
+
+        # Assign remaining samples (no labels) to smallest fold
+        remaining = np.where(assignment == -1)[0]
+        for sample in remaining:
+            fold_sizes = np.array([np.sum(assignment == k) for k in range(self.n_splits)])
+            assignment[sample] = int(fold_sizes.argmin())
+
+        return assignment
+
+
+def _multilabel_make_splits(
+    index: NDArray[np.intp],
+    multilabel: NDArray[np.int8],
+    n_folds: int,
+) -> list[TrainValSplit]:
+    """Create multi-label stratified K-fold splits using iterative stratification."""
+    splitter = _IterativeStratifiedKFold(n_folds)
+    split_defs: list[TrainValSplit] = []
+    for train_idx, eval_idx in splitter.split(index, multilabel):
+        t = np.atleast_1d(train_idx).astype(np.intp)
+        v = np.atleast_1d(eval_idx).astype(np.intp)
+        split_defs.append(TrainValSplit(t, v))
+    return split_defs
+
+
+def _multilabel_find_best_split(
+    multilabel: NDArray[np.int8],
+    split_defs: list[TrainValSplit],
+    split_frac: float,
+) -> TrainValSplit:
+    """Find the split whose per-label frequencies best match the overall distribution."""
+
+    def label_freq_diff(split: TrainValSplit) -> float:
+        overall = multilabel.mean(axis=0)
+        train_freq = multilabel[split.train].mean(axis=0) if len(split.train) else np.zeros_like(overall)
+        val_freq = multilabel[split.val].mean(axis=0) if len(split.val) else np.zeros_like(overall)
+        return float(np.sum(np.abs(train_freq - overall)) + np.sum(np.abs(val_freq - overall)))
+
+    def split_ratio(split: TrainValSplit) -> float:
+        return len(split.val) / (len(split.val) + len(split.train))
+
+    def split_diff(split: TrainValSplit) -> float:
+        return abs(split_frac - split_ratio(split))
+
+    def split_inv_diff(split: TrainValSplit) -> float:
+        return abs(1 - split_frac - split_ratio(split))
+
+    # Prefer label balance for multi-label; fall back to ratio for non-stratified
+    return min(split_defs, key=label_freq_diff)
+
+
+def _multilabel_single_split(
+    index: NDArray[np.intp],
+    multilabel: NDArray[np.int8],
+    split_frac: float,
+) -> TrainValSplit:
+    """Single train/eval split for multi-label data using iterative stratification."""
+    class_counts = multilabel.sum(axis=0)
+    positive_counts = class_counts[class_counts > 0]
+    max_folds = int(positive_counts.min()) if len(positive_counts) else len(index)
+
+    divisor = split_frac if split_frac <= 2 / 3 else 1 - split_frac
+    n_folds = min(max(round(1 / (divisor + EPSILON)), 2), max_folds)
+    _logger.log(logging.DEBUG, f"multilabel n_folds={n_folds} clipped between[2, {max_folds}]")
+
+    split_candidates = _multilabel_make_splits(index, multilabel, n_folds)
+    return _multilabel_find_best_split(multilabel, split_candidates, split_frac)
+
+
 def calculate_validation_fraction(num_folds: int, test_frac: float, val_frac: float) -> float:
     """
     Calculate possible validation fraction based on the number of folds and test fraction.
@@ -821,7 +978,7 @@ def single_split(
     TrainValSplit
         Indices of data partitioned for training and evaluation
     """
-    unique_groups = 2 if groups is None else len(np.unique(groups))
+    unique_groups = len(labels) if groups is None else len(np.unique(groups))
     max_folds = min(min(np.unique(labels, return_counts=True)[1]), unique_groups) if stratified else unique_groups
 
     divisor = split_frac if split_frac <= 2 / 3 else 1 - split_frac
@@ -830,6 +987,106 @@ def single_split(
 
     split_candidates = make_splits(index, labels, n_folds, groups, stratified)
     return find_best_split(labels, split_candidates, stratified, split_frac)
+
+
+def _split_od(
+    multilabel: NDArray[np.int8],
+    num_folds: int,
+    stratify: bool,
+    test_frac: float,
+    val_frac: float,
+    total_partitions: int,
+    split_on: Sequence[str] | None,
+) -> tuple[TrainValSplit, list[TrainValSplit]]:
+    """Split an object detection (multi-label) dataset at the image level."""
+    n_images = len(multilabel)
+    index = np.arange(n_images)
+
+    if n_images <= total_partitions:
+        raise ValueError(
+            f"Total number of images must be greater than the total number of partitions. "
+            f"Got {n_images} images and {total_partitions} total [train, val, test] partitions.",
+        )
+    if stratify:
+        class_counts = multilabel.sum(axis=0)
+        min_count = int(class_counts[class_counts > 0].min()) if (class_counts > 0).any() else 0
+        if min_count < total_partitions:
+            raise ValueError(
+                f"Unable to stratify: the rarest class has only {min_count} images, "
+                f"fewer than the {total_partitions} partitions requested.",
+            )
+    if split_on is not None:
+        _logger.warning("split_on is not supported for object detection datasets; ignoring.")
+
+    # --- Test split ---
+    if test_frac:
+        tvs = (
+            _multilabel_single_split(index, multilabel, test_frac)
+            if stratify
+            else single_split(index, np.argmax(multilabel, axis=1).astype(np.intp), test_frac, None, False)
+        )
+    else:
+        tvs = TrainValSplit(index, np.array([], dtype=np.intp))
+    _logger.debug("OD test split: train=%d, test=%d", len(tvs.train), len(tvs.val))
+
+    # --- Train/Val split ---
+    tv_ml = multilabel[tvs.train]
+    if stratify:
+        if num_folds == 1:
+            tv_splits = [_multilabel_single_split(tvs.train, tv_ml, val_frac)]
+        else:
+            tv_splits = _multilabel_make_splits(tvs.train, tv_ml, num_folds)
+    else:
+        tv_labels = np.argmax(tv_ml, axis=1).astype(np.intp)
+        if num_folds == 1:
+            tv_splits = [single_split(tvs.train, tv_labels, val_frac, None, False)]
+        else:
+            tv_splits = make_splits(tvs.train, tv_labels, num_folds, None, False)
+    _logger.debug("OD train/val: %d fold(s)", len(tv_splits))
+
+    return tvs, tv_splits
+
+
+def _split_ic(
+    metadata: Metadata,
+    labels: NDArray[np.intp],
+    num_folds: int,
+    stratify: bool,
+    split_on: Sequence[str] | None,
+    test_frac: float,
+    val_frac: float,
+    total_partitions: int,
+) -> tuple[TrainValSplit, list[TrainValSplit]]:
+    """Split an image classification (single-label) dataset."""
+    index = np.arange(len(labels))
+
+    validate_labels(labels, total_partitions)
+    if stratify:
+        validate_stratifiable(labels, total_partitions)
+
+    groups = get_groups(metadata, split_on)
+    if groups is not None:
+        group_partitions = total_partitions + 1 if val_frac else total_partitions
+        validate_groupable(groups, group_partitions)
+
+    # --- Test split ---
+    if test_frac:
+        tvs = single_split(index, labels, test_frac, groups, stratify)
+    else:
+        tvs = TrainValSplit(index, np.array([], dtype=np.intp))
+    _logger.debug("IC test split: train=%d, test=%d", len(tvs.train), len(tvs.val))
+
+    # --- Train/Val split ---
+    tv_labels = labels[tvs.train]
+    tv_groups = groups[tvs.train] if groups is not None else None
+
+    if num_folds == 1:
+        tv_splits = [single_split(tvs.train, tv_labels, val_frac, tv_groups, stratify)]
+    else:
+        tv_splits = make_splits(tvs.train, tv_labels, num_folds, tv_groups, stratify)
+    _logger.debug("IC train/val: %d fold(s)", len(tv_splits))
+
+    return tvs, tv_splits
 
 
 def split_dataset(
@@ -873,6 +1130,14 @@ def split_dataset(
     When specifying groups and/or stratification, ratios for test and validation splits can vary
     as the stratification and grouping take higher priority than the percentages
     """
+    _logger.info(
+        "split_dataset: num_folds=%d, stratify=%s, test_frac=%.2f, val_frac=%.2f",
+        num_folds,
+        stratify,
+        test_frac,
+        val_frac,
+    )
+
     val_frac = calculate_validation_fraction(num_folds, test_frac, val_frac)
     total_partitions = num_folds + 1 if test_frac else num_folds
 
@@ -880,34 +1145,42 @@ def split_dataset(
     from dataeval._metadata import Metadata as _Metadata
 
     metadata = dataset if isinstance(dataset, Metadata) else _Metadata(dataset)
-    labels = metadata.class_labels
+    class_labels = metadata.class_labels
 
-    validate_labels(labels, total_partitions)
-    if stratify:
-        validate_stratifiable(labels, total_partitions)
+    # Detect OD datasets: more detections than images means multi-label
+    item_indices: NDArray[np.intp] = getattr(metadata, "item_indices", np.arange(len(class_labels), dtype=np.intp))
+    n_images: int = getattr(metadata, "item_count", len(class_labels))
+    is_od = len(item_indices) > 0 and len(class_labels) > n_images
 
-    groups = get_groups(metadata, split_on)
-    if groups is not None:
-        # Accounts for a test set that is 100 % of the data
-        group_partitions = total_partitions + 1 if val_frac else total_partitions
-        validate_groupable(groups, group_partitions)
-
-    index = np.arange(len(labels))
-
-    if test_frac:
-        tvs = single_split(index, labels, test_frac, groups, stratify)
+    n_classes = len(np.unique(class_labels))
+    if is_od:
+        _logger.info(
+            "Detected Object Detection dataset: %d images, %d classes, %d detections",
+            n_images,
+            n_classes,
+            len(class_labels),
+        )
+        multilabel = _build_multilabel_matrix(class_labels, item_indices, n_images)
+        tvs, tv_splits = _split_od(multilabel, num_folds, stratify, test_frac, val_frac, total_partitions, split_on)
     else:
-        tvs = TrainValSplit(index, np.array([], dtype=np.intp))
-
-    tv_labels = labels[tvs.train]
-    tv_groups = groups[tvs.train] if groups is not None else None
-
-    if num_folds == 1:
-        tv_splits = [single_split(tvs.train, tv_labels, val_frac, tv_groups, stratify)]
-    else:
-        tv_splits = make_splits(tvs.train, tv_labels, num_folds, tv_groups, stratify)
+        _logger.info(
+            "Detected Image Classification dataset: %d samples, %d classes",
+            len(class_labels),
+            n_classes,
+        )
+        tvs, tv_splits = _split_ic(
+            metadata, class_labels, num_folds, stratify, split_on, test_frac, val_frac, total_partitions
+        )
 
     folds: list[TrainValSplit] = [TrainValSplit(tvs.train[split.train], tvs.train[split.val]) for split in tv_splits]
+
+    _logger.info(
+        "Split complete: test=%d, %d fold(s) [train=%d, val=%d]",
+        len(tvs.val),
+        len(folds),
+        len(folds[0].train) if folds else 0,
+        len(folds[0].val) if folds else 0,
+    )
 
     return DatasetSplits(tvs.val, folds)
 

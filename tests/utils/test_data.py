@@ -9,10 +9,17 @@ from numpy.typing import NDArray
 from dataeval._metadata import Metadata
 from dataeval.utils.data import (
     DatasetSplits,
+    TrainValSplit,
+    _build_multilabel_matrix,
+    _IterativeStratifiedKFold,
+    _multilabel_find_best_split,
+    _multilabel_make_splits,
+    _multilabel_single_split,
     _simplify_type,
     calculate_validation_fraction,
     flatten_metadata,
     merge_metadata,
+    single_split,
     split_dataset,
     validate_groupable,
     validate_labels,
@@ -681,3 +688,279 @@ class TestCastSimplify:
     )
     def test_convert_type(self, value, output):
         assert output == _simplify_type(value)
+
+
+####################################################################################################
+################################## Regression / OD Split Tests #####################################
+####################################################################################################
+
+
+def _make_od_metadata(
+    n_images: int,
+    n_classes: int,
+    detections_per_image: int = 3,
+    seed: int = 42,
+) -> MagicMock:
+    """Create a mock Metadata object simulating an OD dataset."""
+    rng = np.random.default_rng(seed)
+    n_detections = n_images * detections_per_image
+    item_indices = np.repeat(np.arange(n_images, dtype=np.intp), detections_per_image)
+    class_labels = rng.integers(0, n_classes, size=n_detections).astype(np.intp)
+
+    metadata = MagicMock(spec=Metadata)
+    metadata.class_labels = class_labels
+    metadata.item_indices = item_indices
+    metadata.item_count = n_images
+    return metadata
+
+
+class TestMaxFoldsRegression:
+    """Regression tests for the unique_groups=2 bug that capped max_folds at 2."""
+
+    def test_single_split_respects_split_frac(self):
+        """single_split should produce splits close to the requested fraction, not 50/50."""
+        labels = np.repeat(np.arange(5, dtype=np.intp), 40)  # 200 labels, 5 classes
+        index = np.arange(len(labels))
+        split = single_split(index, labels, split_frac=0.15, stratified=True)
+        ratio = len(split.val) / len(index)
+        # Should be within 5% of target, NOT the old 50%
+        assert abs(ratio - 0.15) < 0.05, f"Split ratio {ratio:.3f} too far from target 0.15"
+
+    def test_single_split_small_frac(self):
+        """10% split should not produce 50/50."""
+        labels = np.repeat(np.arange(5, dtype=np.intp), 40)
+        index = np.arange(len(labels))
+        split = single_split(index, labels, split_frac=0.10, stratified=True)
+        ratio = len(split.val) / len(index)
+        assert abs(ratio - 0.10) < 0.05
+
+    def test_single_split_large_frac(self):
+        """30% split should not produce 50/50."""
+        labels = np.repeat(np.arange(5, dtype=np.intp), 40)
+        index = np.arange(len(labels))
+        split = single_split(index, labels, split_frac=0.30, stratified=True)
+        ratio = len(split.val) / len(index)
+        assert abs(ratio - 0.30) < 0.05
+
+    def test_split_dataset_proportions_with_test_frac(self):
+        """split_dataset with test_frac=0.15 should not put all data in test."""
+        labels = np.repeat(np.arange(5, dtype=np.intp), 20)  # 100 labels
+        metadata = get_metadata(labels)
+        splits = split_dataset(metadata, num_folds=1, stratify=True, test_frac=0.15, val_frac=0.15)
+        n = len(labels)
+
+        # Test set should be ~15%, NOT 100%
+        test_frac_actual = len(splits.test) / n
+        assert test_frac_actual < 0.25, f"Test fraction {test_frac_actual:.2f} is too large"
+        assert test_frac_actual > 0.05, f"Test fraction {test_frac_actual:.2f} is too small"
+
+        # Train and val should be non-empty
+        assert len(splits.folds[0].train) > 0, "Train set is empty"
+        assert len(splits.folds[0].val) > 0, "Val set is empty"
+
+
+class TestBuildMultilabelMatrix:
+    """Tests for _build_multilabel_matrix."""
+
+    def test_basic(self):
+        class_labels = np.array([0, 1, 2, 0, 1], dtype=np.intp)
+        item_indices = np.array([0, 0, 0, 1, 1], dtype=np.intp)
+        matrix = _build_multilabel_matrix(class_labels, item_indices, n_images=2)
+        expected = np.array([[1, 1, 1], [1, 1, 0]], dtype=np.int8)
+        np.testing.assert_array_equal(matrix, expected)
+
+    def test_single_detection_per_image(self):
+        class_labels = np.array([0, 1, 2], dtype=np.intp)
+        item_indices = np.array([0, 1, 2], dtype=np.intp)
+        matrix = _build_multilabel_matrix(class_labels, item_indices, n_images=3)
+        expected = np.eye(3, dtype=np.int8)
+        np.testing.assert_array_equal(matrix, expected)
+
+    def test_image_with_no_detections(self):
+        """Images with no detections should have all-zero rows."""
+        class_labels = np.array([0, 1], dtype=np.intp)
+        item_indices = np.array([0, 2], dtype=np.intp)  # image 1 has no detections
+        matrix = _build_multilabel_matrix(class_labels, item_indices, n_images=3)
+        np.testing.assert_array_equal(matrix[1], [0, 0])
+
+    def test_duplicate_class_in_image(self):
+        """Multiple detections of same class in one image should still be 1."""
+        class_labels = np.array([0, 0, 0], dtype=np.intp)
+        item_indices = np.array([0, 0, 0], dtype=np.intp)
+        matrix = _build_multilabel_matrix(class_labels, item_indices, n_images=1)
+        np.testing.assert_array_equal(matrix, [[1]])
+
+
+class TestIterativeStratifiedKFold:
+    """Tests for _IterativeStratifiedKFold."""
+
+    def test_fold_sizes_balanced(self):
+        """All folds should have roughly equal sizes."""
+        rng = np.random.default_rng(0)
+        n, c = 100, 5
+        y = rng.integers(0, 2, size=(n, c)).astype(np.int8)
+        splitter = _IterativeStratifiedKFold(n_splits=5)
+        fold_sizes = [len(test) for _, test in splitter.split(np.arange(n), y)]
+        assert sum(fold_sizes) == n
+        assert max(fold_sizes) - min(fold_sizes) <= 2, f"Fold sizes too unbalanced: {fold_sizes}"
+
+    def test_no_overlap_between_folds(self):
+        """Each sample should appear in exactly one fold's test set."""
+        rng = np.random.default_rng(1)
+        n, c = 50, 3
+        y = rng.integers(0, 2, size=(n, c)).astype(np.int8)
+        splitter = _IterativeStratifiedKFold(n_splits=3)
+        all_test = []
+        for _, test in splitter.split(np.arange(n), y):
+            all_test.extend(test.tolist())
+        assert sorted(all_test) == list(range(n))
+
+    def test_train_test_complementary(self):
+        """Train and test indices should be complementary for each fold."""
+        n = 30
+        y = np.eye(5, dtype=np.int8)[:3].T  # 5 samples, 3 classes
+        y = np.tile(y, (6, 1))  # 30 samples
+        splitter = _IterativeStratifiedKFold(n_splits=3)
+        for train, test in splitter.split(np.arange(n), y):
+            assert len(train) + len(test) == n
+            assert set(train.tolist()).isdisjoint(set(test.tolist()))
+
+    def test_rare_labels_distributed(self):
+        """Rare labels should appear in multiple folds, not all in one."""
+        n = 100
+        y = np.zeros((n, 4), dtype=np.int8)
+        y[:, 0] = 1  # common label: all 100 images
+        y[:4, 1] = 1  # rare label: only 4 images
+        y[:50, 2] = 1  # medium label
+        y[:20, 3] = 1  # less common
+        splitter = _IterativeStratifiedKFold(n_splits=4)
+        for _, test in splitter.split(np.arange(n), y):
+            # Rare label (4 total) should have exactly 1 per fold
+            assert y[test, 1].sum() >= 1
+
+
+class TestMultilabelSplitFunctions:
+    """Tests for _multilabel_single_split, _multilabel_make_splits, _multilabel_find_best_split."""
+
+    @pytest.fixture
+    def multilabel_data(self):
+        rng = np.random.default_rng(42)
+        n_images, n_classes = 200, 8
+        ml = rng.integers(0, 2, size=(n_images, n_classes)).astype(np.int8)
+        # Ensure every class appears in at least 10 images
+        for c in range(n_classes):
+            if ml[:, c].sum() < 10:
+                ml[rng.choice(n_images, 10, replace=False), c] = 1
+        return ml
+
+    def test_single_split_no_leakage(self, multilabel_data):
+        ml = multilabel_data
+        index = np.arange(len(ml))
+        split = _multilabel_single_split(index, ml, split_frac=0.2)
+        assert set(split.train.tolist()).isdisjoint(set(split.val.tolist()))
+        assert len(split.train) + len(split.val) == len(ml)
+
+    def test_single_split_respects_fraction(self, multilabel_data):
+        ml = multilabel_data
+        index = np.arange(len(ml))
+        split = _multilabel_single_split(index, ml, split_frac=0.2)
+        ratio = len(split.val) / len(index)
+        assert abs(ratio - 0.2) < 0.05
+
+    def test_make_splits_covers_all_indices(self, multilabel_data):
+        ml = multilabel_data
+        index = np.arange(len(ml))
+        splits = _multilabel_make_splits(index, ml, n_folds=5)
+        assert len(splits) == 5
+        for split in splits:
+            assert len(split.train) + len(split.val) == len(ml)
+
+    def test_find_best_split_prefers_balanced(self):
+        """find_best_split should prefer splits with balanced per-label frequencies."""
+        n = 100
+        ml = np.zeros((n, 2), dtype=np.int8)
+        ml[:50, 0] = 1  # class 0: first 50
+        ml[50:, 1] = 1  # class 1: last 50
+
+        good_split = TrainValSplit(np.arange(0, 80, dtype=np.intp), np.arange(80, 100, dtype=np.intp))
+        bad_split = TrainValSplit(np.arange(50, 100, dtype=np.intp), np.arange(0, 50, dtype=np.intp))
+        best = _multilabel_find_best_split(ml, [good_split, bad_split], 0.2)
+        # good_split has both classes in train; bad_split puts all of class 0 in val
+        assert np.array_equal(best.train, good_split.train)
+
+
+class TestODSplitDataset:
+    """Integration tests for split_dataset with OD (multi-label) datasets."""
+
+    def test_od_returns_image_level_indices(self):
+        """All returned indices must be valid image indices, not detection indices."""
+        meta = _make_od_metadata(n_images=200, n_classes=10)
+        splits = split_dataset(meta, num_folds=1, stratify=True, test_frac=0.15, val_frac=0.15)
+        n_images = 200
+        all_indices = np.concatenate([splits.test, splits.folds[0].train, splits.folds[0].val])
+        assert all_indices.max() < n_images, "Index exceeds number of images"
+        assert all_indices.min() >= 0
+
+    def test_od_no_leakage(self):
+        """No image should appear in more than one split."""
+        meta = _make_od_metadata(n_images=200, n_classes=10)
+        splits = split_dataset(meta, num_folds=1, stratify=True, test_frac=0.15, val_frac=0.15)
+        train = set(splits.folds[0].train.tolist())
+        val = set(splits.folds[0].val.tolist())
+        test = set(splits.test.tolist())
+        assert train.isdisjoint(val), "Train/Val overlap"
+        assert train.isdisjoint(test), "Train/Test overlap"
+        assert val.isdisjoint(test), "Val/Test overlap"
+        assert len(train | val | test) == 200
+
+    def test_od_split_proportions(self):
+        """OD split proportions should approximate requested fractions."""
+        n_images = 500
+        meta = _make_od_metadata(n_images=n_images, n_classes=10)
+        splits = split_dataset(meta, num_folds=1, stratify=True, test_frac=0.15, val_frac=0.15)
+        test_frac = len(splits.test) / n_images
+        train_frac = len(splits.folds[0].train) / n_images
+        val_frac = len(splits.folds[0].val) / n_images
+        assert abs(test_frac - 0.15) < 0.05, f"Test frac {test_frac:.3f} not ~0.15"
+        assert train_frac > 0.5, f"Train frac {train_frac:.3f} too small"
+        assert val_frac > 0.05, f"Val frac {val_frac:.3f} too small"
+
+    def test_od_no_stratify(self):
+        """OD split without stratification should still use image-level indices."""
+        meta = _make_od_metadata(n_images=200, n_classes=10)
+        splits = split_dataset(meta, num_folds=1, stratify=False, test_frac=0.15, val_frac=0.15)
+        all_indices = np.concatenate([splits.test, splits.folds[0].train, splits.folds[0].val])
+        assert all_indices.max() < 200
+        assert len(set(all_indices.tolist())) == 200
+
+    def test_od_multi_fold(self):
+        """OD split with multiple folds should work correctly."""
+        meta = _make_od_metadata(n_images=200, n_classes=10)
+        splits = split_dataset(meta, num_folds=3, stratify=True, test_frac=0.15)
+        assert len(splits.folds) == 3
+        for fold in splits.folds:
+            all_idx = np.concatenate([splits.test, fold.train, fold.val])
+            assert len(set(all_idx.tolist())) == 200
+
+    def test_od_class_representation_in_splits(self):
+        """Every class present in the dataset should appear in the test split."""
+        meta = _make_od_metadata(n_images=500, n_classes=10, detections_per_image=5, seed=0)
+        splits = split_dataset(meta, num_folds=1, stratify=True, test_frac=0.2, val_frac=0.2)
+        ml = _build_multilabel_matrix(meta.class_labels, meta.item_indices, 500)
+        test_classes = ml[splits.test].sum(axis=0)
+        # All classes should appear in the test split
+        assert (test_classes > 0).all(), f"Missing classes in test: {test_classes}"
+
+    def test_od_split_on_warns(self, caplog):
+        """split_on should emit a warning for OD datasets."""
+        meta = _make_od_metadata(n_images=100, n_classes=5)
+        with caplog.at_level(logging.WARNING):
+            split_dataset(meta, num_folds=1, stratify=True, test_frac=0.15, val_frac=0.15, split_on=["foo"])
+        assert "split_on is not supported for object detection" in caplog.text
+
+    def test_ic_dataset_unchanged(self, labels):
+        """IC datasets should still use the standard single-label path."""
+        metadata = get_metadata(labels)
+        splits = split_dataset(metadata, num_folds=1, stratify=True, val_frac=0.2, test_frac=0.2)
+        check_sample_leakage(splits)
+        check_stratification(labels, splits, tolerance=0.02)
