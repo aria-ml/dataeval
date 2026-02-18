@@ -149,7 +149,7 @@ def _calculate_ratio_for_stat(
             # Upscale to float64 for calculation to avoid precision issues
             result = box_arr.astype(np.float64) / (img_arr.astype(np.float64) + EPSILON)
             if np.issubdtype(result.dtype, np.floating):
-                result = result.astype(np.float16)
+                result = result.astype(np.float32)
 
             # Convert numpy scalars to native Python types for consistency
             if isinstance(result, np.ndarray) and result.ndim == 0:
@@ -315,7 +315,7 @@ def calculate_ratios(
     >>> ratios = calculate_ratios(stats)
     >>> ratios["stats"]["width"][:12]
     array([0.25 , 0.203, 0.328, 0.266, 0.234, 0.297, 0.25 , 0.359, 0.297,
-           0.234, 0.359, 0.234], dtype=float16)
+           0.234, 0.359, 0.234], dtype=float32)
 
     **Pattern 2: Separate inputs (backward compatibility)**
 

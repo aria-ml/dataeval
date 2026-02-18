@@ -648,12 +648,12 @@ class Outliers(Evaluator):
         │ i64     ┆ cat         ┆ f64          │
         ╞═════════╪═════════════╪══════════════╡
         │ 7       ┆ entropy     ┆ 0.0          │
-        │ 7       ┆ mean        ┆ 0.97998      │
+        │ 7       ┆ mean        ┆ 0.98         │
         │ 7       ┆ std         ┆ 0.0          │
         │ 7       ┆ var         ┆ 0.0          │
-        │ 8       ┆ skew        ┆ 0.062317     │
+        │ 8       ┆ skew        ┆ 0.062311     │
         │ 11      ┆ entropy     ┆ 0.0          │
-        │ 11      ┆ mean        ┆ 0.97998      │
+        │ 11      ┆ mean        ┆ 0.98         │
         │ 11      ┆ std         ┆ 0.0          │
         │ 11      ┆ var         ┆ 0.0          │
         │ 18      ┆ entropy     ┆ 0.0          │
@@ -948,16 +948,16 @@ class Outliers(Evaluator):
         │ ---     ┆ ---         ┆ ---          │
         │ i64     ┆ cat         ┆ f64          │
         ╞═════════╪═════════════╪══════════════╡
-        │ 7       ┆ brightness  ┆ 0.97998      │
+        │ 7       ┆ brightness  ┆ 0.98         │
         │ 7       ┆ contrast    ┆ 0.0          │
-        │ 7       ┆ darkness    ┆ 0.97998      │
+        │ 7       ┆ darkness    ┆ 0.98         │
         │ 7       ┆ entropy     ┆ 0.0          │
-        │ 7       ┆ mean        ┆ 0.97998      │
+        │ 7       ┆ mean        ┆ 0.98         │
         │ 7       ┆ sharpness   ┆ 0.0          │
         │ 7       ┆ std         ┆ 0.0          │
         │ 7       ┆ var         ┆ 0.0          │
-        │ 8       ┆ skew        ┆ 0.062317     │
-        │ 11      ┆ brightness  ┆ 0.97998      │
+        │ 8       ┆ skew        ┆ 0.062311     │
+        │ 11      ┆ brightness  ┆ 0.98         │
         └─────────┴─────────────┴──────────────┘
 
         Cluster-based detection with embeddings:

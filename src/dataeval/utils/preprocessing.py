@@ -545,14 +545,14 @@ def to_canonical_grayscale(image: NDArray[Any]) -> NDArray[np.uint8]:
 
     # --- Case 1: Single Channel (Already Grayscale) ---
     if channels == 1:
-        return image[0].astype(np.uint8)
+        return np.clip(np.nan_to_num(image[0], nan=0.0), 0, 255).astype(np.uint8)
 
     # --- Case 2: RGB (3 Channels) ---
     if channels == 3:
         # Rec. 601 Luma coefficients
         weights = np.array([0.299, 0.587, 0.114]).reshape(3, 1, 1)
         grayscale = np.sum(image.astype(float) * weights, axis=0)
-        return np.clip(grayscale, 0, 255).astype(np.uint8)
+        return np.clip(np.nan_to_num(grayscale, nan=0.0), 0, 255).astype(np.uint8)
 
     # --- Case 3: 4 Channels (RGBA or CMYK) ---
     if channels == 4:
@@ -585,8 +585,8 @@ def to_canonical_grayscale(image: NDArray[Any]) -> NDArray[np.uint8]:
             b = (rgb_raw[2] * alpha) + (255.0 * (1 - alpha))
             grayscale = (0.299 * r) + (0.587 * g) + (0.114 * b)
 
-        return np.clip(grayscale, 0, 255).astype(np.uint8)
+        return np.clip(np.nan_to_num(grayscale, nan=0.0), 0, 255).astype(np.uint8)
 
     # --- Case 4: Arbitrary Channels (Fallback) ---
     # For 2, 5, or more channels, we simply average all information.
-    return np.mean(image, axis=0).astype(np.uint8)
+    return np.clip(np.nan_to_num(np.mean(image, axis=0), nan=0.0), 0, 255).astype(np.uint8)
